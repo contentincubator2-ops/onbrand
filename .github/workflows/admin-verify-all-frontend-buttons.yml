@@ -1,0 +1,119 @@
+name: Admin — Verify EVERY frontend button via HTTP simulate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            COOKIE='session=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxOTkiLCJvcGVuSWQiOiJoUGRNTXBNOWpNRDdEUXZBR19QUk9TYi1zRGw4bFRmYyIsImlhdCI6MTc3Nzk0Nzk3MywiZXhwIjoxODA5NDgzOTczfQ.ffZWP9Ajog__s5xC4e8fuFjruX1zm89Trg42Ayw4BCA'
+            BASE='http://localhost:3101/trpc'
+            HIT() {
+              local METHOD=$1; local PROC=$2; local BODY=$3
+              if [ "$METHOD" = "GET" ]; then
+                local INPUT_ENC=$(printf '%s' "$BODY" | jq -sRr @uri)
+                curl -sS --max-time 90 -X GET "$BASE/$PROC?batch=1&input=$INPUT_ENC" -H "Cookie: $COOKIE"
+              else
+                curl -sS --max-time 90 -X POST "$BASE/$PROC?batch=1" -H "Cookie: $COOKIE" -H "Content-Type: application/json" -d "$BODY"
+              fi
+            }
+            P() {
+              local LABEL=$1; local RESP=$2
+              local OK=$(echo "$RESP" | python3 -c "
+            import sys, json
+            try:
+                d = json.load(sys.stdin)
+                ok = 'result' in d[0]
+                err = d[0].get('error',{}).get('message','')[:120] if not ok else ''
+                print(f'OK={ok} ERR={err}')
+            except: print('OK=False ERR=parse')
+            ")
+              echo "  $LABEL → $OK"
+            }
+
+            export MYSQL_PWD="mos_secure_2026"
+
+            echo "════════ A. Tier home pages → list-task endpoints ════════"
+            P "task.list (30s catalog)" "$(HIT GET 'taskCatalog.list' '{"0":{"tier":"30s"}}')"
+
+            echo ""
+            echo "════════ B. Create output (intake modal → 立即產出) ════════"
+            CREATE=$(HIT POST quickTask.runOrchestra '{"0":{"taskId":"fb-30-caption-short","inputs":{"topic":"前端按鍵驗收測試"},"brandId":2832}}')
+            OUT_ID=$(echo "$CREATE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('result',{}).get('data',{}).get('outputId',''))")
+            echo "  outputId=$OUT_ID"
+            [ -z "$OUT_ID" ] && { echo "  ✗ STOP — orchestra failed"; exit 1; }
+
+            echo ""
+            echo "════════ C. RunPage toolbar buttons (mode switchers — pure UI, no backend; we test backend each maps to) ════════"
+
+            P "✏️ Edit save (output.updateVariantCaption)" "$(HIT POST output.updateVariantCaption "{\"0\":{\"id\":$OUT_ID,\"variantIndex\":0,\"caption\":\"驗收測試覆寫\"}}")"
+
+            P "💬 Chat refine (quickTask.refineCaption)" "$(HIT POST quickTask.refineCaption "{\"0\":{\"originalCaption\":\"原貼文內容\",\"prompt\":\"改成更短\",\"taskId\":\"fb-30-caption-short\",\"brandId\":2832}}")"
+
+            P "🪄 Regen variant (quickTask.regenerateVariant)" "$(HIT POST quickTask.regenerateVariant "{\"0\":{\"outputId\":$OUT_ID,\"variantIndex\":0}}")"
+
+            echo ""
+            echo "════════ D. 🖼️ Image gen (image.generate → output.updateVariantImage) ════════"
+            IMG_RESP=$(HIT POST image.generate '{"0":{"brandId":2832,"prompt":"溫暖的家庭餐桌風格，自然光，粉紅色系","channel":"facebook"}}')
+            IMG_URL=$(echo "$IMG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); r=d[0].get('result',{}).get('data',{}); print(r.get('url') or r.get('imageUrl') or '')" 2>/dev/null)
+            echo "  image.generate URL: ${IMG_URL:0:80}"
+            if [ -n "$IMG_URL" ]; then
+              P "  output.updateVariantImage" "$(HIT POST output.updateVariantImage "{\"0\":{\"id\":$OUT_ID,\"variantIndex\":0,\"imageUrl\":\"$IMG_URL\",\"style\":\"verify\"}}")"
+            else
+              echo "  ✗ image.generate didn't return a URL (response head): $(echo "$IMG_RESP" | head -c 200)"
+            fi
+
+            echo ""
+            echo "════════ E. 🎬 Video gen (video.generate — async job spawn) ════════"
+            VID_RESP=$(HIT POST video.generate '{"0":{"topic":"產品介紹","platform":"youtube","duration":30,"style":"professional","brandId":2832}}')
+            VID_JOB=$(echo "$VID_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('result',{}).get('data',{}).get('jobId',''))")
+            echo "  video.generate jobId: $VID_JOB"
+            if [ -n "$VID_JOB" ]; then
+              P "  video.status (poll)" "$(HIT GET 'video.status' "{\"0\":{\"jobId\":$VID_JOB}}")"
+            fi
+
+            echo ""
+            echo "════════ F. Publish card actions ════════"
+
+            P "📤 publish.toFacebook (Pipedream)" "$(HIT POST publish.toFacebook "{\"0\":{\"outputId\":$OUT_ID,\"variantIndex\":0,\"pageId\":\"PROBE_PAGE\"}}")"
+
+            P "📅 output.scheduleIcs" "$(HIT POST output.scheduleIcs "{\"0\":{\"id\":$OUT_ID,\"variantIndex\":0,\"scheduledAt\":\"2026-05-15T10:00:00Z\",\"durationMinutes\":30}}")"
+
+            P "📧 output.emailToTeam (will fail without SMTP, but mutation should accept input)" "$(HIT POST output.emailToTeam "{\"0\":{\"id\":$OUT_ID,\"variantIndex\":0,\"recipients\":[\"test@example.com\"],\"note\":\"verify\"}}")"
+
+            P "💾 output.updateStatus → approved" "$(HIT POST output.updateStatus "{\"0\":{\"id\":$OUT_ID,\"status\":\"approved\"}}")"
+
+            echo ""
+            echo "════════ G. Sidebar / shell queries ════════"
+
+            P "output.recent (sidebar history)" "$(HIT GET 'output.recent' '{"0":{"brandId":2832,"tier":"30s","limit":15}}')"
+
+            P "output.getById (load /run page)" "$(HIT GET 'output.getById' "{\"0\":{\"id\":$OUT_ID}}")"
+
+            P "brand.list (brand picker)" "$(HIT GET 'brand.list' '{"0":{}}')"
+
+            P "scope.active (header pill)" "$(HIT GET 'scope.active' '{"0":{"brandId":2832,"productId":null,"eventId":null}}')"
+
+            P "agent.list (agent picker)" "$(HIT GET 'agent.list' '{"0":{"limit":10}}')"
+
+            echo ""
+            echo "════════ H. Tier task lists ════════"
+
+            P "30s tasks (FB list)" "$(HIT GET 'taskCatalog.list' '{"0":{"tier":"30s","channel":"facebook"}}')"
+
+            echo ""
+            echo "════════ I. Final state summary ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT id, status, version, JSON_LENGTH(JSON_EXTRACT(metadata, '\$.stages')) AS stages,
+                JSON_EXTRACT(metadata, '\$.lastRegenAt') AS last_regen
+              FROM mission_outputs WHERE id=$OUT_ID
+            "

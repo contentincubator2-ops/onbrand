@@ -74,6 +74,9 @@ export default function RunPage() {
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
+  /** Video gen state — async job, polled for status. */
+  const [videoDuration, setVideoDuration] = useState<number>(30);
+  const [videoJobId, setVideoJobId] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
   const updateMut = trpc.output.updateVariantCaption.useMutation({
@@ -149,6 +152,31 @@ export default function RunPage() {
         },
       })
     : { mutate: () => {}, isPending: false };
+  // Video gen — async pipeline. Spawn job, poll for status until ready.
+  const videoGenMut = (trpc as any).video?.generate?.useMutation
+    ? (trpc as any).video.generate.useMutation({
+        onSuccess: (r: any) => {
+          setVideoJobId(r.jobId);
+          showToastGlobal(`影片任務已啟動 #${r.jobId} — 5-10 分鐘後完成`);
+        },
+        onError: (e: any) => showToastGlobal(`影片啟動失敗：${e?.message ?? e}`),
+      })
+    : { mutate: () => {}, isPending: false };
+  const videoStatusQuery = (trpc as any).video?.status?.useQuery
+    ? (trpc as any).video.status.useQuery(
+        { jobId: videoJobId ?? 0 },
+        { enabled: !!videoJobId, refetchInterval: 15_000, refetchOnWindowFocus: false },
+      )
+    : { data: null };
+  const videoStatus = (videoStatusQuery?.data ?? null) as any;
+  const videoUrl: string | null = videoStatus?.videoUrl ?? null;
+  const videoStatusLabel: string =
+    !videoStatus ? "查詢中…" :
+    videoStatus.status === "pending" ? `排隊中 (${videoStatus.progress ?? 0}%)` :
+    videoStatus.status === "running" ? `生成中 (${videoStatus.progress ?? 0}%)` :
+    videoStatus.status === "completed" ? "完成 ✓" :
+    videoStatus.status === "failed" ? `失敗：${videoStatus.errorMessage ?? "?"}` :
+    String(videoStatus.status);
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
         onSuccess: (r: any) => {
@@ -600,18 +628,58 @@ export default function RunPage() {
                 <>
                   <p className="text-tiny font-semibold">從這篇生影片</p>
                   <p className="text-[11px] text-default-500 leading-relaxed">
-                    影片產出走 Hailuo / Seedance pipeline（10-30 秒短片，文字描述 → 影片）。
+                    用此 variant caption 當主題，async 跑 Hailuo / Seedance pipeline，5–10 分鐘出影片。
+                    產生中可以繼續做其他事。
                   </p>
+                  <div className="flex gap-1.5">
+                    {(["15", "30", "60"] as const).map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setVideoDuration(Number(d))}
+                        className={`flex-1 px-2 py-1 text-tiny rounded border transition ${
+                          videoDuration === Number(d)
+                            ? "bg-secondary text-white border-secondary"
+                            : "bg-white text-default-700 border-default-200 hover:border-secondary"
+                        }`}
+                      >{d}s</button>
+                    ))}
+                  </div>
                   <Button
-                    variant="flat" fullWidth
-                    isDisabled
-                    onPress={() => navigate(`/99s?b=${data.brand?.id ?? ""}&from-output=${id}`)}
+                    color="secondary" fullWidth
+                    isLoading={videoGenMut.isPending}
+                    isDisabled={videoGenMut.isPending || !slide?.caption?.trim()}
+                    onPress={() => {
+                      const topic = (slide?.caption ?? "").slice(0, 200);
+                      if (!topic.trim()) {
+                        showToastGlobal("此 variant 沒有文案，無法生影片");
+                        return;
+                      }
+                      videoGenMut.mutate({
+                        topic,
+                        platform: (mockupVariant?.platform === "youtube" ? "youtube"
+                          : mockupVariant?.platform === "tiktok" ? "tiktok"
+                          : mockupVariant?.platform === "instagram" ? "instagram"
+                          : "youtube") as any,
+                        language: "zh-TW" as any,
+                        duration: videoDuration,
+                        style: "professional" as any,
+                        brandId: data.brand?.id,
+                      });
+                    }}
                   >
-                    開影片任務（即將推出）
+                    {videoGenMut.isPending ? "排入佇列…" : `立即生 ${videoDuration} 秒影片`}
                   </Button>
-                  <p className="text-[10px] text-default-400">
-                    將跳轉到 100s 影片任務並帶入這篇文案作為腳本起點。
-                  </p>
+                  {videoJobId && (
+                    <div className="bg-default-50 rounded-lg p-2.5 text-[11px] space-y-1">
+                      <p className="font-semibold">影片任務 #{videoJobId}</p>
+                      <p className="text-default-500">{videoStatusLabel}</p>
+                      {videoUrl && (
+                        <video controls className="w-full rounded mt-2">
+                          <source src={videoUrl} />
+                        </video>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
               {mode === "agent" && (() => {
