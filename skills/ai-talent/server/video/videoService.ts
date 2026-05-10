@@ -329,7 +329,7 @@ export async function generateVideoAsync(
     const script = await generateScript(input);
     await updateJob(jobId, { script, progress: 15 });
 
-    // Step 2: Seedance scenes (sequential to avoid rate limits)
+    // Step 2: Hailuo scenes (sequential; Hailuo concurrency is 1 per key)
     const sceneUrls: string[] = [];
     const totalScenes = script.scenes.length;
 
@@ -340,6 +340,26 @@ export async function generateVideoAsync(
 
       const progress = 15 + Math.round(((i + 1) / totalScenes) * 55); // 15–70%
       await updateJob(jobId, { progress });
+    }
+
+    // 2026-05-10 (CJ direction「依序完成」video pipeline): graceful degrade
+    // when ElevenLabs / Creatomate keys aren't configured. Ship the first
+    // Hailuo scene URL as the final video so users get SOMETHING out of the
+    // pipeline instead of a hard fail. When they later provision the keys,
+    // composition + voiceover kick in automatically.
+    const hasElevenLabs = !!process.env.ELEVENLABS_API_KEY;
+    const hasCreatomate = !!process.env.CREATOMATE_API_KEY;
+    if (!hasElevenLabs || !hasCreatomate) {
+      const fallbackUrl = sceneUrls[0];
+      if (!fallbackUrl) throw new Error("沒有產出任何場景影片，且未設定 ElevenLabs / Creatomate 做 fallback");
+      await updateJob(jobId, {
+        progress: 100,
+        status: "completed",
+        videoUrl: fallbackUrl,
+        thumbnailUrl: fallbackUrl, // first frame proxy
+      });
+      console.log(`[video] job ${jobId} completed (single-scene fallback): ${fallbackUrl}`);
+      return;
     }
 
     // Step 3: ElevenLabs voiceover
