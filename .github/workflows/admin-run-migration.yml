@@ -1,0 +1,19 @@
+name: Admin — Run DB migration on prod
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            export $(grep -v '^#' .env | grep -v '^$' | xargs -d '\n')
+            npx tsx scripts/migrate.ts 2>&1 | tail -40

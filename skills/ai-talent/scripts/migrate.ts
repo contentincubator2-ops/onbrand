@@ -1278,6 +1278,66 @@ async function main() {
     `);
     console.log("[migrate] brand_caption_rules: OK");
 
+    // ─── 2026-05-10 (CJ「明天串金流」): subscription columns ─────
+    const ensureCol = async (table: string, col: string, def: string) => {
+      const [rows]: any = await conn.execute(
+        `SELECT COUNT(*) AS n FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [table, col],
+      );
+      if (Number(rows[0]?.n ?? 0) === 0) {
+        await conn.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+        console.log(`[migrate] ${table}.${col} added`);
+      }
+    };
+    await ensureCol("users", "planCode",   "VARCHAR(32) NOT NULL DEFAULT 'trial'");
+    await ensureCol("users", "planStatus", "VARCHAR(16) NOT NULL DEFAULT 'trial'");
+    await ensureCol("users", "planEndsAt", "DATETIME(3) NULL");
+    await conn.execute(`
+      UPDATE users
+      SET planEndsAt = DATE_ADD(createdAt, INTERVAL 7 DAY)
+      WHERE planEndsAt IS NULL
+    `);
+    console.log("[migrate] users.planEndsAt backfilled (7 days from createdAt)");
+
+    // invoices stub (綠界/ezPay 明天接)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId          INT          NOT NULL,
+        invoiceNumber   VARCHAR(32)  NULL,
+        amountTwd       INT          NOT NULL,
+        status          VARCHAR(16)  NOT NULL DEFAULT 'pending',
+        provider        VARCHAR(16)  NULL,
+        providerRef     VARCHAR(128) NULL,
+        taxId           VARCHAR(16)  NULL,
+        companyName     VARCHAR(128) NULL,
+        downloadUrl     VARCHAR(512) NULL,
+        issuedAt        DATETIME(3)  NULL,
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_invoices_userId (userId),
+        INDEX idx_invoices_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] invoices: OK");
+
+    // error_log (Sentry-lite for prod anomalies)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS error_log (
+        id          BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        level       VARCHAR(8)   NOT NULL DEFAULT 'error',
+        source      VARCHAR(64)  NOT NULL,
+        userId      INT          NULL,
+        message     VARCHAR(500) NOT NULL,
+        stack       TEXT         NULL,
+        meta        JSON         NULL,
+        createdAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_error_source_time (source, createdAt),
+        INDEX idx_error_user (userId, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] error_log: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

@@ -134,6 +134,20 @@ authRouter.post("/register", async (req: Request, res: Response) => {
       return;
     }
 
+    // 2026-05-10 (CJ「明天串金流，今天先把試用期跑通」): set planEndsAt
+    // = now + 7 days. Tomorrow's 綠界 webhook updates this to subscription
+    // end date when user pays.
+    try {
+      const { default: localPool } = await import("../localDb");
+      const trialEnds = new Date(Date.now() + 7 * 24 * 3600_000);
+      await localPool.execute(
+        `UPDATE users SET planCode='trial', planStatus='trial', planEndsAt=? WHERE id=?`,
+        [trialEnds, user.userId],
+      );
+    } catch (e) {
+      console.warn("[auth] planEndsAt set failed (non-blocking):", e);
+    }
+
     // Generate email verification token
     const verificationToken = nanoid(64);
     const verificationExpires = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRY_MS);
@@ -645,6 +659,62 @@ authRouter.get("/google/callback", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[auth] google callback error:", err);
     res.status(500).json({ error: "Google 登入失敗" });
+  }
+});
+
+/**
+ * POST /api/auth/change-password — for logged-in users self-changing pwd.
+ * 2026-05-10 (CJ「帳號管理頁」prerequisite for /settings/account).
+ */
+authRouter.post("/change-password", async (req: Request, res: Response) => {
+  try {
+    // Verify session
+    const token = req.cookies?.[SESSION_COOKIE_NAME];
+    if (!token) {
+      res.status(401).json({ error: "未登入" });
+      return;
+    }
+    const payload = await verifySessionToken(token).catch(() => null);
+    if (!payload?.userId) {
+      res.status(401).json({ error: "session 無效" });
+      return;
+    }
+
+    const schema = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8, "新密碼至少 8 字元").max(200),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+      return;
+    }
+
+    // Look up user, verify current password
+    const db = await getDb();
+    const [user] = await db.select().from(users).where(eq(users.id, payload.userId)).limit(1);
+    if (!user || !user.email) {
+      res.status(404).json({ error: "帳號不存在" });
+      return;
+    }
+    const verified = await verifyEmailPassword(db, user.email, parsed.data.currentPassword);
+    if (!verified) {
+      res.status(400).json({ error: "目前密碼不正確" });
+      return;
+    }
+
+    // Hash + write new password
+    const bcrypt = await import("bcryptjs");
+    const newHash = await bcrypt.hash(parsed.data.newPassword, 10);
+    const { default: localPool } = await import("../localDb");
+    await localPool.execute(
+      `UPDATE users SET passwordHash=? WHERE id=?`,
+      [newHash, payload.userId],
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[auth] change-password error:", err);
+    res.status(500).json({ error: "伺服器錯誤" });
   }
 });
 

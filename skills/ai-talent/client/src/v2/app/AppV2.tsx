@@ -47,6 +47,12 @@ import PlaybooksPage from "../pages/PlaybooksPage";
 import TheaterPage from "../pages/TheaterPage";
 import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
 import SquadLabPage from "../pages/admin/SquadLabPage";
+// 2026-05-10 (CJ「明天串金流，今天都做」)
+import PricingPage from "../pages/PricingPage";
+import AccountPage from "../pages/AccountPage";
+import TermsPage from "../pages/legal/TermsPage";
+import PrivacyPage from "../pages/legal/PrivacyPage";
+import RefundPage from "../pages/legal/RefundPage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -108,6 +114,13 @@ export default function AppV2() {
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/login" element={<Navigate to="/auth/login" replace />} />
+
+        {/* 2026-05-10: Public legal + pricing pages (no auth required so
+            unregistered prospects can read T&C / Privacy / Refund + see pricing) */}
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/refund" element={<RefundPage />} />
 
         {/* Onboarding kept */}
         <Route
@@ -171,6 +184,8 @@ export default function AppV2() {
           <Route path="/templates/:slug" element={<MethodologyDetail />} />
           <Route path="/squad-mockups" element={<SquadMockupsGalleryPage />} />
           <Route path="/admin/squads" element={<SquadLabPage />} />
+          {/* 2026-05-10 account settings */}
+          <Route path="/settings/account" element={<AccountPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
