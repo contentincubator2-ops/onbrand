@@ -37,7 +37,7 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
             description={
               <span className="text-tiny text-default-500 flex items-center gap-1">
-                贊助 · 剛剛 · <FontAwesomeIcon icon={faGlobe} className="text-tiny" />
+                剛剛 · <FontAwesomeIcon icon={faGlobe} className="text-tiny" />
               </span>
             }
             avatarProps={{ src: brandLogoUrl || dicebear(brandName ?? "brand"), size: "md", isBordered: !!brandLogoUrl, color: brandLogoUrl ? "default" : "primary" }}
@@ -135,8 +135,11 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           )
         )}
         <div className="px-4 py-2 border-t border-divider flex items-center justify-between text-default-500 text-tiny">
-          <span>👍❤️🎉 1,234</span>
-          <span>87 留言 · 23 分享</span>
+          {/* 2026-05-10 (CJ feedback「假資料誤導」): replaced specific
+              numbers with neutral icons + placeholder so users don't
+              think these are predictions. */}
+          <span>👍❤️🎉</span>
+          <span className="text-default-400">留言 · 分享</span>
         </div>
         <div className="px-4 py-1 border-t border-divider flex items-center justify-around text-default-700 text-small">
           <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
@@ -383,7 +386,7 @@ export function FBAd({ title, brandName, variantLabel }: MockupFields) {
         </div>
         <div className="px-4 py-2 flex items-center justify-between text-default-500 text-tiny">
           <span>👍❤️🎉 12K</span>
-          <span>456 留言 · 89 分享</span>
+          <span className="text-default-400">留言 · 分享</span>
         </div>
       </div>
     </div>

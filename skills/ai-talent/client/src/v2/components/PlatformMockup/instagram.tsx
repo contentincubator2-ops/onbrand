@@ -65,7 +65,13 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         </div>
 
         {/* Image slot — priorities: liveImageUrl > imageSlotFlow > slotMap > liveImageStyle text > skeleton */}
-        <div className="relative aspect-square bg-default-100 overflow-hidden">
+        {/* 2026-05-10 (CJ feedback「IG 主圖太高」): collapse to slim h-32 strip
+            when no image yet; use full aspect-square only when image ready. */}
+        <div
+          className={`relative bg-default-100 overflow-hidden ${
+            liveImageUrl && liveImageStatus === "ready" ? "aspect-square" : "h-32"
+          }`}
+        >
           {liveImageUrl && liveImageStatus === "ready" ? (
             <>
               <img src={liveImageUrl} alt={liveImageStyle ?? "generated"} className="absolute inset-0 w-full h-full object-cover" />
@@ -121,12 +127,9 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
             <Avatar src={dicebear("liker2")} />
             <Avatar src={dicebear("liker3")} />
           </AvatarGroup>
-          <p className="text-small leading-tight">
-            <span className="text-default-500">由 </span>
-            <span className="font-semibold">friend_handle</span>
-            <span className="text-default-500"> 與其他 </span>
-            <span className="font-semibold">1,234</span>
-            <span className="text-default-500"> 人按讚</span>
+          {/* 2026-05-10 (CJ feedback「假資料誤導」): generic placeholder. */}
+          <p className="text-small leading-tight text-default-500">
+            按讚 · 留言 · 分享
           </p>
         </div>
 
@@ -190,7 +193,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         </div>
 
         <p className="px-3 pb-1 text-small text-default-500">
-          查看全部 <span className="font-medium">87</span> 則留言
+          查看留言
         </p>
         <p className="px-3 pb-3 text-tiny text-default-400 uppercase tracking-wider">5 分鐘前</p>
       </div>
@@ -224,7 +227,13 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
           </Button>
         </div>
 
-        <div className="relative aspect-square bg-default-100 overflow-hidden">
+        {/* 2026-05-10 (CJ feedback「IG 主圖太高」): collapse to slim h-32 strip
+            when no image yet; use full aspect-square only when image ready. */}
+        <div
+          className={`relative bg-default-100 overflow-hidden ${
+            liveImageUrl && liveImageStatus === "ready" ? "aspect-square" : "h-32"
+          }`}
+        >
           {liveImageUrl && liveImageStatus === "ready" ? (
             <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
           ) : (

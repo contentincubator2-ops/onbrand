@@ -32,6 +32,8 @@ import {
   Check,
   RefreshCw,
   Copy,
+  Pencil,
+  Flag,
 } from "lucide-react";
 import {
   THEATER_CAST,
@@ -390,22 +392,27 @@ function PlatformCell({
               複製
             </button>
           )}
+          {/* 2026-05-10 (CJ feedback「Notion B&W」+「按鈕命名不清楚」):
+              移除 emoji、用 lucide icons、統一 neutral 色系。
+              標記要改 → 標記修改規則（明確指動作 + 套用範圍） */}
           {onEdit && (
             <button
               onClick={() => setEditing(true)}
               className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
               title="雙擊或按這顆鈕編輯"
             >
-              ✏️ 編輯
+              <Pencil size={11} strokeWidth={2} />
+              編輯
             </button>
           )}
           {onMarkRule && (
             <button
               onClick={onMarkRule}
-              className="text-[10px] px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-900 flex items-center gap-1 transition"
+              className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
               title="標記這篇要改的地方 — 可選擇套用到單篇 / 全品牌"
             >
-              ⚠ 標記要改
+              <Flag size={11} strokeWidth={2} />
+              標記修改
             </button>
           )}
           {onRedo && (
@@ -415,7 +422,7 @@ function PlatformCell({
               title="重新生成這一格"
             >
               <RefreshCw size={11} strokeWidth={2} />
-              重做
+              重新生成
             </button>
           )}
         </div>
@@ -519,8 +526,9 @@ export default function TheaterPage() {
 
   // 7 calendar days starting today
   const days = useMemo(() => {
-    const out: { date: string; weekday: string; label: string }[] = [];
+    const out: { date: string; weekday: string; label: string; isToday: boolean }[] = [];
     const t = new Date();
+    const todayIso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
     for (let i = 0; i < 7; i++) {
       const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() + i);
       const wd = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
@@ -529,6 +537,7 @@ export default function TheaterPage() {
         date: iso,
         weekday: wd,
         label: `${d.getMonth() + 1}/${d.getDate()}（${wd}）`,
+        isToday: iso === todayIso,
       });
     }
     return out;
@@ -1316,41 +1325,43 @@ export default function TheaterPage() {
             <p className="text-neutral-500 text-sm">請先在左上角選擇品牌</p>
           </div>
         ) : (
-          <div
-            className="theater-masonry"
-            style={{ columnGap: "1rem" }}
-          >
-            <style>{`
-              .theater-masonry {
-                column-count: 2;
-              }
-              @media (min-width: 768px)  { .theater-masonry { column-count: 3; } }
-              @media (min-width: 1100px) { .theater-masonry { column-count: 4; } }
-              @media (min-width: 1500px) { .theater-masonry { column-count: 5; } }
-            `}</style>
-            {days.flatMap((d) => {
+          {/* 2026-05-10 (CJ feedback「5/13 整天消失」根因): 舊版 column-count
+              masonry 把 (day × platform) cells flatten 後重新 pack 成 N 個 CSS
+              column，造成 5/13 的 cells 視覺上被插到別 column 的尾巴 → 整欄看
+              起來空白。改成 day-grid：每個 day 自己一個欄位，platform cells 在
+              欄位內垂直 stack。每天永遠看得到，filter 掉某個 platform 也只是
+              那欄變短而不是整天消失。 */}
+          <div className="grid gap-3" style={{
+            gridTemplateColumns: `repeat(${days.length}, minmax(260px, 1fr))`,
+            overflowX: "auto",
+          }}>
+            {days.map((d) => {
               const matchingDate = importantDates.find((x) => x.date === d.date);
-              return activePlatforms.map((p) => {
-                const key = cellKey(p, d.date);
-                const state = cells.get(key) ?? { status: "idle" as const };
-                return (
-                  <div
-                    key={key}
-                    className="mb-4 break-inside-avoid"
-                    style={{ breakInside: "avoid" }}
-                  >
-                    {/* Date + platform chip — replaces the Day row */}
-                    <div className="flex items-center gap-2 mb-1.5 px-1">
-                      <span className="text-[11px] font-semibold text-neutral-700">
-                        {d.label}
+              return (
+                <div key={d.date} className="space-y-3 min-w-0">
+                  {/* Day header */}
+                  <div className={`flex items-center gap-1.5 px-1 py-1.5 ${d.isToday ? "bg-neutral-900 text-white rounded-md px-2" : ""}`}>
+                    <span className={`text-[11px] font-semibold ${d.isToday ? "text-white" : "text-neutral-700"}`}>
+                      {d.label}
+                    </span>
+                    {d.isToday && (
+                      <span className="text-[9px] font-bold tracking-wider bg-white text-neutral-900 px-1 py-0.5 rounded">
+                        TODAY
                       </span>
-                      {matchingDate && (
-                        <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                          🎀 {matchingDate.name}
-                        </span>
-                      )}
-                    </div>
-                    <PlatformCell
+                    )}
+                    {matchingDate && (
+                      <span className="text-[10px] text-neutral-700 bg-neutral-100 border border-neutral-200 px-1.5 py-0.5 rounded">
+                        {matchingDate.name}
+                      </span>
+                    )}
+                  </div>
+                  {/* Platform cells stacked vertically inside this day */}
+                  {activePlatforms.map((p) => {
+                    const key = cellKey(p, d.date);
+                    const state = cells.get(key) ?? { status: "idle" as const };
+                    return (
+                      <div key={key}>
+                        <PlatformCell
                       platform={p}
                       state={state}
                       caption={state.caption ?? ""}
@@ -1363,10 +1374,12 @@ export default function TheaterPage() {
                       onRedo={() => redoCell(key, p)}
                       onEdit={(newCaption) => editCellCaption(key, newCaption)}
                       onMarkRule={() => openRuleModal(key)}
-                    />
-                  </div>
-                );
-              });
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              );
             })}
           </div>
         )}
@@ -1374,16 +1387,25 @@ export default function TheaterPage() {
         {/* Phase 3b — 加入素材 modal (3 tabs: 活動 / 產品 / 照片) */}
         {materialModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6" onClick={() => setMaterialModalOpen(false)}>
-            <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full p-6" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-base font-semibold text-neutral-900 mb-1">📦 加入素材</h3>
+            <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full p-6 relative" onClick={(e) => e.stopPropagation()}>
+              {/* 2026-05-10 (CJ feedback「產品 tab 沒有關閉鈕」): always-visible
+                  ✕ in top-right regardless of which tab is active. */}
+              <button
+                onClick={() => setMaterialModalOpen(false)}
+                className="absolute top-3 right-3 text-neutral-400 hover:text-neutral-700 p-1 rounded-md hover:bg-neutral-100 transition"
+                title="關閉"
+              >
+                <X size={18} />
+              </button>
+              <h3 className="text-base font-semibold text-neutral-900 mb-1">加入素材</h3>
               <p className="text-xs text-neutral-500 mb-4">活動 / 產品 / 照片，等等開始企劃時 agents 會把這些 context 都吃進去。</p>
 
               {/* Tab switcher */}
               <div className="flex items-center gap-1 mb-5 border-b border-neutral-200">
                 {([
-                  { v: "event"   as const, label: "🗓 活動",  count: importantDates.length },
-                  { v: "product" as const, label: "📦 產品",  count: products.length },
-                  { v: "photo"   as const, label: "📸 照片",  count: photos.length },
+                  { v: "event"   as const, label: "活動",  count: importantDates.length },
+                  { v: "product" as const, label: "產品",  count: products.length },
+                  { v: "photo"   as const, label: "照片",  count: photos.length },
                 ]).map((t) => (
                   <button
                     key={t.v}
