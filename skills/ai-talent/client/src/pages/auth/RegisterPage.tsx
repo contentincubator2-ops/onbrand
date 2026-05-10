@@ -58,6 +58,26 @@ export default function RegisterPage() {
         return;
       }
 
+      // 2026-05-10 (CJ direction「註冊不用收驗證碼，直接註冊」):
+      // Email verification is best-effort; backend auto-activates the user.
+      // Auto-login immediately after register so the user lands inside the
+      // app without seeing a "check your email" wall.
+      try {
+        const loginRes = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email, password }),
+        });
+        const loginData = await loginRes.json();
+        if (loginRes.ok && loginData.token) {
+          try { localStorage.setItem("authToken", loginData.token); } catch {}
+          window.location.replace("/");
+          return;
+        }
+      } catch (e) {
+        // fall through to success card
+      }
       setSuccess(true);
     } catch (err) {
       setError("網路錯誤，請稍後再試");
@@ -87,11 +107,10 @@ export default function RegisterPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">註冊成功！</h1>
             <p className="text-gray-600 mb-6">
-              我們已發送驗證電子郵件至 <strong>{email}</strong>
+              你的帳號已啟用，可以直接登入使用 Drop。
             </p>
             <p className="text-sm text-gray-500 mb-6">
-              請檢查您的收件匣並點擊驗證連結以啟動您的帳號。<br />
-              驗證連結將在 24 小時內有效。
+              帳號 <strong>{email}</strong>
             </p>
             <Link
               to="/auth/login"

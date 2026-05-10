@@ -1,0 +1,45 @@
+name: Admin — Force-disable REQUIRE_EMAIL_VERIFICATION + auto-activate stale users
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            echo "════════ BEFORE ════════"
+            grep -E "^REQUIRE_EMAIL_VERIFICATION=" .env || echo "(not set — defaults to disabled)"
+
+            # Force-set to 0 explicitly so there's no ambiguity
+            sed -i '/^REQUIRE_EMAIL_VERIFICATION=/d' .env
+            echo "REQUIRE_EMAIL_VERIFICATION=0" >> .env
+
+            echo ""
+            echo "════════ AFTER ════════"
+            grep -E "^REQUIRE_EMAIL_VERIFICATION=" .env
+
+            echo ""
+            echo "════════ Auto-activate any user stuck on isActive=0 ════════"
+            export MYSQL_PWD="mos_secure_2026"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT id, email, isActive FROM users WHERE isActive = 0 LIMIT 20;
+            " 2>&1
+            mysql -h localhost -u mos_user mos_db -e "
+              UPDATE users SET isActive = 1 WHERE isActive = 0;
+              SELECT ROW_COUNT() AS users_activated;
+            " 2>&1
+
+            echo ""
+            echo "════════ pm2 restart with new env ════════"
+            pm2 restart marketing-os --update-env
+            sleep 3
+            pm2 status | grep marketing-os
