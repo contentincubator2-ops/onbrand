@@ -1,0 +1,53 @@
+name: Admin — Re-test 5 originally-failing 30s tasks (post-budget-bump)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  retest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 600s
+          script: |
+            COOKIE='session=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxOTkiLCJvcGVuSWQiOiJoUGRNTXBNOWpNRDdEUXZBR19QUk9TYi1zRGw4bFRmYyIsImlhdCI6MTc3Nzk0Nzk3MywiZXhwIjoxODA5NDgzOTczfQ.ffZWP9Ajog__s5xC4e8fuFjruX1zm89Trg42Ayw4BCA'
+            BASE='http://localhost:3101/trpc'
+
+            run_task() {
+              local TID=$1; local KEY=$2
+              echo ""
+              echo "── $TID ──"
+              local BODY=$(printf '{"0":{"taskId":"%s","inputs":{"%s":"桂冠營養研究室 5/9 花博粉紅健走應援站 健力湯試喝活動"},"brandId":2832}}' "$TID" "$KEY")
+              local RESP=$(curl -sS --max-time 90 -X POST "$BASE/quickTask.runOrchestra?batch=1" \
+                -H "Content-Type: application/json" -H "Cookie: $COOKIE" -d "$BODY")
+              python3 -c "
+            import sys, json
+            try:
+                d = json.loads('''$RESP''')
+                r = d[0].get('result',{}).get('data') or {}
+                err = d[0].get('error') or {}
+                if err: print(f'  ✗ ERROR: {err.get(\"message\",\"\")[:200]}'); sys.exit(0)
+                vs = r.get('variants', [])
+                ok = sum(1 for v in vs if (v.get('caption') or '').strip())
+                latency = r.get('totalLatencyMs',0)/1000
+                print(f'  variants: {ok}/{len(vs)}  latency: {latency:.1f}s  outputId: {r.get(\"outputId\")}')
+                for v in vs:
+                    cap = (v.get('caption') or '').strip()
+                    print(f'    [{v.get(\"label\")}] len={len(cap)}')
+            except Exception as e:
+                print(f'  parse error: {e}')
+            "
+            }
+
+            run_task "fb-30-ad-primary" "product_focus"
+            run_task "yt-30-end-cta" "topic"
+            run_task "em-30-event-invite" "context"
+            run_task "pr-30-media-pitch" "context"
+            run_task "br-30-brand-voice" "context"
+
+            echo ""
+            echo "════════ DONE — 預期全部 ✓ 因 LLM_BUDGET 20→30s 解決 timeout ════════"
