@@ -36,11 +36,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: ToastType = "success") => {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4500);
+    // 2026-05-10 (CJ direction「toast 不要爆」): dedup identical messages
+    // shown within last 3s. Without this, a tRPC batch of 10 calls all
+    // failing with the same 502 produces 10 identical toasts stacking on
+    // top of each other. Now they collapse to 1.
+    setToasts(prev => {
+      const now = Date.now();
+      const recentDup = prev.find(
+        t => t.message === message && t.type === type && (now - parseInt(t.id.split("-")[1] ?? "0", 10)) < 3000
+      );
+      if (recentDup) return prev; // skip duplicate
+      const id = `toast-${now}-${Math.random().toString(36).slice(2,7)}`;
+      const next = [...prev, { id, message, type }];
+      setTimeout(() => {
+        setToasts(p => p.filter(t => t.id !== id));
+      }, 4500);
+      return next;
+    });
   }, []);
 
   // Wire module-level emitter so non-React code can call showToastGlobal()
