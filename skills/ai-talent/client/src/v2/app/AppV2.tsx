@@ -146,12 +146,16 @@ export default function AppV2() {
           <Route path="/" element={<Navigate to="/30s" replace />} />
           <Route path="/30s" element={<QuickTask30sPage tier="30s" />} />
           <Route path="/60s" element={<QuickTask30sPage tier="60s" />} />
-          <Route path="/100s" element={<QuickTask30sPage tier="100s" />} />
+          {/* 2026-05-10 brand rename: 100s → 99s (久久 雙關 + 設計感).
+              Tier prop stays "100s" so backend orchestra config unchanged. */}
+          <Route path="/99s" element={<QuickTask30sPage tier="100s" />} />
           {/* 2026-05-09 (CJ): Phase 2 route-based output workspace.
               Replaces modal-based viewing for 60s/100s tasks. URL is
               shareable, browser back works, can multi-tab compare. */}
           <Route path="/run/:outputId" element={<RunPage />} />
-          <Route path="/90s" element={<Navigate to="/100s" replace />} />
+          {/* Backwards-compat redirects */}
+          <Route path="/100s" element={<Navigate to="/99s" replace />} />
+          <Route path="/90s"  element={<Navigate to="/99s" replace />} />
           <Route path="/squads" element={<MissionsHome />} />
           <Route path="/quicktask" element={<Navigate to="/30s" replace />} />
           <Route path="/fb" element={<Navigate to="/30s" replace />} />

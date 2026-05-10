@@ -604,7 +604,7 @@ export default function RunPage() {
                   <Button
                     variant="flat" fullWidth
                     isDisabled
-                    onPress={() => navigate(`/100s?b=${data.brand?.id ?? ""}&from-output=${id}`)}
+                    onPress={() => navigate(`/99s?b=${data.brand?.id ?? ""}&from-output=${id}`)}
                   >
                     開影片任務（即將推出）
                   </Button>

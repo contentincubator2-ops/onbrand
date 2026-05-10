@@ -189,7 +189,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 >
                   <FontAwesomeIcon icon={faWandMagicSparkles} style={{ color: "white", fontSize: 32 }} />
                 </div>
-                <h1 className="text-2xl font-semibold mb-2">歡迎使用 Marketing OS</h1>
+                <h1 className="text-2xl font-semibold mb-2">歡迎使用 Drop 秒稿</h1>
                 <p className="text-sm text-default-600 leading-relaxed mb-6 max-w-md mx-auto">
                   我們先花 2 分鐘設定你的第一個品牌 — 系統會自動分析定位、建議文字 / 視覺 / AI 指令，
                   讓你直接開始產內容。
@@ -198,7 +198,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   {[
                     { num: "1", label: "建立品牌", desc: "填名稱、官網、FB" },
                     { num: "2", label: "自動定位", desc: "14 步深度分析" },
-                    { num: "3", label: "開始產內容", desc: "30s/60s/100s 任務" },
+                    { num: "3", label: "開始產內容", desc: "30s 快寫 / 60s 製作包 / 99s 全企劃" },
                   ].map((s) => (
                     <div key={s.num} className="bg-default-50 rounded-xl p-3 text-center">
                       <div className="text-[10px] text-default-400 mb-0.5 font-semibold">STEP {s.num}</div>

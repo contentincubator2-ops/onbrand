@@ -709,7 +709,7 @@ export default function BrandsPage() {
               >
                 <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 28 }} />
               </div>
-              <h1 className="text-2xl font-semibold text-default-900 mb-2">歡迎使用 Marketing OS</h1>
+              <h1 className="text-2xl font-semibold text-default-900 mb-2">歡迎使用 Drop 秒稿</h1>
               <p className="text-sm text-default-500 mb-6 leading-relaxed">
                 先建立你的第一個品牌就能開始 — 系統會自動分析定位、設定文字 / 視覺 / AI 指令。
               </p>

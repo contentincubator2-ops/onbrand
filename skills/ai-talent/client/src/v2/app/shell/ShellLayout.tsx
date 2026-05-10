@@ -41,13 +41,14 @@ interface NavItem {
   matchPrefix?: string;
 }
 
-// 2026-05-05 pivot v2: tier becomes the top-level entry. 30S / 60S / 90S
-// are sibling sidebar items (no longer tabs inside one page). Each tier
-// page has its own MissionsHome-style hero (title + search + channel icons).
+// 2026-05-10 brand rename to 「Drop · 秒稿」(CJ direction):
+// Three creative tiers keep numeric prefix as memorable interval marker
+// but gain plain-language subtitle so brand managers don't have to guess
+// what each tier produces. 100s → 99s (中文雙關「久久」+ 設計感).
 const NAV_ITEMS: NavItem[] = [
-  { to: "/30s",       label: "30S",      icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
-  { to: "/60s",       label: "60S",      icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
-  { to: "/100s",      label: "100S",     icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
+  { to: "/30s",       label: "30s 快寫",   icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
+  { to: "/60s",       label: "60s 製作包", icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
+  { to: "/99s",       label: "99s 全企劃", icon: <FontAwesomeIcon icon={faWandMagicSparkles} />, matchPrefix: "/99s" },
   // 進階 hidden — direct URL /squads still works.
   // { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
@@ -1016,11 +1017,16 @@ function SlidePanel({
   // 2026-05-09 (CJ direction): on tier pages (/30s /60s /100s) AND
   // /run/:outputId, the sidebar shows the brand's recent task runs
   // in this tier. Click a row → /run/:outputId.
-  const tierMatch = currentPath.match(/^\/(30s|60s|100s)\b/);
+  // 2026-05-10: /100s renamed to /99s — match both for backward compat.
+  // currentTier value normalized to "100s" so getById metadata.tier filter
+  // still finds historic outputs persisted under the old tier label.
+  const tierMatch = currentPath.match(/^\/(30s|60s|99s|100s)\b/);
   const runMatch = currentPath.match(/^\/run\/(\d+)/);
   const isTier = !!tierMatch;
   const isRun = !!runMatch;
-  const currentTier = tierMatch?.[1] as ("30s"|"60s"|"100s"|undefined);
+  const rawTier = tierMatch?.[1];
+  // Normalize 99s alias → 100s so DB queries still match historic outputs.
+  const currentTier = (rawTier === "99s" ? "100s" : rawTier) as ("30s"|"60s"|"100s"|undefined);
 
   // For /run/:id pages, fetch the run to get its tier (so sidebar shows
   // the same tier's history). Cheap — already cached if user came from

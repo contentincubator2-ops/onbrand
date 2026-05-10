@@ -57,7 +57,7 @@ export function ProposalCover({ title, brandName, variantLabel, liveCaption }: M
           <Avatar size="sm" name={brandName ?? "B"} className="w-8 h-8 bg-secondary/15 text-secondary" />
           <div className="text-tiny">
             <p className="font-semibold">{brandName ?? "Brand"}</p>
-            <p className="text-default-500">SoWork · Marketing OS</p>
+            <p className="text-default-500">SoWork · Drop</p>
           </div>
         </div>
         <p className="text-tiny text-default-500">{today}</p>
@@ -97,7 +97,7 @@ export function ProposalSpec({ title, brandName, variantLabel, liveCaption }: Mo
 
       {/* Sign-off footer */}
       <div className="px-8 py-3 border-t border-default-100 flex items-center justify-between text-tiny text-default-400">
-        <span>SoWork Marketing OS · Brand Spec</span>
+        <span>SoWork Drop · Brand Spec</span>
         <span>第 1 頁，共 1 頁</span>
       </div>
     </div>
@@ -129,7 +129,7 @@ export function ResearchDoc({ title, brandName, variantLabel, liveCaption }: Moc
 
       {/* Footnote */}
       <div className="px-8 py-3 border-t border-default-100 flex items-center justify-between text-tiny text-default-400">
-        <span>📋 Research Protocol · 由 SoWork Marketing OS 產出</span>
+        <span>📋 Research Protocol · 由 SoWork Drop 產出</span>
         <span>機密 · Internal use only</span>
       </div>
     </div>

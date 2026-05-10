@@ -460,7 +460,7 @@ export default function MissionsHome() {
           {/* Headline — 32px, centered */}
           <div className="mb-6 w-full">
             <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-              SoWork · Marketing OS
+              SoWork · Drop 秒稿
             </p>
             <h1
               className="font-semibold tracking-tight leading-tight text-center"
