@@ -19,7 +19,7 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-center gap-4 pt-3 text-white text-small">
@@ -87,7 +87,7 @@ export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
-    <div className="w-full max-w-[360px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         {/* Header */}
@@ -143,7 +143,7 @@ export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
 export function TTCarousel({ title, brandName, variantLabel }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-center gap-4 pt-3 text-white text-small">
@@ -204,7 +204,7 @@ export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   void title;
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
       <div className="relative bg-default-900 rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         {/* Top: host pill + LIVE + viewers */}

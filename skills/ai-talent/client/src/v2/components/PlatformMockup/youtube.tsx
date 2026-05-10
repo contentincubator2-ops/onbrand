@@ -225,7 +225,7 @@ export function YTCommunity({ title, brief, brandName, brandLogoUrl, variantLabe
 export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-3 text-white">

@@ -294,7 +294,7 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
 export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveVideoDesc, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
   const handle = handleOf(brandName);
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         {/* Top bar */}
@@ -365,7 +365,7 @@ export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCa
   const overlayMain = lines[0] ?? title;
   const overlaySub = lines.slice(1).join("\n");
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
       <div className="relative bg-default-900 rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         {/* Progress bars */}
@@ -508,7 +508,7 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
       <div className="relative bg-default-900 rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         {/* Top: LIVE badge + viewer count + close */}

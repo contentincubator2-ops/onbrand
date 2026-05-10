@@ -159,7 +159,7 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 export function FBReel({ title, brandName, variantLabel }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-3 text-white">
@@ -201,7 +201,7 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
 export function FBStory({ title, brandName, variantLabel }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   return (
-    <div className="w-full max-w-[280px] mx-auto">
+    <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
       <div className="relative bg-default-900 rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-2 inset-x-2 z-20 flex gap-1">
