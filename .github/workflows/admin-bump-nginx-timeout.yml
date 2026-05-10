@@ -1,0 +1,46 @@
+name: Admin — Bump nginx proxy_read_timeout to 120s
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set -e
+            FILE=/etc/nginx/sites-enabled/marketing-os
+            sudo cp $FILE /etc/nginx/sites-available/marketing-os.bak.timeout-$(date +%s)
+
+            echo "── Before ──"
+            sudo grep -nE "proxy_read_timeout|proxy_connect_timeout|proxy_send_timeout" $FILE || echo "(no timeout directives — using nginx defaults of 60s)"
+
+            # Insert timeout directives into all location / { ... } blocks via python
+            sudo python3 <<'PYEOF'
+            path = "/etc/nginx/sites-enabled/marketing-os"
+            with open(path) as f:
+                content = f.read()
+            # If timeouts already declared, replace; else inject after each location { line that proxy_passes
+            if "proxy_read_timeout" not in content:
+                content = content.replace(
+                    "proxy_pass http://localhost:3101;",
+                    "proxy_pass http://localhost:3101;\n        proxy_read_timeout 120s;\n        proxy_send_timeout 120s;\n        proxy_connect_timeout 30s;"
+                )
+                with open(path, "w") as f:
+                    f.write(content)
+                print("✓ Inserted proxy_*_timeout after each proxy_pass line")
+            else:
+                print("(proxy_read_timeout already present, no change)")
+            PYEOF
+
+            echo "── After ──"
+            sudo grep -nE "proxy_read_timeout|proxy_connect_timeout|proxy_send_timeout" $FILE | head -10
+
+            sudo nginx -t
+            sudo nginx -s reload && echo "✓ reloaded"

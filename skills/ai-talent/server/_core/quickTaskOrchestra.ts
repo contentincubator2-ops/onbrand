@@ -27,19 +27,20 @@ import { getCopywritingMasterPrompt, type PlatformCode } from "./copywritingMast
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
-// 2026-05-09: 35s wasn't enough margin for retry path. Now 50s so a
-// failed variant (20s × 2 retries = 40s) plus brief stage still fits
-// before nginx 60s upstream timeout. Cloudflare/nginx headers sized
-// to support this.
-const HARD_BUDGET_MS  = 50_000; // 30s tier
-const HARD_BUDGET_60S = 75_000; // 60s tier (5 variants + QA)
-const HARD_BUDGET_100S= 120_000;// 100s tier (scout + video)
+// 2026-05-10: with LLM_BUDGET 30s + 2 retries = 60s worst case for one
+// variant, orchestra needs 70s+ to fit + brief stage. nginx upstream
+// timeout is 60s default but variants run in parallel so wall-clock is
+// max(variant), not sum. 70s leaves margin while staying near nginx cap.
+const HARD_BUDGET_MS  = 70_000; // 30s tier (was 50s)
+const HARD_BUDGET_60S = 90_000; // 60s tier
+const HARD_BUDGET_100S= 140_000;// 100s tier
 const PER_IMAGE_MS    = 10_000;
-// 2026-05-09: bumped 10s → 20s. PR/RS tasks with heavy system prompts
-// (master persona + brand context + tone + 5W1H structure) genuinely
-// take 12-18s on anthropic-haiku. 10s caused systematic timeouts on PR.
-// Pair with HARD_BUDGET_MS=50s so retry path (20s × 2 = 40s) fits.
-const LLM_BUDGET_MS   = 20_000;
+// 2026-05-10: bumped 20s → 30s. Sweep showed 5/95 tasks failing all on
+// 20s timeout (fb-30-ad-primary, yt-30-end-cta, em-30-event-invite,
+// pr-30-media-pitch, br-30-brand-voice — heaviest system prompts in
+// the catalog). 30s gives anthropic-haiku breathing room for the
+// master-persona + brand-context + tone + structure prompt stack.
+const LLM_BUDGET_MS   = 30_000;
 const QA_BUDGET_MS    = 12_000;
 
 export type OrchestraTier = "30s" | "60s" | "100s";
