@@ -1,0 +1,47 @@
+name: Admin — Check video pipeline env keys
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            echo "════════ Video pipeline env keys ════════"
+            for K in HAILUO_API_KEY MINIMAX_API_KEY ELEVENLABS_API_KEY CREATOMATE_API_KEY GEMINI_API_KEY; do
+              if grep -qE "^$K=" .env; then
+                echo "  $K = <SET>"
+              else
+                echo "  $K = MISSING"
+              fi
+            done
+
+            echo ""
+            echo "════════ Recent video jobs in DB ════════"
+            export MYSQL_PWD="mos_secure_2026"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT id, status, progress, LEFT(errorMessage, 100) AS err, createdAt
+              FROM video_jobs
+              ORDER BY id DESC LIMIT 10
+            " 2>&1 | head -15
+
+            echo ""
+            echo "════════ Test Hailuo API directly ════════"
+            HAILUO=$(grep -E "^(HAILUO|MINIMAX)_API_KEY=" .env | head -1 | cut -d'=' -f2-)
+            if [ -n "$HAILUO" ]; then
+              curl --max-time 20 -sS -X POST "https://api.minimax.chat/v1/video_generation" \
+                -H "Authorization: Bearer $HAILUO" \
+                -H "Content-Type: application/json" \
+                -d '{"model":"T2V-01","prompt":"a cat playing"}' \
+                -w "\nHTTP %{http_code}\n" | head -c 400
+            else
+              echo "  no key, skipping"
+            fi

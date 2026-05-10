@@ -112,17 +112,48 @@ async function generateScript(input: VideoJobInput): Promise<VideoScript> {
   };
 }
 
-// ─── Step 2: Seedance 2.0 — DISABLED 2026-05-05 ──────────────────────────
+// ─── Step 2: Hailuo T2V (replaced disabled Seedance 2026-05-10) ─────────
 //
-// fal.ai removed site-wide (CJ direction — billing dispute irrecoverable).
-// This function now throws so the videoRouter surfaces a clear error.
-// TODO: replace with piapi/kling-v2-master or hailuo/t2v for short clips.
+// fal.ai removed 2026-05-05 (billing dispute), Seedance disabled. CJ direction:
+// route through hailuo/t2v via existing mediaGen pipeline. Each scene
+// becomes one short clip (~6s); composeVideo stitches scenes via Creatomate.
+async function generateScene(scene: SceneScript, platform: string): Promise<string> {
+  const { dispatchGenerate, checkJob } = await import("../_core/mediaGen");
+  const isVertical = platform === "instagram" || platform === "tiktok";
+  // Hailuo prompt: scene.visual is the visual description; scene.narration
+  // gives context. Keep prompt concise (under 800 chars) per MiniMax docs.
+  const prompt = `${scene.visual}\n\nMood: ${scene.narration.slice(0, 200)}`;
 
-async function generateScene(_scene: SceneScript, _platform: string): Promise<string> {
-  throw new Error(
-    "Seedance video generation is disabled (fal.ai removed 2026-05-05). " +
-    "Use piapi/kling-v2-master or hailuo/t2v via mediaGen.dispatchGenerate instead.",
-  );
+  // 1) Submit
+  const submit = await dispatchGenerate("hailuo/t2v", {
+    prompt: prompt.slice(0, 800),
+    aspectRatio: (isVertical ? "9:16" : "16:9") as any,
+    brandId: 0, // no brand context needed for scene clips
+  });
+
+  if (submit.status === "ready" && submit.url) return submit.url;
+  if (submit.status === "failed") {
+    throw new Error(`Hailuo submit failed: ${submit.errorMsg ?? "unknown"}`);
+  }
+  if (submit.status !== "submitted" || !submit.taskId) {
+    throw new Error(`Unexpected hailuo submit response: ${JSON.stringify(submit).slice(0, 200)}`);
+  }
+
+  // 2) Poll until ready (Hailuo t2v typically takes 60-180s)
+  const taskId = submit.taskId;
+  const startedAt = Date.now();
+  const POLL_INTERVAL_MS = 10_000;
+  const MAX_POLL_MS = 6 * 60_000; // 6 min hard cap per scene
+  while (Date.now() - startedAt < MAX_POLL_MS) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    const r = await checkJob("hailuo/t2v", taskId);
+    if (r.status === "ready" && r.url) return r.url;
+    if (r.status === "failed") {
+      throw new Error(`Hailuo poll failed: ${r.errorMsg ?? "unknown"}`);
+    }
+    // status === "submitted" → keep polling
+  }
+  throw new Error(`Hailuo t2v timeout after ${MAX_POLL_MS / 1000}s for task ${taskId}`);
 }
 
 // ─── Step 3: ElevenLabs TTS ──────────────────────────────────────────────────
