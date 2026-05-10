@@ -865,7 +865,7 @@ function BrandSwitcherButton({
               >
                 <span style={{
                   width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                  background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+                  background: "#171717", // 2026-05-11 (CJ「4A B&W」): was purple gradient
                   color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 12, fontWeight: 800, overflow: "hidden",
                 }}>
@@ -1010,7 +1010,7 @@ function NavRow({ icon, label, active, onClick }: { icon: any; label: string; ac
     <button onClick={onClick} style={{
       width: "100%", display: "flex", alignItems: "center", gap: 10,
       padding: "8px 10px", borderRadius: 8, border: "none",
-      background: active ? "#EDE9FE" : "transparent",
+      background: active ? "#F4F4F5" : "transparent", // 2026-05-11 (B&W): was lavender
       cursor: "pointer", textAlign: "left", transition: "background 0.1s", marginBottom: 1,
     }}
       onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}

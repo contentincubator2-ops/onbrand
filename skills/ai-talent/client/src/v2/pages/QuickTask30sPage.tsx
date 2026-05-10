@@ -1587,11 +1587,11 @@ function OutputCarousel({
             <div className="sticky top-0 bg-white pb-2 flex items-center justify-between border-b border-default-100 z-10">
               <span className="text-tiny font-bold tracking-wider uppercase" style={{ color: tierAccent(pageTier) }}>
                 {activeTool === "edit" && "✏️ 直接編輯"}
-                {activeTool === "style" && "🎨 AI 生圖"}
+                {activeTool === "style" && "AI 生圖"}
                 {activeTool === "video" && "🎬 AI 影片生成"}
                 {activeTool === "prompt" && "🪄 視覺方向 / hashtag"}
                 {activeTool === "details" && "📊 細節資訊"}
-                {activeTool === "chat" && `💬 跟 ${agentMeta?.name ?? "AI"} 改文案`}
+                {activeTool === "chat" && `跟 ${agentMeta?.name ?? "AI"} 改文案`}
                 {activeTool === "save" && "💾 儲存 / 加到專案"}
               </span>
               <button onClick={() => setActiveTool(null)} className="text-default-400 hover:text-default-700">
@@ -1680,7 +1680,7 @@ function OutputCarousel({
                         className="w-full text-tiny border border-default-200 rounded-md px-2 py-1.5 bg-white"
                       >
                         <option value="piapi/flux-schnell">⚡ Flux Schnell（快、便宜）</option>
-                        <option value="piapi/flux-pro">✨ Flux Pro（高品質）</option>
+                        <option value="piapi/flux-pro">Flux Pro（高品質）</option>
                         <option value="openai/gpt-image-1">🧠 GPT Image 1（OpenAI）</option>
                         <option value="google/imagen-3">🌈 Imagen 3（Google）</option>
                       </select>
@@ -1803,7 +1803,7 @@ function OutputCarousel({
                         className="w-full text-tiny border border-default-200 rounded-md px-2 py-1.5 bg-white"
                       >
                         <option value="hailuo/t2v">⚡ Hailuo T2V（快、便宜）</option>
-                        <option value="piapi/kling-v2-master">✨ Kling v2 Master（高品質）</option>
+                        <option value="piapi/kling-v2-master">Kling v2 Master（高品質）</option>
                       </select>
                       <p className="text-[10px] text-default-400">影片產生需 60-180 秒，會在背景跑</p>
                     </div>
@@ -1996,7 +1996,7 @@ function OutputCarousel({
                 )}
                 {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost || slide.extras.compareTable || slide.extras.timingAdvice || slide.extras.legalCheck) && (
                   <div className="rounded-xl border border-default-200 bg-white p-3 space-y-2 text-tiny">
-                    <p className="font-semibold flex items-center gap-1.5"><span>📦</span> Production package</p>
+                    <p className="font-semibold">Production package</p>
                     {slide.extras.postingTime && (
                       <p><span className="text-default-500">⏰ 發文時段：</span><span className="text-default-800">{slide.extras.postingTime}</span></p>
                     )}
@@ -2008,7 +2008,7 @@ function OutputCarousel({
                     )}
                     {slide.extras.replyTemplates && slide.extras.replyTemplates.length > 0 && (
                       <div>
-                        <p className="text-default-500 mb-1">💬 留言模板（{slide.extras.replyTemplates.length} 組）</p>
+                        <p className="text-default-500 mb-1">留言模板（{slide.extras.replyTemplates.length} 組）</p>
                         <div className="space-y-1 pl-2 border-l-2 border-default-200">
                           {slide.extras.replyTemplates.slice(0, 5).map((rt, i) => (
                             <div key={i}>

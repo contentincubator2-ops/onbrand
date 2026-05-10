@@ -697,30 +697,31 @@ export default function BrandsPage() {
               utils.brand?.listByMember?.invalidate?.();
             }}
           />
+          {/* 2026-05-10 (CJ「4A 代理商專業感, 不要彩色」): empty state
+              redesigned for B&W Notion discipline. No gradient. No
+              decorative emblem. Editorial typography hierarchy. */}
           <div className="min-h-[60vh] flex items-center justify-center px-6">
-            <div className="max-w-[480px] text-center">
-              <div
-                className="mx-auto mb-5 flex items-center justify-center"
-                style={{
-                  width: 72, height: 72, borderRadius: 18,
-                  background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-                  boxShadow: "0 10px 30px rgba(124,58,237,0.32)",
-                }}
-              >
-                <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 28 }} />
-              </div>
-              <h1 className="text-2xl font-semibold text-default-900 mb-2">歡迎使用 Drop 秒稿</h1>
-              <p className="text-sm text-default-500 mb-6 leading-relaxed">
-                先建立你的第一個品牌就能開始 — 系統會自動分析定位、設定文字 / 視覺 / AI 指令。
+            <div className="max-w-[440px] text-left">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400 mb-4">
+                BRAND · STEP 1
+              </p>
+              <h1 className="text-3xl font-bold text-neutral-900 mb-3 leading-tight">
+                建立你的第一個品牌
+              </h1>
+              <p className="text-sm text-neutral-600 mb-6 leading-relaxed">
+                品牌是 Drop 一切的起點。建立後，AI 會自動分析定位、用詞、
+                視覺風格 — 接下來的所有任務都會吃這份品牌大腦。
               </p>
               <button
                 onClick={() => setOnboardingOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-semibold text-sm shadow-md hover:shadow-lg transition"
-                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366F1 100%)" }}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition"
               >
-                <FontAwesomeIcon icon={faPlus} />
-                開始引導
+                開始建立品牌
+                <FontAwesomeIcon icon={faPlus} className="text-xs" />
               </button>
+              <p className="text-xs text-neutral-400 mt-4">
+                預計 2 分鐘完成 · 過程中可隨時暫停
+              </p>
             </div>
           </div>
         </>
@@ -742,38 +743,25 @@ export default function BrandsPage() {
             <span className="text-xs font-medium">設定</span>
           </button>
         )}
+        {/* 2026-05-10 (CJ「4A 代理商專業感, B&W」): hero redesigned.
+            Removed gradient emblem + gradient title. Editorial
+            typography: tiny eyebrow, large bold title, subtle stats. */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
           {/* Eyebrow */}
-          <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-            SoWork · BRAND
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-400 mb-3">
+            BRAND
           </p>
 
-          {/* Emblem + gradient title (one centered line) */}
-          <div className="flex items-center gap-3 mb-3">
-            <div style={{
-              width: 44, height: 44, borderRadius: 12,
-              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 4px 14px rgba(124,58,237,0.25)",
-            }}>
-              <FontAwesomeIcon icon={scopeIcon} style={{ color: "white", fontSize: 18 }} />
-            </div>
-            <h1
-              className="font-semibold tracking-tight leading-none"
-              style={{
-                fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              {scopeName}
-            </h1>
-          </div>
+          {/* Plain title — no gradient, no emblem. Just typography. */}
+          <h1
+            className="font-bold tracking-tight leading-none text-neutral-900 mb-3"
+            style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
+          >
+            {scopeName}
+          </h1>
 
           {/* Stats */}
-          <div className="text-small text-default-500 mb-5">
+          <div className="text-xs text-neutral-500 mb-5">
             <EntityStats variant="inline" />
           </div>
 
@@ -784,46 +772,45 @@ export default function BrandsPage() {
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-3 w-max mx-auto px-2">
               {([
-                { v: "positioning" as const, label: "定位", Icon: LucideTarget,  bg: "#7C3AED" },
-                { v: "copy"        as const, label: "文字", Icon: LucideType,    bg: "#0EA5E9" },
-                { v: "knowledge"   as const, label: "知識", Icon: LucideBook,    bg: "#10B981" },
+                { v: "positioning" as const, label: "定位", desc: "品牌核心 / Slogan", Icon: LucideTarget },
+                { v: "copy"        as const, label: "文字", desc: "用詞 / 禁忌詞 / 風格",  Icon: LucideType },
+                { v: "knowledge"   as const, label: "知識", desc: "FAQ / 常識資料庫",      Icon: LucideBook },
               ]).map((t) => {
                 const active = category === t.v;
                 const locked = t.v === "positioning" || t.v === "copy"
                   ? !!tabLocks[t.v as "positioning"|"copy"]
                   : false;
                 const Icon = t.Icon;
+                /* 2026-05-10 (CJ「4A 代理商專業感, B&W」): tab tiles
+                   redesigned. Was: colored circles (purple/blue/green).
+                   Now: monochrome rectangular tabs with subtitle + lock chip.
+                   Active = neutral-900 bg + white. Inactive = white +
+                   neutral-200 border, hover lifts. */
                 return (
                   <button
                     key={t.v}
                     type="button"
                     onClick={() => setCategory(t.v)}
-                    /* 2026-05-08 (CJ feedback #4): label was unreliable as a
-                       click target because hover-scale on the parent shifted
-                       hit-box mid-click. pointer-events-none on the inner
-                       children + explicit type="button" + hover handled by
-                       a sibling style prevents the issue. */
-                    className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer relative px-1 py-1 hover:scale-105 transition-transform"
+                    className={`relative shrink-0 px-4 py-3 rounded-lg border transition text-left min-w-[140px] ${
+                      active
+                        ? "bg-neutral-900 border-neutral-900 text-white"
+                        : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-400"
+                    }`}
                   >
-                    <div
-                      className={`pointer-events-none w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white ${active ? "ring-4 ring-default-300" : "shadow-sm"}`}
-                      style={{ background: t.bg }}
-                    >
-                      <Icon size={24} strokeWidth={2} color="#fff" />
+                    <div className="flex items-center gap-2">
+                      <Icon size={16} strokeWidth={2} className={active ? "text-white" : "text-neutral-700"} />
+                      <span className="text-sm font-semibold">{t.label}</span>
                       {locked && (
-                        <span
-                          className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white flex items-center justify-center"
-                          style={{ border: "1px solid #18181B" }}
-                          title="已鎖定"
-                        >
-                          <LucideLock size={10} strokeWidth={2.5} color="#18181B" />
-                        </span>
+                        <LucideLock
+                          size={11} strokeWidth={2.5}
+                          className={active ? "text-neutral-300 ml-auto" : "text-neutral-400 ml-auto"}
+                        />
                       )}
                     </div>
-                    <span className={`pointer-events-none text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
-                      {t.label}
-                      {locked && <span className="ml-1 text-[10px] font-normal" style={{ color: "#71717A" }}>·已鎖定</span>}
-                    </span>
+                    <p className={`text-[11px] mt-0.5 ${active ? "text-neutral-300" : "text-neutral-500"}`}>
+                      {t.desc}
+                      {locked && " · 已鎖定"}
+                    </p>
                   </button>
                 );
               })}
@@ -1516,7 +1503,7 @@ function PositioningBrainBar({ thinking }: {
             {thinking.phase && (
               <>
                 <span>·</span>
-                <span className="text-purple-600">{thinking.phase}</span>
+                <span className="text-neutral-900 font-semibold">{thinking.phase}</span>
               </>
             )}
           </div>
@@ -2539,7 +2526,7 @@ function PositioningTopRow({
     isRunning ? `自動定位中 (${cur}/${total || totalSteps})…`
   : isDone     ? "重新自動定位"
   : isFailed   ? "重試自動定位"
-  : "✨ 自動定位";
+  : "自動定位";
 
   return (
     <>
@@ -2548,10 +2535,10 @@ function PositioningTopRow({
         <button
           onClick={handleAuto}
           disabled={!brandId || !entityKind || locked || isRunning || startMut?.isPending}
-          className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition ${
-            isRunning ? "bg-violet-100 text-violet-700 cursor-wait"
-            : locked ? "bg-default-100 text-default-400 cursor-not-allowed"
-            : "bg-violet-600 text-white hover:bg-violet-700 cursor-pointer shadow-sm"
+          className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition ${
+            isRunning ? "bg-neutral-100 text-neutral-700 cursor-wait border border-neutral-200"
+            : locked ? "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+            : "bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer"
           }`}
           title={
             locked ? "已鎖定 — 解鎖後才能重跑" :
@@ -2566,7 +2553,7 @@ function PositioningTopRow({
         {isRunning && total > 0 && (
           <div className="flex items-center gap-2">
             <div className="w-32 h-1.5 bg-default-200 rounded-full overflow-hidden">
-              <div className="h-full bg-violet-500 transition-all" style={{ width: `${Math.min(100, (cur / total) * 100)}%` }} />
+              <div className="h-full bg-neutral-900 transition-all" style={{ width: `${Math.min(100, (cur / total) * 100)}%` }} />
             </div>
             <span className="text-xs text-default-500 tabular-nums">{cur}/{total}</span>
           </div>
@@ -2803,9 +2790,9 @@ function CopyTabInline({
             onClick={handleBulkAutoFill}
             disabled={!brandId || locked || bulkBusy || emptyKeys.length === 0}
             className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition ${
-              bulkBusy ? "bg-violet-100 text-violet-700 cursor-wait"
+              bulkBusy ? "bg-neutral-100 text-neutral-700 cursor-wait border border-neutral-200"
               : locked || emptyKeys.length === 0 ? "bg-default-100 text-default-400 cursor-not-allowed"
-              : "bg-violet-600 text-white hover:bg-violet-700 cursor-pointer shadow-sm"
+              : "bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer"
             }`}
             title={
               locked ? "已鎖定" :

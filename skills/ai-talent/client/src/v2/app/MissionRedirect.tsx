@@ -1,16 +1,19 @@
 /**
- * MissionRedirect — C1 retirement of MissionDetail (2026-04-27).
+ * MissionRedirect — 2026-05-10 (CJ direction「專案區任務應該在 /run 頁，
+ * 不是 picker」): redirect /m/:missionId → /run/<latest-outputId>.
  *
- * The legacy /m/:missionId route now forwards into the unified picker
- * workspace. WorkflowRunner inside PickerWorkspace re-hydrates from
- * mission_step_progress when ?mission=<id> is present, so any old
- * bookmark / link continues to work and lands users on the same
- * agent workflow they were running.
+ * Old behavior (now retired):
+ *   /m/:id → /picker?mission=:id  (PickerWorkspace runner)
  *
- * We also try to fetch the mission to grab its squadSlug — that lets
- * the picker pre-select the matching squad in the middle column.
+ * New behavior:
+ *   1. Fetch mission's outputs (output.list, sorted DESC by createdAt)
+ *   2. Latest output → /run/<outputId> (mockup center + edit panel right)
+ *   3. No outputs → /projects fallback
+ *
+ * Why: PickerWorkspace was the old workflow runner. Modern UX shows
+ * users their result mockup directly with an edit panel beside it.
  */
-import React, { useEffect } from "react";
+import React from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 
@@ -18,25 +21,26 @@ export default function MissionRedirect() {
   const { missionId } = useParams<{ missionId: string }>();
   const idNum = Number(missionId);
 
-  const missionQuery = (trpc as any).mission?.getById?.useQuery
-    ? (trpc as any).mission.getById.useQuery(
-        { id: idNum },
+  const outputsQuery = (trpc as any).output?.list?.useQuery
+    ? (trpc as any).output.list.useQuery(
+        { missionId: idNum },
         { enabled: !!idNum, refetchOnWindowFocus: false },
       )
     : { data: null, isLoading: false };
 
-  if (!idNum) return <Navigate to="/" replace />;
-  if (missionQuery.isLoading) {
+  if (!idNum) return <Navigate to="/projects" replace />;
+
+  if (outputsQuery.isLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-content2 text-default-500 text-small">
-        正在帶你到工作區…
+        正在開啟你的產出…
       </div>
     );
   }
 
-  const slug = missionQuery.data?.squadSlug ?? "";
-  const qs = new URLSearchParams();
-  qs.set("mission", String(idNum));
-  if (slug) qs.set("slug", slug);
-  return <Navigate to={`/picker?${qs.toString()}`} replace />;
+  const outputs: any[] = outputsQuery.data ?? [];
+  if (outputs.length === 0) return <Navigate to="/projects" replace />;
+  const latestOutputId = outputs[0]?.id;
+  if (!latestOutputId) return <Navigate to="/projects" replace />;
+  return <Navigate to={`/run/${latestOutputId}`} replace />;
 }
