@@ -242,13 +242,16 @@ export const outputRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       // 2026-05-09 cleanup: localPool (drizzle.execute shape was buggy).
+      // 2026-05-10: LIMIT ? as prepared parameter triggers MySQL2
+      // 'Incorrect arguments to mysqld_stmt_execute'. Inline as literal
+      // number after Math.max + clamp (already validated by zod min/max).
       const { default: localPool } = await import("../localDb");
       const params: any[] = [ctx.user.id];
       let brandSql = `AND m.brandId IS NULL`;
       if (input.brandId) { brandSql = `AND m.brandId = ?`; params.push(input.brandId); }
       let tierSql = ``;
       if (input.tier) { tierSql = `AND JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) = ?`; params.push(input.tier); }
-      params.push(input.limit);
+      const safeLimit = Math.max(1, Math.min(50, Number(input.limit) || 15));
       const [rowsRaw]: any = await localPool.execute(
         `SELECT
            o.id, o.title, o.platform, o.outputType, o.status, o.createdAt,
@@ -263,7 +266,7 @@ export const outputRouter = router({
            ${brandSql}
            ${tierSql}
          ORDER BY o.createdAt DESC
-         LIMIT ?`,
+         LIMIT ${safeLimit}`,
         params,
       );
       const arr: any[] = Array.isArray(rowsRaw) ? rowsRaw : [];
