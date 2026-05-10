@@ -121,7 +121,7 @@ async function generateScript(input: VideoJobInput): Promise<VideoScript> {
 async function generateScene(scene: SceneScript, platform: string): Promise<string> {
   const { dispatchGenerate, checkJob } = await import("../_core/mediaGen");
   const isVertical = platform === "instagram" || platform === "tiktok";
-  const prompt = `${scene.visual}\n\nMood: ${scene.narration.slice(0, 200)}`;
+  const prompt = `${scene.visualPrompt}\n\nMood: ${scene.narration.slice(0, 200)}`;
 
   // 1) Submit to PiAPI Kling v2-master
   const submit = await dispatchGenerate("piapi/kling-v2-master", {
