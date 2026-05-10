@@ -1,0 +1,85 @@
+name: Admin — FIX nginx config (revert roster-static + add drop to right file)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set -e
+
+            echo "════════ STEP 1: 還原 roster-static.bak ════════"
+            BAK=$(ls -t /etc/nginx/sites-available/roster-static.bak.* 2>/dev/null | head -1)
+            if [ -n "$BAK" ]; then
+              echo "Restoring from $BAK"
+              sudo cp "$BAK" /etc/nginx/sites-available/roster-static
+              sudo grep "server_name" /etc/nginx/sites-available/roster-static
+            else
+              echo "(no backup found — checking current state)"
+              sudo grep "server_name" /etc/nginx/sites-available/roster-static
+              # If it accidentally has drop.sowork.ai, strip it out
+              sudo sed -i 's/[ \t]drop\.sowork\.ai//g' /etc/nginx/sites-available/roster-static
+              sudo grep "server_name" /etc/nginx/sites-available/roster-static
+            fi
+
+            echo ""
+            echo "════════ STEP 2: 列出所有 nginx server_name 出現 marketing-os 的檔（不只 ssl_certificate path） ════════"
+            for f in /etc/nginx/sites-available/* /etc/nginx/conf.d/*.conf; do
+              [ -f "$f" ] || continue
+              if sudo grep -qE "server_name[ \t]+.*marketing-os\.sowork\.ai" "$f"; then
+                echo "✓ FOUND server_name match in: $f"
+                sudo grep "server_name" "$f"
+              fi
+            done
+
+            echo ""
+            echo "════════ STEP 3: 找到後，改它把 drop.sowork.ai 加進 server_name ════════"
+            TARGET=""
+            for f in /etc/nginx/sites-available/* /etc/nginx/conf.d/*.conf; do
+              [ -f "$f" ] || continue
+              if sudo grep -qE "server_name[ \t]+.*marketing-os\.sowork\.ai" "$f"; then
+                TARGET="$f"
+                break
+              fi
+            done
+            if [ -z "$TARGET" ]; then
+              echo "✗ 找不到正確的 marketing-os 設定檔。手動列舉 sites-available："
+              ls -la /etc/nginx/sites-available/
+              exit 1
+            fi
+            echo "Target: $TARGET"
+            sudo cp "$TARGET" "${TARGET}.bak-fix-$(date +%s)"
+
+            # Add drop.sowork.ai to every server_name line that contains marketing-os.sowork.ai (idempotent)
+            sudo sed -i '/drop\.sowork\.ai/!{ s/\(server_name[^;]*marketing-os\.sowork\.ai\)/\1 drop.sowork.ai/g }' "$TARGET"
+
+            echo ""
+            echo "── server_name lines after edit ──"
+            sudo grep "server_name" "$TARGET"
+
+            echo ""
+            echo "════════ STEP 4: nginx -t 語法檢查 + reload ════════"
+            sudo nginx -t
+            sudo nginx -s reload && echo "✓ nginx reloaded"
+
+            echo ""
+            echo "════════ STEP 5: smoke test (HTTP, before DNS is set) ════════"
+            curl -sS -I --max-time 10 -H "Host: drop.sowork.ai" http://localhost/ | head -3
+            echo ""
+            echo "預期：應該看到跟 https://marketing-os.sowork.ai/ 同樣的回應（302 redirect to HTTPS, or 200 with HTML）"
+            echo "如果 404，server_name 沒 match 到對的 server block"
+
+            echo ""
+            echo "════════ STEP 6: 試 SSL（DNS 還沒指過來會失敗，預期） ════════"
+            sudo certbot --nginx --non-interactive --agree-tos \
+              --email contentincubator2@gmail.com \
+              -d marketing-os.sowork.ai -d drop.sowork.ai \
+              --expand 2>&1 | tail -5 || echo "(SSL 還不行，等 DNS 指過來再跑 admin-add-drop-domain workflow)"
