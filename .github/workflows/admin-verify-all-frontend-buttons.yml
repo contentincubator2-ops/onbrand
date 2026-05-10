@@ -64,12 +64,27 @@ jobs:
             echo ""
             echo "════════ D. 🖼️ Image gen (image.generate → output.updateVariantImage) ════════"
             IMG_RESP=$(HIT POST image.generate '{"0":{"brandId":2832,"prompt":"溫暖的家庭餐桌風格，自然光，粉紅色系","channel":"fb"}}')
-            IMG_URL=$(echo "$IMG_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); r=d[0].get('result',{}).get('data',{}); print(r.get('url') or r.get('imageUrl') or '')" 2>/dev/null)
-            echo "  image.generate URL: ${IMG_URL:0:80}"
-            if [ -n "$IMG_URL" ]; then
-              P "  output.updateVariantImage" "$(HIT POST output.updateVariantImage "{\"0\":{\"id\":$OUT_ID,\"variantIndex\":0,\"imageUrl\":\"$IMG_URL\",\"style\":\"verify\"}}")"
+            IMG_INFO=$(echo "$IMG_RESP" | python3 -c "
+            import sys, json
+            d = json.load(sys.stdin)
+            r = d[0].get('result',{}).get('data',{})
+            url = r.get('url') or r.get('imageUrl')
+            b64 = r.get('b64')
+            if url:
+                print(f'URL|{url[:200]}')
+            elif b64:
+                print(f'B64|len={len(b64)}|provider={r.get(\"provider\")}/{r.get(\"model\")}')
+            else:
+                print(f'NONE|{json.dumps(r)[:200]}')
+            " 2>/dev/null)
+            echo "  image.generate response: $IMG_INFO"
+            if [[ "$IMG_INFO" == URL\|* ]]; then
+              IMG_TO_PERSIST="${IMG_INFO#URL|}"
+              P "  output.updateVariantImage (URL)" "$(HIT POST output.updateVariantImage "{\"0\":{\"id\":$OUT_ID,\"variantIndex\":0,\"imageUrl\":\"$IMG_TO_PERSIST\",\"style\":\"verify\"}}")"
+            elif [[ "$IMG_INFO" == B64\|* ]]; then
+              echo "  ✓ b64 received — frontend will wrap as data: URL (skipping persist test to avoid 10MB body)"
             else
-              echo "  ✗ image.generate didn't return a URL (response head): $(echo "$IMG_RESP" | head -c 200)"
+              echo "  ✗ image.generate returned no usable image"
             fi
 
             echo ""

@@ -197,7 +197,13 @@ export const outputRouter = router({
     .input(z.object({
       id: z.number(),
       variantIndex: z.number().min(0),
-      imageUrl: z.string().url().max(2000),
+      // 2026-05-10: accept either http(s) URL OR data: URL (b64 inline
+      // image from OpenAI gpt-image-1 which doesn't return a URL).
+      // max bumped from 2000 → 10MB since base64 expands ~33%.
+      imageUrl: z.string().min(1).max(10_000_000).refine(
+        (s) => s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:image/"),
+        { message: "imageUrl must be http(s):// or data:image/" },
+      ),
       style: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {

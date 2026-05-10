@@ -180,12 +180,18 @@ export default function RunPage() {
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
         onSuccess: (r: any) => {
-          const url = r?.imageUrl ?? r?.url ?? r?.publicUrl;
-          if (url && updateImageMut) {
-            updateImageMut.mutate({ id, variantIndex: activeIdx, imageUrl: url, style: imagePrompt.slice(0, 480) });
+          // 2026-05-10: image.generate returns either {url} (Flux/Leonardo) or
+          // {b64} (OpenAI gpt-image-1). Normalize to a usable image source —
+          // for b64 we wrap as data: URL so <img> tag renders directly.
+          let imageSrc = r?.imageUrl ?? r?.url ?? r?.publicUrl ?? null;
+          if (!imageSrc && typeof r?.b64 === "string" && r.b64.length > 100) {
+            imageSrc = `data:image/png;base64,${r.b64}`;
+          }
+          if (imageSrc && updateImageMut) {
+            updateImageMut.mutate({ id, variantIndex: activeIdx, imageUrl: imageSrc, style: imagePrompt.slice(0, 480) });
             showToastGlobal("已產圖 ✓");
           } else {
-            showToastGlobal("產圖完成但沒拿到 URL，請檢查 image API 回傳");
+            showToastGlobal("產圖完成但沒拿到 URL/b64，請檢查 image API 回傳");
           }
         },
         onError: (e: any) => showToastGlobal(`產圖失敗：${e?.message ?? e}`),
