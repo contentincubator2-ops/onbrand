@@ -39,16 +39,20 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   matchPrefix?: string;
+  /** When set, renders as tier-style nav: bold tierBadge replacing icon
+   *  + plain subtitle. CJ direction 2026-05-10「30s 取代現有 icon，快寫
+   *  在第二列」 */
+  tierBadge?: string;
 }
 
 // 2026-05-10 brand rename to 「Drop · 秒稿」(CJ direction):
-// Three creative tiers keep numeric prefix as memorable interval marker
-// but gain plain-language subtitle so brand managers don't have to guess
-// what each tier produces. 100s → 99s (中文雙關「久久」+ 設計感).
+// Tier nav items show the seconds badge AS THE ICON (replacing sparkle),
+// with the plain-language subtitle on the second row. Distinct visual
+// rhythm: tier items = numeric badge + verb; everything else = icon + noun.
 const NAV_ITEMS: NavItem[] = [
-  { to: "/30s",       label: "30s 快寫",   icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
-  { to: "/60s",       label: "60s 製作包", icon: <FontAwesomeIcon icon={faWandMagicSparkles} /> },
-  { to: "/99s",       label: "99s 全企劃", icon: <FontAwesomeIcon icon={faWandMagicSparkles} />, matchPrefix: "/99s" },
+  { to: "/30s",       label: "快寫",   tierBadge: "30s", icon: null },
+  { to: "/60s",       label: "製作包", tierBadge: "60s", icon: null },
+  { to: "/99s",       label: "全企劃", tierBadge: "99s", icon: null, matchPrefix: "/99s" },
   // 進階 hidden — direct URL /squads still works.
   // { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
@@ -901,8 +905,18 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
         background: active ? "rgba(249,115,22,0.10)" : "transparent",
         transition: "background 0.1s",
       }} />
-      <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, position: "relative" }}>
-        {item.icon}
+      {/* 2026-05-10: tier items render the seconds badge AS the icon
+          (replacing sparkle), then plain Chinese verb on row 2. Other
+          nav items keep icon + label two-row layout. */}
+      <span style={{
+        width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: item.tierBadge ? 13 : 18,
+        fontWeight: item.tierBadge ? 700 : 400,
+        letterSpacing: item.tierBadge ? "-0.02em" : 0,
+        position: "relative",
+        color: item.tierBadge && active ? "rgb(249,115,22)" : undefined,
+      }}>
+        {item.tierBadge ?? item.icon}
       </span>
       <span style={{ fontSize: 12, fontWeight: active ? 600 : 500, textAlign: "center", position: "relative" }}>
         {item.label}
