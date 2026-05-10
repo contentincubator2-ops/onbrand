@@ -256,6 +256,17 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const brandAssetsForCheck: Record<string, any> =
     ((scopeActiveQuery?.data as any)?.brand?.positioning?._assets ?? {}) as Record<string, any>;
   const textAssetsEmpty = useMemo(() => {
+    // 2026-05-10 (pre-launch UX): hint was showing on EVERY task open
+    // even for brands with positioning + assets done. Now also hide if
+    // brand has tagline OR positioningSummary OR positioningStatus
+    // completed (any of these = brand has been set up beyond stub).
+    const b: any = brandQuery?.data ?? {};
+    const brandSetUp =
+      (typeof b.tagline === "string" && b.tagline.trim()) ||
+      (typeof b.positioningSummary === "string" && b.positioningSummary.trim()) ||
+      b.positioningStatus === "completed";
+    if (brandSetUp) return false;
+
     const v = (assetKey: string): boolean => {
       const a = brandAssetsForCheck[assetKey];
       if (!a) return true;
@@ -264,9 +275,8 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
       if (Array.isArray(a.pairs) && a.pairs.some((p: any) => p?.from?.trim() && p?.to?.trim())) return false;
       return true;
     };
-    // Treat as "empty" if all four core voice assets are blank
     return v("voice") && v("voice_principles") && v("preferred_terms") && v("banned_words");
-  }, [brandAssetsForCheck]);
+  }, [brandAssetsForCheck, brandQuery?.data]);
 
   const [channel, setChannel] = useState<Channel>("facebook");
   const [searchQuery, setSearchQuery] = useState("");
