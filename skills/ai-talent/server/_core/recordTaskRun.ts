@@ -134,6 +134,15 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
       await localPool.execute(`UPDATE missions SET updatedAt = NOW() WHERE id = ?`, [missionId]);
     } catch {/* non-fatal */}
 
+    // 2026-05-10: kick achievement evaluator (non-blocking, fire-and-forget).
+    // Fresh unlocks bubble up next time client calls achievements.evaluate.
+    Promise.resolve().then(async () => {
+      try {
+        const { evaluateAndRecord } = await import("./achievements");
+        await evaluateAndRecord(args.userId);
+      } catch {/* swallow — never break recordTaskRun */}
+    });
+
     return { missionId, outputId: outputId || null };
   } catch (e) {
     console.warn("[recordTaskRun] failed:", (e as Error).message);

@@ -16,6 +16,7 @@ import PositioningNotificationCenter from "../../components/PositioningNotificat
 import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
 import PricingInfoModal from "../../components/PricingInfoModal";
 import TrialCountdownBar from "../../components/TrialCountdownBar";
+import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -183,8 +184,9 @@ export default function ShellLayout() {
 
       {/* Main content */}
       <div style={{ paddingLeft: contentLeft, transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}>
-        {/* 2026-05-10 trial countdown bar */}
+        {/* 2026-05-10 trial countdown bar + achievement watcher (no UI) */}
         <TrialCountdownBar />
+        <AchievementUnlockWatcher />
         <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
         {/* 2026-05-10 global footer w/ legal links — shows on every authenticated page */}
         <footer className="mt-12 pt-6 pb-8 border-t border-neutral-200 text-center text-[11px] text-neutral-400 space-x-3">
@@ -193,6 +195,7 @@ export default function ShellLayout() {
           <a href="/refund" className="hover:text-neutral-700">退費條款</a>
           <a href="/pricing" className="hover:text-neutral-700">方案</a>
           <a href="/settings/account" className="hover:text-neutral-700">帳號</a>
+          <a href="/achievements" className="hover:text-neutral-700">成就</a>
           <a href="mailto:drop@sowork.ai" className="hover:text-neutral-700">drop@sowork.ai</a>
           <span>·</span>
           <span>© SoWork 摘星社群行銷顧問</span>

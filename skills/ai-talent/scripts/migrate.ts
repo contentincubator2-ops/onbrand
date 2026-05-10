@@ -1338,6 +1338,18 @@ async function main() {
     `);
     console.log("[migrate] error_log: OK");
 
+    // ─── 2026-05-10 (CJ「成就系統」): user_achievements ─────
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS user_achievements (
+        userId       INT          NOT NULL,
+        code         VARCHAR(64)  NOT NULL,
+        unlockedAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (userId, code),
+        INDEX idx_user_ach_user (userId, unlockedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] user_achievements: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

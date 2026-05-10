@@ -53,6 +53,7 @@ import AccountPage from "../pages/AccountPage";
 import TermsPage from "../pages/legal/TermsPage";
 import PrivacyPage from "../pages/legal/PrivacyPage";
 import RefundPage from "../pages/legal/RefundPage";
+import AchievementsPage from "../pages/AchievementsPage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -184,8 +185,9 @@ export default function AppV2() {
           <Route path="/templates/:slug" element={<MethodologyDetail />} />
           <Route path="/squad-mockups" element={<SquadMockupsGalleryPage />} />
           <Route path="/admin/squads" element={<SquadLabPage />} />
-          {/* 2026-05-10 account settings */}
+          {/* 2026-05-10 account settings + achievements */}
           <Route path="/settings/account" element={<AccountPage />} />
+          <Route path="/achievements" element={<AchievementsPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

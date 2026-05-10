@@ -53,6 +53,7 @@ import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
 import { publishRouter } from "./publishRouter";
 import { billingRouter } from "./billingRouter";
 import { opsRouter } from "./opsRouter";
+import { achievementsRouter } from "./achievementsRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -111,6 +112,7 @@ export const appRouter = router({
   publish:         publishRouter,
   billing:         billingRouter,
   ops:             opsRouter,
+  achievements:    achievementsRouter,
 });
 
 export type AppRouter = typeof appRouter;
