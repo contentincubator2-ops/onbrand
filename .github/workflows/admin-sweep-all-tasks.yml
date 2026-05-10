@@ -1,0 +1,35 @@
+name: Admin — Sweep ALL remaining tasks (TT/LI/EM/PR/BR/RS + 60s + 99s)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'remaining (136 still untested) | full (all 172) | tier-30 | tier-60 | tier-99'
+        required: true
+        default: 'remaining'
+        type: choice
+        options:
+          - remaining
+          - full
+          - tier-30
+          - tier-60
+          - tier-99
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3000s
+          envs: SWEEP_MODE
+          script: |
+            set +e
+            cd /opt/marketing-os/app/skills/ai-talent
+            export $(grep -v '^#' .env | grep -v '^$' | xargs -d '\n')
+            npx tsx scripts/test-orchestra-all.ts $SWEEP_MODE 2>&1 | tail -250
+        env:
+          SWEEP_MODE: ${{ inputs.mode }}
