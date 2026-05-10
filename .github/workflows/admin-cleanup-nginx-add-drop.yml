@@ -1,0 +1,52 @@
+name: Admin — Clean nginx sites-enabled + properly add drop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set -e
+
+            echo "════════ STEP 1: 砍掉 sites-enabled 內的 .bak / .tmp 垃圾檔 ════════"
+            sudo rm -fv /etc/nginx/sites-enabled/marketing-os.bak.1778150626
+            sudo rm -fv /etc/nginx/sites-enabled/marketing-os.tmp
+            sudo rm -fv /etc/nginx/sites-enabled/marketing-os.bak.* 2>/dev/null || true
+            sudo ls /etc/nginx/sites-enabled/
+
+            echo ""
+            echo "════════ STEP 2: 看現在 sites-enabled/marketing-os 的 server_name ════════"
+            sudo grep -n "server_name" /etc/nginx/sites-enabled/marketing-os
+
+            echo ""
+            echo "════════ STEP 3: 用 awk 精準在 server_name 行加入 drop.sowork.ai（如尚未存在）════════"
+            sudo cp /etc/nginx/sites-enabled/marketing-os /etc/nginx/sites-available/marketing-os.bak.before-drop-$(date +%s) 2>/dev/null || true
+            sudo awk '
+              /server_name/ && /marketing-os\.sowork\.ai/ && !/drop\.sowork\.ai/ {
+                sub(/marketing-os\.sowork\.ai/, "marketing-os.sowork.ai drop.sowork.ai")
+              }
+              { print }
+            ' /etc/nginx/sites-enabled/marketing-os > /tmp/marketing-os.new
+            sudo mv /tmp/marketing-os.new /etc/nginx/sites-enabled/marketing-os
+            sudo grep -n "server_name" /etc/nginx/sites-enabled/marketing-os
+
+            echo ""
+            echo "════════ STEP 4: nginx -t + reload ════════"
+            sudo nginx -t
+            sudo nginx -s reload && echo "✓ reloaded"
+
+            echo ""
+            echo "════════ STEP 5: 該回的 cert 是哪一張 (用 SNI 檢查) ════════"
+            echo | openssl s_client -connect localhost:443 -servername drop.sowork.ai 2>/dev/null | openssl x509 -noout -subject -ext subjectAltName 2>&1 | head -5
+
+            echo ""
+            echo "════════ STEP 6: HTTPS 正式 test ════════"
+            curl -sS -I --max-time 10 https://drop.sowork.ai/ 2>&1 | head -5
