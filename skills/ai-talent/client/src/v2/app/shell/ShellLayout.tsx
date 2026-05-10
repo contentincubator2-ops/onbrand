@@ -185,6 +185,24 @@ export default function ShellLayout() {
         <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
       </div>
 
+      {/* 2026-05-10 (pre-launch): floating support button. Trial users
+          will hit walls; give them a fast escape hatch. Email opens user's
+          mail client; no backend dependency. */}
+      <a
+        href="mailto:contentincubator2@gmail.com?subject=Drop%20%E7%A7%92%E7%A8%BF%20%E5%9B%9E%E5%A0%B1%20/%20%E5%95%8F%E9%A1%8C&body=%E5%93%88%E5%9B%89%EF%BC%8C%E6%88%91%E9%81%87%E5%88%B0%EF%BC%9A%0A%0A%0A%0A%E7%92%B0%E5%A2%83%EF%BC%9A%0A-%20Browser%EF%BC%9A%0A-%20Page%EF%BC%9A"
+        style={{
+          position: "fixed", bottom: 16, right: 16, zIndex: 50,
+          background: "rgb(249,115,22)", color: "white",
+          padding: "10px 16px", borderRadius: 999,
+          fontSize: 13, fontWeight: 600, textDecoration: "none",
+          boxShadow: "0 4px 16px rgba(249,115,22,0.35)",
+          display: "flex", alignItems: "center", gap: 8,
+        }}
+        title="遇到問題？卡住了？直接寫信給我們"
+      >
+        💬 回報 / 求助
+      </a>
+
       {/* Bottom-left toast feed for background positioning pipeline completions */}
       <PositioningNotificationCenter />
 

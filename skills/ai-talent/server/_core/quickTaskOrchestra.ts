@@ -27,20 +27,17 @@ import { getCopywritingMasterPrompt, type PlatformCode } from "./copywritingMast
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
-// 2026-05-10: with LLM_BUDGET 30s + 2 retries = 60s worst case for one
-// variant, orchestra needs 70s+ to fit + brief stage. nginx upstream
-// timeout is 60s default but variants run in parallel so wall-clock is
-// max(variant), not sum. 70s leaves margin while staying near nginx cap.
-const HARD_BUDGET_MS  = 70_000; // 30s tier (was 50s)
-const HARD_BUDGET_60S = 90_000; // 60s tier
-const HARD_BUDGET_100S= 140_000;// 100s tier
+// 2026-05-10 (CJ overnight finishing pass): 3 tasks still timeout with
+// 30s budget — fb-30-ad-primary, yt-30-end-cta, br-30-brand-voice (the
+// heaviest system prompts in the catalog). Bump LLM 30→40s, HARD 70→100s.
+// nginx already at 150s upstream so plenty of headroom. Variants run in
+// parallel so wall-clock = max(variant), not sum. Worst case: variant
+// timeouts (40s) + retry (40s) + brief stage (10s) = 90s, fits in 100s.
+const HARD_BUDGET_MS  = 100_000; // 30s tier
+const HARD_BUDGET_60S = 130_000; // 60s tier
+const HARD_BUDGET_100S= 150_000; // 100s tier
 const PER_IMAGE_MS    = 10_000;
-// 2026-05-10: bumped 20s → 30s. Sweep showed 5/95 tasks failing all on
-// 20s timeout (fb-30-ad-primary, yt-30-end-cta, em-30-event-invite,
-// pr-30-media-pitch, br-30-brand-voice — heaviest system prompts in
-// the catalog). 30s gives anthropic-haiku breathing room for the
-// master-persona + brand-context + tone + structure prompt stack.
-const LLM_BUDGET_MS   = 30_000;
+const LLM_BUDGET_MS   = 40_000;
 const QA_BUDGET_MS    = 12_000;
 
 export type OrchestraTier = "30s" | "60s" | "100s";

@@ -85,8 +85,8 @@ export default function LoginPage() {
       {/* Left brand panel */}
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
         <div className="text-white">
-          <div className="text-4xl font-bold mb-3">Marketing OS</div>
-          <div className="text-xl opacity-80 mb-8">AI 驅動的行銷作戰指揮台</div>
+          <div className="text-4xl font-bold mb-3">Drop · 秒稿</div>
+          <div className="text-xl opacity-80 mb-8">一鍵 drop 一篇貼文 · 你的 AI 行銷工作室</div>
           <ul className="space-y-4 text-sm opacity-90">
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
@@ -109,7 +109,7 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 w-full max-w-md">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">歡迎回來</h1>
-            <p className="text-gray-400 text-sm">使用您的帳號登入 Marketing OS</p>
+            <p className="text-gray-400 text-sm">使用您的帳號登入 Drop · 秒稿</p>
           </div>
 
           {/* Google Login Button */}

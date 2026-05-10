@@ -59,14 +59,28 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
       [userId, since],
     );
     const total = Number((rows as any[])[0]?.total ?? 0);
-    // We don't have plan tier here cheaply — assume trial cap by default
-    // (paid users still safe with $50 cap). Tighten later by joining
-    // user_credits.planTier.
     const cap = DAILY_USD_CAP_TRIAL;
     if (total >= cap) {
       return { ok: false, reason: `今日 LLM 成本已達上限（$${total.toFixed(2)} / $${cap}）。明天再試或聯絡客服升級方案。` };
     }
   } catch {/* daily-cap check best-effort; don't block on DB transient */}
+
+  // 3. 2026-05-10 (pre-launch): rolling 1h task-count cap. Stops a single
+  // user (or scripted abuse) from burst-running 100s of tasks in minutes.
+  // 50/hour matches "heavy human user" upper bound; bots get blocked.
+  try {
+    const hourAgo = new Date(Date.now() - 3600 * 1000).toISOString().slice(0, 19).replace("T", " ");
+    const [rows]: any = await localPool.execute(
+      `SELECT COUNT(*) AS n FROM mission_outputs o
+       JOIN missions m ON m.id = o.missionId
+       WHERE m.userId = ? AND o.createdAt > ?`,
+      [userId, hourAgo],
+    );
+    const n = Number((rows as any[])[0]?.n ?? 0);
+    if (n >= 50) {
+      return { ok: false, reason: `1 小時內已執行 ${n} 個任務（trial 上限 50/hr，防止過度使用）。請稍後再試。` };
+    }
+  } catch {/* best-effort */}
 
   return { ok: true };
 }

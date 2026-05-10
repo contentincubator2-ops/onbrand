@@ -539,16 +539,19 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           navigate(`/run/${(r as any).outputId}`);
           return;
         }
+        // 2026-05-10 (pre-launch): friendlier error UX. Don't expose
+        // technical 'Orchestra/兩次嘗試' jargon to trial users — they
+        // see a calmer message + suggestion. Engineers can see real
+        // error in pm2 log.
         setErrorMsg(
           (r.errors && r.errors.length > 0)
-            ? `Orchestra 失敗：${r.errors.slice(0, 1).join("")}`
-            : "Orchestra 完成但 outputId 未回傳（recordTaskRun 失敗）。請重試。"
+            ? `AI 暫時忙不過來，再按一次「立即產出」就好（多半是熱門時段塞車）。`
+            : "結果沒順利存下來，請按「立即產出」再試一次。如果反覆出現請聯絡客服。"
         );
         return;
       }
-      // 2026-05-09 cleanup: legacy runQuickMut path removed. All tiers
-      // route through orchestra → /run/:outputId.
-      setErrorMsg("此任務沒有對應的 orchestra mutation，請聯絡開發。");
+      // 2026-05-09 cleanup: legacy runQuickMut path removed.
+      setErrorMsg("這個任務還在開發中，請改試其他任務或聯絡客服。");
     } catch (e: any) {
       setErrorMsg(e?.message ?? String(e));
     } finally {
@@ -621,7 +624,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           {/* Three lines above search: eyebrow / gradient title / stats */}
           <div className="mb-6 w-full">
             <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-              SoWork · Marketing OS
+              SoWork · Drop 秒稿
             </p>
             <h1
               className="font-semibold tracking-tight leading-tight text-center"
