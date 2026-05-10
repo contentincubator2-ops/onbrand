@@ -69,7 +69,9 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://marketing-os.sowork.ai"],
+      // 2026-05-10: drop.sowork.ai added as new primary brand domain
+      // (marketing-os kept alive for backward compat).
+      connectSrc: ["'self'", "https://marketing-os.sowork.ai", "https://drop.sowork.ai"],
     },
   },
   hsts: {
@@ -87,7 +89,7 @@ const isProd = process.env.NODE_ENV === "production";
 const corsOrigin = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",").map(s => s.trim())
   : isProd
-    ? ["https://marketing-os.sowork.ai"]
+    ? ["https://marketing-os.sowork.ai", "https://drop.sowork.ai"]
     : ["http://localhost:5173", "http://localhost:3000"];
 app.use(cors({
   origin: corsOrigin,
