@@ -1,0 +1,39 @@
+name: Admin — Finalize drop.sowork.ai SSL (cert install + reload)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set -e
+            echo "════════ STEP 1: Verify cert now contains drop.sowork.ai ════════"
+            sudo openssl x509 -in /etc/letsencrypt/live/marketing-os.sowork.ai/fullchain.pem -noout -text | grep -A1 "Subject Alternative Name"
+
+            echo ""
+            echo "════════ STEP 2: certbot install to wire cert into nginx properly ════════"
+            sudo certbot install --cert-name marketing-os.sowork.ai --nginx --non-interactive 2>&1 | tail -15 || echo "(install may report 'no changes needed' which is fine)"
+
+            echo ""
+            echo "════════ STEP 3: Verify nginx config still valid + reload ════════"
+            sudo nginx -t
+            sudo nginx -s reload && echo "✓ reloaded"
+
+            echo ""
+            echo "════════ STEP 4: HTTPS smoke test from VM itself ════════"
+            curl -sS -I --max-time 15 https://drop.sowork.ai/ -k --resolve drop.sowork.ai:443:127.0.0.1 2>&1 | head -5
+            echo ""
+            echo "── 標準 HTTPS test (cert 驗證) ──"
+            curl -sS -I --max-time 15 https://drop.sowork.ai/ 2>&1 | head -5
+
+            echo ""
+            echo "════════ STEP 5: Certificate served by drop.sowork.ai ════════"
+            echo | openssl s_client -connect drop.sowork.ai:443 -servername drop.sowork.ai 2>/dev/null | openssl x509 -noout -subject -issuer -dates 2>&1 | head -5
