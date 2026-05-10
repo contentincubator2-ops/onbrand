@@ -1,0 +1,39 @@
+name: Admin — Spawn video gen + watch DB for 60s
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            COOKIE='session=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxOTkiLCJvcGVuSWQiOiJoUGRNTXBNOWpNRDdEUXZBR19QUk9TYi1zRGw4bFRmYyIsImlhdCI6MTc3Nzk0Nzk3MywiZXhwIjoxODA5NDgzOTczfQ.ffZWP9Ajog__s5xC4e8fuFjruX1zm89Trg42Ayw4BCA'
+
+            echo "════════ Spawn video.generate ════════"
+            R=$(curl -sS -X POST "http://localhost:3101/trpc/video.generate?batch=1" \
+              -H "Content-Type: application/json" -H "Cookie: $COOKIE" \
+              -d '{"0":{"topic":"產品介紹","platform":"instagram","duration":15,"style":"professional","brandId":2832}}')
+            JOB=$(echo "$R" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d[0].get('result',{}).get('data',{}).get('jobId',''))")
+            echo "  jobId=$JOB"
+            [ -z "$JOB" ] && { echo "✗ no jobId. resp: $R" | head -c 500; exit 1; }
+
+            export MYSQL_PWD="mos_secure_2026"
+            echo ""
+            echo "════════ Polling DB every 15s for 90s ════════"
+            for i in 1 2 3 4 5 6; do
+              sleep 15
+              ROW=$(mysql -h localhost -u mos_user mos_db -BN -e "SELECT status, progress, LEFT(errorMessage,150), videoUrl FROM video_jobs WHERE id=$JOB")
+              echo "  t+${i}5s: $ROW"
+            done
+
+            echo ""
+            echo "════════ Final pm2 logs (look for Kling/PiAPI activity) ════════"
+            pm2 logs marketing-os --lines 80 --nostream --raw 2>&1 | grep -iE "video|kling|piapi|generateScene|generateVideoAsync" | tail -15
