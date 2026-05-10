@@ -351,7 +351,8 @@ export default function RunPage() {
       )}
 
       {/* ─── 2-COL: mockup big (no toolbar) + right tool panel ──────── */}
-      <div className="grid grid-cols-[1fr_360px] gap-4 items-start">
+      {/* 2026-05-10: mobile responsive — stack on small screens. md+ keeps 2-col. */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-4 items-start">
         {/* CENTER: pure mockup, no toolbar above (CJ direction 2026-05-09) */}
         <section className="min-w-0 flex flex-col gap-3">
           <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
