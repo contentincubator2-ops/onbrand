@@ -1277,7 +1277,7 @@ export default function TheaterPage() {
             disabled={running}
           >
             <Plus size={16} strokeWidth={2.5} />
-            <span>📦 加入素材</span>
+            <span className="flex items-center gap-1.5"><Plus size={14} strokeWidth={2.5} />加入素材</span>
             {totalMaterials > 0 && (
               <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">
                 {totalMaterials}
@@ -1298,7 +1298,7 @@ export default function TheaterPage() {
           ))}
           {products.map((p) => (
             <span key={p.id} className="px-2.5 py-1 text-xs rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
-              📦 <span className="font-semibold">{p.name}</span>
+              <span className="font-semibold">{p.name}</span>
               <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900">
                 <X size={11} />
               </button>
@@ -1306,7 +1306,7 @@ export default function TheaterPage() {
           ))}
           {photos.map((ph) => (
             <span key={ph.id} className="px-2.5 py-1 text-xs rounded-lg bg-pink-50 text-pink-800 border border-pink-200 flex items-center gap-1.5">
-              📸 <span>{ph.tag}</span>
+              <span>{ph.tag}</span>
               <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="text-pink-600 hover:text-pink-900">
                 <X size={11} />
               </button>
@@ -1428,7 +1428,7 @@ export default function TheaterPage() {
                     <div className="space-y-1.5 max-h-40 overflow-y-auto">
                       {importantDates.map((d) => (
                         <div key={d.id} className="flex items-center justify-between bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-                          <span className="text-sm">🗓 <b>{d.date}</b> {d.name}</span>
+                          <span className="text-sm flex items-center gap-1.5"><CalendarIcon size={13} className="text-neutral-500" /><b>{d.date}</b> {d.name}</span>
                           <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-600 hover:text-amber-900">
                             <X size={14} />
                           </button>
@@ -1458,7 +1458,7 @@ export default function TheaterPage() {
                       {products.map((p) => (
                         <div key={p.id} className="flex items-start justify-between bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
                           <div className="text-sm">
-                            <p>📦 <b>{p.name}</b> {p.launchDate && <span className="text-emerald-600 text-xs">· {p.launchDate} 上市</span>}</p>
+                            <p><b>{p.name}</b> {p.launchDate && <span className="text-neutral-500 text-xs">· {p.launchDate} 上市</span>}</p>
                             <p className="text-xs text-neutral-600 mt-0.5">{p.usp}</p>
                           </div>
                           <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900 mt-1">
@@ -1563,7 +1563,7 @@ export default function TheaterPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-base font-semibold text-neutral-900 mb-1">
-                ⚠️ 標記要改的地方
+                標記修改規則
               </h3>
               <p className="text-xs text-neutral-500 mb-4">
                 寫下這篇要改的地方（例：「不能說玩家使用經驗」、「不能有負面陳述」、「結尾不要寫『歡迎洽詢』」），等等會自動套用 + 重新生成。
@@ -1581,7 +1581,7 @@ export default function TheaterPage() {
                 {([
                   { v: "post" as const,  label: "只改這一篇", hint: "重新生成這格 caption，套規則一次。" },
                   { v: "run"  as const,  label: "套用到本次 7 天全部",  hint: "這次企劃剩下還沒重做的格子都會吃這條規則。" },
-                  { v: "brand" as const, label: "套用到本品牌所有未來企劃 ✨", hint: "存進品牌規則庫，下次按開始企劃會自動帶。" },
+                  { v: "brand" as const, label: "套用到本品牌所有未來企劃", hint: "存進品牌規則庫，下次按開始企劃會自動帶。" },
                 ]).map((opt) => (
                   <label
                     key={opt.v}
