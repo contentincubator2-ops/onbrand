@@ -1,0 +1,55 @@
+name: Admin — Pipedream probe v2 (Connect-specific endpoints)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set -e
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            for endpoint in \
+              "https://api.pipedream.com/v1/connect/oauth/token" \
+              "https://api.pipedream.com/v1/oauth/v2/token" \
+              "https://api.pipedream.com/oauth/token" \
+              "https://api.pipedream.com/v1/connect/$PIPEDREAM_PROJECT_ID/oauth/token" \
+            ; do
+              echo "── Trying: $endpoint ─────"
+              curl -s --max-time 10 -X POST "$endpoint" \
+                -H "Content-Type: application/json" \
+                -d "{\"grant_type\":\"client_credentials\",\"client_id\":\"$PIPEDREAM_CLIENT_ID\",\"client_secret\":\"$PIPEDREAM_CLIENT_SECRET\"}" \
+                | head -c 300
+              echo; echo
+            done
+
+            echo "── Try: list OAuth clients for this workspace ─────"
+            curl -s --max-time 10 -X GET \
+              "https://api.pipedream.com/v1/workspaces/$PIPEDREAM_WORKSPACE_ID/oauth_clients" \
+              -H "Authorization: Bearer $PIPEDREAM_API_KEY" \
+              | head -c 500
+            echo
+
+            echo "── Try: workspace projects list ─────"
+            curl -s --max-time 10 -X GET \
+              "https://api.pipedream.com/v1/workspaces/$PIPEDREAM_WORKSPACE_ID/projects" \
+              -H "Authorization: Bearer $PIPEDREAM_API_KEY" \
+              | head -c 500
+            echo
+
+            echo "── Try: connect accounts (replaces auth flow probe) ─────"
+            curl -s --max-time 10 -X GET \
+              "https://api.pipedream.com/v1/connect/$PIPEDREAM_PROJECT_ID/accounts" \
+              -H "Authorization: Bearer $PIPEDREAM_API_KEY" \
+              -H "X-PD-Environment: production" \
+              | head -c 500
+            echo
