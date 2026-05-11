@@ -269,7 +269,7 @@ export default function MethodologyCatalog() {
         <div className="relative z-10 flex flex-col items-center text-center">
           {/* 小標 */}
           <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-            SoWork · Drop 秒稿
+            SoWork · OnBrand · 對版
           </p>
 
           {/* 主標題 — 漸層文字，與首頁風格一致 */}

@@ -53,7 +53,7 @@ interface NavItem {
   tooltip?: string;
 }
 
-// 2026-05-10 brand rename to 「Drop · 秒稿」(CJ direction):
+// 2026-05-12 brand rename to 「OnBrand · 對版」(CJ direction):
 // Tier nav items show the seconds badge AS THE ICON (replacing sparkle),
 // with the plain-language subtitle on the second row. Distinct visual
 // rhythm: tier items = numeric badge + verb; everything else = icon + noun.
@@ -226,7 +226,7 @@ export default function ShellLayout() {
           will hit walls; give them a fast escape hatch. Email opens user's
           mail client; no backend dependency. */}
       <a
-        href="mailto:contentincubator2@gmail.com?subject=Drop%20%E7%A7%92%E7%A8%BF%20%E5%9B%9E%E5%A0%B1%20/%20%E5%95%8F%E9%A1%8C&body=%E5%93%88%E5%9B%89%EF%BC%8C%E6%88%91%E9%81%87%E5%88%B0%EF%BC%9A%0A%0A%0A%0A%E7%92%B0%E5%A2%83%EF%BC%9A%0A-%20Browser%EF%BC%9A%0A-%20Page%EF%BC%9A"
+        href="mailto:contentincubator2@gmail.com?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E5%9B%9E%E5%A0%B1%20/%20%E5%95%8F%E9%A1%8C&body=%E5%93%88%E5%9B%89%EF%BC%8C%E6%88%91%E9%81%87%E5%88%B0%EF%BC%9A%0A%0A%0A%0A%E7%92%B0%E5%A2%83%EF%BC%9A%0A-%20Browser%EF%BC%9A%0A-%20Page%EF%BC%9A"
         style={{
           position: "fixed", bottom: 16, right: 16, zIndex: 50,
           background: "rgb(249,115,22)", color: "white",
@@ -1913,7 +1913,7 @@ function AccountPopup({ onLogout, onClose }: {
     {
       icon: faCircleInfo, label: "聯絡客服", arrow: false, badge: null, danger: false,
       // 2026-05-12 — 信箱修正為 sowork@sowork.tw
-      action: () => { window.location.href = "mailto:sowork@sowork.tw?subject=Drop%20%E7%A7%92%E7%A8%BF%20%E6%94%AF%E6%8F%B4"; },
+      action: () => { window.location.href = "mailto:sowork@sowork.tw?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E6%94%AF%E6%8F%B4"; },
     },
     {
       icon: faRightFromBracket, label: "登出", arrow: false, badge: null, danger: true,

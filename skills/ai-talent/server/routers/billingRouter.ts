@@ -54,7 +54,7 @@ export async function assertWithinPlan(userId: number, _kind: keyof import("../_
   if (u.planStatus === "trial" && u.planEndsAt && u.planEndsAt < now) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: "免費試用已到期 — 請升級 Drop Pro 繼續使用",
+      message: "免費試用已到期 — 請升級 OnBrand Pro 繼續使用",
     });
   }
   if (u.planStatus === "expired" || u.planStatus === "canceled") {

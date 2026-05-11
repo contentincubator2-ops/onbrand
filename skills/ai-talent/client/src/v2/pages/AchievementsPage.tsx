@@ -25,7 +25,7 @@ const ROUTE_REWARDS_DISPLAY: Record<string, string[]> = {
   upgrade:     ["首月 9 折券（30 天內兌換）"],
 };
 const FINALE_REWARDS_DISPLAY = [
-  "Drop Founding User 永久徽章",
+  "OnBrand Founding User 永久徽章",
   "首月 9 折券（重複領）",
   "年繳再折 7%（60 天內兌換）",
   "新功能搶先體驗",
@@ -185,7 +185,7 @@ export default function AchievementsPage() {
               <h3 className={`text-lg font-bold mb-2 ${
                 progress?.unlockedCount === progress?.totalCount ? "text-white" : "text-neutral-900"
               }`}>
-                Drop Founding User · 終極獎勵
+                OnBrand Founding User · 終極獎勵
               </h3>
               <ul className={`text-sm space-y-1 ${
                 progress?.unlockedCount === progress?.totalCount ? "text-neutral-100" : "text-neutral-700"

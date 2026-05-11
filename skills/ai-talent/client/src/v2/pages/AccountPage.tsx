@@ -143,7 +143,7 @@ export default function AccountPage() {
                 to="/pricing"
                 className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition"
               >
-                升級 Drop Pro
+                升級 OnBrand Pro
               </Link>
             )}
             {status?.planStatus === "active" && cancelMut && (

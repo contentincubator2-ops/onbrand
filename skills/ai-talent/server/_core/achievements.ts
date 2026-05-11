@@ -42,7 +42,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     code: "first_step",
     route: "onboarding", order: 1, points: 5,
     title: "第一步",
-    description: "成功建立 Drop 帳號 — 歡迎入坑！",
+    description: "成功建立 OnBrand 帳號 — 歡迎入坑！",
     icon: "Sparkles",
   },
   {
@@ -175,14 +175,14 @@ export const ACHIEVEMENTS: Achievement[] = [
     code: "ten_tasks",
     route: "upgrade", order: 1, points: 20,
     title: "工作流",
-    description: "累計完成 10 個任務 — 你已經是 Drop 老手",
+    description: "累計完成 10 個任務 — 你已經是 OnBrand 老手",
     icon: "Award",
   },
   {
     code: "subscribed",
     route: "upgrade", order: 2, points: 50,
-    title: "Drop Pro 用戶",
-    description: "升級為 Drop Pro，無限 30 秒任務一路跑",
+    title: "OnBrand Pro 用戶",
+    description: "升級為 OnBrand Pro，無限 30 秒任務一路跑",
     icon: "Crown",
     ctaPath: "/pricing", ctaText: "查看方案",
   },
@@ -207,7 +207,7 @@ export const ROUTE_META: Record<AchievementRoute, { label: string; subtitle: str
   planning:    { label: "規劃",   subtitle: "整週的內容一次企劃完", dayHint: "Day 4" },
   integration: { label: "整合",   subtitle: "跨平台 + 品牌規則", dayHint: "Day 5" },
   publish:     { label: "發布",   subtitle: "真的把內容送出去", dayHint: "Day 6" },
-  upgrade:     { label: "升級",   subtitle: "成為 Drop Pro", dayHint: "Day 7" },
+  upgrade:     { label: "升級",   subtitle: "成為 OnBrand Pro", dayHint: "Day 7" },
 };
 
 // ─── Evaluators ──────────────────────────────────────────────────────

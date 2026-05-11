@@ -82,7 +82,7 @@ export const PLANS: Record<PlanCode, Plan> = {
   /** Drop Pro — Solo plan. 1 user, single workspace. */
   drop_pro: {
     code: "drop_pro",
-    name: "Drop Pro · 個人",
+    name: "OnBrand Pro · 個人",
     priceTwdMonthly: 990,
     priceTwdAnnually: 9900,
     trialDays: 0,
@@ -109,7 +109,7 @@ export const PLANS: Record<PlanCode, Plan> = {
   /** Drop Team — 5 users, multi-client workspace, monthly client reports. */
   drop_team: {
     code: "drop_team",
-    name: "Drop Team · 小團隊",
+    name: "OnBrand Team · 小團隊",
     priceTwdMonthly: 4990,
     priceTwdAnnually: 49900,    // 12 × 4158 NTD (省 17%)
     trialDays: 0,
@@ -129,7 +129,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       "多客戶 workspace（一個帳號管多個客戶）",
       "邀請客戶看自己品牌（viewer 角色）",
       "月度客戶工作報表",
-      "Drop Pro 全部功能",
+      "OnBrand Pro 全部功能",
     ],
     highlight: "最適合 Agency",
     prioritySupport: false,
@@ -138,7 +138,7 @@ export const PLANS: Record<PlanCode, Plan> = {
   /** Drop Agency — unlimited users, white label, API access. */
   drop_agency: {
     code: "drop_agency",
-    name: "Drop Agency · 代理商",
+    name: "OnBrand Agency · 代理商",
     priceTwdMonthly: 14990,
     priceTwdAnnually: 149900,
     trialDays: 0,
@@ -158,7 +158,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       "White Label（換 logo + 公司名）",
       "API 存取（接你自己的 workflow）",
       "優先客服 + 1 對 1 onboarding",
-      "Drop Team 全部功能",
+      "OnBrand Team 全部功能",
     ],
     whiteLabel: true,
     apiAccess: true,

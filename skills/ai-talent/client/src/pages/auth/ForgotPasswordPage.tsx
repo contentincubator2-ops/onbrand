@@ -78,8 +78,8 @@ export default function ForgotPasswordPage() {
       {/* Left brand panel */}
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
         <div className="text-white">
-          <div className="text-4xl font-bold mb-3">Drop · 秒稿</div>
-          <div className="text-xl opacity-80">AI 驅動的行銷作戰指揮台</div>
+          <div className="text-4xl font-bold mb-3">OnBrand · 對版</div>
+          <div className="text-xl opacity-80">永遠 on-brand 的行銷作戰指揮台</div>
         </div>
       </div>
 

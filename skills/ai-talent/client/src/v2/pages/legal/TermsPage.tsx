@@ -1,5 +1,5 @@
 /**
- * 服務條款 — Drop Pro Terms of Service.
+ * 服務條款 — OnBrand Pro Terms of Service.
  * 2026-05-10. 由 SoWork 法律顧問 review 後正式版替換 (TODO).
  */
 import React from "react";
@@ -16,14 +16,14 @@ export default function TermsPage() {
         <section className="prose prose-sm max-w-none space-y-6 text-neutral-800 leading-relaxed">
           <h2 className="text-lg font-semibold">1. 服務提供方</h2>
           <p>
-            本服務（以下簡稱「Drop」或「本服務」）由 摘星社群行銷顧問股份有限公司
+            本服務（以下簡稱「OnBrand」或「本服務」）由 摘星社群行銷顧問股份有限公司
             （以下簡稱「我們」）提供。本條款是您與我們之間的正式協議。
-            註冊或使用 Drop 即表示您同意本條款全部內容。
+            註冊或使用 OnBrand 即表示您同意本條款全部內容。
           </p>
 
           <h2 className="text-lg font-semibold">2. 服務內容</h2>
           <p>
-            Drop 是 AI 驅動的行銷內容生成與企劃工具。功能包含但不限於：文案產出、
+            OnBrand 是 AI 驅動的行銷內容生成與企劃工具。功能包含但不限於：文案產出、
             視覺設計建議、影片生成、跨平台發布、品牌資產管理、多日企劃排程等。
           </p>
 
@@ -35,8 +35,8 @@ export default function TermsPage() {
 
           <h2 className="text-lg font-semibold">4. 訂閱與付款</h2>
           <ul className="list-disc pl-6 space-y-1">
-            <li>免費試用：新用戶可免費使用 Drop 全部功能 7 天，免綁信用卡。</li>
-            <li>付費方案：Drop Pro 月費 NT$ 990 / 月，或年繳 NT$ 9,900（折抵約 17%）。</li>
+            <li>免費試用：新用戶可免費使用 OnBrand 全部功能 7 天，免綁信用卡。</li>
+            <li>付費方案：OnBrand Pro 月費 NT$ 990 / 月，或年繳 NT$ 9,900（折抵約 17%）。</li>
             <li>自動續訂：訂閱會自動續扣，您可隨時於「帳號設定」取消，當期到期前仍可繼續使用。</li>
             <li>付款方式：信用卡、行動支付（綠界金流，明日上線）。</li>
             <li>發票：採電子發票，系統會自動寄送至您註冊的 email。</li>

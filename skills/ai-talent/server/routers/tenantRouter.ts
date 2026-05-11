@@ -97,7 +97,7 @@ export const tenantRouter = router({
       if (!invitee) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: `${input.email} 還沒註冊 Drop。請他先到 drop.sowork.ai 註冊後再邀請。`,
+          message: `${input.email} 還沒註冊 OnBrand。請他先到 drop.sowork.ai 註冊後再邀請。`,
         });
       }
       await localPool.execute(
@@ -206,7 +206,7 @@ export const tenantRouter = router({
         if (plan !== "drop_agency" && plan !== "enterprise") {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "White Label 需要 Drop Agency 方案以上",
+            message: "White Label 需要 OnBrand Agency 方案以上",
           });
         }
       }

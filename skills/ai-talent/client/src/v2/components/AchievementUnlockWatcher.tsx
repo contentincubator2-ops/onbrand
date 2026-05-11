@@ -80,7 +80,7 @@ export default function AchievementUnlockWatcher() {
         if (r.finaleGrant && !seen.has("finale")) {
           seen.add("finale");
           const labels = (r.finaleGrant.rewards ?? []).map((rw: any) => rw.label).join(" · ");
-          stagger(`🏆 全 18 成就達成！Drop Founding User · ${labels}`);
+          stagger(`🏆 全 18 成就達成！OnBrand Founding User · ${labels}`);
         }
 
         saveSeen(seen);

@@ -21,7 +21,7 @@ export default function PricingPage() {
   const TIERS = [
     {
       code: "drop_pro",
-      name: "Drop Pro",
+      name: "OnBrand Pro",
       sub: "個人操盤者",
       monthly: 990, annual: 9900,
       members: "1 位用戶 · 5 個品牌",
@@ -35,7 +35,7 @@ export default function PricingPage() {
     },
     {
       code: "drop_team",
-      name: "Drop Team",
+      name: "OnBrand Team",
       sub: "5 人小團隊 / Agency 入門",
       monthly: 4990, annual: 49900,
       members: "5 位用戶 · 20 個品牌",
@@ -43,14 +43,14 @@ export default function PricingPage() {
         "多客戶 workspace（一帳號管多客戶）",
         "邀請客戶以 viewer 角色看自己品牌",
         "月度客戶工作報表",
-        "Drop Pro 全部功能",
+        "OnBrand Pro 全部功能",
       ],
       cta: "升級到 Team",
       highlight: true,
     },
     {
       code: "drop_agency",
-      name: "Drop Agency",
+      name: "OnBrand Agency",
       sub: "代理商 / 多客戶營運",
       monthly: 14990, annual: 149900,
       members: "無限用戶 · 無限品牌",
@@ -58,7 +58,7 @@ export default function PricingPage() {
         "White Label（換 logo + 公司名）",
         "API 存取（接你自己的 workflow）",
         "優先客服 + 1 對 1 onboarding",
-        "Drop Team 全部功能",
+        "OnBrand Team 全部功能",
       ],
       cta: "升級到 Agency",
     },

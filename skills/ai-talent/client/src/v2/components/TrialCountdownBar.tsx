@@ -102,7 +102,7 @@ function TrialBarWithProgress({
         to="/pricing"
         className="px-3 py-1 rounded-md bg-neutral-900 text-white font-semibold hover:bg-neutral-800 transition"
       >
-        升級 Drop Pro
+        升級 OnBrand Pro
       </Link>
     </div>
   );

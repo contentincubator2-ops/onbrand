@@ -51,7 +51,7 @@ export const ROUTE_REWARDS: Record<AchievementRoute, Reward[]> = {
 
 /** All-18 finale rewards. Granted when every single achievement is unlocked. */
 export const FINALE_REWARDS: Reward[] = [
-  { type: "badge", name: "drop_founding_user", label: "Drop Founding User 永久徽章" },
+  { type: "badge", name: "onbrand_founding_user", label: "OnBrand Founding User 永久徽章" },
   { type: "promo_code", kind: "first_month_pct", discountPct: 10, expiresInDays: 30, label: "首月 9 折券（重複領）" },
   { type: "promo_code", kind: "annual_pct", discountPct: 7, expiresInDays: 60, label: "年繳再折 7%（60 天內兌換）" },
   { type: "feature_flag", flag: "early_access", label: "新功能搶先體驗" },
