@@ -705,6 +705,18 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
       ? `以 ${brandName ?? "你的品牌"} 的定位為骨架，${tierKicker}`
       : `建議先完成 ${brandName ?? "這個品牌"} 的定位 — 完成後產出會以方法論為骨架，現在跑也行，但會偏通用`;
 
+  // 2026-05-11 (CJ reviewer 反饋:「30s / 60s / 99s 的差異我看不清楚」):
+  // tier-specific eyebrow + concrete "when to use" example so users
+  // self-orient before clicking a task.
+  const tierEyebrow = tier === "30s" ? "30S · QUICK CAPTION"
+    : tier === "60s" ? "60S · PRODUCTION PACK"
+    : "99S · CAMPAIGN";
+  const tierWhenToUse = tier === "30s"
+    ? "適合：日常單篇貼文、追熱點、客戶感謝、緊急發文 — 1 個 caption + 1 張圖風格 brief"
+    : tier === "60s"
+      ? "適合：值得花時間打磨的單篇 — 5 個 variant 挑選 + 完整視覺 brief + QA"
+      : "適合：30 天月曆、活動 launch 包、IG 帳號重新定位 — 整個 campaign";
+
   return (
     <div>
       {/* ─── HERO (matches /squads layout) ────────────────────────────── */}
@@ -712,8 +724,8 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
           {/* Three lines above search: eyebrow / gradient title / stats */}
           <div className="mb-6 w-full">
-            <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-              SoWork · Drop 秒稿
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+              {tierEyebrow}
             </p>
             <h1
               className="font-semibold tracking-tight leading-tight text-center"
@@ -727,11 +739,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
             >
               {heroTitle}
             </h1>
-            {/* 2026-05-11 (CJ): tech-spec EntityStats subtitle replaced with
-                a methodology value-prop that explicitly closes the loop
-                between 定位 → 產出. The first phrase echoes the brand-page
-                manifesto so the methodology feels continuous, not
-                interrupted at the task-runner boundary. */}
+            {/* Methodology value-prop (closes the 定位 → 產出 loop). */}
             <p
               className="mt-3 mx-auto text-default-700"
               style={{
@@ -757,6 +765,22 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                   </a>
                 </>
               )}
+            </p>
+
+            {/* 2026-05-11 — concrete "when to use" line so users self-route
+                between 30s / 60s / 99s before clicking. Reviewer:
+                「30s / 60s / 99s 的差異我看不清楚」. Sans-serif (utility),
+                small + neutral so it sits as supplementary metadata. */}
+            <p
+              className="mt-2 mx-auto text-default-600"
+              style={{
+                fontSize: 12.5,
+                lineHeight: 1.6,
+                maxWidth: 640,
+              }}
+            >
+              <span style={{ fontWeight: 600, color: "#171717" }}>什麼時候用：</span>
+              {tierWhenToUse}
             </p>
           </div>
 
@@ -1018,15 +1042,31 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       </div>
                     )}
 
-                    {/* 2026-05-11 — context confirmation strip. When the task
-                        declares `contextSources`, show users what brand data
-                        will be used so they don't feel asked from scratch.
-                        Reviewer: 「從定位到內容產出的連結是斷裂的」. */}
+                    {/* 2026-05-11 — context confirmation strip. ALWAYS shown
+                        when brand context exists, so the user feels their
+                        positioning is actively in play. If the task declares
+                        explicit contextSources we use them; otherwise we
+                        fall back to a default set drawn from the universal
+                        SoWork positioning fields (Voice / 受眾 / 禁忌詞 /
+                        WHY) — every task implicitly reads these via brand
+                        prefix injection, so showing them is honest. */}
                     {(() => {
-                      const chips = brandCtx
-                        ? buildContextChips(brandCtx, activeTask.contextSources ?? undefined)
-                        : [];
-                      if (chips.length === 0) return null;
+                      const DEFAULT_SOURCES = [
+                        "brand.name",
+                        "brand.positioning.audience.primary",
+                        "brand.positioning.voice.archetypes",
+                        "brand.positioning.voice.tone",
+                        "brand.positioning.voice.forbidden",
+                        "brand.positioning.goldenCircle.why",
+                      ];
+                      const sources = (activeTask.contextSources && activeTask.contextSources.length > 0)
+                        ? activeTask.contextSources
+                        : DEFAULT_SOURCES;
+                      const chips = brandCtx ? buildContextChips(brandCtx, sources) : [];
+                      // Only render when at least one chip has real content —
+                      // hides the strip cleanly for brand-less / unpositioned cases.
+                      const anyContent = chips.some((c) => c.hasContent);
+                      if (!anyContent) return null;
                       return (
                         <div
                           className="mb-3 rounded-lg px-3 py-2.5"
@@ -1039,20 +1079,36 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                               marginBottom: 6,
                             }}
                           >
-                            Context · 我會用以下資料來跑這個任務
+                            Context · 我會用 {brandName ?? "你的品牌"} 的這些資料來跑這個任務
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {chips.map((c, i) => (
+                            {chips.filter((c) => c.hasContent).map((c, i) => (
                               <span
                                 key={i}
                                 title={c.source}
                                 style={{
                                   fontSize: 11, padding: "3px 8px",
                                   borderRadius: 4,
-                                  background: c.hasContent ? "#171717" : "transparent",
-                                  color: c.hasContent ? "#FFFFFF" : "#A3A3A3",
-                                  border: c.hasContent ? "none" : "1px dashed #D4D4D4",
-                                  fontWeight: c.hasContent ? 500 : 400,
+                                  background: "#171717",
+                                  color: "#FFFFFF",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {c.label}
+                              </span>
+                            ))}
+                            {/* Missing fields shown as dashed chips so user
+                                can see what's still incomplete and improve it. */}
+                            {chips.filter((c) => !c.hasContent).slice(0, 3).map((c, i) => (
+                              <span
+                                key={`m${i}`}
+                                title={c.source + " (尚未填寫)"}
+                                style={{
+                                  fontSize: 11, padding: "3px 8px",
+                                  borderRadius: 4,
+                                  background: "transparent",
+                                  color: "#A3A3A3",
+                                  border: "1px dashed #D4D4D4",
                                 }}
                               >
                                 {c.label}

@@ -45,6 +45,9 @@ interface NavItem {
    *  + plain subtitle. CJ direction 2026-05-10「30s 取代現有 icon，快寫
    *  在第二列」 */
   tierBadge?: string;
+  /** 2026-05-11 — hover tooltip explaining when this tier is for.
+   *  Reviewer:「30s / 60s / 99s 的差異我看不清楚」. */
+  tooltip?: string;
 }
 
 // 2026-05-10 brand rename to 「Drop · 秒稿」(CJ direction):
@@ -52,9 +55,12 @@ interface NavItem {
 // with the plain-language subtitle on the second row. Distinct visual
 // rhythm: tier items = numeric badge + verb; everything else = icon + noun.
 const NAV_ITEMS: NavItem[] = [
-  { to: "/30s",       label: "快寫",   tierBadge: "30s", icon: null },
-  { to: "/60s",       label: "製作包", tierBadge: "60s", icon: null },
-  { to: "/99s",       label: "全企劃", tierBadge: "99s", icon: null, matchPrefix: "/99s" },
+  { to: "/30s",       label: "快寫",   tierBadge: "30s", icon: null,
+    tooltip: "30 秒一篇貼文 — 適合日常單篇、追熱點、緊急發文" },
+  { to: "/60s",       label: "製作包", tierBadge: "60s", icon: null,
+    tooltip: "60 秒一個製作包 — 5 種變體挑選 + 視覺 brief + QA" },
+  { to: "/99s",       label: "全企劃", tierBadge: "99s", icon: null, matchPrefix: "/99s",
+    tooltip: "99 秒一個 campaign — 30 天月曆、活動 launch 包、IG 重新定位" },
   // 進階 hidden — direct URL /squads still works.
   // { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
@@ -911,6 +917,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
     <button
       onClick={onClick}
       aria-label={item.label}
+      title={item.tooltip ?? item.label}
       style={{
         width: 64, height: 52, margin: "2px auto 0",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
