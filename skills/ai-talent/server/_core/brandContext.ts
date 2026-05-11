@@ -11,8 +11,15 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "../db";
 
-const CACHE = new Map<number, { prefix: string; expiresAt: number }>();
+function safeParse(s: string): any {
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+// Cache key includes optional product/event so different scopes don't collide.
+const CACHE = new Map<string, { prefix: string; expiresAt: number }>();
 const TTL_MS = 60_000; // 1-minute cache — brand_brain edits become visible quickly
+const cacheKey = (brandId: number, productId?: number | null, eventId?: number | null) =>
+  `${brandId}:${productId ?? 0}:${eventId ?? 0}`;
 
 export interface BrandSummary {
   id: number;
@@ -23,14 +30,24 @@ export interface BrandSummary {
 
 /**
  * Returns a system-prompt suffix string ready to append to any LLM system message.
- * Pulls up to 8 most recently updated brand_brain entries.
+ * Pulls up to 8 most recently updated brand_brain entries, PLUS:
+ *   - if productId set → product name + positioning JSON keys layered after brand
+ *   - if eventId   set → event name + dates + positioning JSON layered last
+ *
+ * Precedence (bottom = wins in prompt-following): brand → product → event.
+ * This lets LLM honor brand identity while letting product/event narrow it.
+ *
+ * 2026-05-11 (CJ「選了 product / event 也要 narrow LLM context」).
  */
 export async function buildBrandPrefix(
-  brandId: number | undefined | null
+  brandId: number | undefined | null,
+  productId?: number | null,
+  eventId?: number | null,
 ): Promise<string> {
   if (!brandId) return "";
 
-  const cached = CACHE.get(brandId);
+  const ck = cacheKey(brandId, productId, eventId);
+  const cached = CACHE.get(ck);
   if (cached && cached.expiresAt > Date.now()) return cached.prefix;
 
   try {
@@ -75,8 +92,70 @@ export async function buildBrandPrefix(
       } catch { /* non-fatal */ }
     }
 
-    if ((!rows || rows.length === 0) && brandLocked.length === 0) {
-      CACHE.set(brandId, { prefix: "", expiresAt: Date.now() + TTL_MS });
+    // ── 2026-05-11 (CJ): product + event positioning overlays ──
+    let productSection = "";
+    if (productId) {
+      try {
+        const [prodRows]: any = await localPool.execute(
+          `SELECT name, positioning FROM products WHERE id = ? LIMIT 1`,
+          [productId],
+        );
+        const p = Array.isArray(prodRows) ? prodRows[0] : null;
+        if (p) {
+          const lines: string[] = [`【產品名稱】${p.name ?? "(未命名)"}`];
+          if (p.positioning) {
+            const pp = typeof p.positioning === "string" ? safeParse(p.positioning) : p.positioning;
+            if (pp && typeof pp === "object") {
+              if (pp.usp) lines.push(`【產品 USP】${String(pp.usp).slice(0, 300)}`);
+              if (pp.target) lines.push(`【產品目標客群】${String(pp.target).slice(0, 200)}`);
+              if (pp.tagline) lines.push(`【產品 Slogan】${String(pp.tagline).slice(0, 100)}`);
+              if (pp.description) lines.push(`【產品描述】${String(pp.description).slice(0, 400)}`);
+              if (pp.keyMessages && Array.isArray(pp.keyMessages)) {
+                lines.push(`【產品關鍵訊息】${pp.keyMessages.slice(0, 4).join(" · ")}`);
+              }
+            }
+          }
+          productSection = "\n[本次產出聚焦的產品 — 必須圍繞此產品撰寫]\n" + lines.map(l => `- ${l}`).join("\n") + "\n";
+        }
+      } catch {/* non-fatal */}
+    }
+
+    let eventSection = "";
+    if (eventId) {
+      try {
+        const [evRows]: any = await localPool.execute(
+          `SELECT name, startAt, endAt, positioning FROM events WHERE id = ? LIMIT 1`,
+          [eventId],
+        );
+        const e = Array.isArray(evRows) ? evRows[0] : null;
+        if (e) {
+          const lines: string[] = [`【活動名稱】${e.name ?? "(未命名活動)"}`];
+          if (e.startAt) {
+            const start = new Date(e.startAt);
+            lines.push(`【活動開始】${start.toLocaleDateString("zh-TW")}`);
+            const now = new Date();
+            const daysLeft = Math.ceil((start.getTime() - now.getTime()) / 86400_000);
+            if (daysLeft > 0) lines.push(`【倒數】還有 ${daysLeft} 天 — 可以做倒數 hook / 預熱`);
+            else if (daysLeft === 0) lines.push(`【倒數】今天就是活動日`);
+            else lines.push(`【活動】已開始 ${-daysLeft} 天`);
+          }
+          if (e.endAt) lines.push(`【活動結束】${new Date(e.endAt).toLocaleDateString("zh-TW")}`);
+          if (e.positioning) {
+            const ep = typeof e.positioning === "string" ? safeParse(e.positioning) : e.positioning;
+            if (ep && typeof ep === "object") {
+              if (ep.theme) lines.push(`【活動主軸】${String(ep.theme).slice(0, 200)}`);
+              if (ep.cta) lines.push(`【活動 CTA】${String(ep.cta).slice(0, 100)}`);
+              if (ep.offer) lines.push(`【活動優惠】${String(ep.offer).slice(0, 200)}`);
+              if (ep.audience) lines.push(`【活動受眾】${String(ep.audience).slice(0, 200)}`);
+            }
+          }
+          eventSection = "\n[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]\n" + lines.map(l => `- ${l}`).join("\n") + "\n";
+        }
+      } catch {/* non-fatal */}
+    }
+
+    if ((!rows || rows.length === 0) && brandLocked.length === 0 && !productSection && !eventSection) {
+      CACHE.set(ck, { prefix: "", expiresAt: Date.now() + TTL_MS });
       return "";
     }
 
@@ -89,9 +168,11 @@ export async function buildBrandPrefix(
         rows.map((r: any) => `- 【${r.category}】${r.title}：${r.content}`).join("\n")
       : "";
 
-    const prefix = "\n\n" + lockedSection + brainSection;
+    // Order: brand identity → brand brain → product narrow → event narrow.
+    // Last-mentioned wins in LLM prompt-following heuristics.
+    const prefix = "\n\n" + lockedSection + brainSection + productSection + eventSection;
 
-    CACHE.set(brandId, { prefix, expiresAt: Date.now() + TTL_MS });
+    CACHE.set(ck, { prefix, expiresAt: Date.now() + TTL_MS });
     return prefix;
   } catch {
     return "";

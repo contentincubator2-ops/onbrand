@@ -43,6 +43,11 @@ export const missionRouter = router({
       // or utf8mb4_general_ci) have mismatched collations. Without an
       // explicit COLLATE on the JOIN, MySQL throws "Illegal mix of
       // collations" and tRPC returns 500, leaving the missions page blank.
+      // 2026-05-11 (CJ「選了 product / event 也要 filter 專案區」):
+      // Pull the latest output's scope (productId/eventId) for each
+      // mission so the frontend can filter projects by active scope.
+      // Subquery uses ANY_VALUE() because GROUP BY semantics; mission's
+      // latest output's metadata scope is good-enough heuristic.
       const rows = await db.execute(sql`
         SELECT m.id, m.title, m.description, m.workspace, m.methodology,
                m.squadSlug AS squadSlug, m.brandId AS brandId,
@@ -54,11 +59,20 @@ export const missionRouter = router({
                s.strategy_layer AS squadLayer,
                s.steps AS squadSteps,
                s.hero_image_url AS squadHeroImageUrl,
-               s.mockup_images  AS squadMockupImages
+               s.mockup_images  AS squadMockupImages,
+               sc.productId AS scopeProductId,
+               sc.eventId   AS scopeEventId
           FROM missions m
           LEFT JOIN brands b ON b.id = m.brandId
           LEFT JOIN squads s ON s.slug COLLATE utf8mb4_unicode_ci
                               = m.squadSlug COLLATE utf8mb4_unicode_ci
+          LEFT JOIN (
+            SELECT mo.missionId,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')) AS UNSIGNED) AS productId,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.eventId'))   AS UNSIGNED) AS eventId,
+                   ROW_NUMBER() OVER (PARTITION BY mo.missionId ORDER BY mo.id DESC) AS rn
+            FROM mission_outputs mo
+          ) sc ON sc.missionId = m.id AND sc.rn = 1
          WHERE m.userId = ${ctx.user.id}
          ORDER BY m.updatedAt DESC
          LIMIT 60

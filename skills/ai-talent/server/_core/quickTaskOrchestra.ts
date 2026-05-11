@@ -701,6 +701,10 @@ export async function runOrchestra(args: {
   config: OrchestraConfig;
   inputs: Record<string, string>;
   brandId?: number;
+  /** 2026-05-11 (CJ): scope narrowing — when set, product/event positioning
+   *  overlays brand baseline in the LLM system prompt. */
+  productId?: number | null;
+  eventId?: number | null;
   /** Caller's userId — used by recordTaskRun to write the output into
    *  mission_outputs so /projects can find it. Optional for back-compat. */
   userId?: number;
@@ -812,7 +816,7 @@ export async function runOrchestra(args: {
       // grounding signal — without it AI hallucinates industry from brand
       // name (e.g. 桂冠營養研究室 → 美妝). 2026-05-08 (CJ direction).
       Promise.all([
-        buildBrandContext(args.brandId).catch(() => ""),
+        buildBrandContext(args.brandId, args.productId, args.eventId).catch(() => ""),
         args.brandId ? loadBrandKnowledgeForPrompt(args.brandId).catch(() => "") : Promise.resolve(""),
         args.brandId
           ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")
@@ -1232,6 +1236,10 @@ export async function runOrchestra(args: {
             // navigate back to the task with the user's prior answers
             // pre-filled (no need to re-type 主問題 input).
             inputs: args.inputs ?? {},
+            // 2026-05-11 (CJ): persist scope so /projects can filter
+            // missions by product/event and /run page can re-apply scope.
+            productId: args.productId ?? null,
+            eventId: args.eventId ?? null,
           },
           thumbnailUrl: firstImage,
         });

@@ -623,6 +623,36 @@ export default function TheaterPage() {
   // Fix: re-hydrate all state from new brand's localStorage on every
   // brandId change. lastBrandIdRef avoids running the reset on initial
   // mount (state was just initialised correctly).
+  // 2026-05-11 (CJ「選了 event 也要 narrow」): when shell scope has an
+  // active event, fetch its details and auto-add to importantDates so the
+  // caption_writer naturally references it. Auto-removes when scope cleared.
+  const scopeEventId = ctx?.scope?.eventId ?? null;
+  const eventQuery = (trpc as any).event?.get?.useQuery
+    ? (trpc as any).event.get.useQuery(
+        { id: scopeEventId ?? 0 },
+        { enabled: !!scopeEventId, refetchOnWindowFocus: false },
+      )
+    : { data: null };
+  const scopeEvent = (eventQuery?.data ?? null) as { id: number; name: string; startAt?: string; endAt?: string } | null;
+  useEffect(() => {
+    if (!scopeEvent || !scopeEvent.startAt) return;
+    const dateStr = new Date(scopeEvent.startAt).toISOString().split("T")[0];
+    setImportantDates((prev) => {
+      // Already added?
+      if (prev.some((d) => d.id === `scope-event-${scopeEvent.id}`)) return prev;
+      // Remove any previous auto-added scope event entries first
+      const cleaned = prev.filter((d) => !d.id?.toString().startsWith("scope-event-"));
+      return [
+        ...cleaned,
+        {
+          id: `scope-event-${scopeEvent.id}`,
+          date: dateStr,
+          name: scopeEvent.name,
+        } as any,
+      ];
+    });
+  }, [scopeEvent?.id, scopeEvent?.startAt]);
+
   const lastBrandIdRef = useRef<number | null>(brandId);
   useEffect(() => {
     if (lastBrandIdRef.current === brandId) return; // mount or no change

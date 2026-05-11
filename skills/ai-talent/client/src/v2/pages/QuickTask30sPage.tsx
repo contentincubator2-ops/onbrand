@@ -485,10 +485,15 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         tier === "100s" ? runOrchestra100Mut :
         runOrchestraMut;
       if (tierMut) {
+        // 2026-05-11 (CJ「product / event 也要 narrow LLM context」):
+        // pass shell scope (productId/eventId) so backend overlays
+        // product + event positioning on top of brand baseline.
         const r = await tierMut.mutateAsync({
           taskId: activeTask.id,
           inputs: { [inputKey]: primaryAnswer },
           brandId: brandId ?? undefined,
+          productId: ctx?.scope?.productId ?? null,
+          eventId: ctx?.scope?.eventId ?? null,
         });
         // Transform OrchestraResult → OutputCarousel-compatible shape.
         // Platform comes from the task itself (FB / IG / Threads). The

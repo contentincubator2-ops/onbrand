@@ -77,6 +77,9 @@ export default function ProjectsPage() {
   const ctx = useOutletContext<ShellOutletCtx>();
   const shellBrands = ctx?.brands ?? [];
   const shellBrandId = ctx?.brandId ?? null;
+  // 2026-05-11 (CJ「選了 product/event 也要 filter projects」): scope filter.
+  const shellProductId = (ctx as any)?.scope?.productId ?? null;
+  const shellEventId = (ctx as any)?.scope?.eventId ?? null;
 
   const allQuery = (trpc as any).mission?.listAllForUser?.useQuery?.(
     undefined,
@@ -114,6 +117,13 @@ export default function ProjectsPage() {
   const filtered = useMemo(() => {
     let r = rows;
     if (activeBrandId !== "all") r = r.filter((m) => m.brandId === activeBrandId);
+    // 2026-05-11 (CJ): when shell scope has product/event, narrow projects too
+    if (shellProductId) {
+      r = r.filter((m) => (m as any).scopeProductId === shellProductId);
+    }
+    if (shellEventId) {
+      r = r.filter((m) => (m as any).scopeEventId === shellEventId);
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       r = r.filter((m) =>
@@ -123,7 +133,7 @@ export default function ProjectsPage() {
       );
     }
     return r;
-  }, [rows, activeBrandId, search]);
+  }, [rows, activeBrandId, search, shellProductId, shellEventId]);
 
   // Brand chips with counts
   const brandsWithCount = useMemo(() => {

@@ -1075,7 +1075,13 @@ export const quickTaskRouter = router({
   // 60s tier — same task pool as 30s, but orchestra scales: 5 variants +
   // QA reviewer (Jordan Hayes) + 50s budget. User sees richer output.
   runOrchestra60: protectedProcedure
-    .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
+    .input(z.object({
+      taskId: z.string().min(1).max(64),
+      inputs: z.record(z.string(), z.string()).default({}),
+      brandId: z.number().optional(),
+      productId: z.number().optional().nullable(),
+      eventId: z.number().optional().nullable(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       // P0-D pre-flight cost guard
@@ -1083,6 +1089,7 @@ export const quickTaskRouter = router({
       const guard60 = await preflightCostCheck(userId);
       if (!guard60.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard60.reason });
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
+      const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
       // 60s production-package tasks (FB / IG / YT / multi-channel) take priority
       const tier60Template =
         getFB60Template(input.taskId) ?? getIG60Template(input.taskId) ??
@@ -1091,7 +1098,7 @@ export const quickTaskRouter = router({
         getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
         getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
       if (tier60Template && tier60Config) {
-        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, userId, tier: "60s" });
+        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" });
       }
       const template =
         FB_30S_TASKS.find((t) => t.id === input.taskId) ??
@@ -1110,7 +1117,7 @@ export const quickTaskRouter = router({
         getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
         getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId);
       if (!config) throw new Error(`No config for: ${input.taskId}`);
-      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, userId, tier: "60s" });
+      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" });
     }),
 
   // refineCaption — AI chat-style refinement. User sees the current caption +
@@ -1359,7 +1366,13 @@ export const quickTaskRouter = router({
   // Uses same 60s production-package task pool; orchestra adds scout stage
   // automatically when tier="100s". Falls through to 30s pool for legacy.
   runOrchestra100: protectedProcedure
-    .input(z.object({ taskId: z.string().min(1).max(64), inputs: z.record(z.string(), z.string()).default({}), brandId: z.number().optional() }))
+    .input(z.object({
+      taskId: z.string().min(1).max(64),
+      inputs: z.record(z.string(), z.string()).default({}),
+      brandId: z.number().optional(),
+      productId: z.number().optional().nullable(),
+      eventId: z.number().optional().nullable(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       // P0-D pre-flight cost guard (100s tier is the most expensive)
@@ -1367,11 +1380,12 @@ export const quickTaskRouter = router({
       const guard100 = await preflightCostCheck(userId);
       if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
+      const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
       // Priority 1: 100s campaign-level tasks (FB100/IG100/YT100/Multi100)
       const tier100Template = get100Template(input.taskId);
       const tier100Config = get100OrchestraConfig(input.taskId);
       if (tier100Template && tier100Config) {
-        return runOrchestra({ template: tier100Template, config: tier100Config, inputs: input.inputs, brandId: input.brandId, userId, tier: "100s" });
+        return runOrchestra({ template: tier100Template, config: tier100Config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "100s" });
       }
       // Priority 2: 60s production-package pools (legacy fallback)
       const tier60Template =
@@ -1381,7 +1395,7 @@ export const quickTaskRouter = router({
         getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
         getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
       if (tier60Template && tier60Config) {
-        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, userId, tier: "100s" });
+        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "100s" });
       }
       // Legacy fallback to 30s pool
       const template =
@@ -1401,7 +1415,7 @@ export const quickTaskRouter = router({
         getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
         getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId);
       if (!config) throw new Error(`No config for: ${input.taskId}`);
-      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, userId, tier: "100s" });
+      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "100s" });
     }),
 
   runOrchestra: protectedProcedure
@@ -1410,6 +1424,9 @@ export const quickTaskRouter = router({
         taskId: z.string().min(1).max(64),
         inputs: z.record(z.string(), z.string()).default({}),
         brandId: z.number().optional(),
+        // 2026-05-11 (CJ「product / event 也要 narrow LLM context」): scope.
+        productId: z.number().optional().nullable(),
+        eventId: z.number().optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1461,6 +1478,8 @@ export const quickTaskRouter = router({
         config,
         inputs: input.inputs,
         brandId: input.brandId,
+        productId: input.productId ?? null,
+        eventId: input.eventId ?? null,
         userId,
       });
     }),
