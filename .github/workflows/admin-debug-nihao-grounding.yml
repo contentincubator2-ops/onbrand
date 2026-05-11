@@ -1,0 +1,55 @@
+name: Admin — Debug 你好中文 (2842) grounding chain
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+
+            echo "════════ brand_brain (2842) ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT category, title, LEFT(content, 100) AS preview, updated_at
+              FROM brand_brain WHERE brand_id = 2842
+              ORDER BY updated_at DESC
+            "
+            COUNT=$(mysql -h localhost -u mos_user mos_db -BN -e "SELECT COUNT(*) FROM brand_brain WHERE brand_id = 2842")
+            echo "  Total: $COUNT entries"
+
+            echo ""
+            echo "════════ brand_knowledge_items (2842) ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT id, LEFT(title, 60) AS title, sourceUrl, createdAt
+              FROM brand_knowledge_items WHERE brandId = 2842
+              ORDER BY createdAt DESC LIMIT 10
+            "
+
+            echo ""
+            echo "════════ 哪個 brand 的 tagline 是「古典音樂，聽懂就好」？ ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT id, name, tagline
+              FROM brands
+              WHERE tagline LIKE '%古典音樂%' OR tagline LIKE '%聽懂%'
+            "
+
+            echo ""
+            echo "════════ recent 5 outputs for 2842 (看是哪個 task 在錯位輸出) ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT o.id, o.platform,
+                     JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '\$.taskId')) AS taskId,
+                     LEFT(o.title, 60) AS title,
+                     o.createdAt
+              FROM mission_outputs o
+              JOIN missions m ON m.id = o.missionId
+              WHERE m.brandId = 2842
+              ORDER BY o.id DESC LIMIT 5
+            "
