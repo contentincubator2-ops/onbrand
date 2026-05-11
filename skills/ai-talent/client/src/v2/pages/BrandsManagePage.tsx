@@ -75,23 +75,39 @@ export default function BrandsManagePage() {
   return (
     <div className="min-h-screen bg-neutral-50 py-8 px-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-400 mb-2">
+        {/* 2026-05-11 (CJ「這兩頁都沒有對齊」): hero aligned to /brands/edit —
+            centered editorial discipline, eyebrow + big title + serif italic
+            subtitle. 新增品牌 button moves to a top-right absolute slot so
+            the title column can stay centered without competing for space. */}
+        <div className="relative pt-2 pb-8 mb-2">
+          <div className="text-center max-w-[1100px] mx-auto">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
               BRAND MANAGER
             </p>
-            <h1 className="text-3xl font-bold text-neutral-900">所有品牌</h1>
-            <p className="text-sm text-neutral-500 mt-1">
+            <h1
+              className="font-bold tracking-tight leading-none text-neutral-900 mb-3"
+              style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
+            >
+              所有品牌
+            </h1>
+            <p
+              className="mt-3 mx-auto text-default-700"
+              style={{
+                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                fontStyle: "italic",
+                fontSize: 14,
+                lineHeight: 1.7,
+                maxWidth: 640,
+              }}
+            >
               {brands.length === 0
-                ? "還沒有任何品牌"
-                : `${brands.length} 個品牌 · 點任一張卡片進入編輯`
-              }
+                ? "從第一個品牌開始 — 為每個品牌套用 SoWork 品牌定位法"
+                : `${brands.length} 個品牌正在跑 SoWork 品牌定位法 · 點任一張卡片進入編輯`}
             </p>
           </div>
           <button
             onClick={() => navigate("/brands/edit?new=1")}
-            className="px-4 py-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold transition flex items-center gap-2"
+            className="absolute right-0 top-2 px-4 py-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold transition flex items-center gap-2"
           >
             <Plus size={16} /> 新增品牌
           </button>
