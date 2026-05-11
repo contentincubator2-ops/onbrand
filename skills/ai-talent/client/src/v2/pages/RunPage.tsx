@@ -31,6 +31,7 @@ import {
 import {
   Pencil, MessageCircle, Image as LucideImage, Video,
   Wand2, Sliders as LucideSliders, Save, Copy as LucideCopy,
+  Share2 as LucideShare,
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
@@ -67,6 +68,8 @@ export default function RunPage() {
   const [editText, setEditText] = useState<string | null>(null);
   const [chatPrompt, setChatPrompt] = useState("");
   const [copied, setCopied] = useState(false);
+  // 2026-05-11 (CJ「Spotify 模式」): community-template publish modal state.
+  const [shareModal, setShareModal] = useState(false);
   /** Local override for variants — applied after save, mockup updates live. */
   const [overrides, setOverrides] = useState<Record<number, { caption: string }>>({});
   /** AI chat history per variant. */
@@ -465,6 +468,9 @@ export default function RunPage() {
               <Divider />
               <ToolbarBtn icon={LucideCopy}    label="複製文案"       onClick={onCopy} highlight={copied} />
               <ToolbarBtn icon={Save}          label="存到 Mission" active={mode==="publish"} onClick={() => setMode("publish")} />
+              {/* 2026-05-11 (CJ「Spotify 模式」): publish this output as a
+                  community template — others can use it and you earn credits. */}
+              <ToolbarBtn icon={LucideShare}   label="公開為模板（被用就賺 credits）" onClick={() => setShareModal(true)} />
               <Divider />
               <Tooltip content="重跑同任務" placement="bottom">
                 <button
@@ -964,7 +970,184 @@ export default function RunPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* 2026-05-11 (CJ「Spotify 模式」): publish this output as a
+          community template. activeVariant + brand context already in scope. */}
+      <PublishTemplateModal
+        isOpen={shareModal}
+        onClose={() => setShareModal(false)}
+        outputId={id}
+        defaultTitle={data?.mission?.title?.toString().slice(0, 80) ?? ""}
+        defaultKind={data?.mission?.tier === "99s" ? "campaign" : "caption"}
+        tier={data?.mission?.tier ?? null}
+        platform={data?.metadata?.platform ?? null}
+        taskId={data?.mission?.taskId ?? null}
+        previewText={(() => {
+          // Use first variant caption as preview; strip super long.
+          const v = data?.variants?.[0] ?? data?.variants?.[activeIdx];
+          const cap = v?.caption ?? "";
+          return cap.length > 280 ? cap.slice(0, 280) + "…" : cap;
+        })()}
+      />
     </div>
+  );
+}
+
+/* ────────────────── PublishTemplateModal ──────────────────
+   One-shot dialog that lets a user push the current RunPage output to
+   the community template gallery. Strips obvious brand-specific tokens
+   from the content body so the template stays portable; users can
+   review + edit before submit.
+   ─────────────────────────────────────────────────────────── */
+function PublishTemplateModal({
+  isOpen, onClose, outputId, defaultTitle, defaultKind, tier, platform, taskId, previewText,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  outputId: number;
+  defaultTitle: string;
+  defaultKind: "caption" | "campaign" | "positioning" | "prompt";
+  tier: string | null;
+  platform: string | null;
+  taskId: string | null;
+  previewText: string;
+}) {
+  const [title, setTitle] = useState(defaultTitle);
+  const [description, setDescription] = useState("");
+  const [visibility, setVisibility] = useState<"public" | "unlisted">("public");
+  const [body, setBody] = useState(previewText);
+  const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
+
+  // Reset on open
+  React.useEffect(() => {
+    if (isOpen) {
+      setTitle(defaultTitle || "");
+      setDescription("");
+      setBody(previewText || "");
+      setVisibility("public");
+    }
+  }, [isOpen, defaultTitle, previewText]);
+
+  const publishMut = (trpc as any).community?.publishTemplate?.useMutation?.();
+
+  if (!isOpen) return null;
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl" backdrop="blur">
+      <ModalContent>
+        <ModalHeader className="flex flex-col items-stretch gap-0 py-2 px-4 border-b border-default-100">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-default-600">
+            COMMUNITY · PUBLISH TEMPLATE
+          </p>
+          <p className="text-[13px] font-medium text-default-800">
+            把這個產出公開回饋給社群（被別人用一次 +2 credits）
+          </p>
+        </ModalHeader>
+        <ModalBody className="space-y-3 py-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-default-600 mb-1">標題</p>
+            <Input
+              size="sm"
+              value={title}
+              onValueChange={setTitle}
+              placeholder="例：節慶限時優惠 hook + CTA 套版"
+              variant="flat"
+            />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-default-600 mb-1">
+              描述（用什麼情境、為什麼好用）
+            </p>
+            <Textarea
+              size="sm"
+              value={description}
+              onValueChange={setDescription}
+              minRows={3}
+              placeholder="例：適合電商品牌做 7 天倒數活動，hook 先給好處再點時間限制"
+              variant="flat"
+            />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-default-600 mb-1">
+              範本內容（你可以把品牌專屬字眼改成 [變數]，讓別人套用）
+            </p>
+            <Textarea
+              size="sm"
+              value={body}
+              onValueChange={setBody}
+              minRows={6}
+              maxRows={14}
+              placeholder=""
+              variant="flat"
+              classNames={{ input: "font-serif" }}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-default-700">
+            <span className="font-semibold uppercase tracking-[0.18em] text-default-600">可見：</span>
+            <button
+              className="px-2 py-1 rounded border text-xs"
+              style={{
+                borderColor: visibility === "public" ? "#171717" : "#D4D4D4",
+                background: visibility === "public" ? "#171717" : "white",
+                color: visibility === "public" ? "white" : "#404040",
+              }}
+              onClick={() => setVisibility("public")}
+            >
+              公開（出現在範本庫）
+            </button>
+            <button
+              className="px-2 py-1 rounded border text-xs"
+              style={{
+                borderColor: visibility === "unlisted" ? "#171717" : "#D4D4D4",
+                background: visibility === "unlisted" ? "#171717" : "white",
+                color: visibility === "unlisted" ? "white" : "#404040",
+              }}
+              onClick={() => setVisibility("unlisted")}
+            >
+              只給有連結的人
+            </button>
+          </div>
+          <div className="text-[11px] text-default-600 bg-default-50 border border-default-200 rounded-md p-2 leading-relaxed">
+            ⚡ 我們不會公開你的品牌名 / 受眾 / 禁忌詞 — 別人用時系統會自動套用他們的品牌。
+            這份模板代表你的 <strong>結構與寫法</strong>，不是你的內容資料。
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="light" onPress={onClose}>取消</Button>
+          <Button
+            color="primary"
+            isLoading={submitting}
+            isDisabled={!title.trim() || !body.trim()}
+            onPress={async () => {
+              setSubmitting(true);
+              try {
+                const r = await publishMut?.mutateAsync?.({
+                  title: title.trim(),
+                  description: description.trim() || undefined,
+                  kind: defaultKind,
+                  tier: (tier ?? undefined) as any,
+                  platform: platform ?? undefined,
+                  taskId: taskId ?? undefined,
+                  content: { body, structure: defaultKind },
+                  previewText: body.slice(0, 280),
+                  sourceOutputId: outputId,
+                  visibility,
+                });
+                showToastGlobal(`已發布到範本庫（#${r?.id ?? "?"}）— 被別人用一次 +2 credits ✓`);
+                onClose();
+                setTimeout(() => navigate("/community"), 800);
+              } catch (e: any) {
+                showToastGlobal(`發布失敗：${e?.message ?? e}`);
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+          >
+            發布到範本庫
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }
 

@@ -1413,6 +1413,84 @@ async function main() {
     `);
     console.log("[migrate] promo_codes: OK");
 
+    // ─── 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」): community template
+    // marketplace. Users publish successful outputs as reusable templates;
+    // other users discover + use them; contributor earns credits when used.
+    //
+    // community_templates — the catalog
+    //   sourceOutputId    NULLABLE — link back to the original mission_output
+    //                                 it came from (for attribution / preview)
+    //   content           JSON — the actual reusable structure (caption template,
+    //                            agent prompt, brand-context-agnostic
+    //                            scaffolding). Shape varies by `kind`.
+    //   kind = "caption"  — single-post caption pattern
+    //        | "campaign" — multi-post / multi-platform pattern (99s outputs)
+    //        | "positioning" — a SoWork brand positioning answer set
+    //        | "prompt"  — a tweaked agent system prompt
+    //   tier              — 30s / 60s / 99s (matches the task tier that
+    //                       can use this template)
+    //   visibility = "public" (in gallery) | "unlisted" (link-only) | "private"
+    //   featured          — admin curation: bumped to top of gallery
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS community_templates (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        authorUserId    INT          NOT NULL,
+        sourceOutputId  BIGINT       NULL,
+        title           VARCHAR(160) NOT NULL,
+        description     TEXT         NULL,
+        kind            VARCHAR(24)  NOT NULL,
+        tier            VARCHAR(8)   NULL,         -- 30s / 60s / 99s / NULL
+        platform        VARCHAR(24)  NULL,         -- facebook / instagram / ...
+        taskId          VARCHAR(64)  NULL,         -- which task this template plugs into
+        tags            JSON         NULL,         -- ["親子", "節慶", ...]
+        content         JSON         NOT NULL,     -- the reusable body
+        previewText     VARCHAR(500) NULL,         -- short blurb for gallery cards
+        previewImageUrl VARCHAR(500) NULL,
+        visibility      VARCHAR(12)  NOT NULL DEFAULT 'public',
+        featured        TINYINT(1)   NOT NULL DEFAULT 0,
+        useCount        INT          NOT NULL DEFAULT 0,
+        likeCount       INT          NOT NULL DEFAULT 0,
+        creditsEarned   INT          NOT NULL DEFAULT 0,
+        status          VARCHAR(16)  NOT NULL DEFAULT 'active', -- active / hidden / removed
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_ct_author (authorUserId, createdAt),
+        INDEX idx_ct_visibility (visibility, status, useCount),
+        INDEX idx_ct_kind_tier (kind, tier, useCount),
+        INDEX idx_ct_featured (featured, useCount)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] community_templates: OK");
+
+    // community_template_likes — one row per (template, user) who 👍'd
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS community_template_likes (
+        templateId   INT          NOT NULL,
+        userId       INT          NOT NULL,
+        likedAt      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (templateId, userId),
+        INDEX idx_ctl_user (userId, likedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] community_template_likes: OK");
+
+    // community_template_uses — every time someone uses a template,
+    // record it for analytics + credit-reward calculation. resultOutputId
+    // links to the mission_output produced from this template.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS community_template_uses (
+        id             BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        templateId     INT          NOT NULL,
+        userId         INT          NOT NULL,
+        resultOutputId BIGINT       NULL,
+        creditsAwarded INT          NOT NULL DEFAULT 0,
+        usedAt         DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_ctu_template (templateId, usedAt),
+        INDEX idx_ctu_user (userId, usedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] community_template_uses: OK");
+
     // ─── 2026-05-11 (CJ「多用戶 SaaS, 每用戶連自己 FB」): per-brand FB binding ───
     // brand.fbPageId: 該品牌綁定的 Facebook 粉專 ID (numeric)
     // brand.fbPageName: 顯示用名稱

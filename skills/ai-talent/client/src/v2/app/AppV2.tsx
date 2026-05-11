@@ -58,6 +58,8 @@ import BrandsManagePage from "../pages/BrandsManagePage";
 // 2026-05-11 (CJ「補 Sentry-style error tracking」): admin dashboard for
 // auto-captured tRPC / frontend errors. Gated server-side by adminProcedure.
 import AdminErrorsPage from "../pages/AdminErrorsPage";
+// 2026-05-11 (CJ「Spotify 模式」): community template marketplace
+import CommunityPage from "../pages/CommunityPage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -228,6 +230,8 @@ export default function AppV2() {
           {/* 2026-05-11 — error tracking dashboard. adminProcedure-gated on
               server; non-admins see a friendly FORBIDDEN screen. */}
           <Route path="/admin/errors" element={<AdminErrorsPage />} />
+          {/* 2026-05-11 — community template marketplace (Spotify model) */}
+          <Route path="/community" element={<CommunityPage />} />
           {/* 2026-05-10 account settings + achievements */}
           <Route path="/settings/account" element={<AccountPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />

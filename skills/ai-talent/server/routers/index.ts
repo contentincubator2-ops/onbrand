@@ -54,6 +54,8 @@ import { publishRouter } from "./publishRouter";
 import { billingRouter } from "./billingRouter";
 import { opsRouter } from "./opsRouter";
 import { achievementsRouter } from "./achievementsRouter";
+// 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」)
+import { communityRouter } from "./communityRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -113,6 +115,7 @@ export const appRouter = router({
   billing:         billingRouter,
   ops:             opsRouter,
   achievements:    achievementsRouter,
+  community:       communityRouter,
 });
 
 export type AppRouter = typeof appRouter;
