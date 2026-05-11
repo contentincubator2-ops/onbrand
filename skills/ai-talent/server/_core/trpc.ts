@@ -71,13 +71,72 @@ export async function createContext({ req }: { req: Request }): Promise<TRPCCont
 const t = initTRPC.context<TRPCContext>().create();
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+
+/**
+ * 2026-05-11 — Sentry-lite error capture middleware.
+ *
+ * Wraps EVERY procedure call so any uncaught error is recorded to the
+ * error_log table with full context (procedure path, type, userId,
+ * stack trace, error code). Expected-by-design errors (UNAUTHORIZED,
+ * BAD_REQUEST, NOT_FOUND, FORBIDDEN, PRECONDITION_FAILED) are skipped
+ * to avoid noise — those are user-facing flow control, not server bugs.
+ *
+ * Implementation note: kept inline (no top-level import) because the
+ * opsRouter helper does a dynamic localDb import; loading it eagerly
+ * here would risk a circular dep during cold start.
+ */
+const errorLoggerMiddleware = t.middleware(async ({ ctx, next, path, type }) => {
+  try {
+    return await next();
+  } catch (err: any) {
+    const code = err?.code ?? "INTERNAL_SERVER_ERROR";
+    const isExpected =
+      code === "UNAUTHORIZED" ||
+      code === "BAD_REQUEST" ||
+      code === "NOT_FOUND" ||
+      code === "FORBIDDEN" ||
+      code === "PRECONDITION_FAILED" ||
+      code === "CONFLICT" ||
+      code === "TOO_MANY_REQUESTS";
+    if (!isExpected) {
+      try {
+        const { logError } = await import("../routers/opsRouter");
+        // Fingerprint = source path + first line of error message, so
+        // duplicate errors group together in the admin dashboard.
+        const firstLine = String(err?.message ?? err).split("\n")[0] ?? "";
+        const fingerprint = `trpc:${path}:${firstLine.slice(0, 80)}`;
+        await logError({
+          source: `trpc.${type}`,
+          route: path,
+          message: firstLine.slice(0, 500),
+          stack: typeof err?.stack === "string" ? err.stack : undefined,
+          userId: ctx.user?.id,
+          fingerprint,
+          meta: {
+            code,
+            type,
+            path,
+            // Cause if upstream wrapped a real error in a TRPCError.
+            cause: err?.cause ? String(err.cause).slice(0, 300) : undefined,
+          },
+          level: "error",
+        });
+      } catch (logErr) {
+        console.error("[trpc errorLogger] failed to record:", logErr);
+      }
+    }
+    throw err; // never swallow — propagate to client
+  }
+});
+
+export const publicProcedure = t.procedure.use(errorLoggerMiddleware);
 
 /**
  * Protected procedure — requires authenticated user.
  * Throws UNAUTHORIZED if no user in context.
  */
 export const protectedProcedure = t.procedure
+  .use(errorLoggerMiddleware)
   .use(({ ctx, next }) => {
     if (!ctx.user) {
       console.warn('[trpc] protectedProcedure: No user in context');
@@ -90,3 +149,20 @@ export const protectedProcedure = t.procedure
     console.log(`[trpc] Protected procedure called: ${path} by userId:`, ctx.user?.id);
     return next({ ctx });
   });
+
+/**
+ * 2026-05-11 — adminProcedure: gated by users.role = 'admin'. Used by
+ * the error-tracking dashboard + future admin tools.
+ */
+export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  const { default: localPool } = await import("../localDb");
+  const [rows]: any = await localPool.execute(
+    `SELECT role FROM users WHERE id = ? LIMIT 1`,
+    [ctx.user.id],
+  );
+  const role = (rows as any[])[0]?.role;
+  if (role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
+  }
+  return next({ ctx });
+});

@@ -1338,6 +1338,29 @@ async function main() {
     `);
     console.log("[migrate] error_log: OK");
 
+    // 2026-05-11 — Sentry-lite extensions: track which route fired the
+    // error, allow admins to mark items as resolved (so the dashboard
+    // surfaces only unhandled cases), and a fingerprint column so we
+    // can roll up duplicates by source+message hash. ensureCol is
+    // idempotent — re-running migrate is safe.
+    await ensureCol("error_log", "route",       "VARCHAR(160) NULL AFTER source");
+    await ensureCol("error_log", "fingerprint", "VARCHAR(64)  NULL AFTER stack");
+    await ensureCol("error_log", "resolvedAt",  "DATETIME(3)  NULL");
+    await ensureCol("error_log", "resolvedBy",  "INT          NULL");
+    // Index unresolved-first for the admin dashboard query path.
+    try {
+      await conn.execute(`CREATE INDEX idx_error_unresolved ON error_log (resolvedAt, createdAt)`);
+    } catch (e: any) {
+      // 1061 = Duplicate key name (index already exists) — ignore.
+      if (!String(e?.message ?? "").includes("Duplicate")) throw e;
+    }
+    try {
+      await conn.execute(`CREATE INDEX idx_error_fingerprint ON error_log (fingerprint, createdAt)`);
+    } catch (e: any) {
+      if (!String(e?.message ?? "").includes("Duplicate")) throw e;
+    }
+    console.log("[migrate] error_log extensions (route / fingerprint / resolvedAt): OK");
+
     // ─── 2026-05-10 (CJ「成就系統」): user_achievements ─────
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS user_achievements (

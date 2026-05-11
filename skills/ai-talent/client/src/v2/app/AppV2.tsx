@@ -55,6 +55,9 @@ import PrivacyPage from "../pages/legal/PrivacyPage";
 import RefundPage from "../pages/legal/RefundPage";
 import AchievementsPage from "../pages/AchievementsPage";
 import BrandsManagePage from "../pages/BrandsManagePage";
+// 2026-05-11 (CJ「補 Sentry-style error tracking」): admin dashboard for
+// auto-captured tRPC / frontend errors. Gated server-side by adminProcedure.
+import AdminErrorsPage from "../pages/AdminErrorsPage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -70,6 +73,39 @@ class AppErrorBoundary extends React.Component<
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // eslint-disable-next-line no-console
     console.error("[AppV2] render error:", error, info);
+    // 2026-05-11 — auto-report to the Sentry-lite error_log table so the
+    // /admin/errors dashboard surfaces frontend crashes without users
+    // needing to tell us. Fingerprint = first line of error so same
+    // bug rolls up. Best-effort: if logging fails we still render the
+    // recovery screen below.
+    try {
+      const firstLine = String(error?.message ?? "").split("\n")[0] ?? "render error";
+      const fingerprint = `react:${firstLine.slice(0, 80)}`;
+      // Use the trpc proxy directly via fetch (avoids importing the React
+      // hook outside a component). The endpoint is publicProcedure so it
+      // works pre-login too.
+      const body = {
+        json: {
+          level: "error",
+          source: "frontend.render",
+          route: window.location.pathname,
+          message: firstLine.slice(0, 500),
+          stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
+          fingerprint,
+          meta: {
+            componentStack: info?.componentStack?.slice(0, 1000),
+            href: window.location.href,
+            ua: navigator.userAgent.slice(0, 200),
+          },
+        },
+      };
+      fetch("/api/trpc/ops.logError?batch=0", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "include",
+      }).catch(() => { /* swallow */ });
+    } catch { /* never throw from componentDidCatch */ }
   }
   render() {
     if (this.state.error) {
@@ -189,6 +225,9 @@ export default function AppV2() {
           <Route path="/templates/:slug" element={<MethodologyDetail />} />
           <Route path="/squad-mockups" element={<SquadMockupsGalleryPage />} />
           <Route path="/admin/squads" element={<SquadLabPage />} />
+          {/* 2026-05-11 — error tracking dashboard. adminProcedure-gated on
+              server; non-admins see a friendly FORBIDDEN screen. */}
+          <Route path="/admin/errors" element={<AdminErrorsPage />} />
           {/* 2026-05-10 account settings + achievements */}
           <Route path="/settings/account" element={<AccountPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />
