@@ -28,8 +28,15 @@ export function useToast() {
  * Set by ToastProvider on mount; safe-no-op until provider is mounted.
  */
 let _globalShowToast: ToastContextValue["showToast"] = () => {};
-export function showToastGlobal(message: string, type: ToastType = "error") {
-  try { _globalShowToast(message, type); } catch {/* no-op */}
+// 2026-05-11 (CJ feedback「紅色 toast 沒有真的在做的感覺」): default
+// changed from "error" → "success" — most call sites are confirmations
+// ("已儲存", "已寄出", "影片任務已啟動"). Error sites still pass "error"
+// explicitly where they showed `失敗:` / `error:` in the message.
+export function showToastGlobal(message: string, type?: ToastType) {
+  // Auto-infer error if message contains error markers, otherwise success
+  const inferred: ToastType =
+    type ?? (/失敗|錯誤|error|fail|無法|忙不過來|忙碌/i.test(message) ? "error" : "success");
+  try { _globalShowToast(message, inferred); } catch {/* no-op */}
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {

@@ -467,7 +467,8 @@ export default function RunPage() {
               <ToolbarBtn icon={LucideSliders} label="參數"           active={mode==="settings"} onClick={() => setMode("settings")} />
               <Divider />
               <ToolbarBtn icon={LucideCopy}    label="複製文案"       onClick={onCopy} highlight={copied} />
-              <ToolbarBtn icon={Save}          label="存到 Mission" active={mode==="publish"} onClick={() => setMode("publish")} />
+              {/* 2026-05-11 (CJ feedback「存 Mission 不要出現在工具列，只要在下方」):
+                  publish card 已經有「存到 Mission」按鈕，工具列這個是重複，砍掉。 */}
               {/* 2026-05-11 (CJ「這個功能可以晚一點再上，先處理別的」):
                   範本收藏 / 市集功能暫緩到 P1 後 — 等 insights 回饋系統做完
                   才能設計品質門檻。Button 暫時拿掉，schema + endpoints 保留。
@@ -613,20 +614,31 @@ export default function RunPage() {
               {mode === "image" && (
                 <>
                   <p className="text-tiny font-semibold">改配圖</p>
+                  {/* 2026-05-11 (CJ feedback「應該要先給用戶指令」):
+                      明確分兩步 — Step 1 寫指令 → Step 2 產圖。
+                      底下圖片變成「目前的圖」獨立區塊，不混在 prompt 裡 */}
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
+                    Step 1：先告訴我你想要什麼樣的圖（或調整現有 prompt）
+                  </div>
                   <Textarea
-                    label="圖片 prompt（可調整）"
+                    label="圖片指令（prompt）"
+                    placeholder="例：陽光灑落在溫暖木桌上，一碗冒著煙的健力湯，柔焦背景帶有家庭溫度"
                     value={imagePrompt}
                     onChange={(e) => setImagePrompt(e.target.value)}
                     minRows={3}
                     maxRows={6}
-                    description="會帶入品牌視覺脈絡（顏色、風格、調性）"
+                    description="會自動帶入品牌的色彩 / 風格 / 調性脈絡。寫越具體圖越貼近你要的"
+                    autoFocus
                   />
                   {slide?.imageUrl && (
-                    <div className="rounded-lg overflow-hidden border border-default-200">
+                    <div className="rounded-lg overflow-hidden border border-default-200 mt-2">
+                      <p className="text-[10px] text-default-500 px-2 py-1 bg-default-50">目前這篇的圖：</p>
                       <img src={slide.imageUrl} alt="current" className="w-full h-auto" />
-                      <p className="text-[10px] text-default-500 px-2 py-1">當前圖片</p>
                     </div>
                   )}
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
+                    Step 2：按下面按鈕，會用你的指令重新產圖（蓋掉目前的圖）
+                  </div>
                   <Button
                     color="secondary" fullWidth
                     isLoading={imageGenMut.isPending}
@@ -661,16 +673,30 @@ export default function RunPage() {
               {mode === "video" && (
                 <>
                   <p className="text-tiny font-semibold">從這篇生影片</p>
-                  <p className="text-[11px] text-default-500 leading-relaxed">
-                    用此 variant caption 當主題，async 跑 Hailuo / Seedance pipeline，5–10 分鐘出影片。
-                    產生中可以繼續做其他事。
-                  </p>
+                  {/* 2026-05-11 (CJ feedback「影片也是要先給指令」):
+                      明確分兩步 — Step 1 寫影片 prompt → Step 2 選秒數 → Step 3 啟動 */}
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
+                    Step 1：先寫影片想呈現什麼（會自動帶入這篇的 caption 當補充）
+                  </div>
+                  <Textarea
+                    label="影片指令"
+                    placeholder="例：開頭 3 秒抓住觀眾的廚房畫面，接著鏡頭帶到一碗冒煙的健力湯，配上「忙到沒時間，也能餐餐補蛋白」的字卡"
+                    value={imagePrompt /* 重用 imagePrompt 也存影片指令 */}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    minRows={3}
+                    maxRows={6}
+                    description="可空白 — 留空就用此 variant 的 caption 當題目"
+                    autoFocus
+                  />
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
+                    Step 2：選影片長度（越短越快）
+                  </div>
                   <div className="flex gap-1.5">
                     {(["15", "30", "60"] as const).map((d) => (
                       <button
                         key={d}
                         onClick={() => setVideoDuration(Number(d))}
-                        className={`flex-1 px-2 py-1 text-tiny rounded border transition ${
+                        className={`flex-1 px-2 py-1.5 text-tiny rounded border transition ${
                           videoDuration === Number(d)
                             ? "bg-secondary text-white border-secondary"
                             : "bg-white text-default-700 border-default-200 hover:border-secondary"
@@ -678,14 +704,18 @@ export default function RunPage() {
                       >{d}s</button>
                     ))}
                   </div>
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
+                    Step 3：啟動任務（5–10 分鐘後出影片，期間可繼續做別的）
+                  </div>
                   <Button
                     color="secondary" fullWidth
                     isLoading={videoGenMut.isPending}
                     isDisabled={videoGenMut.isPending || !slide?.caption?.trim()}
                     onPress={() => {
-                      const topic = (slide?.caption ?? "").slice(0, 200);
-                      if (!topic.trim()) {
-                        showToastGlobal("此 variant 沒有文案，無法生影片");
+                      // 用戶 prompt 優先，沒填就用 caption 當題目
+                      const topic = (imagePrompt.trim() || (slide?.caption ?? "").slice(0, 200)).trim();
+                      if (!topic) {
+                        showToastGlobal("請先填影片指令，或這個 variant 要有文案");
                         return;
                       }
                       videoGenMut.mutate({
@@ -701,12 +731,23 @@ export default function RunPage() {
                       });
                     }}
                   >
-                    {videoGenMut.isPending ? "排入佇列…" : `立即生 ${videoDuration} 秒影片`}
+                    {videoGenMut.isPending ? "排入佇列…" : `🎬 立即生 ${videoDuration} 秒影片`}
                   </Button>
                   {videoJobId && (
-                    <div className="bg-default-50 rounded-lg p-2.5 text-[11px] space-y-1">
-                      <p className="font-semibold">影片任務 #{videoJobId}</p>
-                      <p className="text-default-500">{videoStatusLabel}</p>
+                    <div className="bg-default-50 rounded-lg p-2.5 text-[11px] space-y-1 border border-secondary-200">
+                      <p className="font-semibold flex items-center gap-2">
+                        🎞️ 影片任務 #{videoJobId}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                          videoStatus?.status === "completed" ? "bg-success-100 text-success-800" :
+                          videoStatus?.status === "failed" ? "bg-danger-100 text-danger-800" :
+                          "bg-warning-100 text-warning-800"
+                        }`}>{videoStatusLabel}</span>
+                      </p>
+                      {videoStatus?.status === "failed" && (
+                        <p className="text-[11px] text-danger-700 leading-relaxed">
+                          {videoStatus?.errorMessage ?? "未知錯誤"} — 影片產出 pipeline 還在 beta，部分內容可能不支援。試短一點的 prompt 或 15s 短片。
+                        </p>
+                      )}
                       {videoUrl && (
                         <video controls className="w-full rounded mt-2">
                           <source src={videoUrl} />
@@ -872,13 +913,27 @@ export default function RunPage() {
                 startContent={<FontAwesomeIcon icon={faEnvelope} />}
                 onPress={() => setEmailDialogOpen(true)}
               >寄給團隊</Button>
+              {/* 2026-05-11 (CJ feedback「存 Mission 沒有成功反饋」):
+                  - 成功後 button 變綠色 + 顯示「✓ 已存到 /projects」
+                  - 加 link 到 /projects 讓用戶能立刻去看 */}
               <Button
                 variant="flat" fullWidth
-                startContent={<FontAwesomeIcon icon={faFolderPlus} />}
+                startContent={<FontAwesomeIcon icon={data.status === "approved" ? faClipboardCheck : faFolderPlus} />}
+                color={data.status === "approved" ? "success" : "default"}
                 isDisabled={data.status === "approved" || statusMut.isPending}
                 isLoading={statusMut.isPending}
                 onPress={() => statusMut.mutate({ id, status: "approved" })}
-              >{data.status === "approved" ? "✓ 已存 Mission" : "存到 Mission"}</Button>
+              >
+                {data.status === "approved"
+                  ? "✓ 已存到 Mission（點開「專案」找）"
+                  : "存到 Mission"}
+              </Button>
+              {data.status === "approved" && (
+                <button
+                  onClick={() => navigate("/projects")}
+                  className="text-[11px] text-secondary hover:underline text-center"
+                >→ 直接去專案頁看</button>
+              )}
               {/* 2026-05-09 (CJ): removed 複製文字 here — duplicates the
                   toolbar 📋 複製文案 button. Keep only 複製此頁網址 (different
                   function: shares the run URL, not the caption). */}
