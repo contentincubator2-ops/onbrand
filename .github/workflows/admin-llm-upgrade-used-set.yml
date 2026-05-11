@@ -59,37 +59,66 @@ jobs:
                 with urllib.request.urlopen(req, timeout=90) as r:
                     return json.loads(r.read())["content"][0]["text"].strip()
 
-            # 1. Find sub-A+ in used-set
+            # 1. Find sub-A+ ids only (avoid tab-in-bio parse issues)
             id_csv = ",".join(ALL_IDS)
-            rows = mysql(
-              "SELECT id, IFNULL(name,''), IFNULL(title,''), IFNULL(bio,''), "
-              "IFNULL(specialty,''), IFNULL(methodology,''), "
-              "CHAR_LENGTH(IFNULL(workingPrinciples,'')), "
-              "CHAR_LENGTH(IFNULL(experienceDetail,'')), "
-              "(CHAR_LENGTH(IFNULL(bio,''))"
-              "+CHAR_LENGTH(IFNULL(specialty,''))"
-              "+CHAR_LENGTH(IFNULL(methodology,''))"
-              "+CHAR_LENGTH(IFNULL(taskSystemPrompt,''))"
-              "+CHAR_LENGTH(IFNULL(experienceDetail,''))"
-              "+CHAR_LENGTH(IFNULL(workingPrinciples,''))"
-              "+CHAR_LENGTH(IFNULL(specialtySummary,''))"
-              "+CHAR_LENGTH(IFNULL(tool_instructions,''))"
-              "+CHAR_LENGTH(IFNULL(bio_zh,''))) AS total "
-              f"FROM agents WHERE id IN ({id_csv}) HAVING total < 2000 ORDER BY total ASC"
+            sub_ids_raw = mysql(
+              "SELECT id FROM ("
+              "  SELECT id, "
+              "    (CHAR_LENGTH(IFNULL(bio,''))"
+              "    +CHAR_LENGTH(IFNULL(specialty,''))"
+              "    +CHAR_LENGTH(IFNULL(methodology,''))"
+              "    +CHAR_LENGTH(IFNULL(taskSystemPrompt,''))"
+              "    +CHAR_LENGTH(IFNULL(experienceDetail,''))"
+              "    +CHAR_LENGTH(IFNULL(workingPrinciples,''))"
+              "    +CHAR_LENGTH(IFNULL(specialtySummary,''))"
+              "    +CHAR_LENGTH(IFNULL(tool_instructions,''))"
+              "    +CHAR_LENGTH(IFNULL(bio_zh,''))) AS tc"
+              f"  FROM agents WHERE id IN ({id_csv})"
+              ") x WHERE tc < 2000 ORDER BY tc ASC"
             ).strip()
-            if not rows:
+            sub_ids = [int(x) for x in sub_ids_raw.split() if x.isdigit()]
+            print(f"Found {len(sub_ids)} sub-A+ agent ids: {sub_ids[:5]}...")
+            if not sub_ids:
                 print("All 170 in-use agents already A+ ≥ 2000.")
                 exit(0)
 
-            targets = []
-            for line in rows.split("\n"):
+            # 2. Fetch each row's content separately (safe parsing)
+            def fetch_one(aid):
+                # Use TSV with NULL replaced; we just take ONE row so newlines
+                # inside fields won't fragment line-counting.
+                env = os.environ.copy(); env["MYSQL_PWD"]="mos_secure_2026"
+                r = subprocess.run(
+                    ["mysql","-h","localhost","-u","mos_user","mos_db",
+                     "--batch","--skip-column-names","--default-character-set=utf8mb4",
+                     "-e", f"SELECT IFNULL(name,''), IFNULL(title,''), "
+                           f"IFNULL(LEFT(bio,400),''), IFNULL(LEFT(specialty,600),''), "
+                           f"IFNULL(LEFT(methodology,600),''), "
+                           f"CHAR_LENGTH(IFNULL(workingPrinciples,'')), "
+                           f"CHAR_LENGTH(IFNULL(experienceDetail,'')) "
+                           f"FROM agents WHERE id={aid} LIMIT 1"],
+                    capture_output=True, text=True, env=env, timeout=20,
+                )
+                if r.returncode != 0: return None
+                # mysql --batch escapes tabs in field values as literal \t — and
+                # escapes newlines as \n — so split on real \t is safe here.
+                # But for extra safety we strip + sanitize.
+                line = r.stdout.replace("\n", " ").strip()
                 p = line.split("\t")
-                targets.append({
-                    "id": int(p[0]), "name": p[1], "title": p[2],
-                    "bio": p[3][:400], "specialty": p[4][:600], "methodology": p[5][:600],
-                    "wp_len": int(p[6] or 0), "exp_len": int(p[7] or 0), "total": int(p[8] or 0),
-                })
-            print(f"Found {len(targets)} sub-A+ agents to upgrade")
+                if len(p) < 7: return None
+                return {
+                    "id": aid, "name": p[0], "title": p[1],
+                    "bio": p[2].replace("\\n"," ").replace("\\t"," "),
+                    "specialty": p[3].replace("\\n"," ").replace("\\t"," "),
+                    "methodology": p[4].replace("\\n"," ").replace("\\t"," "),
+                    "wp_len": int(p[5] or 0),
+                    "exp_len": int(p[6] or 0),
+                }
+
+            targets = []
+            for aid in sub_ids:
+                row = fetch_one(aid)
+                if row: targets.append(row)
+            print(f"Fetched {len(targets)} target rows")
 
             def make_wp_prompt(a):
                 return ("Write a workingPrinciples section (Traditional Chinese, 700-850 字) for this professional:\n"
@@ -104,22 +133,16 @@ jobs:
             up, sk, fail = 0, 0, 0
             for a in targets:
                 try:
-                    # Pick the shorter field to fill
-                    needed = 2200 - a["total"]
                     fill_wp = a["wp_len"] < 600
                     fill_exp = a["exp_len"] < 600
-                    if fill_wp and not fill_exp:
+                    if fill_wp:
                         txt = call_anthropic(make_wp_prompt(a))
                         col = "workingPrinciples"
-                    elif fill_exp and not fill_wp:
-                        txt = call_anthropic(make_exp_prompt(a))
-                        col = "experienceDetail"
-                    elif fill_wp and fill_exp:
-                        # Both thin; fill experienceDetail (usually more useful)
+                    elif fill_exp:
                         txt = call_anthropic(make_exp_prompt(a))
                         col = "experienceDetail"
                     else:
-                        # Both already > 600 but total still < 2000 — fill the shorter
+                        # Both >600 already but total still <2000; fill shorter
                         if a["wp_len"] < a["exp_len"]:
                             txt = call_anthropic(make_wp_prompt(a))
                             col = "workingPrinciples"
@@ -128,7 +151,7 @@ jobs:
                             col = "experienceDetail"
                     safe = txt.replace("\\","\\\\").replace("'","''")
                     mysql(f"UPDATE agents SET {col}='{safe}' WHERE id={a['id']}")
-                    print(f"  OK {a['id']} {a['name'][:14]:<14}  {col} +{len(txt)} (was total={a['total']})")
+                    print(f"  OK {a['id']} {a['name'][:14]:<14}  {col} +{len(txt)}")
                     up += 1
                     time.sleep(0.4)
                 except urllib.error.HTTPError as e:
