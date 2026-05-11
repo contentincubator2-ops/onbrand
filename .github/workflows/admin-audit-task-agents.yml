@@ -1,0 +1,127 @@
+name: Admin — Audit task-assigned agents (real DB)
+
+# 2026-05-12 (CJ「mos_db 跟你同一個 VM」): query the live DB for
+# every agent_id referenced by 30s/60s/99s task templates, report
+# real persona thickness (bio + specialty + methodology +
+# taskSystemPrompt), and grade A/B/C/D against the 800-char threshold.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQLT="mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4"
+
+            # All agent_ids referenced in task templates (grep'd from source).
+            # Includes new KOL / cross-post / A-B / competitor / festival tasks.
+            IDS="24,25,26,30006,30014,30015,30016,30019,30020,60005,60030,60061,60068,60071,60080,90004,90005,90006,180003,180157,180170,180196,210001,210011,210017,210018,210019,220164,220507,220869,220887,220896,222204,222206,222211,222311,222504,222638,222665,223197,223253,223755,223993,223995,223996,224001,224005,224054,224056,224059,224061,224067,224071,224079,224081,224086,224089,224094,224101,224114,224116,224121,224154,224156,224159,224161,224167,224171,224179,224196"
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  AGENT POOL — Distribution"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT
+                CASE
+                  WHEN tc >= 2000 THEN 'A+ (>= 2000 char)'
+                  WHEN tc >= 1500 THEN 'A  (1500-1999)'
+                  WHEN tc >= 800  THEN 'B  (800-1499)'
+                  WHEN tc >= 400  THEN 'C  (400-799)'
+                  ELSE                  'D  (<400)'
+                END AS grade,
+                COUNT(*) AS agents
+              FROM (
+                SELECT id,
+                  (CHAR_LENGTH(IFNULL(bio,''))
+                  + CHAR_LENGTH(IFNULL(specialty,''))
+                  + CHAR_LENGTH(IFNULL(methodology,''))
+                  + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))) AS tc
+                FROM agents WHERE id IN ($IDS)
+              ) x GROUP BY grade ORDER BY grade;
+            "
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  SUB-800 char agents (need upgrade)"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT id, LEFT(name, 14) AS name, LEFT(title, 30) AS title,
+                CHAR_LENGTH(IFNULL(bio,'')) AS bio,
+                CHAR_LENGTH(IFNULL(specialty,'')) AS spec,
+                CHAR_LENGTH(IFNULL(methodology,'')) AS meth,
+                CHAR_LENGTH(IFNULL(taskSystemPrompt,'')) AS tsp,
+                (CHAR_LENGTH(IFNULL(bio,''))
+                + CHAR_LENGTH(IFNULL(specialty,''))
+                + CHAR_LENGTH(IFNULL(methodology,''))
+                + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))) AS total
+              FROM agents
+              WHERE id IN ($IDS)
+              HAVING total < 800
+              ORDER BY total ASC;
+            "
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  Top 10 A+ agents (could replace weak ones)"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT id, LEFT(name, 14) AS name, LEFT(title, 35) AS title,
+                (CHAR_LENGTH(IFNULL(bio,''))
+                + CHAR_LENGTH(IFNULL(specialty,''))
+                + CHAR_LENGTH(IFNULL(methodology,''))
+                + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))) AS total
+              FROM agents
+              ORDER BY total DESC
+              LIMIT 10;
+            "
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  Strong PR / Brand / Research replacement candidates"
+            echo "  (for the 6 sub-800 PR-batch agents currently in use)"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT id, LEFT(name, 14) AS name, LEFT(title, 35) AS title,
+                (CHAR_LENGTH(IFNULL(bio,''))
+                + CHAR_LENGTH(IFNULL(specialty,''))
+                + CHAR_LENGTH(IFNULL(methodology,''))
+                + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))) AS total
+              FROM agents
+              WHERE (title LIKE '%PR%' OR title LIKE '%Press%' OR title LIKE '%公關%'
+                  OR title LIKE '%Brand%' OR title LIKE '%品牌%'
+                  OR title LIKE '%Research%' OR title LIKE '%研究%' OR title LIKE '%Insight%')
+              HAVING total >= 1500
+              ORDER BY total DESC
+              LIMIT 15;
+            "
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  Total agent pool size + grade A+ count"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT
+                COUNT(*) AS total_agents,
+                SUM(CASE WHEN tc >= 2000 THEN 1 ELSE 0 END) AS a_plus,
+                SUM(CASE WHEN tc >= 1500 AND tc < 2000 THEN 1 ELSE 0 END) AS a_grade,
+                SUM(CASE WHEN tc >= 800 AND tc < 1500 THEN 1 ELSE 0 END) AS b_grade,
+                SUM(CASE WHEN tc < 800 THEN 1 ELSE 0 END) AS sub_par
+              FROM (
+                SELECT
+                  (CHAR_LENGTH(IFNULL(bio,''))
+                  + CHAR_LENGTH(IFNULL(specialty,''))
+                  + CHAR_LENGTH(IFNULL(methodology,''))
+                  + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))) AS tc
+                FROM agents
+              ) x;
+            "
