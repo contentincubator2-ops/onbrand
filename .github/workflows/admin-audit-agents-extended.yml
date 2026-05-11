@@ -1,0 +1,130 @@
+name: Admin — Extended agent coverage (all rich fields)
+
+# 2026-05-12 (CJ「你也要查詢 agents 完整的欄位有哪些」): the persona
+# loader currently reads only 4 fields. The agents table has 10+ rich
+# text fields that may already contain content we're ignoring.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQLT="mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4"
+
+            # The 146 task-assigned agent IDs (from source code parse)
+            IDS="24,26,29,32,35,30002,30003,30004,30005,30006,30008,30009,30011,30013,30014,30015,30016,30017,30018,30019,30020,60002,60005,60011,60012,60021,60022,60029,60030,60031,60033,60035,60036,60037,60038,60048,60055,60056,60060,60061,60063,60066,60068,60072,60073,90004,90005,90006,90031,90032,180003,180009,180039,180054,180062,180068,180143,180150,180157,180158,180159,180166,180167,180168,180172,180173,180175,180176,180186,180193,180196,180197,180199,180203,180797,210001,210011,210173,210252,210266,210301,210302,220164,220504,220506,220507,220508,220869,220887,220890,220896,222204,222206,222211,222311,222504,222638,222665,222727,222814,222932,222933,222934,223197,223253,223755,223993,223995,223996,224001,224005,224054,224056,224059,224061,224067,224071,224079,224081,224086,224089,224094,224101,224114,224116,224117,224121,224136,224144,224154,224155,224156,224159,224161,224167,224171,224176,224179,224189,224196,224219,224220,224251"
+
+            echo "════════════════════════════════════════════════════════"
+            echo "  EXTENDED COVERAGE — text fields not currently loaded"
+            echo "  (across the 146 task-assigned agents)"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT 'bio              (in use)' AS field,
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(bio,'')) > 50 THEN 1 ELSE 0 END) AS has_substantive,
+                ROUND(AVG(CHAR_LENGTH(IFNULL(bio,'')))) AS avg_len
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT 'specialty        (in use)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(specialty,'')) > 50 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(specialty,''))))
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT 'methodology      (in use)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(methodology,'')) > 50 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(methodology,''))))
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT 'taskSystemPrompt (in use)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(taskSystemPrompt,'')) > 50 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(taskSystemPrompt,''))))
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT '──── newly discovered ────',
+                NULL, NULL
+              UNION ALL SELECT 'experienceDetail (NEW)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(experienceDetail,'')) > 50 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(experienceDetail,''))))
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT 'workingPrinciples(NEW)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(workingPrinciples,'')) > 50 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(workingPrinciples,''))))
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT 'specialtySummary (NEW)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(specialtySummary,'')) > 50 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(specialtySummary,''))))
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT 'tool_instructions(NEW)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(tool_instructions,'')) > 50 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(tool_instructions,''))))
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT 'bio_zh           (NEW)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(bio_zh,'')) > 50 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(bio_zh,''))))
+                FROM agents WHERE id IN ($IDS)
+              UNION ALL SELECT 'caseStudies      (json)',
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(JSON_UNQUOTE(JSON_EXTRACT(caseStudies,'$')),'')) > 20 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(JSON_UNQUOTE(JSON_EXTRACT(caseStudies,'$')),''))))
+                FROM agents WHERE id IN ($IDS)
+              ;
+            "
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  EXTENDED total (10 fields) — re-grade"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT
+                CASE
+                  WHEN ext_total >= 2000 THEN 'A+ (>= 2000)'
+                  WHEN ext_total >= 1500 THEN 'A  (1500-1999)'
+                  WHEN ext_total >= 800  THEN 'B  (800-1499)'
+                  WHEN ext_total >= 400  THEN 'C  (400-799)'
+                  ELSE                       'D  (<400)'
+                END AS grade,
+                COUNT(*) AS agents
+              FROM (
+                SELECT id,
+                  (CHAR_LENGTH(IFNULL(bio,''))
+                  + CHAR_LENGTH(IFNULL(specialty,''))
+                  + CHAR_LENGTH(IFNULL(methodology,''))
+                  + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))
+                  + CHAR_LENGTH(IFNULL(experienceDetail,''))
+                  + CHAR_LENGTH(IFNULL(workingPrinciples,''))
+                  + CHAR_LENGTH(IFNULL(specialtySummary,''))
+                  + CHAR_LENGTH(IFNULL(tool_instructions,''))
+                  + CHAR_LENGTH(IFNULL(bio_zh,''))
+                  + CHAR_LENGTH(IFNULL(JSON_UNQUOTE(JSON_EXTRACT(caseStudies,'$')),''))) AS ext_total
+                FROM agents WHERE id IN ($IDS)
+              ) x GROUP BY grade ORDER BY grade;
+            "
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  Per-agent breakdown (top + bottom)"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT id, LEFT(name,14) AS name,
+                CHAR_LENGTH(IFNULL(bio,''))               AS bio,
+                CHAR_LENGTH(IFNULL(specialty,''))         AS spec,
+                CHAR_LENGTH(IFNULL(methodology,''))       AS meth,
+                CHAR_LENGTH(IFNULL(experienceDetail,''))  AS exp,
+                CHAR_LENGTH(IFNULL(workingPrinciples,'')) AS wp,
+                CHAR_LENGTH(IFNULL(specialtySummary,''))  AS ssum,
+                CHAR_LENGTH(IFNULL(tool_instructions,'')) AS tool,
+                (CHAR_LENGTH(IFNULL(bio,''))
+                + CHAR_LENGTH(IFNULL(specialty,''))
+                + CHAR_LENGTH(IFNULL(methodology,''))
+                + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))
+                + CHAR_LENGTH(IFNULL(experienceDetail,''))
+                + CHAR_LENGTH(IFNULL(workingPrinciples,''))
+                + CHAR_LENGTH(IFNULL(specialtySummary,''))
+                + CHAR_LENGTH(IFNULL(tool_instructions,''))) AS extended
+              FROM agents WHERE id IN ($IDS)
+              ORDER BY extended DESC LIMIT 10;
+            "
