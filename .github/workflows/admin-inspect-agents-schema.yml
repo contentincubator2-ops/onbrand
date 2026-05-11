@@ -1,0 +1,69 @@
+name: Admin — Inspect agents table schema + field coverage
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQLT="mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4"
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  agents TABLE — full column list"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "SHOW COLUMNS FROM agents;"
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  Coverage of EVERY text-ish column (whole pool, 16k agents)"
+            echo "  How many rows have non-empty values + avg char count"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT
+                'bio'              AS field, COUNT(*) AS total,
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(bio,''))             > 0 THEN 1 ELSE 0 END) AS non_empty,
+                ROUND(AVG(CHAR_LENGTH(IFNULL(bio,'')))) AS avg_chars,
+                MAX(CHAR_LENGTH(IFNULL(bio,''))) AS max_chars FROM agents
+              UNION ALL SELECT 'specialty',         COUNT(*),
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(specialty,''))        > 0 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(specialty,'')))),
+                MAX(CHAR_LENGTH(IFNULL(specialty,''))) FROM agents
+              UNION ALL SELECT 'methodology',       COUNT(*),
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(methodology,''))      > 0 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(methodology,'')))),
+                MAX(CHAR_LENGTH(IFNULL(methodology,''))) FROM agents
+              UNION ALL SELECT 'taskSystemPrompt',  COUNT(*),
+                SUM(CASE WHEN CHAR_LENGTH(IFNULL(taskSystemPrompt,'')) > 0 THEN 1 ELSE 0 END),
+                ROUND(AVG(CHAR_LENGTH(IFNULL(taskSystemPrompt,'')))),
+                MAX(CHAR_LENGTH(IFNULL(taskSystemPrompt,''))) FROM agents;
+            "
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  Other potentially-rich fields (introspect via SHOW)"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+              FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = 'mos_db' AND TABLE_NAME = 'agents'
+                AND DATA_TYPE IN ('text','varchar','mediumtext','longtext','json')
+              ORDER BY CHARACTER_MAXIMUM_LENGTH DESC;
+            "
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo "  Sample A+ agent #29 Amy Su — show ALL non-empty fields"
+            echo "════════════════════════════════════════════════════════"
+            $MYSQLT -e "
+              SELECT * FROM agents WHERE id = 29 LIMIT 1\G
+            " | head -200
