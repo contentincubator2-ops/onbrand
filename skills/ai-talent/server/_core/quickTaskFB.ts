@@ -9,11 +9,59 @@
  * Image / video rendering is opt-in via MediaGenFlow (separate flow, no SLA).
  */
 
+/**
+ * 2026-05-11 — `DerivePath` describes WHERE an input's value can be
+ * pulled from the brand context (so the modal doesn't ask users for
+ * data the system already has).
+ *
+ * Dot-path syntax against the resolved brand context object:
+ *   brand.name
+ *   brand.industry
+ *   brand.positioning.audience.primary
+ *   brand.positioning.competition.direct  (array of { name, position, ... })
+ *   brand.positioning.differentiation.summary
+ *   brand.positioning.goldenCircle.why
+ *   product.positioning.coreStatement
+ *   event.positioning.smp.singleMindedProposition
+ *
+ * `mode` controls the modal behaviour when a derived value is found:
+ *   auto    — skip the prompt entirely, use the derived value silently
+ *   confirm — pre-fill the field, let the user edit or confirm
+ *   ask     — still ask, but show the derived value as a hint
+ */
+export type DerivePath = string;
+export interface InputDerive {
+  from: DerivePath[];
+  mode: "auto" | "confirm" | "ask";
+  /** Optional template for shaping the derived raw value into a string
+   *  the user / LLM will see. e.g., for an array of competitor objects
+   *  → "屈臣氏、86 小舖、Watsons". Implemented as a registry of shapers
+   *  keyed by the last segment of the first `from` path. */
+  shape?: "auto" | "list-names" | "summary";
+}
+
+export interface TaskInput {
+  key: string;
+  label: string;
+  type: "text" | "textarea";
+  required: boolean;
+  placeholder?: string;
+  /** 2026-05-11 — if this input is derivable from brand positioning, the
+   *  intake modal will pre-fill or skip it. See InputDerive comment. */
+  derive?: InputDerive;
+}
+
 export interface FBTaskTemplate {
   id: string;                              // e.g. "fb-30-caption-short"
   tier: "30s" | "60s" | "90s" | "100s";
   postType: string;                        // matches mockup format key
-  label: string;                           // user-facing chip label
+  /**
+   * Display label. Legacy form was a single string. 2026-05-11 introduced
+   * structured form { en, zh } so the bilingual title can stay in sync —
+   * UI renders { en, zh } as "English · 中文" without manual concatenation.
+   * Legacy string still supported during migration.
+   */
+  label: string | { en: string; zh: string };
   description: string;                     // 1-line UI hint
   /**
    * 2026-05-05: agent_id is the existing agents.id in mos_db whose persona,
@@ -26,8 +74,14 @@ export interface FBTaskTemplate {
   agent_id?: number;
   skill_slug?: string;
   primary_question?: string;
-  primary_input?: { key: string; placeholder?: string; type: "text" | "textarea" };
-  inputs: Array<{ key: string; label: string; type: "text" | "textarea"; required: boolean; placeholder?: string }>;
+  primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: InputDerive };
+  inputs: TaskInput[];
+  /**
+   * 2026-05-11 — declarative list of brand-context paths the task
+   * implicitly reads (in addition to per-input `derive`). Drives the
+   * "我會用 X 來跑這個任務" confirmation strip in the modal.
+   */
+  contextSources?: DerivePath[];
   systemPrompt: string;                    // task-specific instruction, appended AFTER agent persona
   preferredModel: "qwen" | "zhipu" | "azure-foundry" | "azure-position" | "hermes" | "any";
   /** maxTokens cap — 30s aim ~400, 60s ~900, 90s ~1800 */
@@ -39,6 +93,25 @@ export interface FBTaskTemplate {
     platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "generic";
     post_type: string;
   };
+}
+
+/**
+ * 2026-05-11 — resolve a structured-or-string label to the active locale.
+ * For now we always render zh; en is shown as a small subtitle in the
+ * modal header so the bilingual semantics stay visible without doubling
+ * the chip label width.
+ */
+export function labelZh(t: FBTaskTemplate): string {
+  return typeof t.label === "string" ? t.label : t.label.zh;
+}
+export function labelEn(t: FBTaskTemplate): string | null {
+  if (typeof t.label === "string") {
+    // Legacy: pull the first ASCII run as the EN candidate, e.g.
+    // "FB 30 天內容月曆" → null (no leading EN), "User Research 競品..." → "User Research".
+    const m = t.label.match(/^[A-Za-z][A-Za-z0-9 \-/]+(?=\s|$)/);
+    return m ? m[0].trim() : null;
+  }
+  return t.label.en;
 }
 
 // Helper to keep prompt blocks tidy

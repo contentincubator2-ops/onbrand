@@ -333,56 +333,107 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
   {
     id: "br-100-reposition-toolkit",
     tier: "100s", postType: "press",
-    label: "Brand 完整重新定位 Toolkit",
+    label: { en: "Brand Reposition Toolkit", zh: "品牌重新定位完整 Toolkit" },
     description: "Positioning + Tagline 套 + Voice guide + Visual direction + 應用範例",
     agent_id: 222665, skill_slug: "brand-strategy", // Chih-Ming Yang — PR Strategist 電商/DTC (477 char)
-    primary_question: "想轉到什麼定位？",
-    primary_input: { key: "new_position", placeholder: "新定位方向", type: "textarea" },
-    inputs: [{ key: "new_position", label: "新定位", type: "textarea", required: true }],
+    primary_question: "想往什麼方向轉？（已讀入現有定位作為起點）",
+    primary_input: { key: "new_position", placeholder: "新定位方向 / 想拋下的舊包袱", type: "textarea" },
+    inputs: [{ key: "new_position", label: "新定位方向", type: "textarea", required: true }],
+    contextSources: [
+      "brand.positioning.goldenCircle",
+      "brand.positioning.differentiation",
+      "brand.positioning.voice",
+    ],
     systemPrompt: `產出 Brand reposition toolkit 其中 1 部分（300-600 字）。
-本次你寫的是「{label}」（Positioning statement / Tagline 5 套 / Voice guide / Visual direction / 5 個應用範例）。${TONE_100}`,
+本次你寫的是「{label}」（Positioning statement / Tagline 5 套 / Voice guide / Visual direction / 5 個應用範例）。
+品牌已有完整定位 — 重新定位要明確指出哪些保留、哪些拋下，不是從零開始。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "press" },
   },
   {
     id: "br-100-voice-playbook",
     tier: "100s", postType: "press",
-    label: "Brand Voice 完整 Playbook",
+    label: { en: "Brand Voice Playbook", zh: "品牌語氣完整 Playbook" },
     description: "8 個應用情境 + Do/Don't 詳細 + 5 個範例 + 跨平台 voice 適配",
     agent_id: 26, skill_slug: "brand-strategy", // Emma Wu — Meta Ads Strategist (specialty 4338 chars)
-    primary_question: "想塑造什麼語氣？",
-    primary_input: { key: "voice_direction", placeholder: "語氣方向", type: "textarea" },
-    inputs: [{ key: "voice_direction", label: "語氣方向", type: "textarea", required: true }],
+    primary_question: "想補充或微調哪些情境？（已讀入既有 Voice — 留空即直接展開 8 情境 playbook）",
+    primary_input: { key: "voice_direction", placeholder: "選填 — 想強化的特定情境，如客服 / 危機 / 跨國", type: "textarea" },
+    inputs: [{ key: "voice_direction", label: "情境補充（選填）", type: "textarea", required: false }],
+    contextSources: [
+      "brand.positioning.voice",
+      "brand.positioning.goldenCircle.why",
+    ],
     systemPrompt: `產出 Brand voice playbook 其中 1 部分（400-700 字）。
-本次你寫的是「{label}」。${TONE_100}`,
+本次你寫的是「{label}」。品牌已有「Voice」段落（人格原型 / 語調詞 / 禁區 / 範例對比）— 此 toolkit 是把它延伸到 8 個實戰情境（社群 / 客服 / 危機 / EDM / PR / 跨國 / 內部 / API），不要重寫基礎 voice。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1300,
     outputDefaults: { platform: "press", post_type: "press" },
   },
   {
     id: "rs-100-discovery-sprint",
     tier: "100s", postType: "press",
-    label: "User Research 5 天 Discovery Sprint",
+    label: { en: "User Research · Discovery Sprint", zh: "用戶研究 5 天 Discovery Sprint" },
     description: "訪綱 + 5 personas + JTBD map + insights synthesis + 行動建議",
     agent_id: 222638, skill_slug: "user-research", // Chun-Chieh Hung — PR Strategist 製藥/醫藥 (470 char)
-    primary_question: "想了解用戶什麼？",
-    primary_input: { key: "research_goal", placeholder: "研究目標 / 假設", type: "textarea" },
-    inputs: [{ key: "research_goal", label: "研究目標", type: "textarea", required: true }],
+    primary_question: "想了解用戶什麼？（已讀入既有受眾定位 — 留空即用既有 persona 延伸研究假設）",
+    primary_input: {
+      key: "research_goal",
+      placeholder: "選填 — 想驗證的新假設或想深挖的角度",
+      type: "textarea",
+    },
+    inputs: [{ key: "research_goal", label: "研究目標（選填）", type: "textarea", required: false }],
+    contextSources: [
+      "brand.positioning.audience.primary",
+      "brand.positioning.audience.matrix",
+      "brand.positioning.goldenCircle.why",
+    ],
     systemPrompt: `產出 Discovery sprint 其中 1 部分（400-700 字）。
-本次你寫的是「{label}」（Day 1 訪綱 / Day 2-3 訪談 + 5 personas / Day 4 JTBD map / Day 5 synthesis + 行動）。${TONE_100}`,
+本次你寫的是「{label}」（Day 1 訪綱 / Day 2-3 訪談 + 5 personas / Day 4 JTBD map / Day 5 synthesis + 行動）。
+品牌定位的「目標受眾」已建立 primary persona 與情感需求矩陣 — 請以此為起點延伸研究假設，不要重新拆受眾。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1300,
     outputDefaults: { platform: "press", post_type: "press" },
   },
   {
     id: "rs-100-competitor-mapping",
     tier: "100s", postType: "press",
-    label: "User Research 競品研究完整地圖",
+    // 2026-05-11 (CJ「中英文研究意圖不一樣」): split label + correct EN
+    // (this is competitor research, not user research).
+    label: { en: "Competitor Research Map", zh: "競品研究完整地圖" },
     description: "5-10 競品分析 + 定位 map + opportunity gaps + 推薦策略",
-    agent_id: 90006, skill_slug: "user-research", // Steven Chen — Research Manager, Consumer Insights
-    primary_question: "你的領域？",
-    primary_input: { key: "category", placeholder: "產品類別 / 市場", type: "textarea" },
-    inputs: [{ key: "category", label: "領域", type: "textarea", required: true }],
+    agent_id: 90006, skill_slug: "competitive-intel", // Steven Chen — Research Manager, Consumer Insights
+    primary_question: "想補充什麼？（系統已讀入品牌的競品定位 — 可留空直接跑）",
+    primary_input: {
+      key: "category",
+      placeholder: "選填 — 想額外切入的角度，例如：只看線上競品、加入海外案例",
+      type: "textarea",
+      // 2026-05-11 — auto-resolve the领域 from the brand's audience +
+      // industry. If the brand has positioning, the modal pre-fills
+      // and the question becomes optional rather than required.
+      derive: {
+        from: ["brand.positioning.audience.primary", "brand.industry"],
+        mode: "auto",
+      },
+    },
+    inputs: [{
+      key: "category",
+      label: "額外補充（選填）",
+      type: "textarea",
+      required: false, // ← no longer required; positioning provides ground truth
+      derive: {
+        from: ["brand.positioning.audience.primary", "brand.industry"],
+        mode: "auto",
+      },
+    }],
+    // 2026-05-11 — declare which positioning segments the task uses,
+    // so the modal can show "我會用 X 競品 / Y 受眾 來跑這個任務".
+    contextSources: [
+      "brand.positioning.competition.direct",
+      "brand.positioning.competition.indirect",
+      "brand.positioning.differentiation",
+      "brand.positioning.audience.primary",
+    ],
     systemPrompt: `產出競品 mapping 其中 1 部分（300-600 字）。
-本次你寫的是「{label}」（市場 overview / 競品 1-5 deep dive / 定位 map / opportunity gaps / 推薦策略）。${TONE_100}`,
+本次你寫的是「{label}」（市場 overview / 競品 1-5 deep dive / 定位 map / opportunity gaps / 推薦策略）。
+**重要：** 品牌定位的「競爭格局分析」已寫過 direct / indirect 競品清單與我方差異點 — 請直接引用、深化，不要重複列同一份。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "press" },
   },

@@ -15,6 +15,7 @@ import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
 import {
   Avatar, Badge, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Progress, Skeleton, Spinner,
@@ -126,11 +127,18 @@ interface FBTaskCard {
   /** Platform — FB / IG / Threads / etc. Surfaced by listFB since 2026-05-05. */
   platform?: string;
   label: string;
+  /** 2026-05-11 — structured bilingual label parts so modal header can show
+   *  "EN · 中文" without manual string concatenation drift. */
+  label_en?: string | null;
+  label_zh?: string | null;
+  /** 2026-05-11 — declarative list of brand-context paths this task reads
+   *  (drives the "我會用 X 來跑這個任務" strip in the intake modal). */
+  contextSources?: string[] | null;
   description: string;
   kind: "fast" | "mid" | "squad";
   inputs?: any[];
   primary_question?: string | null;
-  primary_input?: { key: string; placeholder?: string; type: "text" | "textarea" } | null;
+  primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
   agent?: { id: number; name: string; title: string; avatarUrl: string | null } | null;
@@ -284,6 +292,26 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   // Modal + run state
   const [activeTask, setActiveTask] = useState<FBTaskCard | null>(null);
   const [primaryAnswer, setPrimaryAnswer] = useState("");
+
+  // 2026-05-11 — context-aware intake. Build a `brandCtx` from scope.active
+  // payload and feed it into the resolver so the modal can:
+  //   (a) pre-fill primary_input from positioning data
+  //   (b) show "我會用 X 來跑這個任務" chips above the question
+  // Memoized per scope payload so we don't recompute on every keystroke.
+  const brandCtx = useMemo(() => {
+    const data: any = scopeActiveQuery?.data;
+    if (!data?.brand) return null;
+    return {
+      brand: {
+        ...data.brand,
+        // Normalise common aliases — positioning JSON sometimes lives under
+        // .positioning, sometimes loose at top level; expose both.
+        positioning: data.brand.positioning ?? {},
+      },
+      product: data.product ?? null,
+      event: data.event ?? null,
+    };
+  }, [scopeActiveQuery?.data]);
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<any | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
@@ -406,7 +434,18 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     // pipeline runs all steps sequentially via runSquadAuto and returns the
     // result as variant[] (each variant = one step output).
     setActiveTask(t);
-    setPrimaryAnswer("");
+    // 2026-05-11 — pre-fill primary_input from brand context if the task
+    // declares a derive spec. mode=auto / confirm both pre-fill; mode=ask
+    // leaves it blank but the chips below still hint what'll be used.
+    let prefill = "";
+    const derive = (t as any).primary_input?.derive;
+    if (derive && brandCtx) {
+      const r = resolveDerive(brandCtx, derive);
+      if (r && (derive.mode === "auto" || derive.mode === "confirm")) {
+        prefill = r.text;
+      }
+    }
+    setPrimaryAnswer(prefill);
     setOutput(null);
     setErrorMsg(null);
     setLatencyMs(null);
@@ -421,7 +460,15 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
 
   const handleRun = async () => {
     if (!activeTask) return;
-    if (!primaryAnswer.trim() && activeTask.primary_input?.key) {
+    // 2026-05-11 — only block run on empty primary_input when the task
+    // *requires* it AND has no derive fallback. Tasks declaring
+    // `inputs[0].required === false` (e.g. competitor mapping with
+    // positioning context) are runnable empty — the server uses derived
+    // context instead.
+    const primaryRequired = (activeTask.inputs?.[0] as any)?.required !== false;
+    const hasDerive = !!(activeTask.primary_input as any)?.derive
+      || !!(activeTask.contextSources && activeTask.contextSources.length > 0);
+    if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive) {
       setErrorMsg("請先回答這個問題再生成");
       return;
     }
@@ -860,25 +907,35 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
             <>
               {/* Canva-style modal header: title HIDDEN by default (only tooltip on hover);
                   primary visual is the asset. Show only tiny task name + tier chip + ✕. */}
-              <ModalHeader className="flex items-center gap-2 py-1.5 px-3 border-b border-default-100">
-                {/* Tiny task name (almost-hidden) — only readable for orientation */}
-                <div
-                  className="min-w-0 flex-1 group cursor-default"
-                  title={activeTask.agent ? `${activeTask.label} · ${activeTask.agent.name}（${activeTask.agent.title}）` : activeTask.label}
-                >
-                  <p className="text-[11px] text-default-400 truncate group-hover:text-default-600 transition">
-                    {activeTask.label}
-                    {activeTask.agent && <span className="text-default-300 ml-2">· {activeTask.agent.name}</span>}
-                  </p>
+              <ModalHeader className="flex flex-col items-stretch gap-0 py-2 px-3 border-b border-default-100">
+                {/* 2026-05-11 — bilingual title: EN eyebrow (uppercase tracking)
+                    + ZH main line. When `label` is structured { en, zh } both
+                    parts stay semantically synced (no more "User Research 競品..."
+                    drift). Falls back to single legacy label. */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className="min-w-0 flex-1 group cursor-default"
+                    title={activeTask.agent ? `${activeTask.label_zh ?? activeTask.label} · ${activeTask.agent.name}（${activeTask.agent.title}）` : (activeTask.label_zh ?? activeTask.label)}
+                  >
+                    {activeTask.label_en && (
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-default-500 truncate leading-tight">
+                        {activeTask.label_en}
+                      </p>
+                    )}
+                    <p className="text-[12px] text-default-800 truncate font-medium">
+                      {activeTask.label_zh ?? activeTask.label}
+                      {activeTask.agent && <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>}
+                    </p>
+                  </div>
+                  <span
+                    className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
+                    style={{
+                      background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}cc)`,
+                    }}
+                  >
+                    {tier}
+                  </span>
                 </div>
-                <span
-                  className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
-                  style={{
-                    background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}cc)`,
-                  }}
-                >
-                  {tier}
-                </span>
               </ModalHeader>
               <ModalBody>
                 {/* 2026-05-09 cleanup: only intake mode; output viewing at /run/:outputId */}
@@ -905,6 +962,51 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                         </div>
                       </div>
                     )}
+
+                    {/* 2026-05-11 — context confirmation strip. When the task
+                        declares `contextSources`, show users what brand data
+                        will be used so they don't feel asked from scratch.
+                        Reviewer: 「從定位到內容產出的連結是斷裂的」. */}
+                    {(() => {
+                      const chips = brandCtx
+                        ? buildContextChips(brandCtx, activeTask.contextSources ?? undefined)
+                        : [];
+                      if (chips.length === 0) return null;
+                      return (
+                        <div
+                          className="mb-3 rounded-lg px-3 py-2.5"
+                          style={{ background: "#FAFAF9", border: "1px solid #171717" }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 9, fontWeight: 700, color: "#525252",
+                              letterSpacing: "0.22em", textTransform: "uppercase",
+                              marginBottom: 6,
+                            }}
+                          >
+                            Context · 我會用以下資料來跑這個任務
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {chips.map((c, i) => (
+                              <span
+                                key={i}
+                                title={c.source}
+                                style={{
+                                  fontSize: 11, padding: "3px 8px",
+                                  borderRadius: 4,
+                                  background: c.hasContent ? "#171717" : "transparent",
+                                  color: c.hasContent ? "#FFFFFF" : "#A3A3A3",
+                                  border: c.hasContent ? "none" : "1px dashed #D4D4D4",
+                                  fontWeight: c.hasContent ? 500 : 400,
+                                }}
+                              >
+                                {c.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Primary question */}
                     {activeTask.primary_input && (

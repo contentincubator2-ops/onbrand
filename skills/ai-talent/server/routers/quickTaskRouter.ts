@@ -1023,9 +1023,17 @@ export const quickTaskRouter = router({
           : t.id?.startsWith("rs-") ? "audience"
           : t.id?.startsWith("fb-") ? "facebook"
           : "facebook");
+      // 2026-05-11 — label may be a string (legacy) or { en, zh } structured.
+      // Frontend chip + modal title only need a single string, so flatten to
+      // zh (the primary display locale). Bilingual parts are surfaced
+      // separately as label_en / label_zh below so the modal can render
+      // "EN · 中文" without manual concatenation drift.
+      const labelStr = typeof t.label === "string"
+        ? t.label
+        : (t.label?.zh ?? t.label?.en ?? t.id);
       const base = {
         id: t.id, tier: t.tier, postType: t.postType, platform,
-        label: t.label, description: t.description, kind: t.kind,
+        label: labelStr, description: t.description, kind: t.kind,
       };
       if (t.kind === "squad") {
         // 100s squad tasks: surface lead agent + team roster + a primary
@@ -1059,6 +1067,11 @@ export const quickTaskRouter = router({
         skill_slug: t.skill_slug ?? null,
         primary_question: t.primary_question ?? null,
         primary_input: t.primary_input ?? null,
+        // 2026-05-11 — surface bilingual label parts + context wiring so the
+        // intake modal can render "EN · 中文" + the "我會用 X 來跑" strip.
+        label_en: typeof t.label === "object" && t.label?.en ? t.label.en : null,
+        label_zh: typeof t.label === "object" && t.label?.zh ? t.label.zh : null,
+        contextSources: t.contextSources ?? null,
         agent: t.agent_id ? (agentMap[t.agent_id] ?? null) : null,
         team: team.length > 0 ? team : undefined,
       };
