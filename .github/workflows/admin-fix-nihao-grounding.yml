@@ -1,0 +1,50 @@
+name: Admin — Fix 你好中文 (2842) grounding (clear wrong tagline + force-fetch real content)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+
+            echo "════════ STEP 1: 清掉錯誤 tagline (古典音樂...) ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              UPDATE brands SET tagline = NULL, description = '你好中文 NIHAO Chinese — 中文教學 / 兒童中文 / 海外華語' WHERE id = 2842
+            "
+            mysql -h localhost -u mos_user mos_db -e "SELECT id, name, tagline, description FROM brands WHERE id = 2842 \G"
+
+            echo ""
+            echo "════════ STEP 2: Force-fetch real content (清 cache + 重抓) ════════"
+            cd /opt/marketing-os/app/skills/ai-talent
+            cat > /tmp/fetch-real.ts <<'EOF'
+            import { getBrandRealContent } from "/opt/marketing-os/app/skills/ai-talent/server/_core/brandRealContent";
+            const r = await getBrandRealContent(2842, { force: true });
+            console.log("hasContent:", r.hasContent);
+            console.log("sources:", r.sources);
+            console.log("context len:", r.context.length);
+            console.log("context preview (first 800 chars):");
+            console.log(r.context.slice(0, 800));
+            EOF
+            export $(grep -v '^#' .env | grep -v '^$' | xargs -d '\n')
+            cd /opt/marketing-os/app/skills/ai-talent
+            npx tsx --import "data:text/javascript,import { register } from 'tsx/esm/api'; register({ tsconfig: '/opt/marketing-os/app/skills/ai-talent/tsconfig.json' });" /tmp/fetch-real.ts 2>&1 | tail -30 || echo "(direct tsx import failed; will rely on next user task triggering the fetch live)"
+
+            echo ""
+            echo "════════ STEP 3: pm2 restart to clear in-memory caches ════════"
+            pm2 restart marketing-os --update-env 2>&1 | tail -3
+
+            echo ""
+            echo "════════ DONE — CJ 下一步 ════════"
+            echo "1. 去 https://drop.sowork.ai/brands?b=2842"
+            echo "2. 點「自動填寫」或「跑定位」按鈕（會 14 步定位 + 寫入 brand_brain）"
+            echo "3. 等定位跑完（~2-5 min），鎖定"
+            echo "4. 重跑 30s FB 任務，應該看到中英夾雜風格"
