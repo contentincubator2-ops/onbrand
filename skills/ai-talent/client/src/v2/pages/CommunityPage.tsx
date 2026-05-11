@@ -16,6 +16,9 @@ import { Heart, Sparkles, TrendingUp, Search, X, ExternalLink } from "lucide-rea
 
 type Sort = "trending" | "newest" | "most-used" | "most-liked";
 type Kind = "caption" | "campaign" | "positioning" | "prompt" | "all";
+/** 2026-05-11 (CJ refocus): primary use case = personal collection;
+ *  community sharing is secondary. Tabs reflect that hierarchy. */
+type View = "mine" | "community";
 
 interface TemplateRow {
   /** 2026-05-11 — gallery is a UNION across two canonical tables.
@@ -53,23 +56,33 @@ const KIND_LABELS_LIST: Kind[] = ["all", "caption", "campaign", "positioning", "
 
 export default function CommunityPage() {
   const navigate = useNavigate();
+  const [view, setView] = useState<View>("mine");
   const [sort, setSort] = useState<Sort>("trending");
   const [kind, setKind] = useState<Kind>("all");
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
 
-  const listQ = (trpc as any).community?.list?.useQuery?.(
+  // Community: other users' public templates
+  const communityQ = (trpc as any).community?.list?.useQuery?.(
     {
       limit: 60,
       sort,
       kind: kind === "all" ? undefined : kind,
       search: search.trim() || undefined,
     },
-    { refetchOnWindowFocus: false, staleTime: 30_000 },
+    { enabled: view === "community", refetchOnWindowFocus: false, staleTime: 30_000 },
   );
-  const list: TemplateRow[] = listQ?.data ?? [];
+
+  // Mine: my own private + public templates (the primary use case)
+  const mineQ = (trpc as any).community?.myList?.useQuery?.(
+    { limit: 100, sort: sort === "newest" ? "newest" : "most-used", filter: "all" },
+    { enabled: view === "mine", refetchOnWindowFocus: false, staleTime: 30_000 },
+  );
+
+  const list: TemplateRow[] = view === "mine" ? (mineQ?.data ?? []) : (communityQ?.data ?? []);
   const featured = useMemo(() => list.filter((t) => t.featured), [list]);
   const regular = useMemo(() => list.filter((t) => !t.featured), [list]);
+  const listQ = view === "mine" ? mineQ : communityQ;
 
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
@@ -77,7 +90,7 @@ export default function CommunityPage() {
       <div className="relative pt-10 pb-6 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center max-w-[1100px] mx-auto">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
-            COMMUNITY · TEMPLATES
+            {view === "mine" ? "MY TEMPLATES · COLLECTION" : "COMMUNITY · CONTRIBUTIONS"}
           </p>
           <h1
             className="font-semibold tracking-tight leading-tight"
@@ -89,7 +102,7 @@ export default function CommunityPage() {
               backgroundClip: "text",
             }}
           >
-            社群範本庫
+            {view === "mine" ? "你的成功作品收藏" : "別人公開的範本"}
           </h1>
           <p
             className="mt-3 mx-auto text-default-700"
@@ -98,15 +111,38 @@ export default function CommunityPage() {
               fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
             }}
           >
-            別的操盤者跑出來的成功範本 · 你也可以把自己的產出公開回饋給社群
+            {view === "mine"
+              ? "把互動好的貼文存下來，下次同類型內容直接套用"
+              : "別的操盤者貢獻的成功範本 — 你可以參考、收藏、套用"}
           </p>
           <p
             className="mt-2 mx-auto text-default-700"
             style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
           >
-            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>機制：</span>
-            被別人用一次 = 你 +2 credits（每日上限 50） · 像 Spotify 一樣靠播放分潤
+            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
+              {view === "mine" ? "如何累積：" : "想分享："}
+            </span>
+            {view === "mine"
+              ? "跑完任務 → 結果頁按「存為我的模板」（私人）或「公開分享」"
+              : "在 RunPage 把自己跑得好的成果按「公開分享」 · 被別人用 +2 credits/次"}
           </p>
+
+          {/* View toggle */}
+          <div className="mt-4 inline-flex border border-default-300 rounded-md overflow-hidden">
+            {(["mine", "community"] as View[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className="px-4 py-1.5 text-xs font-medium transition"
+                style={{
+                  background: view === v ? "#171717" : "white",
+                  color: view === v ? "white" : "#404040",
+                }}
+              >
+                {v === "mine" ? "我的收藏" : "社群範本"}
+              </button>
+            ))}
+          </div>
 
           {/* Search */}
           <div className="w-full mt-5" style={{ maxWidth: 720 }}>

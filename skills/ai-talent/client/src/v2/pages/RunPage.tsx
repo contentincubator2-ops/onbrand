@@ -468,9 +468,11 @@ export default function RunPage() {
               <Divider />
               <ToolbarBtn icon={LucideCopy}    label="複製文案"       onClick={onCopy} highlight={copied} />
               <ToolbarBtn icon={Save}          label="存到 Mission" active={mode==="publish"} onClick={() => setMode("publish")} />
-              {/* 2026-05-11 (CJ「Spotify 模式」): publish this output as a
-                  community template — others can use it and you earn credits. */}
-              <ToolbarBtn icon={LucideShare}   label="公開為模板（被用就賺 credits）" onClick={() => setShareModal(true)} />
+              {/* 2026-05-11 (CJ「這個功能可以晚一點再上，先處理別的」):
+                  範本收藏 / 市集功能暫緩到 P1 後 — 等 insights 回饋系統做完
+                  才能設計品質門檻。Button 暫時拿掉，schema + endpoints 保留。
+                  設計留在 docs/template-marketplace-design.md。 */}
+              {/* <ToolbarBtn icon={LucideShare} label="存為我的模板" onClick={() => setShareModal(true)} /> */}
               <Divider />
               <Tooltip content="重跑同任務" placement="bottom">
                 <button
@@ -1014,18 +1016,19 @@ function PublishTemplateModal({
 }) {
   const [title, setTitle] = useState(defaultTitle);
   const [description, setDescription] = useState("");
-  const [visibility, setVisibility] = useState<"public" | "unlisted">("public");
+  // 2026-05-11 (CJ refocus): default to PRIVATE — primary use case is
+  // "save my own successful template", sharing is the opt-in extra.
+  const [visibility, setVisibility] = useState<"private" | "public" | "unlisted">("private");
   const [body, setBody] = useState(previewText);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  // Reset on open
   React.useEffect(() => {
     if (isOpen) {
       setTitle(defaultTitle || "");
       setDescription("");
       setBody(previewText || "");
-      setVisibility("public");
+      setVisibility("private");
     }
   }, [isOpen, defaultTitle, previewText]);
 

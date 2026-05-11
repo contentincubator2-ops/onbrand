@@ -64,9 +64,11 @@ const NAV_ITEMS: NavItem[] = [
   // 進階 hidden — direct URL /squads still works.
   // { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
-  // 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」): community marketplace.
-  { to: "/community", label: "範本庫",   icon: <FontAwesomeIcon icon={faBookBookmark} />,
-    tooltip: "社群範本 — 別人跑出來的成功範本你可以直接用，你也可以公開回饋（被用一次 +2 credits）" },
+  // 2026-05-11 (CJ「這個功能可以晚一點再上，先處理別的」): 範本市集功能
+  // schema + endpoints 留著，nav 暫時下架。等做完 P0 (calendar / Team /
+  // multi-client workspace) 再回頭加上。設計留在 docs/template-marketplace-design.md。
+  // { to: "/community", label: "我的模板", icon: <FontAwesomeIcon icon={faBookBookmark} />,
+  //   tooltip: "把互動好的貼文存起來..." },
   // 內容企劃台 — replaces 案例 (CJ 2026-05-07). 20-agent cast plans
   // 6-platform calendar; brain bar shows the active speaker streaming
   // strategy thoughts. Route /theater kept for backward compat.
