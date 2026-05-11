@@ -997,7 +997,16 @@ export async function runOrchestra(args: {
       const label = cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`;
       let caption = (cap?.caption ?? "").trim();
       if (caption && isHookTask && articleBody) {
-        caption = `${caption}\n\n${articleBody}`;
+        // 2026-05-11 (CJ「文案前面幾句重複的問題」): the LLM is told to write
+        // ONLY a hook, but sometimes ignores the instruction and writes the
+        // full caption (or includes the body's opening sentence in its hook
+        // output). Then we append articleBody → user sees duplicated lead.
+        // Two-layer guard:
+        //  (a) If "hook" exceeds 120 chars OR already contains the body's
+        //      first sentence, treat it as a full caption attempt — strip
+        //      back to the first 1-2 sentences before appending body.
+        //  (b) Always run mergeHookAndBody which dedupes overlapping paragraphs.
+        caption = mergeHookAndBody(caption, articleBody);
       }
       if (!caption) {
         errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
@@ -1271,4 +1280,63 @@ export async function runOrchestra(args: {
       errors: [String(e?.message ?? e)],
     };
   }
+}
+
+/**
+ * 2026-05-11 (CJ「文案前面幾句重複的問題」) — merge LLM-written hook with
+ * user-provided article body, defensively de-duplicating any opening lines.
+ *
+ * The LLM is instructed to write ONLY a hook (30-60 chars). It sometimes
+ * ignores this and either:
+ *  (a) writes the full caption including the body's opening,
+ *  (b) truncates mid-sentence at the token limit while ALSO including
+ *      the body opener, so the user sees "[truncated lead]…[full body]"
+ *      with the same first line twice.
+ *
+ * Strategy:
+ *  1. Split both strings into paragraphs.
+ *  2. If the hook's last paragraph is a substring/superstring of the
+ *     body's first paragraph (>= 60% overlap), drop the duplicate.
+ *  3. If the hook is suspiciously long (> 200 chars), trim it back to
+ *     the first 1-2 sentences (the actual hook).
+ *  4. Join with double newline.
+ *
+ * Idempotent + safe for the normal case (short hook, no overlap).
+ */
+function mergeHookAndBody(hook: string, body: string): string {
+  const cleanHook = hook.trim();
+  const cleanBody = body.trim();
+  if (!cleanBody) return cleanHook;
+  if (!cleanHook) return cleanBody;
+
+  // Step 1: trim back a runaway "hook" that's actually a full caption.
+  let h = cleanHook;
+  if (h.length > 200) {
+    // Take first 1-2 sentences (ending on Chinese or ASCII terminator).
+    const m = h.match(/^[\s\S]*?[。！？!?]/);
+    if (m && m[0].length >= 20 && m[0].length <= 200) {
+      h = m[0].trim();
+    } else {
+      // Fallback: first 120 chars
+      h = h.slice(0, 120).trim();
+    }
+  }
+
+  // Step 2: dedupe overlap between end of hook and start of body.
+  const bodyFirstPara = cleanBody.split(/\n\s*\n/)[0] ?? cleanBody;
+  const bodyFirstSentence = (bodyFirstPara.match(/^[^。！？!?\n]+[。！？!?]?/) ?? [bodyFirstPara])[0]!.trim();
+  if (bodyFirstSentence.length >= 10 && h.includes(bodyFirstSentence)) {
+    // Hook already contains body's opening — drop body's opening from body.
+    const rest = cleanBody.slice(bodyFirstPara.indexOf(bodyFirstSentence) + bodyFirstSentence.length).trimStart();
+    // If there's a paragraph break right after, keep it; otherwise add one.
+    const sep = rest.startsWith("\n") ? "" : "\n\n";
+    return `${h}${sep}${rest}`;
+  }
+
+  // Step 3: check if hook is a substring of body opener (rare, but defensive).
+  if (h.length >= 15 && cleanBody.startsWith(h)) {
+    return cleanBody;
+  }
+
+  return `${h}\n\n${cleanBody}`;
 }

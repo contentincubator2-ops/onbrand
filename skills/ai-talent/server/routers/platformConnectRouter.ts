@@ -36,9 +36,11 @@ async function getPipedreamToken(externalUserId: string): Promise<{ token: strin
   const env          = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
 
   if (!clientId || !clientSecret || !projectId) {
+    // 2026-05-11 (CJ「掃 .env 暴露」): env var names removed from user-facing copy.
+    console.error("[platformConnect] missing env: PIPEDREAM_CLIENT_ID / CLIENT_SECRET / PROJECT_ID");
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "Pipedream credentials not configured on server (PIPEDREAM_CLIENT_ID / CLIENT_SECRET / PROJECT_ID)",
+      message: "平台連接服務尚未啟用，請聯絡 drop@sowork.ai。",
     });
   }
 

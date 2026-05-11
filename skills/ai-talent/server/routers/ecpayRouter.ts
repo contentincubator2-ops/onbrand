@@ -59,9 +59,11 @@ export const ecpayRouter = router({
       const apiBase    = env.ECPAY_API_BASE ?? "https://payment-stage.ecpay.com.tw";
       const appUrl     = env.APP_URL ?? "https://drop.sowork.ai";
       if (!merchantId || !hashKey || !hashIv) {
+        // 2026-05-11 (CJ「掃 .env 暴露」): env var names removed from user-facing copy.
+        console.error("[ecpay.createCheckout] missing env: ECPAY_MERCHANT_ID / ECPAY_HASH_KEY / ECPAY_HASH_IV");
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "綠界尚未設定。請在 VM .env 加 ECPAY_MERCHANT_ID / ECPAY_HASH_KEY / ECPAY_HASH_IV。",
+          message: "金流服務尚未啟用，請稍後再試或聯絡 drop@sowork.ai。",
         });
       }
 

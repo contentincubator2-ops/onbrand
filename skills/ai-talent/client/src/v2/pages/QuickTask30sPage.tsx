@@ -162,6 +162,10 @@ interface ChannelTile {
   enabled: boolean;
 }
 
+// 2026-05-11 (CJ「30s/60s/99s 當中的用戶研究和品牌定位可以先拿掉」):
+// these are workspace tasks (live on /brands), not production-tier tasks.
+// Removed from channel chip nav. Backend tasks still exist for back-compat
+// but won't show up in the chip filter. Re-enable by uncommenting.
 const CHANNEL_TILES: ChannelTile[] = [
   { id: "all",        label: "全部",       icon: faStar,        bg: "#7C3AED", enabled: true  },
   { id: "facebook",   label: "Facebook",   icon: faFacebookF,   bg: "#1877F2", enabled: true  },
@@ -170,9 +174,10 @@ const CHANNEL_TILES: ChannelTile[] = [
   { id: "tiktok",     label: "TikTok",     icon: faTiktok,      bg: "#010101", enabled: true  },
   { id: "linkedin",   label: "LinkedIn",   icon: faLinkedinIn,  bg: "#0A66C2", enabled: true  },
   { id: "email",      label: "電子報",     icon: faEnvelope,    bg: "#7B5BC8", enabled: true  },
-  { id: "brand",      label: "品牌定位",   icon: faRocket,      bg: "#7C3AED", enabled: true  },
   { id: "pr",         label: "新聞稿",     icon: faBullhorn,    bg: "#475569", enabled: true  },
-  { id: "audience",   label: "用戶研究",   icon: faUsers,       bg: "#E07B0F", enabled: true  },
+  // 品牌定位 + 用戶研究 隸屬 /brands workspace，不再出現在產出 tier。
+  // { id: "brand",    label: "品牌定位",   icon: faRocket,      bg: "#7C3AED", enabled: true  },
+  // { id: "audience", label: "用戶研究",   icon: faUsers,       bg: "#E07B0F", enabled: true  },
 ];
 
 /**

@@ -40,9 +40,12 @@ export const publishRouter = router({
       const webhookUrl = (ENV as any).PIPEDREAM_FB_PUBLISH_WEBHOOK as string | undefined;
       const secret = (ENV as any).PIPEDREAM_WEBHOOK_SECRET as string | undefined;
       if (!webhookUrl) {
+        // 2026-05-11 (CJ「掃 .env 暴露」): env var names removed from user-facing
+        // copy. Real reason logged for admins via console + error_log.
+        console.error("[publish.toFacebook] missing env: PIPEDREAM_FB_PUBLISH_WEBHOOK / PIPEDREAM_WEBHOOK_SECRET");
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Pipedream webhook 未設定。請在 prod .env 加 PIPEDREAM_FB_PUBLISH_WEBHOOK + PIPEDREAM_WEBHOOK_SECRET",
+          message: "FB 發布服務尚未啟用，請聯絡 drop@sowork.ai。",
         });
       }
 
@@ -154,9 +157,10 @@ export const publishRouter = router({
       const apiKey = (ENV as any).PIPEDREAM_API_KEY as string | undefined;
       const projectId = (ENV as any).PIPEDREAM_PROJECT_ID as string | undefined;
       if (!apiKey || !projectId) {
+        console.error("[publish.getFacebookConnectUrl] missing env: PIPEDREAM_API_KEY / PIPEDREAM_PROJECT_ID");
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Pipedream Connect 未設定。請設 PIPEDREAM_API_KEY + PIPEDREAM_PROJECT_ID in prod .env",
+          message: "Facebook 授權服務尚未啟用，請聯絡 drop@sowork.ai。",
         });
       }
       const resp = await fetch(`https://api.pipedream.com/v1/connect/${projectId}/tokens`, {

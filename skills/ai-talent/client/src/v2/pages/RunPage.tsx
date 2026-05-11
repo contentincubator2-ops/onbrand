@@ -159,8 +159,8 @@ export default function RunPage() {
             if (brandId) {
               setTimeout(() => navigate(`/brands/edit?b=${brandId}&tab=publish`), 600);
             }
-          } else if (msg.includes("Pipedream") && msg.includes("未設定")) {
-            showToastGlobal("FB 發布尚未設定 Pipedream webhook（後端缺 env）");
+          } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
+            showToastGlobal("FB 發布服務尚未啟用 — 請聯絡 drop@sowork.ai");
           } else {
             showToastGlobal(`FB 發布失敗：${e?.message ?? e}`);
           }
