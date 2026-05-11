@@ -1491,6 +1491,57 @@ async function main() {
     `);
     console.log("[migrate] community_template_uses: OK");
 
+    // ─── 2026-05-11 (CJ「你要考慮採用 mos_db 裡面的 squad 嗎？」): ─────────
+    // squads is the canonical store per the team memory rule. Extend it
+    // with the social-marketplace columns so user-contributed squads can
+    // sit in the same /community gallery as lightweight caption templates.
+    // - visibility: public / unlisted / private  (defaults public for
+    //   admin-seeded squads, set by author when user-contributed)
+    // - useCount / likeCount / creditsEarned: same semantics as
+    //   community_templates, kept on squads.* so social proof rolls up
+    //   per the canonical row.
+    // - featured: editor-pick flag distinct from is_approved (which is
+    //   admin sign-off). featured=1 → bumped to top of gallery.
+    await ensureCol("squads", "visibility",     "VARCHAR(12) NOT NULL DEFAULT 'public'");
+    await ensureCol("squads", "useCount",       "INT NOT NULL DEFAULT 0");
+    await ensureCol("squads", "likeCount",      "INT NOT NULL DEFAULT 0");
+    await ensureCol("squads", "creditsEarned",  "INT NOT NULL DEFAULT 0");
+    await ensureCol("squads", "featured",       "TINYINT(1) NOT NULL DEFAULT 0");
+    try {
+      await conn.execute(`CREATE INDEX idx_squads_community ON squads (visibility, is_approved, useCount)`);
+    } catch (e: any) {
+      if (!String(e?.message ?? "").includes("Duplicate")) throw e;
+    }
+    console.log("[migrate] squads social columns: OK");
+
+    // squad_likes — shares semantics with community_template_likes.
+    // Composite PK so a user can only like a given squad once.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS squad_likes (
+        squadId      INT          NOT NULL,
+        userId       INT          NOT NULL,
+        likedAt      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (squadId, userId),
+        INDEX idx_sl_user (userId, likedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] squad_likes: OK");
+
+    // squad_uses — per-execution log feeding creditsEarned + analytics.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS squad_uses (
+        id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        squadId         INT          NOT NULL,
+        userId          INT          NOT NULL,
+        missionId       INT          NULL,
+        creditsAwarded  INT          NOT NULL DEFAULT 0,
+        usedAt          DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_su_squad (squadId, usedAt),
+        INDEX idx_su_user (userId, usedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] squad_uses: OK");
+
     // ─── 2026-05-11 (CJ「多用戶 SaaS, 每用戶連自己 FB」): per-brand FB binding ───
     // brand.fbPageId: 該品牌綁定的 Facebook 粉專 ID (numeric)
     // brand.fbPageName: 顯示用名稱

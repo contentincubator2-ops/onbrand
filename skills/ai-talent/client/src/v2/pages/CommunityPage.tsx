@@ -18,8 +18,13 @@ type Sort = "trending" | "newest" | "most-used" | "most-liked";
 type Kind = "caption" | "campaign" | "positioning" | "prompt" | "all";
 
 interface TemplateRow {
+  /** 2026-05-11 — gallery is a UNION across two canonical tables.
+   *  source="template" → community_templates (lightweight caption / snippet)
+   *  source="squad"    → squads (full methodology + team + steps)
+   *  Both surface the same shape so cards render identically. */
+  source: "template" | "squad";
   id: number;
-  authorUserId: number;
+  authorUserId: number | null;
   authorName: string | null;
   title: string;
   description: string | null;
@@ -140,17 +145,30 @@ export default function CommunityPage() {
         </div>
       </div>
 
-      {/* Featured row */}
-      {featured.length > 0 && (
-        <div className="max-w-[1100px] mx-auto px-6 mb-6">
-          <SectionLabel label="EDITOR'S PICK · 精選" />
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {featured.map((t) => (
-              <TemplateCard key={t.id} t={t} onClick={() => setOpenId(t.id)} highlight />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* 2026-05-11 — card click router: squads have their own existing
+          detail/run UX (picker workspace), templates open inline modal. */}
+      {(() => {
+        const handleClick = (t: TemplateRow) => {
+          if (t.source === "squad") {
+            // Existing squad pipeline route.
+            navigate(`/picker?squadId=${t.id}`);
+          } else {
+            setOpenId(t.id);
+          }
+        };
+        return (
+          <>
+            {/* Featured row */}
+            {featured.length > 0 && (
+              <div className="max-w-[1100px] mx-auto px-6 mb-6">
+                <SectionLabel label="EDITOR'S PICK · 精選" />
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                  {featured.map((t) => (
+                    <TemplateCard key={`${t.source}-${t.id}`} t={t} onClick={() => handleClick(t)} highlight />
+                  ))}
+                </div>
+              </div>
+            )}
 
       {/* Main grid */}
       <div className="max-w-[1100px] mx-auto px-6 pb-24">
@@ -179,11 +197,14 @@ export default function CommunityPage() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {regular.map((t) => (
-              <TemplateCard key={t.id} t={t} onClick={() => setOpenId(t.id)} />
+              <TemplateCard key={`${t.source}-${t.id}`} t={t} onClick={() => handleClick(t)} />
             ))}
           </div>
         )}
       </div>
+          </>
+        );
+      })()}
 
       {openId && (
         <TemplateDetailModal
@@ -295,16 +316,21 @@ function TemplateCard({
       }}
     >
       <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {/* 2026-05-11 — source badge differentiates lightweight templates
+            from full squads. Squads = full methodology + team. */}
         <span
-          className="text-[9px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: "#525252" }}
+          className="text-[9px] font-semibold uppercase tracking-[0.18em] px-1.5 rounded"
+          style={{
+            background: t.source === "squad" ? "#7C3AED" : "#171717",
+            color: "white",
+          }}
         >
-          {KIND_LABELS[t.kind] ?? t.kind}
+          {t.source === "squad" ? "SQUAD" : KIND_LABELS[t.kind] ?? t.kind}
         </span>
         {t.tier && (
           <span
             className="text-[9px] font-semibold uppercase tracking-wider px-1.5 rounded"
-            style={{ background: "#171717", color: "white" }}
+            style={{ background: "white", color: "#171717", border: "1px solid #D4D4D4" }}
           >
             {t.tier}
           </span>

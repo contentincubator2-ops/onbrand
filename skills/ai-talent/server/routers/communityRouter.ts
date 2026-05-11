@@ -1,26 +1,49 @@
 /**
  * communityRouter — Spotify-style template marketplace.
  *
- * 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」). Users publish their
- * successful outputs as reusable templates. Other users discover, like,
- * and use them. Contributors earn credits when their template is used,
- * creating a flywheel: more contributions → more useful gallery →
- * better retention → more output → more contributions.
+ * 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」+ 「你要考慮採用 mos_db 裡面
+ * 的 squad 嗎？」).
  *
- * Reward model (v1):
- *   - Every successful "use" of your template = +CREDITS_PER_USE credits
- *   - Capped per-user/day so a power user can't farm their own templates
+ * ─── ARCHITECTURE — DUAL-SOURCE GALLERY ─────────────────────────
+ * Per the team memory rule "squads is single source", the canonical
+ * store for methodology-shaped templates (multi-agent + multi-step
+ * workflows) is the `squads` table. We DO NOT duplicate that shape.
+ *
+ * The gallery surfaces TWO underlying tables in a single UNION view:
+ *
+ *   1. `squads`              (heavyweight — full methodology + team)
+ *      - User publishes their successful squad run as a reusable
+ *        methodology. Marked is_user_contributed via
+ *        squads.source != 'seeded' AND squads.created_by_user_id IS NOT NULL.
+ *      - Reuses existing squad pipeline + squad search embeddings.
+ *      - 99s campaign / multi-step deliverables go here.
+ *
+ *   2. `community_templates` (lightweight — single caption / snippet)
+ *      - User publishes a single-post caption pattern or prompt tweak.
+ *      - Too small to justify a full squads row.
+ *      - 30s / 60s individual posts go here.
+ *
+ * Both tables share the SAME social columns:
+ *   visibility, useCount, likeCount, creditsEarned, featured
+ * so `list` can UNION them with consistent ordering / filtering.
+ * Their respective like / use tables share the same shape too:
+ *   community_template_likes / community_template_uses
+ *   squad_likes              / squad_uses
+ *
+ * Reward model (v1, identical on both):
+ *   - Every successful "use" of your template/squad = +CREDITS_PER_USE credits
+ *   - Capped per-author/day (DAILY_CONTRIB_CAP) so no self-farming
  *   - Future: convert credits → cash via 綠界 payout when ARR > $50k/mo
  *
  * Curation:
  *   - `visibility = public` shows in the gallery
- *   - `featured = 1` (admin sets) bumps to top
- *   - default sort = trending (useCount in last 7 days)
+ *   - `featured = 1` (admin sets, distinct from is_approved) bumps to top
+ *   - default sort = trending (uses in last 7 days)
  *
- * Templates are brand-context-agnostic on publish (we strip out the
- * brand-specific Voice / WHY / forbidden-word fields so a published
- * caption template is portable). When another user "uses" the template
- * we re-apply THEIR brand context. Same engine as task contextResolver.
+ * Templates / squads are brand-context-agnostic on publish — we strip
+ * the brand-specific Voice / WHY / forbidden-word fields. When another
+ * user uses the template we re-apply THEIR brand context via the
+ * existing taskContextResolver.
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -142,12 +165,15 @@ export const communityRouter = router({
     }),
 
   /**
-   * List public templates with filters.
-   *   sort = "trending" (default, last 7d uses)
-   *        | "newest"
-   *        | "most-used"
-   *        | "most-liked"
-   *   kind / tier / platform are optional filters.
+   * List public templates AND user-contributed squads in a single
+   * unified feed. The gallery doesn't distinguish — users see both as
+   * "範本" — but the underlying row carries `source` ("template" |
+   * "squad") so the use/like routers know which table to write to.
+   *
+   * sort = "trending" (default, 7d uses)
+   *      | "newest"
+   *      | "most-used"
+   *      | "most-liked"
    */
   list: publicProcedure
     .input(z.object({
@@ -159,49 +185,98 @@ export const communityRouter = router({
       platform: z.string().optional(),
       search: z.string().max(120).optional(),
       featuredOnly: z.boolean().default(false),
+      /** "all" (default), "template" (lightweight only), "squad" (heavy only). */
+      source: z.enum(["all", "template", "squad"]).default("all"),
     }))
     .query(async ({ input }) => {
       const { default: localPool } = await import("../localDb");
-      const where: string[] = ["t.visibility = 'public'", "t.status = 'active'"];
-      const params: any[] = [];
-      if (input.kind)     { where.push("t.kind = ?");     params.push(input.kind); }
-      if (input.tier)     { where.push("t.tier = ?");     params.push(input.tier); }
-      if (input.platform) { where.push("t.platform = ?"); params.push(input.platform); }
-      if (input.featuredOnly) where.push("t.featured = 1");
-      if (input.search) {
-        where.push("(t.title LIKE ? OR t.description LIKE ? OR t.previewText LIKE ?)");
-        const q = `%${input.search}%`;
-        params.push(q, q, q);
-      }
-      const orderBy = input.sort === "newest" ? "t.createdAt DESC"
-        : input.sort === "most-used" ? "t.useCount DESC, t.createdAt DESC"
-        : input.sort === "most-liked" ? "t.likeCount DESC, t.createdAt DESC"
-        // trending = uses in last 7d (subquery) — fallback to useCount if nothing yet
-        : "trendingScore DESC, t.useCount DESC, t.createdAt DESC";
 
-      const selectTrending = input.sort === "trending"
-        ? `(SELECT COUNT(*) FROM community_template_uses u WHERE u.templateId = t.id AND u.usedAt > NOW() - INTERVAL 7 DAY) AS trendingScore,`
-        : "";
+      // ─── community_templates query ─────────────────────────────
+      const ctRows: any[] = await (async () => {
+        if (input.source === "squad") return [];
+        const where: string[] = ["t.visibility = 'public'", "t.status = 'active'"];
+        const params: any[] = [];
+        if (input.kind)     { where.push("t.kind = ?");     params.push(input.kind); }
+        if (input.tier)     { where.push("t.tier = ?");     params.push(input.tier); }
+        if (input.platform) { where.push("t.platform = ?"); params.push(input.platform); }
+        if (input.featuredOnly) where.push("t.featured = 1");
+        if (input.search) {
+          where.push("(t.title LIKE ? OR t.description LIKE ? OR t.previewText LIKE ?)");
+          const q = `%${input.search}%`;
+          params.push(q, q, q);
+        }
+        params.push(input.limit);
+        const [r]: any = await localPool.execute(
+          `SELECT
+              'template' AS source,
+              t.id, t.authorUserId, t.title, t.description, t.kind, t.tier,
+              t.platform, t.taskId, t.tags, t.previewText, t.previewImageUrl,
+              t.featured, t.useCount, t.likeCount, t.createdAt,
+              u.name AS authorName,
+              (SELECT COUNT(*) FROM community_template_uses cu WHERE cu.templateId = t.id AND cu.usedAt > NOW() - INTERVAL 7 DAY) AS trendingScore
+            FROM community_templates t
+            LEFT JOIN users u ON u.id = t.authorUserId
+            WHERE ${where.join(" AND ")}
+            ORDER BY t.id DESC
+            LIMIT ?`,
+          params,
+        );
+        return (r as any[]).map((x) => ({ ...x, tags: parseJsonSafe(x.tags) }));
+      })();
 
-      params.push(input.limit, input.cursor);
-      const [rows]: any = await localPool.execute(
-        `SELECT
-            t.id, t.authorUserId, t.title, t.description, t.kind, t.tier,
-            t.platform, t.taskId, t.tags, t.previewText, t.previewImageUrl,
-            t.featured, t.useCount, t.likeCount, t.createdAt,
-            ${selectTrending}
-            u.name AS authorName, u.email AS authorEmail
-          FROM community_templates t
-          LEFT JOIN users u ON u.id = t.authorUserId
-          WHERE ${where.join(" AND ")}
-          ORDER BY ${orderBy}
-          LIMIT ? OFFSET ?`,
-        params,
-      );
-      return (rows as any[]).map((r) => ({
-        ...r,
-        tags: parseJsonSafe(r.tags),
-      }));
+      // ─── squads query (user-contributed only by default) ─────────
+      // We include both user-contributed squads AND admin-approved
+      // seed squads marked visibility=public so the gallery feels
+      // populated even before user UGC arrives. Seed squads simply
+      // have authorUserId = NULL.
+      const squadRows: any[] = await (async () => {
+        if (input.source === "template") return [];
+        const where: string[] = ["s.visibility = 'public'", "s.is_approved = 1"];
+        const params: any[] = [];
+        if (input.tier)     { where.push("s.tier = ?");      params.push(input.tier); }
+        if (input.platform) { where.push("s.workspace = ?"); params.push(input.platform); }
+        if (input.featuredOnly) where.push("s.featured = 1");
+        if (input.search) {
+          where.push("(s.name LIKE ? OR s.description LIKE ? OR s.methodology LIKE ?)");
+          const q = `%${input.search}%`;
+          params.push(q, q, q);
+        }
+        params.push(input.limit);
+        const [r]: any = await localPool.execute(
+          `SELECT
+              'squad' AS source,
+              s.id, s.created_by_user_id AS authorUserId,
+              s.name AS title, s.description, 'campaign' AS kind, s.tier,
+              s.workspace AS platform, NULL AS taskId, s.tags,
+              s.description AS previewText, s.hero_image_url AS previewImageUrl,
+              s.featured, s.useCount, s.likeCount, s.created_at AS createdAt,
+              u.name AS authorName,
+              (SELECT COUNT(*) FROM squad_uses su WHERE su.squadId = s.id AND su.usedAt > NOW() - INTERVAL 7 DAY) AS trendingScore
+            FROM squads s
+            LEFT JOIN users u ON u.id = s.created_by_user_id
+            WHERE ${where.join(" AND ")}
+            ORDER BY s.id DESC
+            LIMIT ?`,
+          params,
+        );
+        return (r as any[]).map((x) => ({ ...x, tags: parseJsonSafe(x.tags) }));
+      })();
+
+      // ─── Merge + sort + slice ──────────────────────────────────
+      const all = [...ctRows, ...squadRows];
+      const sortFn =
+        input.sort === "newest"     ? (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      : input.sort === "most-used"  ? (a: any, b: any) => (b.useCount ?? 0) - (a.useCount ?? 0)
+      : input.sort === "most-liked" ? (a: any, b: any) => (b.likeCount ?? 0) - (a.likeCount ?? 0)
+      :                               (a: any, b: any) => (b.trendingScore ?? 0) - (a.trendingScore ?? 0)
+                                                       || (b.useCount ?? 0) - (a.useCount ?? 0);
+      all.sort(sortFn);
+
+      // Featured items still float to the top within their sort tier.
+      const featured = all.filter((x) => x.featured);
+      const normal = all.filter((x) => !x.featured);
+      const sliced = [...featured, ...normal].slice(input.cursor, input.cursor + input.limit);
+      return sliced;
     }),
 
   /** Single template detail (includes content body so user can preview / use). */
