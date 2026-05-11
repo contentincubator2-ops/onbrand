@@ -1,0 +1,163 @@
+name: Admin — LLM-upgrade phase 2 (fill experienceDetail)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 900s
+          script: |
+            set -e
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            if [ -z "$ANTHROPIC_API_KEY" ]; then
+              echo "ANTHROPIC_API_KEY missing"; exit 1
+            fi
+
+            export MYSQL_PWD="mos_secure_2026"
+            # Same 19 IDs; the script will skip rows already at A+.
+            export AGENT_IDS="238853,221080,239024,239023,222638,222665,222504,223253,223755,223197,222204,222206,222392,220871,220583,220584,220862,220949,220870"
+
+            python3 - <<'PYEOF'
+            import os, json, sys, time
+            import urllib.request, urllib.error
+            import subprocess
+
+            ANTHROPIC_KEY = os.environ["ANTHROPIC_API_KEY"]
+            IDS = os.environ["AGENT_IDS"].split(",")
+
+            def mysql(sql):
+                env = os.environ.copy()
+                env["MYSQL_PWD"] = "mos_secure_2026"
+                r = subprocess.run(
+                    ["mysql", "-h", "localhost", "-u", "mos_user", "mos_db",
+                     "--batch", "--raw", "--skip-column-names",
+                     "--default-character-set=utf8mb4", "-e", sql],
+                    capture_output=True, text=True, env=env, timeout=30,
+                )
+                if r.returncode != 0:
+                    raise RuntimeError("mysql failed: " + r.stderr)
+                return r.stdout
+
+            def call_anthropic(prompt):
+                body = json.dumps({
+                    "model": "claude-haiku-4-5",
+                    "max_tokens": 900,
+                    "messages": [{"role": "user", "content": prompt}],
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    "https://api.anthropic.com/v1/messages",
+                    data=body,
+                    headers={
+                        "x-api-key": ANTHROPIC_KEY,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=90) as resp:
+                    data = json.loads(resp.read())
+                return data["content"][0]["text"]
+
+            def fetch(aid):
+                sql = ("SELECT id, IFNULL(name,''), IFNULL(title,''), IFNULL(bio,''), "
+                       "IFNULL(specialty,''), IFNULL(methodology,''), "
+                       "CHAR_LENGTH(IFNULL(experienceDetail,'')), "
+                       "(CHAR_LENGTH(IFNULL(bio,''))"
+                       "+CHAR_LENGTH(IFNULL(specialty,''))"
+                       "+CHAR_LENGTH(IFNULL(methodology,''))"
+                       "+CHAR_LENGTH(IFNULL(taskSystemPrompt,''))"
+                       "+CHAR_LENGTH(IFNULL(experienceDetail,''))"
+                       "+CHAR_LENGTH(IFNULL(workingPrinciples,''))"
+                       "+CHAR_LENGTH(IFNULL(specialtySummary,''))"
+                       "+CHAR_LENGTH(IFNULL(tool_instructions,''))"
+                       "+CHAR_LENGTH(IFNULL(bio_zh,''))) "
+                       "FROM agents WHERE id = " + str(int(aid)) + " LIMIT 1")
+                out = mysql(sql).strip()
+                if not out:
+                    return None
+                parts = out.split("\t")
+                return {
+                    "id": int(parts[0]), "name": parts[1], "title": parts[2],
+                    "bio": parts[3][:400], "specialty": parts[4][:600],
+                    "methodology": parts[5][:600],
+                    "exp_len": int(parts[6] or 0),
+                    "total": int(parts[7] or 0),
+                }
+
+            def make_prompt(a):
+                lines = []
+                lines.append("You are documenting a professional's career experience for an internal agent profile.")
+                lines.append("")
+                lines.append("Profile:")
+                lines.append("- Name: " + a["name"])
+                lines.append("- Title: " + a["title"])
+                lines.append("- Bio: " + a["bio"])
+                lines.append("- Specialty: " + a["specialty"])
+                lines.append("- Methodology: " + a["methodology"])
+                lines.append("")
+                lines.append("Write an experienceDetail section in Traditional Chinese (650-800 字). 3-4 concrete career milestones / signature projects that match the bio + specialty. Each milestone: 1 short title line + 2-3 sentences (situation, what they did, measurable result). Anti-cliché — no '帶領團隊完成多項專案' empty phrases. Use specific industry context (B2B SaaS / DTC e-com / 連鎖餐飲 / FMCG / 製造業 / 公部門 — pick whatever matches the bio). Output ONLY the milestones text. No preamble, no '以下是'.")
+                return "\n".join(lines)
+
+            updated, skipped, failed = 0, 0, 0
+            for aid in IDS:
+                aid = aid.strip()
+                if not aid:
+                    continue
+                try:
+                    a = fetch(aid)
+                    if not a:
+                        print("  - " + aid + ": not found"); skipped += 1; continue
+                    if a["total"] >= 2200:
+                        print("  - " + aid + " " + a["name"] + ": already A+ (" + str(a["total"]) + ")")
+                        skipped += 1; continue
+                    if a["exp_len"] >= 600:
+                        print("  - " + aid + " " + a["name"] + ": experienceDetail already " + str(a["exp_len"]) + " chars")
+                        skipped += 1; continue
+                    text = call_anthropic(make_prompt(a)).strip()
+                    if len(text) < 400:
+                        time.sleep(1)
+                        text = call_anthropic(make_prompt(a)).strip()
+                    safe = text.replace("\\", "\\\\").replace("'", "''")
+                    mysql("UPDATE agents SET experienceDetail = '" + safe + "' WHERE id = " + str(a["id"]))
+                    print("  OK " + aid + " " + a["name"] + ": wrote " + str(len(text)) + " chars (was " + str(a["total"]) + ")")
+                    updated += 1
+                    time.sleep(0.5)
+                except urllib.error.HTTPError as e:
+                    print("  FAIL " + aid + ": HTTP " + str(e.code) + " " + str(e.read()[:200])); failed += 1
+                except Exception as e:
+                    print("  FAIL " + aid + ": " + type(e).__name__ + " " + str(e)); failed += 1
+
+            print("")
+            print("Summary: " + str(updated) + " updated, " + str(skipped) + " skipped, " + str(failed) + " failed")
+            sys.exit(0 if failed == 0 else 2)
+            PYEOF
+
+            echo
+            echo "--- Final audit (all 19) ---"
+            MYSQLT="mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4"
+            $MYSQLT -e "
+              SELECT id, LEFT(name,16) AS name, total_chars,
+                CASE WHEN total_chars >= 2000 THEN 'A+' ELSE 'sub-A+' END AS grade
+              FROM (
+                SELECT id, name,
+                  (CHAR_LENGTH(IFNULL(bio,''))
+                  + CHAR_LENGTH(IFNULL(specialty,''))
+                  + CHAR_LENGTH(IFNULL(methodology,''))
+                  + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))
+                  + CHAR_LENGTH(IFNULL(experienceDetail,''))
+                  + CHAR_LENGTH(IFNULL(workingPrinciples,''))
+                  + CHAR_LENGTH(IFNULL(specialtySummary,''))
+                  + CHAR_LENGTH(IFNULL(tool_instructions,''))
+                  + CHAR_LENGTH(IFNULL(bio_zh,''))) AS total_chars
+                FROM agents WHERE id IN ($AGENT_IDS)
+              ) x ORDER BY total_chars ASC;
+            "
