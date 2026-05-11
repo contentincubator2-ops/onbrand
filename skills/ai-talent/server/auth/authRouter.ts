@@ -142,7 +142,9 @@ authRouter.post("/register", async (req: Request, res: Response) => {
       const trialEnds = new Date(Date.now() + 7 * 24 * 3600_000);
       await localPool.execute(
         `UPDATE users SET planCode='trial', planStatus='trial', planEndsAt=? WHERE id=?`,
-        [trialEnds, user.userId],
+        // 2026-05-11 — type fix: `user` shape uses `id`, not `userId`.
+        // Pre-existing bug from da4787b that's been failing CI ever since.
+        [trialEnds, user.id],
       );
     } catch (e) {
       console.warn("[auth] planEndsAt set failed (non-blocking):", e);

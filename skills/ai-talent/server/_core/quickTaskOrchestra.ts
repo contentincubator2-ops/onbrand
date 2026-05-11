@@ -1107,7 +1107,10 @@ export async function runOrchestra(args: {
               runSquadLeadQA({
                 agentName: captionLoad.meta?.name ?? "caption_writer",
                 agentTitle: captionLoad.meta?.title,
-                taskTitle: args.template.label,
+                // 2026-05-11 — flatten { en, zh } | string label to string.
+                taskTitle: typeof args.template.label === "string"
+                  ? args.template.label
+                  : (args.template.label?.zh ?? args.template.label?.en ?? args.template.id),
                 agentOutput: v.caption,
                 brandName: args.brandId ? `Brand #${args.brandId}` : undefined,
                 userRequest: userMsg.slice(0, 500),
@@ -1211,14 +1214,18 @@ export async function runOrchestra(args: {
             ?? "other"
         );
         const tierStr = (tier as "30s" | "60s" | "100s");
+        // 2026-05-11 — flatten { en, zh } | string label to string for DB.
+        const flatLabel: string = typeof args.template.label === "string"
+          ? args.template.label
+          : (args.template.label?.zh ?? args.template.label?.en ?? args.template.id);
         const persisted = await recordTaskRun({
           userId: args.userId,
           brandId: args.brandId ?? null,
           workspace: channel,
           taskId: args.template.id,
-          taskLabel: args.template.label ?? args.template.id,
+          taskLabel: flatLabel,
           tier: tierStr,
-          title: result.variants[0]?.caption?.slice(0, 80) || args.template.label,
+          title: result.variants[0]?.caption?.slice(0, 80) || flatLabel,
           content: JSON.stringify(result.variants, null, 2),
           metadata: {
             latencyMs: result.totalLatencyMs,
