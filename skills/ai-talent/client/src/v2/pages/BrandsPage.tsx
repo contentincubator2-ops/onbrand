@@ -164,14 +164,31 @@ export default function BrandsPage() {
   const connData = connQuery?.data as { website: string; socialLinks: Record<string,string> } | null | undefined;
   React.useEffect(() => {
     if (!activeBrandIdForLocks || !connData) return;
-    const dismissedKey = `sowork.connector.dismissed.${activeBrandIdForLocks}`;
+    const hasWebsite = (connData.website ?? "").trim().length > 0;
+    const hasSocial = Object.values(connData.socialLinks ?? {}).some(
+      (v) => typeof v === "string" && v.trim().length > 0,
+    );
+
+    // 2026-05-11 (CJ feedback「中英夾雜變全中文」):
+    // 之前條件是 hasAny — 填了 website 就不再 nudge。但網頁文字往往是
+    // 正式中文，跟用戶 FB/IG 真實夾雜風格不同。改成「全空 OR 缺社群」
+    // 都 nudge，並用不同訊息對應狀態。
+    // 兩個 dismiss key 分開：補完 social 後就不會再跳。
+    const stage =
+      !hasWebsite && !hasSocial ? "none" :
+      hasWebsite && !hasSocial ? "social-missing" :
+      null; // 兩個都有 → 不 nudge
+    if (!stage) return;
+
+    const dismissedKey = `sowork.connector.dismissed.${activeBrandIdForLocks}.${stage}`;
     if (localStorage.getItem(dismissedKey)) return;
-    const hasAny =
-      (connData.website ?? "").trim().length > 0 ||
-      Object.values(connData.socialLinks ?? {}).some((v) => typeof v === "string" && v.trim().length > 0);
-    if (hasAny) return;
+
+    const msg = stage === "none"
+      ? `先填上品牌的官網或 FB / IG 連結。AI 自動填寫、試寫、30s/60s/99s 任務都會去抓這些連結的真實內容做 ground，不填的話 AI 只能用品牌名瞎猜。`
+      : `官網已填 ✓。再補 FB / IG 連結會更準。網頁通常是正式中文，但你的真實品牌語氣（中英夾雜、口語、emoji）藏在社群貼文裡——填了 AI 才寫得像你。`;
+
     setSettingsInitialTab("connector");
-    setOnboardingHint(`先填上品牌的官網或 FB / IG 連結。AI 自動填寫、試寫、30s/60s/99s 任務都會去抓這些連結的真實內容做 ground，不填的話 AI 只能用品牌名瞎猜。填完關掉就不會再跳。`);
+    setOnboardingHint(msg);
     setSettingsOpen(true);
     try { localStorage.setItem(dismissedKey, "1"); } catch {}
   }, [activeBrandIdForLocks, connData]);
