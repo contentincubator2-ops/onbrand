@@ -54,17 +54,26 @@ export async function buildBrandPrefix(
     const db = await getDb();
     if (!db) return "";
 
-    // 2026-05-09 (CJ audit): also pull LOCKED brand attributes from brands
-    // table (tagline, positioningSummary, positioningReport.archetype) so
-    // 30s/60s tasks auto-use the brand's confirmed identity without the
-    // user re-typing them every run.
+    // 2026-05-11 (CJ direction「定義儲存/讀取規格」):
+    // brand.positioning JSON is the SINGLE SOURCE OF TRUTH. Wizard +
+    // positioningJobRunner both write to this column. Older
+    // tagline/positioningSummary/positioningReport top-level columns
+    // are LEGACY and usually NULL — still read for backward compat
+    // but should not be relied on.
     const { default: localPool } = await import("../localDb");
     const [brandRowsRaw]: any = await localPool.execute(
-      `SELECT name, tagline, positioningSummary, positioningReport, positioningStatus
+      `SELECT name, tagline, positioningSummary, positioningReport, positioningStatus, positioning
        FROM brands WHERE id = ? LIMIT 1`,
       [brandId],
     );
     const brandRow = Array.isArray(brandRowsRaw) ? brandRowsRaw[0] : null;
+
+    // Parse the canonical positioning JSON.
+    const positioning: any = (() => {
+      if (!brandRow?.positioning) return null;
+      if (typeof brandRow.positioning === "string") return safeParse(brandRow.positioning);
+      return brandRow.positioning;
+    })();
 
     const [rows] = (await db.execute(
       sql`SELECT category, title, content
@@ -74,22 +83,107 @@ export async function buildBrandPrefix(
           LIMIT 8`
     )) as any;
 
+    // ── BLOCK 1: 鎖定屬性（tagline / archetype / WHY / HOW from positioning JSON） ──
     const brandLocked: string[] = [];
-    if (brandRow?.tagline) brandLocked.push(`【已鎖定 Tagline】${brandRow.tagline}`);
-    if (brandRow?.positioningSummary) brandLocked.push(`【已鎖定定位摘要】${brandRow.positioningSummary}`);
-    // positioningReport is JSON. Try to extract archetype if present.
-    if (brandRow?.positioningReport) {
+
+    // tagline can be: legacy top-level string, OR positioning.tagline.{zhTagline,enTagline,story}
+    const tlObj = positioning?.tagline;
+    if (tlObj && typeof tlObj === "object") {
+      if (tlObj.zhTagline) brandLocked.push(`【Tagline 中】${tlObj.zhTagline}`);
+      if (tlObj.enTagline) brandLocked.push(`【Tagline EN】${tlObj.enTagline}`);
+    } else if (typeof tlObj === "string" && tlObj.trim()) {
+      brandLocked.push(`【Tagline】${tlObj}`);
+    } else if (brandRow?.tagline) {
+      brandLocked.push(`【Tagline (legacy)】${brandRow.tagline}`);
+    }
+
+    // archetype: positioning.voice.archetypes (array) OR legacy positioningReport.archetype
+    const archetypes = positioning?.voice?.archetypes;
+    if (Array.isArray(archetypes) && archetypes.length > 0) {
+      brandLocked.push(`【Archetype】${archetypes.join(" / ")}`);
+    } else if (brandRow?.positioningReport) {
       try {
-        const rep = typeof brandRow.positioningReport === "string"
-          ? JSON.parse(brandRow.positioningReport)
-          : brandRow.positioningReport;
+        const rep = typeof brandRow.positioningReport === "string" ? JSON.parse(brandRow.positioningReport) : brandRow.positioningReport;
         const arch = rep?.archetype ?? rep?.brandArchetype ?? rep?.archetypePrimary;
-        if (arch) brandLocked.push(`【已鎖定 Archetype】${typeof arch === "string" ? arch : JSON.stringify(arch).slice(0, 200)}`);
-        const why = rep?.why ?? rep?.WHY;
-        if (why) brandLocked.push(`【WHY】${String(why).slice(0, 200)}`);
-        const how = rep?.how ?? rep?.HOW;
-        if (how) brandLocked.push(`【HOW】${String(how).slice(0, 200)}`);
-      } catch { /* non-fatal */ }
+        if (arch) brandLocked.push(`【Archetype (legacy)】${typeof arch === "string" ? arch : JSON.stringify(arch).slice(0, 200)}`);
+      } catch {}
+    }
+
+    // golden circle: positioning.goldenCircle.{why,how,what}
+    const gc = positioning?.goldenCircle;
+    if (gc && typeof gc === "object") {
+      if (gc.why) brandLocked.push(`【WHY (信念)】${String(gc.why).slice(0, 400)}`);
+      if (gc.how) brandLocked.push(`【HOW (作法)】${String(gc.how).slice(0, 400)}`);
+      if (gc.what) brandLocked.push(`【WHAT (產品/服務)】${String(gc.what).slice(0, 300)}`);
+    }
+
+    // positioningSummary (legacy)
+    if (brandRow?.positioningSummary) brandLocked.push(`【定位摘要 (legacy)】${brandRow.positioningSummary}`);
+
+    // ── BLOCK 2: VOICE 完整指引 — 這是「中英夾雜變全中文」的關鍵修法 ──
+    // CJ direction「你好中文有跑了定位...每個 brand 都是相同處理方式」:
+    // positioning.voice 裡有 tone/samples/forbidden，必須完整餵給 LLM。
+    const voiceBlock: string[] = [];
+    const voice = positioning?.voice;
+    if (voice && typeof voice === "object") {
+      if (Array.isArray(voice.tone) && voice.tone.length > 0) {
+        voiceBlock.push(`tone keywords: ${voice.tone.join(" / ")}`);
+      }
+      if (Array.isArray(voice.forbidden) && voice.forbidden.length > 0) {
+        voiceBlock.push(`✗ 禁用詞彙 / 句式：\n  ${voice.forbidden.slice(0, 8).map((x: string) => `· ${x}`).join("\n  ")}`);
+      }
+      // SAMPLES are the highest-value training signal (CJ's bilingual / 中英夾雜 use case)
+      if (Array.isArray(voice.samples) && voice.samples.length > 0) {
+        const samp = voice.samples.slice(0, 4).map((s: any, i: number) => {
+          const ours = s.ours ?? s.good ?? s.brand;
+          const generic = s.generic ?? s.bad ?? s.wrong;
+          if (!ours) return null;
+          return `  範例 ${i + 1}：\n    ✓ 我們會寫：${ours}\n    ✗ 不要寫：${generic ?? "(略)"}`;
+        }).filter(Boolean).join("\n");
+        if (samp) voiceBlock.push(`【模仿這些範例的口吻】\n${samp}`);
+      }
+    }
+
+    // ── BLOCK 3: _assets — wizard 寫出的具體寫手指引 ──
+    const assetsBlock: string[] = [];
+    const assets = positioning?._assets;
+    if (assets && typeof assets === "object") {
+      const grab = (key: string, label: string, max = 300) => {
+        const a = assets[key];
+        if (!a) return;
+        if (typeof a.text === "string" && a.text.trim()) {
+          assetsBlock.push(`【${label}】${a.text.trim().slice(0, max)}`);
+        } else if (Array.isArray(a.items) && a.items.length > 0) {
+          assetsBlock.push(`【${label}】${a.items.slice(0, 8).join(" · ")}`);
+        } else if (Array.isArray(a.pairs) && a.pairs.length > 0) {
+          const ps = a.pairs.slice(0, 5).map((p: any) => `${p.from ?? "?"} → ${p.to ?? "?"}`).join(" · ");
+          assetsBlock.push(`【${label}】${ps}`);
+        }
+      };
+      grab("voice", "聲音指南", 600);
+      grab("voice_principles", "聲音原則");
+      grab("preferred_terms", "偏好用詞");
+      grab("banned_words", "禁用詞");
+      grab("cta_library", "CTA 範例");
+      grab("audience", "目標受眾");
+    }
+
+    // ── BLOCK 4: origin 故事 + audience（次要 grounding） ──
+    const contextBlock: string[] = [];
+    if (positioning?.origin?.story) {
+      contextBlock.push(`【品牌故事】${String(positioning.origin.story).slice(0, 400)}`);
+    }
+    if (positioning?.audience && typeof positioning.audience === "object") {
+      const aud = positioning.audience;
+      if (aud.primary) contextBlock.push(`【主要受眾】${String(aud.primary).slice(0, 200)}`);
+      if (aud.painPoints && Array.isArray(aud.painPoints)) {
+        contextBlock.push(`【受眾痛點】${aud.painPoints.slice(0, 3).join(" · ")}`);
+      }
+    }
+    if (positioning?.differentiation) {
+      const d = positioning.differentiation;
+      if (typeof d === "string") contextBlock.push(`【差異化】${d.slice(0, 300)}`);
+      else if (d.summary) contextBlock.push(`【差異化】${String(d.summary).slice(0, 300)}`);
     }
 
     // ── 2026-05-11 (CJ): product + event positioning overlays ──
@@ -154,7 +248,15 @@ export async function buildBrandPrefix(
       } catch {/* non-fatal */}
     }
 
-    if ((!rows || rows.length === 0) && brandLocked.length === 0 && !productSection && !eventSection) {
+    const hasAny =
+      (rows && rows.length > 0) ||
+      brandLocked.length > 0 ||
+      voiceBlock.length > 0 ||
+      assetsBlock.length > 0 ||
+      contextBlock.length > 0 ||
+      productSection ||
+      eventSection;
+    if (!hasAny) {
       CACHE.set(ck, { prefix: "", expiresAt: Date.now() + TTL_MS });
       return "";
     }
@@ -163,14 +265,27 @@ export async function buildBrandPrefix(
       ? "\n[品牌已鎖定屬性 — 最高優先級，所有產出都要符合]\n" + brandLocked.map(l => `- ${l}`).join("\n") + "\n"
       : "";
 
-    const brainSection = rows && rows.length > 0
-      ? "[品牌大腦摘要 — 補充定位 / 語氣 / 守則]\n" +
-        rows.map((r: any) => `- 【${r.category}】${r.title}：${r.content}`).join("\n")
+    const voiceSection = voiceBlock.length > 0
+      ? "\n[品牌聲音指南 — 嚴格遵守，這是品牌的「人聲」]\n" + voiceBlock.join("\n") + "\n"
       : "";
 
-    // Order: brand identity → brand brain → product narrow → event narrow.
-    // Last-mentioned wins in LLM prompt-following heuristics.
-    const prefix = "\n\n" + lockedSection + brainSection + productSection + eventSection;
+    const assetsSection = assetsBlock.length > 0
+      ? "\n[寫手指引 — 用詞 / CTA / 受眾規範]\n" + assetsBlock.map(l => `- ${l}`).join("\n") + "\n"
+      : "";
+
+    const contextSection = contextBlock.length > 0
+      ? "\n[補充脈絡 — 品牌故事 / 受眾 / 差異化]\n" + contextBlock.map(l => `- ${l}`).join("\n") + "\n"
+      : "";
+
+    const brainSection = rows && rows.length > 0
+      ? "\n[品牌大腦補充條目]\n" +
+        rows.map((r: any) => `- 【${r.category}】${r.title}：${r.content}`).join("\n") + "\n"
+      : "";
+
+    // 順序：鎖定屬性 → 聲音指南（含中英夾雜 samples）→ 寫手指引 →
+    // 脈絡 → 補充 → product/event narrow。
+    // LLM 對「靠後出現」內容更易執行，product/event 放最後。
+    const prefix = "\n\n" + lockedSection + voiceSection + assetsSection + contextSection + brainSection + productSection + eventSection;
 
     CACHE.set(ck, { prefix, expiresAt: Date.now() + TTL_MS });
     return prefix;
