@@ -118,7 +118,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
             <h1 className="text-2xl font-semibold text-default-900">AI 指令庫</h1>
           </div>
           <p className="text-sm text-default-500">
-            為每個社群平台設定品牌專屬的文字指令 + 圖片指令。30s / 60s / 100s / Theater 在該平台跑任務時會自動套用。
+            為每個社群平台設定品牌專屬的文字指令 + 圖片指令。30s / 60s / 99s / 企劃台 在該平台跑任務時會自動套用。
           </p>
         </div>
       </div>

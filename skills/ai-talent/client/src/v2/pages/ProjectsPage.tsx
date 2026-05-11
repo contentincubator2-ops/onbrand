@@ -177,7 +177,7 @@ export default function ProjectsPage() {
             專案
           </h1>
           <p className="text-small text-default-500 mb-5">
-            你做過的內容都在這 — 30s / 60s / 100s / 企劃台 的產出自動進入專案。
+            你做過的內容都在這 — 30s / 60s / 99s / 企劃台 的產出自動進入專案。
           </p>
 
           {/* Single search bar */}
@@ -382,7 +382,7 @@ function EmptyState({ search, onClear, onCreate }: { search: string; onClear: ()
         <>
           <p className="text-default-700 font-medium mb-1">還沒有任何專案</p>
           <p className="text-tiny text-default-500 mb-4">
-            到 30s / 60s / 100s / 企劃台 跑任務，產出會自動進來。<br />
+            到 30s / 60s / 99s / 企劃台 跑任務，產出會自動進來。<br />
             或直接建立新任務：
           </p>
           <button

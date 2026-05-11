@@ -171,7 +171,7 @@ export default function BrandsPage() {
       Object.values(connData.socialLinks ?? {}).some((v) => typeof v === "string" && v.trim().length > 0);
     if (hasAny) return;
     setSettingsInitialTab("connector");
-    setOnboardingHint(`先填上品牌的官網或 FB / IG 連結。AI 自動填寫、試寫、30s/60s/100s 任務都會去抓這些連結的真實內容做 ground，不填的話 AI 只能用品牌名瞎猜。填完關掉就不會再跳。`);
+    setOnboardingHint(`先填上品牌的官網或 FB / IG 連結。AI 自動填寫、試寫、30s/60s/99s 任務都會去抓這些連結的真實內容做 ground，不填的話 AI 只能用品牌名瞎猜。填完關掉就不會再跳。`);
     setSettingsOpen(true);
     try { localStorage.setItem(dismissedKey, "1"); } catch {}
   }, [activeBrandIdForLocks, connData]);
@@ -187,7 +187,7 @@ export default function BrandsPage() {
         if (!confirm(`確定要解鎖「${tab === "positioning" ? "定位" : tab === "copy" ? "文字" : "視覺"}」？解鎖後可以繼續編輯，全平台會用最新版本。`)) return;
         await unlockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       } else {
-        if (!confirm(`要鎖定「${tab === "positioning" ? "定位" : tab === "copy" ? "文字" : "視覺"}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有 30s/60s/100s/Theater 任務都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`)) return;
+        if (!confirm(`要鎖定「${tab === "positioning" ? "定位" : tab === "copy" ? "文字" : "視覺"}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有 30s/60s/99s/Theater 任務都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`)) return;
         await lockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       }
       tabLocksQuery.refetch?.();
@@ -503,22 +503,30 @@ export default function BrandsPage() {
 
     const runReal = async () => {
       if (!targetId || scopeMode === "none" || !runStepMutation) return null;
+      // 2026-05-11 (CJ「你好中文按了品牌定位後，一直停留在 0/14」):
+      // Race the mutation against a 90s hard timeout so a hung LLM call
+      // never wedges the whole pipeline. On timeout we mark the step
+      // failed and let the loop advance with mock thinking.
+      const HARD_TIMEOUT_MS = 90_000;
       try {
-        const res = await runStepMutation.mutateAsync({
-          kind: scopeMode as "brand" | "product" | "event",
-          id: targetId,
-          stepId: step.id,
-          segmentId: step.segmentId,
-          agent: step.agent,
-          title: step.title,
-          budget: step.researchBudget,
-          systemHint: step.promptTemplate, // CJ-spec prompt per step
-          schemaHint: step.mockConclusion, // canonical JSON shape for this segment
-        });
+        const res: any = await Promise.race([
+          runStepMutation.mutateAsync({
+            kind: scopeMode as "brand" | "product" | "event",
+            id: targetId,
+            stepId: step.id,
+            segmentId: step.segmentId,
+            agent: step.agent,
+            title: step.title,
+            budget: step.researchBudget,
+            systemHint: step.promptTemplate, // CJ-spec prompt per step
+            schemaHint: step.mockConclusion, // canonical JSON shape for this segment
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`step ${step.id} timed out after ${HARD_TIMEOUT_MS / 1000}s`)), HARD_TIMEOUT_MS),
+          ),
+        ]);
         // Track empty conclusion as a failure even if the request succeeded —
         // 2026-04-29 CJ caught: product step 3-5 silently empty after step 2.
-        // Likely cause: LLM JSON parse failed mid-pipeline, server returns
-        // empty conclusion, advance ran, segment stayed blank, no error UI.
         if (!res?.conclusion || Object.keys(res.conclusion).length === 0) {
           setFailedStepIds((s) => Array.from(new Set([...s, step.id])));
           // eslint-disable-next-line no-console
@@ -527,7 +535,7 @@ export default function BrandsPage() {
         return res?.thinking ?? null;
       } catch (e) {
         // eslint-disable-next-line no-console
-        console.warn("[pipeline] runStep failed, falling back to mock:", e);
+        console.warn("[pipeline] runStep failed/timed out, falling back to mock:", e);
         setFailedStepIds((s) => Array.from(new Set([...s, step.id])));
         return null;
       }
@@ -807,7 +815,7 @@ export default function BrandsPage() {
                 letterSpacing: "0.05em",
               }}
             >
-              奧品牌定位法
+              SoWork 品牌定位法
             </span>
             ・先鎖定你是誰，AI 才知道每篇文章要說什麼。
           </p>
@@ -929,7 +937,7 @@ export default function BrandsPage() {
                         {tabLabel} 尚未鎖定
                       </p>
                       <p className="text-tiny text-default-500 m-0">
-                        鎖定後：編輯欄變唯讀 · 全平台 (30s/60s/100s/Theater) 用這份為單一真相
+                        鎖定後：編輯欄變唯讀 · 全平台 (30s/60s/99s/Theater) 用這份為單一真相
                       </p>
                     </>
                   )}
@@ -1082,7 +1090,7 @@ export default function BrandsPage() {
                     <>
                       {/* Persistent strategist persona bar even when idle —
                           the workspace always feels staffed by a 4A-style
-                          strategy lead, who introduces the 奧品牌定位 method. */}
+                          strategy lead, who introduces the SoWork 品牌定位 method. */}
                       <AgentPersonaBar
                         persona="strategist"
                         brandName={scopeName}
@@ -1092,7 +1100,7 @@ export default function BrandsPage() {
                             ? "為這個產品做定位 — 6 步從族群痛點推導出獨家賣點，作為文案 / 視覺的依據。"
                           : scopeMode === "event"
                             ? "為這場活動做定位 — 11 步從背景與受眾推導出 SMP（單一核心命題），再展開訊息架構與創意。"
-                          : "我會用奧品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」 — 鎖定後，所有內容都會以此為基礎產出。"
+                          : "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」 — 鎖定後，所有內容都會以此為基礎產出。"
                         }
                       />
                       <PositioningTopRow
@@ -1741,10 +1749,6 @@ function PositioningGrid({
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
             {group.segs.map((s, si) => {
-              // 2026-05-11 (CJ「就算做完定位，速查卡、指令庫、標語... 沒有
-              // 呈現文字，要點進去才有」): per-segment preview that knows
-              // about the actual data shape. Falls through to a generic
-              // walker so unseen segments still surface something.
               const segVal = segmentData?.[s.id];
               const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal);
               return (
@@ -1756,6 +1760,7 @@ function PositioningGrid({
                   onClick={() => onSelect(`seg:${s.id}`)}
                   preview={preview}
                   hasContent={hasContent}
+                  rationale={(s as any).rationale}
                 />
               );
             })}
@@ -2229,10 +2234,13 @@ function SectionLabel({ label, counter }: { label: string; counter?: string }) {
    - Filled state: black 1px left edge bar — like a margin annotation
    - Hover: border → black, no scale/shadow circus
    ───────────────────────────────────────────────────────────────── */
-function AssetCard({ label, icon, bg, onClick, preview, hasContent }: {
+function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }: {
   label: string; icon: any; bg: string; onClick: () => void;
   preview?: React.ReactNode;
   hasContent?: boolean;
+  /** Optional methodology rationale shown below the title — explains
+   *  WHY this step matters in the SoWork brand positioning method. */
+  rationale?: string;
 }) {
   // Split "1.1 Golden Circle" → eyebrow "01.1" + title "Golden Circle"
   const m = label.match(/^(\S+)\s+(.+)$/);
@@ -2242,6 +2250,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent }: {
   return (
     <button
       onClick={onClick}
+      title={rationale}
       className="group relative text-left transition-colors"
       style={{
         display: "flex", flexDirection: "column", gap: 10,
@@ -2300,6 +2309,20 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent }: {
       }}>
         {titleText}
       </h3>
+
+      {/* Rationale — methodology "why this step" line. Shown ONLY when
+          the segment has no content yet, so it teaches the user about the
+          method while the box is empty. Once filled, real content takes
+          over and the rationale is conserved for hover (title attr above). */}
+      {rationale && !hasContent && (
+        <p style={{
+          fontSize: 11.5, lineHeight: 1.55, color: "#737373",
+          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+          fontStyle: "italic", margin: 0,
+        }}>
+          {rationale}
+        </p>
+      )}
 
       {/* Body: serif preview when filled, hint otherwise. Use maxHeight
           rather than -webkit-line-clamp so multi-block previews
@@ -3110,11 +3133,11 @@ function PositioningTopRow({
   };
 
   const totalSteps = entityKind === "brand" ? 14 : entityKind === "product" ? 6 : 4;
-  // 2026-05-11 (reviewer:「重新自動定位 可以更名... 強調套用奧品牌定位框架」)
+  // 2026-05-11 (reviewer:「重新自動定位 可以更名... 強調套用SoWork 品牌定位框架」)
   // — frame the button as applying a named methodology, not as a generic
   // "AI fills it in" action. Methodology becomes the competitive moat.
   const methodLabel = entityKind === "brand"
-    ? "奧品牌定位法（14 步）"
+    ? "SoWork 品牌定位法（14 步）"
     : entityKind === "product"
       ? "產品定位框架（6 步）"
       : "活動定位框架（11 步）";
@@ -3438,14 +3461,13 @@ function CopyTabInline({
 
       {COPY_TILE_GROUPS.map((group, gi) => (
         <div key={gi}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-            <span style={{
-              fontSize: 11, fontWeight: 600, color: "#A8A29E",
-              letterSpacing: "0.10em", textTransform: "uppercase",
-              whiteSpace: "nowrap",
-            }}>{group.label}</span>
-            <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
-          </div>
+          {/* 2026-05-11 (CJ「文字和知識的設計風格，也改得跟定位一樣」):
+              editorial section divider, same syntax as PositioningGrid. */}
+          <SectionLabel
+            label={group.label}
+            counter={`${group.items.filter((it: any) => !isEmpty(it.key)).length} / ${group.items.length}`}
+          />
+
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",

@@ -36,6 +36,13 @@ export interface SegmentSpec {
   /** Recommended agent slug — used by the "🤖 由 X 幫我填寫" button. */
   agent: string;
   fields: FieldSpec[];
+  /**
+   * 2026-05-11 — One-line rationale: WHY this step exists in the
+   * SoWork brand positioning method. Surfaces on the layer-1 card so
+   * users understand the methodology, not just the form. Reviewer:
+   * 「目前定位頁的段落像問卷，不像方法論」.
+   */
+  rationale?: string;
 }
 
 // ── Brand (8 segments) ───────────────────────────────────────────────────
@@ -45,6 +52,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "1.1",
     title: "品牌黃金圈",
     agent: "brand-archetype-positioning",
+    rationale: "先有 WHY，才有 HOW 跟 WHAT — Sinek 的黃金圈是定位的起點，沒鎖定信念，後面標語、價值觀、差異化都會飄。",
     fields: [
       { key: "why",  label: "WHY — 品牌願景",        type: "textarea" },
       { key: "how",  label: "HOW — 品牌使命",        type: "textarea" },
@@ -56,6 +64,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "1.2",
     title: "品牌核心標語",
     agent: "brand-tagline-writer",
+    rationale: "標語把 WHY 濃縮成一句記得住的話 — 它是黃金圈的對外口號，所有貼文 / 廣告的 CTA 都會以此為錨。",
     fields: [
       { key: "zhTagline",      label: "中文標語",      type: "text" },
       { key: "enTagline",      label: "英文標語",      type: "text" },
@@ -70,6 +79,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "1.3",
     title: "標語評分摘要",
     agent: "brand-tagline-scorer",
+    rationale: "好標語不只憑感覺 — 6 維度（記憶 / 差異 / 情感 / 簡潔 / 國際化 / 可延展）量化打分，低於 75 分要重寫。",
     fields: [
       { key: "rows", label: "評分", type: "tableRows", columns: [
         { key: "dim",     label: "維度",   type: "text" },
@@ -85,6 +95,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "2.1",
     title: "品牌起源故事",
     agent: "brand-storyteller",
+    rationale: "起源故事是用戶相信你的 receipt — 「為什麼是你做這件事？」沒有故事的品牌只是另一個 logo。",
     fields: [
       { key: "story",         label: "起源故事",       type: "textarea" },
       { key: "belief5Layers", label: "信念五層深挖",   type: "tableRows", columns: [
@@ -98,6 +109,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "2.2",
     title: "品牌核心價值觀",
     agent: "brand-values-coach",
+    rationale: "價值觀是品牌的內建決策框 — 遇到取捨時依此判斷。3-5 條最有力，多了就變裝飾品。",
     fields: [
       { key: "items", label: "核心價值觀", type: "tableRows", columns: [
         { key: "label", label: "核心",   type: "text" },
@@ -110,6 +122,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "3",
     title: "目標受眾",
     agent: "persona-architect",
+    rationale: "AI 寫不像你的品牌，多半是受眾沒鎖定 — 主受眾的痛點、情感需求一旦定義清楚，每篇文章的「對誰說」就有了。",
     fields: [
       { key: "primary",   label: "主受眾（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道）", type: "textarea" },
       { key: "secondary", label: "次受眾",                                                  type: "textarea" },
@@ -126,6 +139,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "4",
     title: "競爭格局分析",
     agent: "competitive-intel",
+    rationale: "不認識競品，差異化只是自己騙自己 — 直接 / 間接 / 潛在三層分清楚，才知道空白在哪裡。",
     fields: [
       { key: "intensity",  label: "競爭強度評估",  type: "textarea" },
       { key: "direct",     label: "直接競爭對手",  type: "tableRows", columns: [
@@ -148,6 +162,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "5",
     title: "品牌差異化戰略",
     agent: "differentiation-strategist",
+    rationale: "差異化要同時拿下情感（為什麼愛我）與功能（為什麼選我） — 只有其中之一，會被便宜或熱情壓過去。",
     fields: [
       { key: "emotional",  label: "情感差異化",  type: "textarea" },
       { key: "functional", label: "功能差異化",  type: "textarea" },
@@ -159,6 +174,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "7",
     title: "市場趨勢與機會",
     agent: "trend-radar",
+    rationale: "趨勢決定切入時機 — 對的策略放錯時機等於 0，識別有利趨勢 + 風險，是內容議題日曆的母本。",
     fields: [
       { key: "favorable", label: "有利趨勢", type: "tableRows", columns: [
         { key: "name", label: "趨勢", type: "text" },
@@ -175,6 +191,7 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     num: "8",
     title: "品牌個性與溝通風格",
     agent: "brand-voice-coach",
+    rationale: "Voice 是 AI 寫貼文的最後一道濾鏡 — 人格原型 + 語調詞 + 禁區字三件套，把品牌「說話的方式」變成可複製的規則。",
     fields: [
       { key: "archetypes", label: "人格原型（主 / 次）",   type: "array" },
       { key: "tone",       label: "核心語調關鍵詞",         type: "array" },

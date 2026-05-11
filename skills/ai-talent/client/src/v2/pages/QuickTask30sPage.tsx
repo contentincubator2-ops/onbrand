@@ -384,12 +384,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     return list;
   }, [tasksThisTier, channel, searchQuery]);
 
-  const tierLabel = tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "100 秒";
+  const tierLabel = tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "99 秒";
   const tierTagline = tier === "30s"
     ? "今天，要寫哪一篇 30 秒搞定的貼文？"
     : tier === "60s"
     ? "今天，要做哪一個 60 秒製作包？"
-    : "今天，要做哪一個 100 秒研究驗證版？";
+    : "今天，要做哪一個 99 秒研究驗證版？";
 
   const runQuickMut = (trpc as any).quickTask?.runQuick?.useMutation();
   // Plan B 20s parallel orchestra (caption_writer + image_director + Flux Schnell ×N)
@@ -616,7 +616,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     : {
         emoji: "🎯",
         kicker: "REAL SQUAD · CAMPAIGN PIPELINE",
-        headline: "100 秒任務 = 真實 Squad 多步驟工作流",
+        headline: "99 秒任務 = 真實 Squad 多步驟工作流",
         sub: "點擊任務後進入 Squad 工作區（/picker）— 多位 agent 接力、按方法論交付完整月曆 / launch toolkit / 危機劇本",
         bullets: ["真實 Squad pipeline", "完整方法論（Pulizzi / Cialdini / Lagadec）", "calendar / toolkit shape 輸出", "FB 11 + IG 7 squad 已就位"],
         accent: "#f59e0b",
@@ -629,7 +629,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     ? "今天，要寫哪一篇 30 秒搞定的貼文？"
     : tier === "60s"
     ? "今天，要做哪一個 60 秒製作包？"
-    : "今天，要做哪一個 100 秒研究驗證版？";
+    : "今天，要做哪一個 99 秒研究驗證版？";
 
   return (
     <div>
@@ -734,7 +734,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               <p className="font-semibold mb-1">{tierLabel} 任務製作中</p>
               <p className="text-tiny text-default-400">
                 {tier === "60s" && "60 秒任務（含完整視覺 brief）將於下一波上線"}
-                {tier === "100s" && "100 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）"}
+                {tier === "100s" && "99 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）"}
                 {tier === "30s" && "請稍候，Agent 正在準備中"}
               </p>
             </CardBody>

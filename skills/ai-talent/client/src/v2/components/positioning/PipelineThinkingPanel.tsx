@@ -256,6 +256,22 @@ export default function PipelineThinkingPanel({
                 通常 20–60 秒，請稍候 — 系統不是當機，是在認真思考。
               </div>
             )}
+            {/* 2026-05-11 (CJ「你好中文按了品牌定位後，一直停留在 0/14」):
+                stuck-step rescue hint — visible after 45s on the same step. */}
+            {status === "running" && elapsedSec >= 45 && phase !== "writing" && (
+              <div
+                style={{
+                  marginTop: 12, padding: "10px 14px",
+                  border: "1px solid #FBBF24", background: "#FFFBEB",
+                  borderRadius: 8,
+                  fontFamily: "system-ui, sans-serif",
+                  fontSize: 12.5, color: "#92400E", lineHeight: 1.55,
+                }}
+              >
+                <strong>這一步比平常久（{elapsedSec}s）</strong>
+                ：系統會在 90 秒後自動跳過，也可以按右上方「跳過」立即略過 — 之後可單獨重跑此段。
+              </div>
+            )}
             {typed}
             {status === "running" && phase === "typing" && (
               <span

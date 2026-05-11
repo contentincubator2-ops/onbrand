@@ -22,7 +22,7 @@ const PLANS = [
     credits: 500,
     cap: "每日 ~$5 USD 上限",
     features: [
-      "30s / 60s / 100s 任務",
+      "30s / 60s / 99s 任務",
       "Theater 內容企劃台",
       "品牌定位 14-step pipeline",
       "全平台 mockup 預覽",
@@ -52,7 +52,7 @@ const PLANS = [
     features: [
       "Starter 全部功能",
       "10× credits",
-      "100s 研究級 pipeline 加速",
+      "99s 研究級 pipeline 加速",
       "優先客服",
     ],
     cta: "聯絡客服",

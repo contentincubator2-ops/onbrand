@@ -32,8 +32,8 @@ const PERSONAS: Record<PersonaId, {
 }> = {
   strategist: {
     label: "策略總監",
-    seed: "Strategist-奧品牌定位",
-    defaultLine: "我會用奧品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」— 鎖定後，所有內容都會以此為基礎產出。",
+    seed: "Strategist-SoWork 品牌定位",
+    defaultLine: "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」— 鎖定後，所有內容都會以此為基礎產出。",
     domain: "Brand Positioning",
   },
   copywriter: {

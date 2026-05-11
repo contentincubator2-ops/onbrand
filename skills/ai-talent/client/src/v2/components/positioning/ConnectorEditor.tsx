@@ -88,7 +88,7 @@ export default function ConnectorEditor({ brandId }: { brandId: number | null })
             <h1 className="text-2xl font-semibold text-default-900">外部連結</h1>
           </div>
           <p className="text-sm text-default-500">
-            填上品牌的官網 + 社群連結。AI 自動填寫 / 測試 / 30s / 60s / 100s 都會去抓這些連結的內容，**讓產出基於真實資料而不是亂猜**。
+            填上品牌的官網 + 社群連結。AI 自動填寫 / 測試 / 30s / 60s / 99s 都會去抓這些連結的內容，**讓產出基於真實資料而不是亂猜**。
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -150,7 +150,7 @@ export default function ConnectorEditor({ brandId }: { brandId: number | null })
 
       <div className="mt-6 text-xs text-default-500 bg-default-50 rounded-lg p-3 leading-relaxed">
         <div className="font-medium text-default-700 mb-1">💡 為什麼要填？</div>
-        AI 在做「自動填寫」、「測試 6 情境」、「30s / 60s / 100s 任務」之前，會先抓這些連結的真實內容（OG 標籤、頁面摘要、首屏文字），把品牌實際在用的語氣 / 受眾 / 產業塞進 prompt，這樣產出才會貼合品牌而不是用品牌名瞎猜產業。
+        AI 在做「自動填寫」、「測試 6 情境」、「30s / 60s / 99s 任務」之前，會先抓這些連結的真實內容（OG 標籤、頁面摘要、首屏文字），把品牌實際在用的語氣 / 受眾 / 產業塞進 prompt，這樣產出才會貼合品牌而不是用品牌名瞎猜產業。
       </div>
     </div>
   );
