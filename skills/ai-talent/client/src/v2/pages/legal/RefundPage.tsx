@@ -42,7 +42,7 @@ export default function RefundPage() {
 
           <h2 className="text-lg font-semibold">退費申請流程</h2>
           <ol className="list-decimal pl-6 space-y-1">
-            <li>email 至 <a href="mailto:drop@sowork.ai" className="text-blue-600 underline">drop@sowork.ai</a>，標題「退費申請」。</li>
+            <li>email 至 <a href="mailto:sowork@sowork.tw" className="text-blue-600 underline">sowork@sowork.tw</a>，標題「退費申請」。</li>
             <li>內文附上：註冊 email、訂單時間、退費原因。</li>
             <li>我們於 <strong>3 個工作天內</strong>回覆審核結果。</li>
             <li>核准後 <strong>7 個工作天內</strong>退至原付款方式。</li>

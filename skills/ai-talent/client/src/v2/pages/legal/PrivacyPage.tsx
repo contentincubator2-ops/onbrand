@@ -75,7 +75,7 @@ export default function PrivacyPage() {
 
           <h2 className="text-lg font-semibold">9. 聯絡個資專責</h2>
           <p>
-            <a href="mailto:drop@sowork.ai" className="text-blue-600 underline">drop@sowork.ai</a>
+            <a href="mailto:sowork@sowork.tw" className="text-blue-600 underline">sowork@sowork.tw</a>
             （標題請註明「個資相關」加速處理）
           </p>
         </section>

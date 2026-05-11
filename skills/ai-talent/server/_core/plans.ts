@@ -213,7 +213,7 @@ export function formatQuota(n: number): string {
   return n.toLocaleString("zh-TW");
 }
 
-export const SUPPORT_EMAIL = "drop@sowork.ai";
+export const SUPPORT_EMAIL = "sowork@sowork.tw";
 export const SUPPORT_LINE_AT = "@sowork";  // placeholder; CJ to register
 export const PARENT_DOMAIN = "https://www.sowork.ai";
 export const PRODUCT_DOMAIN = "https://drop.sowork.ai";

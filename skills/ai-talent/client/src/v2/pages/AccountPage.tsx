@@ -240,8 +240,8 @@ export default function AccountPage() {
           <h2 className="text-lg font-semibold text-neutral-900 mb-2">客服</h2>
           <p className="text-sm text-neutral-600 mb-4">工作日 24 小時內回覆</p>
           <div className="flex flex-wrap gap-3 text-sm">
-            <a href="mailto:drop@sowork.ai" className="px-4 py-2 rounded-lg border border-neutral-300 hover:border-neutral-500 text-neutral-700 transition">
-              drop@sowork.ai
+            <a href="mailto:sowork@sowork.tw" className="px-4 py-2 rounded-lg border border-neutral-300 hover:border-neutral-500 text-neutral-700 transition">
+              sowork@sowork.tw
             </a>
             <a href="https://line.me/R/ti/p/@sowork" target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg border border-neutral-300 hover:border-neutral-500 text-neutral-700 transition">
               LINE 加入好友

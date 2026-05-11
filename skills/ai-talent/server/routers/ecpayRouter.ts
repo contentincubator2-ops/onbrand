@@ -63,7 +63,7 @@ export const ecpayRouter = router({
         console.error("[ecpay.createCheckout] missing env: ECPAY_MERCHANT_ID / ECPAY_HASH_KEY / ECPAY_HASH_IV");
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "金流服務尚未啟用，請稍後再試或聯絡 drop@sowork.ai。",
+          message: "金流服務尚未啟用，請稍後再試或聯絡 sowork@sowork.tw。",
         });
       }
 

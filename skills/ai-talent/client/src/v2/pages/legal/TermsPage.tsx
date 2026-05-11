@@ -80,7 +80,7 @@ export default function TermsPage() {
 
           <h2 className="text-lg font-semibold">11. 聯絡方式</h2>
           <p>
-            <a href="mailto:drop@sowork.ai" className="text-blue-600 underline">drop@sowork.ai</a>
+            <a href="mailto:sowork@sowork.tw" className="text-blue-600 underline">sowork@sowork.tw</a>
           </p>
         </section>
       </div>

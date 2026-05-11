@@ -160,7 +160,7 @@ export default function RunPage() {
               setTimeout(() => navigate(`/brands/edit?b=${brandId}&tab=publish`), 600);
             }
           } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
-            showToastGlobal("FB 發布服務尚未啟用 — 請聯絡 drop@sowork.ai");
+            showToastGlobal("FB 發布服務尚未啟用 — 請聯絡 sowork@sowork.tw");
           } else {
             showToastGlobal(`FB 發布失敗：${e?.message ?? e}`);
           }

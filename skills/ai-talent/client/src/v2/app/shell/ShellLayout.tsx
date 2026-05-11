@@ -215,7 +215,7 @@ export default function ShellLayout() {
           <a href="/pricing" className="hover:text-neutral-700">方案</a>
           <a href="/settings/account" className="hover:text-neutral-700">帳號</a>
           <a href="/achievements" className="hover:text-neutral-700">成就</a>
-          <a href="mailto:drop@sowork.ai" className="hover:text-neutral-700">drop@sowork.ai</a>
+          <a href="mailto:sowork@sowork.tw" className="hover:text-neutral-700">sowork@sowork.tw</a>
           <span>·</span>
           <span>© SoWork 摘星社群行銷顧問</span>
         </footer>
