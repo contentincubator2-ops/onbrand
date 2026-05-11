@@ -46,11 +46,16 @@ export const publishRouter = router({
         });
       }
 
-      // Load output + verify ownership + get caption
+      // Load output + verify ownership + get caption + brand's FB binding
+      // 2026-05-11 (CJ「多用戶 SaaS, 每用戶連自己 FB」): JOIN brands to read
+      // per-brand fbPageId — no more global DEFAULT_FB_PAGE_ID env.
       const { default: localPool } = await import("../localDb");
       const [rows]: any = await localPool.execute(
-        `SELECT o.content, m.brandId, m.userId AS owner_id
-         FROM mission_outputs o JOIN missions m ON m.id = o.missionId
+        `SELECT o.content, m.brandId, m.userId AS owner_id,
+                b.fbPageId AS brand_fb_page_id, b.fbPageName AS brand_fb_page_name
+         FROM mission_outputs o
+         JOIN missions m ON m.id = o.missionId
+         LEFT JOIN brands b ON b.id = m.brandId
          WHERE o.id = ? AND m.userId = ? LIMIT 1`,
         [input.outputId, ctx.user.id],
       );
@@ -69,22 +74,22 @@ export const publishRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "此 variant 沒有 caption 可發布" });
       }
 
-      // 2026-05-09: Pipedream workflow expects {page_id, message} per CJ's
-      // setup. Defaults to brand's saved FB Page ID; falls back to a global
-      // env DEFAULT_FB_PAGE_ID for trial. Send the same name format the
-      // workflow's "Facebook Pages → Create Post" step references.
-      const pageId = input.pageId
-        ?? (ENV as any).DEFAULT_FB_PAGE_ID
-        ?? null;
+      // 2026-05-11 (multi-tenant): page_id MUST come from this brand's
+      // saved binding. No global env fallback — each user connects their
+      // own FB and stores their target page on the brand row.
+      const pageId = input.pageId ?? row.brand_fb_page_id ?? null;
       if (!pageId) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "缺 FB Page ID。請在 publish.toFacebook input 帶 pageId，或設 DEFAULT_FB_PAGE_ID env",
+          message: "此品牌尚未連接 Facebook 粉專。請到 品牌設定 → 連接 Facebook 完成綁定。",
         });
       }
+      // Pipedream Connect: pass external_user_id so the workflow uses
+      // THIS user's OAuth token (not a shared account).
       const payload = {
         page_id: pageId,
         message: caption,
+        connect_external_user_id: String(ctx.user.id),
         // Diagnostics — Pipedream workflow can ignore these but they help
         // for support / dedupe / audit if Pipedream's logs are needed.
         _meta: {
@@ -93,6 +98,7 @@ export const publishRouter = router({
           variantIndex: input.variantIndex,
           brandId: row.brandId,
           userId: ctx.user.id,
+          fbPageName: row.brand_fb_page_name ?? null,
         },
       };
 
@@ -178,6 +184,73 @@ export const publishRouter = router({
         token: data.token,
         connectUrl: data.connect_link_url ?? `https://pipedream.com/_static/connect.html?token=${data.token}&app=facebook_pages`,
         expiresAt: data.expires_at ?? null,
+      };
+    }),
+
+  /**
+   * 2026-05-11 — Bind a Facebook Page to a brand. After the user finishes
+   * Pipedream Connect OAuth, the frontend asks them which Page ID to use
+   * (or pick from a list later) and calls this to persist.
+   */
+  setBrandFacebookPage: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      fbPageId: z.string().min(1).max(64),
+      fbPageName: z.string().max(128).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      // Verify ownership
+      const [rows]: any = await localPool.execute(
+        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      if (!(rows as any[])[0]) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "品牌不存在或無權限" });
+      }
+      await localPool.execute(
+        `UPDATE brands SET fbPageId = ?, fbPageName = ?, fbConnectedAt = NOW() WHERE id = ?`,
+        [input.fbPageId, input.fbPageName ?? null, input.brandId],
+      );
+      return { ok: true };
+    }),
+
+  /** Disconnect FB binding from a brand (does NOT revoke Pipedream token). */
+  unbindBrandFacebook: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      if (!(rows as any[])[0]) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "品牌不存在或無權限" });
+      }
+      await localPool.execute(
+        `UPDATE brands SET fbPageId = NULL, fbPageName = NULL, fbConnectedAt = NULL WHERE id = ?`,
+        [input.brandId],
+      );
+      return { ok: true };
+    }),
+
+  /** Read FB binding status for a brand (drives the settings UI). */
+  getBrandFacebookStatus: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT fbPageId, fbPageName, fbConnectedAt
+         FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "品牌不存在或無權限" });
+      return {
+        connected: !!row.fbPageId,
+        fbPageId: row.fbPageId ?? null,
+        fbPageName: row.fbPageName ?? null,
+        connectedAt: row.fbConnectedAt ?? null,
       };
     }),
 });

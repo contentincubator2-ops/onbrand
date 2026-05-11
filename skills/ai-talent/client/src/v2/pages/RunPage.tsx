@@ -143,9 +143,21 @@ export default function RunPage() {
           utils.output.getById.invalidate({ id });
         },
         onError: (e: any) => {
-          // PRECONDITION_FAILED → onboarding hint; others → raw message
-          if (String(e?.message ?? "").includes("Pipedream") && String(e?.message ?? "").includes("未設定")) {
-            showToastGlobal("FB 發布尚未設定 Pipedream webhook，請先設好 PIPEDREAM_FB_PUBLISH_WEBHOOK env");
+          const msg = String(e?.message ?? "");
+          // 2026-05-11 (multi-tenant): brand not yet bound to FB → guide
+          // user straight to brand settings → 發布 tab.
+          if (msg.includes("尚未連接") || msg.includes("缺 FB Page ID")) {
+            const brandId = data?.mission?.brandId ?? null;
+            showToastGlobal(
+              brandId
+                ? "此品牌尚未連接 Facebook — 開啟「品牌設定 → 發布」綁定粉專"
+                : "此任務沒有對應品牌，無法綁定 Facebook 粉專",
+            );
+            if (brandId) {
+              setTimeout(() => navigate(`/brands/edit?b=${brandId}&tab=publish`), 600);
+            }
+          } else if (msg.includes("Pipedream") && msg.includes("未設定")) {
+            showToastGlobal("FB 發布尚未設定 Pipedream webhook（後端缺 env）");
           } else {
             showToastGlobal(`FB 發布失敗：${e?.message ?? e}`);
           }

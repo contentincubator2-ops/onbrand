@@ -114,7 +114,20 @@ export default function BrandsPage() {
   // every refresh after dismissing.
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   // (effect to auto-open is declared further down once scopeBrands is defined)
-  const [settingsInitialTab, setSettingsInitialTab] = useState<"info"|"connector"|"visual"|"ai"|"danger">("connector");
+  const [settingsInitialTab, setSettingsInitialTab] = useState<"info"|"connector"|"publish"|"visual"|"ai"|"danger">("connector");
+  // 2026-05-11: support deep link /brands/edit?b=:id&tab=publish from
+  // RunPage's "尚未連接 FB" toast.
+  React.useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const t = sp.get("tab");
+      if (t === "publish" || t === "connector" || t === "info" || t === "visual" || t === "ai" || t === "danger") {
+        setSettingsInitialTab(t);
+        setSettingsOpen(true);
+      }
+    } catch { /* no-op */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [onboardingHint, setOnboardingHint] = useState<string | undefined>(undefined);
 
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand

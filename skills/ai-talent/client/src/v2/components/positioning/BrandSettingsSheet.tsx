@@ -15,14 +15,17 @@
  * Opens via the gear icon top-right of Brand workspace header.
  */
 import { useEffect, useState } from "react";
-import { Modal, ModalContent, Button } from "@heroui/react";
+import { Modal, ModalContent, Button, Input, Spinner } from "@heroui/react";
 import {
-  IdCard, Link2, Palette, Bot, Trash2, X,
+  IdCard, Link2, Palette, Bot, Trash2, X, Share2, CheckCircle2, ExternalLink,
 } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFacebook } from "@fortawesome/free-brands-svg-icons";
 import ConnectorEditor from "./ConnectorEditor";
 import AIPromptsEditor from "./AIPromptsEditor";
+import { trpc } from "../../../lib/trpc";
 
-type SettingsTab = "info" | "connector" | "visual" | "ai" | "danger";
+type SettingsTab = "info" | "connector" | "publish" | "visual" | "ai" | "danger";
 
 interface Props {
   isOpen: boolean;
@@ -38,6 +41,7 @@ interface Props {
 const TABS: Array<{ id: SettingsTab; label: string; Icon: any }> = [
   { id: "info",      label: "基本資料",  Icon: IdCard  },
   { id: "connector", label: "連結",      Icon: Link2   },
+  { id: "publish",   label: "發布",      Icon: Share2  },
   { id: "visual",    label: "視覺",      Icon: Palette },
   { id: "ai",        label: "AI 指令",   Icon: Bot     },
   { id: "danger",    label: "危險區",    Icon: Trash2  },
@@ -106,6 +110,7 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
             {activeTab === "connector" && (
               <ConnectorEditor brandId={brandId} />
             )}
+            {activeTab === "publish" && <PublishTab brandId={brandId} />}
             {activeTab === "visual" && <VisualTab brandId={brandId} />}
             {activeTab === "ai" && (
               <AIPromptsEditor brandId={brandId} />
@@ -141,6 +146,195 @@ function VisualTab({ brandId }: { brandId: number | null }) {
         <div className="font-medium text-orange-700 mb-1.5">🚧 開發中</div>
         Logo 上傳、色票挑選器、字型設定 — 接下來會在此 tab 內完整實作。目前若要設定 Logo，請先到 brand.update 設定 logoUrl 欄位，或等下一輪。
         <div className="text-default-400 italic mt-2">brandId: {brandId}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 2026-05-11 — PublishTab: per-brand Facebook binding for multi-tenant SaaS.
+ *
+ * Flow:
+ *   1. User clicks 「連接 Facebook」 → opens Pipedream Connect popup
+ *      (OAuth scoped to this user's external_user_id = our userId).
+ *   2. User authorises FB → Pipedream stores their access token in vault.
+ *   3. User pastes the FB Page ID they want this brand to publish to
+ *      → saved into brands.fbPageId.
+ *   4. From now on, publish.toFacebook reads brand.fbPageId + sends
+ *      connect_external_user_id so Pipedream uses THIS user's token.
+ */
+function PublishTab({ brandId }: { brandId: number | null }) {
+  const statusQ = (trpc as any).publish?.getBrandFacebookStatus?.useQuery?.(
+    { brandId: brandId ?? 0 },
+    { enabled: !!brandId, refetchOnWindowFocus: false },
+  );
+  const setPageM = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
+    onSuccess: () => statusQ?.refetch?.(),
+  });
+  const unbindM = (trpc as any).publish?.unbindBrandFacebook?.useMutation?.({
+    onSuccess: () => statusQ?.refetch?.(),
+  });
+  const connectM = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
+
+  const [pageId, setPageId] = useState("");
+  const [pageName, setPageName] = useState("");
+  const [connectStarted, setConnectStarted] = useState(false);
+
+  useEffect(() => {
+    const d = statusQ?.data;
+    if (d?.fbPageId) setPageId(d.fbPageId);
+    if (d?.fbPageName) setPageName(d.fbPageName);
+  }, [statusQ?.data]);
+
+  const status = statusQ?.data;
+  const isConnected = !!status?.connected;
+  const isLoading = !!statusQ?.isLoading;
+
+  async function handleConnect() {
+    try {
+      const r = await connectM?.mutateAsync?.({});
+      if (r?.connectUrl) {
+        window.open(r.connectUrl, "_blank", "noopener,noreferrer,width=600,height=700");
+        setConnectStarted(true);
+      }
+    } catch (e: any) {
+      alert(`無法開啟 Pipedream Connect：${e?.message ?? "未知錯誤"}`);
+    }
+  }
+
+  async function handleSave() {
+    if (!brandId || !pageId.trim()) return;
+    try {
+      await setPageM?.mutateAsync?.({
+        brandId,
+        fbPageId: pageId.trim(),
+        fbPageName: pageName.trim() || undefined,
+      });
+    } catch (e: any) {
+      alert(`儲存失敗：${e?.message ?? "未知錯誤"}`);
+    }
+  }
+
+  async function handleUnbind() {
+    if (!brandId) return;
+    if (!confirm("確定要解除此品牌的 Facebook 綁定？已發出的貼文不會被刪除。")) return;
+    try {
+      await unbindM?.mutateAsync?.({ brandId });
+      setPageId("");
+      setPageName("");
+    } catch (e: any) {
+      alert(`解除失敗：${e?.message ?? "未知錯誤"}`);
+    }
+  }
+
+  return (
+    <div className="max-w-[760px] mx-auto p-8">
+      <h2 className="text-2xl font-semibold text-default-900 mb-2">發布設定</h2>
+      <p className="text-sm text-default-500 mb-6">
+        為這個品牌連接你自己的 Facebook 粉專，「直接發 FB」會用你的授權發到你選定的粉專。
+      </p>
+
+      {/* Facebook section */}
+      <div className="border border-default-200 rounded-xl p-5 bg-white">
+        <div className="flex items-center gap-3 mb-4">
+          <FontAwesomeIcon icon={faFacebook} style={{ color: "#1877F2", fontSize: 22 }} />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-default-900">Facebook 粉專</div>
+            <div className="text-xs text-default-500">透過 Pipedream Connect 安全授權 · 隨時可解除</div>
+          </div>
+          {isConnected && (
+            <span className="flex items-center gap-1 text-xs text-success-700 bg-success-50 border border-success-200 px-2 py-1 rounded-full">
+              <CheckCircle2 size={12} /> 已連接
+            </span>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="py-6 flex justify-center"><Spinner size="sm" /></div>
+        ) : (
+          <>
+            {/* Step 1: OAuth */}
+            <div className="mb-5">
+              <div className="text-xs font-medium text-default-700 mb-2">
+                1. 授權 Facebook 帳號
+              </div>
+              <Button
+                size="sm"
+                variant={isConnected ? "bordered" : "solid"}
+                color={isConnected ? "default" : "primary"}
+                startContent={<ExternalLink size={13} />}
+                isLoading={connectM?.isPending}
+                onPress={handleConnect}
+              >
+                {isConnected ? "重新授權 / 換帳號" : "連接 Facebook"}
+              </Button>
+              {connectStarted && !isConnected && (
+                <p className="text-xs text-default-500 mt-2">
+                  在新分頁完成授權後回來這裡填入粉專 ID。
+                </p>
+              )}
+            </div>
+
+            {/* Step 2: page ID */}
+            <div className="mb-4">
+              <div className="text-xs font-medium text-default-700 mb-2">
+                2. 想用哪個粉專？
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  size="sm"
+                  label="粉專 ID"
+                  placeholder="例：123456789012345"
+                  value={pageId}
+                  onValueChange={setPageId}
+                  description="可在粉專「關於」頁面找到"
+                />
+                <Input
+                  size="sm"
+                  label="粉專名稱（顯示用）"
+                  placeholder="選填，例：摘星行銷"
+                  value={pageName}
+                  onValueChange={setPageName}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                color="primary"
+                isDisabled={!pageId.trim() || !brandId}
+                isLoading={setPageM?.isPending}
+                onPress={handleSave}
+              >
+                儲存綁定
+              </Button>
+              {isConnected && (
+                <Button
+                  size="sm"
+                  variant="light"
+                  color="danger"
+                  isLoading={unbindM?.isPending}
+                  onPress={handleUnbind}
+                >
+                  解除綁定
+                </Button>
+              )}
+            </div>
+
+            {status?.connectedAt && (
+              <p className="text-xs text-default-400 mt-3">
+                上次連接：{new Date(status.connectedAt).toLocaleString("zh-TW")}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="mt-4 text-xs text-default-400 leading-relaxed">
+        說明：Drop 不會儲存你的 Facebook 密碼。OAuth token 由 Pipedream 代管，
+        每位用戶獨立。解除綁定只會從 Drop 端清除指向關係，要徹底撤銷請至
+        Facebook 設定 → 已連結應用程式移除 Pipedream。
       </div>
     </div>
   );

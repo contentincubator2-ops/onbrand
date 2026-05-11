@@ -1390,6 +1390,15 @@ async function main() {
     `);
     console.log("[migrate] promo_codes: OK");
 
+    // ─── 2026-05-11 (CJ「多用戶 SaaS, 每用戶連自己 FB」): per-brand FB binding ───
+    // brand.fbPageId: 該品牌綁定的 Facebook 粉專 ID (numeric)
+    // brand.fbPageName: 顯示用名稱
+    // brand.fbConnectedAt: OAuth 連接時間, NULL = 尚未連接
+    await ensureCol("brands", "fbPageId",     "VARCHAR(64) NULL");
+    await ensureCol("brands", "fbPageName",   "VARCHAR(128) NULL");
+    await ensureCol("brands", "fbConnectedAt", "DATETIME(3) NULL");
+    console.log("[migrate] brands FB binding columns: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
