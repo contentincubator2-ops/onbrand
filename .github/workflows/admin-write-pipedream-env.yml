@@ -1,0 +1,77 @@
+name: Admin — Write Pipedream env vars to VM
+
+# Push Pipedream Connect credentials from GitHub Secrets to VM .env.
+#
+# Prerequisites (USER ACTION — none of this can be done by Claude):
+#   1. Sign up at https://pipedream.com (free tier OK to start)
+#   2. Create a project: pipedream.com/@<workspace>/projects/<name>
+#      Copy the project ID (looks like proj_XXXXXX)
+#   3. Settings → API Keys → create an API key (starts with "pdk_")
+#      OR: OAuth → create client credentials (client_id + client_secret)
+#   4. Add the following secrets to this repo (gh secret set ...):
+#        PIPEDREAM_API_KEY        (the pdk_... key — easiest path)
+#        PIPEDREAM_PROJECT_ID     (proj_...)
+#        PIPEDREAM_PROJECT_ENV    (optional, "production" or "development";
+#                                  defaults to production if not set)
+#      For OAuth flow (alternative):
+#        PIPEDREAM_CLIENT_ID
+#        PIPEDREAM_CLIENT_SECRET
+#   5. Run THIS workflow to push them to the VM .env and restart pm2.
+#
+# After this completes, run admin-probe-pipedream.yml to verify.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          PIPEDREAM_API_KEY:       ${{ secrets.PIPEDREAM_API_KEY }}
+          PIPEDREAM_CLIENT_ID:     ${{ secrets.PIPEDREAM_CLIENT_ID }}
+          PIPEDREAM_CLIENT_SECRET: ${{ secrets.PIPEDREAM_CLIENT_SECRET }}
+          PIPEDREAM_PROJECT_ID:    ${{ secrets.PIPEDREAM_PROJECT_ID }}
+          PIPEDREAM_PROJECT_ENV:   ${{ secrets.PIPEDREAM_PROJECT_ENV }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: PIPEDREAM_API_KEY,PIPEDREAM_CLIENT_ID,PIPEDREAM_CLIENT_SECRET,PIPEDREAM_PROJECT_ID,PIPEDREAM_PROJECT_ENV
+          script: |
+            set -e
+            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+            touch "$ENV"
+            cp "$ENV" "${ENV}.bak.$(date +%s)"
+
+            upsert() {
+              local KEY="$1"; local VAL="$2"
+              if [ -z "$VAL" ]; then
+                echo "  ⊘ $KEY (empty in secrets, skipped)"; return
+              fi
+              if grep -qE "^${KEY}=" "$ENV"; then
+                sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" "$ENV"
+                echo "  ↻ $KEY (updated, ${#VAL} chars)"
+              else
+                echo "${KEY}=${VAL}" >> "$ENV"
+                echo "  + $KEY (added, ${#VAL} chars)"
+              fi
+            }
+
+            echo "════════════════════════════════════════════════════════"
+            echo "  Writing Pipedream Connect creds to $ENV"
+            echo "════════════════════════════════════════════════════════"
+            upsert PIPEDREAM_API_KEY       "$PIPEDREAM_API_KEY"
+            upsert PIPEDREAM_CLIENT_ID     "$PIPEDREAM_CLIENT_ID"
+            upsert PIPEDREAM_CLIENT_SECRET "$PIPEDREAM_CLIENT_SECRET"
+            upsert PIPEDREAM_PROJECT_ID    "$PIPEDREAM_PROJECT_ID"
+            upsert PIPEDREAM_PROJECT_ENV   "${PIPEDREAM_PROJECT_ENV:-production}"
+
+            echo
+            echo "  Restarting pm2 marketing-os to pick up env..."
+            pm2 restart marketing-os --update-env 2>&1 | tail -3 || echo "(pm2 restart skipped)"
+
+            echo
+            echo "✓ Done. Run admin-probe-pipedream.yml to verify."
