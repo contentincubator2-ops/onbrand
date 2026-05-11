@@ -985,8 +985,19 @@ export default function RunPage() {
         platform={data?.metadata?.platform ?? null}
         taskId={data?.mission?.taskId ?? null}
         previewText={(() => {
-          // Use first variant caption as preview; strip super long.
-          const v = data?.variants?.[0] ?? data?.variants?.[activeIdx];
+          // Variants live inside the output's content JSON, not as a top-
+          // level field. Parse defensively + strip super long.
+          const anyData: any = data;
+          const variants = anyData?.variants
+            ?? (() => {
+                 try {
+                   const parsed = typeof anyData?.content === "string"
+                     ? JSON.parse(anyData.content)
+                     : anyData?.content;
+                   return Array.isArray(parsed) ? parsed : (parsed?.variants ?? []);
+                 } catch { return []; }
+               })();
+          const v = variants?.[0] ?? variants?.[activeIdx];
           const cap = v?.caption ?? "";
           return cap.length > 280 ? cap.slice(0, 280) + "…" : cap;
         })()}
