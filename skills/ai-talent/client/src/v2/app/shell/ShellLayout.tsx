@@ -17,6 +17,8 @@ import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
 import PricingInfoModal from "../../components/PricingInfoModal";
 import TrialCountdownBar from "../../components/TrialCountdownBar";
 import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher";
+// 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
+import FestivalGlobalNudge from "../../components/FestivalGlobalNudge";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -201,6 +203,9 @@ export default function ShellLayout() {
         {/* 2026-05-10 trial countdown bar + achievement watcher (no UI) */}
         <TrialCountdownBar />
         <AchievementUnlockWatcher />
+        {/* 2026-05-11 (CJ「節慶日曆 + 自動提醒」): global festival nudge,
+            shows only when priority ≥ 4 festival is within 7 days. */}
+        <FestivalGlobalNudge />
         <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
         {/* 2026-05-10 global footer w/ legal links — shows on every authenticated page */}
         <footer className="mt-12 pt-6 pb-8 border-t border-neutral-200 text-center text-[11px] text-neutral-400 space-x-3">

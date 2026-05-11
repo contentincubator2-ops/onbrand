@@ -11,7 +11,7 @@ import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Sparkles } from "lucide-react";
 
 const PLATFORM_COLOR: Record<string, string> = {
   facebook: "#1877F2",
@@ -138,6 +138,9 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* 2026-05-11 (CJ「節慶日曆 + 自動提醒」): festival nudge banner */}
+      <FestivalNudgeBanner brandId={brandId} navigate={navigate} />
+
       {/* Month control bar */}
       <div className="max-w-[1100px] mx-auto px-6 mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -260,6 +263,105 @@ export default function CalendarPage() {
           <span className="mx-2 text-default-500">|</span>
           v2 將加入 drag/drop 改時間 + 週曆視圖
         </p>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────── FestivalNudgeBanner ──────────────────
+   "下週是中秋節，要不要先準備 5 篇？" — proactive prompt on the
+   calendar. Lists up to 3 upcoming festivals within 45 days; each
+   has a "幫我準備 5 篇" CTA that routes to /99s with the festival
+   pre-loaded as topic. Per-user dismiss kills future nudges for
+   that festival.
+   ─────────────────────────────────────────────────────────── */
+function FestivalNudgeBanner({
+  brandId, navigate,
+}: { brandId: number | null; navigate: (to: string) => void }) {
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const upcomingQ = (trpc as any).festival?.upcoming?.useQuery?.(
+    { windowDays: 45, limit: 3, minPriority: 3 },
+    { refetchOnWindowFocus: false, staleTime: 5 * 60_000 },
+  );
+  const dismissMut = (trpc as any).festival?.dismiss?.useMutation?.({
+    onSuccess: () => utils?.festival?.upcoming?.invalidate?.(),
+  });
+
+  const items: any[] = upcomingQ?.data ?? [];
+  if (upcomingQ?.isLoading || items.length === 0) return null;
+
+  return (
+    <div className="max-w-[1100px] mx-auto px-6 mb-4">
+      <div
+        className="rounded-xl px-4 py-3"
+        style={{
+          background: "linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(0,180,188,0.06) 100%)",
+          border: "1px solid #171717",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles size={13} className="text-default-900" strokeWidth={2} />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-default-700">
+            UPCOMING · 接下來的節慶
+          </span>
+        </div>
+        <div className="flex flex-col gap-2">
+          {items.map((f: any) => {
+            const days = Number(f.daysAway);
+            const urgent = days <= 14;
+            return (
+              <div
+                key={f.id}
+                className="flex items-center gap-3 py-2 px-3 bg-white rounded-lg"
+                style={{ border: "1px solid #D4D4D4" }}
+              >
+                <span style={{ fontSize: 22 }}>{f.emoji ?? "🎉"}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-default-900">{f.name_zh}</span>
+                    <span className="text-[11px] text-default-600 tabular-nums">
+                      {new Date(f.date).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })}
+                      {" · "}
+                      <span style={{ color: urgent ? "#B91C1C" : "#404040", fontWeight: urgent ? 600 : 400 }}>
+                        {days === 0 ? "今天" : `${days} 天後`}
+                      </span>
+                    </span>
+                  </div>
+                  {f.contentHint && (
+                    <p
+                      className="text-[11px] mt-0.5 line-clamp-1"
+                      style={{
+                        color: "#525252",
+                        fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                        fontStyle: "italic",
+                      }}
+                    >
+                      {f.contentHint}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    const topic = `${f.name_zh} (${new Date(f.date).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })})${f.contentHint ? " — " + f.contentHint : ""}`;
+                    const brandParam = brandId ? `&b=${brandId}` : "";
+                    navigate(`/99s?topic=${encodeURIComponent(topic)}${brandParam}`);
+                  }}
+                  className="px-3 py-1.5 rounded-md text-[12px] font-semibold whitespace-nowrap"
+                  style={{ background: "#171717", color: "white" }}
+                >
+                  幫我準備 5 篇 →
+                </button>
+                <button
+                  onClick={() => dismissMut?.mutateAsync?.({ festivalId: f.id })}
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-default-600 hover:bg-default-100"
+                  title="這個節慶不要提醒"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

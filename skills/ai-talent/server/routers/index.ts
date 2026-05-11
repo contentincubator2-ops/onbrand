@@ -60,6 +60,8 @@ import { communityRouter } from "./communityRouter";
 import { tenantRouter } from "./tenantRouter";
 // 2026-05-11 (CJ「ECPay 金流」): 綠界 checkout + callback.
 import { ecpayRouter } from "./ecpayRouter";
+// 2026-05-11 (CJ「節慶日曆 + 自動提醒」): proactive festival nudges.
+import { festivalRouter } from "./festivalRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -122,6 +124,7 @@ export const appRouter = router({
   community:       communityRouter,
   tenant:          tenantRouter,
   ecpay:           ecpayRouter,
+  festival:        festivalRouter,
 });
 
 export type AppRouter = typeof appRouter;

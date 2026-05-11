@@ -1711,6 +1711,107 @@ async function main() {
     `);
     console.log("[migrate] scheduled_posts: OK");
 
+    // ─── 2026-05-11 (CJ「節慶日曆 + 自動提醒」): festivals + dismissals ─
+    //
+    // festivals — calendar of events that drive proactive prompts like
+    //   「下週是中秋節，要不要先準備 5 篇？」 Seeded with TW festivals
+    //   2026-2028 (solar dates pre-resolved for lunar festivals).
+    //
+    // Categories:
+    //   traditional — 春節 / 中秋 / 端午 / 清明 / 元宵 / 七夕 / 重陽
+    //   commercial  — 母親節 / 父親節 / 教師節 / 情人節 / 雙11 / 雙12 / 黑五
+    //   civic       — 國慶 / 二二八 / 兒童節 / 勞動節 / 元旦 / 跨年
+    //   seasonal    — 24 節氣（立春 / 春分 / 夏至 / 冬至 etc.）
+    //   western     — 萬聖節 / 感恩節 / 聖誕節 / 復活節
+    //
+    // region: TW / CN / HK / global. We index by region so SG/CN users
+    // (future) see different sets.
+    //
+    // priority: 1 (low) → 5 (high, can't ignore). 5 = 春節 / 中秋 / 母親節.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS festivals (
+        id            INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        slug          VARCHAR(64)  NOT NULL,
+        date          DATE         NOT NULL,
+        name_zh       VARCHAR(64)  NOT NULL,
+        name_en       VARCHAR(96)  NOT NULL,
+        region        VARCHAR(8)   NOT NULL DEFAULT 'TW',
+        category      VARCHAR(16)  NOT NULL,
+        priority      TINYINT(1)   NOT NULL DEFAULT 3,
+        emoji         VARCHAR(8)   NULL,
+        themes        JSON         NULL,        -- ["親子","團圓","禮品"]
+        contentHint   TEXT         NULL,        -- short Chinese hint for AI
+        createdAt     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        UNIQUE KEY idx_festival_slug_year (slug, date),
+        INDEX idx_festival_date (date),
+        INDEX idx_festival_region_date (region, date),
+        INDEX idx_festival_priority (priority, date)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] festivals: OK");
+
+    // festival_dismissals — per-user "我這個節慶不要提醒了"
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS festival_dismissals (
+        userId        INT          NOT NULL,
+        festivalId    INT          NOT NULL,
+        dismissedAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (userId, festivalId),
+        INDEX idx_fd_festival (festivalId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] festival_dismissals: OK");
+
+    // Seed TW festivals 2026-2027. Idempotent via INSERT IGNORE on
+    // (slug, date) unique key. Lunar dates pre-resolved to solar.
+    const FESTIVALS_SEED: Array<[string, string, string, string, string, number, string, string[], string]> = [
+      // [slug, date, name_zh, name_en, category, priority, emoji, themes, contentHint]
+      // 2026
+      ["new-year-2026",         "2026-01-01", "元旦",       "New Year's Day",         "civic",       4, "🎊", ["新年","年度回顧","展望"],         "新年新希望、品牌年度回顧、新一年目標"],
+      ["valentine-2026",        "2026-02-14", "西洋情人節", "Valentine's Day",        "commercial",  4, "💝", ["愛情","禮品","浪漫"],           "情侶禮品、單身溫暖、品牌浪漫敘事"],
+      ["spring-festival-2026",  "2026-02-17", "春節",       "Lunar New Year",         "traditional", 5, "🧧", ["團圓","紅包","新春","祝福"],   "春節祝福、紅包設計、團圓飯文化、新春開運"],
+      ["lantern-2026",          "2026-03-03", "元宵節",     "Lantern Festival",       "traditional", 3, "🏮", ["燈會","湯圓","團圓"],           "元宵燈會、湯圓食譜、傳統年味"],
+      ["women-day-2026",        "2026-03-08", "婦女節",     "Women's Day",            "commercial",  3, "🌸", ["女性力量","賦權","致敬"],       "致敬女性、品牌平權"],
+      ["white-valentine-2026",  "2026-03-14", "白色情人節", "White Valentine's Day",  "commercial",  3, "🤍", ["回禮","告白"],                  "情人節回禮、二次告白"],
+      ["228-2026",              "2026-02-28", "和平紀念日", "Peace Memorial Day",     "civic",       2, "🕊️", ["紀念","和平"],                 "莊重表態（小心拿捏，可選擇不發）"],
+      ["children-day-2026",     "2026-04-04", "兒童節",     "Children's Day",         "civic",       3, "🎈", ["童心","親子","回憶"],           "童年回憶、親子互動、品牌童心一面"],
+      ["qingming-2026",         "2026-04-05", "清明節",     "Tomb Sweeping Day",      "traditional", 2, "🕯️", ["追思","家族"],                 "莊重，多數品牌不主動發；殯葬/家居產業可做"],
+      ["mother-day-2026",       "2026-05-10", "母親節",     "Mother's Day",           "commercial",  5, "🌷", ["媽媽","感謝","禮品","檔期"], "母親節禮品、媽媽日常、感恩文案、家庭聚餐"],
+      ["dragon-boat-2026",      "2026-06-19", "端午節",     "Dragon Boat Festival",   "traditional", 4, "🍙", ["粽子","划龍舟","團圓"],         "粽子設計、端午連假、傳統習俗"],
+      ["father-day-2026",       "2026-08-08", "父親節",     "Father's Day",           "commercial",  5, "👨‍👧", ["爸爸","感謝","禮品"],         "父親節禮品、爸爸故事、傳統男性形象翻新"],
+      ["qixi-2026",             "2026-08-19", "七夕情人節", "Qixi Festival",          "traditional", 4, "🌌", ["浪漫","東方情人節"],            "中式浪漫、東方情人節、星空意象"],
+      ["ghost-month-2026",      "2026-08-13", "中元節",     "Ghost Festival",         "traditional", 2, "🕯️", ["祭祀","民俗"],                 "民俗品牌可做，普羅品牌注意分寸"],
+      ["teacher-day-2026",      "2026-09-28", "教師節",     "Teacher's Day",          "commercial",  3, "🎓", ["感謝","學習"],                  "致敬教師、學習致敬"],
+      ["mid-autumn-2026",       "2026-09-25", "中秋節",     "Mid-Autumn Festival",    "traditional", 5, "🌕", ["月餅","團圓","烤肉","賞月"], "月餅設計、團圓飯、烤肉檔期、賞月浪漫"],
+      ["double-tenth-2026",     "2026-10-10", "國慶日",     "National Day",           "civic",       3, "🇹🇼", ["國家","認同"],                ""],
+      ["double-9-2026",         "2026-10-19", "重陽節",     "Double Ninth Festival",  "traditional", 3, "🌼", ["敬老","健康"],                  "敬老檔期、銀髮族訴求"],
+      ["halloween-2026",        "2026-10-31", "萬聖節",     "Halloween",              "western",     4, "🎃", ["變裝","派對","糖果"],           "變裝、派對、品牌玩心面、Z 世代"],
+      ["double-11-2026",        "2026-11-11", "雙11購物節", "Double 11",              "commercial",  5, "🛍️", ["購物","促銷","限時"],          "電商促銷主檔期"],
+      ["thanksgiving-2026",     "2026-11-26", "感恩節",     "Thanksgiving",           "western",     3, "🦃", ["感謝","團聚"],                  "B2B 客戶感謝、家族聚餐"],
+      ["double-12-2026",        "2026-12-12", "雙12購物節", "Double 12",              "commercial",  4, "🎁", ["購物","年末"],                  "年末促銷、補刀檔期"],
+      ["christmas-2026",        "2026-12-25", "聖誕節",     "Christmas",              "western",     5, "🎄", ["禮物","派對","聖誕","團圓"], "禮物清單、聖誕派對、年末感謝"],
+      ["new-year-eve-2026",     "2026-12-31", "跨年夜",     "New Year's Eve",         "commercial",  4, "🎆", ["跨年","派對","煙火"],           "跨年派對、煙火、年度收尾"],
+      // 2027 重要節慶
+      ["new-year-2027",         "2027-01-01", "元旦",       "New Year's Day",         "civic",       4, "🎊", ["新年"],                         "新年新希望"],
+      ["spring-festival-2027",  "2027-02-06", "春節",       "Lunar New Year",         "traditional", 5, "🧧", ["團圓","紅包"],                 "春節祝福、紅包文化"],
+      ["mother-day-2027",       "2027-05-09", "母親節",     "Mother's Day",           "commercial",  5, "🌷", ["媽媽","感謝"],                  "母親節主檔期"],
+      ["father-day-2027",       "2027-08-08", "父親節",     "Father's Day",           "commercial",  5, "👨‍👧", ["爸爸"],                       "父親節主檔期"],
+      ["mid-autumn-2027",       "2027-09-15", "中秋節",     "Mid-Autumn Festival",    "traditional", 5, "🌕", ["月餅","團圓","烤肉"],           "中秋主檔期"],
+      ["christmas-2027",        "2027-12-25", "聖誕節",     "Christmas",              "western",     5, "🎄", ["禮物","聖誕"],                  "聖誕主檔期"],
+    ];
+    try {
+      for (const [slug, date, nameZh, nameEn, cat, prio, emoji, themes, hint] of FESTIVALS_SEED) {
+        await conn.execute(
+          `INSERT IGNORE INTO festivals (slug, date, name_zh, name_en, region, category, priority, emoji, themes, contentHint)
+           VALUES (?, ?, ?, ?, 'TW', ?, ?, ?, ?, ?)`,
+          [slug, date, nameZh, nameEn, cat, prio, emoji, JSON.stringify(themes), hint],
+        );
+      }
+      console.log(`[migrate] festivals seed: ${FESTIVALS_SEED.length} TW entries`);
+    } catch (e: any) {
+      console.warn("[migrate] festivals seed skipped:", e?.message ?? e);
+    }
+
     // ─── 2026-05-11 (CJ「多用戶 SaaS, 每用戶連自己 FB」): per-brand FB binding ───
     // brand.fbPageId: 該品牌綁定的 Facebook 粉專 ID (numeric)
     // brand.fbPageName: 顯示用名稱
