@@ -121,7 +121,7 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "newsletter",
     label: "LI Newsletter 一期",
     description: "Strategist 設計目錄 + 完整 newsletter（標題 + 引言 + 3 段 + CTA）",
-    agent_id: 180203, skill_slug: "linkedin-b2b", // Penny Lee — LinkedIn Authority Builder
+    agent_id: 180491, skill_slug: "linkedin-b2b", // Penny Lee — LinkedIn Authority Builder
     primary_question: "本期主題？",
     primary_input: { key: "topic", placeholder: "本期 newsletter 想講什麼", type: "textarea" },
     inputs: [{ key: "topic", label: "Newsletter 主題", type: "textarea", required: true }],
@@ -197,7 +197,7 @@ export const EMAIL_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "edm",
     label: "Email 促銷序列 (3 封)",
     description: "Strategist 設計促銷弧 + 3 封郵件（預告 / 開賣 / 最後機會）",
-    agent_id: 60012, skill_slug: "email-marketing", // Sophie Ho — Email CRM
+    agent_id: 210261, skill_slug: "email-marketing", // Sophie Ho — Email CRM
     primary_question: "促銷活動？",
     primary_input: { key: "campaign", placeholder: "活動名稱 + 優惠", type: "textarea" },
     inputs: [{ key: "campaign", label: "活動", type: "textarea", required: true }],
@@ -211,7 +211,7 @@ ${TONE("Email")}`,
     tier: "60s", postType: "edm",
     label: "Email Onboarding 3 封",
     description: "新訂閱者前 3 封歡迎序列（D0 / D3 / D7）",
-    agent_id: 60060, skill_slug: "email-marketing", // Zeyu Hsu — B2B Newsletter Copywriter
+    agent_id: 180567, skill_slug: "email-marketing", // Zeyu Hsu — B2B Newsletter Copywriter
     primary_question: "你的服務 / 產品給新訂閱者的價值？",
     primary_input: { key: "value_prop", placeholder: "新訂閱者最該知道什麼", type: "textarea" },
     inputs: [{ key: "value_prop", label: "核心價值", type: "textarea", required: true }],
@@ -445,7 +445,7 @@ export const CROSS_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "feed",
     label: { en: "Cross-Post 4 Platforms", zh: "跨平台一稿四發（FB/IG/Threads/LinkedIn）" },
     description: "同一主題 → 4 個平台的適配版本（tone / 長度 / hashtag 都不同）",
-    agent_id: 30020, skill_slug: "cross-platform-copy",
+    agent_id: 180360, skill_slug: "cross-platform-copy",
     primary_question: "今天要分享什麼？",
     primary_input: {
       key: "topic", placeholder: "主題 / 訊息 / 原文 URL", type: "textarea",
@@ -476,7 +476,7 @@ export const CROSS_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "feed",
     label: { en: "A/B Test Variants", zh: "A/B 雙版本對比測試" },
     description: "從不同 angle 寫兩版 + 「哪版會贏」分析 + 建議測試設定",
-    agent_id: 30020, skill_slug: "ab-testing",
+    agent_id: 210019, skill_slug: "ab-testing",
     primary_question: "要測什麼主題？",
     primary_input: { key: "topic", placeholder: "主題 / 原文 / URL", type: "textarea" },
     inputs: [
@@ -508,7 +508,7 @@ export const KOL_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: { en: "KOL Pitch Pack", zh: "KOL 完整邀約話術包" },
     description: "邀請開場 + 後續追蹤 + brand brief + 報價回應 + 收尾感謝（5 變體）",
-    agent_id: 30015, skill_slug: "kol-outreach",
+    agent_id: 210279, skill_slug: "kol-outreach",
     primary_question: "想找什麼類型的 KOL？合作主題？",
     primary_input: {
       key: "kol_profile", type: "textarea",

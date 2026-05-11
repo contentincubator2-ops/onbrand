@@ -63,7 +63,7 @@ ${YT_TONE}`,
     tier: "60s", postType: "video",
     label: "YT 3 集系列",
     description: "Strategist 設計 3 集弧 + 3 部影片完整 caption + 連貫敘事",
-    agent_id: 30014, // Nina Liu
+    agent_id: 180509, // Nina Liu
     skill_slug: "youtube-content",
     primary_question: "想連載講什麼主題？",
     primary_input: { key: "story_topic", placeholder: "教程系列 / 故事系列 / 評測系列", type: "textarea" },
@@ -95,7 +95,7 @@ ${YT_TONE}`,
     tier: "60s", postType: "video",
     label: "YT 爆款影片改寫",
     description: "Strategist 找原爆款結構 + 改寫為品牌版 + 對照表",
-    agent_id: 210252, // Chun-Hao Cheng
+    agent_id: 180545, // Chun-Hao Cheng
     skill_slug: "youtube-content",
     primary_question: "貼上爆款影片 title / 連結 / 主題",
     primary_input: { key: "viral_source", placeholder: "原爆款 title / URL / 主題", type: "textarea" },

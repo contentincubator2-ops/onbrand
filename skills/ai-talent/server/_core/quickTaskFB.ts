@@ -305,7 +305,7 @@ caption 欄位放 5 個編號 description（每行一個）。${FB_TONE_SUFFIX}`
     postType: "pinned",
     label: "FB 釘選貼文短文案",
     description: "粉專置頂用，講清楚「我們是誰」「為什麼追蹤」",
-    agent_id: 224089,             // Kevin Tan — Social Media Strategist eCommerce MY (1147 char)
+    agent_id: 60064,             // Kevin Tan — Social Media Strategist eCommerce MY (1147 char)
     skill_slug: "fb-copywriting",
     primary_question: "想讓第一次來粉專的人，3 秒內知道你做什麼？",
     primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼值得追蹤", type: "textarea" },

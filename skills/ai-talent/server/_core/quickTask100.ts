@@ -73,7 +73,7 @@ ${TONE_100}`,
     tier: "100s", postType: "event",
     label: "FB 完整 Launch Toolkit (8 篇)",
     description: "預告 ×3 / 當日 / 即時 ×2 / 事後 / 跨平台 IG 改寫 + scout 抓節慶/時事",
-    agent_id: 30015, // Tom Chang — KOL Word-of-Mouth Marketing Exec (2274 char)
+    agent_id: 30001, // Tom Chang — KOL Word-of-Mouth Marketing Exec (2274 char)
     skill_slug: "fb-copywriting",
     primary_question: "活動名稱 + 日期 + 重點？",
     primary_input: { key: "event_name", placeholder: "例：5/20 線上發表會", type: "text" },
@@ -447,7 +447,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: { en: "Competitor Ad Intelligence", zh: "競品廣告偵察報告（Meta Ads Library）" },
     description: "撈最多 5 個競品在 Meta Ads Library 的近期投放 → LLM 分析比例 / 訴求 / 視覺",
-    agent_id: 90006, skill_slug: "competitive-intel",
+    agent_id: 210225, skill_slug: "competitive-intel",
     primary_question: "要監測哪些競品？（最多 5 個品牌名，用逗號分隔）",
     primary_input: {
       key: "competitor_brands",
@@ -488,7 +488,7 @@ ${TONE_100}`,
     tier: "100s", postType: "press",
     label: { en: "KOL Campaign Toolkit", zh: "KOL Campaign 完整話術包" },
     description: "多 KOL 分層邀請 + 漏斗訊息 + brief 模板 + 報價回應 + 結案報告",
-    agent_id: 30015, skill_slug: "kol-outreach", // Tom Chang — KOL Word-of-Mouth (2274 char)
+    agent_id: 30012, skill_slug: "kol-outreach", // Tom Chang — KOL Word-of-Mouth (2274 char)
     primary_question: "活動主題 + 預計合作量級？",
     primary_input: {
       key: "campaign_brief",

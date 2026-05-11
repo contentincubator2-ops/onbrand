@@ -104,7 +104,7 @@ ${IG_TONE}`,
     postType: "story",
     label: "IG Story 3 幀完整組",
     description: "前情 / 重點 / CTA 三幀連貫敘事 + sticker 互動建議",
-    agent_id: 180168, // Wendy Su
+    agent_id: 210337, // Wendy Su
     skill_slug: "social-copy",
     primary_question: "Story 想傳達什麼？",
     primary_input: { key: "topic", placeholder: "例：新品預告、限時優惠、提問互動", type: "textarea" },
@@ -175,7 +175,7 @@ ${IG_TONE}`,
     postType: "live",
     label: "IG Live 直播完整配套 (5 段)",
     description: "預告 / 開場 / 高潮 / 結尾 / 精華 5 段平行",
-    agent_id: 60072, // Yiting Tsai
+    agent_id: 180461, // Yiting Tsai
     skill_slug: "live-content",
     primary_question: "直播主題？",
     primary_input: { key: "live_topic", placeholder: "Q&A / 新品試用 / 創辦故事", type: "text" },
@@ -221,7 +221,7 @@ ${IG_TONE}`,
     postType: "feed",
     label: "IG 爆款改寫",
     description: "Strategist 找原爆款結構 + 改寫品牌版 + 對照表",
-    agent_id: 220751, // Jake Chou
+    agent_id: 180479, // Jake Chou
     skill_slug: "instagram-copywriting",
     primary_question: "貼上爆款原文 / 連結 / 主題",
     primary_input: { key: "viral_source", placeholder: "原爆款貼文 / 連結 / 主題", type: "textarea" },
@@ -244,7 +244,7 @@ ${IG_TONE}`,
     postType: "feed",
     label: "IG 客戶見證改寫",
     description: "Strategist 找見證結構 + 改寫敘事 + 法務檢核",
-    agent_id: 180143, // Emily Wang
+    agent_id: 210206, // Emily Wang
     skill_slug: "instagram-copywriting",
     primary_question: "貼上客戶見證 / 訪談 / 評價",
     primary_input: { key: "testimonial_source", placeholder: "客戶原話、訪談逐字、評論截圖文字", type: "textarea" },

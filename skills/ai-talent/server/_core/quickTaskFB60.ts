@@ -69,7 +69,7 @@ ${FB60_TONE}`,
     postType: "feed",
     label: "FB 連結貼文（完整版）",
     description: "OG 文案 + 縮圖風格 + 引言 + 留言模板 + 發文時段",
-    agent_id: 60021, // Tina Ji
+    agent_id: 180437, // Tina Ji
     skill_slug: "social-copy",
     primary_question: "貼上要分享的連結",
     primary_input: { key: "url", placeholder: "https://...", type: "text" },
