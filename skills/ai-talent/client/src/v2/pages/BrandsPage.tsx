@@ -800,28 +800,25 @@ export default function BrandsPage() {
               one-line methodology manifesto. Engine stats moved to admin /
               about page. Manifesto makes the methodology→content causality
               the headline, not "we have N things". */}
+          {/* 2026-05-11 (CJ「文字渲染的方式，要跟 30S 相同」): aligned to
+              /30s subtitle exactly — same serif italic 14/1.7, no bold span. */}
           <p
-            className="text-sm text-neutral-700 mb-5"
+            className="mt-3 mb-5 mx-auto text-default-700"
             style={{
               fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-              maxWidth: 640,
-              lineHeight: 1.65,
               fontStyle: "italic",
+              fontSize: 14,
+              lineHeight: 1.7,
+              maxWidth: 640,
             }}
           >
-            <span
-              style={{
-                fontStyle: "normal", fontWeight: 600, color: "#171717",
-                letterSpacing: "0.05em",
-              }}
-            >
-              SoWork 品牌定位法
-            </span>
-            ・先鎖定你是誰，AI 才知道每篇文章要說什麼。
+            SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼
           </p>
 
-          {/* Message bar — display-only; matches /30s search bar visually */}
-          <BrandMessageBar brandId={activeBrandIdForLocks} />
+          {/* 2026-05-11 (CJ「搜尋 BAR 不需要了」): BrandMessageBar removed.
+              Manifesto subtitle above already carries the value-prop;
+              tagline preview lived in the bar redundantly. Kept the import
+              available for any debug page that wants to surface it. */}
 
           {/* Tab tiles — /30s circular colored style (5 tiles incl. 連結) */}
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
