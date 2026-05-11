@@ -161,6 +161,46 @@ export default function AccountPage() {
           </div>
         </section>
 
+        {/* Quota usage — 2026-05-12 */}
+        {status?.usage && status?.quota && (
+          <section className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
+            <h2 className="text-lg font-semibold text-neutral-900 mb-4">本月用量</h2>
+            <div className="space-y-3 text-sm">
+              {[
+                { key: "task_30s", label: "30 秒任務" },
+                { key: "task_60s", label: "60 秒任務" },
+                { key: "task_99s", label: "99 秒任務" },
+                { key: "image_gen", label: "AI 圖片" },
+                { key: "video_gen", label: "AI 影片" },
+              ].map(({ key, label }) => {
+                const used = (status.usage as any)[key] ?? 0;
+                const cap = (status.quota as any)[key];
+                if (cap === undefined) return null;
+                const unlimited = cap < 0;
+                const pct = unlimited ? 0 : Math.min(100, Math.round((used / cap) * 100));
+                const isHigh = !unlimited && pct >= 80;
+                return (
+                  <div key={key}>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-neutral-700">{label}</span>
+                      <span className={`font-medium ${isHigh ? "text-amber-700" : "text-neutral-600"}`}>
+                        {used}{unlimited ? " · 無限" : ` / ${cap}`}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${isHigh ? "bg-amber-500" : "bg-neutral-900"}`}
+                        style={{ width: unlimited ? "0%" : `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-4 text-xs text-neutral-400">每月 1 號重置</p>
+          </section>
+        )}
+
         {/* Invoices */}
         <section className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-neutral-900 mb-4">發票紀錄</h2>

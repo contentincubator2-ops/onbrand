@@ -1110,6 +1110,10 @@ export const quickTaskRouter = router({
       const { preflightCostCheck } = await import("../llmWithBilling");
       const guard60 = await preflightCostCheck(userId);
       if (!guard60.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard60.reason });
+      // 2026-05-12: paywall quota check (plan task_60s cap)
+      const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
+      await assertWithinPlan(userId, "task_60s");
+      await recordQuotaUsage(userId, "task_60s", "task", null);
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
       // 60s production-package tasks (FB / IG / YT / multi-channel) take priority
@@ -1402,6 +1406,10 @@ export const quickTaskRouter = router({
       const { preflightCostCheck } = await import("../llmWithBilling");
       const guard100 = await preflightCostCheck(userId);
       if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
+      // 2026-05-12: paywall quota check (plan task_99s cap)
+      const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
+      await assertWithinPlan(userId, "task_99s");
+      await recordQuotaUsage(userId, "task_99s", "task", null);
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
       // Priority 1: 100s campaign-level tasks (FB100/IG100/YT100/Multi100)
@@ -1462,6 +1470,10 @@ export const quickTaskRouter = router({
       if (!guard.ok) {
         throw new TRPCError({ code: "FORBIDDEN", message: guard.reason });
       }
+      // 2026-05-12: paywall quota check (plan task_30s cap)
+      const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
+      await assertWithinPlan(userId, "task_30s");
+      await recordQuotaUsage(userId, "task_30s", "task", null);
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const { getOrchestraConfig } = await import("../_core/quickTaskFB");
       // Look up template + config in both FB and IG catalogs

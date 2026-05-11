@@ -50,6 +50,7 @@ import SquadLabPage from "../pages/admin/SquadLabPage";
 // 2026-05-10 (CJ「明天串金流，今天都做」)
 import PricingPage from "../pages/PricingPage";
 import AccountPage from "../pages/AccountPage";
+import WorkspaceSettingsPage from "../pages/WorkspaceSettingsPage";
 import TermsPage from "../pages/legal/TermsPage";
 import PrivacyPage from "../pages/legal/PrivacyPage";
 import RefundPage from "../pages/legal/RefundPage";
@@ -238,6 +239,7 @@ export default function AppV2() {
           <Route path="/calendar" element={<CalendarPage />} />
           {/* 2026-05-10 account settings + achievements */}
           <Route path="/settings/account" element={<AccountPage />} />
+          <Route path="/settings/workspace" element={<WorkspaceSettingsPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />
         </Route>
 

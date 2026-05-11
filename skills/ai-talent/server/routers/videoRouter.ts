@@ -44,6 +44,10 @@ export const videoRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      // 2026-05-12: paywall quota check (plan video_gen cap)
+      const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
+      await assertWithinPlan(ctx.user.id, "video_gen");
+      await recordQuotaUsage(ctx.user.id, "video_gen", "brand", input.brandId ?? null);
 
       // 建立任務記錄
       const [result] = await db.insert(videoJobs).values({

@@ -40,13 +40,34 @@ async function loadUserPlan(userId: number): Promise<{
 }
 
 /**
- * Throw FORBIDDEN if the user's plan is expired and they don't have an
- * active subscription. Also throws if they hit a quota cap.
+ * Throw FORBIDDEN if the user's plan is expired/inactive OR if they've
+ * hit a per-month quota cap for the given kind.
  *
  * Called from quickTaskRouter / theaterRouter / image.generate / video.generate
- * BEFORE kicking off paid LLM work.
+ * BEFORE kicking off paid LLM work. After this returns, the caller should
+ * recordQuotaUsage() so the count increments.
+ *
+ * Quota counting uses usage_log rows with kind values:
+ *   task_30s | task_60s | task_99s | image_gen | video_gen
+ * tagged at the task entry point. Window = current calendar month
+ * (Asia/Taipei, but we accept server-local for simplicity).
  */
-export async function assertWithinPlan(userId: number, _kind: keyof import("../_core/plans").PlanQuota): Promise<void> {
+const QUOTA_KIND_TO_LOG: Record<string, string | null> = {
+  task_30s: "task_30s",
+  task_60s: "task_60s",
+  task_99s: "task_99s",
+  image_gen: "image_gen",
+  video_gen: "video_gen",
+  brands: null,         // counted from brands table directly, not log
+  fb_publish: null,     // unlimited on all paid plans; skip
+  team_members: null,   // checked in tenantRouter.invite()
+  multi_client: null,   // feature flag, not metered
+};
+
+export async function assertWithinPlan(
+  userId: number,
+  kind: keyof import("../_core/plans").PlanQuota,
+): Promise<void> {
   const u = await loadUserPlan(userId);
   const now = new Date();
 
@@ -69,11 +90,67 @@ export async function assertWithinPlan(userId: number, _kind: keyof import("../_
       message: "付款失敗，請更新付款方式",
     });
   }
-  // TODO (after 金流): per-quota check via usage_log SUM
+
+  const plan = getPlan(u.planCode);
+  const rawCap = plan.quota[kind];
+  // multi_client is a boolean feature flag, not a numeric quota — skip
+  if (typeof rawCap !== "number") return;
+  const cap: number = rawCap;
+  if (cap < 0) return; // -1 = unlimited
+
+  const logKind = QUOTA_KIND_TO_LOG[kind as string];
+  if (!logKind) return; // not metered via usage_log
+
+  const { default: localPool } = await import("../localDb");
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toISOString().slice(0, 19).replace("T", " ");
+  const [rows]: any = await localPool.execute(
+    `SELECT COUNT(*) AS used FROM usage_log
+      WHERE userId = ? AND kind = ? AND ts >= ?`,
+    [userId, logKind, monthStart],
+  );
+  const used = Number((rows as any[])[0]?.used ?? 0);
+  if (used >= cap) {
+    const labels: Record<string, string> = {
+      task_30s: "30 秒任務",
+      task_60s: "60 秒任務",
+      task_99s: "99 秒任務",
+      image_gen: "AI 圖片",
+      video_gen: "AI 影片",
+    };
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `本月 ${labels[logKind] ?? logKind} 額度已用完（${used}/${cap}）— 升級方案或下個月再試`,
+    });
+  }
+}
+
+/**
+ * Record one quota-counter row in usage_log. Cost is 0 — this is a
+ * counter, not a billing row (the real LLM cost rows are inserted by
+ * deeper layers with their own `kind` like `positioning_step`).
+ */
+export async function recordQuotaUsage(
+  userId: number,
+  kind: "task_30s" | "task_60s" | "task_99s" | "image_gen" | "video_gen",
+  entityKind: string | null = null,
+  entityId: number | null = null,
+): Promise<void> {
+  try {
+    const { default: localPool } = await import("../localDb");
+    await localPool.execute(
+      `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+        VALUES (?, ?, ?, ?, 'counter', 0, 0, 0)`,
+      [userId, entityKind, entityId, kind],
+    );
+  } catch (e) {
+    // counter best-effort; never block real work
+    console.warn("[billing] recordQuotaUsage failed:", e);
+  }
 }
 
 export const billingRouter = router({
-  /** Plan + days-left + paywall flag for top-bar trial countdown UI */
+  /** Plan + days-left + per-quota usage for top-bar trial countdown + /settings/account quota bar */
   getStatus: protectedProcedure
     .query(async ({ ctx }) => {
       const u = await loadUserPlan(ctx.user!.id);
@@ -86,6 +163,25 @@ export const billingRouter = router({
         (u.planStatus === "trial" && u.planEndsAt !== null && u.planEndsAt < now);
 
       const plan = getPlan(u.planCode);
+
+      // Current calendar month usage counts (matches assertWithinPlan window)
+      const { default: localPool } = await import("../localDb");
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString().slice(0, 19).replace("T", " ");
+      const [usageRows]: any = await localPool.execute(
+        `SELECT kind, COUNT(*) AS used FROM usage_log
+          WHERE userId = ? AND ts >= ?
+            AND kind IN ('task_30s','task_60s','task_99s','image_gen','video_gen')
+          GROUP BY kind`,
+        [ctx.user!.id, monthStart],
+      );
+      const usage: Record<string, number> = {
+        task_30s: 0, task_60s: 0, task_99s: 0, image_gen: 0, video_gen: 0,
+      };
+      for (const r of usageRows as any[]) {
+        usage[r.kind] = Number(r.used ?? 0);
+      }
+
       return {
         planCode: u.planCode,
         planName: plan.name,
@@ -96,6 +192,7 @@ export const billingRouter = router({
         priceTwdMonthly: plan.priceTwdMonthly,
         priceTwdAnnually: plan.priceTwdAnnually,
         quota: plan.quota,
+        usage,
       };
     }),
 

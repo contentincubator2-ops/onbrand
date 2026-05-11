@@ -16,6 +16,7 @@ import PositioningNotificationCenter from "../../components/PositioningNotificat
 import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
 import PricingInfoModal from "../../components/PricingInfoModal";
 import TrialCountdownBar from "../../components/TrialCountdownBar";
+import WorkspacePill from "../../components/WorkspacePill";
 import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
 import FestivalGlobalNudge from "../../components/FestivalGlobalNudge";
@@ -29,7 +30,7 @@ import {
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
   faCircleHalfStroke, faCircleInfo, faBorderAll, faDisplay, faBriefcase,
-  faShareNodes, faTrophy,
+  faShareNodes, faTrophy, faUsers,
   faStar, faImage, faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
 } from "@fortawesome/free-solid-svg-icons";
@@ -203,6 +204,11 @@ export default function ShellLayout() {
       <div style={{ paddingLeft: contentLeft, transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}>
         {/* 2026-05-10 trial countdown bar + achievement watcher (no UI) */}
         <TrialCountdownBar />
+        {/* 2026-05-12 workspace switcher pill — shows only for Team/Agency users
+            (>1 workspace OR white-label set) */}
+        <div className="flex justify-end px-4 pt-2">
+          <WorkspacePill />
+        </div>
         <AchievementUnlockWatcher />
         {/* 2026-05-11 (CJ「節慶日曆 + 自動提醒」): global festival nudge,
             shows only when priority ≥ 4 festival is within 7 days. */}
@@ -1909,6 +1915,11 @@ function AccountPopup({ onLogout, onClose }: {
       icon: faTrophy, label: "我的成就", arrow: true, badge: null, danger: false,
       // /achievements 已存在，原本 S 選單沒入口
       action: () => { navigate("/achievements"); onClose(); },
+    },
+    {
+      icon: faUsers, label: "Team / Workspace", arrow: true, badge: null, danger: false,
+      // 2026-05-12 — /settings/workspace 管理多客戶 workspace、邀請成員、white label
+      action: () => { navigate("/settings/workspace"); onClose(); },
     },
     {
       icon: faCircleInfo, label: "聯絡客服", arrow: false, badge: null, danger: false,

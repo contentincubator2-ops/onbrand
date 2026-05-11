@@ -42,6 +42,10 @@ export const imageRouter = router({
     .mutation(async ({ input, ctx }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
+      // 2026-05-12: paywall quota check (plan image_gen cap)
+      const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
+      await assertWithinPlan(ctx.user.id, "image_gen");
+      await recordQuotaUsage(ctx.user.id, "image_gen", "brand", input.brandId);
 
       const resolved = await resolveBrandVisualContext(
         input.brandId,
