@@ -1,0 +1,61 @@
+name: Admin — Top off Chen Boyu (221080) to A+
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            set -e
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+            export MYSQL_PWD="mos_secure_2026"
+
+            python3 - <<'PYEOF'
+            import os, json, subprocess, urllib.request
+            KEY = os.environ["ANTHROPIC_API_KEY"]
+
+            def mysql(sql):
+                env = os.environ.copy(); env["MYSQL_PWD"] = "mos_secure_2026"
+                r = subprocess.run(["mysql","-h","localhost","-u","mos_user","mos_db",
+                    "--batch","--raw","--skip-column-names","--default-character-set=utf8mb4",
+                    "-e",sql], capture_output=True, text=True, env=env, timeout=30)
+                if r.returncode != 0: raise RuntimeError(r.stderr)
+                return r.stdout
+
+            row = mysql("SELECT IFNULL(name,''), IFNULL(title,''), IFNULL(bio,''), IFNULL(specialty,'') FROM agents WHERE id=221080").strip().split("\t")
+            name, title, bio, spec = row[0], row[1], row[2][:400], row[3][:600]
+
+            prompt = ("Write a specialtySummary (Traditional Chinese, 300-400 字) for this professional:\n"
+                      "- Name: " + name + "\n- Title: " + title + "\n- Bio: " + bio +
+                      "\n- Specialty: " + spec +
+                      "\n\nA tight executive summary of what they uniquely bring — niche, edge, signature method. No clichés. Output ONLY the summary, no preamble.")
+
+            body = json.dumps({"model":"claude-haiku-4-5","max_tokens":600,
+                "messages":[{"role":"user","content":prompt}]}).encode()
+            req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=body,
+                headers={"x-api-key":KEY,"anthropic-version":"2023-06-01","content-type":"application/json"},
+                method="POST")
+            text = json.loads(urllib.request.urlopen(req,timeout=60).read())["content"][0]["text"].strip()
+            print("Generated " + str(len(text)) + " chars")
+            safe = text.replace("\\","\\\\").replace("'","''")
+            mysql("UPDATE agents SET specialtySummary='" + safe + "' WHERE id=221080")
+            print("Updated 221080")
+            PYEOF
+
+            mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4 -e "
+              SELECT id, name,
+                (CHAR_LENGTH(IFNULL(bio,''))+CHAR_LENGTH(IFNULL(specialty,''))+CHAR_LENGTH(IFNULL(methodology,''))
+                +CHAR_LENGTH(IFNULL(taskSystemPrompt,''))+CHAR_LENGTH(IFNULL(experienceDetail,''))
+                +CHAR_LENGTH(IFNULL(workingPrinciples,''))+CHAR_LENGTH(IFNULL(specialtySummary,''))
+                +CHAR_LENGTH(IFNULL(tool_instructions,''))+CHAR_LENGTH(IFNULL(bio_zh,''))) AS total
+              FROM agents WHERE id=221080;
+            "
