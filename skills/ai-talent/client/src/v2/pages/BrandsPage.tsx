@@ -1746,6 +1746,7 @@ function PositioningGrid({
               if (typeof v === "object") return Object.values(v).some(x => x != null && (typeof x !== "string" || x.trim()));
               return true;
             }).length} / ${group.segs.length}`}
+            intro={SOWORK_GROUP_INTRO[group.label]}
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
             {group.segs.map((s, si) => {
@@ -2201,28 +2202,55 @@ function BridgeBtn({ label, onClick, primary }: { label: string; onClick: () => 
   );
 }
 
-/* Editorial section label — tiny eyebrow + thin rule, optional counter chip. */
-function SectionLabel({ label, counter }: { label: string; counter?: string }) {
+/* Editorial section label — tiny eyebrow + thin rule, optional counter chip.
+   2026-05-11: added optional `intro` line (serif italic) that explains the
+   methodology rationale for this group of segments. Surfaces the
+   "why this order matters" narrative reviewer flagged. */
+function SectionLabel({ label, counter, intro }: { label: string; counter?: string; intro?: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
-      <span style={{
-        fontSize: 10, fontWeight: 600, color: "#525252",
-        letterSpacing: "0.22em", textTransform: "uppercase",
-      }}>
-        {label}
-      </span>
-      <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
-      {counter && (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: intro ? 6 : 0 }}>
         <span style={{
-          fontSize: 10, fontWeight: 500, color: "#A3A3A3",
-          letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
+          fontSize: 10, fontWeight: 600, color: "#525252",
+          letterSpacing: "0.22em", textTransform: "uppercase",
         }}>
-          {counter}
+          {label}
         </span>
+        <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
+        {counter && (
+          <span style={{
+            fontSize: 10, fontWeight: 500, color: "#A3A3A3",
+            letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
+          }}>
+            {counter}
+          </span>
+        )}
+      </div>
+      {intro && (
+        <p style={{
+          fontSize: 12.5, lineHeight: 1.7, color: "#737373",
+          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+          fontStyle: "italic", maxWidth: 700, margin: 0,
+        }}>
+          {intro}
+        </p>
       )}
     </div>
   );
 }
+
+/* SoWork 品牌定位法 — group-level narrative explaining why each
+   block of segments sits where it does in the sequence. Keyed by the
+   prefix-derived label produced in PositioningGrid. */
+const SOWORK_GROUP_INTRO: Record<string, string> = {
+  "品牌識別": "起手式 — 沒有 WHY，後面所有差異化、Voice 都會飄。先把信念 → 標語 → 評分鎖好。",
+  "品牌背景": "信念的證據 — 起源故事 + 價值觀回答「為什麼是你？」沒有這層，黃金圈就只是抽象口號。",
+  "目標受眾": "從『我』轉到『你』— 鎖定主受眾後，每篇貼文才知道對誰說話、要打哪個情感按鈕。",
+  "市場分析": "外部座標 — 直接 / 間接 / 潛在競品看清楚，才知道差異化要切哪一刀。",
+  "競爭策略": "把功能 × 情感雙差異化結合成一句話 — 這是 30s / 60s / 99s 內容的母題。",
+  "市場趨勢": "切入時機 — 對的策略放錯時機等於 0。識別有利趨勢 + 風險，作為議題日曆的母本。",
+  "品牌個性": "AI 寫貼文的最後濾鏡 — 人格原型 + 語調詞 + 禁區字三件套，把品牌「說話的方式」變成可複製規則。",
+};
 
 /* ─────────────────────────── AssetCard ───────────────────────────
    2026-05-11 (CJ「最後品牌定位的呈現方式，也可以很 4A 廣告代理商」)

@@ -176,47 +176,98 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
           </div>
 
           <div className="px-6 py-6 min-h-[420px]">
-            {/* STEP 1 — 歡迎 */}
+            {/* STEP 1 — 歡迎 (2026-05-11: rewritten around SoWork brand
+                positioning method — methodology becomes the headline, not
+                tech specs). */}
             {step === 1 && (
-              <div className="text-center py-4">
-                <div
-                  className="mx-auto mb-5 flex items-center justify-center"
-                  style={{
-                    width: 84, height: 84, borderRadius: 22,
-                    background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
-                    boxShadow: "0 14px 36px rgba(124,58,237,0.32)",
-                  }}
-                >
-                  <FontAwesomeIcon icon={faWandMagicSparkles} style={{ color: "white", fontSize: 32 }} />
-                </div>
-                <h1 className="text-2xl font-semibold mb-2">歡迎使用 Drop 秒稿</h1>
-                <p className="text-sm text-default-600 leading-relaxed mb-6 max-w-md mx-auto">
-                  我們先花 2 分鐘設定你的第一個品牌 — 系統會自動分析定位、建議文字 / 視覺 / AI 指令，
-                  讓你直接開始產內容。
+              <div className="py-2">
+                <p style={{
+                  fontSize: 10, fontWeight: 600, color: "#737373",
+                  letterSpacing: "0.28em", textTransform: "uppercase",
+                  marginBottom: 12,
+                }}>
+                  Welcome · SoWork Brand Method
                 </p>
-                <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mb-6">
+                <h1 style={{
+                  fontSize: 28, fontWeight: 700, color: "#171717",
+                  lineHeight: 1.15, letterSpacing: "-0.015em",
+                  marginBottom: 14, maxWidth: 520,
+                }}>
+                  先鎖定你是誰，AI 才知道每篇文章要說什麼
+                </h1>
+                <p style={{
+                  fontSize: 14, lineHeight: 1.75, color: "#404040",
+                  fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                  maxWidth: 580, marginBottom: 26,
+                }}>
+                  Drop 不是另一個「AI 一鍵生成」工具 — 我們把
+                  <strong style={{ fontFamily: "system-ui", fontWeight: 600, color: "#171717" }}> SoWork 品牌定位法</strong>
+                  做成可執行的 14 步流程，讓 AI 在每篇貼文之前，先讀懂你的 WHY、TA、差異化。鎖定一次，所有平台都跟著你的調性走。
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 24 }}>
                   {[
-                    { num: "1", label: "建立品牌", desc: "填名稱、官網、FB" },
-                    { num: "2", label: "自動定位", desc: "14 步深度分析" },
-                    { num: "3", label: "開始產內容", desc: "30s 快寫 / 60s 製作包 / 99s 全企劃" },
-                  ].map((s) => (
-                    <div key={s.num} className="bg-default-50 rounded-xl p-3 text-center">
-                      <div className="text-[10px] text-default-400 mb-0.5 font-semibold">STEP {s.num}</div>
-                      <div className="text-sm font-semibold text-default-900">{s.label}</div>
-                      <div className="text-[10px] text-default-500 mt-0.5 leading-tight">{s.desc}</div>
+                    { num: "01", label: "建立品牌", desc: "名稱、官網、FB — 給 AI 抓真實內容的入口" },
+                    { num: "02", label: "套用定位法", desc: "14 步深度分析：黃金圈 → 差異化 → Voice" },
+                    { num: "03", label: "內容自動產出", desc: "30s 快寫 / 60s 製作包 / 99s 全企劃" },
+                  ].map((s, i, arr) => (
+                    <div
+                      key={s.num}
+                      style={{
+                        background: "#FFFFFF",
+                        border: "1px solid #E5E5E5",
+                        borderRadius: 8,
+                        padding: "14px 14px 12px",
+                        position: "relative",
+                      }}
+                    >
+                      <p style={{
+                        fontSize: 9, fontWeight: 700, color: "#A3A3A3",
+                        letterSpacing: "0.22em", marginBottom: 6,
+                        fontVariantNumeric: "tabular-nums",
+                      }}>
+                        STEP {s.num}
+                      </p>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: "#171717", marginBottom: 4 }}>
+                        {s.label}
+                      </p>
+                      <p style={{
+                        fontSize: 11.5, lineHeight: 1.55, color: "#525252",
+                        fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                      }}>
+                        {s.desc}
+                      </p>
+                      {i < arr.length - 1 && (
+                        <span aria-hidden style={{
+                          position: "absolute", right: -10, top: "50%",
+                          transform: "translateY(-50%)",
+                          color: "#A3A3A3", fontSize: 14,
+                        }}>→</span>
+                      )}
                     </div>
                   ))}
                 </div>
-                <Button
-                  color="primary"
-                  size="lg"
-                  onPress={() => setStep(2)}
-                  endContent={<FontAwesomeIcon icon={faArrowRight} className="text-tiny" />}
-                  className="font-semibold"
-                  style={{ background: "linear-gradient(135deg, #7c3aed, #6366F1)" }}
+
+                <button
+                  onClick={() => setStep(2)}
+                  style={{
+                    padding: "10px 18px",
+                    fontSize: 13, fontWeight: 600,
+                    letterSpacing: "0.04em",
+                    borderRadius: 6, cursor: "pointer",
+                    border: "1px solid #171717",
+                    background: "#171717", color: "#FFFFFF",
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#262626"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "#171717"; }}
                 >
-                  開始
-                </Button>
+                  開始建立第一個品牌
+                  <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
+                </button>
+                <p style={{ fontSize: 11, color: "#A3A3A3", marginTop: 10 }}>
+                  預計 2 分鐘 · 完成後 AI 已備好可以為你寫內容
+                </p>
               </div>
             )}
 
@@ -291,11 +342,27 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
             {/* STEP 3 — 自動定位中 */}
             {step === 3 && (
               <div>
-                <div className="text-center mb-2">
-                  <h2 className="text-lg font-semibold mb-1">系統正在分析你的品牌定位</h2>
-                  <p className="text-xs text-default-500">
-                    14 步驟 pipeline — 包含市場洞察、目標客群、競爭格局、價值主張、訊息策略…
-                    背景執行，可以略過繼續設定其他內容。
+                <div className="mb-3">
+                  <p style={{
+                    fontSize: 10, fontWeight: 600, color: "#737373",
+                    letterSpacing: "0.28em", textTransform: "uppercase",
+                    marginBottom: 6,
+                  }}>
+                    SoWork Method · In Progress
+                  </p>
+                  <h2 style={{
+                    fontSize: 20, fontWeight: 700, color: "#171717",
+                    letterSpacing: "-0.01em", marginBottom: 6,
+                  }}>
+                    AI 正在套用 SoWork 品牌定位法
+                  </h2>
+                  <p style={{
+                    fontSize: 12.5, lineHeight: 1.7, color: "#525252",
+                    fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                    maxWidth: 520,
+                  }}>
+                    14 步從黃金圈推導到差異化、Voice — 每一步都會持續寫入品牌大腦。
+                    背景執行，可以略過先到工作區看實時進度。
                   </p>
                 </div>
 
@@ -325,45 +392,93 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
 
             {/* STEP 4 — 完成 */}
             {step === 4 && (
-              <div className="text-center py-6">
-                <div
-                  className="mx-auto mb-4 flex items-center justify-center bg-emerald-500"
-                  style={{
-                    width: 72, height: 72, borderRadius: 18,
-                    boxShadow: "0 10px 28px rgba(16,185,129,0.32)",
-                  }}
-                >
-                  <FontAwesomeIcon icon={faCheck} style={{ color: "white", fontSize: 28 }} />
-                </div>
-                <h1 className="text-2xl font-semibold mb-2">完成了 🎉</h1>
-                <p className="text-sm text-default-600 leading-relaxed mb-6 max-w-md mx-auto">
-                  品牌已建立。{jobData?.status === "done"
-                    ? "完整定位已產生，14 個段落都填好了。"
-                    : "完整定位仍在背景產生中（左下會通知）— 你現在可以開始試寫，系統會用臨時定位ground。"}
+              <div className="py-2">
+                <p style={{
+                  fontSize: 10, fontWeight: 600, color: "#737373",
+                  letterSpacing: "0.28em", textTransform: "uppercase",
+                  marginBottom: 12,
+                }}>
+                  Positioning Locked · Ready for Production
                 </p>
-                <div className="flex items-center justify-center gap-3 flex-wrap">
-                  <Button
-                    variant="bordered"
-                    onPress={() => {
-                      if (createdBrandId) navigate(`/brands?b=${createdBrandId}`);
-                      handleFinish();
-                    }}
-                  >
-                    進品牌工作區
-                  </Button>
-                  <Button
-                    color="primary"
-                    onPress={() => {
+                <h1 style={{
+                  fontSize: 26, fontWeight: 700, color: "#171717",
+                  lineHeight: 1.2, letterSpacing: "-0.015em",
+                  marginBottom: 12, maxWidth: 540,
+                }}>
+                  你的品牌已備好，AI 知道每篇文章該說什麼了
+                </h1>
+                <p style={{
+                  fontSize: 13.5, lineHeight: 1.75, color: "#404040",
+                  fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                  maxWidth: 580, marginBottom: 24,
+                }}>
+                  {jobData?.status === "done"
+                    ? "14 個段落全部完成 — 黃金圈、目標受眾、差異化、Voice 已寫入品牌大腦。從現在起 30s / 60s / 99s / 企劃台 的每一篇內容都會以此為骨架產出。"
+                    : "完整定位仍在背景跑（左下會通知）— 你可以先到工作區看 14 步即時推理，或直接用臨時定位開始試寫第一篇。"}
+                </p>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                  <button
+                    onClick={() => {
                       if (createdBrandId) navigate(`/30s?b=${createdBrandId}`);
                       handleFinish();
                     }}
-                    endContent={<FontAwesomeIcon icon={faArrowRight} className="text-tiny" />}
-                    className="font-semibold"
-                    style={{ background: "linear-gradient(135deg, #7c3aed, #6366F1)" }}
+                    style={{
+                      padding: "10px 16px", fontSize: 13, fontWeight: 600,
+                      letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
+                      border: "1px solid #171717",
+                      background: "#171717", color: "#FFFFFF",
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                    }}
                   >
-                    開始產 30s 內容
-                  </Button>
+                    開始 30s 快寫 <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (createdBrandId) navigate(`/b/${createdBrandId}/60s`);
+                      handleFinish();
+                    }}
+                    style={{
+                      padding: "10px 16px", fontSize: 13, fontWeight: 600,
+                      letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
+                      border: "1px solid #171717",
+                      background: "#FFFFFF", color: "#171717",
+                    }}
+                  >
+                    60s 製作包
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (createdBrandId) navigate(`/b/${createdBrandId}/99s`);
+                      handleFinish();
+                    }}
+                    style={{
+                      padding: "10px 16px", fontSize: 13, fontWeight: 600,
+                      letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
+                      border: "1px solid #171717",
+                      background: "#FFFFFF", color: "#171717",
+                    }}
+                  >
+                    99s 全企劃
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (createdBrandId) navigate(`/brands?b=${createdBrandId}`);
+                      handleFinish();
+                    }}
+                    style={{
+                      padding: "10px 16px", fontSize: 13, fontWeight: 600,
+                      letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
+                      border: "1px solid #E5E5E5",
+                      background: "#FFFFFF", color: "#525252",
+                    }}
+                  >
+                    回品牌工作區
+                  </button>
                 </div>
+                <p style={{ fontSize: 11, color: "#A3A3A3" }}>
+                  日後可隨時在「品牌 → 設定」重新跑 SoWork 品牌定位法
+                </p>
               </div>
             )}
           </div>

@@ -7,7 +7,7 @@
  */
 import { useState } from "react";
 import { trpc } from "../../../lib/trpc";
-import { Input, Textarea, Button, Card, CardBody } from "@heroui/react";
+import { Input, Textarea } from "@heroui/react";
 import { Plus, Trash2, BookOpen, ExternalLink } from "lucide-react";
 
 interface Item {
@@ -64,111 +64,247 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
   const charPct = Math.min(100, Math.round((totalChars / 400_000) * 100));
 
   return (
-    <div className="max-w-[1100px] mx-auto px-6 py-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1.5">
-            <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center">
-              <BookOpen size={18} color="#fff" strokeWidth={2} />
-            </div>
-            <h1 className="text-2xl font-semibold text-default-900">品牌知識庫</h1>
-          </div>
-          <p className="text-sm text-default-500">
-            上傳您過去成功的貼文 / 外部參考文章 / 競品案例。Agent 產出時會參考這份知識庫的語氣、結構、案例。
-          </p>
-        </div>
-        <Button
-          color="success"
-          startContent={<Plus size={16} />}
-          onPress={() => setAdding(true)}
-          isDisabled={items.length >= 50}
+    <div className="max-w-[1100px] mx-auto px-6 pb-10">
+      {/* 2026-05-11 (CJ「文字和知識的設計風格，也改得跟定位一樣」):
+          editorial 4A discipline — no emerald color blocks, no rounded
+          pill buttons. Section divider mirrors PositioningGrid; cards
+          use white + 1px border + black filled-bar accent. */}
+
+      {/* Top rail — eyebrow + counter + 新增 button */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, color: "#525252",
+          letterSpacing: "0.22em", textTransform: "uppercase",
+        }}>
+          品牌知識庫
+        </span>
+        <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
+        <span style={{
+          fontSize: 10, fontWeight: 500, color: "#A3A3A3",
+          letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
+        }}>
+          {items.length} / 50 · {totalChars.toLocaleString()} / 400,000
+        </span>
+        <button
+          onClick={() => setAdding(true)}
+          disabled={items.length >= 50}
+          style={{
+            padding: "6px 12px", fontSize: 12, fontWeight: 600,
+            letterSpacing: "0.04em", borderRadius: 6, cursor: items.length >= 50 ? "not-allowed" : "pointer",
+            border: "1px solid #171717",
+            background: items.length >= 50 ? "#F5F5F4" : "#171717",
+            color: items.length >= 50 ? "#A3A3A3" : "#FFFFFF",
+            display: "inline-flex", alignItems: "center", gap: 4,
+          }}
         >
-          新增條目
-        </Button>
+          <Plus size={12} /> 新增條目
+        </button>
       </div>
 
+      {/* Rationale line — why this exists */}
+      <p style={{
+        fontSize: 13, lineHeight: 1.7, color: "#525252",
+        fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+        fontStyle: "italic", maxWidth: 720, marginBottom: 18,
+      }}>
+        上傳你過去成功的貼文、外部參考文章、競品案例 — 任務跑 30s / 60s / 99s / 企劃台 時，
+        會優先從這份知識庫取材，比起讓 AI 從零生成，輸出會更貼近你的真實調性。
+      </p>
+
       {/* Capacity meter */}
-      <div className="mb-6 bg-default-50 border border-default-200 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-2 text-xs text-default-600">
-          <span>{items.length} / 50 條 · {totalChars.toLocaleString()} / 400,000 字元</span>
-          <span className="text-default-400">上限：50 條 × 每條 8,000 字</span>
+      <div style={{
+        marginBottom: 22, padding: "10px 14px",
+        background: "#FAFAF9", border: "1px solid #E5E5E5", borderRadius: 8,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontSize: 10.5, color: "#525252", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            Capacity · {charPct}%
+          </span>
+          <span style={{ fontSize: 10, color: "#A3A3A3" }}>上限：50 條 × 每條 8,000 字</span>
         </div>
-        <div className="h-1.5 bg-default-200 rounded-full overflow-hidden">
-          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${charPct}%` }} />
+        <div style={{ height: 3, background: "#E5E5E5", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{
+            height: "100%",
+            background: charPct > 90 ? "#B91C1C" : "#171717",
+            width: `${charPct}%`,
+            transition: "width 0.2s",
+          }} />
         </div>
       </div>
 
       {/* Add form */}
       {adding && (
-        <Card className="mb-6 border-2 border-emerald-200">
-          <CardBody className="p-5 space-y-3">
-            <Input
-              label="標題"
-              placeholder="例：去年端午節最高觸及貼文"
-              value={title}
-              onValueChange={setTitle}
-              isRequired
-            />
-            <Input
-              label="來源連結（可選）"
-              placeholder="https://..."
-              value={sourceUrl}
-              onValueChange={setSourceUrl}
-            />
-            <Textarea
-              label="內容（最多 8,000 字）"
-              placeholder="貼上原文 / 摘要 / 觀察..."
-              value={body}
-              onValueChange={setBody}
-              minRows={6}
-              maxLength={8000}
-              description={`${body.length} / 8,000 字`}
-            />
-            {err && <div className="text-sm text-danger">{err}</div>}
-            <div className="flex justify-end gap-2">
-              <Button variant="light" onPress={() => { setAdding(false); setTitle(""); setBody(""); setSourceUrl(""); setErr(null); }}>取消</Button>
-              <Button color="success" onPress={handleAdd} isLoading={createMut?.isPending}>儲存</Button>
-            </div>
-          </CardBody>
-        </Card>
+        <div style={{
+          marginBottom: 22, padding: 18,
+          background: "#FFFFFF", border: "1px solid #171717", borderRadius: 10,
+        }}>
+          <p style={{
+            fontSize: 10, fontWeight: 600, color: "#525252",
+            letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 12,
+          }}>
+            New Entry
+          </p>
+          <Input
+            label="標題"
+            placeholder="例：去年端午節最高觸及貼文"
+            value={title}
+            onValueChange={setTitle}
+            isRequired
+            variant="flat"
+            classNames={{ inputWrapper: "bg-default-50" }}
+          />
+          <div style={{ height: 10 }} />
+          <Input
+            label="來源連結（可選）"
+            placeholder="https://..."
+            value={sourceUrl}
+            onValueChange={setSourceUrl}
+            variant="flat"
+            classNames={{ inputWrapper: "bg-default-50" }}
+          />
+          <div style={{ height: 10 }} />
+          <Textarea
+            label="內容（最多 8,000 字）"
+            placeholder="貼上原文 / 摘要 / 觀察..."
+            value={body}
+            onValueChange={setBody}
+            minRows={6}
+            maxLength={8000}
+            description={`${body.length} / 8,000 字`}
+            variant="flat"
+            classNames={{ inputWrapper: "bg-default-50" }}
+          />
+          {err && <div style={{ fontSize: 13, color: "#B91C1C", marginTop: 8 }}>{err}</div>}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+            <button
+              onClick={() => { setAdding(false); setTitle(""); setBody(""); setSourceUrl(""); setErr(null); }}
+              style={{
+                padding: "6px 14px", fontSize: 12, fontWeight: 600,
+                borderRadius: 6, cursor: "pointer",
+                border: "1px solid #E5E5E5", background: "#FFFFFF", color: "#525252",
+              }}
+            >
+              取消
+            </button>
+            <button
+              onClick={handleAdd}
+              disabled={!title.trim() || createMut?.isPending}
+              style={{
+                padding: "6px 14px", fontSize: 12, fontWeight: 600,
+                borderRadius: 6, cursor: "pointer",
+                border: "1px solid #171717",
+                background: !title.trim() ? "#F5F5F4" : "#171717",
+                color: !title.trim() ? "#A3A3A3" : "#FFFFFF",
+              }}
+            >
+              {createMut?.isPending ? "儲存中…" : "儲存"}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Items grid */}
       {items.length === 0 && !adding ? (
-        <div className="text-center py-16 text-default-400">
-          <BookOpen size={40} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm">還沒有知識條目 — 點右上「新增條目」開始</p>
+        <div style={{
+          padding: "80px 24px", textAlign: "center",
+          color: "#A3A3A3",
+          border: "1px dashed #E5E5E5", borderRadius: 12,
+        }}>
+          <BookOpen size={36} strokeWidth={1.3} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
+          <p style={{ fontSize: 13, color: "#525252", marginBottom: 6, fontWeight: 500 }}>
+            還沒有知識條目
+          </p>
+          <p style={{
+            fontSize: 12, color: "#A3A3A3",
+            fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+            fontStyle: "italic", maxWidth: 320, margin: "0 auto",
+          }}>
+            從你最成功的一篇貼文開始上傳 — AI 會把它的語氣 / 結構納入後續任務的取材池。
+          </p>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {items.map((it) => (
-            <Card key={it.id} className="hover:shadow-md transition">
-              <CardBody className="p-4">
-                <div className="flex items-start justify-between mb-2 gap-2">
-                  <h3 className="font-medium text-default-900 leading-snug">{it.title}</h3>
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
+          {items.map((it) => {
+            const filled = (it.body ?? "").trim().length > 0;
+            return (
+              <div
+                key={it.id}
+                style={{
+                  position: "relative",
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E5E5",
+                  borderRadius: 8,
+                  padding: "14px 16px 12px",
+                  transition: "border-color 0.15s",
+                  minHeight: 140,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#171717"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#E5E5E5"; }}
+              >
+                {filled && (
+                  <span
+                    aria-hidden
+                    style={{
+                      position: "absolute", left: 0, top: 12, bottom: 12, width: 2,
+                      background: "#171717", borderRadius: 2,
+                    }}
+                  />
+                )}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
+                    <BookOpen size={12} strokeWidth={1.7} style={{ color: filled ? "#171717" : "#A3A3A3", flexShrink: 0 }} />
+                    <h3 style={{
+                      fontSize: 13.5, fontWeight: 600, color: "#171717",
+                      lineHeight: 1.35, margin: 0,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {it.title}
+                    </h3>
+                  </div>
                   <button
                     onClick={() => { if (confirm(`刪除「${it.title}」？`)) deleteMut?.mutate?.({ id: it.id }); }}
-                    className="text-default-300 hover:text-danger transition shrink-0"
                     title="刪除"
+                    style={{
+                      background: "transparent", border: "none", cursor: "pointer",
+                      color: "#A3A3A3", padding: 2, display: "flex", flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "#A3A3A3"; }}
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
                 {it.body && (
-                  <p className="text-xs text-default-600 mb-2 whitespace-pre-wrap line-clamp-4">{it.body}</p>
+                  <p style={{
+                    fontSize: 12, lineHeight: 1.6, color: "#525252",
+                    fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                    whiteSpace: "pre-wrap",
+                    overflow: "hidden",
+                    maxHeight: 78,
+                    marginBottom: 10,
+                  }}>
+                    {it.body.length > 200 ? it.body.slice(0, 200) + "…" : it.body}
+                  </p>
                 )}
-                <div className="flex items-center justify-between text-[10px] text-default-400">
-                  <span>{(it.body ?? "").length.toLocaleString()} 字</span>
+                <div style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  fontSize: 9.5, color: "#A3A3A3",
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                  borderTop: "1px solid #F5F5F4", paddingTop: 8,
+                }}>
+                  <span>{(it.body ?? "").length.toLocaleString()} chars</span>
                   {it.sourceUrl && (
-                    <a href={it.sourceUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-default-700">
-                      <ExternalLink size={10} /> 來源
+                    <a
+                      href={it.sourceUrl} target="_blank" rel="noreferrer"
+                      style={{ display: "flex", alignItems: "center", gap: 3, color: "#525252", textDecoration: "none" }}
+                    >
+                      <ExternalLink size={10} /> Source
                     </a>
                   )}
                 </div>
-              </CardBody>
-            </Card>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

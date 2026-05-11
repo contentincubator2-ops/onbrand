@@ -1,14 +1,18 @@
 /**
  * InlineAssetCard — single brand-asset card with the editor INLINE.
  *
- * Replaces the old click-to-navigate AssetCard behaviour. User edits in
- * place; values auto-save (debounced 800ms) via parent's onChange.
+ * 2026-05-11 (CJ「文字和知識的設計風格，也改得跟定位一樣」):
+ * editorial 4A discipline mirroring PositioningGrid's AssetCard:
+ * white card, 1px neutral border that darkens on hover, tabular
+ * eyebrow code, sans title, no pastel background, filled state
+ * shown as a 2px black left-edge bar + FILLED chip. Inputs use a
+ * neutral underline style instead of grey-fill boxes so the card
+ * reads like an editorial form, not a UI dump.
  *
  * Per-card AI button removed (CJ 2026-05-07: 全局只要一個按鈕). Bulk
  * auto-fill is handled by parent CopyTabInline.
  */
 import { Plus, X, Sparkles } from "lucide-react";
-import { Textarea, Input } from "@heroui/react";
 
 type Shape = "text" | "items" | "pairs";
 
@@ -16,7 +20,7 @@ interface Props {
   assetKey: string;
   label: string;
   Icon: any;       // Lucide line-icon component (Notion-style)
-  bg: string;      // tile color
+  bg: string;      // legacy — ignored under the new 4A discipline
   shape: Shape;
   value: any;
   onChange: (next: any) => void;
@@ -26,29 +30,104 @@ interface Props {
   filling?: boolean;
 }
 
+/** Detect whether the card has any meaningful user content. */
+function isFilled(value: any, shape: Shape): boolean {
+  if (!value) return false;
+  if (shape === "text") return typeof value.text === "string" && value.text.trim().length > 0;
+  if (shape === "items") {
+    return Array.isArray(value.items)
+      && value.items.some((x: any) => typeof x === "string" && x.trim().length > 0);
+  }
+  if (shape === "pairs") {
+    return Array.isArray(value.pairs)
+      && value.pairs.some((p: any) => p?.from?.trim() && p?.to?.trim());
+  }
+  return false;
+}
+
 export default function InlineAssetCard({
-  assetKey, label, Icon, bg, shape, value, onChange, readOnly, filling,
+  assetKey: _ak, label, Icon, shape, value, onChange, readOnly, filling,
 }: Props) {
   const v = value ?? {};
+  const filled = isFilled(v, shape);
+
+  // Split "01.1 標題" → eyebrow "01.1" + title "標題" (mirrors AssetCard).
+  const m = label.match(/^(\S+)\s+(.+)$/);
+  const eyebrow = m ? m[1] : "";
+  const titleText = m ? m[2] : label;
 
   return (
     <div
-      className="rounded-xl border border-default-200 transition hover:shadow-sm relative"
-      style={{ background: bg, padding: 14, minHeight: 200, display: "flex", flexDirection: "column" }}
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid #E5E5E5",
+        borderRadius: 8,
+        padding: "14px 16px 12px",
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 196,
+        transition: "border-color 0.15s",
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#171717"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#E5E5E5"; }}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Icon size={15} strokeWidth={1.7} className="text-default-600 shrink-0" />
-          <span className="text-sm font-semibold text-default-800 truncate">{label}</span>
-        </div>
-        {filling && (
-          <span className="flex items-center gap-1 text-[10px] font-medium text-violet-700 px-2 py-1 rounded-full bg-violet-100 shrink-0">
-            <Sparkles size={11} className="animate-pulse" /> 自動填寫中…
+      {/* Filled accent — 2px black left edge bar */}
+      {filled && (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", left: 0, top: 12, bottom: 12, width: 2,
+            background: "#171717", borderRadius: 2,
+          }}
+        />
+      )}
+
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <Icon size={12} strokeWidth={1.8} style={{ color: filled ? "#171717" : "#A3A3A3", flexShrink: 0 }} />
+        {eyebrow && (
+          <span style={{
+            fontSize: 9, fontWeight: 700, color: "#A3A3A3",
+            letterSpacing: "0.2em", textTransform: "uppercase",
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            {eyebrow}
+          </span>
+        )}
+        <div style={{ flex: 1 }} />
+        {filling ? (
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 4,
+            fontSize: 9, fontWeight: 600, letterSpacing: "0.18em",
+            textTransform: "uppercase", color: "#171717",
+          }}>
+            <Sparkles size={10} className="animate-pulse" /> Writing
+          </span>
+        ) : filled && (
+          <span style={{
+            fontSize: 9, fontWeight: 600, color: "#171717",
+            letterSpacing: "0.18em", textTransform: "uppercase",
+          }}>
+            Filled
           </span>
         )}
       </div>
 
-      <div className="flex-1" style={readOnly ? { opacity: 0.55, pointerEvents: "none" } : undefined}>
+      <h3 style={{
+        fontSize: 14, fontWeight: 600, color: "#171717",
+        lineHeight: 1.35, margin: 0, marginBottom: 8,
+      }}>
+        {titleText}
+      </h3>
+
+      <div
+        style={{
+          flex: 1,
+          opacity: readOnly ? 0.55 : 1,
+          pointerEvents: readOnly ? "none" : "auto",
+        }}
+      >
         {shape === "text" && <TextField v={v} onChange={onChange} />}
         {shape === "items" && <ListField v={v} onChange={onChange} />}
         {shape === "pairs" && <PairListField v={v} onChange={onChange} />}
@@ -57,17 +136,29 @@ export default function InlineAssetCard({
   );
 }
 
+/** Editorial textarea — borderless, underline-style focus, serif body. */
 function TextField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
   return (
-    <Textarea
-      size="sm"
-      variant="flat"
-      minRows={4}
-      maxRows={10}
-      placeholder="尚未填寫 — 直接輸入，或按右上「AI 協助填」"
+    <textarea
+      placeholder="點此輸入，或按上方「自動填寫」交給 AI"
       value={v?.text ?? ""}
-      onValueChange={(s) => onChange({ ...v, text: s })}
-      classNames={{ inputWrapper: "bg-white/70" }}
+      onChange={(e) => onChange({ ...v, text: e.target.value })}
+      rows={5}
+      style={{
+        width: "100%",
+        background: "transparent",
+        border: "none",
+        outline: "none",
+        resize: "vertical",
+        fontSize: 13,
+        lineHeight: 1.65,
+        color: "#171717",
+        fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+        padding: "6px 0",
+        borderTop: "1px solid #E5E5E5",
+      }}
+      onFocus={(e) => { e.target.style.borderTopColor = "#171717"; }}
+      onBlur={(e) => { e.target.style.borderTopColor = "#E5E5E5"; }}
     />
   );
 }
@@ -76,34 +167,58 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
   const items: string[] = Array.isArray(v?.items) ? v.items : [];
   const setItems = (next: string[]) => onChange({ ...v, items: next });
   return (
-    <div className="flex flex-col gap-1.5">
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {items.length === 0 && (
-        <div className="text-[11px] text-default-400 italic px-1 py-1.5">
-          尚未填寫 — 點下方 + 自己輸入，或按右上「AI 協助填」
+        <div style={{
+          fontSize: 11.5, color: "#A3A3A3", fontStyle: "italic",
+          padding: "4px 0",
+          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+        }}>
+          尚未填寫 — 按下方 + 自己輸入，或按上方「自動填寫」
         </div>
       )}
       {items.map((it, i) => (
-        <div key={i} className="flex items-center gap-1">
-          <Input
-            size="sm"
-            variant="flat"
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid #F5F5F4", padding: "4px 0" }}>
+          <span style={{
+            fontSize: 9, color: "#A3A3A3", fontFamily: "system-ui",
+            letterSpacing: "0.1em", minWidth: 18, textAlign: "right",
+          }}>
+            {String(i + 1).padStart(2, "0")}
+          </span>
+          <input
+            type="text"
             value={it}
-            onValueChange={(s) => setItems(items.map((x, j) => j === i ? s : x))}
+            onChange={(e) => setItems(items.map((x, j) => j === i ? e.target.value : x))}
             placeholder={`條目 ${i + 1}`}
-            classNames={{ inputWrapper: "bg-white/70" }}
+            style={{
+              flex: 1, background: "transparent", border: "none", outline: "none",
+              fontSize: 13, color: "#171717", padding: "2px 0",
+            }}
           />
           <button
             onClick={() => setItems(items.filter((_, j) => j !== i))}
-            className="text-default-400 hover:text-danger p-1 shrink-0"
             title="刪除"
+            style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              color: "#A3A3A3", padding: 2, display: "flex",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "#A3A3A3"; }}
           >
-            <X size={13} />
+            <X size={12} />
           </button>
         </div>
       ))}
       <button
         onClick={() => setItems([...items, ""])}
-        className="self-start text-[11px] text-default-500 hover:text-default-800 flex items-center gap-1 mt-1 px-1"
+        style={{
+          alignSelf: "flex-start", marginTop: 6, padding: "3px 0",
+          fontSize: 11, color: "#525252", background: "transparent",
+          border: "none", cursor: "pointer", display: "flex",
+          alignItems: "center", gap: 4, letterSpacing: "0.05em",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "#171717"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
       >
         <Plus size={11} /> 新增條目
       </button>
@@ -115,39 +230,52 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
   const pairs: { from: string; to: string }[] = Array.isArray(v?.pairs) ? v.pairs : [];
   const setPairs = (next: { from: string; to: string }[]) => onChange({ ...v, pairs: next });
   return (
-    <div className="flex flex-col gap-1.5">
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {pairs.length === 0 && (
-        <div className="text-[11px] text-default-400 italic px-1 py-1.5">
-          尚未填寫 — 點下方 + 自己輸入，或按右上「AI 協助填」
+        <div style={{
+          fontSize: 11.5, color: "#A3A3A3", fontStyle: "italic",
+          padding: "4px 0",
+          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+        }}>
+          尚未填寫 — 按下方 + 自己輸入，或按上方「自動填寫」
         </div>
       )}
       {pairs.map((p, i) => (
-        <div key={i} className="flex items-center gap-1">
-          <Input
-            size="sm" variant="flat" placeholder="原本說的"
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid #F5F5F4", padding: "4px 0" }}>
+          <input
+            type="text" placeholder="原本說的"
             value={p.from}
-            onValueChange={(s) => setPairs(pairs.map((x, j) => j === i ? { ...x, from: s } : x))}
-            classNames={{ inputWrapper: "bg-white/70" }}
+            onChange={(e) => setPairs(pairs.map((x, j) => j === i ? { ...x, from: e.target.value } : x))}
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#737373", padding: "2px 0" }}
           />
-          <span className="text-default-400 shrink-0">→</span>
-          <Input
-            size="sm" variant="flat" placeholder="改成說的"
+          <span style={{ color: "#A3A3A3", fontSize: 12, flexShrink: 0 }}>→</span>
+          <input
+            type="text" placeholder="改成說的"
             value={p.to}
-            onValueChange={(s) => setPairs(pairs.map((x, j) => j === i ? { ...x, to: s } : x))}
-            classNames={{ inputWrapper: "bg-white/70" }}
+            onChange={(e) => setPairs(pairs.map((x, j) => j === i ? { ...x, to: e.target.value } : x))}
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#171717", fontWeight: 500, padding: "2px 0" }}
           />
           <button
             onClick={() => setPairs(pairs.filter((_, j) => j !== i))}
-            className="text-default-400 hover:text-danger p-1 shrink-0"
             title="刪除"
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#A3A3A3", padding: 2, display: "flex" }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "#A3A3A3"; }}
           >
-            <X size={13} />
+            <X size={12} />
           </button>
         </div>
       ))}
       <button
         onClick={() => setPairs([...pairs, { from: "", to: "" }])}
-        className="self-start text-[11px] text-default-500 hover:text-default-800 flex items-center gap-1 mt-1 px-1"
+        style={{
+          alignSelf: "flex-start", marginTop: 6, padding: "3px 0",
+          fontSize: 11, color: "#525252", background: "transparent",
+          border: "none", cursor: "pointer", display: "flex",
+          alignItems: "center", gap: 4, letterSpacing: "0.05em",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "#171717"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
       >
         <Plus size={11} /> 新增對照
       </button>
