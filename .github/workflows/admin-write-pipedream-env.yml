@@ -34,12 +34,13 @@ jobs:
           PIPEDREAM_CLIENT_SECRET: ${{ secrets.PIPEDREAM_CLIENT_SECRET }}
           PIPEDREAM_PROJECT_ID:    ${{ secrets.PIPEDREAM_PROJECT_ID }}
           PIPEDREAM_PROJECT_ENV:   ${{ secrets.PIPEDREAM_PROJECT_ENV }}
+          PIPEDREAM_WORKSPACE_ID:  ${{ secrets.PIPEDREAM_WORKSPACE_ID }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 60s
-          envs: PIPEDREAM_API_KEY,PIPEDREAM_CLIENT_ID,PIPEDREAM_CLIENT_SECRET,PIPEDREAM_PROJECT_ID,PIPEDREAM_PROJECT_ENV
+          envs: PIPEDREAM_API_KEY,PIPEDREAM_CLIENT_ID,PIPEDREAM_CLIENT_SECRET,PIPEDREAM_PROJECT_ID,PIPEDREAM_PROJECT_ENV,PIPEDREAM_WORKSPACE_ID
           script: |
             set -e
             ENV=/opt/marketing-os/app/skills/ai-talent/.env
@@ -68,6 +69,7 @@ jobs:
             upsert PIPEDREAM_CLIENT_SECRET "$PIPEDREAM_CLIENT_SECRET"
             upsert PIPEDREAM_PROJECT_ID    "$PIPEDREAM_PROJECT_ID"
             upsert PIPEDREAM_PROJECT_ENV   "${PIPEDREAM_PROJECT_ENV:-production}"
+            upsert PIPEDREAM_WORKSPACE_ID  "$PIPEDREAM_WORKSPACE_ID"
 
             echo
             echo "  Restarting pm2 marketing-os to pick up env..."
