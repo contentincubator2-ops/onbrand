@@ -14,7 +14,7 @@
  * mission_outputs via recordTaskRun, so this page actually reflects the
  * user's work.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
@@ -74,7 +74,9 @@ function brandColor(seed: string): string {
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const { brands: shellBrands = [] } = useOutletContext<ShellOutletCtx>();
+  const ctx = useOutletContext<ShellOutletCtx>();
+  const shellBrands = ctx?.brands ?? [];
+  const shellBrandId = ctx?.brandId ?? null;
 
   const allQuery = (trpc as any).mission?.listAllForUser?.useQuery?.(
     undefined,
@@ -91,7 +93,21 @@ export default function ProjectsPage() {
   }, [allQuery?.data, fallbackQuery.data]);
 
   const [search, setSearch] = useState("");
-  const [activeBrandId, setActiveBrandId] = useState<number | "all">("all");
+  // 2026-05-11 (CJ「切換品牌應該全局切換」): default filter follows the
+  // shell's active brand. If shell brand is set, filter to it on mount.
+  const [activeBrandId, setActiveBrandId] = useState<number | "all">(
+    shellBrandId ?? "all",
+  );
+  // Sync filter when user switches brand in the top bar.
+  useEffect(() => {
+    if (shellBrandId !== null && shellBrandId !== activeBrandId) {
+      setActiveBrandId(shellBrandId);
+    }
+    // Intentionally don't run when activeBrandId changes locally (user
+    // can still manually pick 'all' or another brand within ProjectsPage
+    // without it getting overridden until shell brand changes again).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shellBrandId]);
   const [createOpen, setCreateOpen] = useState(false);
 
   // Filter

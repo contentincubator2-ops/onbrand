@@ -616,6 +616,41 @@ export default function TheaterPage() {
     scoutPatterns?: string[];
   }>>(() => new Map(persisted?.cellMeta ?? []));
 
+  // 2026-05-11 (CJ「切換品牌應該全局切換，目前還停在前一個品牌」):
+  // useState only reads `persisted` on first mount. When the user switches
+  // brand in the top bar, brandId changes, persisted re-computes via
+  // useMemo, but state variables stay bound to the OLD brand's snapshot.
+  // Fix: re-hydrate all state from new brand's localStorage on every
+  // brandId change. lastBrandIdRef avoids running the reset on initial
+  // mount (state was just initialised correctly).
+  const lastBrandIdRef = useRef<number | null>(brandId);
+  useEffect(() => {
+    if (lastBrandIdRef.current === brandId) return; // mount or no change
+    lastBrandIdRef.current = brandId;
+    if (!brandId) {
+      // Cleared to null — reset to defaults
+      setActivePlatforms(["facebook", "instagram", "youtube"]);
+      setImportantDates([]);
+      setProducts([]);
+      setPhotos([]);
+      setCells(new Map());
+      setCellMeta(new Map());
+      cellsRef.current = new Map();
+      return;
+    }
+    const p = loadPersisted(brandId);
+    setActivePlatforms(p?.activePlatforms ?? ["facebook", "instagram", "youtube"]);
+    setImportantDates(p?.importantDates ?? []);
+    setProducts(p?.products ?? []);
+    setPhotos(p?.photos ?? []);
+    setCells(new Map(p?.cells ?? []));
+    setCellMeta(new Map(p?.cellMeta ?? []));
+    cellsRef.current = new Map(p?.cells ?? []);
+    // NOTE: in-flight orchestration from previous brand will continue
+    // and may write to stale state; this is rare and acceptable for
+    // trial scope. Future: pass an abort signal to runCalendar.
+  }, [brandId]);
+
   // Persist on any state change (debounced via single effect)
   useEffect(() => {
     if (!brandId) return;
