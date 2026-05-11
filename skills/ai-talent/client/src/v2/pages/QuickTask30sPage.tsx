@@ -33,7 +33,9 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
-import { EntityStats } from "../components/EntityStats";
+// 2026-05-11 — EntityStats removed from hero (tech-spec → value-prop). Kept
+// available via direct import elsewhere if any debug page needs it.
+// import { EntityStats } from "../components/EntityStats";
 import MediaGenFlow from "../components/media/MediaGenFlow";
 import { StagePipelineView } from "../components/quickTask/StagePipelineView";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
@@ -678,6 +680,31 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     ? "今天，要做哪一個 60 秒製作包？"
     : "今天，要做哪一個 99 秒研究驗證版？";
 
+  // 2026-05-11 (CJ「整個因果鏈在最後一公里斷掉了」): replace the tech-spec
+  // EntityStats subtitle with a methodology value-prop that explicitly
+  // links the previous "定位" step to the current "產出" step. Adapts:
+  //   - brand has positioning → confident value-prop
+  //   - brand exists but not positioned → soft nudge back to /brands
+  //   - no brand selected → generic SoWork framing
+  const positioningReady = useMemo(() => {
+    const b: any = brandQuery?.data ?? {};
+    const p: any = (scopeActiveQuery?.data as any)?.brand?.positioning ?? {};
+    if (b.positioningStatus === "completed") return true;
+    if (typeof b.tagline === "string" && b.tagline.trim()) return true;
+    if (p.goldenCircle?.why && String(p.goldenCircle.why).trim()) return true;
+    if (p.tagline?.zhTagline && String(p.tagline.zhTagline).trim()) return true;
+    return false;
+  }, [brandQuery?.data, scopeActiveQuery?.data]);
+
+  const tierKicker = tier === "30s" ? "30 秒搞定一篇貼文"
+    : tier === "60s" ? "60 秒做完一個完整製作包"
+    : "99 秒交付一個 campaign 級內容";
+  const heroSubtitle = !brandId
+    ? "SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼"
+    : positioningReady
+      ? `以 ${brandName ?? "你的品牌"} 的定位為骨架，${tierKicker}`
+      : `建議先完成 ${brandName ?? "這個品牌"} 的定位 — 完成後產出會以方法論為骨架，現在跑也行，但會偏通用`;
+
   return (
     <div>
       {/* ─── HERO (matches /squads layout) ────────────────────────────── */}
@@ -700,9 +727,37 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
             >
               {heroTitle}
             </h1>
-            <div className="mt-3 text-small text-default-500">
-              <EntityStats variant="inline" />
-            </div>
+            {/* 2026-05-11 (CJ): tech-spec EntityStats subtitle replaced with
+                a methodology value-prop that explicitly closes the loop
+                between 定位 → 產出. The first phrase echoes the brand-page
+                manifesto so the methodology feels continuous, not
+                interrupted at the task-runner boundary. */}
+            <p
+              className="mt-3 mx-auto text-default-700"
+              style={{
+                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                fontStyle: "italic",
+                fontSize: 14,
+                lineHeight: 1.7,
+                maxWidth: 640,
+              }}
+            >
+              {heroSubtitle}
+              {brandId && !positioningReady && (
+                <>
+                  {" "}
+                  <a
+                    href={`/brands/edit?b=${brandId}`}
+                    style={{
+                      color: "#171717", textDecoration: "underline",
+                      fontStyle: "normal", fontWeight: 600,
+                    }}
+                  >
+                    去完成定位 →
+                  </a>
+                </>
+              )}
+            </p>
           </div>
 
           {/* Search bar — matches /squads sizing */}

@@ -474,9 +474,22 @@ export default function MissionsHome() {
             >
               今天，想將哪個策略付諸實現？
             </h1>
-            <div className="mt-3 text-small text-default-500">
-              <EntityStats variant="inline" />
-            </div>
+            {/* 2026-05-11 (CJ「最後一公里斷掉」): replaced tech-spec stats
+                with the same methodology value-prop pattern used on
+                /30s · /60s · /99s — keeps the SoWork brand-method
+                narrative continuous from /brands through every task page. */}
+            <p
+              className="mt-3 mx-auto text-default-700"
+              style={{
+                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                fontStyle: "italic",
+                fontSize: 14,
+                lineHeight: 1.7,
+                maxWidth: 640,
+              }}
+            >
+              以你的品牌定位為骨架，把策略翻成每一篇可發出去的內容
+            </p>
           </div>
 
           {/* Search bar — 800px max, 64px tall + focus filter row (Canva spec) */}

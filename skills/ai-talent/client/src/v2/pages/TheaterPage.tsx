@@ -1265,8 +1265,18 @@ export default function TheaterPage() {
             <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
               內容企劃台
             </h1>
-            <p className="text-sm text-neutral-500 mt-1">
-              20 位 AI agents 為 {brandName ?? "（請先選品牌）"} 規劃 7 天跨平台內容
+            {/* 2026-05-11 (CJ「最後一公里斷掉」): tech-spec ("20 位 agents")
+                replaced with methodology value-prop tying back to /brands. */}
+            <p
+              className="mt-1 text-neutral-700"
+              style={{
+                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                fontStyle: "italic",
+                fontSize: 14,
+                lineHeight: 1.65,
+              }}
+            >
+              以 {brandName ?? "你的品牌"} 的定位為骨架，編排 7 天跨平台內容
             </p>
           </div>
           <div className="flex items-center gap-2">
