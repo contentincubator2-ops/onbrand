@@ -80,10 +80,12 @@ jobs:
             echo "  Agents NOT YET A+ (these need upgrade — bio + tsp)"
             echo "════════════════════════════════════════════════════════"
             $MYSQLT -e "
-              SELECT COUNT(*) AS need_upgrade FROM agents
-              WHERE id IN ($IDS)
-              HAVING (CHAR_LENGTH(IFNULL(bio,''))
-                + CHAR_LENGTH(IFNULL(specialty,''))
-                + CHAR_LENGTH(IFNULL(methodology,''))
-                + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))) < 2000;
+              SELECT COUNT(*) AS need_upgrade FROM (
+                SELECT id,
+                  (CHAR_LENGTH(IFNULL(bio,''))
+                  + CHAR_LENGTH(IFNULL(specialty,''))
+                  + CHAR_LENGTH(IFNULL(methodology,''))
+                  + CHAR_LENGTH(IFNULL(taskSystemPrompt,''))) AS tc
+                FROM agents WHERE id IN ($IDS)
+              ) x WHERE tc < 2000;
             "

@@ -72,46 +72,63 @@ export default function RunningAgentCarousel({
 
   if (!activeAgent) return null;
 
+  // 2026-05-11 (CJ direction「外框圓周視為 100%，陸續跑完」):
+  // Replace 3 pulse rings with single SVG arc that fills clockwise as
+  // progress completes. Apple Watch activity-ring vibe — avatar = task,
+  // ring around it = progress percentage.
+  const SIZE = 132;
+  const STROKE = 6;            // ring thickness
+  const RADIUS = (SIZE - STROKE) / 2;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const safePct = Math.max(0, Math.min(100, typeof progressPct === "number" ? progressPct : 0));
+  const dashOffset = CIRCUMFERENCE * (1 - safePct / 100);
+
   return (
     <div className="flex flex-col items-center py-6 px-4">
-      {/* Concentric ring + avatar */}
+      {/* Avatar with SVG progress ring around perimeter */}
       <div
         className="relative flex items-center justify-center"
-        style={{ width: 132, height: 132 }}
+        style={{ width: SIZE, height: SIZE }}
       >
-        {/* Outer ring — slow pulse */}
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            border: `2px solid ${accentColor}55`,
-            animation: "ringPulseSlow 2.4s ease-in-out infinite",
-          }}
-        />
-        {/* Mid ring — faster pulse, offset */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            inset: 14,
-            border: `2px solid ${accentColor}99`,
-            animation: "ringPulseFast 1.8s ease-in-out infinite 0.4s",
-          }}
-        />
-        {/* Inner solid ring — solid colour */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            inset: 28,
-            border: `2px solid ${accentColor}`,
-          }}
-        />
-        {/* Avatar — fades when active idx changes */}
+        {/* Background ring (the unfilled remainder) + progress arc */}
+        <svg
+          width={SIZE}
+          height={SIZE}
+          className="absolute inset-0"
+          style={{ transform: "rotate(-90deg)" /* start at 12 o'clock */ }}
+        >
+          {/* Background track — light grey ring */}
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            fill="none"
+            stroke={`${accentColor}22`}
+            strokeWidth={STROKE}
+          />
+          {/* Progress arc — fills clockwise as safePct grows */}
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            fill="none"
+            stroke={accentColor}
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={dashOffset}
+            style={{ transition: "stroke-dashoffset 0.6s ease-out" }}
+          />
+        </svg>
+        {/* Avatar — fades when active idx changes. Sits inside the ring
+            with a small gap so the ring is clearly visible. */}
         <div
           key={activeAgent.id ?? activeAgent.name}
           className="absolute rounded-full overflow-hidden bg-white"
           style={{
-            inset: 32,
+            inset: STROKE + 4,
             animation: "avatarFade 0.45s ease",
-            boxShadow: `0 0 18px ${accentColor}55`,
+            boxShadow: `0 0 16px ${accentColor}44`,
           }}
         >
           <Avatar
@@ -120,18 +137,25 @@ export default function RunningAgentCarousel({
             classNames={{ base: "w-full h-full rounded-full" }}
           />
         </div>
-        {/* Tiny status dot top-right */}
-        <span
-          className="absolute rounded-full"
-          style={{
-            top: 18, right: 18,
-            width: 14, height: 14,
-            background: "#10B981",
-            border: "2px solid white",
-            animation: "blink 1.2s ease-in-out infinite",
-          }}
-          title="active"
-        />
+        {/* Percentage label — center bottom-overlay style. Only shows
+            when progress > 0 to avoid empty 0% noise on first render. */}
+        {safePct > 0 && (
+          <div
+            className="absolute font-bold tabular-nums"
+            style={{
+              bottom: -4, right: -4,
+              fontSize: 11,
+              padding: "2px 6px",
+              background: accentColor,
+              color: "white",
+              borderRadius: 999,
+              border: "2px solid white",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+            }}
+          >
+            {Math.round(safePct)}%
+          </div>
+        )}
       </div>
 
       {/* Agent name + role */}
@@ -157,23 +181,12 @@ export default function RunningAgentCarousel({
         </div>
       )}
 
-      {/* Progress bar (thin) */}
-      {typeof progressPct === "number" && (
-        <div className="w-full max-w-[280px] mt-4">
-          <div className="h-1 rounded-full bg-default-100 overflow-hidden">
-            <div
-              className="h-full transition-all duration-500"
-              style={{
-                width: `${Math.min(100, progressPct)}%`,
-                background: accentColor,
-              }}
-            />
-          </div>
-          {elapsedText && (
-            <div className="mt-1.5 text-[10px] text-default-400 text-center tabular-nums">
-              {elapsedText}
-            </div>
-          )}
+      {/* 2026-05-11: removed thin horizontal progress bar — the avatar
+          ring above IS the progress indicator now. Only keep elapsed
+          timestamp text. */}
+      {elapsedText && (
+        <div className="mt-3 text-[10px] text-default-400 text-center tabular-nums">
+          {elapsedText}
         </div>
       )}
 
