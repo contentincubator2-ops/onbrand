@@ -862,12 +862,11 @@ export default function BrandsPage() {
         onClose={() => setTestPanelOpen(false)}
       />
 
-      {/* Brain bar — appears WHILE positioning pipeline runs.
-          Shows current step's agent + thinking text in the same line-art
-          portrait + speech bubble style as /theater. */}
-      {pipelineThinking && (
-        <PositioningBrainBar thinking={pipelineThinking} />
-      )}
+      {/* 2026-05-11 (CJ「大腦區感覺也重複了」): the floating
+          PositioningBrainBar duplicated the new in-page
+          PipelineThinkingPanel. Removed — the in-page panel is now the
+          single source of "AI thinking" UI. (Component retained below
+          in case we want to revive it as a global indicator later.) */}
 
       {/* Lock controls bar — sits above each tab's content. State-aware:
           locked → green check banner with 解鎖 button
@@ -1046,17 +1045,21 @@ export default function BrandsPage() {
               {/* ── 定位 card grid (pos:home) ── */}
               {section === "pos:home" ? (
                 <div style={{ padding: "16px 28px 0", display: "flex", flexDirection: "column", gap: 20 }}>
-                  <PositioningTopRow
-                    brandId={(scope?.brandId ?? brandId) as number | null}
-                    scopeMode={scopeMode}
-                    locked={!!tabLocks.positioning}
-                    onLockToggle={() => handleLockToggle("positioning")}
-                  />
-                  {/* 2026-05-11 (CJ「直接在第一層顯現，要有頂級廣告公司的感覺」):
-                      editorial layer-1 pipeline thinking panel. Shows the
-                      streaming reasoning + step queue right on the brand
-                      home view, so users don't need to drill into a segment
-                      page to see the brain at work. */}
+                  {/* 2026-05-11 (CJ「目前就是工作區以上的鎖定定位等等內容有點重複」):
+                      while the pipeline is running the brain bar IS the workspace —
+                      hide the lock toolbar + 品牌工具 grid until it's done.
+                      Idle: show lock toolbar + tile grid (normal view).
+                      Running / Paused: show ONLY the brain panel.
+                      Done: brain panel above + tiles below (so user sees results immediately). */}
+                  {pipeline.status === "idle" && (
+                    <PositioningTopRow
+                      brandId={(scope?.brandId ?? brandId) as number | null}
+                      scopeMode={scopeMode}
+                      locked={!!tabLocks.positioning}
+                      onLockToggle={() => handleLockToggle("positioning")}
+                    />
+                  )}
+
                   {scopeMode !== "none" && pipelineSteps.length > 0 && pipeline.status !== "idle" && (
                     <PipelineThinkingPanel
                       steps={pipelineSteps}
@@ -1071,6 +1074,7 @@ export default function BrandsPage() {
                         : scopeMode === "event" ? "Event Positioning"
                         : "Brand Positioning"
                       }
+                      brandName={scopeName}
                       onStart={startPipeline}
                       onPause={pausePipeline}
                       onResume={resumePipeline}
@@ -1078,12 +1082,17 @@ export default function BrandsPage() {
                       onStop={stopPipeline}
                     />
                   )}
-                  <PositioningGrid
-                    scopeMode={scopeMode}
-                    segments={segments}
-                    onSelect={setSection}
-                    segmentData={positioningSegmentData}
-                  />
+
+                  {/* 品牌工具 grid — hidden while running/paused; shown when idle
+                      (user hasn't started yet) or done (results ready). */}
+                  {(pipeline.status === "idle" || pipeline.status === "done") && (
+                    <PositioningGrid
+                      scopeMode={scopeMode}
+                      segments={segments}
+                      onSelect={setSection}
+                      segmentData={positioningSegmentData}
+                    />
+                  )}
                 </div>
               ) : (
               /* ── 選了具體 section → 原本的內容 ── */
