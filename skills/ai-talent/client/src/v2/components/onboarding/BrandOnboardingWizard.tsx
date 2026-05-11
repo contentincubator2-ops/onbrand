@@ -182,7 +182,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
             {step === 1 && (
               <div className="py-2">
                 <p style={{
-                  fontSize: 10, fontWeight: 600, color: "#737373",
+                  fontSize: 10, fontWeight: 600, color: "#404040",
                   letterSpacing: "0.28em", textTransform: "uppercase",
                   marginBottom: 12,
                 }}>
@@ -215,14 +215,14 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                       key={s.num}
                       style={{
                         background: "#FFFFFF",
-                        border: "1px solid #E5E5E5",
+                        border: "1px solid #D4D4D4",
                         borderRadius: 8,
                         padding: "14px 14px 12px",
                         position: "relative",
                       }}
                     >
                       <p style={{
-                        fontSize: 9, fontWeight: 700, color: "#A3A3A3",
+                        fontSize: 9, fontWeight: 700, color: "#525252",
                         letterSpacing: "0.22em", marginBottom: 6,
                         fontVariantNumeric: "tabular-nums",
                       }}>
@@ -241,7 +241,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                         <span aria-hidden style={{
                           position: "absolute", right: -10, top: "50%",
                           transform: "translateY(-50%)",
-                          color: "#A3A3A3", fontSize: 14,
+                          color: "#525252", fontSize: 14,
                         }}>→</span>
                       )}
                     </div>
@@ -265,7 +265,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   開始建立第一個品牌
                   <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
                 </button>
-                <p style={{ fontSize: 11, color: "#A3A3A3", marginTop: 10 }}>
+                <p style={{ fontSize: 11, color: "#525252", marginTop: 10 }}>
                   預計 2 分鐘 · 完成後 AI 已備好可以為你寫內容
                 </p>
               </div>
@@ -344,7 +344,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
               <div>
                 <div className="mb-3">
                   <p style={{
-                    fontSize: 10, fontWeight: 600, color: "#737373",
+                    fontSize: 10, fontWeight: 600, color: "#404040",
                     letterSpacing: "0.28em", textTransform: "uppercase",
                     marginBottom: 6,
                   }}>
@@ -394,7 +394,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
             {step === 4 && (
               <div className="py-2">
                 <p style={{
-                  fontSize: 10, fontWeight: 600, color: "#737373",
+                  fontSize: 10, fontWeight: 600, color: "#404040",
                   letterSpacing: "0.28em", textTransform: "uppercase",
                   marginBottom: 12,
                 }}>
@@ -469,14 +469,14 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     style={{
                       padding: "10px 16px", fontSize: 13, fontWeight: 600,
                       letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
-                      border: "1px solid #E5E5E5",
+                      border: "1px solid #D4D4D4",
                       background: "#FFFFFF", color: "#525252",
                     }}
                   >
                     回品牌工作區
                   </button>
                 </div>
-                <p style={{ fontSize: 11, color: "#A3A3A3" }}>
+                <p style={{ fontSize: 11, color: "#525252" }}>
                   日後可隨時在「品牌 → 設定」重新跑 SoWork 品牌定位法
                 </p>
               </div>

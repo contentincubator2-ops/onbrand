@@ -157,11 +157,11 @@ export default function PipelineThinkingPanel({
               }}
             />
             <div className="flex items-center justify-between gap-3 mb-1">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-neutral-500">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-neutral-700">
                 <span className="font-semibold text-neutral-800">{personaName}</span>
-                <span className="text-neutral-300">·</span>
+                <span className="text-neutral-500">·</span>
                 <span>{title}</span>
-                <span className="text-neutral-300">·</span>
+                <span className="text-neutral-500">·</span>
                 <span>Step {Math.min(cursor + 1, total)} / {total}</span>
                 {status === "running" && (
                   <span className="inline-flex items-center gap-1 text-neutral-700">
@@ -219,7 +219,7 @@ export default function PipelineThinkingPanel({
                     track: "bg-neutral-100",
                   }}
                 />
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-neutral-400 mt-1.5">
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-neutral-700 mt-1.5">
                   <span>{completedIds.length} / {total} complete</span>
                   {status === "running" && <span className="font-mono">{elapsedSec}s</span>}
                 </div>
@@ -236,7 +236,7 @@ export default function PipelineThinkingPanel({
       >
         {/* LEFT — reasoning */}
         <div className="px-7 py-6 lg:border-r border-neutral-200 min-h-[280px]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-400 mb-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-700 mb-3">
             {phase === "loading" && "Anthropic 啟動推理鏈"}
             {phase === "typing"  && "Reasoning · streaming"}
             {phase === "writing" && "寫入欄位中"}
@@ -251,7 +251,7 @@ export default function PipelineThinkingPanel({
             }}
           >
             {phase === "loading" && !typed && (
-              <div className="text-neutral-400 italic text-sm">
+              <div className="text-neutral-700 italic text-sm">
                 正在啟動 Anthropic 推理鏈，搭配 web search 與既有 context 推導本步驟。
                 通常 20–60 秒，請稍候 — 系統不是當機，是在認真思考。
               </div>
@@ -285,19 +285,19 @@ export default function PipelineThinkingPanel({
 
         {/* RIGHT — agenda */}
         <aside className="px-6 py-6 bg-neutral-50/50">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-400 mb-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-700 mb-3">
             Agenda
           </p>
 
           {/* Now */}
           <div className="mb-4">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 mb-1">Now</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-700 mb-1">Now</p>
             <div className="flex items-start gap-2">
               <CircleDot size={13} className="text-neutral-900 mt-1 shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-neutral-900 leading-snug">{stepTitle}</p>
                 {current?.segmentId && (
-                  <p className="text-[11px] text-neutral-500 mt-0.5 font-mono">{current.segmentId}</p>
+                  <p className="text-[11px] text-neutral-700 mt-0.5 font-mono">{current.segmentId}</p>
                 )}
               </div>
             </div>
@@ -305,15 +305,15 @@ export default function PipelineThinkingPanel({
 
           {next && status !== "done" && (
             <div className="mb-4">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 mb-1">Next</p>
-              <p className="text-sm text-neutral-600 leading-snug pl-5">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-700 mb-1">Next</p>
+              <p className="text-sm text-neutral-700 leading-snug pl-5">
                 {cleanTitle(next.title)}
               </p>
             </div>
           )}
 
           <div className="border-t border-neutral-200 pt-3">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 mb-2">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-700 mb-2">
               All · {total}
             </p>
             <ol className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
@@ -326,9 +326,9 @@ export default function PipelineThinkingPanel({
                     key={s.id}
                     className={`flex items-center gap-2 text-[11.5px] leading-snug ${
                       isCur ? "text-neutral-900 font-semibold"
-                        : isDone ? "text-neutral-500"
-                        : isFuture ? "text-neutral-400"
-                        : "text-neutral-500"
+                        : isDone ? "text-neutral-700"
+                        : isFuture ? "text-neutral-700"
+                        : "text-neutral-700"
                     }`}
                   >
                     <span
@@ -338,7 +338,7 @@ export default function PipelineThinkingPanel({
                           : "bg-neutral-200"
                       }`}
                     />
-                    <span className="font-mono text-[10px] text-neutral-400 w-5 shrink-0">
+                    <span className="font-mono text-[10px] text-neutral-700 w-5 shrink-0">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="truncate">{cleanTitle(s.title)}</span>

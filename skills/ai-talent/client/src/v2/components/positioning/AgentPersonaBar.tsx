@@ -124,18 +124,18 @@ export default function AgentPersonaBar({
             }}
           />
           <div className="flex items-center justify-between gap-3 mb-1.5">
-            <div className="flex items-center gap-2 flex-wrap text-[11px] uppercase tracking-[0.22em] text-neutral-500">
+            <div className="flex items-center gap-2 flex-wrap text-[11px] uppercase tracking-[0.22em] text-neutral-700">
               <span className="font-semibold text-neutral-800">{p.label}</span>
-              <span className="text-neutral-300">·</span>
+              <span className="text-neutral-500">·</span>
               <span>{p.domain}</span>
               {meta && (
                 <>
-                  <span className="text-neutral-300">·</span>
+                  <span className="text-neutral-500">·</span>
                   <span>{meta}</span>
                 </>
               )}
               {mode === "idle" && (
-                <span className="inline-flex items-center gap-1 text-neutral-500">
+                <span className="inline-flex items-center gap-1 text-neutral-700">
                   <span className="w-1.5 h-1.5 rounded-full bg-neutral-300" />
                   Ready
                 </span>

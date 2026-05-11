@@ -78,9 +78,9 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         }}>
           品牌知識庫
         </span>
-        <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
+        <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         <span style={{
-          fontSize: 10, fontWeight: 500, color: "#A3A3A3",
+          fontSize: 10, fontWeight: 500, color: "#525252",
           letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
         }}>
           {items.length} / 50 · {totalChars.toLocaleString()} / 400,000
@@ -92,8 +92,8 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
             padding: "6px 12px", fontSize: 12, fontWeight: 600,
             letterSpacing: "0.04em", borderRadius: 6, cursor: items.length >= 50 ? "not-allowed" : "pointer",
             border: "1px solid #171717",
-            background: items.length >= 50 ? "#F5F5F4" : "#171717",
-            color: items.length >= 50 ? "#A3A3A3" : "#FFFFFF",
+            background: items.length >= 50 ? "#D4D4D4" : "#171717",
+            color: items.length >= 50 ? "#525252" : "#FFFFFF",
             display: "inline-flex", alignItems: "center", gap: 4,
           }}
         >
@@ -114,15 +114,15 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
       {/* Capacity meter */}
       <div style={{
         marginBottom: 22, padding: "10px 14px",
-        background: "#FAFAF9", border: "1px solid #E5E5E5", borderRadius: 8,
+        background: "#FAFAF9", border: "1px solid #D4D4D4", borderRadius: 8,
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
           <span style={{ fontSize: 10.5, color: "#525252", letterSpacing: "0.1em", textTransform: "uppercase" }}>
             Capacity · {charPct}%
           </span>
-          <span style={{ fontSize: 10, color: "#A3A3A3" }}>上限：50 條 × 每條 8,000 字</span>
+          <span style={{ fontSize: 10, color: "#525252" }}>上限：50 條 × 每條 8,000 字</span>
         </div>
-        <div style={{ height: 3, background: "#E5E5E5", borderRadius: 2, overflow: "hidden" }}>
+        <div style={{ height: 3, background: "#D4D4D4", borderRadius: 2, overflow: "hidden" }}>
           <div style={{
             height: "100%",
             background: charPct > 90 ? "#B91C1C" : "#171717",
@@ -181,7 +181,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
               style={{
                 padding: "6px 14px", fontSize: 12, fontWeight: 600,
                 borderRadius: 6, cursor: "pointer",
-                border: "1px solid #E5E5E5", background: "#FFFFFF", color: "#525252",
+                border: "1px solid #D4D4D4", background: "#FFFFFF", color: "#525252",
               }}
             >
               取消
@@ -193,8 +193,8 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 padding: "6px 14px", fontSize: 12, fontWeight: 600,
                 borderRadius: 6, cursor: "pointer",
                 border: "1px solid #171717",
-                background: !title.trim() ? "#F5F5F4" : "#171717",
-                color: !title.trim() ? "#A3A3A3" : "#FFFFFF",
+                background: !title.trim() ? "#D4D4D4" : "#171717",
+                color: !title.trim() ? "#525252" : "#FFFFFF",
               }}
             >
               {createMut?.isPending ? "儲存中…" : "儲存"}
@@ -207,15 +207,15 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
       {items.length === 0 && !adding ? (
         <div style={{
           padding: "80px 24px", textAlign: "center",
-          color: "#A3A3A3",
-          border: "1px dashed #E5E5E5", borderRadius: 12,
+          color: "#525252",
+          border: "1px dashed #D4D4D4", borderRadius: 12,
         }}>
           <BookOpen size={36} strokeWidth={1.3} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
           <p style={{ fontSize: 13, color: "#525252", marginBottom: 6, fontWeight: 500 }}>
             還沒有知識條目
           </p>
           <p style={{
-            fontSize: 12, color: "#A3A3A3",
+            fontSize: 12, color: "#525252",
             fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
             fontStyle: "italic", maxWidth: 320, margin: "0 auto",
           }}>
@@ -232,14 +232,14 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 style={{
                   position: "relative",
                   background: "#FFFFFF",
-                  border: "1px solid #E5E5E5",
+                  border: "1px solid #D4D4D4",
                   borderRadius: 8,
                   padding: "14px 16px 12px",
                   transition: "border-color 0.15s",
                   minHeight: 140,
                 }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#171717"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#E5E5E5"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#D4D4D4"; }}
               >
                 {filled && (
                   <span
@@ -252,7 +252,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 )}
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
-                    <BookOpen size={12} strokeWidth={1.7} style={{ color: filled ? "#171717" : "#A3A3A3", flexShrink: 0 }} />
+                    <BookOpen size={12} strokeWidth={1.7} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />
                     <h3 style={{
                       fontSize: 13.5, fontWeight: 600, color: "#171717",
                       lineHeight: 1.35, margin: 0,
@@ -266,10 +266,10 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                     title="刪除"
                     style={{
                       background: "transparent", border: "none", cursor: "pointer",
-                      color: "#A3A3A3", padding: 2, display: "flex", flexShrink: 0,
+                      color: "#525252", padding: 2, display: "flex", flexShrink: 0,
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "#A3A3A3"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
                   >
                     <Trash2 size={13} />
                   </button>
@@ -288,9 +288,9 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 )}
                 <div style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
-                  fontSize: 9.5, color: "#A3A3A3",
+                  fontSize: 9.5, color: "#525252",
                   letterSpacing: "0.12em", textTransform: "uppercase",
-                  borderTop: "1px solid #F5F5F4", paddingTop: 8,
+                  borderTop: "1px solid #D4D4D4", paddingTop: 8,
                 }}>
                   <span>{(it.body ?? "").length.toLocaleString()} chars</span>
                   {it.sourceUrl && (

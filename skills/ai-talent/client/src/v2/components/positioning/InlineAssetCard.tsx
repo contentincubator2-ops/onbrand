@@ -60,7 +60,7 @@ export default function InlineAssetCard({
     <div
       style={{
         background: "#FFFFFF",
-        border: "1px solid #E5E5E5",
+        border: "1px solid #D4D4D4",
         borderRadius: 8,
         padding: "14px 16px 12px",
         position: "relative",
@@ -70,7 +70,7 @@ export default function InlineAssetCard({
         transition: "border-color 0.15s",
       }}
       onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#171717"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#E5E5E5"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#D4D4D4"; }}
     >
       {/* Filled accent — 2px black left edge bar */}
       {filled && (
@@ -85,10 +85,10 @@ export default function InlineAssetCard({
 
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <Icon size={12} strokeWidth={1.8} style={{ color: filled ? "#171717" : "#A3A3A3", flexShrink: 0 }} />
+        <Icon size={12} strokeWidth={1.8} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />
         {eyebrow && (
           <span style={{
-            fontSize: 9, fontWeight: 700, color: "#A3A3A3",
+            fontSize: 9, fontWeight: 700, color: "#525252",
             letterSpacing: "0.2em", textTransform: "uppercase",
             fontVariantNumeric: "tabular-nums",
           }}>
@@ -155,10 +155,10 @@ function TextField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
         color: "#171717",
         fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         padding: "6px 0",
-        borderTop: "1px solid #E5E5E5",
+        borderTop: "1px solid #D4D4D4",
       }}
       onFocus={(e) => { e.target.style.borderTopColor = "#171717"; }}
-      onBlur={(e) => { e.target.style.borderTopColor = "#E5E5E5"; }}
+      onBlur={(e) => { e.target.style.borderTopColor = "#D4D4D4"; }}
     />
   );
 }
@@ -170,7 +170,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {items.length === 0 && (
         <div style={{
-          fontSize: 11.5, color: "#A3A3A3", fontStyle: "italic",
+          fontSize: 11.5, color: "#525252", fontStyle: "italic",
           padding: "4px 0",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         }}>
@@ -178,9 +178,9 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
         </div>
       )}
       {items.map((it, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid #F5F5F4", padding: "4px 0" }}>
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid #D4D4D4", padding: "4px 0" }}>
           <span style={{
-            fontSize: 9, color: "#A3A3A3", fontFamily: "system-ui",
+            fontSize: 9, color: "#525252", fontFamily: "system-ui",
             letterSpacing: "0.1em", minWidth: 18, textAlign: "right",
           }}>
             {String(i + 1).padStart(2, "0")}
@@ -200,10 +200,10 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
             title="刪除"
             style={{
               background: "transparent", border: "none", cursor: "pointer",
-              color: "#A3A3A3", padding: 2, display: "flex",
+              color: "#525252", padding: 2, display: "flex",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "#A3A3A3"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
           >
             <X size={12} />
           </button>
@@ -233,7 +233,7 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {pairs.length === 0 && (
         <div style={{
-          fontSize: 11.5, color: "#A3A3A3", fontStyle: "italic",
+          fontSize: 11.5, color: "#525252", fontStyle: "italic",
           padding: "4px 0",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         }}>
@@ -241,14 +241,14 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
         </div>
       )}
       {pairs.map((p, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid #F5F5F4", padding: "4px 0" }}>
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid #D4D4D4", padding: "4px 0" }}>
           <input
             type="text" placeholder="原本說的"
             value={p.from}
             onChange={(e) => setPairs(pairs.map((x, j) => j === i ? { ...x, from: e.target.value } : x))}
-            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#737373", padding: "2px 0" }}
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#404040", padding: "2px 0" }}
           />
-          <span style={{ color: "#A3A3A3", fontSize: 12, flexShrink: 0 }}>→</span>
+          <span style={{ color: "#525252", fontSize: 12, flexShrink: 0 }}>→</span>
           <input
             type="text" placeholder="改成說的"
             value={p.to}
@@ -258,9 +258,9 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
           <button
             onClick={() => setPairs(pairs.filter((_, j) => j !== i))}
             title="刪除"
-            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#A3A3A3", padding: 2, display: "flex" }}
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#525252", padding: 2, display: "flex" }}
             onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "#A3A3A3"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
           >
             <X size={12} />
           </button>

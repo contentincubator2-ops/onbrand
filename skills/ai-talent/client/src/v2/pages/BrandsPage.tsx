@@ -728,7 +728,7 @@ export default function BrandsPage() {
               decorative emblem. Editorial typography hierarchy. */}
           <div className="min-h-[60vh] flex items-center justify-center px-6">
             <div className="max-w-[440px] text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400 mb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-600 mb-4">
                 BRAND · STEP 1
               </p>
               <h1 className="text-3xl font-bold text-neutral-900 mb-3 leading-tight">
@@ -745,7 +745,7 @@ export default function BrandsPage() {
                 開始建立品牌
                 <FontAwesomeIcon icon={faPlus} className="text-xs" />
               </button>
-              <p className="text-xs text-neutral-400 mt-4">
+              <p className="text-xs text-neutral-600 mt-4">
                 預計 2 分鐘完成 · 過程中可隨時暫停
               </p>
             </div>
@@ -762,7 +762,7 @@ export default function BrandsPage() {
         <div className="absolute top-5 left-5 z-10">
           <a
             href="/brands"
-            className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900 transition"
+            className="flex items-center gap-1 text-xs text-neutral-700 hover:text-neutral-900 transition"
           >
             ← 所有品牌
           </a>
@@ -783,7 +783,7 @@ export default function BrandsPage() {
             typography: tiny eyebrow, large bold title, subtle stats. */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
           {/* Eyebrow */}
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-400 mb-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
             BRAND
           </p>
 
@@ -858,11 +858,11 @@ export default function BrandsPage() {
                       {locked && (
                         <LucideLock
                           size={11} strokeWidth={2.5}
-                          className={active ? "text-neutral-300 ml-auto" : "text-neutral-400 ml-auto"}
+                          className={active ? "text-neutral-300 ml-auto" : "text-neutral-600 ml-auto"}
                         />
                       )}
                     </div>
-                    <p className={`text-[11px] mt-0.5 ${active ? "text-neutral-300" : "text-neutral-500"}`}>
+                    <p className={`text-[11px] mt-0.5 ${active ? "text-neutral-300" : "text-neutral-700"}`}>
                       {t.desc}
                       {locked && " · 已鎖定"}
                     </p>
@@ -936,7 +936,7 @@ export default function BrandsPage() {
                       <p className="text-small font-semibold text-default-800 m-0">
                         {tabLabel} 尚未鎖定
                       </p>
-                      <p className="text-tiny text-default-500 m-0">
+                      <p className="text-tiny text-default-700 m-0">
                         鎖定後：編輯欄變唯讀 · 全平台 (30s/60s/99s/Theater) 用這份為單一真相
                       </p>
                     </>
@@ -1192,7 +1192,7 @@ export default function BrandsPage() {
                         {smpData?.singleMindedProposition && (
                           <div className="mt-2 p-2 rounded bg-white border border-divider">
                             <p className="text-small font-medium text-foreground">「{smpData.singleMindedProposition}」</p>
-                            {smpData.rationale && <p className="text-tiny text-default-500 mt-1 leading-relaxed">{smpData.rationale}</p>}
+                            {smpData.rationale && <p className="text-tiny text-default-700 mt-1 leading-relaxed">{smpData.rationale}</p>}
                           </div>
                         )}
                         <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -1620,7 +1620,7 @@ function PositioningBrainBar({ thinking }: {
               transform: "rotate(45deg)",
             }}
           />
-          <div className="text-tiny text-neutral-500 mb-0.5 flex items-center gap-2">
+          <div className="text-tiny text-neutral-700 mb-0.5 flex items-center gap-2">
             <span className="font-semibold text-neutral-800">
               Step {thinking.stepNum} / {thinking.stepTotal}
             </span>
@@ -1810,7 +1810,7 @@ function TagRow({ items, max = 4 }: { items: string[]; max?: number }) {
         </span>
       ))}
       {items.length > max && (
-        <span style={{ fontSize: 10, color: "#A3A3A3" }}>+{items.length - max}</span>
+        <span style={{ fontSize: 10, color: "#525252" }}>+{items.length - max}</span>
       )}
     </span>
   );
@@ -1853,7 +1853,7 @@ function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | 
               </span>
             )}
             {en && (
-              <span style={{ display: "block", color: "#737373", fontStyle: "italic", marginTop: 2 }}>
+              <span style={{ display: "block", color: "#404040", fontStyle: "italic", marginTop: 2 }}>
                 {truncate(en, 60)}
               </span>
             )}
@@ -1877,12 +1877,12 @@ function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | 
             {total != null && (
               <span style={{ display: "block", marginBottom: 4 }}>
                 <span style={{ fontSize: 22, fontWeight: 700, color: "#171717", fontFamily: "system-ui" }}>{total}</span>
-                <span style={{ fontSize: 11, color: "#A3A3A3", marginLeft: 4 }}>/ 100</span>
+                <span style={{ fontSize: 11, color: "#525252", marginLeft: 4 }}>/ 100</span>
               </span>
             )}
             {rows.slice(0, 3).map((r: any, i: number) => (
               <span key={i} style={{ display: "block", fontSize: 11 }}>
-                <span style={{ color: "#737373" }}>{r.dim}</span>
+                <span style={{ color: "#404040" }}>{r.dim}</span>
                 <span style={{ color: "#171717", fontWeight: 600, marginLeft: 6 }}>{r.score}</span>
               </span>
             ))}
@@ -1906,13 +1906,13 @@ function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | 
               <span key={i} style={{ display: "block", marginBottom: 2 }}>
                 <span style={{ color: "#171717", fontWeight: 600, fontFamily: "system-ui" }}>· {it.label}</span>
                 {it.body && (
-                  <span style={{ color: "#737373", marginLeft: 4, fontSize: 11 }}>
+                  <span style={{ color: "#404040", marginLeft: 4, fontSize: 11 }}>
                     {truncate(it.body, 40)}
                   </span>
                 )}
               </span>
             ))}
-            {items.length > 4 && <span style={{ fontSize: 10, color: "#A3A3A3" }}>+{items.length - 4}</span>}
+            {items.length > 4 && <span style={{ fontSize: 10, color: "#525252" }}>+{items.length - 4}</span>}
           </span>
         ),
         hasContent: true,
@@ -1932,7 +1932,7 @@ function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | 
           <span>
             {intensity && <span style={{ display: "block" }}>{truncate(intensity, 90)}</span>}
             {direct.length > 0 && (
-              <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#737373", fontFamily: "system-ui" }}>
+              <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#404040", fontFamily: "system-ui" }}>
                 vs {direct.slice(0, 3).map((d: any) => d.name).join("、")}
                 {direct.length > 3 && <span> +{direct.length - 3}</span>}
               </span>
@@ -1980,13 +1980,13 @@ function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | 
           <span>
             {arche && (
               <span style={{ display: "block", marginBottom: 4 }}>
-                <span style={{ fontSize: 10, color: "#A3A3A3", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>原型</span>
+                <span style={{ fontSize: 10, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>原型</span>
                 <TagRow items={arche} max={3} />
               </span>
             )}
             {tone && (
               <span style={{ display: "block" }}>
-                <span style={{ fontSize: 10, color: "#A3A3A3", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>語調</span>
+                <span style={{ fontSize: 10, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>語調</span>
                 <TagRow items={tone} max={4} />
               </span>
             )}
@@ -2011,7 +2011,7 @@ function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | 
               「{truncate(smp, 60)}」
             </span>
             {v.rationale && (
-              <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#737373" }}>
+              <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#404040" }}>
                 {truncate(v.rationale, 80)}
               </span>
             )}
@@ -2068,13 +2068,13 @@ function buildBrandCheatPreview(seg?: Record<string, any>): { node: React.ReactN
         )}
         {why && (
           <span style={{ display: "block", fontSize: 11, marginBottom: 2 }}>
-            <span style={{ color: "#A3A3A3", fontFamily: "system-ui", marginRight: 4 }}>WHY</span>
+            <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>WHY</span>
             {truncate(why, 70)}
           </span>
         )}
         {diff && (
           <span style={{ display: "block", fontSize: 11 }}>
-            <span style={{ color: "#A3A3A3", fontFamily: "system-ui", marginRight: 4 }}>EDGE</span>
+            <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>EDGE</span>
             {truncate(diff, 70)}
           </span>
         )}
@@ -2096,7 +2096,7 @@ function buildPromptsPreview(seg?: Record<string, any>): { node: React.ReactNode
       <span>
         {arche && (
           <span style={{ display: "block", marginBottom: 4, fontSize: 11 }}>
-            <span style={{ color: "#A3A3A3", fontFamily: "system-ui", marginRight: 4 }}>原型</span>
+            <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>原型</span>
             {arche.slice(0, 2).join(" / ")}
           </span>
         )}
@@ -2142,7 +2142,7 @@ function PositioningCompletionBridge({
     >
       <div style={{ flex: "1 1 320px", minWidth: 0 }}>
         <p style={{
-          fontSize: 10, fontWeight: 600, color: "#737373",
+          fontSize: 10, fontWeight: 600, color: "#404040",
           letterSpacing: "0.25em", textTransform: "uppercase",
           marginBottom: 6,
         }}>
@@ -2216,10 +2216,10 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
         }}>
           {label}
         </span>
-        <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
+        <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         {counter && (
           <span style={{
-            fontSize: 10, fontWeight: 500, color: "#A3A3A3",
+            fontSize: 10, fontWeight: 500, color: "#525252",
             letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
           }}>
             {counter}
@@ -2228,7 +2228,7 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
       </div>
       {intro && (
         <p style={{
-          fontSize: 12.5, lineHeight: 1.7, color: "#737373",
+          fontSize: 12.5, lineHeight: 1.7, color: "#404040",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
           fontStyle: "italic", maxWidth: 700, margin: 0,
         }}>
@@ -2284,14 +2284,14 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
         display: "flex", flexDirection: "column", gap: 10,
         padding: "16px 16px 14px",
         background: bg,
-        border: "1px solid #E5E5E5",
+        border: "1px solid #D4D4D4",
         borderRadius: 8,
         cursor: "pointer", width: "100%",
         minHeight: preview ? 140 : 124,
         position: "relative",
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#171717"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E5E5E5"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#D4D4D4"; }}
     >
       {/* Filled accent — 1px black left edge bar */}
       {hasContent && (
@@ -2308,11 +2308,11 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
         <FontAwesomeIcon
           icon={icon}
-          style={{ fontSize: 12, color: hasContent ? "#171717" : "#A3A3A3", flexShrink: 0 }}
+          style={{ fontSize: 12, color: hasContent ? "#171717" : "#525252", flexShrink: 0 }}
         />
         {eyebrow && (
           <span style={{
-            fontSize: 9, fontWeight: 700, color: "#A3A3A3",
+            fontSize: 9, fontWeight: 700, color: "#525252",
             letterSpacing: "0.2em", textTransform: "uppercase",
             fontVariantNumeric: "tabular-nums",
           }}>
@@ -2344,7 +2344,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
           over and the rationale is conserved for hover (title attr above). */}
       {rationale && !hasContent && (
         <p style={{
-          fontSize: 11.5, lineHeight: 1.55, color: "#737373",
+          fontSize: 11.5, lineHeight: 1.55, color: "#404040",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
           fontStyle: "italic", margin: 0,
         }}>
@@ -2368,7 +2368,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
         </div>
       ) : (
         <span style={{
-          fontSize: 11, color: "#A3A3A3", marginTop: "auto",
+          fontSize: 11, color: "#525252", marginTop: "auto",
           letterSpacing: "0.05em",
         }}>
           尚未填寫 — 點擊開始
@@ -2549,9 +2549,9 @@ function PositioningPanel({
     return (
       <Card shadow="none" className="border-2 border-dashed border-divider">
         <CardBody className="py-16 items-center text-center gap-3">
-          <FontAwesomeIcon icon={faBookOpen} className="text-3xl text-default-300" />
+          <FontAwesomeIcon icon={faBookOpen} className="text-3xl text-default-500" />
           <p className="text-medium font-medium">尚未選擇 scope</p>
-          <p className="text-small text-default-500 max-w-[320px]">
+          <p className="text-small text-default-700 max-w-[320px]">
             請於右上 ScopeBar 選擇品牌 / 產品 / 活動，才能編輯定位內容。
           </p>
         </CardBody>
@@ -2668,9 +2668,9 @@ function PositioningEditor({
     return (
       <Card shadow="none" className="border border-divider">
         <CardBody className="py-12 items-center text-center gap-2">
-          <FontAwesomeIcon icon={faBookOpen} className="text-3xl text-default-300" />
+          <FontAwesomeIcon icon={faBookOpen} className="text-3xl text-default-500" />
           <p className="text-medium font-medium">找不到段落</p>
-          <p className="text-small text-default-500">請於左側選擇要編輯的定位書段落。</p>
+          <p className="text-small text-default-700">請於左側選擇要編輯的定位書段落。</p>
         </CardBody>
       </Card>
     );
@@ -2681,7 +2681,7 @@ function PositioningEditor({
       <Card shadow="none" className="border border-divider">
         <CardBody className="px-5 py-4 gap-1 flex-row items-center justify-between flex-wrap">
           <div>
-            <p className="text-tiny text-default-500 uppercase tracking-wider">
+            <p className="text-tiny text-default-700 uppercase tracking-wider">
               {scopeMode.toUpperCase()} · {activeSegment.num} {activeSegment.title}
             </p>
             <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
@@ -2754,7 +2754,7 @@ function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; br
     <div className="flex flex-col gap-3">
       <Card shadow="none" className="border border-divider">
         <CardBody className="px-5 py-3 flex-row items-center justify-between flex-wrap">
-          <p className="text-small text-default-500">
+          <p className="text-small text-default-700">
             這個區塊由你手動填寫；改動會在 800ms 後自動儲存到 brand.positioning._assets
           </p>
           <SaveIndicator state={saveState} hasTarget={true} />
@@ -2822,7 +2822,7 @@ function BrandAssetTile({ tile, onClick }: { tile: Tile; onClick: () => void }) 
           </Chip>
         )}
         {!tile.ready && (
-          <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md text-default-500">
+          <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md text-default-700">
             即將推出
           </Chip>
         )}
@@ -2911,7 +2911,7 @@ function EventSettingsPanel({
   };
 
   if (eventQuery.isLoading) {
-    return <p className="text-small text-default-500">載入中…</p>;
+    return <p className="text-small text-default-700">載入中…</p>;
   }
   if (!event) {
     return (
@@ -2927,9 +2927,9 @@ function EventSettingsPanel({
     <div className="flex flex-col gap-4 max-w-3xl">
       <Card shadow="none" className="border border-divider">
         <CardBody className="px-5 py-4 gap-1">
-          <p className="text-tiny text-default-500 uppercase tracking-wider">EVENT · 設定</p>
+          <p className="text-tiny text-default-700 uppercase tracking-wider">EVENT · 設定</p>
           <h2 className="text-xl font-semibold tracking-tight">{event.name}</h2>
-          <p className="text-small text-default-500">
+          <p className="text-small text-default-700">
             slug: <code className="text-tiny">{event.slug}</code>
           </p>
         </CardBody>
@@ -2974,11 +2974,11 @@ function EventSettingsPanel({
           </div>
           <div>
             <p className="text-small font-medium mb-1">關聯產品（可多選）</p>
-            <p className="text-tiny text-default-500 mb-2">
+            <p className="text-tiny text-default-700 mb-2">
               選 0 個 = 品牌層級活動；2+ 個 = 跨產品活動。改變綁定的品牌後產品清單會更新。
             </p>
             {candidateProducts.length === 0 ? (
-              <p className="text-tiny text-default-500">此品牌尚無產品。</p>
+              <p className="text-tiny text-default-700">此品牌尚無產品。</p>
             ) : (
               <CheckboxGroup
                 value={productIds.map(String)}
@@ -3044,7 +3044,7 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
     <div className="max-w-[640px] mx-auto space-y-4">
       <div>
         <h3 className="text-medium font-semibold">品牌 logo / 頭像</h3>
-        <p className="text-tiny text-default-500 mt-1">
+        <p className="text-tiny text-default-700 mt-1">
           mockup 顯示用的「{brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。
         </p>
       </div>
@@ -3060,7 +3060,7 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
             {logoUrl ? "目前 logo" : "尚未設定 logo（顯示 dicebear 預設圖）"}
           </p>
           {logoUrl && (
-            <p className="text-tiny text-default-400 truncate">{logoUrl}</p>
+            <p className="text-tiny text-default-600 truncate">{logoUrl}</p>
           )}
         </div>
       </div>
@@ -3069,7 +3069,7 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
         <p className="text-small font-medium">
           {logoUrl ? "換一張（從 FB 粉專重抓）" : "從 FB 粉專自動抓"}
         </p>
-        <p className="text-tiny text-default-500">
+        <p className="text-tiny text-default-700">
           貼粉專網址或純 handle。粉專必須是公開的。會覆蓋現有 logo。
         </p>
         <Input
@@ -3185,7 +3185,7 @@ function PositioningTopRow({
           disabled={!brandId || !entityKind || locked || isRunning || startMut?.isPending}
           className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition ${
             isRunning ? "bg-neutral-100 text-neutral-700 cursor-wait border border-neutral-200"
-            : locked ? "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+            : locked ? "bg-neutral-100 text-neutral-600 cursor-not-allowed"
             : "bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer"
           }`}
           title={
@@ -3203,7 +3203,7 @@ function PositioningTopRow({
             <div className="w-32 h-1.5 bg-default-200 rounded-full overflow-hidden">
               <div className="h-full bg-neutral-900 transition-all" style={{ width: `${Math.min(100, (cur / total) * 100)}%` }} />
             </div>
-            <span className="text-xs text-default-500 tabular-nums">{cur}/{total}</span>
+            <span className="text-xs text-default-700 tabular-nums">{cur}/{total}</span>
           </div>
         )}
         {isFailed && jobData?.lastError && (
@@ -3237,7 +3237,7 @@ function KickerRow({
 }) {
   const { status, isRunning } = usePositioningStatus(brandId);
   return (
-    <div className="mt-4 flex items-center gap-2 text-tiny text-default-400 flex-wrap justify-center">
+    <div className="mt-4 flex items-center gap-2 text-tiny text-default-600 flex-wrap justify-center">
       <span
         className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
         style={{ background: "#7C3AED", fontSize: 9, letterSpacing: "0.15em" }}
@@ -3246,7 +3246,7 @@ function KickerRow({
       </span>
       <span>·</span>
       <span className="text-default-600">{scopeName}</span>
-      <span className="text-default-300 mx-1">|</span>
+      <span className="text-default-500 mx-1">|</span>
       <BrandActionChipsRow
         brandId={brandId}
         expanded={testOpen}
@@ -3426,7 +3426,7 @@ function CopyTabInline({
   };
 
   if (!brandId) {
-    return <div className="p-8 text-center text-default-500">請先選擇品牌</div>;
+    return <div className="p-8 text-center text-default-700">請先選擇品牌</div>;
   }
 
   return (
@@ -3439,7 +3439,7 @@ function CopyTabInline({
             disabled={!brandId || locked || bulkBusy || emptyKeys.length === 0}
             className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition ${
               bulkBusy ? "bg-neutral-100 text-neutral-700 cursor-wait border border-neutral-200"
-              : locked || emptyKeys.length === 0 ? "bg-default-100 text-default-400 cursor-not-allowed"
+              : locked || emptyKeys.length === 0 ? "bg-default-100 text-default-600 cursor-not-allowed"
               : "bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer"
             }`}
             title={
@@ -3454,11 +3454,11 @@ function CopyTabInline({
               : `自動填寫 ${emptyKeys.length} 個空欄`}
           </button>
           {savingKey ? (
-            <span className="flex items-center gap-1 text-xs text-default-500">
+            <span className="flex items-center gap-1 text-xs text-default-700">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> 自動儲存中…
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-xs text-default-400">
+            <span className="flex items-center gap-1 text-xs text-default-600">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 自動儲存
             </span>
           )}
