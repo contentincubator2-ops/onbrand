@@ -14,7 +14,7 @@
  * No max-width container anywhere — extends to viewport edges.
  */
 import React, { useMemo, useState } from "react";
-import { useOutletContext, useSearchParams } from "react-router-dom";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
@@ -27,6 +27,7 @@ import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
 import PipelineThinkingPanel from "../components/positioning/PipelineThinkingPanel";
+import AgentPersonaBar from "../components/positioning/AgentPersonaBar";
 import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
@@ -786,10 +787,30 @@ export default function BrandsPage() {
             {scopeName}
           </h1>
 
-          {/* Stats */}
-          <div className="text-xs text-neutral-500 mb-5">
-            <EntityStats variant="inline" />
-          </div>
+          {/* 2026-05-11 (reviewer feedback「方法論本身是隱形的」):
+              replaced tech-spec stats (X 方法論・Y 技能・Z Agents) with a
+              one-line methodology manifesto. Engine stats moved to admin /
+              about page. Manifesto makes the methodology→content causality
+              the headline, not "we have N things". */}
+          <p
+            className="text-sm text-neutral-700 mb-5"
+            style={{
+              fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+              maxWidth: 640,
+              lineHeight: 1.65,
+              fontStyle: "italic",
+            }}
+          >
+            <span
+              style={{
+                fontStyle: "normal", fontWeight: 600, color: "#171717",
+                letterSpacing: "0.05em",
+              }}
+            >
+              奧品牌定位法
+            </span>
+            ・先鎖定你是誰，AI 才知道每篇文章要說什麼。
+          </p>
 
           {/* Message bar — display-only; matches /30s search bar visually */}
           <BrandMessageBar brandId={activeBrandIdForLocks} />
@@ -1035,7 +1056,13 @@ export default function BrandsPage() {
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ minWidth: 0 }}>
           {/* ── 知識庫 ── */}
           {derivedCategory === "knowledge" && (
-            <KnowledgeEditor key={`knowledge-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
+            <div style={{ padding: "16px 28px 0", display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* 2026-05-11 (CJ「在定位和文字的地方，都有常駐的 agents」):
+                  Persistent persona bar so the workspace feels staffed even
+                  when nothing is running. Same line-art style as 定位. */}
+              <AgentPersonaBar persona="librarian" brandName={scopeName} mode="idle" />
+              <KnowledgeEditor key={`knowledge-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
+            </div>
           )}
 
 
@@ -1052,12 +1079,29 @@ export default function BrandsPage() {
                       Running / Paused: show ONLY the brain panel.
                       Done: brain panel above + tiles below (so user sees results immediately). */}
                   {pipeline.status === "idle" && (
-                    <PositioningTopRow
-                      brandId={(scope?.brandId ?? brandId) as number | null}
-                      scopeMode={scopeMode}
-                      locked={!!tabLocks.positioning}
-                      onLockToggle={() => handleLockToggle("positioning")}
-                    />
+                    <>
+                      {/* Persistent strategist persona bar even when idle —
+                          the workspace always feels staffed by a 4A-style
+                          strategy lead, who introduces the 奧品牌定位 method. */}
+                      <AgentPersonaBar
+                        persona="strategist"
+                        brandName={scopeName}
+                        mode="idle"
+                        message={
+                          scopeMode === "product"
+                            ? "為這個產品做定位 — 6 步從族群痛點推導出獨家賣點，作為文案 / 視覺的依據。"
+                          : scopeMode === "event"
+                            ? "為這場活動做定位 — 11 步從背景與受眾推導出 SMP（單一核心命題），再展開訊息架構與創意。"
+                          : "我會用奧品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」 — 鎖定後，所有內容都會以此為基礎產出。"
+                        }
+                      />
+                      <PositioningTopRow
+                        brandId={(scope?.brandId ?? brandId) as number | null}
+                        scopeMode={scopeMode}
+                        locked={!!tabLocks.positioning}
+                        onLockToggle={() => handleLockToggle("positioning")}
+                      />
+                    </>
                   )}
 
                   {scopeMode !== "none" && pipelineSteps.length > 0 && pipeline.status !== "idle" && (
@@ -1080,6 +1124,16 @@ export default function BrandsPage() {
                       onResume={resumePipeline}
                       onSkip={skipPipeline}
                       onStop={stopPipeline}
+                    />
+                  )}
+
+                  {/* 2026-05-11 (reviewer feedback「從定位到內容產出的連結是斷裂的」):
+                      bridge banner shown after pipeline completes — makes the
+                      causal chain "定位 → 30s / 60s / 企劃台" visible. */}
+                  {pipeline.status === "done" && (
+                    <PositioningCompletionBridge
+                      brandId={(scope?.brandId ?? brandId) as number | null}
+                      scopeMode={scopeMode}
                     />
                   )}
 
@@ -1338,8 +1392,11 @@ export default function BrandsPage() {
               receives the resolved brandId regardless of active scope. */}
           {derivedCategory === "copy" && activeBrandIdForLocks && (
             <>
+              <div style={{ padding: "16px 28px 0" }}>
+                <AgentPersonaBar persona="copywriter" brandName={scopeName} mode="idle" />
+              </div>
               {scopeMode !== "brand" && (
-                <div className="max-w-[1100px] mx-auto px-6 pt-4">
+                <div className="max-w-[1100px] mx-auto px-6 pt-2">
                   <div className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 text-xs text-sky-900">
                     💡 文字資產屬於品牌共用 — 在這裡編輯會影響此品牌下所有產品 / 活動。
                   </div>
@@ -2051,6 +2108,92 @@ function buildPromptsPreview(seg?: Record<string, any>): { node: React.ReactNode
     ),
     hasContent: true,
   };
+}
+
+/* ────────────────── PositioningCompletionBridge ──────────────────
+   Renders right after the 14-step pipeline finishes — closes the loop
+   between "定位完成" and "內容產出". Makes the methodology→content
+   causality explicit (reviewer feedback 2026-05-11).
+   ────────────────────────────────────────────────────────────────── */
+function PositioningCompletionBridge({
+  brandId, scopeMode,
+}: { brandId: number | null; scopeMode: "brand"|"product"|"event"|"none" }) {
+  const navigate = useNavigate();
+  if (!brandId) return null;
+  const scopeLabel = scopeMode === "product" ? "產品定位" : scopeMode === "event" ? "活動定位" : "品牌定位";
+  return (
+    <div
+      style={{
+        background: "#FAFAF9",
+        border: "1px solid #171717",
+        borderRadius: 14,
+        padding: "20px 24px",
+        display: "flex",
+        alignItems: "center",
+        gap: 20,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+        <p style={{
+          fontSize: 10, fontWeight: 600, color: "#737373",
+          letterSpacing: "0.25em", textTransform: "uppercase",
+          marginBottom: 6,
+        }}>
+          Positioning Locked · Ready for Production
+        </p>
+        <h3 style={{
+          fontSize: 18, fontWeight: 700, color: "#171717",
+          letterSpacing: "-0.01em", marginBottom: 4,
+        }}>
+          你的{scopeLabel}已備好，AI 知道每篇文章該說什麼了
+        </h3>
+        <p style={{
+          fontSize: 13, lineHeight: 1.65, color: "#525252",
+          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+          maxWidth: 620,
+        }}>
+          這份定位現在會自動成為 30s 快寫、60s 製作包、99s 全企劃、企劃台 的內容骨架 —
+          每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。
+        </p>
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <BridgeBtn label="30s 快寫" onClick={() => navigate(`/b/${brandId}/30s`)} primary />
+        <BridgeBtn label="60s 製作包" onClick={() => navigate(`/b/${brandId}/60s`)} />
+        <BridgeBtn label="99s 全企劃" onClick={() => navigate(`/b/${brandId}/99s`)} />
+        <BridgeBtn label="企劃台" onClick={() => navigate(`/b/${brandId}/theater`)} />
+      </div>
+    </div>
+  );
+}
+
+function BridgeBtn({ label, onClick, primary }: { label: string; onClick: () => void; primary?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "8px 14px",
+        fontSize: 12,
+        fontWeight: 600,
+        letterSpacing: "0.04em",
+        borderRadius: 6,
+        cursor: "pointer",
+        border: "1px solid #171717",
+        background: primary ? "#171717" : "#FFFFFF",
+        color: primary ? "#FFFFFF" : "#171717",
+        transition: "background 0.15s",
+      }}
+      onMouseEnter={(e) => {
+        if (primary) e.currentTarget.style.background = "#262626";
+        else e.currentTarget.style.background = "#F5F5F4";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = primary ? "#171717" : "#FFFFFF";
+      }}
+    >
+      {label} →
+    </button>
+  );
 }
 
 /* Editorial section label — tiny eyebrow + thin rule, optional counter chip. */
@@ -2967,12 +3110,20 @@ function PositioningTopRow({
   };
 
   const totalSteps = entityKind === "brand" ? 14 : entityKind === "product" ? 6 : 4;
+  // 2026-05-11 (reviewer:「重新自動定位 可以更名... 強調套用奧品牌定位框架」)
+  // — frame the button as applying a named methodology, not as a generic
+  // "AI fills it in" action. Methodology becomes the competitive moat.
+  const methodLabel = entityKind === "brand"
+    ? "奧品牌定位法（14 步）"
+    : entityKind === "product"
+      ? "產品定位框架（6 步）"
+      : "活動定位框架（11 步）";
   const buttonLabel =
     optimisticStarting && !jobData?.status ? "啟動中…"
-  : isRunning ? `自動定位中 (${cur}/${total || totalSteps})…`
-  : isDone     ? "重新自動定位"
-  : isFailed   ? "重試自動定位"
-  : "自動定位";
+  : isRunning ? `分析中 ${cur}/${total || totalSteps}`
+  : isDone     ? `重新套用${methodLabel}`
+  : isFailed   ? `重試 — ${methodLabel}`
+  : `套用${methodLabel}`;
 
   return (
     <>
