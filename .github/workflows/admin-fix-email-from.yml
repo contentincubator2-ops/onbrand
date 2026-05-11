@@ -1,0 +1,45 @@
+name: Admin — Switch EMAIL_FROM to noreply@sowork.ai (Resend verified domain)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+
+            echo "── BEFORE ──"
+            grep "^EMAIL_FROM=" .env
+
+            sed -i 's/^EMAIL_FROM=.*/EMAIL_FROM=noreply@sowork.ai/' .env
+
+            echo ""
+            echo "── AFTER ──"
+            grep "^EMAIL_FROM=" .env
+
+            echo ""
+            echo "── pm2 restart (load new env) ──"
+            pm2 restart marketing-os --update-env 2>&1 | tail -3
+            sleep 3
+            pm2 status | grep marketing-os
+
+            echo ""
+            echo "── Smoke test: send to cjwang@sowork.tw ──"
+            RESEND_KEY=$(grep "^RESEND_API_KEY=" .env | head -1 | cut -d= -f2-)
+            curl -sS --max-time 10 -X POST https://api.resend.com/emails \
+              -H "Authorization: Bearer $RESEND_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "from": "Drop 秒稿 <noreply@sowork.ai>",
+                "to": ["cjwang@sowork.tw"],
+                "subject": "Drop 秒稿 寄件測試",
+                "html": "<p>如果你收到這封，寄信功能修好了。可以開始用「寄給團隊」按鈕。</p>"
+              }' | head -c 300
