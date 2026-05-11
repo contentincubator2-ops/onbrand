@@ -136,28 +136,128 @@ function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
   return "qwen"; // safe default
 }
 
+/**
+ * Field-level char caps so a single huge field can't blow the persona
+ * budget. Total persona budget is PERSONA_TOTAL_CAP — we walk fields in
+ * priority order and stop when budget hits zero.
+ */
+const PERSONA_TOTAL_CAP = 5000;
+const FIELD_CAPS: Record<string, number> = {
+  bio:              500,
+  specialty:        1500,
+  methodology:      1500,
+  experienceDetail: 600,
+  workingPrinciples:1000,
+  specialtySummary: 400,
+  tool_instructions:800,
+  bio_zh:           300,
+  caseStudies:      800,   // applied to JSON-stringified body
+  taskSystemPrompt: 2000,  // canonical work manual when present
+};
+
+/** Trim a single string field to its cap, with "…" suffix if cut. */
+function trimField(s: string | null | undefined, cap: number): string {
+  if (!s) return "";
+  const t = String(s).trim();
+  if (t.length <= cap) return t;
+  return t.slice(0, cap - 1).trimEnd() + "…";
+}
+
+/** Render caseStudies JSON as a human-readable summary chunk. */
+function renderCaseStudies(raw: any): string {
+  if (!raw) return "";
+  let arr: any;
+  try { arr = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return ""; }
+  if (!Array.isArray(arr)) return "";
+  const lines: string[] = [];
+  for (const cs of arr.slice(0, 5)) {
+    if (!cs) continue;
+    const brand = cs.brand ?? cs.client ?? "";
+    const result = cs.result ?? cs.outcome ?? cs.summary ?? "";
+    const role = cs.role ?? "";
+    const yr = cs.year ?? "";
+    const parts = [brand, role, yr].filter(Boolean).join(" · ");
+    if (parts || result) lines.push(`- ${parts}${parts ? "：" : ""}${result}`);
+  }
+  return lines.join("\n");
+}
+
 export async function loadAgent(id: number | null | undefined): Promise<{ meta: AgentMeta | null; persona: string; aiModel: string | null }> {
   if (!id) return { meta: null, persona: "", aiModel: null };
   try {
+    // 2026-05-12 (CJ「都是有完整經歷的人」+ "我要的是全站任務都同一個標準"):
+    // pull ALL 10 rich text fields, not just 4. The agents table has
+    // experienceDetail, workingPrinciples, specialtySummary, tool_instructions,
+    // bio_zh, caseStudies JSON — previously ignored. Total persona is
+    // capped at PERSONA_TOTAL_CAP chars so even the thickest agent
+    // (Amy Su, 7811 char) fits within first-token budget (~5000 chars
+    // ≈ 1700 tokens ≈ 200-500ms latency add).
     const [rows]: any = await localPool.execute(
-      `SELECT id, name, title, bio, specialty, methodology, taskSystemPrompt, aiModel, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
+      `SELECT id, name, title, bio, specialty, methodology, taskSystemPrompt,
+              experienceDetail, workingPrinciples, specialtySummary,
+              tool_instructions, bio_zh, caseStudies,
+              aiModel, avatarUrl
+       FROM agents WHERE id = ? LIMIT 1`,
       [id],
     );
     const a = (rows as any[])?.[0];
     if (!a) return { meta: null, persona: "", aiModel: null };
-    // taskSystemPrompt is the agent's full role manual (200-500w). When
-    // present it dominates — it IS the writing instruction set. bio /
-    // specialty / methodology become identity flavor.
-    const taskBlock = a.taskSystemPrompt
-      ? `\n# 你的工作守則（必讀，違反等於失敗）\n${a.taskSystemPrompt}\n`
-      : "";
+
+    // Build sections in priority order. taskSystemPrompt is most authoritative;
+    // workingPrinciples + methodology are second; bio + specialty are identity.
+    const sections: Array<{ label: string; body: string }> = [];
+    const push = (label: string, body: string) => {
+      if (body.trim()) sections.push({ label, body });
+    };
+    push("背景",         trimField(a.bio,             FIELD_CAPS.bio!));
+    push("中文背景",     trimField(a.bio_zh,          FIELD_CAPS.bio_zh!));
+    push("專長",         trimField(a.specialty,       FIELD_CAPS.specialty!));
+    push("專長摘要",     trimField(a.specialtySummary,FIELD_CAPS.specialtySummary!));
+    push("經歷",         trimField(a.experienceDetail,FIELD_CAPS.experienceDetail!));
+    push("方法論",       trimField(a.methodology,     FIELD_CAPS.methodology!));
+    push("工作原則",     trimField(a.workingPrinciples,FIELD_CAPS.workingPrinciples!));
+    push("工具與流程",   trimField(a.tool_instructions,FIELD_CAPS.tool_instructions!));
+    push("代表案例",     trimField(renderCaseStudies(a.caseStudies), FIELD_CAPS.caseStudies!));
+
+    // Greedy fill within total cap.
+    const header = `你是 ${a.name}，${a.title}。\n`;
+    let body = "";
+    let usedChars = header.length;
+    for (const s of sections) {
+      const chunk = `${s.label}：${s.body}\n`;
+      if (usedChars + chunk.length > PERSONA_TOTAL_CAP) {
+        // Try to squeeze in a trimmed version
+        const remaining = PERSONA_TOTAL_CAP - usedChars - s.label.length - 4;
+        if (remaining > 80) {
+          const cut = trimField(s.body, remaining);
+          const partial = `${s.label}：${cut}\n`;
+          body += partial;
+          usedChars += partial.length;
+        }
+        break;
+      }
+      body += chunk;
+      usedChars += chunk.length;
+    }
+
+    // taskSystemPrompt goes last, with a distinct heading. If we'd overflow,
+    // truncate but still always include it because it's the work-manual.
+    let tsp = trimField(a.taskSystemPrompt, FIELD_CAPS.taskSystemPrompt!);
+    if (tsp) {
+      const tspHeader = `\n# 工作守則（必讀，違反等於失敗）\n`;
+      const budgetLeft = PERSONA_TOTAL_CAP - usedChars - tspHeader.length;
+      if (budgetLeft < tsp.length && budgetLeft > 100) {
+        tsp = trimField(tsp, budgetLeft);
+      } else if (budgetLeft <= 100) {
+        tsp = ""; // no room
+      }
+    }
+
     const persona =
-      `你是 ${a.name}，${a.title}。\n` +
-      (a.bio ? `背景：${a.bio}\n` : "") +
-      (a.specialty ? `專長：${a.specialty}\n` : "") +
-      (a.methodology ? `方法論：${a.methodology}\n` : "") +
-      taskBlock +
-      `用你的口氣寫，不要寫得像通用 AI。\n\n`;
+      header + body +
+      (tsp ? `\n# 工作守則（必讀，違反等於失敗）\n${tsp}\n` : "") +
+      `\n用你的口氣寫，不要寫得像通用 AI。\n\n`;
+
     return {
       meta: { id: a.id, name: a.name, title: a.title, avatarUrl: a.avatarUrl ?? null },
       persona,

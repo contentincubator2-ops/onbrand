@@ -1,0 +1,38 @@
+name: Admin — Find brand 你好中文 (correct brand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            echo "════════ 搜尋 name LIKE '%你好%' ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT id, userId, name, industry, website, socialLinks,
+                     LEFT(description, 80) AS description,
+                     positioningStatus, LEFT(positioningSummary, 80) AS positioning,
+                     tagline, createdAt
+              FROM brands
+              WHERE name LIKE '%你好%' OR name LIKE '%中文%' OR name LIKE '%hello%' OR name LIKE '%nihao%'
+              ORDER BY id DESC LIMIT 10
+            \G"
+
+            echo ""
+            echo "════════ CJ (userId=199) 最近 10 個 brand ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT id, name, industry, website,
+                     CHAR_LENGTH(IFNULL(socialLinks, '')) AS social_len,
+                     positioningStatus, createdAt
+              FROM brands
+              WHERE userId = 199
+              ORDER BY id DESC LIMIT 10
+            "
