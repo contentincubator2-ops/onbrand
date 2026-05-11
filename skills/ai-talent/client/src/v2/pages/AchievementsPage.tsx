@@ -81,10 +81,43 @@ export default function AchievementsPage() {
           <ChevronLeft size={16} /> 返回
         </button>
 
-        {/* Top stats */}
+        {/* 2026-05-11 (CJ): canonical header template — same as /30s · /60s · /99s. */}
+        <div className="text-center mb-8">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+            ACHIEVEMENTS · ROUTES
+          </p>
+          <h1
+            className="font-semibold tracking-tight leading-tight mx-auto"
+            style={{
+              fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            你的成就
+          </h1>
+          <p
+            className="mt-3 mx-auto text-default-700"
+            style={{
+              fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+              fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
+            }}
+          >
+            完成所有路線 = 你已經是 Drop 高手
+          </p>
+          <p
+            className="mt-2 mx-auto text-default-700"
+            style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
+          >
+            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>路線：</span>
+            7 條 + 18 個成就 · 解完後系統會送你獎勵
+          </p>
+        </div>
+
+        {/* Progress block */}
         <div className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
-          <h1 className="text-2xl font-bold text-neutral-900 mb-1">你的成就</h1>
-          <p className="text-sm text-neutral-500 mb-6">完成所有路線 = 你已經是 Drop 高手</p>
 
           {progress ? (
             <>

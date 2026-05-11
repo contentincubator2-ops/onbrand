@@ -800,19 +800,22 @@ export default function BrandsPage() {
               one-line methodology manifesto. Engine stats moved to admin /
               about page. Manifesto makes the methodology→content causality
               the headline, not "we have N things". */}
-          {/* 2026-05-11 (CJ「文字渲染的方式，要跟 30S 相同」): aligned to
-              /30s subtitle exactly — same serif italic 14/1.7, no bold span. */}
+          {/* Canonical subtitle — same rendering as /30s · /60s · /99s · /theater · /projects · /missions. */}
           <p
-            className="mt-3 mb-5 mx-auto text-default-700"
+            className="mt-3 mx-auto text-default-700"
             style={{
               fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-              fontStyle: "italic",
-              fontSize: 14,
-              lineHeight: 1.7,
-              maxWidth: 640,
+              fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
             }}
           >
             SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼
+          </p>
+          <p
+            className="mt-2 mb-5 mx-auto text-default-700"
+            style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
+          >
+            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>包含：</span>
+            14 步定位 · 文字 / 視覺 / 知識資產 · AI 指令庫
           </p>
 
           {/* 2026-05-11 (CJ「搜尋 BAR 不需要了」): BrandMessageBar removed.

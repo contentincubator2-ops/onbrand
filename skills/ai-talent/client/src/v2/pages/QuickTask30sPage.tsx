@@ -696,14 +696,15 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     return false;
   }, [brandQuery?.data, scopeActiveQuery?.data]);
 
-  const tierKicker = tier === "30s" ? "30 秒搞定一篇貼文"
-    : tier === "60s" ? "60 秒做完一個完整製作包"
-    : "99 秒交付一個 campaign 級內容";
+  // 2026-05-11 (CJ「字數儘量精簡」): trimmed subtitle copy.
+  const tierKicker = tier === "30s" ? "30 秒一篇貼文"
+    : tier === "60s" ? "60 秒一個製作包"
+    : "99 秒一個 campaign";
   const heroSubtitle = !brandId
-    ? "SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼"
+    ? "先鎖定你是誰，AI 才知道每篇文章要說什麼"
     : positioningReady
       ? `以 ${brandName ?? "你的品牌"} 的定位為骨架，${tierKicker}`
-      : `建議先完成 ${brandName ?? "這個品牌"} 的定位 — 完成後產出會以方法論為骨架，現在跑也行，但會偏通用`;
+      : `先完成 ${brandName ?? "這個品牌"} 的定位，AI 產出才會像你`;
 
   // 2026-05-11 (CJ reviewer 反饋:「30s / 60s / 99s 的差異我看不清楚」):
   // tier-specific eyebrow + concrete "when to use" example so users
@@ -711,11 +712,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const tierEyebrow = tier === "30s" ? "30S · QUICK CAPTION"
     : tier === "60s" ? "60S · PRODUCTION PACK"
     : "99S · CAMPAIGN";
+  // 2026-05-11 (CJ「字數儘量精簡」): trimmed copy.
   const tierWhenToUse = tier === "30s"
-    ? "適合：日常單篇貼文、追熱點、客戶感謝、緊急發文 — 1 個 caption + 1 張圖風格 brief"
+    ? "日常單篇 · 追熱點 · 客戶感謝 · 緊急發文"
     : tier === "60s"
-      ? "適合：值得花時間打磨的單篇 — 5 個 variant 挑選 + 完整視覺 brief + QA"
-      : "適合：30 天月曆、活動 launch 包、IG 帳號重新定位 — 整個 campaign";
+      ? "值得打磨的單篇 · 5 變體 + 視覺 brief + QA"
+      : "30 天月曆 · 活動 launch 包 · IG 帳號重新定位";
 
   return (
     <div>
@@ -772,14 +774,15 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                 「30s / 60s / 99s 的差異我看不清楚」. Sans-serif (utility),
                 small + neutral so it sits as supplementary metadata. */}
             <p
-              className="mt-2 mx-auto text-default-600"
+              className="mt-2 mx-auto text-default-700"
               style={{
-                fontSize: 12.5,
-                lineHeight: 1.6,
-                maxWidth: 640,
+                fontSize: 12, lineHeight: 1.55, maxWidth: 640,
+                letterSpacing: "0.02em",
               }}
             >
-              <span style={{ fontWeight: 600, color: "#171717" }}>什麼時候用：</span>
+              <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
+                適合：
+              </span>
               {tierWhenToUse}
             </p>
           </div>

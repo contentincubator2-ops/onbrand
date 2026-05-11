@@ -161,8 +161,9 @@ export default function ProjectsPage() {
       {/* ─── Hero (matches /30s / /brands rhythm) ─────────────────── */}
       <div className="relative pt-10 pb-5 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center max-w-[1100px] mx-auto">
-          <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-            SoWork · PROJECTS
+          {/* 2026-05-11 (CJ): canonical header template — same as /30s / /60s / /99s. */}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+            PROJECTS · OUTPUTS
           </p>
           <h1
             className="font-semibold tracking-tight leading-none mb-3"
@@ -174,10 +175,23 @@ export default function ProjectsPage() {
               backgroundClip: "text",
             }}
           >
-            專案
+            你做過的每一篇都在這
           </h1>
-          <p className="text-small text-default-500 mb-5">
-            你做過的內容都在這 — 30s / 60s / 99s / 企劃台 的產出自動進入專案。
+          <p
+            className="mt-3 mx-auto text-default-700"
+            style={{
+              fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+              fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
+            }}
+          >
+            30s / 60s / 99s / 企劃台 的產出自動歸檔到這裡
+          </p>
+          <p
+            className="mt-2 mb-5 mx-auto text-default-700"
+            style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
+          >
+            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>適合：</span>
+            找上週做過的東西 · 重跑同任務 · 整理待發內容
           </p>
 
           {/* Single search bar */}

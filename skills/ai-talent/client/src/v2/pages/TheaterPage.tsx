@@ -1258,25 +1258,42 @@ export default function TheaterPage() {
         </div>
       )}
 
-      {/* Top bar — controls */}
-      <div className="max-w-[1400px] mx-auto px-6 pt-6 pb-4">
+      {/* 2026-05-11 (CJ「每一個功能按下去，標題 header 樣式都長這樣」):
+          canonical header template — eyebrow / gradient title / serif
+          subtitle / when-to-use line. Same as /30s · /60s · /99s. */}
+      <div className="max-w-[1400px] mx-auto px-6 pt-10 pb-4">
         <div className="flex items-end justify-between flex-wrap gap-4 mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
-              內容企劃台
-            </h1>
-            {/* 2026-05-11 (CJ「最後一公里斷掉」): tech-spec ("20 位 agents")
-                replaced with methodology value-prop tying back to /brands. */}
-            <p
-              className="mt-1 text-neutral-700"
+          <div className="text-center mx-auto" style={{ flex: "1 1 auto" }}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+              THEATER · 7 DAYS
+            </p>
+            <h1
+              className="font-semibold tracking-tight leading-tight"
               style={{
-                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                fontStyle: "italic",
-                fontSize: 14,
-                lineHeight: 1.65,
+                fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
               }}
             >
-              以 {brandName ?? "你的品牌"} 的定位為骨架，編排 7 天跨平台內容
+              這 7 天，要怎麼跨平台說品牌故事？
+            </h1>
+            <p
+              className="mt-3 mx-auto text-default-700"
+              style={{
+                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
+              }}
+            >
+              以 {brandName ?? "你的品牌"} 的定位為骨架，編排 7 天內容
+            </p>
+            <p
+              className="mt-2 mx-auto text-default-700"
+              style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
+            >
+              <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>適合：</span>
+              月度節奏 · 活動週 · 多平台主敘事弧
             </p>
           </div>
           <div className="flex items-center gap-2">

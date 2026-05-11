@@ -459,8 +459,9 @@ export default function MissionsHome() {
 
           {/* Headline — 32px, centered */}
           <div className="mb-6 w-full">
-            <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-              SoWork · Drop 秒稿
+            {/* Canonical header template — eyebrow / gradient title / serif subtitle / 適合 line. */}
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+              MISSIONS · PLAY
             </p>
             <h1
               className="font-semibold tracking-tight leading-tight text-center"
@@ -472,23 +473,23 @@ export default function MissionsHome() {
                 backgroundClip: "text",
               }}
             >
-              今天，想將哪個策略付諸實現？
+              今天，要實現哪個策略？
             </h1>
-            {/* 2026-05-11 (CJ「最後一公里斷掉」): replaced tech-spec stats
-                with the same methodology value-prop pattern used on
-                /30s · /60s · /99s — keeps the SoWork brand-method
-                narrative continuous from /brands through every task page. */}
             <p
               className="mt-3 mx-auto text-default-700"
               style={{
                 fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                fontStyle: "italic",
-                fontSize: 14,
-                lineHeight: 1.7,
-                maxWidth: 640,
+                fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
               }}
             >
-              以你的品牌定位為骨架，把策略翻成每一篇可發出去的內容
+              以你的品牌定位為骨架，把策略翻成可發出去的內容
+            </p>
+            <p
+              className="mt-2 mx-auto text-default-700"
+              style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
+            >
+              <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>適合：</span>
+              既有策略找對應任務 · 跨平台一次規劃
             </p>
           </div>
 
