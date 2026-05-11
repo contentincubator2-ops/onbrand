@@ -67,13 +67,13 @@ export const opsRouter = router({
       if (input.route)  { where.push("route = ?");  params.push(input.route); }
       if (input.level)  { where.push("level = ?");  params.push(input.level); }
       const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
-      params.push(input.limit);
+      const safeLimit1 = Math.max(1, Math.min(500, Number(input.limit) || 100));
       const [rows]: any = await localPool.execute(
         `SELECT id, level, source, route, userId, message,
                 LEFT(stack, 2000) AS stack, meta, fingerprint,
                 createdAt, resolvedAt, resolvedBy
          FROM error_log ${whereSql}
-         ORDER BY id DESC LIMIT ?`,
+         ORDER BY id DESC LIMIT ${safeLimit1}`,
         params,
       );
       return (rows as any[]).map((r) => ({
@@ -163,11 +163,11 @@ export const opsRouter = router({
       const params: any[] = [];
       let where = "";
       if (input.source) { where = "WHERE source = ?"; params.push(input.source); }
-      params.push(input.limit);
+      const safeLimit2 = Math.max(1, Math.min(500, Number(input.limit) || 100));
       const [rows]: any = await localPool.execute(
         `SELECT id, level, source, userId, message, LEFT(stack, 500) AS stack_preview, createdAt
          FROM error_log ${where}
-         ORDER BY id DESC LIMIT ?`,
+         ORDER BY id DESC LIMIT ${safeLimit2}`,
         params,
       );
       return rows;

@@ -188,7 +188,9 @@ export const communityRouter = router({
         ? `(SELECT COUNT(*) FROM community_template_uses u WHERE u.templateId = t.id AND u.usedAt > NOW() - INTERVAL 7 DAY) AS trendingScore,`
         : "";
 
-      params.push(input.limit, input.cursor);
+      // 2026-05-10: LIMIT ? + OFFSET ? as prepared params trip MySQL.
+      const safeLimit = Math.max(1, Math.min(200, Number(input.limit) || 50));
+      const safeOffset = Math.max(0, Math.min(100000, Number(input.cursor) || 0));
       const [rows]: any = await localPool.execute(
         `SELECT
             'template' AS source,
@@ -201,7 +203,7 @@ export const communityRouter = router({
           LEFT JOIN users u ON u.id = t.authorUserId
           WHERE ${where.join(" AND ")}
           ORDER BY ${orderBy}
-          LIMIT ? OFFSET ?`,
+          LIMIT ${safeLimit} OFFSET ${safeOffset}`,
         params,
       );
       return (rows as any[]).map((r) => ({ ...r, tags: parseJsonSafe(r.tags) }));
@@ -231,7 +233,7 @@ export const communityRouter = router({
       const orderBy = input.sort === "most-used"
         ? "t.useCount DESC, t.createdAt DESC"
         : "t.createdAt DESC";
-      params.push(input.limit);
+      const safeLimit = Math.max(1, Math.min(200, Number(input.limit) || 100));
       const [rows]: any = await localPool.execute(
         `SELECT
             'template' AS source,
@@ -242,7 +244,7 @@ export const communityRouter = router({
           FROM community_templates t
           WHERE ${where.join(" AND ")}
           ORDER BY ${orderBy}
-          LIMIT ?`,
+          LIMIT ${safeLimit}`,
         params,
       );
       return (rows as any[]).map((r) => ({ ...r, tags: parseJsonSafe(r.tags) }));
@@ -389,13 +391,14 @@ export const communityRouter = router({
     .input(z.object({ limit: z.number().min(1).max(100).default(50) }).optional())
     .query(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
+      const safeLimit = Math.max(1, Math.min(100, Number(input?.limit) || 50));
       const [rows]: any = await localPool.execute(
         `SELECT id, title, kind, tier, platform, visibility, featured,
                 useCount, likeCount, creditsEarned, status, createdAt
          FROM community_templates
          WHERE authorUserId = ?
-         ORDER BY id DESC LIMIT ?`,
-        [ctx.user.id, input?.limit ?? 50],
+         ORDER BY id DESC LIMIT ${safeLimit}`,
+        [ctx.user.id],
       );
       return rows;
     }),

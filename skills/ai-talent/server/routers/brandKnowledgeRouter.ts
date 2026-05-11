@@ -428,11 +428,14 @@ export async function loadBrandKnowledgeForPrompt(
   budgetChars = 80_000,
 ): Promise<string> {
   try {
+    // 2026-05-10: LIMIT ? as prepared param triggers 'Incorrect arguments
+    // to mysqld_stmt_execute' on MySQL — inline the constant.
+    const safeLimit = Math.max(1, Math.min(1000, Number(MAX_ITEMS_PER_BRAND) || 100));
     const [rows]: any = await localPool.execute(
       `SELECT title, body, sourceUrl FROM brand_knowledge_items
         WHERE brandId = ?
-        ORDER BY createdAt DESC LIMIT ?`,
-      [brandId, MAX_ITEMS_PER_BRAND],
+        ORDER BY createdAt DESC LIMIT ${safeLimit}`,
+      [brandId],
     );
     const items = rows as any[];
     if (!items.length) return "";

@@ -26,7 +26,7 @@ import {
   faBolt, faClipboard, faClipboardCheck, faClock, faPaperPlane,
   faRotateRight, faXmark, faStar, faChevronLeft, faChevronRight,
   faMagnifyingGlass, faEnvelope, faRocket, faBullhorn, faUsers,
-  faFolderPlus, faCompass,
+  faFolderPlus, faCompass, faHandshake,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -152,7 +152,7 @@ interface FBTaskCard {
 }
 
 type Tier = "30s" | "60s" | "100s";
-type Channel = "facebook" | "instagram" | "youtube" | "tiktok" | "linkedin" | "email" | "pr" | "audience" | "brand" | "all";
+type Channel = "facebook" | "instagram" | "youtube" | "tiktok" | "linkedin" | "email" | "pr" | "audience" | "brand" | "kol" | "all";
 
 interface ChannelTile {
   id: Channel;
@@ -175,6 +175,8 @@ const CHANNEL_TILES: ChannelTile[] = [
   { id: "linkedin",   label: "LinkedIn",   icon: faLinkedinIn,  bg: "#0A66C2", enabled: true  },
   { id: "email",      label: "電子報",     icon: faEnvelope,    bg: "#7B5BC8", enabled: true  },
   { id: "pr",         label: "新聞稿",     icon: faBullhorn,    bg: "#475569", enabled: true  },
+  // 2026-05-12 (CJ「KOL 提供說法不提供名單」): outreach talking points tile
+  { id: "kol",        label: "KOL 邀約",   icon: faHandshake,   bg: "#9333EA", enabled: true  },
   // 品牌定位 + 用戶研究 隸屬 /brands workspace，不再出現在產出 tier。
   // { id: "brand",    label: "品牌定位",   icon: faRocket,      bg: "#7C3AED", enabled: true  },
   // { id: "audience", label: "用戶研究",   icon: faUsers,       bg: "#E07B0F", enabled: true  },
@@ -496,7 +498,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           });
           // Same channel→mockup-platform normalization as the orchestra path
           const SQUAD_CHANNEL_MAP: Record<string, string> = {
-            pr: "press", brand: "generic", audience: "generic",
+            pr: "press", brand: "generic", audience: "generic", kol: "generic",
           };
           const rawPlat = (activeTask as any).platform ?? "facebook";
           const platform = SQUAD_CHANNEL_MAP[rawPlat] ?? rawPlat;
@@ -563,6 +565,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           pr:       "press",    // 新聞稿 → minimalist press-release mockup
           brand:    "generic",  // 品牌定位 → generic doc mockup (taglines / value prop)
           audience: "generic",  // 用戶研究 → generic doc mockup (interviews / personas)
+          kol:      "generic",  // 2026-05-12 KOL 訊息 / brief → generic message mockup
         };
         const rawTaskPlatform =
           (activeTask as any).platform ??

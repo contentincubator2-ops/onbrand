@@ -437,6 +437,89 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "press" },
   },
+
+  // ─── 2026-05-12 (CJ「競品截圖」)──────────────────────────────
+  // 競品廣告偵察 — 用 LLM web search 撈 Meta Ads Library 公開資料，
+  // 不直接 scrape（避免 TOS 風險）。資料量大時請求 Claude 搭 web_search
+  // 翻譯成可讀的競品 report。
+  {
+    id: "rs-100-competitor-ads",
+    tier: "100s", postType: "press",
+    label: { en: "Competitor Ad Intelligence", zh: "競品廣告偵察報告（Meta Ads Library）" },
+    description: "撈最多 5 個競品在 Meta Ads Library 的近期投放 → LLM 分析比例 / 訴求 / 視覺",
+    agent_id: 90006, skill_slug: "competitive-intel",
+    primary_question: "要監測哪些競品？（最多 5 個品牌名，用逗號分隔）",
+    primary_input: {
+      key: "competitor_brands",
+      placeholder: "例：屈臣氏, 康是美, 86 小舖",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "competitor_brands", label: "競品品牌", type: "textarea", required: true,
+        placeholder: "用逗號分隔，最多 5 個" },
+      { key: "focus", label: "想看什麼？（選填）", type: "textarea", required: false,
+        placeholder: "投放節奏 / 訴求語氣 / 視覺風格 / 廣告類型分佈 / 全部" },
+    ],
+    contextSources: [
+      "brand.positioning.competition.direct",
+      "brand.positioning.differentiation",
+    ],
+    systemPrompt: `產出競品廣告偵察報告其中 1 部分（300-600 字）。本次你寫的是「{label}」。
+
+**資料來源（請呼叫 web_search）：**
+請對每個競品搜尋 \`site:facebook.com/ads/library/ <品牌名>\` 或直接訪問
+\`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=TW&q=<競品>\`
+撈該品牌近 30-90 天在台灣投放的廣告（含創意縮圖描述、文案、投放開始日）。
+
+**輸出結構**（依本步驟所屬段落）：
+- 投放節奏：每個競品幾支廣告、頻率、新舊比
+- 訴求分析：情感 vs 功能 / 折扣 vs 故事 / hook 套路
+- 視覺風格：色調、版面、人物 vs 產品為主
+- 廣告類型分佈：圖片 / 影片 / 輪播 / Reels
+- 機會點：我方差異 vs 競品空白
+${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 1500,
+    outputDefaults: { platform: "press", post_type: "press" },
+  },
+
+  // ─── 2026-05-12 (CJ「KOL 我們提供說法，不提供名單」)──────────
+  {
+    id: "kl-100-campaign-toolkit",
+    tier: "100s", postType: "press",
+    label: { en: "KOL Campaign Toolkit", zh: "KOL Campaign 完整話術包" },
+    description: "多 KOL 分層邀請 + 漏斗訊息 + brief 模板 + 報價回應 + 結案報告",
+    agent_id: 30015, skill_slug: "kol-outreach", // Tom Chang — KOL Word-of-Mouth (2274 char)
+    primary_question: "活動主題 + 預計合作量級？",
+    primary_input: {
+      key: "campaign_brief",
+      placeholder: "例：5 月母親節活動，想找 5 位媽媽育兒 KOL，預算共 30 萬",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "campaign_brief", label: "活動 brief", type: "textarea", required: true },
+      { key: "kol_tiers", label: "KOL 分層（選填）", type: "text", required: false,
+        placeholder: "例：1 位 100K+ + 2 位 30-100K + 5 位 1-10K" },
+    ],
+    contextSources: [
+      "brand.positioning.voice",
+      "brand.positioning.goldenCircle.why",
+      "brand.positioning.differentiation.summary",
+    ],
+    systemPrompt: `產出 KOL Campaign Toolkit 其中 1 部分（400-700 字）。
+本次你寫的是「{label}」（邀請開場 / brand brief 模板 / 報價回應 / brief 確認 /
+拍攝期追蹤 / 上稿確認 / 結案感謝 / 結案數據要求）。
+
+我們**不**幫客戶找 KOL 名單。我們提供：
+- 怎麼開場（不被當業配機器拒絕）
+- 怎麼給 brief（KOL 能拍但不偏離品牌）
+- 怎麼回應報價（守得住但不傷關係）
+- 怎麼收尾（讓 KOL 願意再合作）
+
+語氣：尊重、不卑不亢、有 brand pride 但不傲慢。
+${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 1400,
+    outputDefaults: { platform: "press", post_type: "press" },
+  },
 ];
 
 // ─── Orchestra configs ──────────────────────────────────────────────────

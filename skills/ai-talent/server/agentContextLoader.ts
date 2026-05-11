@@ -87,13 +87,15 @@ export async function loadAgentContext(input: AgentContextInput): Promise<AgentC
   }
 
   // ── 3. 任務對話歷史 ────────────────────────────────────────────────────────
+  // 2026-05-10: LIMIT ? as prepared param → MySQL 'Incorrect arguments'. Inline.
+  const safeLimit = Math.max(1, Math.min(500, Number(limit) || 30));
   const [msgRows] = await pool.execute(
     `SELECT role, content, conversationTitle as agentName, createdAt
      FROM chat_messages
      WHERE missionId = ? AND userId = ?
      ORDER BY createdAt DESC
-     LIMIT ?`,
-    [input.missionId, input.userId, limit]
+     LIMIT ${safeLimit}`,
+    [input.missionId, input.userId]
   ) as any[];
   const recentMessages = (msgRows as any[]).reverse().map((r: any) => ({
     role: r.role,

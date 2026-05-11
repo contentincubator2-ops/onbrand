@@ -434,14 +434,146 @@ export const RESEARCH_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 };
 
+// ─── 2026-05-12 (CJ「跨平台 / A/B / KOL 都加進 60s」) ──────────────
+// Cross-post, A/B test, and KOL pitch — three power-user 60s tasks.
+// All use 2-input intake (primary + 1 secondary) which the modal
+// already supports via `inputs[1]`.
+const CW_IMG = 60030;   // re-use BR_IMG slot for now
+export const CROSS_60S_TASKS: FBTaskTemplate[] = [
+  {
+    id: "cw-60-crosspost-4platform",
+    tier: "60s", postType: "feed",
+    label: { en: "Cross-Post 4 Platforms", zh: "跨平台一稿四發（FB/IG/Threads/LinkedIn）" },
+    description: "同一主題 → 4 個平台的適配版本（tone / 長度 / hashtag 都不同）",
+    agent_id: 30020, skill_slug: "cross-platform-copy",
+    primary_question: "今天要分享什麼？",
+    primary_input: {
+      key: "topic", placeholder: "主題 / 訊息 / 原文 URL", type: "textarea",
+    },
+    inputs: [
+      { key: "topic", label: "主題 / 訊息", type: "textarea", required: true },
+      { key: "platforms", label: "要哪幾個平台？（選填，預設全選）", type: "text", required: false,
+        placeholder: "FB, IG, Threads, LinkedIn（用逗號分隔，留空 = 全部）" },
+    ],
+    contextSources: [
+      "brand.positioning.voice",
+      "brand.positioning.audience.primary",
+    ],
+    systemPrompt: `產出跨平台 4 版貼文中的 1 版。本次你寫的是「{label}」。
+
+平台適配規則（每個 variant 對應一個平台）：
+- **FB**     中長文（150-250 字），人話、有 hook、CTA 自然，最多 3 hashtags
+- **IG**     短文（80-150 字），情感先行、多斷行、5-8 hashtags
+- **Threads** 口語短文（60-100 字），對話感、最多 1-2 hashtag
+- **LinkedIn** 專業中長（200-400 字），有觀點 / 數據 / 結論，0-2 hashtag
+
+同主題、不同切角 — 不要 4 篇講一樣的話。語氣全部貼合品牌 voice。${TONE("Cross")}`,
+    preferredModel: "qwen", maxTokens: 1100,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+  {
+    id: "cw-60-ab-variants",
+    tier: "60s", postType: "feed",
+    label: { en: "A/B Test Variants", zh: "A/B 雙版本對比測試" },
+    description: "從不同 angle 寫兩版 + 「哪版會贏」分析 + 建議測試設定",
+    agent_id: 30020, skill_slug: "ab-testing",
+    primary_question: "要測什麼主題？",
+    primary_input: { key: "topic", placeholder: "主題 / 原文 / URL", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "主題 / 訊息", type: "textarea", required: true },
+      { key: "test_axis", label: "想測什麼面向？（選填）", type: "text", required: false,
+        placeholder: "情感 vs 理性 / 短 vs 長 / 故事 vs 數據 / 直球 vs 暗示" },
+    ],
+    contextSources: [
+      "brand.positioning.voice",
+      "brand.positioning.audience.primary",
+    ],
+    systemPrompt: `產出 A/B 雙版本對比，本次你寫的是「{label}」變體之一（A 版或 B 版）。
+
+每個 variant 必須三段，用 \`||\` 分隔：
+1. 完整貼文（150-250 字）
+2. 「為什麼這版可能贏」（30-60 字假設）
+3. 建議測試設定（50/50 分流 N 天，觀察互動率 / 留言質量 / 點擊率）
+
+兩版必須真正不同：不只是換詞，是換 angle（情感 vs 理性 / 短 vs 長 / 等）。${TONE("AB")}`,
+    preferredModel: "qwen", maxTokens: 900,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+];
+
+const KOL_IMG = 60030;
+export const KOL_60S_TASKS: FBTaskTemplate[] = [
+  {
+    id: "kl-60-pitch-pack",
+    tier: "60s", postType: "generic",
+    label: { en: "KOL Pitch Pack", zh: "KOL 完整邀約話術包" },
+    description: "邀請開場 + 後續追蹤 + brand brief + 報價回應 + 收尾感謝（5 變體）",
+    agent_id: 30015, skill_slug: "kol-outreach",
+    primary_question: "想找什麼類型的 KOL？合作主題？",
+    primary_input: {
+      key: "kol_profile", type: "textarea",
+      placeholder: "例：找媽媽育兒類 1-5 萬粉絲的 KOL 聊母親節活動",
+    },
+    inputs: [
+      { key: "kol_profile", label: "KOL 類型 + 合作主題", type: "textarea", required: true },
+      { key: "deal_terms", label: "合作條件（選填）", type: "textarea", required: false,
+        placeholder: "預算範圍 / 產品試用 / 互惠 / 想要的內容形式" },
+    ],
+    contextSources: [
+      "brand.positioning.voice",
+      "brand.positioning.goldenCircle.why",
+    ],
+    systemPrompt: `產出 KOL pitch pack 一個段落（200-400 字）。
+本次你寫的是「{label}」（邀請開場 / 後續追蹤 / brand brief 模板 / 報價回應 / 收尾感謝）。
+
+語氣準則：
+- 尊重對方，不卑不亢
+- 像個人 vs 像業配機器：用品牌語氣，不是模板
+- 不要過度推銷自家品牌，先 frame why this 合作
+- 報價回應段：守住但不傷關係
+
+我們**不**提供 KOL 名單，只提供「怎麼說」。${TONE("KOL")}`,
+    preferredModel: "qwen", maxTokens: 900,
+    outputDefaults: { platform: "generic", post_type: "generic" },
+  },
+];
+
+export const CROSS_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  "cw-60-crosspost-4platform": {
+    variants: 4, images: 4, runImageGen: true, imageDirectorId: CW_IMG,
+    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    variantLabels: ["FB 版", "IG 版", "Threads 版", "LinkedIn 版"],
+    captionMinChars: 60, captionMaxChars: 400,
+    extras: { replyTemplates: 0, postingTime: true, followupPost: false },
+  },
+  "cw-60-ab-variants": {
+    variants: 2, images: 2, runImageGen: true, imageDirectorId: CW_IMG,
+    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    variantLabels: ["A 版", "B 版"],
+    captionMinChars: 150, captionMaxChars: 350,
+    extras: { replyTemplates: 0, postingTime: true, followupPost: false },
+  },
+};
+export const KOL_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  "kl-60-pitch-pack": {
+    variants: 5, images: 0, runImageGen: false, imageDirectorId: KOL_IMG,
+    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    variantLabels: ["邀請開場", "後續追蹤", "Brand Brief", "報價回應", "收尾感謝"],
+    captionMinChars: 200, captionMaxChars: 400,
+    extras: { replyTemplates: 0, postingTime: false, followupPost: false },
+  },
+};
+
 // ─── Unified lookup helpers ──────────────────────────────────────────────
 const ALL_TASKS = [
   ...TT_60S_TASKS, ...LI_60S_TASKS, ...EMAIL_60S_TASKS,
   ...PR_60S_TASKS, ...BRAND_60S_TASKS, ...RESEARCH_60S_TASKS,
+  ...CROSS_60S_TASKS, ...KOL_60S_TASKS,
 ];
 const ALL_ORCH: Record<string, OrchestraConfig> = {
   ...TT_60S_ORCHESTRA, ...LI_60S_ORCHESTRA, ...EMAIL_60S_ORCHESTRA,
   ...PR_60S_ORCHESTRA, ...BRAND_60S_ORCHESTRA, ...RESEARCH_60S_ORCHESTRA,
+  ...CROSS_60S_ORCHESTRA, ...KOL_60S_ORCHESTRA,
 };
 
 export const MULTI_60S_TASKS = ALL_TASKS;
