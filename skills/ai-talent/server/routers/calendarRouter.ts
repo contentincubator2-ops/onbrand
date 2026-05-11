@@ -108,4 +108,174 @@ export const calendarRouter = router({
       `)) as any;
       return Array.isArray(rows) ? rows : [];
     }),
+
+  // ─── 2026-05-11 (P0-1 內容日曆 + 排程發布) ────────────────────────
+  // New surface combining `scheduled_posts` (pending future posts) +
+  // `mission_outputs` (already published) into a single calendar feed.
+  // The legacy month/day above is for decisions; this is for content runs.
+
+  /** Unified [from, to) feed of scheduled + published posts owned by caller. */
+  range: protectedProcedure
+    .input(z.object({
+      from: z.string(),
+      to: z.string(),
+      brandId: z.number().int().positive().optional(),
+      workspaceId: z.number().int().positive().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const brandFilter = input.brandId ? "AND sp.brandId = ?" : "";
+      const wsFilter    = input.workspaceId ? "AND sp.workspaceId = ?" : "";
+      const params: any[] = [ctx.user.id, input.from, input.to];
+      if (input.brandId) params.push(input.brandId);
+      if (input.workspaceId) params.push(input.workspaceId);
+
+      const [scheduled]: any = await localPool.execute(
+        `SELECT sp.id, sp.outputId, sp.variantIndex, sp.platform,
+                sp.scheduledAt, sp.status, sp.publishedAt, sp.externalUrl,
+                sp.brandId, b.name AS brandName,
+                o.content AS outputContent, m.title AS missionTitle
+         FROM scheduled_posts sp
+         LEFT JOIN brands b ON b.id = sp.brandId
+         LEFT JOIN mission_outputs o ON o.id = sp.outputId
+         LEFT JOIN missions m ON m.id = o.missionId
+         WHERE sp.userId = ?
+           AND sp.scheduledAt >= ? AND sp.scheduledAt < ?
+           ${brandFilter} ${wsFilter}
+         ORDER BY sp.scheduledAt ASC`,
+        params,
+      );
+
+      const params2: any[] = [ctx.user.id, input.from, input.to];
+      if (input.brandId) params2.push(input.brandId);
+      const brandFilter2 = input.brandId ? "AND m.brandId = ?" : "";
+      const [published]: any = await localPool.execute(
+        `SELECT o.id, o.content, o.publishedAt, o.status,
+                m.brandId, b.name AS brandName, m.title AS missionTitle,
+                m.workspace AS platform
+         FROM mission_outputs o
+         JOIN missions m ON m.id = o.missionId
+         LEFT JOIN brands b ON b.id = m.brandId
+         WHERE m.userId = ?
+           AND o.publishedAt IS NOT NULL
+           AND o.publishedAt >= ? AND o.publishedAt < ?
+           ${brandFilter2}
+         ORDER BY o.publishedAt DESC
+         LIMIT 200`,
+        params2,
+      );
+
+      const items = [
+        ...(scheduled as any[]).map((s) => ({
+          kind: "scheduled" as const,
+          id: s.id,
+          outputId: s.outputId,
+          at: s.scheduledAt,
+          platform: s.platform,
+          status: s.status,
+          brandId: s.brandId,
+          brandName: s.brandName,
+          missionTitle: s.missionTitle,
+          externalUrl: s.externalUrl,
+          preview: extractCaption(s.outputContent, s.variantIndex),
+        })),
+        ...(published as any[]).map((p) => ({
+          kind: "published" as const,
+          id: p.id,
+          outputId: p.id,
+          at: p.publishedAt,
+          platform: p.platform,
+          status: p.status,
+          brandId: p.brandId,
+          brandName: p.brandName,
+          missionTitle: p.missionTitle,
+          externalUrl: null,
+          preview: extractCaption(p.content, 0),
+        })),
+      ];
+      return items;
+    }),
+
+  schedule: protectedProcedure
+    .input(z.object({
+      outputId: z.number().int().positive(),
+      variantIndex: z.number().int().min(0).default(0),
+      scheduledAt: z.string(),
+      platform: z.string().min(1).max(24),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT m.userId, m.brandId, b.workspaceId
+         FROM mission_outputs o
+         JOIN missions m ON m.id = o.missionId
+         LEFT JOIN brands b ON b.id = m.brandId
+         WHERE o.id = ? LIMIT 1`,
+        [input.outputId],
+      );
+      const row = (rows as any[])[0];
+      if (!row || row.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
+      }
+      const at = new Date(input.scheduledAt);
+      if (isNaN(at.getTime()) || at.getTime() < Date.now() - 60_000) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "scheduledAt 必須是未來時間" });
+      }
+      const [r]: any = await localPool.execute(
+        `INSERT INTO scheduled_posts
+           (userId, workspaceId, brandId, outputId, variantIndex, platform, scheduledAt, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [ctx.user.id, row.workspaceId ?? null, row.brandId ?? null,
+         input.outputId, input.variantIndex, input.platform, at],
+      );
+      return { ok: true, id: (r as any).insertId as number };
+    }),
+
+  reschedule: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      scheduledAt: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const at = new Date(input.scheduledAt);
+      if (isNaN(at.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid date" });
+      }
+      const [r]: any = await localPool.execute(
+        `UPDATE scheduled_posts SET scheduledAt = ?
+         WHERE id = ? AND userId = ? AND status = 'pending'`,
+        [at, input.id, ctx.user.id],
+      );
+      if ((r as any).affectedRows === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到此排程，或已發布 / 取消" });
+      }
+      return { ok: true };
+    }),
+
+  cancel: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      await localPool.execute(
+        `UPDATE scheduled_posts
+         SET status = 'cancelled', cancelledAt = NOW(3), cancelledBy = ?
+         WHERE id = ? AND userId = ? AND status = 'pending'`,
+        [ctx.user.id, input.id, ctx.user.id],
+      );
+      return { ok: true };
+    }),
 });
+
+function extractCaption(content: any, variantIndex: number): string {
+  if (!content) return "";
+  try {
+    const parsed = typeof content === "string" ? JSON.parse(content) : content;
+    const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
+    const v = variants[variantIndex] ?? variants[0];
+    const cap = v?.caption ?? v?.text ?? "";
+    return String(cap).slice(0, 120);
+  } catch {
+    return String(content).slice(0, 120);
+  }
+}

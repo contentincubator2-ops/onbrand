@@ -64,6 +64,9 @@ const NAV_ITEMS: NavItem[] = [
   // 進階 hidden — direct URL /squads still works.
   // { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
   { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
+  // 2026-05-11 (CJ「P0-1 內容日曆」)
+  { to: "/calendar",  label: "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
+    tooltip: "月曆視圖 — 已排程 + 已發布內容一目了然，vs Buffer 的硬實力" },
   // 2026-05-11 (CJ「這個功能可以晚一點再上，先處理別的」): 範本市集功能
   // schema + endpoints 留著，nav 暫時下架。等做完 P0 (calendar / Team /
   // multi-client workspace) 再回頭加上。設計留在 docs/template-marketplace-design.md。

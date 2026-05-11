@@ -60,6 +60,8 @@ import BrandsManagePage from "../pages/BrandsManagePage";
 import AdminErrorsPage from "../pages/AdminErrorsPage";
 // 2026-05-11 (CJ「Spotify 模式」): community template marketplace
 import CommunityPage from "../pages/CommunityPage";
+// 2026-05-11 (CJ「P0-1 內容日曆」): vs Buffer
+import CalendarPage from "../pages/CalendarPage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -232,6 +234,8 @@ export default function AppV2() {
           <Route path="/admin/errors" element={<AdminErrorsPage />} />
           {/* 2026-05-11 — community template marketplace (Spotify model) */}
           <Route path="/community" element={<CommunityPage />} />
+          {/* 2026-05-11 — content calendar (P0-1) */}
+          <Route path="/calendar" element={<CalendarPage />} />
           {/* 2026-05-10 account settings + achievements */}
           <Route path="/settings/account" element={<AccountPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />

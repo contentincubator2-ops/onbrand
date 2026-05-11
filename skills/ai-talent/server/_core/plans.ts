@@ -17,7 +17,9 @@
  * Heavy-use cost @ 80% caps: ~$13 USD ≈ NTD 400, vs NTD 990 revenue → 60% margin.
  */
 
-export type PlanCode = "trial" | "drop_pro" | "enterprise";
+// 2026-05-11 — multi-tier for $1M ARR strategy. Solo / Team / Agency
+// split (CJ「Team / Agency 方案是 $1M 真正的槓桿」).
+export type PlanCode = "trial" | "drop_pro" | "drop_team" | "drop_agency" | "enterprise";
 
 export interface PlanQuota {
   /** -1 means unlimited */
@@ -28,6 +30,10 @@ export interface PlanQuota {
   video_gen: number;
   brands: number;
   fb_publish: number;
+  /** 2026-05-11 — max members in this workspace plan (1 = solo only). */
+  team_members: number;
+  /** 2026-05-11 — can the workspace host multi-client (sub-brand sharing)? */
+  multi_client: boolean;
 }
 
 export interface Plan {
@@ -38,6 +44,12 @@ export interface Plan {
   trialDays: number;
   quota: PlanQuota;
   features: string[];          // human-readable bullets for /pricing
+  /** Tier highlight on /pricing (e.g., 「最受歡迎」). */
+  highlight?: string;
+  /** 2026-05-11 — white-label / API / priority support flags. */
+  whiteLabel?: boolean;
+  apiAccess?: boolean;
+  prioritySupport?: boolean;
 }
 
 export const PLANS: Record<PlanCode, Plan> = {
@@ -49,13 +61,15 @@ export const PLANS: Record<PlanCode, Plan> = {
     priceTwdAnnually: 0,
     trialDays: 7,
     quota: {
-      task_30s: -1,        // unlimited (cheap)
+      task_30s: -1,
       task_60s: 50,
       task_99s: 20,
       image_gen: 150,
       video_gen: 10,
       brands: 5,
       fb_publish: -1,
+      team_members: 1,
+      multi_client: false,
     },
     features: [
       "所有 90+ 任務模板",
@@ -65,12 +79,12 @@ export const PLANS: Record<PlanCode, Plan> = {
     ],
   },
 
-  /** Paying tier — same quota as trial. After day 7, payment kicks in. */
+  /** Drop Pro — Solo plan. 1 user, single workspace. */
   drop_pro: {
     code: "drop_pro",
-    name: "Drop Pro",
+    name: "Drop Pro · 個人",
     priceTwdMonthly: 990,
-    priceTwdAnnually: 9900,    // = 12 months × 825 NTD (省一個月 = 17%)
+    priceTwdAnnually: 9900,
     trialDays: 0,
     quota: {
       task_30s: -1,
@@ -80,23 +94,82 @@ export const PLANS: Record<PlanCode, Plan> = {
       video_gen: 10,
       brands: 5,
       fb_publish: -1,
+      team_members: 1,
+      multi_client: false,
     },
     features: [
+      "1 位用戶 · 5 個品牌",
       "所有 90+ 任務模板",
-      "完整 7 天內容企劃台",
-      "5 個品牌資產管理",
+      "FB 直接發布 + 排程（無限）",
       "圖片 + 影片 AI 生成",
-      "FB 直接發布（無限）",
-      "Email / LINE 客服",
       "電子發票",
     ],
+  },
+
+  /** Drop Team — 5 users, multi-client workspace, monthly client reports. */
+  drop_team: {
+    code: "drop_team",
+    name: "Drop Team · 小團隊",
+    priceTwdMonthly: 4990,
+    priceTwdAnnually: 49900,    // 12 × 4158 NTD (省 17%)
+    trialDays: 0,
+    quota: {
+      task_30s: -1,
+      task_60s: 250,
+      task_99s: 100,
+      image_gen: 600,
+      video_gen: 40,
+      brands: 20,
+      fb_publish: -1,
+      team_members: 5,
+      multi_client: true,
+    },
+    features: [
+      "5 位用戶 · 20 個品牌",
+      "多客戶 workspace（一個帳號管多個客戶）",
+      "邀請客戶看自己品牌（viewer 角色）",
+      "月度客戶工作報表",
+      "Drop Pro 全部功能",
+    ],
+    highlight: "最適合 Agency",
+    prioritySupport: false,
+  },
+
+  /** Drop Agency — unlimited users, white label, API access. */
+  drop_agency: {
+    code: "drop_agency",
+    name: "Drop Agency · 代理商",
+    priceTwdMonthly: 14990,
+    priceTwdAnnually: 149900,
+    trialDays: 0,
+    quota: {
+      task_30s: -1,
+      task_60s: -1,
+      task_99s: -1,
+      image_gen: 2000,
+      video_gen: 150,
+      brands: -1,
+      fb_publish: -1,
+      team_members: -1,
+      multi_client: true,
+    },
+    features: [
+      "無限用戶 · 無限品牌",
+      "White Label（換 logo + 公司名）",
+      "API 存取（接你自己的 workflow）",
+      "優先客服 + 1 對 1 onboarding",
+      "Drop Team 全部功能",
+    ],
+    whiteLabel: true,
+    apiAccess: true,
+    prioritySupport: true,
   },
 
   /** Enterprise — quote-based, contact sales. */
   enterprise: {
     code: "enterprise",
     name: "企業版",
-    priceTwdMonthly: -1,       // contact sales
+    priceTwdMonthly: -1,
     priceTwdAnnually: -1,
     trialDays: 0,
     quota: {
@@ -107,14 +180,19 @@ export const PLANS: Record<PlanCode, Plan> = {
       video_gen: -1,
       brands: -1,
       fb_publish: -1,
+      team_members: -1,
+      multi_client: true,
     },
     features: [
       "無限額度",
-      "團隊成員",
+      "客製品牌風格庫 + LoRA",
       "SLA 服務承諾",
-      "客製品牌風格庫",
       "專屬客戶成功經理",
+      "On-prem 部署選項",
     ],
+    whiteLabel: true,
+    apiAccess: true,
+    prioritySupport: true,
   },
 };
 

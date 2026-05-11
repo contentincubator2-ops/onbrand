@@ -16,104 +16,187 @@ export default function PricingPage() {
     : { data: null };
   const status = statusQuery?.data;
 
+  // 2026-05-11 — 4-tier pricing: Solo / Team / Agency / Enterprise. CJ
+  // direction「Team / Agency 方案是 $1M 真正的槓桿」.
+  const TIERS = [
+    {
+      code: "drop_pro",
+      name: "Drop Pro",
+      sub: "個人操盤者",
+      monthly: 990, annual: 9900,
+      members: "1 位用戶 · 5 個品牌",
+      features: [
+        "所有 90+ 任務模板",
+        "FB 直接發布 + 排程（無限）",
+        "AI 圖 150 / 影片 10 / 月",
+        "電子發票（個人 / B2B）",
+      ],
+      cta: "開始 7 天試用",
+    },
+    {
+      code: "drop_team",
+      name: "Drop Team",
+      sub: "5 人小團隊 / Agency 入門",
+      monthly: 4990, annual: 49900,
+      members: "5 位用戶 · 20 個品牌",
+      features: [
+        "多客戶 workspace（一帳號管多客戶）",
+        "邀請客戶以 viewer 角色看自己品牌",
+        "月度客戶工作報表",
+        "Drop Pro 全部功能",
+      ],
+      cta: "升級到 Team",
+      highlight: true,
+    },
+    {
+      code: "drop_agency",
+      name: "Drop Agency",
+      sub: "代理商 / 多客戶營運",
+      monthly: 14990, annual: 149900,
+      members: "無限用戶 · 無限品牌",
+      features: [
+        "White Label（換 logo + 公司名）",
+        "API 存取（接你自己的 workflow）",
+        "優先客服 + 1 對 1 onboarding",
+        "Drop Team 全部功能",
+      ],
+      cta: "升級到 Agency",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="max-w-5xl mx-auto px-6 pt-16 pb-12 text-center">
-        <h1 className="text-4xl font-bold text-neutral-900 mb-3">一個價格，所有功能</h1>
-        <p className="text-lg text-neutral-600 mb-8">
-          AI 小白也能輕鬆上手，月費 NT$ 990 用到飽。
-        </p>
-
-        {/* Annual toggle */}
-        <div className="inline-flex items-center bg-neutral-100 rounded-full p-1 mb-12">
-          <button
-            onClick={() => setAnnual(false)}
-            className={`px-6 py-2 rounded-full text-sm font-medium transition ${
-              !annual ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600"
-            }`}
+      <div className="max-w-6xl mx-auto px-6 pt-14 pb-12">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
+            PRICING · CHOOSE YOUR SCALE
+          </p>
+          <h1
+            className="font-semibold tracking-tight leading-tight mb-3"
+            style={{
+              fontSize: "clamp(1.8rem, 3.5vw, 2.75rem)",
+              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
           >
-            月繳
-          </button>
-          <button
-            onClick={() => setAnnual(true)}
-            className={`px-6 py-2 rounded-full text-sm font-medium transition ${
-              annual ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600"
-            }`}
+            從 1 個人到整個 Agency 都用得了
+          </h1>
+          <p
+            className="mx-auto text-default-700"
+            style={{
+              fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+              fontStyle: "italic", fontSize: 15, lineHeight: 1.7, maxWidth: 640,
+            }}
           >
-            年繳 <span className="text-xs text-emerald-600 ml-1">省 17%</span>
-          </button>
-        </div>
+            SoWork 品牌定位法 · 多平台一致性 · 排程發布 — 一套訂閱搞定
+          </p>
 
-        {/* Single plan card */}
-        <div className="max-w-md mx-auto bg-white border-2 border-neutral-900 rounded-2xl p-8 shadow-lg">
-          <div className="text-left">
-            <p className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-1">Drop Pro</p>
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-5xl font-bold text-neutral-900">
-                {annual ? "9,900" : "990"}
-              </span>
-              <span className="text-lg text-neutral-500">NT$ / {annual ? "年" : "月"}</span>
-            </div>
-            {annual && (
-              <p className="text-xs text-neutral-500 mb-4">每月平均 NT$ 825</p>
-            )}
-            {!annual && <p className="text-xs text-neutral-500 mb-4">隨時取消</p>}
-
-            <p className="text-sm text-neutral-600 my-6 pb-6 border-b border-neutral-200">
-              7 天免費試用 · 免綁信用卡
-            </p>
-
-            <ul className="space-y-2 text-sm text-neutral-800 mb-8">
-              {[
-                ["所有 90+ 任務模板", "FB / IG / YT / TT / LinkedIn / Email / PR / 品牌 / 用戶研究"],
-                ["完整 7 天內容企劃台", "多日跨平台一鍵排程"],
-                ["5 個品牌資產管理", "logo / 定位 / 用詞庫 / 視覺風格"],
-                ["AI 圖片生成 150 張 / 月", "OpenAI gpt-image / Flux"],
-                ["AI 影片生成 10 支 / 月", "PiAPI Kling 5 秒短片"],
-                ["FB 直接發布", "Pipedream Connect 安全 OAuth"],
-                ["Email + LINE 客服", "工作日 24 小時內回覆"],
-                ["電子發票", "個人 / B2B 統編皆可"],
-              ].map(([title, desc]) => (
-                <li key={title} className="flex items-start gap-2">
-                  <Check size={16} className="text-neutral-900 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
-                  <span>
-                    <strong>{title}</strong>
-                    <span className="block text-xs text-neutral-500">{desc}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-
+          {/* Annual toggle */}
+          <div className="mt-6 inline-flex items-center bg-neutral-100 rounded-full p-1">
             <button
-              onClick={() => {
-                if (status?.expired) {
-                  showToastGlobal("付款功能明天上線，請先聯繫 drop@sowork.ai");
-                } else if (!status) {
-                  navigate("/auth/register");
-                } else {
-                  showToastGlobal("付款功能明天上線，請先聯繫 drop@sowork.ai");
-                }
-              }}
-              className="w-full py-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-semibold transition"
+              onClick={() => setAnnual(false)}
+              className={`px-5 py-1.5 rounded-full text-sm font-medium transition ${
+                !annual ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600"
+              }`}
             >
-              {status ? (status.expired ? "立即升級" : "你已是 Drop 用戶") : "開始 7 天免費試用"}
+              月繳
             </button>
-            {!status && (
-              <p className="text-center text-xs text-neutral-400 mt-3">
-                註冊後立刻可用，到期前再決定要不要繼續
-              </p>
-            )}
+            <button
+              onClick={() => setAnnual(true)}
+              className={`px-5 py-1.5 rounded-full text-sm font-medium transition ${
+                annual ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600"
+              }`}
+            >
+              年繳 <span className="text-xs text-emerald-600 ml-1">省 17%</span>
+            </button>
           </div>
         </div>
 
-        {/* Enterprise teaser */}
-        <div className="mt-16 max-w-2xl mx-auto bg-neutral-50 rounded-xl p-6 text-left">
-          <p className="text-sm font-semibold text-neutral-900 mb-1">需要更多？</p>
-          <p className="text-sm text-neutral-600 mb-3">
-            企業版提供無限額度、團隊成員、SLA、客製品牌風格庫、專屬 CSM。
-          </p>
-          <a href="mailto:drop@sowork.ai?subject=企業版洽詢" className="text-sm text-neutral-900 font-medium hover:underline">
+        {/* 3-tier grid */}
+        <div className="grid gap-5 md:grid-cols-3 mb-10">
+          {TIERS.map((tier) => (
+            <div
+              key={tier.code}
+              className="bg-white rounded-2xl p-6 flex flex-col"
+              style={{
+                border: tier.highlight ? "2px solid #171717" : "1px solid #D4D4D4",
+                boxShadow: tier.highlight ? "0 8px 32px -8px rgba(0,0,0,0.12)" : undefined,
+                position: "relative",
+              }}
+            >
+              {tier.highlight && (
+                <span
+                  className="absolute -top-3 left-6 text-[10px] font-bold uppercase tracking-[0.18em] px-2 py-0.5 rounded-md"
+                  style={{ background: "#171717", color: "white" }}
+                >
+                  最適合 Agency
+                </span>
+              )}
+              <div className="mb-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-600">
+                  {tier.name}
+                </p>
+                <p className="text-xs text-neutral-700 mt-0.5">{tier.sub}</p>
+              </div>
+              <div className="flex items-baseline gap-1.5 mt-3">
+                <span className="text-3xl font-bold text-neutral-900 tabular-nums">
+                  {annual ? (tier.annual / 1000).toLocaleString() + "K" : tier.monthly.toLocaleString()}
+                </span>
+                <span className="text-sm text-neutral-700">NT$ / {annual ? "年" : "月"}</span>
+              </div>
+              <p className="text-xs text-neutral-700 mt-1">
+                {annual ? `每月平均 NT$ ${Math.round(tier.annual / 12).toLocaleString()}` : "隨時取消"}
+              </p>
+              <p className="text-xs text-neutral-900 font-medium mt-3 pb-3 border-b border-neutral-200">
+                {tier.members}
+              </p>
+              <ul className="space-y-2 text-sm text-neutral-800 mt-4 mb-6 flex-1">
+                {tier.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <Check size={14} className="text-neutral-900 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => {
+                  if (!status) {
+                    navigate("/auth/register");
+                  } else {
+                    showToastGlobal("付款功能即將上線（綠界整合中）— 請先聯繫 drop@sowork.ai");
+                  }
+                }}
+                className="w-full py-2.5 rounded-lg font-semibold text-sm transition"
+                style={{
+                  background: tier.highlight ? "#171717" : "white",
+                  color: tier.highlight ? "white" : "#171717",
+                  border: tier.highlight ? "none" : "1px solid #171717",
+                }}
+              >
+                {tier.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Enterprise row */}
+        <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">
+              ENTERPRISE · CUSTOM
+            </p>
+            <p className="text-base font-semibold text-neutral-900">企業版</p>
+            <p className="text-sm text-neutral-700 mt-1 max-w-xl">
+              無限額度 · 客製 LoRA 品牌風格庫 · SLA 承諾 · 專屬 CSM · On-prem 部署
+            </p>
+          </div>
+          <a
+            href="mailto:drop@sowork.ai?subject=企業版洽詢"
+            className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
+          >
             聯繫業務 →
           </a>
         </div>

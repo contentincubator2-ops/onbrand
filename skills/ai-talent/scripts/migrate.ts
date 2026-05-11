@@ -1321,6 +1321,21 @@ async function main() {
     `);
     console.log("[migrate] invoices: OK");
 
+    // 2026-05-11 — ECPay extensions to invoices.
+    await ensureCol("invoices", "workspaceId",     "INT NULL");
+    await ensureCol("invoices", "merchantTradeNo", "VARCHAR(32) NULL");
+    await ensureCol("invoices", "planCode",        "VARCHAR(24) NULL");
+    await ensureCol("invoices", "billingCycle",    "VARCHAR(12) NULL");
+    await ensureCol("invoices", "amount",          "INT NULL");
+    await ensureCol("invoices", "paidAt",          "DATETIME(3) NULL");
+    await ensureCol("invoices", "rawPayload",      "JSON NULL");
+    try {
+      await conn.execute(`CREATE UNIQUE INDEX idx_invoices_trade ON invoices (merchantTradeNo)`);
+    } catch (e: any) {
+      if (!String(e?.message ?? "").includes("Duplicate")) throw e;
+    }
+    console.log("[migrate] invoices ECPay columns: OK");
+
     // error_log (Sentry-lite for prod anomalies)
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS error_log (
@@ -1541,6 +1556,160 @@ async function main() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log("[migrate] squad_uses: OK");
+
+    // ─── 2026-05-11 (CJ「四個 P0 都要完成」: foundation for Team/Agency
+    // plan + multi-client workspace + ECPay multi-client billing) ─────
+    //
+    // workspaces — a workspace = an agency / team / solo container.
+    //   solo user → auto-created default workspace at first login
+    //   team plan → +5 members
+    //   agency plan → unlimited members + white label
+    //
+    // workspace_members — many users in a workspace, each with a role
+    //   owner   — billing, invites, full edit
+    //   admin   — invites, full edit (no billing)
+    //   editor  — edit assigned brands only
+    //   viewer  — read-only on assigned brands (great for clients!)
+    //
+    // brands.workspaceId — multi-tenant scoping. Existing brands get
+    // backfilled to the user's default workspace on next login or
+    // on the next CREATE/UPDATE pass (handled in brandRouter).
+    //
+    // workspace_member_brands — for editor/viewer, restricts which
+    // brands they can see. owner/admin see all. Empty rows = full access.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS workspaces (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        slug            VARCHAR(64)  NOT NULL UNIQUE,
+        name            VARCHAR(160) NOT NULL,
+        ownerUserId     INT          NOT NULL,
+        planCode        VARCHAR(24)  NOT NULL DEFAULT 'solo',
+        planStatus      VARCHAR(16)  NOT NULL DEFAULT 'trial',
+        planEndsAt      DATETIME(3)  NULL,
+        billingMode     VARCHAR(12)  NOT NULL DEFAULT 'solo',
+        whiteLabelLogo  VARCHAR(500) NULL,
+        whiteLabelName  VARCHAR(160) NULL,
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_ws_owner (ownerUserId),
+        INDEX idx_ws_plan (planCode, planStatus)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] workspaces: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS workspace_members (
+        workspaceId  INT          NOT NULL,
+        userId       INT          NOT NULL,
+        role         VARCHAR(12)  NOT NULL DEFAULT 'viewer',
+        invitedAt    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        joinedAt     DATETIME(3)  NULL,
+        invitedBy    INT          NULL,
+        PRIMARY KEY (workspaceId, userId),
+        INDEX idx_wm_user (userId),
+        INDEX idx_wm_role (workspaceId, role)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] workspace_members: OK");
+
+    // workspace_member_brands — restricts editor/viewer to specific brands.
+    // Empty (no rows for a member) = full access to all workspace brands.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS workspace_member_brands (
+        workspaceId  INT          NOT NULL,
+        userId       INT          NOT NULL,
+        brandId      INT          NOT NULL,
+        addedAt      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (workspaceId, userId, brandId),
+        INDEX idx_wmb_brand (brandId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] workspace_member_brands: OK");
+
+    // brands.workspaceId — scoping column. Backfill happens in
+    // brandRouter via a one-time pass: each user gets a default
+    // workspace, all their brands move under it.
+    await ensureCol("brands", "workspaceId", "INT NULL AFTER userId");
+    try {
+      await conn.execute(`CREATE INDEX idx_brands_workspace ON brands (workspaceId)`);
+    } catch (e: any) {
+      if (!String(e?.message ?? "").includes("Duplicate")) throw e;
+    }
+    console.log("[migrate] brands.workspaceId: OK");
+
+    // Backfill: every user without a default workspace gets one.
+    // Done in a single pass — idempotent because we INSERT IGNORE.
+    try {
+      // Create default workspace for users who don't own one yet.
+      await conn.execute(`
+        INSERT INTO workspaces (slug, name, ownerUserId, planCode, planStatus, billingMode)
+        SELECT
+          CONCAT('ws-', u.id, '-', SUBSTRING(MD5(RAND()), 1, 6)) AS slug,
+          COALESCE(u.name, CONCAT('Workspace #', u.id)) AS name,
+          u.id AS ownerUserId,
+          COALESCE(u.planCode, 'solo') AS planCode,
+          COALESCE(u.planStatus, 'trial') AS planStatus,
+          'solo' AS billingMode
+        FROM users u
+        WHERE NOT EXISTS (
+          SELECT 1 FROM workspaces w WHERE w.ownerUserId = u.id
+        )
+      `);
+      // Owner becomes a member of their workspace.
+      await conn.execute(`
+        INSERT IGNORE INTO workspace_members (workspaceId, userId, role, joinedAt)
+        SELECT w.id, w.ownerUserId, 'owner', NOW(3)
+        FROM workspaces w
+        WHERE NOT EXISTS (
+          SELECT 1 FROM workspace_members m
+          WHERE m.workspaceId = w.id AND m.userId = w.ownerUserId
+        )
+      `);
+      // Brands without workspaceId get pointed to the owner's default workspace.
+      await conn.execute(`
+        UPDATE brands b
+        JOIN workspaces w ON w.ownerUserId = b.userId
+        SET b.workspaceId = w.id
+        WHERE b.workspaceId IS NULL
+      `);
+      console.log("[migrate] workspaces backfill: OK");
+    } catch (e: any) {
+      console.warn("[migrate] workspaces backfill skipped:", e?.message ?? e);
+    }
+
+    // ─── 2026-05-11 (P0-1 calendar): scheduled_posts table ──────────
+    // A scheduled post = output that will be auto-published at scheduledAt.
+    // Status flow: pending → publishing → published | failed | cancelled
+    // Cron worker polls every 60s, hits the platform publish endpoint
+    // (publishRouter.toFacebook etc.) and updates status.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS scheduled_posts (
+        id             BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId         INT          NOT NULL,
+        workspaceId    INT          NULL,
+        brandId        INT          NULL,
+        outputId       BIGINT       NOT NULL,
+        variantIndex   INT          NOT NULL DEFAULT 0,
+        platform       VARCHAR(24)  NOT NULL,
+        scheduledAt    DATETIME(3)  NOT NULL,
+        status         VARCHAR(12)  NOT NULL DEFAULT 'pending',
+        publishedAt    DATETIME(3)  NULL,
+        externalPostId VARCHAR(120) NULL,
+        externalUrl    VARCHAR(500) NULL,
+        attempts       INT          NOT NULL DEFAULT 0,
+        lastError      TEXT         NULL,
+        cancelledAt    DATETIME(3)  NULL,
+        cancelledBy    INT          NULL,
+        createdAt      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_sp_due (status, scheduledAt),
+        INDEX idx_sp_user (userId, scheduledAt),
+        INDEX idx_sp_workspace (workspaceId, scheduledAt),
+        INDEX idx_sp_brand (brandId, scheduledAt),
+        INDEX idx_sp_output (outputId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] scheduled_posts: OK");
 
     // ─── 2026-05-11 (CJ「多用戶 SaaS, 每用戶連自己 FB」): per-brand FB binding ───
     // brand.fbPageId: 該品牌綁定的 Facebook 粉專 ID (numeric)

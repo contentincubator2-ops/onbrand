@@ -56,6 +56,10 @@ import { opsRouter } from "./opsRouter";
 import { achievementsRouter } from "./achievementsRouter";
 // 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」)
 import { communityRouter } from "./communityRouter";
+// 2026-05-11 (CJ「Team / Agency 方案 + 多客戶 workspace」): multi-tenant container.
+import { tenantRouter } from "./tenantRouter";
+// 2026-05-11 (CJ「ECPay 金流」): 綠界 checkout + callback.
+import { ecpayRouter } from "./ecpayRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -116,6 +120,8 @@ export const appRouter = router({
   ops:             opsRouter,
   achievements:    achievementsRouter,
   community:       communityRouter,
+  tenant:          tenantRouter,
+  ecpay:           ecpayRouter,
 });
 
 export type AppRouter = typeof appRouter;
