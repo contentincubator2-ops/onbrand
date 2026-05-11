@@ -26,6 +26,7 @@ import {
 import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
+import PipelineThinkingPanel from "../components/positioning/PipelineThinkingPanel";
 import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
@@ -456,8 +457,11 @@ export default function BrandsPage() {
       setLiveThinking(null);
       return;
     }
-    // Auto-jump sub-nav to this step's target segment.
-    setSection(step.segmentTarget);
+    // 2026-05-11 (CJ「直接在第一層顯現」): keep user on pos:home so the
+    // editorial PipelineThinkingPanel stays visible. Only auto-jump to
+    // the segment target if user has already drilled into a segment
+    // (i.e., they explicitly left the home grid).
+    setSection((curr) => (curr === "pos:home" ? "pos:home" : step.segmentTarget));
     setLiveThinking(null); // clear previous
 
     let cancelled = false;
@@ -1041,13 +1045,39 @@ export default function BrandsPage() {
             <>
               {/* ── 定位 card grid (pos:home) ── */}
               {section === "pos:home" ? (
-                <div style={{ padding: "16px 28px 0" }}>
+                <div style={{ padding: "16px 28px 0", display: "flex", flexDirection: "column", gap: 20 }}>
                   <PositioningTopRow
                     brandId={(scope?.brandId ?? brandId) as number | null}
                     scopeMode={scopeMode}
                     locked={!!tabLocks.positioning}
                     onLockToggle={() => handleLockToggle("positioning")}
                   />
+                  {/* 2026-05-11 (CJ「直接在第一層顯現，要有頂級廣告公司的感覺」):
+                      editorial layer-1 pipeline thinking panel. Shows the
+                      streaming reasoning + step queue right on the brand
+                      home view, so users don't need to drill into a segment
+                      page to see the brain at work. */}
+                  {scopeMode !== "none" && pipelineSteps.length > 0 && pipeline.status !== "idle" && (
+                    <PipelineThinkingPanel
+                      steps={pipelineSteps}
+                      status={pipeline.status}
+                      cursor={pipeline.cursor}
+                      completedIds={pipeline.completed}
+                      thinkingText={liveThinking}
+                      phase={thinkingPhase}
+                      startedAt={thinkingStartedAt}
+                      title={
+                        scopeMode === "product" ? "Product Positioning"
+                        : scopeMode === "event" ? "Event Positioning"
+                        : "Brand Positioning"
+                      }
+                      onStart={startPipeline}
+                      onPause={pausePipeline}
+                      onResume={resumePipeline}
+                      onSkip={skipPipeline}
+                      onStop={stopPipeline}
+                    />
+                  )}
                   <PositioningGrid
                     scopeMode={scopeMode}
                     segments={segments}
