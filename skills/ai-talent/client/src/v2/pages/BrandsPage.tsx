@@ -1637,8 +1637,35 @@ function PositioningGrid({
       <div>
         <SectionLabel label="品牌工具" />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
-          <AssetCard label="速查卡"   icon={faTableList} bg="#FFFFFF" onClick={() => onSelect("card")} />
-          <AssetCard label="AI 指令庫" icon={faRobot}     bg="#FFFFFF" onClick={() => onSelect("prompts")} />
+          {(() => {
+            // 速查卡：把品牌定位精華（tagline / golden-circle why / differentiation）
+            // 直接濃縮成一張預覽，使用者不必點進去也能掃到品牌精神。
+            const cardPreview = buildBrandCheatPreview(segmentData);
+            return (
+              <AssetCard
+                label="速查卡"
+                icon={faTableList}
+                bg="#FFFFFF"
+                onClick={() => onSelect("card")}
+                preview={cardPreview.node}
+                hasContent={cardPreview.hasContent}
+              />
+            );
+          })()}
+          {(() => {
+            // AI 指令庫：voice + 禁區 + tone 詞庫合成的一張預覽。
+            const promptsPreview = buildPromptsPreview(segmentData);
+            return (
+              <AssetCard
+                label="AI 指令庫"
+                icon={faRobot}
+                bg="#FFFFFF"
+                onClick={() => onSelect("prompts")}
+                preview={promptsPreview.node}
+                hasContent={promptsPreview.hasContent}
+              />
+            );
+          })()}
         </div>
       </div>
 
@@ -1657,46 +1684,12 @@ function PositioningGrid({
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
             {group.segs.map((s, si) => {
-              // Try to derive a preview from segment data:
-              // positioning[segId] could be a string, object {summary,...},
-              // or array. Stringify carefully + truncate.
+              // 2026-05-11 (CJ「就算做完定位，速查卡、指令庫、標語... 沒有
+              // 呈現文字，要點進去才有」): per-segment preview that knows
+              // about the actual data shape. Falls through to a generic
+              // walker so unseen segments still surface something.
               const segVal = segmentData?.[s.id];
-              let preview: React.ReactNode | null = null;
-              let hasContent = false;
-              if (segVal != null) {
-                if (typeof segVal === "string") {
-                  const t = segVal.trim();
-                  if (t) { preview = <span>{t.length > 140 ? t.slice(0, 140) + "…" : t}</span>; hasContent = true; }
-                } else if (typeof segVal === "object") {
-                  // Pull the most likely "main text" field
-                  const candidates = [
-                    segVal.summary, segVal.statement, segVal.value, segVal.text,
-                    segVal.tagline, segVal.story, segVal.why, segVal.usp,
-                  ].filter((x: any) => typeof x === "string" && x.trim());
-                  if (candidates.length > 0) {
-                    const t = String(candidates[0]).trim();
-                    preview = <span>{t.length > 140 ? t.slice(0, 140) + "…" : t}</span>;
-                    hasContent = true;
-                  } else if (Array.isArray(segVal)) {
-                    const items = segVal.filter((x: any) => typeof x === "string");
-                    if (items.length > 0) {
-                      preview = (
-                        <span>
-                          {items.slice(0, 3).map((x: string, i: number) => (
-                            <span key={i} style={{
-                              display: "inline-block", margin: "1px 3px 1px 0",
-                              padding: "1px 6px", borderRadius: 999,
-                              background: "rgba(255,255,255,0.7)", fontSize: 10,
-                            }}>{x}</span>
-                          ))}
-                          {items.length > 3 && <span style={{ color: "#9CA3AF", fontSize: 10 }}>+{items.length - 3}</span>}
-                        </span>
-                      );
-                      hasContent = true;
-                    }
-                  }
-                }
-              }
+              const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal);
               return (
                 <AssetCard
                   key={s.id}
@@ -1718,6 +1711,346 @@ function PositioningGrid({
           floating button. Page stays editorial. */}
     </div>
   );
+}
+
+/* ────────────────────── Preview extractors ──────────────────────
+   These read the actual positioning JSON shape per segment and render
+   a short editorial preview (≤4 lines) for the layer-1 card grid, so
+   users see real content without drilling in.
+   2026-05-11 (CJ「我希望只有在一頁呈現，不用再點進去」)
+   ────────────────────────────────────────────────────────────────── */
+const truncate = (s: string, n = 130) => {
+  const t = String(s).trim();
+  return t.length > n ? t.slice(0, n) + "…" : t;
+};
+const firstTruthy = (...xs: any[]): string | null => {
+  for (const x of xs) {
+    if (typeof x === "string" && x.trim()) return x.trim();
+  }
+  return null;
+};
+const isFilledArr = (a: any) => Array.isArray(a) && a.some((x: any) =>
+  typeof x === "string" ? x.trim() : x != null,
+);
+
+/** Render mini list of tokens (used for arrays). */
+function TagRow({ items, max = 4 }: { items: string[]; max?: number }) {
+  return (
+    <span>
+      {items.slice(0, max).map((x, i) => (
+        <span key={i} style={{
+          display: "inline-block", marginRight: 6, marginBottom: 3,
+          fontSize: 10.5, color: "#404040",
+          fontFamily: '"SF Mono", Menlo, monospace',
+        }}>
+          {x}
+        </span>
+      ))}
+      {items.length > max && (
+        <span style={{ fontSize: 10, color: "#A3A3A3" }}>+{items.length - max}</span>
+      )}
+    </span>
+  );
+}
+
+/** Smart preview per segment. Returns React node + whether considered filled. */
+function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | null; hasContent: boolean } {
+  if (v == null) return { node: null, hasContent: false };
+  if (typeof v === "string") {
+    const t = v.trim();
+    return t ? { node: <span>{truncate(t, 140)}</span>, hasContent: true } : { node: null, hasContent: false };
+  }
+  if (typeof v !== "object") return { node: null, hasContent: false };
+
+  // ── Per-segment custom renderers ──
+  switch (segId) {
+    case "goldenCircle": {
+      const why = firstTruthy(v.why);
+      if (!why) return { node: null, hasContent: false };
+      return {
+        node: (
+          <span>
+            <strong style={{ color: "#171717", fontFamily: "system-ui" }}>WHY · </strong>
+            {truncate(why, 120)}
+          </span>
+        ),
+        hasContent: true,
+      };
+    }
+    case "tagline": {
+      const zh = firstTruthy(v.zhTagline);
+      const en = firstTruthy(v.enTagline);
+      if (!zh && !en) return { node: null, hasContent: false };
+      return {
+        node: (
+          <span>
+            {zh && (
+              <span style={{ display: "block", color: "#171717", fontWeight: 600, fontFamily: "system-ui", fontSize: 13 }}>
+                「{truncate(zh, 40)}」
+              </span>
+            )}
+            {en && (
+              <span style={{ display: "block", color: "#737373", fontStyle: "italic", marginTop: 2 }}>
+                {truncate(en, 60)}
+              </span>
+            )}
+            {v.story && (
+              <span style={{ display: "block", marginTop: 4, fontSize: 11 }}>
+                {truncate(v.story, 80)}
+              </span>
+            )}
+          </span>
+        ),
+        hasContent: true,
+      };
+    }
+    case "taglineScore": {
+      const total = v.total ?? (Array.isArray(v.rows) ? v.rows.reduce((acc: number, r: any) => acc + Number(r.score ?? 0), 0) : null);
+      const rows = Array.isArray(v.rows) ? v.rows.filter((r: any) => r?.dim) : [];
+      if (!total && rows.length === 0) return { node: null, hasContent: false };
+      return {
+        node: (
+          <span>
+            {total != null && (
+              <span style={{ display: "block", marginBottom: 4 }}>
+                <span style={{ fontSize: 22, fontWeight: 700, color: "#171717", fontFamily: "system-ui" }}>{total}</span>
+                <span style={{ fontSize: 11, color: "#A3A3A3", marginLeft: 4 }}>/ 100</span>
+              </span>
+            )}
+            {rows.slice(0, 3).map((r: any, i: number) => (
+              <span key={i} style={{ display: "block", fontSize: 11 }}>
+                <span style={{ color: "#737373" }}>{r.dim}</span>
+                <span style={{ color: "#171717", fontWeight: 600, marginLeft: 6 }}>{r.score}</span>
+              </span>
+            ))}
+          </span>
+        ),
+        hasContent: true,
+      };
+    }
+    case "origin": {
+      const story = firstTruthy(v.story);
+      if (!story) return { node: null, hasContent: false };
+      return { node: <span>{truncate(story, 150)}</span>, hasContent: true };
+    }
+    case "values": {
+      const items = Array.isArray(v.items) ? v.items.filter((x: any) => x?.label) : [];
+      if (items.length === 0) return { node: null, hasContent: false };
+      return {
+        node: (
+          <span>
+            {items.slice(0, 4).map((it: any, i: number) => (
+              <span key={i} style={{ display: "block", marginBottom: 2 }}>
+                <span style={{ color: "#171717", fontWeight: 600, fontFamily: "system-ui" }}>· {it.label}</span>
+                {it.body && (
+                  <span style={{ color: "#737373", marginLeft: 4, fontSize: 11 }}>
+                    {truncate(it.body, 40)}
+                  </span>
+                )}
+              </span>
+            ))}
+            {items.length > 4 && <span style={{ fontSize: 10, color: "#A3A3A3" }}>+{items.length - 4}</span>}
+          </span>
+        ),
+        hasContent: true,
+      };
+    }
+    case "audience": {
+      const p = firstTruthy(v.primary, v.primaryAudience);
+      if (!p) return { node: null, hasContent: false };
+      return { node: <span>{truncate(p, 150)}</span>, hasContent: true };
+    }
+    case "competition": {
+      const intensity = firstTruthy(v.intensity);
+      const direct = Array.isArray(v.direct) ? v.direct.filter((x: any) => x?.name) : [];
+      if (!intensity && direct.length === 0) return { node: null, hasContent: false };
+      return {
+        node: (
+          <span>
+            {intensity && <span style={{ display: "block" }}>{truncate(intensity, 90)}</span>}
+            {direct.length > 0 && (
+              <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#737373", fontFamily: "system-ui" }}>
+                vs {direct.slice(0, 3).map((d: any) => d.name).join("、")}
+                {direct.length > 3 && <span> +{direct.length - 3}</span>}
+              </span>
+            )}
+          </span>
+        ),
+        hasContent: true,
+      };
+    }
+    case "differentiation": {
+      const txt = firstTruthy(v.summary, v.emotional, v.functional);
+      if (!txt) return { node: null, hasContent: false };
+      return { node: <span>{truncate(txt, 150)}</span>, hasContent: true };
+    }
+    case "trends": {
+      const fav = Array.isArray(v.favorable) ? v.favorable.filter((x: any) => x?.name) : [];
+      const risks = Array.isArray(v.risks) ? v.risks.filter((x: any) => x?.name) : [];
+      if (fav.length === 0 && risks.length === 0) return { node: null, hasContent: false };
+      return {
+        node: (
+          <span>
+            {fav.slice(0, 2).map((t: any, i: number) => (
+              <span key={`f${i}`} style={{ display: "block", fontSize: 11 }}>
+                <span style={{ color: "#059669", fontWeight: 600, fontFamily: "system-ui" }}>↗</span>
+                <span style={{ marginLeft: 4 }}>{truncate(t.name, 50)}</span>
+              </span>
+            ))}
+            {risks.slice(0, 2).map((t: any, i: number) => (
+              <span key={`r${i}`} style={{ display: "block", fontSize: 11 }}>
+                <span style={{ color: "#B45309", fontWeight: 600, fontFamily: "system-ui" }}>↘</span>
+                <span style={{ marginLeft: 4 }}>{truncate(t.name, 50)}</span>
+              </span>
+            ))}
+          </span>
+        ),
+        hasContent: true,
+      };
+    }
+    case "voice": {
+      const arche = isFilledArr(v.archetypes) ? v.archetypes : null;
+      const tone = isFilledArr(v.tone) ? v.tone : null;
+      if (!arche && !tone) return { node: null, hasContent: false };
+      return {
+        node: (
+          <span>
+            {arche && (
+              <span style={{ display: "block", marginBottom: 4 }}>
+                <span style={{ fontSize: 10, color: "#A3A3A3", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>原型</span>
+                <TagRow items={arche} max={3} />
+              </span>
+            )}
+            {tone && (
+              <span style={{ display: "block" }}>
+                <span style={{ fontSize: 10, color: "#A3A3A3", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>語調</span>
+                <TagRow items={tone} max={4} />
+              </span>
+            )}
+          </span>
+        ),
+        hasContent: true,
+      };
+    }
+    // Product / event fall-throughs
+    case "core": {
+      const txt = firstTruthy(v.oneLineValueProp, v.coreStatement, v.zhTagline);
+      if (!txt) return { node: null, hasContent: false };
+      return { node: <span>{truncate(txt, 150)}</span>, hasContent: true };
+    }
+    case "smp": {
+      const smp = firstTruthy(v.singleMindedProposition);
+      if (!smp) return { node: null, hasContent: false };
+      return {
+        node: (
+          <span>
+            <span style={{ display: "block", color: "#171717", fontWeight: 600, fontFamily: "system-ui" }}>
+              「{truncate(smp, 60)}」
+            </span>
+            {v.rationale && (
+              <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#737373" }}>
+                {truncate(v.rationale, 80)}
+              </span>
+            )}
+          </span>
+        ),
+        hasContent: true,
+      };
+    }
+  }
+
+  // ── Generic fallback: pull the first useful string-ish field ──
+  const candidates = [
+    v.summary, v.statement, v.text, v.story, v.body, v.description,
+    v.primary, v.primaryAudience, v.coreMessage, v.creativeTheme,
+    v.coreStatement, v.briefSummary, v.businessGoal,
+  ].filter((x: any) => typeof x === "string" && x.trim());
+  if (candidates.length > 0) {
+    return { node: <span>{truncate(candidates[0]!, 140)}</span>, hasContent: true };
+  }
+  // last resort: arrays
+  for (const key of Object.keys(v)) {
+    const arr = (v as any)[key];
+    if (Array.isArray(arr)) {
+      const strs = arr.filter((x: any) => typeof x === "string" && x.trim());
+      if (strs.length > 0) {
+        return { node: <TagRow items={strs} max={4} />, hasContent: true };
+      }
+      const named = arr.filter((x: any) => x?.name || x?.label);
+      if (named.length > 0) {
+        return {
+          node: <TagRow items={named.map((x: any) => x.name ?? x.label)} max={4} />,
+          hasContent: true,
+        };
+      }
+    }
+  }
+  return { node: null, hasContent: false };
+}
+
+/** 速查卡 preview — composes tagline + WHY + differentiation summary. */
+function buildBrandCheatPreview(seg?: Record<string, any>): { node: React.ReactNode | null; hasContent: boolean } {
+  if (!seg) return { node: null, hasContent: false };
+  const tagline = firstTruthy(seg.tagline?.zhTagline);
+  const why = firstTruthy(seg.goldenCircle?.why);
+  const diff = firstTruthy(seg.differentiation?.summary, seg.differentiation?.emotional);
+  if (!tagline && !why && !diff) return { node: null, hasContent: false };
+  return {
+    node: (
+      <span>
+        {tagline && (
+          <span style={{ display: "block", color: "#171717", fontWeight: 600, fontFamily: "system-ui", fontSize: 13, marginBottom: 4 }}>
+            「{truncate(tagline, 40)}」
+          </span>
+        )}
+        {why && (
+          <span style={{ display: "block", fontSize: 11, marginBottom: 2 }}>
+            <span style={{ color: "#A3A3A3", fontFamily: "system-ui", marginRight: 4 }}>WHY</span>
+            {truncate(why, 70)}
+          </span>
+        )}
+        {diff && (
+          <span style={{ display: "block", fontSize: 11 }}>
+            <span style={{ color: "#A3A3A3", fontFamily: "system-ui", marginRight: 4 }}>EDGE</span>
+            {truncate(diff, 70)}
+          </span>
+        )}
+      </span>
+    ),
+    hasContent: true,
+  };
+}
+
+/** AI 指令庫 preview — composes voice archetype + tone + forbidden words. */
+function buildPromptsPreview(seg?: Record<string, any>): { node: React.ReactNode | null; hasContent: boolean } {
+  if (!seg) return { node: null, hasContent: false };
+  const arche = isFilledArr(seg.voice?.archetypes) ? seg.voice.archetypes : null;
+  const tone = isFilledArr(seg.voice?.tone) ? seg.voice.tone : null;
+  const forbid = isFilledArr(seg.voice?.forbidden) ? seg.voice.forbidden : null;
+  if (!arche && !tone && !forbid) return { node: null, hasContent: false };
+  return {
+    node: (
+      <span>
+        {arche && (
+          <span style={{ display: "block", marginBottom: 4, fontSize: 11 }}>
+            <span style={{ color: "#A3A3A3", fontFamily: "system-ui", marginRight: 4 }}>原型</span>
+            {arche.slice(0, 2).join(" / ")}
+          </span>
+        )}
+        {tone && (
+          <span style={{ display: "block", marginBottom: 4 }}>
+            <TagRow items={tone} max={5} />
+          </span>
+        )}
+        {forbid && (
+          <span style={{ display: "block", fontSize: 10, color: "#B45309", fontFamily: "system-ui" }}>
+            禁區 · {forbid.slice(0, 3).join("、")}{forbid.length > 3 ? `+${forbid.length - 3}` : ""}
+          </span>
+        )}
+      </span>
+    ),
+    hasContent: true,
+  };
 }
 
 /* Editorial section label — tiny eyebrow + thin rule, optional counter chip. */
@@ -1825,16 +2158,17 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent }: {
         {titleText}
       </h3>
 
-      {/* Body: serif preview when filled, hint otherwise */}
+      {/* Body: serif preview when filled, hint otherwise. Use maxHeight
+          rather than -webkit-line-clamp so multi-block previews
+          (lists / tag rows) render fully without being clipped at line 4. */}
       {preview ? (
         <div style={{
           flex: 1,
-          fontSize: 12, lineHeight: 1.6, color: "#525252",
+          fontSize: 12, lineHeight: 1.55, color: "#525252",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
           overflow: "hidden",
-          display: "-webkit-box",
-          WebkitLineClamp: 4,
-          WebkitBoxOrient: "vertical",
+          maxHeight: 110,
+          textAlign: "left",
         }}>
           {preview}
         </div>
