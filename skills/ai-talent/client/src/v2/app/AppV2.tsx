@@ -54,6 +54,7 @@ import TermsPage from "../pages/legal/TermsPage";
 import PrivacyPage from "../pages/legal/PrivacyPage";
 import RefundPage from "../pages/legal/RefundPage";
 import AchievementsPage from "../pages/AchievementsPage";
+import BrandsManagePage from "../pages/BrandsManagePage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -175,7 +176,10 @@ export default function AppV2() {
           <Route path="/fb" element={<Navigate to="/30s" replace />} />
           <Route path="/quicktask-legacy" element={<QuickTasksPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/brands" element={<BrandsPage />} />
+          {/* 2026-05-11 (CJ): /brands is now the manager dashboard.
+              Old single-brand editor moved to /brands/edit?b=:id */}
+          <Route path="/brands" element={<BrandsManagePage />} />
+          <Route path="/brands/edit" element={<BrandsPage />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
           <Route path="/theater"   element={<TheaterPage />} />

@@ -100,6 +100,93 @@ export const brandRouter = router({
     return db.select().from(brands).where(eq(brands.userId, ctx.user.id)).orderBy(brands.createdAt);
   }),
 
+  /**
+   * 2026-05-11 (CJ「我需要管理我所有的品牌，看每個底下有多少活動和產品」):
+   * Returns brands with aggregated counts for the manage dashboard.
+   *   productCount  — products owned by user under this brand
+   *   eventCount    — events under this brand
+   *   missionCount  — missions for this brand
+   *   outputCount   — total mission_outputs across this brand's missions
+   *   lastActivity  — latest output createdAt (for sorting / display)
+   */
+  listWithStats: protectedProcedure.query(async ({ ctx }) => {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT
+         b.id, b.name, b.logoUrl, b.industry, b.website, b.createdAt,
+         COALESCE(p.cnt, 0) AS productCount,
+         COALESCE(e.cnt, 0) AS eventCount,
+         COALESCE(m.cnt, 0) AS missionCount,
+         COALESCE(o.cnt, 0) AS outputCount,
+         o.lastActivity
+       FROM brands b
+       LEFT JOIN (
+         SELECT brandId, COUNT(*) AS cnt FROM products WHERE userId = ? GROUP BY brandId
+       ) p ON p.brandId = b.id
+       LEFT JOIN (
+         SELECT brandId, COUNT(*) AS cnt FROM events WHERE userId = ? GROUP BY brandId
+       ) e ON e.brandId = b.id
+       LEFT JOIN (
+         SELECT brandId, COUNT(*) AS cnt FROM missions WHERE userId = ? GROUP BY brandId
+       ) m ON m.brandId = b.id
+       LEFT JOIN (
+         SELECT mi.brandId, COUNT(*) AS cnt, MAX(mo.createdAt) AS lastActivity
+         FROM mission_outputs mo
+         JOIN missions mi ON mi.id = mo.missionId
+         WHERE mi.userId = ?
+         GROUP BY mi.brandId
+       ) o ON o.brandId = b.id
+       WHERE b.userId = ?
+       ORDER BY o.lastActivity DESC, b.createdAt DESC`,
+      [ctx.user.id, ctx.user.id, ctx.user.id, ctx.user.id, ctx.user.id],
+    );
+    return (rows as any[]).map((r) => ({
+      id: Number(r.id),
+      name: r.name,
+      logoUrl: r.logoUrl,
+      industry: r.industry,
+      website: r.website,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      productCount: Number(r.productCount ?? 0),
+      eventCount: Number(r.eventCount ?? 0),
+      missionCount: Number(r.missionCount ?? 0),
+      outputCount: Number(r.outputCount ?? 0),
+      lastActivity: r.lastActivity instanceof Date ? r.lastActivity.toISOString() : (r.lastActivity ?? null),
+    }));
+  }),
+
+  /**
+   * 2026-05-11: detailed drill-down for one brand — list all its products,
+   * events, missions for the manage dashboard's expanded view.
+   */
+  getDetail: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [brandRows]: any = await localPool.execute(
+        `SELECT * FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      const brand = (brandRows as any[])[0];
+      if (!brand) return null;
+      const [products]: any = await localPool.execute(
+        `SELECT id, name, slug, description, createdAt FROM products
+         WHERE brandId = ? AND userId = ? ORDER BY createdAt DESC LIMIT 50`,
+        [input.id, ctx.user.id],
+      );
+      const [events]: any = await localPool.execute(
+        `SELECT id, name, slug, productId, startAt, endAt, createdAt FROM events
+         WHERE brandId = ? AND userId = ? ORDER BY COALESCE(startAt, createdAt) DESC LIMIT 50`,
+        [input.id, ctx.user.id],
+      );
+      const [missions]: any = await localPool.execute(
+        `SELECT id, title, workspace, status, createdAt, updatedAt FROM missions
+         WHERE brandId = ? AND userId = ? ORDER BY updatedAt DESC LIMIT 50`,
+        [input.id, ctx.user.id],
+      );
+      return { brand, products, events, missions };
+    }),
+
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {

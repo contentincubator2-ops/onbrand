@@ -731,7 +731,16 @@ export default function BrandsPage() {
           eyebrow → title → stats → message bar → tiles → kicker.
           測試 / 定案 chips live in the kicker row, NOT in the bar. */}
       {scopeBrands.length > 0 && (
-      <div className="relative pt-10 pb-6 px-6 text-center">
+      <div className="relative pt-6 pb-6 px-6 text-center">
+        {/* 2026-05-11 (CJ「品牌管理」): breadcrumb back to /brands manager */}
+        <div className="absolute top-5 left-5 z-10">
+          <a
+            href="/brands"
+            className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900 transition"
+          >
+            ← 所有品牌
+          </a>
+        </div>
         {/* Gear icon top-right — opens Settings sheet (連結 / 視覺 / AI 指令 / 危險區) */}
         {activeBrandIdForLocks && (
           <button
