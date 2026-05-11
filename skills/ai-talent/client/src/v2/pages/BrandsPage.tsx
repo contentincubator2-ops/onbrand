@@ -1624,38 +1624,37 @@ function PositioningGrid({
     // product / event fallbacks
     core: faBullseye, positioning: faBullseye, smp: faWandSparkles,
   };
-  const BG_CYCLE = ["#FFF7ED","#F5F3FF","#EFF6FF","#F0FDF4","#FFF0F6","#FFFBEB","#F0F9FF","#ECFDF5"];
+  // 2026-05-11 (CJ「最後品牌定位的呈現方式，也可以很 4A 廣告代理商嗎」):
+  // dropped the pastel BG_CYCLE. Cards are pure white with a 1px neutral
+  // border + serif eyebrow, matching the editorial discipline of the
+  // brain panel above. Filled segments get a subtle darker accent on
+  // the left edge instead of decorative tints.
+  const BG_CYCLE = ["#FFFFFF"];
 
   return (
-    <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32 }}>
+    <div style={{ padding: "8px 0 24px", display: "flex", flexDirection: "column", gap: 36 }}>
       {/* ── 工具群組 ── */}
       <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", letterSpacing: "0.10em", textTransform: "uppercase" }}>
-            品牌工具
-          </span>
-          <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
-        </div>
+        <SectionLabel label="品牌工具" />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
-          <AssetCard label="速查卡"   icon={faTableList} bg="#FFF7ED" onClick={() => onSelect("card")} />
-          <AssetCard label="AI 指令庫" icon={faRobot}     bg="#F5F3FF" onClick={() => onSelect("prompts")} />
+          <AssetCard label="速查卡"   icon={faTableList} bg="#FFFFFF" onClick={() => onSelect("card")} />
+          <AssetCard label="AI 指令庫" icon={faRobot}     bg="#FFFFFF" onClick={() => onSelect("prompts")} />
         </div>
       </div>
 
       {/* ── Segment groups ── */}
       {groupedSegs.map((group, gi) => (
         <div key={group.label}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", letterSpacing: "0.10em", textTransform: "uppercase" }}>
-              {group.label}
-            </span>
-            <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
-            {group.segs.length > 4 && (
-              <button style={{ fontSize: 12, color: "#6366F1", background: "none", border: "none", cursor: "pointer", whiteSpace: "nowrap", padding: 0, fontWeight: 500 }}>
-                顯示更多
-              </button>
-            )}
-          </div>
+          <SectionLabel
+            label={group.label}
+            counter={`${group.segs.filter(s => {
+              const v = segmentData?.[s.id];
+              if (v == null) return false;
+              if (typeof v === "string") return v.trim().length > 0;
+              if (typeof v === "object") return Object.values(v).some(x => x != null && (typeof x !== "string" || x.trim()));
+              return true;
+            }).length} / ${group.segs.length}`}
+          />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
             {group.segs.map((s, si) => {
               // Try to derive a preview from segment data:
@@ -1714,107 +1713,139 @@ function PositioningGrid({
         </div>
       ))}
 
-      {/* ⑥ 紫色浮動 + 按鈕 */}
-      <button title="新增" style={{
-        position: "fixed", bottom: 32, right: 32, zIndex: 50,
-        width: 52, height: 52, borderRadius: "50%",
-        background: "linear-gradient(135deg, #7C3AED, #6366F1)",
-        border: "none", cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: "white", fontSize: 22,
-        boxShadow: "0 6px 20px rgba(99,102,241,0.45)",
-        transition: "transform 0.18s, box-shadow 0.18s",
-      }}
-        onMouseEnter={e => { e.currentTarget.style.transform="scale(1.08)"; e.currentTarget.style.boxShadow="0 10px 28px rgba(99,102,241,0.55)"; }}
-        onMouseLeave={e => { e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(99,102,241,0.45)"; }}
-      >
-        <FontAwesomeIcon icon={faPlus} />
-      </button>
+      {/* 2026-05-11 (CJ 4A discipline): removed gradient purple FAB.
+          New tasks are launched via top-bar / hero, not a decorative
+          floating button. Page stays editorial. */}
     </div>
   );
 }
 
-/* ─────────────────────────── AssetCard ─────────────────────────── */
-// ③ 4-col 資產卡片：hover scale(1.02) + shadow 加深。
-// 支援可選的 preview — 已填內容直接顯示在卡片上，省去點進去才看到。
+/* Editorial section label — tiny eyebrow + thin rule, optional counter chip. */
+function SectionLabel({ label, counter }: { label: string; counter?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+      <span style={{
+        fontSize: 10, fontWeight: 600, color: "#525252",
+        letterSpacing: "0.22em", textTransform: "uppercase",
+      }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
+      {counter && (
+        <span style={{
+          fontSize: 10, fontWeight: 500, color: "#A3A3A3",
+          letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
+        }}>
+          {counter}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────── AssetCard ───────────────────────────
+   2026-05-11 (CJ「最後品牌定位的呈現方式，也可以很 4A 廣告代理商」)
+   Redesigned for editorial discipline:
+   - Pure white, 1px neutral border, no shadow at rest
+   - 14×14 thin icon top-left, no decorative pill background
+   - Eyebrow line "01.1 GOLDEN CIRCLE" in 9px uppercase tracking
+   - Title in 13.5px sans, preview in serif body
+   - Filled state: black 1px left edge bar — like a margin annotation
+   - Hover: border → black, no scale/shadow circus
+   ───────────────────────────────────────────────────────────────── */
 function AssetCard({ label, icon, bg, onClick, preview, hasContent }: {
   label: string; icon: any; bg: string; onClick: () => void;
   preview?: React.ReactNode;
   hasContent?: boolean;
 }) {
-  const [hovered, setHovered] = React.useState(false);
-  // Two layouts:
-  //   compact (no preview)  → centered icon + label, 28px padding
-  //   detailed (preview)    → top-left icon + label, preview content area, 14px padding
-  if (preview) {
-    return (
-      <button
-        onClick={onClick}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          display: "flex", flexDirection: "column", alignItems: "stretch", textAlign: "left",
-          gap: 8, padding: "14px 14px 12px", borderRadius: 12,
-          background: bg, border: "1px solid rgba(0,0,0,0.06)",
-          cursor: "pointer", width: "100%",
-          minHeight: 132,
-          transform: hovered ? "scale(1.015)" : "scale(1)",
-          boxShadow: hovered ? "0 8px 24px rgba(0,0,0,0.13)" : "0 1px 4px rgba(0,0,0,0.06)",
-          transition: "transform 0.2s ease, box-shadow 0.2s ease",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+  // Split "1.1 Golden Circle" → eyebrow "01.1" + title "Golden Circle"
+  const m = label.match(/^(\S+)\s+(.+)$/);
+  const eyebrow = m ? m[1] : "";
+  const titleText = m ? m[2] : label;
+
+  return (
+    <button
+      onClick={onClick}
+      className="group relative text-left transition-colors"
+      style={{
+        display: "flex", flexDirection: "column", gap: 10,
+        padding: "16px 16px 14px",
+        background: bg,
+        border: "1px solid #E5E5E5",
+        borderRadius: 8,
+        cursor: "pointer", width: "100%",
+        minHeight: preview ? 140 : 124,
+        position: "relative",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#171717"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E5E5E5"; }}
+    >
+      {/* Filled accent — 1px black left edge bar */}
+      {hasContent && (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", left: 0, top: 12, bottom: 12, width: 2,
+            background: "#171717", borderRadius: 2,
+          }}
+        />
+      )}
+
+      {/* Top row: icon + eyebrow */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <FontAwesomeIcon
+          icon={icon}
+          style={{ fontSize: 12, color: hasContent ? "#171717" : "#A3A3A3", flexShrink: 0 }}
+        />
+        {eyebrow && (
           <span style={{
-            width: 28, height: 28, borderRadius: 8,
-            background: "rgba(255,255,255,0.65)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0,
+            fontSize: 9, fontWeight: 700, color: "#A3A3A3",
+            letterSpacing: "0.2em", textTransform: "uppercase",
+            fontVariantNumeric: "tabular-nums",
           }}>
-            <FontAwesomeIcon icon={icon} style={{ fontSize: 14, color: "#6B7280" }} />
+            {eyebrow}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", flex: 1, minWidth: 0 }}>
-            {label}
+        )}
+        <div style={{ flex: 1 }} />
+        {hasContent && (
+          <span style={{
+            fontSize: 9, fontWeight: 600, color: "#171717",
+            letterSpacing: "0.18em", textTransform: "uppercase",
+          }}>
+            Filled
           </span>
-          {hasContent && (
-            <span style={{
-              fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 4,
-              background: "rgba(16,185,129,0.18)", color: "#047857",
-            }}>已填</span>
-          )}
-        </div>
+        )}
+      </div>
+
+      {/* Title */}
+      <h3 style={{
+        fontSize: 14, fontWeight: 600, color: "#171717",
+        lineHeight: 1.35, margin: 0,
+      }}>
+        {titleText}
+      </h3>
+
+      {/* Body: serif preview when filled, hint otherwise */}
+      {preview ? (
         <div style={{
           flex: 1,
-          fontSize: 11, lineHeight: 1.55, color: "#4B5563",
+          fontSize: 12, lineHeight: 1.6, color: "#525252",
+          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
           overflow: "hidden",
           display: "-webkit-box",
-          WebkitLineClamp: 5,
+          WebkitLineClamp: 4,
           WebkitBoxOrient: "vertical",
         }}>
           {preview}
         </div>
-      </button>
-    );
-  }
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        gap: 12, padding: "28px 16px", borderRadius: 12,
-        background: bg, border: "1px solid rgba(0,0,0,0.06)",
-        cursor: "pointer", width: "100%",
-        transform: hovered ? "scale(1.02)" : "scale(1)",
-        boxShadow: hovered
-          ? "0 8px 24px rgba(0,0,0,0.13)"
-          : "0 1px 4px rgba(0,0,0,0.06)",
-        transition: "transform 0.2s ease, box-shadow 0.2s ease",
-      }}
-    >
-      <FontAwesomeIcon icon={icon} style={{ fontSize: 28, color: "#6B7280", opacity: 0.85 }} />
-      <span style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>{label}</span>
-      <span style={{ fontSize: 10, color: "#9CA3AF" }}>尚未填寫 — 點進去開始</span>
+      ) : (
+        <span style={{
+          fontSize: 11, color: "#A3A3A3", marginTop: "auto",
+          letterSpacing: "0.05em",
+        }}>
+          尚未填寫 — 點擊開始
+        </span>
+      )}
     </button>
   );
 }
@@ -2556,13 +2587,20 @@ function PositioningTopRow({
     scopeMode === "event" ? "event" : null;
 
   const [startError, setStartError] = useState<string | null>(null);
+  // 2026-05-11 (CJ「第一次按重新自動定位的時候，都沒有反應」): the
+  // getStatus query polls every 4s, so after start mutation succeeds
+  // the button label stayed "重新自動定位" for up to 4 seconds —
+  // users thought nothing happened. Use a local optimistic flag so the
+  // UI flips to "啟動中…" instantly, plus immediate invalidate.
+  const [optimisticStarting, setOptimisticStarting] = useState(false);
+  const utils = (trpc as any).useUtils?.() ?? null;
 
   const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
     { entityKind: entityKind ?? "brand", entityId: brandId ?? 0 },
     { enabled: !!brandId && !!entityKind, refetchInterval: 4_000 },
   );
   const jobData = (job?.data as any) ?? null;
-  const isRunning = jobData?.status === "running";
+  const isRunning = jobData?.status === "running" || optimisticStarting;
   const isDone = jobData?.status === "done";
   const isFailed = jobData?.status === "failed";
   const cur = Number(jobData?.currentStep ?? 0);
@@ -2570,21 +2608,34 @@ function PositioningTopRow({
 
   const startMut = (trpc as any).positioningJobs?.start?.useMutation?.({
     onSuccess: (data: any) => {
-      if (!data?.ok) setStartError(data?.error || "啟動失敗");
-      else setStartError(null);
+      if (!data?.ok) {
+        setStartError(data?.error || "啟動失敗");
+        setOptimisticStarting(false);
+      } else {
+        setStartError(null);
+        // Immediately refetch status so the button flips to "自動定位中…".
+        utils?.positioningJobs?.getStatus?.invalidate?.();
+        // Stop optimistic state once the server reports running.
+        setTimeout(() => setOptimisticStarting(false), 5_000);
+      }
     },
-    onError: (e: any) => setStartError(String(e?.message ?? e ?? "啟動失敗")),
+    onError: (e: any) => {
+      setStartError(String(e?.message ?? e ?? "啟動失敗"));
+      setOptimisticStarting(false);
+    },
   });
 
   const handleAuto = () => {
     if (!brandId || !entityKind || locked || isRunning) return;
     setStartError(null);
+    setOptimisticStarting(true); // instant feedback
     startMut?.mutate?.({ entityKind, entityId: brandId, lang: "zh-TW" });
   };
 
   const totalSteps = entityKind === "brand" ? 14 : entityKind === "product" ? 6 : 4;
   const buttonLabel =
-    isRunning ? `自動定位中 (${cur}/${total || totalSteps})…`
+    optimisticStarting && !jobData?.status ? "啟動中…"
+  : isRunning ? `自動定位中 (${cur}/${total || totalSteps})…`
   : isDone     ? "重新自動定位"
   : isFailed   ? "重試自動定位"
   : "自動定位";
