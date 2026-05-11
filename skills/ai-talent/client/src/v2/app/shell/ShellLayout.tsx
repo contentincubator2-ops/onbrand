@@ -29,6 +29,7 @@ import {
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
   faCircleHalfStroke, faCircleInfo, faBorderAll, faDisplay, faBriefcase,
+  faShareNodes, faTrophy,
   faStar, faImage, faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
 } from "@fortawesome/free-solid-svg-icons";
@@ -1883,41 +1884,39 @@ function AccountPopup({ onLogout, onClose }: {
   });
   const totalCredits = (balanceQuery?.data as any)?.totalAvailable ?? null;
 
-  const comingSoon = (label: string) => {
-    showToastGlobal(`「${label}」即將推出`, "info");
-    onClose();
-  };
-
+  // 2026-05-12 (CJ「通盤檢查每個 S 按鈕選項都要有地方去」):
+  // 全部 7 項本來有 4 個是死按鈕（即將推出 toast / modal）。重整後每個都有
+  // 真實的地方去，並補上「連結社群帳號」「我的成就」「客服」三個原本沒入口
+  // 的功能。
   const menuItems = [
     {
-      icon: faGear, label: "設定", arrow: false, badge: null, danger: false,
-      // 2026-05-08: route to Brands settings sheet (closest existing settings UX)
+      icon: faGear, label: "帳號設定", arrow: true, badge: null, danger: false,
+      // 真實的帳號設定頁（電子郵件 / 密碼 / 訂閱 / 統編 / 帳號刪除）
+      action: () => { navigate("/settings/account"); onClose(); },
+    },
+    {
+      icon: faShareNodes, label: "品牌與社群連結", arrow: true, badge: null, danger: false,
+      // 連結社群帳號（FB OAuth / IG / LinkedIn）住在每個品牌的 publish tab。
+      // 從這裡去品牌管理頁，點任何品牌 → 設定 → 發布即可連結。
       action: () => { navigate("/brands"); onClose(); },
     },
     {
-      icon: faCircleHalfStroke, label: "主題", arrow: false, badge: "即將推出", danger: false,
-      action: () => comingSoon("主題（深淺色）"),
+      icon: faBriefcase, label: "方案和定價", arrow: true, badge: null, danger: false,
+      // 已有 /pricing 路由（4 個 tier），不再開 modal。
+      action: () => { navigate("/pricing"); onClose(); },
     },
     {
-      icon: faCircleInfo, label: "說明和資源", arrow: false, badge: null, danger: false,
-      // External support email
-      action: () => { window.location.href = "mailto:cj@sowork.ai?subject=Marketing%20OS%20%E6%94%AF%E6%8F%B4"; },
+      icon: faTrophy, label: "我的成就", arrow: true, badge: null, danger: false,
+      // /achievements 已存在，原本 S 選單沒入口
+      action: () => { navigate("/achievements"); onClose(); },
     },
     {
-      icon: faBorderAll, label: "進階工具", arrow: false, badge: "即將推出", danger: false,
-      action: () => comingSoon("進階工具"),
+      icon: faCircleInfo, label: "聯絡客服", arrow: false, badge: null, danger: false,
+      // 2026-05-12 — 信箱修正為 sowork@sowork.tw
+      action: () => { window.location.href = "mailto:sowork@sowork.tw?subject=Drop%20%E7%A7%92%E7%A8%BF%20%E6%94%AF%E6%8F%B4"; },
     },
     {
-      icon: faBriefcase, label: "方案和定價", arrow: false, badge: null, danger: false,
-      // Opens informational pricing modal (no Stripe — contact-sales)
-      action: () => { setPricingOpen(true); },
-    },
-    {
-      icon: faDisplay, label: "取得 SoWork 應用程式", arrow: false, badge: "即將推出", danger: false,
-      action: () => comingSoon("桌面應用程式"),
-    },
-    {
-      icon: faRightFromBracket, label: "從所有帳號登出", arrow: false, badge: null, danger: true,
+      icon: faRightFromBracket, label: "登出", arrow: false, badge: null, danger: true,
       action: onLogout,
     },
   ];

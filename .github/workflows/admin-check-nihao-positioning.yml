@@ -1,0 +1,51 @@
+name: Admin — Check 你好中文 positioning JSON column
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+
+            echo "════════ brands.positioning JSON (raw, first 2000 chars) ════════"
+            mysql -h localhost -u mos_user mos_db -BN -e "
+              SELECT positioning FROM brands WHERE id = 2842
+            " | head -c 2000
+
+            echo ""
+            echo ""
+            echo "════════ JSON keys at top level ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT
+                JSON_LENGTH(positioning) AS top_keys_count,
+                JSON_KEYS(positioning) AS top_keys
+              FROM brands WHERE id = 2842 \G"
+
+            echo ""
+            echo "════════ Specific key probes ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT
+                JSON_EXTRACT(positioning, '\$.tagline') AS tagline_in_json,
+                JSON_EXTRACT(positioning, '\$.archetype') AS archetype,
+                JSON_EXTRACT(positioning, '\$.voice') AS voice,
+                JSON_EXTRACT(positioning, '\$.goldenCircle') AS gold_circle,
+                LEFT(JSON_EXTRACT(positioning, '\$._assets'), 300) AS assets_preview
+              FROM brands WHERE id = 2842 \G"
+
+            echo ""
+            echo "════════ Top-level columns (what buildBrandPrefix actually reads) ════════"
+            mysql -h localhost -u mos_user mos_db -e "
+              SELECT positioningStatus,
+                     LEFT(positioningSummary, 200) AS positioningSummary,
+                     LEFT(positioningReport, 200) AS positioningReport,
+                     tagline
+              FROM brands WHERE id = 2842 \G"
