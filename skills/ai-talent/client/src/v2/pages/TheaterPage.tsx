@@ -952,6 +952,23 @@ export default function TheaterPage() {
           });
           return next;
         });
+        // 2026-05-12: collect first sentences of cells already written in
+        // this run on the same platform — pass them so the model is forbidden
+        // from repeating the same opening structure. Mitigates gpt-4.1
+        // "上週遇到一位..." / "大家都以為..." template lock-in.
+        const priorOpenings: string[] = [];
+        for (const [k, st] of cellsRef.current.entries()) {
+          if (k === task.key) continue;
+          if (!st.caption || st.status === "writing") continue;
+          // Same-platform priors carry more weight; mix all platforms anyway
+          // since template lock-in tends to bleed across platforms too.
+          const firstLine = String(st.caption).split(/[\n。！？!?]/)[0]?.trim();
+          if (firstLine && firstLine.length >= 6 && firstLine.length <= 80) {
+            priorOpenings.push(firstLine);
+          }
+          if (priorOpenings.length >= 12) break;
+        }
+
         try {
           const r = await generateCellMut.mutateAsync({
             brandId,
@@ -973,6 +990,8 @@ export default function TheaterPage() {
             // Phase 3b: 素材 context
             products: products.map((p) => ({ name: p.name, usp: p.usp, launchDate: p.launchDate })),
             photoTags: photos.map((ph) => ph.tag),
+            // 2026-05-12: anti-repetition (server forbids these openings)
+            priorOpenings: priorOpenings.length > 0 ? priorOpenings : undefined,
           });
           if (stopRef.current) return;
           if (r.ok && r.caption) {

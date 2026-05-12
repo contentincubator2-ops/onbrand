@@ -816,6 +816,14 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
     max_tokens: params.maxTokens ?? params.max_tokens ?? 8192,
   };
 
+  // 2026-05-12: pass through temperature + penalty for non-reasoning models.
+  // gpt-4.1 locks into template phrasing without these; bumps creativity for
+  // brand-voice copy without hurting determinism for structured output.
+  const anyP = params as any;
+  if (typeof anyP.temperature === "number")        payload.temperature       = anyP.temperature;
+  if (typeof anyP.presence_penalty === "number")   payload.presence_penalty  = anyP.presence_penalty;
+  if (typeof anyP.frequency_penalty === "number")  payload.frequency_penalty = anyP.frequency_penalty;
+
   if (tools && tools.length > 0) {
     payload.tools = tools;
   }

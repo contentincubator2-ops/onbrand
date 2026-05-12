@@ -574,6 +574,12 @@ ${platformAsks}
         name: z.string(), usp: z.string(), launchDate: z.string().optional(),
       })).max(10).optional(),
       photoTags: z.array(z.string()).max(10).optional(),
+      // 2026-05-12 — anti-structural-repetition. Client passes the first
+      // sentence of every already-rendered cell in this run. We forbid the
+      // model from echoing those opening patterns. Mitigates gpt-4.1's
+      // tendency to lock into "上週遇到一位..." / "大家都以為..." templates
+      // across the whole week.
+      priorOpenings: z.array(z.string()).max(20).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const [brandRules, knowledgeBlock, realContent] = await Promise.all([
@@ -617,6 +623,20 @@ ${allRules.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
         ? `\n【今日 CTA 意圖 — 強制執行】\n${CTA_PLAYBOOK[input.cta]}\n禁止用其他 CTA 結尾。`
         : "";
 
+      // 2026-05-12: anti-template list from cells already rendered in this run.
+      // We pass up to 12 prior opening fragments and explicitly forbid both
+      // verbatim echo AND structural mimicry (same template with different nouns).
+      const priorOpeningsInstruction = (input.priorOpenings && input.priorOpenings.length > 0)
+        ? `\n【本檔期已產出的開頭 — 嚴禁與以下任一句「結構或起手式」雷同】
+這些是本週其他天已寫好的開頭。**不可重複它們的起手語、句型、敘事結構**（即使換掉名詞也算重複）：
+${input.priorOpenings.slice(0, 12).map((s, i) => `${i + 1}. ${s.slice(0, 60)}`).join("\n")}
+
+特別禁止：
+- 不要用「上週遇到一位 X」「最近發現」「大家都以為」「晚上 X 點」這種「敘事鉤起手式」如果其他天已用過。
+- 不要用同樣的「人物 → 場景 → 對話」模板。
+- 想想完全不同的進入角度：直接拋數字、反問、產品特寫、地點切入、用戶引言、爭議句、節氣現象 — 自己挑一個沒被用過的。`
+        : "";
+
       // Phase 1.5: real Perplexity scout patterns for this platform.
       // Anchor the writer to actual high-engagement structures from the
       // brand's industry, not LLM-trained boilerplate. We DO NOT ask the
@@ -652,7 +672,7 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 
 【平台原生結構（必讀）】
 ${guide}
-${hookInstruction}${ctaInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}
+${hookInstruction}${ctaInstruction}${priorOpeningsInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。
@@ -693,15 +713,23 @@ ${importantHint}
 不要在 JSON 外加任何文字 / markdown 圍籬 / 解釋。`;
 
       try {
+        // 2026-05-12 (CJ「結構重複」): bump temperature + penalty when prior
+        // openings exist, so gpt-4.1 doesn't lock into "上週遇到一位..." templates.
+        const hasPriors = (input.priorOpenings?.length ?? 0) > 0;
         const r = await invokeLLM({
           provider: "anthropic",
           model: "claude-haiku-4-5",
           maxTokens: 800,
+          // Higher temperature + presence_penalty pushes the model off its
+          // template prior. Reasoning models will strip these automatically.
+          ...(hasPriors
+            ? { temperature: 0.95, presence_penalty: 0.6, frequency_penalty: 0.4 }
+            : { temperature: 0.85, presence_penalty: 0.3, frequency_penalty: 0.2 }),
           messages: [
             { role: "system", content: sys },
             { role: "user", content: user },
           ],
-        });
+        } as any);
         const raw = r.choices[0]?.message?.content?.toString().trim() ?? "";
         // Strip code fences if present
         const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
