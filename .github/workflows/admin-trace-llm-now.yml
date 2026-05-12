@@ -1,0 +1,35 @@
+name: Admin — Trace LLM / generation errors right now
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set -e
+            LOG_OUT=/home/$(whoami)/.pm2/logs/marketing-os-out.log
+            LOG_ERR=/home/$(whoami)/.pm2/logs/marketing-os-error.log
+
+            echo "════════════════════════════════════════════════════════"
+            echo "  Recent LLM / quickTask errors (last 30 min window)"
+            echo "════════════════════════════════════════════════════════"
+
+            echo
+            echo "── error-log: last 200 non-empty lines ─────"
+            tail -400 "$LOG_ERR" 2>/dev/null | tail -200
+
+            echo
+            echo "── out-log: anything mentioning LLM/anthropic/openai/quickTask/orchestra/preflight ─────"
+            tail -1500 "$LOG_OUT" 2>/dev/null | grep -iE "anthropic|openai|llm|quicktask|orchestra|preflight|FORBIDDEN|invokeLLM|model.*error|api.*error" | tail -80
+
+            echo
+            echo "── pm2 process state ─────"
+            pm2 list 2>&1 | tail -10
