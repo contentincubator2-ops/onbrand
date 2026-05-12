@@ -206,8 +206,16 @@ export default function ShellLayout() {
         onNavigate={(to) => navigate(to)}
       />
 
-      {/* Main content */}
-      <div style={{ paddingLeft: contentLeft, transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}>
+      {/* Main content. 2026-05-12 (CJ「header 標題與品牌 bar 重疊」): the
+          fixed BrandSwitcher pill (top:10, left:12, width:260, height:44)
+          floats over the top of every page. Without a top padding here,
+          page content (e.g. RunPage's task title row) is overlapped by
+          the pill. 64px clears the pill (10 + 44 + 10 buffer). */}
+      <div style={{
+        paddingLeft: contentLeft,
+        paddingTop: 64,
+        transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)",
+      }}>
         {/* 2026-05-10 trial countdown bar + achievement watcher (no UI) */}
         <TrialCountdownBar />
         {/* 2026-05-12 workspace switcher pill — shows only for Team/Agency users

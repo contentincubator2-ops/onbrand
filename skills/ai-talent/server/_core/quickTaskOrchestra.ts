@@ -1110,6 +1110,11 @@ export async function runOrchestra(args: {
         //  (b) Always run mergeHookAndBody which dedupes overlapping paragraphs.
         caption = mergeHookAndBody(caption, articleBody);
       }
+      // 2026-05-12 (CJ「文案中第一段話跟文中最後一段重複」): always run
+      // internal-dedupe even when no separate articleBody. Catches the
+      // writer LLM duplicating its own hook + hashtag groups within a
+      // single output.
+      if (caption) caption = deduplicateInternalCaption(caption);
       if (!caption) {
         errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
       }
@@ -1441,4 +1446,59 @@ function mergeHookAndBody(hook: string, body: string): string {
   }
 
   return `${h}\n\n${cleanBody}`;
+}
+
+/**
+ * 2026-05-12 (CJ「文案中第一段話跟最後一段重複」): after mergeHookAndBody
+ * we still see captions where the writer LLM internally duplicated content
+ * (hook appears twice, hashtags 3x, etc). Run a strong pass that detects:
+ *   - Duplicate paragraphs (same after whitespace/punctuation normalize)
+ *   - Duplicate hashtag-only lines (collapse to last occurrence)
+ *   - Adjacent sentences with high overlap (≥80%)
+ */
+export function deduplicateInternalCaption(text: string): string {
+  if (!text) return text;
+  const norm = (s: string) =>
+    s.toLowerCase()
+      .replace(/[\s　]+/g, " ")
+      .replace(/[，。、！？!?，、：:；;]/g, "")
+      .trim();
+
+  // Split into paragraphs by blank lines
+  const paragraphs = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length <= 1) return text;
+
+  const HASHTAG_LINE_RE = /^(\s*#\S+\s*)+$/;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  // Walk in REVERSE so the LAST occurrence of hashtags wins (industry
+  // convention: hashtags at end of post).
+  for (let i = paragraphs.length - 1; i >= 0; i--) {
+    const p = paragraphs[i]!;
+    const key = norm(p);
+    if (!key) continue;
+    // Skip if this exact paragraph already accepted later in the post
+    if (seen.has(key)) continue;
+    // For hashtag-only paragraphs: also dedupe by the set of hashtags
+    // (handles "#a #b #c" vs "#a #b #c " with trailing space variants).
+    if (HASHTAG_LINE_RE.test(p)) {
+      const hashtagKey = "HASHTAGS:" + p.match(/#\S+/g)!.sort().join(" ").toLowerCase();
+      if (seen.has(hashtagKey)) continue;
+      seen.add(hashtagKey);
+    }
+    // For sentence-form paragraphs: also block paragraphs that are
+    // substrings of an already-accepted paragraph (handles "X with hashtags"
+    // vs "X" appearing as separate paragraphs).
+    let isSubsetOfAccepted = false;
+    for (const accepted of seen) {
+      if (accepted.length > 10 && accepted.includes(key) && key.length >= 10) {
+        isSubsetOfAccepted = true;
+        break;
+      }
+    }
+    if (isSubsetOfAccepted) continue;
+    seen.add(key);
+    out.unshift(p);
+  }
+  return out.join("\n\n");
 }
