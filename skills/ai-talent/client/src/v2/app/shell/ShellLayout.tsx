@@ -82,11 +82,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/theater",   label: "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
   { to: "/brands",    label: "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
   // 2026-05-12 (CJ「加一個獨立的功能區叫做『連結』」): direct entry to
-  // the brand settings sheet (connector tab) so users don't need to
-  // drill /brands → click brand card → tab. Active-brand-aware: lands
-  // on /brands/edit?b=<active>&tab=connector. If no active brand, the
-  // BrandsPage shows the list selector first.
-  { to: "/connections", label: "連結",   icon: <FontAwesomeIcon icon={faShareNodes} /> },
+  // brand settings (connector tab). Points to /brands/settings directly
+  // — BrandSettingsPage handles missing ?b= by falling back to ctx
+  // brandId. matchPrefix ensures this item highlights (not 品牌) when on
+  // /brands/settings.
+  { to: "/brands/settings", label: "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands/settings" },
   // 範本 / 比稿 / 案例 hidden — direct URL access still works (/templates,
   // /boardroom, /playbooks).
 ];
@@ -350,9 +350,26 @@ function IconBar({
       {/* Nav icons */}
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px" }}>
         {NAV_ITEMS.map((item) => {
-          const isActive = item.matchPrefix
-            ? currentPath.startsWith(item.matchPrefix)
-            : (item.to === "/" ? currentPath === "/" : currentPath.startsWith(item.to));
+          // 2026-05-12 (CJ「按了連結還是顯示為品牌區」): pick the MOST SPECIFIC
+          // matching item. If another nav item has a longer matching prefix,
+          // this one yields. e.g. on /brands/settings, the 連結 item (prefix
+          // /brands/settings) wins over the 品牌 item (prefix /brands).
+          const myPrefix = item.matchPrefix ?? item.to;
+          const myMatches =
+            item.to === "/" ? currentPath === "/" : currentPath.startsWith(myPrefix);
+          let beatenByMoreSpecific = false;
+          if (myMatches) {
+            for (const other of NAV_ITEMS) {
+              if (other.to === item.to) continue;
+              const otherPrefix = other.matchPrefix ?? other.to;
+              if (otherPrefix === "/") continue;
+              if (currentPath.startsWith(otherPrefix) && otherPrefix.length > myPrefix.length) {
+                beatenByMoreSpecific = true;
+                break;
+              }
+            }
+          }
+          const isActive = myMatches && !beatenByMoreSpecific;
           return <IconNavLink key={item.to} item={item} active={isActive} onClick={() => onNavigate(item.to)} />;
         })}
 
