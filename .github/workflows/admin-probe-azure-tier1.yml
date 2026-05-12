@@ -1,0 +1,108 @@
+name: Admin — Probe higher-tier Azure Foundry models
+
+# Test the strongest models in the Foundry deployment with correct params
+# (gpt-5*/o3/o4 need max_completion_tokens, not max_tokens).
+# We're looking for the best Chinese-brand-voice model to use as fallback.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 240s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            cat > /tmp/probe_tier1.py <<'PYEOF'
+            import os, json, time, urllib.request, urllib.error
+            AZF_KEY = os.environ["AZURE_FOUNDRY_API_KEY"]
+            AZF_EP  = os.environ["AZURE_FOUNDRY_PROJECT_ENDPOINT"].rstrip("/")
+            URL = f"{AZF_EP}/openai/v1/chat/completions"
+            REASONING_PREFIX = ("gpt-5", "o1", "o3", "o4")
+
+            PROMPT = ("你是台灣品牌策略顧問。請用 80 字內，為一家賣手工木質玩具的台灣品牌「樂木」"
+                      "寫一句母親節活動 hook（要有情緒鉤、不要『限時優惠』這種促銷腔）。")
+
+            def call(model):
+                is_reasoning = any(model.lower().startswith(p) for p in REASONING_PREFIX)
+                payload = {"model": model, "messages":[{"role":"user","content":PROMPT}]}
+                if is_reasoning:
+                    payload["max_completion_tokens"] = 400
+                else:
+                    payload["max_tokens"] = 400
+                body = json.dumps(payload).encode()
+                req = urllib.request.Request(URL, data=body,
+                    headers={"api-key":AZF_KEY,"content-type":"application/json"},
+                    method="POST")
+                t0 = time.time()
+                try:
+                    with urllib.request.urlopen(req, timeout=60) as r:
+                        raw = r.read().decode("utf-8","replace")
+                    dt = time.time() - t0
+                except urllib.error.HTTPError as e:
+                    raw = e.read().decode("utf-8","replace")
+                    return {"model":model, "ok":False, "err":f"HTTP {e.code}: {raw[:200]}", "ms":int((time.time()-t0)*1000)}
+                except Exception as e:
+                    return {"model":model, "ok":False, "err":f"{type(e).__name__}: {e}", "ms":int((time.time()-t0)*1000)}
+                try:
+                    d = json.loads(raw)
+                except:
+                    return {"model":model, "ok":False, "err":"parse fail", "ms":int(dt*1000)}
+                ch = d.get("choices") or []
+                if not ch:
+                    err = d.get("error") or d
+                    return {"model":model, "ok":False, "err":json.dumps(err)[:200], "ms":int(dt*1000)}
+                m = ch[0].get("message") or {}
+                c = m.get("content") or m.get("reasoning_content") or ""
+                return {
+                    "model": model,
+                    "ok": bool(c.strip()),
+                    "content": c[:400],
+                    "ms": int(dt*1000),
+                    "tokens_out": d.get("usage",{}).get("completion_tokens"),
+                    "finish": ch[0].get("finish_reason"),
+                }
+
+            MODELS = [
+                "gpt-5.4",
+                "gpt-5.4-mini",
+                "gpt-5.4-nano",
+                "gpt-4.1",
+                "gpt-4.1-mini",
+                "gpt-4.1-nano",
+                "gpt-4o-mini",
+                "o3",
+                "o4-mini",
+                "grok-4-1-fast",
+                "grok-4-20-reasoning",
+                "Llama-3.3-70B",
+                "FW-MiniMax-M2.5",
+                "Phi-4-multimodal",
+            ]
+            results = []
+            for m in MODELS:
+                r = call(m)
+                results.append(r)
+                tag = "✓" if r["ok"] else "✗"
+                line = f"  {tag} {m:<22} {r['ms']:>5}ms"
+                if r["ok"]:
+                    line += f"  out={r.get('tokens_out')}  {r['content'][:80].replace(chr(10),' ')}"
+                else:
+                    line += f"  {r['err'][:120]}"
+                print(line)
+
+            print("\n── WINNERS (working, ranked by quality + speed) ─────")
+            winners = [r for r in results if r["ok"]]
+            for r in winners:
+                print(f"  {r['model']:<22} {r['ms']}ms  finish={r['finish']}  {r['content'][:120]}")
+            PYEOF
+
+            python3 /tmp/probe_tier1.py
