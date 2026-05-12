@@ -623,7 +623,12 @@ function getFallbackChain(): string[] {
   // anthropic → azure-foundry (gpt-5.4) → openai (gpt-4.1-mini) → gemini 2.5-flash
   //   → qwen (zh-strong) → gemma 3-27b (open-weights) → deepseek
   // 7 providers across 5 vendors. Override via LLM_FALLBACK_CHAIN.
-  return ["anthropic", "azure-foundry", "openai", "gemini", "qwen", "gemma", "deepseek", "ollama"];
+  // 2026-05-12 reordered after side-by-side benchmark (admin-bench-all-providers):
+  //   Qwen Plus API + DeepSeek V3 both outscore gpt-4.1-mini on zh brand voice
+  //   and are cheaper. Gemini truncates output on OpenAI-compat shim → demoted.
+  //   Gemma 3-27b returns 404 on AI Studio shim → removed (would need Vertex AI).
+  //   Ollama qwen2.5:7b is true last-resort (slow + simplified-zh leakage).
+  return ["anthropic", "azure-foundry", "qwen", "deepseek", "openai", "gemini", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {
