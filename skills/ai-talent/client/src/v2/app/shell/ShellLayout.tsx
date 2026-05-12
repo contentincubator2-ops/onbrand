@@ -81,6 +81,12 @@ const NAV_ITEMS: NavItem[] = [
   // strategy thoughts. Route /theater kept for backward compat.
   { to: "/theater",   label: "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
   { to: "/brands",    label: "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
+  // 2026-05-12 (CJ「加一個獨立的功能區叫做『連結』」): direct entry to
+  // the brand settings sheet (connector tab) so users don't need to
+  // drill /brands → click brand card → tab. Active-brand-aware: lands
+  // on /brands/edit?b=<active>&tab=connector. If no active brand, the
+  // BrandsPage shows the list selector first.
+  { to: "/connections", label: "連結",   icon: <FontAwesomeIcon icon={faShareNodes} /> },
   // 範本 / 比稿 / 案例 hidden — direct URL access still works (/templates,
   // /boardroom, /playbooks).
 ];

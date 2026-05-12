@@ -56,6 +56,7 @@ import PrivacyPage from "../pages/legal/PrivacyPage";
 import RefundPage from "../pages/legal/RefundPage";
 import AchievementsPage from "../pages/AchievementsPage";
 import BrandsManagePage from "../pages/BrandsManagePage";
+import ConnectionsRedirect from "../pages/ConnectionsRedirect";
 // 2026-05-11 (CJ「補 Sentry-style error tracking」): admin dashboard for
 // auto-captured tRPC / frontend errors. Gated server-side by adminProcedure.
 import AdminErrorsPage from "../pages/AdminErrorsPage";
@@ -224,6 +225,9 @@ export default function AppV2() {
               Old single-brand editor moved to /brands/edit?b=:id */}
           <Route path="/brands" element={<BrandsManagePage />} />
           <Route path="/brands/edit" element={<BrandsPage />} />
+          {/* 2026-05-12 (CJ「加一個獨立的功能區叫做『連結』」): direct
+              entry to brand settings → connector tab. */}
+          <Route path="/connections" element={<ConnectionsRedirect />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
           <Route path="/theater"   element={<TheaterPage />} />
