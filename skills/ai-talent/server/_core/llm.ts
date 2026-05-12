@@ -764,7 +764,17 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     );
   }
 
-  return (await response.json()) as InvokeResult;
+  // 2026-05-12: some Azure Foundry reasoning models (e.g. Kimi-K2.5) return
+  // output in `message.reasoning_content` instead of `message.content`.
+  // Normalize so downstream callers always see content.
+  const j: any = await response.json();
+  for (const ch of j.choices ?? []) {
+    const m = ch.message ?? {};
+    if ((!m.content || m.content === "") && typeof m.reasoning_content === "string" && m.reasoning_content) {
+      m.content = m.reasoning_content;
+    }
+  }
+  return j as InvokeResult;
 }
 
 
