@@ -169,6 +169,62 @@ export default function RunPage() {
   // 2026-05-09 (P5 — CJ「use pipedream for OAuth」): publish to FB via
   // Pipedream Connect. Server hits a Pipedream webhook; Pipedream's
   // workflow handles Meta OAuth/token, calls Graph API, returns post_id.
+  // 2026-05-12 (CJ「直接發 facebook 應該直接跳出 pipedream 授權」):
+  // On '尚未連接' error, automatically open the Pipedream Connect popup
+  // for that platform. After successful authorization, the user can press
+  // 直接發 again to publish.
+  const getConnectTokenMut = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
+  const [pipedreamBusy, setPipedreamBusy] = useState(false);
+
+  const openPipedreamConnect = async (platform: "facebook" | "instagram" | "linkedin" | "youtube") => {
+    if (pipedreamBusy) return;
+    setPipedreamBusy(true);
+    try {
+      const tk = await getConnectTokenMut?.mutateAsync?.({ platform });
+      if (!tk?.token) {
+        showToastGlobal("無法取得授權 token — 請聯絡 sowork@sowork.tw");
+        return;
+      }
+      const { PipedreamClient } = await import("@pipedream/sdk/browser");
+      const pd = new PipedreamClient({
+        projectEnvironment: (tk.env ?? "production") as "production" | "development",
+        externalUserId: `sowork-user`,
+        tokenCallback: async () => ({
+          token: tk.token,
+          expiresAt: new Date(tk.expiresAt || Date.now() + 300_000),
+          connectLinkUrl: "",
+        }),
+      });
+      const PLATFORM_LABEL: Record<string, string> = {
+        facebook: "Facebook",
+        instagram: "Instagram",
+        linkedin: "LinkedIn",
+        youtube: "YouTube",
+      };
+      await new Promise<void>((resolve, reject) => {
+        pd.connectAccount({
+          app: tk.appSlug,
+          onSuccess: () => {
+            showToastGlobal(`已授權 ${PLATFORM_LABEL[platform]} ✓ 現在可以發布`);
+            resolve();
+          },
+          onError: (err: any) => reject(new Error(String(err))),
+          onClose: ({ successful }: any) => {
+            if (!successful) reject(new Error("授權視窗已關閉"));
+            else resolve();
+          },
+        });
+      });
+    } catch (e: any) {
+      const m = String(e?.message ?? "");
+      if (!/視窗已關閉|closed/i.test(m)) {
+        showToastGlobal(`授權失敗：${m.slice(0, 120)}`);
+      }
+    } finally {
+      setPipedreamBusy(false);
+    }
+  };
+
   const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
     ? (trpc as any).publish.toFacebook.useMutation({
         onSuccess: (r: any) => {
@@ -177,18 +233,10 @@ export default function RunPage() {
         },
         onError: (e: any) => {
           const msg = String(e?.message ?? "");
-          // 2026-05-11 (multi-tenant): brand not yet bound to FB → guide
-          // user straight to brand settings → 發布 tab.
           if (msg.includes("尚未連接") || msg.includes("缺 FB Page ID")) {
-            const brandId = data?.mission?.brandId ?? null;
-            showToastGlobal(
-              brandId
-                ? "此品牌尚未連接 Facebook — 開啟「品牌設定 → 發布」綁定粉專"
-                : "此任務沒有對應品牌，無法綁定 Facebook 粉專",
-            );
-            if (brandId) {
-              setTimeout(() => navigate(`/brands/edit?b=${brandId}&tab=publish`), 600);
-            }
+            // Auto-open Pipedream connect popup — no manual navigate to brand settings
+            showToastGlobal("尚未授權 Facebook — 正在開啟授權視窗…");
+            openPipedreamConnect("facebook");
           } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
             showToastGlobal("FB 發布服務尚未啟用 — 請聯絡 sowork@sowork.tw");
           } else {
@@ -1111,11 +1159,9 @@ export default function RunPage() {
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
                 onPress={() => setScheduleDialogOpen(true)}
               >排程到日曆（.ics）</Button>
-              <Button
-                variant="flat" fullWidth
-                startContent={<FontAwesomeIcon icon={faEnvelope} />}
-                onPress={() => setEmailDialogOpen(true)}
-              >寄給團隊</Button>
+              {/* 2026-05-12 (CJ「移除寄給團隊」+「先移除 agency 邀請團隊的設計」):
+                  寄給團隊 button removed. Email dialog code kept in file but
+                  unreachable — can resurrect later if team review re-enabled. */}
               {/* 2026-05-11 (CJ feedback「存 Mission 沒有成功反饋」):
                   - 成功後 button 變綠色 + 顯示「✓ 已存到 /projects」
                   - 加 link 到 /projects 讓用戶能立刻去看 */}

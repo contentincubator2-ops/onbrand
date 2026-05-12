@@ -218,11 +218,13 @@ export default function ShellLayout() {
       }}>
         {/* 2026-05-10 trial countdown bar + achievement watcher (no UI) */}
         <TrialCountdownBar />
-        {/* 2026-05-12 workspace switcher pill — shows only for Team/Agency users
-            (>1 workspace OR white-label set) */}
+        {/* 2026-05-12 workspace switcher pill — disabled with agency invite
+            UI per CJ「先移除 agency 邀請團隊的設計」. Re-enable when team/agency
+            tier launches.
         <div className="flex justify-end px-4 pt-2">
           <WorkspacePill />
         </div>
+        */}
         <AchievementUnlockWatcher />
         {/* 2026-05-11 (CJ「節慶日曆 + 自動提醒」): global festival nudge,
             shows only when priority ≥ 4 festival is within 7 days. */}
@@ -1930,11 +1932,9 @@ function AccountPopup({ onLogout, onClose }: {
       // /achievements 已存在，原本 S 選單沒入口
       action: () => { navigate("/achievements"); onClose(); },
     },
-    {
-      icon: faUsers, label: "Team / Workspace", arrow: true, badge: null, danger: false,
-      // 2026-05-12 — /settings/workspace 管理多客戶 workspace、邀請成員、white label
-      action: () => { navigate("/settings/workspace"); onClose(); },
-    },
+    // 2026-05-12 (CJ「先移除 agency 邀請團隊的設計」): Team/Workspace entry
+    // removed from S-menu. /settings/workspace route still exists for direct
+    // access; re-add this entry when agency tier launches.
     {
       icon: faCircleInfo, label: "聯絡客服", arrow: false, badge: null, danger: false,
       // 2026-05-12 — 信箱修正為 sowork@sowork.tw
