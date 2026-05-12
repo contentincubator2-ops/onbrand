@@ -28,22 +28,56 @@ import { router, protectedProcedure } from "../_core/trpc";
 const RoleEnum = z.enum(["owner", "admin", "editor", "viewer"]);
 
 export const tenantRouter = router({
-  /** Workspaces the calling user is a member of. */
+  /** Workspaces the calling user is a member of.
+   *
+   *  2026-05-12 (CJ): prod workspaces table may be an older schema (organizationId/
+   *  workspaceKey/status) without the new agency-tier columns. We probe column
+   *  presence dynamically so this query never 500s — missing columns are
+   *  returned as NULL/0/defaults and the UI shows a sensible empty state. */
   listMine: protectedProcedure.query(async ({ ctx }) => {
     const { default: localPool } = await import("../localDb");
-    const [rows]: any = await localPool.execute(
-      `SELECT w.id, w.slug, w.name, w.planCode, w.planStatus, w.billingMode,
-              w.whiteLabelName, w.whiteLabelLogo,
-              w.ownerUserId = ? AS isOwner,
-              m.role AS myRole,
-              (SELECT COUNT(*) FROM workspace_members WHERE workspaceId = w.id) AS memberCount,
-              (SELECT COUNT(*) FROM brands WHERE workspaceId = w.id) AS brandCount
-       FROM workspaces w
-       JOIN workspace_members m ON m.workspaceId = w.id AND m.userId = ?
-       ORDER BY w.createdAt ASC`,
-      [ctx.user.id, ctx.user.id],
+
+    // Discover which agency-tier columns actually exist in this DB
+    const [colRows]: any = await localPool.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'workspaces'`,
     );
-    return rows;
+    const cols = new Set<string>((colRows as any[]).map((r) => r.COLUMN_NAME));
+    if (!cols.has("ownerUserId")) {
+      // Old workspaces table — not yet migrated to multi-tenant model. Return
+      // empty list so the UI can render its empty state.
+      return [] as any[];
+    }
+    const memberTable = await tableExists("workspace_members");
+    if (!memberTable) return [] as any[];
+
+    const has = (c: string) => cols.has(c);
+    const col = (c: string, fallback: string) => (has(c) ? `w.${c}` : `${fallback} AS ${c}`);
+
+    const sql = `
+      SELECT w.id,
+             ${col("slug",           "NULL")},
+             w.name,
+             ${col("planCode",       "'solo'")},
+             ${col("planStatus",     "'trial'")},
+             ${col("billingMode",    "'solo'")},
+             ${col("whiteLabelName", "NULL")},
+             ${col("whiteLabelLogo", "NULL")},
+             w.ownerUserId = ? AS isOwner,
+             m.role AS myRole,
+             (SELECT COUNT(*) FROM workspace_members WHERE workspaceId = w.id) AS memberCount,
+             (SELECT COUNT(*) FROM brands WHERE workspaceId = w.id) AS brandCount
+      FROM workspaces w
+      JOIN workspace_members m ON m.workspaceId = w.id AND m.userId = ?
+      ORDER BY w.createdAt ASC
+    `;
+    try {
+      const [rows]: any = await localPool.execute(sql, [ctx.user.id, ctx.user.id]);
+      return rows;
+    } catch (e) {
+      console.warn("[tenant.listMine] query failed, returning empty:", e);
+      return [];
+    }
   }),
 
   detail: protectedProcedure
@@ -250,6 +284,18 @@ export const tenantRouter = router({
       return { ok: true };
     }),
 });
+
+async function tableExists(name: string): Promise<boolean> {
+  const { default: localPool } = await import("../localDb");
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT COUNT(*) AS c FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+      [name],
+    );
+    return Number((rows as any[])[0]?.c ?? 0) > 0;
+  } catch { return false; }
+}
 
 async function getMemberRole(workspaceId: number, userId: number): Promise<string | null> {
   const { default: localPool } = await import("../localDb");
