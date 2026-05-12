@@ -64,6 +64,8 @@ import { ecpayRouter } from "./ecpayRouter";
 import { festivalRouter } from "./festivalRouter";
 // 2026-05-12 (CJ「Phase 1 prompt library」): Nano-Banana 175 image-prompt templates.
 import { promptTemplateRouter } from "./promptTemplateRouter";
+// 2026-05-12 (CJ「策略顧問 — 5 scenario cards + McKinsey reports + Q&A + 比稿」)
+import { strategyConsultantRouter } from "./strategyConsultantRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -127,7 +129,8 @@ export const appRouter = router({
   tenant:          tenantRouter,
   ecpay:           ecpayRouter,
   festival:        festivalRouter,
-  promptTemplate:  promptTemplateRouter,
+  promptTemplate:      promptTemplateRouter,
+  strategyConsultant:  strategyConsultantRouter,
 });
 
 export type AppRouter = typeof appRouter;

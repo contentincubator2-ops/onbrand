@@ -43,6 +43,7 @@ import QuickTasksPage from "../pages/QuickTasksPage";
 import QuickTask30sPage from "../pages/QuickTask30sPage";
 import RunPage from "../pages/RunPage";
 import BoardroomPage from "../pages/BoardroomPage";
+import StrategyConsultantPage from "../pages/StrategyConsultantPage";
 import PlaybooksPage from "../pages/PlaybooksPage";
 import TheaterPage from "../pages/TheaterPage";
 import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
@@ -258,6 +259,7 @@ export default function AppV2() {
               brand settings (replaces the modal sheet for direct navigation). */}
           <Route path="/brands/settings" element={<BrandSettingsPage />} />
           <Route path="/boardroom" element={<BoardroomPage />} />
+          <Route path="/consultant" element={<StrategyConsultantPage />} />
           <Route path="/playbooks" element={<PlaybooksPage />} />
           <Route path="/theater"   element={<TheaterPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />

@@ -25,7 +25,7 @@ import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles, faRocket,
-  faMicrophone, faBookBookmark, faEllipsis, faBell,
+  faMicrophone, faBookBookmark, faEllipsis, faBell, faChessKnight,
   faPlus, faRightFromBracket,
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
@@ -87,6 +87,9 @@ const NAV_ITEMS: NavItem[] = [
   // brandId. matchPrefix ensures this item highlights (not 品牌) when on
   // /brands/settings.
   { to: "/brands/settings", label: "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands/settings" },
+  // 2026-05-12 (CJ「策略顧問」): 5 scenario cards + McKinsey reports + Q&A
+  { to: "/consultant", label: "策略顧問", icon: <FontAwesomeIcon icon={faChessKnight} />,
+    tooltip: "策略顧問 — 5 大策略場景 × 20+ 方法論 × 麥肯錫水準報告 × 來回問答" },
   // 範本 / 比稿 / 案例 hidden — direct URL access still works (/templates,
   // /boardroom, /playbooks).
 ];
