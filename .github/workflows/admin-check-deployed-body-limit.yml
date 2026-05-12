@@ -1,0 +1,17 @@
+name: Admin — Check deployed body limit
+on: workflow_dispatch
+jobs:
+  c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            grep -n "express.json\|limit:" /opt/marketing-os/app/skills/ai-talent/server/index.ts | head -10
+            echo
+            echo "── full stack from error log ─────"
+            tail -800 /home/$(whoami)/.pm2/logs/marketing-os-error.log 2>/dev/null | grep -B 1 -A 30 "PayloadTooLargeError" | tail -50
