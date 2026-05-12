@@ -1,4 +1,4 @@
-name: Admin — Show which agent + aiModel each theater platform will use
+name: Admin — Show theater-cell agents + aiModel (per platform)
 
 on:
   workflow_dispatch:
@@ -17,17 +17,29 @@ jobs:
             export MYSQL_PWD="mos_secure_2026"
             MYSQLT="mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4"
 
-            echo "── theater-cell-{platform} agent assignments ─────"
+            echo "── theater-cell-{platform} → which agent + what aiModel ─────"
+            # Agent IDs read from data/agent-assignments.json:
+            #   facebook  → 60056
+            #   instagram → 220505
+            #   youtube   → 223998
+            #   threads   → 220502
+            #   line      → 220503
+            #   blog      → 220504
             $MYSQLT -e "
               SELECT
-                aa.slot_key                                      AS slot,
-                aa.role                                          AS role,
-                aa.agent_id                                      AS agent_id,
-                LEFT(a.name, 14)                                 AS agent_name,
-                LEFT(a.title, 36)                                AS title,
-                IFNULL(a.aiModel, '(NULL)')                      AS aiModel
-              FROM agent_assignments aa
-              LEFT JOIN agents a ON a.id = aa.agent_id
-              WHERE aa.slot_key LIKE 'theater-cell-%'
-              ORDER BY aa.slot_key;
+                CASE id
+                  WHEN 60056  THEN 'facebook'
+                  WHEN 220505 THEN 'instagram'
+                  WHEN 223998 THEN 'youtube'
+                  WHEN 220502 THEN 'threads'
+                  WHEN 220503 THEN 'line'
+                  WHEN 220504 THEN 'blog'
+                END                          AS platform,
+                id                           AS agent_id,
+                LEFT(name, 16)               AS name,
+                LEFT(title, 36)              AS title,
+                IFNULL(aiModel, '(NULL)')    AS aiModel
+              FROM agents
+              WHERE id IN (60056, 220505, 223998, 220502, 220503, 220504)
+              ORDER BY FIELD(id, 60056, 220505, 223998, 220502, 220503, 220504);
             "
