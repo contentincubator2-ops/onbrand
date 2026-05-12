@@ -449,19 +449,37 @@ async function piapiSubmit(modelId: string, opts: GenOptions): Promise<{ taskId:
   if (!key) throw new Error("PIAPI_KEY missing");
   const spec = PIAPI_MAP[modelId];
   if (!spec) throw new Error(`PiAPI: unknown modelId ${modelId}`);
+  const requestBody = { model: spec.model, task_type: spec.task_type, input: spec.buildInput(opts) };
   const resp = await fetch(`${PIAPI_BASE}/task`, {
     method: "POST",
     headers: { "x-api-key": key, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: spec.model, task_type: spec.task_type, input: spec.buildInput(opts) }),
+    body: JSON.stringify(requestBody),
     signal: AbortSignal.timeout(30_000),
   });
   if (!resp.ok) {
     const t = await resp.text();
-    throw new Error(`PiAPI submit ${resp.status}: ${t.slice(0, 300)}`);
+    // 2026-05-12: full body + tagged hint for common 400 causes
+    console.error(`[piapi] submit ${resp.status} for ${modelId}. body=${t.slice(0, 800)}`);
+    let hint = "";
+    if (/content[_ ]policy|nsfw|violat/i.test(t)) hint = "（內容政策觸發 — 試著移除涉及人物特寫 / 敏感詞）";
+    else if (/credit|quota|balance/i.test(t)) hint = "（PiAPI 帳號額度不足）";
+    else if (/rate.?limit|429/i.test(t)) hint = "（PiAPI 速率限制 — 等 30 秒再試）";
+    else if (/invalid.*key|unauthorized/i.test(t)) hint = "（PiAPI 金鑰失效）";
+    throw new Error(`PiAPI submit ${resp.status}${hint}: ${t.slice(0, 500)}`);
   }
   const data: any = await resp.json();
+  // 2026-05-12: PiAPI can return code: 200 with HTTP 200 but data with code != 200
+  // OR HTTP 200 with empty task_id (the "code:400 in 200" pattern seen in
+  // earlier failed rows). Treat both as failure with explicit body.
+  const innerCode = data?.code;
   const taskId = data?.data?.task_id ?? data?.task_id;
-  if (!taskId) throw new Error(`PiAPI: no task_id in response: ${JSON.stringify(data).slice(0, 200)}`);
+  if (innerCode && innerCode !== 200) {
+    const msg = data?.message ?? data?.data?.error ?? JSON.stringify(data).slice(0, 400);
+    throw new Error(`PiAPI inner ${innerCode}: ${msg}`);
+  }
+  if (!taskId) {
+    throw new Error(`PiAPI: no task_id. response=${JSON.stringify(data).slice(0, 400)}`);
+  }
   return { taskId };
 }
 

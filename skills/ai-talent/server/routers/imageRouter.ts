@@ -73,6 +73,15 @@ export const imageRouter = router({
         modelChoice: input.modelChoice,
         brandContext,
       });
+      // 2026-05-12: surface actual provider failures to the client.
+      // Previously a failed result still returned 200 with url:null, leading
+      // to the misleading "產圖完成但沒拿到 URL/b64" toast.
+      if (result.status === "failed") {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `生圖失敗：${(result.errorMsg ?? "unknown").slice(0, 400)}`,
+        });
+      }
       return result;
     }),
 

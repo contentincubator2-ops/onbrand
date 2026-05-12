@@ -220,7 +220,11 @@ export default function RunPage() {
             updateImageMut.mutate({ id, variantIndex: activeIdx, imageUrl: imageSrc, style: imagePrompt.slice(0, 480) });
             showToastGlobal("已產圖 ✓");
           } else {
-            showToastGlobal("產圖完成但沒拿到 URL/b64，請檢查 image API 回傳");
+            // 2026-05-12: server should TRPCError on failure now; this branch
+            // only reaches if a provider returned success-shaped but empty
+            // data. Include any returned errorMsg if present.
+            const detail = String(r?.errorMsg ?? r?.message ?? "").slice(0, 200);
+            showToastGlobal(detail ? `產圖失敗：${detail}` : "產圖完成但 API 沒回傳圖片網址（請聯絡客服）");
           }
         },
         onError: (e: any) => showToastGlobal(`產圖失敗：${e?.message ?? e}`),
