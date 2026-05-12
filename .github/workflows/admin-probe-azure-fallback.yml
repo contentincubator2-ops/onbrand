@@ -1,0 +1,46 @@
+name: Admin — Probe Azure Foundry fallback readiness
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set -e
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            echo "── Azure Foundry env vars ─────"
+            for k in AZURE_FOUNDRY_API_KEY AZURE_FOUNDRY_PROJECT_ENDPOINT AZURE_FOUNDRY_MODEL AZURE_FOUNDRY_FALLBACK_MODEL; do
+              v=$(printenv "$k" || true)
+              if [ -z "$v" ]; then
+                echo "  $k = (MISSING)"
+              else
+                echo "  $k = ${v:0:50}... (${#v} chars)"
+              fi
+            done
+
+            echo
+            echo "── Live test: chat completion through Azure Foundry fallback model ─────"
+            FB_MODEL="${AZURE_FOUNDRY_FALLBACK_MODEL:-Kimi-K2.5}"
+            ENDPOINT="${AZURE_FOUNDRY_PROJECT_ENDPOINT%/}/openai/v1/chat/completions"
+            echo "  endpoint: $ENDPOINT"
+            echo "  model: $FB_MODEL"
+            curl -s --max-time 30 -X POST "$ENDPOINT" \
+              -H "api-key: $AZURE_FOUNDRY_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"model\":\"$FB_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"用 10 字內回答：母親節要送什麼？\"}],\"max_tokens\":80}" \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print('  reply:', d.get('choices',[{}])[0].get('message',{}).get('content','???')[:200]); print('  model:', d.get('model','?'))" 2>&1
+            echo
+
+            echo "── Recent fallback events in log (last 15 min) ─────"
+            tail -2000 /home/$(whoami)/.pm2/logs/marketing-os-out.log 2>/dev/null | grep -i "falling back to Azure" | tail -10 || echo "(no fallback events yet)"
+            tail -2000 /home/$(whoami)/.pm2/logs/marketing-os-error.log 2>/dev/null | grep -i "falling back to Azure" | tail -10 || true
