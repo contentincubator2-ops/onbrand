@@ -42,7 +42,11 @@ export const festivalRouter = router({
       const dismissedFilter = userId ? "AND d.festivalId IS NULL" : "";
       const params: any[] = [];
       if (userId) params.push(userId);
-      params.push(input.region, input.windowDays, input.minPriority, input.limit);
+      params.push(input.region, input.minPriority);
+      // Inline integers that mysql2 prepared statements refuse to bind into
+      // (INTERVAL clause + LIMIT). Both are already validated by zod above.
+      const windowDays = Math.floor(input.windowDays);
+      const limit = Math.floor(input.limit);
       const [rows]: any = await localPool.execute(
         `SELECT f.id, f.slug, f.date, f.name_zh, f.name_en, f.region,
                 f.category, f.priority, f.emoji, f.themes, f.contentHint,
@@ -51,11 +55,11 @@ export const festivalRouter = router({
          ${dismissedJoin}
          WHERE f.region = ?
            AND f.date >= CURDATE()
-           AND f.date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+           AND f.date <= DATE_ADD(CURDATE(), INTERVAL ${windowDays} DAY)
            AND f.priority >= ?
            ${dismissedFilter}
          ORDER BY f.date ASC
-         LIMIT ?`,
+         LIMIT ${limit}`,
         params,
       );
       return (rows as any[]).map((r) => ({
