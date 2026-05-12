@@ -1,0 +1,35 @@
+name: Admin — Trace "Incorrect arguments to mysqld_stmt_execute"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set -e
+            echo "════════════════════════════════════════════════════════"
+            echo "  Tracing 'Incorrect arguments' mysql2 errors"
+            echo "════════════════════════════════════════════════════════"
+
+            LOG_OUT=/home/$(whoami)/.pm2/logs/marketing-os-out.log
+            LOG_ERR=/home/$(whoami)/.pm2/logs/marketing-os-error.log
+
+            echo
+            echo "── recent occurrences in error log ─────"
+            tail -2000 "$LOG_ERR" 2>/dev/null | grep -B 1 -A 10 "Incorrect arguments to mysqld_stmt_execute" | tail -120 || echo "(none in -error.log)"
+
+            echo
+            echo "── recent occurrences in out log ─────"
+            tail -2000 "$LOG_OUT" 2>/dev/null | grep -B 1 -A 10 "Incorrect arguments to mysqld_stmt_execute" | tail -120 || echo "(none in -out.log)"
+
+            echo
+            echo "── recent tRPC errors with stack (last 200 lines from error log) ─────"
+            tail -400 "$LOG_ERR" 2>/dev/null | grep -iE "TRPCError|error.*at .*\.ts" | tail -60
