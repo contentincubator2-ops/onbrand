@@ -1,0 +1,41 @@
+name: Admin — Check Pipedream publish webhooks + brand columns
+
+on:
+  workflow_dispatch:
+
+jobs:
+  c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+            echo "── webhook env vars ─────"
+            for k in PIPEDREAM_FB_PUBLISH_WEBHOOK PIPEDREAM_IG_PUBLISH_WEBHOOK PIPEDREAM_LI_PUBLISH_WEBHOOK PIPEDREAM_YT_PUBLISH_WEBHOOK PIPEDREAM_INSTAGRAM_PUBLISH_WEBHOOK PIPEDREAM_LINKEDIN_PUBLISH_WEBHOOK PIPEDREAM_YOUTUBE_PUBLISH_WEBHOOK PIPEDREAM_WEBHOOK_SECRET PIPEDREAM_API_KEY PIPEDREAM_PROJECT_ID; do
+              v=$(printenv "$k" || true)
+              if [ -z "$v" ]; then echo "  $k = MISSING"; else echo "  $k = ${v:0:24}... (${#v} chars)"; fi
+            done
+
+            echo
+            echo "── brands columns related to platform bindings ─────"
+            export MYSQL_PWD="mos_secure_2026"
+            mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4 -e "
+              SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
+              FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = 'mos_db' AND TABLE_NAME = 'brands'
+                AND (COLUMN_NAME LIKE 'fb%' OR COLUMN_NAME LIKE 'ig%'
+                  OR COLUMN_NAME LIKE 'li%' OR COLUMN_NAME LIKE 'yt%'
+                  OR COLUMN_NAME LIKE 'instagram%' OR COLUMN_NAME LIKE 'linkedin%'
+                  OR COLUMN_NAME LIKE 'youtube%')
+              ORDER BY COLUMN_NAME;
+            "
+
+            echo
+            echo "── grep server code for publish.toInstagram / toLinkedIn / toYouTube ─────"
+            grep -n "toInstagram\|toLinkedIn\|toYouTube\|toYoutube\|toIg\|toLi\|toYt" server/routers/publishRouter.ts 2>/dev/null || echo "(no IG/LI/YT publish routes yet)"
