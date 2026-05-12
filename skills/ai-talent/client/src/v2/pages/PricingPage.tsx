@@ -1,5 +1,5 @@
 /**
- * Pricing page — single-tier Drop Pro.
+ * Pricing page — single-tier OnBrand 個人.
  * 2026-05-10. CJ direction「one price, AI 小白 friendly」.
  */
 import React from "react";

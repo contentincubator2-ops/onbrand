@@ -132,7 +132,7 @@ export default function BrandsManagePage() {
               </p>
               <h2 className="text-xl font-bold text-neutral-900 mb-2">建立你的第一個品牌</h2>
               <p className="text-sm text-neutral-500 mb-6">
-                品牌是 Drop 一切的起點。建立後 AI 自動分析定位、用詞、視覺風格，
+                品牌是 OnBrand 一切的起點。建立後 AI 自動分析定位、用詞、視覺風格，
                 之後所有任務都會吃這份品牌大腦。
               </p>
               <button

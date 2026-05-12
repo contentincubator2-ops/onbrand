@@ -585,7 +585,11 @@ export default function RunPage() {
               <ToolbarBtn icon={Pencil}        label="直接編輯"      active={mode==="edit"}  onClick={() => setMode("edit")} />
               <ToolbarBtn icon={MessageCircle} label="跟 agent 對話" active={mode==="chat"}  onClick={() => setMode("chat")} />
               <ToolbarBtn icon={LucideImage}   label="改圖"          active={mode==="image"} onClick={() => setMode("image")} />
-              <ToolbarBtn icon={Video}         label="改影片"        active={mode==="video"} onClick={() => setMode("video")} />
+              {/* 2026-05-12 (CJ「影片功能我想要先拿掉，現在看起來不穩」):
+                  hide 改影片 entry. The /trpc/video.* router still exists
+                  so existing video jobs continue to render, but new
+                  generation entry point is closed until stability work. */}
+              {/* <ToolbarBtn icon={Video}         label="改影片"        active={mode==="video"} onClick={() => setMode("video")} /> */}
               <Divider />
               {/* Agent avatars — click to see that agent's thinking */}
               <Tooltip content="撰寫 agent — 看思考過程">

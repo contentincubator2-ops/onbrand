@@ -1,5 +1,5 @@
 /**
- * 隱私政策 — Drop Privacy Policy (PDPA-compliant).
+ * 隱私政策 — OnBrand Privacy Policy (PDPA-compliant).
  * 2026-05-10. 由法律顧問 review 正式版替換 (TODO).
  */
 import React from "react";
@@ -25,7 +25,7 @@ export default function PrivacyPage() {
 
           <h2 className="text-lg font-semibold">2. 蒐集目的</h2>
           <ul className="list-disc pl-6 space-y-1">
-            <li>提供、維護及改善 Drop 服務。</li>
+            <li>提供、維護及改善 OnBrand 服務。</li>
             <li>處理付款、開立發票、續訂提醒。</li>
             <li>客戶服務、技術支援、爭議處理。</li>
             <li>系統安全監控、防止濫用。</li>

@@ -22,7 +22,7 @@
  *   ECPAY_HASH_IV          — provided by 綠界
  *   ECPAY_API_BASE         — https://payment-stage.ecpay.com.tw (stage)
  *                            https://payment.ecpay.com.tw (prod)
- *   APP_URL                — https://drop.sowork.ai
+ *   APP_URL                — https://onbrand.sowork.ai
  *
  * ─── Idempotency ───────────────────────────────────────────
  * The callback endpoint may fire multiple times for the same MerchantTradeNo.
@@ -57,7 +57,7 @@ export const ecpayRouter = router({
       const hashKey    = env.ECPAY_HASH_KEY;
       const hashIv     = env.ECPAY_HASH_IV;
       const apiBase    = env.ECPAY_API_BASE ?? "https://payment-stage.ecpay.com.tw";
-      const appUrl     = env.APP_URL ?? "https://drop.sowork.ai";
+      const appUrl     = env.APP_URL ?? "https://onbrand.sowork.ai";
       if (!merchantId || !hashKey || !hashIv) {
         // 2026-05-11 (CJ「掃 .env 暴露」): env var names removed from user-facing copy.
         console.error("[ecpay.createCheckout] missing env: ECPAY_MERCHANT_ID / ECPAY_HASH_KEY / ECPAY_HASH_IV");

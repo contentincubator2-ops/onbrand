@@ -105,7 +105,7 @@ export default function AchievementsPage() {
               fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
             }}
           >
-            完成所有路線 = 你已經是 Drop 高手
+            完成所有路線 = 你已經是 OnBrand 高手
           </p>
           <p
             className="mt-2 mx-auto text-default-700"
@@ -297,7 +297,7 @@ export default function AchievementsPage() {
         })}
 
         <div className="text-center text-xs text-neutral-400 mt-8">
-          <p>解鎖全部 18 個成就 = 你已用過 Drop 完整功能。然後就靠你的創意了 ✨</p>
+          <p>解鎖全部 18 個成就 = 你已用過 OnBrand 完整功能。然後就靠你的創意了 ✨</p>
         </div>
       </div>
     </div>

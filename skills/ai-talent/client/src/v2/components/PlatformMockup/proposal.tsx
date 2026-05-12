@@ -97,7 +97,7 @@ export function ProposalSpec({ title, brandName, variantLabel, liveCaption }: Mo
 
       {/* Sign-off footer */}
       <div className="px-8 py-3 border-t border-default-100 flex items-center justify-between text-tiny text-default-400">
-        <span>SoWork Drop · Brand Spec</span>
+        <span>SoWork OnBrand · Brand Spec</span>
         <span>第 1 頁，共 1 頁</span>
       </div>
     </div>
@@ -129,7 +129,7 @@ export function ResearchDoc({ title, brandName, variantLabel, liveCaption }: Moc
 
       {/* Footnote */}
       <div className="px-8 py-3 border-t border-default-100 flex items-center justify-between text-tiny text-default-400">
-        <span>📋 Research Protocol · 由 SoWork Drop 產出</span>
+        <span>📋 Research Protocol · 由 SoWork OnBrand 產出</span>
         <span>機密 · Internal use only</span>
       </div>
     </div>

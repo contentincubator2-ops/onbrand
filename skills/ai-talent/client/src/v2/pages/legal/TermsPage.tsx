@@ -48,7 +48,7 @@ export default function TermsPage() {
           <h2 className="text-lg font-semibold">6. 使用限制</h2>
           <p>您同意不會：</p>
           <ul className="list-disc pl-6 space-y-1">
-            <li>用 Drop 產出違法、侵權、煽動、騷擾或其他違反公序良俗的內容。</li>
+            <li>用 OnBrand 產出違法、侵權、煽動、騷擾或其他違反公序良俗的內容。</li>
             <li>嘗試破解、反編譯或其他未經授權的方式接入服務後端。</li>
             <li>分享、轉售帳號予第三方使用。</li>
             <li>在試用期或付費期間以惡意自動化腳本超過合理使用範圍。</li>
@@ -56,7 +56,7 @@ export default function TermsPage() {
 
           <h2 className="text-lg font-semibold">7. 內容權利</h2>
           <p>
-            您透過 Drop 產出的所有內容，所有權歸您所有。我們不主張任何權利。
+            您透過 OnBrand 產出的所有內容，所有權歸您所有。我們不主張任何權利。
             您同意我們得在不識別您身分的前提下，蒐集匿名使用數據以改善服務品質。
           </p>
 
@@ -68,7 +68,7 @@ export default function TermsPage() {
 
           <h2 className="text-lg font-semibold">9. 免責聲明</h2>
           <p>
-            Drop 為輔助創作工具，AI 生成內容可能含有不準確、過時或不適當之資訊。
+            OnBrand 為輔助創作工具，AI 生成內容可能含有不準確、過時或不適當之資訊。
             您於使用前應自行檢視，我們對使用結果不負保證責任。
           </p>
 

@@ -1,5 +1,5 @@
 /**
- * Drop Pro plan config — single tier, monthly fixed.
+ * OnBrand plan config — single tier, monthly fixed.
  *
  * Decision (2026-05-10, CJ direction「都由你訂定 + AI 小白 + 月費固定」):
  *   - One plan, one price. No tier-decision fatigue for newbie users.
@@ -53,7 +53,10 @@ export interface Plan {
 }
 
 export const PLANS: Record<PlanCode, Plan> = {
-  /** New users get 7 days of full-feature access without a credit card. */
+  /** New users get 7 days of full-feature access without a credit card.
+   *  2026-05-12: trial quotas reduced + video stripped (matches the new
+   *  OnBrand 個人 plan minus 1/3 — generous enough to evaluate, tight
+   *  enough that they upgrade.) */
   trial: {
     code: "trial",
     name: "7 天免費試用",
@@ -62,51 +65,60 @@ export const PLANS: Record<PlanCode, Plan> = {
     trialDays: 7,
     quota: {
       task_30s: -1,
-      task_60s: 50,
-      task_99s: 20,
-      image_gen: 150,
-      video_gen: 10,
-      brands: 5,
+      task_60s: 15,                // trial 用 1/3 of paid
+      task_99s: 5,
+      image_gen: 30,
+      video_gen: 0,                // 影片功能下架
+      brands: 1,
       fb_publish: -1,
       team_members: 1,
       multi_client: false,
     },
     features: [
-      "所有 90+ 任務模板",
-      "完整 7 天內容企劃台",
+      "30s / 60s / 99s 任務模板（額度有限）",
+      "30 張 AI 圖預覽試用",
+      "7 天完整內容企劃台",
       "Email / LINE 客服",
       "免綁信用卡",
     ],
   },
 
-  /** Drop Pro — Solo plan. 1 user, single workspace. */
+  /** OnBrand 個人 — Solo plan. 1 user, single workspace.
+   *  2026-05-12 (CJ pricing decision):
+   *    - 早鳥價 NT$ 900/月 (現價)
+   *    - 標準價 NT$ 1,500/月 (之後)
+   *    - 影片功能不穩，先從方案抽掉
+   *    - 加購包之後上線（文字 + 圖像，不含影片）
+   */
   drop_pro: {
     code: "drop_pro",
-    name: "OnBrand Pro · 個人",
-    priceTwdMonthly: 990,
-    priceTwdAnnually: 9900,
+    name: "OnBrand 個人",
+    priceTwdMonthly: 900,          // 早鳥價（也就是現在實際收的價）
+    priceTwdAnnually: 9000,        // 早鳥年費 (10 個月優惠)
     trialDays: 0,
     quota: {
       task_30s: -1,
       task_60s: 50,
       task_99s: 20,
       image_gen: 150,
-      video_gen: 10,
-      brands: 5,
+      video_gen: 0,                // 2026-05-12: 影片暫時下架
+      brands: 1,                   // 個人 = 1 品牌（之前是 5）
       fb_publish: -1,
       team_members: 1,
       multi_client: false,
     },
     features: [
-      "1 位用戶 · 5 個品牌",
-      "所有 90+ 任務模板",
+      "1 位用戶 · 1 個品牌",
+      "30s / 60s / 99s 全部任務模板",
+      "150 張 AI 圖（Flux / GPT Image-1 / Imagen）",
       "FB 直接發布 + 排程（無限）",
-      "圖片 + 影片 AI 生成",
       "電子發票",
+      "影片功能優化中（之後開放加購）",
     ],
+    highlight: "早鳥 NT$ 900／正常 NT$ 1,500",
   },
 
-  /** Drop Team — 5 users, multi-client workspace, monthly client reports. */
+  /** OnBrand Team — 5 users, multi-client workspace, monthly client reports. */
   drop_team: {
     code: "drop_team",
     name: "OnBrand Team · 小團隊",
@@ -135,7 +147,7 @@ export const PLANS: Record<PlanCode, Plan> = {
     prioritySupport: false,
   },
 
-  /** Drop Agency — unlimited users, white label, API access. */
+  /** OnBrand Agency — unlimited users, white label, API access. */
   drop_agency: {
     code: "drop_agency",
     name: "OnBrand Agency · 代理商",
@@ -216,6 +228,6 @@ export function formatQuota(n: number): string {
 export const SUPPORT_EMAIL = "sowork@sowork.tw";
 export const SUPPORT_LINE_AT = "@sowork";  // placeholder; CJ to register
 export const PARENT_DOMAIN = "https://www.sowork.ai";
-export const PRODUCT_DOMAIN = "https://drop.sowork.ai";
+export const PRODUCT_DOMAIN = "https://onbrand.sowork.ai";
 export const COMPANY_NAME = "摘星社群行銷顧問股份有限公司";
 export const COMPANY_TAX_ID = "—";  // CJ to fill 統一編號

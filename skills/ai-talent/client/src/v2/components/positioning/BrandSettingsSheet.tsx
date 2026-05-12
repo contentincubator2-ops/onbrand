@@ -495,8 +495,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
       </div>
 
       <div className="mt-4 text-xs text-default-400 leading-relaxed">
-        說明：Drop 不會儲存你的 Facebook 密碼。OAuth token 由 Pipedream 代管，
-        每位用戶獨立。解除綁定只會從 Drop 端清除指向關係，要徹底撤銷請至
+        說明：OnBrand 不會儲存你的 Facebook 密碼。OAuth token 由 Pipedream 代管，
+        每位用戶獨立。解除綁定只會從 OnBrand 端清除指向關係，要徹底撤銷請至
         Facebook 設定 → 已連結應用程式移除 Pipedream。
       </div>
     </div>

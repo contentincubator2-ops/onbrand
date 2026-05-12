@@ -131,7 +131,7 @@ export const tenantRouter = router({
       if (!invitee) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: `${input.email} 還沒註冊 OnBrand。請他先到 drop.sowork.ai 註冊後再邀請。`,
+          message: `${input.email} 還沒註冊 OnBrand。請他先到 onbrand.sowork.ai 註冊後再邀請。`,
         });
       }
       await localPool.execute(

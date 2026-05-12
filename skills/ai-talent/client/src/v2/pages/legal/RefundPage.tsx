@@ -1,5 +1,5 @@
 /**
- * 退費條款 — Drop Refund Policy.
+ * 退費條款 — OnBrand Refund Policy.
  * 2026-05-10.
  */
 import React from "react";

@@ -200,7 +200,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
                   maxWidth: 580, marginBottom: 26,
                 }}>
-                  Drop 不是另一個「AI 一鍵生成」工具 — 我們把
+                  OnBrand 不是另一個「AI 一鍵生成」工具 — 我們把
                   <strong style={{ fontFamily: "system-ui", fontWeight: 600, color: "#171717" }}> SoWork 品牌定位法</strong>
                   做成可執行的 14 步流程，讓 AI 在每篇貼文之前，先讀懂你的 WHY、TA、差異化。鎖定一次，所有平台都跟著你的調性走。
                 </p>
