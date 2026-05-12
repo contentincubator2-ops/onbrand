@@ -97,12 +97,13 @@ app.use(cors({
 }));
 console.log(`[server] CORS origin: ${Array.isArray(corsOrigin) ? corsOrigin.join(",") : corsOrigin}`);
 app.use(cookieParser());
-// SEC-B-08 (2026-05-04): cap JSON body size to 1MB. Default was unbounded
-// (express's 100KB default applies only when limit is set explicitly via the
-// option), creating a DoS vector via giant payloads. 1MB covers all legit
-// inputs including markdown / brief / prompt strings; raise for specific
-// upload routes if/when needed.
-app.use(express.json({ limit: '1mb' }));
+// SEC-B-08 (2026-05-04): cap JSON body size. Per-field check below is the
+// real DoS protection; body limit just caps overall request size.
+// 2026-05-12: bumped 1MB → 25MB. OpenAI gpt-image-1 returns base64 PNG
+// that, wrapped as data:image/png;base64,..., is typically 2-5MB. Frontend
+// stores this in mission_outputs via output.updateVariantImage. CJ hit
+// "can't transfer from server" on 改圖 because the 1MB limit rejected it.
+app.use(express.json({ limit: '25mb' }));
 
 // SEC-B-08 v2 (2026-05-05): per-field string cap. The 1MB body limit alone
 // allowed e.g. a 999KB string in a single field to slip through and burn
@@ -111,9 +112,16 @@ app.use(express.json({ limit: '1mb' }));
 // largest legit input we have (markdown / prompt / brief) — easily 10x
 // any realistic content while still preventing pathological payloads.
 const MAX_FIELD_CHARS = 50_000;
+// 2026-05-12: image data URLs (data:image/png;base64,…) routinely run 2-7M
+// chars. Whitelist by field name so legitimate gpt-image-1 / Flux b64
+// payloads pass through. Still capped by the overall 25MB body limit above.
+const IMAGE_DATA_FIELDS = /(^|\.)(imageUrl|imageB64|b64|publicUrl|url)$/;
 function deepCheckStringLengths(obj: any, path: string = ""): string | null {
   if (obj == null) return null;
   if (typeof obj === "string") {
+    // Image-data fields are exempted (base64 PNG legitimately exceeds the
+    // generic per-field cap). Other fields stay at 50K to prevent DoS.
+    if (IMAGE_DATA_FIELDS.test(path)) return null;
     if (obj.length > MAX_FIELD_CHARS) {
       return `${path || "(root)"} string is ${obj.length} chars (max ${MAX_FIELD_CHARS})`;
     }

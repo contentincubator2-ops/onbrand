@@ -134,6 +134,16 @@ export default function RunPage() {
   const updateImageMut = (trpc as any).output?.updateVariantImage?.useMutation
     ? (trpc as any).output.updateVariantImage.useMutation({
         onSuccess: () => utils.output.getById.invalidate({ id }),
+        onError: (e: any) => {
+          // 2026-05-12 (CJ「生圖完成但顯示 can't transfer」): surface the
+          // actual error so we never silently swallow it again.
+          const msg = String(e?.message ?? "");
+          if (/payload|too large|413/i.test(msg)) {
+            showToastGlobal("圖片檔太大，無法保存到伺服器（請聯絡客服）");
+          } else {
+            showToastGlobal(`圖片保存失敗：${msg.slice(0, 120)}`);
+          }
+        },
       })
     : null;
   // 2026-05-09 (P5 — CJ「use pipedream for OAuth」): publish to FB via
@@ -249,16 +259,34 @@ export default function RunPage() {
     if (mode !== "image" && mode !== "video") return;
 
     const cap = String(slide?.caption ?? "").trim();
-    const firstSentence = cap.split(/[\n。！？!?]/)[0]?.trim().slice(0, 80) ?? "";
+
+    // Extract a SUBJECT noun phrase from the caption — not just the first
+    // sentence which often is a hook question. We try several signals.
+    const extractSubject = (s: string): string => {
+      if (!s) return "";
+      // Pull the first meaningful sentence (skip pure-question hooks)
+      const sentences = s.split(/[\n。！？!?]/).map(t => t.trim()).filter(t => t.length >= 6);
+      // Prefer sentences that describe a scene (contain 在/坐/站/拿/看/聽/喝/吃/泡/煮/拍/走/笑/睡/穿)
+      const sceneRe = /(在|坐|站|拿|看|聽|喝|吃|泡|煮|拍|走|笑|睡|穿|裝|擺|放|沖|淋|抱|牽|握|寫|讀|畫|種|插)/;
+      const scenic = sentences.find(t => sceneRe.test(t)) ?? sentences[0] ?? "";
+      return scenic.slice(0, 80);
+    };
+
+    const subject = extractSubject(cap);
 
     if (mode === "image") {
-      // Image: prefer existing imageStyle (the brief that produced current image)
+      // Prefer existing imageStyle (the brief that produced current image)
       if (slide?.imageStyle && slide.imageStyle.trim().length > 0) {
         setImagePrompt(slide.imageStyle);
         return;
       }
-      const seed = firstSentence
-        ? `${firstSentence}。畫面：自然光、寫實質感、與品牌調性相符。`
+      // Richer image brief: subject + lighting + composition + mood + style cue
+      const seed = subject
+        ? `主角 / 場景：${subject}\n` +
+          `鏡頭：中景，主體稍微偏左、留白給文字。\n` +
+          `光線：自然柔光，從窗戶斜進來的暖色調。\n` +
+          `氛圍：寫實、生活感、不刻意擺拍。\n` +
+          `風格：摹片風（不要過度修圖、不要 3D 渲染感），會自動套用品牌色彩 / 調性。`
         : "";
       setImagePrompt(seed);
       return;
@@ -266,8 +294,11 @@ export default function RunPage() {
 
     // Video: 3-beat storyboard seed (hook → main shot → text overlay/CTA)
     if (mode === "video") {
-      const seed = firstSentence
-        ? `開頭 3 秒：${firstSentence}的畫面抓住注意力。\n中段：產品 / 場景特寫，自然光、節奏穩。\n結尾字卡：呼應這篇 caption 的核心訊息，3-6 字。`
+      const seed = subject
+        ? `開頭 3 秒（hook）：${subject} —— 鏡頭抓住一個吸睛瞬間。\n` +
+          `中段（10-20 秒）：產品 / 場景特寫 + 一個具體動作（手部、表情、物件接觸）。\n` +
+          `結尾（3-5 秒）：字卡呼應 caption 核心，3-8 字。可配「定格 + 留白」收尾。\n` +
+          `風格：自然光、節奏穩、不刻意配音、字卡簡潔。`
         : "";
       setImagePrompt(seed);
       return;
