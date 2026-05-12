@@ -242,13 +242,35 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 
-  // P4: pre-fill image prompt from current variant's imageStyle when
-  // mode switches to image OR active variant changes.
+  // P4: pre-fill image prompt when image mode opens OR variant switches.
+  // 2026-05-12 (CJ「按下改圖以後，應該要有預設的圖片指令」). Priority:
+  //   1. existing variant.imageStyle (the brief that produced the current
+  //      image — best starting point for "tweak this")
+  //   2. derived from caption (gives user a non-blank starting point so
+  //      they can iterate instead of staring at a placeholder)
+  // We refresh whenever the user enters image mode or switches variant —
+  // user edits within the same variant aren't preserved across mode toggles,
+  // but they're saved on press of 立即產圖.
   useEffect(() => {
-    if (mode === "image" && slide?.imageStyle) {
+    if (mode !== "image") return;
+
+    if (slide?.imageStyle && slide.imageStyle.trim().length > 0) {
       setImagePrompt(slide.imageStyle);
+      return;
     }
-  }, [mode, activeIdx, slide?.imageStyle]);
+    const cap = String(slide?.caption ?? "").trim();
+    if (cap.length > 0) {
+      const firstSentence = cap.split(/[\n。！？!?]/)[0]?.trim().slice(0, 80) ?? "";
+      const seed = firstSentence
+        ? `${firstSentence}。畫面：自然光、寫實質感、與品牌調性相符。`
+        : "";
+      if (seed) {
+        setImagePrompt(seed);
+        return;
+      }
+    }
+    setImagePrompt("");
+  }, [mode, activeIdx, slide?.imageStyle, slide?.caption]);
 
   // 2026-05-09 (CJ direction「只留一個 mockup 路徑」): 一律渲染 mockup，
   // 不再 block on missing taskId. Inference falls through 3 layers:
