@@ -1,0 +1,50 @@
+name: Admin — List Pipedream workflows in project
+
+on:
+  workflow_dispatch:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            PROJ="$PIPEDREAM_PROJECT_ID"
+            KEY="$PIPEDREAM_API_KEY"
+            WS="$PIPEDREAM_WORKSPACE_ID"
+
+            echo "Project: $PROJ"
+            echo "Workspace: $WS"
+            echo
+
+            # Try several endpoints — Pipedream's API path for listing
+            # workflows varies between docs revisions
+            for path in \
+              "/v1/workflows" \
+              "/v1/projects/$PROJ/workflows" \
+              "/v1/users/me/workflows" \
+              "/v1/workspaces/$WS/workflows" \
+              "/v1/sources" \
+              "/v1/projects/$PROJ" \
+            ; do
+              echo "── GET $path ─────"
+              curl -s --max-time 10 "https://api.pipedream.com$path" \
+                -H "Authorization: Bearer $KEY" \
+                | head -c 600
+              echo; echo
+            done
+
+            echo "── Pipedream Connect: list this project's connected accounts ─────"
+            curl -s --max-time 10 "https://api.pipedream.com/v1/connect/$PROJ/accounts" \
+              -H "Authorization: Bearer $KEY" \
+              -H "X-PD-Environment: production" \
+              | head -c 800
+            echo
