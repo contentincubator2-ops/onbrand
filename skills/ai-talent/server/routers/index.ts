@@ -62,6 +62,8 @@ import { tenantRouter } from "./tenantRouter";
 import { ecpayRouter } from "./ecpayRouter";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」): proactive festival nudges.
 import { festivalRouter } from "./festivalRouter";
+// 2026-05-12 (CJ「Phase 1 prompt library」): Nano-Banana 175 image-prompt templates.
+import { promptTemplateRouter } from "./promptTemplateRouter";
 
 export const appRouter = router({
   workflow:      workflowRouter,
@@ -125,6 +127,7 @@ export const appRouter = router({
   tenant:          tenantRouter,
   ecpay:           ecpayRouter,
   festival:        festivalRouter,
+  promptTemplate:  promptTemplateRouter,
 });
 
 export type AppRouter = typeof appRouter;

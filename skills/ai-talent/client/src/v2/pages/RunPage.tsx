@@ -84,8 +84,24 @@ export default function RunPage() {
   const [videoJobId, setVideoJobId] = useState<number | null>(null);
   /** 2026-05-12: user-selected video model for 改影片 dropdown. */
   const [videoModel, setVideoModel] = useState<string>("auto");
+  /** 2026-05-12 Phase 1 — picked template category for the 改圖 picker. */
+  const [templateCategory, setTemplateCategory] = useState<string>("");
 
   const utils = trpc.useUtils();
+
+  // 2026-05-12 Phase 1: Nano-Banana prompt-template catalog (lazy on image mode).
+  const templateCategoriesQ = (trpc as any).promptTemplate?.categories?.useQuery
+    ? (trpc as any).promptTemplate.categories.useQuery(undefined, {
+        enabled: mode === "image",
+        staleTime: 60 * 60 * 1000,
+      })
+    : { data: [] };
+  const templatesQ = (trpc as any).promptTemplate?.list?.useQuery
+    ? (trpc as any).promptTemplate.list.useQuery(
+        { category: templateCategory || undefined, limit: 30 },
+        { enabled: mode === "image" && !!templateCategory, staleTime: 60 * 60 * 1000 },
+      )
+    : { data: [] };
   const updateMut = trpc.output.updateVariantCaption.useMutation({
     onSuccess: () => {
       showToastGlobal("已儲存");
@@ -699,8 +715,52 @@ export default function RunPage() {
                       <img src={slide.imageUrl} alt="current" className="w-full h-auto" />
                     </div>
                   )}
+                  {/* 2026-05-12 Phase 1 (CJ「prompt library 整合」):
+                      Nano-Banana 175 商業攝影 prompt 範本。先選類別 → 列表
+                      → 點 card 套用到 prompt textarea。 */}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
-                    Step 2：選用哪個模型（不同模型擅長不同風格）
+                    Step 2（選填）：用商業攝影範本當起點
+                  </div>
+                  <label className="block text-tiny text-default-600 -mb-1">範本類別</label>
+                  <select
+                    value={templateCategory}
+                    onChange={(e) => setTemplateCategory(e.target.value)}
+                    className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary"
+                  >
+                    <option value="">— 不用範本（直接寫 prompt）—</option>
+                    {((templateCategoriesQ?.data ?? []) as any[]).map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.label_zh}（{c.count} 個範本）
+                      </option>
+                    ))}
+                  </select>
+                  {templateCategory && (templatesQ?.data ?? []).length > 0 && (
+                    <div className="max-h-48 overflow-y-auto border border-default-200 rounded-lg divide-y divide-default-100">
+                      {((templatesQ?.data ?? []) as any[]).map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={async () => {
+                            // Fetch full prompt body, then prepend to user's prompt
+                            try {
+                              const full = await (utils as any).promptTemplate?.detail?.fetch?.({ id: t.id });
+                              if (full?.prompt) {
+                                setImagePrompt(full.prompt);
+                                showToastGlobal(`已套用範本：${full.title.slice(0, 30)}`);
+                              }
+                            } catch (e: any) {
+                              showToastGlobal(`套用失敗：${e?.message ?? e}`);
+                            }
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-default-50 transition"
+                        >
+                          <p className="text-xs font-medium text-default-800 truncate">{t.title}</p>
+                          <p className="text-[10px] text-default-500 line-clamp-2 mt-0.5">{t.preview}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
+                    Step 3：選用哪個模型（不同模型擅長不同風格）
                   </div>
                   <label className="block text-tiny text-default-600 -mb-1">AI 模型</label>
                   <select
@@ -716,7 +776,7 @@ export default function RunPage() {
                     <option value="imagen-3">Google Imagen 3</option>
                   </select>
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
-                    Step 3：按下面按鈕，會用你的指令重新產圖（蓋掉目前的圖）
+                    Step 4：按下面按鈕，會用你的指令重新產圖（蓋掉目前的圖）
                   </div>
                   <Button
                     color="secondary" fullWidth
