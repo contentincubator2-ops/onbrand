@@ -1,0 +1,50 @@
+name: Admin — Trace PiAPI image-gen failures
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            LOG_OUT=/home/$(whoami)/.pm2/logs/marketing-os-out.log
+            LOG_ERR=/home/$(whoami)/.pm2/logs/marketing-os-error.log
+
+            echo "── all PiAPI / flux / ideogram mentions in last 500 OUT lines ─────"
+            tail -500 "$LOG_OUT" 2>/dev/null | grep -iE "piapi|flux|ideogram|qubico" | tail -40
+
+            echo
+            echo "── all PiAPI / flux / ideogram mentions in last 500 ERROR lines ─────"
+            tail -500 "$LOG_ERR" 2>/dev/null | grep -B 1 -A 5 -iE "piapi|flux|ideogram|qubico" | tail -50
+
+            echo
+            echo "── most recent generated_images rows for cj (userId 199) ─────"
+            export MYSQL_PWD="mos_secure_2026"
+            mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4 -e "
+              SELECT i.id, i.brandId, LEFT(i.provider, 12) AS provider, LEFT(i.model, 24) AS model,
+                LEFT(IFNULL(i.url, '(null)'), 60) AS url,
+                LEFT(IFNULL(i.errorMsg, '(none)'), 100) AS errorMsg,
+                i.status, i.createdAt
+              FROM generated_images i
+              JOIN brands b ON b.id = i.brandId
+              WHERE b.userId = 199
+              ORDER BY i.id DESC
+              LIMIT 10;
+            "
+
+            echo
+            echo "── PIAPI status sanity check ─────"
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+            curl -s --max-time 10 "https://api.piapi.ai/api/v1/task" \
+              -H "x-api-key: $PIAPI_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"model":"Qubico/flux1-schnell","task_type":"txt2img","input":{"prompt":"red apple","width":512,"height":512}}' \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print('  submit:', d.get('code'), 'task_id:', d.get('data',{}).get('task_id'))"
