@@ -770,36 +770,12 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
     });
     if (!r.ok) {
       const txt = await r.text();
-      const primaryErr = `LLM invoke failed (${providerKey}): ${r.status} – ${txt.slice(0, 400)}`;
-
-      // 2026-05-12 (CJ「Anthropic 餘額不足 → fallback Azure Foundry」):
-      // When Anthropic returns 400 with credit-balance error (or 401/403/429/5xx),
-      // fall back to Azure Foundry's Kimi-K2.5 (or configured fallback model).
-      // Only applies to primary == "anthropic" (api.anthropic.com); azure-position
-      // is itself an Azure resource so we don't loop.
-      if (providerKey === "anthropic") {
-        const looksLikeBillingOrAvailability =
-          r.status === 400 || r.status === 401 || r.status === 402 ||
-          r.status === 403 || r.status === 429 || r.status >= 500 ||
-          /credit\s*balance|insufficient|quota/i.test(txt);
-        const foundryKey = (ENV as any).AZURE_FOUNDRY_API_KEY ?? (ENV as any).AZURE_AI_API_KEY ?? "";
-        const foundryEndpoint = ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT ?? "").replace(/\/$/, "");
-        if (looksLikeBillingOrAvailability && foundryKey && foundryEndpoint) {
-          const fbModel = (ENV as any).AZURE_FOUNDRY_FALLBACK_MODEL ?? "Kimi-K2.5";
-          console.warn(`[invokeLLM] Anthropic ${r.status} → falling back to Azure Foundry ${fbModel}`);
-          try {
-            return await invokeLLM({
-              ...params,
-              provider: "azure-foundry",
-              model: fbModel,
-            });
-          } catch (fbErr: any) {
-            throw new Error(`Both Anthropic + Azure Foundry failed. Anthropic: ${primaryErr.slice(0,160)} | Azure Foundry: ${String(fbErr?.message ?? fbErr).slice(0,200)}`);
-          }
-        }
-      }
-
-      throw new Error(primaryErr);
+      // 2026-05-12: removed the inner Anthropic→Azure Kimi-K2.5 fallback.
+      // The OUTER cascade (invokeLLM wrapper) handles all fallback now —
+      // and it does so with the configured AZURE_FOUNDRY_MODEL (gpt-4.1)
+      // instead of the hard-coded Kimi-K2.5 which returned reasoning_content
+      // only (empty content) and broke /theater for hours.
+      throw new Error(`LLM invoke failed (${providerKey}): ${r.status} – ${txt.slice(0, 400)}`);
     }
     const j: any = await r.json();
     const text = (j.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
@@ -1056,16 +1032,16 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
     console.warn(`[invokeLLMStream] primary (${providerKey}/${model}) failed: ${primaryErr.slice(0, 200)}`);
 
     // ── Fallback chain ────────────────────────────────────────────────
-    // Primary = Anthropic  → fallback to Azure Foundry gpt-4o
+    // Primary = Anthropic  → fallback to Azure Foundry gpt-4.1
     // Primary = other      → fallback to Anthropic (claude-sonnet-4-6)
     if (providerKey === "anthropic") {
       const foundryKey = (ENV as any).AZURE_FOUNDRY_API_KEY ?? (ENV as any).AZURE_AI_API_KEY ?? "";
       const foundryEndpoint = ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT ?? "").replace(/\/$/, "");
       if (foundryKey && foundryEndpoint) {
-        // Fallback model: set AZURE_FOUNDRY_FALLBACK_MODEL env to any confirmed-deployed model.
-        // Confirmed as of 2026-04-25: gpt-4o, Kimi-K2.5, DeepSeek-V3.2, Mistral-Large-3
-        // gpt-5-nano was removed; use Kimi-K2.5 as default — strong model, handles zh well.
-        const fbModel = (ENV as any).AZURE_FOUNDRY_FALLBACK_MODEL ?? "Kimi-K2.5";
+        // 2026-05-12: was hard-coded to Kimi-K2.5 (reasoning model that returns
+        // empty content for streaming) — broke /theater. Now defaults to gpt-4.1
+        // (non-reasoning, deterministic clean output).
+        const fbModel = (ENV as any).AZURE_FOUNDRY_FALLBACK_MODEL ?? "gpt-4.1";
         console.warn(`[invokeLLMStream] Anthropic failed → falling back to Azure Foundry ${fbModel}`);
         const fbUrl = `${foundryEndpoint}/openai/v1/chat/completions`;
         const fbPayload = {
