@@ -128,7 +128,9 @@ const PROVIDER_CONFIG: Record<
   },
   openai: {
     baseUrl:      "https://api.openai.com/v1",
-    defaultModel: "gpt-4o-mini",
+    // 2026-05-12: gpt-4.1-mini > gpt-4o-mini for zh brand voice (cleaner phrasing,
+    // less clunky 載體/載入 vocabulary). Override via OPENAI_MODEL env if needed.
+    defaultModel: (ENV as any).OPENAI_MODEL || "gpt-4.1-mini",
     getKey:       () => ENV.OPENAI_API_KEY ?? "",
   },
   zhipu: {
