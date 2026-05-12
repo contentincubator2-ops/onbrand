@@ -1,9 +1,5 @@
 name: Admin — Probe full LLM fallback chain readiness
 
-# Hits each provider in the cascade with a minimal prompt and reports
-# which return real content. Used to confirm we have viable fallbacks
-# beyond Anthropic + Azure Foundry.
-
 on:
   workflow_dispatch:
 
@@ -18,78 +14,103 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 180s
           script: |
-            set -e
+            set +e
             cd /opt/marketing-os/app/skills/ai-talent
             set -a; . ./.env; set +a
 
-            PROMPT='用 15 字內回答：母親節最好的禮物是什麼？'
+            cat > /tmp/probe_chain.py <<'PYEOF'
+            import os, json, sys, urllib.request, urllib.error
 
-            check() {
-              local NAME="$1"; local URL="$2"; local AUTH="$3"; local PAYLOAD="$4"
-              echo "── $NAME ─────"
-              local RESP
-              RESP=$(curl -s --max-time 25 -X POST "$URL" $AUTH \
-                -H "Content-Type: application/json" \
-                -d "$PAYLOAD")
-              local CONTENT
-              CONTENT=$(echo "$RESP" | python3 -c "
-              import sys, json
-              try:
-                  d = json.load(sys.stdin)
-              except:
-                  print('PARSE_FAIL: ' + sys.stdin.read()[:200])
-                  sys.exit(0)
-              # Anthropic shape
-              if 'content' in d and isinstance(d['content'], list):
-                  txts = [b.get('text','') for b in d['content'] if b.get('type')=='text']
-                  print('ANTHROPIC: ' + (''.join(txts) or '(empty)')[:200])
-                  sys.exit(0)
-              # OpenAI shape
-              ch = d.get('choices', [{}])
-              if ch:
-                  m = ch[0].get('message', {})
-                  c = m.get('content') or m.get('reasoning_content') or '(empty)'
-                  print('OPENAI: ' + c[:200])
-                  sys.exit(0)
-              err = d.get('error') or d
-              print('ERR: ' + json.dumps(err)[:300])
-              " 2>&1)
-              echo "  $CONTENT"
-              echo
-            }
+            PROMPT = "用 15 字內回答：母親節最好的禮物是什麼？"
 
-            # 1. Anthropic (expected to fail — credits empty)
-            check "1. Anthropic" \
-              "https://api.anthropic.com/v1/messages" \
-              "-H \"x-api-key: $ANTHROPIC_API_KEY\" -H \"anthropic-version: 2023-06-01\"" \
-              "{\"model\":\"claude-haiku-4-5\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+            def call(name, url, headers, payload):
+                print(f"── {name} ─────")
+                try:
+                    data = json.dumps(payload).encode("utf-8")
+                    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+                    with urllib.request.urlopen(req, timeout=25) as r:
+                        body = r.read().decode("utf-8", "replace")
+                except urllib.error.HTTPError as e:
+                    body = e.read().decode("utf-8", "replace")
+                    print(f"  HTTP {e.code}: {body[:300]}")
+                    print()
+                    return False
+                except Exception as e:
+                    print(f"  ERR: {type(e).__name__} {e}")
+                    print()
+                    return False
+                try:
+                    d = json.loads(body)
+                except Exception:
+                    print(f"  PARSE_FAIL: {body[:300]}"); print(); return False
+                # Anthropic shape
+                if isinstance(d.get("content"), list):
+                    txt = "".join(b.get("text","") for b in d["content"] if b.get("type")=="text")
+                    print(f"  ✓ ANTHROPIC content: {(txt or '(empty)')[:200]}")
+                    print()
+                    return bool(txt.strip())
+                # OpenAI shape
+                ch = d.get("choices") or []
+                if ch:
+                    m = ch[0].get("message") or {}
+                    c = m.get("content") or m.get("reasoning_content") or ""
+                    print(f"  ✓ OPENAI content: {(c or '(empty)')[:200]}")
+                    print()
+                    return bool(c.strip())
+                err = d.get("error") or d
+                print(f"  ERR: {json.dumps(err)[:300]}")
+                print()
+                return False
 
-            # 2. Azure Foundry gpt-4.1-mini
-            check "2. Azure Foundry gpt-4.1-mini" \
-              "${AZURE_FOUNDRY_PROJECT_ENDPOINT%/}/openai/v1/chat/completions" \
-              "-H \"api-key: $AZURE_FOUNDRY_API_KEY\"" \
-              "{\"model\":\"gpt-4.1-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+            ANTHRO = os.environ.get("ANTHROPIC_API_KEY","")
+            AZF_KEY = os.environ.get("AZURE_FOUNDRY_API_KEY","")
+            AZF_EP = os.environ.get("AZURE_FOUNDRY_PROJECT_ENDPOINT","").rstrip("/")
+            OPENAI = os.environ.get("OPENAI_API_KEY","")
+            GEMINI = os.environ.get("GEMINI_API_KEY","") or os.environ.get("GOOGLE_AI_API_KEY","")
+            DEEPSK = os.environ.get("DEEPSEEK_API_KEY","")
 
-            # 3. OpenAI gpt-4o-mini
-            check "3. OpenAI gpt-4o-mini" \
-              "https://api.openai.com/v1/chat/completions" \
-              "-H \"Authorization: Bearer $OPENAI_API_KEY\"" \
-              "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+            results = {}
+            results["anthropic"] = call("1. Anthropic claude-haiku-4-5",
+                "https://api.anthropic.com/v1/messages",
+                {"x-api-key": ANTHRO, "anthropic-version":"2023-06-01", "content-type":"application/json"},
+                {"model":"claude-haiku-4-5","messages":[{"role":"user","content":PROMPT}],"max_tokens":120})
 
-            # 4. Gemini 2.5-flash via AI Studio OpenAI-compat
-            check "4. Gemini 2.5-flash" \
-              "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
-              "-H \"Authorization: Bearer $GEMINI_API_KEY\"" \
-              "{\"model\":\"gemini-2.5-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+            if AZF_KEY and AZF_EP:
+                results["azure-foundry"] = call("2. Azure Foundry gpt-4.1-mini",
+                    f"{AZF_EP}/openai/v1/chat/completions",
+                    {"api-key": AZF_KEY, "content-type":"application/json"},
+                    {"model":"gpt-4.1-mini","messages":[{"role":"user","content":PROMPT}],"max_tokens":120})
 
-            # 5. DeepSeek V3
-            check "5. DeepSeek V3" \
-              "https://api.deepseek.com/v1/chat/completions" \
-              "-H \"Authorization: Bearer $DEEPSEEK_API_KEY\"" \
-              "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+            if OPENAI:
+                results["openai"] = call("3. OpenAI gpt-4o-mini",
+                    "https://api.openai.com/v1/chat/completions",
+                    {"Authorization": f"Bearer {OPENAI}", "content-type":"application/json"},
+                    {"model":"gpt-4o-mini","messages":[{"role":"user","content":PROMPT}],"max_tokens":120})
 
-            echo "── env-key presence summary ─────"
-            for k in ANTHROPIC_API_KEY AZURE_FOUNDRY_API_KEY OPENAI_API_KEY GEMINI_API_KEY DEEPSEEK_API_KEY QWEN_API_KEY COHERE_API_KEY; do
+            if GEMINI:
+                results["gemini"] = call("4. Gemini 2.5-flash (OpenAI-compat)",
+                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                    {"Authorization": f"Bearer {GEMINI}", "content-type":"application/json"},
+                    {"model":"gemini-2.5-flash","messages":[{"role":"user","content":PROMPT}],"max_tokens":120})
+
+            if DEEPSK:
+                results["deepseek"] = call("5. DeepSeek V3",
+                    "https://api.deepseek.com/v1/chat/completions",
+                    {"Authorization": f"Bearer {DEEPSK}", "content-type":"application/json"},
+                    {"model":"deepseek-chat","messages":[{"role":"user","content":PROMPT}],"max_tokens":120})
+
+            print("── summary ─────")
+            for p, ok in results.items():
+                print(f"  {p:20s} {'WORKS ✓' if ok else 'BROKEN ✗'}")
+            working = sum(1 for ok in results.values() if ok)
+            print(f"\n  {working}/{len(results)} providers working")
+            PYEOF
+
+            python3 /tmp/probe_chain.py
+
+            echo
+            echo "── env-key presence ─────"
+            for k in ANTHROPIC_API_KEY AZURE_FOUNDRY_API_KEY OPENAI_API_KEY GEMINI_API_KEY DEEPSEEK_API_KEY; do
               v=$(printenv "$k" || true)
               if [ -z "$v" ]; then echo "  $k = MISSING"; else echo "  $k = SET (${#v} chars)"; fi
             done
