@@ -21,6 +21,15 @@ import { generateVideoAsync } from "../video/videoService";
 const PlatformEnum = z.enum(["youtube", "instagram", "tiktok", "facebook"]);
 const LanguageEnum = z.enum(["zh-TW", "zh-CN", "en"]);
 const StyleEnum = z.enum(["professional", "casual", "energetic", "minimalist"]);
+// 2026-05-12 (CJ「給用戶選 video model」): expose PiAPI video model picker.
+const VideoModelEnum = z.enum([
+  "auto",
+  "piapi/kling-v2-master",   // 主力，3-5 min/clip, A-grade
+  "piapi/kling-v1-6-i2v",    // 快速，1-2 min
+  "piapi/runway-gen-4",      // 電影感
+  "piapi/runway-gen-4-turbo",
+  "piapi/pika-v2",           // 急用
+]);
 
 // ─── Router ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +48,7 @@ export const videoRouter = router({
         duration: z.number().int().min(15).max(180).default(60), // seconds
         style:    StyleEnum.default("professional"),
         brandId:  z.number().int().optional(),
+        videoModel: VideoModelEnum.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -48,6 +58,11 @@ export const videoRouter = router({
       const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
       await assertWithinPlan(ctx.user.id, "video_gen");
       await recordQuotaUsage(ctx.user.id, "video_gen", "brand", input.brandId ?? null);
+
+      // Resolve "auto" to the default video model id for the worker
+      const resolvedVideoModel = !input.videoModel || input.videoModel === "auto"
+        ? "piapi/kling-v2-master"
+        : input.videoModel;
 
       // 建立任務記錄
       const [result] = await db.insert(videoJobs).values({
@@ -64,7 +79,7 @@ export const videoRouter = router({
       const jobId = result.insertId as number;
 
       // 非同步執行（不等待完成）
-      generateVideoAsync(jobId, input, ctx.user.id).catch((err) => {
+      generateVideoAsync(jobId, { ...input, videoModel: resolvedVideoModel }, ctx.user.id).catch((err) => {
         console.error(`[video] job ${jobId} failed:`, err);
       });
 

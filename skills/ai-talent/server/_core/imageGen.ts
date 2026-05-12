@@ -15,8 +15,19 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { loadLineage } from "./decisionBridge";
 
-export type ImageProvider = "openai" | "google" | "stability";
+export type ImageProvider = "openai" | "google" | "stability" | "piapi";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
+
+// 2026-05-12 (CJ「改圖要給用戶選 model」): user-facing model IDs.
+// "auto" = use IMAGE_GEN_PROVIDER_PRIMARY env (currently openai).
+// Other values map to specific providers in generateImage's switch.
+export type ImageModelChoice =
+  | "auto"
+  | "flux-schnell"      // PiAPI Flux Schnell — fast (5-10s), 4-step
+  | "gpt-image-1"       // OpenAI — best realism
+  | "flux-realism"      // PiAPI Flux Dev with realism LoRA
+  | "ideogram-v3"       // PiAPI Ideogram — strongest at text-in-image
+  | "imagen-3";         // Google Imagen 3
 
 export interface BrandVisualContext {
   brandName?: string;
@@ -35,6 +46,8 @@ export interface ImageGenInput {
   channel?: "fb" | "ig" | "linkedin" | "youtube" | "pr";
   size?: ImageSize;
   brandContext?: BrandVisualContext;
+  /** 2026-05-12: user-selected model. "auto" or undefined = env default. */
+  modelChoice?: ImageModelChoice;
 }
 
 export interface ImageGenResult {
@@ -151,6 +164,25 @@ async function runGoogleImagen(
   return { url: null, b64, model };
 }
 
+// 2026-05-12: PiAPI bridge for user-selectable image models.
+// Imports dispatchGenerate from mediaGen which handles PiAPI submit + poll.
+async function runPiapi(
+  prompt: string,
+  size: ImageSize,
+  modelId: string,
+): Promise<{ url: string | null; b64: string | null; model: string }> {
+  const { dispatchGenerate } = await import("./mediaGen");
+  // Map our 1024x1024 / 1024x1536 / 1536x1024 sizes to PiAPI aspect ratios
+  const aspect: "1:1" | "9:16" | "16:9" =
+    size === "1024x1536" ? "9:16" :
+    size === "1536x1024" ? "16:9" : "1:1";
+  const r = await dispatchGenerate(modelId, { prompt, aspectRatio: aspect });
+  if (r.status !== "ready" || !r.url) {
+    throw new Error(`PiAPI ${modelId}: ${r.errorMsg ?? `status=${r.status}`}`);
+  }
+  return { url: r.url, b64: null, model: r.modelId };
+}
+
 export async function generateImage(input: ImageGenInput): Promise<ImageGenResult> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -171,24 +203,45 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   const primary = (process.env.IMAGE_GEN_PROVIDER_PRIMARY || "openai") as ImageProvider;
   const fallback = (process.env.IMAGE_GEN_PROVIDER_FALLBACK || "google") as ImageProvider;
 
-  const run = async (p: ImageProvider) => {
+  // 2026-05-12: model choice override. When user picks a specific model,
+  // it becomes "primary" and the env default becomes "fallback".
+  const choice = input.modelChoice ?? "auto";
+  let effectivePrimary: ImageProvider = primary;
+  let primaryModelId: string | null = null;
+  switch (choice) {
+    case "flux-schnell":   effectivePrimary = "piapi";  primaryModelId = "piapi/flux-schnell"; break;
+    case "gpt-image-1":    effectivePrimary = "openai"; break;
+    case "flux-realism":   effectivePrimary = "piapi";  primaryModelId = "piapi/flux-realism"; break;
+    case "ideogram-v3":    effectivePrimary = "piapi";  primaryModelId = "piapi/ideogram-v3"; break;
+    case "imagen-3":       effectivePrimary = "google"; break;
+    case "auto":
+    default:               /* keep env default */ break;
+  }
+
+  const run = async (p: ImageProvider, modelId?: string | null) => {
     if (p === "openai") return await runOpenAI(promptText, size);
     if (p === "google") return await runGoogleImagen(promptText, size);
+    if (p === "piapi")  return await runPiapi(promptText, size, modelId ?? "piapi/flux-schnell");
     throw new Error(`Provider ${p} not implemented`);
   };
 
-  let provider: ImageProvider = primary;
+  let provider: ImageProvider = effectivePrimary;
   let out: { url: string | null; b64: string | null; model: string } | null = null;
   let errorMsg: string | undefined;
   try {
-    out = await run(primary);
+    out = await run(effectivePrimary, primaryModelId);
   } catch (e: any) {
-    errorMsg = `${primary}: ${e?.message ?? e}`;
+    errorMsg = `${effectivePrimary}: ${e?.message ?? e}`;
+    // Fall back to the env default (different from the user's pick to maximize
+    // chance of recovery). If user picked something that IS the env default,
+    // fall back to the other-half default.
+    const fbProvider: ImageProvider =
+      effectivePrimary === fallback ? primary : fallback;
     try {
-      out = await run(fallback);
-      provider = fallback;
+      out = await run(fbProvider);
+      provider = fbProvider;
     } catch (e2: any) {
-      errorMsg = `${errorMsg}\n${fallback}: ${e2?.message ?? e2}`;
+      errorMsg = `${errorMsg}\n${fbProvider}: ${e2?.message ?? e2}`;
     }
   }
 

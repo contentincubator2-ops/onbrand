@@ -21,6 +21,9 @@ export interface VideoJobInput {
   duration: number;
   style:    string;
   brandId?: number;
+  /** 2026-05-12 (CJ「給用戶選 video model」): user-selected model.
+   *  Accepts PIAPI_MAP keys. "auto" or undefined = "piapi/kling-v2-master". */
+  videoModel?: string;
 }
 
 export interface SceneScript {
@@ -118,13 +121,17 @@ async function generateScript(input: VideoJobInput): Promise<VideoScript> {
 // PiAPI key already in use for image gen (flux-schnell), so video reuses
 // same subscription. Each scene = one 5s Kling clip; composeVideo stitches
 // via Creatomate (or single-scene fallback if Creatomate not configured).
-async function generateScene(scene: SceneScript, platform: string): Promise<string> {
+async function generateScene(
+  scene: SceneScript,
+  platform: string,
+  modelId: string = "piapi/kling-v2-master",
+): Promise<string> {
   const { dispatchGenerate, checkJob } = await import("../_core/mediaGen");
   const isVertical = platform === "instagram" || platform === "tiktok";
   const prompt = `${scene.visualPrompt}\n\nMood: ${scene.narration.slice(0, 200)}`;
 
-  // 1) Submit to PiAPI Kling v2-master
-  const submit = await dispatchGenerate("piapi/kling-v2-master", {
+  // 1) Submit to the selected PiAPI video model (default kling-v2-master)
+  const submit = await dispatchGenerate(modelId, {
     prompt: prompt.slice(0, 800),
     aspectRatio: (isVertical ? "9:16" : "16:9") as any,
     brandId: 0,
@@ -132,26 +139,27 @@ async function generateScene(scene: SceneScript, platform: string): Promise<stri
 
   if (submit.status === "ready" && submit.url) return submit.url;
   if (submit.status === "failed") {
-    throw new Error(`Kling submit failed: ${submit.errorMsg ?? "unknown"}`);
+    throw new Error(`${modelId} submit failed: ${submit.errorMsg ?? "unknown"}`);
   }
   if (submit.status !== "submitted" || !submit.taskId) {
-    throw new Error(`Unexpected Kling submit: ${JSON.stringify(submit).slice(0, 200)}`);
+    throw new Error(`Unexpected submit: ${JSON.stringify(submit).slice(0, 200)}`);
   }
 
-  // 2) Poll (Kling v2-master pro mode typically 90-180s per 5s clip)
+  // 2) Poll. Models vary in latency — Kling v2 pro takes 90-180s per clip,
+  // Pika v2 / Kling v1.6 are faster. 8-min cap covers all.
   const taskId = submit.taskId;
   const startedAt = Date.now();
   const POLL_INTERVAL_MS = 10_000;
   const MAX_POLL_MS = 8 * 60_000;
   while (Date.now() - startedAt < MAX_POLL_MS) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    const r = await checkJob("piapi/kling-v2-master", taskId);
+    const r = await checkJob(modelId, taskId);
     if (r.status === "ready" && r.url) return r.url;
     if (r.status === "failed") {
-      throw new Error(`Kling poll failed: ${r.errorMsg ?? "unknown"}`);
+      throw new Error(`${modelId} poll failed: ${r.errorMsg ?? "unknown"}`);
     }
   }
-  throw new Error(`Kling v2 timeout after ${MAX_POLL_MS / 1000}s for task ${taskId}`);
+  throw new Error(`${modelId} timeout after ${MAX_POLL_MS / 1000}s for task ${taskId}`);
 }
 
 // ─── Step 3: ElevenLabs TTS ──────────────────────────────────────────────────
@@ -331,9 +339,22 @@ export async function generateVideoAsync(
     const sceneUrls: string[] = [];
     const totalScenes = script.scenes.length;
 
+    // 2026-05-12: resolve user-selected model. "auto" / undefined → default
+    // PiAPI Kling v2-master.
+    const VALID_MODELS = new Set([
+      "piapi/kling-v2-master",
+      "piapi/kling-v1-6-i2v",
+      "piapi/runway-gen-4",
+      "piapi/runway-gen-4-turbo",
+      "piapi/pika-v2",
+    ]);
+    const sceneModelId = input.videoModel && VALID_MODELS.has(input.videoModel)
+      ? input.videoModel
+      : "piapi/kling-v2-master";
+
     for (let i = 0; i < totalScenes; i++) {
       const scene = script.scenes[i]!;
-      const url = await generateScene(scene, input.platform);
+      const url = await generateScene(scene, input.platform, sceneModelId);
       sceneUrls.push(url);
 
       const progress = 15 + Math.round(((i + 1) / totalScenes) * 55); // 15–70%

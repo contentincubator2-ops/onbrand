@@ -1,0 +1,46 @@
+name: Admin — Probe PIAPI_KEY presence + flux-schnell ping
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            for k in PIAPI_KEY PIAPI_API_KEY; do
+              v=$(printenv "$k" || true)
+              if [ -z "$v" ]; then
+                echo "  $k = MISSING"
+              else
+                echo "  $k = ${v:0:6}... (${#v} chars)"
+              fi
+            done
+
+            KEY="${PIAPI_KEY:-$PIAPI_API_KEY}"
+            if [ -z "$KEY" ]; then
+              echo
+              echo "⚠ Neither PIAPI_KEY nor PIAPI_API_KEY is set."
+              echo "  Image-gen model picker still works for: gpt-image-1, imagen-3."
+              echo "  flux-schnell / flux-realism / ideogram-v3 will fail until key is set."
+              echo "  Video-gen requires PIAPI_KEY for ALL models (kling, runway, pika)."
+              exit 0
+            fi
+
+            echo
+            echo "── ping PiAPI with Qubico/flux1-schnell ─────"
+            curl -s --max-time 20 -X POST "https://api.piapi.ai/api/v1/task" \
+              -H "x-api-key: $KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"model":"Qubico/flux1-schnell","task_type":"txt2img","input":{"prompt":"a red apple on a white plate, photorealistic","width":512,"height":512}}' \
+              | head -c 400
+            echo

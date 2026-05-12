@@ -77,9 +77,13 @@ export default function RunPage() {
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
+  /** 2026-05-12: user-selected image model for 改圖 dropdown. */
+  const [imageModel, setImageModel] = useState<string>("auto");
   /** Video gen state — async job, polled for status. */
   const [videoDuration, setVideoDuration] = useState<number>(30);
   const [videoJobId, setVideoJobId] = useState<number | null>(null);
+  /** 2026-05-12: user-selected video model for 改影片 dropdown. */
+  const [videoModel, setVideoModel] = useState<string>("auto");
 
   const utils = trpc.useUtils();
   const updateMut = trpc.output.updateVariantCaption.useMutation({
@@ -692,7 +696,23 @@ export default function RunPage() {
                     </div>
                   )}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
-                    Step 2：按下面按鈕，會用你的指令重新產圖（蓋掉目前的圖）
+                    Step 2：選用哪個模型（不同模型擅長不同風格）
+                  </div>
+                  <label className="block text-tiny text-default-600 -mb-1">AI 模型</label>
+                  <select
+                    value={imageModel}
+                    onChange={(e) => setImageModel(e.target.value)}
+                    className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary"
+                  >
+                    <option value="auto">自動（預設）</option>
+                    <option value="flux-schnell">快速 — Flux Schnell（5-10 秒）</option>
+                    <option value="gpt-image-1">寫實 — GPT Image-1（15-25 秒，最像照片）</option>
+                    <option value="flux-realism">攝影感 — Flux Realism（15-30 秒）</option>
+                    <option value="ideogram-v3">含文字 — Ideogram V3（圖中文字最強）</option>
+                    <option value="imagen-3">Google Imagen 3</option>
+                  </select>
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
+                    Step 3：按下面按鈕，會用你的指令重新產圖（蓋掉目前的圖）
                   </div>
                   <Button
                     color="secondary" fullWidth
@@ -715,6 +735,7 @@ export default function RunPage() {
                           mockupVariant?.platform === "tiktok"    ? "tiktok" :
                           "fb"
                         ) as any,
+                        modelChoice: imageModel as any,
                       });
                     }}
                   >
@@ -760,7 +781,23 @@ export default function RunPage() {
                     ))}
                   </div>
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
-                    Step 3：啟動任務（5–10 分鐘後出影片，期間可繼續做別的）
+                    Step 3：選用哪個影片模型（不同模型擅長不同節奏）
+                  </div>
+                  <label className="block text-tiny text-default-600 -mb-1">AI 模型</label>
+                  <select
+                    value={videoModel}
+                    onChange={(e) => setVideoModel(e.target.value)}
+                    className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary"
+                  >
+                    <option value="auto">自動（預設）</option>
+                    <option value="piapi/kling-v2-master">主力 — Kling v2-master（3-5 分鐘，最強）</option>
+                    <option value="piapi/kling-v1-6-i2v">快速 — Kling v1.6 i2v（1-2 分鐘）</option>
+                    <option value="piapi/runway-gen-4">電影感 — Runway Gen-4（3-5 分鐘）</option>
+                    <option value="piapi/runway-gen-4-turbo">Runway Gen-4 Turbo（2-3 分鐘）</option>
+                    <option value="piapi/pika-v2">急用 — Pika v2（1-2 分鐘）</option>
+                  </select>
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
+                    Step 4：啟動任務（依模型而定 1–10 分鐘出影片，期間可繼續做別的）
                   </div>
                   <Button
                     color="secondary" fullWidth
@@ -783,10 +820,11 @@ export default function RunPage() {
                         duration: videoDuration,
                         style: "professional" as any,
                         brandId: data.brand?.id,
+                        videoModel: videoModel as any,
                       });
                     }}
                   >
-                    {videoGenMut.isPending ? "排入佇列…" : `🎬 立即生 ${videoDuration} 秒影片`}
+                    {videoGenMut.isPending ? "排入佇列…" : `立即生 ${videoDuration} 秒影片`}
                   </Button>
                   {videoJobId && (
                     <div className="bg-default-50 rounded-lg p-2.5 text-[11px] space-y-1 border border-secondary-200">

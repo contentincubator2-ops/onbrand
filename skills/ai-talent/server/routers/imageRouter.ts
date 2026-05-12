@@ -16,6 +16,15 @@ import { assertBrandOwner } from "../_core/brandAuth";
 
 const channel = z.enum(["fb", "ig", "linkedin", "youtube", "pr"]);
 const size = z.enum(["1024x1024", "1024x1536", "1536x1024"]);
+// 2026-05-12 (CJ「給用戶選 image model」): user-facing model picker.
+const modelChoice = z.enum([
+  "auto",
+  "flux-schnell",
+  "gpt-image-1",
+  "flux-realism",
+  "ideogram-v3",
+  "imagen-3",
+]);
 
 export const imageRouter = router({
   generate: protectedProcedure
@@ -28,6 +37,7 @@ export const imageRouter = router({
         optionId: z.number().int().positive().optional(),
         upstreamDecisionId: z.number().int().positive().optional(),
         size: size.optional(),
+        modelChoice: modelChoice.optional(),
         overrideBrandContext: z
           .object({
             positioning: z.string().optional(),
@@ -60,6 +70,7 @@ export const imageRouter = router({
         prompt: input.prompt,
         channel: input.channel,
         size: input.size,
+        modelChoice: input.modelChoice,
         brandContext,
       });
       return result;
