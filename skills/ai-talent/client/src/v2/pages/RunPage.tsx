@@ -242,34 +242,36 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 
-  // P4: pre-fill image prompt when image mode opens OR variant switches.
-  // 2026-05-12 (CJ「按下改圖以後，應該要有預設的圖片指令」). Priority:
-  //   1. existing variant.imageStyle (the brief that produced the current
-  //      image — best starting point for "tweak this")
-  //   2. derived from caption (gives user a non-blank starting point so
-  //      they can iterate instead of staring at a placeholder)
-  // We refresh whenever the user enters image mode or switches variant —
-  // user edits within the same variant aren't preserved across mode toggles,
-  // but they're saved on press of 立即產圖.
+  // P4: pre-fill image / video prompt when entering that mode or switching
+  // variant. 2026-05-12 (CJ「按下改圖/改影片，應該要有預設的提示詞」).
+  // imagePrompt state is reused for video — different seed format per mode.
   useEffect(() => {
-    if (mode !== "image") return;
+    if (mode !== "image" && mode !== "video") return;
 
-    if (slide?.imageStyle && slide.imageStyle.trim().length > 0) {
-      setImagePrompt(slide.imageStyle);
-      return;
-    }
     const cap = String(slide?.caption ?? "").trim();
-    if (cap.length > 0) {
-      const firstSentence = cap.split(/[\n。！？!?]/)[0]?.trim().slice(0, 80) ?? "";
+    const firstSentence = cap.split(/[\n。！？!?]/)[0]?.trim().slice(0, 80) ?? "";
+
+    if (mode === "image") {
+      // Image: prefer existing imageStyle (the brief that produced current image)
+      if (slide?.imageStyle && slide.imageStyle.trim().length > 0) {
+        setImagePrompt(slide.imageStyle);
+        return;
+      }
       const seed = firstSentence
         ? `${firstSentence}。畫面：自然光、寫實質感、與品牌調性相符。`
         : "";
-      if (seed) {
-        setImagePrompt(seed);
-        return;
-      }
+      setImagePrompt(seed);
+      return;
     }
-    setImagePrompt("");
+
+    // Video: 3-beat storyboard seed (hook → main shot → text overlay/CTA)
+    if (mode === "video") {
+      const seed = firstSentence
+        ? `開頭 3 秒：${firstSentence}的畫面抓住注意力。\n中段：產品 / 場景特寫，自然光、節奏穩。\n結尾字卡：呼應這篇 caption 的核心訊息，3-6 字。`
+        : "";
+      setImagePrompt(seed);
+      return;
+    }
   }, [mode, activeIdx, slide?.imageStyle, slide?.caption]);
 
   // 2026-05-09 (CJ direction「只留一個 mockup 路徑」): 一律渲染 mockup，
