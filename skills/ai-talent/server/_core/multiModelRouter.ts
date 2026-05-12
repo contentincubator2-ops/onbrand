@@ -148,27 +148,28 @@ const DEFAULT_MODELS: Record<ModelProvider, string> = {
  */
 function getAvailabilityMap(): Record<ModelProvider, boolean> {
   return {
-    // 2026-05-09: qwen key is invalid (HTTP 401 on direct curl), zhipu
-    // not verified working. Disabled until keys re-issued. Until then,
-    // anthropic carries everything.
-    qwen:                 false,  // !!ENV.QWEN_API_KEY — key invalid
-    zhipu:                false,  // !!ENV.ZHIPU_API_KEY — not verified
+    // 2026-05-12 (CJ「YT 6-ep 502」): re-enabled qwen/zhipu/openai/gemini.
+    // 2026-05-09 had hard-coded these to false because of broken keys at the
+    // time, but admin-probe-fallback-chain on 2026-05-12 confirmed all 4 work
+    // (qwen: 媽媽的手，曾牽我學步…; openai gpt-4.1-mini ✓; gemini ✓; deepseek ✓).
+    // Hard-coding false forced every agent pinned to these providers through
+    // Anthropic → 400 → outer cascade. 5x latency per call.
+    qwen:                 !!(ENV as any).QWEN_API_KEY,
+    zhipu:                !!(ENV as any).ZHIPU_API_KEY,
     "azure-foundry":      !!(ENV as any).AZURE_FOUNDRY_API_KEY,
-    // Newly added Azure resources (keys written 2026-05-04)
+    // Azure resources (keys written 2026-05-04)
     "azure-position":     !!(ENV as any).AZURE_POSITION_API_KEY,
     "azure-claude":       !!(ENV as any).AZURE_CLAUDE_SWEDEN_API_KEY,
     "azure-northcentral": !!(ENV as any).AZURE_NORTHCENTRAL_API_KEY,
     "azure-canada":       !!(ENV as any).AZURE_CANADA_API_KEY,
-    // 2026-05-09: anthropic re-enabled — invokeLLM gained dedicated /v1/messages
-    // path. Confirmed working: curl claude-haiku-4-5-20251001 → 200 in 0.6s.
-    anthropic:           !!(ENV as any).ANTHROPIC_API_KEY,
-    openai:              false,   // 401 — key expired
-    perplexity:          false,   // 401 — all 5 keys quota exhausted
-    google:              false,   // gemini-oai-compat 400; native works in perplexityScout
-    cohere:              false,   // 401 — key invalid
-    forge:               false,   // no key on VM
-    gemini:              false,   // 400 — openai-compat mismatch; native works in perplexityScout
-    hermes:              !!(ENV as any).HERMES_API_URL,  // self-hosted on VM when deployed
+    anthropic:            !!(ENV as any).ANTHROPIC_API_KEY,
+    openai:               !!(ENV as any).OPENAI_API_KEY,
+    perplexity:           false,   // 401 — all 5 keys quota exhausted (still true)
+    google:               !!((ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY),
+    cohere:               !!(ENV as any).COHERE_API_KEY,
+    forge:                false,   // no key on VM
+    gemini:               !!((ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY),
+    hermes:               !!(ENV as any).HERMES_API_URL,
   };
 }
 
