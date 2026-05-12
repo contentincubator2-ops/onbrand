@@ -124,8 +124,10 @@ export interface OrchestraResult {
 /** Map agent.aiModel string → ModelProvider used by callModel.
  *  Working providers (probe 2026-05-08 after endpoint+shape fixes):
  *  qwen / zhipu / azure-foundry (Kimi) / azure-position (claude-haiku/sonnet)
- *  / azure-northcentral (DeepSeek-V3.2/R1). Others fall back to qwen. */
-function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
+ *  / azure-northcentral (DeepSeek-V3.2/R1). Others fall back to qwen.
+ *  Exported so theaterRouter (and other places) can derive provider from
+ *  agent.aiModel consistently. */
+export function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
   if (!aiModel) return "qwen";
   const m = aiModel.toLowerCase();
   if (m.includes("qwen")) return "qwen";

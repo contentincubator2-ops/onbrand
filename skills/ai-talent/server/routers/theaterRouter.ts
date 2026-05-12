@@ -18,7 +18,7 @@ import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
 import { getBrandRealContent } from "../_core/brandRealContent";
 import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywritingMaster";
 import { resolveAgentId } from "../_core/agentAssignments";
-import { loadAgent } from "../_core/quickTaskOrchestra";
+import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -658,7 +658,9 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
       // (B+, ≥400 char real-person modeled). One DB read, cached after first
       // hit. Falls back gracefully if assignment missing.
       const theaterAgentId = resolveAgentId(`theater-cell-${input.platform}`, "lead", null);
-      const theaterPersonaLoad = theaterAgentId ? await loadAgent(theaterAgentId).catch(() => ({ persona: "" })) : { persona: "" };
+      const theaterPersonaLoad: { persona: string; aiModel?: string | null } = theaterAgentId
+        ? await loadAgent(theaterAgentId).catch(() => ({ persona: "", aiModel: null }))
+        : { persona: "", aiModel: null };
       const theaterPersona = theaterPersonaLoad.persona ? `\n# 你的角色（per-platform 真人模擬 agent）\n${theaterPersonaLoad.persona}\n` : "";
 
       const sys = `${masterBlock}${theaterPersona}
@@ -716,9 +718,18 @@ ${importantHint}
         // 2026-05-12 (CJ「結構重複」): bump temperature + penalty when prior
         // openings exist, so gpt-4.1 doesn't lock into "上週遇到一位..." templates.
         const hasPriors = (input.priorOpenings?.length ?? 0) > 0;
+        // 2026-05-12 (CJ「Theater 該讀 agent.aiModel」): derive provider + model
+        // from the per-platform theater agent's `aiModel` field instead of
+        // hardcoding Anthropic. The cascade still rescues on failure — the
+        // agent's preferred model is now tier 1 of THIS call's chain, with
+        // the default chain (gpt-4.1 → qwen → deepseek → ...) as backup.
+        // Falls back to leaving provider undefined (= full cascade from default)
+        // when no agent is assigned or aiModel is missing.
+        const agentAiModel = theaterPersonaLoad.aiModel ?? null;
+        const derivedProvider = agentAiModel ? aiModelToProvider(agentAiModel) : undefined;
         const r = await invokeLLM({
-          provider: "anthropic",
-          model: "claude-haiku-4-5",
+          ...(derivedProvider ? { provider: derivedProvider as any } : {}),
+          ...(agentAiModel ? { model: agentAiModel } : {}),
           maxTokens: 800,
           // Higher temperature + presence_penalty pushes the model off its
           // template prior. Reasoning models will strip these automatically.

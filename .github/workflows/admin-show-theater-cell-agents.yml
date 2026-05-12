@@ -1,0 +1,33 @@
+name: Admin — Show which agent + aiModel each theater platform will use
+
+on:
+  workflow_dispatch:
+
+jobs:
+  show:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            export MYSQL_PWD="mos_secure_2026"
+            MYSQLT="mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4"
+
+            echo "── theater-cell-{platform} agent assignments ─────"
+            $MYSQLT -e "
+              SELECT
+                aa.slot_key                                      AS slot,
+                aa.role                                          AS role,
+                aa.agent_id                                      AS agent_id,
+                LEFT(a.name, 14)                                 AS agent_name,
+                LEFT(a.title, 36)                                AS title,
+                IFNULL(a.aiModel, '(NULL)')                      AS aiModel
+              FROM agent_assignments aa
+              LEFT JOIN agents a ON a.id = aa.agent_id
+              WHERE aa.slot_key LIKE 'theater-cell-%'
+              ORDER BY aa.slot_key;
+            "
