@@ -213,8 +213,14 @@ export const outputRouter = router({
       // image from OpenAI gpt-image-1 which doesn't return a URL).
       // max bumped from 2000 → 10MB since base64 expands ~33%.
       imageUrl: z.string().min(1).max(10_000_000).refine(
-        (s) => s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:image/"),
-        { message: "imageUrl must be http(s):// or data:image/" },
+        (s) =>
+          s.startsWith("http://") ||
+          s.startsWith("https://") ||
+          s.startsWith("data:image/") ||
+          // 2026-05-12: PiAPI Flux/Ideogram saves to /static/covers/...
+          // served by our own static handler. Relative paths are fine.
+          s.startsWith("/"),
+        { message: "imageUrl must be http(s):// or data:image/ or /relative/path" },
       ),
       style: z.string().max(500).optional(),
     }))

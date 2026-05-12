@@ -99,11 +99,11 @@ console.log(`[server] CORS origin: ${Array.isArray(corsOrigin) ? corsOrigin.join
 app.use(cookieParser());
 // SEC-B-08 (2026-05-04): cap JSON body size. Per-field check below is the
 // real DoS protection; body limit just caps overall request size.
-// 2026-05-12: bumped 1MB → 25MB. OpenAI gpt-image-1 returns base64 PNG
-// that, wrapped as data:image/png;base64,..., is typically 2-5MB. Frontend
-// stores this in mission_outputs via output.updateVariantImage. CJ hit
-// "can't transfer from server" on 改圖 because the 1MB limit rejected it.
-app.use(express.json({ limit: '25mb' }));
+// 2026-05-12: bumped 1MB → 50MB. OpenAI gpt-image-1 returns base64 PNG.
+// 1024x1024 high-quality PNGs come back as 8-15MB base64 strings; 25MB
+// wasn't always enough. 50MB covers the worst case; per-field check below
+// is the real DoS guard.
+app.use(express.json({ limit: '50mb' }));
 
 // SEC-B-08 v2 (2026-05-05): per-field string cap. The 1MB body limit alone
 // allowed e.g. a 999KB string in a single field to slip through and burn
