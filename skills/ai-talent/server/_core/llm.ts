@@ -59,7 +59,7 @@ export type ToolChoice =
 export type InvokeParams = {
   messages: Message[];
   // Note: "openrouter" is deprecated — at runtime it's silently routed to LLM_DEFAULT_PROVIDER.
-  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "azure-position" | "azure-claude" | "azure-northcentral" | "azure-canada" | "google-vertex" | "gemini" | "hermes";
+  provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "azure-position" | "azure-claude" | "azure-northcentral" | "azure-canada" | "google-vertex" | "gemini" | "gemma" | "ollama" | "hermes";
   model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
@@ -234,6 +234,26 @@ const PROVIDER_CONFIG: Record<
     baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
     defaultModel: "gemini-2.5-flash",
     getKey:       () => (ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
+  },
+  // Gemma (Google open-weights, accessed via the same AI Studio endpoint).
+  // 2026-05-12: Gemma 4 does not exist yet; current latest is Gemma 3
+  // (gemma-3-27b-it / gemma-3-12b-it / gemma-3-4b-it). Override via GEMMA_MODEL env.
+  gemma: {
+    baseUrl:      "https://generativelanguage.googleapis.com/v1beta/openai",
+    defaultModel: (ENV as any).GEMMA_MODEL || "gemma-3-27b-it",
+    getKey:       () => (ENV as any).GEMINI_API_KEY ?? (ENV as any).GOOGLE_AI_API_KEY ?? "",
+  },
+  // Ollama (local on-VM LLM, tier-8 last-resort fallback). 2026-05-12:
+  // CPU-only Qwen 2.5 7B q4_K_M @ ~5 tok/s. Slow but always available.
+  // Endpoint defaults to http://127.0.0.1:11434/v1; no API key required
+  // (Ollama doesn't enforce auth on the loopback by default).
+  // Override model via OLLAMA_MODEL env.
+  ollama: {
+    baseUrl:      (ENV as any).OLLAMA_BASE_URL || "http://127.0.0.1:11434/v1",
+    defaultModel: (ENV as any).OLLAMA_MODEL    || "qwen2.5:7b",
+    // Returning a dummy string keeps the cascade's "has key" check happy.
+    // Real auth (or lack thereof) is handled by Ollama itself.
+    getKey:       () => ((ENV as any).OLLAMA_API_KEY || "local"),
   },
   // Google Vertex AI — OpenAI-compatible endpoint (uses service account)
   "google-vertex": {
@@ -599,8 +619,11 @@ function adaptPayloadForModel(payload: Record<string, unknown>, model: string): 
 function getFallbackChain(): string[] {
   const envChain = (process.env.LLM_FALLBACK_CHAIN ?? "").trim();
   if (envChain) return envChain.split(",").map((s) => s.trim()).filter(Boolean);
-  // Default: best Chinese brand voice → cheapest reliable → English fallback
-  return ["anthropic", "azure-foundry", "openai", "gemini", "deepseek"];
+  // 2026-05-12 default chain (CJ「all providers fallback」):
+  // anthropic → azure-foundry (gpt-5.4) → openai (gpt-4.1-mini) → gemini 2.5-flash
+  //   → qwen (zh-strong) → gemma 3-27b (open-weights) → deepseek
+  // 7 providers across 5 vendors. Override via LLM_FALLBACK_CHAIN.
+  return ["anthropic", "azure-foundry", "openai", "gemini", "qwen", "gemma", "deepseek", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {
@@ -610,20 +633,39 @@ function isRetryableLLMError(msg: string): boolean {
 }
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  // If caller explicitly pinned a provider, honor it (no auto-cascade).
-  // This keeps things like Theater (uses azure-position by design) deterministic.
-  if (params.provider && params.provider !== "openrouter") {
-    return invokeLLMOnce(params);
+  // 2026-05-12 (CJ「all agents should fallback too」): always cascade on
+  // failure, regardless of whether the caller pinned a provider. A pinned
+  // provider just becomes tier-1 in the chain. The rest of the default
+  // chain rescues if the pinned provider fails.
+  //
+  // Exception: callers that REALLY want no fallback (e.g. probes) can pass
+  // provider="anthropic-only" or set ?noFallback (not implemented yet).
+
+  const defaultChain = getFallbackChain();
+  // Build the effective chain: pinned-first (if any), then the rest
+  // (de-duped so a pinned provider doesn't repeat).
+  const pinned = params.provider && params.provider !== "openrouter" ? params.provider : null;
+  const chainSet = new Set<string>();
+  const chain: string[] = [];
+  if (pinned) { chain.push(pinned); chainSet.add(pinned); }
+  for (const p of defaultChain) {
+    if (!chainSet.has(p)) { chain.push(p); chainSet.add(p); }
   }
 
-  const chain = getFallbackChain();
   const errors: string[] = [];
   for (const provider of chain) {
     // Skip providers whose key isn't configured
     const cfg = PROVIDER_CONFIG[provider];
     if (!cfg || !cfg.getKey()) continue;
     try {
-      const out = await invokeLLMOnce({ ...params, provider: provider as any });
+      // When falling to a non-pinned provider, drop the pinned model so each
+      // provider uses its own defaultModel (e.g. "claude-sonnet-4-6" doesn't
+      // exist on Azure Foundry; we want gpt-5.4 there instead).
+      const isOriginalProvider = pinned && provider === pinned;
+      const callParams = isOriginalProvider
+        ? { ...params, provider: provider as any }
+        : { ...params, provider: provider as any, model: undefined };
+      const out = await invokeLLMOnce(callParams);
       // Empty content from a successful 200 = treat as a soft failure;
       // some reasoning models slip through without reasoning_content.
       const text = out?.choices?.[0]?.message?.content;

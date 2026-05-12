@@ -1,0 +1,90 @@
+name: Admin — Install Ollama + Qwen 2.5 7B on VM (CPU fallback tier)
+
+# Sets up the local LLM tier:
+#   1. Install Ollama (one-line script from ollama.com)
+#   2. systemd-enable it so it survives reboots
+#   3. Pull qwen2.5:7b (~4.7 GB disk, ~8 GB RAM at runtime)
+#   4. Smoke-test it answers a Chinese prompt
+#   5. Write OLLAMA_BASE_URL / OLLAMA_MODEL to app .env
+#
+# Hosting model: http://127.0.0.1:11434 (loopback only — no public exposure)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 1500s
+          script: |
+            set -e
+
+            echo "════════════════════════════════════════════════════════"
+            echo "  Pre-flight: VM resources"
+            echo "════════════════════════════════════════════════════════"
+            echo "RAM:  $(free -h | awk '/Mem:/{print $2 " total, " $7 " avail"}')"
+            echo "Disk: $(df -h / | awk 'NR==2{print $4 " avail"}')"
+            echo "CPU:  $(nproc) vCPU"
+
+            echo
+            echo "── 1. Install Ollama (skip if already installed) ─────"
+            if command -v ollama &>/dev/null; then
+              echo "  ollama already installed: $(ollama --version 2>&1 | head -1)"
+            else
+              curl -fsSL https://ollama.com/install.sh | sh
+            fi
+
+            echo
+            echo "── 2. Ensure ollama systemd service is enabled + running ─────"
+            sudo systemctl enable ollama || true
+            sudo systemctl start ollama || true
+            sleep 3
+            sudo systemctl status ollama --no-pager 2>&1 | head -5 || true
+
+            echo
+            echo "── 3. Pull qwen2.5:7b (~4.7 GB; this can take 5-15 min on first run) ─────"
+            ollama pull qwen2.5:7b 2>&1 | tail -5
+
+            echo
+            echo "── 4. List installed models ─────"
+            ollama list
+
+            echo
+            echo "── 5. Smoke test: Chinese prompt ─────"
+            time curl -s --max-time 90 http://127.0.0.1:11434/v1/chat/completions \
+              -H "Content-Type: application/json" \
+              -d '{"model":"qwen2.5:7b","messages":[{"role":"user","content":"用 30 字內回答：母親節要寫一句溫暖的文案，台灣手作品牌「樂木」用。"}],"max_tokens":200}' \
+              | python3 -c "
+            import sys,json
+            try:
+                d = json.load(sys.stdin)
+                c = d['choices'][0]['message'].get('content','(empty)')
+                print('reply:', c)
+            except Exception as e:
+                print('parse fail:', e, sys.stdin.read()[:400])
+            "
+
+            echo
+            echo "── 6. Write env vars to app .env ─────"
+            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+            upsert() {
+              local K="$1"; local V="$2"
+              if grep -qE "^${K}=" "$ENV"; then
+                sed -i "s|^${K}=.*|${K}=${V}|" "$ENV"
+                echo "  ↻ $K = $V"
+              else
+                echo "${K}=${V}" >> "$ENV"
+                echo "  + $K = $V"
+              fi
+            }
+            upsert OLLAMA_BASE_URL "http://127.0.0.1:11434/v1"
+            upsert OLLAMA_MODEL    "qwen2.5:7b"
+
+            pm2 restart marketing-os --update-env 2>&1 | tail -3 || true
+            echo "✓ Ollama tier-8 fallback ready"
