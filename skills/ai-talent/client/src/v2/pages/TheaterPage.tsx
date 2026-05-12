@@ -20,6 +20,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Avatar, Button, Spinner } from "@heroui/react";
 import { PlatformMockup } from "../components/PlatformMockup";
@@ -129,6 +130,7 @@ function BrainBar({
   thought: string;
   avatarUrl: string | null;
 }) {
+  const { t } = useLang();
   // Typewriter effect for thought
   const [shown, setShown] = useState("");
   useEffect(() => {
@@ -146,11 +148,11 @@ function BrainBar({
   // platform. Was tinting bg + shadow with brand color.
   const accent = "#171717"; // neutral-900
   const roleLabel = {
-    chief:  "總策畫",
-    lead:   member.platform ? `${PLATFORM_META[member.platform].label} Lead` : "Lead",
-    writer: member.platform ? `${PLATFORM_META[member.platform].label} 文案` : "Writer",
-    image:  member.platform ? `${PLATFORM_META[member.platform].label} 視覺` : "Visual",
-    qa:     "QA 總編",
+    chief:  t("theater_role_chief"),
+    lead:   member.platform ? `${PLATFORM_META[member.platform].label} ${t("theater_role_lead_suffix")}` : t("theater_role_lead_suffix"),
+    writer: member.platform ? `${PLATFORM_META[member.platform].label} ${t("theater_role_writer_suffix")}` : t("theater_role_writer_suffix"),
+    image:  member.platform ? `${PLATFORM_META[member.platform].label} ${t("theater_role_image_suffix")}` : t("theater_role_image_suffix"),
+    qa:     t("theater_role_qa"),
   }[member.role];
 
   return (
@@ -254,6 +256,7 @@ function PlatformCell({
   onEdit?: (newCaption: string) => void;
   onMarkRule?: () => void;
 }) {
+  const { t } = useLang();
   // Phase 3a — inline edit state
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(caption);
@@ -269,12 +272,12 @@ function PlatformCell({
   // Tiny status pill (replaces the heavy colored header strip — mockup
   // already shows the platform identity, we just need a state indicator).
   const statusLabel =
-    state.status === "queued"  ? "排隊中" :
-    state.status === "writing" ? "撰寫中" :
-    state.status === "qa"      ? "QA 校對中" :
-    state.status === "imaging" ? "生圖中" :
-    state.status === "done"    ? "完成"   :
-    state.status === "failed"  ? "失敗"   : "等待";
+    state.status === "queued"  ? t("theater_status_queued") :
+    state.status === "writing" ? t("theater_status_writing") :
+    state.status === "qa"      ? t("theater_status_qa") :
+    state.status === "imaging" ? t("theater_status_imaging") :
+    state.status === "done"    ? t("theater_status_done")   :
+    state.status === "failed"  ? t("theater_status_failed") : t("theater_status_waiting");
 
   return (
     <div className="relative flex flex-col">
@@ -319,7 +322,7 @@ function PlatformCell({
               variants support these slots natively. */}
           {(state.structured as any)?.chapters?.length > 0 && (
             <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[10px] leading-relaxed">
-              <p className="text-neutral-500 mb-0.5">章節時間軸</p>
+              <p className="text-neutral-500 mb-0.5">{t("theater_chapters_label")}</p>
               {((state.structured as any).chapters as string[]).slice(0, 5).map((c, i) => (
                 <p key={i} className="text-neutral-700">{c}</p>
               ))}
@@ -327,7 +330,7 @@ function PlatformCell({
           )}
           {(state.structured as any)?.thread?.length > 1 && (
             <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[10px] leading-relaxed">
-              <p className="text-neutral-500 mb-0.5">續發 ({(state.structured as any).thread.length} 則)</p>
+              <p className="text-neutral-500 mb-0.5">{t("theater_thread_label", { n: (state.structured as any).thread.length })}</p>
               {((state.structured as any).thread as string[]).slice(1, 4).map((t, i) => (
                 <p key={i} className="text-neutral-700">{`${i + 2}. ${t.slice(0, 80)}`}</p>
               ))}
@@ -337,20 +340,20 @@ function PlatformCell({
             <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
               <Avatar src={imageDirAvatar ?? undefined} size="sm" className="w-8 h-8" />
               <Spinner size="sm" />
-              <p className="text-[10px] text-neutral-600">視覺指導生圖中…</p>
+              <p className="text-[10px] text-neutral-600">{t("theater_image_dir_busy")}</p>
             </div>
           )}
           {isWriting && !caption && (
             <div className="absolute inset-0 bg-white/80 flex items-center gap-2 justify-center">
               <Avatar src={writerAvatar ?? undefined} size="sm" className="w-6 h-6" />
-              <p className="text-[11px] text-neutral-600">caption writer 撰寫中…</p>
+              <p className="text-[11px] text-neutral-600">{t("theater_writer_busy")}</p>
             </div>
           )}
           {isQA && (
             <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full shadow-sm">
               <Avatar src={qaAvatar ?? undefined} size="sm" className="w-5 h-5" />
               <Spinner size="sm" classNames={{ wrapper: "w-3 h-3", circle1: "border-b-amber-500", circle2: "border-b-amber-500" }} />
-              <span className="text-[10px] text-amber-700 font-medium pr-1">Chun-Hao 校對中</span>
+              <span className="text-[10px] text-amber-700 font-medium pr-1">{t("theater_qa_busy")}</span>
             </div>
           )}
         </div>
@@ -361,7 +364,7 @@ function PlatformCell({
         >
           <PlatformIcon platformKey={meta.iconKey} className="text-2xl text-neutral-400" />
           <p className="text-[10px] text-neutral-400">
-            {isIdle ? `${meta.short} · 等候接棒…` : "—"}
+            {isIdle ? t("theater_cell_idle_hint", { platform: meta.short }) : "—"}
           </p>
         </div>
       )}
@@ -370,7 +373,7 @@ function PlatformCell({
       {editing && (
         <div className="absolute inset-0 z-30 bg-white/95 backdrop-blur-sm rounded-lg p-3 flex flex-col gap-2 shadow-lg" style={{ border: "2px solid #6366f1" }}>
           <p className="text-[10px] text-indigo-700 font-semibold flex items-center gap-1">
-            ✏️ 編輯 caption — Enter 儲存 / Esc 取消
+            ✏️ {t("theater_edit_hint")}
           </p>
           <textarea
             autoFocus
@@ -391,13 +394,13 @@ function PlatformCell({
               onClick={() => { setEditing(false); setDraft(caption); }}
               className="text-[10px] px-2 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
             >
-              取消
+              {t("cancel")}
             </button>
             <button
               onClick={() => { onEdit?.(draft); setEditing(false); }}
               className="text-[10px] px-2 py-1 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium"
             >
-              儲存
+              {t("save")}
             </button>
           </div>
         </div>
@@ -409,7 +412,7 @@ function PlatformCell({
           className="absolute inset-0 cursor-text"
           style={{ background: "transparent" }}
           onDoubleClick={() => setEditing(true)}
-          title="雙擊編輯文字"
+          title={t("theater_dblclick_to_edit")}
         />
       )}
 
@@ -420,10 +423,10 @@ function PlatformCell({
             <button
               onClick={onCopy}
               className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
-              title="複製 caption"
+              title={t("theater_copy_tip")}
             >
               <Copy size={11} strokeWidth={2} />
-              複製
+              {t("theater_btn_copy")}
             </button>
           )}
           {/* 2026-05-10 (CJ feedback「Notion B&W」+「按鈕命名不清楚」):
@@ -433,30 +436,30 @@ function PlatformCell({
             <button
               onClick={() => setEditing(true)}
               className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
-              title="雙擊或按這顆鈕編輯"
+              title={t("theater_edit_tip")}
             >
               <Pencil size={11} strokeWidth={2} />
-              編輯
+              {t("theater_btn_edit")}
             </button>
           )}
           {onMarkRule && (
             <button
               onClick={onMarkRule}
               className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
-              title="標記這篇要改的地方 — 可選擇套用到單篇 / 全品牌"
+              title={t("theater_btn_mark_rule_tip")}
             >
               <Flag size={11} strokeWidth={2} />
-              標記修改
+              {t("theater_btn_mark_rule")}
             </button>
           )}
           {onRedo && (
             <button
               onClick={onRedo}
               className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
-              title="重新生成這一格"
+              title={t("theater_btn_redo_tip")}
             >
               <RefreshCw size={11} strokeWidth={2} />
-              重新生成
+              {t("theater_btn_redo_cell")}
             </button>
           )}
         </div>
@@ -514,6 +517,7 @@ function savePersisted(brandId: number | null, data: PersistedRun) {
 }
 
 export default function TheaterPage() {
+  const { t, lang } = useLang();
   const ctx = useOutletContext<ShellOutletCtx>();
   const brandId = ctx?.brandId ?? null;
   const brandName = useMemo(
@@ -561,21 +565,27 @@ export default function TheaterPage() {
   // 7 calendar days starting today
   const days = useMemo(() => {
     const out: { date: string; weekday: string; label: string; isToday: boolean }[] = [];
-    const t = new Date();
-    const todayIso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+    const now = new Date();
+    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const wdLabels = lang === "en"
+      ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+      : ["日", "一", "二", "三", "四", "五", "六"];
     for (let i = 0; i < 7; i++) {
-      const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() + i);
-      const wd = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      const wd = wdLabels[d.getDay()] as string;
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const label = lang === "en"
+        ? `${d.getMonth() + 1}/${d.getDate()} (${wd})`
+        : `${d.getMonth() + 1}/${d.getDate()}（${wd}）`;
       out.push({
         date: iso,
         weekday: wd,
-        label: `${d.getMonth() + 1}/${d.getDate()}（${wd}）`,
+        label,
         isToday: iso === todayIso,
       });
     }
     return out;
-  }, []);
+  }, [lang]);
 
   // Preload cast avatars
   const castQuery = trpc.agent.byIds.useQuery({ ids: castIds() }, {
@@ -728,11 +738,11 @@ export default function TheaterPage() {
   const startRun = async () => {
     if (running) return;
     if (!brandId) {
-      alert("請先選擇品牌");
+      alert(t("theater_alert_pick_brand"));
       return;
     }
     if (activePlatforms.length === 0) {
-      alert("請至少選擇一個社群平台");
+      alert(t("theater_alert_pick_platform"));
       return;
     }
 
@@ -776,7 +786,7 @@ export default function TheaterPage() {
     } catch (e) {
       console.error("[theater] runStart failed:", e);
       setRunning(false);
-      alert("無法載入品牌定位 — 請先完成品牌定位再試");
+      alert(t("theater_alert_pos_failed"));
       return;
     }
 
@@ -784,21 +794,25 @@ export default function TheaterPage() {
     // Surface brand rule count + lock acknowledgment in chief station
     const brandRulesCount = brandRules?.length ?? 0;
     const lockedTabs: string[] = [];
-    if (lockState?.positioning) lockedTabs.push("定位");
-    if (lockState?.copy)        lockedTabs.push("文字");
-    if (lockState?.visual)      lockedTabs.push("視覺");
+    if (lockState?.positioning) lockedTabs.push(t("theater_lock_positioning"));
+    if (lockState?.copy)        lockedTabs.push(t("theater_lock_copy"));
+    if (lockState?.visual)      lockedTabs.push(t("theater_lock_visual"));
     const brandTagline = positioning?.tagline ?? null;
     const brandVoice   = positioning?.brandVoice ?? null;
 
     // 1) Chief opening monologue (real LLM-generated)
     //    Append brand-rule count chip if any are active so user sees the
     //    /brands 文字 tab assets are flowing through.
-    const baseChief = chiefOpening || `本週 USP 候選：${usps.join("、")}。一篇貼文 = 一個 USP。${activePlatforms.map((p) => PLATFORM_META[p].short).join("、")} 各組準備接手。`;
+    const joiner = lang === "en" ? ", " : "、";
+    const baseChief = chiefOpening || t("theater_default_chief", {
+      usps: usps.join(joiner),
+      platforms: activePlatforms.map((p) => PLATFORM_META[p].short).join(joiner),
+    });
     const rulesLine = brandRulesCount > 0
-      ? `\n（已載入 ${brandRulesCount} 條品牌文字規則 — 來自 /brands 文字 tab，所有 caption 自動套用。）`
+      ? t("theater_brand_rules_chip", { n: brandRulesCount })
       : "";
     const lockLine = lockedTabs.length > 0
-      ? `\n📌 採用已鎖定的品牌${lockedTabs.join(" · ")} — 全平台單一真相。`
+      ? t("theater_locked_chip", { tabs: lockedTabs.join(" · ") })
       : "";
     const stations: BrainStation[] = [
       {
@@ -813,10 +827,14 @@ export default function TheaterPage() {
     //    that real research happened on each platform.
     for (const p of activePlatforms) {
       const lead = getPlatformLead(p);
-      const baseThought = leadThoughts[p] || `${PLATFORM_META[p].label} 我這條線接手。`;
+      const baseThought = leadThoughts[p] || t("theater_default_lead", { platform: PLATFORM_META[p].label });
       const scoutCount = scoutByPlatform[p]?.length ?? 0;
       const scoutLine = scoutCount > 0
-        ? `（剛掃了 ${scoutCount} 篇本週 ${PLATFORM_META[p].label} ${scoutIndustry ?? "同產業"}高互動貼文，結構參考已注入。）`
+        ? t("theater_scout_line", {
+            n: scoutCount,
+            platform: PLATFORM_META[p].label,
+            industry: scoutIndustry ?? t("theater_industry_fallback"),
+          })
         : "";
       stations.push({
         member: lead,
@@ -830,7 +848,7 @@ export default function TheaterPage() {
       const w = getPlatformWriter(p);
       stations.push({
         member: w,
-        thought: `我開始寫 ${PLATFORM_META[p].label} 的 caption，2 篇並行，照日期順序排。`,
+        thought: t("theater_writer_intro", { platform: PLATFORM_META[p].label }),
         durationMs: 3500,
       });
     }
@@ -838,7 +856,7 @@ export default function TheaterPage() {
       const i = getPlatformImage(p);
       stations.push({
         member: i,
-        thought: `${PLATFORM_META[p].label} 的視覺我接著生，1 張 1 張穩穩來，照日期排瀑布。`,
+        thought: t("theater_image_intro", { platform: PLATFORM_META[p].label }),
         durationMs: 3500,
       });
     }
@@ -846,7 +864,7 @@ export default function TheaterPage() {
     // 4) QA closing
     stations.push({
       member: getQA(),
-      thought: `所有篇章我會逐篇審 USP / 違禁 / 一致性，flag 問題我會標註紅色，沒問題的我放行。`,
+      thought: t("theater_qa_closing"),
       durationMs: 5000,
     });
 
@@ -896,7 +914,7 @@ export default function TheaterPage() {
     // so theater still ships content rather than crashing.
     const uspsArr: string[] = Array.isArray(plan?.usps) && plan.usps.length > 0
       ? plan.usps
-      : [(plan?.brandTagline ?? "我們的核心價值")];
+      : [(plan?.brandTagline ?? t("theater_default_core_value"))];
     for (const d of days) {
       const matching = importantDates.find((x) => x.date === d.date);
       for (const p of activePlatforms) {
@@ -1277,7 +1295,7 @@ export default function TheaterPage() {
           <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-3">
             <Sparkles size={18} className="text-neutral-400" strokeWidth={1.5} />
             <p className="text-sm text-neutral-500">
-              選好平台 + 重要日子，按「開始企劃」— Claire 會率隊上場
+              {t("theater_idle_brain")}
             </p>
           </div>
         </div>
@@ -1290,7 +1308,7 @@ export default function TheaterPage() {
         <div className="flex items-end justify-between flex-wrap gap-4 mb-4">
           <div className="text-center mx-auto" style={{ flex: "1 1 auto" }}>
             <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
-              THEATER · 7 DAYS
+              {t("theater_hero_eyebrow")}
             </p>
             <h1
               className="font-semibold tracking-tight leading-tight"
@@ -1302,7 +1320,7 @@ export default function TheaterPage() {
                 backgroundClip: "text",
               }}
             >
-              這 7 天，要怎麼跨平台說品牌故事？
+              {t("theater_hero_title")}
             </h1>
             <p
               className="mt-3 mx-auto text-default-700"
@@ -1311,14 +1329,14 @@ export default function TheaterPage() {
                 fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
               }}
             >
-              以 {brandName ?? "你的品牌"} 的定位為骨架，編排 7 天內容
+              {t("theater_hero_subtitle", { brand: brandName ?? t("theater_brand_placeholder") })}
             </p>
             <p
               className="mt-2 mx-auto text-default-700"
               style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
             >
-              <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>適合：</span>
-              月度節奏 · 活動週 · 多平台主敘事弧
+              <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>{t("theater_suitable_label")}</span>
+              {t("theater_suitable_value")}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1327,7 +1345,7 @@ export default function TheaterPage() {
                 size="sm"
                 variant="light"
                 onPress={() => {
-                  if (!confirm("確認清空目前這個品牌的企劃結果？此動作不可還原。")) return;
+                  if (!confirm(t("theater_confirm_clear"))) return;
                   setCells(new Map());
                   setCellMeta(new Map());
                   setStation(null);
@@ -1336,7 +1354,7 @@ export default function TheaterPage() {
                 }}
                 startContent={<RefreshCw size={13} strokeWidth={2} />}
               >
-                清空結果
+                {t("theater_btn_clear")}
               </Button>
             )}
             {!running ? (
@@ -1346,7 +1364,7 @@ export default function TheaterPage() {
                 startContent={<Play size={14} strokeWidth={2} />}
                 isDisabled={!brandId}
               >
-                {cells.size > 0 ? "重新企劃" : "開始企劃"}
+                {cells.size > 0 ? t("theater_btn_restart") : t("theater_btn_start")}
               </Button>
             ) : (() => {
               // 2026-05-08 (CJ test report #2): live elapsed + ETA + done/total
@@ -1367,7 +1385,7 @@ export default function TheaterPage() {
                       {" / "}
                       ~{Math.floor(expectedTotalSec / 60)}:{String(expectedTotalSec % 60).padStart(2, "0")}
                       {remainingSec > 0 && elapsedSec < expectedTotalSec && (
-                        <span className="text-default-400 ml-1">（剩 {remainingSec}s）</span>
+                        <span className="text-default-400 ml-1">{t("theater_progress_remaining", { n: remainingSec })}</span>
                       )}
                     </div>
                     <div className="w-32 h-1 bg-default-200 rounded-full overflow-hidden mt-1">
@@ -1380,7 +1398,7 @@ export default function TheaterPage() {
                     onPress={() => { stopRef.current = true; stopRun(); }}
                     startContent={<X size={14} strokeWidth={2} />}
                   >
-                    停止
+                    {t("theater_btn_stop")}
                   </Button>
                 </div>
               );
@@ -1390,7 +1408,7 @@ export default function TheaterPage() {
 
         {/* Platform multi-select */}
         <div className="flex items-center gap-2 flex-wrap mb-4">
-          <span className="text-xs text-neutral-500 mr-2">平台：</span>
+          <span className="text-xs text-neutral-500 mr-2">{t("theater_label_platforms")}</span>
           {(Object.keys(PLATFORM_META) as TheaterPlatform[]).map((p) => {
             const meta = PLATFORM_META[p];
             const on = activePlatforms.includes(p);
@@ -1425,7 +1443,7 @@ export default function TheaterPage() {
             disabled={running}
           >
             <Plus size={16} strokeWidth={2.5} />
-            <span className="flex items-center gap-1.5"><Plus size={14} strokeWidth={2.5} />加入素材</span>
+            <span className="flex items-center gap-1.5"><Plus size={14} strokeWidth={2.5} />{t("theater_btn_add_materials")}</span>
             {totalMaterials > 0 && (
               <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">
                 {totalMaterials}
@@ -1454,7 +1472,7 @@ export default function TheaterPage() {
           ))}
           {photos.map((ph) => (
             <span key={ph.id} className="px-2.5 py-1 text-xs rounded-lg bg-pink-50 text-pink-800 border border-pink-200 flex items-center gap-1.5">
-              <span>{ph.tag}</span>
+              <span>{t(`theater_photo_tag_${ph.tag}` as any)}</span>
               <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="text-pink-600 hover:text-pink-900">
                 <X size={11} />
               </button>
@@ -1470,7 +1488,7 @@ export default function TheaterPage() {
       <div className="max-w-[1600px] mx-auto px-6 pb-16">
         {!brandId ? (
           <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center">
-            <p className="text-neutral-500 text-sm">請先在左上角選擇品牌</p>
+            <p className="text-neutral-500 text-sm">{t("theater_must_pick_brand")}</p>
           </div>
         ) : (
           // 2026-05-10 (CJ「5/13 整天消失」根因): 舊版 column-count masonry 把
@@ -1492,7 +1510,7 @@ export default function TheaterPage() {
                     </span>
                     {d.isToday && (
                       <span className="text-[9px] font-bold tracking-wider bg-white text-neutral-900 px-1 py-0.5 rounded">
-                        TODAY
+                        {t("theater_today_pill")}
                       </span>
                     )}
                     {matchingDate && (
@@ -1539,19 +1557,19 @@ export default function TheaterPage() {
               <button
                 onClick={() => setMaterialModalOpen(false)}
                 className="absolute top-3 right-3 text-neutral-400 hover:text-neutral-700 p-1 rounded-md hover:bg-neutral-100 transition"
-                title="關閉"
+                title={t("theater_close_tip")}
               >
                 <X size={18} />
               </button>
-              <h3 className="text-base font-semibold text-neutral-900 mb-1">加入素材</h3>
-              <p className="text-xs text-neutral-500 mb-4">活動 / 產品 / 照片，等等開始企劃時 agents 會把這些 context 都吃進去。</p>
+              <h3 className="text-base font-semibold text-neutral-900 mb-1">{t("theater_modal_materials_title")}</h3>
+              <p className="text-xs text-neutral-500 mb-4">{t("theater_modal_materials_subtitle")}</p>
 
               {/* Tab switcher */}
               <div className="flex items-center gap-1 mb-5 border-b border-neutral-200">
                 {([
-                  { v: "event"   as const, label: "活動",  count: importantDates.length },
-                  { v: "product" as const, label: "產品",  count: products.length },
-                  { v: "photo"   as const, label: "照片",  count: photos.length },
+                  { v: "event"   as const, label: t("theater_tab_event"),   count: importantDates.length },
+                  { v: "product" as const, label: t("theater_tab_product"), count: products.length },
+                  { v: "photo"   as const, label: t("theater_tab_photo"),   count: photos.length },
                 ]).map((t) => (
                   <button
                     key={t.v}
@@ -1584,13 +1602,13 @@ export default function TheaterPage() {
                   )}
                   <div className="flex items-center gap-2">
                     <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
-                    <input type="text" placeholder="活動 / 檔期名稱（例：母親節限時優惠）" value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
                     <button
                       onClick={() => { handleAddDate(); }}
                       disabled={!newDate || !newDateName}
                       className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
                     >
-                      新增
+                      {t("theater_btn_add_item")}
                     </button>
                   </div>
                 </div>
@@ -1604,7 +1622,7 @@ export default function TheaterPage() {
                       {products.map((p) => (
                         <div key={p.id} className="flex items-start justify-between bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
                           <div className="text-sm">
-                            <p><b>{p.name}</b> {p.launchDate && <span className="text-neutral-500 text-xs">· {p.launchDate} 上市</span>}</p>
+                            <p><b>{p.name}</b> {p.launchDate && <span className="text-neutral-500 text-xs">· {p.launchDate} {t("theater_product_launched")}</span>}</p>
                             <p className="text-xs text-neutral-600 mt-0.5">{p.usp}</p>
                           </div>
                           <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900 mt-1">
@@ -1615,10 +1633,10 @@ export default function TheaterPage() {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <input type="text" placeholder="產品 / 服務名稱（例：健力餐 5g）" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                    <input type="text" placeholder="這個產品的 USP（一句話）" value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
                     <div className="flex items-center gap-2">
-                      <input type="date" placeholder="上市日（可選）" value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
+                      <input type="date" placeholder={t("theater_product_launch_ph")} value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
                       <button
                         onClick={() => {
                           if (!newProductName || !newProductUsp) return;
@@ -1633,7 +1651,7 @@ export default function TheaterPage() {
                         disabled={!newProductName || !newProductUsp}
                         className="ml-auto text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
                       >
-                        新增
+                        {t("theater_btn_add_item")}
                       </button>
                     </div>
                   </div>
@@ -1649,7 +1667,7 @@ export default function TheaterPage() {
                         <div key={ph.id} className="relative group">
                           <img src={ph.url} alt={ph.note ?? ph.tag} className="w-full aspect-square object-cover rounded-lg border border-pink-200" />
                           <span className="absolute top-1 left-1 text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/90 text-white font-medium">
-                            {ph.tag}
+                            {t(`theater_photo_tag_${ph.tag}` as any)}
                           </span>
                           <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100">
                             <X size={11} />
@@ -1659,15 +1677,15 @@ export default function TheaterPage() {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <input type="url" placeholder="照片 URL（直接貼網址 / 將來支援上傳）" value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="url" placeholder={t("theater_photo_url_ph")} value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
                     <div className="flex items-center gap-2">
                       <select value={newPhotoTag} onChange={(e) => setNewPhotoTag(e.target.value as any)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded">
-                        <option value="product">產品實拍</option>
-                        <option value="scene">場景</option>
-                        <option value="person">人物</option>
-                        <option value="lifestyle">情境</option>
+                        <option value="product">{t("theater_photo_tag_product")}</option>
+                        <option value="scene">{t("theater_photo_tag_scene")}</option>
+                        <option value="person">{t("theater_photo_tag_person")}</option>
+                        <option value="lifestyle">{t("theater_photo_tag_lifestyle")}</option>
                       </select>
-                      <input type="text" placeholder="備註（可選）" value={newPhotoNote} onChange={(e) => setNewPhotoNote(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <input type="text" placeholder={t("theater_photo_note_ph")} value={newPhotoNote} onChange={(e) => setNewPhotoNote(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
                       <button
                         onClick={() => {
                           if (!newPhotoUrl) return;
@@ -1682,7 +1700,7 @@ export default function TheaterPage() {
                         disabled={!newPhotoUrl}
                         className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
                       >
-                        新增
+                        {t("theater_btn_add_item")}
                       </button>
                     </div>
                   </div>
@@ -1694,7 +1712,7 @@ export default function TheaterPage() {
                   onClick={() => setMaterialModalOpen(false)}
                   className="text-sm px-4 py-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
                 >
-                  完成
+                  {t("theater_btn_done_modal")}
                 </button>
               </div>
             </div>
@@ -1709,25 +1727,25 @@ export default function TheaterPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-base font-semibold text-neutral-900 mb-1">
-                標記修改規則
+                {t("theater_modal_rule_title")}
               </h3>
               <p className="text-xs text-neutral-500 mb-4">
-                寫下這篇要改的地方（例：「不能說玩家使用經驗」、「不能有負面陳述」、「結尾不要寫『歡迎洽詢』」），等等會自動套用 + 重新生成。
+                {t("theater_modal_rule_subtitle")}
               </p>
               <textarea
                 autoFocus
                 value={ruleText}
                 onChange={(e) => setRuleText(e.target.value)}
-                placeholder="例：不能說玩家使用經驗"
+                placeholder={t("theater_rule_placeholder")}
                 className="w-full text-sm px-3 py-2 border border-neutral-300 rounded resize-none focus:outline-none focus:border-indigo-500"
                 style={{ minHeight: 80 }}
               />
-              <p className="text-xs font-medium text-neutral-700 mt-4 mb-2">套用範圍</p>
+              <p className="text-xs font-medium text-neutral-700 mt-4 mb-2">{t("theater_rule_scope_label")}</p>
               <div className="space-y-2">
                 {([
-                  { v: "post" as const,  label: "只改這一篇", hint: "重新生成這格 caption，套規則一次。" },
-                  { v: "run"  as const,  label: "套用到本次 7 天全部",  hint: "這次企劃剩下還沒重做的格子都會吃這條規則。" },
-                  { v: "brand" as const, label: "套用到本品牌所有未來企劃", hint: "存進品牌規則庫，下次按開始企劃會自動帶。" },
+                  { v: "post" as const,  label: t("theater_scope_post"),  hint: t("theater_scope_post_hint") },
+                  { v: "run"  as const,  label: t("theater_scope_run"),   hint: t("theater_scope_run_hint") },
+                  { v: "brand" as const, label: t("theater_scope_brand"), hint: t("theater_scope_brand_hint") },
                 ]).map((opt) => (
                   <label
                     key={opt.v}
@@ -1755,14 +1773,14 @@ export default function TheaterPage() {
                   onClick={closeRuleModal}
                   className="text-sm px-4 py-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
                 >
-                  取消
+                  {t("cancel")}
                 </button>
                 <button
                   onClick={submitRule}
                   disabled={!ruleText.trim()}
                   className="text-sm px-4 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  套用 + 重新生成
+                  {t("theater_btn_apply_redo")}
                 </button>
               </div>
             </div>
@@ -1771,7 +1789,7 @@ export default function TheaterPage() {
 
         {/* Cast roster footer */}
         <div className="mt-12 pt-6 border-t border-neutral-200">
-          <p className="text-xs text-neutral-500 mb-3">演職員表（20 位 AI agents · 全員不重複）</p>
+          <p className="text-xs text-neutral-500 mb-3">{t("theater_cast_footer")}</p>
           <div className="flex flex-wrap gap-2">
             {THEATER_CAST.map((m) => (
               <div

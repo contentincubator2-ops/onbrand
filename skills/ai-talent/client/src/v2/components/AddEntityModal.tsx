@@ -17,6 +17,7 @@
  */
 import React, { useState, useEffect } from "react";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import { Modal, ModalBody, ModalContent, ModalHeader, Button, Input, Textarea, Select, SelectItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark, faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
@@ -44,6 +45,7 @@ function autoSlug(name: string): string {
 }
 
 export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultBrandId, onCreated }: Props) {
+  const { lang } = useLang();
   const [tab, setTab] = useState<AddEntityTab>(initialTab);
   useEffect(() => { if (isOpen) setTab(initialTab); }, [isOpen, initialTab]);
 
@@ -174,11 +176,18 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     }
   };
 
+  const entityLabel = (k: AddEntityTab) => lang === "en"
+    ? (k === "brand" ? "brand" : k === "product" ? "product" : "event")
+    : (k === "brand" ? "品牌" : k === "product" ? "產品" : "活動");
+  const EntityLabel = (k: AddEntityTab) => lang === "en"
+    ? (k === "brand" ? "Brand" : k === "product" ? "Product" : "Event")
+    : entityLabel(k);
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="2xl" backdrop="blur">
       <ModalContent>
         <ModalHeader className="flex items-center justify-between">
-          <span className="text-lg font-semibold">新增 {tab === "brand" ? "品牌" : tab === "product" ? "產品" : "活動"}</span>
+          <span className="text-lg font-semibold">{lang === "en" ? `Add a ${entityLabel(tab)}` : `新增 ${entityLabel(tab)}`}</span>
           <button onClick={onClose} className="text-default-400 hover:text-default-700">
             <FontAwesomeIcon icon={faXmark} />
           </button>
@@ -187,9 +196,9 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
           {/* Tab strip */}
           <div className="flex items-center gap-1 mb-5 border-b border-default-200">
             {([
-              { v: "brand"   as const, label: "品牌", icon: faRocket,        accent: "#7C3AED" },
-              { v: "product" as const, label: "產品", icon: faCubes,         accent: "#059669" },
-              { v: "event"   as const, label: "活動", icon: faCalendarDays,  accent: "#F97316" },
+              { v: "brand"   as const, label: EntityLabel("brand"),   icon: faRocket,        accent: "#7C3AED" },
+              { v: "product" as const, label: EntityLabel("product"), icon: faCubes,         accent: "#059669" },
+              { v: "event"   as const, label: EntityLabel("event"),   icon: faCalendarDays,  accent: "#F97316" },
             ]).map((t) => (
               <button
                 key={t.v}
@@ -211,19 +220,19 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
           {tab === "brand" && (
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">品牌名稱<span className="text-danger ml-0.5">*</span></label>
-                <Input value={brandName} onValueChange={setBrandName} placeholder="例：桂冠營養研究室" autoFocus isRequired />
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Brand name" : "品牌名稱"}<span className="text-danger ml-0.5">*</span></label>
+                <Input value={brandName} onValueChange={setBrandName} placeholder={lang === "en" ? "e.g. Laurel Nutrition Lab" : "例：桂冠營養研究室"} autoFocus isRequired />
               </div>
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">官網（可選）</label>
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Website (optional)" : "官網（可選）"}</label>
                 <Input value={brandWebsite} onValueChange={setBrandWebsite} placeholder="https://..." />
               </div>
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">目標受眾（可選，1 句話）</label>
-                <Textarea value={brandTA} onValueChange={setBrandTA} placeholder="例：35-50 歲、雙薪家庭、注重健康的媽媽" minRows={2} />
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Target audience (optional, one line)" : "目標受眾（可選，1 句話）"}</label>
+                <Textarea value={brandTA} onValueChange={setBrandTA} placeholder={lang === "en" ? "e.g. health-conscious moms, 35-50, dual-income households" : "例：35-50 歲、雙薪家庭、注重健康的媽媽"} minRows={2} />
               </div>
               <p className="text-xs text-default-500 italic">
-                建立後會自動觸發品牌定位推估（10-step Sowork analysis）。
+                {lang === "en" ? "We'll auto-run a brand positioning analysis once it's created." : "建立後會自動觸發品牌定位推估（10-step Sowork analysis）。"}
               </p>
             </div>
           )}
@@ -232,14 +241,14 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
           {tab === "product" && (
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">所屬品牌<span className="text-danger ml-0.5">*</span></label>
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Brand" : "所屬品牌"}<span className="text-danger ml-0.5">*</span></label>
                 <Select
                   selectedKeys={prodBrandId ? new Set([String(prodBrandId)]) : new Set()}
                   onSelectionChange={(keys) => {
                     const v = Array.from(keys as Set<string>)[0];
                     setProdBrandId(v ? Number(v) : null);
                   }}
-                  placeholder="請選擇品牌"
+                  placeholder={lang === "en" ? "Pick a brand" : "請選擇品牌"}
                   isRequired
                 >
                   {brandsList.map((b) => (
@@ -248,12 +257,12 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">產品名稱<span className="text-danger ml-0.5">*</span></label>
-                <Input value={prodName} onValueChange={setProdName} placeholder="例：健力餐 5g 蛋白質微波系列" autoFocus isRequired />
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Product name" : "產品名稱"}<span className="text-danger ml-0.5">*</span></label>
+                <Input value={prodName} onValueChange={setProdName} placeholder={lang === "en" ? "e.g. Healthy Meal 5g Protein microwave line" : "例：健力餐 5g 蛋白質微波系列"} autoFocus isRequired />
               </div>
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">產品定位 / USP（可選）</label>
-                <Textarea value={prodPositioning} onValueChange={setProdPositioning} placeholder="一句話描述產品的核心差異" minRows={2} />
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Positioning / USP (optional)" : "產品定位 / USP（可選）"}</label>
+                <Textarea value={prodPositioning} onValueChange={setProdPositioning} placeholder={lang === "en" ? "One line on what makes this product different" : "一句話描述產品的核心差異"} minRows={2} />
               </div>
             </div>
           )}
@@ -262,14 +271,14 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
           {tab === "event" && (
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">所屬品牌<span className="text-danger ml-0.5">*</span></label>
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Brand" : "所屬品牌"}<span className="text-danger ml-0.5">*</span></label>
                 <Select
                   selectedKeys={evBrandId ? new Set([String(evBrandId)]) : new Set()}
                   onSelectionChange={(keys) => {
                     const v = Array.from(keys as Set<string>)[0];
                     setEvBrandId(v ? Number(v) : null);
                   }}
-                  placeholder="請選擇品牌"
+                  placeholder={lang === "en" ? "Pick a brand" : "請選擇品牌"}
                   isRequired
                 >
                   {brandsList.map((b) => (
@@ -278,22 +287,22 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">活動名稱<span className="text-danger ml-0.5">*</span></label>
-                <Input value={evName} onValueChange={setEvName} placeholder="例：母親節限時優惠 / 新品上市發表會" autoFocus isRequired />
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Event name" : "活動名稱"}<span className="text-danger ml-0.5">*</span></label>
+                <Input value={evName} onValueChange={setEvName} placeholder={lang === "en" ? "e.g. Mother's Day flash sale / Product launch event" : "例：母親節限時優惠 / 新品上市發表會"} autoFocus isRequired />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-default-700 block mb-1">起始日</label>
+                  <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Start date" : "起始日"}</label>
                   <Input type="date" value={evStart} onValueChange={setEvStart} />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-default-700 block mb-1">結束日</label>
+                  <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "End date" : "結束日"}</label>
                   <Input type="date" value={evEnd} onValueChange={setEvEnd} />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">活動主題 / 重點（可選）</label>
-                <Textarea value={evNote} onValueChange={setEvNote} placeholder="活動的訴求 / 主題 / 配套" minRows={2} />
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Theme / hooks (optional)" : "活動主題 / 重點（可選）"}</label>
+                <Textarea value={evNote} onValueChange={setEvNote} placeholder={lang === "en" ? "What's the angle, theme, or perks" : "活動的訴求 / 主題 / 配套"} minRows={2} />
               </div>
             </div>
           )}
@@ -305,7 +314,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
           )}
 
           <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-default-100">
-            <Button variant="light" onPress={onClose} isDisabled={busy}>取消</Button>
+            <Button variant="light" onPress={onClose} isDisabled={busy}>{lang === "en" ? "Cancel" : "取消"}</Button>
             <Button
               color="primary"
               isLoading={busy}
@@ -320,7 +329,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                 return handleCreateEvent();
               }}
             >
-              建立 {tab === "brand" ? "品牌" : tab === "product" ? "產品" : "活動"}
+              {lang === "en" ? `Create ${entityLabel(tab)}` : `建立 ${entityLabel(tab)}`}
             </Button>
           </div>
         </ModalBody>

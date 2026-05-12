@@ -14,9 +14,11 @@
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { Sparkles, X } from "lucide-react";
+import { useLang } from "../../lib/i18n";
 
 export default function FestivalGlobalNudge() {
   const navigate = useNavigate();
+  const { lang } = useLang();
   const utils = (trpc as any).useUtils?.() ?? null;
   // Only show the single most-urgent festival within 7 days, priority ≥ 4.
   const upcomingQ = (trpc as any).festival?.upcoming?.useQuery?.(
@@ -53,7 +55,7 @@ export default function FestivalGlobalNudge() {
         <Sparkles size={12} strokeWidth={2} style={{ color: urgent ? "#B91C1C" : "#7C3AED" }} />
         <span style={{ fontSize: 18 }}>{f.emoji ?? "🎉"}</span>
         <span className="font-medium text-default-900 truncate flex-1 min-w-0">
-          {f.name_zh}
+          {lang === "en" ? (f.name_en ?? f.name_zh) : f.name_zh}
           <span
             className="ml-2"
             style={{
@@ -61,10 +63,12 @@ export default function FestivalGlobalNudge() {
               fontWeight: urgent ? 600 : 400,
             }}
           >
-            {days === 0 ? "今天就是！" : `還有 ${days} 天`}
+            {days === 0
+              ? (lang === "en" ? "It's today!" : "今天就是！")
+              : (lang === "en" ? `${days} ${days === 1 ? "day" : "days"} away` : `還有 ${days} 天`)}
           </span>
           <span className="ml-2 text-default-700 hidden sm:inline">
-            — 要不要先準備內容？
+            — {lang === "en" ? "want to prep some posts?" : "要不要先準備內容？"}
           </span>
         </span>
         <button
@@ -75,12 +79,12 @@ export default function FestivalGlobalNudge() {
           className="px-3 py-1 rounded text-[11px] font-semibold whitespace-nowrap"
           style={{ background: "#171717", color: "white" }}
         >
-          幫我準備 →
+          {lang === "en" ? "Prep it for me →" : "幫我準備 →"}
         </button>
         <button
           onClick={() => dismissMut?.mutateAsync?.({ festivalId: f.id })}
           className="w-6 h-6 rounded flex items-center justify-center text-default-600 hover:bg-black/5"
-          title="這個節慶不要提醒"
+          title={lang === "en" ? "Don't remind me about this one" : "這個節慶不要提醒"}
         >
           <X size={12} />
         </button>

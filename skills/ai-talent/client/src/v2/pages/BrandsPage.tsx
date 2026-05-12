@@ -16,6 +16,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
@@ -102,6 +103,7 @@ interface Tile {
 }
 
 export default function BrandsPage() {
+  const { t, lang } = useLang();
   const { brandId, setBrandId, brands, scope, setScope } = useOutletContext<ShellOutletCtx>();
 
   // Add entity modal (新增品牌 / 產品 / 活動)
@@ -184,8 +186,12 @@ export default function BrandsPage() {
     if (localStorage.getItem(dismissedKey)) return;
 
     const msg = stage === "none"
-      ? `先填上品牌的官網或 FB / IG 連結。AI 自動填寫、試寫、30s/60s/99s 任務都會去抓這些連結的真實內容做 ground，不填的話 AI 只能用品牌名瞎猜。`
-      : `官網已填 ✓。再補 FB / IG 連結會更準。網頁通常是正式中文，但你的真實品牌語氣（中英夾雜、口語、emoji）藏在社群貼文裡——填了 AI 才寫得像你。`;
+      ? (lang === "en"
+          ? "Drop in your website or FB / IG link first. Auto-fill, test writes, and every 30s / 60s / 99s task grounds itself on these — without them, the AI is guessing from the brand name."
+          : "先填上品牌的官網或 FB / IG 連結。AI 自動填寫、試寫、30s/60s/99s 任務都會去抓這些連結的真實內容做 ground，不填的話 AI 只能用品牌名瞎猜。")
+      : (lang === "en"
+          ? "Website added ✓. Add FB / IG too for sharper results. Your real voice lives in social posts, not on the website — the AI needs that to sound like you."
+          : "官網已填 ✓。再補 FB / IG 連結會更準。網頁通常是正式中文，但你的真實品牌語氣（中英夾雜、口語、emoji）藏在社群貼文裡——填了 AI 才寫得像你。");
 
     setSettingsInitialTab("connector");
     setOnboardingHint(msg);
@@ -200,11 +206,22 @@ export default function BrandsPage() {
   const handleLockToggle = async (tab: "positioning" | "copy" | "visual") => {
     if (!activeBrandIdForLocks) return;
     try {
+      const tabName = tab === "positioning"
+        ? (lang === "en" ? "Positioning" : "定位")
+        : tab === "copy"
+          ? (lang === "en" ? "Copy" : "文字")
+          : (lang === "en" ? "Visual" : "視覺");
       if (tabLocks[tab]) {
-        if (!confirm(`確定要解鎖「${tab === "positioning" ? "定位" : tab === "copy" ? "文字" : "視覺"}」？解鎖後可以繼續編輯，全平台會用最新版本。`)) return;
+        const msg = lang === "en"
+          ? `Unlock "${tabName}"? You'll be able to edit again, and every channel will pick up the latest version.`
+          : `確定要解鎖「${tabName}」？解鎖後可以繼續編輯，全平台會用最新版本。`;
+        if (!confirm(msg)) return;
         await unlockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       } else {
-        if (!confirm(`要鎖定「${tab === "positioning" ? "定位" : tab === "copy" ? "文字" : "視覺"}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有 30s/60s/99s/Theater 任務都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`)) return;
+        const msg = lang === "en"
+          ? `Lock "${tabName}"?\nAfter locking:\n· Editor goes read-only (unlock to change)\n· Every channel uses this as the single source of truth\n· All 30s / 60s / 99s / Theater tasks show the locked badge\nYou can unlock anytime.`
+          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有 30s/60s/99s/Theater 任務都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`;
+        if (!confirm(msg)) return;
         await lockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       }
       tabLocksQuery.refetch?.();
@@ -258,8 +275,8 @@ export default function BrandsPage() {
   const segments = scopeMode === "none" ? [] : SCOPE_SEGMENTS[scopeMode];
   const SUBNAV: SubNavItem[] = useMemo(() => {
     const items: SubNavItem[] = [];
-    items.push({ id: "card",    label: "速查卡",     group: "doc" });
-    items.push({ id: "prompts", label: "AI 指令庫",  group: "doc" });
+    items.push({ id: "card",    label: lang === "en" ? "Cheat sheet" : "速查卡",     group: "doc" });
+    items.push({ id: "prompts", label: lang === "en" ? "AI prompts"  : "AI 指令庫",  group: "doc" });
     for (const s of segments) {
       items.push({
         id: `seg:${s.id}`,
@@ -335,9 +352,9 @@ export default function BrandsPage() {
     [scopeBrands, scope?.brandId, brandId]
   );
   const scopeName =
-    scopeMode === "product" ? ((productQuery.data as any)?.name ?? "（請於右上選擇產品）")
-    : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? "（請於右上選擇活動）")
-    : (currentBrand?.name ?? "（請於右上選擇品牌）");
+    scopeMode === "product" ? ((productQuery.data as any)?.name ?? (lang === "en" ? "(Pick a product up top)" : "（請於右上選擇產品）"))
+    : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? (lang === "en" ? "(Pick an event up top)" : "（請於右上選擇活動）"))
+    : (currentBrand?.name ?? (lang === "en" ? "(Pick a brand up top)" : "（請於右上選擇品牌）"));
   const scopeIcon =
     scopeMode === "product" ? faBox
     : scopeMode === "event" ? faCalendarDay
@@ -346,7 +363,7 @@ export default function BrandsPage() {
     scopeMode === "product" ? "PRODUCT"
     : scopeMode === "event" ? "EVENT"
     : "BRAND";
-  const brandName = currentBrand?.name ?? "我的品牌";
+  const brandName = currentBrand?.name ?? (lang === "en" ? "My brand" : "我的品牌");
   const brandInitial = brandName.charAt(0).toUpperCase();
 
   const brainQuery = (trpc as any).brandBrain?.list?.useQuery
@@ -749,21 +766,22 @@ export default function BrandsPage() {
                 BRAND · STEP 1
               </p>
               <h1 className="text-3xl font-bold text-neutral-900 mb-3 leading-tight">
-                建立你的第一個品牌
+                {lang === "en" ? "Set up your first brand" : "建立你的第一個品牌"}
               </h1>
               <p className="text-sm text-neutral-600 mb-6 leading-relaxed">
-                品牌是 OnBrand 一切的起點。建立後，AI 會自動分析定位、用詞、
-                視覺風格 — 接下來的所有任務都會吃這份品牌大腦。
+                {lang === "en"
+                  ? "Your brand is where everything in OnBrand starts. Once it's in, the AI reads your positioning, words, and visual style — every task pulls from this brain."
+                  : "品牌是 OnBrand 一切的起點。建立後，AI 會自動分析定位、用詞、視覺風格 — 接下來的所有任務都會吃這份品牌大腦。"}
               </p>
               <button
                 onClick={() => setOnboardingOpen(true)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition"
               >
-                開始建立品牌
+                {lang === "en" ? "Start setup" : "開始建立品牌"}
                 <FontAwesomeIcon icon={faPlus} className="text-xs" />
               </button>
               <p className="text-xs text-neutral-600 mt-4">
-                預計 2 分鐘完成 · 過程中可隨時暫停
+                {lang === "en" ? "About 2 min · pause anytime" : "預計 2 分鐘完成 · 過程中可隨時暫停"}
               </p>
             </div>
           </div>
@@ -781,7 +799,7 @@ export default function BrandsPage() {
             href="/brands"
             className="flex items-center gap-1 text-xs text-neutral-700 hover:text-neutral-900 transition"
           >
-            ← 所有品牌
+            ← {lang === "en" ? "All brands" : "所有品牌"}
           </a>
         </div>
         {/* Gear icon top-right — opens Settings sheet (連結 / 視覺 / AI 指令 / 危險區) */}
@@ -789,10 +807,10 @@ export default function BrandsPage() {
           <button
             onClick={() => setSettingsOpen(true)}
             className="absolute top-5 right-5 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-default-200 hover:border-default-400 shadow-sm transition text-default-600 hover:text-default-900 z-10"
-            title="設定（連結 / 視覺 / AI 指令 / 刪除）"
+            title={lang === "en" ? "Settings (links / visual / AI / delete)" : "設定（連結 / 視覺 / AI 指令 / 刪除）"}
           >
             <LucideSettings size={14} strokeWidth={1.8} />
-            <span className="text-xs font-medium">設定</span>
+            <span className="text-xs font-medium">{lang === "en" ? "Settings" : "設定"}</span>
           </button>
         )}
         {/* 2026-05-10 (CJ「4A 代理商專業感, B&W」): hero redesigned.
@@ -825,14 +843,18 @@ export default function BrandsPage() {
               fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
             }}
           >
-            SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼
+            {lang === "en"
+              ? "The SoWork Brand Positioning Method · lock who you are first, then every post knows what to say"
+              : "SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼"}
           </p>
           <p
             className="mt-2 mb-5 mx-auto text-default-700"
             style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
           >
-            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>包含：</span>
-            14 步定位 · 文字 / 視覺 / 知識資產 · AI 指令庫
+            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>{lang === "en" ? "Includes:" : "包含："}</span>
+            {lang === "en"
+              ? "14-step positioning · Copy / visual / knowledge assets · AI prompt library"
+              : "14 步定位 · 文字 / 視覺 / 知識資產 · AI 指令庫"}
           </p>
 
           {/* 2026-05-11 (CJ「搜尋 BAR 不需要了」): BrandMessageBar removed.
@@ -844,9 +866,9 @@ export default function BrandsPage() {
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-3 w-max mx-auto px-2">
               {([
-                { v: "positioning" as const, label: "定位", desc: "品牌核心 / Slogan", Icon: LucideTarget },
-                { v: "copy"        as const, label: "文字", desc: "用詞 / 禁忌詞 / 風格",  Icon: LucideType },
-                { v: "knowledge"   as const, label: "知識", desc: "FAQ / 常識資料庫",      Icon: LucideBook },
+                { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位", desc: lang === "en" ? "Brand core / slogan"          : "品牌核心 / Slogan", Icon: LucideTarget },
+                { v: "copy"        as const, label: lang === "en" ? "Copy"        : "文字", desc: lang === "en" ? "Words / banned / style"        : "用詞 / 禁忌詞 / 風格",  Icon: LucideType },
+                { v: "knowledge"   as const, label: lang === "en" ? "Knowledge"   : "知識", desc: lang === "en" ? "FAQ / fact library"            : "FAQ / 常識資料庫",      Icon: LucideBook },
               ]).map((t) => {
                 const active = category === t.v;
                 const locked = t.v === "positioning" || t.v === "copy"
@@ -881,7 +903,7 @@ export default function BrandsPage() {
                     </div>
                     <p className={`text-[11px] mt-0.5 ${active ? "text-neutral-300" : "text-neutral-700"}`}>
                       {t.desc}
-                      {locked && " · 已鎖定"}
+                      {locked && (lang === "en" ? " · Locked" : " · 已鎖定")}
                     </p>
                   </button>
                 );
@@ -918,7 +940,11 @@ export default function BrandsPage() {
           locked → green check banner with 解鎖 button
           unlocked → soft hint with 🔒 鎖定 button to commit current state */}
       {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
-        const tabLabel = category === "positioning" ? "定位" : category === "copy" ? "文字" : "視覺";
+        const tabLabel = category === "positioning"
+          ? (lang === "en" ? "Positioning" : "定位")
+          : category === "copy"
+            ? (lang === "en" ? "Copy" : "文字")
+            : (lang === "en" ? "Visual" : "視覺");
         const lock = tabLocks[category];
         const isLocked = !!lock;
         return (
@@ -942,19 +968,25 @@ export default function BrandsPage() {
                   {isLocked ? (
                     <>
                       <p className="text-small font-semibold text-emerald-800 m-0">
-                        ✅ {tabLabel}已鎖定 — 全平台採用此版本為單一真相
+                        {lang === "en"
+                          ? `✅ ${tabLabel} locked — single source of truth across all channels`
+                          : `✅ ${tabLabel}已鎖定 — 全平台採用此版本為單一真相`}
                       </p>
                       <p className="text-tiny text-emerald-600 m-0">
-                        鎖定於 {new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })}
+                        {lang === "en"
+                          ? `Locked at ${new Date(lock.at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}`
+                          : `鎖定於 ${new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })}`}
                       </p>
                     </>
                   ) : (
                     <>
                       <p className="text-small font-semibold text-default-800 m-0">
-                        {tabLabel} 尚未鎖定
+                        {lang === "en" ? `${tabLabel} — not locked yet` : `${tabLabel} 尚未鎖定`}
                       </p>
                       <p className="text-tiny text-default-700 m-0">
-                        鎖定後：編輯欄變唯讀 · 全平台 (30s/60s/99s/Theater) 用這份為單一真相
+                        {lang === "en"
+                          ? "Once locked: editor goes read-only · every channel (30s / 60s / 99s / Theater) uses this as the single source of truth"
+                          : "鎖定後：編輯欄變唯讀 · 全平台 (30s/60s/99s/Theater) 用這份為單一真相"}
                       </p>
                     </>
                   )}
@@ -970,7 +1002,9 @@ export default function BrandsPage() {
                 {/* CJ 2026-05-08: 只要出現一個 icon — kept the left circle
                     icon at line ~875, removed the duplicate startContent
                     icon from this button. */}
-                {isLocked ? "解鎖" : `鎖定${tabLabel}`}
+                {isLocked
+                  ? (lang === "en" ? "Unlock" : "解鎖")
+                  : (lang === "en" ? `Lock ${tabLabel}` : `鎖定${tabLabel}`)}
               </Button>
             </div>
           </div>
@@ -1114,10 +1148,16 @@ export default function BrandsPage() {
                         mode="idle"
                         message={
                           scopeMode === "product"
-                            ? "為這個產品做定位 — 6 步從族群痛點推導出獨家賣點，作為文案 / 視覺的依據。"
+                            ? (lang === "en"
+                                ? "Positioning this product — 6 steps from audience pain to a unique selling angle that powers all copy and visuals."
+                                : "為這個產品做定位 — 6 步從族群痛點推導出獨家賣點，作為文案 / 視覺的依據。")
                           : scopeMode === "event"
-                            ? "為這場活動做定位 — 11 步從背景與受眾推導出 SMP（單一核心命題），再展開訊息架構與創意。"
-                          : "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」 — 鎖定後，所有內容都會以此為基礎產出。"
+                            ? (lang === "en"
+                                ? "Positioning this campaign — 11 steps from background and audience to an SMP (single-minded proposition), then messaging and creative."
+                                : "為這場活動做定位 — 11 步從背景與受眾推導出 SMP（單一核心命題），再展開訊息架構與創意。")
+                          : (lang === "en"
+                              ? "I'll run the 14-step SoWork Brand Positioning Method to lock in who you are and who you're here for — every piece of content flows from this."
+                              : "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」 — 鎖定後，所有內容都會以此為基礎產出。")
                         }
                       />
                       <PositioningTopRow
@@ -1181,16 +1221,18 @@ export default function BrandsPage() {
                   fontSize: 12, color: "#78716C", background: "none", border: "none",
                   cursor: "pointer", padding: 0, marginBottom: 4,
                 }}>
-                  ← 品牌定位總覽
+                  ← {lang === "en" ? "Positioning overview" : "品牌定位總覽"}
                 </button>
                 {scopeMode !== "none" && pipelineSteps.length > 0 && (
                   <PipelineRunner
                     steps={pipelineSteps}
                     state={pipeline}
                     title={
-                      scopeMode === "product" ? "產品定位分析"
-                      : scopeMode === "event" ? "活動定位分析"
-                      : "品牌定位分析"
+                      scopeMode === "product"
+                        ? (lang === "en" ? "Product positioning analysis" : "產品定位分析")
+                      : scopeMode === "event"
+                        ? (lang === "en" ? "Campaign positioning analysis" : "活動定位分析")
+                        : (lang === "en" ? "Brand positioning analysis"    : "品牌定位分析")
                     }
                     onStart={startPipeline}
                     onPause={pausePipeline}
@@ -1204,8 +1246,8 @@ export default function BrandsPage() {
                     <div className="flex items-start gap-3">
                       <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-small font-semibold text-primary-800">🛑 SMP Checkpoint — 請確認單一核心命題</p>
-                        <p className="text-tiny text-default-600 mt-1">SMP 是這次活動的最高創意準則，後面 5 個 step 都會圍繞它展開。先確認再繼續。</p>
+                        <p className="text-small font-semibold text-primary-800">{lang === "en" ? "🛑 SMP Checkpoint — confirm the single-minded proposition" : "🛑 SMP Checkpoint — 請確認單一核心命題"}</p>
+                        <p className="text-tiny text-default-600 mt-1">{lang === "en" ? "SMP is the top creative principle for this campaign — the next 5 steps revolve around it. Confirm before continuing." : "SMP 是這次活動的最高創意準則，後面 5 個 step 都會圍繞它展開。先確認再繼續。"}</p>
                         {smpData?.singleMindedProposition && (
                           <div className="mt-2 p-2 rounded bg-white border border-divider">
                             <p className="text-small font-medium text-foreground">「{smpData.singleMindedProposition}」</p>
@@ -1213,8 +1255,8 @@ export default function BrandsPage() {
                           </div>
                         )}
                         <div className="mt-3 flex items-center gap-2 flex-wrap">
-                          <button className="px-3 py-1 rounded-md bg-primary text-white text-tiny font-medium hover:opacity-90" onClick={resumeAfterSmp}>▶ 繼續（跑 step 7-11）</button>
-                          <button className="px-3 py-1 rounded-md border border-divider text-tiny hover:bg-default-50" onClick={() => setSection("seg:smp")}>編輯 SMP</button>
+                          <button className="px-3 py-1 rounded-md bg-primary text-white text-tiny font-medium hover:opacity-90" onClick={resumeAfterSmp}>{lang === "en" ? "▶ Continue (steps 7-11)" : "▶ 繼續（跑 step 7-11）"}</button>
+                          <button className="px-3 py-1 rounded-md border border-divider text-tiny hover:bg-default-50" onClick={() => setSection("seg:smp")}>{lang === "en" ? "Edit SMP" : "編輯 SMP"}</button>
                         </div>
                       </div>
                     </div>
@@ -1222,9 +1264,9 @@ export default function BrandsPage() {
                 )}
                 {failedStepIds.length > 0 && (
                   <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
-                    ⚠ 以下 step 沒寫入內容，建議到對應頁籤重跑：{" "}
-                    {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`; }).join("、")}
-                    <button className="ml-2 underline" onClick={() => setFailedStepIds([])}>關閉</button>
+                    {lang === "en" ? "⚠ These steps came back empty — re-run them from each segment:" : "⚠ 以下 step 沒寫入內容，建議到對應頁籤重跑："}{" "}
+                    {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`; }).join(lang === "en" ? ", " : "、")}
+                    <button className="ml-2 underline" onClick={() => setFailedStepIds([])}>{t("close")}</button>
                   </div>
                 )}
                 <PositioningPanel
@@ -1250,15 +1292,15 @@ export default function BrandsPage() {
               {section === "asset:all" && (
                 <TabActionBar
                   tab="visual"
-                  label="視覺"
+                  label={lang === "en" ? "Visual" : "視覺"}
                   locked={!!tabLocks.visual}
                   hasContent={tabHasContent.visual}
                   statusText={
                     tabHasContent.visual
-                      ? "已有部分視覺資產 — 可繼續補完，或重新從第一張開始"
-                      : "尚未填寫 — 按下開始，從標誌設定起逐步完成"
+                      ? (lang === "en" ? "Some visual assets ready — keep filling or start over from the first one" : "已有部分視覺資產 — 可繼續補完，或重新從第一張開始")
+                      : (lang === "en" ? "Empty — hit start to walk through from logo on" : "尚未填寫 — 按下開始，從標誌設定起逐步完成")
                   }
-                  subText="標誌 / 顏色 / 字型 / 圖像風格 / 視覺規範 / 素材庫"
+                  subText={lang === "en" ? "Logo / colors / fonts / imagery / guidelines / library" : "標誌 / 顏色 / 字型 / 圖像風格 / 視覺規範 / 素材庫"}
                   onAction={() => handleTabAction("visual")}
                 />
               )}
@@ -1286,7 +1328,7 @@ export default function BrandsPage() {
                         fontSize: 12, color: "#78716C", background: "none", border: "none",
                         cursor: "pointer", marginBottom: 16, padding: 0,
                       }}>
-                        ← 所有資產
+                        ← {lang === "en" ? "All assets" : "所有資產"}
                       </button>
                       <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} locked={!!tabLocks.visual} />
                     </div>
@@ -1299,33 +1341,33 @@ export default function BrandsPage() {
                   items: Array<{ id: string; label: string; icon: any; bg: string; }>;
                 }> = [
                   {
-                    label: "基礎元素",
+                    label: lang === "en" ? "Essentials" : "基礎元素",
                     items: [
-                      { id: "asset:logo",       label: "標誌",   icon: faPenNib,    bg: "#FFF7ED" },
-                      { id: "asset:colors",     label: "顏色",   icon: faPalette,   bg: "#F5F3FF" },
-                      { id: "asset:fonts",      label: "字型",   icon: faFont,      bg: "#EFF6FF" },
+                      { id: "asset:logo",       label: lang === "en" ? "Logo"   : "標誌",   icon: faPenNib,    bg: "#FFF7ED" },
+                      { id: "asset:colors",     label: lang === "en" ? "Colors" : "顏色",   icon: faPalette,   bg: "#F5F3FF" },
+                      { id: "asset:fonts",      label: lang === "en" ? "Fonts"  : "字型",   icon: faFont,      bg: "#EFF6FF" },
                     ],
                   },
                   {
-                    label: "視覺風格",
+                    label: lang === "en" ? "Visual style" : "視覺風格",
                     items: [
-                      { id: "asset:imagery_style", label: "圖像風格", icon: faImage,    bg: "#FFF7ED" },
-                      { id: "asset:icon_style",    label: "圖示風格", icon: faIcons,    bg: "#F5F3FF" },
-                      { id: "asset:chart_style",   label: "圖表風格", icon: faChartPie, bg: "#ECFDF5" },
+                      { id: "asset:imagery_style", label: lang === "en" ? "Imagery style" : "圖像風格", icon: faImage,    bg: "#FFF7ED" },
+                      { id: "asset:icon_style",    label: lang === "en" ? "Icon style"    : "圖示風格", icon: faIcons,    bg: "#F5F3FF" },
+                      { id: "asset:chart_style",   label: lang === "en" ? "Chart style"   : "圖表風格", icon: faChartPie, bg: "#ECFDF5" },
                     ],
                   },
                   {
-                    label: "視覺規範",
+                    label: lang === "en" ? "Visual rules" : "視覺規範",
                     items: [
-                      { id: "asset:guidelines",   label: "視覺準則", icon: faShieldHalved, bg: "#F0FDF4" },
-                      { id: "asset:layout_rules", label: "排版規範", icon: faPenNib,       bg: "#FFFBEB" },
+                      { id: "asset:guidelines",   label: lang === "en" ? "Visual guidelines" : "視覺準則", icon: faShieldHalved, bg: "#F0FDF4" },
+                      { id: "asset:layout_rules", label: lang === "en" ? "Layout rules"     : "排版規範", icon: faPenNib,       bg: "#FFFBEB" },
                     ],
                   },
                   {
-                    label: "素材庫",
+                    label: lang === "en" ? "Library" : "素材庫",
                     items: [
-                      { id: "asset:photos",     label: "照片",     icon: faImages,    bg: "#F0F9FF" },
-                      { id: "asset:templates",  label: "品牌範本", icon: faFolderOpen, bg: "#FFFBEB" },
+                      { id: "asset:photos",     label: lang === "en" ? "Photos"    : "照片",     icon: faImages,    bg: "#F0F9FF" },
+                      { id: "asset:templates",  label: lang === "en" ? "Templates" : "品牌範本", icon: faFolderOpen, bg: "#FFFBEB" },
                     ],
                   },
                 ];
@@ -1347,7 +1389,7 @@ export default function BrandsPage() {
                             cursor: "pointer", whiteSpace: "nowrap", padding: 0,
                             fontWeight: 500,
                           }}>
-                            顯示更多
+                            {lang === "en" ? "Show more" : "顯示更多"}
                           </button>
                         </div>
 
@@ -1361,7 +1403,7 @@ export default function BrandsPage() {
                           {group.items.map(item => {
                             const k = item.id.startsWith("asset:") ? item.id.slice("asset:".length) : item.id;
                             const v = brandAssets[k];
-                            const preview = previewForAsset(k, v);
+                            const preview = previewForAsset(k, v, lang);
                             return (
                               <AssetCard
                                 key={item.id}
@@ -1380,7 +1422,7 @@ export default function BrandsPage() {
 
                     {/* ⑥ 紫色浮動 + 按鈕 → 開啟新增 entity modal（品牌 / 產品 / 活動） */}
                     <button
-                      title="新增品牌 / 產品 / 活動"
+                      title={lang === "en" ? "Add brand / product / campaign" : "新增品牌 / 產品 / 活動"}
                       onClick={() => setAddModal({ open: true, tab: scopeMode === "brand" ? "product" : scopeMode === "product" ? "event" : "brand" })}
                       style={{
                         position: "fixed", bottom: 32, right: 32, zIndex: 50,
@@ -1423,7 +1465,7 @@ export default function BrandsPage() {
               {scopeMode !== "brand" && (
                 <div className="max-w-[1100px] mx-auto px-6 pt-2">
                   <div className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 text-xs text-sky-900">
-                    💡 文字資產屬於品牌共用 — 在這裡編輯會影響此品牌下所有產品 / 活動。
+                    {lang === "en" ? "💡 Copy assets are shared at brand level — edits here affect every product and campaign under this brand." : "💡 文字資產屬於品牌共用 — 在這裡編輯會影響此品牌下所有產品 / 活動。"}
                   </div>
                 </div>
               )}
@@ -1461,7 +1503,7 @@ export default function BrandsPage() {
           modal with a sensible default tab based on current scope. */}
       <button
         onClick={() => setAddModal({ open: true, tab: scopeMode === "brand" ? "product" : scopeMode === "product" ? "event" : "brand" })}
-        title="新增 品牌 / 產品 / 活動"
+        title={lang === "en" ? "Add brand / product / campaign" : "新增 品牌 / 產品 / 活動"}
         style={{
           position: "fixed", bottom: 32, right: 32, zIndex: 60,
           padding: "12px 20px", borderRadius: 999,
@@ -1476,7 +1518,7 @@ export default function BrandsPage() {
         onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(99,102,241,0.45)"; }}
       >
         <FontAwesomeIcon icon={faPlus} />
-        <span>新增</span>
+        <span>{lang === "en" ? "Add" : "新增"}</span>
       </button>
 
       {/* AddEntityModal — shared dialog for 品牌 / 產品 / 活動 */}
@@ -1523,6 +1565,7 @@ function TabActionBar({
   onStop?: () => void;
   onAction: () => void;
 }) {
+  const { lang } = useLang();
   const isRunning = pipelineStatus === "running";
   const isPaused  = pipelineStatus === "paused";
   return (
@@ -1534,9 +1577,11 @@ function TabActionBar({
       <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-4 flex-wrap">
         <div>
           <p style={{ fontSize: 14, fontWeight: 600, color: "#18181B", margin: 0 }}>
-            {locked ? `${label}已鎖定 — 解鎖才能編輯` :
-              isRunning ? "正在分析中…" :
-              statusText}
+            {locked
+              ? (lang === "en" ? `${label} is locked — unlock to edit` : `${label}已鎖定 — 解鎖才能編輯`)
+              : isRunning
+                ? (lang === "en" ? "Analyzing…" : "正在分析中…")
+                : statusText}
           </p>
           {subText && (
             <p style={{ fontSize: 12, color: "#71717A", margin: "2px 0 0" }}>
@@ -1547,9 +1592,9 @@ function TabActionBar({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {tab === "positioning" && isRunning && (
             <>
-              <Button size="sm" variant="bordered" onPress={onPause}>暫停</Button>
-              <Button size="sm" variant="bordered" onPress={onSkip}>跳過此步</Button>
-              <Button size="sm" variant="bordered" color="danger" onPress={onStop}>停止</Button>
+              <Button size="sm" variant="bordered" onPress={onPause}>{lang === "en" ? "Pause" : "暫停"}</Button>
+              <Button size="sm" variant="bordered" onPress={onSkip}>{lang === "en" ? "Skip step" : "跳過此步"}</Button>
+              <Button size="sm" variant="bordered" color="danger" onPress={onStop}>{lang === "en" ? "Stop" : "停止"}</Button>
             </>
           )}
           {tab === "positioning" && isPaused && (
@@ -1559,7 +1604,7 @@ function TabActionBar({
               startContent={<LucidePlay size={14} strokeWidth={2} />}
               style={{ background: "#18181B", color: "white" }}
             >
-              繼續
+              {lang === "en" ? "Continue" : "繼續"}
             </Button>
           )}
           {(!isRunning && !isPaused) && (
@@ -1580,10 +1625,10 @@ function TabActionBar({
               }}
             >
               {locked
-                ? `已鎖定`
+                ? (lang === "en" ? "Locked" : "已鎖定")
                 : hasContent
-                  ? `重新${label}`
-                  : `開始${label}`}
+                  ? (lang === "en" ? `Redo ${label.toLowerCase()}` : `重新${label}`)
+                  : (lang === "en" ? `Start ${label.toLowerCase()}` : `開始${label}`)}
             </Button>
           )}
         </div>
@@ -1612,6 +1657,7 @@ function PositioningBrainBar({ thinking }: {
     stepTitle: string;
   };
 }) {
+  const { lang } = useLang();
   // Typewriter-feel: just render text plain (server already streams it).
   return (
     <div
@@ -1651,7 +1697,7 @@ function PositioningBrainBar({ thinking }: {
             )}
           </div>
           <p className="text-small text-neutral-900 leading-snug">
-            {thinking.text || "正在分析…"}
+            {thinking.text || (lang === "en" ? "Analyzing…" : "正在分析…")}
             <span
               className="inline-block w-[2px] h-[14px] ml-0.5 align-middle bg-neutral-900"
               style={{ animation: "blink 1s steps(2) infinite" }}
@@ -1675,27 +1721,34 @@ function PositioningGrid({
   /** Map of segment id → its current content (top-level positioning keys). */
   segmentData?: Record<string, any>;
 }) {
+  const { lang } = useLang();
+  const groupLabels: Record<string, { zh: string; en: string }> = {
+    "1": { zh: "品牌識別", en: "Brand identity" },
+    "2": { zh: "品牌背景", en: "Brand backstory" },
+    "3": { zh: "目標受眾", en: "Target audience" },
+    "4": { zh: "市場分析", en: "Market analysis" },
+    "5": { zh: "競爭策略", en: "Competitive strategy" },
+    "6": { zh: "行銷策略", en: "Marketing strategy" },
+    "7": { zh: "市場趨勢", en: "Market trends" },
+    "8": { zh: "品牌個性", en: "Brand personality" },
+  };
   // Derive groups from segment num prefix
   const groupedSegs = React.useMemo(() => {
-    const map = new Map<string, { label: string; segs: typeof segments }>();
+    const map = new Map<string, { label: string; prefix: string; segs: typeof segments }>();
     for (const s of segments) {
       const prefix = s.num.split(".")[0]!;
-      // label by prefix convention
-      const label =
-        prefix === "1" ? "品牌識別"
-        : prefix === "2" ? "品牌背景"
-        : prefix === "3" ? "目標受眾"
-        : prefix === "4" ? "市場分析"
-        : prefix === "5" ? "競爭策略"
-        : prefix === "6" ? "行銷策略"
-        : prefix === "7" ? "市場趨勢"
-        : prefix === "8" ? "品牌個性"
-        : `第 ${prefix} 章`;
-      if (!map.has(label)) map.set(label, { label, segs: [] });
-      map.get(label)!.segs.push(s);
+      const pair = groupLabels[prefix];
+      const label = pair
+        ? (lang === "en" ? pair.en : pair.zh)
+        : (lang === "en" ? `Chapter ${prefix}` : `第 ${prefix} 章`);
+      // Stable key by zh label so intro lookup works regardless of UI language
+      const key = pair ? pair.zh : `第 ${prefix} 章`;
+      if (!map.has(key)) map.set(key, { label, prefix, segs: [] });
+      map.get(key)!.segs.push(s);
     }
     return Array.from(map.values());
-  }, [segments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segments, lang]);
 
   // Icon map per segment id
   const ICONS: Record<string, any> = {
@@ -1717,7 +1770,7 @@ function PositioningGrid({
     <div style={{ padding: "8px 0 24px", display: "flex", flexDirection: "column", gap: 36 }}>
       {/* ── 工具群組 ── */}
       <div>
-        <SectionLabel label="品牌工具" />
+        <SectionLabel label={lang === "en" ? "Brand tools" : "品牌工具"} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
           {(() => {
             // 速查卡：把品牌定位精華（tagline / golden-circle why / differentiation）
@@ -1725,7 +1778,7 @@ function PositioningGrid({
             const cardPreview = buildBrandCheatPreview(segmentData);
             return (
               <AssetCard
-                label="速查卡"
+                label={lang === "en" ? "Cheat sheet" : "速查卡"}
                 icon={faTableList}
                 bg="#FFFFFF"
                 onClick={() => onSelect("card")}
@@ -1736,10 +1789,10 @@ function PositioningGrid({
           })()}
           {(() => {
             // AI 指令庫：voice + 禁區 + tone 詞庫合成的一張預覽。
-            const promptsPreview = buildPromptsPreview(segmentData);
+            const promptsPreview = buildPromptsPreview(segmentData, lang);
             return (
               <AssetCard
-                label="AI 指令庫"
+                label={lang === "en" ? "AI prompts" : "AI 指令庫"}
                 icon={faRobot}
                 bg="#FFFFFF"
                 onClick={() => onSelect("prompts")}
@@ -1763,12 +1816,12 @@ function PositioningGrid({
               if (typeof v === "object") return Object.values(v).some(x => x != null && (typeof x !== "string" || x.trim()));
               return true;
             }).length} / ${group.segs.length}`}
-            intro={SOWORK_GROUP_INTRO[group.label]}
+            intro={SOWORK_GROUP_INTRO[group.prefix]?.[lang === "en" ? "en" : "zh"]}
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
             {group.segs.map((s, si) => {
               const segVal = segmentData?.[s.id];
-              const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal);
+              const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal, lang);
               return (
                 <AssetCard
                   key={s.id}
@@ -1834,7 +1887,7 @@ function TagRow({ items, max = 4 }: { items: string[]; max?: number }) {
 }
 
 /** Smart preview per segment. Returns React node + whether considered filled. */
-function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | null; hasContent: boolean } {
+function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-TW"): { node: React.ReactNode | null; hasContent: boolean } {
   if (v == null) return { node: null, hasContent: false };
   if (typeof v === "string") {
     const t = v.trim();
@@ -1997,13 +2050,13 @@ function renderSegmentPreview(segId: string, v: any): { node: React.ReactNode | 
           <span>
             {arche && (
               <span style={{ display: "block", marginBottom: 4 }}>
-                <span style={{ fontSize: 10, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>原型</span>
+                <span style={{ fontSize: 10, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>{lang === "en" ? "Archetype" : "原型"}</span>
                 <TagRow items={arche} max={3} />
               </span>
             )}
             {tone && (
               <span style={{ display: "block" }}>
-                <span style={{ fontSize: 10, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>語調</span>
+                <span style={{ fontSize: 10, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>{lang === "en" ? "Tone" : "語調"}</span>
                 <TagRow items={tone} max={4} />
               </span>
             )}
@@ -2102,7 +2155,7 @@ function buildBrandCheatPreview(seg?: Record<string, any>): { node: React.ReactN
 }
 
 /** AI 指令庫 preview — composes voice archetype + tone + forbidden words. */
-function buildPromptsPreview(seg?: Record<string, any>): { node: React.ReactNode | null; hasContent: boolean } {
+function buildPromptsPreview(seg?: Record<string, any>, lang: "zh-TW" | "en" = "zh-TW"): { node: React.ReactNode | null; hasContent: boolean } {
   if (!seg) return { node: null, hasContent: false };
   const arche = isFilledArr(seg.voice?.archetypes) ? seg.voice.archetypes : null;
   const tone = isFilledArr(seg.voice?.tone) ? seg.voice.tone : null;
@@ -2113,7 +2166,7 @@ function buildPromptsPreview(seg?: Record<string, any>): { node: React.ReactNode
       <span>
         {arche && (
           <span style={{ display: "block", marginBottom: 4, fontSize: 11 }}>
-            <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>原型</span>
+            <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>{lang === "en" ? "Archetype" : "原型"}</span>
             {arche.slice(0, 2).join(" / ")}
           </span>
         )}
@@ -2124,7 +2177,7 @@ function buildPromptsPreview(seg?: Record<string, any>): { node: React.ReactNode
         )}
         {forbid && (
           <span style={{ display: "block", fontSize: 10, color: "#B45309", fontFamily: "system-ui" }}>
-            禁區 · {forbid.slice(0, 3).join("、")}{forbid.length > 3 ? `+${forbid.length - 3}` : ""}
+            {lang === "en" ? "Avoid · " : "禁區 · "}{forbid.slice(0, 3).join(lang === "en" ? ", " : "、")}{forbid.length > 3 ? `+${forbid.length - 3}` : ""}
           </span>
         )}
       </span>
@@ -2142,8 +2195,13 @@ function PositioningCompletionBridge({
   brandId, scopeMode,
 }: { brandId: number | null; scopeMode: "brand"|"product"|"event"|"none" }) {
   const navigate = useNavigate();
+  const { lang } = useLang();
   if (!brandId) return null;
-  const scopeLabel = scopeMode === "product" ? "產品定位" : scopeMode === "event" ? "活動定位" : "品牌定位";
+  const scopeLabel = scopeMode === "product"
+    ? (lang === "en" ? "product positioning" : "產品定位")
+    : scopeMode === "event"
+      ? (lang === "en" ? "campaign positioning" : "活動定位")
+      : (lang === "en" ? "brand positioning"    : "品牌定位");
   return (
     <div
       style={{
@@ -2169,24 +2227,27 @@ function PositioningCompletionBridge({
           fontSize: 18, fontWeight: 700, color: "#171717",
           letterSpacing: "-0.01em", marginBottom: 4,
         }}>
-          你的{scopeLabel}已備好，AI 知道每篇文章該說什麼了
+          {lang === "en"
+            ? `Your ${scopeLabel} is ready — the AI knows what every post should say`
+            : `你的${scopeLabel}已備好，AI 知道每篇文章該說什麼了`}
         </h3>
         <p style={{
           fontSize: 13, lineHeight: 1.65, color: "#525252",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
           maxWidth: 620,
         }}>
-          這份定位現在會自動成為 30s 快寫、60s 製作包、99s 全企劃、企劃台 的內容骨架 —
-          每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。
+          {lang === "en"
+            ? "This positioning becomes the backbone for 30s crafts, 60s packages, 99s campaigns, and Theater — every post is built from it, so the AI never sounds off-brand again."
+            : "這份定位現在會自動成為 30s 快寫、60s 製作包、99s 全企劃、企劃台 的內容骨架 — 每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。"}
         </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {/* 2026-05-12 pre-launch zombie audit: routes were /b/X/30s which
             don't exist (404). Real routes are /30s?b=X */}
-        <BridgeBtn label="30s 快寫" onClick={() => navigate(`/30s?b=${brandId}`)} primary />
-        <BridgeBtn label="60s 製作包" onClick={() => navigate(`/60s?b=${brandId}`)} />
-        <BridgeBtn label="99s 全企劃" onClick={() => navigate(`/99s?b=${brandId}`)} />
-        <BridgeBtn label="企劃台" onClick={() => navigate(`/theater?b=${brandId}`)} />
+        <BridgeBtn label={lang === "en" ? "30s craft"    : "30s 快寫"}    onClick={() => navigate(`/30s?b=${brandId}`)} primary />
+        <BridgeBtn label={lang === "en" ? "60s package"  : "60s 製作包"}  onClick={() => navigate(`/60s?b=${brandId}`)} />
+        <BridgeBtn label={lang === "en" ? "99s campaign" : "99s 全企劃"}  onClick={() => navigate(`/99s?b=${brandId}`)} />
+        <BridgeBtn label={lang === "en" ? "Theater"      : "企劃台"}      onClick={() => navigate(`/theater?b=${brandId}`)} />
       </div>
     </div>
   );
@@ -2261,14 +2322,35 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
 /* SoWork 品牌定位法 — group-level narrative explaining why each
    block of segments sits where it does in the sequence. Keyed by the
    prefix-derived label produced in PositioningGrid. */
-const SOWORK_GROUP_INTRO: Record<string, string> = {
-  "品牌識別": "起手式 — 沒有 WHY，後面所有差異化、Voice 都會飄。先把信念 → 標語 → 評分鎖好。",
-  "品牌背景": "信念的證據 — 起源故事 + 價值觀回答「為什麼是你？」沒有這層，黃金圈就只是抽象口號。",
-  "目標受眾": "從『我』轉到『你』— 鎖定主受眾後，每篇貼文才知道對誰說話、要打哪個情感按鈕。",
-  "市場分析": "外部座標 — 直接 / 間接 / 潛在競品看清楚，才知道差異化要切哪一刀。",
-  "競爭策略": "把功能 × 情感雙差異化結合成一句話 — 這是 30s / 60s / 99s 內容的母題。",
-  "市場趨勢": "切入時機 — 對的策略放錯時機等於 0。識別有利趨勢 + 風險，作為議題日曆的母本。",
-  "品牌個性": "AI 寫貼文的最後濾鏡 — 人格原型 + 語調詞 + 禁區字三件套，把品牌「說話的方式」變成可複製規則。",
+const SOWORK_GROUP_INTRO: Record<string, { zh: string; en: string }> = {
+  "1": {
+    zh: "起手式 — 沒有 WHY，後面所有差異化、Voice 都會飄。先把信念 → 標語 → 評分鎖好。",
+    en: "Opening move — without a WHY, every differentiation and voice choice drifts. Lock the belief, the tagline, and the score first.",
+  },
+  "2": {
+    zh: "信念的證據 — 起源故事 + 價值觀回答「為什麼是你？」沒有這層，黃金圈就只是抽象口號。",
+    en: "Evidence for the belief — origin story plus values answer 'why you?'. Without this layer, the golden circle is just slogans.",
+  },
+  "3": {
+    zh: "從『我』轉到『你』— 鎖定主受眾後，每篇貼文才知道對誰說話、要打哪個情感按鈕。",
+    en: "Pivot from 'me' to 'you' — once the primary audience is locked, every post knows who it's talking to and which emotional button to press.",
+  },
+  "4": {
+    zh: "外部座標 — 直接 / 間接 / 潛在競品看清楚，才知道差異化要切哪一刀。",
+    en: "External coordinates — see direct, indirect, and latent competitors clearly so you know where to cut your differentiation.",
+  },
+  "5": {
+    zh: "把功能 × 情感雙差異化結合成一句話 — 這是 30s / 60s / 99s 內容的母題。",
+    en: "Fuse functional × emotional differentiation into one line — this becomes the parent theme for every 30s / 60s / 99s piece.",
+  },
+  "7": {
+    zh: "切入時機 — 對的策略放錯時機等於 0。識別有利趨勢 + 風險，作為議題日曆的母本。",
+    en: "Timing the entry — the right strategy at the wrong time is zero. Spot the favorable trends and risks; they seed your editorial calendar.",
+  },
+  "8": {
+    zh: "AI 寫貼文的最後濾鏡 — 人格原型 + 語調詞 + 禁區字三件套，把品牌「說話的方式」變成可複製規則。",
+    en: "The final filter the AI runs every post through — archetype, tone words, and forbidden words turn 'how the brand talks' into a repeatable rule.",
+  },
 };
 
 /* ─────────────────────────── AssetCard ───────────────────────────
@@ -2289,6 +2371,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
    *  WHY this step matters in the SoWork brand positioning method. */
   rationale?: string;
 }) {
+  const { lang } = useLang();
   // Split "1.1 Golden Circle" → eyebrow "01.1" + title "Golden Circle"
   const m = label.match(/^(\S+)\s+(.+)$/);
   const eyebrow = m ? m[1] : "";
@@ -2390,7 +2473,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
           fontSize: 11, color: "#525252", marginTop: "auto",
           letterSpacing: "0.05em",
         }}>
-          尚未填寫 — 點擊開始
+          {lang === "en" ? "Empty — tap to start" : "尚未填寫 — 點擊開始"}
         </span>
       )}
     </button>
@@ -2399,7 +2482,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
 
 /** Derive a preview ReactNode from an asset value. Returns null if no
  *  meaningful content yet (caller falls back to compact card). */
-function previewForAsset(assetKey: string, value: any): React.ReactNode | null {
+function previewForAsset(assetKey: string, value: any, lang: "zh-TW" | "en" = "zh-TW"): React.ReactNode | null {
   if (!value || typeof value !== "object") return null;
   const v = value;
   // text-like: GenericTextarea uses { text } or { links }
@@ -2436,7 +2519,7 @@ function previewForAsset(assetKey: string, value: any): React.ReactNode | null {
             <span style={{ color: "#374151", fontWeight: 500 }}>{p.to}</span>
           </span>
         ))}
-        {ps.length > 3 && <span style={{ color: "#9CA3AF", fontSize: 10 }}>+{ps.length - 3} 條</span>}
+        {ps.length > 3 && <span style={{ color: "#9CA3AF", fontSize: 10 }}>+{ps.length - 3}{lang === "en" ? "" : " 條"}</span>}
       </span>
     );
   }
@@ -2466,7 +2549,7 @@ function previewForAsset(assetKey: string, value: any): React.ReactNode | null {
   if (assetKey === "logo" && (v.primaryUrl || v.iconUrl || v.darkUrl)) {
     return (
       <span style={{ fontSize: 10 }}>
-        {v.primaryUrl && <span style={{ display: "block", color: "#374151" }}>主 logo: {String(v.primaryUrl).slice(0, 40)}…</span>}
+        {v.primaryUrl && <span style={{ display: "block", color: "#374151" }}>{lang === "en" ? "Primary logo: " : "主 logo: "}{String(v.primaryUrl).slice(0, 40)}…</span>}
         {v.guidelines && <span style={{ display: "block", color: "#6B7280", marginTop: 2 }}>{String(v.guidelines).slice(0, 60)}</span>}
       </span>
     );
@@ -2474,8 +2557,8 @@ function previewForAsset(assetKey: string, value: any): React.ReactNode | null {
   // FontFields: { primary, secondary, ... }
   if (assetKey === "fonts") {
     const lines: string[] = [];
-    if (v.primary) lines.push(`主：${v.primary}`);
-    if (v.secondary) lines.push(`副：${v.secondary}`);
+    if (v.primary) lines.push(lang === "en" ? `Primary: ${v.primary}` : `主：${v.primary}`);
+    if (v.secondary) lines.push(lang === "en" ? `Secondary: ${v.secondary}` : `副：${v.secondary}`);
     if (lines.length === 0) return null;
     return <span>{lines.join(" · ")}</span>;
   }
@@ -2483,7 +2566,7 @@ function previewForAsset(assetKey: string, value: any): React.ReactNode | null {
   if (assetKey === "photos") {
     const urls: string[] = Array.isArray(v.urls) ? v.urls : Array.isArray(v.list) ? v.list : [];
     if (urls.length === 0) return null;
-    return <span>{urls.length} 張照片</span>;
+    return <span>{lang === "en" ? `${urls.length} photos` : `${urls.length} 張照片`}</span>;
   }
   // Generic textarea
   if (textBlob) {
@@ -2564,14 +2647,17 @@ function PositioningPanel({
   onAutoFill?: (segmentId: string) => void;
   locked?: boolean;
 }) {
+  const { lang } = useLang();
   if (scopeMode === "none") {
     return (
       <Card shadow="none" className="border-2 border-dashed border-divider">
         <CardBody className="py-16 items-center text-center gap-3">
           <FontAwesomeIcon icon={faBookOpen} className="text-3xl text-default-500" />
-          <p className="text-medium font-medium">尚未選擇 scope</p>
+          <p className="text-medium font-medium">{lang === "en" ? "No scope picked yet" : "尚未選擇 scope"}</p>
           <p className="text-small text-default-700 max-w-[320px]">
-            請於右上 ScopeBar 選擇品牌 / 產品 / 活動，才能編輯定位內容。
+            {lang === "en"
+              ? "Pick a brand, product, or campaign from the ScopeBar (top right) to edit positioning."
+              : "請於右上 ScopeBar 選擇品牌 / 產品 / 活動，才能編輯定位內容。"}
           </p>
         </CardBody>
       </Card>
@@ -2589,7 +2675,7 @@ function PositioningPanel({
           display: "flex", alignItems: "center", gap: 8,
         }}>
           <span>🔒</span>
-          <span>定位已鎖定 — 此 segment 為唯讀。回 /brands 解鎖才能編輯。</span>
+          <span>{lang === "en" ? "Positioning is locked — this segment is read-only. Head back to /brands to unlock and edit." : "定位已鎖定 — 此 segment 為唯讀。回 /brands 解鎖才能編輯。"}</span>
         </div>
       )}
       <div style={locked ? { opacity: 0.65, pointerEvents: "none" } : undefined}>
@@ -2620,6 +2706,7 @@ function PositioningEditor({
   pipelineThinking: PipelineThinking | null;
   onAutoFill?: (segmentId: string) => void;
 }) {
+  const { lang } = useLang();
   const segments: SegmentSpec[] = SCOPE_SEGMENTS[scopeMode] ?? [];
   const segmentId = section.startsWith("seg:") ? section.slice(4) : null;
   const activeSegment = segmentId ? segments.find((s) => s.id === segmentId) ?? null : null;
@@ -2688,8 +2775,8 @@ function PositioningEditor({
       <Card shadow="none" className="border border-divider">
         <CardBody className="py-12 items-center text-center gap-2">
           <FontAwesomeIcon icon={faBookOpen} className="text-3xl text-default-500" />
-          <p className="text-medium font-medium">找不到段落</p>
-          <p className="text-small text-default-700">請於左側選擇要編輯的定位書段落。</p>
+          <p className="text-medium font-medium">{lang === "en" ? "Section not found" : "找不到段落"}</p>
+          <p className="text-small text-default-700">{lang === "en" ? "Pick a positioning section from the left to edit." : "請於左側選擇要編輯的定位書段落。"}</p>
         </CardBody>
       </Card>
     );
@@ -2735,6 +2822,7 @@ function PositioningEditor({
 // Reads scope.active.brand.positioning._assets[assetKey], writes via
 // scope.savePositioning with debounced (800ms) auto-save.
 function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; brandId: number; locked?: boolean }) {
+  const { lang } = useLang();
   const utils = (trpc as any).useUtils?.() ?? null;
   const scopeActive = (trpc as any).scope?.active?.useQuery
     ? (trpc as any).scope.active.useQuery(
@@ -2774,7 +2862,9 @@ function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; br
       <Card shadow="none" className="border border-divider">
         <CardBody className="px-5 py-3 flex-row items-center justify-between flex-wrap">
           <p className="text-small text-default-700">
-            這個區塊由你手動填寫；改動會在 800ms 後自動儲存到 brand.positioning._assets
+            {lang === "en"
+              ? "Fill this section in yourself — changes auto-save 800ms after you stop typing."
+              : "這個區塊由你手動填寫；改動會在 800ms 後自動儲存到 brand.positioning._assets"}
           </p>
           <SaveIndicator state={saveState} hasTarget={true} />
         </CardBody>
@@ -2785,16 +2875,17 @@ function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; br
 }
 
 function SaveIndicator({ state, hasTarget }: { state: "idle" | "saving" | "saved" | "error"; hasTarget: boolean }) {
+  const { t, lang } = useLang();
   if (!hasTarget) {
     return (
       <Chip size="sm" variant="flat" color="warning" className="shrink-0">
-        未綁定 ID — 編輯不會儲存
+        {lang === "en" ? "No ID bound — edits won't save" : "未綁定 ID — 編輯不會儲存"}
       </Chip>
     );
   }
-  if (state === "saving") return <Chip size="sm" variant="flat" color="default" className="shrink-0">儲存中…</Chip>;
-  if (state === "saved")  return <Chip size="sm" variant="flat" color="success" className="shrink-0">已儲存</Chip>;
-  if (state === "error")  return <Chip size="sm" variant="flat" color="danger"  className="shrink-0">儲存失敗</Chip>;
+  if (state === "saving") return <Chip size="sm" variant="flat" color="default" className="shrink-0">{t("saving")}</Chip>;
+  if (state === "saved")  return <Chip size="sm" variant="flat" color="success" className="shrink-0">{t("saved")}</Chip>;
+  if (state === "error")  return <Chip size="sm" variant="flat" color="danger"  className="shrink-0">{t("toast_save_failed")}</Chip>;
   return null;
 }
 
@@ -2821,6 +2912,7 @@ function PromptLibraryView({ scopeMode, data, scopeName }: { scopeMode: string; 
 /* ─────────────────────────── BrandAssetTile ─────────────────────────── */
 
 function BrandAssetTile({ tile, onClick }: { tile: Tile; onClick: () => void }) {
+  const { lang } = useLang();
   return (
     <Card
       isPressable
@@ -2842,7 +2934,7 @@ function BrandAssetTile({ tile, onClick }: { tile: Tile; onClick: () => void }) 
         )}
         {!tile.ready && (
           <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md text-default-700">
-            即將推出
+            {lang === "en" ? "Coming soon" : "即將推出"}
           </Chip>
         )}
       </CardBody>
@@ -2862,6 +2954,7 @@ function BrandAssetTile({ tile, onClick }: { tile: Tile; onClick: () => void }) 
 function EventSettingsPanel({
   eventId, brands,
 }: { eventId: number; brands: any[] }) {
+  const { t, lang } = useLang();
   const utils = (trpc as any).useUtils?.() ?? null;
   const eventQuery = (trpc as any).event?.get?.useQuery
     ? (trpc as any).event.get.useQuery({ id: eventId }, { refetchOnWindowFocus: false })
@@ -2907,8 +3000,8 @@ function EventSettingsPanel({
 
   const onSave = async () => {
     if (!upsert) { setErr("event.upsert not available"); return; }
-    if (!name.trim()) { setErr("名稱不能為空"); return; }
-    if (!brandId) { setErr("必須綁定品牌"); return; }
+    if (!name.trim()) { setErr(lang === "en" ? "Name can't be empty" : "名稱不能為空"); return; }
+    if (!brandId) { setErr(lang === "en" ? "Pick a brand to link" : "必須綁定品牌"); return; }
     setErr(null);
     try {
       await upsert.mutateAsync({
@@ -2930,13 +3023,13 @@ function EventSettingsPanel({
   };
 
   if (eventQuery.isLoading) {
-    return <p className="text-small text-default-700">載入中…</p>;
+    return <p className="text-small text-default-700">{t("loading")}</p>;
   }
   if (!event) {
     return (
       <Card shadow="none" className="border border-divider">
         <CardBody className="py-16 items-center text-center">
-          <p className="text-medium font-medium">找不到此活動</p>
+          <p className="text-medium font-medium">{lang === "en" ? "Campaign not found" : "找不到此活動"}</p>
         </CardBody>
       </Card>
     );
@@ -2946,7 +3039,7 @@ function EventSettingsPanel({
     <div className="flex flex-col gap-4 max-w-3xl">
       <Card shadow="none" className="border border-divider">
         <CardBody className="px-5 py-4 gap-1">
-          <p className="text-tiny text-default-700 uppercase tracking-wider">EVENT · 設定</p>
+          <p className="text-tiny text-default-700 uppercase tracking-wider">{lang === "en" ? "EVENT · Settings" : "EVENT · 設定"}</p>
           <h2 className="text-xl font-semibold tracking-tight">{event.name}</h2>
           <p className="text-small text-default-700">
             slug: <code className="text-tiny">{event.slug}</code>
@@ -2957,7 +3050,7 @@ function EventSettingsPanel({
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-5 gap-4">
           <Input
-            label="活動名稱（必填）"
+            label={lang === "en" ? "Campaign name (required)" : "活動名稱（必填）"}
             labelPlacement="outside"
             variant="bordered" size="sm" radius="md"
             value={name}
@@ -2965,7 +3058,7 @@ function EventSettingsPanel({
             isRequired
           />
           <Select
-            label="所屬品牌（必選）"
+            label={lang === "en" ? "Owning brand (required)" : "所屬品牌（必選）"}
             labelPlacement="outside"
             variant="bordered" size="sm" radius="md"
             selectedKeys={brandId ? new Set([String(brandId)]) : new Set()}
@@ -2981,23 +3074,25 @@ function EventSettingsPanel({
           </Select>
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="開始日期" labelPlacement="outside"
+              label={lang === "en" ? "Start date" : "開始日期"} labelPlacement="outside"
               variant="bordered" size="sm" radius="md" type="date"
               value={startAt} onValueChange={setStartAt}
             />
             <Input
-              label="結束日期" labelPlacement="outside"
+              label={lang === "en" ? "End date" : "結束日期"} labelPlacement="outside"
               variant="bordered" size="sm" radius="md" type="date"
               value={endAt} onValueChange={setEndAt}
             />
           </div>
           <div>
-            <p className="text-small font-medium mb-1">關聯產品（可多選）</p>
+            <p className="text-small font-medium mb-1">{lang === "en" ? "Linked products (multi-select)" : "關聯產品（可多選）"}</p>
             <p className="text-tiny text-default-700 mb-2">
-              選 0 個 = 品牌層級活動；2+ 個 = 跨產品活動。改變綁定的品牌後產品清單會更新。
+              {lang === "en"
+                ? "0 = brand-level campaign; 2+ = cross-product campaign. The product list updates when you switch the linked brand."
+                : "選 0 個 = 品牌層級活動；2+ 個 = 跨產品活動。改變綁定的品牌後產品清單會更新。"}
             </p>
             {candidateProducts.length === 0 ? (
-              <p className="text-tiny text-default-700">此品牌尚無產品。</p>
+              <p className="text-tiny text-default-700">{lang === "en" ? "This brand has no products yet." : "此品牌尚無產品。"}</p>
             ) : (
               <CheckboxGroup
                 value={productIds.map(String)}
@@ -3019,9 +3114,9 @@ function EventSettingsPanel({
               isLoading={upsert?.isPending ?? false}
               onPress={onSave}
             >
-              儲存
+              {t("save")}
             </Button>
-            {savedAt && <span className="text-tiny text-success">已儲存 · {savedAt}</span>}
+            {savedAt && <span className="text-tiny text-success">{lang === "en" ? `Saved · ${savedAt}` : `已儲存 · ${savedAt}`}</span>}
           </div>
         </CardBody>
       </Card>
@@ -3035,6 +3130,7 @@ function EventSettingsPanel({
  * 大頭貼 + 換一張. Used in BrandsPage settings tab.
  */
 function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName: string | null }) {
+  const { lang } = useLang();
   const brandQuery = (trpc as any).brand?.get?.useQuery
     ? (trpc as any).brand.get.useQuery({ id: brandId }, { refetchOnWindowFocus: false })
     : { data: null, refetch: () => {} };
@@ -3047,11 +3143,11 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
   const fetchMut = (trpc as any).brand?.fetchFacebookAvatar?.useMutation();
 
   const submit = async () => {
-    if (!handle.trim()) { setErr("請輸入 FB 粉專網址或 handle"); return; }
+    if (!handle.trim()) { setErr(lang === "en" ? "Paste a FB page URL or handle" : "請輸入 FB 粉專網址或 handle"); return; }
     setBusy(true); setErr(null); setOkMsg(null);
     try {
       const r = await fetchMut.mutateAsync({ brandId, handleOrUrl: handle.trim() });
-      setOkMsg(`已抓取 (${r.bytes.toLocaleString()} bytes)`);
+      setOkMsg(lang === "en" ? `Fetched (${r.bytes.toLocaleString()} bytes)` : `已抓取 (${r.bytes.toLocaleString()} bytes)`);
       setHandle("");
       await brandQuery.refetch?.();
     } catch (e: any) {
@@ -3062,9 +3158,11 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
   return (
     <div className="max-w-[640px] mx-auto space-y-4">
       <div>
-        <h3 className="text-medium font-semibold">品牌 logo / 頭像</h3>
+        <h3 className="text-medium font-semibold">{lang === "en" ? "Brand logo / avatar" : "品牌 logo / 頭像"}</h3>
         <p className="text-tiny text-default-700 mt-1">
-          mockup 顯示用的「{brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。
+          {lang === "en"
+            ? `The "${brandName ?? "brand"}" avatar used in mockups. Auto-fetch from the FB page, or upload manually later.`
+            : `mockup 顯示用的「${brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。`}
         </p>
       </div>
 
@@ -3076,7 +3174,9 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
         />
         <div className="flex-1 min-w-0">
           <p className="text-small font-medium">
-            {logoUrl ? "目前 logo" : "尚未設定 logo（顯示 dicebear 預設圖）"}
+            {logoUrl
+              ? (lang === "en" ? "Current logo" : "目前 logo")
+              : (lang === "en" ? "No logo yet (showing dicebear placeholder)" : "尚未設定 logo（顯示 dicebear 預設圖）")}
           </p>
           {logoUrl && (
             <p className="text-tiny text-default-600 truncate">{logoUrl}</p>
@@ -3086,21 +3186,27 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
 
       <div className="space-y-2 border border-default-200 rounded-medium p-4">
         <p className="text-small font-medium">
-          {logoUrl ? "換一張（從 FB 粉專重抓）" : "從 FB 粉專自動抓"}
+          {logoUrl
+            ? (lang === "en" ? "Swap (re-fetch from FB page)" : "換一張（從 FB 粉專重抓）")
+            : (lang === "en" ? "Auto-fetch from FB page" : "從 FB 粉專自動抓")}
         </p>
         <p className="text-tiny text-default-700">
-          貼粉專網址或純 handle。粉專必須是公開的。會覆蓋現有 logo。
+          {lang === "en"
+            ? "Paste the page URL or handle. The page must be public. This overwrites your current logo."
+            : "貼粉專網址或純 handle。粉專必須是公開的。會覆蓋現有 logo。"}
         </p>
         <Input
           size="sm"
-          placeholder="https://www.facebook.com/桂冠營養研究室"
+          placeholder="https://www.facebook.com/yourbrand"
           value={handle}
           onValueChange={setHandle}
           isDisabled={busy}
         />
         <div className="flex items-center gap-2">
           <Button color="primary" size="sm" onPress={submit} isLoading={busy}>
-            {logoUrl ? "重新抓取" : "抓取 logo"}
+            {logoUrl
+              ? (lang === "en" ? "Re-fetch" : "重新抓取")
+              : (lang === "en" ? "Fetch logo" : "抓取 logo")}
           </Button>
           {okMsg && <span className="text-tiny text-success-600">✓ {okMsg}</span>}
           {err && <span className="text-tiny text-danger-600">{err}</span>}
@@ -3124,6 +3230,7 @@ function PositioningTopRow({
   locked: boolean;
   onLockToggle: () => void;
 }) {
+  const { lang } = useLang();
   // 2026-05-08: hooks must be called unconditionally (Rules of Hooks).
   // Previous version did `(entityKind && brandId) ? useQuery(...) : null`
   // which made hook count vary across renders → React broke silently
@@ -3156,7 +3263,7 @@ function PositioningTopRow({
   const startMut = (trpc as any).positioningJobs?.start?.useMutation?.({
     onSuccess: (data: any) => {
       if (!data?.ok) {
-        setStartError(data?.error || "啟動失敗");
+        setStartError(data?.error || (lang === "en" ? "Couldn't start" : "啟動失敗"));
         setOptimisticStarting(false);
       } else {
         setStartError(null);
@@ -3167,7 +3274,7 @@ function PositioningTopRow({
       }
     },
     onError: (e: any) => {
-      setStartError(String(e?.message ?? e ?? "啟動失敗"));
+      setStartError(String(e?.message ?? e ?? (lang === "en" ? "Couldn't start" : "啟動失敗")));
       setOptimisticStarting(false);
     },
   });
@@ -3184,16 +3291,20 @@ function PositioningTopRow({
   // — frame the button as applying a named methodology, not as a generic
   // "AI fills it in" action. Methodology becomes the competitive moat.
   const methodLabel = entityKind === "brand"
-    ? "SoWork 品牌定位法（14 步）"
+    ? (lang === "en" ? "the SoWork Brand Positioning Method (14 steps)" : "SoWork 品牌定位法（14 步）")
     : entityKind === "product"
-      ? "產品定位框架（6 步）"
-      : "活動定位框架（11 步）";
+      ? (lang === "en" ? "the product positioning framework (6 steps)" : "產品定位框架（6 步）")
+      : (lang === "en" ? "the campaign positioning framework (11 steps)" : "活動定位框架（11 步）");
   const buttonLabel =
-    optimisticStarting && !jobData?.status ? "啟動中…"
-  : isRunning ? `分析中 ${cur}/${total || totalSteps}`
-  : isDone     ? `重新套用${methodLabel}`
-  : isFailed   ? `重試 — ${methodLabel}`
-  : `套用${methodLabel}`;
+    optimisticStarting && !jobData?.status
+      ? (lang === "en" ? "Starting…" : "啟動中…")
+      : isRunning
+        ? (lang === "en" ? `Analyzing ${cur}/${total || totalSteps}` : `分析中 ${cur}/${total || totalSteps}`)
+      : isDone
+        ? (lang === "en" ? `Re-apply ${methodLabel}` : `重新套用${methodLabel}`)
+      : isFailed
+        ? (lang === "en" ? `Retry — ${methodLabel}` : `重試 — ${methodLabel}`)
+        : (lang === "en" ? `Apply ${methodLabel}` : `套用${methodLabel}`);
 
   return (
     <>
@@ -3208,9 +3319,13 @@ function PositioningTopRow({
             : "bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer"
           }`}
           title={
-            locked ? "已鎖定 — 解鎖後才能重跑" :
-            isRunning ? `背景產生中 (step ${cur}/${total})` :
-            `用 ${totalSteps}-step pipeline 自動填寫所有定位欄位（背景執行，retry × 5）`
+            locked
+              ? (lang === "en" ? "Locked — unlock to re-run" : "已鎖定 — 解鎖後才能重跑")
+              : isRunning
+                ? (lang === "en" ? `Running in the background (step ${cur}/${total})` : `背景產生中 (step ${cur}/${total})`)
+                : (lang === "en"
+                    ? `Auto-fill every positioning field via a ${totalSteps}-step pipeline (background run, retry × 5)`
+                    : `用 ${totalSteps}-step pipeline 自動填寫所有定位欄位（背景執行，retry × 5）`)
           }
         >
           <Sparkles size={14} className={isRunning ? "animate-pulse" : ""} />
@@ -3228,7 +3343,7 @@ function PositioningTopRow({
         {isFailed && jobData?.lastError && (
           <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}>⚠ {String(jobData.lastError).slice(0, 80)}</span>
         )}
-        {isDone && <span className="text-xs text-emerald-700">✓ 已完成 {total} 個段落</span>}
+        {isDone && <span className="text-xs text-emerald-700">{lang === "en" ? `✓ Done · ${total} sections` : `✓ 已完成 ${total} 個段落`}</span>}
         {startError && (
           <span className="text-xs text-danger truncate max-w-md" title={startError}>⚠ {startError}</span>
         )}
@@ -3285,39 +3400,38 @@ function KickerRow({
    Compact lock chip sits top-right (replaces the old wide TabActionBar).
    ───────────────────────────────────────────────────────────────────── */
 type CopyShape = "text" | "items" | "pairs";
-const COPY_TILE_GROUPS: Array<{
-  label: string;
-  items: Array<{ key: string; label: string; Icon: any; bg: string; shape: CopyShape }>;
-}> = [
+type CopyTileItem = { key: string; labelZh: string; labelEn: string; Icon: any; bg: string; shape: CopyShape };
+type CopyTileGroup = { labelZh: string; labelEn: string; items: CopyTileItem[] };
+const COPY_TILE_GROUPS: CopyTileGroup[] = [
   {
-    label: "口吻風格",
+    labelZh: "口吻風格", labelEn: "Voice & style",
     items: [
-      { key: "voice",            label: "品牌口吻", Icon: LucideQuote,       bg: "#FFF0F6", shape: "text" },
-      { key: "voice_principles", label: "品牌準則", Icon: LucideShield,      bg: "#F0FDF4", shape: "items" },
+      { key: "voice",            labelZh: "品牌口吻", labelEn: "Brand voice",       Icon: LucideQuote,       bg: "#FFF0F6", shape: "text" },
+      { key: "voice_principles", labelZh: "品牌準則", labelEn: "Voice principles",  Icon: LucideShield,      bg: "#F0FDF4", shape: "items" },
     ],
   },
   {
-    label: "用詞規範",
+    labelZh: "用詞規範", labelEn: "Word rules",
     items: [
-      { key: "preferred_terms",     label: "推薦用詞", Icon: LucideTypeIcon, bg: "#ECFDF5", shape: "items" },
-      { key: "banned_words",        label: "禁用詞",   Icon: LucideShield,   bg: "#FEE2E2", shape: "items" },
-      { key: "term_substitutions",  label: "替換對照", Icon: LucidePencil,   bg: "#FFFBEB", shape: "pairs" },
+      { key: "preferred_terms",     labelZh: "推薦用詞", labelEn: "Preferred terms",   Icon: LucideTypeIcon, bg: "#ECFDF5", shape: "items" },
+      { key: "banned_words",        labelZh: "禁用詞",   labelEn: "Banned words",      Icon: LucideShield,   bg: "#FEE2E2", shape: "items" },
+      { key: "term_substitutions",  labelZh: "替換對照", labelEn: "Substitutions",     Icon: LucidePencil,   bg: "#FFFBEB", shape: "pairs" },
     ],
   },
   {
-    label: "專用詞彙",
+    labelZh: "專用詞彙", labelEn: "Brand vocabulary",
     items: [
-      { key: "branded_terms",   label: "品牌術語",     Icon: LucideAward,    bg: "#F5F3FF", shape: "items" },
-      { key: "product_naming",  label: "產品名稱規範", Icon: LucidePackage,  bg: "#EFF6FF", shape: "text" },
-      { key: "abbreviations",   label: "縮寫對照",     Icon: LucideHash,     bg: "#FFF7ED", shape: "pairs" },
+      { key: "branded_terms",   labelZh: "品牌術語",     labelEn: "Brand terms",       Icon: LucideAward,    bg: "#F5F3FF", shape: "items" },
+      { key: "product_naming",  labelZh: "產品名稱規範", labelEn: "Product naming",    Icon: LucidePackage,  bg: "#EFF6FF", shape: "text" },
+      { key: "abbreviations",   labelZh: "縮寫對照",     labelEn: "Abbreviations",     Icon: LucideHash,     bg: "#FFF7ED", shape: "pairs" },
     ],
   },
   {
-    label: "常用文案",
+    labelZh: "常用文案", labelEn: "Copy library",
     items: [
-      { key: "cta_library",     label: "CTA 庫",     Icon: LucideMessage,    bg: "#F0F9FF", shape: "items" },
-      { key: "hook_library",    label: "Hook 庫",    Icon: LucideQuote,      bg: "#FFF0F6", shape: "items" },
-      { key: "templates_copy",  label: "文案範本",   Icon: LucideFileText,   bg: "#FFFBEB", shape: "items" },
+      { key: "cta_library",     labelZh: "CTA 庫",     labelEn: "CTA library",        Icon: LucideMessage,    bg: "#F0F9FF", shape: "items" },
+      { key: "hook_library",    labelZh: "Hook 庫",    labelEn: "Hook library",       Icon: LucideQuote,      bg: "#FFF0F6", shape: "items" },
+      { key: "templates_copy",  labelZh: "文案範本",   labelEn: "Copy templates",     Icon: LucideFileText,   bg: "#FFFBEB", shape: "items" },
     ],
   },
 ];
@@ -3331,6 +3445,7 @@ function CopyTabInline({
   locked: boolean;
   onLockToggle: () => void;
 }) {
+  const { lang } = useLang();
   const utils = (trpc as any).useUtils?.() ?? null;
   const saveMut = (trpc as any).scope?.savePositioning?.useMutation
     ? (trpc as any).scope.savePositioning.useMutation({
@@ -3400,7 +3515,7 @@ function CopyTabInline({
     setBulkFillingKeys(new Set(emptyKeys));
     try {
       const r = await bulkMut?.mutateAsync?.({ brandId, emptyKeys });
-      if (!r?.ok) { setBulkErr("自動填寫失敗（伺服器無回應）"); return; }
+      if (!r?.ok) { setBulkErr(lang === "en" ? "Auto-fill failed (no server response)" : "自動填寫失敗（伺服器無回應）"); return; }
       // Merge all results into drafts and persist in ONE save.
       const updates: Record<string, any> = {};
       for (const [k, payload] of Object.entries(r.results ?? {})) {
@@ -3428,12 +3543,16 @@ function CopyTabInline({
       const errCount = Object.keys(r.errors ?? {}).length;
       const warnings: string[] = [];
       if (!r.hasRealContent) {
-        warnings.push("⚠️ 找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
+        warnings.push(lang === "en"
+          ? "⚠️ No website / FB found — results may be off. Add a website / social links in Settings, then retry."
+          : "⚠️ 找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
       }
       if (errCount > 0) {
         const firstFew = Object.entries(r.errors ?? {}).slice(0, 3)
           .map(([k, msg]) => `${k}: ${msg}`).join(" | ");
-        warnings.push(`${errCount} 個欄位失敗（${firstFew}${errCount > 3 ? " …" : ""}）`);
+        warnings.push(lang === "en"
+          ? `${errCount} field(s) failed (${firstFew}${errCount > 3 ? " …" : ""})`
+          : `${errCount} 個欄位失敗（${firstFew}${errCount > 3 ? " …" : ""}）`);
       }
       if (warnings.length > 0) setBulkErr(warnings.join("\n"));
     } catch (e: any) {
@@ -3445,7 +3564,7 @@ function CopyTabInline({
   };
 
   if (!brandId) {
-    return <div className="p-8 text-center text-default-700">請先選擇品牌</div>;
+    return <div className="p-8 text-center text-default-700">{lang === "en" ? "Pick a brand first" : "請先選擇品牌"}</div>;
   }
 
   return (
@@ -3462,23 +3581,33 @@ function CopyTabInline({
               : "bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer"
             }`}
             title={
-              locked ? "已鎖定" :
-              emptyKeys.length === 0 ? "所有欄位都已填寫" :
-              `根據官網 / FB 自動填寫剩下 ${emptyKeys.length} 個空欄`
+              locked
+                ? (lang === "en" ? "Locked" : "已鎖定")
+                : emptyKeys.length === 0
+                  ? (lang === "en" ? "All fields filled" : "所有欄位都已填寫")
+                  : (lang === "en"
+                      ? `Auto-fill the remaining ${emptyKeys.length} fields from website / FB`
+                      : `根據官網 / FB 自動填寫剩下 ${emptyKeys.length} 個空欄`)
             }
           >
             <Sparkles size={14} className={bulkBusy ? "animate-pulse" : ""} />
-            {bulkBusy ? `自動填寫中 (${bulkFillingKeys.size} 個欄位)…`
-              : emptyKeys.length === 0 ? "全部已填寫"
-              : `自動填寫 ${emptyKeys.length} 個空欄`}
+            {bulkBusy
+              ? (lang === "en"
+                  ? `Auto-filling (${bulkFillingKeys.size} fields)…`
+                  : `自動填寫中 (${bulkFillingKeys.size} 個欄位)…`)
+              : emptyKeys.length === 0
+                ? (lang === "en" ? "All filled" : "全部已填寫")
+                : (lang === "en"
+                    ? `Auto-fill ${emptyKeys.length} fields`
+                    : `自動填寫 ${emptyKeys.length} 個空欄`)}
           </button>
           {savingKey ? (
             <span className="flex items-center gap-1 text-xs text-default-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> 自動儲存中…
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> {lang === "en" ? "Auto-saving…" : "自動儲存中…"}
             </span>
           ) : (
             <span className="flex items-center gap-1 text-xs text-default-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 自動儲存
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {lang === "en" ? "Auto-save on" : "自動儲存"}
             </span>
           )}
         </div>
@@ -3488,10 +3617,14 @@ function CopyTabInline({
             locked ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                    : "bg-default-100 text-default-600 hover:bg-default-200"
           }`}
-          title={locked ? "點擊解鎖文字" : "點擊鎖定文字（全平台用這份做為單一真相）"}
+          title={locked
+            ? (lang === "en" ? "Click to unlock copy" : "點擊解鎖文字")
+            : (lang === "en" ? "Click to lock copy (becomes the single source of truth)" : "點擊鎖定文字（全平台用這份做為單一真相）")}
         >
           <FontAwesomeIcon icon={locked ? faLock : faLockOpen} className="text-[11px]" />
-          {locked ? "已鎖定 · 點此解鎖" : "鎖定文字"}
+          {locked
+            ? (lang === "en" ? "Locked · click to unlock" : "已鎖定 · 點此解鎖")
+            : (lang === "en" ? "Lock copy" : "鎖定文字")}
         </button>
       </div>
 
@@ -3501,7 +3634,9 @@ function CopyTabInline({
           bulkErr ? "bg-amber-50 text-amber-800" :
           "bg-emerald-50 text-emerald-800"
         }`}>
-          {bulkResult && <div>✓ 已填入 {bulkResult.filled} 個欄位{bulkResult.sources.length > 0 && `（來源：${bulkResult.sources.join(" + ")}）`}</div>}
+          {bulkResult && <div>{lang === "en"
+            ? `✓ Filled ${bulkResult.filled} fields${bulkResult.sources.length > 0 ? ` (sources: ${bulkResult.sources.join(" + ")})` : ""}`
+            : `✓ 已填入 ${bulkResult.filled} 個欄位${bulkResult.sources.length > 0 ? `（來源：${bulkResult.sources.join(" + ")}）` : ""}`}</div>}
           {bulkErr && <div>{bulkErr}</div>}
         </div>
       )}
@@ -3511,7 +3646,7 @@ function CopyTabInline({
           {/* 2026-05-11 (CJ「文字和知識的設計風格，也改得跟定位一樣」):
               editorial section divider, same syntax as PositioningGrid. */}
           <SectionLabel
-            label={group.label}
+            label={lang === "en" ? group.labelEn : group.labelZh}
             counter={`${group.items.filter((it: any) => !isEmpty(it.key)).length} / ${group.items.length}`}
           />
 
@@ -3524,7 +3659,7 @@ function CopyTabInline({
               <InlineAssetCard
                 key={item.key}
                 assetKey={item.key}
-                label={item.label}
+                label={lang === "en" ? item.labelEn : item.labelZh}
                 Icon={item.Icon}
                 bg={item.bg}
                 shape={item.shape}

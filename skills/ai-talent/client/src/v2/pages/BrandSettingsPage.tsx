@@ -21,17 +21,9 @@ import {
   DangerTab,
 } from "../components/positioning/BrandSettingsSheet";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 
 type SettingsTab = "info" | "connector" | "publish" | "visual" | "ai" | "danger";
-
-const TABS: Array<{ id: SettingsTab; label: string; Icon: any; hint: string }> = [
-  { id: "info",      label: "基本資料",  Icon: IdCard,  hint: "名稱 / 產業 / 描述" },
-  { id: "connector", label: "連結",      Icon: Link2,   hint: "FB / IG / LinkedIn / YouTube" },
-  { id: "publish",   label: "發布",      Icon: Share2,  hint: "選擇要發布的 FB 粉專" },
-  { id: "visual",    label: "視覺",      Icon: Palette, hint: "Logo / 色票 / 字型" },
-  { id: "ai",        label: "AI 指令",   Icon: Bot,     hint: "per-platform 自訂 prompt" },
-  { id: "danger",    label: "危險區",    Icon: Trash2,  hint: "刪除品牌" },
-];
 
 interface ShellCtx {
   brandId: number | null;
@@ -40,8 +32,18 @@ interface ShellCtx {
 
 export default function BrandSettingsPage() {
   const navigate = useNavigate();
+  const { lang } = useLang();
   const ctx = useOutletContext<ShellCtx | null>();
   const [search, setSearch] = useSearchParams();
+
+  const TABS: Array<{ id: SettingsTab; label: string; Icon: any; hint: string }> = [
+    { id: "info",      label: lang === "en" ? "Basics"    : "基本資料",  Icon: IdCard,  hint: lang === "en" ? "Name / industry / description"        : "名稱 / 產業 / 描述" },
+    { id: "connector", label: lang === "en" ? "Connect"   : "連結",      Icon: Link2,   hint: lang === "en" ? "FB / IG / LinkedIn / YouTube"          : "FB / IG / LinkedIn / YouTube" },
+    { id: "publish",   label: lang === "en" ? "Publish"   : "發布",      Icon: Share2,  hint: lang === "en" ? "Pick the FB page to publish to"        : "選擇要發布的 FB 粉專" },
+    { id: "visual",    label: lang === "en" ? "Visual"    : "視覺",      Icon: Palette, hint: lang === "en" ? "Logo / colors / fonts"                 : "Logo / 色票 / 字型" },
+    { id: "ai",        label: lang === "en" ? "AI prompts": "AI 指令",   Icon: Bot,     hint: lang === "en" ? "Per-platform custom prompts"           : "per-platform 自訂 prompt" },
+    { id: "danger",    label: lang === "en" ? "Danger"    : "危險區",    Icon: Trash2,  hint: lang === "en" ? "Delete this brand"                     : "刪除品牌" },
+  ];
 
   // Resolve brand: ?b= override > shell context > first brand in list
   const urlB = search.get("b");
@@ -78,12 +80,12 @@ export default function BrandSettingsPage() {
   if (!brandId) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-6">
-        <p className="text-sm text-default-500">尚未選擇品牌</p>
+        <p className="text-sm text-default-500">{lang === "en" ? "No brand selected yet" : "尚未選擇品牌"}</p>
         <button
           onClick={() => navigate("/brands")}
           className="px-4 py-2 text-sm rounded-lg bg-neutral-900 text-white hover:bg-neutral-800"
         >
-          回到品牌列表
+          {lang === "en" ? "Back to brands" : "回到品牌列表"}
         </button>
       </div>
     );
@@ -100,15 +102,15 @@ export default function BrandSettingsPage() {
             onClick={() => navigate("/brands")}
             className="text-xs text-default-500 hover:text-default-900 flex items-center gap-1 mb-3"
           >
-            <ChevronLeft size={14} /> 品牌列表
+            <ChevronLeft size={14} /> {lang === "en" ? "Brands" : "品牌列表"}
           </button>
           <div className="flex items-baseline gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-default-900">{brandName ?? "—"}</h1>
             <span className="text-default-300">·</span>
-            <span className="text-base text-default-600">品牌設定</span>
+            <span className="text-base text-default-600">{lang === "en" ? "Brand settings" : "品牌設定"}</span>
           </div>
           <p className="text-sm text-default-500 mt-1.5">
-            {activeTabMeta?.hint ?? "管理這個品牌的基本資料、連結與發布設定"}
+            {activeTabMeta?.hint ?? (lang === "en" ? "Manage this brand's basics, connections, and publishing" : "管理這個品牌的基本資料、連結與發布設定")}
           </p>
         </div>
 

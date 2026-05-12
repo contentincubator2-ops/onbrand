@@ -29,6 +29,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { AgentAvatar } from "../components/AgentAvatar";
 import { TaskChip } from "../components/TaskChip";
+import { useLang } from "../../lib/i18n";
 
 interface MemberPreview {
   id: number | null;
@@ -66,10 +67,16 @@ interface SquadPlaybook {
   memberPreview: MemberPreview[];
 }
 
-const LAYER_LABEL: Record<string, string> = {
+const LAYER_LABEL_ZH: Record<string, string> = {
   L1: "策略", L2: "產品", L3: "受眾",
   L4: "通路", L5: "規劃", L6: "監測",
 };
+const LAYER_LABEL_EN: Record<string, string> = {
+  L1: "Strategy", L2: "Product", L3: "Audience",
+  L4: "Channels", L5: "Plan", L6: "Track",
+};
+const layerLabel = (k: string, lang: "en" | "zh-TW") =>
+  (lang === "en" ? LAYER_LABEL_EN : LAYER_LABEL_ZH)[k] ?? (lang === "en" ? "Strategy" : "策略");
 
 const LAYER_COLOR: Record<string, "primary" | "secondary" | "success" | "warning" | "danger" | "default"> = {
   L1: "primary",
@@ -86,6 +93,7 @@ const layerKey = (raw: string | null): string => {
 };
 
 export default function PlaybooksPage() {
+  const { lang } = useLang();
   const navigate = useNavigate();
   const { brandId, brands } = useOutletContext<ShellOutletCtx>();
   const currentBrand = useMemo(
@@ -129,13 +137,25 @@ export default function PlaybooksPage() {
     return r;
   }, [playbooks, layerFilter, searchQ, sort]);
 
-  const SORT_LABEL: Record<typeof sort, string> = {
+  const SORT_LABEL: Record<typeof sort, string> = lang === "en" ? {
+    recommended: "Recommended",
+    members: "By team size",
+    steps: "By step count",
+  } : {
     recommended: "推薦排序",
     members: "依顧問人數",
     steps: "依步驟數",
   };
 
-  const FILTERS: Array<{ id: string; label: string }> = [
+  const FILTERS: Array<{ id: string; label: string }> = lang === "en" ? [
+    { id: "all", label: "All" },
+    { id: "L1",  label: "L1 Strategy" },
+    { id: "L2",  label: "L2 Product" },
+    { id: "L3",  label: "L3 Audience" },
+    { id: "L4",  label: "L4 Channels" },
+    { id: "L5",  label: "L5 Plan" },
+    { id: "L6",  label: "L6 Track" },
+  ] : [
     { id: "all", label: "全部" },
     { id: "L1",  label: "L1 策略" },
     { id: "L2",  label: "L2 產品" },
@@ -150,21 +170,22 @@ export default function PlaybooksPage() {
       {/* ── Hero ──────────────────────────────────────────── */}
       <div className="mb-6">
         <Breadcrumbs size="sm" className="mb-3">
-          <BreadcrumbItem href="/">首頁</BreadcrumbItem>
-          <BreadcrumbItem>成長方案</BreadcrumbItem>
+          <BreadcrumbItem href="/">{lang === "en" ? "Home" : "首頁"}</BreadcrumbItem>
+          <BreadcrumbItem>{lang === "en" ? "Playbooks" : "成長方案"}</BreadcrumbItem>
         </Breadcrumbs>
 
         <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider mb-2">
-          PLAYBOOKS · 成長方案
+          {lang === "en" ? "PLAYBOOKS · proven methods" : "PLAYBOOKS · 成長方案"}
         </Chip>
         <h1 className="font-semibold text-3xl leading-tight text-foreground mb-3">
-          挑一個有真實案例的方法論，套用到品牌
+          {lang === "en" ? "Pick a method with real-world wins — apply it to your brand" : "挑一個有真實案例的方法論，套用到品牌"}
         </h1>
         <p className="text-default-500 text-small max-w-[640px] leading-relaxed">
-          每個方案都對應一個有作者背景的方法論小組（squad），由真實顧問
-          + 多階段工作流組成。選一個 → 直接派出。
+          {lang === "en"
+            ? "Each playbook maps to a named methodology squad — real consultants + a multi-stage workflow. Pick one → deploy."
+            : "每個方案都對應一個有作者背景的方法論小組（squad），由真實顧問 + 多階段工作流組成。選一個 → 直接派出。"}
           {currentBrand && (
-            <> — 將套用到 <Chip size="sm" variant="flat" color="default">{currentBrand.name}</Chip></>
+            <> — {lang === "en" ? "will run on" : "將套用到"} <Chip size="sm" variant="flat" color="default">{currentBrand.name}</Chip></>
           )}
         </p>
       </div>
@@ -172,7 +193,7 @@ export default function PlaybooksPage() {
       {/* ── Filter row ─────────────────────────────────────── */}
       <div className="mb-6 flex items-center gap-3 flex-wrap">
         <Tabs
-          aria-label="策略層"
+          aria-label={lang === "en" ? "Strategy layer" : "策略層"}
           selectedKey={layerFilter}
           onSelectionChange={(k) => setLayerFilter(String(k))}
           variant="underlined"
@@ -198,7 +219,7 @@ export default function PlaybooksPage() {
           <Input
             size="sm" radius="full" variant="bordered"
             value={searchQ} onValueChange={setSearchQ}
-            placeholder="搜尋方法論…" isClearable onClear={() => setSearchQ("")}
+            placeholder={lang === "en" ? "Search methods…" : "搜尋方法論…"} isClearable onClear={() => setSearchQ("")}
             startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 text-tiny" />}
             className="w-[220px]"
           />
@@ -213,14 +234,14 @@ export default function PlaybooksPage() {
               </Button>
             </DropdownTrigger>
             <DropdownMenu
-              aria-label="排序"
+              aria-label={lang === "en" ? "Sort" : "排序"}
               selectionMode="single"
               selectedKeys={new Set([sort])}
               onAction={(k) => setSort(String(k) as typeof sort)}
             >
-              <DropdownItem key="recommended">推薦排序</DropdownItem>
-              <DropdownItem key="members">依顧問人數</DropdownItem>
-              <DropdownItem key="steps">依步驟數</DropdownItem>
+              <DropdownItem key="recommended">{SORT_LABEL.recommended}</DropdownItem>
+              <DropdownItem key="members">{SORT_LABEL.members}</DropdownItem>
+              <DropdownItem key="steps">{SORT_LABEL.steps}</DropdownItem>
             </DropdownMenu>
           </Dropdown>
         </div>
@@ -247,19 +268,21 @@ export default function PlaybooksPage() {
             <FontAwesomeIcon icon={faFolderOpen} className="text-4xl text-default-300" />
             <p className="text-medium font-medium">
               {playbooks.length === 0
-                ? "還沒有 squad 配上真實案例"
+                ? (lang === "en" ? "No squads with real case studies yet" : "還沒有 squad 配上真實案例")
                 : searchQ
-                  ? `沒有找到符合「${searchQ}」的方案`
-                  : "這個策略層目前沒有方案"}
+                  ? (lang === "en" ? `No playbooks match "${searchQ}"` : `沒有找到符合「${searchQ}」的方案`)
+                  : (lang === "en" ? "No playbooks in this layer yet" : "這個策略層目前沒有方案")}
             </p>
             <p className="text-small text-default-500 max-w-[480px]">
               {playbooks.length === 0
-                ? "這個頁面只展示有真實成功案例的 squad。為 squad 的 showcases JSON 加上第 2 筆以上的真實案例（baseline 自動填的不算），就會出現在這裡。"
-                : "換個關鍵字、或選擇其他類別"}
+                ? (lang === "en"
+                    ? "This page only shows squads with real success cases. Add a real case beyond the auto-baseline to a squad's showcases JSON and it'll appear here."
+                    : "這個頁面只展示有真實成功案例的 squad。為 squad 的 showcases JSON 加上第 2 筆以上的真實案例（baseline 自動填的不算），就會出現在這裡。")
+                : (lang === "en" ? "Try another keyword or pick a different layer" : "換個關鍵字、或選擇其他類別")}
             </p>
             {(searchQ || layerFilter !== "all") && playbooks.length > 0 && (
               <Button size="sm" variant="light" onPress={() => { setSearchQ(""); setLayerFilter("all"); }}>
-                清除篩選
+                {lang === "en" ? "Clear filters" : "清除篩選"}
               </Button>
             )}
           </CardBody>
@@ -290,6 +313,7 @@ export default function PlaybooksPage() {
 /* ─────────────────────────── PlaybookCard ─────────────────────────── */
 
 function PlaybookCard({ playbook: p, onClick }: { playbook: SquadPlaybook; onClick: () => void }) {
+  const { lang } = useLang();
   const lk = layerKey(p.strategyLayer);
   const lkColor = LAYER_COLOR[lk] ?? "default";
 
@@ -306,7 +330,7 @@ function PlaybookCard({ playbook: p, onClick }: { playbook: SquadPlaybook; onCli
             size="sm" variant="flat" color="default"
             startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}
           >
-            {lk} · {LAYER_LABEL[lk] ?? "策略"}
+            {lk} · {layerLabel(lk, lang)}
           </Chip>
           {p.taskLabel && (
             <TaskChip
@@ -345,7 +369,7 @@ function PlaybookCard({ playbook: p, onClick }: { playbook: SquadPlaybook; onCli
             <div className="w-full bg-success-50 border border-success-200 rounded-medium px-3 py-2 space-y-1">
               <div className="flex items-center gap-1.5 text-tiny font-bold text-success-700">
                 <FontAwesomeIcon icon={faTrophy} className="text-tiny" />
-                <span className="truncate">{lead.title ?? "成功案例"}</span>
+                <span className="truncate">{lead.title ?? (lang === "en" ? "Case study" : "成功案例")}</span>
                 {p.showcases.length > 2 && (
                   <span className="text-default-500 font-normal ml-auto">+{p.showcases.length - 2}</span>
                 )}
@@ -382,19 +406,19 @@ function PlaybookCard({ playbook: p, onClick }: { playbook: SquadPlaybook; onCli
                     </span>
                   ))}
                 </div>
-                <span className="text-tiny text-default-500 ml-1">{p.memberCount} 位顧問</span>
+                <span className="text-tiny text-default-500 ml-1">{lang === "en" ? `${p.memberCount} consultants` : `${p.memberCount} 位顧問`}</span>
               </>
             ) : (
               <Chip size="sm" variant="flat"
                 startContent={<FontAwesomeIcon icon={faUsers} className="text-tiny ml-1" />}>
-                {p.memberCount} 位顧問
+                {lang === "en" ? `${p.memberCount} consultants` : `${p.memberCount} 位顧問`}
               </Chip>
             )}
           </div>
           {p.stepCount > 0 && (
             <Chip size="sm" variant="flat"
               startContent={<FontAwesomeIcon icon={faCheck} className="text-tiny ml-1" />}>
-              {p.stepCount} 步驟
+              {lang === "en" ? `${p.stepCount} steps` : `${p.stepCount} 步驟`}
             </Chip>
           )}
         </div>
@@ -414,13 +438,14 @@ function PlaybookDetail({
   brandName: string | null;
   onLaunched: (missionId: number) => void;
 }) {
+  const { lang } = useLang();
   const createMission = (trpc as any).mission?.create?.useMutation?.() ?? { mutateAsync: async () => null };
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
 
   const onLaunch = async () => {
     if (!squad || !brandId) {
-      setApplyError("請先選擇品牌");
+      setApplyError(lang === "en" ? "Pick a brand first" : "請先選擇品牌");
       return;
     }
     setApplying(true);
@@ -434,10 +459,10 @@ function PlaybookDetail({
         brandId,
         brandName,
       });
-      if (!res?.id) throw new Error("後端沒有回傳 mission id");
+      if (!res?.id) throw new Error(lang === "en" ? "Server didn't return a project id" : "後端沒有回傳 mission id");
       onLaunched(Number(res.id));
     } catch (e: any) {
-      setApplyError(`啟動失敗：${e?.message ?? e}`);
+      setApplyError(lang === "en" ? `Couldn't deploy: ${e?.message ?? e}` : `啟動失敗：${e?.message ?? e}`);
     } finally {
       setApplying(false);
     }
@@ -458,29 +483,29 @@ function PlaybookDetail({
       <DrawerContent>
         {!squad ? (
           <DrawerBody className="items-center justify-center">
-            <Spinner label="載入方案中…" />
+            <Spinner label={lang === "en" ? "Loading playbook…" : "載入方案中…"} />
           </DrawerBody>
         ) : (
           <>
             <DrawerHeader className="flex flex-col gap-3 px-8 pt-6 pb-5 relative bg-default-50">
               <Button
                 isIconOnly size="sm" variant="light" radius="full"
-                onPress={onClose} aria-label="關閉"
+                onPress={onClose} aria-label={lang === "en" ? "Close" : "關閉"}
                 className="absolute top-4 right-4"
               >
                 <FontAwesomeIcon icon={faXmark} />
               </Button>
 
               <Breadcrumbs size="sm">
-                <BreadcrumbItem href="/">首頁</BreadcrumbItem>
-                <BreadcrumbItem onPress={onClose}>成長方案</BreadcrumbItem>
+                <BreadcrumbItem href="/">{lang === "en" ? "Home" : "首頁"}</BreadcrumbItem>
+                <BreadcrumbItem onPress={onClose}>{lang === "en" ? "Playbooks" : "成長方案"}</BreadcrumbItem>
                 <BreadcrumbItem>{squad.name}</BreadcrumbItem>
               </Breadcrumbs>
 
               <div className="flex items-start gap-2 flex-wrap">
                 <Chip size="sm" color="default" variant="flat"
                   startContent={<FontAwesomeIcon icon={faLayerGroup} className="text-tiny ml-1" />}>
-                  {lk} · {LAYER_LABEL[lk] ?? "策略"}
+                  {lk} · {layerLabel(lk, lang)}
                 </Chip>
                 {squad.taskLabel && (
                   <TaskChip
@@ -498,7 +523,7 @@ function PlaybookDetail({
 
             <DrawerBody className="p-0">
               <Tabs
-                aria-label="方案細節"
+                aria-label={lang === "en" ? "Playbook details" : "方案細節"}
                 variant="underlined"
                 color="primary"
                 fullWidth
@@ -507,7 +532,7 @@ function PlaybookDetail({
                   panel: "p-0 h-full overflow-hidden",
                 }}
               >
-                <Tab key="overview" title="總覽">
+                <Tab key="overview" title={lang === "en" ? "Overview" : "總覽"}>
                   <ScrollShadow className="h-full">
                     <div className="px-8 py-6 space-y-6">
                       {/* Real showcases — skip baseline (idx 0) if there are >= 2 */}
@@ -516,7 +541,7 @@ function PlaybookDetail({
                           ? squad.showcases.slice(1)
                           : squad.showcases;
                         return (
-                          <Section title={`成功案例 · ${realCases.length}`}>
+                          <Section title={lang === "en" ? `Case studies · ${realCases.length}` : `成功案例 · ${realCases.length}`}>
                             <div className="space-y-3">
                               {realCases.map((sc, i) => (
                                 <Card key={i} shadow="none" className="border border-success-200 bg-success-50">
@@ -527,7 +552,7 @@ function PlaybookDetail({
                                       </span>
                                       <div className="min-w-0 flex-1">
                                         <p className="text-tiny tracking-wider uppercase text-success-700 font-medium">CASE STUDY</p>
-                                        <p className="text-medium font-bold leading-snug">{sc.title ?? "成功案例"}</p>
+                                        <p className="text-medium font-bold leading-snug">{sc.title ?? (lang === "en" ? "Case study" : "成功案例")}</p>
                                       </div>
                                     </div>
 
@@ -556,7 +581,7 @@ function PlaybookDetail({
 
                       {/* 方法論作者 (secondary context) */}
                       {squad.methodology?.author && (
-                        <Section title="方法論起源">
+                        <Section title={lang === "en" ? "Method origin" : "方法論起源"}>
                           <Card shadow="none" className="border border-divider">
                             <CardBody className="gap-2 p-4 flex flex-row items-center">
                               <span className="w-10 h-10 rounded-medium bg-secondary-100 flex items-center justify-center shrink-0">
@@ -579,19 +604,19 @@ function PlaybookDetail({
                       )}
 
                       <div className="grid grid-cols-3 gap-3">
-                        <StatCard label="顧問" count={squad.memberCount} icon={faUsers} />
-                        <StatCard label="工作步驟" count={squad.stepCount} icon={faCheck} />
-                        <StatCard label="通路" count={squad.workspace.length} icon={faLayerGroup} />
+                        <StatCard label={lang === "en" ? "Consultants" : "顧問"} count={squad.memberCount} icon={faUsers} />
+                        <StatCard label={lang === "en" ? "Steps" : "工作步驟"} count={squad.stepCount} icon={faCheck} />
+                        <StatCard label={lang === "en" ? "Channels" : "通路"} count={squad.workspace.length} icon={faLayerGroup} />
                       </div>
                     </div>
                   </ScrollShadow>
                 </Tab>
 
-                <Tab key="agents" title={`顧問 · ${squad.memberCount}`}>
+                <Tab key="agents" title={lang === "en" ? `Consultants · ${squad.memberCount}` : `顧問 · ${squad.memberCount}`}>
                   <ScrollShadow className="h-full">
                     <div className="px-8 py-6 space-y-3">
                       {squad.memberPreview.length === 0 ? (
-                        <p className="text-small text-default-500">此方案尚未配置 agent。</p>
+                        <p className="text-small text-default-500">{lang === "en" ? "No agents on this playbook yet." : "此方案尚未配置 agent。"}</p>
                       ) : (
                         squad.memberPreview.map((m, i) => (
                           <Card key={m.id ?? i} shadow="none" className="border border-divider">
@@ -616,19 +641,20 @@ function PlaybookDetail({
                       )}
                       {squad.memberPreview.length < squad.memberCount && (
                         <p className="text-tiny text-default-500 text-center">
-                          + 還有 {squad.memberCount - squad.memberPreview.length} 位 ·
-                          完整名單於啟動後查看
+                          {lang === "en"
+                            ? `+ ${squad.memberCount - squad.memberPreview.length} more · full roster shows after deploy`
+                            : `+ 還有 ${squad.memberCount - squad.memberPreview.length} 位 · 完整名單於啟動後查看`}
                         </p>
                       )}
                     </div>
                   </ScrollShadow>
                 </Tab>
 
-                <Tab key="meta" title="標籤">
+                <Tab key="meta" title={lang === "en" ? "Tags" : "標籤"}>
                   <ScrollShadow className="h-full">
                     <div className="px-8 py-6 space-y-4">
                       {squad.workspace.length > 0 && (
-                        <Section title="適用通路">
+                        <Section title={lang === "en" ? "Channels" : "適用通路"}>
                           <div className="flex flex-wrap gap-1.5">
                             {squad.workspace.map((w, i) => (
                               <Chip key={i} size="sm" variant="flat">{w}</Chip>
@@ -637,7 +663,7 @@ function PlaybookDetail({
                         </Section>
                       )}
                       {squad.tags.length > 0 && (
-                        <Section title="標籤">
+                        <Section title={lang === "en" ? "Tags" : "標籤"}>
                           <div className="flex flex-wrap gap-1.5">
                             {squad.tags.map((t, i) => (
                               <Chip key={i} size="sm" variant="bordered">{t}</Chip>
@@ -656,9 +682,9 @@ function PlaybookDetail({
                 <Alert color="danger" variant="flat" title={applyError} onClose={() => setApplyError(null)} />
               )}
               {!brandId && !applyError && (
-                <Alert color="warning" variant="flat" title="請先在左上角選擇品牌再套用" />
+                <Alert color="warning" variant="flat" title={lang === "en" ? "Pick a brand in the top-left first" : "請先在左上角選擇品牌再套用"} />
               )}
-              <Tooltip content={!brandId ? "請先選擇品牌" : ""} isDisabled={!!brandId}>
+              <Tooltip content={!brandId ? (lang === "en" ? "Pick a brand first" : "請先選擇品牌") : ""} isDisabled={!!brandId}>
                 <Button
                   color="primary" size="lg" radius="lg"
                   className="w-full font-medium"
@@ -668,11 +694,15 @@ function PlaybookDetail({
                   startContent={!applying && <FontAwesomeIcon icon={faRocket} />}
                   endContent={!applying && <FontAwesomeIcon icon={faArrowUpRightFromSquare} />}
                 >
-                  {applying ? "啟動中…" : `派出方案 · ${squad.memberCount} 位顧問接力`}
+                  {applying
+                    ? (lang === "en" ? "Deploying…" : "啟動中…")
+                    : (lang === "en" ? `Deploy · ${squad.memberCount} consultants in a relay` : `派出方案 · ${squad.memberCount} 位顧問接力`)}
                 </Button>
               </Tooltip>
               <p className="text-tiny text-default-500 text-center">
-                派出後跳到 picker 工作台 · 顧問逐段交付完整成品
+                {lang === "en"
+                  ? "Jumps to the picker workspace · consultants hand off stage by stage to a finished deliverable"
+                  : "派出後跳到 picker 工作台 · 顧問逐段交付完整成品"}
               </p>
             </DrawerFooter>
           </>

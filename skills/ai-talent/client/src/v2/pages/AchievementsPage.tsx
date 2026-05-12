@@ -7,6 +7,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import {
   Sparkles, Building2, Zap, LayoutGrid, MessageCircle, RefreshCw,
   Image, Video, Calendar, Layers, Flag, Pencil, Send,
@@ -15,7 +16,7 @@ import {
 } from "lucide-react";
 
 /** Mini reward catalog — must mirror server/_core/achievementRewards.ts */
-const ROUTE_REWARDS_DISPLAY: Record<string, string[]> = {
+const ROUTE_REWARDS_DISPLAY_ZH: Record<string, string[]> = {
   onboarding:  ["額外 1 個品牌位（試用期間）"],
   explore:     ["額外 30 張 AI 圖（試用期間）"],
   visual:      ["額外 2 支 AI 影片（試用期間）"],
@@ -24,11 +25,26 @@ const ROUTE_REWARDS_DISPLAY: Record<string, string[]> = {
   publish:     ["試用期延長 3 天"],
   upgrade:     ["首月 9 折券（30 天內兌換）"],
 };
-const FINALE_REWARDS_DISPLAY = [
+const ROUTE_REWARDS_DISPLAY_EN: Record<string, string[]> = {
+  onboarding:  ["+1 brand slot (trial)"],
+  explore:     ["+30 AI images (trial)"],
+  visual:      ["+2 AI videos (trial)"],
+  planning:    ["Unlock auto-schedule reminders (beta)"],
+  integration: ["Unlock brand-style PDF export"],
+  publish:     ["+3 trial days"],
+  upgrade:     ["10% off first month (redeem within 30 days)"],
+};
+const FINALE_REWARDS_DISPLAY_ZH = [
   "OnBrand Founding User 永久徽章",
   "首月 9 折券（重複領）",
   "年繳再折 7%（60 天內兌換）",
   "新功能搶先體驗",
+];
+const FINALE_REWARDS_DISPLAY_EN = [
+  "OnBrand Founding User badge (permanent)",
+  "10% off first month (stackable)",
+  "Extra 7% off annual (redeem within 60 days)",
+  "Early access to new features",
 ];
 
 const ICON_MAP: Record<string, any> = {
@@ -50,6 +66,9 @@ function AchIcon({ name, locked }: { name: string; locked: boolean }) {
 
 export default function AchievementsPage() {
   const navigate = useNavigate();
+  const { t, lang } = useLang();
+  const ROUTE_REWARDS_DISPLAY = lang === "en" ? ROUTE_REWARDS_DISPLAY_EN : ROUTE_REWARDS_DISPLAY_ZH;
+  const FINALE_REWARDS_DISPLAY = lang === "en" ? FINALE_REWARDS_DISPLAY_EN : FINALE_REWARDS_DISPLAY_ZH;
   const listQuery = (trpc as any).achievements?.list?.useQuery
     ? (trpc as any).achievements.list.useQuery()
     : { data: [] };
@@ -78,7 +97,7 @@ export default function AchievementsPage() {
           onClick={() => navigate(-1)}
           className="text-sm text-neutral-500 hover:text-neutral-900 flex items-center gap-1 mb-6"
         >
-          <ChevronLeft size={16} /> 返回
+          <ChevronLeft size={16} /> {t("back")}
         </button>
 
         {/* 2026-05-11 (CJ): canonical header template — same as /30s · /60s · /99s. */}
@@ -96,7 +115,7 @@ export default function AchievementsPage() {
               backgroundClip: "text",
             }}
           >
-            你的成就
+            {lang === "en" ? "Your achievements" : "你的成就"}
           </h1>
           <p
             className="mt-3 mx-auto text-default-700"
@@ -105,14 +124,14 @@ export default function AchievementsPage() {
               fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
             }}
           >
-            完成所有路線 = 你已經是 OnBrand 高手
+            {lang === "en" ? "Finish every route — you've mastered OnBrand" : "完成所有路線 = 你已經是 OnBrand 高手"}
           </p>
           <p
             className="mt-2 mx-auto text-default-700"
             style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
           >
-            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>路線：</span>
-            7 條 + 18 個成就 · 解完後系統會送你獎勵
+            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>{lang === "en" ? "Routes:" : "路線："}</span>
+            {lang === "en" ? "7 routes · 18 achievements · rewards on completion" : "7 條 + 18 個成就 · 解完後系統會送你獎勵"}
           </p>
         </div>
 
@@ -128,7 +147,9 @@ export default function AchievementsPage() {
                     {progress.unlockedCount} <span className="text-base font-medium text-neutral-500">/ {progress.totalCount}</span>
                   </p>
                   <p className="text-xs text-neutral-500 mt-1">
-                    {progress.earnedPoints} 點 / 共 {progress.totalPoints} 點
+                    {lang === "en"
+                      ? `${progress.earnedPoints} pts / ${progress.totalPoints} pts total`
+                      : `${progress.earnedPoints} 點 / 共 ${progress.totalPoints} 點`}
                   </p>
                 </div>
                 <p className="text-xs text-neutral-500">
@@ -145,7 +166,7 @@ export default function AchievementsPage() {
               {/* Suggestions */}
               {progress.suggestions?.length > 0 && (
                 <div className="mt-6 pt-6 border-t border-neutral-100">
-                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">下一步試試</p>
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">{lang === "en" ? "Try next" : "下一步試試"}</p>
                   <div className="grid sm:grid-cols-3 gap-2">
                     {progress.suggestions.map((s: any) => (
                       <button
@@ -155,7 +176,7 @@ export default function AchievementsPage() {
                       >
                         <p className="text-sm font-semibold text-neutral-900 mb-0.5">{s.title}</p>
                         <p className="text-xs text-neutral-500 group-hover:text-neutral-700 flex items-center gap-1">
-                          {s.ctaText ?? "前往"} <ChevronRight size={11} />
+                          {s.ctaText ?? (lang === "en" ? "Go" : "前往")} <ChevronRight size={11} />
                         </p>
                       </button>
                     ))}
@@ -164,7 +185,7 @@ export default function AchievementsPage() {
               )}
             </>
           ) : (
-            <p className="text-sm text-neutral-500">載入中…</p>
+            <p className="text-sm text-neutral-500">{t("loading")}</p>
           )}
         </div>
 
@@ -180,12 +201,12 @@ export default function AchievementsPage() {
               <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${
                 progress?.unlockedCount === progress?.totalCount ? "text-amber-300" : "text-neutral-500"
               }`}>
-                完成全 18 個成就
+                {lang === "en" ? "Unlock all 18 achievements" : "完成全 18 個成就"}
               </p>
               <h3 className={`text-lg font-bold mb-2 ${
                 progress?.unlockedCount === progress?.totalCount ? "text-white" : "text-neutral-900"
               }`}>
-                OnBrand Founding User · 終極獎勵
+                {lang === "en" ? "OnBrand Founding User · Final reward" : "OnBrand Founding User · 終極獎勵"}
               </h3>
               <ul className={`text-sm space-y-1 ${
                 progress?.unlockedCount === progress?.totalCount ? "text-neutral-100" : "text-neutral-700"
@@ -232,7 +253,9 @@ export default function AchievementsPage() {
                   <Gift size={14} className="mt-0.5 flex-shrink-0" />
                   <div className="flex-1 text-xs">
                     <p className="font-semibold">
-                      {stats?.unlocked === stats?.total ? "已領獎勵：" : "完成可獲得："}
+                      {stats?.unlocked === stats?.total
+                        ? (lang === "en" ? "Reward claimed:" : "已領獎勵：")
+                        : (lang === "en" ? "Earn on completion:" : "完成可獲得：")}
                     </p>
                     <p className="opacity-90">
                       {ROUTE_REWARDS_DISPLAY[routeKey].join(" · ")}
@@ -271,19 +294,19 @@ export default function AchievementsPage() {
                         </p>
                         <div className="flex items-center justify-between">
                           <span className={`text-[10px] font-mono ${a.unlocked ? "text-neutral-700" : "text-neutral-400"}`}>
-                            {a.points} 點
+                            {lang === "en" ? `${a.points} pts` : `${a.points} 點`}
                           </span>
                           {!a.unlocked && a.ctaPath && (
                             <Link
                               to={a.ctaPath}
                               className="text-[11px] text-neutral-900 hover:underline font-medium"
                             >
-                              {a.ctaText ?? "前往"} →
+                              {a.ctaText ?? (lang === "en" ? "Go" : "前往")} →
                             </Link>
                           )}
                           {a.unlocked && (
                             <span className="text-[10px] text-neutral-500">
-                              {a.unlockedAt ? new Date(a.unlockedAt).toLocaleDateString("zh-TW") : ""}
+                              {a.unlockedAt ? new Date(a.unlockedAt).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW") : ""}
                             </span>
                           )}
                         </div>
@@ -297,7 +320,7 @@ export default function AchievementsPage() {
         })}
 
         <div className="text-center text-xs text-neutral-400 mt-8">
-          <p>解鎖全部 18 個成就 = 你已用過 OnBrand 完整功能。然後就靠你的創意了 ✨</p>
+          <p>{lang === "en" ? "Unlock all 18 — you've used every part of OnBrand. From here, it's your creativity ✨" : "解鎖全部 18 個成就 = 你已用過 OnBrand 完整功能。然後就靠你的創意了 ✨"}</p>
         </div>
       </div>
     </div>

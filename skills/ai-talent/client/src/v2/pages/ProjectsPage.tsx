@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Skeleton } from "@heroui/react";
 import { Search, Plus, Folder, Clock, Trash2, Copy, Info } from "lucide-react";
@@ -51,18 +52,19 @@ const WORKSPACE_TONE: Record<string, string> = {
   website: "#10B981", theater: "#F97316",
 };
 
-function formatRelative(dateStr?: string): string {
+function formatRelative(dateStr: string | undefined, lang: "zh-TW" | "en"): string {
   if (!dateStr) return "";
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins  = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days  = Math.floor(diff / 86400000);
-  if (mins < 1)    return "剛剛";
-  if (mins < 60)   return `${mins} 分鐘前`;
-  if (hours < 24)  return `${hours} 小時前`;
-  if (days === 1)  return "1 天前";
-  if (days < 30)   return `${days} 天前`;
-  return new Date(dateStr).toLocaleDateString("zh-TW", { month: "short", day: "numeric" });
+  const isEn = lang === "en";
+  if (mins < 1)    return isEn ? "Just now" : "剛剛";
+  if (mins < 60)   return isEn ? `${mins}m ago` : `${mins} 分鐘前`;
+  if (hours < 24)  return isEn ? `${hours}h ago` : `${hours} 小時前`;
+  if (days === 1)  return isEn ? "1 day ago" : "1 天前";
+  if (days < 30)   return isEn ? `${days} days ago` : `${days} 天前`;
+  return new Date(dateStr).toLocaleDateString(isEn ? "en-US" : "zh-TW", { month: "short", day: "numeric" });
 }
 
 function brandColor(seed: string): string {
@@ -74,6 +76,7 @@ function brandColor(seed: string): string {
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
+  const { t, lang } = useLang();
   const ctx = useOutletContext<ShellOutletCtx>();
   const shellBrands = ctx?.brands ?? [];
   const shellBrandId = ctx?.brandId ?? null;
@@ -175,7 +178,7 @@ export default function ProjectsPage() {
               backgroundClip: "text",
             }}
           >
-            你做過的每一篇都在這
+            {lang === "en" ? "Everything you've made — all in one place" : "你做過的每一篇都在這"}
           </h1>
           <p
             className="mt-3 mx-auto text-default-700"
@@ -184,14 +187,20 @@ export default function ProjectsPage() {
               fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
             }}
           >
-            30s / 60s / 99s / 企劃台 的產出自動歸檔到這裡
+            {lang === "en"
+              ? "Outputs from 30s / 60s / 99s / Plan land here automatically"
+              : "30s / 60s / 99s / 企劃台 的產出自動歸檔到這裡"}
           </p>
           <p
             className="mt-2 mb-5 mx-auto text-default-700"
             style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
           >
-            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>適合：</span>
-            找上週做過的東西 · 重跑同任務 · 整理待發內容
+            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
+              {lang === "en" ? "Good for:" : "適合："}
+            </span>
+            {lang === "en"
+              ? "Finding last week's work · Rerunning a task · Tidying drafts"
+              : "找上週做過的東西 · 重跑同任務 · 整理待發內容"}
           </p>
 
           {/* Single search bar */}
@@ -201,12 +210,12 @@ export default function ProjectsPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="搜尋專案 / 品牌 / 平台…"
+                placeholder={lang === "en" ? "Search projects, brands, channels…" : "搜尋專案 / 品牌 / 平台…"}
                 className="flex-1 bg-transparent text-sm outline-none"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="text-default-400 hover:text-default-700 text-sm shrink-0">
-                  清除
+                  {lang === "en" ? "Clear" : "清除"}
                 </button>
               )}
             </div>
@@ -226,7 +235,7 @@ export default function ProjectsPage() {
                   : "bg-white text-default-700 border-default-200 hover:border-default-400"
               }`}
             >
-              全部 · {rows.length}
+              {lang === "en" ? "All" : "全部"} · {rows.length}
             </button>
             {brandsWithCount.filter((b) => b.count > 0).map((b) => {
               const active = activeBrandId === b.id;
@@ -255,8 +264,12 @@ export default function ProjectsPage() {
           <div className="flex items-center gap-2">
             <Clock size={14} className="text-default-500" />
             <h2 className="text-sm font-semibold text-default-700">
-              {activeBrandId === "all" ? "最近活動" : "活動"}
-              <span className="text-default-400 font-normal ml-2">{filtered.length} 個</span>
+              {activeBrandId === "all"
+                ? (lang === "en" ? "Recent" : "最近活動")
+                : (lang === "en" ? "Activity" : "活動")}
+              <span className="text-default-400 font-normal ml-2">
+                {lang === "en" ? `${filtered.length} items` : `${filtered.length} 個`}
+              </span>
             </h2>
           </div>
         </div>
@@ -272,11 +285,12 @@ export default function ProjectsPage() {
             search={search}
             onClear={() => { setSearch(""); setActiveBrandId("all"); }}
             onCreate={() => setCreateOpen(true)}
+            lang={lang}
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {recent.map((m) => (
-              <ProjectCard key={m.id} mission={m} onClick={() => goToMission(m)} />
+              <ProjectCard key={m.id} mission={m} onClick={() => goToMission(m)} lang={lang} />
             ))}
           </div>
         )}
@@ -293,7 +307,7 @@ export default function ProjectsPage() {
         }}
       >
         <Plus size={16} />
-        新任務
+        {lang === "en" ? "New project" : "新任務"}
       </button>
 
       <CreateMissionModal open={createOpen} initialWorkspace="all" onClose={() => setCreateOpen(false)} />
@@ -302,7 +316,7 @@ export default function ProjectsPage() {
 }
 
 /* ─────────────────────── ProjectCard ─────────────────────── */
-function ProjectCard({ mission, onClick }: { mission: MissionRow; onClick: () => void }) {
+function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick: () => void; lang: "zh-TW" | "en" }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const ws = (mission.workspace ?? "other").toLowerCase();
   const icon = WORKSPACE_ICONS[ws] ?? faPenNib;
@@ -341,11 +355,11 @@ function ProjectCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
       {/* Body */}
       <div className="p-3">
         <h3 className="text-sm font-medium text-default-900 mb-0.5 line-clamp-1" title={mission.title ?? ""}>
-          {mission.title || "（未命名）"}
+          {mission.title || (lang === "en" ? "(Untitled)" : "（未命名）")}
         </h3>
         <div className="flex items-center justify-between text-[11px] text-default-500">
-          <span className="truncate">{mission.brandName ?? "（未指定品牌）"}</span>
-          <span className="shrink-0">{formatRelative(mission.updatedAt)}</span>
+          <span className="truncate">{mission.brandName ?? (lang === "en" ? "(No brand)" : "（未指定品牌）")}</span>
+          <span className="shrink-0">{formatRelative(mission.updatedAt, lang)}</span>
         </div>
       </div>
 
@@ -353,7 +367,7 @@ function ProjectCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
       <button
         onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
         className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/0 group-hover:bg-white shadow-sm hover:shadow flex items-center justify-center text-default-500 transition opacity-0 group-hover:opacity-100"
-        title="動作選單"
+        title={lang === "en" ? "Actions" : "動作選單"}
       >
         ⋯
       </button>
@@ -365,14 +379,14 @@ function ProjectCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
             className="absolute top-9 right-2 z-50 bg-white rounded-lg border border-default-200 shadow-lg py-1 w-36"
           >
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onClick(); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2">
-              <Info size={11} /> 查看詳細
+              <Info size={11} /> {lang === "en" ? "View details" : "查看詳細"}
             </button>
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2 text-default-600">
-              <Copy size={11} /> 建立複本
+              <Copy size={11} /> {lang === "en" ? "Duplicate" : "建立複本"}
             </button>
             <div className="border-t border-default-100 my-1" />
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-danger-50 flex items-center gap-2 text-danger">
-              <Trash2 size={11} /> 移到垃圾桶
+              <Trash2 size={11} /> {lang === "en" ? "Move to trash" : "移到垃圾桶"}
             </button>
           </div>
         </>
@@ -382,29 +396,40 @@ function ProjectCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
 }
 
 /* ─────────────────────── EmptyState ─────────────────────── */
-function EmptyState({ search, onClear, onCreate }: { search: string; onClear: () => void; onCreate: () => void }) {
+function EmptyState({ search, onClear, onCreate, lang }: { search: string; onClear: () => void; onCreate: () => void; lang: "zh-TW" | "en" }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <Folder size={56} className="text-default-300 mb-4" strokeWidth={1.2} />
       {search ? (
         <>
-          <p className="text-default-700 font-medium mb-1">找不到符合「{search}」的專案</p>
-          <p className="text-tiny text-default-500 mb-4">試試別的關鍵字，或清除搜尋條件</p>
-          <button onClick={onClear} className="text-xs text-violet-600 hover:underline">清除搜尋</button>
+          <p className="text-default-700 font-medium mb-1">
+            {lang === "en" ? `No projects match "${search}"` : `找不到符合「${search}」的專案`}
+          </p>
+          <p className="text-tiny text-default-500 mb-4">
+            {lang === "en" ? "Try different words, or clear the search" : "試試別的關鍵字，或清除搜尋條件"}
+          </p>
+          <button onClick={onClear} className="text-xs text-violet-600 hover:underline">
+            {lang === "en" ? "Clear search" : "清除搜尋"}
+          </button>
         </>
       ) : (
         <>
-          <p className="text-default-700 font-medium mb-1">還沒有任何專案</p>
+          <p className="text-default-700 font-medium mb-1">
+            {lang === "en" ? "No projects yet" : "還沒有任何專案"}
+          </p>
           <p className="text-tiny text-default-500 mb-4">
-            到 30s / 60s / 99s / 企劃台 跑任務，產出會自動進來。<br />
-            或直接建立新任務：
+            {lang === "en" ? (
+              <>Run a task in 30s / 60s / 99s / Plan and outputs land here.<br />Or start a new project:</>
+            ) : (
+              <>到 30s / 60s / 99s / 企劃台 跑任務，產出會自動進來。<br />或直接建立新任務：</>
+            )}
           </p>
           <button
             onClick={onCreate}
             className="flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm font-medium"
             style={{ background: "linear-gradient(135deg, #7C3AED, #6366F1)" }}
           >
-            <Plus size={14} /> 新任務
+            <Plus size={14} /> {lang === "en" ? "New project" : "新任務"}
           </button>
         </>
       )}

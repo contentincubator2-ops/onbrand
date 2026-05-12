@@ -680,16 +680,17 @@ export default function PickerWorkspace() {
   const headerTitle = (() => {
     if (activeMissionId && selectedSquad) {
       const squadName = pickLocaleText(selectedSquad.name, lang) || selectedSquad.slug;
-      return `任務執行中 — ${squadName}`;
+      return lang === "en" ? `Project running — ${squadName}` : `任務執行中 — ${squadName}`;
     }
+    const pick = lang === "en" ? "Pick a method" : "挑選方法論";
     if (channelFilter !== "all") {
       const c = CHANNEL_OPTIONS.find((x) => x.key === channelFilter);
-      return c ? `挑選方法論 — ${c.label}` : "挑選方法論";
+      return c ? `${pick} — ${c.label}` : pick;
     }
     if (layerFilter !== "ALL") {
-      return `挑選方法論 — ${layerFilter}・${LAYER_TOKENS[layerFilter].label}`;
+      return `${pick} — ${layerFilter}・${LAYER_TOKENS[layerFilter].label}`;
     }
-    return "挑選方法論";
+    return pick;
   })();
 
   // Sync URL when filter changes (so refresh / share-link works)
@@ -738,7 +739,7 @@ export default function PickerWorkspace() {
     const topItems: RailItem[]        = RAIL_TOP;  // 範本
     const briefItems: RailItem[]      = selectedSquad ? [{
       key:   "brief__summary",
-      label: "摘要",
+      label: lang === "en" ? "Brief" : "摘要",
       icon:  faClipboardCheck,
       kind:  "brief" as RailKind,
     }] : [];
@@ -774,7 +775,7 @@ export default function PickerWorkspace() {
           startContent={<FontAwesomeIcon icon={faArrowLeft} />}
           className="text-tiny"
         >
-          返回
+          {lang === "en" ? "Back" : "返回"}
         </Button>
         <div className="font-semibold text-small text-foreground truncate px-4">
           {headerTitle}
@@ -784,24 +785,24 @@ export default function PickerWorkspace() {
               direction 2026-04-29 — replaces the brand-only switcher so
               /picker matches the global ShellLayout header. */}
           <ScopeBar scope={scope} setScope={setScope} />
-          <Tooltip content="新增品牌 / 產品 / 活動" placement="bottom" radius="sm">
+          <Tooltip content={lang === "en" ? "Add brand / product / event" : "新增品牌 / 產品 / 活動"} placement="bottom" radius="sm">
             <Button
               size="sm" variant="flat" radius="full" isIconOnly
               className="text-default-400 hover:text-foreground h-7 w-7 min-w-7"
               onPress={() => { window.location.href = "/brands"; /* P0-E 2026-05-08: was /settings/brands which doesn't exist */ }}
-              aria-label="新增品牌"
+              aria-label={lang === "en" ? "Add a brand" : "新增品牌"}
             >
               <span className="text-sm font-bold">＋</span>
             </Button>
           </Tooltip>
-          <Tooltip content="進入專注模式 (F)" placement="bottom" radius="sm">
+          <Tooltip content={lang === "en" ? "Focus mode (F)" : "進入專注模式 (F)"} placement="bottom" radius="sm">
             <Button
               isIconOnly
               size="sm"
               variant="light"
               radius="sm"
               onPress={() => setFullscreen(true)}
-              aria-label="進入專注模式"
+              aria-label={lang === "en" ? "Enter focus mode" : "進入專注模式"}
             >
               <FontAwesomeIcon icon={faExpand} />
             </Button>
@@ -872,10 +873,10 @@ export default function PickerWorkspace() {
           style={{ left: 68, width: 380 }}
         >
           {/* Collapse handle on the right edge — Canva-style */}
-          <Tooltip content={middleCollapsed ? "顯示方法論清單" : "暫時隱藏清單（讓出畫布空間）"} placement="right" radius="sm">
+          <Tooltip content={middleCollapsed ? (lang === "en" ? "Show method list" : "顯示方法論清單") : (lang === "en" ? "Hide list (more canvas room)" : "暫時隱藏清單（讓出畫布空間）")} placement="right" radius="sm">
             <button
               onClick={toggleMiddle}
-              aria-label={middleCollapsed ? "展開" : "收合"}
+              aria-label={middleCollapsed ? (lang === "en" ? "Expand" : "展開") : (lang === "en" ? "Collapse" : "收合")}
               className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-6 h-12 bg-content1 border border-divider rounded-r-medium shadow flex items-center justify-center text-default-500 hover:text-foreground hover:bg-content2 transition"
               style={{ boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
             >
@@ -1005,18 +1006,22 @@ export default function PickerWorkspace() {
               "所有結果" list. */}
           <div className="flex-1 min-h-0 overflow-y-auto p-3">
             {squadsQuery.isLoading ? (
-              <div className="text-small text-default-500 py-6 text-center">載入中…</div>
+              <div className="text-small text-default-500 py-6 text-center">{lang === "en" ? "One sec…" : "載入中…"}</div>
             ) : (
               <>
                 {/* ── 0. 任務目錄 (新前門 — task_catalog active items) ── */}
                 <ThumbSection
-                  title={q ? `任務目錄符合（${filteredCatalog.length}）` : "任務目錄 — 精選"}
+                  title={q
+                    ? (lang === "en" ? `Task catalog matches (${filteredCatalog.length})` : `任務目錄符合（${filteredCatalog.length}）`)
+                    : (lang === "en" ? "Task catalog — featured" : "任務目錄 — 精選")}
                   onCta={comingSoonTasks.length > 0 ? () => setComingSoonOpen(true) : undefined}
-                  ctaLabel={comingSoonTasks.length > 0 ? `🔮 即將推出（${comingSoonTasks.length}）` : undefined}
+                  ctaLabel={comingSoonTasks.length > 0 ? (lang === "en" ? `🔮 Coming soon (${comingSoonTasks.length})` : `🔮 即將推出（${comingSoonTasks.length}）`) : undefined}
                 >
                   {filteredCatalog.length === 0 ? (
                     <div className="text-tiny text-default-500 py-3 text-center">
-                      {q ? `目錄裡沒有「${q}」相關任務` : "此分類目前無啟用任務"}
+                      {q
+                        ? (lang === "en" ? `No tasks matching "${q}"` : `目錄裡沒有「${q}」相關任務`)
+                        : (lang === "en" ? "No active tasks in this category" : "此分類目前無啟用任務")}
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1038,9 +1043,9 @@ export default function PickerWorkspace() {
                   if (items.length === 0) return null;
                   return (
                     <ThumbSection
-                      title="最近使用的方法論"
+                      title={lang === "en" ? "Recently used methods" : "最近使用的方法論"}
                       onCta={() => navigate("/")}
-                      ctaLabel="查看全部"
+                      ctaLabel={lang === "en" ? "See all" : "查看全部"}
                     >
                       <div className="grid grid-cols-2 gap-2">
                         {items.map((sq) => (
@@ -1061,7 +1066,7 @@ export default function PickerWorkspace() {
                 {!q && (() => {
                   const items = brandTemplates.filter(passesFacets);
                   return (
-                    <ThumbSection title="品牌範本">
+                    <ThumbSection title={lang === "en" ? "Brand templates" : "品牌範本"}>
                       {items.length > 0 ? (
                         <div className="space-y-2">
                           {items.slice(0, 3).map((sq) => (
@@ -1082,10 +1087,10 @@ export default function PickerWorkspace() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-small font-semibold text-foreground">
-                                發佈為品牌範本
+                                {lang === "en" ? "Publish as a brand template" : "發佈為品牌範本"}
                               </div>
                               <div className="text-tiny text-default-500 leading-snug mt-0.5">
-                                完成此設計後，你可以將其變成可重複使用的範本。
+                                {lang === "en" ? "Once you finish this design, turn it into a reusable template." : "完成此設計後，你可以將其變成可重複使用的範本。"}
                               </div>
                             </div>
                           </CardBody>
@@ -1097,11 +1102,15 @@ export default function PickerWorkspace() {
 
                 {/* ── 3. 所有結果 ── */}
                 <ThumbSection
-                  title={q ? `搜尋結果（${filtered.length}）` : "所有結果"}
+                  title={q
+                    ? (lang === "en" ? `Search results (${filtered.length})` : `搜尋結果（${filtered.length}）`)
+                    : (lang === "en" ? "All results" : "所有結果")}
                 >
                   {filtered.length === 0 ? (
                     <div className="text-small text-default-500 py-6 text-center px-4">
-                      {q ? `沒有找到符合「${q}」的方法論。` : "這個分類目前沒有方法論。"}
+                      {q
+                        ? (lang === "en" ? `No methods match "${q}".` : `沒有找到符合「${q}」的方法論。`)
+                        : (lang === "en" ? "No methods in this category yet." : "這個分類目前沒有方法論。")}
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1135,7 +1144,7 @@ export default function PickerWorkspace() {
         >
           {/* Fullscreen exit */}
           {fullscreen && (
-            <Tooltip content="退出專注模式 (Esc / F)" placement="left" radius="sm">
+            <Tooltip content={lang === "en" ? "Exit focus mode (Esc / F)" : "退出專注模式 (Esc / F)"} placement="left" radius="sm">
               <Button
                 isIconOnly
                 size="sm"
@@ -1143,7 +1152,7 @@ export default function PickerWorkspace() {
                 variant="bordered"
                 onPress={() => setFullscreen(false)}
                 className="absolute top-3 right-3 z-40 bg-content1"
-                aria-label="退出專注模式"
+                aria-label={lang === "en" ? "Exit focus mode" : "退出專注模式"}
               >
                 <FontAwesomeIcon icon={faCompress} />
               </Button>
@@ -1172,10 +1181,10 @@ export default function PickerWorkspace() {
               <div className="text-center max-w-[420px]">
                 <div className="text-5xl mb-4 text-default-400">▣</div>
                 <h2 className="font-semibold text-xl text-foreground mb-2">
-                  從左側挑一個方法論小組來開始
+                  {lang === "en" ? "Pick a method squad on the left to get started" : "從左側挑一個方法論小組來開始"}
                 </h2>
                 <p className="text-small text-default-500 leading-relaxed">
-                  每個方法論都附帶完整的工作步驟與 AI 專員陣容，點擊 → 預覽 → 啟動。
+                  {lang === "en" ? "Each method comes with a full workflow and an AI consultant lineup. Click → preview → deploy." : "每個方法論都附帶完整的工作步驟與 AI 專員陣容，點擊 → 預覽 → 啟動。"}
                 </p>
               </div>
             </div>
@@ -1185,10 +1194,10 @@ export default function PickerWorkspace() {
         {/* "Reopen middle" tab — surfaces when middle is collapsed but
             we're not in fullscreen, so the user can pop the panel back. */}
         {!fullscreen && middleCollapsed && (
-          <Tooltip content="展開方法論清單" placement="right" radius="sm">
+          <Tooltip content={lang === "en" ? "Expand method list" : "展開方法論清單"} placement="right" radius="sm">
             <button
               onClick={toggleMiddle}
-              aria-label="展開方法論清單"
+              aria-label={lang === "en" ? "Expand method list" : "展開方法論清單"}
               className="absolute z-30 top-1/2 -translate-y-1/2 w-6 h-12 bg-content1 border border-divider rounded-r-medium shadow flex items-center justify-center text-default-500 hover:text-foreground hover:bg-content2 transition"
               style={{ left: 68, boxShadow: "1px 1px 4px rgba(0,0,0,0.06)" }}
             >

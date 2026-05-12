@@ -12,6 +12,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
@@ -83,7 +84,8 @@ function tierAccent(tier: "30s" | "60s" | "90s" | "100s" | undefined | null): st
  *   60s tier: pre / strategist / caption / brief / gen / extras / qa (~50s)
  *   100s tier: + scout at front (~60-90s)
  */
-function synthesizeStages(elapsedMs: number, tier: "30s" | "60s" | "100s"): any[] {
+function synthesizeStages(elapsedMs: number, tier: "30s" | "60s" | "100s", lang: "zh-TW" | "en" = "zh-TW"): any[] {
+  const L = (zh: string, en: string) => (lang === "en" ? en : zh);
   const t = elapsedMs;
   const isResearch = tier === "100s";
   const isProd = tier === "60s" || tier === "100s";
@@ -106,18 +108,18 @@ function synthesizeStages(elapsedMs: number, tier: "30s" | "60s" | "100s"): any[
 
   const stages: any[] = [];
   if (isResearch) {
-    stages.push(mk("scout", "🔬 Scout 爬取真實爆款數據", 0, scoutEnd));
+    stages.push(mk("scout", L("🔬 Scout 爬取真實爆款數據", "🔬 Scout pulls real viral data"), 0, scoutEnd));
   }
-  stages.push(mk("pre", "URL / persona / brand load", scoutEnd, preEnd));
+  stages.push(mk("pre", L("URL / persona / brand load", "URL / persona / brand load"), scoutEnd, preEnd));
   if (isProd) {
-    stages.push(mk("strategist", "Strategist 規劃敘事弧", preEnd, stratEnd));
+    stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   }
-  stages.push(mk("caption", "Caption Writer 寫變體", capStart, capEnd));
-  stages.push(mk("brief", "Image Director 寫視覺 brief", capStart, capEnd));
-  stages.push(mk("gen", "Flux 生圖", capEnd, genEnd));
+  stages.push(mk("caption", L("Caption Writer 寫變體", "Caption writer drafts variants"), capStart, capEnd));
+  stages.push(mk("brief", L("Image Director 寫視覺 brief", "Image director writes the visual brief"), capStart, capEnd));
+  stages.push(mk("gen", L("Flux 生圖", "Flux paints the image"), capEnd, genEnd));
   if (isProd) {
-    stages.push(mk("extras", "留言模板 / 發文時段 / 跟進", capEnd, extrasEnd));
-    stages.push(mk("qa", "Jordan Hayes 審核", extrasEnd, qaEnd));
+    stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), capEnd, extrasEnd));
+    stages.push(mk("qa", L("Jordan Hayes 審核", "Jordan Hayes reviews"), extrasEnd, qaEnd));
   }
   return stages;
 }
@@ -177,6 +179,21 @@ const CHANNEL_TILES: ChannelTile[] = [
   { id: "pr",         label: "新聞稿",     icon: faBullhorn,    bg: "#475569", enabled: true  },
   // 2026-05-12 (CJ「KOL 提供說法不提供名單」): outreach talking points tile
   { id: "kol",        label: "KOL 邀約",   icon: faHandshake,   bg: "#9333EA", enabled: true  },
+];
+
+// Channel label translations for "en" mode. zh label stays in CHANNEL_TILES.
+const CHANNEL_EN_LABEL: Record<string, string> = {
+  all: "All",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  youtube: "YouTube",
+  tiktok: "TikTok",
+  linkedin: "LinkedIn",
+  email: "Newsletter",
+  pr: "Press release",
+  kol: "Influencer pitch",
+};
+const __CHANNEL_LABELS_SENTINEL__: never[] = [
   // 品牌定位 + 用戶研究 隸屬 /brands workspace，不再出現在產出 tier。
   // { id: "brand",    label: "品牌定位",   icon: faRocket,      bg: "#7C3AED", enabled: true  },
   // { id: "audience", label: "用戶研究",   icon: faUsers,       bg: "#E07B0F", enabled: true  },
@@ -209,7 +226,7 @@ class TierPageErrorBoundary extends React.Component<
             <p style={{ fontSize: 11, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1 }}>
               /{this.props.tier} render error
             </p>
-            <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>頁面載入失敗</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{(typeof localStorage !== "undefined" && localStorage.getItem("language") === "en") ? "Page failed to load" : "頁面載入失敗"}</h2>
             <p style={{ marginTop: 8, color: "#374151" }}>{e.message}</p>
             <pre style={{ marginTop: 12, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap" }}>
               {e.stack}
@@ -218,7 +235,7 @@ class TierPageErrorBoundary extends React.Component<
               style={{ marginTop: 12, padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
               onClick={() => this.setState({ error: null })}
             >
-              重試渲染
+              {(typeof localStorage !== "undefined" && localStorage.getItem("language") === "en") ? "Try again" : "重試渲染"}
             </button>
           </div>
         </div>
@@ -229,6 +246,7 @@ class TierPageErrorBoundary extends React.Component<
 }
 
 function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
+  const { t, lang } = useLang();
   const ctx = useOutletContext<ShellOutletCtx>();
   const navigate = useNavigate();
   const brandId = (ctx?.brandId as number | null) ?? null;
@@ -421,12 +439,20 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     return list;
   }, [tasksThisTier, channel, searchQuery]);
 
-  const tierLabel = tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "99 秒";
-  const tierTagline = tier === "30s"
-    ? "今天，要寫哪一篇 30 秒搞定的貼文？"
-    : tier === "60s"
-    ? "今天，要做哪一個 60 秒製作包？"
-    : "今天，要做哪一個 99 秒研究驗證版？";
+  const tierLabel = lang === "en"
+    ? (tier === "30s" ? "30s" : tier === "60s" ? "60s" : "99s")
+    : (tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "99 秒");
+  const tierTagline = lang === "en"
+    ? (tier === "30s"
+        ? "Which post are we crafting in 30 seconds today?"
+        : tier === "60s"
+        ? "Which 60-second package are we making today?"
+        : "Which 99-second research-backed piece are we making today?")
+    : (tier === "30s"
+        ? "今天，要寫哪一篇 30 秒搞定的貼文？"
+        : tier === "60s"
+        ? "今天，要做哪一個 60 秒製作包？"
+        : "今天，要做哪一個 99 秒研究驗證版？");
 
   const runQuickMut = (trpc as any).quickTask?.runQuick?.useMutation();
   // Plan B 20s parallel orchestra (caption_writer + image_director + Flux Schnell ×N)
@@ -478,7 +504,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     const hasDerive = !!(activeTask.primary_input as any)?.derive
       || !!(activeTask.contextSources && activeTask.contextSources.length > 0);
     if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive) {
-      setErrorMsg("請先回答這個問題再生成");
+      setErrorMsg(lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成");
       return;
     }
     setRunning(true);
@@ -527,10 +553,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
             navigate(`/run/${(r as any).outputId}`);
             return;
           }
-          setErrorMsg("Squad 執行成功但 outputId 未回傳（recordTaskRun 失敗），請重試或回報。");
+          setErrorMsg(lang === "en"
+            ? "Squad ran but the output ID didn't come back. Try again or contact support."
+            : "Squad 執行成功但 outputId 未回傳（recordTaskRun 失敗），請重試或回報。");
           return;
         }
-        setErrorMsg("Squad 自動執行 mutation 暫不可用");
+        setErrorMsg(lang === "en" ? "Squad auto-run isn't available right now." : "Squad 自動執行 mutation 暫不可用");
         return;
       }
       const inputKey = activeTask.primary_input?.key ?? "topic";
@@ -617,13 +645,19 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         // error in pm2 log.
         setErrorMsg(
           (r.errors && r.errors.length > 0)
-            ? `AI 暫時忙不過來，再按一次「立即產出」就好（多半是熱門時段塞車）。`
-            : "結果沒順利存下來，請按「立即產出」再試一次。如果反覆出現請聯絡客服。"
+            ? (lang === "en"
+                ? "AI is a bit busy — hit Make it again (usually rush-hour traffic)."
+                : `AI 暫時忙不過來，再按一次「立即產出」就好（多半是熱門時段塞車）。`)
+            : (lang === "en"
+                ? "The result didn't save. Hit Make it again — contact support if it keeps happening."
+                : "結果沒順利存下來，請按「立即產出」再試一次。如果反覆出現請聯絡客服。")
         );
         return;
       }
       // 2026-05-09 cleanup: legacy runQuickMut path removed.
-      setErrorMsg("這個任務還在開發中，請改試其他任務或聯絡客服。");
+      setErrorMsg(lang === "en"
+        ? "This task isn't ready yet. Try a different one or contact support."
+        : "這個任務還在開發中，請改試其他任務或聯絡客服。");
     } catch (e: any) {
       setErrorMsg(e?.message ?? String(e));
     } finally {
@@ -635,7 +669,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const handleCopy = () => {
     if (!output?.caption) return;
     navigator.clipboard.writeText(output.caption);
-    showToastGlobal("已複製到剪貼簿", "success");
+    showToastGlobal(t("toast_copied"), "success");
   };
 
   const mockupVariant: MockupVariant | null = useMemo(() => {
@@ -654,9 +688,9 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     ? {
         emoji: "⚡",
         kicker: "QUICK DRAFT",
-        headline: "30 秒搞定一篇貼文",
-        sub: "輕量產出 · 3 個 caption 變體 · 風格 brief（按需生圖）",
-        bullets: ["3 變體", "<20 秒", "URL/品牌語氣支援"],
+        headline: lang === "en" ? "Make a post in 30 seconds" : "30 秒搞定一篇貼文",
+        sub: lang === "en" ? "Light output · 3 caption variants · visual brief (image on demand)" : "輕量產出 · 3 個 caption 變體 · 風格 brief（按需生圖）",
+        bullets: lang === "en" ? ["3 variants", "<20s", "URL / brand voice"] : ["3 變體", "<20 秒", "URL/品牌語氣支援"],
         accent: "#00b4bc",
         gradientFrom: "rgba(0,180,188,0.10)",
       }
@@ -664,29 +698,39 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     ? {
         emoji: "🎼",
         kicker: "PRODUCTION PACKAGE",
-        headline: "60 秒交付一份完整製作包",
-        sub: "多 Agent 協作 · 5 變體 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
-        bullets: ["5 變體", "7-9 位 agent 協作", "Flux 真生圖", "Jordan QA 審核"],
+        headline: lang === "en" ? "A full production pack in 60 seconds" : "60 秒交付一份完整製作包",
+        sub: lang === "en" ? "Multi-agent · 5 variants + real images + reply templates + posting time + QA" : "多 Agent 協作 · 5 變體 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
+        bullets: lang === "en" ? ["5 variants", "7-9 agents", "Real Flux images", "Jordan QA"] : ["5 變體", "7-9 位 agent 協作", "Flux 真生圖", "Jordan QA 審核"],
         accent: "#7c3aed",
         gradientFrom: "rgba(124,58,237,0.10)",
       }
     : {
         emoji: "🎯",
         kicker: "REAL SQUAD · CAMPAIGN PIPELINE",
-        headline: "99 秒任務 = 真實 Squad 多步驟工作流",
-        sub: "點擊任務後進入 Squad 工作區（/picker）— 多位 agent 接力、按方法論交付完整月曆 / launch toolkit / 危機劇本",
-        bullets: ["真實 Squad pipeline", "完整方法論（Pulizzi / Cialdini / Lagadec）", "calendar / toolkit shape 輸出", "FB 11 + IG 7 squad 已就位"],
+        headline: lang === "en" ? "99s = a real multi-step squad workflow" : "99 秒任務 = 真實 Squad 多步驟工作流",
+        sub: lang === "en"
+          ? "Click a task to enter the Squad workspace — agents hand off step by step to deliver a full calendar / launch toolkit / crisis playbook."
+          : "點擊任務後進入 Squad 工作區（/picker）— 多位 agent 接力、按方法論交付完整月曆 / launch toolkit / 危機劇本",
+        bullets: lang === "en"
+          ? ["Real squad pipeline", "Full methodology (Pulizzi / Cialdini / Lagadec)", "Calendar / toolkit output", "FB 11 + IG 7 squads ready"]
+          : ["真實 Squad pipeline", "完整方法論（Pulizzi / Cialdini / Lagadec）", "calendar / toolkit shape 輸出", "FB 11 + IG 7 squad 已就位"],
         accent: "#f59e0b",
         gradientFrom: "rgba(245,158,11,0.10)",
       };
 
   // Hero copy adapts to tier but the visual structure is identical to /squads
   // (eyebrow → gradient title → EntityStats → search → channel icons).
-  const heroTitle = tier === "30s"
-    ? "今天，要寫哪一篇 30 秒搞定的貼文？"
-    : tier === "60s"
-    ? "今天，要做哪一個 60 秒製作包？"
-    : "今天，要做哪一個 99 秒研究驗證版？";
+  const heroTitle = lang === "en"
+    ? (tier === "30s"
+        ? "Which post are we crafting in 30 seconds today?"
+        : tier === "60s"
+        ? "Which 60-second package are we making today?"
+        : "Which 99-second research-backed piece are we making today?")
+    : (tier === "30s"
+        ? "今天，要寫哪一篇 30 秒搞定的貼文？"
+        : tier === "60s"
+        ? "今天，要做哪一個 60 秒製作包？"
+        : "今天，要做哪一個 99 秒研究驗證版？");
 
   // 2026-05-11 (CJ「整個因果鏈在最後一公里斷掉了」): replace the tech-spec
   // EntityStats subtitle with a methodology value-prop that explicitly
@@ -705,14 +749,20 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   }, [brandQuery?.data, scopeActiveQuery?.data]);
 
   // 2026-05-11 (CJ「字數儘量精簡」): trimmed subtitle copy.
-  const tierKicker = tier === "30s" ? "30 秒一篇貼文"
-    : tier === "60s" ? "60 秒一個製作包"
-    : "99 秒一個 campaign";
+  const tierKicker = lang === "en"
+    ? (tier === "30s" ? "a 30-second post" : tier === "60s" ? "a 60-second production pack" : "a 99-second campaign")
+    : (tier === "30s" ? "30 秒一篇貼文" : tier === "60s" ? "60 秒一個製作包" : "99 秒一個 campaign");
   const heroSubtitle = !brandId
-    ? "先鎖定你是誰，AI 才知道每篇文章要說什麼"
+    ? (lang === "en"
+        ? "Lock in who you are first so the AI knows what every post should say."
+        : "先鎖定你是誰，AI 才知道每篇文章要說什麼")
     : positioningReady
-      ? `以 ${brandName ?? "你的品牌"} 的定位為骨架，${tierKicker}`
-      : `先完成 ${brandName ?? "這個品牌"} 的定位，AI 產出才會像你`;
+      ? (lang === "en"
+          ? `Using ${brandName ?? "your brand"}'s positioning as the spine — ${tierKicker}.`
+          : `以 ${brandName ?? "你的品牌"} 的定位為骨架，${tierKicker}`)
+      : (lang === "en"
+          ? `Finish ${brandName ?? "this brand"}'s positioning first so the AI sounds like you.`
+          : `先完成 ${brandName ?? "這個品牌"} 的定位，AI 產出才會像你`);
 
   // 2026-05-11 (CJ reviewer 反饋:「30s / 60s / 99s 的差異我看不清楚」):
   // tier-specific eyebrow + concrete "when to use" example so users
@@ -721,11 +771,17 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     : tier === "60s" ? "60S · PRODUCTION PACK"
     : "99S · CAMPAIGN";
   // 2026-05-11 (CJ「字數儘量精簡」): trimmed copy.
-  const tierWhenToUse = tier === "30s"
-    ? "日常單篇 · 追熱點 · 客戶感謝 · 緊急發文"
-    : tier === "60s"
-      ? "值得打磨的單篇 · 5 變體 + 視覺 brief + QA"
-      : "30 天月曆 · 活動 launch 包 · IG 帳號重新定位";
+  const tierWhenToUse = lang === "en"
+    ? (tier === "30s"
+        ? "Daily posts · trending topics · thank-you notes · urgent updates"
+        : tier === "60s"
+          ? "Posts worth polishing · 5 variants + visual brief + QA"
+          : "30-day calendars · launch packs · IG account repositioning")
+    : (tier === "30s"
+        ? "日常單篇 · 追熱點 · 客戶感謝 · 緊急發文"
+        : tier === "60s"
+          ? "值得打磨的單篇 · 5 變體 + 視覺 brief + QA"
+          : "30 天月曆 · 活動 launch 包 · IG 帳號重新定位");
 
   return (
     <div>
@@ -771,7 +827,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       fontStyle: "normal", fontWeight: 600,
                     }}
                   >
-                    去完成定位 →
+                    {lang === "en" ? "Finish positioning →" : "去完成定位 →"}
                   </a>
                 </>
               )}
@@ -789,7 +845,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               }}
             >
               <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
-                適合：
+                {lang === "en" ? "Best for:" : "適合："}
               </span>
               {tierWhenToUse}
             </p>
@@ -801,7 +857,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               size="lg"
               radius="lg"
               variant="flat"
-              placeholder={`搜尋 ${tierLabel} 任務、Agent 或 skill…`}
+              placeholder={lang === "en" ? `Search ${tierLabel} tasks, agents, or skills…` : `搜尋 ${tierLabel} 任務、Agent 或 skill…`}
               value={searchQuery}
               onValueChange={setSearchQuery}
               isClearable
@@ -837,7 +893,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       <FontAwesomeIcon icon={c.icon} className="text-xl" />
                     </div>
                     <span className={`text-tiny ${active ? "font-semibold text-default-900" : "text-default-600"}`}>
-                      {c.label}
+                      {lang === "en" ? (CHANNEL_EN_LABEL[c.id] ?? c.label) : c.label}
                     </span>
                   </button>
                 );
@@ -855,9 +911,9 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               {tierHero.kicker}
             </span>
             <span>·</span>
-            <span>{tasksThisTier.length} 個 {tierLabel} 任務</span>
+            <span>{lang === "en" ? `${tasksThisTier.length} ${tierLabel} tasks` : `${tasksThisTier.length} 個 ${tierLabel} 任務`}</span>
             <span>·</span>
-            <span>品牌腦：<span className="font-medium text-default-700">{brandName ?? "（未選）"}</span></span>
+            <span>{lang === "en" ? "Brand:" : "品牌腦："}<span className="font-medium text-default-700">{brandName ?? (lang === "en" ? "(none picked)" : "（未選）")}</span></span>
           </div>
         </div>
       </div>
@@ -868,11 +924,11 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           <Card>
             <CardBody className="text-center text-default-500 py-12">
               <FontAwesomeIcon icon={faBolt} className="text-3xl mb-2 text-default-300" />
-              <p className="font-semibold mb-1">{tierLabel} 任務製作中</p>
+              <p className="font-semibold mb-1">{lang === "en" ? `${tierLabel} tasks in the works` : `${tierLabel} 任務製作中`}</p>
               <p className="text-tiny text-default-400">
-                {tier === "60s" && "60 秒任務（含完整視覺 brief）將於下一波上線"}
-                {tier === "100s" && "99 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）"}
-                {tier === "30s" && "請稍候，Agent 正在準備中"}
+                {tier === "60s" && (lang === "en" ? "60-second tasks (with full visual brief) launch next wave." : "60 秒任務（含完整視覺 brief）將於下一波上線")}
+                {tier === "100s" && (lang === "en" ? "99s: real-data validation + video generation (Phase 3 rolling out)" : "99 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）")}
+                {tier === "30s" && (lang === "en" ? "Hang tight — agents are warming up." : "請稍候，Agent 正在準備中")}
               </p>
             </CardBody>
           </Card>
@@ -882,8 +938,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               <FontAwesomeIcon icon={faMagnifyingGlass} className="text-2xl mb-2 text-default-300" />
               <p>
                 {!["facebook","instagram","youtube","tiktok","linkedin","email","pr","brand","audience","all"].includes(channel)
-                  ? `${CHANNEL_TILES.find((c) => c.id === channel)?.label} 通路的 ${tierLabel} 任務製作中…`
-                  : `沒有匹配 "${searchQuery}" 的任務`}
+                  ? (lang === "en"
+                      ? `${(CHANNEL_EN_LABEL[channel] ?? CHANNEL_TILES.find((c) => c.id === channel)?.label)} ${tierLabel} tasks are in the works…`
+                      : `${CHANNEL_TILES.find((c) => c.id === channel)?.label} 通路的 ${tierLabel} 任務製作中…`)
+                  : (lang === "en"
+                      ? `No tasks match "${searchQuery}"`
+                      : `沒有匹配 "${searchQuery}" 的任務`)}
               </p>
             </CardBody>
           </Card>
@@ -891,10 +951,10 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           <>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-semibold text-lg tracking-tight">精選任務</h2>
-                <p className="text-tiny text-default-400 mt-0.5">按下即產出，先回答 1 個關鍵問題</p>
+                <h2 className="font-semibold text-lg tracking-tight">{lang === "en" ? "Featured tasks" : "精選任務"}</h2>
+                <p className="text-tiny text-default-400 mt-0.5">{lang === "en" ? "Tap to make — answer one quick question first." : "按下即產出，先回答 1 個關鍵問題"}</p>
               </div>
-              <Chip size="sm" variant="flat" color="secondary">{visibleTasks.length} 件</Chip>
+              <Chip size="sm" variant="flat" color="secondary">{lang === "en" ? `${visibleTasks.length} tasks` : `${visibleTasks.length} 件`}</Chip>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {visibleTasks.map((t, idx) => {
@@ -957,7 +1017,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                                 ))}
                             </div>
                             <span className="text-[10px] text-default-500">
-                              +{Math.max(0, (t as any).team.length - 5)} · {(t as any).team.length} 位協作
+                              +{Math.max(0, (t as any).team.length - 5)} · {lang === "en" ? `${(t as any).team.length} collaborators` : `${(t as any).team.length} 位協作`}
                             </span>
                           </div>
                         )}
@@ -1038,17 +1098,35 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
                         <span className="text-base leading-none mt-0.5">💡</span>
                         <div className="flex-1 leading-relaxed">
-                          <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
-                          {" "}先到{" "}
-                          <a
-                            href={`/brands?b=${brandId}&cat=copy`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline font-medium hover:text-amber-700"
-                          >
-                            品牌 → 文字
-                          </a>
-                          {" "}按「自動填寫」設好口吻 / 禁用詞，AI 產出會明顯貼合品牌語氣（不填也能跑，但結果會比較通用）。
+                          {lang === "en" ? (
+                            <>
+                              <span className="font-medium">This brand's word assets are empty.</span>
+                              {" "}Pop into{" "}
+                              <a
+                                href={`/brands?b=${brandId}&cat=copy`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline font-medium hover:text-amber-700"
+                              >
+                                Brand → Words
+                              </a>
+                              {" "}and hit Auto-fill to set tone and banned words. Results will sound much more on-brand (it'll still run without, but generic).
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
+                              {" "}先到{" "}
+                              <a
+                                href={`/brands?b=${brandId}&cat=copy`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline font-medium hover:text-amber-700"
+                              >
+                                品牌 → 文字
+                              </a>
+                              {" "}按「自動填寫」設好口吻 / 禁用詞，AI 產出會明顯貼合品牌語氣（不填也能跑，但結果會比較通用）。
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1090,7 +1168,9 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                               marginBottom: 6,
                             }}
                           >
-                            Context · 我會用 {brandName ?? "你的品牌"} 的這些資料來跑這個任務
+                            {lang === "en"
+                              ? `Context · I'll use these from ${brandName ?? "your brand"} to run this`
+                              : `Context · 我會用 ${brandName ?? "你的品牌"} 的這些資料來跑這個任務`}
                           </p>
                           <div className="flex flex-wrap gap-1.5">
                             {chips.filter((c) => c.hasContent).map((c, i) => (
@@ -1113,7 +1193,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                             {chips.filter((c) => !c.hasContent).slice(0, 3).map((c, i) => (
                               <span
                                 key={`m${i}`}
-                                title={c.source + " (尚未填寫)"}
+                                title={c.source + (lang === "en" ? " (not filled in yet)" : " (尚未填寫)")}
                                 style={{
                                   fontSize: 11, padding: "3px 8px",
                                   borderRadius: 4,
@@ -1162,7 +1242,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       const stagesNow =
                         orchestraStages && orchestraStages.length > 0
                           ? orchestraStages
-                          : synthesizeStages(tickMs, tier);
+                          : synthesizeStages(tickMs, tier, lang);
                       const elapsedText = `${(tickMs / 1000).toFixed(1)}s / ${expectedSec}s`;
                       const accent = tierAccent(tier);
 
@@ -1170,12 +1250,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       // image_director (60s+), then specialty (100s).
                       const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
                       const cap = agentMeta ?? activeTask.agent;
-                      if (cap) agentRoster.push({ id: cap.id, name: cap.name, title: cap.title, avatarUrl: cap.avatarUrl, role: "撰寫文案" });
-                      if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: "視覺方向" });
+                      if (cap) agentRoster.push({ id: cap.id, name: cap.name, title: cap.title, avatarUrl: cap.avatarUrl, role: lang === "en" ? "Writing caption" : "撰寫文案" });
+                      if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: lang === "en" ? "Visual direction" : "視覺方向" });
 
                       return (
                         <RunningAgentCarousel
-                          agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: "處理中" }]}
+                          agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: lang === "en" ? "Working" : "處理中" }]}
                           stages={stagesNow}
                           accentColor={accent}
                           progressPct={progressPct}
@@ -1193,7 +1273,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={closeTask} startContent={<FontAwesomeIcon icon={faXmark} />}>
-                  取消
+                  {t("cancel")}
                 </Button>
                 <Button
                   color="primary"
@@ -1202,7 +1282,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                   isDisabled={running}
                   startContent={!running && <FontAwesomeIcon icon={faPaperPlane} />}
                 >
-                  {running ? "生成中…" : "立即產出"}
+                  {running ? t("qt_run_busy") : t("qt_run_btn")}
                 </Button>
               </ModalFooter>
             </>
@@ -1242,6 +1322,7 @@ function SavePanel({ slide, accent, onClose }: {
   const listQuery = (trpc as any).project?.list?.useQuery
     ? (trpc as any).project.list.useQuery(undefined, { refetchOnWindowFocus: false })
     : { data: null, isLoading: false };
+  const { lang } = useLang();
   const projects: any[] = listQuery.data ?? [];
   const projectsAvailable = (trpc as any).project?.list?.useQuery != null;
   const [savedProjectId, setSavedProjectId] = useState<number | null>(null);
@@ -1250,15 +1331,15 @@ function SavePanel({ slide, accent, onClose }: {
     <div className="space-y-2">
       {!projectsAvailable && (
         <div className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-tiny text-warning-800">
-          <p className="font-semibold mb-1">專案功能正在接後端</p>
-          <p>目前可以先用「複製文案」帶到你自己的文件。專案 API 上線後此處就會顯示專案清單。</p>
+          <p className="font-semibold mb-1">{lang === "en" ? "Projects coming soon" : "專案功能正在接後端"}</p>
+          <p>{lang === "en" ? "For now, hit Copy to grab the caption. Project picker shows up once the API is live." : "目前可以先用「複製文案」帶到你自己的文件。專案 API 上線後此處就會顯示專案清單。"}</p>
         </div>
       )}
       {projectsAvailable && (
         <>
-          <p className="text-[10px] text-default-500">挑一個專案，把這個版本的文案 + 圖片風格存進去：</p>
+          <p className="text-[10px] text-default-500">{lang === "en" ? "Pick a project to save this version's caption + visual brief:" : "挑一個專案，把這個版本的文案 + 圖片風格存進去："}</p>
           {projects.length === 0 && !listQuery.isLoading && (
-            <p className="text-tiny text-default-400 italic py-3 text-center">尚未建立專案</p>
+            <p className="text-tiny text-default-400 italic py-3 text-center">{lang === "en" ? "No projects yet" : "尚未建立專案"}</p>
           )}
           <div className="space-y-1">
             {projects.map((p: any) => (
@@ -1281,7 +1362,7 @@ function SavePanel({ slide, accent, onClose }: {
                   {p.name?.charAt(0) ?? "P"}
                 </span>
                 <span className="flex-1 min-w-0 truncate text-tiny font-semibold text-default-800">{p.name}</span>
-                {savedProjectId === p.id && <span className="text-success-600 text-tiny">✓ 已存</span>}
+                {savedProjectId === p.id && <span className="text-success-600 text-tiny">{lang === "en" ? "✓ Saved" : "✓ 已存"}</span>}
               </button>
             ))}
           </div>
@@ -1294,7 +1375,7 @@ function SavePanel({ slide, accent, onClose }: {
         startContent={<FontAwesomeIcon icon={faFolderPlus} />}
         onPress={() => { window.location.href = "/projects"; }}
       >
-        新增專案
+        {lang === "en" ? "New project" : "新增專案"}
       </Button>
     </div>
   );
@@ -1327,6 +1408,7 @@ function OutputCarousel({
   onClose?: () => void;
   onRedo?: () => void;
 }) {
+  const { t, lang } = useLang();
   // Build the slide list. Plan B (orchestra) returns variants[] already as
   // the authoritative slide list — no separate "main"; first variant IS the
   // main. Legacy runQuick path uses [main, ...variants] as before.
@@ -1347,7 +1429,7 @@ function OutputCarousel({
     const orchestraMode = (output.variants ?? []).some((v: any) => v.imageUrl !== undefined || v.imageStatus !== undefined);
     if (orchestraMode) {
       return (output.variants ?? []).map((v: any, i: number) => ({
-        label: v.label || `版本 ${i + 1}`,
+        label: v.label || (lang === "en" ? `Version ${i + 1}` : `版本 ${i + 1}`),
         caption: v.caption ?? "",
         hashtags: v.hashtags ?? [],
         imageStyle: v.image_style_direction?.summary || topStyle,
@@ -1359,13 +1441,13 @@ function OutputCarousel({
     }
     // Legacy path
     const main = {
-      label: "主版本",
+      label: lang === "en" ? "Main version" : "主版本",
       caption: output.caption ?? "",
       hashtags: output.hashtags ?? [],
       imageStyle: topStyle,
     };
     const vars = (output.variants ?? []).map((v: any, i: number) => ({
-      label: v.label || `版本 ${i + 2}`,
+      label: v.label || (lang === "en" ? `Version ${i + 2}` : `版本 ${i + 2}`),
       caption: v.caption ?? "",
       hashtags: v.hashtags ?? output.hashtags ?? [],
       imageStyle: v.image_style_direction?.summary || topStyle,
@@ -1386,7 +1468,7 @@ function OutputCarousel({
   const fetchFbAvatarMut = (trpc as any).brand?.fetchFacebookAvatar?.useMutation();
   const onSubmitFbHandle = async () => {
     if (!brandId) return;
-    if (!fbHandle.trim()) { setFbErr("請輸入 FB 粉專網址或 handle"); return; }
+    if (!fbHandle.trim()) { setFbErr(lang === "en" ? "Paste your Facebook page URL or handle" : "請輸入 FB 粉專網址或 handle"); return; }
     setFbBusy(true); setFbErr(null);
     try {
       await fetchFbAvatarMut.mutateAsync({ brandId, handleOrUrl: fbHandle.trim() });
@@ -1451,7 +1533,7 @@ function OutputCarousel({
         setImageGenStatus("ready");
       } else {
         setImageGenStatus("failed");
-        setImageGenError(r?.message ?? "生成失敗");
+        setImageGenError(r?.message ?? (lang === "en" ? "Couldn't make it" : "生成失敗"));
       }
     } catch (e: any) {
       setImageGenStatus("failed");
@@ -1476,10 +1558,10 @@ function OutputCarousel({
         setVideoGenStatus("ready");
       } else if (r?.status === "submitted") {
         setVideoGenStatus("submitted");
-        setVideoGenError("影片在背景生成中（60-180 秒），請耐心等候。");
+        setVideoGenError(lang === "en" ? "Video is rendering in the background (60-180s). Hang tight." : "影片在背景生成中（60-180 秒），請耐心等候。");
       } else {
         setVideoGenStatus("failed");
-        setVideoGenError(r?.message ?? "生成失敗");
+        setVideoGenError(r?.message ?? (lang === "en" ? "Couldn't make it" : "生成失敗"));
       }
     } catch (e: any) {
       setVideoGenStatus("failed");
@@ -1509,14 +1591,14 @@ function OutputCarousel({
       if (r?.ok && r.rewritten) {
         setChatHistory((h) => [...h, {
           role: "assistant",
-          content: r.explanation || `根據你的意見改寫：`,
+          content: r.explanation || (lang === "en" ? `Here's a rewrite based on your note:` : `根據你的意見改寫：`),
           rewritten: r.rewritten,
         }]);
       } else {
-        setChatHistory((h) => [...h, { role: "assistant", content: `（沒寫成功：${r?.error ?? "未知錯誤"}）` }]);
+        setChatHistory((h) => [...h, { role: "assistant", content: lang === "en" ? `(Didn't work: ${r?.error ?? "unknown error"})` : `（沒寫成功：${r?.error ?? "未知錯誤"}）` }]);
       }
     } catch (e: any) {
-      setChatHistory((h) => [...h, { role: "assistant", content: `（出錯：${e?.message ?? e}）` }]);
+      setChatHistory((h) => [...h, { role: "assistant", content: lang === "en" ? `(Error: ${e?.message ?? e})` : `（出錯：${e?.message ?? e}）` }]);
     } finally {
       setChatBusy(false);
     }
@@ -1564,7 +1646,9 @@ function OutputCarousel({
       {!slide.caption && (
         <Card className="bg-warning-50 border border-warning-200">
           <CardBody className="text-warning-800 text-tiny py-2 px-3">
-            這個版本（{slide.label}）LLM 沒生出文字，先看其他版本，或按「重做」。
+            {lang === "en"
+              ? `This version (${slide.label}) didn't get any text from the LLM. Check the other versions or hit Redo.`
+              : `這個版本（${slide.label}）LLM 沒生出文字，先看其他版本，或按「重做」。`}
           </CardBody>
         </Card>
       )}
@@ -1584,23 +1668,23 @@ function OutputCarousel({
         <div className="pointer-events-auto inline-flex items-center gap-0.5 bg-white border border-default-200 rounded-full shadow-lg px-1.5 py-1">
           {/* GROUP A: 修改 / 生產 */}
           {slide?.caption && (
-            <ToolBtn lucide={Pencil} label="編輯文案" active={activeTool === "edit"} onPress={() => toggleTool("edit")} />
+            <ToolBtn lucide={Pencil} label={lang === "en" ? "Edit caption" : "編輯文案"} active={activeTool === "edit"} onPress={() => toggleTool("edit")} />
           )}
           {slide?.caption && (
-            <ToolBtn lucide={MessageCircle} label="跟 AI 改文案（對話迭代）" active={activeTool === "chat"}
+            <ToolBtn lucide={MessageCircle} label={lang === "en" ? "Chat with AI to tweak the caption" : "跟 AI 改文案（對話迭代）"} active={activeTool === "chat"}
               onPress={() => toggleTool("chat")} />
           )}
-          <ToolBtn lucide={LucideImage} label="AI 生圖" active={activeTool === "style"}
+          <ToolBtn lucide={LucideImage} label={lang === "en" ? "AI image" : "AI 生圖"} active={activeTool === "style"}
             disabled={!slide?.imageStyle} onPress={() => { setImageStep("brief"); toggleTool("style"); }} />
-          <ToolBtn lucide={Video} label="AI 生影片" active={activeTool === "video"}
+          <ToolBtn lucide={Video} label={lang === "en" ? "AI video" : "AI 生影片"} active={activeTool === "video"}
             onPress={() => { setVideoStep("brief"); toggleTool("video"); }} />
 
           <span className="w-px h-5 bg-default-200 mx-1" />
           {/* GROUP B: Agent 頭像（直接 inline toolbar）— 點頭像看那位 agent 做了什麼 */}
           {(() => {
             const allAgents: Array<{ id: number; name: string; title?: string; avatarUrl?: string | null; role: string; output?: string }> = [];
-            if (agentMeta) allAgents.push({ id: agentMeta.id, name: agentMeta.name, title: agentMeta.title, avatarUrl: agentMeta.avatarUrl, role: "文案主寫" });
-            if (imageAgentMeta) allAgents.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: "視覺方向" });
+            if (agentMeta) allAgents.push({ id: agentMeta.id, name: agentMeta.name, title: agentMeta.title, avatarUrl: agentMeta.avatarUrl, role: lang === "en" ? "Lead writer" : "文案主寫" });
+            if (imageAgentMeta) allAgents.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: lang === "en" ? "Visual direction" : "視覺方向" });
             for (const v of slides) {
               const va = (v as any).agent;
               if (va && !allAgents.find((a) => a.id === va.id)) {
@@ -1641,12 +1725,16 @@ function OutputCarousel({
                               <FontAwesomeIcon icon={faXmark} className="text-tiny" />
                             </button>
                           </div>
-                          <p className="text-[10px] font-semibold text-default-500">完成的事：</p>
+                          <p className="text-[10px] font-semibold text-default-500">{lang === "en" ? "What they did:" : "完成的事："}</p>
                           <p className="text-tiny text-default-800 whitespace-pre-line leading-relaxed max-h-40 overflow-y-auto">
                             {a.output ? a.output.slice(0, 360) + (a.output.length > 360 ? "…" : "")
-                              : a.role === "文案主寫" ? `撰寫了 ${slides.length} 個變體的 caption。當前版本「${slide?.label}」：\n${slide?.caption?.slice(0, 200) ?? ""}…`
-                              : a.role === "視覺方向" ? `產出視覺風格 brief：\n${slide?.imageStyle?.slice(0, 200) ?? "（沒有 brief）"}`
-                              : "（無單獨輸出記錄）"}
+                              : (a.role === "文案主寫" || a.role === "Lead writer") ? (lang === "en"
+                                  ? `Wrote ${slides.length} caption variants. Current "${slide?.label}":\n${slide?.caption?.slice(0, 200) ?? ""}…`
+                                  : `撰寫了 ${slides.length} 個變體的 caption。當前版本「${slide?.label}」：\n${slide?.caption?.slice(0, 200) ?? ""}…`)
+                              : (a.role === "視覺方向" || a.role === "Visual direction") ? (lang === "en"
+                                  ? `Wrote the visual brief:\n${slide?.imageStyle?.slice(0, 200) ?? "(no brief)"}`
+                                  : `產出視覺風格 brief：\n${slide?.imageStyle?.slice(0, 200) ?? "（沒有 brief）"}`)
+                              : (lang === "en" ? "(no separate output recorded)" : "（無單獨輸出記錄）")}
                           </p>
                         </div>
                       )}
@@ -1656,7 +1744,7 @@ function OutputCarousel({
                 {overflowCount > 0 && (
                   <button
                     onClick={() => toggleTool("details")}
-                    title={`還有 ${overflowCount} 位 agent，點開看完整協作流程`}
+                    title={lang === "en" ? `${overflowCount} more agents — see the full collab flow` : `還有 ${overflowCount} 位 agent，點開看完整協作流程`}
                     className="w-7 h-7 rounded-full bg-default-100 text-default-600 text-[10px] font-bold hover:bg-default-200 transition flex items-center justify-center"
                   >
                     +{overflowCount}
@@ -1668,31 +1756,31 @@ function OutputCarousel({
 
           <span className="w-px h-5 bg-default-200 mx-1" />
           {/* GROUP C: 看細節 */}
-          <ToolBtn lucide={Wand2} label="視覺方向 / hashtag" active={activeTool === "prompt"}
+          <ToolBtn lucide={Wand2} label={lang === "en" ? "Visual brief / hashtags" : "視覺方向 / hashtag"} active={activeTool === "prompt"}
             disabled={!slide?.imageStyle} onPress={() => toggleTool("prompt")} />
-          <ToolBtn lucide={LucideSliders} label="QA / Production package / 連結" active={activeTool === "details"}
+          <ToolBtn lucide={LucideSliders} label={lang === "en" ? "QA / production pack / links" : "QA / Production package / 連結"} active={activeTool === "details"}
             disabled={!hasDetails} onPress={() => toggleTool("details")} />
 
           <span className="w-px h-5 bg-default-200 mx-1" />
           {/* GROUP D: 拿走 */}
-          <ToolBtn lucide={Copy} label="複製文案"
+          <ToolBtn lucide={Copy} label={lang === "en" ? "Copy caption" : "複製文案"}
             onPress={() => {
               if (slide?.caption) {
                 navigator.clipboard.writeText(slide.caption);
-                showToastGlobal("已複製到剪貼簿", "success");
+                showToastGlobal(t("toast_copied"), "success");
               }
             }} />
-          <ToolBtn lucide={Save} label="儲存 / 加到專案" active={activeTool === "save"}
+          <ToolBtn lucide={Save} label={lang === "en" ? "Save / add to project" : "儲存 / 加到專案"} active={activeTool === "save"}
             onPress={() => toggleTool("save")} />
 
           {/* GROUP E (2026-05-08): 重做 + 關閉 — relocated from ModalFooter
               so the mockup background has zero buttons.  */}
           {(onRedo || onClose) && <span className="w-px h-5 bg-default-200 mx-1" />}
           {onRedo && (
-            <ToolBtn lucide={RotateCcw} label="重做（保留問題、重新產出）" onPress={onRedo} />
+            <ToolBtn lucide={RotateCcw} label={lang === "en" ? "Redo (keep the brief, regenerate)" : "重做（保留問題、重新產出）"} onPress={onRedo} />
           )}
           {onClose && (
-            <ToolBtn lucide={LucideX} label="關閉" onPress={onClose} />
+            <ToolBtn lucide={LucideX} label={lang === "en" ? "Close" : "關閉"} onPress={onClose} />
           )}
         </div>
       </div>
@@ -1711,8 +1799,8 @@ function OutputCarousel({
                     ? "opacity-0 cursor-not-allowed pointer-events-none"
                     : "text-default-500 hover:text-default-800 hover:bg-white/60"
                 }`}
-                aria-label="上一個版本"
-                title={idx > 0 ? `上一版：${slides[idx - 1]?.label}` : ""}
+                aria-label={lang === "en" ? "Previous version" : "上一個版本"}
+                title={idx > 0 ? (lang === "en" ? `Previous: ${slides[idx - 1]?.label}` : `上一版：${slides[idx - 1]?.label}`) : ""}
               >
                 <FontAwesomeIcon icon={faChevronLeft} className="text-large" />
                 {idx > 0 && (
@@ -1773,8 +1861,8 @@ function OutputCarousel({
                     ? "opacity-0 cursor-not-allowed pointer-events-none"
                     : "text-default-500 hover:text-default-800 hover:bg-white/60"
                 }`}
-                aria-label="下一個版本"
-                title={idx < total - 1 ? `下一版：${slides[idx + 1]?.label}` : ""}
+                aria-label={lang === "en" ? "Next version" : "下一個版本"}
+                title={idx < total - 1 ? (lang === "en" ? `Next: ${slides[idx + 1]?.label}` : `下一版：${slides[idx + 1]?.label}`) : ""}
               >
                 <FontAwesomeIcon icon={faChevronRight} className="text-large" />
                 {idx < total - 1 && (
@@ -1799,10 +1887,10 @@ function OutputCarousel({
             <button
               onClick={() => setFbLogoModalOpen(true)}
               className="fixed bottom-20 right-6 z-30 flex items-center gap-1.5 text-[10px] text-default-500 bg-white hover:bg-default-50 transition border border-default-200 rounded-full shadow-sm px-2.5 py-1"
-              title="這個品牌還沒粉專頭像 — 點此一鍵抓取"
+              title={lang === "en" ? "No Facebook page avatar yet — grab it with one click" : "這個品牌還沒粉專頭像 — 點此一鍵抓取"}
             >
               <FontAwesomeIcon icon={faFacebookF} className="text-default-400 text-[9px]" />
-              <span>抓粉專頭像</span>
+              <span>{lang === "en" ? "Grab FB avatar" : "抓粉專頭像"}</span>
             </button>
           )}
         </div>
@@ -1815,13 +1903,13 @@ function OutputCarousel({
             {/* Panel header with close button */}
             <div className="sticky top-0 bg-white pb-2 flex items-center justify-between border-b border-default-100 z-10">
               <span className="text-tiny font-bold tracking-wider uppercase" style={{ color: tierAccent(pageTier) }}>
-                {activeTool === "edit" && "✏️ 直接編輯"}
-                {activeTool === "style" && "AI 生圖"}
-                {activeTool === "video" && "🎬 AI 影片生成"}
-                {activeTool === "prompt" && "🪄 視覺方向 / hashtag"}
-                {activeTool === "details" && "📊 細節資訊"}
-                {activeTool === "chat" && `跟 ${agentMeta?.name ?? "AI"} 改文案`}
-                {activeTool === "save" && "💾 儲存 / 加到專案"}
+                {activeTool === "edit" && (lang === "en" ? "✏️ Direct edit" : "✏️ 直接編輯")}
+                {activeTool === "style" && (lang === "en" ? "AI image" : "AI 生圖")}
+                {activeTool === "video" && (lang === "en" ? "🎬 AI video" : "🎬 AI 影片生成")}
+                {activeTool === "prompt" && (lang === "en" ? "🪄 Visual brief / hashtags" : "🪄 視覺方向 / hashtag")}
+                {activeTool === "details" && (lang === "en" ? "📊 Details" : "📊 細節資訊")}
+                {activeTool === "chat" && (lang === "en" ? `Chat with ${agentMeta?.name ?? "AI"}` : `跟 ${agentMeta?.name ?? "AI"} 改文案`)}
+                {activeTool === "save" && (lang === "en" ? "💾 Save / add to project" : "💾 儲存 / 加到專案")}
               </span>
               <button onClick={() => setActiveTool(null)} className="text-default-400 hover:text-default-700">
                 <FontAwesomeIcon icon={faXmark} className="text-tiny" />
@@ -1832,7 +1920,9 @@ function OutputCarousel({
             {activeTool === "edit" && slide?.caption && (
               <div className="space-y-2">
                 <p className="text-[10px] text-default-500 leading-relaxed">
-                  在這裡改文字，左邊 mockup 會即時跟著變。改好就直接複製或存到 Mission。
+                  {lang === "en"
+                    ? "Edit here — the mockup updates live. Copy it or save to a project when you're done."
+                    : "在這裡改文字，左邊 mockup 會即時跟著變。改好就直接複製或存到 Mission。"}
                 </p>
                 <Textarea
                   value={slide.caption}
@@ -1846,7 +1936,7 @@ function OutputCarousel({
                     onClick={() => setEdits((e) => { const next = { ...e }; delete next[idx]; return next; })}
                     className="text-tiny text-default-500 hover:text-default-700 underline-offset-2 hover:underline"
                   >
-                    還原 AI 原版
+                    {lang === "en" ? "Revert to AI original" : "還原 AI 原版"}
                   </button>
                 )}
               </div>
@@ -1859,10 +1949,10 @@ function OutputCarousel({
                 <div className="rounded-xl border border-default-200 bg-default-50 p-3">
                   <p className="text-[10px] font-semibold text-default-500 mb-1 flex items-center gap-1">
                     <span className="w-4 h-4 rounded-full bg-default-200 text-default-700 text-[9px] flex items-center justify-center">1</span>
-                    中文視覺風格建議
+                    {lang === "en" ? "Visual style suggestion" : "中文視覺風格建議"}
                   </p>
                   <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line">
-                    {slide?.imageStyle ?? "（無視覺方向 brief）"}
+                    {slide?.imageStyle ?? (lang === "en" ? "(no visual brief)" : "（無視覺方向 brief）")}
                   </p>
                 </div>
 
@@ -1878,7 +1968,7 @@ function OutputCarousel({
                     }}
                     endContent={<FontAwesomeIcon icon={faChevronRight} />}
                   >
-                    下一步：產出 AI 指令
+                    {lang === "en" ? "Next: write the AI prompt" : "下一步：產出 AI 指令"}
                   </Button>
                 )}
 
@@ -1888,7 +1978,7 @@ function OutputCarousel({
                     <div className="rounded-xl border border-default-200 bg-default-50 p-3">
                       <p className="text-[10px] font-semibold text-default-500 mb-1 flex items-center gap-1">
                         <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: tierAccent(pageTier) }}>2</span>
-                        確認 / 編輯 AI 指令
+                        {lang === "en" ? "Review / edit the AI prompt" : "確認 / 編輯 AI 指令"}
                       </p>
                       <Textarea
                         value={editablePrompt}
@@ -1901,17 +1991,17 @@ function OutputCarousel({
                     <div className="rounded-xl border border-default-200 bg-default-50 p-3 space-y-2">
                       <p className="text-[10px] font-semibold text-default-500 flex items-center gap-1">
                         <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: tierAccent(pageTier) }}>3</span>
-                        選擇 AI 模型
+                        {lang === "en" ? "Pick an AI model" : "選擇 AI 模型"}
                       </p>
                       <select
                         value={imageModel}
                         onChange={(e) => setImageModel(e.target.value as any)}
                         className="w-full text-tiny border border-default-200 rounded-md px-2 py-1.5 bg-white"
                       >
-                        <option value="piapi/flux-schnell">⚡ Flux Schnell（快、便宜）</option>
-                        <option value="piapi/flux-pro">Flux Pro（高品質）</option>
-                        <option value="openai/gpt-image-1">🧠 GPT Image 1（OpenAI）</option>
-                        <option value="google/imagen-3">🌈 Imagen 3（Google）</option>
+                        <option value="piapi/flux-schnell">{lang === "en" ? "⚡ Flux Schnell (fast, cheap)" : "⚡ Flux Schnell（快、便宜）"}</option>
+                        <option value="piapi/flux-pro">{lang === "en" ? "Flux Pro (high quality)" : "Flux Pro（高品質）"}</option>
+                        <option value="openai/gpt-image-1">{lang === "en" ? "🧠 GPT Image 1 (OpenAI)" : "🧠 GPT Image 1（OpenAI）"}</option>
+                        <option value="google/imagen-3">{lang === "en" ? "🌈 Imagen 3 (Google)" : "🌈 Imagen 3（Google）"}</option>
                       </select>
                     </div>
                     <div className="flex gap-2">
@@ -1922,7 +2012,7 @@ function OutputCarousel({
                         onPress={() => setImageStep("brief")}
                         isDisabled={imageGenStatus === "generating"}
                       >
-                        ‹ 上一步
+                        {lang === "en" ? "‹ Back" : "‹ 上一步"}
                       </Button>
                       <Button
                         size="sm"
@@ -1933,13 +2023,13 @@ function OutputCarousel({
                         isLoading={imageGenStatus === "generating"}
                         isDisabled={imageGenStatus === "generating"}
                       >
-                        {imageGenStatus === "generating" ? "生成中…" : "生成"}
+                        {imageGenStatus === "generating" ? (lang === "en" ? "Making…" : "生成中…") : (lang === "en" ? "Make it" : "生成")}
                       </Button>
                     </div>
                     {/* Inline result — image appears here when ready, no popup */}
                     {imageGenStatus === "ready" && imageOverrides[idx] && (
                       <div className="rounded-xl border border-success-200 bg-success-50 p-3 space-y-2">
-                        <p className="text-tiny font-semibold text-success-700">✓ 已套用到 mockup</p>
+                        <p className="text-tiny font-semibold text-success-700">{lang === "en" ? "✓ Applied to mockup" : "✓ 已套用到 mockup"}</p>
                         <img
                           src={imageOverrides[idx]}
                           alt="generated"
@@ -1952,26 +2042,26 @@ function OutputCarousel({
                           onPress={handleInlineImageGen}
                           startContent={<FontAwesomeIcon icon={faRotateRight} />}
                         >
-                          再生一張
+                          {lang === "en" ? "Make another" : "再生一張"}
                         </Button>
                       </div>
                     )}
                     {imageGenStatus === "generating" && (
                       <div className="rounded-xl border border-default-200 bg-default-50 p-3 flex items-center gap-2">
                         <Spinner size="sm" />
-                        <span className="text-tiny text-default-600">{imageModel.includes("flux-pro") ? "Flux Pro 生圖中（10-15 秒）…" : "生圖中（5-10 秒）…"}</span>
+                        <span className="text-tiny text-default-600">{lang === "en" ? (imageModel.includes("flux-pro") ? "Flux Pro painting (10-15s)…" : "Painting (5-10s)…") : (imageModel.includes("flux-pro") ? "Flux Pro 生圖中（10-15 秒）…" : "生圖中（5-10 秒）…")}</span>
                       </div>
                     )}
                     {imageGenStatus === "failed" && (
                       <div className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-tiny text-warning-800">
-                        ✗ 生成失敗：{imageGenError}
+                        {lang === "en" ? `✗ Failed: ${imageGenError}` : `✗ 生成失敗：${imageGenError}`}
                       </div>
                     )}
                   </>
                 )}
 
                 {slide?.imageUrl && imageGenStatus === "idle" && (
-                  <p className="text-tiny text-success-600">✓ 此版本已有真生圖</p>
+                  <p className="text-tiny text-success-600">{lang === "en" ? "✓ This version already has a real image" : "✓ 此版本已有真生圖"}</p>
                 )}
               </div>
             )}
@@ -1986,10 +2076,10 @@ function OutputCarousel({
                 <div className="rounded-xl border border-default-200 bg-default-50 p-3">
                   <p className="text-[10px] font-semibold text-default-500 mb-1 flex items-center gap-1">
                     <span className="w-4 h-4 rounded-full bg-default-200 text-default-700 text-[9px] flex items-center justify-center">1</span>
-                    影片風格建議
+                    {lang === "en" ? "Video style suggestion" : "影片風格建議"}
                   </p>
                   <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line">
-                    {(output as any)?.video_style_direction?.summary ?? slide?.imageStyle ?? "（沒有 video brief，會用 image brief 當基礎）"}
+                    {(output as any)?.video_style_direction?.summary ?? slide?.imageStyle ?? (lang === "en" ? "(no video brief — using the image brief as the base)" : "（沒有 video brief，會用 image brief 當基礎）")}
                   </p>
                 </div>
                 {videoStep === "brief" && (
@@ -2003,7 +2093,7 @@ function OutputCarousel({
                     }}
                     endContent={<FontAwesomeIcon icon={faChevronRight} />}
                   >
-                    下一步：產出 AI 指令
+                    {lang === "en" ? "Next: write the AI prompt" : "下一步：產出 AI 指令"}
                   </Button>
                 )}
                 {videoStep === "prompt" && (
@@ -2011,7 +2101,7 @@ function OutputCarousel({
                     <div className="rounded-xl border border-default-200 bg-default-50 p-3">
                       <p className="text-[10px] font-semibold text-default-500 mb-1 flex items-center gap-1">
                         <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: tierAccent(pageTier) }}>2</span>
-                        確認 / 編輯影片 AI 指令
+                        {lang === "en" ? "Review / edit the video AI prompt" : "確認 / 編輯影片 AI 指令"}
                       </p>
                       <Textarea
                         value={editableVideoPrompt}
@@ -2024,23 +2114,23 @@ function OutputCarousel({
                     <div className="rounded-xl border border-default-200 bg-default-50 p-3 space-y-2">
                       <p className="text-[10px] font-semibold text-default-500 flex items-center gap-1">
                         <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: tierAccent(pageTier) }}>3</span>
-                        選擇 AI 模型
+                        {lang === "en" ? "Pick an AI model" : "選擇 AI 模型"}
                       </p>
                       <select
                         value={videoModel}
                         onChange={(e) => setVideoModel(e.target.value as any)}
                         className="w-full text-tiny border border-default-200 rounded-md px-2 py-1.5 bg-white"
                       >
-                        <option value="hailuo/t2v">⚡ Hailuo T2V（快、便宜）</option>
-                        <option value="piapi/kling-v2-master">Kling v2 Master（高品質）</option>
+                        <option value="hailuo/t2v">{lang === "en" ? "⚡ Hailuo T2V (fast, cheap)" : "⚡ Hailuo T2V（快、便宜）"}</option>
+                        <option value="piapi/kling-v2-master">{lang === "en" ? "Kling v2 Master (high quality)" : "Kling v2 Master（高品質）"}</option>
                       </select>
-                      <p className="text-[10px] text-default-400">影片產生需 60-180 秒，會在背景跑</p>
+                      <p className="text-[10px] text-default-400">{lang === "en" ? "Video rendering takes 60-180s and runs in the background." : "影片產生需 60-180 秒，會在背景跑"}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="flat" className="flex-1"
                         onPress={() => setVideoStep("brief")}
                         isDisabled={videoGenStatus === "generating"}>
-                        ‹ 上一步
+                        {lang === "en" ? "‹ Back" : "‹ 上一步"}
                       </Button>
                       <Button
                         size="sm"
@@ -2051,13 +2141,13 @@ function OutputCarousel({
                         isLoading={videoGenStatus === "generating"}
                         isDisabled={videoGenStatus === "generating"}
                       >
-                        {videoGenStatus === "generating" ? "生成中…" : "生成影片"}
+                        {videoGenStatus === "generating" ? (lang === "en" ? "Making…" : "生成中…") : (lang === "en" ? "Make video" : "生成影片")}
                       </Button>
                     </div>
                     {/* Inline video result */}
                     {videoGenStatus === "ready" && generatedVideoUrl && (
                       <div className="rounded-xl border border-success-200 bg-success-50 p-3 space-y-2">
-                        <p className="text-tiny font-semibold text-success-700">✓ 影片完成</p>
+                        <p className="text-tiny font-semibold text-success-700">{lang === "en" ? "✓ Video ready" : "✓ 影片完成"}</p>
                         <video
                           src={generatedVideoUrl}
                           controls
@@ -2070,25 +2160,27 @@ function OutputCarousel({
                           onPress={handleInlineVideoGen}
                           startContent={<FontAwesomeIcon icon={faRotateRight} />}
                         >
-                          再生一支
+                          {lang === "en" ? "Make another" : "再生一支"}
                         </Button>
                       </div>
                     )}
                     {videoGenStatus === "generating" && (
                       <div className="rounded-xl border border-default-200 bg-default-50 p-3 flex items-center gap-2">
                         <Spinner size="sm" />
-                        <span className="text-tiny text-default-600">影片生成中（60-180 秒）…</span>
+                        <span className="text-tiny text-default-600">{lang === "en" ? "Rendering video (60-180s)…" : "影片生成中（60-180 秒）…"}</span>
                       </div>
                     )}
                     {videoGenStatus === "submitted" && (
                       <div className="rounded-xl border border-default-200 bg-default-50 p-3 text-tiny text-default-700">
-                        ⏳ 影片已提交，背景生成中（{videoModel.includes("kling") ? "120-180" : "60-90"} 秒）
+                        {lang === "en"
+                          ? `⏳ Submitted — rendering in the background (${videoModel.includes("kling") ? "120-180" : "60-90"}s)`
+                          : `⏳ 影片已提交，背景生成中（${videoModel.includes("kling") ? "120-180" : "60-90"} 秒）`}
                         <p className="text-[10px] text-default-400 mt-1">{videoGenError}</p>
                       </div>
                     )}
                     {videoGenStatus === "failed" && (
                       <div className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-tiny text-warning-800">
-                        ✗ 生成失敗：{videoGenError}
+                        {lang === "en" ? `✗ Failed: ${videoGenError}` : `✗ 生成失敗：${videoGenError}`}
                       </div>
                     )}
                   </>
@@ -2102,13 +2194,24 @@ function OutputCarousel({
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1" style={{ maxHeight: 380 }}>
                   {chatHistory.length === 0 && (
                     <div className="rounded-xl bg-default-50 p-3 text-tiny text-default-700 leading-relaxed">
-                      <p className="font-semibold mb-1">{agentMeta?.name ?? "Aiden Hsu"}：</p>
-                      <p>目前的文案已經寫好（看左邊 mockup）。告訴我你想怎麼調整？例如：</p>
+                      <p className="font-semibold mb-1">{agentMeta?.name ?? "Aiden Hsu"}{lang === "en" ? ":" : "："}</p>
+                      <p>{lang === "en" ? "The caption is done (see the mockup on the left). Tell me what you'd like to tweak — for example:" : "目前的文案已經寫好（看左邊 mockup）。告訴我你想怎麼調整？例如："}</p>
                       <ul className="mt-1.5 space-y-0.5 text-[11px] text-default-600 list-disc list-inside">
-                        <li>「希望更年輕、學生族群一點」</li>
-                        <li>「把第二段刪掉，太囉嗦」</li>
-                        <li>「加入媽媽節情緒」</li>
-                        <li>「結尾的 CTA 改成限時優惠」</li>
+                        {lang === "en" ? (
+                          <>
+                            <li>"Make it younger, more student-friendly"</li>
+                            <li>"Drop the second paragraph, too wordy"</li>
+                            <li>"Add Mother's Day emotion"</li>
+                            <li>"Change the closing CTA to a limited-time offer"</li>
+                          </>
+                        ) : (
+                          <>
+                            <li>「希望更年輕、學生族群一點」</li>
+                            <li>「把第二段刪掉，太囉嗦」</li>
+                            <li>「加入媽媽節情緒」</li>
+                            <li>「結尾的 CTA 改成限時優惠」</li>
+                          </>
+                        )}
                       </ul>
                     </div>
                   )}
@@ -2119,13 +2222,13 @@ function OutputCarousel({
                         : "mr-2 bg-default-50"
                     }`}>
                       {m.role === "assistant" && (
-                        <p className="text-[10px] font-semibold text-default-500 mb-1">{agentMeta?.name ?? "AI"}：</p>
+                        <p className="text-[10px] font-semibold text-default-500 mb-1">{agentMeta?.name ?? "AI"}{lang === "en" ? ":" : "："}</p>
                       )}
                       <p className="whitespace-pre-line">{m.content}</p>
                       {m.rewritten && (
                         <>
                           <div className="mt-2 p-2 bg-white rounded-md border border-default-200">
-                            <p className="text-[10px] font-semibold text-default-500 mb-1">改寫後：</p>
+                            <p className="text-[10px] font-semibold text-default-500 mb-1">{lang === "en" ? "Rewritten:" : "改寫後："}</p>
                             <p className="text-default-800 whitespace-pre-line text-[11px]">{m.rewritten}</p>
                           </div>
                           <div className="flex gap-2 mt-2">
@@ -2137,7 +2240,7 @@ function OutputCarousel({
                                 setEdits((e) => ({ ...e, [idx]: m.rewritten! }));
                               }}
                             >
-                              ✓ 採用這版
+                              {lang === "en" ? "✓ Use this one" : "✓ 採用這版"}
                             </Button>
                           </div>
                         </>
@@ -2146,7 +2249,7 @@ function OutputCarousel({
                   ))}
                   {chatBusy && (
                     <div className="rounded-xl bg-default-50 p-2.5 text-tiny text-default-500 italic">
-                      {agentMeta?.name ?? "AI"} 思考中…
+                      {lang === "en" ? `${agentMeta?.name ?? "AI"} is thinking…` : `${agentMeta?.name ?? "AI"} 思考中…`}
                     </div>
                   )}
                 </div>
@@ -2156,7 +2259,7 @@ function OutputCarousel({
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
-                    placeholder="說明你想怎麼改…"
+                    placeholder={lang === "en" ? "Tell me what to tweak…" : "說明你想怎麼改…"}
                     className="flex-1 text-tiny border border-default-200 rounded-md px-2 py-1.5 focus:outline-none focus:border-primary-400"
                     disabled={chatBusy}
                   />
@@ -2166,7 +2269,7 @@ function OutputCarousel({
                     isDisabled={!chatInput.trim() || chatBusy}
                     style={{ background: tierAccent(pageTier), color: "white" }}
                   >
-                    送出
+                    {lang === "en" ? "Send" : "送出"}
                   </Button>
                 </div>
               </div>
@@ -2186,13 +2289,13 @@ function OutputCarousel({
             {/* PROMPT panel — show what was sent to LLM */}
             {activeTool === "prompt" && (
               <div className="rounded-xl border border-default-200 bg-default-50 p-3 space-y-2">
-                <p className="text-[10px] text-default-500 mb-1">視覺方向（會送進 AI 生圖）</p>
+                <p className="text-[10px] text-default-500 mb-1">{lang === "en" ? "Visual brief (goes into AI image gen)" : "視覺方向（會送進 AI 生圖）"}</p>
                 <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line border-l-2 border-default-300 pl-2">
-                  {slide?.imageStyle ?? "（這個任務沒有 visual brief）"}
+                  {slide?.imageStyle ?? (lang === "en" ? "(no visual brief for this task)" : "（這個任務沒有 visual brief）")}
                 </p>
                 {slide?.hashtags && slide.hashtags.length > 0 && (
                   <>
-                    <p className="text-[10px] text-default-500 mt-3 mb-1">推薦 hashtag</p>
+                    <p className="text-[10px] text-default-500 mt-3 mb-1">{lang === "en" ? "Suggested hashtags" : "推薦 hashtag"}</p>
                     <p className="text-tiny text-primary-700">
                       {slide.hashtags.map((h: string) => `#${h}`).join(" ")}
                     </p>
@@ -2225,24 +2328,24 @@ function OutputCarousel({
                 )}
                 {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length || slide.extras.followupPost || slide.extras.compareTable || slide.extras.timingAdvice || slide.extras.legalCheck) && (
                   <div className="rounded-xl border border-default-200 bg-white p-3 space-y-2 text-tiny">
-                    <p className="font-semibold">Production package</p>
+                    <p className="font-semibold">{lang === "en" ? "Production package" : "Production package"}</p>
                     {slide.extras.postingTime && (
-                      <p><span className="text-default-500">⏰ 發文時段：</span><span className="text-default-800">{slide.extras.postingTime}</span></p>
+                      <p><span className="text-default-500">{lang === "en" ? "⏰ Posting time:" : "⏰ 發文時段："}</span><span className="text-default-800">{slide.extras.postingTime}</span></p>
                     )}
                     {slide.extras.followupPost && (
                       <div>
-                        <p className="text-default-500">📅 24h 跟進：</p>
+                        <p className="text-default-500">{lang === "en" ? "📅 24h follow-up:" : "📅 24h 跟進："}</p>
                         <p className="text-default-800 whitespace-pre-line leading-relaxed">{slide.extras.followupPost}</p>
                       </div>
                     )}
                     {slide.extras.replyTemplates && slide.extras.replyTemplates.length > 0 && (
                       <div>
-                        <p className="text-default-500 mb-1">留言模板（{slide.extras.replyTemplates.length} 組）</p>
+                        <p className="text-default-500 mb-1">{lang === "en" ? `Reply templates (${slide.extras.replyTemplates.length})` : `留言模板（${slide.extras.replyTemplates.length} 組）`}</p>
                         <div className="space-y-1 pl-2 border-l-2 border-default-200">
                           {slide.extras.replyTemplates.slice(0, 5).map((rt, i) => (
                             <div key={i}>
-                              <p className="text-default-500 text-[10px]">用戶：{rt.userSays}</p>
-                              <p className="text-default-800 text-[10px]">你回：{rt.yourReply}</p>
+                              <p className="text-default-500 text-[10px]">{lang === "en" ? "User:" : "用戶："}{rt.userSays}</p>
+                              <p className="text-default-800 text-[10px]">{lang === "en" ? "You:" : "你回："}{rt.yourReply}</p>
                             </div>
                           ))}
                         </div>
@@ -2250,19 +2353,19 @@ function OutputCarousel({
                     )}
                     {slide.extras.compareTable && (
                       <div className="border-t border-default-100 pt-2">
-                        <p className="text-default-500 mb-1">🔁 爆款對照</p>
+                        <p className="text-default-500 mb-1">{lang === "en" ? "🔁 Viral comparison" : "🔁 爆款對照"}</p>
                         <p className="text-default-800 whitespace-pre-line text-[10px]">{slide.extras.compareTable}</p>
                       </div>
                     )}
                     {slide.extras.timingAdvice && (
                       <div className="border-t border-default-100 pt-2">
-                        <p className="text-default-500 mb-1">⏱ 時效性</p>
+                        <p className="text-default-500 mb-1">{lang === "en" ? "⏱ Timing" : "⏱ 時效性"}</p>
                         <p className="text-default-800 whitespace-pre-line text-[10px]">{slide.extras.timingAdvice}</p>
                       </div>
                     )}
                     {slide.extras.legalCheck && (
                       <div className="border-t border-default-100 pt-2">
-                        <p className="text-default-500 mb-1">⚖ 法務檢核</p>
+                        <p className="text-default-500 mb-1">{lang === "en" ? "⚖ Legal check" : "⚖ 法務檢核"}</p>
                         <p className="text-default-800 whitespace-pre-line text-[10px]">{slide.extras.legalCheck}</p>
                       </div>
                     )}
@@ -2270,7 +2373,7 @@ function OutputCarousel({
                 )}
                 {orchestraStages && orchestraStages.length > 0 && (
                   <div className="rounded-xl border border-default-200 bg-white p-3">
-                    <p className="text-tiny font-semibold mb-2">🎼 Agent 協作 ({doneStages}/{stageCount})</p>
+                    <p className="text-tiny font-semibold mb-2">{lang === "en" ? `🎼 Agent collab (${doneStages}/${stageCount})` : `🎼 Agent 協作 (${doneStages}/${stageCount})`}</p>
                     <StagePipelineView
                       stages={orchestraStages}
                       captionAgent={agentMeta}
@@ -2281,11 +2384,11 @@ function OutputCarousel({
                 )}
                 {fetchedUrl && (
                   <div className="rounded-xl border border-default-200 bg-white p-3 text-tiny">
-                    <p className="font-semibold mb-1">🔗 已讀連結</p>
+                    <p className="font-semibold mb-1">{lang === "en" ? "🔗 Link read" : "🔗 已讀連結"}</p>
                     <a href={fetchedUrl.url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline break-all text-[10px]">
                       {fetchedUrl.title ?? fetchedUrl.url}
                     </a>
-                    <p className="text-default-400 text-[10px] mt-1">{fetchedUrl.chars.toLocaleString()} 字</p>
+                    <p className="text-default-400 text-[10px] mt-1">{lang === "en" ? `${fetchedUrl.chars.toLocaleString()} chars` : `${fetchedUrl.chars.toLocaleString()} 字`}</p>
                   </div>
                 )}
               </div>
@@ -2304,9 +2407,11 @@ function OutputCarousel({
       <Modal isOpen={fbLogoModalOpen} onClose={() => setFbLogoModalOpen(false)} size="md" backdrop="blur">
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1">
-            <p className="font-semibold">從 FB 粉專抓 logo</p>
+            <p className="font-semibold">{lang === "en" ? "Grab logo from FB page" : "從 FB 粉專抓 logo"}</p>
             <p className="text-tiny text-default-500 font-normal">
-              貼上你 FB 粉專網址，系統會抓回頭像存進「{brandName ?? "品牌"}」。
+              {lang === "en"
+                ? `Paste your FB page URL — we'll save the avatar to "${brandName ?? "your brand"}".`
+                : `貼上你 FB 粉專網址，系統會抓回頭像存進「${brandName ?? "品牌"}」。`}
             </p>
           </ModalHeader>
           <ModalBody>
@@ -2320,16 +2425,20 @@ function OutputCarousel({
               isDisabled={fbBusy}
             />
             <p className="text-tiny text-default-400">
-              也接受純 handle（例：<code>桂冠營養研究室</code>）。粉專必須是公開的。
+              {lang === "en" ? (
+                <>Also accepts a plain handle (e.g. <code>nikecom</code>). The page must be public.</>
+              ) : (
+                <>也接受純 handle（例：<code>桂冠營養研究室</code>）。粉專必須是公開的。</>
+              )}
             </p>
             {fbErr && (
               <p className="text-tiny text-danger-600 mt-1">{fbErr}</p>
             )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={() => setFbLogoModalOpen(false)} isDisabled={fbBusy}>取消</Button>
+            <Button variant="light" onPress={() => setFbLogoModalOpen(false)} isDisabled={fbBusy}>{t("cancel")}</Button>
             <Button color="primary" onPress={onSubmitFbHandle} isLoading={fbBusy}>
-              抓取
+              {lang === "en" ? "Grab it" : "抓取"}
             </Button>
           </ModalFooter>
         </ModalContent>

@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "../../lib/trpc";
 import { Link } from "react-router-dom";
+import { useLang } from "../../lib/i18n";
 
 interface Notif {
   id: number;
@@ -75,9 +76,14 @@ export default function PositioningNotificationCenter() {
 }
 
 function NotifChip({ notif, onDismiss }: { notif: Notif; onDismiss: () => void }) {
+  const { lang } = useLang();
   const ok = notif.status === "done";
-  const kindLabel = notif.entityKind === "brand" ? "品牌" : notif.entityKind === "product" ? "產品" : "活動";
-  const statusLabel = ok ? "完整定位完成" : "定位產生失敗（已重試 5 次）";
+  const kindLabel = lang === "en"
+    ? (notif.entityKind === "brand" ? "Brand" : notif.entityKind === "product" ? "Product" : "Event")
+    : (notif.entityKind === "brand" ? "品牌" : notif.entityKind === "product" ? "產品" : "活動");
+  const statusLabel = lang === "en"
+    ? (ok ? "positioning ready" : "positioning failed (retried 5×)")
+    : (ok ? "完整定位完成" : "定位產生失敗（已重試 5 次）");
   const linkTo =
     notif.entityKind === "brand" ? `/brands/${notif.entityId}`
     : notif.entityKind === "product" ? `/products/${notif.entityId}`
@@ -104,7 +110,7 @@ function NotifChip({ notif, onDismiss }: { notif: Notif; onDismiss: () => void }
       <span style={{ fontSize: 16 }}>{ok ? "✓" : "⚠"}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: "#111", fontWeight: 600 }}>{kindLabel} #{notif.entityId} {statusLabel}</div>
-        <Link to={linkTo} style={{ fontSize: 12, color: "#6b7280" }} onClick={onDismiss}>查看</Link>
+        <Link to={linkTo} style={{ fontSize: 12, color: "#6b7280" }} onClick={onDismiss}>{lang === "en" ? "View" : "查看"}</Link>
       </div>
       <button
         onClick={onDismiss}

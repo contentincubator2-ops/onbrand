@@ -12,6 +12,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Sparkles } from "lucide-react";
+import { useLang } from "../../lib/i18n";
 
 const PLATFORM_COLOR: Record<string, string> = {
   facebook: "#1877F2",
@@ -28,12 +29,13 @@ const PLATFORM_COLOR: Record<string, string> = {
 
 export default function CalendarPage() {
   const navigate = useNavigate();
+  const { t, lang } = useLang();
   const ctx = useOutletContext<ShellOutletCtx>();
   const brandId = (ctx?.brandId as number | null) ?? null;
   const brandName = useMemo(() => {
     const list = (ctx?.brands ?? []) as Array<{ id: number; name: string }>;
-    return list.find((b) => b?.id === brandId)?.name ?? "全部品牌";
-  }, [ctx, brandId]);
+    return list.find((b) => b?.id === brandId)?.name ?? (lang === "en" ? "All brands" : "全部品牌");
+  }, [ctx, brandId, lang]);
 
   // Current month cursor
   const [cursor, setCursor] = useState(() => {
@@ -43,7 +45,7 @@ export default function CalendarPage() {
 
   const monthStart = cursor;
   const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-  const monthLabel = cursor.toLocaleDateString("zh-TW", { year: "numeric", month: "long" });
+  const monthLabel = cursor.toLocaleDateString(lang === "en" ? "en-US" : "zh-TW", { year: "numeric", month: "long" });
 
   // Build 6-row × 7-col grid (Sun=0 first)
   const days = useMemo(() => {
@@ -117,7 +119,7 @@ export default function CalendarPage() {
               backgroundClip: "text",
             }}
           >
-            這個月，你會發什麼？
+            {lang === "en" ? "What are you posting this month?" : "這個月，你會發什麼？"}
           </h1>
           <p
             className="mt-3 mx-auto text-default-700"
@@ -126,20 +128,26 @@ export default function CalendarPage() {
               fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
             }}
           >
-            {brandName} 已排程 + 已發布的內容，一目了然
+            {lang === "en"
+              ? `${brandName} — scheduled + published content at a glance`
+              : `${brandName} 已排程 + 已發布的內容，一目了然`}
           </p>
           <p
             className="mt-2 mx-auto text-default-700"
             style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
           >
-            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>適合：</span>
-            月度節奏 · 跨平台一致性 · 不要重複發 · 補洞看哪天還沒內容
+            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
+              {lang === "en" ? "Good for:" : "適合："}
+            </span>
+            {lang === "en"
+              ? "Monthly cadence · Cross-channel consistency · No double posts · Spotting empty days"
+              : "月度節奏 · 跨平台一致性 · 不要重複發 · 補洞看哪天還沒內容"}
           </p>
         </div>
       </div>
 
       {/* 2026-05-11 (CJ「節慶日曆 + 自動提醒」): festival nudge banner */}
-      <FestivalNudgeBanner brandId={brandId} navigate={navigate} />
+      <FestivalNudgeBanner brandId={brandId} navigate={navigate} lang={lang} />
 
       {/* Month control bar */}
       <div className="max-w-[1100px] mx-auto px-6 mb-4 flex items-center justify-between">
@@ -163,21 +171,21 @@ export default function CalendarPage() {
             onClick={() => setCursor(new Date(today.getFullYear(), today.getMonth(), 1))}
             className="ml-2 px-3 py-1 text-xs border border-default-300 rounded hover:border-default-900"
           >
-            今天
+            {lang === "en" ? "Today" : "今天"}
           </button>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-default-700">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-neutral-900" />
-            已排程
+            {lang === "en" ? "Scheduled" : "已排程"}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-600" />
-            已發布
+            {lang === "en" ? "Published" : "已發布"}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-500" />
-            失敗
+            {lang === "en" ? "Failed" : "失敗"}
           </span>
         </div>
       </div>
@@ -187,7 +195,10 @@ export default function CalendarPage() {
         <div className="bg-white border border-default-300 rounded-xl overflow-hidden">
           {/* Header row */}
           <div className="grid grid-cols-7 border-b border-default-300">
-            {["日", "一", "二", "三", "四", "五", "六"].map((d) => (
+            {(lang === "en"
+              ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+              : ["日", "一", "二", "三", "四", "五", "六"]
+            ).map((d) => (
               <div
                 key={d}
                 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-default-700 py-2 px-3 border-r border-default-300 last:border-r-0"
@@ -259,9 +270,19 @@ export default function CalendarPage() {
 
         {/* Footer hint */}
         <p className="mt-4 text-[11px] text-default-700 text-center">
-          想排新貼文？到 <a href="/30s" className="font-medium text-default-900 underline">30s 快寫</a> 跑一篇 → 結果頁按「排程發布」
-          <span className="mx-2 text-default-500">|</span>
-          v2 將加入 drag/drop 改時間 + 週曆視圖
+          {lang === "en" ? (
+            <>
+              Want to schedule a new post? Hit <a href="/30s" className="font-medium text-default-900 underline">30s craft</a>, then tap "Schedule" on the result page
+              <span className="mx-2 text-default-500">|</span>
+              v2 adds drag-to-reschedule + week view
+            </>
+          ) : (
+            <>
+              想排新貼文？到 <a href="/30s" className="font-medium text-default-900 underline">30s 快寫</a> 跑一篇 → 結果頁按「排程發布」
+              <span className="mx-2 text-default-500">|</span>
+              v2 將加入 drag/drop 改時間 + 週曆視圖
+            </>
+          )}
         </p>
       </div>
     </div>
@@ -276,8 +297,8 @@ export default function CalendarPage() {
    that festival.
    ─────────────────────────────────────────────────────────── */
 function FestivalNudgeBanner({
-  brandId, navigate,
-}: { brandId: number | null; navigate: (to: string) => void }) {
+  brandId, navigate, lang,
+}: { brandId: number | null; navigate: (to: string) => void; lang: "zh-TW" | "en" }) {
   const utils = (trpc as any).useUtils?.() ?? null;
   const upcomingQ = (trpc as any).festival?.upcoming?.useQuery?.(
     { windowDays: 45, limit: 3, minPriority: 3 },
@@ -302,7 +323,7 @@ function FestivalNudgeBanner({
         <div className="flex items-center gap-2 mb-2">
           <Sparkles size={13} className="text-default-900" strokeWidth={2} />
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-default-700">
-            UPCOMING · 接下來的節慶
+            {lang === "en" ? "UPCOMING · Holidays & festivals" : "UPCOMING · 接下來的節慶"}
           </span>
         </div>
         <div className="flex flex-col gap-2">
@@ -318,12 +339,16 @@ function FestivalNudgeBanner({
                 <span style={{ fontSize: 22 }}>{f.emoji ?? "🎉"}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-default-900">{f.name_zh}</span>
+                    <span className="text-sm font-semibold text-default-900">
+                      {lang === "en" ? (f.name_en ?? f.name_zh) : f.name_zh}
+                    </span>
                     <span className="text-[11px] text-default-600 tabular-nums">
-                      {new Date(f.date).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })}
+                      {new Date(f.date).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}
                       {" · "}
                       <span style={{ color: urgent ? "#B91C1C" : "#404040", fontWeight: urgent ? 600 : 400 }}>
-                        {days === 0 ? "今天" : `${days} 天後`}
+                        {days === 0
+                          ? (lang === "en" ? "Today" : "今天")
+                          : (lang === "en" ? `in ${days} days` : `${days} 天後`)}
                       </span>
                     </span>
                   </div>
@@ -342,19 +367,20 @@ function FestivalNudgeBanner({
                 </div>
                 <button
                   onClick={() => {
-                    const topic = `${f.name_zh} (${new Date(f.date).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })})${f.contentHint ? " — " + f.contentHint : ""}`;
+                    const fname = lang === "en" ? (f.name_en ?? f.name_zh) : f.name_zh;
+                    const topic = `${fname} (${new Date(f.date).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW", { month: "short", day: "numeric" })})${f.contentHint ? " — " + f.contentHint : ""}`;
                     const brandParam = brandId ? `&b=${brandId}` : "";
                     navigate(`/99s?topic=${encodeURIComponent(topic)}${brandParam}`);
                   }}
                   className="px-3 py-1.5 rounded-md text-[12px] font-semibold whitespace-nowrap"
                   style={{ background: "#171717", color: "white" }}
                 >
-                  幫我準備 5 篇 →
+                  {lang === "en" ? "Prep 5 posts →" : "幫我準備 5 篇 →"}
                 </button>
                 <button
                   onClick={() => dismissMut?.mutateAsync?.({ festivalId: f.id })}
                   className="w-7 h-7 rounded-md flex items-center justify-center text-default-600 hover:bg-default-100"
-                  title="這個節慶不要提醒"
+                  title={lang === "en" ? "Don't remind me about this one" : "這個節慶不要提醒"}
                 >
                   <X size={13} />
                 </button>

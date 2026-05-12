@@ -9,8 +9,10 @@ import MethodologyCard from "../components/methodology/MethodologyCard";
 import { accentForIndex } from "../../studio/primitives/tokens";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Button, Breadcrumbs, BreadcrumbItem, Chip } from "@heroui/react";
+import { useLang } from "../../lib/i18n";
 
 export default function MethodologyDetail() {
+  const { lang } = useLang();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const ctx = useOutletContext<ShellOutletCtx | undefined>();
@@ -25,7 +27,9 @@ export default function MethodologyDetail() {
     setBusy(true);
     setErrMsg(null);
     try {
-      const title = `新任務 · ${squad.name ?? squad.slug}`;
+      const title = lang === "en"
+        ? `New project · ${squad.name ?? squad.slug}`
+        : `新任務 · ${squad.name ?? squad.slug}`;
       const desc = (squad.description ?? "").slice(0, 1000);
       const res = await createMission.mutateAsync({
         title,
@@ -35,14 +39,16 @@ export default function MethodologyDetail() {
         brandId: brandId ?? undefined,
       });
       if (!res?.id) {
-        setErrMsg("後端沒有回傳 mission id，請重試");
+        setErrMsg(lang === "en" ? "Server didn't return a project id. Try again." : "後端沒有回傳 mission id，請重試");
         return;
       }
       navigate(brandId ? `/b/${brandId}/_/m/${res.id}` : `/m/${res.id}`);
     } catch (e: any) {
       // eslint-disable-next-line no-console
       console.error("[MethodologyDetail] mission.create failed:", e);
-      setErrMsg(`建立任務失敗：${e?.message ?? String(e)}`);
+      setErrMsg(lang === "en"
+        ? `Couldn't create project: ${e?.message ?? String(e)}`
+        : `建立任務失敗：${e?.message ?? String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -58,14 +64,14 @@ export default function MethodologyDetail() {
   const s: any = squadQuery.data;
 
   if (squadQuery.isLoading) {
-    return <div className="px-8 py-10 text-default-500">載入中…</div>;
+    return <div className="px-8 py-10 text-default-500">{lang === "en" ? "One sec…" : "載入中…"}</div>;
   }
   if (!s) {
     return (
       <div className="px-8 py-10">
-        <div className="text-default-500">找不到任務範本「{slug}」。</div>
+        <div className="text-default-500">{lang === "en" ? `Can't find template "${slug}".` : `找不到任務範本「${slug}」。`}</div>
         <Link to="/templates" className="mt-4 inline-block text-foreground underline underline-offset-4">
-          ← 回任務範本型錄
+          {lang === "en" ? "← Back to templates" : "← 回任務範本型錄"}
         </Link>
       </div>
     );
@@ -77,8 +83,8 @@ export default function MethodologyDetail() {
   return (
     <main className="px-8 py-10">
       <Breadcrumbs size="sm" className="mb-3">
-        <BreadcrumbItem href="/">首頁</BreadcrumbItem>
-        <BreadcrumbItem href="/templates">任務範本</BreadcrumbItem>
+        <BreadcrumbItem href="/">{lang === "en" ? "Home" : "首頁"}</BreadcrumbItem>
+        <BreadcrumbItem href="/templates">{lang === "en" ? "Templates" : "任務範本"}</BreadcrumbItem>
         <BreadcrumbItem>{s.name ?? s.slug}</BreadcrumbItem>
       </Breadcrumbs>
 
@@ -103,7 +109,7 @@ export default function MethodologyDetail() {
 
           <div className="border-t border-divider pt-5">
             <div className="text-tiny tracking-[0.22em] uppercase text-default-400 mb-3">
-              工作流 · {stepObjs.length} steps
+              {lang === "en" ? `Workflow · ${stepObjs.length} steps` : `工作流 · ${stepObjs.length} steps`}
             </div>
             <ol className="space-y-3">
               {stepObjs.map((st: any, i: number) => (
@@ -114,10 +120,10 @@ export default function MethodologyDetail() {
                   <div className="flex-1">
                     <div className="font-semibold text-medium text-foreground">{st.name}</div>
                     {st.requiredSkill && (
-                      <div className="text-tiny text-default-500">技能 · {st.requiredSkill}</div>
+                      <div className="text-tiny text-default-500">{lang === "en" ? `Skill · ${st.requiredSkill}` : `技能 · ${st.requiredSkill}`}</div>
                     )}
                     {st.outputType && (
-                      <div className="text-tiny text-default-500">產出 · {st.outputType}</div>
+                      <div className="text-tiny text-default-500">{lang === "en" ? `Output · ${st.outputType}` : `產出 · ${st.outputType}`}</div>
                     )}
                   </div>
                 </li>
@@ -133,7 +139,9 @@ export default function MethodologyDetail() {
             isLoading={busy}
             className="mt-6"
           >
-            {busy ? "建立中…" : "套用到新任務"}
+            {busy
+              ? (lang === "en" ? "Creating…" : "建立中…")
+              : (lang === "en" ? "Use for a new project" : "套用到新任務")}
           </Button>
           {errMsg && (
             <div className="mt-3 text-small text-danger whitespace-pre-wrap max-w-[560px]">
@@ -155,7 +163,7 @@ export default function MethodologyDetail() {
               glyph: `0${idx + 1}`,
             }))}
             leadName={s.lead?.name ?? "Squad Lead"}
-            ctaLabel={busy ? "建立中…" : "套用"}
+            ctaLabel={busy ? (lang === "en" ? "Creating…" : "建立中…") : (lang === "en" ? "Use it" : "套用")}
             onCtaClick={() => applyToNewMission(s)}
           />
         </aside>

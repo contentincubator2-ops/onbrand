@@ -29,8 +29,13 @@ import { agentAvatarUrl } from "../components/AgentAvatar";
 import { LAYER_TOKENS, type MosLayer } from "../../studio/primitives/tokens";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { OUTPUT_TYPE_REGISTRY, ALL_OUTPUT_TYPES, getOutputTypeMeta } from "../lib/outputTypes";
+import { useLang } from "../../lib/i18n";
 
 // ── Layer palette ────────────────────────────────────────────────────────────
+const LAYER_EN: Record<string, string> = {
+  L1: "Brand strategy", L2: "Product strategy", L3: "Audience strategy",
+  L4: "Channel strategy", L5: "Campaign strategy", L6: "Validate & tune",
+};
 const LAYER: Record<string, { bg: string; text: string; label: string; icon: any }> = {
   L1: { bg: "#EEF2FF", text: "#4F46E5", label: "品牌策略", icon: faBullseye   },
   L2: { bg: "#FFF1F2", text: "#E11D48", label: "產品策略", icon: faBriefcase  },
@@ -39,6 +44,8 @@ const LAYER: Record<string, { bg: string; text: string; label: string; icon: any
   L5: { bg: "#F0FDF4", text: "#16A34A", label: "活動策略", icon: faRocket     },
   L6: { bg: "#F5F5F4", text: "#57534E", label: "驗證校準", icon: faChartLine  },
 };
+const layerLabelFor = (k: string, lang: "en" | "zh-TW") =>
+  lang === "en" ? (LAYER_EN[k] ?? LAYER_EN.L1) : (LAYER[k]?.label ?? LAYER.L1.label);
 function layerInfo(raw?: string | null) {
   const k = String(raw ?? "L1").toUpperCase().match(/L([1-6])/)?.[0] ?? "L1";
   return { key: k, ...(LAYER[k] ?? LAYER.L1) };
@@ -54,14 +61,29 @@ const skillIcon = (t?: string | null) => SKILL_ICON[String(t ?? "").toLowerCase(
 
 // ── Kind tabs ────────────────────────────────────────────────────────────────
 type Kind = "squad" | "agent" | "skill";
-const KIND_TABS: Array<{ id: Kind; label: string; icon: any }> = [
+const KIND_TABS_ZH: Array<{ id: Kind; label: string; icon: any }> = [
   { id: "squad", label: "方法論小組", icon: faUsers  },
   { id: "agent", label: "Agents",     icon: faRobot  },
   { id: "skill", label: "技能",       icon: faCubes  },
 ];
+const KIND_TABS_EN: Array<{ id: Kind; label: string; icon: any }> = [
+  { id: "squad", label: "Method squads", icon: faUsers  },
+  { id: "agent", label: "Agents",        icon: faRobot  },
+  { id: "skill", label: "Skills",        icon: faCubes  },
+];
+const kindTabs = (lang: "en" | "zh-TW") => lang === "en" ? KIND_TABS_EN : KIND_TABS_ZH;
 
 // ── Category explore tiles ───────────────────────────────────────────────────
-const EXPLORE_TILES = [
+const exploreTiles = (lang: "en" | "zh-TW") => lang === "en" ? [
+  { key: "L1", label: "Brand strategy",   hint: "Positioning / Archetypes / Narrative", kind: "squad" as Kind, layer: "L1" },
+  { key: "L2", label: "Product strategy", hint: "JTBD / Launch / Value prop",           kind: "squad" as Kind, layer: "L2" },
+  { key: "L3", label: "Audience strategy",hint: "STP / Persona / Segments",              kind: "squad" as Kind, layer: "L3" },
+  { key: "L4", label: "Channel strategy", hint: "FB / IG / YT / LinkedIn",               kind: "squad" as Kind, layer: "L4" },
+  { key: "L5", label: "Campaign strategy",hint: "Launch / Campaign / Event",             kind: "squad" as Kind, layer: "L5" },
+  { key: "L6", label: "Validate & tune",  hint: "Track / Audit / Calibrate",             kind: "squad" as Kind, layer: "L6" },
+  { key: "agent", label: "Agents",        hint: "AI characters & experts",               kind: "agent" as Kind, layer: "" },
+  { key: "skill", label: "Skills",        hint: "Atomic capability library",             kind: "skill" as Kind, layer: "" },
+] : [
   { key: "L1", label: "品牌策略", hint: "定位 / 原型 / 敘事",        kind: "squad" as Kind, layer: "L1" },
   { key: "L2", label: "產品策略", hint: "JTBD / 上市 / 價值主張",    kind: "squad" as Kind, layer: "L2" },
   { key: "L3", label: "受眾策略", hint: "STP / Persona / 分眾",      kind: "squad" as Kind, layer: "L3" },
@@ -72,9 +94,9 @@ const EXPLORE_TILES = [
   { key: "skill", label: "技能",   hint: "原子能力庫",               kind: "skill" as Kind, layer: "" },
 ];
 
-const LAYER_OPTIONS = [
-  { value: "ALL", label: "全部層級" },
-  ...Object.entries(LAYER).map(([k, v]) => ({ value: k, label: `${k}・${v.label}` })),
+const layerOptions = (lang: "en" | "zh-TW") => [
+  { value: "ALL", label: lang === "en" ? "All layers" : "全部層級" },
+  ...Object.entries(LAYER).map(([k]) => ({ value: k, label: `${k}・${layerLabelFor(k, lang)}` })),
 ];
 
 // ── Toast ────────────────────────────────────────────────────────────────────
@@ -91,6 +113,10 @@ function showToast(msg: string) {
 
 // ════════════════════════════════════════════════════════════════════════════
 export default function MethodologyCatalog() {
+  const { lang } = useLang();
+  const KIND_TABS = kindTabs(lang);
+  const EXPLORE_TILES = exploreTiles(lang);
+  const LAYER_OPTIONS = layerOptions(lang);
   const { brandId } = useOutletContext<ShellOutletCtx>();
   const [searchParams] = useSearchParams();
 
@@ -248,8 +274,8 @@ export default function MethodologyCatalog() {
     setTimeout(() => document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }), 60);
   };
 
-  const layerLabel = LAYER_OPTIONS.find(o => o.value === layerFilter)?.label ?? "全部層級";
-  const kindLabel  = KIND_TABS.find(t => t.id === activeKind)?.label ?? "方法論小組";
+  const layerLabel = LAYER_OPTIONS.find(o => o.value === layerFilter)?.label ?? (lang === "en" ? "All layers" : "全部層級");
+  const kindLabel  = KIND_TABS.find(t => t.id === activeKind)?.label ?? (lang === "en" ? "Method squads" : "方法論小組");
 
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAF9", paddingBottom: 64 }}>
@@ -269,7 +295,7 @@ export default function MethodologyCatalog() {
         <div className="relative z-10 flex flex-col items-center text-center">
           {/* 小標 */}
           <p className="text-xs font-semibold uppercase tracking-widest text-default-400 mb-3">
-            SoWork · OnBrand · 對版
+            {lang === "en" ? "SoWork · OnBrand · proof" : "SoWork · OnBrand · 對版"}
           </p>
 
           {/* 主標題 — 漸層文字，與首頁風格一致 */}
@@ -283,14 +309,18 @@ export default function MethodologyCatalog() {
               backgroundClip: "text",
             }}
           >
-            什麼都可以做到。應該吧!
+            {lang === "en" ? "Anything's doable. Probably!" : "什麼都可以做到。應該吧!"}
           </h1>
 
           {/* 統計數字 */}
           <p className="text-small text-default-500 mb-6">
             {counts.total > 0
-              ? `${counts.squad} 個方法論小組（共 ${squads.length}）・${counts.agent} 個 Agents・${counts.skill} 個技能`
-              : isLoading ? "載入中…" : "瀏覽我們的 Squad、Agent、Skill 目錄"}
+              ? (lang === "en"
+                  ? `${counts.squad} method squads (${squads.length} total) · ${counts.agent} Agents · ${counts.skill} skills`
+                  : `${counts.squad} 個方法論小組（共 ${squads.length}）・${counts.agent} 個 Agents・${counts.skill} 個技能`)
+              : (isLoading
+                  ? (lang === "en" ? "One sec…" : "載入中…")
+                  : (lang === "en" ? "Browse our squads, agents, and skills" : "瀏覽我們的 Squad、Agent、Skill 目錄"))}
           </p>
 
           {/* Search — 與首頁同款白底圓角搜尋框 */}
@@ -304,7 +334,7 @@ export default function MethodologyCatalog() {
                 <input
                   value={searchQ}
                   onChange={e => setSearchQ(e.target.value)}
-                  placeholder="搜尋 Squad、Agent、技能…"
+                  placeholder={lang === "en" ? "Search squads, agents, skills…" : "搜尋 Squad、Agent、技能…"}
                   style={{ width: "100%", height: 64, padding: "0 48px 0 52px", borderRadius: 20, border: "none", fontSize: 16, outline: "none", background: "transparent", color: "#1A1A18", boxSizing: "border-box" }}
                 />
                 {searchQ && (
@@ -348,9 +378,9 @@ export default function MethodologyCatalog() {
       <div style={{ padding: "0 40px" }}>
 
         {/* ── 探索類別 ─────────────────────────────────────────────────── */}
-        <HScrollSection title="探索類別" mt={32}>
+        <HScrollSection title={lang === "en" ? "Explore by category" : "探索類別"} mt={32}>
           {EXPLORE_TILES.map(t => {
-            const li = t.layer ? layerInfo(t.layer) : (t.key === "agent" ? { key: "agent", bg: "#F5F3FF", text: "#7C3AED", label: "Agents", icon: faRobot } : { key: "skill", bg: "#ECFDF5", text: "#059669", label: "技能", icon: faCubes });
+            const li = t.layer ? layerInfo(t.layer) : (t.key === "agent" ? { key: "agent", bg: "#F5F3FF", text: "#7C3AED", label: "Agents", icon: faRobot } : { key: "skill", bg: "#ECFDF5", text: "#059669", label: (lang === "en" ? "Skills" : "技能"), icon: faCubes });
             const active = t.layer ? (activeKind === t.kind && layerFilter === t.layer) : activeKind === t.kind;
             return (
               <button key={t.key} onClick={() => applyTile(t)}
@@ -394,8 +424,8 @@ export default function MethodologyCatalog() {
         </HScrollSection>
 
         {/* ── 探索範本 ─────────────────────────────────────────────── */}
-        <HScrollSection title="探索範本" subtitle={`${counts.squad} 個預配好的 AI 小組方法論`} accentColor="#4F46E5"
-          cta="完整目錄 →" onCta={() => { setActiveKind("squad"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
+        <HScrollSection title={lang === "en" ? "Explore templates" : "探索範本"} subtitle={lang === "en" ? `${counts.squad} pre-built AI squad methods` : `${counts.squad} 個預配好的 AI 小組方法論`} accentColor="#4F46E5"
+          cta={lang === "en" ? "Full catalog →" : "完整目錄 →"} onCta={() => { setActiveKind("squad"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
           loading={isLoading} mt={32}
         >
           {squads.slice(0, 30).map(e => (
@@ -407,8 +437,8 @@ export default function MethodologyCatalog() {
 
         {/* ── 認識 AI Agents ──────────────────────────────────────────────── */}
         {agents.length > 0 && (
-          <HScrollSection title="認識 AI Agents" subtitle={`${counts.agent} 個 AI 專家角色，各有獨立人格與專業`} accentColor="#7C3AED"
-            cta="認識更多 →" onCta={() => { setActiveKind("agent"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
+          <HScrollSection title={lang === "en" ? "Meet the AI Agents" : "認識 AI Agents"} subtitle={lang === "en" ? `${counts.agent} AI experts, each with their own personality and craft` : `${counts.agent} 個 AI 專家角色，各有獨立人格與專業`} accentColor="#7C3AED"
+            cta={lang === "en" ? "Meet more →" : "認識更多 →"} onCta={() => { setActiveKind("agent"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
             mt={32}
           >
             {agents.slice(0, 24).map(e => (
@@ -421,8 +451,8 @@ export default function MethodologyCatalog() {
 
         {/* ── 熱門技能 ────────────────────────────────────────────────────────── */}
         {skills.length > 0 && (
-          <HScrollSection title="熱門技能" subtitle={`${counts.skill} 個原子能力，可組合執行任何行銷任務`} accentColor="#059669"
-            cta="瀏覽全部 →" onCta={() => { setActiveKind("skill"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
+          <HScrollSection title={lang === "en" ? "Popular skills" : "熱門技能"} subtitle={lang === "en" ? `${counts.skill} atomic skills — mix and match for any marketing task` : `${counts.skill} 個原子能力，可組合執行任何行銷任務`} accentColor="#059669"
+            cta={lang === "en" ? "Browse all →" : "瀏覽全部 →"} onCta={() => { setActiveKind("skill"); document.getElementById("grid-section")?.scrollIntoView({ behavior: "smooth" }); }}
             mt={32}
           >
             {skills.slice(0, 24).map(e => (
@@ -440,8 +470,8 @@ export default function MethodologyCatalog() {
         <div id="grid-section" style={{ marginTop: 44 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
             <div>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1A1A18", margin: "0 0 2px", letterSpacing: "-0.01em" }}>為你提供更多範本</h2>
-              <p style={{ fontSize: 13, color: "#A8A29E", margin: 0 }}>{gridItems.length} 個 {kindLabel}{layerFilter !== "ALL" ? ` · ${layerLabel}` : ""}</p>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: "#1A1A18", margin: "0 0 2px", letterSpacing: "-0.01em" }}>{lang === "en" ? "More for you" : "為你提供更多範本"}</h2>
+              <p style={{ fontSize: 13, color: "#A8A29E", margin: 0 }}>{lang === "en" ? `${gridItems.length} ${kindLabel}${layerFilter !== "ALL" ? ` · ${layerLabel}` : ""}` : `${gridItems.length} 個 ${kindLabel}${layerFilter !== "ALL" ? ` · ${layerLabel}` : ""}`}</p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               {/* Kind dropdown */}
@@ -494,11 +524,11 @@ export default function MethodologyCatalog() {
           {!isLoading && gridItems.length === 0 && (
             <div style={{ padding: "60px 24px", textAlign: "center", border: "2px dashed #E4E3E1", borderRadius: 16 }}>
               <FontAwesomeIcon icon={faCircleInfo} style={{ fontSize: 36, color: "#D1D0CE", marginBottom: 16 }} />
-              <p style={{ fontSize: 16, fontWeight: 600, color: "#57534E", margin: "0 0 8px" }}>沒有符合的{kindLabel}</p>
-              <p style={{ fontSize: 14, color: "#A8A29E", margin: "0 0 16px" }}>試試清除搜尋或換個層級篩選</p>
+              <p style={{ fontSize: 16, fontWeight: 600, color: "#57534E", margin: "0 0 8px" }}>{lang === "en" ? `No matching ${kindLabel.toLowerCase()}` : `沒有符合的${kindLabel}`}</p>
+              <p style={{ fontSize: 14, color: "#A8A29E", margin: "0 0 16px" }}>{lang === "en" ? "Try clearing search or another layer" : "試試清除搜尋或換個層級篩選"}</p>
               <button onClick={() => { setSearchQ(""); setLayerFilter("ALL"); }}
                 style={{ padding: "8px 20px", borderRadius: 8, background: "#6366F1", color: "white", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
-                清除篩選
+                {lang === "en" ? "Clear filters" : "清除篩選"}
               </button>
             </div>
           )}
@@ -528,8 +558,8 @@ export default function MethodologyCatalog() {
                 }}
               >
                 {agentLoadingMore
-                  ? "載入中…"
-                  : `顯示更多 Agents（已載入 ${agents.length} 個）`}
+                  ? (lang === "en" ? "One sec…" : "載入中…")
+                  : (lang === "en" ? `Show more agents (${agents.length} loaded)` : `顯示更多 Agents（已載入 ${agents.length} 個）`)}
               </button>
             </div>
           )}
@@ -574,6 +604,7 @@ const INSPIRATION_PLATFORMS = [
 function InspirationSection({ squads, onPreview, mt = 32 }: {
   squads: any[]; onPreview: (e: any) => void; mt?: number;
 }) {
+  const { lang } = useLang();
   const [activePlatform, setActivePlatform] = useState<string>("facebook");
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (d: 1 | -1) => ref.current?.scrollBy({ left: d * 680, behavior: "smooth" });
@@ -599,8 +630,8 @@ function InspirationSection({ squads, onPreview, mt = 32 }: {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1A1A18", margin: 0, letterSpacing: "-0.01em" }}>受你啟發</h2>
-          <p style={{ fontSize: 13, color: "#A8A29E", margin: "2px 0 0" }}>根據你常用的平台，推薦最匹配的行銷小組</p>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1A1A18", margin: 0, letterSpacing: "-0.01em" }}>{lang === "en" ? "Inspired for you" : "受你啟發"}</h2>
+          <p style={{ fontSize: 13, color: "#A8A29E", margin: "2px 0 0" }}>{lang === "en" ? "Based on your go-to platforms, here are the best-matching squads" : "根據你常用的平台，推薦最匹配的行銷小組"}</p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={() => scroll(-1)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #E4E3E1", background: "white", cursor: "pointer", color: "#57534E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>
@@ -634,7 +665,7 @@ function InspirationSection({ squads, onPreview, mt = 32 }: {
       {/* Squad scroll */}
       {displaySquads.length === 0 ? (
         <div style={{ padding: "32px 24px", textAlign: "center", background: "#F9F8F7", borderRadius: 12, color: "#A8A29E", fontSize: 14 }}>
-          尚無 {platform.label} 相關小組，敬請期待 ✨
+          {lang === "en" ? `No ${platform.label} squads yet — stay tuned ✨` : `尚無 ${platform.label} 相關小組，敬請期待 ✨`}
         </div>
       ) : (
         <div ref={ref} style={{ display: "flex", gap: 16, overflowX: "auto", scrollbarWidth: "none", paddingBottom: 8 }}>
@@ -700,6 +731,7 @@ function HScrollSection({ title, subtitle, accentColor, cta, onCta, loading, mt 
 function LandscapeCard({ entity, onPreview, aspect = "16/9", size = "md" }: {
   entity: any; onPreview: () => void; aspect?: string; size?: "sm" | "md" | "lg";
 }) {
+  const { lang } = useLang();
   const [hov, setHov] = useState(false);
   const [starHov, setStarHov] = useState(false);
   const [menuHov, setMenuHov] = useState(false);
@@ -713,7 +745,10 @@ function LandscapeCard({ entity, onPreview, aspect = "16/9", size = "md" }: {
     entity.coverImageUrl ?? entity.heroImageUrl ??
     (Array.isArray(entity.mockupImages) ? entity.mockupImages[0] : undefined) ??
     undefined;
-  const kindLabel = entity.kind === "squad" ? "小組" : entity.kind === "agent" ? "Agent" : "技能";
+  const kindLabel = lang === "en"
+    ? (entity.kind === "squad" ? "Squad" : entity.kind === "agent" ? "Agent" : "Skill")
+    : (entity.kind === "squad" ? "小組" : entity.kind === "agent" ? "Agent" : "技能");
+  const layerLabelLocal = layerLabelFor(li.key, lang);
   const titleSize = size === "sm" ? 13 : size === "lg" ? 16 : 14;
   const glyphSize = size === "sm" ? 64 : size === "lg" ? 120 : 88;
 
@@ -790,7 +825,7 @@ function LandscapeCard({ entity, onPreview, aspect = "16/9", size = "md" }: {
           color: li.text, pointerEvents: "none",
           border: `1px solid ${li.text}20`,
         }}>
-          {layer}・{li.label}
+          {layer}・{layerLabelLocal}
         </div>
 
         {/* Kind chip — top-right, fades on hover */}
@@ -810,7 +845,7 @@ function LandscapeCard({ entity, onPreview, aspect = "16/9", size = "md" }: {
             position: "absolute", bottom: 10, right: 10,
             background: "#FEF3C7", borderRadius: 6, padding: "2px 7px",
             fontSize: 10, fontWeight: 600, color: "#D97706",
-          }}>審核中</div>
+          }}>{lang === "en" ? "In review" : "審核中"}</div>
         )}
 
         {/* Hover overlay: subtle tint + action buttons */}
@@ -908,6 +943,7 @@ function DropItem({ children, active, onClick }: { children: React.ReactNode; ac
 // Each step has a dropdown to assign / change the outputType.
 // Saves via trpc.squadTemplate.setStepOutputType.
 function StepOutputEditor({ entity, li }: { entity: any; li: { bg: string; text: string } }) {
+  const { lang } = useLang();
   const [steps, setSteps] = useState<any[]>(entity.steps ?? []);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState<number | null>(null);
@@ -930,7 +966,7 @@ function StepOutputEditor({ entity, li }: { entity: any; li: { bg: string; text:
   return (
     <div style={{ marginBottom: 20 }}>
       <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px" }}>
-        工作流程（{steps.length} 步）
+        {lang === "en" ? `Workflow (${steps.length} steps)` : `工作流程（${steps.length} 步）`}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {steps.map((s: any, i: number) => {
@@ -946,7 +982,7 @@ function StepOutputEditor({ entity, li }: { entity: any; li: { bg: string; text:
               {/* Step name */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: 13, color: "#1A1A18", margin: "0 0 4px", lineHeight: 1.4, fontWeight: 500 }}>
-                  {s.name ?? s.title ?? `步驟 ${i + 1}`}
+                  {s.name ?? s.title ?? (lang === "en" ? `Step ${i + 1}` : `步驟 ${i + 1}`)}
                 </p>
 
                 {/* Output badge + assign button */}
@@ -959,13 +995,13 @@ function StepOutputEditor({ entity, li }: { entity: any; li: { bg: string; text:
                       disabled={isSaving}
                       style={{ fontSize: 11, padding: "3px 6px", borderRadius: 6, border: "1px solid #C4C0BB", color: "#57534E", background: "white", cursor: "pointer" }}
                     >
-                      <option value="">— 尚未指定 —</option>
+                      <option value="">{lang === "en" ? "— Not set —" : "— 尚未指定 —"}</option>
                       {ALL_OUTPUT_TYPES.map(t => (
                         <option key={t.key} value={t.key}>{t.label} ({t.format})</option>
                       ))}
                     </select>
                     <button onClick={() => setEditingIdx(null)}
-                      style={{ fontSize: 10, color: "#A8A29E", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>取消</button>
+                      style={{ fontSize: 10, color: "#A8A29E", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>{lang === "en" ? "Cancel" : "取消"}</button>
                   </div>
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -974,11 +1010,11 @@ function StepOutputEditor({ entity, li }: { entity: any; li: { bg: string; text:
                         <span>📄</span>{outMeta.label}
                       </span>
                     ) : (
-                      <span style={{ fontSize: 10, color: "#D1D0CE", fontStyle: "italic" }}>尚未指定產出</span>
+                      <span style={{ fontSize: 10, color: "#D1D0CE", fontStyle: "italic" }}>{lang === "en" ? "Output not set" : "尚未指定產出"}</span>
                     )}
                     <button onClick={() => setEditingIdx(i)}
                       style={{ fontSize: 10, color: "#A8A29E", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", opacity: 0.6 }}
-                      title="指定此步驟的產出文件類型">✏️</button>
+                      title={lang === "en" ? "Set the output document type for this step" : "指定此步驟的產出文件類型"}>✏️</button>
                   </div>
                 )}
               </div>
@@ -986,7 +1022,7 @@ function StepOutputEditor({ entity, li }: { entity: any; li: { bg: string; text:
           );
         })}
         {steps.length > 6 && (
-          <p style={{ fontSize: 12, color: "#A8A29E", margin: "0 0 0 32px" }}>還有更多步驟在執行時動態展開</p>
+          <p style={{ fontSize: 12, color: "#A8A29E", margin: "0 0 0 32px" }}>{lang === "en" ? "More steps unfold dynamically at runtime" : "還有更多步驟在執行時動態展開"}</p>
         )}
       </div>
     </div>
@@ -998,14 +1034,20 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
   entity: any; relatedEntities: any[]; onClose: () => void;
   onLaunch: (e: any) => void; onSelectRelated: (e: any) => void;
 }) {
+  const { lang } = useLang();
   const li = layerInfo(entity.strategyLayer ?? entity.strategy_layer);
   const layer = li.key;
+  const layerLabelLocal = layerLabelFor(li.key, lang);
   const coverImageUrl: string | undefined =
     entity.coverImageUrl ?? entity.heroImageUrl ??
     (Array.isArray(entity.mockupImages) ? entity.mockupImages[0] : undefined) ??
     undefined;
-  const kindLabel = entity.kind === "squad" ? "方法論小組" : entity.kind === "agent" ? "Agent" : "技能";
-  const ctaLabel  = entity.kind === "squad" ? "啟動此小組" : entity.kind === "agent" ? "套用此 Agent" : "套用此技能";
+  const kindLabel = lang === "en"
+    ? (entity.kind === "squad" ? "Method squad" : entity.kind === "agent" ? "Agent" : "Skill")
+    : (entity.kind === "squad" ? "方法論小組" : entity.kind === "agent" ? "Agent" : "技能");
+  const ctaLabel  = lang === "en"
+    ? (entity.kind === "squad" ? "Deploy this squad" : entity.kind === "agent" ? "Use this Agent" : "Use this skill")
+    : (entity.kind === "squad" ? "啟動此小組" : entity.kind === "agent" ? "套用此 Agent" : "套用此技能");
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -1037,14 +1079,14 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
                 <MethodologyGlyph seed={entity.slug ?? entity.id} layer={(layer as MosLayer)} size={200} />
               </div>
             )}
-            <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(255,255,255,0.94)", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, color: li.text }}>{layer}・{li.label}</div>
+            <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(255,255,255,0.94)", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, color: li.text }}>{layer}・{layerLabelLocal}</div>
             <div style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,255,255,0.94)", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 500, color: "#57534E" }}>{kindLabel}</div>
           </div>
 
           {/* Related */}
           {relatedEntities.length > 0 && (
             <div style={{ marginTop: 20 }}>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A18", margin: "0 0 12px" }}>更多類似的{kindLabel}</p>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A18", margin: "0 0 12px" }}>{lang === "en" ? `More like this ${kindLabel.toLowerCase()}` : `更多類似的${kindLabel}`}</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                 {relatedEntities.map(r => (
                   <div key={`rel-${r.kind}-${r.id}`} onClick={() => onSelectRelated(r)}
@@ -1074,9 +1116,9 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
 
           {/* ── Row 2: chips ── */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-            <span style={{ padding: "3px 10px", borderRadius: 20, background: li.bg, fontSize: 11, fontWeight: 600, color: li.text }}>{layer}・{li.label}</span>
+            <span style={{ padding: "3px 10px", borderRadius: 20, background: li.bg, fontSize: 11, fontWeight: 600, color: li.text }}>{layer}・{layerLabelLocal}</span>
             <span style={{ padding: "3px 10px", borderRadius: 20, background: "#F5F4F2", fontSize: 11, color: "#57534E" }}>{kindLabel}</span>
-            {entity.is_approved === 0 && <span style={{ padding: "3px 10px", borderRadius: 20, background: "#FEF3C7", fontSize: 11, fontWeight: 600, color: "#D97706" }}>審核中</span>}
+            {entity.is_approved === 0 && <span style={{ padding: "3px 10px", borderRadius: 20, background: "#FEF3C7", fontSize: 11, fontWeight: 600, color: "#D97706" }}>{lang === "en" ? "In review" : "審核中"}</span>}
           </div>
 
           {/* ── Row 3: title ── */}
@@ -1090,7 +1132,7 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
             onMouseLeave={e => e.currentTarget.style.background = "#7c3aed"}
           >
             <FontAwesomeIcon icon={faRocket} />
-            採用此範本
+            {lang === "en" ? "Use this template" : "採用此範本"}
           </button>
 
           {/* ── Row 5: secondary actions ── */}
@@ -1099,13 +1141,13 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
               onMouseEnter={e => e.currentTarget.style.borderColor = "#A8A29E"}
               onMouseLeave={e => e.currentTarget.style.borderColor = "#E4E3E1"}
             >
-              <FontAwesomeIcon icon={faStar} style={{ fontSize: 12 }} /> 收藏
+              <FontAwesomeIcon icon={faStar} style={{ fontSize: 12 }} /> {lang === "en" ? "Save" : "收藏"}
             </button>
             <button style={{ flex: 1, padding: "9px", borderRadius: 8, background: "white", color: "#57534E", border: "1.5px solid #E4E3E1", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "border-color 0.15s" }}
               onMouseEnter={e => e.currentTarget.style.borderColor = "#A8A29E"}
               onMouseLeave={e => e.currentTarget.style.borderColor = "#E4E3E1"}
             >
-              <FontAwesomeIcon icon={faEllipsis} style={{ fontSize: 12 }} /> 更多
+              <FontAwesomeIcon icon={faEllipsis} style={{ fontSize: 12 }} /> {lang === "en" ? "More" : "更多"}
             </button>
           </div>
 
@@ -1120,7 +1162,7 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
           {/* ── Agents — avatar 頭像列 ── */}
           {entity.kind === "squad" && (entity.agents?.length ?? 0) > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 12px" }}>參與 Agents</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 12px" }}>{lang === "en" ? "Agents on board" : "參與 Agents"}</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {entity.agents.map((a: any, i: number) => {
                   const agentSlug = a.slug ?? a.agentId ?? `agent-${i}`;
@@ -1154,7 +1196,7 @@ function DetailModal({ entity, relatedEntities, onClose, onLaunch, onSelectRelat
           {/* ── Workspace tags ── */}
           {entity.workspace && (
             <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 8px" }}>適用通路</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 8px" }}>{lang === "en" ? "Channels" : "適用通路"}</p>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {(Array.isArray(entity.workspace) ? entity.workspace : [entity.workspace]).map((w: string, i: number) => (
                   <span key={i} style={{ padding: "3px 10px", borderRadius: 20, background: "#F0F0EE", fontSize: 12, color: "#57534E" }}>{w}</span>

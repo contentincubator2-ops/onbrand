@@ -12,6 +12,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import { Heart, Sparkles, TrendingUp, Search, X, ExternalLink } from "lucide-react";
 
 type Sort = "trending" | "newest" | "most-used" | "most-liked";
@@ -45,17 +46,26 @@ interface TemplateRow {
   createdAt: string;
 }
 
-const KIND_LABELS: Record<string, string> = {
+const KIND_LABELS_ZH: Record<string, string> = {
   caption: "貼文",
   campaign: "Campaign",
   positioning: "定位",
   prompt: "Prompt",
   all: "全部",
 };
+const KIND_LABELS_EN: Record<string, string> = {
+  caption: "Post",
+  campaign: "Campaign",
+  positioning: "Positioning",
+  prompt: "Prompt",
+  all: "All",
+};
 const KIND_LABELS_LIST: Kind[] = ["all", "caption", "campaign", "positioning", "prompt"];
 
 export default function CommunityPage() {
   const navigate = useNavigate();
+  const { t, lang } = useLang();
+  const KIND_LABELS = lang === "en" ? KIND_LABELS_EN : KIND_LABELS_ZH;
   const [view, setView] = useState<View>("mine");
   const [sort, setSort] = useState<Sort>("trending");
   const [kind, setKind] = useState<Kind>("all");
@@ -102,7 +112,9 @@ export default function CommunityPage() {
               backgroundClip: "text",
             }}
           >
-            {view === "mine" ? "你的成功作品收藏" : "別人公開的範本"}
+            {view === "mine"
+              ? (lang === "en" ? "Your saved winners" : "你的成功作品收藏")
+              : (lang === "en" ? "Templates shared by others" : "別人公開的範本")}
           </h1>
           <p
             className="mt-3 mx-auto text-default-700"
@@ -112,19 +124,21 @@ export default function CommunityPage() {
             }}
           >
             {view === "mine"
-              ? "把互動好的貼文存下來，下次同類型內容直接套用"
-              : "別的操盤者貢獻的成功範本 — 你可以參考、收藏、套用"}
+              ? (lang === "en" ? "Save your high-performing posts and reuse them next time" : "把互動好的貼文存下來，下次同類型內容直接套用")
+              : (lang === "en" ? "Templates other operators have shared — browse, save, and reuse" : "別的操盤者貢獻的成功範本 — 你可以參考、收藏、套用")}
           </p>
           <p
             className="mt-2 mx-auto text-default-700"
             style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
           >
             <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
-              {view === "mine" ? "如何累積：" : "想分享："}
+              {view === "mine"
+                ? (lang === "en" ? "How to build:" : "如何累積：")
+                : (lang === "en" ? "Want to share:" : "想分享：")}
             </span>
             {view === "mine"
-              ? "跑完任務 → 結果頁按「存為我的模板」（私人）或「公開分享」"
-              : "在 RunPage 把自己跑得好的成果按「公開分享」 · 被別人用 +2 credits/次"}
+              ? (lang === "en" ? "After a task, hit \"Save as template\" (private) or \"Share publicly\" on the result page" : "跑完任務 → 結果頁按「存為我的模板」（私人）或「公開分享」")
+              : (lang === "en" ? "On the RunPage hit \"Share publicly\" on a winner · +2 credits each time it's used" : "在 RunPage 把自己跑得好的成果按「公開分享」 · 被別人用 +2 credits/次")}
           </p>
 
           {/* View toggle */}
@@ -139,7 +153,9 @@ export default function CommunityPage() {
                   color: view === v ? "white" : "#404040",
                 }}
               >
-                {v === "mine" ? "我的收藏" : "社群範本"}
+                {v === "mine"
+                  ? (lang === "en" ? "My collection" : "我的收藏")
+                  : (lang === "en" ? "Community" : "社群範本")}
               </button>
             ))}
           </div>
@@ -154,12 +170,12 @@ export default function CommunityPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="搜尋範本 / 平台 / 主題…"
+                placeholder={lang === "en" ? "Search templates, platforms, topics…" : "搜尋範本 / 平台 / 主題…"}
                 className="flex-1 bg-transparent text-sm outline-none"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="text-default-600 hover:text-default-900 text-sm shrink-0">
-                  清除
+                  {lang === "en" ? "Clear" : "清除"}
                 </button>
               )}
             </div>
@@ -171,13 +187,13 @@ export default function CommunityPage() {
       <div className="max-w-[1100px] mx-auto px-6 mb-6">
         <div className="flex flex-wrap items-center gap-4">
           <ChipGroup
-            label="類型"
+            label={lang === "en" ? "Type" : "類型"}
             options={KIND_LABELS_LIST.map((k) => ({ value: k, label: KIND_LABELS[k] ?? k }))}
             value={kind}
             onChange={(v) => setKind(v as Kind)}
           />
           <div className="flex-1 min-w-[200px]" />
-          <SortToggle value={sort} onChange={setSort} />
+          <SortToggle value={sort} onChange={setSort} lang={lang} />
         </div>
       </div>
 
@@ -197,10 +213,10 @@ export default function CommunityPage() {
             {/* Featured row */}
             {featured.length > 0 && (
               <div className="max-w-[1100px] mx-auto px-6 mb-6">
-                <SectionLabel label="EDITOR'S PICK · 精選" />
+                <SectionLabel label={lang === "en" ? "EDITOR'S PICK · FEATURED" : "EDITOR'S PICK · 精選"} />
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {featured.map((t) => (
-                    <TemplateCard key={`${t.source}-${t.id}`} t={t} onClick={() => handleClick(t)} highlight />
+                    <TemplateCard key={`${t.source}-${t.id}`} t={t} onClick={() => handleClick(t)} highlight lang={lang} kindLabels={KIND_LABELS} />
                   ))}
                 </div>
               </div>
@@ -210,30 +226,30 @@ export default function CommunityPage() {
       <div className="max-w-[1100px] mx-auto px-6 pb-24">
         <SectionLabel
           label={
-            sort === "trending" ? "TRENDING · 過去 7 天熱門"
-            : sort === "newest" ? "LATEST · 最新發布"
-            : sort === "most-used" ? "MOST USED · 累積最高"
-            : "MOST LIKED · 最多 ❤️"
+            sort === "trending" ? (lang === "en" ? "TRENDING · LAST 7 DAYS" : "TRENDING · 過去 7 天熱門")
+            : sort === "newest" ? (lang === "en" ? "LATEST · NEW RELEASES" : "LATEST · 最新發布")
+            : sort === "most-used" ? (lang === "en" ? "MOST USED · ALL-TIME" : "MOST USED · 累積最高")
+            : (lang === "en" ? "MOST LIKED · TOP ❤️" : "MOST LIKED · 最多 ❤️")
           }
         />
         {listQ?.isLoading ? (
-          <div className="text-center py-16 text-default-600">載入中…</div>
+          <div className="text-center py-16 text-default-600">{t("loading")}</div>
         ) : regular.length === 0 ? (
           <div className="text-center py-20">
             <Sparkles size={32} className="mx-auto mb-3 text-default-500" strokeWidth={1.4} />
-            <p className="text-default-700 font-medium mb-1">這個區段還沒有公開的範本</p>
-            <p className="text-tiny text-default-600">換個篩選，或第一個發布範本的人就是你 →</p>
+            <p className="text-default-700 font-medium mb-1">{lang === "en" ? "No public templates in this section yet" : "這個區段還沒有公開的範本"}</p>
+            <p className="text-tiny text-default-600">{lang === "en" ? "Try a different filter — or be the first to publish one →" : "換個篩選，或第一個發布範本的人就是你 →"}</p>
             <button
               onClick={() => navigate("/projects")}
               className="mt-4 px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
             >
-              到專案找產出去公開
+              {lang === "en" ? "Find an output to share" : "到專案找產出去公開"}
             </button>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {regular.map((t) => (
-              <TemplateCard key={`${t.source}-${t.id}`} t={t} onClick={() => handleClick(t)} />
+              <TemplateCard key={`${t.source}-${t.id}`} t={t} onClick={() => handleClick(t)} lang={lang} kindLabels={KIND_LABELS} />
             ))}
           </div>
         )}
@@ -245,6 +261,8 @@ export default function CommunityPage() {
       {openId && (
         <TemplateDetailModal
           id={openId}
+          lang={lang}
+          kindLabels={KIND_LABELS}
           onClose={() => setOpenId(null)}
           onUsed={() => {
             listQ?.refetch?.();
@@ -303,12 +321,12 @@ function ChipGroup<T extends string>({
   );
 }
 
-function SortToggle({ value, onChange }: { value: Sort; onChange: (v: Sort) => void }) {
+function SortToggle({ value, onChange, lang }: { value: Sort; onChange: (v: Sort) => void; lang: string }) {
   const options: Array<{ v: Sort; label: string; icon: React.ReactNode }> = [
-    { v: "trending",   label: "熱門",  icon: <TrendingUp size={11} /> },
-    { v: "newest",     label: "最新",  icon: null },
-    { v: "most-used",  label: "最常用", icon: null },
-    { v: "most-liked", label: "最愛",   icon: <Heart size={11} /> },
+    { v: "trending",   label: lang === "en" ? "Trending"  : "熱門",  icon: <TrendingUp size={11} /> },
+    { v: "newest",     label: lang === "en" ? "Newest"    : "最新",  icon: null },
+    { v: "most-used",  label: lang === "en" ? "Most used" : "最常用", icon: null },
+    { v: "most-liked", label: lang === "en" ? "Most liked": "最愛",   icon: <Heart size={11} /> },
   ];
   return (
     <div className="inline-flex border border-default-300 rounded-md overflow-hidden">
@@ -330,11 +348,13 @@ function SortToggle({ value, onChange }: { value: Sort; onChange: (v: Sort) => v
 }
 
 function TemplateCard({
-  t, onClick, highlight,
+  t, onClick, highlight, lang, kindLabels,
 }: {
   t: TemplateRow;
   onClick: () => void;
   highlight?: boolean;
+  lang: string;
+  kindLabels: Record<string, string>;
 }) {
   return (
     <button
@@ -361,7 +381,7 @@ function TemplateCard({
             color: "white",
           }}
         >
-          {t.source === "squad" ? "SQUAD" : KIND_LABELS[t.kind] ?? t.kind}
+          {t.source === "squad" ? "SQUAD" : kindLabels[t.kind] ?? t.kind}
         </span>
         {t.tier && (
           <span
@@ -408,8 +428,8 @@ function TemplateCard({
       >
         <span className="truncate">{t.authorName ?? `User #${t.authorUserId}`}</span>
         <span className="flex items-center gap-3 shrink-0 tabular-nums">
-          <span title="使用次數">▶ {t.useCount}</span>
-          <span title="收藏" className="flex items-center gap-0.5">
+          <span title={lang === "en" ? "Uses" : "使用次數"}>▶ {t.useCount}</span>
+          <span title={lang === "en" ? "Likes" : "收藏"} className="flex items-center gap-0.5">
             <Heart size={10} /> {t.likeCount}
           </span>
         </span>
@@ -419,8 +439,8 @@ function TemplateCard({
 }
 
 function TemplateDetailModal({
-  id, onClose, onUsed,
-}: { id: number; onClose: () => void; onUsed: () => void }) {
+  id, onClose, onUsed, lang, kindLabels,
+}: { id: number; onClose: () => void; onUsed: () => void; lang: string; kindLabels: Record<string, string> }) {
   const navigate = useNavigate();
   const detailQ = (trpc as any).community?.detail?.useQuery?.({ id }, { refetchOnWindowFocus: false });
   const utils = (trpc as any).useUtils?.() ?? null;
@@ -460,12 +480,12 @@ function TemplateDetailModal({
         </div>
 
         {detailQ?.isLoading || !d ? (
-          <div className="p-12 text-center text-default-600">載入中…</div>
+          <div className="p-12 text-center text-default-600">{lang === "en" ? "One sec…" : "載入中…"}</div>
         ) : (
           <>
             <div className="px-5 py-4 border-b border-default-200">
               <div className="flex items-center gap-2 mb-2 flex-wrap text-[10px] uppercase tracking-[0.18em] text-default-600">
-                <span style={{ fontWeight: 600 }}>{KIND_LABELS[d.kind] ?? d.kind}</span>
+                <span style={{ fontWeight: 600 }}>{kindLabels[d.kind] ?? d.kind}</span>
                 {d.tier && (
                   <span className="px-1.5 rounded text-white" style={{ background: "#171717" }}>{d.tier}</span>
                 )}
@@ -501,7 +521,9 @@ function TemplateDetailModal({
 
             <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-default-200 bg-default-50">
               <div className="text-[11px] text-default-600 tabular-nums">
-                ▶ 已被使用 {d.useCount} 次 · ❤️ {d.likeCount} · 作者已賺 {d.creditsEarned ?? 0} credits
+                {lang === "en"
+                  ? `▶ Used ${d.useCount} times · ❤️ ${d.likeCount} · Author earned ${d.creditsEarned ?? 0} credits`
+                  : `▶ 已被使用 ${d.useCount} 次 · ❤️ ${d.likeCount} · 作者已賺 ${d.creditsEarned ?? 0} credits`}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -514,7 +536,9 @@ function TemplateDetailModal({
                   }}
                 >
                   <Heart size={12} fill={d.likedByMe ? "currentColor" : "none"} />
-                  {d.likedByMe ? "已收藏" : "收藏"}
+                  {d.likedByMe
+                    ? (lang === "en" ? "Liked" : "已收藏")
+                    : (lang === "en" ? "Like" : "收藏")}
                 </button>
                 <button
                   onClick={async () => {
@@ -530,13 +554,13 @@ function TemplateDetailModal({
                         navigate(`/30s?templateId=${d.id}`);
                       }
                     } catch (e: any) {
-                      alert(`使用失敗：${e?.message ?? e}`);
+                      alert(lang === "en" ? `Use failed: ${e?.message ?? e}` : `使用失敗：${e?.message ?? e}`);
                     }
                   }}
                   className="px-3 py-1.5 rounded-md text-xs font-semibold text-white flex items-center gap-1"
                   style={{ background: "#171717" }}
                 >
-                  使用此模板 <ExternalLink size={11} />
+                  {lang === "en" ? "Use this template" : "使用此模板"} <ExternalLink size={11} />
                 </button>
               </div>
             </div>

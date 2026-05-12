@@ -3,20 +3,21 @@
  */
 
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useLang } from "../../lib/i18n";
 
 export default function ForgotPasswordPage() {
+  const { t, lang, setLang } = useLang();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email) {
-      setError("請輸入您的電子郵件");
+      setError(t("auth_err_email_invalid"));
       return;
     }
 
@@ -33,13 +34,13 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "請求失敗，請稍後再試");
+        setError(data.error || (lang === "en" ? "Couldn't send the link — try again." : "請求失敗，請稍後再試"));
         return;
       }
 
       setSuccess(true);
     } catch (err) {
-      setError("網路錯誤，請稍後再試");
+      setError(t("auth_err_network"));
     } finally {
       setLoading(false);
     }
@@ -54,19 +55,19 @@ export default function ForgotPasswordPage() {
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">已發送重設連結</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{lang === "en" ? "Check your inbox" : "已發送重設連結"}</h1>
           <p className="text-gray-600 mb-6">
-            如果此電子郵件已註冊，您將收到密碼重設連結
+            {lang === "en"
+              ? "If this email is registered, you'll get a reset link any second now."
+              : "如果此電子郵件已註冊，您將收到密碼重設連結"}
           </p>
-          <p className="text-sm text-gray-500 mb-6">
-            連結將在 1 小時內有效。請檢查您的收件匣。
-          </p>
+          <p className="text-sm text-gray-500 mb-6">{t("auth_forgot_sent")}</p>
           <Link
             to="/auth/login"
             className="inline-block rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-all duration-200"
             style={{ background: "linear-gradient(90deg, #6C5CE7, #a29bfe)" }}
           >
-            返回登入
+            {t("auth_back_to_login")}
           </Link>
         </div>
       </div>
@@ -75,32 +76,36 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left brand panel */}
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
         <div className="text-white">
-          <div className="text-4xl font-bold mb-3">OnBrand · 對版</div>
-          <div className="text-xl opacity-80">永遠 on-brand 的行銷作戰指揮台</div>
+          <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
+          <div className="text-xl opacity-80">
+            {lang === "en" ? "Marketing on autopilot — always on-brand." : "永遠 on-brand 的行銷作戰指揮台"}
+          </div>
+          <button
+            onClick={() => setLang(lang === "en" ? "zh-TW" : "en")}
+            className="mt-10 text-xs opacity-70 hover:opacity-100 underline transition"
+          >
+            {lang === "en" ? "切換為繁體中文" : "Switch to English"}
+          </button>
         </div>
       </div>
 
-      {/* Right panel */}
       <div className="flex flex-col justify-center items-center w-full lg:w-1/2 px-8">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 w-full max-w-md">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">忘記密碼？</h1>
-            <p className="text-gray-400 text-sm">輸入您的電子郵件以重設密碼</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">{t("auth_forgot_title")}</h1>
+            <p className="text-gray-400 text-sm">{t("auth_forgot_subtitle")}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                電子郵件
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("auth_email_label")}</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder={t("auth_email_placeholder")}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors"
                 autoComplete="email"
                 required
@@ -123,13 +128,13 @@ export default function ForgotPasswordPage() {
                 boxShadow: loading ? "none" : "0 4px 12px rgba(108,92,231,0.35)",
               }}
             >
-              {loading ? "發送中..." : "發送重設連結"}
+              {loading ? t("auth_forgot_busy") : t("auth_forgot_btn")}
             </button>
 
             <p className="text-center text-xs text-gray-400">
-              記得密碼了？
+              {lang === "en" ? "Remembered it?" : "記得密碼了？"}
               <Link to="/auth/login" className="text-indigo-500 hover:text-indigo-700 ml-1 underline">
-                返回登入
+                {t("auth_back_to_login")}
               </Link>
             </p>
           </form>

@@ -25,6 +25,7 @@ import {
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useLang } from "../../lib/i18n";
 import {
   faWandMagicSparkles, faArrowLeft, faCircleCheck, faCircleXmark,
   faPlay, faRotateRight, faPaperPlane, faClipboard, faClipboardCheck,
@@ -156,6 +157,7 @@ type AgentState =
 /* ─────────────────────────── Page ───────────────────────────────────── */
 
 export default function QuickTasksPage() {
+  const { lang } = useLang();
   const { brands, brandId, scope } = useOutletContext<ShellOutletCtx>();
   const currentBrand = useMemo(
     () => brands.find((b: any) => b.id === brandId) ?? null,
@@ -217,7 +219,15 @@ export default function QuickTasksPage() {
   }, [activeId]);
 
   // ── Category tabs for filtering catalog tasks
-  const CATALOG_TABS = [
+  const CATALOG_TABS = lang === "en" ? [
+    { key: "all",      label: "For you" },
+    { key: "文案",     label: "Copywriting" },
+    { key: "分析",     label: "Market analysis" },
+    { key: "社群",     label: "Social" },
+    { key: "活動",     label: "Campaigns" },
+    { key: "電商",     label: "E-commerce" },
+    { key: "影音",     label: "Video scripts" },
+  ] as const : [
     { key: "all",      label: "為你推薦" },
     { key: "文案",     label: "文案創作" },
     { key: "分析",     label: "市場分析" },
@@ -258,15 +268,17 @@ export default function QuickTasksPage() {
               backgroundClip: "text",
             }}
           >
-            一鍵產出，30 秒交稿
+            {lang === "en" ? "One tap. Done in 30s." : "一鍵產出，30 秒交稿"}
           </h1>
           <p className="mt-2 text-small text-default-500 max-w-lg">
-            每件任務背後是一組分工好的 Agent Squad — 按下即自動接力完成，不需填表單。
+            {lang === "en"
+              ? "Behind every task is an Agent Squad — tap once, they hand off to each other. No forms."
+              : "每件任務背後是一組分工好的 Agent Squad — 按下即自動接力完成，不需填表單。"}
           </p>
           {currentBrand && (
             <div className="mt-3 flex items-center gap-2 text-tiny text-default-500">
               <Avatar name={currentBrand.name} size="sm" radius="full" className="shrink-0" />
-              <span>品牌腦：<strong className="text-default-700">{currentBrand.name}</strong>・已自動帶入定位 TA 語氣</span>
+              <span>{lang === "en" ? "Brand brain: " : "品牌腦："}<strong className="text-default-700">{currentBrand.name}</strong>{lang === "en" ? " · positioning, TA, voice auto-loaded" : "・已自動帶入定位 TA 語氣"}</span>
             </div>
           )}
 
@@ -285,7 +297,7 @@ export default function QuickTasksPage() {
                 onValueChange={setCatalogSearch}
                 isClearable
                 onClear={() => setCatalogSearch("")}
-                placeholder="搜尋任務、功能…"
+                placeholder={lang === "en" ? "Search tasks, features…" : "搜尋任務、功能…"}
                 classNames={{
                   inputWrapper: "h-14 bg-white border-none shadow-none rounded-full",
                 }}
@@ -328,7 +340,7 @@ export default function QuickTasksPage() {
             onPress={() => setActiveId(null)}
             startContent={<FontAwesomeIcon icon={faArrowLeft} />}
           >
-            回任務牆
+            {lang === "en" ? "Back to tasks" : "回任務牆"}
           </Button>
           <div className="mt-5">
             <RunPanel
@@ -375,10 +387,10 @@ export default function QuickTasksPage() {
               <div className="mb-12">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="font-semibold text-lg tracking-tight">精選任務</h2>
-                    <p className="text-tiny text-default-400 mt-0.5">按下即產出，不需填寫表單</p>
+                    <h2 className="font-semibold text-lg tracking-tight">{lang === "en" ? "Featured tasks" : "精選任務"}</h2>
+                    <p className="text-tiny text-default-400 mt-0.5">{lang === "en" ? "Tap to ship — no forms" : "按下即產出，不需填寫表單"}</p>
                   </div>
-                  <Chip size="sm" variant="flat" color="secondary">{atomicTasks.length} 件</Chip>
+                  <Chip size="sm" variant="flat" color="secondary">{lang === "en" ? `${atomicTasks.length} items` : `${atomicTasks.length} 件`}</Chip>
                 </div>
 
                 {/* Canva-style horizontal scroll row */}
@@ -406,17 +418,17 @@ export default function QuickTasksPage() {
                             className="absolute top-2 right-2 text-tiny font-semibold px-2 py-0.5 rounded-full"
                             style={{ background: "rgba(255,255,255,0.8)", color: pal.text }}
                           >
-                            即時
+                            {lang === "en" ? "Instant" : "即時"}
                           </span>
                         </div>
                         {/* Card info */}
                         <div className="p-3 flex flex-col gap-1 flex-1">
                           <p className="text-small font-semibold leading-tight line-clamp-2" style={{ color: "#111" }}>
-                            {t.name_zh}
+                            {lang === "en" ? (t.name_en ?? t.name_zh) : t.name_zh}
                           </p>
                           <p className="text-tiny text-default-500 line-clamp-2">{t.description}</p>
                           <p className="text-tiny mt-auto pt-1" style={{ color: pal.to, fontWeight: 600 }}>
-                            立即產出 →
+                            {lang === "en" ? "Ship it →" : "立即產出 →"}
                           </p>
                         </div>
                       </button>
@@ -432,10 +444,10 @@ export default function QuickTasksPage() {
             <div className="mb-10">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="font-semibold text-lg tracking-tight">Squad 作業</h2>
-                  <p className="text-tiny text-default-400 mt-0.5">多 Agent 接力，深度產出</p>
+                  <h2 className="font-semibold text-lg tracking-tight">{lang === "en" ? "Squad jobs" : "Squad 作業"}</h2>
+                  <p className="text-tiny text-default-400 mt-0.5">{lang === "en" ? "Multi-agent relay, deeper output" : "多 Agent 接力，深度產出"}</p>
                 </div>
-                <Chip size="sm" variant="flat">{tasks.length} 組</Chip>
+                <Chip size="sm" variant="flat">{lang === "en" ? `${tasks.length} squads` : `${tasks.length} 組`}</Chip>
               </div>
               {tasksQuery.isLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -485,6 +497,7 @@ function AtomicResultModal({
   result: any | null;
   error: string | null;
 }) {
+  const { lang } = useLang();
   const [editBuffer, setEditBuffer] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
@@ -512,11 +525,13 @@ function AtomicResultModal({
         <ModalHeader className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <Chip size="sm" variant="flat" color="secondary" className="uppercase">⚡ Atomic</Chip>
-            <h2 className="text-medium font-semibold">{t.name_zh}</h2>
+            <h2 className="text-medium font-semibold">{lang === "en" ? (t.name_en ?? t.name_zh) : t.name_zh}</h2>
           </div>
           {result.agent && (
             <p className="text-tiny text-default-500">
-              由 {result.agent.name}（{result.agent.title ?? ""}）交付
+              {lang === "en"
+                ? `Delivered by ${result.agent.name} (${result.agent.title ?? ""})`
+                : `由 ${result.agent.name}（${result.agent.title ?? ""}）交付`}
               {result.durationMs != null && ` · ${(result.durationMs / 1000).toFixed(1)}s`}
             </p>
           )}
@@ -525,7 +540,7 @@ function AtomicResultModal({
           {result.pending ? (
             <div className="flex flex-col items-center gap-3 py-10">
               <Spinner size="lg" color="secondary" />
-              <p className="text-small text-default-500">agent 產出中…</p>
+              <p className="text-small text-default-500">{lang === "en" ? "Agent working on it…" : "agent 產出中…"}</p>
               <div className="flex items-center gap-1 text-tiny text-default-400">
                 <FontAwesomeIcon icon={faClock} />
                 <span>{elapsed}s</span>
@@ -541,7 +556,7 @@ function AtomicResultModal({
           ) : error ? (
             <Card shadow="none" className="border border-danger-200 bg-danger-50">
               <CardBody className="p-3">
-                <p className="text-small font-medium text-danger">✗ 執行失敗</p>
+                <p className="text-small font-medium text-danger">{lang === "en" ? "✗ Run failed" : "✗ 執行失敗"}</p>
                 <p className="text-tiny text-danger-700 mt-1">{error}</p>
               </CardBody>
             </Card>
@@ -564,14 +579,14 @@ function AtomicResultModal({
                   onPress={() => navigator.clipboard.writeText(editBuffer)}
                   startContent={<FontAwesomeIcon icon={faCopy} />}
                 >
-                  複製到剪貼簿
+                  {lang === "en" ? "Copy to clipboard" : "複製到剪貼簿"}
                 </Button>
               </div>
             </>
           )}
         </ModalBody>
         <ModalFooter>
-          <Button size="sm" variant="light" onPress={onClose}>關閉</Button>
+          <Button size="sm" variant="light" onPress={onClose}>{lang === "en" ? "Close" : "關閉"}</Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
@@ -583,6 +598,7 @@ function AtomicResultModal({
 function SquadTile({
   task, index: _index, onPress,
 }: { task: TaskMeta; index: number; onPress: () => void }) {
+  const { lang } = useLang();
   const allAgents = useMemo(() => task.stages.flatMap((s) => s.agents), [task]);
   return (
     <Card
@@ -625,13 +641,13 @@ function SquadTile({
             </Tooltip>
           ))}
         </AvatarGroup>
-        <span className="ml-1 text-tiny text-default-400">{allAgents.length} 位</span>
+        <span className="ml-1 text-tiny text-default-400">{lang === "en" ? `${allAgents.length} agents` : `${allAgents.length} 位`}</span>
         <Chip
           size="sm" variant="flat" color="primary"
           className="ml-auto"
           startContent={<FontAwesomeIcon icon={faRocket} className="text-tiny ml-1" />}
         >
-          派出
+          {lang === "en" ? "Deploy" : "派出"}
         </Chip>
       </CardFooter>
     </Card>
@@ -646,6 +662,7 @@ function FreeInputBar({
   onRoute: (taskId: string, inputs: Record<string, string | number>) => void;
   disabled?: boolean;
 }) {
+  const { lang } = useLang();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -657,13 +674,13 @@ function FreeInputBar({
     try {
       const r = await routeMut.mutateAsync({ text: text.trim() });
       if (!r.taskId || r.confidence < 0.4) {
-        setHint("沒有完全匹配的任務 — 請從下方選一件，或換個說法。");
+        setHint(lang === "en" ? "No exact match — pick one below or rephrase." : "沒有完全匹配的任務 — 請從下方選一件，或換個說法。");
       } else {
         onRoute(r.taskId, r.inputs ?? {});
         setText("");
       }
     } catch (e: any) {
-      setHint(`路由失敗：${e?.message ?? e}`);
+      setHint(lang === "en" ? `Routing failed: ${e?.message ?? e}` : `路由失敗：${e?.message ?? e}`);
     } finally { setBusy(false); }
   };
 
@@ -677,7 +694,7 @@ function FreeInputBar({
         onValueChange={setText}
         onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
         isDisabled={disabled || busy}
-        placeholder="例：幫 NIKE 寫 5 個 IG hook，主題是夏季新鞋"
+        placeholder={lang === "en" ? "e.g. write 5 IG hooks for NIKE about summer kicks" : "例：幫 NIKE 寫 5 個 IG hook，主題是夏季新鞋"}
         startContent={<FontAwesomeIcon icon={faWandMagicSparkles} style={{ color: ACCENT }} />}
         endContent={
           <Button
@@ -687,7 +704,7 @@ function FreeInputBar({
             onPress={submit}
             endContent={!busy && <FontAwesomeIcon icon={faPaperPlane} />}
           >
-            {busy ? "路由中" : "派 Agent"}
+            {busy ? (lang === "en" ? "Routing" : "路由中") : (lang === "en" ? "Send Agent" : "派 Agent")}
           </Button>
         }
       />
@@ -695,7 +712,7 @@ function FreeInputBar({
         <p className="mt-2 text-tiny text-default-500">{hint}</p>
       )}
       <p className="mt-2 text-tiny tracking-wider uppercase text-default-400">
-        AUTO-MATCH · 你的品牌大腦會自動帶入
+        {lang === "en" ? "AUTO-MATCH · your brand brain loads in" : "AUTO-MATCH · 你的品牌大腦會自動帶入"}
       </p>
     </div>
   );
@@ -710,6 +727,7 @@ function RunPanel({
   prefilled: Record<string, string | number>;
   currentBrand: { id: number; name: string } | null;
 }) {
+  const { lang } = useLang();
   const [inputs, setInputs] = useState<Record<string, string | number>>(() => {
     const init: Record<string, string | number> = {};
     for (const f of task.fields) if (f.default !== undefined) init[f.key] = f.default;
@@ -842,10 +860,10 @@ function RunPanel({
             <div className="flex items-center gap-2 flex-wrap">
               <Chip size="sm" variant="flat">SQUAD</Chip>
               <Chip size="sm" variant="flat">~ {task.etaSeconds}s</Chip>
-              <Chip size="sm" variant="flat">{task.stages.length} 階段接力</Chip>
+              <Chip size="sm" variant="flat">{lang === "en" ? `${task.stages.length} stage relay` : `${task.stages.length} 階段接力`}</Chip>
               {currentBrand && (
                 <Chip size="sm" color="default" variant="flat">
-                  已自動帶入 {currentBrand.name} 的 brand brain
+                  {lang === "en" ? `${currentBrand.name}'s brand brain loaded` : `已自動帶入 ${currentBrand.name} 的 brand brain`}
                 </Chip>
               )}
             </div>
@@ -887,7 +905,7 @@ function RunPanel({
               startContent={<span className="text-tiny tracking-wider uppercase mr-1">BRAND</span>}
             >
               <span className="font-medium">{currentBrand.name}</span>
-              <span className="text-default-500 text-tiny ml-2">已從 shell 自動帶入</span>
+              <span className="text-default-500 text-tiny ml-2">{lang === "en" ? "auto-loaded from shell" : "已從 shell 自動帶入"}</span>
             </Chip>
           )}
 
@@ -906,12 +924,16 @@ function RunPanel({
             onPress={runAll}
             startContent={!running && <FontAwesomeIcon icon={hasRun ? faRotateRight : faPlay} />}
           >
-            {running ? "管線執行中…" : hasRun ? "重新派出" : `派出管線（${task.stages.length} 階段）`}
+            {running
+              ? (lang === "en" ? "Pipeline running…" : "管線執行中…")
+              : hasRun
+                ? (lang === "en" ? "Run again" : "重新派出")
+                : (lang === "en" ? `Run pipeline (${task.stages.length} stages)` : `派出管線（${task.stages.length} 階段）`)}
           </Button>
 
           <Divider />
 
-          <p className="text-tiny tracking-wider uppercase text-default-400">管線概覽</p>
+          <p className="text-tiny tracking-wider uppercase text-default-400">{lang === "en" ? "Pipeline overview" : "管線概覽"}</p>
           <ol className="space-y-3 text-small">
             {task.stages.map((s, i) => {
               const isActive = activeStageIdx === i;
@@ -968,15 +990,19 @@ function RunPanel({
 }
 
 function ReadyState({ stages }: { stages: number }) {
+  const { lang } = useLang();
   return (
     <div className="h-full min-h-[460px] flex items-center justify-center text-center">
       <div className="flex flex-col items-center gap-3">
         <Spinner size="lg" color="default" label={null as any} />
         <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider">READY</Chip>
-        <p className="font-semibold text-2xl tracking-tight">{stages} 階段管線已就位</p>
+        <p className="font-semibold text-2xl tracking-tight">{lang === "en" ? `${stages}-stage pipeline ready` : `${stages} 階段管線已就位`}</p>
         <p className="text-small text-default-500 max-w-[420px]">
-          填好左邊的 brief，點「派出管線」<br />
-          每個階段的 agent 會同時動工，前一階段交棒給下一階段
+          {lang === "en" ? (
+            <>Fill in the brief on the left, hit "Run pipeline"<br />Agents work in parallel per stage, then hand off to the next</>
+          ) : (
+            <>填好左邊的 brief，點「派出管線」<br />每個階段的 agent 會同時動工，前一階段交棒給下一階段</>
+          )}
         </p>
       </div>
     </div>
@@ -995,6 +1021,7 @@ function StageBlock({
   kFn: (sId: string, aId: string) => string;
   finalKind: TaskMeta["finalKind"];
 }) {
+  const { lang } = useLang();
   const isOrch = stage.isOrchestrator;
 
   return (
@@ -1015,7 +1042,7 @@ function StageBlock({
           </span>
           <div>
             <p className={`text-tiny tracking-wider uppercase ${isOrch ? "opacity-70" : "text-default-500"}`}>
-              {isOrch ? "ORCHESTRATOR · 收尾" : `STAGE ${stageIdx + 1} · 並行`}
+              {isOrch ? (lang === "en" ? "ORCHESTRATOR · wrap up" : "ORCHESTRATOR · 收尾") : (lang === "en" ? `STAGE ${stageIdx + 1} · parallel` : `STAGE ${stageIdx + 1} · 並行`)}
             </p>
             <p className="font-semibold text-medium tracking-tight">{stage.label}</p>
           </div>
@@ -1064,6 +1091,7 @@ function AgentCard({
   isOrchestrator: boolean;
   finalKind: TaskMeta["finalKind"];
 }) {
+  const { lang } = useLang();
   const status = state?.status ?? "queued";
   const elapsed = useElapsed(status === "working" ? (state as any).startedAt : null);
 
@@ -1140,13 +1168,13 @@ function AgentCard({
         <div className="px-4 py-3">
           {status === "queued" && (
             <p className={`text-tiny ${onDark ? "text-white/60" : "text-default-500"}`}>
-              等待 {agent.role} 上工…
+              {lang === "en" ? `Waiting for ${agent.role}…` : `等待 ${agent.role} 上工…`}
             </p>
           )}
           {status === "working" && (
             <div className="space-y-2">
               <p className="text-tiny font-medium" style={{ color: toneColor }}>
-                {agent.name} 正在{verbForTone(tone)}…
+                {lang === "en" ? `${agent.name} is ${verbForTone(tone, lang)}…` : `${agent.name} 正在${verbForTone(tone, lang)}…`}
               </p>
               <Skeleton className="h-2.5 w-[68%] rounded" />
               <Skeleton className="h-2.5 w-[92%] rounded" />
@@ -1165,7 +1193,7 @@ function AgentCard({
               </pre>
             ) : (
               <p className={`text-tiny ${onDark ? "text-white/60" : "text-default-500"}`}>
-                ✓ 收尾完成 — 完整交付見下方紫框
+                {lang === "en" ? "✓ Wrap-up done — see the full delivery in the purple box below" : "✓ 收尾完成 — 完整交付見下方紫框"}
               </p>
             )
           )}
@@ -1175,7 +1203,14 @@ function AgentCard({
   );
 }
 
-function verbForTone(t: AgentTone): string {
+function verbForTone(t: AgentTone, lang: "en" | "zh-TW" = "zh-TW"): string {
+  if (lang === "en") {
+    if (t === "research") return "digging through data";
+    if (t === "analyze") return "analyzing";
+    if (t === "write") return "writing";
+    if (t === "craft") return "polishing";
+    return "wrapping up";
+  }
   if (t === "research") return "翻資料";
   if (t === "analyze") return "分析";
   if (t === "write") return "動筆寫稿";
@@ -1200,6 +1235,7 @@ function useElapsed(startedAt: number | null) {
 function FinalDeliverable({
   result, finalKind,
 }: { result: AgentResult; finalKind: TaskMeta["finalKind"] }) {
+  const { lang } = useLang();
   return (
     <Card
       shadow="lg" radius="lg"
@@ -1215,7 +1251,7 @@ function FinalDeliverable({
           </Badge>
           <div>
             <Chip size="sm" color="default" variant="flat" className="uppercase tracking-wider">
-              FINAL DELIVERABLE · 交付完成
+              {lang === "en" ? "FINAL DELIVERABLE · ready" : "FINAL DELIVERABLE · 交付完成"}
             </Chip>
             <p className="font-semibold text-medium tracking-tight mt-1">
               {result.agentName} · {result.agentRole}
@@ -1254,6 +1290,7 @@ function FinalDeliverable({
 }
 
 function CopyButton({ text }: { text: string }) {
+  const { lang } = useLang();
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -1265,7 +1302,7 @@ function CopyButton({ text }: { text: string }) {
       }}
       startContent={<FontAwesomeIcon icon={copied ? faClipboardCheck : faClipboard} />}
     >
-      {copied ? "已複製" : "複製全文"}
+      {copied ? (lang === "en" ? "Copied" : "已複製") : (lang === "en" ? "Copy all" : "複製全文")}
     </Button>
   );
 }
@@ -1304,6 +1341,7 @@ function SwotGrid({ data }: { data: any }) {
 }
 
 function PersonaCard({ data }: { data: any }) {
+  const { lang } = useLang();
   const initials = String(data.name ?? "?").trim().slice(0, 2);
   return (
     <div className="grid grid-cols-[88px_1fr] gap-5">
@@ -1322,8 +1360,8 @@ function PersonaCard({ data }: { data: any }) {
           </div>
         )}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <PersonaList title="價值觀" items={data.values} />
-          <PersonaList title="痛點"   items={data.painPoints} />
+          <PersonaList title={lang === "en" ? "Values" : "價值觀"} items={data.values} />
+          <PersonaList title={lang === "en" ? "Pain points" : "痛點"}   items={data.painPoints} />
         </div>
         {Array.isArray(data.platforms) && (
           <div className="mt-3 flex gap-1.5 flex-wrap">

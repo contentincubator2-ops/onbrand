@@ -4,8 +4,10 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLang } from "../../lib/i18n";
 
 export default function VerifyEmailPage() {
+  const { lang } = useLang();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -17,7 +19,7 @@ export default function VerifyEmailPage() {
 
       if (!token) {
         setStatus("error");
-        setMessage("無效的驗證連結");
+        setMessage(lang === "en" ? "Invalid verification link" : "無效的驗證連結");
         return;
       }
 
@@ -33,24 +35,23 @@ export default function VerifyEmailPage() {
 
         if (!res.ok || !data.success) {
           setStatus("error");
-          setMessage(data.error || "驗證失敗");
+          setMessage(data.error || (lang === "en" ? "Verification failed" : "驗證失敗"));
           return;
         }
 
         setStatus("success");
-        setMessage("您的電子郵件已成功驗證！");
+        setMessage(lang === "en" ? "Your email is verified!" : "您的電子郵件已成功驗證！");
 
-        // Wait for cookie to be set
         await new Promise(resolve => setTimeout(resolve, 500));
         window.location.href = "/";
       } catch (err) {
         setStatus("error");
-        setMessage("網路錯誤，請稍後再試");
+        setMessage(lang === "en" ? "Network error — try again in a sec." : "網路錯誤，請稍後再試");
       }
     };
 
     verifyEmail();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, lang]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -58,8 +59,12 @@ export default function VerifyEmailPage() {
         {status === "loading" && (
           <>
             <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-500 rounded-full animate-spin mx-auto mb-6" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">驗證中...</h1>
-            <p className="text-gray-600">正在驗證您的電子郵件</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {lang === "en" ? "Verifying…" : "驗證中…"}
+            </h1>
+            <p className="text-gray-600">
+              {lang === "en" ? "Checking your email now" : "正在驗證您的電子郵件"}
+            </p>
           </>
         )}
 
@@ -70,9 +75,13 @@ export default function VerifyEmailPage() {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">驗證成功！</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {lang === "en" ? "You're verified!" : "驗證成功！"}
+            </h1>
             <p className="text-gray-600 mb-6">{message}</p>
-            <p className="text-sm text-gray-500">正在前往首頁...</p>
+            <p className="text-sm text-gray-500">
+              {lang === "en" ? "Taking you home…" : "正在前往首頁…"}
+            </p>
           </>
         )}
 
@@ -85,14 +94,16 @@ export default function VerifyEmailPage() {
                 <line x1="9" y1="9" x2="15" y2="15" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">驗證失敗</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {lang === "en" ? "Verification failed" : "驗證失敗"}
+            </h1>
             <p className="text-gray-600 mb-6">{message}</p>
             <button
               onClick={() => navigate("/auth/login")}
               className="inline-block rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-all duration-200"
               style={{ background: "linear-gradient(90deg, #6C5CE7, #a29bfe)" }}
             >
-              返回登入
+              {lang === "en" ? "← Back to sign in" : "返回登入"}
             </button>
           </>
         )}

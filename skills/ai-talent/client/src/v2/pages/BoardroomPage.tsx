@@ -20,6 +20,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Alert, Avatar, Badge, Breadcrumbs, BreadcrumbItem, Button, Card, CardBody,
@@ -97,10 +98,11 @@ const agentAvatar = (a: { avatarUrl?: string | null; name?: string | null }) =>
 
 export default function BoardroomPage() {
   const navigate = useNavigate();
+  const { t, lang } = useLang();
   const ctx = useOutletContext<ShellOutletCtx>() ?? ({} as ShellOutletCtx);
   const brandId = ctx.brandId ?? undefined;
   const currentBrand = (ctx.brands || []).find((b: any) => b?.id === ctx.brandId);
-  const brandName = currentBrand?.name || "未指定品牌";
+  const brandName = currentBrand?.name || (lang === "en" ? "No brand selected" : "未指定品牌");
 
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -117,7 +119,9 @@ export default function BoardroomPage() {
 
   const onHire = async (c: Candidate) => {
     if (!c.squadSlug) {
-      setError(`${c.name} 沒有對應的 squad（無法直接派出，可能是個人顧問）`);
+      setError(lang === "en"
+        ? `${c.name} has no matching squad (can't dispatch directly — may be an individual consultant)`
+        : `${c.name} 沒有對應的 squad（無法直接派出，可能是個人顧問）`);
       return;
     }
     setHiringId(c.agentId);
@@ -131,11 +135,11 @@ export default function BoardroomPage() {
         brandId: brandId ?? undefined,
         brandName: currentBrand?.name,
       });
-      if (!res?.id) throw new Error("後端沒有回傳 mission id");
+      if (!res?.id) throw new Error(lang === "en" ? "Backend did not return a mission id" : "後端沒有回傳 mission id");
       // Jump into picker workspace with mission active — orchestra produces deliverable
       navigate(`/picker?mission=${res.id}&slug=${encodeURIComponent(c.squadSlug)}`);
     } catch (e: any) {
-      setError(`派出 ${c.name} 失敗：${e?.message ?? e}`);
+      setError(lang === "en" ? `Failed to dispatch ${c.name}: ${e?.message ?? e}` : `派出 ${c.name} 失敗：${e?.message ?? e}`);
       setHiringId(null);
     }
   };
@@ -156,9 +160,9 @@ export default function BoardroomPage() {
       const r = await recommendQuery.refetch();
       const list = (r.data?.candidates as Candidate[]) ?? [];
       setCandidates(list);
-      if (list.length === 0) setError("沒有找到匹配的顧問。試著改個說法。");
+      if (list.length === 0) setError(lang === "en" ? "No matching consultants found. Try rephrasing." : "沒有找到匹配的顧問。試著改個說法。");
     } catch (e: any) {
-      setError(`搜尋失敗：${e?.message ?? e}`);
+      setError(lang === "en" ? `Search failed: ${e?.message ?? e}` : `搜尋失敗：${e?.message ?? e}`);
     }
   };
 
@@ -222,18 +226,20 @@ export default function BoardroomPage() {
       {/* ─── LEFT: BRIEF ─────────────────────────────────────────────── */}
       <aside className="overflow-y-auto p-5 space-y-4 bg-content1">
         <Breadcrumbs size="sm">
-          <BreadcrumbItem href="/">首頁</BreadcrumbItem>
-          <BreadcrumbItem>Boardroom · 比稿</BreadcrumbItem>
+          <BreadcrumbItem href="/">{lang === "en" ? "Home" : "首頁"}</BreadcrumbItem>
+          <BreadcrumbItem>{lang === "en" ? "Boardroom · Pitch" : "Boardroom · 比稿"}</BreadcrumbItem>
         </Breadcrumbs>
 
         <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider">
           BOARDROOM
         </Chip>
         <h1 className="font-semibold text-3xl tracking-tight leading-tight">
-          邀請顧問為您比稿
+          {lang === "en" ? "Invite consultants to pitch" : "邀請顧問為您比稿"}
         </h1>
         <p className="text-tiny text-default-500">
-          說出需求 → 系統推薦 12 位候選 → 您勾選 → 顧問各自提案
+          {lang === "en"
+            ? "Describe your need → we recommend 12 candidates → you pick → each pitches their plan"
+            : "說出需求 → 系統推薦 12 位候選 → 您勾選 → 顧問各自提案"}
         </p>
 
         {currentBrand && (
@@ -244,17 +250,19 @@ export default function BoardroomPage() {
             classNames={{ content: "flex items-center gap-1.5" }}
           >
             <span className="font-medium">{brandName}</span>
-            <span className="text-tiny text-default-500">brand brain 自動帶入</span>
+            <span className="text-tiny text-default-500">{lang === "en" ? "brand brain auto-loaded" : "brand brain 自動帶入"}</span>
           </Chip>
         )}
 
         <Divider />
 
         <p className="text-tiny tracking-wider uppercase text-default-500 font-medium flex items-center gap-1.5">
-          <FontAwesomeIcon icon={faPenToSquare} /> 您今天想解決什麼問題
+          <FontAwesomeIcon icon={faPenToSquare} /> {lang === "en" ? "What do you want to solve today" : "您今天想解決什麼問題"}
         </p>
         <Textarea
-          placeholder="例：我要做新品上市的 IG 內容企劃，預算有限，30 天內要看到效果…"
+          placeholder={lang === "en"
+            ? "e.g. I'm planning an IG launch for a new product, tight budget, need results in 30 days…"
+            : "例：我要做新品上市的 IG 內容企劃，預算有限，30 天內要看到效果…"}
           variant="bordered" radius="md"
           minRows={5} maxRows={10}
           value={query}
@@ -263,12 +271,19 @@ export default function BoardroomPage() {
         />
 
         <div className="flex flex-wrap gap-1.5">
-          {[
-            "新品上市的 IG 內容企劃",
-            "B2B SaaS LinkedIn 內容增長",
-            "電商品牌找新的市場定位",
-            "品牌故事重塑",
-          ].map((e) => (
+          {(lang === "en"
+            ? [
+                "IG launch plan for a new product",
+                "B2B SaaS LinkedIn growth content",
+                "New market positioning for an e-commerce brand",
+                "Brand story refresh",
+              ]
+            : [
+                "新品上市的 IG 內容企劃",
+                "B2B SaaS LinkedIn 內容增長",
+                "電商品牌找新的市場定位",
+                "品牌故事重塑",
+              ]).map((e) => (
             <Chip
               key={e} size="sm" variant="bordered"
               className="cursor-pointer hover:bg-default-100"
@@ -287,7 +302,9 @@ export default function BoardroomPage() {
           onPress={onFindAgents}
           startContent={!recommending && <FontAwesomeIcon icon={faMagnifyingGlass} />}
         >
-          {recommending ? "搜尋中…" : "找候選顧問"}
+          {recommending
+            ? (lang === "en" ? "Searching…" : "搜尋中…")
+            : (lang === "en" ? "Find candidates" : "找候選顧問")}
         </Button>
 
         {error && <Alert color="danger" variant="flat" title={error} onClose={() => setError(null)} />}
@@ -310,11 +327,15 @@ export default function BoardroomPage() {
                 isIndeterminate={anyPitchInFlight && progressPct === 0}
               />
               <p className="text-tiny text-default-500">
-                {anyPitchInFlight ? "顧問撰寫中…" : progressPct === 100 ? "✓ 所有提案就緒" : ""}
+                {anyPitchInFlight
+                  ? (lang === "en" ? "Consultants writing…" : "顧問撰寫中…")
+                  : progressPct === 100
+                    ? (lang === "en" ? "✓ All pitches ready" : "✓ 所有提案就緒")
+                    : ""}
               </p>
             </div>
             <Button size="sm" variant="light" onPress={reset} className="w-full">
-              <FontAwesomeIcon icon={faRotateRight} className="mr-1.5" /> 重新比稿
+              <FontAwesomeIcon icon={faRotateRight} className="mr-1.5" /> {lang === "en" ? "Start over" : "重新比稿"}
             </Button>
           </>
         )}
@@ -324,14 +345,14 @@ export default function BoardroomPage() {
       <section className="overflow-y-auto bg-default-50">
         <div className="p-6 lg:p-10 max-w-[960px] mx-auto">
           {pitchStates.size === 0 ? (
-            <EmptyStage candidatesLen={candidates.length} query={query} />
+            <EmptyStage candidatesLen={candidates.length} query={query} lang={lang} />
           ) : (
             <div className="space-y-5">
               <div className="flex items-center gap-2 flex-wrap">
                 <FontAwesomeIcon icon={faGavel} className="text-secondary" />
-                <h2 className="text-xl font-semibold tracking-tight">提案就位</h2>
+                <h2 className="text-xl font-semibold tracking-tight">{lang === "en" ? "Pitches in place" : "提案就位"}</h2>
                 <Chip size="sm" variant="flat">
-                  {deliveredCount} / {totalSelected} 已完成
+                  {lang === "en" ? `${deliveredCount} / ${totalSelected} done` : `${deliveredCount} / ${totalSelected} 已完成`}
                 </Chip>
               </div>
               {Array.from(pitchStates.entries()).map(([agentId, state]) => {
@@ -344,6 +365,7 @@ export default function BoardroomPage() {
                     state={state}
                     onHire={() => onHire(c)}
                     isHiring={hiringId === c.agentId}
+                    lang={lang}
                   />
                 );
               })}
@@ -360,7 +382,7 @@ export default function BoardroomPage() {
               <FontAwesomeIcon icon={faUserGroup} /> CANDIDATES
             </p>
             {candidates.length > 0 && (
-              <Chip size="sm" variant="flat">{candidates.length} 位</Chip>
+              <Chip size="sm" variant="flat">{lang === "en" ? `${candidates.length}` : `${candidates.length} 位`}</Chip>
             )}
           </div>
 
@@ -386,9 +408,9 @@ export default function BoardroomPage() {
             <Card shadow="none" className="border-2 border-dashed border-divider">
               <CardBody className="py-10 items-center text-center gap-2">
                 <FontAwesomeIcon icon={faMagnifyingGlass} className="text-3xl text-default-300" />
-                <p className="text-small font-medium">尚未搜尋</p>
+                <p className="text-small font-medium">{lang === "en" ? "No search yet" : "尚未搜尋"}</p>
                 <p className="text-tiny text-default-500">
-                  在左側輸入需求，按下「找候選顧問」
+                  {lang === "en" ? "Enter your need on the left, then hit \"Find candidates\"" : "在左側輸入需求，按下「找候選顧問」"}
                 </p>
               </CardBody>
             </Card>
@@ -405,6 +427,7 @@ export default function BoardroomPage() {
                   pitched={pitchStates.has(c.agentId)}
                   pitchStatus={pitchStates.get(c.agentId)?.status}
                   onToggle={() => toggle(c.agentId)}
+                  lang={lang}
                 />
               ))}
             </div>
@@ -424,10 +447,10 @@ export default function BoardroomPage() {
               endContent={!anyPitchInFlight && <FontAwesomeIcon icon={faArrowRight} />}
             >
               {anyPitchInFlight
-                ? `撰寫中（${deliveredCount}/${totalSelected}）`
-                : `邀比稿（${selected.size} 位）`}
+                ? (lang === "en" ? `Writing (${deliveredCount}/${totalSelected})` : `撰寫中（${deliveredCount}/${totalSelected}）`)
+                : (lang === "en" ? `Invite to pitch (${selected.size})` : `邀比稿（${selected.size} 位）`)}
             </Button>
-            <p className="text-tiny text-default-400 text-center mt-2">最多選 5 位 · 單筆併行撰寫</p>
+            <p className="text-tiny text-default-400 text-center mt-2">{lang === "en" ? "Up to 5 · written in parallel" : "最多選 5 位 · 單筆併行撰寫"}</p>
           </div>
         )}
       </aside>
@@ -437,15 +460,18 @@ export default function BoardroomPage() {
 
 /* ─── Sub: Empty stage (pre-pitch) ─────────────────────────────────── */
 
-function EmptyStage({ candidatesLen, query }: { candidatesLen: number; query: string }) {
+function EmptyStage({ candidatesLen, query, lang }: { candidatesLen: number; query: string; lang: string }) {
   if (candidatesLen === 0) {
     return (
       <div className="h-full min-h-[480px] flex flex-col items-center justify-center text-center gap-3">
         <FontAwesomeIcon icon={faWandMagicSparkles} className="text-5xl text-default-300" />
-        <p className="text-medium font-semibold">輸入需求 → 看候選顧問 → 收提案</p>
+        <p className="text-medium font-semibold">
+          {lang === "en" ? "Enter your need → review candidates → collect pitches" : "輸入需求 → 看候選顧問 → 收提案"}
+        </p>
         <p className="text-tiny text-default-500 max-w-[420px]">
-          12 位 AI 顧問會看您的需求 + 品牌脈絡，從不同角度提出 4 段式方案：
-          看見的問題 / 我會這樣做 / 第一週交付 / 為什麼選我。
+          {lang === "en"
+            ? "12 AI consultants read your brief + brand context and pitch a 4-part plan: the problem they see / how they'd tackle it / week-one deliverable / why pick them."
+            : "12 位 AI 顧問會看您的需求 + 品牌脈絡，從不同角度提出 4 段式方案：看見的問題 / 我會這樣做 / 第一週交付 / 為什麼選我。"}
         </p>
       </div>
     );
@@ -453,11 +479,13 @@ function EmptyStage({ candidatesLen, query }: { candidatesLen: number; query: st
   return (
     <div className="h-full min-h-[480px] flex flex-col items-center justify-center text-center gap-3">
       <FontAwesomeIcon icon={faGavel} className="text-5xl text-default-300" />
-      <p className="text-medium font-semibold">候選顧問已備齊</p>
+      <p className="text-medium font-semibold">{lang === "en" ? "Candidates ready" : "候選顧問已備齊"}</p>
       <p className="text-tiny text-default-500 max-w-[420px]">
-        在右側勾選 1–5 位顧問，按「邀比稿」開跑。提案會即時填入這個區塊。
+        {lang === "en"
+          ? "Pick 1–5 consultants on the right, then hit \"Invite to pitch\" to start. Pitches stream in here."
+          : "在右側勾選 1–5 位顧問，按「邀比稿」開跑。提案會即時填入這個區塊。"}
       </p>
-      <p className="text-tiny text-default-500">您的需求：「{query}」</p>
+      <p className="text-tiny text-default-500">{lang === "en" ? `Your brief: "${query}"` : `您的需求：「${query}」`}</p>
     </div>
   );
 }
@@ -465,7 +493,7 @@ function EmptyStage({ candidatesLen, query }: { candidatesLen: number; query: st
 /* ─── Sub: CandidateCard ──────────────────────────────────────────── */
 
 function CandidateCard({
-  candidate: c, selected, disabled, pitched, pitchStatus, onToggle,
+  candidate: c, selected, disabled, pitched, pitchStatus, onToggle, lang,
 }: {
   candidate: Candidate;
   selected: boolean;
@@ -473,13 +501,14 @@ function CandidateCard({
   pitched: boolean;
   pitchStatus?: "queued" | "working" | "delivered" | "failed";
   onToggle: () => void;
+  lang: string;
 }) {
   const statusChip = (() => {
     if (!pitched) return null;
-    if (pitchStatus === "working")   return <Chip size="sm" color="default" variant="flat" startContent={<Spinner size="sm" classNames={{ wrapper: "w-3 h-3 ml-1" }} />}>撰寫中</Chip>;
-    if (pitchStatus === "delivered") return <Chip size="sm" color="success" variant="flat" startContent={<FontAwesomeIcon icon={faCircleCheck} className="text-tiny ml-1" />}>已交稿</Chip>;
-    if (pitchStatus === "failed")    return <Chip size="sm" color="danger" variant="flat" startContent={<FontAwesomeIcon icon={faTriangleExclamation} className="text-tiny ml-1" />}>失敗</Chip>;
-    return <Chip size="sm" variant="flat">排隊中</Chip>;
+    if (pitchStatus === "working")   return <Chip size="sm" color="default" variant="flat" startContent={<Spinner size="sm" classNames={{ wrapper: "w-3 h-3 ml-1" }} />}>{lang === "en" ? "Writing" : "撰寫中"}</Chip>;
+    if (pitchStatus === "delivered") return <Chip size="sm" color="success" variant="flat" startContent={<FontAwesomeIcon icon={faCircleCheck} className="text-tiny ml-1" />}>{lang === "en" ? "Delivered" : "已交稿"}</Chip>;
+    if (pitchStatus === "failed")    return <Chip size="sm" color="danger" variant="flat" startContent={<FontAwesomeIcon icon={faTriangleExclamation} className="text-tiny ml-1" />}>{lang === "en" ? "Failed" : "失敗"}</Chip>;
+    return <Chip size="sm" variant="flat">{lang === "en" ? "Queued" : "排隊中"}</Chip>;
   })();
 
   return (
@@ -540,7 +569,7 @@ function CandidateCard({
           <ProviderChip provider={c.providerBucket} model={c.aiModel} />
           <div className="flex items-center gap-1">
             {statusChip}
-            <Tooltip content={`匹配分數：${c.matchScore}`}>
+            <Tooltip content={lang === "en" ? `Match score: ${c.matchScore}` : `匹配分數：${c.matchScore}`}>
               <Chip
                 size="sm" variant="bordered"
                 startContent={<FontAwesomeIcon icon={faChartSimple} className="text-tiny ml-1" />}
@@ -559,12 +588,13 @@ function CandidateCard({
 /* ─── Sub: PitchCard (center) ─────────────────────────────────────── */
 
 function PitchCard({
-  candidate: c, state, onHire, isHiring,
+  candidate: c, state, onHire, isHiring, lang,
 }: {
   candidate: Candidate;
   state: PitchState;
   onHire: () => void;
   isHiring: boolean;
+  lang: string;
 }) {
   const [chatInput, setChatInput] = useState("");
   const isWorking = state.status === "queued" || state.status === "working";
@@ -602,7 +632,7 @@ function PitchCard({
         {state.status === "delivered" && (
           <Chip size="sm" color="success" variant="flat"
             startContent={<FontAwesomeIcon icon={faCircleCheck} className="text-tiny ml-1" />}
-          >已交稿</Chip>
+          >{lang === "en" ? "Delivered" : "已交稿"}</Chip>
         )}
       </CardHeader>
       <Divider />
@@ -611,7 +641,7 @@ function PitchCard({
         {isWorking && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-tiny text-default-500">
-              <Spinner size="sm" /> {c.name} 正在撰寫提案…
+              <Spinner size="sm" /> {lang === "en" ? `${c.name} is writing a pitch…` : `${c.name} 正在撰寫提案…`}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[1, 2, 3, 4].map((i) => (
@@ -630,7 +660,7 @@ function PitchCard({
           <Card shadow="none" className="border border-danger-200 bg-danger-50">
             <CardBody className="flex flex-row items-center gap-2 p-4 text-danger">
               <FontAwesomeIcon icon={faTriangleExclamation} />
-              <span className="text-small">提案失敗 · 請從右側重新挑選或改寫需求</span>
+              <span className="text-small">{lang === "en" ? "Pitch failed · pick again on the right or rephrase your brief" : "提案失敗 · 請從右側重新挑選或改寫需求"}</span>
             </CardBody>
           </Card>
         )}
@@ -669,13 +699,17 @@ function PitchCard({
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0 flex-1">
                 <p className="text-small font-medium leading-tight">
-                  喜歡這個方向？讓 {c.name} 開始產出
+                  {lang === "en"
+                    ? `Like this direction? Let ${c.name} get started`
+                    : `喜歡這個方向？讓 ${c.name} 開始產出`}
                 </p>
                 <p className="text-tiny text-default-500 mt-0.5">
-                  將跳到 picker · {c.squadName ?? "顧問 squad"} 會逐步交付完整成品
+                  {lang === "en"
+                    ? `Jumps to picker · ${c.squadName ?? "consultant squad"} will deliver the full output step by step`
+                    : `將跳到 picker · ${c.squadName ?? "顧問 squad"} 會逐步交付完整成品`}
                 </p>
               </div>
-              <Tooltip content={!c.squadSlug ? "此顧問沒有對應 squad" : ""} isDisabled={!!c.squadSlug}>
+              <Tooltip content={!c.squadSlug ? (lang === "en" ? "This consultant has no matching squad" : "此顧問沒有對應 squad") : ""} isDisabled={!!c.squadSlug}>
                 <Button
                   color="primary" size="md" radius="full"
                   className="font-medium shrink-0"
@@ -685,25 +719,31 @@ function PitchCard({
                   startContent={!isHiring && <FontAwesomeIcon icon={faRocket} />}
                   endContent={!isHiring && <FontAwesomeIcon icon={faArrowRight} />}
                 >
-                  {isHiring ? "派出中…" : "選這位 · 開始產出"}
+                  {isHiring
+                    ? (lang === "en" ? "Dispatching…" : "派出中…")
+                    : (lang === "en" ? "Pick this one · start output" : "選這位 · 開始產出")}
                 </Button>
               </Tooltip>
             </div>
             <Divider />
             {/* Secondary — chat (placeholder) */}
             <div className="flex items-center gap-2 text-tiny text-default-500">
-              <FontAwesomeIcon icon={faComments} /> 想先討論細節？對 {c.name} 留言（即將推出）
+              <FontAwesomeIcon icon={faComments} /> {lang === "en"
+                ? `Want to discuss first? Message ${c.name} (coming soon)`
+                : `想先討論細節？對 ${c.name} 留言（即將推出）`}
             </div>
             <div className="flex gap-2">
               <Input
                 size="sm" radius="lg" variant="bordered"
-                placeholder={`對 ${c.name} 提問或要求調整…`}
+                placeholder={lang === "en"
+                  ? `Ask ${c.name} a question or request a tweak…`
+                  : `對 ${c.name} 提問或要求調整…`}
                 value={chatInput}
                 onValueChange={setChatInput}
                 isDisabled
                 startContent={<FontAwesomeIcon icon={faPenToSquare} className="text-tiny text-default-400" />}
               />
-              <Button isIconOnly size="sm" color="default" radius="lg" isDisabled aria-label="送出">
+              <Button isIconOnly size="sm" color="default" radius="lg" isDisabled aria-label={lang === "en" ? "Send" : "送出"}>
                 <FontAwesomeIcon icon={faPaperPlane} />
               </Button>
             </div>

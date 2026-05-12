@@ -7,8 +7,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 
 export default function TrialCountdownBar() {
+  const { lang } = useLang();
   const statusQuery = (trpc as any).billing?.getStatus?.useQuery
     ? (trpc as any).billing.getStatus.useQuery(undefined, {
         refetchInterval: 5 * 60_000,         // every 5 min
@@ -35,17 +37,17 @@ export default function TrialCountdownBar() {
       <div className="px-4 py-2 text-xs flex items-center justify-center gap-3 border-b bg-red-50 border-red-200 text-red-900">
         <span>
           <strong>
-            {status.planStatus === "canceled" ? "訂閱已取消" :
-             status.planStatus === "expired" ? "訂閱已到期" :
-             status.planStatus === "past_due" ? "付款失敗" :
-             "免費試用已到期"}
-          </strong> — 可繼續查看歷史紀錄，但無法產出新內容
+            {status.planStatus === "canceled" ? (lang === "en" ? "Subscription canceled" : "訂閱已取消") :
+             status.planStatus === "expired" ? (lang === "en" ? "Subscription expired" : "訂閱已到期") :
+             status.planStatus === "past_due" ? (lang === "en" ? "Payment failed" : "付款失敗") :
+             (lang === "en" ? "Free trial ended" : "免費試用已到期")}
+          </strong> — {lang === "en" ? "you can still view history, but can't make new content" : "可繼續查看歷史紀錄，但無法產出新內容"}
         </span>
         <Link
           to="/pricing"
           className="px-3 py-1 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 transition"
         >
-          立即續訂
+          {lang === "en" ? "Renew now" : "立即續訂"}
         </Link>
       </div>
     );
@@ -65,6 +67,7 @@ function TrialBarWithProgress({
   days: number;
   urgency: "high" | "medium" | "low";
 }) {
+  const { lang } = useLang();
   const achQuery = (trpc as any).achievements?.getProgress?.useQuery
     ? (trpc as any).achievements.getProgress.useQuery(undefined, {
         refetchInterval: 60_000,
@@ -81,14 +84,16 @@ function TrialBarWithProgress({
     }`}>
       <span>
         {days > 0
-          ? <>免費試用剩 <strong>{days} 天</strong>{urgency === "high" && " — 別讓你的內容企劃中斷"}</>
-          : <>試用今天到期</>
+          ? lang === "en"
+            ? <><strong>{days} {days === 1 ? "day" : "days"} left</strong> in trial{urgency === "high" && " — keep your content rolling"}</>
+            : <>免費試用剩 <strong>{days} 天</strong>{urgency === "high" && " — 別讓你的內容企劃中斷"}</>
+          : lang === "en" ? <>Trial ends today</> : <>試用今天到期</>
         }
       </span>
       {ach && (
         <Link to="/achievements" className="flex items-center gap-2 hover:underline">
           <span>
-            成就 <strong>{ach.unlockedCount} / {ach.totalCount}</strong>
+            {lang === "en" ? "Achievements" : "成就"} <strong>{ach.unlockedCount} / {ach.totalCount}</strong>
           </span>
           <span className="w-20 h-1.5 bg-neutral-300/50 rounded-full overflow-hidden">
             <span
@@ -102,7 +107,7 @@ function TrialBarWithProgress({
         to="/pricing"
         className="px-3 py-1 rounded-md bg-neutral-900 text-white font-semibold hover:bg-neutral-800 transition"
       >
-        升級 OnBrand Pro
+        {lang === "en" ? "Upgrade to OnBrand Pro" : "升級 OnBrand Pro"}
       </Link>
     </div>
   );
