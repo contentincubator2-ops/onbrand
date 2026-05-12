@@ -1,0 +1,46 @@
+name: Admin — End-to-end test Flux Schnell through full pipeline
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            echo "── 1. Confirm deployed code has the URL validator fix ─────"
+            grep -A 3 "imageUrl: z.string" server/routers/outputRouter.ts | head -8
+
+            echo
+            echo "── 2. Confirm deployed code has 50mb body limit ─────"
+            grep "express.json" server/index.ts | head -3
+
+            echo
+            echo "── 3. Run Flux Schnell end-to-end via mediaGen ─────"
+            cat > /tmp/test_flux.mjs <<'JS'
+            process.chdir("/opt/marketing-os/app/skills/ai-talent");
+            const dotenv = await import("dotenv");
+            dotenv.config({ path: "./.env" });
+            const { dispatchGenerate } = await import("/opt/marketing-os/app/skills/ai-talent/dist/server/_core/mediaGen.js");
+            const r = await dispatchGenerate("piapi/flux-schnell", {
+              prompt: "a red apple on a white plate, photorealistic, soft natural light",
+              aspectRatio: "1:1",
+              brandId: 0,
+            });
+            console.log("RESULT:", JSON.stringify({ status: r.status, url: r.url, model: r.modelId, errorMsg: r.errorMsg, meta: r.meta }, null, 2));
+            JS
+            timeout 120 node /tmp/test_flux.mjs || echo "(timed out or errored)"
+
+            echo
+            echo "── 4. Check static handler exists for /static/covers ─────"
+            grep -n "/static/covers\|express.static" server/index.ts | head -5
+            ls /opt/marketing-os/covers 2>&1 | head -5
