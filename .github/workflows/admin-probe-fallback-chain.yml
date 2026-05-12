@@ -1,0 +1,95 @@
+name: Admin — Probe full LLM fallback chain readiness
+
+# Hits each provider in the cascade with a minimal prompt and reports
+# which return real content. Used to confirm we have viable fallbacks
+# beyond Anthropic + Azure Foundry.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 180s
+          script: |
+            set -e
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            PROMPT='用 15 字內回答：母親節最好的禮物是什麼？'
+
+            check() {
+              local NAME="$1"; local URL="$2"; local AUTH="$3"; local PAYLOAD="$4"
+              echo "── $NAME ─────"
+              local RESP
+              RESP=$(curl -s --max-time 25 -X POST "$URL" $AUTH \
+                -H "Content-Type: application/json" \
+                -d "$PAYLOAD")
+              local CONTENT
+              CONTENT=$(echo "$RESP" | python3 -c "
+              import sys, json
+              try:
+                  d = json.load(sys.stdin)
+              except:
+                  print('PARSE_FAIL: ' + sys.stdin.read()[:200])
+                  sys.exit(0)
+              # Anthropic shape
+              if 'content' in d and isinstance(d['content'], list):
+                  txts = [b.get('text','') for b in d['content'] if b.get('type')=='text']
+                  print('ANTHROPIC: ' + (''.join(txts) or '(empty)')[:200])
+                  sys.exit(0)
+              # OpenAI shape
+              ch = d.get('choices', [{}])
+              if ch:
+                  m = ch[0].get('message', {})
+                  c = m.get('content') or m.get('reasoning_content') or '(empty)'
+                  print('OPENAI: ' + c[:200])
+                  sys.exit(0)
+              err = d.get('error') or d
+              print('ERR: ' + json.dumps(err)[:300])
+              " 2>&1)
+              echo "  $CONTENT"
+              echo
+            }
+
+            # 1. Anthropic (expected to fail — credits empty)
+            check "1. Anthropic" \
+              "https://api.anthropic.com/v1/messages" \
+              "-H \"x-api-key: $ANTHROPIC_API_KEY\" -H \"anthropic-version: 2023-06-01\"" \
+              "{\"model\":\"claude-haiku-4-5\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+
+            # 2. Azure Foundry gpt-4.1-mini
+            check "2. Azure Foundry gpt-4.1-mini" \
+              "${AZURE_FOUNDRY_PROJECT_ENDPOINT%/}/openai/v1/chat/completions" \
+              "-H \"api-key: $AZURE_FOUNDRY_API_KEY\"" \
+              "{\"model\":\"gpt-4.1-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+
+            # 3. OpenAI gpt-4o-mini
+            check "3. OpenAI gpt-4o-mini" \
+              "https://api.openai.com/v1/chat/completions" \
+              "-H \"Authorization: Bearer $OPENAI_API_KEY\"" \
+              "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+
+            # 4. Gemini 2.5-flash via AI Studio OpenAI-compat
+            check "4. Gemini 2.5-flash" \
+              "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+              "-H \"Authorization: Bearer $GEMINI_API_KEY\"" \
+              "{\"model\":\"gemini-2.5-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+
+            # 5. DeepSeek V3
+            check "5. DeepSeek V3" \
+              "https://api.deepseek.com/v1/chat/completions" \
+              "-H \"Authorization: Bearer $DEEPSEEK_API_KEY\"" \
+              "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":120}"
+
+            echo "── env-key presence summary ─────"
+            for k in ANTHROPIC_API_KEY AZURE_FOUNDRY_API_KEY OPENAI_API_KEY GEMINI_API_KEY DEEPSEEK_API_KEY QWEN_API_KEY COHERE_API_KEY; do
+              v=$(printenv "$k" || true)
+              if [ -z "$v" ]; then echo "  $k = MISSING"; else echo "  $k = SET (${#v} chars)"; fi
+            done

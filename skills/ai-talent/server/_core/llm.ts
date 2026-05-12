@@ -585,7 +585,71 @@ function adaptPayloadForModel(payload: Record<string, unknown>, model: string): 
   delete payload.top_p;
 }
 
+/**
+ * 2026-05-12 (CJ「全站 fallback chain」): cascade through every viable
+ * provider so a single vendor outage / billing pause doesn't take the
+ * site down. Chain only runs when the caller didn't pin a specific
+ * provider (i.e. legacy / default Anthropic path). Explicit provider
+ * requests still go through invokeLLMOnce directly.
+ *
+ * Override via env LLM_FALLBACK_CHAIN="anthropic,azure-foundry,openai,gemini"
+ */
+function getFallbackChain(): string[] {
+  const envChain = (process.env.LLM_FALLBACK_CHAIN ?? "").trim();
+  if (envChain) return envChain.split(",").map((s) => s.trim()).filter(Boolean);
+  // Default: best Chinese brand voice → cheapest reliable → English fallback
+  return ["anthropic", "azure-foundry", "openai", "gemini", "deepseek"];
+}
+
+function isRetryableLLMError(msg: string): boolean {
+  // Billing / availability / rate-limit signals — keep going down the chain
+  return /credit\s*balance|insufficient|quota|rate.?limit|429|401|402|403|400|404|5\d\d|deployment\s*not\s*found|temporarily.*unavail|connection.*reset|ECONNRESET|ETIMEDOUT|fetch\s*failed/i
+    .test(msg);
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  // If caller explicitly pinned a provider, honor it (no auto-cascade).
+  // This keeps things like Theater (uses azure-position by design) deterministic.
+  if (params.provider && params.provider !== "openrouter") {
+    return invokeLLMOnce(params);
+  }
+
+  const chain = getFallbackChain();
+  const errors: string[] = [];
+  for (const provider of chain) {
+    // Skip providers whose key isn't configured
+    const cfg = PROVIDER_CONFIG[provider];
+    if (!cfg || !cfg.getKey()) continue;
+    try {
+      const out = await invokeLLMOnce({ ...params, provider: provider as any });
+      // Empty content from a successful 200 = treat as a soft failure;
+      // some reasoning models slip through without reasoning_content.
+      const text = out?.choices?.[0]?.message?.content;
+      if (typeof text === "string" && text.trim().length > 0) {
+        if (errors.length > 0) {
+          console.warn(`[invokeLLM] succeeded with ${provider} after ${errors.length} failed providers`);
+        }
+        return out;
+      }
+      errors.push(`${provider}: empty content`);
+      console.warn(`[invokeLLM] ${provider} returned empty content, trying next…`);
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      errors.push(`${provider}: ${msg.slice(0, 120)}`);
+      if (!isRetryableLLMError(msg)) {
+        // Non-retryable (config / auth typo / payload error) — but still
+        // try the next provider since site-wide fallback is more important
+        // than surfacing the original error.
+        console.warn(`[invokeLLM] ${provider} hard error, continuing chain: ${msg.slice(0, 200)}`);
+      } else {
+        console.warn(`[invokeLLM] ${provider} retryable error, continuing: ${msg.slice(0, 200)}`);
+      }
+    }
+  }
+  throw new Error(`All LLM providers failed. Tried: ${errors.join(" | ").slice(0, 800)}`);
+}
+
+async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
   // DEBT-1: Real multi-provider routing
   const providerKey = resolveProvider(params.provider as any);
   const config = PROVIDER_CONFIG[providerKey];
