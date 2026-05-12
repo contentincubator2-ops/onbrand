@@ -1,0 +1,169 @@
+name: Admin — Benchmark all 8 LLM providers (same prompt, side-by-side)
+
+# Runs ONE marketing prompt through every provider in the cascade and
+# reports: model, latency, output token count, sample output. Lets you
+# see quality + speed differences at a glance.
+#
+# Prompts chosen to stress-test:
+#   1. Brand voice (zh hook) — short, voice-sensitive
+#   2. Long-form (zh post) — narrative coherence
+#   3. Strategic (zh planning) — reasoning + structure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 1500s
+          script: |
+            cd /opt/marketing-os/app/skills/ai-talent
+            set -a; . ./.env; set +a
+
+            cat > /tmp/bench_providers.py <<'PYEOF'
+            import os, json, sys, time, urllib.request, urllib.error
+            REASONING_PREFIX = ("gpt-5", "o1", "o3", "o4")
+
+            PROMPTS = {
+                "brand_hook": "你是台灣品牌策略顧問。請用 80 字內，為手工木質玩具品牌「樂木」寫一句母親節活動 hook（有情緒鉤、不要『限時優惠』促銷腔）。只輸出 hook 一句。",
+                "long_post": "為品牌「樂木」寫一篇 200-300 字 Instagram 母親節貼文，要有 hook、品牌故事連結、CTA。風格：溫暖文藝、有觸感。",
+                "strategy":  "為品牌「樂木」規劃母親節 5 天內容檔期，每天一個主題（hook → 故事 → 用戶分享 → 產品聚焦 → CTA），每天列出 3 個 key message。",
+            }
+
+            def call(name, url, headers, payload, timeout=60):
+                t0 = time.time()
+                try:
+                    body = json.dumps(payload).encode()
+                    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+                    with urllib.request.urlopen(req, timeout=timeout) as r:
+                        raw = r.read().decode("utf-8","replace")
+                except urllib.error.HTTPError as e:
+                    raw = e.read().decode("utf-8","replace")
+                    return {"ok":False, "err":f"HTTP {e.code}", "raw":raw[:200], "ms":int((time.time()-t0)*1000)}
+                except Exception as e:
+                    return {"ok":False, "err":f"{type(e).__name__}", "raw":str(e)[:200], "ms":int((time.time()-t0)*1000)}
+                ms = int((time.time()-t0)*1000)
+                try: d = json.loads(raw)
+                except: return {"ok":False, "err":"parse fail", "raw":raw[:200], "ms":ms}
+                # Anthropic
+                if isinstance(d.get("content"), list):
+                    txt = "".join(b.get("text","") for b in d["content"] if b.get("type")=="text")
+                    return {"ok":bool(txt.strip()), "content":txt, "ms":ms,
+                            "in_tok":d.get("usage",{}).get("input_tokens"),
+                            "out_tok":d.get("usage",{}).get("output_tokens")}
+                # OpenAI shape
+                ch = d.get("choices") or []
+                if ch:
+                    m = ch[0].get("message") or {}
+                    c = m.get("content") or m.get("reasoning_content") or ""
+                    return {"ok":bool(c.strip()), "content":c, "ms":ms,
+                            "in_tok":d.get("usage",{}).get("prompt_tokens"),
+                            "out_tok":d.get("usage",{}).get("completion_tokens")}
+                return {"ok":False, "err":json.dumps(d.get("error",d))[:200], "ms":ms}
+
+            ANTHRO = os.environ.get("ANTHROPIC_API_KEY","")
+            AZF_KEY = os.environ.get("AZURE_FOUNDRY_API_KEY","")
+            AZF_EP  = os.environ.get("AZURE_FOUNDRY_PROJECT_ENDPOINT","").rstrip("/")
+            OPENAI  = os.environ.get("OPENAI_API_KEY","")
+            GEMINI  = os.environ.get("GEMINI_API_KEY","") or os.environ.get("GOOGLE_AI_API_KEY","")
+            QWEN    = os.environ.get("QWEN_API_KEY","")
+            DEEPSK  = os.environ.get("DEEPSEEK_API_KEY","")
+            OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL","http://127.0.0.1:11434/v1")
+
+            def make_payload(model, prompt, is_reasoning=False, max_tok=600):
+                p = {"model": model, "messages":[{"role":"user","content":prompt}]}
+                if is_reasoning:
+                    p["max_completion_tokens"] = max_tok
+                else:
+                    p["max_tokens"] = max_tok
+                return p
+
+            def run_anthropic(prompt):
+                return call("anthropic claude-haiku-4-5",
+                    "https://api.anthropic.com/v1/messages",
+                    {"x-api-key":ANTHRO,"anthropic-version":"2023-06-01","content-type":"application/json"},
+                    {"model":"claude-haiku-4-5","messages":[{"role":"user","content":prompt}],"max_tokens":600})
+
+            def run_azure(prompt, model="gpt-5.4"):
+                is_r = any(model.lower().startswith(p) for p in REASONING_PREFIX)
+                return call(f"azure {model}",
+                    f"{AZF_EP}/openai/v1/chat/completions",
+                    {"api-key":AZF_KEY,"content-type":"application/json"},
+                    make_payload(model, prompt, is_r))
+
+            def run_openai(prompt, model="gpt-4.1-mini"):
+                return call(f"openai {model}",
+                    "https://api.openai.com/v1/chat/completions",
+                    {"Authorization":f"Bearer {OPENAI}","content-type":"application/json"},
+                    make_payload(model, prompt))
+
+            def run_gemini(prompt, model="gemini-2.5-flash"):
+                return call(f"gemini {model}",
+                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                    {"Authorization":f"Bearer {GEMINI}","content-type":"application/json"},
+                    make_payload(model, prompt))
+
+            def run_qwen(prompt, model="qwen-plus"):
+                return call(f"qwen {model}",
+                    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+                    {"Authorization":f"Bearer {QWEN}","content-type":"application/json"},
+                    make_payload(model, prompt))
+
+            def run_gemma(prompt, model="gemma-3-27b-it"):
+                return call(f"gemma {model}",
+                    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                    {"Authorization":f"Bearer {GEMINI}","content-type":"application/json"},
+                    make_payload(model, prompt))
+
+            def run_deepseek(prompt, model="deepseek-chat"):
+                return call(f"deepseek {model}",
+                    "https://api.deepseek.com/v1/chat/completions",
+                    {"Authorization":f"Bearer {DEEPSK}","content-type":"application/json"},
+                    make_payload(model, prompt))
+
+            def run_ollama(prompt, model="qwen2.5:7b"):
+                return call(f"ollama {model}",
+                    f"{OLLAMA_URL.rstrip('/')}/chat/completions",
+                    {"content-type":"application/json"},
+                    make_payload(model, prompt, max_tok=600),
+                    timeout=180)
+
+            RUNNERS = [
+                ("1. Anthropic Haiku 4.5",  run_anthropic),
+                ("2. Azure gpt-5.4",        run_azure),
+                ("3. OpenAI gpt-4.1-mini",  run_openai),
+                ("4. Gemini 2.5-flash",     run_gemini),
+                ("5. Qwen Plus (API)",      run_qwen),
+                ("6. Gemma 3-27b",          run_gemma),
+                ("7. DeepSeek V3",          run_deepseek),
+                ("8. Ollama qwen2.5:7b",    run_ollama),
+            ]
+
+            for prompt_name, prompt in PROMPTS.items():
+                print()
+                print("="*72)
+                print(f"  PROMPT: {prompt_name}")
+                print("="*72)
+                print(f"  «{prompt[:80]}...»")
+                print()
+                for tier_name, runner in RUNNERS:
+                    r = runner(prompt)
+                    if r.get("ok"):
+                        speed = f"{r['ms']/1000:.1f}s"
+                        tok = r.get("out_tok")
+                        tok_str = f"{tok}t" if tok else "?t"
+                        content = r["content"].replace("\n", " ⏎ ")[:300]
+                        print(f"  ✓ {tier_name:<26} {speed:>7}  {tok_str:>5}  {content}")
+                    else:
+                        print(f"  ✗ {tier_name:<26} {r.get('ms',0)/1000:.1f}s   err={r.get('err','?')[:50]}")
+                    sys.stdout.flush()
+
+            PYEOF
+
+            python3 /tmp/bench_providers.py
