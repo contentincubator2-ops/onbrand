@@ -198,26 +198,51 @@ export default function RunPage() {
       })
     : { mutate: () => {}, isPending: false };
   // Video gen — async pipeline. Spawn job, poll for status until ready.
-  const videoGenMut = (trpc as any).video?.generate?.useMutation
-    ? (trpc as any).video.generate.useMutation({
+  // 2026-05-12 (CJ「我要改成只給腳本 — C」): storyboard mode replaces full
+  // video gen. Calls video.generateStoryboard which returns a script with
+  // one Flux Schnell reference image per scene. ~30-90 seconds end-to-end.
+  const videoGenMut = (trpc as any).video?.generateStoryboard?.useMutation
+    ? (trpc as any).video.generateStoryboard.useMutation({
         onSuccess: (r: any) => {
           setVideoJobId(r.jobId);
-          showToastGlobal(`影片任務已啟動 #${r.jobId} — 5-10 分鐘後完成`);
+          showToastGlobal(`故事板生成中 #${r.jobId} — 約 1 分鐘內完成`);
         },
-        onError: (e: any) => showToastGlobal(`影片啟動失敗：${e?.message ?? e}`),
+        onError: (e: any) => showToastGlobal(`故事板啟動失敗：${e?.message ?? e}`),
       })
     : { mutate: () => {}, isPending: false };
   const videoStatusQuery = (trpc as any).video?.status?.useQuery
     ? (trpc as any).video.status.useQuery(
         { jobId: videoJobId ?? 0 },
-        { enabled: !!videoJobId, refetchInterval: 15_000, refetchOnWindowFocus: false },
+        // Poll faster than full-video mode since storyboard is ~30-90s
+        { enabled: !!videoJobId, refetchInterval: 5_000, refetchOnWindowFocus: false },
       )
     : { data: null };
   const videoStatus = (videoStatusQuery?.data ?? null) as any;
   const videoUrl: string | null = videoStatus?.videoUrl ?? null;
+  // Parse script JSON for storyboard scene rendering
+  const storyboardScenes: Array<{
+    sceneIndex: number; durationSec: number; visualPrompt: string;
+    narration: string; cameraMove: string; imageUrl?: string | null;
+  }> = useMemo(() => {
+    const s = videoStatus?.script;
+    if (!s) return [];
+    try {
+      const obj = typeof s === "string" ? JSON.parse(s) : s;
+      return Array.isArray(obj?.scenes) ? obj.scenes : [];
+    } catch { return []; }
+  }, [videoStatus?.script]);
+  const storyboardTitle: string = useMemo(() => {
+    const s = videoStatus?.script;
+    if (!s) return "";
+    try {
+      const obj = typeof s === "string" ? JSON.parse(s) : s;
+      return String(obj?.title ?? "");
+    } catch { return ""; }
+  }, [videoStatus?.script]);
   const videoStatusLabel: string =
     !videoStatus ? "查詢中…" :
     videoStatus.status === "pending" ? `排隊中 (${videoStatus.progress ?? 0}%)` :
+    videoStatus.status === "processing" ? `生成中 (${videoStatus.progress ?? 0}%)` :
     videoStatus.status === "running" ? `生成中 (${videoStatus.progress ?? 0}%)` :
     videoStatus.status === "completed" ? "完成 ✓" :
     videoStatus.status === "failed" ? `失敗：${videoStatus.errorMessage ?? "?"}` :
@@ -812,11 +837,12 @@ export default function RunPage() {
               )}
               {mode === "video" && (
                 <>
-                  <p className="text-tiny font-semibold">從這篇生影片</p>
-                  {/* 2026-05-11 (CJ feedback「影片也是要先給指令」):
-                      明確分兩步 — Step 1 寫影片 prompt → Step 2 選秒數 → Step 3 啟動 */}
+                  <p className="text-tiny font-semibold">生成影片故事板</p>
+                  {/* 2026-05-12 (CJ「我要改成只給腳本 — C」):
+                      Storyboard mode = 腳本 + 每個 scene 配 Flux 參考圖。
+                      用戶可拿這份 brief 自己拍 / 給拍攝團隊。 */}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
-                    Step 1：先寫影片想呈現什麼（會自動帶入這篇的 caption 當補充）
+                    Step 1：寫影片想呈現什麼（會自動帶入這篇的 caption 當補充）
                   </div>
                   <Textarea
                     label="影片指令"
@@ -829,7 +855,7 @@ export default function RunPage() {
                     autoFocus
                   />
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
-                    Step 2：選影片長度（越短越快）
+                    Step 2：選影片長度（決定分鏡數量）
                   </div>
                   <div className="flex gap-1.5">
                     {(["15", "30", "60"] as const).map((d) => (
@@ -844,31 +870,14 @@ export default function RunPage() {
                       >{d}s</button>
                     ))}
                   </div>
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
-                    Step 3：選用哪個影片模型（不同模型擅長不同節奏）
-                  </div>
-                  <label className="block text-tiny text-default-600 -mb-1">AI 模型</label>
-                  <select
-                    value={videoModel}
-                    onChange={(e) => setVideoModel(e.target.value)}
-                    className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary"
-                  >
-                    <option value="auto">自動（預設）</option>
-                    <option value="piapi/kling-v2-master">主力 — Kling v2-master（3-5 分鐘，最強）</option>
-                    <option value="piapi/kling-v1-6-i2v">快速 — Kling v1.6 i2v（1-2 分鐘）</option>
-                    <option value="piapi/runway-gen-4">電影感 — Runway Gen-4（3-5 分鐘）</option>
-                    <option value="piapi/runway-gen-4-turbo">Runway Gen-4 Turbo（2-3 分鐘）</option>
-                    <option value="piapi/pika-v2">急用 — Pika v2（1-2 分鐘）</option>
-                  </select>
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
-                    Step 4：啟動任務（依模型而定 1–10 分鐘出影片，期間可繼續做別的）
+                    Step 3：生成故事板（約 1 分鐘 — 腳本 + 每個 scene 一張參考圖）
                   </div>
                   <Button
                     color="secondary" fullWidth
                     isLoading={videoGenMut.isPending}
                     isDisabled={videoGenMut.isPending || !slide?.caption?.trim()}
                     onPress={() => {
-                      // 用戶 prompt 優先，沒填就用 caption 當題目
                       const topic = (imagePrompt.trim() || (slide?.caption ?? "").slice(0, 200)).trim();
                       if (!topic) {
                         showToastGlobal("請先填影片指令，或這個 variant 要有文案");
@@ -884,16 +893,15 @@ export default function RunPage() {
                         duration: videoDuration,
                         style: "professional" as any,
                         brandId: data.brand?.id,
-                        videoModel: videoModel as any,
                       });
                     }}
                   >
-                    {videoGenMut.isPending ? "排入佇列…" : `立即生 ${videoDuration} 秒影片`}
+                    {videoGenMut.isPending ? "啟動中…" : `生成 ${videoDuration} 秒故事板`}
                   </Button>
                   {videoJobId && (
-                    <div className="bg-default-50 rounded-lg p-2.5 text-[11px] space-y-1 border border-secondary-200">
+                    <div className="bg-default-50 rounded-lg p-2.5 text-[11px] space-y-2 border border-secondary-200 mt-2">
                       <p className="font-semibold flex items-center gap-2">
-                        🎞️ 影片任務 #{videoJobId}
+                        故事板 #{videoJobId}
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                           videoStatus?.status === "completed" ? "bg-success-100 text-success-800" :
                           videoStatus?.status === "failed" ? "bg-danger-100 text-danger-800" :
@@ -902,13 +910,51 @@ export default function RunPage() {
                       </p>
                       {videoStatus?.status === "failed" && (
                         <p className="text-[11px] text-danger-700 leading-relaxed">
-                          {videoStatus?.errorMessage ?? "未知錯誤"} — 影片產出 pipeline 還在 beta，部分內容可能不支援。試短一點的 prompt 或 15s 短片。
+                          {videoStatus?.errorMessage ?? "未知錯誤"}
                         </p>
                       )}
-                      {videoUrl && (
-                        <video controls className="w-full rounded mt-2">
-                          <source src={videoUrl} />
-                        </video>
+                      {storyboardTitle && (
+                        <p className="text-xs font-semibold text-default-800 mt-1">{storyboardTitle}</p>
+                      )}
+                      {storyboardScenes.length > 0 && (
+                        <div className="space-y-3 mt-1">
+                          {storyboardScenes.map((scene, i) => (
+                            <div key={i} className="border border-default-200 rounded-lg overflow-hidden bg-white">
+                              {scene.imageUrl ? (
+                                <img src={scene.imageUrl} alt={`scene ${i + 1}`} className="w-full h-auto" />
+                              ) : (
+                                <div className="w-full aspect-video bg-default-100 flex items-center justify-center text-[10px] text-default-400">
+                                  （此 scene 參考圖尚未產出 / 失敗）
+                                </div>
+                              )}
+                              <div className="p-2 space-y-1">
+                                <p className="text-[10px] font-semibold text-secondary-700">
+                                  Scene {i + 1} · {scene.durationSec ?? "?"}s · {scene.cameraMove || "static"}
+                                </p>
+                                <p className="text-[11px] text-default-700 leading-snug">
+                                  <span className="text-default-500">畫面：</span>{scene.visualPrompt}
+                                </p>
+                                <p className="text-[11px] text-default-700 leading-snug">
+                                  <span className="text-default-500">旁白：</span>{scene.narration}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {videoStatus?.status === "completed" && storyboardScenes.length > 0 && (
+                        <Button
+                          size="sm" variant="flat" fullWidth
+                          onPress={() => {
+                            const text = storyboardScenes.map((s, i) =>
+                              `Scene ${i + 1} (${s.durationSec}s, ${s.cameraMove}):\n` +
+                              `畫面：${s.visualPrompt}\n` +
+                              `旁白：${s.narration}\n`
+                            ).join("\n");
+                            navigator.clipboard.writeText(text);
+                            showToastGlobal("已複製腳本");
+                          }}
+                        >複製整份腳本</Button>
                       )}
                     </div>
                   )}

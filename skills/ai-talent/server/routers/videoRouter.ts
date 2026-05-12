@@ -14,7 +14,7 @@ import { getDb } from "../db";
 import { videoJobs } from "../../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { generateVideoAsync } from "../video/videoService";
+import { generateVideoAsync, generateStoryboardAsync } from "../video/videoService";
 
 // ─── Input Schemas ──────────────────────────────────────────────────────────
 
@@ -87,6 +87,56 @@ export const videoRouter = router({
         jobId,
         status: "pending",
         message: `影片生成任務已啟動，預計 5–10 分鐘完成`,
+      };
+    }),
+
+  /**
+   * 2026-05-12 (CJ「我要改成只給腳本 — C: script + 每 scene 配一張參考圖」)
+   * Storyboard mode: returns a script with one Flux Schnell reference image
+   * per scene. ~30-90 seconds (LLM script ~5-15s + parallel Flux ~10-15s).
+   * Polled via the same /video.status endpoint; image URLs appear in
+   * script.scenes[i].imageUrl.
+   */
+  generateStoryboard: protectedProcedure
+    .input(
+      z.object({
+        topic:    z.string().min(2).max(200),
+        platform: PlatformEnum.default("youtube"),
+        language: LanguageEnum.default("zh-TW"),
+        duration: z.number().int().min(15).max(180).default(60),
+        style:    StyleEnum.default("professional"),
+        brandId:  z.number().int().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      // Paywall quota check — storyboard images count against image_gen quota
+      // (5-6 Flux Schnell calls per storyboard).
+      const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
+      await assertWithinPlan(ctx.user.id, "image_gen");
+      await recordQuotaUsage(ctx.user.id, "image_gen", "brand", input.brandId ?? null);
+
+      const [result] = await db.insert(videoJobs).values({
+        userId:   ctx.user.id,
+        brandId:  input.brandId ?? null,
+        topic:    input.topic,
+        platform: input.platform,
+        language: input.language,
+        duration: input.duration,
+        style:    input.style,
+        status:   "pending",
+      });
+      const jobId = result.insertId as number;
+
+      generateStoryboardAsync(jobId, input, ctx.user.id).catch((err) => {
+        console.error(`[storyboard] job ${jobId} failed:`, err);
+      });
+
+      return {
+        jobId,
+        status: "pending",
+        message: "故事板生成中（30-90 秒）— 含腳本 + 每個場景的參考圖",
       };
     }),
 

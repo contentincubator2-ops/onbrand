@@ -322,6 +322,80 @@ async function composeVideo(
   throw new Error("Creatomate render timed out");
 }
 
+// ─── Storyboard Orchestrator (script + per-scene reference images) ──────────
+// 2026-05-12 (CJ「我要改成只給腳本 — C: script + 每 scene 配一張參考圖」).
+// Same shape as generateVideoAsync but instead of Kling video clips, each
+// scene gets a Flux Schnell still image. Result lives in the same script JSON
+// (job.script.scenes[i].imageUrl) so existing /video.status keeps working.
+export async function generateStoryboardAsync(
+  jobId:  number,
+  input:  VideoJobInput,
+  _userId: number,
+): Promise<void> {
+  try {
+    // Step 1: Script
+    await updateJob(jobId, { status: "processing", progress: 10 });
+    const script = await generateScript(input);
+    await updateJob(jobId, { script, progress: 25 });
+
+    // Step 2: For each scene, generate a reference image (parallel Flux Schnell)
+    const { dispatchGenerate } = await import("../_core/mediaGen");
+    const isVertical = input.platform === "instagram" || input.platform === "tiktok";
+    const aspect = (isVertical ? "9:16" : "16:9") as "9:16" | "16:9";
+
+    const total = script.scenes.length;
+    const sceneImages: (string | null)[] = new Array(total).fill(null);
+
+    await Promise.all(
+      script.scenes.map(async (scene, idx) => {
+        try {
+          const r = await dispatchGenerate("piapi/flux-schnell", {
+            // Flux likes English prompts; visualPrompt is already English from the LLM.
+            // Append a "no text" guard so the reference frame isn't cluttered with words.
+            prompt: `${scene.visualPrompt}, no text overlays, no captions, editorial photography`.slice(0, 800),
+            aspectRatio: aspect,
+            brandId: 0,
+          });
+          if (r.status === "ready" && r.url) {
+            sceneImages[idx] = r.url;
+          } else if (r.status === "failed") {
+            console.warn(`[storyboard] scene ${idx} image failed: ${r.errorMsg}`);
+          }
+        } catch (e: any) {
+          console.warn(`[storyboard] scene ${idx} image exception: ${e?.message ?? e}`);
+        }
+      })
+    );
+
+    // Stitch image URLs back into the script structure
+    const enrichedScenes = script.scenes.map((s, i) => ({
+      ...s,
+      imageUrl: sceneImages[i] ?? null,
+    }));
+    const enrichedScript = { ...script, scenes: enrichedScenes };
+
+    // Use first non-null image as the job thumbnail
+    const thumbnail = sceneImages.find((u) => !!u) ?? "";
+
+    await updateJob(jobId, {
+      progress: 100,
+      status: "completed",
+      script: enrichedScript,
+      thumbnailUrl: thumbnail,
+      // videoUrl intentionally left null — this is storyboard mode, not video
+    });
+    const okCount = sceneImages.filter((u) => !!u).length;
+    console.log(`[storyboard] job ${jobId} completed: ${total} scenes, ${okCount} images`);
+  } catch (err: any) {
+    const errorMessage = err?.message ?? String(err);
+    console.error(`[storyboard] job ${jobId} failed:`, errorMessage);
+    await updateJob(jobId, {
+      status: "failed",
+      errorMessage: errorMessage.slice(0, 500),
+    });
+  }
+}
+
 // ─── Main Orchestrator ───────────────────────────────────────────────────────
 
 export async function generateVideoAsync(
