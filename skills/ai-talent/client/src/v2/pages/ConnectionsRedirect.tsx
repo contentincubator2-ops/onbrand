@@ -35,7 +35,8 @@ export default function ConnectionsRedirect() {
       (ctx?.brands?.[0]?.id ?? null);
 
     if (activeBrandId) {
-      navigate(`/brands/edit?b=${activeBrandId}&tab=connector`, { replace: true });
+      // 2026-05-12: route to full-page settings (replaces modal sheet).
+      navigate(`/brands/settings?b=${activeBrandId}&tab=connector`, { replace: true });
     } else {
       // No active brand — go to manager list so user picks
       navigate("/brands", { replace: true });

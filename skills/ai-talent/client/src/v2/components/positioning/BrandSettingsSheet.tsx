@@ -123,7 +123,7 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
   );
 }
 
-function InfoTab({ brandId, brandName }: { brandId: number | null; brandName: string | null }) {
+export function InfoTab({ brandId, brandName }: { brandId: number | null; brandName: string | null }) {
   return (
     <div className="max-w-[700px] mx-auto p-8">
       <h2 className="text-2xl font-semibold text-default-900 mb-2">基本資料</h2>
@@ -137,15 +137,178 @@ function InfoTab({ brandId, brandName }: { brandId: number | null; brandName: st
   );
 }
 
-function VisualTab({ brandId }: { brandId: number | null }) {
+export function VisualTab({ brandId }: { brandId: number | null }) {
+  // 2026-05-12 (CJ「視覺還在開發，請開發完成」): real implementation.
+  // Logo URL + 3 brand colors + font hint + guidelines, all wired to
+  // brand.updateVisual which also feeds image-gen as brandContext.
+  const visualQ = (trpc as any).brand?.getVisual?.useQuery?.(
+    { brandId: brandId ?? 0 },
+    { enabled: !!brandId, refetchOnWindowFocus: false },
+  );
+  const updateM = (trpc as any).brand?.updateVisual?.useMutation?.({
+    onSuccess: () => visualQ?.refetch?.(),
+  });
+
+  const [logoUrl,     setLogoUrl]     = useState("");
+  const [primary,     setPrimary]     = useState("#000000");
+  const [secondary,   setSecondary]   = useState("#ffffff");
+  const [accent,      setAccent]      = useState("#7c3aed");
+  const [fontFamily,  setFontFamily]  = useState("");
+  const [guidelines,  setGuidelines]  = useState("");
+  const [dirty,       setDirty]       = useState(false);
+
+  useEffect(() => {
+    const v = visualQ?.data;
+    if (!v) return;
+    setLogoUrl(v.logoUrl ?? "");
+    setPrimary(v.primaryColor ?? "#000000");
+    setSecondary(v.secondaryColor ?? "#ffffff");
+    setAccent(v.accentColor ?? "#7c3aed");
+    setFontFamily(v.fontFamily ?? "");
+    setGuidelines(v.visualGuidelines ?? "");
+    setDirty(false);
+  }, [visualQ?.data]);
+
+  const save = async () => {
+    if (!brandId) return;
+    try {
+      await updateM?.mutateAsync?.({
+        brandId,
+        logoUrl: logoUrl.trim() || null,
+        primaryColor:   primary,
+        secondaryColor: secondary,
+        accentColor:    accent,
+        fontFamily:     fontFamily.trim() || null,
+        visualGuidelines: guidelines.trim() || null,
+      });
+      setDirty(false);
+    } catch (e: any) {
+      alert(`儲存失敗：${e?.message ?? "未知錯誤"}`);
+    }
+  };
+
+  const onChange = (setter: (v: string) => void) => (v: string) => {
+    setter(v);
+    setDirty(true);
+  };
+
+  if (visualQ?.isLoading) {
+    return <div className="p-12 flex justify-center"><Spinner size="sm" /></div>;
+  }
+
   return (
-    <div className="max-w-[800px] mx-auto p-8">
+    <div className="max-w-[820px] mx-auto p-8">
       <h2 className="text-2xl font-semibold text-default-900 mb-2">視覺識別</h2>
-      <p className="text-sm text-default-500 mb-6">Logo · 色票 · 字型 · 識別規範</p>
-      <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 text-sm text-default-700 leading-relaxed">
-        <div className="font-medium text-orange-700 mb-1.5">🚧 開發中</div>
-        Logo 上傳、色票挑選器、字型設定 — 接下來會在此 tab 內完整實作。目前若要設定 Logo，請先到 brand.update 設定 logoUrl 欄位，或等下一輪。
-        <div className="text-default-400 italic mt-2">brandId: {brandId}</div>
+      <p className="text-sm text-default-500 mb-6">
+        Logo · 色票 · 字型 · 識別規範 — AI 生圖時會自動套用，確保不脫離品牌調性
+      </p>
+
+      {/* Logo */}
+      <section className="border border-default-200 rounded-xl p-5 bg-white mb-4">
+        <h3 className="text-sm font-semibold text-default-900 mb-3">Logo</h3>
+        <div className="flex items-start gap-4">
+          <div
+            className="w-20 h-20 rounded-lg border border-default-200 bg-default-50 flex items-center justify-center overflow-hidden flex-shrink-0"
+          >
+            {logoUrl ? (
+              <img src={logoUrl} alt="logo" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <span className="text-xs text-default-400">無 logo</span>
+            )}
+          </div>
+          <div className="flex-1">
+            <Input
+              size="sm"
+              label="Logo URL"
+              placeholder="https://example.com/logo.png 或 /static/..."
+              value={logoUrl}
+              onValueChange={onChange(setLogoUrl)}
+              description="貼上 logo 的網址（PNG / SVG / JPG 都可）。檔案上傳功能稍後上線。"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Colors */}
+      <section className="border border-default-200 rounded-xl p-5 bg-white mb-4">
+        <h3 className="text-sm font-semibold text-default-900 mb-3">色票（HEX）</h3>
+        <p className="text-xs text-default-500 mb-4">
+          AI 生圖時會以這三色為主視覺基調。建議：主色 = logo 主色 / 副色 = 互補色 / 強調色 = CTA 按鈕用色。
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { label: "主色",  val: primary,   setter: setPrimary },
+            { label: "副色",  val: secondary, setter: setSecondary },
+            { label: "強調色", val: accent,    setter: setAccent },
+          ].map((c) => (
+            <label key={c.label} className="flex items-center gap-3 p-3 border border-default-200 rounded-lg bg-default-50">
+              <input
+                type="color"
+                value={c.val}
+                onChange={(e) => { c.setter(e.target.value); setDirty(true); }}
+                className="w-12 h-12 rounded cursor-pointer border-0 p-0"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-default-600 mb-0.5">{c.label}</div>
+                <input
+                  type="text"
+                  value={c.val}
+                  onChange={(e) => { c.setter(e.target.value); setDirty(true); }}
+                  className="w-full text-sm font-mono bg-transparent border-0 p-0 focus:outline-none"
+                />
+              </div>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {/* Font */}
+      <section className="border border-default-200 rounded-xl p-5 bg-white mb-4">
+        <h3 className="text-sm font-semibold text-default-900 mb-3">字型</h3>
+        <Input
+          size="sm"
+          label="主要字型"
+          placeholder="例：Noto Sans TC, sans-serif 或 思源黑體"
+          value={fontFamily}
+          onValueChange={onChange(setFontFamily)}
+          description="CSS font-family 寫法。AI 在生視覺草稿時會優先選擇相近風格的字型。"
+        />
+        {fontFamily && (
+          <div className="mt-3 p-3 bg-default-50 rounded-lg" style={{ fontFamily }}>
+            <div className="text-tiny text-default-500 mb-1">預覽：</div>
+            <div className="text-lg text-default-900">中文預覽 ABC abc 123 — {fontFamily}</div>
+          </div>
+        )}
+      </section>
+
+      {/* Guidelines */}
+      <section className="border border-default-200 rounded-xl p-5 bg-white mb-6">
+        <h3 className="text-sm font-semibold text-default-900 mb-3">識別規範（自由填寫）</h3>
+        <p className="text-xs text-default-500 mb-3">
+          給 AI 生圖時的視覺指引。例：「永遠用自然光、避免高對比、不要用堆疊文字、人物以亞洲面孔為主」。
+        </p>
+        <textarea
+          value={guidelines}
+          onChange={(e) => { setGuidelines(e.target.value); setDirty(true); }}
+          rows={6}
+          placeholder="例：&#10;- 自然光為主，避免棚拍硬光&#10;- 構圖留白多，主體偏左&#10;- 木材、棉麻等天然材質為主&#10;- 不要使用 emoji 或文字疊圖"
+          className="w-full text-sm border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-default-500"
+        />
+      </section>
+
+      {/* Save bar */}
+      <div className="flex items-center gap-3">
+        <Button
+          color="primary"
+          size="md"
+          isDisabled={!dirty || !brandId}
+          isLoading={updateM?.isPending}
+          onPress={save}
+        >
+          儲存視覺識別
+        </Button>
+        {dirty && <span className="text-xs text-amber-600">有未儲存的變更</span>}
+        {!dirty && visualQ?.data && <span className="text-xs text-default-400">已儲存</span>}
       </div>
     </div>
   );
@@ -163,7 +326,7 @@ function VisualTab({ brandId }: { brandId: number | null }) {
  *   4. From now on, publish.toFacebook reads brand.fbPageId + sends
  *      connect_external_user_id so Pipedream uses THIS user's token.
  */
-function PublishTab({ brandId }: { brandId: number | null }) {
+export function PublishTab({ brandId }: { brandId: number | null }) {
   const statusQ = (trpc as any).publish?.getBrandFacebookStatus?.useQuery?.(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false },
@@ -340,7 +503,7 @@ function PublishTab({ brandId }: { brandId: number | null }) {
   );
 }
 
-function DangerTab({ brandId, brandName, onClose }: { brandId: number | null; brandName: string | null; onClose: () => void }) {
+export function DangerTab({ brandId, brandName, onClose }: { brandId: number | null; brandName: string | null; onClose: () => void }) {
   return (
     <div className="max-w-[700px] mx-auto p-8">
       <h2 className="text-2xl font-semibold text-default-900 mb-2">危險區</h2>

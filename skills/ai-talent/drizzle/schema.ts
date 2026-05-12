@@ -131,6 +131,14 @@ export const brands = mysqlTable("brands", {
   emotionalDiff: varchar("emotionalDiff", { length: 200 }),
   functionalDiff: varchar("functionalDiff", { length: 200 }),
   isEstimate: tinyint("isEstimate").default(0),
+  // 2026-05-12 (CJ「視覺還在開發，請開發完成」): visual identity columns.
+  // 3 brand colors as HEX strings (#RRGGBB), font hint, free-text guidelines
+  // that get fed to image-gen prompts as brandContext.colourHints.
+  primaryColor: varchar("primaryColor", { length: 16 }),
+  secondaryColor: varchar("secondaryColor", { length: 16 }),
+  accentColor: varchar("accentColor", { length: 16 }),
+  fontFamily: varchar("fontFamily", { length: 64 }),
+  visualGuidelines: text("visualGuidelines"),
 });
 
 export type Brand = typeof brands.$inferSelect;

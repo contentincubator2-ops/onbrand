@@ -1255,6 +1255,29 @@ async function main() {
       console.log("[migrate] brands.tabLocks: already exists, skipped");
     }
 
+    // 2026-05-12 (CJ「視覺還在開發，請開發完成」): brand visual identity columns.
+    // primaryColor / secondaryColor / accentColor — HEX strings (#RRGGBB)
+    // fontFamily — CSS font-family hint
+    // visualGuidelines — free text, fed to image-gen prompts as brandContext.
+    for (const [col, def] of [
+      ["primaryColor",     "VARCHAR(16) NULL"],
+      ["secondaryColor",   "VARCHAR(16) NULL"],
+      ["accentColor",      "VARCHAR(16) NULL"],
+      ["fontFamily",       "VARCHAR(64) NULL"],
+      ["visualGuidelines", "TEXT NULL"],
+    ] as const) {
+      const [rows] = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brands' AND COLUMN_NAME = ?
+      `, [col]) as any;
+      if ((rows as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE brands ADD COLUMN ${col} ${def}`);
+        console.log(`[migrate] brands.${col}: added`);
+      } else {
+        console.log(`[migrate] brands.${col}: already exists, skipped`);
+      }
+    }
+
     // ── Theater brand_caption_rules (Phase 3a) ──────────────────────────
     // User-defined caption rules per brand. Injected into Theater
     // generateCell prompt as additional rules. Scope determines lifetime:

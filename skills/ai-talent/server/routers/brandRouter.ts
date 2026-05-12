@@ -336,6 +336,61 @@ export const brandRouter = router({
       return { ok: true as const };
     }),
 
+  /** 2026-05-12 (CJ「視覺還在開發，請開發完成」): visual identity getter.
+   *  Returns logoUrl + 3 brand colors + font + guidelines. */
+  getVisual: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { brands } = await import("../../drizzle/schema");
+      const rows = await db.select({
+        logoUrl:          brands.logoUrl,
+        primaryColor:     brands.primaryColor,
+        secondaryColor:   brands.secondaryColor,
+        accentColor:      brands.accentColor,
+        fontFamily:       brands.fontFamily,
+        visualGuidelines: brands.visualGuidelines,
+      }).from(brands)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      return rows[0];
+    }),
+
+  /** Update visual identity columns. logoUrl is updated by a separate
+   *  upload route; this mutation handles only the metadata. */
+  updateVisual: protectedProcedure
+    .input(z.object({
+      brandId:          z.number().int().positive(),
+      primaryColor:     z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+      secondaryColor:   z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+      accentColor:      z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+      fontFamily:       z.string().max(64).optional().nullable(),
+      visualGuidelines: z.string().max(4000).optional().nullable(),
+      logoUrl:          z.string().max(2048).optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { brands } = await import("../../drizzle/schema");
+      const rows = await db.select().from(brands)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      const patch: Record<string, any> = {};
+      if (input.primaryColor     !== undefined) patch.primaryColor     = input.primaryColor;
+      if (input.secondaryColor   !== undefined) patch.secondaryColor   = input.secondaryColor;
+      if (input.accentColor      !== undefined) patch.accentColor      = input.accentColor;
+      if (input.fontFamily       !== undefined) patch.fontFamily       = input.fontFamily?.trim() || null;
+      if (input.visualGuidelines !== undefined) patch.visualGuidelines = input.visualGuidelines?.trim() || null;
+      if (input.logoUrl          !== undefined) patch.logoUrl          = input.logoUrl?.trim() || null;
+      if (Object.keys(patch).length === 0) return { ok: true as const };
+      await db.update(brands).set(patch as any)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
+      return { ok: true as const };
+    }),
+
   /** Read connections (website + socialLinks) for the connector tile UI. */
   getConnections: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
