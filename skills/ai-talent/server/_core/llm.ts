@@ -648,7 +648,36 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     });
     if (!r.ok) {
       const txt = await r.text();
-      throw new Error(`LLM invoke failed (${providerKey}): ${r.status} – ${txt.slice(0, 400)}`);
+      const primaryErr = `LLM invoke failed (${providerKey}): ${r.status} – ${txt.slice(0, 400)}`;
+
+      // 2026-05-12 (CJ「Anthropic 餘額不足 → fallback Azure Foundry」):
+      // When Anthropic returns 400 with credit-balance error (or 401/403/429/5xx),
+      // fall back to Azure Foundry's Kimi-K2.5 (or configured fallback model).
+      // Only applies to primary == "anthropic" (api.anthropic.com); azure-position
+      // is itself an Azure resource so we don't loop.
+      if (providerKey === "anthropic") {
+        const looksLikeBillingOrAvailability =
+          r.status === 400 || r.status === 401 || r.status === 402 ||
+          r.status === 403 || r.status === 429 || r.status >= 500 ||
+          /credit\s*balance|insufficient|quota/i.test(txt);
+        const foundryKey = (ENV as any).AZURE_FOUNDRY_API_KEY ?? (ENV as any).AZURE_AI_API_KEY ?? "";
+        const foundryEndpoint = ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT ?? "").replace(/\/$/, "");
+        if (looksLikeBillingOrAvailability && foundryKey && foundryEndpoint) {
+          const fbModel = (ENV as any).AZURE_FOUNDRY_FALLBACK_MODEL ?? "Kimi-K2.5";
+          console.warn(`[invokeLLM] Anthropic ${r.status} → falling back to Azure Foundry ${fbModel}`);
+          try {
+            return await invokeLLM({
+              ...params,
+              provider: "azure-foundry",
+              model: fbModel,
+            });
+          } catch (fbErr: any) {
+            throw new Error(`Both Anthropic + Azure Foundry failed. Anthropic: ${primaryErr.slice(0,160)} | Azure Foundry: ${String(fbErr?.message ?? fbErr).slice(0,200)}`);
+          }
+        }
+      }
+
+      throw new Error(primaryErr);
     }
     const j: any = await r.json();
     const text = (j.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
