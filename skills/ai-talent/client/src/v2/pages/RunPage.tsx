@@ -1142,18 +1142,60 @@ export default function RunPage() {
           <Card>
             <CardBody className="space-y-2">
               <p className="text-tiny font-semibold">發布到</p>
-              <Button
-                color="primary" fullWidth
-                startContent={<FontAwesomeIcon icon={faRocket} />}
-                isLoading={fbPublishMut.isPending}
-                isDisabled={fbPublishMut.isPending}
-                onPress={() => {
-                  if (!confirm("確定要把這個 variant 發到 Facebook？發布後會直接出現在你的 FB 粉專。")) return;
-                  fbPublishMut.mutate({ outputId: id, variantIndex: activeIdx });
-                }}
-              >
-                {fbPublishMut.isPending ? "發布中…" : "直接發 Facebook"}
-              </Button>
+              {/* 2026-05-12 (CJ「若是產出為 instagram/linkedin/youtube，也要有
+                  一鍵授權的按鈕」): platform-aware publish row.
+                  - Facebook: 直接發 (full publish via Pipedream webhook, auto-auth
+                    popup on '尚未連接')
+                  - Instagram / LinkedIn / YouTube: 一鍵授權 (publish backend not
+                    wired yet — button opens Pipedream auth popup; once authorized,
+                    the platform's connect token is stored against this user so a
+                    future publish.toX call can use it without re-auth) */}
+              {(() => {
+                const platform = (mockupVariant?.platform ?? "facebook") as string;
+                if (platform === "facebook") {
+                  return (
+                    <Button
+                      color="primary" fullWidth
+                      startContent={<FontAwesomeIcon icon={faRocket} />}
+                      isLoading={fbPublishMut.isPending}
+                      isDisabled={fbPublishMut.isPending}
+                      onPress={() => {
+                        if (!confirm("確定要把這個 variant 發到 Facebook？發布後會直接出現在你的 FB 粉專。")) return;
+                        fbPublishMut.mutate({ outputId: id, variantIndex: activeIdx });
+                      }}
+                    >
+                      {fbPublishMut.isPending ? "發布中…" : "直接發 Facebook"}
+                    </Button>
+                  );
+                }
+                const PLATFORM_AUTH: Record<string, { label: string; key: "instagram" | "linkedin" | "youtube" }> = {
+                  instagram: { label: "Instagram", key: "instagram" },
+                  linkedin:  { label: "LinkedIn",  key: "linkedin"  },
+                  youtube:   { label: "YouTube",   key: "youtube"   },
+                };
+                const cfg = PLATFORM_AUTH[platform];
+                if (!cfg) {
+                  // Threads / LINE / TikTok / Email / PR don't have Pipedream
+                  // connect support yet — show a neutral disabled state.
+                  return (
+                    <Button
+                      variant="flat" fullWidth isDisabled
+                      startContent={<FontAwesomeIcon icon={faRocket} />}
+                    >此平台發布功能即將開放</Button>
+                  );
+                }
+                return (
+                  <Button
+                    color="primary" fullWidth
+                    startContent={<FontAwesomeIcon icon={faRocket} />}
+                    isLoading={pipedreamBusy}
+                    isDisabled={pipedreamBusy}
+                    onPress={() => openPipedreamConnect(cfg.key)}
+                  >
+                    {pipedreamBusy ? "授權中…" : `一鍵授權 ${cfg.label}`}
+                  </Button>
+                );
+              })()}
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
