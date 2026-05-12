@@ -1,0 +1,46 @@
+name: Admin — Switch Azure Foundry model gpt-5.4 → gpt-4.1
+
+# CJ reported CoT leakage from gpt-5.4 in /theater output (Chun-Hao Chen
+# returned its own thinking process instead of a cleaned post). gpt-5.4 is
+# a reasoning model — its `reasoning_content` field can leak into
+# `content` under certain prompts. gpt-4.1 is non-reasoning, slightly
+# slower than 5.4 but always returns clean answers.
+#
+# Quality-wise gpt-4.1 still scored ⭐⭐⭐⭐ on the benchmark
+# ("用溫潤的木頭，收藏親子共玩的時光").
+
+on:
+  workflow_dispatch:
+
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            set -e
+            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+            cp "$ENV" "${ENV}.bak.$(date +%s)"
+
+            upsert() {
+              local K="$1"; local V="$2"
+              if grep -qE "^${K}=" "$ENV"; then
+                sed -i "s|^${K}=.*|${K}=${V}|" "$ENV"
+                echo "  ↻ $K = $V"
+              else
+                echo "${K}=${V}" >> "$ENV"
+                echo "  + $K = $V"
+              fi
+            }
+
+            # Non-reasoning models — no CoT-leak risk
+            upsert AZURE_FOUNDRY_MODEL          "gpt-4.1"
+            upsert AZURE_FOUNDRY_FALLBACK_MODEL "gpt-4.1"
+
+            pm2 restart marketing-os --update-env 2>&1 | tail -3 || true
+            echo "✓ Done"

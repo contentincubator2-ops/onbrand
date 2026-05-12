@@ -671,17 +671,26 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         ? { ...params, provider: provider as any }
         : { ...params, provider: provider as any, model: undefined };
       const out = await invokeLLMOnce(callParams);
-      // Empty content from a successful 200 = treat as a soft failure;
-      // some reasoning models slip through without reasoning_content.
+      // Empty content = soft failure (e.g. gpt-5.4 used its budget on
+      // reasoning, never emitted final answer). Cascade moves on.
       const text = out?.choices?.[0]?.message?.content;
-      if (typeof text === "string" && text.trim().length > 0) {
-        if (errors.length > 0) {
-          console.warn(`[invokeLLM] succeeded with ${provider} after ${errors.length} failed providers`);
-        }
-        return out;
+      if (typeof text !== "string" || text.trim().length === 0) {
+        errors.push(`${provider}: empty content`);
+        console.warn(`[invokeLLM] ${provider} returned empty content, trying next…`);
+        continue;
       }
-      errors.push(`${provider}: empty content`);
-      console.warn(`[invokeLLM] ${provider} returned empty content, trying next…`);
+      // CoT leakage detection: if the model dumped its chain-of-thought
+      // instead of a clean answer (typical for reasoning models when the
+      // user prompt asks for "直接回傳純文字"), treat as failure.
+      if (looksLikeChainOfThought(text)) {
+        errors.push(`${provider}: CoT leakage`);
+        console.warn(`[invokeLLM] ${provider} CoT leaked (first 100 chars: ${text.slice(0,100)}…), trying next…`);
+        continue;
+      }
+      if (errors.length > 0) {
+        console.warn(`[invokeLLM] succeeded with ${provider} after ${errors.length} failed providers`);
+      }
+      return out;
     } catch (e: any) {
       const msg = String(e?.message ?? e);
       errors.push(`${provider}: ${msg.slice(0, 120)}`);
@@ -877,17 +886,37 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
     );
   }
 
-  // 2026-05-12: some Azure Foundry reasoning models (e.g. Kimi-K2.5) return
-  // output in `message.reasoning_content` instead of `message.content`.
-  // Normalize so downstream callers always see content.
+  // 2026-05-12 (CJ「Chun-Hao Chen 自我對話」):
+  // DO NOT copy reasoning_content into content. For gpt-5*/o3/o4 reasoning
+  // models, reasoning_content is the model's internal chain-of-thought,
+  // NOT the final answer. Leaking it gives the user "讓我分析一下..." dumps.
+  // If content is empty but reasoning_content has text, treat as soft
+  // failure → leave content empty and let the cascade fall to the next
+  // provider (which will return a clean answer).
   const j: any = await response.json();
-  for (const ch of j.choices ?? []) {
-    const m = ch.message ?? {};
-    if ((!m.content || m.content === "") && typeof m.reasoning_content === "string" && m.reasoning_content) {
-      m.content = m.reasoning_content;
-    }
-  }
   return j as InvokeResult;
+}
+
+// 2026-05-12: CoT leakage detector. If a model returns "thinking" output
+// instead of a clean answer (despite our prompt asking for direct output),
+// flag it so the cascade can fall through.
+const COT_LEAK_PATTERNS = [
+  /^讓我(分析|想|看看|理解|思考|檢查)/m,
+  /^我(需要|應該|來|先)(分析|想想|看看|理解|思考)/m,
+  /^用戶(要|想|希望|讓我)/m,
+  /^(等等|嗯|好的|讓我重新)/m,
+  /^Let me (analyze|think|check|see|understand)/im,
+  /<thinking>|<\/thinking>|<reasoning>|<\/reasoning>/i,
+];
+export function looksLikeChainOfThought(text: string): boolean {
+  if (!text || text.length < 40) return false;
+  // Heuristic: leading 200 chars look like self-narration
+  const head = text.slice(0, 400);
+  let hits = 0;
+  for (const re of COT_LEAK_PATTERNS) {
+    if (re.test(head)) hits++;
+  }
+  return hits >= 1;
 }
 
 
