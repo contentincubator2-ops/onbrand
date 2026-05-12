@@ -43,6 +43,19 @@ import localPool from "./localDb";
  * 30s/60s/100s tasks burning the budget.
  */
 export async function preflightCostCheck(userId: number): Promise<{ ok: true } | { ok: false; reason: string }> {
+  // 0. Enterprise plan bypass — internal/team accounts (planCode='enterprise')
+  // skip all preflight caps. They share infra cost, not subject to trial caps.
+  // 2026-05-12 (CJ「移除 sowork.tw 帳號的額度限制」).
+  try {
+    const [prows]: any = await localPool.execute(
+      `SELECT planCode FROM users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    if ((prows as any[])[0]?.planCode === "enterprise") {
+      return { ok: true };
+    }
+  } catch {/* if plan lookup fails, fall through to standard checks */}
+
   // 1. Wallet floor check (re-uses checkEnoughCredits from deductCredits)
   try {
     const c = await checkEnoughCredits(userId, MIN_CREDITS_TO_RUN);
