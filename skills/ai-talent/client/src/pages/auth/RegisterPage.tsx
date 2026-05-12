@@ -4,8 +4,10 @@
 
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useLang } from "../../lib/i18n";
 
 export default function RegisterPage() {
+  const { t, lang, setLang } = useLang();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,22 +23,24 @@ export default function RegisterPage() {
 
     // Validation
     if (!name || !email || !password || !confirmPassword) {
-      setError("請填寫所有欄位");
+      setError(lang === "en" ? "Please fill in every field" : "請填寫所有欄位");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("密碼確認不一致");
+      setError(lang === "en" ? "Passwords don't match" : "密碼確認不一致");
       return;
     }
 
     if (password.length < 8) {
-      setError("密碼至少需要 8 個字元");
+      setError(t("auth_err_password_short"));
       return;
     }
 
     if (!agreeToTerms) {
-      setError("請同意服務條款和隱私政策");
+      setError(lang === "en"
+        ? "Agree to the Terms and Privacy Policy to continue"
+        : "請同意服務條款和隱私政策");
       return;
     }
 
@@ -54,7 +58,7 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "註冊失敗，請稍後再試");
+        setError(data.error || (lang === "en" ? "Sign-up failed — try again in a sec." : "註冊失敗，請稍後再試"));
         return;
       }
 
@@ -80,7 +84,7 @@ export default function RegisterPage() {
       }
       setSuccess(true);
     } catch (err) {
-      setError("網路錯誤，請稍後再試");
+      setError(t("auth_err_network"));
     } finally {
       setLoading(false);
     }
@@ -105,19 +109,23 @@ export default function RegisterPage() {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">註冊成功！</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {lang === "en" ? "You're in!" : "註冊成功！"}
+            </h1>
             <p className="text-gray-600 mb-6">
-              你的帳號已啟用，可以直接登入使用 OnBrand。
+              {lang === "en"
+                ? "Your account is ready. Sign in to start making."
+                : "你的帳號已啟用，可以直接登入使用 OnBrand。"}
             </p>
             <p className="text-sm text-gray-500 mb-6">
-              帳號 <strong>{email}</strong>
+              {lang === "en" ? "Account" : "帳號"} <strong>{email}</strong>
             </p>
             <Link
               to="/auth/login"
               className="inline-block rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-all duration-200"
               style={{ background: "linear-gradient(90deg, #6C5CE7, #a29bfe)" }}
             >
-              前往登入
+              {lang === "en" ? "Sign in" : "前往登入"}
             </Link>
           </div>
         </div>
@@ -130,22 +138,30 @@ export default function RegisterPage() {
       {/* Left brand panel */}
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
         <div className="text-white">
-          <div className="text-4xl font-bold mb-3">OnBrand · 對版</div>
-          <div className="text-xl opacity-80 mb-8">永遠 on-brand 的行銷作戰指揮台</div>
+          <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
+          <div className="text-xl opacity-80 mb-8">
+            {lang === "en" ? "Marketing on autopilot — always on-brand." : "永遠 on-brand 的行銷作戰指揮台"}
+          </div>
           <ul className="space-y-4 text-sm opacity-90">
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
-              註冊即送 1000 點數，免費體驗 AI 行銷
+              {lang === "en" ? "1000 free credits when you sign up" : "註冊即送 1000 點數，免費體驗 AI 行銷"}
             </li>
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
-              多 Agent 並行執行，3 倍行銷產出效率
+              {lang === "en" ? "3× output with parallel AI agents" : "多 Agent 並行執行，3 倍行銷產出效率"}
             </li>
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
-              Facebook、LinkedIn、YouTube 全管道整合
+              {lang === "en" ? "Facebook, LinkedIn, YouTube — all in one" : "Facebook、LinkedIn、YouTube 全管道整合"}
             </li>
           </ul>
+          <button
+            onClick={() => setLang(lang === "en" ? "zh-TW" : "en")}
+            className="mt-10 text-xs opacity-70 hover:opacity-100 underline transition"
+          >
+            {lang === "en" ? "切換為繁體中文" : "Switch to English"}
+          </button>
         </div>
       </div>
 
@@ -153,20 +169,20 @@ export default function RegisterPage() {
       <div className="flex flex-col justify-center items-center w-full lg:w-1/2 px-8">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 w-full max-w-md">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">建立新帳號</h1>
-            <p className="text-gray-400 text-sm">開始使用 OnBrand · 對版</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">{t("auth_register_title")}</h1>
+            <p className="text-gray-400 text-sm">{t("auth_register_subtitle")}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                姓名
+                {t("auth_name_label")}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="您的姓名"
+                placeholder={t("auth_name_placeholder")}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors"
                 autoComplete="name"
                 required
@@ -175,13 +191,13 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                電子郵件
+                {t("auth_email_label")}
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder={t("auth_email_placeholder")}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors"
                 autoComplete="email"
                 required
@@ -190,13 +206,13 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                密碼
+                {t("auth_password_label")}
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="至少 8 個字元"
+                placeholder={t("auth_password_hint")}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors"
                 autoComplete="new-password"
                 required
@@ -206,13 +222,13 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                確認密碼
+                {lang === "en" ? "Confirm password" : "確認密碼"}
               </label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="再次輸入密碼"
+                placeholder={lang === "en" ? "Type it again" : "再次輸入密碼"}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors"
                 autoComplete="new-password"
                 required
@@ -229,7 +245,10 @@ export default function RegisterPage() {
                 required
               />
               <label htmlFor="terms" className="text-xs text-gray-500">
-                我同意 <Link to="/terms" className="text-indigo-500 hover:underline">服務條款</Link> 和 <Link to="/privacy" className="text-indigo-500 hover:underline">隱私政策</Link>
+                {t("auth_agree_terms")}{" "}
+                <Link to="/terms" className="text-indigo-500 hover:underline">{t("auth_terms_link")}</Link>
+                {" "}{t("auth_and")}{" "}
+                <Link to="/privacy" className="text-indigo-500 hover:underline">{t("auth_privacy_link")}</Link>
               </label>
             </div>
 
@@ -249,13 +268,13 @@ export default function RegisterPage() {
                 boxShadow: loading ? "none" : "0 4px 12px rgba(108,92,231,0.35)",
               }}
             >
-              {loading ? "註冊中..." : "註冊"}
+              {loading ? t("auth_register_busy") : t("auth_register_btn")}
             </button>
 
             <p className="text-center text-xs text-gray-400">
-              已有帳號？
+              {t("auth_have_account")}
               <Link to="/auth/login" className="text-indigo-500 hover:text-indigo-700 ml-1 underline">
-                立即登入
+                {t("auth_sign_in_link")}
               </Link>
             </p>
           </form>

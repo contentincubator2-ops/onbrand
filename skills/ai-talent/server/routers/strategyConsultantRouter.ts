@@ -291,7 +291,7 @@ export const strategyConsultantRouter = router({
 
       // 2. Fetch brand context
       const brandContext = input.brandId
-        ? await buildBrandPrefix(input.brandId, ctx.userId)
+        ? await buildBrandPrefix(input.brandId, ctx.user.id)
         : "";
 
       // 3. Tavily grounding
@@ -314,15 +314,20 @@ export const strategyConsultantRouter = router({
         return "azure-foundry" as const;
       })();
 
-      const result = await callModel(provider, [
-        { role: "system", content: systemPrompt },
-        { role: "user",   content: input.question || "請針對我的品牌進行全面的策略分析。" },
-      ], { maxTokens: 3000 });
+      // 2026-05-12: callModel signature is (messages, taskType?, preferredProvider?, preferredModel?)
+      const result = await callModel(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user",   content: input.question || "請針對我的品牌進行全面的策略分析。" },
+        ],
+        undefined,
+        provider,
+      );
 
       return {
         agentName,
         agentTitle,
-        report: result.text ?? "",
+        report: result.content ?? "",
         provider: result.provider ?? provider,
         model: result.model ?? aiModel,
       };
@@ -360,7 +365,7 @@ export const strategyConsultantRouter = router({
       const agentMethodology= agent?.methodology? String(agent.methodology).slice(0, 600) : "";
 
       const brandContext = input.brandId
-        ? await buildBrandPrefix(input.brandId, ctx.userId)
+        ? await buildBrandPrefix(input.brandId, ctx.user.id)
         : "";
 
       // For follow-ups, only do Tavily on the latest user message if it looks like a research question
@@ -384,15 +389,19 @@ export const strategyConsultantRouter = router({
         return "azure-foundry" as const;
       })();
 
-      const result = await callModel(provider, [
-        { role: "system", content: systemPrompt },
-        ...input.messages,
-      ], { maxTokens: 2500 });
+      const result = await callModel(
+        [
+          { role: "system", content: systemPrompt },
+          ...input.messages,
+        ],
+        undefined,
+        provider,
+      );
 
       return {
         agentName,
         agentTitle,
-        reply: result.text ?? "",
+        reply: result.content ?? "",
         provider: result.provider ?? provider,
         model: result.model ?? aiModel,
       };

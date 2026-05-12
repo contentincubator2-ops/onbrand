@@ -4,8 +4,10 @@
 
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useLang } from "../../lib/i18n";
 
 export default function LoginPage() {
+  const { t, lang, setLang } = useLang();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -58,7 +60,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "登入失敗，請檢查您的電子郵件和密碼");
+        setError(data.error || t("auth_err_wrong_creds"));
         if (res.status === 403 && data.needsVerification) {
           setNeedsVerification(true);
         }
@@ -69,7 +71,7 @@ export default function LoginPage() {
       await new Promise(resolve => setTimeout(resolve, 500));
       window.location.href = "/";
     } catch (err) {
-      setError("網路錯誤，請稍後再試");
+      setError(t("auth_err_network"));
     } finally {
       setLoading(false);
     }
@@ -85,22 +87,39 @@ export default function LoginPage() {
       {/* Left brand panel */}
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
         <div className="text-white">
-          <div className="text-4xl font-bold mb-3">OnBrand · 對版</div>
-          <div className="text-xl opacity-80 mb-8">永遠 on-brand · 你的 AI 行銷工作室</div>
+          <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
+          <div className="text-xl opacity-80 mb-8">
+            {lang === "en"
+              ? "Always on-brand. Your AI marketing studio."
+              : "永遠 on-brand · 你的 AI 行銷工作室"}
+          </div>
           <ul className="space-y-4 text-sm opacity-90">
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
-              多 Agent 並行執行，3 倍行銷產出效率
+              {lang === "en"
+                ? "3× output with parallel AI agents"
+                : "多 Agent 並行執行，3 倍行銷產出效率"}
             </li>
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
-              Facebook、LinkedIn、YouTube 全管道整合
+              {lang === "en"
+                ? "Facebook, LinkedIn, YouTube — all in one"
+                : "Facebook、LinkedIn、YouTube 全管道整合"}
             </li>
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
-              A2A 架構，策略到執行一氣呵成
+              {lang === "en"
+                ? "Strategy to execution in a single flow"
+                : "A2A 架構，策略到執行一氣呵成"}
             </li>
           </ul>
+          {/* Language toggle on auth pages (pre-login users can't reach S-menu) */}
+          <button
+            onClick={() => setLang(lang === "en" ? "zh-TW" : "en")}
+            className="mt-10 text-xs opacity-70 hover:opacity-100 underline transition"
+          >
+            {lang === "en" ? "切換為繁體中文" : "Switch to English"}
+          </button>
         </div>
       </div>
 
@@ -108,8 +127,8 @@ export default function LoginPage() {
       <div className="flex flex-col justify-center items-center w-full lg:w-1/2 px-8">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 w-full max-w-md">
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">歡迎回來</h1>
-            <p className="text-gray-400 text-sm">使用您的帳號登入 OnBrand</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">{t("auth_login_title")}</h1>
+            <p className="text-gray-400 text-sm">{t("auth_login_subtitle")}</p>
           </div>
 
           {/* Google Login Button */}
@@ -121,7 +140,7 @@ export default function LoginPage() {
             {googleLoading ? (
               <>
                 <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                連接中...
+                {lang === "en" ? "Connecting…" : "連接中…"}
               </>
             ) : (
               <>
@@ -131,7 +150,7 @@ export default function LoginPage() {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                使用 Google 繼續
+                {lang === "en" ? "Continue with Google" : "使用 Google 繼續"}
               </>
             )}
           </button>
@@ -141,7 +160,7 @@ export default function LoginPage() {
               <div className="w-full border-t border-gray-200" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-400">或</span>
+              <span className="px-2 bg-white text-gray-400">{lang === "en" ? "or" : "或"}</span>
             </div>
           </div>
 
@@ -149,13 +168,13 @@ export default function LoginPage() {
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                電子郵件
+                {t("auth_email_label")}
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder={t("auth_email_placeholder")}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors"
                 autoComplete="email"
                 required
@@ -164,7 +183,7 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                密碼
+                {t("auth_password_label")}
               </label>
               <div className="relative">
                 <input
@@ -210,7 +229,9 @@ export default function LoginPage() {
                       disabled={resendBusy || !email}
                       className="self-start text-xs font-medium px-3 py-1 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
-                      {resendBusy ? "寄送中…" : "重新寄送驗證信"}
+                      {resendBusy
+                        ? (lang === "en" ? "Sending…" : "寄送中…")
+                        : (lang === "en" ? "Resend verification email" : "重新寄送驗證信")}
                     </button>
                     {resendMsg && (
                       <span className="text-xs text-default-600">{resendMsg}</span>
@@ -222,7 +243,7 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between text-sm">
               <Link to="/auth/forgot-password" className="text-indigo-500 hover:text-indigo-700">
-                忘記密碼？
+                {t("auth_forgot_password")}
               </Link>
             </div>
 
@@ -236,13 +257,13 @@ export default function LoginPage() {
                 boxShadow: loading ? "none" : "0 4px 12px rgba(108,92,231,0.35)",
               }}
             >
-              {loading ? "登入中..." : "登入"}
+              {loading ? t("auth_login_busy") : t("auth_login_btn")}
             </button>
 
             <p className="text-center text-xs text-gray-400">
-              還沒有帳號？
+              {t("auth_no_account")}
               <Link to="/auth/register" className="text-indigo-500 hover:text-indigo-700 ml-1 underline">
-                立即註冊
+                {t("auth_create_account")}
               </Link>
             </p>
           </form>

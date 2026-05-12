@@ -21,6 +21,7 @@ import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher"
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
 import FestivalGlobalNudge from "../../components/FestivalGlobalNudge";
 import { showToastGlobal } from "../../../components/ui/Toast";
+import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -30,7 +31,7 @@ import {
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
   faCircleHalfStroke, faCircleInfo, faBorderAll, faDisplay, faBriefcase,
-  faShareNodes, faTrophy, faUsers,
+  faShareNodes, faTrophy, faUsers, faLanguage,
   faStar, faImage, faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
 } from "@fortawesome/free-solid-svg-icons";
@@ -1901,6 +1902,8 @@ function AccountPopup({ onLogout, onClose }: {
   // toasts so trial users don't hit silent no-ops.
   const navigate = useNavigate();
   const [pricingOpen, setPricingOpen] = React.useState(false);
+  // 2026-05-12 Phase 0 i18n: language toggle in S-menu
+  const { lang, setLang } = useLang();
 
   // 2026-05-08: real user info via REST /api/auth/me (auth uses Express,
   // not trpc — same endpoint RequireAuthV2 hits).
@@ -1951,6 +1954,14 @@ function AccountPopup({ onLogout, onClose }: {
       icon: faTrophy, label: "我的成就", arrow: true, badge: null, danger: false,
       // /achievements 已存在，原本 S 選單沒入口
       action: () => { navigate("/achievements"); onClose(); },
+    },
+    {
+      // 2026-05-12 Phase 0 i18n: language toggle. Tapping flips between
+      // zh-TW and en (no separate dropdown — keeps S-menu compact).
+      icon: faLanguage,
+      label: lang === "en" ? "Language · English" : "語系 · 繁體中文",
+      arrow: true, badge: null, danger: false,
+      action: () => { setLang(lang === "en" ? "zh-TW" : "en"); },
     },
     // 2026-05-12 (CJ「先移除 agency 邀請團隊的設計」): Team/Workspace entry
     // removed from S-menu. /settings/workspace route still exists for direct
