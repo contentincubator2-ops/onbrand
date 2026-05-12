@@ -891,10 +891,16 @@ export default function TheaterPage() {
     };
     const captionTasks: Task[] = [];
     let uspCursor = 0;
+    // 2026-05-12 pre-launch zombie audit: guard against modulo-by-zero
+    // (RangeError) and empty plan.usps. Fall back to a brand-named default
+    // so theater still ships content rather than crashing.
+    const uspsArr: string[] = Array.isArray(plan?.usps) && plan.usps.length > 0
+      ? plan.usps
+      : [(plan?.brandTagline ?? "我們的核心價值")];
     for (const d of days) {
       const matching = importantDates.find((x) => x.date === d.date);
       for (const p of activePlatforms) {
-        const usp = plan.usps[uspCursor % plan.usps.length] ?? plan.usps[0]!;
+        const usp = uspsArr[uspCursor % uspsArr.length] ?? uspsArr[0]!;
         uspCursor++;
         const planKey = `${d.date}::${p}`;
         captionTasks.push({

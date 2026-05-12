@@ -39,14 +39,18 @@ export interface PlanQuota {
 export interface Plan {
   code: PlanCode;
   name: string;
-  priceTwdMonthly: number;     // NTD per month
+  priceTwdMonthly: number;     // NTD per month (effective default = current sticker)
   priceTwdAnnually: number;    // NTD per year (discounted)
+  /** 2026-05-12 (CJ「老用戶永遠保 900」): early-bird vs standard.
+   *  priceTwdMonthly is set to the CURRENT (early-bird) price so anyone
+   *  not flagged earlyBird falls through to standardPriceTwdMonthly.
+   *  earlyBirdPriceTwdMonthly is what flagged users actually pay. */
+  earlyBirdPriceTwdMonthly?: number;
+  standardPriceTwdMonthly?: number;
   trialDays: number;
   quota: PlanQuota;
   features: string[];          // human-readable bullets for /pricing
-  /** Tier highlight on /pricing (e.g., 「最受歡迎」). */
   highlight?: string;
-  /** 2026-05-11 — white-label / API / priority support flags. */
   whiteLabel?: boolean;
   apiAccess?: boolean;
   prioritySupport?: boolean;
@@ -93,8 +97,10 @@ export const PLANS: Record<PlanCode, Plan> = {
   drop_pro: {
     code: "drop_pro",
     name: "OnBrand 個人",
-    priceTwdMonthly: 900,          // 早鳥價（也就是現在實際收的價）
-    priceTwdAnnually: 9000,        // 早鳥年費 (10 個月優惠)
+    priceTwdMonthly: 1500,                 // 標準價（新用戶看到的）
+    priceTwdAnnually: 15000,               // 標準年費
+    earlyBirdPriceTwdMonthly: 900,         // 早鳥永久價（grandfathered 用戶）
+    standardPriceTwdMonthly: 1500,         // 同 priceTwdMonthly，明示語意
     trialDays: 0,
     quota: {
       task_30s: -1,
@@ -210,6 +216,51 @@ export const PLANS: Record<PlanCode, Plan> = {
 
 export function getPlan(code: PlanCode | string): Plan {
   return PLANS[code as PlanCode] ?? PLANS.trial;
+}
+
+/**
+ * 2026-05-12 — resolve the EFFECTIVE monthly price for a specific user.
+ * Hierarchy (high → low):
+ *   1. users.lockedPriceTwdMonthly — explicit override (custom deals)
+ *   2. earlyBird flag → plan.earlyBirdPriceTwdMonthly
+ *   3. plan.priceTwdMonthly (standard sticker)
+ */
+export function getEffectivePrice(
+  plan: Plan,
+  userFlags: { earlyBird?: number | boolean; lockedPriceTwdMonthly?: number | null },
+): { monthly: number; annually: number; isEarlyBird: boolean; isLocked: boolean } {
+  // 1. Locked custom price wins
+  const locked = userFlags.lockedPriceTwdMonthly;
+  if (typeof locked === "number" && locked > 0) {
+    return { monthly: locked, annually: locked * 10, isEarlyBird: false, isLocked: true };
+  }
+  // 2. Early-bird (grandfathered) users
+  const isEarlyBird = Boolean(userFlags.earlyBird);
+  if (isEarlyBird && plan.earlyBirdPriceTwdMonthly && plan.earlyBirdPriceTwdMonthly > 0) {
+    return {
+      monthly:  plan.earlyBirdPriceTwdMonthly,
+      annually: plan.earlyBirdPriceTwdMonthly * 10,
+      isEarlyBird: true,
+      isLocked: false,
+    };
+  }
+  // 3. Standard sticker
+  return {
+    monthly:  plan.priceTwdMonthly,
+    annually: plan.priceTwdAnnually,
+    isEarlyBird: false,
+    isLocked: false,
+  };
+}
+
+/**
+ * Should new sign-ups today get the early-bird flag?
+ * Controlled by env ONBRAND_PROMO_ACTIVE. Defaults to true (i.e. promo
+ * active) until CJ flips it off.
+ */
+export function isPromoActiveForNewSignups(): boolean {
+  const v = (process.env.ONBRAND_PROMO_ACTIVE ?? "1").toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
 }
 
 /** Format NTD for display: 990 → 'NT$ 990' */

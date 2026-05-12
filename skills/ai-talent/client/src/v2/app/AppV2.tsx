@@ -125,9 +125,9 @@ class AppErrorBoundary extends React.Component<
             <pre style={{ marginTop: 12, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap" }}>
               {this.state.error.stack}
             </pre>
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <button
-                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer", marginRight: 8 }}
+                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
                 onClick={() => { this.setState({ error: null }); }}
               >
                 重試渲染
@@ -138,6 +138,31 @@ class AppErrorBoundary extends React.Component<
               >
                 重新整理頁面
               </button>
+              <button
+                style={{ padding: "6px 12px", background: "white", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer" }}
+                onClick={() => {
+                  try { localStorage.clear(); } catch {}
+                  try {
+                    document.cookie.split(";").forEach((c) => {
+                      const eqPos = c.indexOf("=");
+                      const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
+                      document.cookie = `${name}=;expires=Thu,01 Jan 1970 00:00:00 GMT;path=/`;
+                    });
+                  } catch {}
+                  window.location.replace("/auth/login");
+                }}
+              >
+                清除登入狀態並重新登入
+              </button>
+              {/* 2026-05-12 pre-launch zombie audit: surface support email
+                  even on error-recovery screen — users stuck here have no
+                  shell/footer to reach customer service. */}
+              <a
+                href={`mailto:sowork@sowork.tw?subject=${encodeURIComponent("OnBrand 應用程式錯誤")}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
+                style={{ marginLeft: "auto", fontSize: 12, color: "#3b82f6", textDecoration: "underline" }}
+              >
+                聯絡客服 sowork@sowork.tw
+              </a>
             </div>
           </div>
         </div>

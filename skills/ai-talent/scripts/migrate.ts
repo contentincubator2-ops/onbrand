@@ -1255,6 +1255,24 @@ async function main() {
       console.log("[migrate] brands.tabLocks: already exists, skipped");
     }
 
+    // 2026-05-12 (CJ「老用戶永遠保 900，新用戶才漲 1500」): early-bird flag
+    // on users — set at register time based on ONBRAND_PROMO_ACTIVE env.
+    for (const [col, def] of [
+      ["earlyBird",               "TINYINT(1) NOT NULL DEFAULT 0"],
+      ["lockedPriceTwdMonthly",   "INT NULL"],
+    ] as const) {
+      const [rows] = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?
+      `, [col]) as any;
+      if ((rows as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE users ADD COLUMN ${col} ${def}`);
+        console.log(`[migrate] users.${col}: added`);
+      } else {
+        console.log(`[migrate] users.${col}: already exists, skipped`);
+      }
+    }
+
     // 2026-05-12 (CJ「視覺還在開發，請開發完成」): brand visual identity columns.
     // primaryColor / secondaryColor / accentColor — HEX strings (#RRGGBB)
     // fontFamily — CSS font-family hint

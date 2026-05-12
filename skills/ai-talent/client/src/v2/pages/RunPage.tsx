@@ -342,10 +342,14 @@ export default function RunPage() {
   }, [data]);
 
   // Apply local overrides so mockup reflects unsaved edits in real time
+  // 2026-05-12 pre-launch zombie audit: clamp activeIdx so deleted-variant
+  // / archive scenarios don't return undefined slide and crash mockup render.
   const slide = useMemo(() => {
-    const base = variants[activeIdx];
+    if (!variants || variants.length === 0) return undefined;
+    const safeIdx = Math.min(Math.max(0, activeIdx), variants.length - 1);
+    const base = variants[safeIdx];
     if (!base) return base;
-    const ov = overrides[activeIdx];
+    const ov = overrides[safeIdx];
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 

@@ -24,10 +24,15 @@ async function loadUserPlan(userId: number): Promise<{
   planStatus: string;
   planEndsAt: Date | null;
   isActive: boolean;
+  earlyBird: number;
+  lockedPriceTwdMonthly: number | null;
 }> {
   const { default: localPool } = await import("../localDb");
   const [rows]: any = await localPool.execute(
-    `SELECT planCode, planStatus, planEndsAt, isActive FROM users WHERE id = ? LIMIT 1`,
+    `SELECT planCode, planStatus, planEndsAt, isActive,
+            IFNULL(earlyBird, 0) AS earlyBird,
+            lockedPriceTwdMonthly
+       FROM users WHERE id = ? LIMIT 1`,
     [userId],
   );
   const r = (rows as any[])[0];
@@ -36,6 +41,8 @@ async function loadUserPlan(userId: number): Promise<{
     planStatus: r?.planStatus ?? "trial",
     planEndsAt: r?.planEndsAt instanceof Date ? r.planEndsAt : (r?.planEndsAt ? new Date(r.planEndsAt) : null),
     isActive: Number(r?.isActive ?? 0) === 1,
+    earlyBird: Number(r?.earlyBird ?? 0),
+    lockedPriceTwdMonthly: r?.lockedPriceTwdMonthly ?? null,
   };
 }
 
@@ -163,6 +170,12 @@ export const billingRouter = router({
         (u.planStatus === "trial" && u.planEndsAt !== null && u.planEndsAt < now);
 
       const plan = getPlan(u.planCode);
+      // 2026-05-12 (CJ「老用戶永遠保 900」): resolve actual price for THIS user.
+      const { getEffectivePrice } = await import("../_core/plans");
+      const eff = getEffectivePrice(plan, {
+        earlyBird: u.earlyBird,
+        lockedPriceTwdMonthly: u.lockedPriceTwdMonthly,
+      });
 
       // Current calendar month usage counts (matches assertWithinPlan window)
       const { default: localPool } = await import("../localDb");
@@ -189,8 +202,15 @@ export const billingRouter = router({
         planEndsAt: u.planEndsAt?.toISOString() ?? null,
         daysLeft,
         expired,
-        priceTwdMonthly: plan.priceTwdMonthly,
-        priceTwdAnnually: plan.priceTwdAnnually,
+        // Effective price for THIS user (early-bird grandfathered or
+        // locked custom or standard). Used by /pricing + /settings/account
+        // + ECPay checkout.
+        priceTwdMonthly:  eff.monthly,
+        priceTwdAnnually: eff.annually,
+        isEarlyBird: eff.isEarlyBird,
+        isLocked:    eff.isLocked,
+        // Also expose the sticker price so UI can show "原價 1500 / 早鳥 900"
+        standardPriceTwdMonthly: plan.standardPriceTwdMonthly ?? plan.priceTwdMonthly,
         quota: plan.quota,
         usage,
       };

@@ -34,8 +34,12 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import * as crypto from "crypto";
 
-const PLAN_TO_AMOUNT: Record<string, { monthly: number; annual: number }> = {
-  drop_pro:    { monthly: 990,   annual: 9900   },
+// 2026-05-12: amounts are now SOURCED from plans.ts + per-user
+// getEffectivePrice() so early-bird grandfathering happens at checkout.
+// This table is fallback only for team/agency (which don't have per-user
+// pricing yet).
+const PLAN_TO_AMOUNT_FALLBACK: Record<string, { monthly: number; annual: number }> = {
+  drop_pro:    { monthly: 1500,  annual: 15000  },   // standard sticker
   drop_team:   { monthly: 4990,  annual: 49900  },
   drop_agency: { monthly: 14990, annual: 149900 },
 };
@@ -77,7 +81,24 @@ export const ecpayRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "只有 workspace owner 可以訂閱" });
       }
 
-      const amount = PLAN_TO_AMOUNT[input.planCode]?.[input.annual ? "annual" : "monthly"];
+      // 2026-05-12: resolve the user's effective price (early-bird, locked,
+      // or standard). Only drop_pro has per-user pricing today.
+      let amount: number | undefined;
+      if (input.planCode === "drop_pro") {
+        const { getPlan, getEffectivePrice } = await import("../_core/plans");
+        const [uRows]: any = await localPool.execute(
+          `SELECT IFNULL(earlyBird,0) AS earlyBird, lockedPriceTwdMonthly FROM users WHERE id = ? LIMIT 1`,
+          [ctx.user.id],
+        );
+        const flags = (uRows as any[])[0] ?? { earlyBird: 0, lockedPriceTwdMonthly: null };
+        const eff = getEffectivePrice(getPlan("drop_pro"), {
+          earlyBird: Number(flags.earlyBird),
+          lockedPriceTwdMonthly: flags.lockedPriceTwdMonthly,
+        });
+        amount = input.annual ? eff.annually : eff.monthly;
+      } else {
+        amount = PLAN_TO_AMOUNT_FALLBACK[input.planCode]?.[input.annual ? "annual" : "monthly"];
+      }
       if (!amount) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown plan" });
 
       // MerchantTradeNo must be unique per shop, max 20 chars alphanumeric.

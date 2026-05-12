@@ -45,6 +45,14 @@ export const users = mysqlTable("users", {
   companyId: int("companyId"),
   departmentId: int("departmentId"),
   orgRole: mysqlEnum("orgRole", ["owner", "admin", "member"]).default("member"),
+  // 2026-05-12 (CJ「老用戶永遠保 900，新用戶才漲 1500」): grandfathered
+  // launch-promo flag. Set on register based on ONBRAND_PROMO_ACTIVE env.
+  // When 1: this user keeps the early-bird price forever even after the
+  // standard price kicks in for new sign-ups.
+  earlyBird: int("earlyBird").default(0).notNull(),
+  // 2026-05-12: lockedPriceTwdMonthly — overrides plan default when set.
+  // Reserved for custom pricing (negotiated agency deals, beta partners).
+  lockedPriceTwdMonthly: int("lockedPriceTwdMonthly"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

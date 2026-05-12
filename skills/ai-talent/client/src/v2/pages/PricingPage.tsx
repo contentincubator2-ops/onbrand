@@ -21,15 +21,22 @@ export default function PricingPage() {
   const TIERS = [
     {
       code: "drop_pro",
-      name: "OnBrand Pro",
+      name: "OnBrand 個人",
       sub: "個人操盤者",
-      monthly: 990, annual: 9900,
-      members: "1 位用戶 · 5 個品牌",
+      // 2026-05-12 (CJ「老用戶永遠保 900」): early-bird sticker is 900,
+      // standard sticker (post-promo) is 1500. status.priceTwdMonthly
+      // shows the price for THIS user (already resolves earlyBird flag).
+      monthly: status?.priceTwdMonthly ?? 900,
+      annual:  status?.priceTwdAnnually ?? 9000,
+      standardMonthly: status?.standardPriceTwdMonthly ?? 1500,
+      isEarlyBird: status?.isEarlyBird ?? true,
+      members: "1 位用戶 · 1 個品牌",
       features: [
-        "所有 90+ 任務模板",
+        "30s / 60s / 99s 全部任務模板",
+        "30 篇貼文 · 150 張 AI 圖 / 月",
         "FB 直接發布 + 排程（無限）",
-        "AI 圖 150 / 影片 10 / 月",
         "電子發票（個人 / B2B）",
+        "影片功能加購中（暫時下架）",
       ],
       cta: "開始 7 天試用",
     },
@@ -146,10 +153,22 @@ export default function PricingPage() {
                   {annual ? (tier.annual / 1000).toLocaleString() + "K" : tier.monthly.toLocaleString()}
                 </span>
                 <span className="text-sm text-neutral-700">NT$ / {annual ? "年" : "月"}</span>
+                {/* 2026-05-12: show struck-through standard price next to
+                    early-bird price (only on drop_pro, only when standard > current) */}
+                {(tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && !annual && (
+                  <span className="text-sm text-neutral-400 line-through tabular-nums ml-1">
+                    NT$ {(tier as any).standardMonthly.toLocaleString()}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-neutral-700 mt-1">
                 {annual ? `每月平均 NT$ ${Math.round(tier.annual / 12).toLocaleString()}` : "隨時取消"}
               </p>
+              {(tier as any).isEarlyBird && (tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && (
+                <p className="text-xs text-emerald-700 mt-1 font-medium">
+                  ⭐ 早鳥優惠 · 永久保價
+                </p>
+              )}
               <p className="text-xs text-neutral-900 font-medium mt-3 pb-3 border-b border-neutral-200">
                 {tier.members}
               </p>

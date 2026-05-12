@@ -99,6 +99,11 @@ export async function createUser(db: DB, data: {
   // to isActive=0 once email infra is reliable. Set
   // `REQUIRE_EMAIL_VERIFICATION=1` env to opt back in.
   const requireVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "1";
+  // 2026-05-12 (CJ「老用戶永遠保 900」): stamp earlyBird flag at register time.
+  // While promo is active, all new sign-ups get the grandfathered price.
+  // Flip ONBRAND_PROMO_ACTIVE=0 in env when ready to charge new users NT$1500.
+  const { isPromoActiveForNewSignups } = await import("../_core/plans");
+  const earlyBird = isPromoActiveForNewSignups() ? 1 : 0;
   try {
     await db
       .insert(users)
@@ -112,7 +117,8 @@ export async function createUser(db: DB, data: {
         credits: 1000, // signup bonus
         registrationIp: data.registrationIp,
         role: "user",
-      })
+        earlyBird,
+      } as any)
       .$dynamic();
   } catch (err: any) {
     const code = err?.code ?? err?.errno;

@@ -2181,10 +2181,12 @@ function PositioningCompletionBridge({
         </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <BridgeBtn label="30s 快寫" onClick={() => navigate(`/b/${brandId}/30s`)} primary />
-        <BridgeBtn label="60s 製作包" onClick={() => navigate(`/b/${brandId}/60s`)} />
-        <BridgeBtn label="99s 全企劃" onClick={() => navigate(`/b/${brandId}/99s`)} />
-        <BridgeBtn label="企劃台" onClick={() => navigate(`/b/${brandId}/theater`)} />
+        {/* 2026-05-12 pre-launch zombie audit: routes were /b/X/30s which
+            don't exist (404). Real routes are /30s?b=X */}
+        <BridgeBtn label="30s 快寫" onClick={() => navigate(`/30s?b=${brandId}`)} primary />
+        <BridgeBtn label="60s 製作包" onClick={() => navigate(`/60s?b=${brandId}`)} />
+        <BridgeBtn label="99s 全企劃" onClick={() => navigate(`/99s?b=${brandId}`)} />
+        <BridgeBtn label="企劃台" onClick={() => navigate(`/theater?b=${brandId}`)} />
       </div>
     </div>
   );

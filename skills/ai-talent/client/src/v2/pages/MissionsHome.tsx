@@ -954,14 +954,12 @@ const CARD_MENU_ITEMS = [
   { key: "run-once",     icon: faBolt,                    label: "立即自主執行",     accent: "#F97316", badge: null,    dividerAfter: false },
   { key: "run-schedule", icon: faCalendarDays,           label: "排程自主執行",     accent: "#F97316", badge: null,    dividerAfter: true  },
   // ── Canva-faithful items ────────────────────────────────────────────
+  // 2026-05-12 pre-launch zombie audit: dropped duplicate / move / download
+  // / offline / share — they were showing "即將上線" toasts which made the
+  // app feel half-built. Re-add when actually wired.
   { key: "open-tab",     icon: faArrowUpRightFromSquare,  label: "在新索引標籤中開啟", accent: null,      badge: null,    dividerAfter: false },
   { key: "info",         icon: faCircleInfo,              label: "詳細資訊",         accent: null,      badge: null,    dividerAfter: false },
-  { key: "duplicate",    icon: faCopy,                    label: "建立複本",         accent: null,      badge: null,    dividerAfter: false },
   { key: "star",         icon: faBookmark,                label: "加入已標記星號項目", accent: null,      badge: null,    dividerAfter: false },
-  { key: "move",         icon: faFolderOpen,              label: "移動",             accent: null,      badge: null,    dividerAfter: false },
-  { key: "download",     icon: faDownload,                label: "下載",             accent: null,      badge: null,    dividerAfter: false },
-  { key: "offline",      icon: faWifi,                    label: "設為可離線存取",    accent: null,      badge: "新功能", dividerAfter: false },
-  { key: "share",        icon: faShareNodes,              label: "分享",             accent: null,      badge: null,    dividerAfter: false },
   { key: "copy-link",    icon: faLink,                    label: "複製連結",         accent: null,      badge: null,    dividerAfter: true  },
   { key: "trash",        icon: faTrash,                   label: "移至垃圾桶",       accent: "#EF4444",  badge: null,    dividerAfter: false },
 ] as const;
@@ -993,24 +991,9 @@ function MissionCard({ mission, onClick }: { mission: MissionRow; onClick: () =>
       case "info":
         navigate(missionUrl);
         break;
-      case "duplicate":
-        showToast("建立複本功能即將上線");
-        break;
       case "star":
         setStarred(v => !v);
         showToast(starred ? "已取消星號標記" : "已加入星號標記", "success");
-        break;
-      case "move":
-        showToast("移動功能即將上線");
-        break;
-      case "download":
-        showToast("下載功能即將上線");
-        break;
-      case "offline":
-        showToast("離線功能即將上線");
-        break;
-      case "share":
-        showToast("分享功能即將上線");
         break;
       case "copy-link":
         navigator.clipboard.writeText(window.location.origin + missionUrl)
@@ -1291,12 +1274,7 @@ function MissionCardRow({ mission, onClick }: { mission: MissionRow; onClick: ()
       case "run-schedule": navigate(missionUrl + "?tab=schedule"); break;
       case "open-tab":   window.open(window.location.origin + missionUrl, "_blank"); break;
       case "info":       navigate(missionUrl); break;
-      case "duplicate":  showToast("建立複本功能即將上線"); break;
       case "star":       setStarred(v => !v); showToast(starred ? "已取消星號標記" : "已加入星號標記", "success"); break;
-      case "move":       showToast("移動功能即將上線"); break;
-      case "download":   showToast("下載功能即將上線"); break;
-      case "offline":    showToast("離線功能即將上線"); break;
-      case "share":      showToast("分享功能即將上線"); break;
       case "copy-link":
         navigator.clipboard.writeText(window.location.origin + missionUrl)
           .then(() => showToast("連結已複製", "success"))
