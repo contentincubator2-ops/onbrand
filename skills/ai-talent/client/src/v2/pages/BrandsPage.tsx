@@ -1647,31 +1647,10 @@ export default function BrandsPage() {
                       </div>
                     ))}
 
-                    {/* ⑥ 紫色浮動 + 按鈕 → 開啟新增 entity modal（品牌 / 產品 / 活動） */}
-                    <button
-                      title={lang === "en" ? "Add brand / product / campaign" : "新增品牌 / 產品 / 活動"}
-                      onClick={() => setAddModal({ open: true, tab: scopeMode === "brand" ? "product" : scopeMode === "product" ? "event" : "brand" })}
-                      style={{
-                        position: "fixed", bottom: 32, right: 32, zIndex: 50,
-                        width: 52, height: 52, borderRadius: "50%",
-                        background: "linear-gradient(135deg, #7C3AED, #6366F1)",
-                        border: "none", cursor: "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        color: "white", fontSize: 22,
-                        boxShadow: "0 6px 20px rgba(99,102,241,0.45)",
-                        transition: "transform 0.18s, box-shadow 0.18s",
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.transform = "scale(1.08)";
-                        e.currentTarget.style.boxShadow = "0 10px 28px rgba(99,102,241,0.55)";
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.transform = "scale(1)";
-                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(99,102,241,0.45)";
-                      }}
-                    >
-                      <FontAwesomeIcon icon={faPlus} />
-                    </button>
+                    {/* 2026-05-13 (CJ「右下方的 icon 重疊了，只留客服 icon」):
+                        the floating + FAB was redundant with BrandHierarchyPill's
+                        「+ 新增品牌 / 產品 / 活動」menu top-left, and overlapped
+                        with the bottom-right Mia 客服 avatar. Removed. */}
                   </>
                 );
               })()}

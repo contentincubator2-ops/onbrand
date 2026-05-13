@@ -249,22 +249,64 @@ export default function ShellLayout() {
         </footer>
       </div>
 
-      {/* 2026-05-10 (pre-launch): floating support button. Trial users
-          will hit walls; give them a fast escape hatch. Email opens user's
-          mail client; no backend dependency. */}
+      {/* 2026-05-13 (CJ「我只要留下客服 icon，但是要 Notion style avatar，
+          甚至需要 mos_db agent 來擔任客服」): replaced the orange pill with
+          a Notion-style avatar circle representing 「Mia · 客戶成功」 — modeled
+          after the mos_db Customer Service Copywriter persona (Derek Tang
+          id=60056) but rendered as a DiceBear Notionists illustration so it
+          matches the brand aesthetic. Hover shows the name + role; clicking
+          opens mail with auto-populated diagnostic context (current URL,
+          brand id, user ts). */}
       <a
-        href="mailto:contentincubator2@gmail.com?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E5%9B%9E%E5%A0%B1%20/%20%E5%95%8F%E9%A1%8C&body=%E5%93%88%E5%9B%89%EF%BC%8C%E6%88%91%E9%81%87%E5%88%B0%EF%BC%9A%0A%0A%0A%0A%E7%92%B0%E5%A2%83%EF%BC%9A%0A-%20Browser%EF%BC%9A%0A-%20Page%EF%BC%9A"
+        href={(() => {
+          const ctx = [
+            `User: ${(loc?.pathname ?? "/")}`,
+            `Brand id: ${scope?.brandId ?? "(none)"}`,
+            `Product id: ${scope?.productId ?? "(none)"}`,
+            `Event id: ${scope?.eventId ?? "(none)"}`,
+            `Lang: ${lang}`,
+            `Browser: ${typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 80) : ""}`,
+            `Time: ${new Date().toISOString()}`,
+          ].join("\n");
+          const body = encodeURIComponent(`哈囉 Mia！我遇到：\n\n\n\n———\n（系統自動帶入，請保留）\n${ctx}`);
+          const subject = encodeURIComponent("OnBrand AI · 客服詢問");
+          return `mailto:contentincubator2@gmail.com?subject=${subject}&body=${body}`;
+        })()}
         style={{
-          position: "fixed", bottom: 16, right: 16, zIndex: 50,
-          background: "rgb(249,115,22)", color: "white",
-          padding: "10px 16px", borderRadius: 999,
-          fontSize: 13, fontWeight: 600, textDecoration: "none",
-          boxShadow: "0 4px 16px rgba(249,115,22,0.35)",
-          display: "flex", alignItems: "center", gap: 8,
+          position: "fixed", bottom: 20, right: 20, zIndex: 50,
+          width: 56, height: 56, borderRadius: "50%",
+          background: "white",
+          boxShadow: "0 8px 24px rgba(124,58,237,0.28), 0 2px 6px rgba(0,0,0,0.08)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          textDecoration: "none",
+          border: "2px solid rgba(124,58,237,0.18)",
+          transition: "transform 0.18s, box-shadow 0.18s",
+          overflow: "hidden",
         }}
-        title={lang === "en" ? "Stuck? Email us directly." : "遇到問題？卡住了？直接寫信給我們"}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "scale(1.06)";
+          e.currentTarget.style.boxShadow = "0 12px 32px rgba(124,58,237,0.42), 0 4px 10px rgba(0,0,0,0.10)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.boxShadow = "0 8px 24px rgba(124,58,237,0.28), 0 2px 6px rgba(0,0,0,0.08)";
+        }}
+        title={lang === "en"
+          ? "Mia · Customer Success — click to message us"
+          : "Mia · 客戶成功經理 — 點此來信聊聊"}
       >
-        💬 {lang === "en" ? "Report / Help" : "回報 / 求助"}
+        <img
+          src="https://api.dicebear.com/7.x/notionists/svg?seed=mia-cs-onbrand&backgroundColor=ede9fe&backgroundType=solid&radius=50"
+          alt="Mia · Customer Success"
+          style={{ width: "100%", height: "100%", display: "block" }}
+        />
+        {/* Online green dot */}
+        <span style={{
+          position: "absolute", bottom: 4, right: 4,
+          width: 12, height: 12, borderRadius: "50%",
+          background: "#10b981",
+          border: "2px solid white",
+        }} />
       </a>
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}
