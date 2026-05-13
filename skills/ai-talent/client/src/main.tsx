@@ -23,6 +23,14 @@ function shouldSilentSkip(err: any): boolean {
   // Auth redirects are handled by authAwareFetch — don't double-toast
   const code = err?.data?.code ?? err?.code;
   if (code === "UNAUTHORIZED") return true;
+  // 2026-05-13 (CJ「按品牌後出現 event not found / product not found 錯誤訊息」):
+  // NOT_FOUND from scope-resolution queries (event.get / product.get with
+  // stale ids carried over from a previous session) is expected during
+  // scope transitions and shouldn't trigger a red toast — the UI gates
+  // these queries with `enabled:` but stale localStorage scope can briefly
+  // fire them before the new scope settles. Real not-found pages handle
+  // their own UX inline.
+  if (code === "NOT_FOUND") return true;
   return false;
 }
 function formatErr(err: any): string {
