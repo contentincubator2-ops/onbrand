@@ -128,15 +128,23 @@ export const PLANS: Record<PlanCode, Plan> = {
     standardPriceTwdMonthly: 1500,         // 同 priceTwdMonthly，明示語意
     trialDays: 0,
     quota: {
+      // 2026-05-14: legacy per-task quotas removed (-1). Gating is
+      // now purely point-based — see pointsPerCycle below.
       task_30s: -1,
-      task_60s: 50,
-      task_99s: 20,
-      image_gen: 150,
+      task_60s: -1,
+      task_99s: -1,
+      image_gen: -1,
       video_gen: 0,                // 2026-05-12: 影片暫時下架
-      brands: 1,                   // 個人 = 1 品牌（之前是 5）
+      brands: 1,
       fb_publish: -1,
       team_members: 1,
       multi_client: false,
+      // Solo plan = 3,000 points / month
+      //   = 100× 30s tasks, or 50× 60s, or 30× 99s, or 100× Flux images
+      //   = ~10× the trial allocation
+      // Worst-case cost (all 99s @ NT$15): NT$ 450 → 50% margin vs NT$900
+      pointsPerCycle: 3000,
+      pointsCycleDays: 30,
     },
     features: [
       "1 位用戶 · 1 個品牌",
@@ -157,15 +165,15 @@ export const PLANS: Record<PlanCode, Plan> = {
     priceTwdAnnually: 49900,    // 12 × 4158 NTD (省 17%)
     trialDays: 0,
     quota: {
-      task_30s: -1,
-      task_60s: 250,
-      task_99s: 100,
-      image_gen: 600,
+      task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1,
       video_gen: 40,
       brands: 20,
       fb_publish: -1,
       team_members: 5,
       multi_client: true,
+      // Team plan = 15,000 pts/month (5× solo)
+      pointsPerCycle: 15000,
+      pointsCycleDays: 30,
     },
     features: [
       "5 位用戶 · 20 個品牌",
@@ -186,15 +194,15 @@ export const PLANS: Record<PlanCode, Plan> = {
     priceTwdAnnually: 149900,
     trialDays: 0,
     quota: {
-      task_30s: -1,
-      task_60s: -1,
-      task_99s: -1,
-      image_gen: 2000,
+      task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1,
       video_gen: 150,
       brands: -1,
       fb_publish: -1,
       team_members: -1,
       multi_client: true,
+      // Agency plan = 50,000 pts/month (~17× solo, 3× team)
+      pointsPerCycle: 50000,
+      pointsCycleDays: 30,
     },
     features: [
       "無限用戶 · 無限品牌",
@@ -216,15 +224,11 @@ export const PLANS: Record<PlanCode, Plan> = {
     priceTwdAnnually: -1,
     trialDays: 0,
     quota: {
-      task_30s: -1,
-      task_60s: -1,
-      task_99s: -1,
-      image_gen: -1,
-      video_gen: -1,
-      brands: -1,
-      fb_publish: -1,
-      team_members: -1,
-      multi_client: true,
+      task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1, video_gen: -1,
+      brands: -1, fb_publish: -1, team_members: -1, multi_client: true,
+      // Enterprise = unlimited points (-1 == bypass check)
+      pointsPerCycle: -1,
+      pointsCycleDays: 30,
     },
     features: [
       "無限額度",
