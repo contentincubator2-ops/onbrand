@@ -46,7 +46,15 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           />
         </div>
         <div className="px-4 py-2 space-y-2">
-          {title && <p className="text-small font-medium">{title}</p>}
+          {/* 2026-05-13 (CJ「標題還是有重複」): hide the standalone title
+              line when it's just a duplicate of the caption's opener. */}
+          {(() => {
+            const t = (title ?? "").trim();
+            if (!t) return null;
+            const capStart = (liveCaption ?? "").trim().slice(0, t.length + 30);
+            if (capStart && capStart.startsWith(t)) return null;
+            return <p className="text-small font-medium">{t}</p>;
+          })()}
           {liveCaption ? (
             // 2026-05-13 (CJ「標題看起來都會不完整」): the caption was
             // line-clamped at 6 lines, so 100-200 字 Chinese captions

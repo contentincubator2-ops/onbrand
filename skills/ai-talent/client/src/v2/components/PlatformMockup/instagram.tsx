@@ -137,7 +137,17 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 
         <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
-          <span className="text-foreground">{title}</span>
+          {/* 2026-05-13 (CJ「標題還是有重複」): if title is the first
+              sentence of liveCaption, the inline title + caption body
+              shows the same sentence twice. Hide the inline title when
+              that's the case — caption already carries it. */}
+          {(() => {
+            const t = (title ?? "").trim();
+            if (!t) return null;
+            const capStart = (liveCaption ?? "").trim().slice(0, t.length + 30);
+            if (capStart && capStart.startsWith(t)) return null;
+            return <span className="text-foreground">{t}</span>;
+          })()}
 
           {/* Caption slot — SlotContent handles loading/filled/empty */}
           <div className="mt-1.5">
@@ -279,7 +289,15 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
 
         <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
-          <span className="text-foreground">{title}</span>
+          {/* 2026-05-13 (CJ「標題還是有重複」): hide inline title if it's
+              already the first sentence of liveCaption. */}
+          {(() => {
+            const t = (title ?? "").trim();
+            if (!t) return null;
+            const capStart = (liveCaption ?? "").trim().slice(0, t.length + 30);
+            if (capStart && capStart.startsWith(t)) return null;
+            return <span className="text-foreground">{t}</span>;
+          })()}
           {liveCaption ? (
             // 2026-05-13 (CJ「標題看起來都會不完整」): removed line-clamp
             // — IG captions can be long (2200 char cap), trimming at 5 lines
