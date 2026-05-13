@@ -74,8 +74,9 @@ function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
     { to: "/theater",   label: en ? "Theater" : "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
     { to: "/brands",    label: en ? "Brands" : "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
     { to: "/brands/settings", label: en ? "Connect" : "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands/settings" },
-    { to: "/consultant", label: en ? "Strategist" : "策略顧問", icon: <FontAwesomeIcon icon={faChessKnight} />,
-      tooltip: en ? "Strategist — 5 scenarios × 20+ frameworks × McKinsey-grade reports × Q&A" : "策略顧問 — 5 大策略場景 × 20+ 方法論 × 麥肯錫水準報告 × 來回問答" },
+    // 2026-05-12 (CJ「請把策略顧問拿掉」): /consultant route still works
+    // for power users / direct URL access, but no sidebar entry. Solo
+    // users don't need McKinsey-grade strategy frameworks in their face.
   ];
 }
 
@@ -366,24 +367,11 @@ function IconBar({
           return <IconNavLink key={item.to} item={item} active={isActive} onClick={() => onNavigate(item.to)} />;
         })}
 
-        {/* More */}
-        <Tooltip content={isEn ? "Show more" : "顯示更多"} placement="right">
-          <button
-            aria-label={isEn ? "Show more" : "顯示更多"}
-            onClick={onToggle}
-            style={{
-              width: 64, height: 44, margin: "2px auto 0", display: "flex",
-              flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
-              background: "none", border: "none", color: "#9ca3af", cursor: "pointer",
-              transition: "color 0.1s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#374151")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
-          >
-            <FontAwesomeIcon icon={faEllipsis} style={{ fontSize: 16 }} />
-            <span style={{ fontSize: 11, fontWeight: 500 }}>{isEn ? "More" : "顯示更多"}</span>
-          </button>
-        </Tooltip>
+        {/* 2026-05-12 (CJ「顯示更多拿掉」): sidebar expand-toggle removed.
+            The expanded panel content (plan card / invite users / brand
+            tree) was a power-user surface that confused solo users. They
+            can still reach those via: BrandSwitcherButton (top-left pill)
+            → /brands list, S-menu → 帳號設定 / 方案 / Workspace, etc. */}
       </nav>
 
       {/* Bottom: bell + avatar */}
@@ -2159,26 +2147,28 @@ function AccountSubPanel() {
    Notification panel
 ══════════════════════════════════════════════════════════════════ */
 
-const MOCK_NOTIFS = [
-  {
-    id: 1, unread: true, avatar: "L", avatarColor: "#7c3aed",
-    title: "Laila Chu 在任務「品牌月曆」撰寫了評論。",
-    excerpt: "社群日活動時間這串文字想要變色強調",
-    time: "3月31日 下午6:45", from: "Laila Chu", fromCount: 2,
-  },
-  {
-    id: 2, unread: true, avatar: "Y", avatarColor: "#059669",
-    title: "「yirenyan」解決了有關「Facebook 廣告文案」的評論。",
-    excerpt: "@SoWork 圖片上的英文字幕可以去除嗎",
-    time: "1月22日 上午10:26", from: "yirenyan", fromCount: 1,
-  },
-  {
-    id: 3, unread: false, avatar: "簡", avatarColor: "#0891b2",
-    title: "簡維德 在任務「GO Tour DM」撰寫了評論。",
-    excerpt: "建議這兩隻皮卡丘的外框用更明顯的顏色替代白色",
-    time: "4天前", from: "簡維德", fromCount: 1,
-  },
-];
+function getMockNotifs(isEn: boolean) {
+  return [
+    {
+      id: 1, unread: true, avatar: "L", avatarColor: "#7c3aed",
+      title: isEn ? "Laila Chu commented on \"Brand calendar\"." : "Laila Chu 在任務「品牌月曆」撰寫了評論。",
+      excerpt: isEn ? "Highlight the community-day event time in a different color" : "社群日活動時間這串文字想要變色強調",
+      time: isEn ? "Mar 31, 6:45 PM" : "3月31日 下午6:45", from: "Laila Chu", fromCount: 2,
+    },
+    {
+      id: 2, unread: true, avatar: "Y", avatarColor: "#059669",
+      title: isEn ? "yirenyan resolved a comment on \"Facebook ad copy\"." : "「yirenyan」解決了有關「Facebook 廣告文案」的評論。",
+      excerpt: isEn ? "@SoWork can we remove the English subtitles on the image?" : "@SoWork 圖片上的英文字幕可以去除嗎",
+      time: isEn ? "Jan 22, 10:26 AM" : "1月22日 上午10:26", from: "yirenyan", fromCount: 1,
+    },
+    {
+      id: 3, unread: false, avatar: isEn ? "J" : "簡", avatarColor: "#0891b2",
+      title: isEn ? "Jane Chien commented on \"GO Tour DM\"." : "簡維德 在任務「GO Tour DM」撰寫了評論。",
+      excerpt: isEn ? "Try a bolder outline color on these two Pikachu instead of white" : "建議這兩隻皮卡丘的外框用更明顯的顏色替代白色",
+      time: isEn ? "4 days ago" : "4天前", from: isEn ? "Jane Chien" : "簡維德", fromCount: 1,
+    },
+  ];
+}
 
 function NotifPanel({ onClose }: { onClose: () => void }) {
   const [readAll, setReadAll] = React.useState(false);
@@ -2229,7 +2219,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", minHeight: 0 }}>
-        {MOCK_NOTIFS.map((n) => {
+        {getMockNotifs(isEn).map((n) => {
           const isUnread = n.unread && !readAll;
           return (
             <div key={n.id} style={{
