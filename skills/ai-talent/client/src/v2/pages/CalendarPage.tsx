@@ -13,6 +13,7 @@ import { trpc } from "../../lib/trpc";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Sparkles } from "lucide-react";
 import { useLang } from "../../lib/i18n";
+import { getFestivalHintEn } from "../lib/festivalI18n";
 
 const PLATFORM_COLOR: Record<string, string> = {
   facebook: "#1877F2",
@@ -352,23 +353,30 @@ function FestivalNudgeBanner({
                       </span>
                     </span>
                   </div>
-                  {f.contentHint && (
-                    <p
-                      className="text-[11px] mt-0.5 line-clamp-1"
-                      style={{
-                        color: "#525252",
-                        fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                        fontStyle: "italic",
-                      }}
-                    >
-                      {f.contentHint}
-                    </p>
-                  )}
+                  {(() => {
+                    const hint = lang === "en"
+                      ? getFestivalHintEn(f.slug)
+                      : f.contentHint;
+                    if (!hint) return null;
+                    return (
+                      <p
+                        className="text-[11px] mt-0.5 line-clamp-1"
+                        style={{
+                          color: "#525252",
+                          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                          fontStyle: "italic",
+                        }}
+                      >
+                        {hint}
+                      </p>
+                    );
+                  })()}
                 </div>
                 <button
                   onClick={() => {
                     const fname = lang === "en" ? (f.name_en ?? f.name_zh) : f.name_zh;
-                    const topic = `${fname} (${new Date(f.date).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW", { month: "short", day: "numeric" })})${f.contentHint ? " — " + f.contentHint : ""}`;
+                    const hintForTopic = lang === "en" ? getFestivalHintEn(f.slug) : f.contentHint;
+                    const topic = `${fname} (${new Date(f.date).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW", { month: "short", day: "numeric" })})${hintForTopic ? " — " + hintForTopic : ""}`;
                     const brandParam = brandId ? `&b=${brandId}` : "";
                     navigate(`/99s?topic=${encodeURIComponent(topic)}${brandParam}`);
                   }}
