@@ -12,27 +12,18 @@ module.exports = {
     env: {
       NODE_ENV: 'production',
       SKILLS_PATH: '/home/azureuser/A2A-Marketing-Claw/skills',
-      PORT: '3101',
-      TRUST_PROXY: '1',
-      DB_HOST: 'ytcreator-ai-server.mysql.database.azure.com',
-      DB_PORT: '3306',
-      DB_USER: 'openclaw',
-      DB_PASSWORD: 'u40d6d070db7e92982940a62ee40c4261',
-      DB_NAME: 'sowork_db',
-      DB_SSL: 'true',
-      JWT_SECRET: 'mos-enterprise-jwt-secret-2026-sowork-ai',
-      GOOGLE_GEMINI_API_KEY: 'AIzaSyAGOLFGqgCBSMy_mAKd0YOULgJLGMdPPiA',
-      OPENROUTER_API_KEY: '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',
-      AZURE_FOUNDRY_API_KEY: 'EMw03pDcy50OuvxhLf6Ad2a5bMDWdkxCwEaXbnqCUT44D9WZp8MqJQQJ99CCACYeBjFXJ3w3AAAAACOGi40x',
-      AZURE_FOUNDRY_PROJECT_ENDPOINT: 'https://soworkclawagents.services.ai.azure.com/api/projects/proj-sowork-claw',
-      AZURE_OPENAI_ENDPOINT: 'https://soworkclawagents.openai.azure.com/openai/v1',
-      GOOGLE_AI_API_KEY: 'AIzaSyAGOLFGqgCBSMy_mAKd0YOULgJLGMdPPiA',
-      SESSION_SECRET: 'mos-enterprise-secret-2026',
-      LOCAL_DB_HOST: 'localhost',
-      LOCAL_DB_PORT: '3306',
-      LOCAL_DB_USER: 'mos_user',
-      LOCAL_DB_PASSWORD: 'mos_secure_2026',
-      LOCAL_DB_NAME: 'mos_db',
+      PORT: process.env.PORT || '3101',
+      TRUST_PROXY: process.env.TRUST_PROXY || '1',
+      // 2026-05-13 (pre-launch security review): every secret moved
+      // to env. Historical commits still contain the old values — they
+      // MUST be rotated externally:
+      //   · Azure MySQL prod (DB_PASSWORD)
+      //   · JWT_SECRET (any signed token is forgeable until rotated)
+      //   · SESSION_SECRET
+      //   · OpenRouter, Azure Foundry, Google AI API keys
+      // Server reads from /opt/marketing-os/app/skills/ai-talent/.env
+      // via dotenv (loaded in server/index.ts bootstrap-env block).
+      // pm2 inherits process env when this file's env block is empty.
     },
     error_file: '/home/azureuser/logs/marketing-os-error.log',
     out_file: '/home/azureuser/logs/marketing-os-out.log',

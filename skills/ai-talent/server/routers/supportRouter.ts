@@ -20,6 +20,24 @@ import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import { callModel } from "../_core/multiModelRouter";
 
+// ── per-user rate limit (in-memory) ────────────────────────────────────────
+// Trial users can't spam Mia to burn LLM credits. 20 msgs/hour, 5 msgs/min.
+// In-memory is fine for single-instance pm2; if we ever scale horizontally
+// move to Redis. Resets on server restart (acceptable for the threat model).
+type RateState = { hourCount: number; hourReset: number; minCount: number; minReset: number };
+const rateStateByUser = new Map<number, RateState>();
+function checkRateLimit(userId: number): { allowed: boolean; reason?: string } {
+  const now = Date.now();
+  let s = rateStateByUser.get(userId);
+  if (!s) { s = { hourCount: 0, hourReset: now + 3600_000, minCount: 0, minReset: now + 60_000 }; rateStateByUser.set(userId, s); }
+  if (now >= s.hourReset) { s.hourCount = 0; s.hourReset = now + 3600_000; }
+  if (now >= s.minReset)  { s.minCount = 0;  s.minReset  = now + 60_000; }
+  if (s.minCount >= 5)  return { allowed: false, reason: "minute_cap" };
+  if (s.hourCount >= 20) return { allowed: false, reason: "hour_cap" };
+  s.minCount++; s.hourCount++;
+  return { allowed: true };
+}
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
 async function ensureOpenConversation(userId: number, brandId?: number | null): Promise<number> {
@@ -47,14 +65,19 @@ async function loadConversation(conversationId: number, userId: number) {
   return (rows as any[])[0] ?? null;
 }
 
-async function loadMessages(conversationId: number) {
+async function loadMessages(conversationId: number, limit = 100) {
+  // 2026-05-13 (security review): cap rows so a spammed conversation
+  // doesn't load 10k+ messages per sendMessage call (DoS vector).
+  const safe = Math.max(1, Math.min(500, Math.floor(limit)));
   const [rows]: any = await localPool.execute(
     `SELECT id, role, content, createdAt FROM support_messages
       WHERE conversationId = ?
-      ORDER BY createdAt ASC, id ASC`,
+      ORDER BY id DESC
+      LIMIT ${safe}`,
     [conversationId],
   );
-  return rows as Array<{ id: number; role: string; content: string; createdAt: Date }>;
+  // We selected DESC for LIMIT; flip back to ASC for caller.
+  return (rows as Array<{ id: number; role: string; content: string; createdAt: Date }>).reverse();
 }
 
 async function insertMessage(args: {
@@ -200,6 +223,17 @@ export const supportRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
+      // 2026-05-13 (security review): per-user rate limit. Each LLM call
+      // costs $; without this a malicious trial user can burn the wallet.
+      const rate = checkRateLimit(userId);
+      if (!rate.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: rate.reason === "minute_cap"
+            ? "1 分鐘只能聊 5 次，先喘口氣再問。"
+            : "1 小時上限 20 則。如果還沒解決，請點下方「我要找真人 →」直接開單。",
+        });
+      }
       const conv = await loadConversation(input.conversationId, userId);
       if (!conv) throw new TRPCError({ code: "NOT_FOUND", message: "conversation not found" });
 

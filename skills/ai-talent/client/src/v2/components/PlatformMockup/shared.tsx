@@ -37,7 +37,22 @@ export function MarkdownText({
           ul: ({ children }) => <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>,
           li: ({ children }) => <li className="text-small">{children}</li>,
-          a: ({ children, href }) => <a href={href} className="text-primary underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+          a: ({ children, href }) => {
+            // 2026-05-13 (security review): sanitize URL scheme. AI-
+            // generated captions could contain `javascript:` / `data:` /
+            // `vbscript:` URLs — block everything except http(s) / mailto
+            // / tel / fragment / relative.
+            const safe = (() => {
+              if (!href) return false;
+              const s = String(href).trim().toLowerCase();
+              if (s.startsWith("http://") || s.startsWith("https://")) return true;
+              if (s.startsWith("mailto:") || s.startsWith("tel:")) return true;
+              if (s.startsWith("/") || s.startsWith("#") || s.startsWith("?")) return true;
+              return false;
+            })();
+            if (!safe) return <span className="text-primary underline">{children}</span>;
+            return <a href={href} className="text-primary underline" target="_blank" rel="noopener noreferrer">{children}</a>;
+          },
           h1: ({ children }) => <p className="font-bold text-medium mb-1">{children}</p>,
           h2: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
           h3: ({ children }) => <p className="font-medium mb-0.5">{children}</p>,

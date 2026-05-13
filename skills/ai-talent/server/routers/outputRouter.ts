@@ -213,14 +213,22 @@ export const outputRouter = router({
       // image from OpenAI gpt-image-1 which doesn't return a URL).
       // max bumped from 2000 → 10MB since base64 expands ~33%.
       imageUrl: z.string().min(1).max(10_000_000).refine(
-        (s) =>
-          s.startsWith("http://") ||
-          s.startsWith("https://") ||
-          s.startsWith("data:image/") ||
-          // 2026-05-12: PiAPI Flux/Ideogram saves to /static/covers/...
-          // served by our own static handler. Relative paths are fine.
-          s.startsWith("/"),
-        { message: "imageUrl must be http(s):// or data:image/ or /relative/path" },
+        (s) => {
+          // 2026-05-13 (security review):
+          // 1. Block data:image/svg+xml — SVGs can contain <script>.
+          //    Today they're only rendered via <img> (safe), but a future
+          //    code path rendering via <object>/<iframe>/innerHTML would
+          //    become stored-XSS. Block at write time.
+          // 2. Restrict relative paths to known-safe prefixes only —
+          //    prevents using the variant image field as a CSRF probe
+          //    target (e.g. /api/auth/csrf-token rendered as <img src>).
+          if (s.startsWith("data:image/svg")) return false;
+          if (s.startsWith("data:image/")) return true;
+          if (s.startsWith("http://") || s.startsWith("https://")) return true;
+          if (s.startsWith("/static/") || s.startsWith("/assets/")) return true;
+          return false;
+        },
+        { message: "imageUrl must be http(s)://, data:image/ (not svg), /static/, or /assets/" },
       ),
       style: z.string().max(500).optional(),
     }))
