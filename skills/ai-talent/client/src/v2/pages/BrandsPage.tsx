@@ -155,29 +155,96 @@ export default function BrandsPage() {
       )
     : { data: null };
   // 2026-05-13 (CJ「復華顯示定位完成，但很多內容都沒有填寫」): the
-  // positioning runner writes server-side keys (brandOrigin / brandValues /
-  // targetAudience / goldenCircleRefined / taglineCandidates /
-  // brandPositioningScore) but the UI segments read shorter aliases
-  // (origin / values / audience / goldenCircle / tagline / taglineScore).
-  // Translate at read time so the existing data shows up in the UI without
-  // a server migration. Keys are only aliased when the alias slot is empty,
-  // so any future direct-write to the alias is preserved.
-  const SERVER_TO_UI_KEY_ALIASES: Record<string, string> = {
-    brandOrigin:           "origin",
-    brandValues:           "values",
-    targetAudience:        "audience",
-    goldenCircleRefined:   "goldenCircle",
-    taglineCandidates:     "tagline",
-    brandPositioningScore: "taglineScore",
-  };
+  // positioning runner writes server-side data shapes that don't match
+  // what the UI segment renderers expect. Two-level mismatch:
+  //   (a) top-level key   — server `brandOrigin` vs UI `origin`
+  //   (b) inner field key — server `founderStory` vs UI `story`
+  // Translate at read time so existing data renders without a server
+  // migration. Renderers only require the keys they care about; extra
+  // fields are ignored.
   const rawPositioning = (scopeActiveQuery.data as any)?.brand?.positioning ?? {};
   const fullPositioning: Record<string, any> = (() => {
     const merged: Record<string, any> = { ...rawPositioning };
-    for (const [serverKey, uiKey] of Object.entries(SERVER_TO_UI_KEY_ALIASES)) {
-      if (merged[uiKey] == null && merged[serverKey] != null) {
-        merged[uiKey] = merged[serverKey];
+    const setIfEmpty = (k: string, v: any) => {
+      if (v != null && (merged[k] == null || (typeof merged[k] === "object" && Object.keys(merged[k]).length === 0))) {
+        merged[k] = v;
       }
+    };
+
+    // (1) origin: server brandOrigin{rootBelief, founderStory, triggerMoment}
+    //     → UI origin{story, belief5Layers[]}
+    const bo = merged.brandOrigin;
+    if (bo && typeof bo === "object") {
+      const story = [bo.founderStory, bo.rootBelief, bo.triggerMoment]
+        .filter(Boolean).join("\n\n");
+      const belief5Layers = [
+        bo.rootBelief && { layer: "根信念", body: bo.rootBelief },
+        bo.founderStory && { layer: "創辦故事", body: bo.founderStory },
+        bo.triggerMoment && { layer: "觸發時刻", body: bo.triggerMoment },
+      ].filter(Boolean);
+      setIfEmpty("origin", { story, belief5Layers });
     }
+
+    // (2) values: server brandValues{coreValues:string[], brandVision, brandMission, goldenCircle}
+    //     → UI values{items: [{label, body}]}
+    const bv = merged.brandValues;
+    if (bv && typeof bv === "object") {
+      const cv = Array.isArray(bv.coreValues) ? bv.coreValues : [];
+      const items = cv.map((entry: any) => {
+        if (typeof entry === "string") {
+          // Split "穩健信賴：以數十年..." into label / body
+          const m = entry.match(/^([^：:]+)[：:]\s*(.+)$/);
+          return m ? { label: m[1]!.trim(), body: m[2]!.trim() } : { label: entry, body: "" };
+        }
+        if (entry && typeof entry === "object") {
+          return { label: entry.label ?? entry.name ?? "", body: entry.body ?? entry.description ?? "" };
+        }
+        return { label: "", body: "" };
+      }).filter((x: any) => x.label);
+      setIfEmpty("values", { items });
+    }
+
+    // (3) audience: server targetAudience{primarySegment, keyPersonas[], demographics, psychographics, buyingBehavior}
+    //     → UI audience{primary, secondary, matrix?[]}
+    const ta = merged.targetAudience;
+    if (ta && typeof ta === "object") {
+      const personas = Array.isArray(ta.keyPersonas) ? ta.keyPersonas : [];
+      const primary = [ta.primarySegment, personas[0]?.description].filter(Boolean).join("\n\n");
+      const secondary = personas[1]?.description ?? "";
+      setIfEmpty("audience", { primary, secondary, matrix: [] });
+    }
+
+    // (4) goldenCircle: server goldenCircleRefined{why, how, what} — already matches UI shape
+    if (merged.goldenCircleRefined && !merged.goldenCircle) {
+      merged.goldenCircle = merged.goldenCircleRefined;
+    }
+    // ...fallback: derive from brandValues.goldenCircle if outer not present
+    if (!merged.goldenCircle && bv?.goldenCircle) {
+      merged.goldenCircle = bv.goldenCircle;
+    }
+
+    // (5) tagline: server taglineCandidates{candidates[], recommended}
+    //     → UI tagline{zhTagline, enTagline, type, scenes[], competitorDiff, story}
+    const tc = merged.taglineCandidates;
+    if (tc && typeof tc === "object") {
+      const recommended = tc.recommended ?? (Array.isArray(tc.candidates) ? tc.candidates[0] : "");
+      const candidates = Array.isArray(tc.candidates) ? tc.candidates : [];
+      const others = candidates.filter((c: string) => c !== recommended).slice(0, 4);
+      setIfEmpty("tagline", {
+        zhTagline: recommended,
+        enTagline: "",
+        story: others.length ? `其他候選：\n${others.map((c: string) => "· " + c).join("\n")}` : "",
+        type: "",
+        scenes: [],
+        competitorDiff: "",
+      });
+    }
+
+    // (6) taglineScore: server brandPositioningScore — pass through best-effort
+    if (merged.brandPositioningScore && !merged.taglineScore) {
+      merged.taglineScore = merged.brandPositioningScore;
+    }
+
     return merged;
   })();
   const brandAssets: Record<string, any> = (fullPositioning?._assets ?? {}) as Record<string, any>;
