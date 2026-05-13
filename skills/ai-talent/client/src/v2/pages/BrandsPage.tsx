@@ -1383,7 +1383,12 @@ export default function BrandsPage() {
                         }
                       />
                       <PositioningTopRow
-                        brandId={(scope?.brandId ?? brandId) as number | null}
+                        // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
+                        // pass the scope-aware entity id, not the brand id.
+                        // When scope is event/product, server looks up
+                        // events.id = entityId — passing brandId here
+                        // mismatched and returned "not found".
+                        brandId={targetId as number | null}
                         scopeMode={scopeMode}
                         locked={!!tabLocks.positioning}
                         onLockToggle={() => handleLockToggle("positioning")}
