@@ -4,6 +4,7 @@ import { marketRouter } from "./marketRouter";
 import { brandRouter } from "./brandRouter";
 import { creditsRouter } from "./creditsRouter";
 import { notificationRouter } from "./notificationRouter";
+import { supportRouter } from "./supportRouter";
 import { taskRouter } from "./taskRouter";
 import { a2aRouter } from "./a2aRouter";
 import { conversationRouter } from "./conversationRouter";
@@ -73,6 +74,7 @@ export const appRouter = router({
   brand:         brandRouter,
   credits:       creditsRouter,
   notifications: notificationRouter,
+  support:       supportRouter,
   task:          taskRouter,
   a2a:           a2aRouter,
   conversation:  conversationRouter,

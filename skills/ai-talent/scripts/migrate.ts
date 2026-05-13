@@ -1203,6 +1203,60 @@ async function main() {
     `);
     console.log("[migrate] brand_knowledge_items: OK");
 
+    // ── support tables (Mia · 客戶成功 — 2026-05-13) ────────────────────
+    // Three-table model:
+    //   support_conversations : one chat thread per user × brand
+    //   support_messages      : every message (user / mia / admin)
+    //   support_tickets       : when user clicks "找真人", a ticket is
+    //                           opened linking back to the conversation
+    //                           with auto-captured context snapshot.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS support_conversations (
+        id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId      INT          NOT NULL,
+        brandId     INT          NULL,
+        status      VARCHAR(16)  NOT NULL DEFAULT 'open',  -- open|closed
+        createdAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_user (userId, updatedAt),
+        KEY idx_brand (brandId, updatedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS support_messages (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        conversationId  INT          NOT NULL,
+        role            VARCHAR(16)  NOT NULL,            -- 'user' | 'mia' | 'admin'
+        content         MEDIUMTEXT   NOT NULL,
+        contextSnapshot JSON         NULL,                -- session ctx at this message
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        KEY idx_conv (conversationId, createdAt),
+        CONSTRAINT fk_msg_conv FOREIGN KEY (conversationId)
+          REFERENCES support_conversations(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS support_tickets (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        conversationId  INT          NOT NULL,
+        userId          INT          NOT NULL,
+        userEmail       VARCHAR(255) NULL,
+        status          VARCHAR(16)  NOT NULL DEFAULT 'open',  -- open|in_progress|resolved
+        tag             VARCHAR(32)  NULL,                     -- bug|feature|how-to|billing
+        priority        VARCHAR(16)  NOT NULL DEFAULT 'normal', -- low|normal|high
+        subject         VARCHAR(255) NULL,
+        autoContext     JSON         NULL,
+        assignedTo      VARCHAR(64)  NULL,
+        adminNotes      TEXT         NULL,
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_status (status, updatedAt),
+        KEY idx_user (userId, createdAt),
+        KEY idx_tag (tag, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] support_* (conversations/messages/tickets): OK");
+
     // ── 2026-05-08 (P1-3): UNIQUE index on users.email ──────────────────
     // Race-safe register — concurrent POST /api/auth/register with the
     // same email should produce ONE user, not two. The check-then-insert

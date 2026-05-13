@@ -51,6 +51,8 @@ import SquadLabPage from "../pages/admin/SquadLabPage";
 // 2026-05-10 (CJ「明天串金流，今天都做」)
 import PricingPage from "../pages/PricingPage";
 import AccountPage from "../pages/AccountPage";
+import AdminSupportPage from "../pages/AdminSupportPage";
+import ChangelogPage from "../pages/ChangelogPage";
 import WorkspaceSettingsPage from "../pages/WorkspaceSettingsPage";
 import TermsPage from "../pages/legal/TermsPage";
 import PrivacyPage from "../pages/legal/PrivacyPage";
@@ -279,6 +281,9 @@ export default function AppV2() {
           <Route path="/settings/account" element={<AccountPage />} />
           <Route path="/settings/workspace" element={<WorkspaceSettingsPage />} />
           <Route path="/achievements" element={<AchievementsPage />} />
+          {/* 2026-05-13 — Layer 3 (admin support inbox) + Layer 5 (public changelog) */}
+          <Route path="/admin/support" element={<AdminSupportPage />} />
+          <Route path="/changelog" element={<ChangelogPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -20,6 +20,7 @@ import WorkspacePill from "../../components/WorkspacePill";
 import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
 import FestivalGlobalNudge from "../../components/FestivalGlobalNudge";
+import SupportDrawer from "../../components/SupportDrawer";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
@@ -139,6 +140,7 @@ export default function ShellLayout() {
   };
 
   const [notifOpen, setNotifOpen] = React.useState(false);
+  const [supportOpen, setSupportOpen] = React.useState(false);
   // 2026-05-13: badge count comes from the same trpc query as the panel.
   // Polled every 60s + when the user opens/closes the panel.
   const notifLastSeen = readLastSeen();
@@ -249,39 +251,27 @@ export default function ShellLayout() {
         </footer>
       </div>
 
-      {/* 2026-05-13 (CJ「我只要留下客服 icon，但是要 Notion style avatar，
-          甚至需要 mos_db agent 來擔任客服」): replaced the orange pill with
-          a Notion-style avatar circle representing 「Mia · 客戶成功」 — modeled
-          after the mos_db Customer Service Copywriter persona (Derek Tang
-          id=60056) but rendered as a DiceBear Notionists illustration so it
-          matches the brand aesthetic. Hover shows the name + role; clicking
-          opens mail with auto-populated diagnostic context (current URL,
-          brand id, user ts). */}
-      <a
-        href={(() => {
-          const ctx = [
-            `User: ${(loc?.pathname ?? "/")}`,
-            `Brand id: ${scope?.brandId ?? "(none)"}`,
-            `Product id: ${scope?.productId ?? "(none)"}`,
-            `Event id: ${scope?.eventId ?? "(none)"}`,
-            `Lang: ${lang}`,
-            `Browser: ${typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 80) : ""}`,
-            `Time: ${new Date().toISOString()}`,
-          ].join("\n");
-          const body = encodeURIComponent(`哈囉 Mia！我遇到：\n\n\n\n———\n（系統自動帶入，請保留）\n${ctx}`);
-          const subject = encodeURIComponent("OnBrand AI · 客服詢問");
-          return `mailto:contentincubator2@gmail.com?subject=${subject}&body=${body}`;
-        })()}
+      {/* 2026-05-13 (CJ「實作 Layer 2: Mia chat drawer」): Notion-style
+          avatar opens an in-page chat drawer (SupportDrawer). Mia is an
+          LLM-backed customer success agent with session context. If she
+          can't help, "我要找真人 →" inside the drawer opens a ticket. */}
+      <button
+        onClick={() => setSupportOpen(true)}
+        aria-label={lang === "en" ? "Open support chat" : "打開客服對話"}
+        title={lang === "en"
+          ? "Mia · Customer Success"
+          : "Mia · 客戶成功經理"}
         style={{
           position: "fixed", bottom: 20, right: 20, zIndex: 50,
           width: 56, height: 56, borderRadius: "50%",
           background: "white",
           boxShadow: "0 8px 24px rgba(124,58,237,0.28), 0 2px 6px rgba(0,0,0,0.08)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          textDecoration: "none",
           border: "2px solid rgba(124,58,237,0.18)",
           transition: "transform 0.18s, box-shadow 0.18s",
           overflow: "hidden",
+          cursor: "pointer",
+          padding: 0,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.06)";
@@ -291,23 +281,24 @@ export default function ShellLayout() {
           e.currentTarget.style.transform = "scale(1)";
           e.currentTarget.style.boxShadow = "0 8px 24px rgba(124,58,237,0.28), 0 2px 6px rgba(0,0,0,0.08)";
         }}
-        title={lang === "en"
-          ? "Mia · Customer Success — click to message us"
-          : "Mia · 客戶成功經理 — 點此來信聊聊"}
       >
         <img
           src="https://api.dicebear.com/7.x/notionists/svg?seed=mia-cs-onbrand&backgroundColor=ede9fe&backgroundType=solid&radius=50"
           alt="Mia · Customer Success"
           style={{ width: "100%", height: "100%", display: "block" }}
         />
-        {/* Online green dot */}
         <span style={{
           position: "absolute", bottom: 4, right: 4,
           width: 12, height: 12, borderRadius: "50%",
           background: "#10b981",
           border: "2px solid white",
         }} />
-      </a>
+      </button>
+      <SupportDrawer
+        open={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        scope={scope}
+      />
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}
       <PositioningNotificationCenter />
