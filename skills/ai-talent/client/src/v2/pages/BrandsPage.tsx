@@ -154,7 +154,32 @@ export default function BrandsPage() {
         { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false, staleTime: 30_000 }
       )
     : { data: null };
-  const fullPositioning = (scopeActiveQuery.data as any)?.brand?.positioning ?? {};
+  // 2026-05-13 (CJ「復華顯示定位完成，但很多內容都沒有填寫」): the
+  // positioning runner writes server-side keys (brandOrigin / brandValues /
+  // targetAudience / goldenCircleRefined / taglineCandidates /
+  // brandPositioningScore) but the UI segments read shorter aliases
+  // (origin / values / audience / goldenCircle / tagline / taglineScore).
+  // Translate at read time so the existing data shows up in the UI without
+  // a server migration. Keys are only aliased when the alias slot is empty,
+  // so any future direct-write to the alias is preserved.
+  const SERVER_TO_UI_KEY_ALIASES: Record<string, string> = {
+    brandOrigin:           "origin",
+    brandValues:           "values",
+    targetAudience:        "audience",
+    goldenCircleRefined:   "goldenCircle",
+    taglineCandidates:     "tagline",
+    brandPositioningScore: "taglineScore",
+  };
+  const rawPositioning = (scopeActiveQuery.data as any)?.brand?.positioning ?? {};
+  const fullPositioning: Record<string, any> = (() => {
+    const merged: Record<string, any> = { ...rawPositioning };
+    for (const [serverKey, uiKey] of Object.entries(SERVER_TO_UI_KEY_ALIASES)) {
+      if (merged[uiKey] == null && merged[serverKey] != null) {
+        merged[uiKey] = merged[serverKey];
+      }
+    }
+    return merged;
+  })();
   const brandAssets: Record<string, any> = (fullPositioning?._assets ?? {}) as Record<string, any>;
 
   // Onboarding nudge: if this brand has no website / socialLinks yet,

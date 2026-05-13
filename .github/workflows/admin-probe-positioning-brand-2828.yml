@@ -37,6 +37,28 @@ jobs:
           "
 
           echo ""
+          echo "=== Inner shape of each step's result ==="
+          $MYSQL -e "
+            SELECT JSON_PRETTY(JSON_EXTRACT(soworkAnalysis, '\$.brandOrigin')) AS brandOrigin FROM brands WHERE id=2828
+          " 2>&1 | head -30
+          echo ""
+          $MYSQL -e "
+            SELECT JSON_PRETTY(JSON_EXTRACT(soworkAnalysis, '\$.brandValues')) AS brandValues FROM brands WHERE id=2828
+          " 2>&1 | head -30
+          echo ""
+          $MYSQL -e "
+            SELECT JSON_PRETTY(JSON_EXTRACT(soworkAnalysis, '\$.targetAudience')) AS targetAudience FROM brands WHERE id=2828
+          " 2>&1 | head -30
+          echo ""
+          $MYSQL -e "
+            SELECT JSON_PRETTY(JSON_EXTRACT(soworkAnalysis, '\$.goldenCircleRefined')) AS goldenCircle FROM brands WHERE id=2828
+          " 2>&1 | head -30
+          echo ""
+          $MYSQL -e "
+            SELECT JSON_PRETTY(JSON_EXTRACT(soworkAnalysis, '\$.taglineCandidates')) AS tagline FROM brands WHERE id=2828
+          " 2>&1 | head -30
+
+          echo ""
           echo "=== Top-level keys + null/empty check ==="
           $MYSQL -e "
             SELECT
