@@ -38,23 +38,23 @@ jobs:
 
           EMAIL="${{ github.event.inputs.user_email }}"
           EMAIL="${EMAIL:-contentincubator2@gmail.com}"
-          UID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL' LIMIT 1")
-          echo "User id for $EMAIL → $UID"
-          if [ -z "$UID" ]; then echo "user not found"; exit 1; fi
+          USER_ID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL' LIMIT 1")
+          echo "User id for $EMAIL → $USER_ID"
+          if [ -z "$USER_ID" ]; then echo "user not found"; exit 1; fi
 
           echo ""
           echo "=== Brands ==="
-          $MYSQL -e "SELECT id, name FROM brands WHERE userId=$UID ORDER BY id" -t
+          $MYSQL -e "SELECT id, name FROM brands WHERE userId=$USER_ID ORDER BY id" -t
 
           echo ""
           echo "=== Events (all) ==="
-          $MYSQL -e "SELECT id, name, brandId, productId, slug, updatedAt FROM events WHERE userId=$UID ORDER BY updatedAt DESC" -t
+          $MYSQL -e "SELECT id, name, brandId, productId, slug, updatedAt FROM events WHERE userId=$USER_ID ORDER BY updatedAt DESC" -t
 
           echo ""
           echo "=== Orphan events (brandId IS NULL) ==="
-          ORPHAN=$($MYSQL -e "SELECT COUNT(*) FROM events WHERE userId=$UID AND brandId IS NULL")
+          ORPHAN=$($MYSQL -e "SELECT COUNT(*) FROM events WHERE userId=$USER_ID AND brandId IS NULL")
           echo "orphan count: $ORPHAN"
-          $MYSQL -e "SELECT e.id, e.name, e.slug, GROUP_CONCAT(ep.productId) AS productIds FROM events e LEFT JOIN event_products ep ON ep.eventId=e.id WHERE e.userId=$UID AND e.brandId IS NULL GROUP BY e.id" -t
+          $MYSQL -e "SELECT e.id, e.name, e.slug, GROUP_CONCAT(ep.productId) AS productIds FROM events e LEFT JOIN event_products ep ON ep.eventId=e.id WHERE e.userId=$USER_ID AND e.brandId IS NULL GROUP BY e.id" -t
 
           MODE="${{ github.event.inputs.mode }}"
           MODE="${MODE:-probe}"
@@ -76,7 +76,7 @@ jobs:
               HAVING brandCount = 1
             ) x ON x.eventId = e.id
             SET e.brandId = x.inferredBrandId
-            WHERE e.userId = $UID AND e.brandId IS NULL;
+            WHERE e.userId = $USER_ID AND e.brandId IS NULL;
           "
           echo "Done. Remaining orphans:"
-          $MYSQL -e "SELECT id, name, slug FROM events WHERE userId=$UID AND brandId IS NULL" -t
+          $MYSQL -e "SELECT id, name, slug FROM events WHERE userId=$USER_ID AND brandId IS NULL" -t
