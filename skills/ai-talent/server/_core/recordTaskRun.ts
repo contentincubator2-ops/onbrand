@@ -94,13 +94,18 @@ async function ensureMission(args: {
 /** Persist a completed task run's output. Non-fatal on error. */
 export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: number | null; outputId: number | null }> {
   try {
+    // 2026-05-13 (CJ「現在應該沒有100S」): user-facing tier label is now
+    // "99s" (久久 wordplay). Internal orchestra config keys still use
+    // "100s" to avoid touching every config map; we normalize at the
+    // single boundary where the tier hits the DB.
+    const displayTier = args.tier === "100s" ? "99s" : args.tier;
     const missionId = await ensureMission({
       userId: args.userId,
       brandId: args.brandId,
       workspace: args.workspace,
       taskId: args.taskId,
       taskLabel: args.taskLabel,
-      tier: args.tier,
+      tier: displayTier as any,
     });
     if (!missionId) return { missionId: null, outputId: null };
 
@@ -117,7 +122,7 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
     const metadata = JSON.stringify({
       ...(args.metadata ?? {}),
       taskId: args.taskId,
-      tier: args.tier,
+      tier: displayTier,
       thumbnailUrl: args.thumbnailUrl ?? null,
     });
 

@@ -261,7 +261,9 @@ export const outputRouter = router({
   recent: protectedProcedure
     .input(z.object({
       brandId: z.number().nullable().optional(),
-      tier: z.enum(["30s", "60s", "100s"]).optional(),
+      // 2026-05-13 (CJ「現在應該沒有100S」): accept both "100s" and "99s"
+      // as the orchestra config still keys on "100s" but DB now stores "99s".
+      tier: z.enum(["30s", "60s", "100s", "99s"]).optional(),
       limit: z.number().min(1).max(50).default(15),
     }))
     .query(async ({ ctx, input }) => {
@@ -274,7 +276,13 @@ export const outputRouter = router({
       let brandSql = `AND m.brandId IS NULL`;
       if (input.brandId) { brandSql = `AND m.brandId = ?`; params.push(input.brandId); }
       let tierSql = ``;
-      if (input.tier) { tierSql = `AND JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) = ?`; params.push(input.tier); }
+      if (input.tier) {
+        // Map "100s" → "99s" so old callers pointing at the legacy tier id
+        // still find current records.
+        const queryTier = input.tier === "100s" ? "99s" : input.tier;
+        tierSql = `AND JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) = ?`;
+        params.push(queryTier);
+      }
       const safeLimit = Math.max(1, Math.min(50, Number(input.limit) || 15));
       const [rowsRaw]: any = await localPool.execute(
         `SELECT
