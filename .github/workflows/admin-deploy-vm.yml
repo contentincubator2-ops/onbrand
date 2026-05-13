@@ -38,12 +38,24 @@ jobs:
 
       - name: Client build
         run: |
-          set -e
+          set -eo pipefail
           APP=/opt/marketing-os/app
           AI=$APP/skills/ai-talent
           cd "$AI/client"
           npm install --legacy-peer-deps 2>&1 | tail -5
-          npm run build 2>&1 | tail -10
+          # 2026-05-13: previous version masked tsc/vite failures with
+          # `2>&1 | tail -10` — when tsc errored, build silently succeeded
+          # and public/ stayed stale. set -eo pipefail makes pipe failures
+          # surface; tee preserves logs without swallowing exit codes.
+          npm run build 2>&1 | tee /tmp/client-build.log | tail -30
+          # Sanity: index.html must reference a bundle that EXISTS in assets/
+          BUNDLE=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$AI/public/index.html" | head -1)
+          if [ -z "$BUNDLE" ] || [ ! -f "$AI/public/assets/$BUNDLE" ]; then
+            echo "❌ public/index.html references $BUNDLE but file missing in assets/"
+            ls "$AI/public/assets/" | head
+            exit 1
+          fi
+          echo "✓ index.html → $BUNDLE ($(stat -c%s $AI/public/assets/$BUNDLE) bytes)"
           stat -c '%y %s bytes' "$AI/public/index.html"
 
       - name: Restart pm2
