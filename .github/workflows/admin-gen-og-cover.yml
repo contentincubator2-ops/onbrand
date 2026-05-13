@@ -35,7 +35,7 @@ jobs:
             -d "$(jq -nc \
               --arg p "$PROMPT" \
               --arg seed "${{ github.event.inputs.seed }}" \
-              '{model: "Qubico/ideogram", task_type: "txt2img", input: {prompt: $p, aspect_ratio: "16:9", style_type: "DESIGN", magic_prompt_option: "AUTO", seed: ($seed | tonumber)}}')")
+              '{model: "Qubico/flux1-schnell", task_type: "txt2img", input: {prompt: $p, width: 1216, height: 640, steps: 4, seed: ($seed | tonumber)}}')")
           echo "$RESP" | head -c 400
           echo ""
 
