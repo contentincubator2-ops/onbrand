@@ -27,6 +27,14 @@ jobs:
             $MYSQL -e "SELECT id, JSON_PRETTY(metadata) FROM mission_outputs ORDER BY id DESC LIMIT 3" -t 2>&1 | head -60
 
             echo ""
+            echo "=== latest mission_outputs by tier ==="
+            $MYSQL -e "SELECT JSON_EXTRACT(metadata, '$.tier') AS tier, COUNT(*) AS n, MAX(createdAt) AS latest FROM mission_outputs GROUP BY tier ORDER BY latest DESC LIMIT 10" -t
+
+            echo ""
+            echo "=== most recent 60s + 99s/100s outputs ==="
+            $MYSQL -e "SELECT id, JSON_EXTRACT(metadata, '$.tier') AS tier, JSON_EXTRACT(metadata, '$.thumbnailUrl') AS thumb, JSON_EXTRACT(metadata, '$.errors') AS errs, createdAt FROM mission_outputs WHERE JSON_EXTRACT(metadata, '$.tier') IN ('60s','99s','100s') ORDER BY id DESC LIMIT 10" -t
+
+            echo ""
             echo "=== piapi-related log lines (last 200 OUT) ==="
             LOG_OUT=/home/$(whoami)/.pm2/logs/marketing-os-out.log
             tail -500 "$LOG_OUT" 2>/dev/null | grep -iE "piapi|flux|genOneImage|dispatchGenerate" | tail -30
