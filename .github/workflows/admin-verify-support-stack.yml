@@ -74,7 +74,8 @@ jobs:
         run: |
           set -e
           AI=/opt/marketing-os/app/skills/ai-talent
-          BUNDLE=$(ls "$AI/public/assets/index-"*.js | grep -v "index-D6jv" | grep -v "index-lE7" | head -1)
+          # Pick the LARGEST bundle (main app code; minor chunks are small)
+          BUNDLE=$(ls -S "$AI/public/assets/index-"*.js | head -1)
           echo "  bundle: $BUNDLE  ($(stat -c%s $BUNDLE) bytes)"
           # Component class names get minified; only check user-visible UTF-8 strings
           # that survive minification (DiceBear seed + Chinese UI labels).
