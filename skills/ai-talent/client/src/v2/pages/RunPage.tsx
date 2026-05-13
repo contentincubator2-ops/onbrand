@@ -26,7 +26,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faClipboard, faClipboardCheck, faRotateRight, faXmark,
   faShare, faCalendarPlus, faEnvelope, faRocket, faFolderPlus,
-  faChevronLeft,
+  faChevronLeft, faFolderOpen,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   Pencil, MessageCircle, Image as LucideImage, Video,
@@ -106,7 +106,16 @@ export default function RunPage() {
     : { data: [] };
   const updateMut = trpc.output.updateVariantCaption.useMutation({
     onSuccess: () => {
-      showToastGlobal(t("toast_saved"));
+      // 2026-05-13 (CJ「編輯完文案回上一頁找不到存檔，要翻專案才看到」):
+      // tell the user WHERE it landed and offer a 1-tap path to /projects.
+      // The HeroUI toast helper renders an action button when given one.
+      const missionTitle = (data as any)?.mission?.title
+        ?? (data as any)?.mission?.taskLabel
+        ?? "";
+      const where = missionTitle
+        ? (lang === "en" ? `Saved to 「${missionTitle}」` : `已存到「${missionTitle}」`)
+        : (lang === "en" ? "Saved to Projects" : "已存到專案");
+      showToastGlobal(`${where} · ${lang === "en" ? "Open Projects →" : "去專案 →"}`);
       utils.output.getById.invalidate({ id });
     },
     onError: (e) => showToastGlobal(
@@ -560,7 +569,7 @@ export default function RunPage() {
     return (
       <div className="p-12 flex flex-col items-center gap-3 text-default-500">
         <p>{lang === "en" ? "Run not found (it may have been removed or you don't have access)" : "找不到這個 run（可能已被移除或無權限）"}</p>
-        <Button variant="flat" onPress={() => navigate(-1)}>{lang === "en" ? "Back" : "返回"}</Button>
+        <Button variant="flat" onPress={() => navigate("/projects")}>{lang === "en" ? "Back to Projects" : "回專案"}</Button>
       </div>
     );
   }
@@ -582,6 +591,48 @@ export default function RunPage() {
       {/* Header removed 2026-05-09 (CJ): was overlapping with ShellLayout's
           global brand picker. ShellLayout already shows the current brand
           + tier nav. Tier chip + 重跑 + 關閉 moved into the toolbar below. */}
+
+      {/* ─── Breadcrumb (CJ 2026-05-13「編輯完文案回上一頁找不到存檔」):
+            explicit path so the user knows where this output lives and
+            has a 1-click way back to /projects without using the bare X.
+            The save toast now mirrors this with an "Open Projects →" hint. */}
+      <div className="flex items-center gap-1.5 text-tiny text-default-500 mb-2 px-1">
+        <button
+          onClick={() => navigate("/projects")}
+          className="hover:text-default-900 transition flex items-center gap-1"
+        >
+          <FontAwesomeIcon icon={faFolderOpen} className="text-tiny" />
+          {lang === "en" ? "Projects" : "專案"}
+        </button>
+        {(data as any)?.mission?.brandName && (
+          <>
+            <span className="text-default-300">›</span>
+            <button
+              onClick={() => navigate("/projects")}
+              className="hover:text-default-900 transition truncate max-w-[160px]"
+              title={(data as any).mission.brandName}
+            >
+              {(data as any).mission.brandName}
+            </button>
+          </>
+        )}
+        {(data as any)?.mission?.title && (
+          <>
+            <span className="text-default-300">›</span>
+            <button
+              onClick={() => navigate("/projects")}
+              className="hover:text-default-900 transition truncate max-w-[260px]"
+              title={(data as any).mission.title}
+            >
+              {(data as any).mission.title}
+            </button>
+          </>
+        )}
+        <span className="text-default-300">›</span>
+        <span className="text-default-700 font-medium">
+          {lang === "en" ? `Version #${(data as any)?.version ?? 1}` : `版本 #${(data as any)?.version ?? 1}`}
+        </span>
+      </div>
 
       {/* ─── Task label + status row (slim, non-overlapping) ────────── */}
       <div className="flex items-center gap-2 mb-3 px-1">
@@ -713,11 +764,11 @@ export default function RunPage() {
                   <FontAwesomeIcon icon={faRotateRight} className="text-tiny" />
                 </button>
               </Tooltip>
-              <Tooltip content={lang === "en" ? "Back" : "返回"} placement="bottom">
+              <Tooltip content={lang === "en" ? "Close → Projects" : "關閉 → 專案"} placement="bottom">
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={() => navigate("/projects")}
                   className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
-                  aria-label={lang === "en" ? "Back" : "返回"}
+                  aria-label={lang === "en" ? "Close to Projects" : "關閉到專案"}
                 >
                   <FontAwesomeIcon icon={faXmark} className="text-tiny" />
                 </button>
