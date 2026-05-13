@@ -1,0 +1,82 @@
+name: Admin — Fix event/brand attribution
+
+# Two-phase utility for the bug where events with NULL brandId leaked
+# into every brand's event list and got mis-attributed on selection.
+#
+# Phase 1 (mode=probe, default): prints all events for a user with their
+# brandId, slug, productIds, plus orphan count.
+#
+# Phase 2 (mode=backfill): for orphan events (brandId IS NULL), tries to
+# infer the correct brandId by looking at event_products → products.brandId.
+# If a single distinct brandId is found across linked products, sets it.
+# Otherwise leaves the event NULL (manual fix needed).
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_email:
+        description: "User email to probe / fix (default: CJ)"
+        required: false
+        default: "contentincubator2@gmail.com"
+      mode:
+        description: "probe (read-only) | backfill (mutates DB)"
+        required: false
+        default: "probe"
+
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Resolve env
+        run: |
+          set -e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N --silent"
+
+          EMAIL="${{ github.event.inputs.user_email }}"
+          EMAIL="${EMAIL:-contentincubator2@gmail.com}"
+          UID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL' LIMIT 1")
+          echo "User id for $EMAIL → $UID"
+          if [ -z "$UID" ]; then echo "user not found"; exit 1; fi
+
+          echo ""
+          echo "=== Brands ==="
+          $MYSQL -e "SELECT id, name FROM brands WHERE userId=$UID ORDER BY id" -t
+
+          echo ""
+          echo "=== Events (all) ==="
+          $MYSQL -e "SELECT id, name, brandId, productId, slug, updatedAt FROM events WHERE userId=$UID ORDER BY updatedAt DESC" -t
+
+          echo ""
+          echo "=== Orphan events (brandId IS NULL) ==="
+          ORPHAN=$($MYSQL -e "SELECT COUNT(*) FROM events WHERE userId=$UID AND brandId IS NULL")
+          echo "orphan count: $ORPHAN"
+          $MYSQL -e "SELECT e.id, e.name, e.slug, GROUP_CONCAT(ep.productId) AS productIds FROM events e LEFT JOIN event_products ep ON ep.eventId=e.id WHERE e.userId=$UID AND e.brandId IS NULL GROUP BY e.id" -t
+
+          MODE="${{ github.event.inputs.mode }}"
+          MODE="${MODE:-probe}"
+          if [ "$MODE" != "backfill" ]; then
+            echo ""
+            echo "Probe mode — no DB writes. Re-run with mode=backfill to fix."
+            exit 0
+          fi
+
+          echo ""
+          echo "=== BACKFILL: inferring brandId from event_products → products.brandId ==="
+          $MYSQL -e "
+            UPDATE events e
+            JOIN (
+              SELECT ep.eventId, MIN(p.brandId) AS inferredBrandId, COUNT(DISTINCT p.brandId) AS brandCount
+                FROM event_products ep
+                JOIN products p ON p.id = ep.productId
+               GROUP BY ep.eventId
+              HAVING brandCount = 1
+            ) x ON x.eventId = e.id
+            SET e.brandId = x.inferredBrandId
+            WHERE e.userId = $UID AND e.brandId IS NULL;
+          "
+          echo "Done. Remaining orphans:"
+          $MYSQL -e "SELECT id, name, slug FROM events WHERE userId=$UID AND brandId IS NULL" -t

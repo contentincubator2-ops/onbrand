@@ -722,10 +722,14 @@ function BrandHierarchyPill({
                   <button
                     key={ev.id}
                     onClick={() => {
-                      // Auto-bind brand from event row + product if single
-                      const evBrandId = ev.brandId ?? scope.brandId;
+                      // Auto-bind brand from event row + product if single.
+                      // NEVER fall back to the currently-selected brand — that
+                      // mis-attributes orphan events to whatever's on screen.
+                      const evBrandId = ev.brandId ?? null;
                       const productIds: number[] = ev.productIds ?? [];
-                      const evProductId = productIds.length === 1 ? productIds[0] : (ev.productId ?? scope.productId);
+                      const evProductId = productIds.length === 1
+                        ? productIds[0]
+                        : (ev.productId ?? null);
                       setScope({ brandId: evBrandId, productId: evProductId ?? null, eventId: ev.id });
                       setOpen(false);
                     }}
