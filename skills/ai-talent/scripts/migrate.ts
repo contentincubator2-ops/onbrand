@@ -1315,6 +1315,39 @@ async function main() {
       console.log("[migrate] brands.tabLocks: already exists, skipped");
     }
 
+    // 2026-05-14 (CJ「點數系統」): pointsBalance + auto-refill timestamp on users.
+    for (const [col, def] of [
+      ["pointsBalance",           "INT NOT NULL DEFAULT 0"],
+      ["pointsLastResetAt",       "DATETIME(3) NULL"],
+    ] as const) {
+      const [rows] = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?
+      `, [col]) as any;
+      if ((rows as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE users ADD COLUMN ${col} ${def}`);
+        console.log(`[migrate] users.${col}: added`);
+      } else {
+        console.log(`[migrate] users.${col}: already exists, skipped`);
+      }
+    }
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS point_transactions (
+        id            INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId        INT          NOT NULL,
+        kind          VARCHAR(24)  NOT NULL COMMENT 'deduct | refill | topup | grant | refund',
+        delta         INT          NOT NULL COMMENT 'positive=credit, negative=deduct',
+        balanceAfter  INT          NOT NULL,
+        reason        VARCHAR(64)  NOT NULL COMMENT 'task_30s | monthly_refill | topup:1000pts',
+        entityKind    VARCHAR(24)  NULL,
+        entityId      INT          NULL,
+        createdAt     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        KEY idx_user_ts (userId, createdAt),
+        KEY idx_kind (kind)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] point_transactions: OK");
+
     // 2026-05-12 (CJ「老用戶永遠保 900，新用戶才漲 1500」): early-bird flag
     // on users — set at register time based on ONBRAND_PROMO_ACTIVE env.
     for (const [col, def] of [

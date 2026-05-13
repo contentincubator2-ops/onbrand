@@ -53,9 +53,39 @@ export const users = mysqlTable("users", {
   // 2026-05-12: lockedPriceTwdMonthly — overrides plan default when set.
   // Reserved for custom pricing (negotiated agency deals, beta partners).
   lockedPriceTwdMonthly: int("lockedPriceTwdMonthly"),
+  // 2026-05-14 (CJ「點數系統」): time-denominated points system.
+  // 1 point = 1 second of task compute (30s task = 30 pts, 60s = 60 pts,
+  // 99s = 99 pts, image = 30 pts).
+  // Trial = 300 pts. Solo plan = 3000 pts/month. Auto-topup on the 1st.
+  pointsBalance: int("pointsBalance").default(0).notNull(),
+  // When did the user's monthly allocation last reset? null = never (trial).
+  pointsLastResetAt: timestamp("pointsLastResetAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+// 2026-05-14: point_transactions — audit ledger for every credit/debit.
+// debit (kind="deduct") = user ran a task. credit (kind="refill"|"topup"
+// |"grant") = balance was added. Sum over a window must equal current
+// pointsBalance modulo manual admin adjustments.
+export const pointTransactions = mysqlTable("point_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  /** "deduct" | "refill" (monthly) | "topup" (purchased) | "grant" (admin) | "refund" */
+  kind: varchar("kind", { length: 24 }).notNull(),
+  /** Positive for credit, negative for deduct. */
+  delta: int("delta").notNull(),
+  /** Running balance AFTER this transaction (denormalized for audit). */
+  balanceAfter: int("balanceAfter").notNull(),
+  /** What action consumed/added points. E.g. "task_30s", "monthly_refill", "topup:1000pts" */
+  reason: varchar("reason", { length: 64 }).notNull(),
+  /** Optional: entity affected (taskId, brandId, invoiceId) for traceability. */
+  entityKind: varchar("entityKind", { length: 24 }),
+  entityId: int("entityId"),
+  /** ISO timestamp. */
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PointTransaction = typeof pointTransactions.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 

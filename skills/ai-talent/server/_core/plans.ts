@@ -34,7 +34,27 @@ export interface PlanQuota {
   team_members: number;
   /** 2026-05-11 — can the workspace host multi-client (sub-brand sharing)? */
   multi_client: boolean;
+  /** 2026-05-14 — monthly point allocation (refilled on the 1st).
+   *  1 point = 1 second of task compute. Trial gets a one-time grant
+   *  (pointsPerCycle and pointsCycleDays=7); paid plans refresh monthly. */
+  pointsPerCycle: number;
+  pointsCycleDays: number;   // 7 for trial, 30 for monthly subs
 }
+
+/** 2026-05-14: per-action point costs. Keep this single-source so
+ *  pricing changes don't drift across the codebase. */
+export const POINT_COSTS = {
+  task_30s:        30,
+  task_60s:        60,
+  task_99s:        99,
+  image_flux:      30,   // PiAPI Flux Schnell — default
+  image_gpt:      100,   // OpenAI gpt-image-1 — premium
+  image_imagen:    50,   // Google Imagen — middle
+  image_ideogram:  50,   // PiAPI Ideogram (text-in-image)
+  // video pulled per CJ direction; keep cost defined for when re-enabled
+  video_clip:    1500,   // 1 PiAPI Kling 5s clip
+} as const;
+export type PointAction = keyof typeof POINT_COSTS;
 
 export interface Plan {
   code: PlanCode;
@@ -68,15 +88,20 @@ export const PLANS: Record<PlanCode, Plan> = {
     priceTwdAnnually: 0,
     trialDays: 7,
     quota: {
+      // 2026-05-14: legacy per-task quotas kept for back-compat but
+      // gating is now point-based. -1 = no per-task cap; only points apply.
       task_30s: -1,
-      task_60s: 15,                // trial 用 1/3 of paid
-      task_99s: 5,
-      image_gen: 30,
-      video_gen: 0,                // 影片功能下架
+      task_60s: -1,
+      task_99s: -1,
+      image_gen: -1,
+      video_gen: 0,                // video still hard-disabled
       brands: 1,
       fb_publish: -1,
       team_members: 1,
       multi_client: false,
+      // Trial = 300 points (= ~3× 99s tasks or 10× 30s tasks)
+      pointsPerCycle: 300,
+      pointsCycleDays: 7,
     },
     features: [
       "30s / 60s / 99s 任務模板（額度有限）",
