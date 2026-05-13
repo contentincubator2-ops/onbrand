@@ -38,6 +38,36 @@ export default function BrandsManagePage() {
     : { data: [], refetch: () => {} };
   const brands = (listQuery?.data ?? []) as Array<any>;
 
+  // Resolve the active scope so we can show a direct CTA into the
+  // positioning editor when the user has picked a product or event from
+  // the ScopeBar — without this banner there's no obvious path from the
+  // brand grid into 活動定位 / 產品定位.
+  const scope = ctx?.scope ?? { brandId: null, productId: null, eventId: null };
+  const scopeKind: "event" | "product" | "brand" | "none" =
+    scope.eventId ? "event"
+    : scope.productId ? "product"
+    : scope.brandId ? "brand"
+    : "none";
+  const activeBrand = scope.brandId ? brands.find((b) => b.id === scope.brandId) : null;
+  // Pull event/product name when scope is set
+  const eventQ = (trpc as any).event?.get?.useQuery?.(
+    { id: scope.eventId ?? 0 },
+    { enabled: !!scope.eventId, refetchOnWindowFocus: false },
+  );
+  const productQ = (trpc as any).product?.get?.useQuery?.(
+    { id: scope.productId ?? 0 },
+    { enabled: !!scope.productId && !scope.eventId, refetchOnWindowFocus: false },
+  );
+  const scopeName =
+    scopeKind === "event" ? (eventQ?.data?.name ?? "")
+    : scopeKind === "product" ? (productQ?.data?.name ?? "")
+    : scopeKind === "brand" ? (activeBrand?.name ?? "")
+    : "";
+  const scopeLabel =
+    scopeKind === "event" ? (lang === "en" ? "campaign positioning" : "活動定位")
+    : scopeKind === "product" ? (lang === "en" ? "product positioning" : "產品定位")
+    : (lang === "en" ? "brand positioning" : "品牌定位");
+
   const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
 
@@ -141,6 +171,41 @@ export default function BrandsManagePage() {
             <Plus size={16} /> {t("create_brand")}
           </button>
         </div>
+
+        {/* Scope CTA — when the user has picked a product or event from the
+            ScopeBar but landed on the brand grid, surface a direct path into
+            the positioning editor. Without this, 活動定位 / 產品定位 are
+            buried behind 「進入編輯」 on a brand card. */}
+        {(scopeKind === "event" || scopeKind === "product") && scopeName && (
+          <div
+            className="mb-6 rounded-xl border flex items-center gap-3 px-4 py-3"
+            style={{
+              background: "linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(0,180,188,0.06) 100%)",
+              borderColor: "#E4E3E1",
+            }}
+          >
+            <span
+              className="text-[10px] font-semibold uppercase tracking-[0.15em] px-2 py-1 rounded"
+              style={{ background: "rgba(124,58,237,0.12)", color: "#5B21B6" }}
+            >
+              {scopeKind === "event"
+                ? (lang === "en" ? "Campaign" : "活動")
+                : (lang === "en" ? "Product" : "產品")}
+            </span>
+            <span className="text-sm text-neutral-700 flex-1 min-w-0 truncate">
+              {lang === "en"
+                ? <>You picked <strong className="text-neutral-900">{scopeName}</strong> — jump to its {scopeLabel}.</>
+                : <>目前已選 <strong className="text-neutral-900">{scopeName}</strong> — 直接編輯它的{scopeLabel}。</>}
+            </span>
+            <button
+              onClick={() => navigate(`/brands/edit?b=${scope.brandId ?? activeBrand?.id ?? ""}`)}
+              className="px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap flex items-center gap-1"
+              style={{ background: "#171717", color: "white" }}
+            >
+              {lang === "en" ? `Edit ${scopeLabel} →` : `編輯${scopeLabel} →`}
+            </button>
+          </div>
+        )}
 
         {/* Empty state */}
         {brands.length === 0 ? (
