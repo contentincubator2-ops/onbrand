@@ -531,10 +531,14 @@ function BrandHierarchyPill({
       ref={ref}
       style={{
         position: "fixed",
-        left: 12,
+        // 2026-05-12 (CJ「側邊欄出來會遮到品牌」): track sidebar width so
+        // expanded sidebar doesn't cover the pill. sidebarLeft = ICON_W
+        // (collapsed) or ICON_W+PANEL_W (expanded).
+        left: sidebarLeft + 12,
         top: 10,
         zIndex: 50,
         width: 260,
+        transition: "left 0.22s cubic-bezier(0.4,0,0.2,1)",
       }}
     >
       <button
