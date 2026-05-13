@@ -15,8 +15,8 @@
  *
  * Editor (current /brands content) moves to /brands/edit?b=:id
  */
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { useOutletContext } from "react-router-dom";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
@@ -67,6 +67,26 @@ export default function BrandsManagePage() {
     scopeKind === "event" ? (lang === "en" ? "campaign positioning" : "活動定位")
     : scopeKind === "product" ? (lang === "en" ? "product positioning" : "產品定位")
     : (lang === "en" ? "brand positioning" : "品牌定位");
+
+  // Scope-aware redirect: when the user has any scope picked (brand /
+  // product / event), `/brands` becomes "show me that one thing's
+  // positioning + copy + knowledge" and forwards into the editor. The
+  // grid only renders when nothing is picked. Stays opt-in: ?all=1 keeps
+  // the grid visible even with scope (useful for cross-brand switching).
+  const [searchParams] = useSearchParams();
+  const forceGrid = searchParams.get("all") === "1";
+  useEffect(() => {
+    if (forceGrid) return;
+    if (scopeKind === "none") return;
+    // Forward into the editor — it reads scope state and renders the
+    // correct mode (brand / product / event) automatically.
+    const bid = scope.brandId ?? activeBrand?.id ?? "";
+    navigate(`/brands/edit${bid ? `?b=${bid}` : ""}`, { replace: true });
+  }, [forceGrid, scopeKind, scope.brandId, activeBrand?.id, navigate]);
+  // While redirecting, render nothing (avoids a flash of the grid).
+  if (!forceGrid && scopeKind !== "none") {
+    return null;
+  }
 
   const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
