@@ -7,6 +7,7 @@
  */
 import { useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 import { Input, Textarea } from "@heroui/react";
 import { Plus, Trash2, BookOpen, ExternalLink } from "lucide-react";
 
@@ -22,8 +23,10 @@ interface Item {
 }
 
 export default function KnowledgeEditor({ brandId }: { brandId: number | null }) {
+  const { lang } = useLang();
+  const en = lang === "en";
   if (!brandId) {
-    return <div className="p-8 text-center text-default-500">請先選擇品牌</div>;
+    return <div className="p-8 text-center text-default-500">{en ? "Pick a brand first" : "請先選擇品牌"}</div>;
   }
 
   const utils = trpc.useUtils();
@@ -55,7 +58,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         sourceUrl: sourceUrl.trim() || undefined,
         tags: [],
       });
-      if (r?.ok === false) { setErr(r.error || "新增失敗"); return; }
+      if (r?.ok === false) { setErr(r.error || (en ? "Failed to add" : "新增失敗")); return; }
       setTitle(""); setBody(""); setSourceUrl(""); setAdding(false);
     } catch (e: any) { setErr(String(e?.message ?? e)); }
   };
@@ -76,7 +79,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
           fontSize: 10, fontWeight: 600, color: "#525252",
           letterSpacing: "0.22em", textTransform: "uppercase",
         }}>
-          品牌知識庫
+          {en ? "BRAND KNOWLEDGE" : "品牌知識庫"}
         </span>
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         <span style={{
@@ -97,7 +100,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
             display: "inline-flex", alignItems: "center", gap: 4,
           }}
         >
-          <Plus size={12} /> 新增條目
+          <Plus size={12} /> {en ? "Add entry" : "新增條目"}
         </button>
       </div>
 
@@ -107,8 +110,9 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         fontStyle: "italic", maxWidth: 720, marginBottom: 18,
       }}>
-        上傳你過去成功的貼文、外部參考文章、競品案例 — 任務跑 30s / 60s / 99s / 企劃台 時，
-        會優先從這份知識庫取材，比起讓 AI 從零生成，輸出會更貼近你的真實調性。
+        {en
+          ? "Upload your past hits, reference articles, and competitor case studies — when 30s / 60s / 99s / Theater run, they pull from this library first. Closer to your real voice than letting AI start from scratch."
+          : "上傳你過去成功的貼文、外部參考文章、競品案例 — 任務跑 30s / 60s / 99s / 企劃台 時，會優先從這份知識庫取材，比起讓 AI 從零生成，輸出會更貼近你的真實調性。"}
       </p>
 
       {/* Capacity meter */}
@@ -120,7 +124,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
           <span style={{ fontSize: 10.5, color: "#525252", letterSpacing: "0.1em", textTransform: "uppercase" }}>
             Capacity · {charPct}%
           </span>
-          <span style={{ fontSize: 10, color: "#525252" }}>上限：50 條 × 每條 8,000 字</span>
+          <span style={{ fontSize: 10, color: "#525252" }}>{en ? "Cap: 50 entries × 8,000 chars each" : "上限：50 條 × 每條 8,000 字"}</span>
         </div>
         <div style={{ height: 3, background: "#D4D4D4", borderRadius: 2, overflow: "hidden" }}>
           <div style={{
@@ -142,11 +146,11 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
             fontSize: 10, fontWeight: 600, color: "#525252",
             letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 12,
           }}>
-            New Entry
+            {en ? "New Entry" : "新條目"}
           </p>
           <Input
-            label="標題"
-            placeholder="例：去年端午節最高觸及貼文"
+            label={en ? "Title" : "標題"}
+            placeholder={en ? "e.g. Highest-reach post from last Dragon Boat" : "例：去年端午節最高觸及貼文"}
             value={title}
             onValueChange={setTitle}
             isRequired
@@ -155,7 +159,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
           />
           <div style={{ height: 10 }} />
           <Input
-            label="來源連結（可選）"
+            label={en ? "Source link (optional)" : "來源連結（可選）"}
             placeholder="https://..."
             value={sourceUrl}
             onValueChange={setSourceUrl}
@@ -164,13 +168,13 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
           />
           <div style={{ height: 10 }} />
           <Textarea
-            label="內容（最多 8,000 字）"
-            placeholder="貼上原文 / 摘要 / 觀察..."
+            label={en ? "Content (max 8,000 chars)" : "內容（最多 8,000 字）"}
+            placeholder={en ? "Paste the original / summary / takeaways…" : "貼上原文 / 摘要 / 觀察..."}
             value={body}
             onValueChange={setBody}
             minRows={6}
             maxLength={8000}
-            description={`${body.length} / 8,000 字`}
+            description={en ? `${body.length} / 8,000 chars` : `${body.length} / 8,000 字`}
             variant="flat"
             classNames={{ inputWrapper: "bg-default-50" }}
           />
@@ -184,7 +188,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 border: "1px solid #D4D4D4", background: "#FFFFFF", color: "#525252",
               }}
             >
-              取消
+              {en ? "Cancel" : "取消"}
             </button>
             <button
               onClick={handleAdd}
@@ -197,7 +201,9 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 color: !title.trim() ? "#525252" : "#FFFFFF",
               }}
             >
-              {createMut?.isPending ? "儲存中…" : "儲存"}
+              {createMut?.isPending
+                ? (en ? "Saving…" : "儲存中…")
+                : (en ? "Save" : "儲存")}
             </button>
           </div>
         </div>
@@ -212,14 +218,16 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         }}>
           <BookOpen size={36} strokeWidth={1.3} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
           <p style={{ fontSize: 13, color: "#525252", marginBottom: 6, fontWeight: 500 }}>
-            還沒有知識條目
+            {en ? "No knowledge entries yet" : "還沒有知識條目"}
           </p>
           <p style={{
             fontSize: 12, color: "#525252",
             fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
             fontStyle: "italic", maxWidth: 320, margin: "0 auto",
           }}>
-            從你最成功的一篇貼文開始上傳 — AI 會把它的語氣 / 結構納入後續任務的取材池。
+            {en
+              ? "Start by uploading your best-performing post — the AI will fold its voice and structure into every future task."
+              : "從你最成功的一篇貼文開始上傳 — AI 會把它的語氣 / 結構納入後續任務的取材池。"}
           </p>
         </div>
       ) : (
@@ -262,8 +270,8 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                     </h3>
                   </div>
                   <button
-                    onClick={() => { if (confirm(`刪除「${it.title}」？`)) deleteMut?.mutate?.({ id: it.id }); }}
-                    title="刪除"
+                    onClick={() => { if (confirm(en ? `Delete "${it.title}"?` : `刪除「${it.title}」？`)) deleteMut?.mutate?.({ id: it.id }); }}
+                    title={en ? "Delete" : "刪除"}
                     style={{
                       background: "transparent", border: "none", cursor: "pointer",
                       color: "#525252", padding: 2, display: "flex", flexShrink: 0,

@@ -17,10 +17,12 @@ import {
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, MarkdownText, dicebear } from "./shared";
+import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── FB Feed ─────────────── */
 
 export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard }: MockupFields) {
+  const { lang } = useLang();
   // 2026-05-05: liveImageStyle takes priority over liveImageDesc — it's the
   // "style direction" the quick-task agent produced, kept inside the image
   // slot as a brief for the user to carry into MediaGenFlow.
@@ -37,7 +39,7 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
             description={
               <span className="text-tiny text-default-500 flex items-center gap-1">
-                剛剛 · <FontAwesomeIcon icon={faGlobe} className="text-tiny" />
+                {lang === "en" ? "Just now" : "剛剛"} · <FontAwesomeIcon icon={faGlobe} className="text-tiny" />
               </span>
             }
             avatarProps={{ src: brandLogoUrl || dicebear(brandName ?? "brand"), size: "md", isBordered: !!brandLogoUrl, color: brandLogoUrl ? "default" : "primary" }}
@@ -113,22 +115,22 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
                 {liveImageStatus === "timeout" ? (
                   <>
-                    <p className="text-tiny font-semibold text-warning-600 mb-1">補完中…（20s 已超）</p>
+                    <p className="text-tiny font-semibold text-warning-600 mb-1">{lang === "en" ? "Finishing… (over 20s)" : "補完中…（20s 已超）"}</p>
                     <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>
                   </>
                 ) : liveImageStatus === "failed" ? (
                   <>
-                    <p className="text-tiny font-semibold text-danger-600 mb-1">生圖失敗</p>
+                    <p className="text-tiny font-semibold text-danger-600 mb-1">{lang === "en" ? "Image failed" : "生圖失敗"}</p>
                     <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>
                   </>
                 ) : liveImageStyle ? (
                   <>
-                    <p className="text-tiny font-semibold text-default-600 mb-1">圖片風格方向</p>
+                    <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Visual direction" : "圖片風格方向"}</p>
                     <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
-                    <p className="text-[10px] text-default-400 mt-2">點此用 MediaGenFlow 生圖</p>
+                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to generate via MediaGenFlow" : "點此用 MediaGenFlow 生圖"}</p>
                   </>
                 ) : (
-                  <p className="text-tiny line-clamp-3">{liveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+                  <p className="text-tiny line-clamp-3">{liveImageDesc ?? (lang === "en" ? "Hero image · waiting for craft agent" : "主圖 · 等待 craft agent")}</p>
                 )}
               </div>
             </div>
@@ -139,17 +141,17 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
               numbers with neutral icons + placeholder so users don't
               think these are predictions. */}
           <span>👍❤️🎉</span>
-          <span className="text-default-400">留言 · 分享</span>
+          <span className="text-default-400">{lang === "en" ? "Comments · Shares" : "留言 · 分享"}</span>
         </div>
         <div className="px-4 py-1 border-t border-divider flex items-center justify-around text-default-700 text-small">
           <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
-            <FontAwesomeIcon icon={faThumbsUp} /> 讚
+            <FontAwesomeIcon icon={faThumbsUp} /> {lang === "en" ? "Like" : "讚"}
           </button>
           <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
-            <FontAwesomeIcon icon={faComment} /> 留言
+            <FontAwesomeIcon icon={faComment} /> {lang === "en" ? "Comment" : "留言"}
           </button>
           <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
-            <FontAwesomeIcon icon={faShare} /> 分享
+            <FontAwesomeIcon icon={faShare} /> {lang === "en" ? "Share" : "分享"}
           </button>
         </div>
       </div>
@@ -160,6 +162,7 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 /* ─────────────── FB Reel ─────────────── */
 
 export function FBReel({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   return (
     <div className="w-full max-w-[400px] mx-auto">
@@ -173,25 +176,25 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
           <Skeleton className="absolute inset-0 opacity-30" />
           <div className="relative z-10 text-center text-white/60">
             <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-            <p className="text-tiny">9:16 影片 · 等待 craft agent</p>
+            <p className="text-tiny">{lang === "en" ? "9:16 video · waiting for craft agent" : "9:16 影片 · 等待 craft agent"}</p>
           </div>
         </div>
         <div className="absolute right-2 bottom-20 z-10 flex flex-col items-center gap-3.5 text-white drop-shadow-lg">
           <RailIcon icon={faThumbsUp} count="12K" />
           <RailIcon icon={faComment} count="456" />
-          <RailIcon icon={faPaperPlane} count="分享" />
+          <RailIcon icon={faPaperPlane} count={lang === "en" ? "Share" : "分享"} />
           <RailIcon icon={faMusic} />
         </div>
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1.5 bg-gradient-to-t from-black/80 to-transparent">
           <div className="flex items-center gap-2">
             <Avatar src={dicebear(brandName ?? "brand")} size="sm" isBordered color="primary" />
             <span className="text-small font-semibold">{handle}</span>
-            <Button size="sm" radius="sm" className="h-6 min-w-0 px-2 text-tiny bg-primary text-white">追蹤</Button>
+            <Button size="sm" radius="sm" className="h-6 min-w-0 px-2 text-tiny bg-primary text-white">{lang === "en" ? "Follow" : "追蹤"}</Button>
           </div>
           <p className="text-small line-clamp-2">{title}</p>
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
-            <span>原創音訊 · {handle}</span>
+            <span>{lang === "en" ? "Original audio" : "原創音訊"} · {handle}</span>
           </div>
         </div>
       </div>
@@ -202,6 +205,7 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
 /* ─────────────── FB Story ─────────────── */
 
 export function FBStory({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   return (
     <div className="w-full max-w-[400px] mx-auto">
@@ -218,7 +222,7 @@ export function FBStory({ title, brandName, variantLabel }: MockupFields) {
           <div className="flex items-center gap-2">
             <Avatar src={dicebear(brandName ?? "brand")} size="sm" isBordered color="primary" />
             <span className="text-small font-semibold">{handle}</span>
-            <span className="text-tiny opacity-80">5 分鐘前</span>
+            <span className="text-tiny opacity-80">{lang === "en" ? "5m ago" : "5 分鐘前"}</span>
           </div>
           <div className="flex items-center gap-3 opacity-90">
             <FontAwesomeIcon icon={faVolumeHigh} className="text-small" />
@@ -229,7 +233,7 @@ export function FBStory({ title, brandName, variantLabel }: MockupFields) {
           <Skeleton className="absolute inset-0 opacity-30" />
           <div className="relative z-10 text-center text-white/60">
             <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">限動圖 · 等待 craft agent</p>
+            <p className="text-tiny">{lang === "en" ? "Story image · waiting for craft agent" : "限動圖 · 等待 craft agent"}</p>
           </div>
         </div>
         <div className="absolute bottom-16 inset-x-3 z-10">
@@ -237,7 +241,7 @@ export function FBStory({ title, brandName, variantLabel }: MockupFields) {
         </div>
         <div className="absolute bottom-3 inset-x-3 z-10 flex items-center gap-2">
           <div className="flex-1 bg-white/15 border border-white/30 rounded-full px-3 py-1.5 text-tiny text-white/70">
-            傳訊息給 {handle}…
+            {lang === "en" ? `Message ${handle}…` : `傳訊息給 ${handle}…`}
           </div>
           <FontAwesomeIcon icon={faHeart} className="text-white" />
           <FontAwesomeIcon icon={faPaperPlane} className="text-white" />
@@ -253,6 +257,7 @@ export function FBStory({ title, brandName, variantLabel }: MockupFields) {
 /* ─────────────── FB Marketplace ─────────────── */
 
 export function FBMarketplace({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[420px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -261,28 +266,28 @@ export function FBMarketplace({ title, brandName, variantLabel }: MockupFields) 
           <Skeleton className="absolute inset-0" />
           <div className="text-center relative z-10">
             <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">商品圖 · 等待 craft agent</p>
+            <p className="text-tiny">{lang === "en" ? "Product image · waiting for craft agent" : "商品圖 · 等待 craft agent"}</p>
           </div>
           <span className="absolute top-2 right-2 bg-black/60 text-white text-tiny px-2 py-0.5 rounded-full backdrop-blur-sm">
-            <FontAwesomeIcon icon={faBookmark} className="mr-1" /> 儲存
+            <FontAwesomeIcon icon={faBookmark} className="mr-1" /> {lang === "en" ? "Save" : "儲存"}
           </span>
         </div>
         <div className="px-4 py-3 space-y-1.5">
-          <p className="text-2xl font-bold text-foreground">NT$ 1,234</p>
+          <p className="text-2xl font-bold text-foreground">{lang === "en" ? "$39" : "NT$ 1,234"}</p>
           <p className="text-small font-medium line-clamp-2">{title}</p>
           <div className="flex items-center gap-1 text-tiny text-default-500">
             <FontAwesomeIcon icon={faLocationDot} />
-            <span>台北市 · 5 分鐘前刊登</span>
+            <span>{lang === "en" ? "Taipei · Listed 5m ago" : "台北市 · 5 分鐘前刊登"}</span>
           </div>
           <div className="pt-2 flex gap-2">
-            <Button color="primary" size="sm" radius="md" className="flex-1">傳訊息</Button>
-            <Button variant="bordered" size="sm" radius="md" className="flex-1">分享</Button>
+            <Button color="primary" size="sm" radius="md" className="flex-1">{lang === "en" ? "Message" : "傳訊息"}</Button>
+            <Button variant="bordered" size="sm" radius="md" className="flex-1">{lang === "en" ? "Share" : "分享"}</Button>
           </div>
           <div className="pt-2 flex items-center gap-2 border-t border-divider mt-2">
             <Avatar src={dicebear(brandName ?? "seller")} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-tiny font-medium truncate">{brandName ?? "賣家"}</p>
-              <p className="text-tiny text-default-500">5.0 ★ · 32 筆評價</p>
+              <p className="text-tiny font-medium truncate">{brandName ?? (lang === "en" ? "Seller" : "賣家")}</p>
+              <p className="text-tiny text-default-500">{lang === "en" ? "5.0 ★ · 32 reviews" : "5.0 ★ · 32 筆評價"}</p>
             </div>
           </div>
         </div>
@@ -294,6 +299,7 @@ export function FBMarketplace({ title, brandName, variantLabel }: MockupFields) 
 /* ─────────────── FB Event ─────────────── */
 
 export function FBEvent({ title, brief, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[480px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -302,32 +308,32 @@ export function FBEvent({ title, brief, brandName, variantLabel }: MockupFields)
           <Skeleton className="absolute inset-0" />
           <div className="text-center relative z-10">
             <FontAwesomeIcon icon={faCalendarDays} className="text-4xl mb-2" />
-            <p className="text-tiny">活動封面 · 等待 craft agent</p>
+            <p className="text-tiny">{lang === "en" ? "Event cover · waiting for craft agent" : "活動封面 · 等待 craft agent"}</p>
           </div>
         </div>
         <div className="px-4 py-3 flex items-start gap-3">
           <div className="shrink-0 w-14 text-center">
-            <div className="text-tiny font-bold uppercase text-danger tracking-wider">5月</div>
+            <div className="text-tiny font-bold uppercase text-danger tracking-wider">{lang === "en" ? "MAY" : "5月"}</div>
             <div className="text-2xl font-bold leading-none mt-0.5">15</div>
-            <div className="text-tiny text-default-500 mt-0.5">週四</div>
+            <div className="text-tiny text-default-500 mt-0.5">{lang === "en" ? "Thu" : "週四"}</div>
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <p className="text-medium font-bold leading-snug line-clamp-2">{title}</p>
             <div className="flex items-center gap-1 text-tiny text-default-500">
               <FontAwesomeIcon icon={faLocationDot} />
-              <span>線上 · {brandName ?? "Your Brand"} 主辦</span>
+              <span>{lang === "en" ? `Online · Hosted by ${brandName ?? "Your Brand"}` : `線上 · ${brandName ?? "Your Brand"} 主辦`}</span>
             </div>
             <div className="flex items-center gap-1 text-tiny text-default-500">
               <FontAwesomeIcon icon={faUserGroup} />
-              <span>1.2K 人感興趣 · 234 人參加</span>
+              <span>{lang === "en" ? "1.2K interested · 234 going" : "1.2K 人感興趣 · 234 人參加"}</span>
             </div>
             {brief && <p className="text-tiny text-default-500 line-clamp-2 mt-1">{brief}</p>}
           </div>
         </div>
         <div className="px-4 pb-4 flex gap-2">
-          <Button color="primary" size="sm" radius="md" className="flex-1">參加</Button>
-          <Button variant="bordered" size="sm" radius="md" className="flex-1">感興趣</Button>
-          <Button variant="light" size="sm" radius="md">分享</Button>
+          <Button color="primary" size="sm" radius="md" className="flex-1">{lang === "en" ? "Going" : "參加"}</Button>
+          <Button variant="bordered" size="sm" radius="md" className="flex-1">{lang === "en" ? "Interested" : "感興趣"}</Button>
+          <Button variant="light" size="sm" radius="md">{lang === "en" ? "Share" : "分享"}</Button>
         </div>
       </div>
     </div>
@@ -348,6 +354,7 @@ function RailIcon({ icon, count }: { icon: any; count?: string }) {
 /* ─────────────── FB Ad (feed + Sponsored + CTA) ─────────────── */
 
 export function FBAd({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -357,7 +364,7 @@ export function FBAd({ title, brandName, variantLabel }: MockupFields) {
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
             description={
               <span className="text-tiny text-default-500 flex items-center gap-1">
-                贊助 · <FontAwesomeIcon icon={faGlobe} className="text-tiny" />
+                {lang === "en" ? "Sponsored" : "贊助"} · <FontAwesomeIcon icon={faGlobe} className="text-tiny" />
               </span>
             }
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
@@ -365,28 +372,28 @@ export function FBAd({ title, brandName, variantLabel }: MockupFields) {
         </div>
         <div className="px-4 py-2">
           <p className="text-small">{title}</p>
-          <p className="text-tiny text-default-500 mt-1">立即購買，限時 9 折優惠 →</p>
+          <p className="text-tiny text-default-500 mt-1">{lang === "en" ? "Shop now — 10% off, limited time →" : "立即購買，限時 9 折優惠 →"}</p>
         </div>
         <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
           <Skeleton className="absolute inset-0" />
           <div className="text-center relative z-10">
             <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">廣告主圖 · 等待 craft agent</p>
+            <p className="text-tiny">{lang === "en" ? "Ad image · waiting for craft agent" : "廣告主圖 · 等待 craft agent"}</p>
           </div>
         </div>
         {/* CTA bar (FB ad signature) */}
         <div className="px-4 py-2.5 bg-default-100 border-y border-divider flex items-center justify-between">
           <div className="min-w-0">
             <p className="text-tiny text-default-500 uppercase tracking-wider">YOUR-BRAND.COM</p>
-            <p className="text-small font-semibold truncate">立即購買 · 限時優惠</p>
+            <p className="text-small font-semibold truncate">{lang === "en" ? "Shop now · Limited offer" : "立即購買 · 限時優惠"}</p>
           </div>
           <Button color="default" size="sm" radius="md" className="bg-default-200 font-semibold ml-2">
-            選購
+            {lang === "en" ? "Shop" : "選購"}
           </Button>
         </div>
         <div className="px-4 py-2 flex items-center justify-between text-default-500 text-tiny">
           <span>👍❤️🎉 12K</span>
-          <span className="text-default-400">留言 · 分享</span>
+          <span className="text-default-400">{lang === "en" ? "Comments · Shares" : "留言 · 分享"}</span>
         </div>
       </div>
     </div>
@@ -396,6 +403,7 @@ export function FBAd({ title, brandName, variantLabel }: MockupFields) {
 /* ─────────────── FB Carousel Ad (multi-card horizontal scroll) ─────────────── */
 
 export function FBCarousel({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -403,7 +411,7 @@ export function FBCarousel({ title, brandName, variantLabel }: MockupFields) {
         <div className="px-4 py-3 flex items-center gap-3">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">贊助 · 輪播廣告</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "Sponsored · Carousel ad" : "贊助 · 輪播廣告"}</span>}
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
           />
         </div>
@@ -419,10 +427,10 @@ export function FBCarousel({ title, brandName, variantLabel }: MockupFields) {
                 <FontAwesomeIcon icon={faImages} className="relative z-10 text-default-400 text-2xl" />
               </div>
               <div className="p-2 space-y-1">
-                <p className="text-tiny font-semibold leading-tight line-clamp-2">商品 {i + 1}</p>
-                <p className="text-tiny text-default-500">NT$ 1,234</p>
+                <p className="text-tiny font-semibold leading-tight line-clamp-2">{lang === "en" ? `Item ${i + 1}` : `商品 ${i + 1}`}</p>
+                <p className="text-tiny text-default-500">{lang === "en" ? "$39" : "NT$ 1,234"}</p>
                 <Button size="sm" radius="sm" color="default" className="w-full text-tiny h-6 bg-default-200 font-semibold">
-                  選購
+                  {lang === "en" ? "Shop" : "選購"}
                 </Button>
               </div>
             </div>
@@ -436,13 +444,13 @@ export function FBCarousel({ title, brandName, variantLabel }: MockupFields) {
         </div>
         <div className="px-4 py-1 border-t border-divider flex items-center justify-around text-default-700 text-small">
           <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
-            <FontAwesomeIcon icon={faThumbsUp} /> 讚
+            <FontAwesomeIcon icon={faThumbsUp} /> {lang === "en" ? "Like" : "讚"}
           </button>
           <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
-            <FontAwesomeIcon icon={faComment} /> 留言
+            <FontAwesomeIcon icon={faComment} /> {lang === "en" ? "Comment" : "留言"}
           </button>
           <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
-            <FontAwesomeIcon icon={faShare} /> 分享
+            <FontAwesomeIcon icon={faShare} /> {lang === "en" ? "Share" : "分享"}
           </button>
         </div>
       </div>

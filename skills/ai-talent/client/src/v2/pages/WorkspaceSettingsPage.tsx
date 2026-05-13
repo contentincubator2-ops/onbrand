@@ -11,16 +11,23 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { ChevronLeft, UserPlus, Trash2, Shield, Building2 } from "lucide-react";
 
 type Role = "owner" | "admin" | "editor" | "viewer";
 
-const ROLE_LABEL: Record<Role, string> = {
+const ROLE_LABEL_ZH: Record<Role, string> = {
   owner: "Owner",
   admin: "Admin",
   editor: "Editor",
   viewer: "Viewer (僅查看)",
+};
+const ROLE_LABEL_EN: Record<Role, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  editor: "Editor",
+  viewer: "Viewer (read-only)",
 };
 
 const PLAN_LABEL: Record<string, string> = {
@@ -33,6 +40,8 @@ const PLAN_LABEL: Record<string, string> = {
 
 export default function WorkspaceSettingsPage() {
   const navigate = useNavigate();
+  const { lang } = useLang();
+  const ROLE_LABEL = lang === "en" ? ROLE_LABEL_EN : ROLE_LABEL_ZH;
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const listQ = (trpc as any).tenant?.listMine?.useQuery
@@ -61,19 +70,21 @@ export default function WorkspaceSettingsPage() {
           onClick={() => navigate(-1)}
           className="text-sm text-neutral-500 hover:text-neutral-900 flex items-center gap-1 mb-6"
         >
-          <ChevronLeft size={16} /> 返回
+          <ChevronLeft size={16} /> {lang === "en" ? "Back" : "返回"}
         </button>
 
-        <h1 className="text-2xl font-bold text-neutral-900 mb-1">Workspace 設定</h1>
-        <p className="text-sm text-neutral-500 mb-6">管理團隊成員、客戶分權、white-label 設定</p>
+        <h1 className="text-2xl font-bold text-neutral-900 mb-1">{lang === "en" ? "Workspace settings" : "Workspace 設定"}</h1>
+        <p className="text-sm text-neutral-500 mb-6">{lang === "en"
+          ? "Manage team members, client access, and white-label"
+          : "管理團隊成員、客戶分權、white-label 設定"}</p>
 
         <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
           {/* Sidebar: workspace list */}
           <aside className="space-y-1">
             {listQ?.isLoading ? (
-              <p className="text-sm text-neutral-400">載入中…</p>
+              <p className="text-sm text-neutral-400">{lang === "en" ? "One sec…" : "載入中…"}</p>
             ) : workspaces.length === 0 ? (
-              <p className="text-sm text-neutral-400">尚無 workspace</p>
+              <p className="text-sm text-neutral-400">{lang === "en" ? "No workspaces yet" : "尚無 workspace"}</p>
             ) : (
               workspaces.map((w) => (
                 <button
@@ -89,7 +100,9 @@ export default function WorkspaceSettingsPage() {
                     <Building2 size={14} /> {w.name}
                   </div>
                   <div className={`text-xs mt-0.5 ${selectedId === w.id ? "text-neutral-300" : "text-neutral-400"}`}>
-                    {PLAN_LABEL[w.planCode] ?? w.planCode} · {w.memberCount} 位成員 · {w.brandCount} 品牌
+                    {PLAN_LABEL[w.planCode] ?? w.planCode} · {lang === "en"
+                      ? `${w.memberCount} members · ${w.brandCount} brands`
+                      : `${w.memberCount} 位成員 · ${w.brandCount} 品牌`}
                   </div>
                 </button>
               ))
@@ -108,7 +121,7 @@ export default function WorkspaceSettingsPage() {
               />
             ) : (
               <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center text-neutral-400 text-sm">
-                選擇左側一個 workspace
+                {lang === "en" ? "Pick a workspace on the left" : "選擇左側一個 workspace"}
               </div>
             )}
           </main>
@@ -119,6 +132,8 @@ export default function WorkspaceSettingsPage() {
 }
 
 function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => void }) {
+  const { lang } = useLang();
+  const ROLE_LABEL = lang === "en" ? ROLE_LABEL_EN : ROLE_LABEL_ZH;
   const ws = detail.workspace;
   const myRole: Role = detail.myRole;
   const members = (detail.members ?? []) as any[];
@@ -127,20 +142,20 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
   const isOwner = myRole === "owner";
 
   const inviteMut = (trpc as any).tenant?.invite?.useMutation?.({
-    onSuccess: () => { showToastGlobal("已加入成員", "success"); onChanged(); },
-    onError: (e: any) => showToastGlobal(e?.message ?? "邀請失敗"),
+    onSuccess: () => { showToastGlobal(lang === "en" ? "Member added" : "已加入成員", "success"); onChanged(); },
+    onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Couldn't invite" : "邀請失敗")),
   });
   const setRoleMut = (trpc as any).tenant?.setRole?.useMutation?.({
-    onSuccess: () => { showToastGlobal("角色已更新", "success"); onChanged(); },
-    onError: (e: any) => showToastGlobal(e?.message ?? "更新失敗"),
+    onSuccess: () => { showToastGlobal(lang === "en" ? "Role updated" : "角色已更新", "success"); onChanged(); },
+    onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Update failed" : "更新失敗")),
   });
   const removeMut = (trpc as any).tenant?.removeMember?.useMutation?.({
-    onSuccess: () => { showToastGlobal("已移除", "success"); onChanged(); },
-    onError: (e: any) => showToastGlobal(e?.message ?? "移除失敗"),
+    onSuccess: () => { showToastGlobal(lang === "en" ? "Removed" : "已移除", "success"); onChanged(); },
+    onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Couldn't remove" : "移除失敗")),
   });
   const updateMut = (trpc as any).tenant?.update?.useMutation?.({
-    onSuccess: () => { showToastGlobal("已儲存", "success"); onChanged(); },
-    onError: (e: any) => showToastGlobal(e?.message ?? "更新失敗"),
+    onSuccess: () => { showToastGlobal(lang === "en" ? "Saved ✓" : "已儲存", "success"); onChanged(); },
+    onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Update failed" : "更新失敗")),
   });
 
   const [inviteEmail, setInviteEmail] = useState("");
@@ -159,8 +174,8 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
           <div>
             <h2 className="text-lg font-semibold text-neutral-900">{ws.name}</h2>
             <p className="text-xs text-neutral-500 mt-1">
-              方案：{PLAN_LABEL[ws.planCode] ?? ws.planCode} ·
-              你的角色：<span className="font-medium ml-1">{ROLE_LABEL[myRole]}</span>
+              {lang === "en" ? "Plan: " : "方案："}{PLAN_LABEL[ws.planCode] ?? ws.planCode} ·
+              {lang === "en" ? " Your role:" : "你的角色："}<span className="font-medium ml-1">{ROLE_LABEL[myRole]}</span>
             </p>
           </div>
           <span className="text-xs px-2 py-1 rounded-full bg-neutral-100 text-neutral-600">
@@ -172,15 +187,15 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
       {/* Members */}
       <section className="bg-white border border-neutral-200 rounded-xl p-6">
         <h3 className="text-base font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-          <Shield size={16} /> 成員（{members.length}）
+          <Shield size={16} /> {lang === "en" ? `Members (${members.length})` : `成員（${members.length}）`}
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-neutral-500 border-b border-neutral-200">
               <tr>
-                <th className="text-left py-2">姓名</th>
+                <th className="text-left py-2">{lang === "en" ? "Name" : "姓名"}</th>
                 <th className="text-left py-2">Email</th>
-                <th className="text-left py-2">角色</th>
+                <th className="text-left py-2">{lang === "en" ? "Role" : "角色"}</th>
                 <th className="text-right py-2"></th>
               </tr>
             </thead>
@@ -212,7 +227,8 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                     {canManage && m.role !== "owner" && (
                       <button
                         onClick={() => {
-                          if (confirm(`確定移除 ${m.email}？`)) {
+                          const msg = lang === "en" ? `Remove ${m.email}?` : `確定移除 ${m.email}？`;
+                          if (confirm(msg)) {
                             removeMut?.mutate({ workspaceId: ws.id, userId: m.userId });
                           }
                         }}
@@ -232,12 +248,12 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
         {canManage && (
           <div className="mt-6 pt-6 border-t border-neutral-100">
             <h4 className="text-sm font-medium text-neutral-900 mb-3 flex items-center gap-1.5">
-              <UserPlus size={14} /> 邀請新成員
+              <UserPlus size={14} /> {lang === "en" ? "Invite a member" : "邀請新成員"}
             </h4>
             <div className="flex flex-wrap gap-2 items-start">
               <input
                 type="email"
-                placeholder="同事/客戶 email"
+                placeholder={lang === "en" ? "teammate or client email" : "同事/客戶 email"}
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-neutral-900"
@@ -266,14 +282,18 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                 disabled={!inviteEmail || inviteMut?.isPending}
                 className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition disabled:opacity-50"
               >
-                {inviteMut?.isPending ? "處理中…" : "邀請"}
+                {inviteMut?.isPending
+                  ? (lang === "en" ? "Sending…" : "處理中…")
+                  : (lang === "en" ? "Invite" : "邀請")}
               </button>
             </div>
             {/* Brand scoping (for viewer/editor) */}
             {inviteRole !== "admin" && brands.length > 0 && (
               <div className="mt-3">
                 <p className="text-xs text-neutral-500 mb-2">
-                  限制只看以下品牌（不選 = 可看 workspace 所有品牌）
+                  {lang === "en"
+                    ? "Limit access to these brands (none = sees every brand in workspace)"
+                    : "限制只看以下品牌（不選 = 可看 workspace 所有品牌）"}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {brands.map((b) => (
@@ -302,7 +322,9 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
               </div>
             )}
             <p className="mt-2 text-xs text-neutral-400">
-              對方需先在 drop.sowork.ai 註冊。Team 方案上限 5 位，Agency 方案無限。
+              {lang === "en"
+                ? "They'll need to sign up at drop.sowork.ai first. Team plan caps at 5; Agency is unlimited."
+                : "對方需先在 drop.sowork.ai 註冊。Team 方案上限 5 位，Agency 方案無限。"}
             </p>
           </div>
         )}
@@ -314,18 +336,22 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
           <h3 className="text-base font-semibold text-neutral-900 mb-1">White Label</h3>
           <p className="text-xs text-neutral-500 mb-4">
             {canWhiteLabel
-              ? "用你自己的公司名和 logo，給客戶看的工作報表會自動換成你的品牌。"
-              : "升級 OnBrand Agency 解鎖（用你的 logo + 公司名給客戶看）"}
+              ? (lang === "en"
+                ? "Use your own name and logo — client-facing reports rebrand automatically."
+                : "用你自己的公司名和 logo，給客戶看的工作報表會自動換成你的品牌。")
+              : (lang === "en"
+                ? "Upgrade to OnBrand Agency to unlock (your logo + name on client views)"
+                : "升級 OnBrand Agency 解鎖（用你的 logo + 公司名給客戶看）")}
           </p>
           <div className="space-y-3 max-w-md">
             <div>
-              <label className="block text-xs text-neutral-600 mb-1">顯示名稱</label>
+              <label className="block text-xs text-neutral-600 mb-1">{lang === "en" ? "Display name" : "顯示名稱"}</label>
               <input
                 type="text"
                 value={wlName}
                 onChange={(e) => setWlName(e.target.value)}
                 disabled={!canWhiteLabel}
-                placeholder="例：你的代理商名稱"
+                placeholder={lang === "en" ? "e.g. Your Agency Name" : "例：你的代理商名稱"}
                 className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-neutral-900 disabled:bg-neutral-50"
               />
             </div>
@@ -349,7 +375,9 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
               disabled={!canWhiteLabel || updateMut?.isPending}
               className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition disabled:opacity-50"
             >
-              {updateMut?.isPending ? "儲存中…" : "儲存"}
+              {updateMut?.isPending
+                ? (lang === "en" ? "Saving…" : "儲存中…")
+                : (lang === "en" ? "Save" : "儲存")}
             </button>
           </div>
         </section>

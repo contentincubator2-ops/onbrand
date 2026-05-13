@@ -12,6 +12,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import {
   Button, Card, CardBody, CardHeader, Chip, Divider,
@@ -134,9 +135,70 @@ const SCENARIOS: ScenarioConfig[] = [
   },
 ];
 
+// ─── EN translations for scenario + methodology labels ─────────────────────
+const SCENARIO_EN: Record<string, { label: string; description: string }> = {
+  business:  { label: "Business strategy", description: "Competitive landscape, positioning, and growth paths" },
+  audience:  { label: "Audience insight",  description: "Target customers, unmet needs, and the human map" },
+  pricing:   { label: "Pricing strategy",  description: "12 pricing methods — find the right one for you" },
+  promotion: { label: "Promotion",         description: "Brand storytelling, from reach to word of mouth" },
+  channel:   { label: "Channel & product", description: "Go-to-market, channel design, and new product development" },
+};
+const METHOD_EN: Record<string, { label: string; sublabel: string }> = {
+  "blue-ocean":       { label: "Blue Ocean",          sublabel: "Eliminate · Reduce · Raise · Create" },
+  "five-forces":      { label: "Five Forces",         sublabel: "Porter's competitive intensity" },
+  "swot":             { label: "SWOT cross matrix",   sublabel: "SO / ST / WO / WT plays" },
+  "bcg":              { label: "BCG matrix",          sublabel: "Resource allocation priority" },
+  "ansoff":           { label: "Ansoff growth matrix",sublabel: "Four-quadrant growth paths" },
+  "value-chain":      { label: "Value chain",         sublabel: "Porter's competitive advantage" },
+  "moat":             { label: "Economic moats",      sublabel: "Morningstar's 5 moats" },
+  "stp":              { label: "STP positioning",     sublabel: "Segment · Target · Position" },
+  "persona":          { label: "Customer persona",    sublabel: "Deep user portraits" },
+  "jtbd":             { label: "Jobs-to-be-Done",     sublabel: "Tasks × need insight" },
+  "journey":          { label: "Customer journey",    sublabel: "5 stages × emotion map" },
+  "rfm":              { label: "RFM analysis",        sublabel: "Recency · Frequency · Monetary" },
+  "empathy":          { label: "Empathy map",         sublabel: "Think / Feel / See / Do" },
+  "penetration":      { label: "Penetration pricing", sublabel: "Low entry, raise later" },
+  "skimming":         { label: "Price skimming",      sublabel: "Open high, harvest early adopters" },
+  "value-based":      { label: "Value-based pricing", sublabel: "EVE model — capture differentiated value" },
+  "cost-plus":        { label: "Cost-plus",           sublabel: "Cost stack + target margin" },
+  "competitive":      { label: "Competitive pricing", sublabel: "Dynamic follow + differentiation" },
+  "freemium":         { label: "Freemium",            sublabel: "Conversion design × SaaS funnel" },
+  "anchor":           { label: "Anchor pricing",      sublabel: "Good / Better / Best tiers" },
+  "decoy":            { label: "Decoy effect",        sublabel: "Asymmetric option design" },
+  "psychological":    { label: "Psychological pricing", sublabel: ".99 effect × left-digit bias" },
+  "dynamic":          { label: "Dynamic pricing",     sublabel: "Real-time supply-and-demand pricing" },
+  "subscription":     { label: "Subscription model",  sublabel: "LTV × churn × lock-in" },
+  "bundle":           { label: "Bundle pricing",      sublabel: "Pure vs mixed bundles" },
+  "kotler-5a":        { label: "Kotler 5A",           sublabel: "Aware → Appeal → Ask → Act → Advocate" },
+  "aida":             { label: "AIDA",                sublabel: "Attention · Interest · Desire · Action" },
+  "aisas":            { label: "AISAS",               sublabel: "Digital-age search + share loop" },
+  "aarrr":            { label: "AARRR growth",        sublabel: "Pirate metrics × leaky bucket" },
+  "content-funnel":   { label: "Content funnel",      sublabel: "ToFu / MoFu / BoFu" },
+  "inbound":          { label: "Inbound flywheel",    sublabel: "Attract → Convert → Close → Delight" },
+  "wom":              { label: "Word-of-mouth (WOMM)",sublabel: "Talk Trigger × tipping point" },
+  "dtc":              { label: "DTC direct sales",    sublabel: "Own channel × unit economics" },
+  "marketplace":      { label: "Marketplace strategy",sublabel: "Shopee / Shopify visibility design" },
+  "gtm":              { label: "GTM launch plan",     sublabel: "ICP → distribution → 8-week launch" },
+  "stage-gate":       { label: "Stage-Gate (new product)", sublabel: "5 gates + kill criteria" },
+  "lean-startup":     { label: "Lean Startup",        sublabel: "MVP × Build-Measure-Learn" },
+  "design-thinking":  { label: "Design Thinking",     sublabel: "Empathize → Define → Ideate → Test" },
+};
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function StrategyConsultantPage() {
+  const { t, lang } = useLang();
+  // Resolve labels for SCENARIOS depending on lang
+  const scenarios = React.useMemo(() => SCENARIOS.map((s) => ({
+    ...s,
+    label: lang === "en" ? (SCENARIO_EN[s.id]?.label ?? s.label) : s.label,
+    description: lang === "en" ? (SCENARIO_EN[s.id]?.description ?? s.description) : s.description,
+    methodologies: s.methodologies.map((m) => ({
+      ...m,
+      label: lang === "en" ? (METHOD_EN[m.key]?.label ?? m.label) : m.label,
+      sublabel: lang === "en" ? (METHOD_EN[m.key]?.sublabel ?? m.sublabel) : m.sublabel,
+    })),
+  })), [lang]);
   const ctx = useOutletContext<ShellOutletCtx>() ?? ({} as ShellOutletCtx);
   const brandId = ctx.brandId ?? undefined;
   const currentBrand = (ctx.brands || []).find((b: any) => b?.id === ctx.brandId);
@@ -186,7 +248,9 @@ export default function StrategyConsultantPage() {
 
   const onAnalyze = async () => {
     if (!scenario || !methodology || !agent) return;
-    const q = question.trim() || "請針對我的品牌進行全面的策略分析，並給出具體行動建議。";
+    const q = question.trim() || (lang === "en"
+      ? "Give my brand a full strategy review and concrete next steps."
+      : "請針對我的品牌進行全面的策略分析，並給出具體行動建議。");
     setMessages([{ role: "user", content: q }]);
     setQuestion("");
     try {
@@ -204,7 +268,7 @@ export default function StrategyConsultantPage() {
     } catch (e: any) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: `❌ 分析失敗：${e?.message ?? "請稍後再試"}`, agentName: agent?.name },
+        { role: "assistant", content: lang === "en" ? `Analysis failed: ${e?.message ?? "Try again in a moment."}` : `❌ 分析失敗：${e?.message ?? "請稍後再試"}`, agentName: agent?.name },
       ]);
     }
   };
@@ -230,7 +294,7 @@ export default function StrategyConsultantPage() {
     } catch (e: any) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: `❌ 回覆失敗：${e?.message ?? "請稍後再試"}`, agentName: agent?.name },
+        { role: "assistant", content: lang === "en" ? `Reply failed: ${e?.message ?? "Try again in a moment."}` : `❌ 回覆失敗：${e?.message ?? "請稍後再試"}`, agentName: agent?.name },
       ]);
     }
   };
@@ -256,7 +320,7 @@ export default function StrategyConsultantPage() {
         )}
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <FontAwesomeIcon icon={faBrain} className="text-orange-500" />
-          <span className="font-semibold text-gray-800 dark:text-neutral-100 text-sm">策略顧問</span>
+          <span className="font-semibold text-gray-800 dark:text-neutral-100 text-sm">{lang === "en" ? "Strategy Consultant" : "策略顧問"}</span>
           {scenario && (
             <>
               <span className="text-gray-300 dark:text-neutral-600">/</span>
@@ -304,7 +368,7 @@ export default function StrategyConsultantPage() {
             onClick={reset}
             className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300 transition-colors flex items-center gap-1 shrink-0"
           >
-            <FontAwesomeIcon icon={faRotateRight} className="text-[10px]" /> 重新開始
+            <FontAwesomeIcon icon={faRotateRight} className="text-[10px]" /> {lang === "en" ? "Start over" : "重新開始"}
           </button>
         )}
       </div>
@@ -314,14 +378,14 @@ export default function StrategyConsultantPage() {
         <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-neutral-100 mb-2">
-              你今天想解決什麼策略問題？
+              {lang === "en" ? "What strategy question are you tackling today?" : "你今天想解決什麼策略問題？"}
             </h1>
             <p className="text-sm text-gray-500 dark:text-neutral-400">
-              選擇一個場景，系統會為你匹配最合適的策略框架與顧問
+              {lang === "en" ? "Pick a scenario and we'll match you with the right framework and consultant." : "選擇一個場景，系統會為你匹配最合適的策略框架與顧問"}
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {SCENARIOS.map((s) => (
+            {scenarios.map((s) => (
               <button
                 key={s.id}
                 onClick={() => onPickScenario(s)}
@@ -344,7 +408,7 @@ export default function StrategyConsultantPage() {
                   {s.description}
                 </p>
                 <div className="mt-3 flex items-center gap-1 text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium">
-                  選擇 <FontAwesomeIcon icon={faArrowRight} className="text-[10px]" />
+                  {lang === "en" ? "Pick" : "選擇"} <FontAwesomeIcon icon={faArrowRight} className="text-[10px]" />
                 </div>
               </button>
             ))}
@@ -360,10 +424,10 @@ export default function StrategyConsultantPage() {
               {scenario.icon} {scenario.label}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-neutral-100 mb-2">
-              選擇分析框架
+              {lang === "en" ? "Pick a framework" : "選擇分析框架"}
             </h1>
             <p className="text-sm text-gray-500 dark:text-neutral-400">
-              顧問將以這個方法論為核心，提供結構化的麥肯錫水準分析
+              {lang === "en" ? "Your consultant will use this as the core lens for a McKinsey-grade breakdown." : "顧問將以這個方法論為核心，提供結構化的麥肯錫水準分析"}
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -396,10 +460,10 @@ export default function StrategyConsultantPage() {
               <Chip size="sm" variant="flat">{methodology.label}</Chip>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-neutral-100 mb-2">
-              選擇你的策略顧問
+              {lang === "en" ? "Choose your consultant" : "選擇你的策略顧問"}
             </h1>
             <p className="text-sm text-gray-500 dark:text-neutral-400">
-              每位顧問都有獨特的專長與方法論，選一位來做深度分析
+              {lang === "en" ? "Each consultant brings their own lens and playbook — pick one for a deep dive." : "每位顧問都有獨特的專長與方法論，選一位來做深度分析"}
             </p>
           </div>
 
@@ -464,10 +528,12 @@ export default function StrategyConsultantPage() {
           {messages.length === 0 && !analyzeMut.isPending && (
             <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 p-5">
               <p className="text-sm font-semibold text-gray-700 dark:text-neutral-200 mb-3">
-                告訴 {agent.name} 你的問題或背景（可選）
+                {lang === "en" ? `Tell ${agent.name} your question or context (optional)` : `告訴 ${agent.name} 你的問題或背景（可選）`}
               </p>
               <Textarea
-                placeholder={`例：我的品牌是中高端保養品，主力客群是 28–40 歲女性，目前面臨電商平台競爭激烈，想了解如何用 ${methodology.label} 找出新出路…`}
+                placeholder={lang === "en"
+                  ? `e.g. We're a premium skincare brand targeting women 28–40, facing tough competition on ecom marketplaces — how would ${methodology.label} help us find a new angle?`
+                  : `例：我的品牌是中高端保養品，主力客群是 28–40 歲女性，目前面臨電商平台競爭激烈，想了解如何用 ${methodology.label} 找出新出路…`}
                 variant="bordered"
                 minRows={4}
                 maxRows={8}
@@ -484,7 +550,7 @@ export default function StrategyConsultantPage() {
                 isLoading={analyzeMut.isPending}
                 startContent={!analyzeMut.isPending && <FontAwesomeIcon icon={faBrain} />}
               >
-                {analyzeMut.isPending ? `${agent.name} 正在分析中…` : "開始策略分析"}
+                {analyzeMut.isPending ? (lang === "en" ? `${agent.name} is analyzing…` : `${agent.name} 正在分析中…`) : (lang === "en" ? "Start the analysis" : "開始策略分析")}
               </Button>
             </div>
           )}
@@ -494,7 +560,7 @@ export default function StrategyConsultantPage() {
             <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 p-6 space-y-3">
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-neutral-400 mb-4">
                 <Spinner size="sm" />
-                <span>{agent.name} 正在運用 {methodology.label} 框架進行分析，請稍候…</span>
+                <span>{lang === "en" ? `${agent.name} is running the ${methodology.label} framework — hang tight…` : `${agent.name} 正在運用 ${methodology.label} 框架進行分析，請稍候…`}</span>
               </div>
               {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className={`h-3 rounded ${i % 3 === 2 ? "w-2/3" : "w-full"}`} />
@@ -556,7 +622,7 @@ export default function StrategyConsultantPage() {
             <div className="sticky bottom-4 bg-white dark:bg-neutral-900 rounded-2xl border border-gray-100 dark:border-neutral-800 p-3 shadow-lg">
               <div className="flex items-end gap-2">
                 <Textarea
-                  placeholder={`繼續向 ${agent.name} 提問…`}
+                  placeholder={lang === "en" ? `Keep asking ${agent.name}…` : `繼續向 ${agent.name} 提問…`}
                   variant="flat"
                   minRows={1}
                   maxRows={5}
@@ -580,14 +646,14 @@ export default function StrategyConsultantPage() {
                   onPress={onChat}
                   isLoading={chatMut.isPending}
                   isDisabled={!chatInput.trim()}
-                  aria-label="送出"
+                  aria-label={lang === "en" ? "Send" : "送出"}
                   className="shrink-0 mb-0.5"
                 >
                   {!chatMut.isPending && <FontAwesomeIcon icon={faPaperPlane} />}
                 </Button>
               </div>
               <p className="text-[10px] text-gray-400 dark:text-neutral-600 mt-1.5 px-1">
-                Enter 送出 · Shift+Enter 換行 · 顧問記得完整對話歷史
+                {lang === "en" ? "Enter to send · Shift+Enter for newline · your consultant remembers the full thread" : "Enter 送出 · Shift+Enter 換行 · 顧問記得完整對話歷史"}
               </p>
             </div>
           )}

@@ -4,53 +4,173 @@
  */
 import React from "react";
 import { Link } from "react-router-dom";
+import { useLang } from "../../../lib/i18n";
 
 export default function RefundPage() {
+  const { lang } = useLang();
+  const isEn = lang === "en";
+
   return (
     <div className="min-h-screen bg-neutral-50 py-12 px-6">
       <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm border border-neutral-200 p-10">
-        <Link to="/" className="text-sm text-neutral-500 hover:text-neutral-900">← 返回首頁</Link>
-        <h1 className="text-3xl font-bold mt-4 mb-2">退費條款</h1>
-        <p className="text-sm text-neutral-500 mb-8">最後更新：2026-05-10</p>
+        <Link to="/" className="text-sm text-neutral-500 hover:text-neutral-900">
+          {isEn ? "← Back to home" : "← 返回首頁"}
+        </Link>
+        <h1 className="text-3xl font-bold mt-4 mb-2">
+          {isEn ? "Refund Policy" : "退費條款"}
+        </h1>
+        <p className="text-sm text-neutral-500 mb-8">
+          {isEn ? "Last updated: 2026-05-10" : "最後更新：2026-05-10"}
+        </p>
 
         <section className="prose prose-sm max-w-none space-y-6 text-neutral-800 leading-relaxed">
-          <h2 className="text-lg font-semibold">免費試用</h2>
+          <h2 className="text-lg font-semibold">
+            {isEn ? "Free trial" : "免費試用"}
+          </h2>
           <p>
-            新用戶享有 7 天免費試用，無須綁定信用卡。試用期內無任何費用，亦不需退費程序。
+            {isEn
+              ? "New users get a 7-day free trial. No credit card needed. There are no charges during the trial — and nothing to refund."
+              : "新用戶享有 7 天免費試用，無須綁定信用卡。試用期內無任何費用，亦不需退費程序。"}
           </p>
 
-          <h2 className="text-lg font-semibold">月費方案退費</h2>
+          <h2 className="text-lg font-semibold">
+            {isEn ? "Monthly plan refunds" : "月費方案退費"}
+          </h2>
           <ul className="list-disc pl-6 space-y-1">
-            <li>付款後 <strong>7 日內</strong>，且累計使用次數未超過 3 個任務，可申請全額退費。</li>
-            <li>付款後 <strong>超過 7 日</strong>，本期費用恕不退還，但您可立即取消訂閱避免下期續扣。</li>
-            <li>取消訂閱後，當期到期前仍可正常使用。</li>
+            <li>
+              {isEn ? (
+                <>
+                  Within <strong>7 days</strong> of payment, and if you've run no more than 3 projects, you can request a full refund.
+                </>
+              ) : (
+                <>
+                  付款後 <strong>7 日內</strong>，且累計使用次數未超過 3 個任務，可申請全額退費。
+                </>
+              )}
+            </li>
+            <li>
+              {isEn ? (
+                <>
+                  <strong>After 7 days</strong>, the current period isn't refundable — but you can cancel right away to stop the next renewal.
+                </>
+              ) : (
+                <>
+                  付款後 <strong>超過 7 日</strong>，本期費用恕不退還，但您可立即取消訂閱避免下期續扣。
+                </>
+              )}
+            </li>
+            <li>
+              {isEn
+                ? "After you cancel, you keep full access until the current period ends."
+                : "取消訂閱後，當期到期前仍可正常使用。"}
+            </li>
           </ul>
 
-          <h2 className="text-lg font-semibold">年費方案退費</h2>
+          <h2 className="text-lg font-semibold">
+            {isEn ? "Yearly plan refunds" : "年費方案退費"}
+          </h2>
           <ul className="list-disc pl-6 space-y-1">
-            <li>付款後 <strong>14 日內</strong>且尚未使用，可申請全額退費。</li>
-            <li>付款後 <strong>超過 14 日</strong>，按已使用月份扣除（NT$ 990 / 月）後退還餘額。</li>
-            <li>例：年繳 9,900 元，使用 3 個月後申請，退還 9,900 - (990×3) = 6,930 元。</li>
+            <li>
+              {isEn ? (
+                <>
+                  Within <strong>14 days</strong> of payment, and if you haven't used the service yet, you can request a full refund.
+                </>
+              ) : (
+                <>
+                  付款後 <strong>14 日內</strong>且尚未使用，可申請全額退費。
+                </>
+              )}
+            </li>
+            <li>
+              {isEn ? (
+                <>
+                  <strong>After 14 days</strong>, we deduct used months at NT$ 990 / month and refund the balance.
+                </>
+              ) : (
+                <>
+                  付款後 <strong>超過 14 日</strong>，按已使用月份扣除（NT$ 990 / 月）後退還餘額。
+                </>
+              )}
+            </li>
+            <li>
+              {isEn
+                ? "Example: paid NT$ 9,900 / year, used 3 months — refund = 9,900 − (990 × 3) = NT$ 6,930."
+                : "例：年繳 9,900 元，使用 3 個月後申請，退還 9,900 - (990×3) = 6,930 元。"}
+            </li>
           </ul>
 
-          <h2 className="text-lg font-semibold">不予退費情形</h2>
+          <h2 className="text-lg font-semibold">
+            {isEn ? "When refunds aren't issued" : "不予退費情形"}
+          </h2>
           <ul className="list-disc pl-6 space-y-1">
-            <li>違反<Link to="/terms" className="text-blue-600 underline">服務條款</Link>導致帳號被停用。</li>
-            <li>第三方服務（Anthropic / PiAPI / Pipedream 等）因您濫用導致額外費用。</li>
-            <li>已開立電子發票且超過 14 日（依稅法規定）— 可改以折抵或服務延長處理。</li>
+            <li>
+              {isEn ? "Account suspended for violating the " : "違反"}
+              <Link to="/terms" className="text-blue-600 underline">
+                {isEn ? "Terms of Service" : "服務條款"}
+              </Link>
+              {isEn ? "." : "導致帳號被停用。"}
+            </li>
+            <li>
+              {isEn
+                ? "Extra costs charged by third-party services (Anthropic / PiAPI / Pipedream, etc.) caused by your misuse."
+                : "第三方服務（Anthropic / PiAPI / Pipedream 等）因您濫用導致額外費用。"}
+            </li>
+            <li>
+              {isEn
+                ? "Electronic invoice already issued and more than 14 days have passed (per tax law) — we can offer credit or extended service instead."
+                : "已開立電子發票且超過 14 日（依稅法規定）— 可改以折抵或服務延長處理。"}
+            </li>
           </ul>
 
-          <h2 className="text-lg font-semibold">退費申請流程</h2>
+          <h2 className="text-lg font-semibold">
+            {isEn ? "How to request a refund" : "退費申請流程"}
+          </h2>
           <ol className="list-decimal pl-6 space-y-1">
-            <li>email 至 <a href="mailto:sowork@sowork.tw" className="text-blue-600 underline">sowork@sowork.tw</a>，標題「退費申請」。</li>
-            <li>內文附上：註冊 email、訂單時間、退費原因。</li>
-            <li>我們於 <strong>3 個工作天內</strong>回覆審核結果。</li>
-            <li>核准後 <strong>7 個工作天內</strong>退至原付款方式。</li>
+            <li>
+              {isEn ? "Email " : "email 至 "}
+              <a href="mailto:sowork@sowork.tw" className="text-blue-600 underline">
+                sowork@sowork.tw
+              </a>
+              {isEn ? ' with the subject "Refund request".' : "，標題「退費申請」。"}
+            </li>
+            <li>
+              {isEn
+                ? "Include: your account email, order date, and reason for the refund."
+                : "內文附上：註冊 email、訂單時間、退費原因。"}
+            </li>
+            <li>
+              {isEn ? (
+                <>
+                  We'll reply with our decision within <strong>3 business days</strong>.
+                </>
+              ) : (
+                <>
+                  我們於 <strong>3 個工作天內</strong>回覆審核結果。
+                </>
+              )}
+            </li>
+            <li>
+              {isEn ? (
+                <>
+                  Once approved, the refund lands on your original payment method within <strong>7 business days</strong>.
+                </>
+              ) : (
+                <>
+                  核准後 <strong>7 個工作天內</strong>退至原付款方式。
+                </>
+              )}
+            </li>
           </ol>
 
-          <h2 className="text-lg font-semibold">爭議處理</h2>
+          <h2 className="text-lg font-semibold">
+            {isEn ? "Disputes" : "爭議處理"}
+          </h2>
           <p>
-            如對退費結果有疑慮，可循<Link to="/terms" className="text-blue-600 underline">服務條款</Link>第 10 條爭議解決機制處理。
+            {isEn ? "If you disagree with our decision, the dispute process in section 10 of the " : "如對退費結果有疑慮，可循"}
+            <Link to="/terms" className="text-blue-600 underline">
+              {isEn ? "Terms of Service" : "服務條款"}
+            </Link>
+            {isEn ? " applies." : "第 10 條爭議解決機制處理。"}
           </p>
         </section>
       </div>

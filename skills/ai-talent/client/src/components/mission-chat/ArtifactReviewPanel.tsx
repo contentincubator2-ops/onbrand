@@ -5,6 +5,7 @@
  */
 import { useState, useRef } from "react";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -63,12 +64,25 @@ const PLATFORM_LABELS: Record<string, string> = {
   ppt: 'Slides', doc: 'Document', script: '影片腳本', other: '其他',
 };
 
+function getPlatformLabel(key: string, lang: string): string {
+  if (lang === 'en') {
+    const en: Record<string, string> = {
+      facebook: 'Facebook', instagram: 'Instagram', linkedin: 'LinkedIn',
+      youtube: 'YouTube', google_ads: 'Google Ads', email: 'Email/EDM',
+      ppt: 'Slides', doc: 'Document', script: 'Video script', other: 'Other',
+    };
+    return en[key] ?? key;
+  }
+  return PLATFORM_LABELS[key] ?? key;
+}
+
 function PlatformPreview({ platform, content, title }: { platform: string; content: string; title?: string }) {
+  const { lang } = useLang();
   if (platform === 'facebook') return (
     <div style={{ fontFamily: 'Helvetica,Arial,sans-serif', border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden', background: '#fff', fontSize: 14 }}>
       <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#1877F2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>B</div>
-        <div><div style={{ fontWeight: 600, fontSize: 13 }}>品牌頁面</div><div style={{ fontSize: 11, color: '#65676b' }}>剛剛 · 🌐</div></div>
+        <div><div style={{ fontWeight: 600, fontSize: 13 }}>{lang === 'en' ? 'Brand Page' : '品牌頁面'}</div><div style={{ fontSize: 11, color: '#65676b' }}>{lang === 'en' ? 'Just now' : '剛剛'} · 🌐</div></div>
       </div>
       <div style={{ padding: '0 12px 12px', fontSize: 14, lineHeight: 1.6, color: '#1c1e21', whiteSpace: 'pre-wrap' }}>{content}</div>
     </div>
@@ -80,7 +94,7 @@ function PlatformPreview({ platform, content, title }: { platform: string; conte
         <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)', flexShrink: 0 }} />
         <span style={{ fontWeight: 600, fontSize: 13 }}>brand_account</span>
       </div>
-      <div style={{ background: '#f5f5f5', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontSize: 12 }}>圖片區域</div>
+      <div style={{ background: '#f5f5f5', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontSize: 12 }}>{lang === 'en' ? 'Image area' : '圖片區域'}</div>
       <div style={{ padding: '10px 12px', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}><strong>brand_account</strong> {content}</div>
     </div>
   );
@@ -89,7 +103,7 @@ function PlatformPreview({ platform, content, title }: { platform: string; conte
     <div style={{ fontFamily: '-apple-system,sans-serif', border: '1px solid #e0e0e0', borderRadius: 8, background: '#fff', padding: 14, fontSize: 14 }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#0077B5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, flexShrink: 0 }}>B</div>
-        <div><div style={{ fontWeight: 600, fontSize: 13 }}>品牌名稱</div><div style={{ fontSize: 11, color: '#666' }}>行銷 · 1分鐘前</div></div>
+        <div><div style={{ fontWeight: 600, fontSize: 13 }}>{lang === 'en' ? 'Brand Name' : '品牌名稱'}</div><div style={{ fontSize: 11, color: '#666' }}>{lang === 'en' ? 'Marketing · 1 min ago' : '行銷 · 1分鐘前'}</div></div>
       </div>
       <div style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{content}</div>
     </div>
@@ -97,15 +111,15 @@ function PlatformPreview({ platform, content, title }: { platform: string; conte
 
   if (platform === 'google_ads') return (
     <div style={{ fontFamily: 'Arial,sans-serif', border: '1px solid #ddd', borderRadius: 4, padding: 12, background: '#fff', fontSize: 13 }}>
-      <div style={{ fontSize: 11, color: '#006621', marginBottom: 2 }}>廣告 · www.example.com</div>
-      <div style={{ fontSize: 17, color: '#1a0dab', marginBottom: 4 }}>{title || '廣告標題'}</div>
+      <div style={{ fontSize: 11, color: '#006621', marginBottom: 2 }}>{lang === 'en' ? 'Ad' : '廣告'} · www.example.com</div>
+      <div style={{ fontSize: 17, color: '#1a0dab', marginBottom: 4 }}>{title || (lang === 'en' ? 'Ad title' : '廣告標題')}</div>
       <div style={{ color: '#545454', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{content}</div>
     </div>
   );
 
   if (platform === 'email') return (
     <div style={{ fontFamily: 'Arial,sans-serif', border: '1px solid #ddd', background: '#fff', fontSize: 13 }}>
-      <div style={{ background: '#f5f5f5', padding: '8px 12px', borderBottom: '1px solid #ddd', color: '#666' }}>主旨：{title || '（無主旨）'}</div>
+      <div style={{ background: '#f5f5f5', padding: '8px 12px', borderBottom: '1px solid #ddd', color: '#666' }}>{lang === 'en' ? 'Subject: ' : '主旨：'}{title || (lang === 'en' ? '(no subject)' : '（無主旨）')}</div>
       <div style={{ padding: '16px 12px', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{content}</div>
     </div>
   );
@@ -116,6 +130,7 @@ function PlatformPreview({ platform, content, title }: { platform: string; conte
 // ─── SOP Tab ─────────────────────────────────────────────────────────────────
 
 function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (steps: any[]) => void }) {
+  const { t, lang } = useLang();
   const [editingStep, setEditingStep] = useState<number | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const [editAgent, setEditAgent] = useState('');
@@ -130,7 +145,7 @@ function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (
   if (!missionId) return (
     <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-4">
       <div className="text-3xl">📋</div>
-      <p className="text-xs text-neutral-400">選擇任務後可查看 SOP 流程</p>
+      <p className="text-xs text-neutral-400">{lang === 'en' ? 'Select a mission to view its SOP' : '選擇任務後可查看 SOP 流程'}</p>
     </div>
   );
 
@@ -151,13 +166,13 @@ function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (
     setTimeout(() => setRunning(false), 2000);
   };
 
-  if (sopQuery.isLoading) return <div className="text-xs text-center text-neutral-400 py-8">載入中...</div>;
+  if (sopQuery.isLoading) return <div className="text-xs text-center text-neutral-400 py-8">{t('loading')}</div>;
 
   if (!sop) return (
     <div className="text-center py-8">
       <div className="text-2xl mb-2">📋</div>
-      <p className="text-xs text-neutral-400">尚無 SOP 流程</p>
-      <p className="text-xs text-neutral-300 mt-1">任務執行後自動生成</p>
+      <p className="text-xs text-neutral-400">{lang === 'en' ? 'No SOP yet' : '尚無 SOP 流程'}</p>
+      <p className="text-xs text-neutral-300 mt-1">{lang === 'en' ? 'Auto-generated after running the mission' : '任務執行後自動生成'}</p>
     </div>
   );
 
@@ -168,13 +183,13 @@ function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (
         <div>
           <p className="text-sm font-semibold text-neutral-800">{sop.title}</p>
           <p className="text-[10px] text-neutral-400 mt-0.5">
-            {sop.sourceType === 'auto_learned' ? '🤖 Squad 自動生成' : '手動建立'} · {sop.steps?.length ?? 0} 步驟
+            {sop.sourceType === 'auto_learned' ? (lang === 'en' ? '🤖 Auto-generated by Squad' : '🤖 Squad 自動生成') : (lang === 'en' ? 'Manual' : '手動建立')} · {t('step_total', { n: sop.steps?.length ?? 0 })}
           </p>
         </div>
         <button
           onClick={() => deleteSop.mutate({ id: sop.id })}
           className="text-neutral-300 hover:text-red-400 text-xs shrink-0 mt-1"
-          title="刪除 SOP"
+          title={lang === 'en' ? 'Delete SOP' : '刪除 SOP'}
         >✕</button>
       </div>
 
@@ -196,23 +211,23 @@ function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (
                       value={editLabel}
                       onChange={e => setEditLabel(e.target.value)}
                       className="w-full text-xs border border-neutral-200 rounded px-2 py-1 bg-white outline-none focus:border-amber-400"
-                      placeholder="步驟名稱"
+                      placeholder={lang === 'en' ? 'Step name' : '步驟名稱'}
                     />
                     <input
                       value={editAgent}
                       onChange={e => setEditAgent(e.target.value)}
                       className="w-full text-xs border border-neutral-200 rounded px-2 py-1 bg-white outline-none focus:border-amber-400"
-                      placeholder="AI Agent 名稱"
+                      placeholder={lang === 'en' ? 'AI Agent name' : 'AI Agent 名稱'}
                     />
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => setEditingStep(null)}
                         className="flex-1 text-xs py-1 rounded bg-amber-500 text-white hover:bg-amber-600"
-                      >儲存</button>
+                      >{t('save')}</button>
                       <button
                         onClick={() => setEditingStep(null)}
                         className="text-xs px-2 py-1 rounded border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
-                      >取消</button>
+                      >{t('cancel')}</button>
                     </div>
                   </div>
                 ) : (
@@ -227,7 +242,7 @@ function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (
                     {step.outputSummary && (
                       <p className="text-[10px] text-neutral-400 mt-0.5 leading-relaxed line-clamp-2">{step.outputSummary}</p>
                     )}
-                    <p className="text-[9px] text-neutral-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">點擊編輯</p>
+                    <p className="text-[9px] text-neutral-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">{lang === 'en' ? 'Click to edit' : '點擊編輯'}</p>
                   </div>
                 )}
               </div>
@@ -242,7 +257,7 @@ function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (
         disabled={running}
         className="w-full text-xs py-2.5 rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition-colors font-medium mt-2"
       >
-        {running ? '▶ 執行中...' : '▶ 重新執行此 SOP'}
+        {running ? (lang === 'en' ? '▶ Running...' : '▶ 執行中...') : (lang === 'en' ? '▶ Re-run this SOP' : '▶ 重新執行此 SOP')}
       </button>
     </div>
   );
@@ -251,6 +266,7 @@ function SopTab({ missionId, onRerun }: { missionId?: number | null; onRerun?: (
 // ─── Outputs Tab ──────────────────────────────────────────────────────────────
 
 function OutputsTab({ missionId }: { missionId?: number | null }) {
+  const { t, lang } = useLang();
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [previewId, setPreviewId] = useState<number | null>(null);
@@ -265,7 +281,7 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
   if (!missionId) return (
     <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-4">
       <div className="text-3xl">📦</div>
-      <p className="text-xs text-neutral-400">選擇任務後查看產出</p>
+      <p className="text-xs text-neutral-400">{lang === 'en' ? 'Select a mission to see outputs' : '選擇任務後查看產出'}</p>
     </div>
   );
 
@@ -281,7 +297,10 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
     published: 'bg-emerald-100 text-emerald-700',
     archived: 'bg-neutral-100 text-neutral-400',
   };
-  const STATUS_LABELS: Record<string, string> = {
+  const STATUS_LABELS: Record<string, string> = lang === 'en' ? {
+    draft: 'Draft', pending_review: 'In review', approved: 'Approved',
+    scheduled: 'Scheduled', published: 'Published', archived: 'Archived',
+  } : {
     draft: '草稿', pending_review: '待審', approved: '已批准',
     scheduled: '已排程', published: '已發布', archived: '已歸檔',
   };
@@ -294,7 +313,7 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
         {['all','draft','pending_review','approved','published'].map(f => (
           <button key={f} onClick={() => setActiveFilter(f)}
             className={`shrink-0 text-[10px] px-2 py-1 rounded-lg font-medium transition-colors ${activeFilter === f ? 'bg-amber-500 text-white' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'}`}>
-            {f === 'all' ? `全部 (${outputs.length})` : STATUS_LABELS[f]}
+            {f === 'all' ? `${lang === 'en' ? 'All' : '全部'} (${outputs.length})` : STATUS_LABELS[f]}
           </button>
         ))}
       </div>
@@ -306,13 +325,13 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
             onChange={e => setSelectedIds(e.target.checked ? new Set(filtered.map((o: any) => o.id)) : new Set())}
             className="w-3 h-3"
           />
-          <span className="text-xs text-neutral-500">全選 {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}</span>
+          <span className="text-xs text-neutral-500">{lang === 'en' ? 'Select all' : '全選'} {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}</span>
           {selectedIds.size > 0 && (
             <div className="flex gap-1 ml-auto">
               <button onClick={() => batchUpdate.mutate({ ids: [...selectedIds], status: 'pending_review' })}
-                className="text-[10px] px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600">送審</button>
+                className="text-[10px] px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600">{lang === 'en' ? 'Send to review' : '送審'}</button>
               <button onClick={() => batchUpdate.mutate({ ids: [...selectedIds], status: 'approved' })}
-                className="text-[10px] px-2 py-1 rounded bg-green-500 text-white hover:bg-green-600">批准</button>
+                className="text-[10px] px-2 py-1 rounded bg-green-500 text-white hover:bg-green-600">{lang === 'en' ? 'Approve' : '批准'}</button>
             </div>
           )}
         </div>
@@ -322,7 +341,7 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
         <div className="rounded-xl border border-amber-200 bg-white overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border-b border-amber-100">
             <span className="text-xs font-semibold text-amber-700">
-              {PLATFORM_ICONS[(previewOutput as any).platform]} 平台預覽
+              {PLATFORM_ICONS[(previewOutput as any).platform]} {lang === 'en' ? 'Platform preview' : '平台預覽'}
             </span>
             <button onClick={() => setPreviewId(null)} className="text-amber-400 hover:text-amber-600 text-xs">✕</button>
           </div>
@@ -337,12 +356,14 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
       )}
 
       {outputsQuery.isLoading ? (
-        <div className="text-xs text-center text-neutral-400 py-4">載入中...</div>
+        <div className="text-xs text-center text-neutral-400 py-4">{t('loading')}</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-10">
           <div className="text-2xl mb-2">📦</div>
-          <p className="text-xs text-neutral-400">尚無{activeFilter === 'all' ? '' : STATUS_LABELS[activeFilter]}產出</p>
-          <p className="text-xs text-neutral-300 mt-1">對話中確認內容後自動歸檔</p>
+          <p className="text-xs text-neutral-400">{lang === 'en'
+            ? `No ${activeFilter === 'all' ? '' : STATUS_LABELS[activeFilter].toLowerCase() + ' '}outputs yet`
+            : `尚無${activeFilter === 'all' ? '' : STATUS_LABELS[activeFilter]}產出`}</p>
+          <p className="text-xs text-neutral-300 mt-1">{lang === 'en' ? 'Filed automatically after you confirm content in chat' : '對話中確認內容後自動歸檔'}</p>
         </div>
       ) : (
         filtered.map((output: any) => (
@@ -362,7 +383,7 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm">{PLATFORM_ICONS[output.platform]}</span>
                   <p className="text-xs font-semibold text-neutral-800 truncate flex-1">
-                    {output.title || `${PLATFORM_LABELS[output.platform]} 產出`}
+                    {output.title || (lang === 'en' ? `${getPlatformLabel(output.platform, lang)} output` : `${PLATFORM_LABELS[output.platform]} 產出`)}
                   </p>
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[output.status]}`}>
                     {STATUS_LABELS[output.status]}
@@ -371,17 +392,17 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
                 <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{output.content?.slice(0, 100)}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-[10px] text-neutral-400">v{output.version}</span>
-                  {output.isUrgent ? <span className="text-[10px] text-red-500 font-medium">🔴 緊急</span> : null}
+                  {output.isUrgent ? <span className="text-[10px] text-red-500 font-medium">🔴 {lang === 'en' ? 'Urgent' : '緊急'}</span> : null}
                   <div className="flex gap-1 ml-auto">
                     <button onClick={() => setPreviewId(previewId === output.id ? null : output.id)}
-                      className="text-[10px] text-amber-600 hover:text-amber-800 font-medium">預覽</button>
+                      className="text-[10px] text-amber-600 hover:text-amber-800 font-medium">{t('preview')}</button>
                     {output.status === 'draft' && (
                       <button onClick={() => updateStatus.mutate({ id: output.id, status: 'pending_review' })}
-                        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">送審</button>
+                        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">{lang === 'en' ? 'Send to review' : '送審'}</button>
                     )}
                     {output.status === 'pending_review' && (
                       <button onClick={() => updateStatus.mutate({ id: output.id, status: 'approved' })}
-                        className="text-[10px] text-green-600 hover:text-green-800 font-medium">批准</button>
+                        className="text-[10px] text-green-600 hover:text-green-800 font-medium">{lang === 'en' ? 'Approve' : '批准'}</button>
                     )}
                   </div>
                 </div>
@@ -397,6 +418,7 @@ function OutputsTab({ missionId }: { missionId?: number | null }) {
 // ─── Knowledge Tab ────────────────────────────────────────────────────────────
 
 function KnowledgeTab({ missionId }: { missionId?: number | null }) {
+  const { t, lang } = useLang();
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -411,7 +433,7 @@ function KnowledgeTab({ missionId }: { missionId?: number | null }) {
   if (!missionId) return (
     <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-4">
       <div className="text-3xl">📚</div>
-      <p className="text-xs text-neutral-400">選擇任務後管理知識庫</p>
+      <p className="text-xs text-neutral-400">{lang === 'en' ? 'Select a mission to manage knowledge' : '選擇任務後管理知識庫'}</p>
     </div>
   );
 
@@ -421,7 +443,12 @@ function KnowledgeTab({ missionId }: { missionId?: number | null }) {
     pdf: '📄', docx: '📝', xlsx: '📊', csv: '📊', txt: '📃', url: '🔗', other: '📁',
   };
 
-  const EMBED_STATUS: Record<string, { cls: string; label: string }> = {
+  const EMBED_STATUS: Record<string, { cls: string; label: string }> = lang === 'en' ? {
+    pending:    { cls: 'text-neutral-400', label: 'Pending' },
+    processing: { cls: 'text-blue-500', label: 'Indexing...' },
+    completed:  { cls: 'text-green-600', label: 'Ready' },
+    failed:     { cls: 'text-red-500', label: 'Failed' },
+  } : {
     pending:    { cls: 'text-neutral-400', label: '待處理' },
     processing: { cls: 'text-blue-500', label: '向量化中...' },
     completed:  { cls: 'text-green-600', label: '可用' },
@@ -488,7 +515,7 @@ function KnowledgeTab({ missionId }: { missionId?: number | null }) {
         onClick={() => fileInputRef.current?.click()}
       >
         <div className="text-2xl mb-1">{uploading ? '⏳' : '📎'}</div>
-        <p className="text-xs text-neutral-500 font-medium">{uploading ? '上傳中...' : '點擊上傳文件'}</p>
+        <p className="text-xs text-neutral-500 font-medium">{uploading ? (lang === 'en' ? 'Uploading...' : '上傳中...') : (lang === 'en' ? 'Click to upload a file' : '點擊上傳文件')}</p>
         <p className="text-[10px] text-neutral-300 mt-1">PDF / DOCX / XLSX / CSV / TXT</p>
         <input
           ref={fileInputRef}
@@ -500,11 +527,11 @@ function KnowledgeTab({ missionId }: { missionId?: number | null }) {
       </div>
 
       {filesQuery.isLoading ? (
-        <div className="text-xs text-center text-neutral-400 py-4">載入中...</div>
+        <div className="text-xs text-center text-neutral-400 py-4">{t('loading')}</div>
       ) : files.length === 0 ? (
         <div className="text-center py-6">
-          <p className="text-xs text-neutral-400">尚無文件</p>
-          <p className="text-[10px] text-neutral-300 mt-1">上傳文件後 AI 可在對話中引用</p>
+          <p className="text-xs text-neutral-400">{lang === 'en' ? 'No files yet' : '尚無文件'}</p>
+          <p className="text-[10px] text-neutral-300 mt-1">{lang === 'en' ? 'Once uploaded, AI can reference these in chat' : '上傳文件後 AI 可在對話中引用'}</p>
         </div>
       ) : (
         files.map((file: any) => {
@@ -518,7 +545,7 @@ function KnowledgeTab({ missionId }: { missionId?: number | null }) {
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`text-[10px] font-medium ${embedSt.cls}`}>{embedSt.label}</span>
                     {file.fileSize && <span className="text-[10px] text-neutral-400">{(file.fileSize / 1024).toFixed(0)}KB</span>}
-                    {file.usageCount > 0 && <span className="text-[10px] text-neutral-400">用過 {file.usageCount} 次</span>}
+                    {file.usageCount > 0 && <span className="text-[10px] text-neutral-400">{lang === 'en' ? `Used ${file.usageCount}×` : `用過 ${file.usageCount} 次`}</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <label className="flex items-center gap-1 cursor-pointer">
@@ -526,12 +553,12 @@ function KnowledgeTab({ missionId }: { missionId?: number | null }) {
                         onChange={e => updateSettings.mutate({ id: file.id, autoInject: e.target.checked })}
                         className="w-3 h-3"
                       />
-                      <span className="text-[10px] text-neutral-500">自動帶入對話</span>
+                      <span className="text-[10px] text-neutral-500">{lang === 'en' ? 'Auto-include in chat' : '自動帶入對話'}</span>
                     </label>
                     <button
-                      onClick={() => { if (window.confirm(`刪除「${file.originalName}」？`)) deleteFile.mutate({ id: file.id }); }}
+                      onClick={() => { if (window.confirm(lang === 'en' ? `Delete "${file.originalName}"?` : `刪除「${file.originalName}」？`)) deleteFile.mutate({ id: file.id }); }}
                       className="ml-auto text-[10px] text-neutral-300 hover:text-red-400"
-                    >刪除</button>
+                    >{t('delete')}</button>
                   </div>
                 </div>
               </div>
@@ -546,6 +573,7 @@ function KnowledgeTab({ missionId }: { missionId?: number | null }) {
 // ─── Review Queue (bottom) ────────────────────────────────────────────────────
 
 function ReviewQueue({ missionId }: { missionId?: number | null }) {
+  const { t, lang } = useLang();
   const [expanded, setExpanded] = useState(false);
 
   const pendingCount = (trpc as any).review.pendingCount.useQuery(
@@ -576,7 +604,7 @@ function ReviewQueue({ missionId }: { missionId?: number | null }) {
       >
         <div className="flex items-center gap-2">
           {count > 0 ? '⚠️' : '✓'}
-          <span>待審核</span>
+          <span>{lang === 'en' ? 'In review' : '待審核'}</span>
           {count > 0 && (
             <span className="bg-yellow-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{count}</span>
           )}
@@ -587,24 +615,28 @@ function ReviewQueue({ missionId }: { missionId?: number | null }) {
       {expanded && (
         <div className="px-4 pb-3 space-y-2 max-h-48 overflow-y-auto">
           {reviewList.isLoading ? (
-            <p className="text-xs text-neutral-400 py-2">載入中...</p>
+            <p className="text-xs text-neutral-400 py-2">{t('loading')}</p>
           ) : (reviewList.data ?? []).length === 0 ? (
-            <p className="text-xs text-neutral-400 py-2">無待審項目</p>
+            <p className="text-xs text-neutral-400 py-2">{lang === 'en' ? 'Nothing pending review' : '無待審項目'}</p>
           ) : (
             (reviewList.data ?? []).map((item: any) => (
               <div key={item.id} className="rounded-lg border border-yellow-200 bg-white p-2.5">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-neutral-700 flex-1 truncate">產出 #{item.outputId}</p>
+                  <p className="text-xs text-neutral-700 flex-1 truncate">{lang === 'en' ? `Output #${item.outputId}` : `產出 #${item.outputId}`}</p>
                   <span className="text-[10px] text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded-full shrink-0">
-                    {item.reviewType === 'external' ? '外部審核' : item.reviewType === 'client' ? '客戶審核' : '內部審核'}
+                    {item.reviewType === 'external'
+                      ? (lang === 'en' ? 'External review' : '外部審核')
+                      : item.reviewType === 'client'
+                      ? (lang === 'en' ? 'Client review' : '客戶審核')
+                      : (lang === 'en' ? 'Internal review' : '內部審核')}
                   </span>
                 </div>
-                {item.isUrgent ? <p className="text-[10px] text-red-500 mt-1">🔴 緊急</p> : null}
+                {item.isUrgent ? <p className="text-[10px] text-red-500 mt-1">🔴 {lang === 'en' ? 'Urgent' : '緊急'}</p> : null}
                 <div className="flex gap-2 mt-2">
                   <button onClick={() => approve.mutate({ id: item.id })}
-                    className="flex-1 text-[10px] py-1 rounded bg-green-500 text-white hover:bg-green-600 font-medium">批准</button>
-                  <button onClick={() => { const note = window.prompt('退回原因：'); if (note) requestRevision.mutate({ id: item.id, note }); }}
-                    className="flex-1 text-[10px] py-1 rounded border border-neutral-200 text-neutral-500 hover:bg-neutral-50">退回</button>
+                    className="flex-1 text-[10px] py-1 rounded bg-green-500 text-white hover:bg-green-600 font-medium">{lang === 'en' ? 'Approve' : '批准'}</button>
+                  <button onClick={() => { const note = window.prompt(lang === 'en' ? 'Reason for sending back:' : '退回原因：'); if (note) requestRevision.mutate({ id: item.id, note }); }}
+                    className="flex-1 text-[10px] py-1 rounded border border-neutral-200 text-neutral-500 hover:bg-neutral-50">{lang === 'en' ? 'Send back' : '退回'}</button>
                 </div>
               </div>
             ))
@@ -618,6 +650,7 @@ function ReviewQueue({ missionId }: { missionId?: number | null }) {
 // ─── Mission Status Bar ───────────────────────────────────────────────────────
 
 function MissionStatusBar({ missionId }: { missionId?: number | null }) {
+  const { lang } = useLang();
   const missionQuery = (trpc as any).mission.getById.useQuery(
     { id: missionId! },
     { enabled: !!missionId, refetchOnWindowFocus: false }
@@ -640,11 +673,11 @@ function MissionStatusBar({ missionId }: { missionId?: number | null }) {
       <div className="flex items-center gap-3 mt-1">
         <span className="flex items-center gap-1 text-[10px] text-neutral-400">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
-          進行中
+          {lang === 'en' ? 'In progress' : '進行中'}
         </span>
-        <span className="text-[10px] text-neutral-400">產出 {outputCount.data?.length ?? 0} 件</span>
+        <span className="text-[10px] text-neutral-400">{lang === 'en' ? `${outputCount.data?.length ?? 0} outputs` : `產出 ${outputCount.data?.length ?? 0} 件`}</span>
         {(pendingReview.data ?? 0) > 0 && (
-          <span className="text-[10px] text-yellow-600 font-medium">待審 {pendingReview.data}</span>
+          <span className="text-[10px] text-yellow-600 font-medium">{lang === 'en' ? `${pendingReview.data} pending` : `待審 ${pendingReview.data}`}</span>
         )}
       </div>
     </div>
@@ -664,12 +697,13 @@ export default function ArtifactReviewPanel({
   onPinArtifact,
   onExportArtifact,
 }: Props) {
+  const { lang } = useLang();
   const [activeTab, setActiveTab] = useState<Tab>('sop');
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'sop', label: 'SOP', icon: '📋' },
-    { key: 'outputs', label: '產出', icon: '📦' },
-    { key: 'knowledge', label: '知識庫', icon: '📚' },
+    { key: 'outputs', label: lang === 'en' ? 'Outputs' : '產出', icon: '📦' },
+    { key: 'knowledge', label: lang === 'en' ? 'Knowledge' : '知識庫', icon: '📚' },
   ];
 
   return (

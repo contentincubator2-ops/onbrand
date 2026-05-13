@@ -27,10 +27,12 @@ import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
   dicebear, handleOf, SlotContent, MarkdownText,
 } from "./shared";
+import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
 
 export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, slotMap, imageSlotFlow }: MockupFields) {
+  const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
 
@@ -56,7 +58,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 {handle}
                 <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-tiny text-default-500 truncate leading-tight">原創音訊</p>
+              <p className="text-tiny text-default-500 truncate leading-tight">{lang === "en" ? "Original audio" : "原創音訊"}</p>
             </div>
           </div>
           <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
@@ -87,7 +89,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center px-4">
                 <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-3" />
-                <p className="text-tiny text-primary/70">視覺 Agent 生成中…</p>
+                <p className="text-tiny text-primary/70">{lang === "en" ? "Visual agent generating…" : "視覺 Agent 生成中…"}</p>
               </div>
             </div>
           ) : imageSlot?.status === "filled" && typeof imageSlot.value === "string" && imageSlot.value.startsWith("http") ? (
@@ -100,11 +102,11 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                   <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
                   {liveImageStyle ? (
                     <>
-                      <p className="text-tiny font-semibold text-default-600 mb-1">圖片風格方向</p>
+                      <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Visual direction" : "圖片風格方向"}</p>
                       <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
                     </>
                   ) : (
-                    <p className="text-tiny line-clamp-3">{effectiveImageDesc ?? "主圖 · 等待 craft agent"}</p>
+                    <p className="text-tiny line-clamp-3">{effectiveImageDesc ?? (lang === "en" ? "Hero image · waiting for craft agent" : "主圖 · 等待 craft agent")}</p>
                   )}
                 </div>
               </div>
@@ -129,7 +131,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           </AvatarGroup>
           {/* 2026-05-10 (CJ feedback「假資料誤導」): generic placeholder. */}
           <p className="text-small leading-tight text-default-500">
-            按讚 · 留言 · 分享
+            {lang === "en" ? "Likes · Comments · Shares" : "按讚 · 留言 · 分享"}
           </p>
         </div>
 
@@ -170,11 +172,11 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 effectiveHashtags && effectiveHashtags.length > 0 ? (
                   <p className="text-secondary text-small">
                     {effectiveHashtags.slice(0, 8).join(" ")}
-                    {effectiveHashtags.length > 8 && <span className="text-default-500"> …更多</span>}
+                    {effectiveHashtags.length > 8 && <span className="text-default-500">{lang === "en" ? " …more" : " …更多"}</span>}
                   </p>
                 ) : (
                   <p className="text-secondary text-small">
-                    #等寫手 #等寫手 #等寫手 <span className="text-default-500">…更多</span>
+                    {lang === "en" ? "#writer-pending #writer-pending #writer-pending" : "#等寫手 #等寫手 #等寫手"} <span className="text-default-500">{lang === "en" ? "…more" : "…更多"}</span>
                   </p>
                 )
               }
@@ -184,7 +186,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 return (
                   <p className="text-secondary text-small">
                     {tags.slice(0, 8).join(" ")}
-                    {tags.length > 8 && <span className="text-default-500"> …更多</span>}
+                    {tags.length > 8 && <span className="text-default-500">{lang === "en" ? " …more" : " …更多"}</span>}
                   </p>
                 );
               }}
@@ -193,9 +195,9 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         </div>
 
         <p className="px-3 pb-1 text-small text-default-500">
-          查看留言
+          {lang === "en" ? "View comments" : "查看留言"}
         </p>
-        <p className="px-3 pb-3 text-tiny text-default-400 uppercase tracking-wider">5 分鐘前</p>
+        <p className="px-3 pb-3 text-tiny text-default-400 uppercase tracking-wider">{lang === "en" ? "5 minutes ago" : "5 分鐘前"}</p>
       </div>
     </div>
   );
@@ -204,6 +206,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 /* ─────────────── IG Carousel ─────────────── */
 
 export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   const carouselCount = 9;
@@ -219,7 +222,7 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
                 {handle}
                 <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-tiny text-default-500 truncate leading-tight">原創音訊</p>
+              <p className="text-tiny text-default-500 truncate leading-tight">{lang === "en" ? "Original audio" : "原創音訊"}</p>
             </div>
           </div>
           <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
@@ -244,11 +247,11 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
                   <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
                   {liveImageStyle ? (
                     <>
-                      <p className="text-tiny font-semibold text-default-600 mb-1">每頁視覺風格</p>
+                      <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Per-slide visual style" : "每頁視覺風格"}</p>
                       <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
                     </>
                   ) : (
-                    <p className="text-tiny line-clamp-3">{liveImageDesc ?? `輪播 1 / ${carouselCount} · 等待 craft agent`}</p>
+                    <p className="text-tiny line-clamp-3">{liveImageDesc ?? (lang === "en" ? `Slide 1 / ${carouselCount} · waiting for craft agent` : `輪播 1 / ${carouselCount} · 等待 craft agent`)}</p>
                   )}
                 </div>
               </div>
@@ -292,7 +295,7 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
           )}
         </div>
 
-        <p className="px-3 pb-3 text-tiny text-default-400 uppercase tracking-wider">5 分鐘前</p>
+        <p className="px-3 pb-3 text-tiny text-default-400 uppercase tracking-wider">{lang === "en" ? "5 minutes ago" : "5 分鐘前"}</p>
       </div>
     </div>
   );
@@ -301,6 +304,7 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
 /* ─────────────── IG Reels (9:16 + side action rail) ─────────────── */
 
 export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveVideoDesc, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const handle = handleOf(brandName);
   return (
     <div className="w-full max-w-[400px] mx-auto">
@@ -322,11 +326,11 @@ export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCapt
               <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
               {liveImageStyle ? (
                 <>
-                  <p className="text-tiny font-semibold mb-1 text-white">封面風格方向</p>
+                  <p className="text-tiny font-semibold mb-1 text-white">{lang === "en" ? "Cover direction" : "封面風格方向"}</p>
                   <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
                 </>
               ) : (
-                <p className="text-tiny line-clamp-3">{liveVideoDesc ?? "9:16 影片 · 等待 craft agent"}</p>
+                <p className="text-tiny line-clamp-3">{liveVideoDesc ?? (lang === "en" ? "9:16 video · waiting for craft agent" : "9:16 影片 · 等待 craft agent")}</p>
               )}
             </div>
           </div>
@@ -350,12 +354,12 @@ export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCapt
           <div className="flex items-center gap-2">
             <StoryRingAvatar src={dicebear(brandName ?? "brand")} size={28} />
             <span className="text-small font-semibold">{handle}</span>
-            <Button size="sm" radius="sm" variant="bordered" className="h-6 min-w-0 px-2 text-tiny border-white text-white">追蹤</Button>
+            <Button size="sm" radius="sm" variant="bordered" className="h-6 min-w-0 px-2 text-tiny border-white text-white">{lang === "en" ? "Follow" : "追蹤"}</Button>
           </div>
           <MarkdownText content={liveCaption ?? title ?? ""} lineClamp={3} className="text-small" />
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
-            <span>原創音訊 · {handle}</span>
+            <span>{lang === "en" ? "Original audio" : "原創音訊"} · {handle}</span>
           </div>
         </div>
       </div>
@@ -366,6 +370,7 @@ export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCapt
 /* ─────────────── IG Stories (top progress bars + 9:16) ─────────────── */
 
 export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const handle = handleOf(brandName);
   const segCount = 5;
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
@@ -392,7 +397,7 @@ export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCa
           <div className="flex items-center gap-2">
             <img src={avatarSrc} alt="" className="w-7 h-7 rounded-full border border-white/40" />
             <span className="text-small font-semibold">{handle}</span>
-            <span className="text-tiny opacity-80">5 分鐘前</span>
+            <span className="text-tiny opacity-80">{lang === "en" ? "5m ago" : "5 分鐘前"}</span>
           </div>
           <div className="flex items-center gap-3 opacity-90">
             <FontAwesomeIcon icon={faVolumeHigh} className="text-small" />
@@ -409,7 +414,7 @@ export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCa
             {liveImageStyle && (
               <div className="relative z-10 text-center text-white/80 px-6 max-w-[80%]">
                 <FontAwesomeIcon icon={faImages} className="text-2xl mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">背景風格</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">{lang === "en" ? "Background style" : "背景風格"}</p>
                 <p className="text-tiny line-clamp-4">{liveImageStyle}</p>
               </div>
             )}
@@ -431,7 +436,7 @@ export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCa
         {/* Reply input */}
         <div className="absolute bottom-3 inset-x-3 z-10 flex items-center gap-2">
           <div className="flex-1 bg-white/15 border border-white/30 rounded-full px-3 py-1.5 text-tiny text-white/70">
-            傳訊息給 {handle}…
+            {lang === "en" ? `Message ${handle}…` : `傳訊息給 ${handle}…`}
           </div>
           <FontAwesomeIcon icon={faHeart} className="text-white" />
           <FontAwesomeIcon icon={faPaperPlane} className="text-white" />
@@ -449,6 +454,7 @@ export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCa
 /* ─────────────── IG Profile (3-col grid) ─────────────── */
 
 export function IGProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
+  const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
@@ -462,9 +468,9 @@ export function IGProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
         <div className="px-4 py-3 flex items-center gap-5">
           <StoryRingAvatar src={avatarSrc} size={84} />
           <div className="flex-1 grid grid-cols-3 gap-2 text-center text-small">
-            <div><div className="font-bold">42</div><div className="text-tiny text-default-500">貼文</div></div>
-            <div><div className="font-bold">12.3K</div><div className="text-tiny text-default-500">粉絲</div></div>
-            <div><div className="font-bold">567</div><div className="text-tiny text-default-500">追蹤中</div></div>
+            <div><div className="font-bold">42</div><div className="text-tiny text-default-500">{lang === "en" ? "posts" : "貼文"}</div></div>
+            <div><div className="font-bold">12.3K</div><div className="text-tiny text-default-500">{lang === "en" ? "followers" : "粉絲"}</div></div>
+            <div><div className="font-bold">567</div><div className="text-tiny text-default-500">{lang === "en" ? "following" : "追蹤中"}</div></div>
           </div>
         </div>
         <div className="px-4 pb-2 space-y-1">
@@ -476,20 +482,20 @@ export function IGProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
           {liveCaption ? (
             <p className="text-tiny text-default-700 whitespace-pre-line leading-relaxed">{liveCaption}</p>
           ) : (
-            <p className="text-tiny text-default-400">（bio 等待 agent 寫入）</p>
+            <p className="text-tiny text-default-400">{lang === "en" ? "(bio pending — agent will write)" : "（bio 等待 agent 寫入）"}</p>
           )}
           <p className="text-tiny text-primary">your-brand.com</p>
         </div>
         <div className="px-4 pb-3 grid grid-cols-3 gap-2">
-          <Button size="sm" radius="md" color="primary" className="font-medium">追蹤</Button>
-          <Button size="sm" radius="md" variant="bordered">傳訊息</Button>
+          <Button size="sm" radius="md" color="primary" className="font-medium">{lang === "en" ? "Follow" : "追蹤"}</Button>
+          <Button size="sm" radius="md" variant="bordered">{lang === "en" ? "Message" : "傳訊息"}</Button>
           <Button isIconOnly size="sm" radius="md" variant="bordered" aria-label="more"><FontAwesomeIcon icon={faUserGroup} /></Button>
         </div>
         <div className="px-4 pb-3 flex gap-3 overflow-x-auto">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="shrink-0 flex flex-col items-center gap-1 w-16">
               <div className="w-14 h-14 rounded-full border-2 border-divider bg-default-100" />
-              <p className="text-tiny text-default-500 truncate w-full text-center">精選 {i + 1}</p>
+              <p className="text-tiny text-default-500 truncate w-full text-center">{lang === "en" ? `Highlight ${i + 1}` : `精選 ${i + 1}`}</p>
             </div>
           ))}
         </div>
@@ -514,6 +520,7 @@ export function IGProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
 /* ─────────────── IG Live (9:16 + LIVE chip + viewers + chat) ─────────────── */
 
 export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
@@ -534,7 +541,7 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         <div className="absolute top-12 left-3 z-10 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full pl-1 pr-2 py-0.5">
           <StoryRingAvatar src={avatarSrc} size={24} />
           <span className="text-white text-tiny font-semibold">{handle}</span>
-          <button className="bg-white text-black text-tiny font-bold px-2 py-0.5 rounded-full">追蹤</button>
+          <button className="bg-white text-black text-tiny font-bold px-2 py-0.5 rounded-full">{lang === "en" ? "Follow" : "追蹤"}</button>
         </div>
         {/* Background — generated cover image OR style brief OR skeleton */}
         {liveImageUrl && liveImageStatus === "ready" ? (
@@ -545,7 +552,7 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
             {liveImageStyle && (
               <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
                 <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">封面風格</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">{lang === "en" ? "Cover style" : "封面風格"}</p>
                 <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
               </div>
             )}
@@ -554,13 +561,13 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         {/* Live opening script overlay — shows the caption (host's opening 30s) */}
         {liveCaption && (
           <div className="absolute top-24 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto">
-            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">開場腳本</p>
+            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">{lang === "en" ? "Opening script" : "開場腳本"}</p>
             <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
           </div>
         )}
         {/* Floating chat bubbles bottom-left */}
         <div className="absolute bottom-16 left-3 z-10 space-y-1.5 max-w-[60%]">
-          {["太精彩了!", "什麼時候下一場?", "❤️❤️❤️"].map((m, i) => (
+          {(lang === "en" ? ["So good!", "When's the next one?", "❤️❤️❤️"] : ["太精彩了!", "什麼時候下一場?", "❤️❤️❤️"]).map((m, i) => (
             <div key={i} className="bg-black/50 backdrop-blur-sm text-white text-tiny px-2 py-1 rounded-medium">
               <span className="font-semibold">user_{i+1}</span> {m}
             </div>
@@ -569,7 +576,7 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         {/* Bottom: comment input + reactions */}
         <div className="absolute bottom-3 inset-x-3 z-10 flex items-center gap-2">
           <div className="flex-1 bg-white/15 border border-white/30 rounded-full px-3 py-1.5 text-tiny text-white/70">
-            傳訊息…
+            {lang === "en" ? "Message…" : "傳訊息…"}
           </div>
           <FontAwesomeIcon icon={faHeart} className="text-white text-medium" />
           <FontAwesomeIcon icon={faPaperPlane} className="text-white text-medium" />
@@ -584,6 +591,7 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 /* ─────────────── IG Ad (feed + Sponsored + CTA bar) ─────────────── */
 
 export function IGAd({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   const handle = handleOf(brandName);
   return (
     <div className="w-full max-w-[420px] mx-auto">
@@ -597,7 +605,7 @@ export function IGAd({ title, brandName, variantLabel }: MockupFields) {
                 {handle}
                 <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-tiny text-default-500 truncate leading-tight">贊助 · Sponsored</p>
+              <p className="text-tiny text-default-500 truncate leading-tight">{lang === "en" ? "Sponsored" : "贊助 · Sponsored"}</p>
             </div>
           </div>
           <span className="text-medium tracking-tighter">⋯</span>
@@ -607,7 +615,7 @@ export function IGAd({ title, brandName, variantLabel }: MockupFields) {
           <div className="absolute inset-0 flex items-center justify-center text-default-400">
             <div className="text-center">
               <FontAwesomeIcon icon={faShoppingBag} className="text-4xl mb-2" />
-              <p className="text-tiny">廣告主圖 · 等待 craft agent</p>
+              <p className="text-tiny">{lang === "en" ? "Ad image · waiting for craft agent" : "廣告主圖 · 等待 craft agent"}</p>
             </div>
           </div>
         </div>
@@ -615,7 +623,7 @@ export function IGAd({ title, brandName, variantLabel }: MockupFields) {
         <div className="px-3 py-2.5 border-y border-divider bg-default-50 flex items-center justify-between">
           <div className="min-w-0">
             <p className="text-tiny text-default-500">your-brand.com</p>
-            <p className="text-small font-semibold truncate">立即購買 · 限時優惠</p>
+            <p className="text-small font-semibold truncate">{lang === "en" ? "Shop now · Limited offer" : "立即購買 · 限時優惠"}</p>
           </div>
           <FontAwesomeIcon icon={faChevronLeft} className="rotate-180 text-default-500 shrink-0 ml-2" />
         </div>

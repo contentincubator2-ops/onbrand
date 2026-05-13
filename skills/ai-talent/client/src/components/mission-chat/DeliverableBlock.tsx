@@ -6,6 +6,7 @@
  *   Level 3：定稿入庫（確認定稿按鈕 + 二次確認）
  */
 import React, { useState } from 'react';
+import { useLang } from '../../lib/i18n';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -36,11 +37,16 @@ interface DeliverableBlockProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const LEVEL_LABEL: Record<number, string> = {
-  1: 'Level 1 · 直接即用',
-  2: 'Level 2 · 編輯後使用',
-  3: 'Level 3 · 定稿入庫',
-};
+function getLevelLabel(level: number, lang: string): string {
+  if (lang === 'en') {
+    return level === 1 ? 'Level 1 · Ready to ship'
+      : level === 2 ? 'Level 2 · Edit then use'
+      : 'Level 3 · Finalize to library';
+  }
+  return level === 1 ? 'Level 1 · 直接即用'
+    : level === 2 ? 'Level 2 · 編輯後使用'
+    : 'Level 3 · 定稿入庫';
+}
 
 const LEVEL_COLOR: Record<number, string> = {
   1: '#34D399',
@@ -56,13 +62,13 @@ const TOOL_ICON: Record<DeliverableTool, string> = {
   openclaw_video: '🎬',
 };
 
-const TOOL_NAME: Record<DeliverableTool, string> = {
-  none: '',
-  canva: 'Canva',
-  google_slides: 'Google Slides',
-  google_doc: 'Google Doc',
-  openclaw_video: '影片',
-};
+function getToolName(tool: DeliverableTool, lang: string): string {
+  if (tool === 'openclaw_video') return lang === 'en' ? 'Video' : '影片';
+  return tool === 'canva' ? 'Canva'
+    : tool === 'google_slides' ? 'Google Slides'
+    : tool === 'google_doc' ? 'Google Doc'
+    : '';
+}
 
 function isUrlExpired(expiresAt?: string): boolean {
   if (!expiresAt) return false;
@@ -78,6 +84,7 @@ function daysUntilExpiry(expiresAt?: string): number | null {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function LevelBadge({ level }: { level: 1 | 2 | 3 }) {
+  const { lang } = useLang();
   return (
     <span style={{
       fontSize: 9,
@@ -89,7 +96,7 @@ function LevelBadge({ level }: { level: 1 | 2 | 3 }) {
       fontWeight: 600,
       letterSpacing: '0.03em',
     }}>
-      {LEVEL_LABEL[level]}
+      {getLevelLabel(level, lang)}
     </span>
   );
 }
@@ -98,6 +105,7 @@ function UrlExpiryWarning({ expiresAt, onRegenerate }: {
   expiresAt?: string;
   onRegenerate?: () => void;
 }) {
+  const { lang } = useLang();
   if (!expiresAt) return null;
   const days = daysUntilExpiry(expiresAt);
   const expired = isUrlExpired(expiresAt);
@@ -117,8 +125,8 @@ function UrlExpiryWarning({ expiresAt, onRegenerate }: {
     }}>
       <span style={{ fontSize: 11, color: expired ? '#EF4444' : '#F59E0B' }}>
         {expired
-          ? '⚠️ 編輯連結已過期'
-          : `⏰ 編輯連結將於 ${days} 天後到期`}
+          ? (lang === 'en' ? '⚠️ Edit link expired' : '⚠️ 編輯連結已過期')
+          : (lang === 'en' ? `⏰ Edit link expires in ${days} day${days === 1 ? '' : 's'}` : `⏰ 編輯連結將於 ${days} 天後到期`)}
       </span>
       {onRegenerate && (
         <button
@@ -134,7 +142,7 @@ function UrlExpiryWarning({ expiresAt, onRegenerate }: {
             cursor: 'pointer',
           }}
         >
-          🔄 重新生成
+          🔄 {lang === 'en' ? 'Regenerate' : '重新生成'}
         </button>
       )}
     </div>
@@ -146,6 +154,7 @@ function FinalizeConfirmModal({ itemTitle, onConfirm, onCancel }: {
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t, lang } = useLang();
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -163,11 +172,16 @@ function FinalizeConfirmModal({ itemTitle, onConfirm, onCancel }: {
       }}>
         <div style={{ fontSize: 20, marginBottom: 12 }}>✅</div>
         <div style={{ fontSize: 15, fontWeight: 600, color: '#E8E8E8', marginBottom: 8 }}>
-          確認定稿「{itemTitle || '此文件'}」？
+          {lang === 'en'
+            ? `Finalize "${itemTitle || 'this document'}"?`
+            : `確認定稿「${itemTitle || '此文件'}」？`}
         </div>
         <div style={{ fontSize: 12, color: '#888', lineHeight: 1.6, marginBottom: 20 }}>
-          定稿後，此文件將儲存為系統知識，後續所有相關 Squad 任務將自動套用其內容。<br />
-          定稿後仍可查看，但無法撤銷。
+          {lang === 'en' ? (
+            <>Once finalized, this document is saved as system knowledge and applied to all related Squad tasks.<br />You can still view it, but cannot undo.</>
+          ) : (
+            <>定稿後，此文件將儲存為系統知識，後續所有相關 Squad 任務將自動套用其內容。<br />定稿後仍可查看，但無法撤銷。</>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button
@@ -182,7 +196,7 @@ function FinalizeConfirmModal({ itemTitle, onConfirm, onCancel }: {
               cursor: 'pointer',
             }}
           >
-            取消
+            {t('cancel')}
           </button>
           <button
             onClick={onConfirm}
@@ -197,7 +211,7 @@ function FinalizeConfirmModal({ itemTitle, onConfirm, onCancel }: {
               cursor: 'pointer',
             }}
           >
-            ✅ 確認定稿
+            ✅ {lang === 'en' ? 'Finalize' : '確認定稿'}
           </button>
         </div>
       </div>
@@ -220,6 +234,7 @@ function DeliverableCard({
   onFinalize?: (id: number) => Promise<void>;
   onRegenerateUrl?: (id: number) => Promise<void>;
 }) {
+  const { t, lang } = useLang();
   const [showModal, setShowModal] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -266,12 +281,12 @@ function DeliverableCard({
           gap: 8,
         }}>
           <span style={{ fontSize: 13, color: '#E8E8E8', fontWeight: 600, flex: 1 }}>
-            {tool !== 'none' && TOOL_ICON[tool]} {item.title || '交付物'}
+            {tool !== 'none' && TOOL_ICON[tool]} {item.title || t('deliverable')}
           </span>
           <LevelBadge level={item.deliverableLevel} />
           {isFinalized && (
             <span style={{ fontSize: 10, color: '#34D399', background: '#34D39915', padding: '2px 7px', borderRadius: 4, border: '1px solid #34D39930' }}>
-              已定稿 {item.finalizedAt ? new Date(item.finalizedAt).toLocaleDateString('zh-TW') : ''}
+              {lang === 'en' ? 'Finalized' : '已定稿'} {item.finalizedAt ? new Date(item.finalizedAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW') : ''}
             </span>
           )}
         </div>
@@ -298,7 +313,7 @@ function DeliverableCard({
                   border: 'none', cursor: 'pointer', padding: '4px 0 0',
                 }}
               >
-                {contentExpanded ? '▾ 收起' : '▸ 展開全文'}
+                {contentExpanded ? (lang === 'en' ? '▾ Collapse' : '▾ 收起') : (lang === 'en' ? '▸ Show more' : '▸ 展開全文')}
               </button>
             )}
           </div>
@@ -338,7 +353,7 @@ function DeliverableCard({
               borderRadius: 6,
               padding: '6px 10px',
             }}>
-              ✅ 此文件已定稿，後續所有相關 Squad 任務將自動套用此設定
+              ✅ {lang === 'en' ? 'This document is finalized — all related Squad tasks will apply it automatically' : '此文件已定稿，後續所有相關 Squad 任務將自動套用此設定'}
             </div>
           </div>
         )}
@@ -357,12 +372,12 @@ function DeliverableCard({
             <>
               {item.content && (
                 <ActionBtn onClick={handleCopy} color="#34D399">
-                  {copied ? '✓ 已複製' : '📋 複製'}
+                  {copied ? `✓ ${t('copied')}` : `📋 ${t('copy')}`}
                 </ActionBtn>
               )}
               {onDownload && (
                 <ActionBtn onClick={() => onDownload(item)} color="#34D399">
-                  ⬇️ 下載
+                  ⬇️ {t('download')}
                 </ActionBtn>
               )}
             </>
@@ -376,17 +391,17 @@ function DeliverableCard({
                   href={item.toolEditUrl}
                   color="#F59E0B"
                 >
-                  ✏️ 在 {TOOL_NAME[tool]} 編輯 ↗
+                  ✏️ {lang === 'en' ? `Edit in ${getToolName(tool, lang)}` : `在 ${getToolName(tool, lang)} 編輯`} ↗
                 </ActionBtn>
               )}
               {tool === 'openclaw_video' && item.videoUrl && (
                 <ActionBtn href={item.videoUrl} color="#F59E0B">
-                  ⬇️ 下載影片
+                  ⬇️ {lang === 'en' ? 'Download video' : '下載影片'}
                 </ActionBtn>
               )}
               {tool === 'openclaw_video' && onRegenerateUrl && (
                 <ActionBtn onClick={() => onRegenerateUrl(item.id)} color="#888">
-                  🔄 重新生成
+                  🔄 {lang === 'en' ? 'Regenerate' : '重新生成'}
                 </ActionBtn>
               )}
             </>
@@ -397,7 +412,7 @@ function DeliverableCard({
             <>
               {tool !== 'none' && tool !== 'openclaw_video' && item.toolEditUrl && !urlExpired && !isFinalized && (
                 <ActionBtn href={item.toolEditUrl} color="#818CF8">
-                  ✏️ 繼續編輯 ↗
+                  ✏️ {lang === 'en' ? 'Keep editing' : '繼續編輯'} ↗
                 </ActionBtn>
               )}
               {!isFinalized && (
@@ -407,7 +422,7 @@ function DeliverableCard({
                   disabled={finalizing}
                   primary
                 >
-                  {finalizing ? '定稿中...' : '✅ 確認定稿'}
+                  {finalizing ? (lang === 'en' ? 'Finalizing...' : '定稿中...') : `✅ ${lang === 'en' ? 'Finalize' : '確認定稿'}`}
                 </ActionBtn>
               )}
             </>
@@ -416,7 +431,7 @@ function DeliverableCard({
           {/* 共用複製按鈕 (L2/L3 也可複製文字) */}
           {item.deliverableLevel > 1 && item.content && (
             <ActionBtn onClick={handleCopy} color="#555">
-              {copied ? '✓ 已複製' : '📋 複製文字'}
+              {copied ? `✓ ${t('copied')}` : `📋 ${lang === 'en' ? 'Copy text' : '複製文字'}`}
             </ActionBtn>
           )}
         </div>
@@ -428,7 +443,7 @@ function DeliverableCard({
             fontSize: 10,
             color: '#444',
           }}>
-            AI 已完成 70% 設計，點開後可調整視覺細節
+            {lang === 'en' ? 'AI finished ~70% of the design — open it to fine-tune visuals' : 'AI 已完成 70% 設計，點開後可調整視覺細節'}
           </div>
         )}
       </div>
@@ -502,6 +517,7 @@ export default function DeliverableBlock({
   onFinalize,
   onRegenerateUrl,
 }: DeliverableBlockProps) {
+  const { t, lang } = useLang();
   if (!items || items.length === 0) return null;
 
   // 依 level 分組
@@ -521,7 +537,7 @@ export default function DeliverableBlock({
         letterSpacing: '0.08em',
         marginBottom: 8,
       }}>
-        交付物
+        {t('deliverable')}
       </div>
 
       {([1, 2, 3] as const).map(level =>
@@ -536,7 +552,7 @@ export default function DeliverableBlock({
                 marginBottom: 4,
                 marginTop: level > 1 ? 10 : 0,
               }}>
-                {LEVEL_LABEL[level]}
+                {getLevelLabel(level, lang)}
               </div>
             )}
             {byLevel[level].map(item => (

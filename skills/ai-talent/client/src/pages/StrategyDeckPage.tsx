@@ -23,6 +23,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
+import { useLang } from "../lib/i18n";
 import { DiagnosticWizard } from "../components/deck/DiagnosticWizard";
 import { StrategyCardDetail } from "../components/deck/StrategyCardDetail";
 import { StrategyCard } from "../components/deck/StrategyCard";
@@ -49,6 +50,7 @@ const C = {
 
 // ─── Main page ──────────────────────────────────────────────────────────────
 export default function StrategyDeckPage() {
+  const { t, lang } = useLang();
   const { brandId: brandIdParam } = useParams<{ brandId: string }>();
   const navigate = useNavigate();
   const brandId = brandIdParam ? Number(brandIdParam) : null;
@@ -68,7 +70,7 @@ export default function StrategyDeckPage() {
 
   if (!brandId) {
     return (
-      <CenteredMessage text="缺少 brandId" />
+      <CenteredMessage text={lang === "en" ? "Missing brandId" : "缺少 brandId"} />
     );
   }
 
@@ -116,11 +118,11 @@ export default function StrategyDeckPage() {
               padding: "4px 8px",
             }}
           >
-            ← 返回
+            ← {lang === "en" ? "Back" : "返回"}
           </button>
           <div style={{ width: 1, height: 18, background: C.border }} />
           <div style={{ fontSize: 14, fontWeight: 600 }}>
-            {brand?.name ?? "（讀取中…）"}
+            {brand?.name ?? (lang === "en" ? "(Loading…)" : "（讀取中…）")}
           </div>
           <span
             style={{
@@ -151,7 +153,7 @@ export default function StrategyDeckPage() {
               cursor: "pointer",
             }}
           >
-            + 建立策略卡
+            + {lang === "en" ? "New strategy" : "建立策略卡"}
           </button>
         </div>
       </div>
@@ -178,8 +180,8 @@ export default function StrategyDeckPage() {
           />
         )}
         {activeZone === "detect" && <DetectZone brandId={brandId} />}
-        {activeZone === "make" && <PlaceholderZone title="製作執行" subtitle="策略 × 通路 × 目標組合器 — Phase 2" />}
-        {activeZone === "review" && <PlaceholderZone title="複盤優化" subtitle="效果歸因、AB 總結、下一步建議 — Phase 4" />}
+        {activeZone === "make" && <PlaceholderZone title={lang === "en" ? "Make & launch" : "製作執行"} subtitle={lang === "en" ? "Strategy × channel × goal composer — Phase 2" : "策略 × 通路 × 目標組合器 — Phase 2"} />}
+        {activeZone === "review" && <PlaceholderZone title={lang === "en" ? "Review & optimize" : "複盤優化"} subtitle={lang === "en" ? "Attribution, A/B summary, what to try next — Phase 4" : "效果歸因、AB 總結、下一步建議 — Phase 4"} />}
       </div>
 
       {/* Diagnostic wizard modal */}
@@ -225,10 +227,11 @@ function DecideZone({
   onOpen: (id: number) => void;
   onCreate: () => void;
 }) {
+  const { lang } = useLang();
   const total = active.length + drafts.length + archived.length;
 
   if (loading) {
-    return <CenteredMessage text="載入中…" />;
+    return <CenteredMessage text={lang === "en" ? "Loading…" : "載入中…"} />;
   }
   if (total === 0) {
     return <EmptyState onCreate={onCreate} />;
@@ -238,17 +241,17 @@ function DecideZone({
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
       {active.length > 0 && (
         <CardSection
-          title="使用中"
-          hint="執行與優化時會自動引用"
+          title={lang === "en" ? "In use" : "使用中"}
+          hint={lang === "en" ? "Auto-referenced when you run or optimize" : "執行與優化時會自動引用"}
           cards={active}
           onOpen={onOpen}
         />
       )}
       {drafts.length > 0 && (
-        <CardSection title="草稿" hint="填完設定後按「啟用」" cards={drafts} onOpen={onOpen} />
+        <CardSection title={lang === "en" ? "Drafts" : "草稿"} hint={lang === "en" ? "Fill the fields, then hit Activate" : "填完設定後按「啟用」"} cards={drafts} onOpen={onOpen} />
       )}
       {archived.length > 0 && (
-        <CardSection title="封存" hint="歷史紀錄，可隨時復活" cards={archived} onOpen={onOpen} />
+        <CardSection title={lang === "en" ? "Archived" : "封存"} hint={lang === "en" ? "History — bring any back anytime" : "歷史紀錄，可隨時復活"} cards={archived} onOpen={onOpen} />
       )}
     </div>
   );
@@ -297,6 +300,7 @@ function CardSection({
 }
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
+  const { lang } = useLang();
   return (
     <div
       style={{
@@ -311,12 +315,12 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
     >
       <div style={{ fontSize: 44, marginBottom: 12, filter: "grayscale(0.3)" }}>🎴</div>
       <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px" }}>
-        這個品牌還沒有策略卡
+        {lang === "en" ? "No strategy cards yet for this brand" : "這個品牌還沒有策略卡"}
       </h3>
       <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 20px", lineHeight: 1.6 }}>
-        策略卡是執行、優化、情報的引用來源。
-        <br />
-        先回答兩個問題，我們幫你挑 2–3 套合適的方法論。
+        {lang === "en"
+          ? <>Strategy cards power your execution, optimization, and intel.<br />Answer two quick questions and we'll pick 2–3 frameworks that fit.</>
+          : <>策略卡是執行、優化、情報的引用來源。<br />先回答兩個問題，我們幫你挑 2–3 套合適的方法論。</>}
       </p>
       <button
         onClick={onCreate}
@@ -331,7 +335,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
           cursor: "pointer",
         }}
       >
-        開始診斷
+        {lang === "en" ? "Start diagnosis" : "開始診斷"}
       </button>
     </div>
   );

@@ -251,7 +251,10 @@ function AgentAvatar({ name, layer }: { name: string; layer: string }) {
 }
 
 function LayerBadge({ layer }: { layer: string }) {
-  const label: Record<string, string> = { strategy: "策略層", execution: "執行層", training: "訓練層" };
+  const { lang } = useLang();
+  const label: Record<string, string> = lang === "en"
+    ? { strategy: "Strategy", execution: "Execution", training: "Training" }
+    : { strategy: "策略層", execution: "執行層", training: "訓練層" };
   return (
     <span style={{
       fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 20,
@@ -273,18 +276,24 @@ function TeamAssemblyPanel({
   onApprove: () => void;
   onToggleSummary: (id: number) => void;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const activeStep = relaySteps.find((s) => s.status === "running");
   const completedCount = relaySteps.filter((s) => s.status === "done").length;
   const progress = relaySteps.length ? Math.round((completedCount / relaySteps.length) * 100) : 0;
 
-  const phaseLabel = {
+  const phaseLabel = (lang === "en" ? {
+    analyzing: "Analyzing your task…",
+    assembling: "Assembling your AI team…",
+    proposal: "Team proposal ready",
+    executing: "AI agents executing",
+    done: "Mission complete",
+  } : {
     analyzing: "分析任務中...",
     assembling: "組建自主代理團隊中...",
     proposal: "Team Proposal 已準備完成",
     executing: "自主代理接力執行中",
     done: "任務已由 AI 團隊完成",
-  }[state.phase];
+  })[state.phase];
 
   const phaseIcon = {
     analyzing: "...", assembling: "...", proposal: "ready", executing: "running", done: "done",
@@ -332,7 +341,7 @@ function TeamAssemblyPanel({
         {relaySteps.length > 0 && (
           <div style={{ padding: "12px 18px", borderBottom: "1px solid #F5F5F4" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: "#9B9990", textTransform: "uppercase", letterSpacing: "0.07em" }}>執行進度</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "#9B9990", textTransform: "uppercase", letterSpacing: "0.07em" }}>{lang === "en" ? "Progress" : "執行進度"}</span>
               <span style={{ fontSize: 10, color: "#C8C7C3" }}>{completedCount}/{relaySteps.length} steps</span>
             </div>
             <div style={{ height: 6, background: "#F2F1EF", borderRadius: 3, overflow: "hidden" }}>
@@ -340,7 +349,9 @@ function TeamAssemblyPanel({
             </div>
             {activeStep && (
               <div style={{ fontSize: 11, color: "#6B6A66", marginTop: 6 }}>
-                目前由 <strong style={{ color: "#1A1A18" }}>{activeStep.agentName}</strong> 執行：{activeStep.label}
+                {lang === "en"
+                  ? (<><strong style={{ color: "#1A1A18" }}>{activeStep.agentName}</strong> is on it: {activeStep.label}</>)
+                  : (<>目前由 <strong style={{ color: "#1A1A18" }}>{activeStep.agentName}</strong> 執行：{activeStep.label}</>)}
               </div>
             )}
           </div>
@@ -349,7 +360,7 @@ function TeamAssemblyPanel({
         {/* Agents */}
         {state.agents.length > 0 && (
           <div style={{ padding: "12px 18px", borderBottom: "1px solid #F5F5F4" }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: "#9B9990", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>本次任務團隊</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#9B9990", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>{lang === "en" ? "This mission team" : "本次任務團隊"}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {state.agents.map((agent) => (
                 <div key={agent.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -381,7 +392,7 @@ function TeamAssemblyPanel({
                     fontWeight: 600, cursor: "pointer",
                   }}
                 >
-                  開始執行
+                  {lang === "en" ? "Start" : "開始執行"}
                 </button>
               )}
             </div>
@@ -417,7 +428,11 @@ function TeamAssemblyPanel({
                         color: step.status === "done" ? "#3D9A3D" : step.status === "running" ? "#E8631A" : "#9B9990",
                         border: `1px solid ${step.status === "done" ? "#C8E6C8" : "#E4E3E1"}`,
                       }}>
-                        {step.status === "done" ? "已完成" : step.status === "running" ? "執行中..." : "待執行"}
+                        {step.status === "done"
+                          ? (lang === "en" ? "Done" : "已完成")
+                          : step.status === "running"
+                          ? (lang === "en" ? "Running..." : "執行中...")
+                          : (lang === "en" ? "Pending" : "待執行")}
                       </span>
                       <span style={{ fontSize: 10, color: "#C8C7C3" }}>ETA {step.eta}</span>
                     </div>
@@ -450,7 +465,7 @@ function TeamAssemblyPanel({
 
         {state.phase === "proposal" && (
           <div style={{ padding: "12px 18px", background: "#FAFAF9" }}>
-            <p style={{ fontSize: 12, color: "#6B6A66" }}>批准後，AI 團隊會一棒接一棒自動完成任務。</p>
+            <p style={{ fontSize: 12, color: "#6B6A66" }}>{lang === "en" ? "Once you approve, your AI team takes the relay all the way to delivery." : "批准後，AI 團隊會一棒接一棒自動完成任務。"}</p>
           </div>
         )}
       </div>
@@ -479,7 +494,7 @@ export default function MissionChatCore({
   onSquadPreview,
   onSquadStepProgress,
 }: MissionChatCoreProps = {}) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   // ── Conversations state ──────────────────────────────────────────────────
   const [conversations, setConversations] = useState<Array<{
@@ -1601,10 +1616,10 @@ export default function MissionChatCore({
                 )}
                 <span style={{ fontSize: 12, fontWeight: 600, color: squadStep.isComplete ? "#059669" : "#1A1A18" }}>
                   {squadStep.isComplete
-                    ? "Squad 執行完成"
+                    ? (lang === "en" ? "Squad complete" : "Squad 執行完成")
                     : streamingAgentName
-                    ? `${streamingAgentName} 執行中…`
-                    : currentStepLabel || "分析中…"
+                    ? (lang === "en" ? `${streamingAgentName} working…` : `${streamingAgentName} 執行中…`)
+                    : currentStepLabel || (lang === "en" ? "Analyzing…" : "分析中…")
                   }
                 </span>
                 {!squadStep.isComplete && streamingAgentTitle && (
@@ -1623,10 +1638,10 @@ export default function MissionChatCore({
                 </span>
                 {!squadStep.isComplete && (
                   <button
-                    onClick={() => setInput("我想換一支不同的小組來執行這個任務，請列出可選的 Squad 選項")}
+                    onClick={() => setInput(lang === "en" ? "I'd like a different squad for this task — please list the options." : "我想換一支不同的小組來執行這個任務，請列出可選的 Squad 選項")}
                     style={{ fontSize: 10, color: "#9B9990", background: "transparent", border: "1px solid #E4E3E1", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
                   >
-                    換 Squad
+                    {lang === "en" ? "Switch Squad" : "換 Squad"}
                   </button>
                 )}
               </div>
@@ -1682,7 +1697,7 @@ export default function MissionChatCore({
               display: "flex", alignItems: "center", gap: 4,
             }}>
               <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} />
-              執行中…
+              {lang === "en" ? "Running…" : "執行中…"}
             </span>
           )}
           {awaitingApproval && (
@@ -1690,7 +1705,7 @@ export default function MissionChatCore({
               fontSize: 11, color: "#4A4A45", background: "#F2F1EF",
               border: "1px solid #E4E3E1", padding: "2px 8px", borderRadius: 20,
             }}>
-              等待批准
+              {lang === "en" ? "Awaiting approval" : "等待批准"}
             </span>
           )}
         </div>
@@ -1748,7 +1763,7 @@ export default function MissionChatCore({
       }}>
         <button
           onClick={() => {
-            const summaryText = "請總結以上對話的重點，包含：主要決策、行動項目、待確認事項。";
+            const summaryText = lang === "en" ? "Please summarize this conversation: key decisions, action items, and open questions." : "請總結以上對話的重點，包含：主要決策、行動項目、待確認事項。";
             setInput(summaryText);
             setTimeout(() => { const ev = new Event("submit-shortcut"); document.dispatchEvent(ev); }, 50);
           }}
@@ -1773,7 +1788,7 @@ export default function MissionChatCore({
         {/* 清空對話按鈕 */}
         <button
           onClick={async () => {
-            if (!window.confirm("確定要清空目前對話？定位進度也會重置。")) return;
+            if (!window.confirm(lang === "en" ? "Clear this conversation? Positioning progress will also reset." : "確定要清空目前對話？定位進度也會重置。")) return;
             // 清空前端狀態
             if (active) {
               setConversations((prev) =>
@@ -1820,7 +1835,7 @@ export default function MissionChatCore({
           onClick={() => {
             // 建立新對話，重置所有 relay/team 狀態
             const newId = `conv-new-${Date.now()}`;
-            const newConv = { id: newId, title: "新對話", messages: [], createdAt: Date.now() };
+            const newConv = { id: newId, title: lang === "en" ? "New chat" : "新對話", messages: [], createdAt: Date.now() };
             setConversations((prev) => [newConv, ...prev]);
             setActiveId(newId);
             setRelaySteps([]);
@@ -1866,7 +1881,7 @@ export default function MissionChatCore({
               <path d="M2 17l10 5 10-5"/>
               <path d="M2 12l10 5 10-5"/>
             </svg>
-            儲存為我的 Squad
+            {lang === "en" ? "Save as my Squad" : "儲存為我的 Squad"}
           </button>
         )}
       </div>
@@ -1992,7 +2007,7 @@ export default function MissionChatCore({
               <SaveToBrainButton
                 brandId={activeBrand.id}
                 content={msg.content ?? ""}
-                title={msg.squadStepLabel ?? `Step ${msg.squadStep} 輸出`}
+                title={msg.squadStepLabel ?? (lang === "en" ? `Step ${msg.squadStep} output` : `Step ${msg.squadStep} 輸出`)}
                 missionId={activeMissionId ?? undefined}
               />
             )}
@@ -2006,7 +2021,7 @@ export default function MissionChatCore({
               && (() => {
               const deliverableItems: DeliverableItem[] = [{
                 id: parseInt(msg.id.replace(/\D/g, "").slice(-8) || "1"),
-                title: msg.squadStepLabel ?? "任務成品",
+                title: msg.squadStepLabel ?? (lang === "en" ? "Mission deliverable" : "任務成品"),
                 content: msg.content,
                 outputType: "text",
                 deliverableLevel: 1,
@@ -2180,8 +2195,8 @@ export default function MissionChatCore({
               {!streamingAgentName && (
                 <span style={{ fontSize: 11, color: "#9B9990" }}>
                   {activeMissionId && (missionDataQuery.data as any)?.squadSlug
-                    ? "A2A 交接中，準備下一位 Agent…"
-                    : "分析任務中..."}
+                    ? (lang === "en" ? "Handing off to the next Agent…" : "A2A 交接中，準備下一位 Agent…")
+                    : (lang === "en" ? "Analyzing the task..." : "分析任務中...")}
                 </span>
               )}
               <button
@@ -2196,7 +2211,7 @@ export default function MissionChatCore({
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="3" y="3" width="18" height="18" rx="2"/>
                 </svg>
-                停止
+                {lang === "en" ? "Stop" : "停止"}
               </button>
             </div>
             <div style={{ padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -2214,8 +2229,8 @@ export default function MissionChatCore({
                 {streamingThinking
                   ? streamingThinking.slice(0, 200) + (streamingThinking.length > 200 ? "…" : "")
                   : (!streamingAgentName && activeMissionId && (missionDataQuery.data as any)?.squadSlug)
-                  ? "正在將成果交給下一位 Agent，請稍候…"
-                  : "正在思考最佳策略..."}
+                  ? (lang === "en" ? "Handing the results to the next Agent, hold on…" : "正在將成果交給下一位 Agent，請稍候…")
+                  : (lang === "en" ? "Thinking through the best plan..." : "正在思考最佳策略...")}
               </span>
             </div>
           </div>
@@ -2245,7 +2260,7 @@ export default function MissionChatCore({
             <svg width="10" height="10" viewBox="0 0 24 24" fill="#C8C7C3">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
             </svg>
-            已停止生成
+            {lang === "en" ? "Generation stopped" : "已停止生成"}
           </div>
         )}
 
@@ -2260,7 +2275,7 @@ export default function MissionChatCore({
                 const newObj = existingObj ? existingObj : snippet;
                 updateMission.mutate({ id: activeMissionId, objective: newObj });
               }}
-              title="儲存到任務需求"
+              title={lang === "en" ? "Save to mission requirements" : "儲存到任務需求"}
               style={{
                 background: "none", border: "1px solid #E4E3E1",
                 borderRadius: 6, padding: "2px 8px",
@@ -2276,7 +2291,7 @@ export default function MissionChatCore({
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
               </svg>
-              更新需求
+              {lang === "en" ? "Update brief" : "更新需求"}
             </button>
           </div>
         ))}
@@ -2308,9 +2323,11 @@ export default function MissionChatCore({
                 </svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>Squad 執行完成</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>{lang === "en" ? "Squad complete" : "Squad 執行完成"}</div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 1 }}>
-                  {squadStepProgress.length} 位 Agent · {squadStep.totalSteps - 1} 個步驟全部完成
+                  {lang === "en"
+                    ? `${squadStepProgress.length} agents · ${squadStep.totalSteps - 1} steps complete`
+                    : `${squadStepProgress.length} 位 Agent · ${squadStep.totalSteps - 1} 個步驟全部完成`}
                 </div>
               </div>
               {/* Agent avatar row */}
@@ -2357,7 +2374,7 @@ export default function MissionChatCore({
                     .filter(m => m.role === "assistant" && m.squadStep !== undefined && m.content)
                     .map(m => `## ${m.squadStepLabel ?? m.agentName ?? "Agent"}\n\n${m.content}`)
                     .join("\n\n---\n\n") ?? "";
-                  navigator.clipboard.writeText(allContent).then(() => alert("已複製到剪貼簿！"));
+                  navigator.clipboard.writeText(allContent).then(() => alert(lang === "en" ? "Copied to clipboard!" : "已複製到剪貼簿！"));
                 }}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
@@ -2394,7 +2411,7 @@ export default function MissionChatCore({
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                     <polyline points="22,6 12,13 2,6"/>
                   </svg>
-                  Email 給我
+                  {lang === "en" ? "Email me" : "Email 給我"}
                 </button>
               )}
               {emailSent && (
@@ -2407,7 +2424,7 @@ export default function MissionChatCore({
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
-                  Email 已送出
+                  {lang === "en" ? "Email sent" : "Email 已送出"}
                 </span>
               )}
 
@@ -2426,10 +2443,10 @@ export default function MissionChatCore({
                         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                         body: JSON.stringify({
                           category: "custom",
-                          title: `Squad 完整成果 — ${new Date().toLocaleDateString("zh-TW")}`,
+                          title: lang === "en" ? `Squad full results — ${new Date().toLocaleDateString("en-US")}` : `Squad 完整成果 — ${new Date().toLocaleDateString("zh-TW")}`,
                           content: allContent.slice(0, 2000), sourceMissionId: activeMissionId,
                         }),
-                      }).then(() => alert("成果已存入品牌大腦！")).catch(() => {});
+                      }).then(() => alert(lang === "en" ? "Saved to Brand Brain!" : "成果已存入品牌大腦！")).catch(() => {});
                     }
                   }}
                   style={{
@@ -2452,7 +2469,7 @@ export default function MissionChatCore({
 
               {/* Deep analysis */}
               <button
-                onClick={() => setInput("我想針對某個環節深入分析，或調整方向重新執行")}
+                onClick={() => setInput(lang === "en" ? "I'd like to deepen one step or adjust the direction and rerun" : "我想針對某個環節深入分析，或調整方向重新執行")}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
                   padding: "8px 14px", borderRadius: 8, fontSize: 12,
@@ -2467,7 +2484,7 @@ export default function MissionChatCore({
                   <polyline points="23 4 23 10 17 10"/>
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
                 </svg>
-                深入分析 / 調整方向
+                {lang === "en" ? "Deep dive / adjust" : "深入分析 / 調整方向"}
               </button>
             </div>
 
@@ -2486,7 +2503,7 @@ export default function MissionChatCore({
                   marginBottom: 8, textTransform: "uppercase" as const,
                   letterSpacing: "0.06em",
                 }}>
-                  將完整成果 Email 發送至
+                  {lang === "en" ? "Email the full results to" : "將完整成果 Email 發送至"}
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input
@@ -2521,7 +2538,7 @@ export default function MissionChatCore({
                         .filter(m => m.role === "assistant" && m.squadStep !== undefined && m.content)
                         .map(m => `## ${m.squadStepLabel ?? m.agentName ?? "Agent"}\n\n${m.content}`)
                         .join("\n\n---\n\n") ?? "";
-                      const missionTitle = (missionDataQuery.data as any)?.title ?? "行銷任務";
+                      const missionTitle = (missionDataQuery.data as any)?.title ?? (lang === "en" ? "Marketing mission" : "行銷任務");
                       const token = localStorage.getItem("authToken");
                       try {
                         const resp = await fetch("/api/chat/email-results", {
@@ -2529,14 +2546,14 @@ export default function MissionChatCore({
                           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                           body: JSON.stringify({
                             recipientEmail: emailInput,
-                            subject: `${activeBrand?.name ?? ""} ${missionTitle} — AI Squad 成果報告`,
+                            subject: lang === "en" ? `${activeBrand?.name ?? ""} ${missionTitle} — AI Squad results report` : `${activeBrand?.name ?? ""} ${missionTitle} — AI Squad 成果報告`,
                             content: allContent,
                             missionId: activeMissionId,
                           }),
                         });
                         if (resp.ok) { setEmailSent(true); setEmailDialogOpen(false); }
-                        else { alert("發送失敗，請稍後再試"); }
-                      } catch { alert("發送失敗，請稍後再試"); }
+                        else { alert(lang === "en" ? "Send failed, please try again" : "發送失敗，請稍後再試"); }
+                      } catch { alert(lang === "en" ? "Send failed, please try again" : "發送失敗，請稍後再試"); }
                       finally { setEmailSending(false); }
                     }}
                     style={{
@@ -2554,9 +2571,9 @@ export default function MissionChatCore({
                     {emailSending ? (
                       <>
                         <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
-                        發送中
+                        {lang === "en" ? "Sending" : "發送中"}
                       </>
-                    ) : "發送"}
+                    ) : (lang === "en" ? "Send" : "發送")}
                   </button>
                   <button
                     onClick={() => setEmailDialogOpen(false)}
@@ -2564,7 +2581,7 @@ export default function MissionChatCore({
                       background: "none", border: "none", color: "#9CA3AF",
                       cursor: "pointer", fontSize: 16, padding: "4px", lineHeight: 1,
                     }}
-                    title="取消"
+                    title={lang === "en" ? "Cancel" : "取消"}
                   >×</button>
                 </div>
               </div>
@@ -2603,7 +2620,7 @@ export default function MissionChatCore({
             <span>{preselectedAgent.type === "agent" ? "A" : "S"}</span>
             <span style={{ fontWeight: 500, color: "#E8631A" }}>{preselectedAgent.name}</span>
             {preselectedAgent.title && <span style={{ color: "#B07A30", fontSize: 11 }}>· {preselectedAgent.title}</span>}
-            <span style={{ fontSize: 11, color: "#C8973A", marginLeft: 4 }}>已選擇，輸入你的任務 👇</span>
+            <span style={{ fontSize: 11, color: "#C8973A", marginLeft: 4 }}>{lang === "en" ? "Selected — type your task 👇" : "已選擇，輸入你的任務 👇"}</span>
             <button
               onClick={onClearAgent}
               style={{ marginLeft: "auto", background: "none", border: "none", color: "#C8C7C3", cursor: "pointer", fontSize: 12 }}
@@ -2628,7 +2645,7 @@ export default function MissionChatCore({
               }}>
                 {lastAgentMsg.agentName?.charAt(0) ?? "A"}
               </div>
-              <span>回覆 {lastAgentMsg.agentName ?? "Agent"}</span>
+              <span>{lang === "en" ? `Reply to ${lastAgentMsg.agentName ?? "Agent"}` : `回覆 ${lastAgentMsg.agentName ?? "Agent"}`}</span>
             </div>
           );
         })()}
@@ -2653,7 +2670,7 @@ export default function MissionChatCore({
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
                 </svg>
-                <span>任務需求已套用 ({count} 項)</span>
+                <span>{lang === "en" ? `Brief applied (${count} ${count === 1 ? "item" : "items"})` : `任務需求已套用 (${count} 項)`}</span>
               </span>
             </div>
           );

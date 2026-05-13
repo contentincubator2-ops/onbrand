@@ -195,7 +195,8 @@ function Rail({ activeTab, onTabChange, notifCount }: {
   onTabChange: (t: string) => void;
   notifCount: number;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const isEn = lang === "en";
   const navigate = useNavigate();
   const railStyle: React.CSSProperties = {
     width: 48, minWidth: 48,
@@ -249,7 +250,7 @@ function Rail({ activeTab, onTabChange, notifCount }: {
             onClick={() => {
               const brandId = readPersistedBrandId();
               if (brandId) navigate(`/b/${brandId}/deck`);
-              else alert("請先選一個品牌");
+              else alert(isEn ? "Pick a brand first" : "請先選一個品牌");
             }}
             style={{
               ...btnBase,
@@ -284,7 +285,7 @@ function Rail({ activeTab, onTabChange, notifCount }: {
             onClick={() => {
               const brandId = readPersistedBrandId();
               if (brandId) navigate(`/studio/${brandId}/triage`);
-              else alert("請先選一個品牌");
+              else alert(isEn ? "Pick a brand first" : "請先選一個品牌");
             }}
             style={{
               ...btnBase,
@@ -374,11 +375,15 @@ function fmtModel(m: string): string {
 
 function ResourceStats({ resourceData, isLoading }: { resourceData: any; isLoading: boolean }) {
   const [expanded, setExpanded] = React.useState<string | null>(null);
+  const { lang } = useLang();
+  const isEn = lang === "en";
 
   const skillChips: string[]    = (resourceData?.skillList   ?? []).slice(0, 20);
   const modelChips: string[]    = (resourceData?.providerList ?? []).map((m: string) => fmtModel(m));
   const agentDesc: string | null = resourceData?.agents != null
-    ? `${resourceData.agents.toLocaleString()} 位專業行銷 Agent 待命中`
+    ? (isEn
+      ? `${resourceData.agents.toLocaleString()} marketing agents on standby`
+      : `${resourceData.agents.toLocaleString()} 位專業行銷 Agent 待命中`)
     : null;
 
   const items = [
@@ -1112,7 +1117,7 @@ const BRAIN_CATEGORY_META: Record<string, { labelKey: string; emoji: string; bg:
 };
 
 function BrandBrainTab({ brandId }: { brandId?: number | null }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [expandedKey, setExpandedKey] = React.useState<string | null>(null);
   const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
 
@@ -1134,7 +1139,7 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
 
   const fmtDate = (d: string | null | undefined) => {
     if (!d) return null;
-    try { return new Date(d).toLocaleDateString("zh-TW", { month: "short", day: "numeric" }); }
+    try { return new Date(d).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW", { month: "short", day: "numeric" }); }
     catch { return d; }
   };
 
@@ -1343,6 +1348,8 @@ function BrandBrainTab({ brandId }: { brandId?: number | null }) {
 // ─── MembersTab ───────────────────────────────────────────────────────────────
 
 function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId?: number | null }) {
+  const { lang } = useLang();
+  const isEn = lang === "en";
   const [assembling, setAssembling] = React.useState(false);
   const [squadUid, setSquadUid] = React.useState<string | null>(null);
   const [squadTitle, setSquadTitle] = React.useState<string>("");
@@ -1421,7 +1428,7 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
   if (!missionId) {
     return (
       <div style={{ padding: "30px 0", textAlign: "center" as const, color: "#C8C7C3", fontSize: 11 }}>
-        選擇任務後顯示成員
+        {isEn ? "Pick a project to see the team" : "選擇任務後顯示成員"}
       </div>
     );
   }
@@ -1439,21 +1446,21 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
               <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           </div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>召集你的行銷小組</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>{isEn ? "Assemble your marketing team" : "召集你的行銷小組"}</div>
           <div style={{ fontSize: 11, color: "#9B9990", lineHeight: 1.5 }}>
-            PM 已為這個任務推薦了<br />最適合的 Agent 組合
+            {isEn ? (<>The PM has picked the best<br />agents for this project</>) : (<>PM 已為這個任務推薦了<br />最適合的 Agent 組合</>)}
           </div>
         </div>
         {/* 預覽成員陣容 */}
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column" as const, gap: 5 }}>
           {[
-            { name: "Jordan Hayes", role: "Squad Lead · AI 品牌故事 CMO", lead: true },
-            { name: "Ryan Torres", role: "市場研究師" },
-            { name: "Priya Nair", role: "消費者洞察師" },
-            { name: "Layla Brooks", role: "品牌策略師" },
-            { name: "Marcus Webb", role: "策略定位師" },
-            { name: "Claire Sutton", role: "品牌文案師" },
-            { name: "Derek Mills", role: "行銷通路師" },
+            { name: "Jordan Hayes", role: isEn ? "Squad Lead · AI brand-story CMO" : "Squad Lead · AI 品牌故事 CMO", lead: true },
+            { name: "Ryan Torres", role: isEn ? "Market researcher" : "市場研究師" },
+            { name: "Priya Nair", role: isEn ? "Consumer-insight analyst" : "消費者洞察師" },
+            { name: "Layla Brooks", role: isEn ? "Brand strategist" : "品牌策略師" },
+            { name: "Marcus Webb", role: isEn ? "Positioning strategist" : "策略定位師" },
+            { name: "Claire Sutton", role: isEn ? "Brand copywriter" : "品牌文案師" },
+            { name: "Derek Mills", role: isEn ? "Channel strategist" : "行銷通路師" },
           ].map((m, i) => (
             <div key={i} style={{
               display: "flex", alignItems: "center", gap: 8,
@@ -1484,7 +1491,7 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
             border: "none", fontFamily: "inherit",
           }}
         >
-          ✅ 確認組隊，開始召集
+          {isEn ? "✅ Lock in this team — start assembling" : "✅ 確認組隊，開始召集"}
         </button>
       </div>
     );
@@ -1495,8 +1502,8 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
     return (
       <div style={{ padding: "30px 8px", textAlign: "center" as const }}>
         <div style={{ fontSize: 28, marginBottom: 10 }}>⏳</div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>成員召集中...</div>
-        <div style={{ fontSize: 11, color: "#9B9990" }}>正在為這個品牌建立專屬小組</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>{isEn ? "Bringing the team together…" : "成員召集中..."}</div>
+        <div style={{ fontSize: 11, color: "#9B9990" }}>{isEn ? "Building a custom squad for this brand" : "正在為這個品牌建立專屬小組"}</div>
       </div>
     );
   }
@@ -1506,8 +1513,8 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
     return (
       <div style={{ padding: "20px 8px", textAlign: "center" as const }}>
         <div style={{ fontSize: 24, marginBottom: 8 }}>🎯</div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>小組就緒！</div>
-        <div style={{ fontSize: 11, color: "#9B9990" }}>Squad Lead 正在分析品牌...</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A18", marginBottom: 4 }}>{isEn ? "Team's ready!" : "小組就緒！"}</div>
+        <div style={{ fontSize: 11, color: "#9B9990" }}>{isEn ? "Squad Lead is reading your brand…" : "Squad Lead 正在分析品牌..."}</div>
         <div style={{ marginTop: 12, fontSize: 10, color: "#C8C7C3" }}>⏳</div>
       </div>
     );
@@ -1519,7 +1526,7 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
       {/* Squad 標題 */}
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 10, fontWeight: 600, color: "#C8C7C3", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>
-          👥 {squadTitle || "品牌定位小組"}
+          👥 {squadTitle || (isEn ? "Brand positioning squad" : "品牌定位小組")}
         </div>
       </div>
 
@@ -1538,7 +1545,7 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
             }}>劉</div>
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18" }}>{openingAgent || "Jordan Hayes"}</div>
-              <div style={{ fontSize: 9, color: "#9B9990" }}>Squad Lead · AI 品牌故事 CMO</div>
+              <div style={{ fontSize: 9, color: "#9B9990" }}>{isEn ? "Squad Lead · AI brand-story CMO" : "Squad Lead · AI 品牌故事 CMO"}</div>
             </div>
           </div>
           <div style={{ fontSize: 11, color: "#1A1A18", lineHeight: 1.6, whiteSpace: "pre-wrap" as const }}>
@@ -1571,13 +1578,13 @@ function MembersTab({ missionId, brandId }: { missionId?: number | null; brandId
         )) : (
           // Fallback：用靜態清單顯示
           [
-            { name: "Ryan Torres", role: "市場研究師" },
-            { name: "Priya Nair", role: "消費者洞察師" },
-            { name: "Layla Brooks", role: "品牌策略師" },
-            { name: "Marcus Webb", role: "策略定位師" },
-            { name: "Claire Sutton", role: "品牌文案師" },
-            { name: "Derek Mills", role: "行銷通路師" },
-            { name: "PM Agent", role: "行銷計劃師" },
+            { name: "Ryan Torres", role: isEn ? "Market researcher" : "市場研究師" },
+            { name: "Priya Nair", role: isEn ? "Consumer-insight analyst" : "消費者洞察師" },
+            { name: "Layla Brooks", role: isEn ? "Brand strategist" : "品牌策略師" },
+            { name: "Marcus Webb", role: isEn ? "Positioning strategist" : "策略定位師" },
+            { name: "Claire Sutton", role: isEn ? "Brand copywriter" : "品牌文案師" },
+            { name: "Derek Mills", role: isEn ? "Channel strategist" : "行銷通路師" },
+            { name: "PM Agent", role: isEn ? "Marketing PM" : "行銷計劃師" },
           ].map((m, i) => (
             <div key={i} style={{
               background: "white", border: "1px solid #ECEAE8",
@@ -1768,7 +1775,8 @@ function RightPanel({
   onWidthChange?: (w: number) => void;
   squadStepProgress?: SquadStepProgress[];
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const isEn = lang === "en";
   // ── Resolve squad: prefer chip selection, fall back to stored slug ──────────
   const slugQuery = trpc.squad.getSquadBySlug.useQuery(
     { slug: missionSquadSlug ?? "" },
@@ -1923,7 +1931,7 @@ function RightPanel({
             isLoading={agentsQuery.isLoading}
             activeStep={activeStep}
           />
-        : emptyHint("選擇執行方式\n查看對應流程"),
+        : emptyHint(isEn ? "Pick a method\nto see the workflow" : "選擇執行方式\n查看對應流程"),
     },
     // Commercial Validation — only shown when squad has showcases
     ...((agentsData?.showcases ?? []).length > 0 ? [{
@@ -1940,7 +1948,7 @@ function RightPanel({
               padding: "9px 10px",
             }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A18", marginBottom: 3 }}>
-                {sc.company ?? sc.brand ?? "案例"}
+                {sc.company ?? sc.brand ?? (isEn ? "Case study" : "案例")}
               </div>
               {sc.result && (
                 <div style={{ fontSize: 11, color: "#6B6A66", lineHeight: 1.5, marginBottom: 3 }}>
@@ -1975,7 +1983,7 @@ function RightPanel({
                 isLoading={agentsQuery.isLoading}
                 activeStep={activeStep}
               />
-            : emptyHint("選擇執行方式\n查看協作成員")}
+            : emptyHint(isEn ? "Pick a method\nto see team members" : "選擇執行方式\n查看協作成員")}
         </div>
       ),
     },
@@ -2082,7 +2090,7 @@ function RightPanel({
         <div style={{ position: "relative" }} ref={pickerRef}>
           <button
             onClick={() => setShowSectionPicker(p => !p)}
-            title="選擇顯示的面板"
+            title={isEn ? "Pick which panels to show" : "選擇顯示的面板"}
             style={{
               padding: "2px 8px",
               borderRadius: 5,
@@ -2251,7 +2259,7 @@ function RightPanel({
                 {/* X close button — hide section entirely (re-add via 面板 picker) */}
                 <button
                   onClick={() => setHiddenSections(prev => ({ ...prev, [section.key]: true }))}
-                  title="關閉此面板（可從上方「面板」重新開啟）"
+                  title={isEn ? "Close this panel (re-open from the Panel menu above)" : "關閉此面板（可從上方「面板」重新開啟）"}
                   style={{
                     flexShrink: 0,
                     width: 24, height: 32,
@@ -2307,7 +2315,8 @@ function DBSquadMethodologyPanel({
   isLoading: boolean;
   activeStep?: number; // 0 = lead intake, 1+ = workflow steps
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const isEn = lang === "en";
   return (
     <div>
       {/* Squad header */}
@@ -2347,7 +2356,7 @@ function DBSquadMethodologyPanel({
             const isActive = activeStep !== undefined && activeStep > 0 && activeStep === stepNum;
             const isDone   = activeStep !== undefined && activeStep > stepNum;
             const isLast   = i === steps.length - 1;
-            const title    = step.title ?? step.name ?? step.skill ?? step.role_key ?? `步驟 ${i + 1}`;
+            const title    = step.title ?? step.name ?? step.skill ?? step.role_key ?? (isEn ? `Step ${i + 1}` : `步驟 ${i + 1}`);
             // "conclusion" = real execution output if present, else description as fallback.
             // Raw LLM output may contain markdown — strip common markers so the 2-line clamp reads cleanly.
             const rawConclusion: string | null = step.conclusion ?? step.output ?? step.result ?? step.description ?? null;
@@ -2667,6 +2676,8 @@ function DBAgentMembersList({
 // Renders alternative squad lead agents from other squads
 
 function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; isLoading: boolean }) {
+  const { lang } = useLang();
+  const isEn = lang === "en";
   if (isLoading) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2680,7 +2691,7 @@ function DBAlternativesList({ alternatives, isLoading }: { alternatives: any[]; 
   if (!alternatives.length) {
     return (
       <div style={{ padding: "12px 0", textAlign: "center", fontSize: 11, color: "#C8C7C3" }}>
-        無備選專家資料
+        {isEn ? "No alternative experts" : "無備選專家資料"}
       </div>
     );
   }
@@ -2746,21 +2757,21 @@ function isActionType(type: string) {
 }
 
 /** Placeholder label for a provider */
-function providerActionLabel(type: string, provider?: string) {
+function providerActionLabel(type: string, provider?: string, isEn?: boolean) {
   if (type === "output") {
-    if (provider === "email") return "輸入 Email";
-    if (provider === "line")  return "輸入 LINE ID";
-    return "授權連結";
+    if (provider === "email") return isEn ? "Enter email" : "輸入 Email";
+    if (provider === "line")  return isEn ? "Enter LINE ID" : "輸入 LINE ID";
+    return isEn ? "Authorize" : "授權連結";
   }
-  return "連結帳戶";
+  return isEn ? "Connect account" : "連結帳戶";
 }
 
 /** Inline edit placeholder text */
-function actionPlaceholder(type: string, provider?: string) {
-  if (provider === "email") return "收件地址 example@email.com";
-  if (provider === "line")  return "LINE ID 或手機號碼";
-  if (type === "output")    return "貼上授權 Token（暫時）";
-  return "貼上 API Key 或 Access Token（暫時）";
+function actionPlaceholder(type: string, provider?: string, isEn?: boolean) {
+  if (provider === "email") return isEn ? "Inbox e.g. example@email.com" : "收件地址 example@email.com";
+  if (provider === "line")  return isEn ? "LINE ID or phone number" : "LINE ID 或手機號碼";
+  if (type === "output")    return isEn ? "Paste auth token (temporary)" : "貼上授權 Token（暫時）";
+  return isEn ? "Paste API key or access token (temporary)" : "貼上 API Key 或 Access Token（暫時）";
 }
 
 function SquadRequirementsPanel({
@@ -2772,7 +2783,8 @@ function SquadRequirementsPanel({
   squadSlug?: string | null;
   workspace?: string | null;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const isEn = lang === "en";
   const requirementsQuery = (trpc as any).squad?.getRequirements?.useQuery
     ? (trpc as any).squad.getRequirements.useQuery(
         { squadSlug: squadSlug ?? "", workspace: workspace ?? undefined },
@@ -2827,12 +2839,12 @@ function SquadRequirementsPanel({
   // ── Empty states ─────────────────────────────────────────────────────────
   if (!missionId) return (
     <div style={{ padding: "16px 4px", textAlign: "center" as const, color: "#C5C4C0", fontSize: 11, lineHeight: 1.8 }}>
-      選擇任務後<br />查看需求清單
+      {isEn ? (<>Pick a project<br />to see what we need</>) : (<>選擇任務後<br />查看需求清單</>)}
     </div>
   );
   if (!squadSlug) return (
     <div style={{ padding: "14px 4px", textAlign: "center" as const, color: "#C5C4C0", fontSize: 11, lineHeight: 1.8 }}>
-      選擇一個 Squad<br />查看所需資料清單
+      {isEn ? (<>Pick a squad<br />to see the checklist</>) : (<>選擇一個 Squad<br />查看所需資料清單</>)}
     </div>
   );
 
@@ -2924,7 +2936,7 @@ function SquadRequirementsPanel({
                             padding: "0 7px", maxWidth: 90, overflow: "hidden",
                             textOverflow: "ellipsis", whiteSpace: "nowrap" as const, flexShrink: 0,
                           }}>
-                            {isAction ? (req.provider === "email" || req.provider === "line" ? values[req.id] : "已連結 ✓") : values[req.id]}
+                            {isAction ? (req.provider === "email" || req.provider === "line" ? values[req.id] : (isEn ? "Connected ✓" : "已連結 ✓")) : values[req.id]}
                           </span>
                         ) : isAction ? (
                           <span style={{
@@ -2932,7 +2944,7 @@ function SquadRequirementsPanel({
                             border: "1px solid #C7D2FE", borderRadius: 10,
                             padding: "1px 8px", flexShrink: 0, whiteSpace: "nowrap" as const,
                           }}>
-                            🔗 {providerActionLabel(req.type, req.provider)}
+                            🔗 {providerActionLabel(req.type, req.provider, isEn)}
                           </span>
                         ) : (
                           <>
@@ -2976,14 +2988,14 @@ function SquadRequirementsPanel({
                               borderRadius: 5, padding: "5px 6px", background: "#FFF", fontFamily: "inherit",
                             }}
                           >
-                            <option value="">選擇…</option>
+                            <option value="">{isEn ? "Pick one…" : "選擇…"}</option>
                             {(req.options ?? []).map((o: string) => (
                               <option key={o} value={o}>{o}</option>
                             ))}
                           </select>
                         ) : req.type === "boolean" ? (
                           <div style={{ display: "flex", gap: 6 }}>
-                            {["是", "否"].map(opt => (
+                            {(isEn ? ["Yes", "No"] : ["是", "否"]).map(opt => (
                               <button key={opt} onClick={() => setEditValue(opt)} style={{
                                 fontSize: 11, border: `1px solid ${editValue === opt ? "#5B7FDB" : "#D1D5DB"}`,
                                 borderRadius: 5, padding: "4px 18px", cursor: "pointer",
@@ -2998,7 +3010,7 @@ function SquadRequirementsPanel({
                             type={req.provider === "email" ? "email" : "text"}
                             value={editValue}
                             onChange={e => setEditValue(e.target.value)}
-                            placeholder={actionPlaceholder(req.type, req.provider)}
+                            placeholder={actionPlaceholder(req.type, req.provider, isEn)}
                             onKeyDown={e => { if (e.key === "Enter") commitEdit(req.id); if (e.key === "Escape") cancelEdit(); }}
                             style={{
                               width: "100%", fontSize: 11, border: "1px solid #A7F3D0",
@@ -3026,12 +3038,12 @@ function SquadRequirementsPanel({
                           <button onClick={() => commitEdit(req.id)} style={{
                             fontSize: 10, background: "#1A1A18", color: "#FFF", border: "none",
                             borderRadius: 5, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit",
-                          }}>儲存</button>
+                          }}>{t("save")}</button>
                           <button onClick={cancelEdit} style={{
                             fontSize: 10, background: "none", border: "1px solid #E4E3E1",
                             borderRadius: 5, padding: "4px 10px", cursor: "pointer",
                             color: "#6B6A66", fontFamily: "inherit",
-                          }}>取消</button>
+                          }}>{t("cancel")}</button>
                         </div>
                       </div>
                     )}
@@ -3047,7 +3059,7 @@ function SquadRequirementsPanel({
       {Object.keys(outputs).length > 0 && (
         <div style={{ marginTop: 8, paddingTop: 10, borderTop: "1px solid #EEEDE9" }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: "#9B9990", marginBottom: 6, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>
-            交付物
+            {isEn ? "Deliverables" : "交付物"}
           </div>
 
           {/* Default always-unlocked chips */}
@@ -3075,7 +3087,7 @@ function SquadRequirementsPanel({
               return (
                 <div key={gate} style={{ marginTop: 7 }}>
                   <div style={{ fontSize: 9, color: unlocked ? "#059669" : "#B5B4B0", marginBottom: 4 }}>
-                    {unlocked ? "✓" : (isConn ? "🔗" : "+")} {isConn ? "連結" : "填"}「{matchLabel}」解鎖：
+                    {unlocked ? "✓" : (isConn ? "🔗" : "+")} {isEn ? `${isConn ? "Connect" : "Fill"} "${matchLabel}" to unlock:` : `${isConn ? "連結" : "填"}「${matchLabel}」解鎖：`}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4 }}>
                     {items.map((item: string, i: number) => (
@@ -3130,6 +3142,8 @@ function BrainPanel({
   brandId?: number | null;
   missionId?: number | null;
 }) {
+  const { lang } = useLang();
+  const isEn = lang === "en";
   const brainQ = (trpc as any).brandBrain?.list?.useQuery
     ? (trpc as any).brandBrain.list.useQuery(
         { brandId: brandId ?? 0 },
@@ -3157,7 +3171,7 @@ function BrainPanel({
         flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
         color: "#9B9990", fontSize: 13,
       }}>
-        請先選擇品牌 / Select a brand to view its brain
+        {isEn ? "Pick a brand to view its brain" : "請先選擇品牌 / Select a brand to view its brain"}
       </div>
     );
   }
@@ -3176,10 +3190,10 @@ function BrainPanel({
       }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1A18", letterSpacing: "-0.01em" }}>
-            品牌大腦
+            {isEn ? "Brand Brain" : "品牌大腦"}
           </div>
           <div style={{ fontSize: 11, color: "#8C8B87", marginTop: 2 }}>
-            此工作區 / 任務的記憶與知識庫 · {items.length} 項
+            {isEn ? `Memory & knowledge for this workspace / project · ${items.length} items` : `此工作區 / 任務的記憶與知識庫 · ${items.length} 項`}
             {missionId ? ` · Mission #${missionId}` : ""}
           </div>
         </div>
@@ -3201,13 +3215,13 @@ function BrainPanel({
       {/* Item list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
         {brainQ.isLoading ? (
-          <div style={{ color: "#9B9990", fontSize: 12 }}>載入中…</div>
+          <div style={{ color: "#9B9990", fontSize: 12 }}>{isEn ? "Loading…" : "載入中…"}</div>
         ) : items.length === 0 ? (
           <div style={{
             padding: "48px 0", textAlign: "center",
             color: "#9B9990", fontSize: 12,
           }}>
-            尚未累積任何知識。從對話中把重點「釘」到大腦即可在這裡看到。
+            {isEn ? 'No knowledge yet. Pin key takeaways from a chat to add them here.' : "尚未累積任何知識。從對話中把重點「釘」到大腦即可在這裡看到。"}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -3272,6 +3286,8 @@ function SettingsPanel() {
 // ─── ExportsPanel ─────────────────────────────────────────────────────────────
 
 function ExportsPanel({ brandId }: { brandId?: number | null }) {
+  const { lang } = useLang();
+  const isEn = lang === "en";
   const [exports, setExports] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
 
@@ -3296,14 +3312,14 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
 
   const typeLabel = (type: string) => {
     if (type === "ppt" || type === "presentation") return "PPT";
-    if (type === "report") return "報告";
-    if (type === "doc") return "文件";
-    if (type === "copy" || type === "text") return "文案";
-    return "其他";
+    if (type === "report") return isEn ? "Report" : "報告";
+    if (type === "doc") return isEn ? "Doc" : "文件";
+    if (type === "copy" || type === "text") return isEn ? "Copy" : "文案";
+    return isEn ? "Other" : "其他";
   };
 
   const fmtDate = (d: string) => {
-    try { return new Date(d).toLocaleDateString("zh-TW"); } catch { return d; }
+    try { return new Date(d).toLocaleDateString(isEn ? "en-US" : "zh-TW"); } catch { return d; }
   };
 
   return (
@@ -3319,10 +3335,10 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
         flexShrink: 0,
       }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A18", margin: 0 }}>
-          📦 任務產出
+          📦 {isEn ? "Project outputs" : "任務產出"}
         </h2>
         <p style={{ fontSize: 12, color: "#9B9990", marginTop: 4, marginBottom: 0 }}>
-          所有任務生成的 PPT、報告、文案等產出
+          {isEn ? "PPTs, reports, copy — everything your projects produce" : "所有任務生成的 PPT、報告、文案等產出"}
         </p>
       </div>
 
@@ -3330,13 +3346,13 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
         {loading ? (
           <div style={{ textAlign: "center" as const, padding: "60px 0", color: "#C8C7C3", fontSize: 13 }}>
-            載入中…
+            {isEn ? "Loading…" : "載入中…"}
           </div>
         ) : exports.length === 0 ? (
           <div style={{ textAlign: "center" as const, padding: "60px 0" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A18", marginBottom: 6 }}>尚無產出</div>
-            <div style={{ fontSize: 12, color: "#9B9990" }}>完成任務後，產出將自動出現在這裡</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A18", marginBottom: 6 }}>{isEn ? "Nothing yet" : "尚無產出"}</div>
+            <div style={{ fontSize: 12, color: "#9B9990" }}>{isEn ? "Outputs land here automatically when a project finishes" : "完成任務後，產出將自動出現在這裡"}</div>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
@@ -3357,7 +3373,7 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A18", marginBottom: 2 }}>
-                      {item.missionTitle ?? item.title ?? "未命名產出"}
+                      {item.missionTitle ?? item.title ?? (isEn ? "Untitled output" : "未命名產出")}
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
                       <span style={{
@@ -3398,7 +3414,7 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
                       marginTop: "auto",
                     }}
                   >
-                    ⬇ 下載
+                    ⬇ {isEn ? "Download" : "下載"}
                   </a>
                 )}
               </div>
@@ -3411,7 +3427,8 @@ function ExportsPanel({ brandId }: { brandId?: number | null }) {
 }
 
 export default function AppShell({ children, onMissionSelect, onNewTask, activeMissionId, activeSquad, squadStepProgress = [] }: AppShellProps) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const isEn = lang === "en";
   const [railTab, setRailTab] = useState("chat");
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("rightPanelWidth") : null;
@@ -3567,7 +3584,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
         /* Collapsed drawer — thin 16px strip with expand button */
         <div
           onClick={toggleDrawer}
-          title="展開側欄"
+          title={isEn ? "Expand sidebar" : "展開側欄"}
           style={{
             width: 16, minWidth: 16,
             background: "#F2F1EF",
@@ -3605,7 +3622,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
             {activeMissionWorkspace && (
               <>
                 <span style={{ color: "#D4D3D0" }}>/</span>
-                <span>{activeMissionWorkspace === "strategy" ? "策略定位" : activeMissionWorkspace === "website" ? "官網" : activeMissionWorkspace === "facebook" ? "Facebook" : activeMissionWorkspace}</span>
+                <span>{activeMissionWorkspace === "strategy" ? (isEn ? "Strategy" : "策略定位") : activeMissionWorkspace === "website" ? (isEn ? "Website" : "官網") : activeMissionWorkspace === "facebook" ? "Facebook" : activeMissionWorkspace}</span>
               </>
             )}
             {activeMissionTitle ? (
@@ -3624,7 +3641,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
             {/* Fullscreen toggle */}
             <button
               onClick={toggleFullscreen}
-              title={chatFullscreen ? "退出全螢幕 (Esc)" : "全螢幕對話 (Ctrl+\\)"}
+              title={chatFullscreen ? (isEn ? "Exit full screen (Esc)" : "退出全螢幕 (Esc)") : (isEn ? "Full-screen chat (Ctrl+\\)" : "全螢幕對話 (Ctrl+\\)")}
               style={{
                 ...btnGhost,
                 padding: "4px 9px",
@@ -3636,7 +3653,7 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
               }}
             >
               <span style={{ fontSize: 14, lineHeight: 1 }}>{chatFullscreen ? "⛶" : "⛶"}</span>
-              <span style={{ fontSize: 11 }}>{chatFullscreen ? "退出" : "全螢幕"}</span>
+              <span style={{ fontSize: 11 }}>{chatFullscreen ? (isEn ? "Exit" : "退出") : (isEn ? "Full screen" : "全螢幕")}</span>
             </button>
             {/* Notification Bell */}
             <div style={{ position: "relative", marginRight: 4 }}>

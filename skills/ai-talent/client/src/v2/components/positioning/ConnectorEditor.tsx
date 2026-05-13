@@ -12,25 +12,31 @@
  */
 import { useEffect, useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 import { useSafeMutation } from "../../../lib/assertMutation";
 import { Card, CardBody, Input, Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faLine, faThreads, faTiktok, faLinkedin } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe, faSave, faCheck } from "@fortawesome/free-solid-svg-icons";
 
-const SOCIAL_FIELDS: Array<{ key: string; label: string; icon: any; placeholder: string; tone: string }> = [
-  { key: "facebook",  label: "Facebook 粉專",  icon: faFacebook,  tone: "#1877F2", placeholder: "https://www.facebook.com/yourpage" },
-  { key: "instagram", label: "Instagram",      icon: faInstagram, tone: "#E1306C", placeholder: "https://www.instagram.com/yourhandle" },
-  { key: "youtube",   label: "YouTube",         icon: faYoutube,   tone: "#FF0000", placeholder: "https://www.youtube.com/@yourchannel" },
-  { key: "threads",   label: "Threads",         icon: faThreads,   tone: "#000000", placeholder: "https://www.threads.net/@yourhandle" },
-  { key: "tiktok",    label: "TikTok",          icon: faTiktok,    tone: "#000000", placeholder: "https://www.tiktok.com/@yourhandle" },
-  { key: "linkedin",  label: "LinkedIn",        icon: faLinkedin,  tone: "#0A66C2", placeholder: "https://www.linkedin.com/company/yours" },
-  { key: "line",      label: "LINE 官方帳號",   icon: faLine,      tone: "#06C755", placeholder: "https://lin.ee/xxxxx 或 @yourLineId" },
-];
+function getSocialFields(en: boolean): Array<{ key: string; label: string; icon: any; placeholder: string; tone: string }> {
+  return [
+    { key: "facebook",  label: en ? "Facebook Page" : "Facebook 粉專",  icon: faFacebook,  tone: "#1877F2", placeholder: "https://www.facebook.com/yourpage" },
+    { key: "instagram", label: "Instagram",      icon: faInstagram, tone: "#E1306C", placeholder: "https://www.instagram.com/yourhandle" },
+    { key: "youtube",   label: "YouTube",         icon: faYoutube,   tone: "#FF0000", placeholder: "https://www.youtube.com/@yourchannel" },
+    { key: "threads",   label: "Threads",         icon: faThreads,   tone: "#000000", placeholder: "https://www.threads.net/@yourhandle" },
+    { key: "tiktok",    label: "TikTok",          icon: faTiktok,    tone: "#000000", placeholder: "https://www.tiktok.com/@yourhandle" },
+    { key: "linkedin",  label: "LinkedIn",        icon: faLinkedin,  tone: "#0A66C2", placeholder: "https://www.linkedin.com/company/yours" },
+    { key: "line",      label: en ? "LINE Official"  : "LINE 官方帳號",   icon: faLine,      tone: "#06C755", placeholder: en ? "https://lin.ee/xxxxx or @yourLineId" : "https://lin.ee/xxxxx 或 @yourLineId" },
+  ];
+}
 
 export default function ConnectorEditor({ brandId }: { brandId: number | null }) {
+  const { t, lang } = useLang();
+  const en = lang === "en";
+  const SOCIAL_FIELDS = getSocialFields(en);
   if (!brandId) {
-    return <div className="p-8 text-center text-default-500">請先選擇品牌</div>;
+    return <div className="p-8 text-center text-default-500">{en ? "Pick a brand first" : "請先選擇品牌"}</div>;
   }
 
   const utils = trpc.useUtils();
@@ -85,21 +91,23 @@ export default function ConnectorEditor({ brandId }: { brandId: number | null })
             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#64748B" }}>
               <FontAwesomeIcon icon={faGlobe} style={{ color: "#fff", fontSize: 14 }} />
             </div>
-            <h1 className="text-2xl font-semibold text-default-900">外部連結</h1>
+            <h1 className="text-2xl font-semibold text-default-900">{en ? "External links" : "外部連結"}</h1>
           </div>
           <p className="text-sm text-default-500">
-            填上品牌的官網 + 社群連結。AI 自動填寫 / 測試 / 30s / 60s / 99s 都會去抓這些連結的內容，**讓產出基於真實資料而不是亂猜**。
+            {en
+              ? "Add this brand's website + social links. Auto-fill / Test / 30s / 60s / 99s all pull real content from these URLs — **so output is grounded in reality, not guessed**."
+              : "填上品牌的官網 + 社群連結。AI 自動填寫 / 測試 / 30s / 60s / 99s 都會去抓這些連結的內容，**讓產出基於真實資料而不是亂猜**。"}
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs text-default-500">{filledCount} / {1 + SOCIAL_FIELDS.length} 已填</span>
+          <span className="text-xs text-default-500">{filledCount} / {1 + SOCIAL_FIELDS.length} {en ? "filled" : "已填"}</span>
           <Button
             color="primary"
             onPress={handleSave}
             isLoading={updateMut?.isPending}
             startContent={!updateMut?.isPending && <FontAwesomeIcon icon={saved ? faCheck : faSave} className="text-tiny" />}
           >
-            {saved ? "已儲存" : "儲存"}
+            {saved ? (en ? "Saved" : "已儲存") : t("save")}
           </Button>
         </div>
       </div>
@@ -112,7 +120,7 @@ export default function ConnectorEditor({ brandId }: { brandId: number | null })
           <div className="flex items-center gap-3">
             <FontAwesomeIcon icon={faGlobe} className="text-default-500 shrink-0" style={{ fontSize: 18 }} />
             <div className="flex-1 min-w-0">
-              <label className="text-xs font-medium text-default-700 mb-1 block">官網</label>
+              <label className="text-xs font-medium text-default-700 mb-1 block">{en ? "Website" : "官網"}</label>
               <Input
                 size="sm"
                 variant="flat"
@@ -149,8 +157,10 @@ export default function ConnectorEditor({ brandId }: { brandId: number | null })
       </div>
 
       <div className="mt-6 text-xs text-default-500 bg-default-50 rounded-lg p-3 leading-relaxed">
-        <div className="font-medium text-default-700 mb-1">💡 為什麼要填？</div>
-        AI 在做「自動填寫」、「測試 6 情境」、「30s / 60s / 99s 任務」之前，會先抓這些連結的真實內容（OG 標籤、頁面摘要、首屏文字），把品牌實際在用的語氣 / 受眾 / 產業塞進 prompt，這樣產出才會貼合品牌而不是用品牌名瞎猜產業。
+        <div className="font-medium text-default-700 mb-1">{en ? "💡 Why fill these in?" : "💡 為什麼要填？"}</div>
+        {en
+          ? "Before \"auto-fill\", \"test 6 scenarios\", or any 30s / 60s / 99s task, the AI pulls real content from these URLs (OG tags, page summaries, hero text) and injects your actual voice / audience / industry into the prompt — so output matches your brand instead of guessing from the name."
+          : "AI 在做「自動填寫」、「測試 6 情境」、「30s / 60s / 99s 任務」之前，會先抓這些連結的真實內容（OG 標籤、頁面摘要、首屏文字），把品牌實際在用的語氣 / 受眾 / 產業塞進 prompt，這樣產出才會貼合品牌而不是用品牌名瞎猜產業。"}
       </div>
     </div>
   );

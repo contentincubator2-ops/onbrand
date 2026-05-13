@@ -21,40 +21,54 @@
  */
 import React from "react";
 import { Avatar } from "@heroui/react";
+import { useLang, type Lang } from "../../../lib/i18n";
 
 export type PersonaId = "strategist" | "copywriter" | "librarian" | "creative";
 
-const PERSONAS: Record<PersonaId, {
+interface PersonaMeta {
   label: string;
   seed: string;
   defaultLine: string;
   domain: string;
-}> = {
-  strategist: {
-    label: "策略總監",
-    seed: "Strategist-SoWork 品牌定位",
-    defaultLine: "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」— 鎖定後，所有內容都會以此為基礎產出。",
-    domain: "Brand Positioning",
-  },
-  copywriter: {
-    label: "文字總監",
-    seed: "Copywriter-Drop",
-    defaultLine: "等你的定位鎖定後，我會為你建立統一的品牌語氣、用字偏好、禁用詞，30s / 60s / 99s 任務都會吃這份手冊。",
-    domain: "Brand Voice & Copy",
-  },
-  librarian: {
-    label: "知識總監",
-    seed: "Librarian-Drop",
-    defaultLine: "我管理品牌的知識庫 — 產品資訊、競品研究、案例素材、FAQ。任務需要 ground truth 時，會優先從這裡取材。",
-    domain: "Brand Knowledge",
-  },
-  creative: {
-    label: "創意總監",
-    seed: "Creative-Drop",
-    defaultLine: "定位 + 文字 + 知識備好後，我會把它們轉成每篇貼文的骨架 — 30s 快寫、60s 製作包、99s 全企劃。",
-    domain: "Creative Direction",
-  },
-};
+}
+
+function getPersonas(lang: Lang): Record<PersonaId, PersonaMeta> {
+  const en = lang === "en";
+  return {
+    strategist: {
+      label: en ? "Strategy Director" : "策略總監",
+      seed: "Strategist-SoWork 品牌定位",
+      defaultLine: en
+        ? "I'll walk you through SoWork's 14-step brand positioning to lock down who you are and who you exist for — once locked, every piece of content builds from this."
+        : "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」— 鎖定後，所有內容都會以此為基礎產出。",
+      domain: en ? "Brand Positioning" : "Brand Positioning",
+    },
+    copywriter: {
+      label: en ? "Copy Director" : "文字總監",
+      seed: "Copywriter-Drop",
+      defaultLine: en
+        ? "Once your positioning is locked, I'll build a unified brand voice, preferred words, and banned terms — every 30s / 60s / 99s task pulls from this playbook."
+        : "等你的定位鎖定後，我會為你建立統一的品牌語氣、用字偏好、禁用詞，30s / 60s / 99s 任務都會吃這份手冊。",
+      domain: en ? "Brand Voice & Copy" : "Brand Voice & Copy",
+    },
+    librarian: {
+      label: en ? "Knowledge Director" : "知識總監",
+      seed: "Librarian-Drop",
+      defaultLine: en
+        ? "I manage the brand knowledge base — product info, competitor research, case studies, FAQs. When tasks need ground truth, this is the first stop."
+        : "我管理品牌的知識庫 — 產品資訊、競品研究、案例素材、FAQ。任務需要 ground truth 時，會優先從這裡取材。",
+      domain: en ? "Brand Knowledge" : "Brand Knowledge",
+    },
+    creative: {
+      label: en ? "Creative Director" : "創意總監",
+      seed: "Creative-Drop",
+      defaultLine: en
+        ? "Once positioning + copy + knowledge are ready, I turn them into the skeleton of every post — 30s quick drafts, 60s production packs, 99s full plans."
+        : "定位 + 文字 + 知識備好後，我會把它們轉成每篇貼文的骨架 — 30s 快寫、60s 製作包、99s 全企劃。",
+      domain: en ? "Creative Direction" : "Creative Direction",
+    },
+  };
+}
 
 export interface AgentPersonaBarProps {
   persona: PersonaId;
@@ -75,7 +89,8 @@ export interface AgentPersonaBarProps {
 export default function AgentPersonaBar({
   persona, message, meta, trailing, mode = "idle", brandName, compact = false,
 }: AgentPersonaBarProps) {
-  const p = PERSONAS[persona];
+  const { lang } = useLang();
+  const p = getPersonas(lang)[persona];
   const avatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(p.seed + "-" + (brandName ?? ""))}`;
   const portraitSize = compact ? 72 : 88;
   const avatarSize = compact ? 56 : 72;

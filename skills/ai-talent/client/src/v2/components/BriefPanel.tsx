@@ -17,6 +17,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBrain, faGlobe, faLink, faRotateRight, faPen, faCheck,
@@ -197,6 +198,40 @@ const LAYER_TABS: Record<string, BriefTab[]> = {
   ],
 };
 
+// ── zh → en label map (for tab labels, field labels, placeholders) ──────────
+const ZH_EN: Record<string, string> = {
+  // Tab labels
+  "摘要": "Summary", "品牌": "Brand", "競品": "Competitors", "受眾": "Audience",
+  "產品": "Product", "定價": "Pricing", "頻道": "Channel", "素材": "Content",
+  "活動": "Campaign", "指標": "Metrics", "對標": "Benchmark", "其他補充": "Other notes",
+  // Field labels
+  "品牌名稱": "Brand name", "品牌故事": "Brand story", "品牌價值主張": "Value proposition",
+  "品牌語調": "Brand voice", "主要競爭者": "Main competitors", "競品定位分析": "Competitor positioning",
+  "目標族群": "Target audience", "核心痛點": "Pain points", "產品名稱": "Product name",
+  "產品網址": "Product URL", "產品描述": "Product description", "售價": "Price",
+  "競品定價": "Competitor pricing", "競爭者": "Competitors", "競品特色": "Competitor features",
+  "品牌定位": "Brand positioning", "人口統計": "Demographics", "購買觸發點": "Buying trigger",
+  "Persona 名稱": "Persona name", "Persona 描述": "Persona profile",
+  "頻道網址": "Channel URL", "粉絲數": "Followers", "發文頻率": "Posting frequency",
+  "爆款貼文": "Top posts", "品牌素材": "Brand assets",
+  "活動名稱": "Campaign name", "活動目標": "Campaign goal", "活動預算": "Budget",
+  "KPI 指標": "KPIs", "行業基準值": "Industry benchmarks", "市場定位": "Market position",
+  "想告訴 Agent 的話": "Anything to tell the Agent",
+  // Placeholders
+  "貼上圖片連結或稍後上傳": "Paste image link or upload later",
+  "例：提升 Q3 銷售 30%，觸及 20-35 歲女性": "e.g. Lift Q3 sales 30%, reach women 20-35",
+  "例：NT$ 500,000": "e.g. NT$ 500,000",
+  "例：ROAS > 3, CTR > 2%": "e.g. ROAS > 3, CTR > 2%",
+  "例：ROAS, CTR, CAC, LTV": "e.g. ROAS, CTR, CAC, LTV",
+  "例：這次強調夏季新品、語調輕鬆活潑、目標是 25-35 歲女性、不要提到競品名稱…": "e.g. Push summer launch, breezy tone, target women 25-35, don't name competitors…",
+};
+
+function tr(s: string | undefined, lang: string): string {
+  if (!s) return s ?? "";
+  if (lang !== "en") return s;
+  return ZH_EN[s] ?? s;
+}
+
 // ── Source meta ───────────────────────────────────────────────────────────────
 
 const SOURCE_META: Record<FieldSource, { icon: any; label: string; color: string }> = {
@@ -240,7 +275,14 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
   field: BriefField; state: FieldState; typing: boolean;
   onEdit: () => void; onRefetch: () => void; onChange: (v: string) => void;
 }) {
+  const { lang } = useLang();
   const src = SOURCE_META[field.source];
+  const srcLabel = lang === "en"
+    ? (field.source === "user_input" ? "Manual"
+        : field.source === "scope" ? "Scope"
+        : field.source === "brand_brain" ? "Brand Brain"
+        : "Web")
+    : src.label;
   const { displayed, done } = useTypewriter(state.value, typing && state.status === "filled", 12);
   const showValue = state.status === "filled" && !typing ? state.value : displayed;
   const isEditing = state.status === "editing";
@@ -259,23 +301,23 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           {field.icon && <FontAwesomeIcon icon={field.icon} style={{ fontSize: 10, color: "#A8A29E" }} />}
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#78716C", letterSpacing: "0.03em" }}>{field.label}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#78716C", letterSpacing: "0.03em" }}>{tr(field.label, lang)}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {(state.status === "filled" || isLoading) && (
             <span style={{ fontSize: 9, color: src.color, background: `${src.color}14`, padding: "1px 6px", borderRadius: 8, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-              <FontAwesomeIcon icon={src.icon} style={{ fontSize: 8 }} />{src.label}
+              <FontAwesomeIcon icon={src.icon} style={{ fontSize: 8 }} />{srcLabel}
             </span>
           )}
           {state.status === "filled" && !isEditing && (
             <>
-              <button onClick={onEdit} title="編輯"
+              <button onClick={onEdit} title={lang === "en" ? "Edit" : "編輯"}
                 style={{ width: 20, height: 20, borderRadius: 5, border: "1px solid #E4E3E1", background: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#C4C0BB", fontSize: 9 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = "#7C3AED"; e.currentTarget.style.color = "#7C3AED"; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = "#E4E3E1"; e.currentTarget.style.color = "#C4C0BB"; }}
               ><FontAwesomeIcon icon={faPen} /></button>
               {field.source !== "scope" && (
-                <button onClick={onRefetch} title="重新抓取"
+                <button onClick={onRefetch} title={lang === "en" ? "Refetch" : "重新抓取"}
                   style={{ width: 20, height: 20, borderRadius: 5, border: "1px solid #E4E3E1", background: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#C4C0BB", fontSize: 9 }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = "#0891B2"; e.currentTarget.style.color = "#0891B2"; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = "#E4E3E1"; e.currentTarget.style.color = "#C4C0BB"; }}
@@ -294,11 +336,11 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
       {/* Value */}
       {isLoading && (
         <div style={{ color: "#A8A29E", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: 10 }} />自動填入中…
+          <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: 10 }} />{lang === "en" ? "Filling in…" : "自動填入中…"}
         </div>
       )}
       {isIdle && !isUserInput && (
-        <div style={{ color: "#D1D0CE", fontSize: 12, fontStyle: "italic" }}>{field.placeholder ?? "等待填入…"}</div>
+        <div style={{ color: "#D1D0CE", fontSize: 12, fontStyle: "italic" }}>{tr(field.placeholder, lang) || (lang === "en" ? "Waiting…" : "等待填入…")}</div>
       )}
       {isEditing && (
         <textarea autoFocus value={state.editDraft ?? state.value}
@@ -320,7 +362,7 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
       {isUserInput && (isIdle || state.status === "filled") && !isEditing && (
         <textarea value={state.editDraft ?? state.value}
           onChange={e => onChange(e.target.value)}
-          placeholder={field.placeholder ?? "請填寫…"}
+          placeholder={tr(field.placeholder, lang) || (lang === "en" ? "Type here…" : "請填寫…")}
           rows={field.type === "textarea" ? 3 : 1}
           style={{ width: "100%", border: "none", outline: "none", fontSize: 13, color: "#57534E", lineHeight: 1.6, resize: "none", background: "transparent", fontFamily: "inherit", boxSizing: "border-box" }}
         />
@@ -344,6 +386,7 @@ interface SummaryTabProps {
 }
 
 function SummaryTab({ contentTabs, fieldStates, typingFieldId, onEdit, onRefetch, onChange, activeFieldId }: SummaryTabProps) {
+  const { lang } = useLang();
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Scroll to active field when auto-fill moves to it
@@ -363,7 +406,7 @@ function SummaryTab({ contentTabs, fieldStates, typingFieldId, onEdit, onRefetch
           {/* Section header */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <p style={{ fontSize: 10, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-              {tab.label}
+              {tr(tab.label, lang)}
             </p>
             <div style={{ flex: 1, height: 1, background: "#F0F0EE" }} />
           </div>
@@ -417,6 +460,7 @@ export function BriefPanel({
   layer, squadSlug, squadName, brandId, brandName, productName, eventName,
   onLaunch, onBack, activeTabId: externalActiveTabId, onTabChange,
 }: BriefPanelProps) {
+  const { t, lang } = useLang();
   const layerKey = String(layer ?? "L1").slice(0, 2).toUpperCase();
 
   // Layer-specific tabs + always-on "其他補充" free-text section at the end
@@ -507,7 +551,7 @@ export function BriefPanel({
     } else if (field.source === "brand_brain") {
       await new Promise(r => setTimeout(r, 500));
       value = getBrainText(field.brainCategory ?? "positioning");
-      if (!value) value = `（尚未有 ${field.label} 資料，請手動填寫）`;
+      if (!value) value = lang === "en" ? `(No ${tr(field.label, lang)} data yet — please fill manually)` : `（尚未有 ${field.label} 資料，請手動填寫）`;
     } else if (field.source === "web_search") {
       const q = (field.searchQuery ?? "")
         .replace("{brand_name}",   brandName   ?? "")
@@ -612,11 +656,11 @@ export function BriefPanel({
             onMouseEnter={e => e.currentTarget.style.color = "#57534E"}
             onMouseLeave={e => e.currentTarget.style.color = "#A8A29E"}
           >
-            <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: 9 }} /> 所有方法論
+            <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: 9 }} /> {lang === "en" ? "All methodologies" : "所有方法論"}
           </button>
         )}
         <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A18", lineHeight: 1.3 }}>
-          {squadName ?? "方法論小組"}
+          {squadName ?? (lang === "en" ? "Methodology Squad" : "方法論小組")}
         </div>
         <div style={{ marginTop: 3, display: "flex", gap: 5 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: layerColor, background: `${layerColor}14`, padding: "2px 7px", borderRadius: 8 }}>{layerKey}</span>
@@ -629,7 +673,7 @@ export function BriefPanel({
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: brandId ? "#16A34A" : "#D1D0CE" }} />
           <span style={{ fontSize: 11, color: "#57534E", fontWeight: 600, flex: 1 }}>
-            Brand Brain {brandId ? "已連接" : "未連接"}
+            Brand Brain {brandId ? (lang === "en" ? "connected" : "已連接") : (lang === "en" ? "not connected" : "未連接")}
           </span>
           <button onClick={runAuto} disabled={isAutoRunning}
             style={{
@@ -640,14 +684,14 @@ export function BriefPanel({
             }}
           >
             <FontAwesomeIcon icon={isAutoRunning ? faPause : faWandSparkles} style={{ fontSize: 9 }} />
-            {isAutoRunning ? "填寫中…" : "自動填寫"}
+            {isAutoRunning ? (lang === "en" ? "Filling…" : "填寫中…") : (lang === "en" ? "Autofill" : "自動填寫")}
           </button>
         </div>
         {/* Progress bar */}
         <div style={{ height: 3, background: "#F0F0EE", borderRadius: 10, overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${pct}%`, background: layerColor, borderRadius: 10, transition: "width 0.4s ease" }} />
         </div>
-        <div style={{ fontSize: 10, color: "#A8A29E", marginTop: 3 }}>{filledCount}/{totalFields} 欄位已填</div>
+        <div style={{ fontSize: 10, color: "#A8A29E", marginTop: 3 }}>{filledCount}/{totalFields} {lang === "en" ? "fields filled" : "欄位已填"}</div>
       </div>
 
       {/* ── Tabs (hidden in controlled/rail mode) ── */}
@@ -665,7 +709,7 @@ export function BriefPanel({
                 transition: "all 0.15s",
               }}
             >
-              {tab.id === "_summary" ? "摘要" : tab.label}
+              {tab.id === "_summary" ? (lang === "en" ? "Summary" : "摘要") : tr(tab.label, lang)}
             </button>
           ))}
         </div>
@@ -714,7 +758,11 @@ export function BriefPanel({
           onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
         >
           <FontAwesomeIcon icon={faRocket} />
-          {isAutoRunning ? `自動填寫中（${filledCount}/${totalFields}）` : canLaunch ? "開始執行" : "請先填寫 Brief"}
+          {isAutoRunning
+            ? (lang === "en" ? `Filling in (${filledCount}/${totalFields})` : `自動填寫中（${filledCount}/${totalFields}）`)
+            : canLaunch
+              ? (lang === "en" ? "Start" : "開始執行")
+              : (lang === "en" ? "Please fill the brief first" : "請先填寫 Brief")}
         </button>
       </div>
 

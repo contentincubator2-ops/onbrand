@@ -15,6 +15,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 
 const C = {
   panelBg:    "#FFFFFF",
@@ -33,17 +34,17 @@ const C = {
   okBg:       "#E7F5EB",
 };
 
-const TIER_META: Record<string, { label: string; emoji: string; hint: string }> = {
-  free_public:   { label: "免費公開資料", emoji: "🔓", hint: "無需帳號、無風險，直接啟用。" },
-  user_api_key:  { label: "自備 API 金鑰",   emoji: "🔑", hint: "貼上你在該平台的 API key / token。合法合規。" },
-  user_browser:  { label: "虛擬瀏覽器代操", emoji: "🖥️", hint: "我們開虛擬瀏覽器用你的帳密登入並抓取。⚠️ 可能違反 ToS，有帳號被鎖風險，需勾選免責。" },
+const TIER_META: Record<string, { label: string; labelEn: string; emoji: string; hint: string; hintEn: string }> = {
+  free_public:   { label: "免費公開資料", labelEn: "Free / public", emoji: "🔓", hint: "無需帳號、無風險，直接啟用。", hintEn: "No account or risk — just enable." },
+  user_api_key:  { label: "自備 API 金鑰", labelEn: "Bring your own API key", emoji: "🔑", hint: "貼上你在該平台的 API key / token。合法合規。", hintEn: "Paste your platform API key or token. Fully compliant." },
+  user_browser:  { label: "虛擬瀏覽器代操", labelEn: "Virtual browser operator", emoji: "🖥️", hint: "我們開虛擬瀏覽器用你的帳密登入並抓取。⚠️ 可能違反 ToS，有帳號被鎖風險，需勾選免責。", hintEn: "We log in via a virtual browser using your credentials. ⚠️ May violate ToS and risk account locks — disclaimer required." },
 };
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: "待測試", color: C.warn,   bg: C.warnBg },
-  ok:      { label: "正常",   color: C.ok,     bg: C.okBg },
-  error:   { label: "錯誤",   color: C.danger, bg: "#FCE8E8" },
-  expired: { label: "已過期", color: C.danger, bg: "#FCE8E8" },
+const STATUS_META: Record<string, { label: string; labelEn: string; color: string; bg: string }> = {
+  pending: { label: "待測試", labelEn: "Untested", color: C.warn,   bg: C.warnBg },
+  ok:      { label: "正常",   labelEn: "Working",  color: C.ok,     bg: C.okBg },
+  error:   { label: "錯誤",   labelEn: "Error",    color: C.danger, bg: "#FCE8E8" },
+  expired: { label: "已過期", labelEn: "Expired",  color: C.danger, bg: "#FCE8E8" },
 };
 
 export function ToolCredDrawer({
@@ -53,6 +54,7 @@ export function ToolCredDrawer({
   brandId: number;
   onClose: () => void;
 }) {
+  const { lang } = useLang();
   const catalogQuery = trpc.toolCred.catalog.useQuery(undefined, { refetchOnWindowFocus: false });
   const listQuery = trpc.toolCred.listByBrand.useQuery(
     { brandId },
@@ -104,9 +106,9 @@ export function ToolCredDrawer({
           }}
         >
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>🔌 工具連線</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{lang === "en" ? "🔌 Connect tools" : "🔌 工具連線"}</div>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
-              連接外部行銷工具，讓自動情報更完整。憑證加密後存放。
+              {lang === "en" ? "Hook up external marketing tools to enrich auto intel. Credentials are encrypted at rest." : "連接外部行銷工具，讓自動情報更完整。憑證加密後存放。"}
             </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
@@ -124,10 +126,10 @@ export function ToolCredDrawer({
               <section key={tier} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
-                    {tm.emoji} {tm.label}
+                    {tm.emoji} {lang === "en" ? tm.labelEn : tm.label}
                   </div>
                   <div style={{ fontSize: 11, color: C.textMuted }}>
-                    {tm.hint}
+                    {lang === "en" ? tm.hintEn : tm.hint}
                   </div>
                 </div>
                 {tools.map((t) => (
@@ -176,6 +178,7 @@ function ToolRow({
   onEdit: () => void;
   onChanged: () => void;
 }) {
+  const { lang } = useLang();
   const [busy, setBusy] = useState<"remove" | null>(null);
   const removeMut = trpc.toolCred.remove.useMutation();
 
@@ -184,12 +187,12 @@ function ToolRow({
   const sm = status ? STATUS_META[status] : null;
 
   async function doRemove() {
-    if (!confirm(`確定移除 ${tool.label} 的連線？`)) return;
+    if (!confirm(lang === "en" ? `Disconnect ${tool.label}?` : `確定移除 ${tool.label} 的連線？`)) return;
     setBusy("remove");
     try {
       await removeMut.mutateAsync({ brandId, tool: tool.slug });
     } catch (e: any) {
-      alert("移除失敗：" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "Remove failed: " : "移除失敗：") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setBusy(null);
       onChanged();
@@ -215,7 +218,7 @@ function ToolRow({
               fontSize: 10.5, fontWeight: 600, color: sm.color, background: sm.bg,
               padding: "2px 6px", borderRadius: 4,
             }}>
-              {sm.label}
+              {lang === "en" ? sm.labelEn : sm.label}
             </span>
           )}
           {tool.docsUrl && (
@@ -253,12 +256,12 @@ function ToolRow({
           <>
             <CredTestButton brandId={brandId} tool={tool.slug} onDone={onChanged} />
             <button style={btnMiniDanger} onClick={doRemove} disabled={busy === "remove"}>
-              {busy === "remove" ? "…" : "移除"}
+              {busy === "remove" ? "…" : (lang === "en" ? "Remove" : "移除")}
             </button>
           </>
         )}
         <button style={btnPrimary} onClick={onEdit}>
-          {hasCred ? "重新輸入" : "連接"}
+          {hasCred ? (lang === "en" ? "Re-enter" : "重新輸入") : (lang === "en" ? "Connect" : "連接")}
         </button>
       </div>
     </div>
@@ -268,6 +271,7 @@ function ToolRow({
 // Tests the shared browser runtime (Batch 2-2a). Not tied to any specific
 // tool — verifies Browserbase / local Chromium pipeline works at all.
 function BrowserPingButton() {
+  const { lang } = useLang();
   const [busy, setBusy] = useState(false);
   const pingMut = trpc.toolCred.browserPing.useMutation();
   async function run() {
@@ -286,7 +290,7 @@ function BrowserPingButton() {
       ].filter(Boolean).join("\n");
       alert(lines);
     } catch (e: any) {
-      alert("❌ Browser runtime test 失敗：\n" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "❌ Browser runtime test failed:\n" : "❌ Browser runtime test 失敗：\n") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setBusy(false);
     }
@@ -296,23 +300,24 @@ function BrowserPingButton() {
       style={{ ...btnMini, background: busy ? "#F5F5F4" : C.accentSoft, color: C.accent, borderColor: C.accentSoft }}
       onClick={run}
       disabled={busy}
-      title="測試虛擬瀏覽器管線是否正常"
+      title={lang === "en" ? "Test virtual browser pipeline" : "測試虛擬瀏覽器管線是否正常"}
     >
-      {busy ? "測試中…" : "🧪 Browser ping"}
+      {busy ? (lang === "en" ? "Testing…" : "測試中…") : "🧪 Browser ping"}
     </button>
   );
 }
 
 function CredTestButton({ brandId, tool, onDone }: { brandId: number; tool: string; onDone: () => void }) {
+  const { lang } = useLang();
   const [busy, setBusy] = useState(false);
   const testMut = trpc.toolCred.test.useMutation();
   async function run() {
     setBusy(true);
     try {
       const r = (await testMut.mutateAsync({ brandId, tool })) as any;
-      if (!r?.ok) alert(`測試失敗：${r?.message ?? "未知錯誤"}`);
+      if (!r?.ok) alert((lang === "en" ? "Test failed: " : "測試失敗：") + (r?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } catch (e: any) {
-      alert("測試失敗：" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "Test failed: " : "測試失敗：") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setBusy(false);
       onDone();
@@ -320,7 +325,7 @@ function CredTestButton({ brandId, tool, onDone }: { brandId: number; tool: stri
   }
   return (
     <button style={btnMini} onClick={run} disabled={busy}>
-      {busy ? "測試中…" : "測試"}
+      {busy ? (lang === "en" ? "Testing…" : "測試中…") : (lang === "en" ? "Test" : "測試")}
     </button>
   );
 }
@@ -339,6 +344,7 @@ function EditCredModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { lang } = useLang();
   const [payload, setPayload] = useState<Record<string, string>>({});
   const [acceptTerms, setAcceptTerms] = useState(existing?.termsAcceptedAt ? true : false);
   const [busy, setBusy] = useState(false);
@@ -347,7 +353,7 @@ function EditCredModal({
 
   async function handleSave() {
     if (tool.requiresTerms && !acceptTerms) {
-      alert("請勾選免責條款後再儲存");
+      alert(lang === "en" ? "Please accept the disclaimer before saving" : "請勾選免責條款後再儲存");
       return;
     }
     setBusy(true);
@@ -360,7 +366,7 @@ function EditCredModal({
       });
       onSaved();
     } catch (e: any) {
-      alert("儲存失敗：" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "Save failed: " : "儲存失敗：") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setBusy(false);
     }
@@ -385,7 +391,9 @@ function EditCredModal({
       >
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>
-            {existing ? `重新輸入 ${tool.label} 憑證` : `連接 ${tool.label}`}
+            {existing
+              ? (lang === "en" ? `Re-enter ${tool.label} credentials` : `重新輸入 ${tool.label} 憑證`)
+              : (lang === "en" ? `Connect ${tool.label}` : `連接 ${tool.label}`)}
           </div>
           {tool.notes && (
             <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 6, lineHeight: 1.55 }}>
@@ -399,7 +407,7 @@ function EditCredModal({
               rel="noopener noreferrer"
               style={{ fontSize: 11.5, color: C.accent, marginTop: 4, display: "inline-block" }}
             >
-              📖 官方文件與申請方式
+              {lang === "en" ? "📖 Official docs and how to apply" : "📖 官方文件與申請方式"}
             </a>
           )}
         </div>
@@ -411,7 +419,7 @@ function EditCredModal({
               fontSize: 12.5, lineHeight: 1.55,
             }}
           >
-            此工具免費公開、不需憑證，點下方按鈕即可啟用。
+            {lang === "en" ? "This tool is free and public — no credential needed. Tap below to enable." : "此工具免費公開、不需憑證，點下方按鈕即可啟用。"}
           </div>
         ) : (
           (tool.fields as any[]).map((f: any) => (
@@ -425,7 +433,7 @@ function EditCredModal({
                 style={inputStyle}
                 value={payload[f.key] ?? ""}
                 onChange={(e) => setPayload((p) => ({ ...p, [f.key]: e.target.value }))}
-                placeholder={existing?.maskedFields?.[f.key] ? `目前：${existing.maskedFields[f.key]}（留空不變）` : ""}
+                placeholder={existing?.maskedFields?.[f.key] ? (lang === "en" ? `Current: ${existing.maskedFields[f.key]} (leave blank to keep)` : `目前：${existing.maskedFields[f.key]}（留空不變）`) : ""}
               />
             </div>
           ))
@@ -447,17 +455,19 @@ function EditCredModal({
               style={{ marginTop: 2 }}
             />
             <span>
-              <b style={{ color: C.warn }}>⚠️ ToS 風險免責</b>
+              <b style={{ color: C.warn }}>{lang === "en" ? "⚠️ ToS risk disclaimer" : "⚠️ ToS 風險免責"}</b>
               <br />
-              我理解 {tool.label} 的使用條款通常禁止自動化存取，SoWork 透過虛擬瀏覽器代操可能導致我的帳號被封鎖、服務中斷，並可能違反我與該平台的合約。我自願承擔以上風險，並授權 SoWork 代我登入與抓取資料。
+              {lang === "en"
+                ? <>I understand {tool.label}'s terms typically forbid automated access. SoWork's virtual browser operator may cause my account to be locked or service interrupted, and may breach my contract with the platform. I accept the risk and authorize SoWork to log in and fetch data on my behalf.</>
+                : <>我理解 {tool.label} 的使用條款通常禁止自動化存取，SoWork 透過虛擬瀏覽器代操可能導致我的帳號被封鎖、服務中斷，並可能違反我與該平台的合約。我自願承擔以上風險，並授權 SoWork 代我登入與抓取資料。</>}
             </span>
           </label>
         )}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button style={btnGhost} onClick={onClose} disabled={busy}>取消</button>
+          <button style={btnGhost} onClick={onClose} disabled={busy}>{lang === "en" ? "Cancel" : "取消"}</button>
           <button style={btnPrimary} onClick={handleSave} disabled={busy}>
-            {busy ? "儲存中…" : existing ? "更新" : "啟用"}
+            {busy ? (lang === "en" ? "Saving…" : "儲存中…") : existing ? (lang === "en" ? "Update" : "更新") : (lang === "en" ? "Enable" : "啟用")}
           </button>
         </div>
       </div>

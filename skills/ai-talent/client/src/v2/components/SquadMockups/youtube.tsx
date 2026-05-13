@@ -17,6 +17,7 @@ import {
 } from "../PlatformMockup/youtube";
 import type { MockupFields } from "../PlatformMockup/shared";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
+import { useLang } from "../../../lib/i18n";
 
 // ── Data shapes ──────────────────────────────────────────────────────────────
 
@@ -86,10 +87,11 @@ function toFields(channelName: string, extra: Partial<MockupFields> = {}): Mocku
 interface VideoProps extends SquadMockupCommonProps { data?: YTVideoScript; }
 
 export function YTVideoMockup({ data, isActive = false }: VideoProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="▶️" eyebrow="SQUAD · YT VIDEO" title="YouTube 影片腳本" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="▶️" eyebrow="SQUAD · YT VIDEO" title={lang === "en" ? "YouTube video script" : "YouTube 影片腳本"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.channelName, {
@@ -99,20 +101,20 @@ export function YTVideoMockup({ data, isActive = false }: VideoProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="▶️" eyebrow="SQUAD · YT VIDEO" title={`YouTube 影片（${data.durationMin ?? "?"}分鐘）`} />
-          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="▶️" eyebrow="SQUAD · YT VIDEO" title={lang === "en" ? `YouTube video (${data.durationMin ?? "?"} min)` : `YouTube 影片（${data.durationMin ?? "?"}分鐘）`} />
+          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <YTVideoCard {...fields} />
       </NotionCard>
 
       <NotionCard>
-        <SectionHeader eyebrow="HOOK" title="開場鉤子（前 30 秒）" />
+        <SectionHeader eyebrow="HOOK" title={lang === "en" ? "Opening hook (first 30s)" : "開場鉤子（前 30 秒）"} />
         <p className="text-small text-default-700 leading-relaxed">{data.hook}</p>
       </NotionCard>
 
       {data.chapters?.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="CHAPTERS" title={`影片章節（${data.chapters.length} 段）`} />
+          <SectionHeader eyebrow="CHAPTERS" title={lang === "en" ? `Chapters (${data.chapters.length})` : `影片章節（${data.chapters.length} 段）`} />
           <div className="flex flex-col gap-2">
             {data.chapters.map((ch, i) => (
               <div key={i} className="flex gap-2 items-start p-2 rounded-md border border-divider">
@@ -128,7 +130,7 @@ export function YTVideoMockup({ data, isActive = false }: VideoProps) {
       )}
 
       <NotionCard>
-        <SectionHeader eyebrow="CTA + DESCRIPTION" title="行動呼籲 + 說明欄" />
+        <SectionHeader eyebrow="CTA + DESCRIPTION" title={lang === "en" ? "Call to action + description" : "行動呼籲 + 說明欄"} />
         <p className="text-small text-danger font-medium mb-2">👉 {data.cta}</p>
         {data.descriptionCopy && (
           <pre className="text-tiny leading-relaxed whitespace-pre-wrap font-sans bg-default-50 border border-divider rounded-md p-3">
@@ -152,10 +154,11 @@ export function YTVideoMockup({ data, isActive = false }: VideoProps) {
 interface ShortsProps extends SquadMockupCommonProps { data?: YTShortsScript; }
 
 export function YTShortsMockup({ data, isActive = false }: ShortsProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="🎬" eyebrow="ATOMIC · YT SHORTS" title="YouTube Shorts 腳本" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="🎬" eyebrow="ATOMIC · YT SHORTS" title={lang === "en" ? "YouTube Shorts script" : "YouTube Shorts 腳本"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.channelName, { title: data.videoTitle });
@@ -163,17 +166,17 @@ export function YTShortsMockup({ data, isActive = false }: ShortsProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🎬" eyebrow="ATOMIC · YT SHORTS" title={`YouTube Shorts（${data.durationSec ?? "60"}秒）`} />
-          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="🎬" eyebrow="ATOMIC · YT SHORTS" title={lang === "en" ? `YouTube Shorts (${data.durationSec ?? "60"}s)` : `YouTube Shorts（${data.durationSec ?? "60"}秒）`} />
+          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <YTShorts {...fields} />
       </NotionCard>
       <NotionCard>
-        <SectionHeader eyebrow="SCRIPT" title="腳本三段式結構" />
+        <SectionHeader eyebrow="SCRIPT" title={lang === "en" ? "Three-part script structure" : "腳本三段式結構"} />
         <div className="flex flex-col gap-2">
           {[
-            { label: "🪝 Hook（0–3s）", text: data.hook, color: "border-danger" },
-            { label: "⏱ Hold（4–45s）", text: data.hold, color: "border-warning" },
+            { label: lang === "en" ? "🪝 Hook (0–3s)" : "🪝 Hook（0–3s）", text: data.hook, color: "border-danger" },
+            { label: lang === "en" ? "⏱ Hold (4–45s)" : "⏱ Hold（4–45s）", text: data.hold, color: "border-warning" },
             { label: "🎯 Payoff / CTA", text: data.payoff, color: "border-success" },
           ].map((row, i) => (
             <div key={i} className={`p-3 rounded-md border-l-4 border border-divider ${row.color} bg-default-50`}>
@@ -182,10 +185,10 @@ export function YTShortsMockup({ data, isActive = false }: ShortsProps) {
             </div>
           ))}
         </div>
-        {data.audioNote && <p className="text-tiny text-default-500 mt-1">🎵 音樂方向：{data.audioNote}</p>}
+        {data.audioNote && <p className="text-tiny text-default-500 mt-1">{lang === "en" ? `🎵 Audio direction: ${data.audioNote}` : `🎵 音樂方向：${data.audioNote}`}</p>}
         {data.overlayText && data.overlayText.length > 0 && (
           <div className="mt-1">
-            <p className="text-tiny text-default-500 font-medium mb-0.5">字幕 Overlay：</p>
+            <p className="text-tiny text-default-500 font-medium mb-0.5">{lang === "en" ? "Caption overlay:" : "字幕 Overlay："}</p>
             <div className="flex flex-wrap gap-1.5">
               {data.overlayText.map((t, i) => (
                 <Chip key={i} size="sm" variant="flat" className="h-5 text-tiny">{t}</Chip>
@@ -203,10 +206,11 @@ export function YTShortsMockup({ data, isActive = false }: ShortsProps) {
 interface CommunityProps extends SquadMockupCommonProps { data?: YTCommunityData; }
 
 export function YTCommunityMockup({ data, isActive = false }: CommunityProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="💬" eyebrow="ATOMIC · YT COMMUNITY" title="YouTube 社群貼文" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="💬" eyebrow="ATOMIC · YT COMMUNITY" title={lang === "en" ? "YouTube community post" : "YouTube 社群貼文"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.channelName, { liveCaption: data.body });
@@ -214,14 +218,14 @@ export function YTCommunityMockup({ data, isActive = false }: CommunityProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="💬" eyebrow="ATOMIC · YT COMMUNITY" title="YouTube 社群貼文" />
-          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="💬" eyebrow="ATOMIC · YT COMMUNITY" title={lang === "en" ? "YouTube community post" : "YouTube 社群貼文"} />
+          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <YTCommunity {...fields} />
       </NotionCard>
       {data.isPoll && data.pollOptions && data.pollOptions.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="POLL OPTIONS" title="投票選項" />
+          <SectionHeader eyebrow="POLL OPTIONS" title={lang === "en" ? "Poll options" : "投票選項"} />
           <div className="flex flex-col gap-1.5">
             {data.pollOptions.map((opt, i) => (
               <div key={i} className="flex items-center gap-2 p-2 rounded-md border border-divider">
@@ -241,10 +245,11 @@ export function YTCommunityMockup({ data, isActive = false }: CommunityProps) {
 interface PremiereProps extends SquadMockupCommonProps { data?: YTPremiereData; }
 
 export function YTPremiereMockup({ data, isActive = false }: PremiereProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="🎞️" eyebrow="SQUAD · YT PREMIERE" title="YouTube 首播企劃" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="🎞️" eyebrow="SQUAD · YT PREMIERE" title={lang === "en" ? "YouTube Premiere plan" : "YouTube 首播企劃"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.channelName, { title: data.videoTitle, brief: data.teaser });
@@ -252,17 +257,17 @@ export function YTPremiereMockup({ data, isActive = false }: PremiereProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🎞️" eyebrow="SQUAD · YT PREMIERE" title="YouTube 首播企劃" />
-          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="🎞️" eyebrow="SQUAD · YT PREMIERE" title={lang === "en" ? "YouTube Premiere plan" : "YouTube 首播企劃"} />
+          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <YTPremiere {...fields} />
       </NotionCard>
       <NotionCard>
-        <SectionHeader eyebrow="PREMIERE BRIEF" title="首播企劃詳情" />
+        <SectionHeader eyebrow="PREMIERE BRIEF" title={lang === "en" ? "Premiere brief" : "首播企劃詳情"} />
         <div className="flex flex-col gap-1.5 text-small">
-          <p>📅 <strong>首播時間：</strong>{data.premiereDate}</p>
+          <p>📅 <strong>{lang === "en" ? "Premiere time: " : "首播時間："}</strong>{data.premiereDate}</p>
           <p className="text-default-700 leading-relaxed mt-1">{data.teaser}</p>
-          {data.thumbnailDesc && <p className="text-tiny text-default-500 mt-1">🎨 縮圖方向：{data.thumbnailDesc}</p>}
+          {data.thumbnailDesc && <p className="text-tiny text-default-500 mt-1">{lang === "en" ? `🎨 Thumbnail direction: ${data.thumbnailDesc}` : `🎨 縮圖方向：${data.thumbnailDesc}`}</p>}
         </div>
       </NotionCard>
     </div>
@@ -274,10 +279,11 @@ export function YTPremiereMockup({ data, isActive = false }: PremiereProps) {
 interface LiveProps extends SquadMockupCommonProps { data?: YTLiveData; }
 
 export function YTLiveMockup({ data, isActive = false }: LiveProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="🔴" eyebrow="SQUAD · YT LIVE" title="YouTube 直播企劃" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="🔴" eyebrow="SQUAD · YT LIVE" title={lang === "en" ? "YouTube live plan" : "YouTube 直播企劃"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.channelName, { title: data.streamTitle });
@@ -285,14 +291,14 @@ export function YTLiveMockup({ data, isActive = false }: LiveProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🔴" eyebrow="SQUAD · YT LIVE" title="YouTube 直播企劃" />
+          <SectionHeader icon="🔴" eyebrow="SQUAD · YT LIVE" title={lang === "en" ? "YouTube live plan" : "YouTube 直播企劃"} />
           {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">● LIVE</Chip>}
         </div>
         <YTLive {...fields} />
       </NotionCard>
       {data.runOfShow?.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="RUN OF SHOW" title={`直播流程表（${data.expectedDurationMin ?? "?"}分鐘）`} />
+          <SectionHeader eyebrow="RUN OF SHOW" title={lang === "en" ? `Live run of show (${data.expectedDurationMin ?? "?"} min)` : `直播流程表（${data.expectedDurationMin ?? "?"}分鐘）`} />
           <div className="flex flex-col gap-1.5">
             {data.runOfShow.map((row, i) => (
               <div key={i} className="flex gap-2 p-2 rounded-md border border-divider">

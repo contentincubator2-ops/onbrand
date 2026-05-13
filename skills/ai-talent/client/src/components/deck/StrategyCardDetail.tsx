@@ -11,6 +11,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
 import { synthesizeStrategy } from "./strategySynth";
+import { useLang } from "../../lib/i18n";
 
 const C = {
   overlay:    "rgba(18,18,16,0.45)",
@@ -35,6 +36,7 @@ export function StrategyCardDetail({
   strategyId: number;
   onClose: () => void;
 }) {
+  const { lang } = useLang();
   const strategyQuery = trpc.strategyDeck.get.useQuery(
     { id: strategyId },
     { refetchOnWindowFocus: false }
@@ -84,13 +86,13 @@ export function StrategyCardDetail({
 
   async function activate() {
     await save();
-    if (!confirm("啟用這張策略卡？啟用後 90 天內執行、情報、優化都會引用它。")) return;
+    if (!confirm(lang === "en" ? "Activate this strategy card? Once active, execution, intel, and optimization will reference it for 90 days." : "啟用這張策略卡？啟用後 90 天內執行、情報、優化都會引用它。")) return;
     await activateMutation.mutateAsync({ id: strategyId } as any);
     await strategyQuery.refetch();
   }
 
   async function archive() {
-    if (!confirm("封存這張策略卡？後續執行不會再引用，但歷史會保留。")) return;
+    if (!confirm(lang === "en" ? "Archive this card? It won't be referenced going forward, but history stays." : "封存這張策略卡？後續執行不會再引用，但歷史會保留。")) return;
     await archiveMutation.mutateAsync({ id: strategyId } as any);
     await strategyQuery.refetch();
   }
@@ -109,7 +111,7 @@ export function StrategyCardDetail({
         overwriteFilled: overwrite,
       });
       if ((res as any)?.skipped === "already-complete") {
-        alert("所有欄位都已填好 — 如果想重新產生，請點「全部覆蓋重寫」。");
+        alert(lang === "en" ? "Every field is filled in — tap \"Overwrite all\" if you want a fresh pass." : "所有欄位都已填好 — 如果想重新產生，請點「全部覆蓋重寫」。");
         return;
       }
       // Merge the server's merged config into local state
@@ -118,19 +120,19 @@ export function StrategyCardDetail({
       setDirty(false);
       await strategyQuery.refetch();
     } catch (err: any) {
-      alert(err?.message ?? "AI 產生失敗，請稍後再試");
+      alert(err?.message ?? (lang === "en" ? "AI generation failed — try again in a moment" : "AI 產生失敗，請稍後再試"));
     } finally {
       setAutoFilling(false);
     }
   }
 
   async function remove() {
-    if (!confirm("確定刪除？此動作無法復原。")) return;
+    if (!confirm(lang === "en" ? "Delete for good? This can't be undone." : "確定刪除？此動作無法復原。")) return;
     try {
       await removeMutation.mutateAsync({ id: strategyId } as any);
       onClose();
     } catch (err: any) {
-      alert(err?.message ?? "刪除失敗");
+      alert(err?.message ?? (lang === "en" ? "Delete failed" : "刪除失敗"));
     }
   }
 
@@ -171,7 +173,7 @@ export function StrategyCardDetail({
             <button onClick={onClose} style={iconBtn}>✕</button>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>
-                {strategyQuery.isLoading ? "載入中…" : strategy?.name}
+                {strategyQuery.isLoading ? (lang === "en" ? "Loading…" : "載入中…") : strategy?.name}
               </div>
               <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>
                 {strategy?.methodologyName}
@@ -191,7 +193,7 @@ export function StrategyCardDetail({
               fontWeight: 600,
             }}
           >
-            {flipped ? "← 回到正面" : "問 AI 一下 💬"}
+            {flipped ? (lang === "en" ? "← Back to front" : "← 回到正面") : (lang === "en" ? "Ask AI 💬" : "問 AI 一下 💬")}
           </button>
         </div>
 
@@ -225,27 +227,27 @@ export function StrategyCardDetail({
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: C.textDim }}>
               {strategy?.status === "active" && strategy?.expiresAt && (
-                <span>到期 {new Date(strategy.expiresAt).toLocaleDateString("zh-TW")}</span>
+                <span>{lang === "en" ? `Expires ${new Date(strategy.expiresAt).toLocaleDateString("en-US")}` : `到期 ${new Date(strategy.expiresAt).toLocaleDateString("zh-TW")}`}</span>
               )}
-              {dirty && <span style={{ color: C.warn }}>有未儲存變更</span>}
+              {dirty && <span style={{ color: C.warn }}>{lang === "en" ? "Unsaved changes" : "有未儲存變更"}</span>}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               {strategy?.status !== "archived" && (
-                <button onClick={archive} style={secondaryBtn}>封存</button>
+                <button onClick={archive} style={secondaryBtn}>{lang === "en" ? "Archive" : "封存"}</button>
               )}
               {strategy?.status === "draft" && (
-                <button onClick={remove} style={{ ...secondaryBtn, color: C.danger }}>刪除</button>
+                <button onClick={remove} style={{ ...secondaryBtn, color: C.danger }}>{lang === "en" ? "Delete" : "刪除"}</button>
               )}
               <button
                 onClick={save}
                 disabled={!dirty || saving}
                 style={dirty && !saving ? secondaryBtn : disabledBtn}
               >
-                {saving ? "儲存中…" : "儲存"}
+                {saving ? (lang === "en" ? "Saving…" : "儲存中…") : (lang === "en" ? "Save" : "儲存")}
               </button>
               {strategy?.status !== "active" && (
                 <button onClick={activate} style={primaryBtn}>
-                  {strategy?.status === "archived" ? "重新啟用" : "啟用 → 90 天"}
+                  {strategy?.status === "archived" ? (lang === "en" ? "Reactivate" : "重新啟用") : (lang === "en" ? "Activate → 90 days" : "啟用 → 90 天")}
                 </button>
               )}
             </div>
@@ -276,8 +278,9 @@ function FrontFace({
   onAutoFill: (overwrite: boolean) => Promise<void>;
   autoFilling: boolean;
 }) {
+  const { lang } = useLang();
   if (!strategy) {
-    return <div style={{ padding: 32, color: C.textDim }}>載入中…</div>;
+    return <div style={{ padding: 32, color: C.textDim }}>{lang === "en" ? "Loading…" : "載入中…"}</div>;
   }
 
   const fields = (methodology?.fields ?? []) as any[];
@@ -309,7 +312,7 @@ function FrontFace({
       )}
 
       {/* Strategy name */}
-      <Field label="策略卡名稱">
+      <Field label={lang === "en" ? "Card name" : "策略卡名稱"}>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -339,36 +342,36 @@ function FrontFace({
                 textTransform: "uppercase",
               }}
             >
-              方法論欄位
+              {lang === "en" ? "Framework fields" : "方法論欄位"}
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <button
                 onClick={() => onAutoFill(false)}
                 disabled={autoFilling}
-                title="AI 會讀取品牌資料＋方法論，把空白欄位填起來，你可以再調整"
+                title={lang === "en" ? "AI reads your brand + framework and fills empty fields — you can tweak after" : "AI 會讀取品牌資料＋方法論，把空白欄位填起來，你可以再調整"}
                 style={{
                   ...aiBtn,
                   opacity: autoFilling ? 0.55 : 1,
                   cursor: autoFilling ? "wait" : "pointer",
                 }}
               >
-                {autoFilling ? "產生中…" : "🤖 AI 產生空白欄位"}
+                {autoFilling ? (lang === "en" ? "Generating…" : "產生中…") : (lang === "en" ? "🤖 AI fill empty fields" : "🤖 AI 產生空白欄位")}
               </button>
               <button
                 onClick={() => {
-                  if (confirm("重新產生會覆蓋所有已填的欄位（包含你手動改過的）。確定？")) {
+                  if (confirm(lang === "en" ? "Regenerating will overwrite every field (including ones you edited). Continue?" : "重新產生會覆蓋所有已填的欄位（包含你手動改過的）。確定？")) {
                     onAutoFill(true);
                   }
                 }}
                 disabled={autoFilling}
-                title="覆蓋所有欄位重新產生"
+                title={lang === "en" ? "Overwrite every field" : "覆蓋所有欄位重新產生"}
                 style={{
                   ...aiBtnGhost,
                   opacity: autoFilling ? 0.55 : 1,
                   cursor: autoFilling ? "wait" : "pointer",
                 }}
               >
-                🔄 全部覆蓋
+                {lang === "en" ? "🔄 Overwrite all" : "🔄 全部覆蓋"}
               </button>
             </div>
           </div>
@@ -380,7 +383,7 @@ function FrontFace({
               lineHeight: 1.55,
             }}
           >
-            想省事就按「AI 產生」，它會依你品牌資料 + 這套方法論自動填。想自己寫也可以直接打字。
+            {lang === "en" ? "Tap AI fill to let it generate from your brand + this framework, or just type in your own answers." : "想省事就按「AI 產生」，它會依你品牌資料 + 這套方法論自動填。想自己寫也可以直接打字。"}
           </div>
           {fields.map((f) => (
             <Field key={f.key} label={f.label}>
@@ -407,7 +410,7 @@ function FrontFace({
                     })
                   }
                   rows={3}
-                  placeholder="一行一個項目"
+                  placeholder={lang === "en" ? "One item per line" : "一行一個項目"}
                   style={{ ...textInput, resize: "vertical", fontFamily: "inherit" }}
                 />
               ) : (
@@ -442,10 +445,10 @@ function FrontFace({
                 textTransform: "uppercase",
               }}
             >
-              策略解讀
+              {lang === "en" ? "Strategy readout" : "策略解讀"}
             </div>
             <div style={{ fontSize: 11, color: C.textDim }}>
-              完成度 {Math.round(synth.completeness * 100)}%
+              {lang === "en" ? `${Math.round(synth.completeness * 100)}% complete` : `完成度 ${Math.round(synth.completeness * 100)}%`}
             </div>
           </div>
 
@@ -539,7 +542,7 @@ function FrontFace({
                 lineHeight: 1.55,
               }}
             >
-              還有 {synth.gaps.length} 個欄位沒填 — 填完會讓這個策略更完整、執行時 AI 才能正確引用。
+              {lang === "en" ? `${synth.gaps.length} fields still empty — fill them so this strategy is complete and AI can reference it during execution.` : `還有 ${synth.gaps.length} 個欄位沒填 — 填完會讓這個策略更完整、執行時 AI 才能正確引用。`}
             </div>
           )}
         </div>
@@ -558,9 +561,11 @@ function FrontFace({
         }}
       >
         <div style={{ fontWeight: 600, marginBottom: 6, color: C.text }}>
-          使用方式
+          {lang === "en" ? "How it works" : "使用方式"}
         </div>
-        填完方法論欄位後按「啟用」。啟用後 90 天內，其他區（製作/優化/情報）都會把這張卡當作品牌當下的定位依據。90 天後會提醒你重新驗證。
+        {lang === "en"
+          ? "Fill in the framework fields, then tap Activate. For the next 90 days, every other zone (Make / Optimize / Detect) will treat this card as your brand's current positioning. We'll prompt you to revalidate after 90 days."
+          : "填完方法論欄位後按「啟用」。啟用後 90 天內，其他區（製作/優化/情報）都會把這張卡當作品牌當下的定位依據。90 天後會提醒你重新驗證。"}
       </div>
     </div>
   );
@@ -568,6 +573,7 @@ function FrontFace({
 
 // ─── Mini chat drawer (card back) ───────────────────────────────────────────
 function MiniChatDrawer({ strategyId }: { strategyId: number }) {
+  const { lang } = useLang();
   const messagesQuery = trpc.strategyDeck.listMessages.useQuery(
     { strategyId },
     { refetchOnWindowFocus: false }
@@ -587,7 +593,7 @@ function MiniChatDrawer({ strategyId }: { strategyId: number }) {
       await sendMutation.mutateAsync({ strategyId, content });
       await messagesQuery.refetch();
     } catch (err: any) {
-      alert(err?.message ?? "送出失敗");
+      alert(err?.message ?? (lang === "en" ? "Send failed" : "送出失敗"));
     } finally {
       setSending(false);
     }
@@ -604,13 +610,13 @@ function MiniChatDrawer({ strategyId }: { strategyId: number }) {
           borderBottom: `1px solid ${C.borderSoft}`,
         }}
       >
-        💡 問 AI 協助微調這張策略卡。對話只跟這張卡綁定，不影響其他品牌或任務。
+        {lang === "en" ? "💡 Ask AI to help fine-tune this card. The chat is scoped to this card — it won't leak into other brands or tasks." : "💡 問 AI 協助微調這張策略卡。對話只跟這張卡綁定，不影響其他品牌或任務。"}
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 22px" }}>
         {messages.length === 0 && (
           <div style={{ color: C.textDim, fontSize: 13, textAlign: "center", marginTop: 40 }}>
-            還沒對話過。試試問：
+            {lang === "en" ? "No chat yet. Try asking:" : "還沒對話過。試試問："}
             <ul
               style={{
                 listStyle: "none",
@@ -621,11 +627,17 @@ function MiniChatDrawer({ strategyId }: { strategyId: number }) {
                 gap: 8,
               }}
             >
-              {[
-                "這個主原型適合我們嗎？還有什麼選項？",
-                "我們的陰影面應該寫什麼？",
-                "幫我把 why 寫得更有感染力",
-              ].map((q) => (
+              {(lang === "en"
+                ? [
+                    "Is this primary archetype right for us? What else could fit?",
+                    "What should our shadow side say?",
+                    "Help me make the why more compelling",
+                  ]
+                : [
+                    "這個主原型適合我們嗎？還有什麼選項？",
+                    "我們的陰影面應該寫什麼？",
+                    "幫我把 why 寫得更有感染力",
+                  ]).map((q) => (
                 <li key={q}>
                   <button
                     onClick={() => setInput(q)}
@@ -650,7 +662,7 @@ function MiniChatDrawer({ strategyId }: { strategyId: number }) {
         {messages.map((m) => (
           <ChatBubble key={m.id} role={m.role} content={m.content} />
         ))}
-        {sending && <ChatBubble role="assistant" content="思考中…" />}
+        {sending && <ChatBubble role="assistant" content={lang === "en" ? "Thinking…" : "思考中…"} />}
       </div>
 
       <div
@@ -671,7 +683,7 @@ function MiniChatDrawer({ strategyId }: { strategyId: number }) {
               send();
             }
           }}
-          placeholder="問點什麼…"
+          placeholder={lang === "en" ? "Ask anything…" : "問點什麼…"}
           style={{
             flex: 1,
             padding: "10px 12px",
@@ -686,7 +698,7 @@ function MiniChatDrawer({ strategyId }: { strategyId: number }) {
           disabled={!input.trim() || sending}
           style={input.trim() && !sending ? primaryBtn : disabledBtn}
         >
-          {sending ? "…" : "送出"}
+          {sending ? "…" : (lang === "en" ? "Send" : "送出")}
         </button>
       </div>
     </div>

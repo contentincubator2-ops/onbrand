@@ -17,6 +17,7 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faXmark, faMagnifyingGlass, faRocket, faBullhorn, faUsers,
@@ -102,8 +103,33 @@ const WS_INFO: Record<string, { icon: any; color: string }> = {
 /* ════════════════════════════════════════════════════════════════════ */
 interface Props { open: boolean; initialWorkspace: string; onClose: () => void; }
 
+/* ── i18n label maps ─────────────────────────────────────────────────── */
+const CAT_LABEL_EN: Record<string, string> = {
+  recommended: "For you", social: "Social", brand: "Brand strategy", email: "Newsletter", upload: "Upload",
+};
+const CT_LABEL_EN: Record<string, string> = {
+  calendar: "Calendar", post: "Post", ad: "Ad copy", campaign: "Campaign", report: "Report",
+  script: "Script", visual: "Visual", positioning: "Brand positioning", research: "Research",
+  newsletter: "Newsletter",
+};
+const BRAND_TAB_LABEL_EN: Record<string, string> = {
+  "brand-positioning": "Brand positioning", pr: "Press release", audience: "Audience research",
+};
+function tCat(key: string, fallback: string, lang: string): string {
+  return lang === "en" ? (CAT_LABEL_EN[key] ?? fallback) : fallback;
+}
+function tCT(value: string, fallback: string, lang: string): string {
+  return lang === "en" ? (CT_LABEL_EN[value] ?? fallback) : fallback;
+}
+function tChannelTab(key: string, fallback: string, lang: string): string {
+  if (lang !== "en") return fallback;
+  // Channel keys: facebook, instagram, etc. keep their proper names — only brand tabs need translation
+  return BRAND_TAB_LABEL_EN[key] ?? fallback;
+}
+
 export default function CreateMissionModal({ open, initialWorkspace, onClose }: Props) {
   const navigate = useNavigate();
+  const { lang } = useLang();
 
   const [category, setCategory]     = useState<CategoryKey>(() => (WS_TO_CAT[initialWorkspace] ?? "recommended") as CategoryKey);
   const [channel,  setChannel]      = useState<string>(initialWorkspace || "all");
@@ -215,8 +241,10 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
   if (!open) return null;
 
   const sectionLabel = channel !== "all"
-    ? tabs.find(t => t.key === channel)?.label ?? "熱門"
-    : (category === "recommended" ? "為你推薦" : catDef.label);
+    ? tChannelTab(channel, tabs.find(t => t.key === channel)?.label ?? (lang === "en" ? "Popular" : "熱門"), lang)
+    : (category === "recommended"
+        ? (lang === "en" ? "For you" : "為你推薦")
+        : tCat(category, catDef.label, lang));
 
   return (
     /* ── Backdrop: semi-transparent + blur, HOME PAGE VISIBLE BEHIND ── */
@@ -282,7 +310,7 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
             margin: "0 0 20px", padding: "0 20px",
             letterSpacing: "-0.02em",
           }}>
-            建立任務
+            {lang === "en" ? "Create a task" : "建立任務"}
           </h2>
 
           {channel !== "all" ? (
@@ -299,7 +327,7 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
                 onMouseEnter={e => (e.currentTarget.style.color = "#374151")}
                 onMouseLeave={e => (e.currentTarget.style.color = "#9CA3AF")}
               >
-                ← 返回
+                {lang === "en" ? "← Back" : "← 返回"}
               </button>
 
               {/* Channel header */}
@@ -322,15 +350,15 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
                       <FontAwesomeIcon icon={tabDef.icon} style={{ fontSize: 12, color: "#fff" }} />
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
-                      {tabDef.label}
+                      {tChannelTab(channel, tabDef.label, lang)}
                     </span>
                   </div>
                 );
               })()}
 
-              {/* 全部 */}
+              {/* All */}
               <SidebarItem
-                label="全部"
+                label={lang === "en" ? "All" : "全部"}
                 active={contentType === "all"}
                 color={WS_INFO[channel]?.color ?? "#7C3AED"}
                 onClick={() => setContentType("all")}
@@ -340,7 +368,7 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
               {(CONTENT_TYPES[channel] ?? []).map(ct => (
                 <SidebarItem
                   key={ct.value}
-                  label={ct.label}
+                  label={tCT(ct.value, ct.label, lang)}
                   active={contentType === ct.value}
                   color={WS_INFO[channel]?.color ?? "#7C3AED"}
                   onClick={() => setContentType(ct.value)}
@@ -372,7 +400,7 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
                     fontSize: 13, fontWeight: active ? 600 : 400,
                     color: active ? "#7C3AED" : "#374151",
                   }}>
-                    {cat.label}
+                    {tCat(cat.key, cat.label, lang)}
                   </span>
                 </button>
               );
@@ -396,7 +424,7 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="你想要建立什麼？"
+                placeholder={lang === "en" ? "What do you want to make?" : "你想要建立什麼？"}
                 autoFocus
                 style={{
                   flex: 1, border: "none", outline: "none",
@@ -413,16 +441,16 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
               display: "flex", gap: 6, alignItems: "center",
               overflowX: "auto", scrollbarWidth: "none",
             }}>
-              {/* 熱門 */}
+              {/* Popular */}
               <TabPill
-                label="熱門" icon={faFire} iconColor="#F97316"
+                label={lang === "en" ? "Popular" : "熱門"} icon={faFire} iconColor="#F97316"
                 active={channel === "all"}
                 onClick={() => { setChannel("all"); setContentType("all"); }}
               />
               {tabs.map(t => (
                 <TabPill
                   key={t.key}
-                  label={t.label} icon={t.icon} iconColor={t.color}
+                  label={tChannelTab(t.key, t.label, lang)} icon={t.icon} iconColor={t.color}
                   active={channel === t.key}
                   onClick={() => {
                     const cat = WS_TO_CAT[t.key];
@@ -439,13 +467,13 @@ export default function CreateMissionModal({ open, initialWorkspace, onClose }: 
           <div style={{ flexShrink: 0, padding: "14px 24px 6px", display: "flex", alignItems: "center", gap: 6 }}>
             {channel !== "all" && (
               <span style={{ fontSize: 12, color: "#9CA3AF" }}>
-                {tabs.find(t => t.key === channel)?.label ?? ""}
+                {tChannelTab(channel, tabs.find(t => t.key === channel)?.label ?? "", lang)}
                 {contentType !== "all" && " ›"}
               </span>
             )}
             <p style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: 0 }}>
               {contentType !== "all"
-                ? (CONTENT_TYPES[channel] ?? []).find(c => c.value === contentType)?.label ?? sectionLabel
+                ? tCT(contentType, (CONTENT_TYPES[channel] ?? []).find(c => c.value === contentType)?.label ?? sectionLabel, lang)
                 : sectionLabel}
             </p>
           </div>
@@ -570,6 +598,7 @@ function SubChip({ label, active, color, onClick }: {
  * (each image fades/slides in every 1.2s while card is hovered).
  */
 function SquadCard({ entity, onSelect }: { entity: any; onSelect: () => void }) {
+  const { lang } = useLang();
   const [hov, setHov]         = useState(false);
   const [imgIdx, setImgIdx]   = useState(0);
   const timerRef              = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -697,7 +726,7 @@ function SquadCard({ entity, onSelect }: { entity: any; onSelect: () => void }) 
             background: color, borderRadius: 20, padding: "5px 18px",
             boxShadow: `0 2px 8px rgba(${rgb},0.4)`,
           }}>
-            開始使用
+            {lang === "en" ? "Use this" : "開始使用"}
           </span>
         </div>
       </div>
@@ -949,11 +978,12 @@ function GridSkeleton() {
 
 /* ── Empty ────────────────────────────────────────────────────────── */
 function EmptyState() {
+  const { lang } = useLang();
   return (
     <div style={{ textAlign: "center", padding: "60px 0", color: "#9CA3AF" }}>
       <FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 34, display: "block", margin: "0 auto 12px" }} />
-      <p style={{ fontSize: 14 }}>尚無符合的任務範本</p>
-      <p style={{ fontSize: 12, marginTop: 4 }}>試試其他分類或搜尋關鍵字</p>
+      <p style={{ fontSize: 14 }}>{lang === "en" ? "No templates match yet" : "尚無符合的任務範本"}</p>
+      <p style={{ fontSize: 12, marginTop: 4 }}>{lang === "en" ? "Try another category or search" : "試試其他分類或搜尋關鍵字"}</p>
     </div>
   );
 }

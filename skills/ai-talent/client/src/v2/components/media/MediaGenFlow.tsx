@@ -23,6 +23,7 @@ import {
 import {
   availableModels, type MediaKind, type MediaModel,
 } from "../../lib/mediaModels";
+import { useLang } from "../../../lib/i18n";
 
 interface MediaGenFlowProps {
   open: boolean;
@@ -70,6 +71,7 @@ export default function MediaGenFlow({
   open, onClose, initialBrief = "", brandContext, audienceContext,
   kind = "image", brandId, inline = false, preferredModelTags, onComplete,
 }: MediaGenFlowProps) {
+  const { lang } = useLang();
   const [phase, setPhase] = React.useState<Phase>("input");
   const [brief, setBrief] = React.useState(initialBrief);
   const [busy, setBusy]   = React.useState(false);
@@ -99,8 +101,8 @@ export default function MediaGenFlow({
   const generateMutation= (trpc as any).media?.generate?.useMutation?.()           ?? null;
 
   const onProposeDirections = async () => {
-    if (!brief.trim()) { setErr("請先輸入 brief"); return; }
-    if (!proposeMutation) { setErr("media.proposeDirection 尚未部署"); return; }
+    if (!brief.trim()) { setErr(lang === "en" ? "Enter a brief first" : "請先輸入 brief"); return; }
+    if (!proposeMutation) { setErr(lang === "en" ? "media.proposeDirection not deployed yet" : "media.proposeDirection 尚未部署"); return; }
     setBusy(true); setErr(null);
     try {
       const res: any = await proposeMutation.mutateAsync({
@@ -152,12 +154,12 @@ export default function MediaGenFlow({
     if (m.status === "manual") {
       // copy to clipboard, signal manual workflow
       try { await navigator.clipboard.writeText(promptEn); } catch { /* */ }
-      setGenResult({ ok: true, message: `Prompt 已複製。請手動貼到 ${m.name}（無 API）。` });
+      setGenResult({ ok: true, message: lang === "en" ? `Prompt copied. Paste it into ${m.name} (no API).` : `Prompt 已複製。請手動貼到 ${m.name}（無 API）。` });
       setPhase("model");
       return;
     }
     if (!generateMutation) {
-      setGenResult({ ok: false, message: "media.generate 尚未部署" });
+      setGenResult({ ok: false, message: lang === "en" ? "media.generate not deployed yet" : "media.generate 尚未部署" });
       setPhase("model");
       return;
     }
@@ -168,7 +170,7 @@ export default function MediaGenFlow({
       });
       setGenResult({
         ok: !!res?.ok,
-        message: res?.message ?? (res?.ok ? "生成完成" : "Phase 2 將接入此 provider"),
+        message: res?.message ?? (res?.ok ? (lang === "en" ? "Generated" : "生成完成") : (lang === "en" ? "Phase 2 will wire this provider" : "Phase 2 將接入此 provider")),
         url: res?.url,
       });
       // Notify the squad-runner so it can attach the URL to the active step.
@@ -235,7 +237,7 @@ export default function MediaGenFlow({
           busy={busy}
         />
       )}
-      {busy && <div className="flex items-center gap-2 text-tiny text-default-500"><Spinner size="sm" /> 處理中…</div>}
+      {busy && <div className="flex items-center gap-2 text-tiny text-default-500"><Spinner size="sm" /> {lang === "en" ? "Working…" : "處理中…"}</div>}
       {err && <p className="text-tiny text-danger">{err}</p>}
     </>
   );
@@ -244,9 +246,9 @@ export default function MediaGenFlow({
     <>
       <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider self-start"
         startContent={<FontAwesomeIcon icon={kind === "video" ? faVideo : faImage} className="text-tiny ml-1" />}>
-        {kind === "video" ? "影片生成" : "圖像生成"}
+        {kind === "video" ? (lang === "en" ? "Video gen" : "影片生成") : (lang === "en" ? "Image gen" : "圖像生成")}
       </Chip>
-      <h2 className="text-medium font-semibold">3-step 視覺產出流程</h2>
+      <h2 className="text-medium font-semibold">{lang === "en" ? "3-step visual gen flow" : "3-step 視覺產出流程"}</h2>
       <PhaseStepper phase={phase} />
     </>
   );
@@ -269,7 +271,7 @@ export default function MediaGenFlow({
         <ModalHeader className="flex flex-col gap-1">{header}</ModalHeader>
         <ModalBody className="gap-3">{body}</ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>關閉</Button>
+          <Button variant="light" onPress={onClose}>{lang === "en" ? "Close" : "關閉"}</Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
@@ -277,11 +279,12 @@ export default function MediaGenFlow({
 }
 
 function PhaseStepper({ phase }: { phase: Phase }) {
+  const { lang } = useLang();
   const steps: Array<{ id: Phase; label: string }> = [
     { id: "input",      label: "Brief" },
-    { id: "directions", label: "設計方向" },
+    { id: "directions", label: lang === "en" ? "Direction" : "設計方向" },
     { id: "prompt",     label: "AI Prompt" },
-    { id: "model",      label: "選擇模型" },
+    { id: "model",      label: lang === "en" ? "Pick model" : "選擇模型" },
   ];
   const idx = steps.findIndex((s) => s.id === phase);
   return (
@@ -299,13 +302,16 @@ function PhaseStepper({ phase }: { phase: Phase }) {
 function InputPhase({
   brief, setBrief, onPropose, onSkip,
 }: { brief: string; setBrief: (s: string) => void; onPropose: () => void; onSkip: () => void }) {
+  const { lang } = useLang();
   return (
     <>
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label="Brief（你想要什麼樣的視覺？）"
+        label={lang === "en" ? "Brief (what visual do you want?)" : "Brief（你想要什麼樣的視覺？）"}
         labelPlacement="outside"
-        placeholder="例：為 SoWork 摘星活動主視覺，呈現拓荒者在資料宇宙中尋找方向的感覺，要有科技感但保留情感溫度。"
+        placeholder={lang === "en"
+          ? "e.g. Hero visual for SoWork's launch — pioneers finding their way in a data universe; techy but warm."
+          : "例：為 SoWork 摘星活動主視覺，呈現拓荒者在資料宇宙中尋找方向的感覺，要有科技感但保留情感溫度。"}
         minRows={4}
         value={brief}
         onValueChange={setBrief}
@@ -314,11 +320,11 @@ function InputPhase({
       <div className="flex items-center gap-2 flex-wrap">
         <Button color="primary" startContent={<FontAwesomeIcon icon={faPalette} />} onPress={onPropose}
           isDisabled={!brief.trim()}>
-          請 AI 提設計方向（推薦）
+          {lang === "en" ? "Ask AI for directions (recommended)" : "請 AI 提設計方向（推薦）"}
         </Button>
-        <Tooltip content="跳過設計方向，直接寫 prompt">
+        <Tooltip content={lang === "en" ? "Skip directions — go straight to prompt" : "跳過設計方向，直接寫 prompt"}>
           <Button variant="light" startContent={<FontAwesomeIcon icon={faForward} />} onPress={onSkip}>
-            我已有想法，直接給 prompt
+            {lang === "en" ? "I have ideas — write prompt" : "我已有想法，直接給 prompt"}
           </Button>
         </Tooltip>
       </div>
@@ -336,20 +342,23 @@ function DirectionsPhase({
   onSkip: () => void;
   busy: boolean;
 }) {
+  const { lang } = useLang();
   return (
     <>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <p className="text-small text-default-500">
-          AI 提了 {directions.length} 個跨度大的方向。挑一個最對的（每個都不一樣），或要 AI 重提一輪。
+          {lang === "en"
+            ? `AI proposed ${directions.length} wide-spread directions. Pick the one that fits, or refresh.`
+            : `AI 提了 ${directions.length} 個跨度大的方向。挑一個最對的（每個都不一樣），或要 AI 重提一輪。`}
         </p>
         <div className="flex items-center gap-1">
-          <Tooltip content="重新提案">
-            <Button isIconOnly size="sm" variant="light" onPress={onRefresh} isDisabled={busy} aria-label="重新提案">
+          <Tooltip content={lang === "en" ? "Refresh" : "重新提案"}>
+            <Button isIconOnly size="sm" variant="light" onPress={onRefresh} isDisabled={busy} aria-label={lang === "en" ? "refresh" : "重新提案"}>
               <FontAwesomeIcon icon={faRotate} className="text-tiny" />
             </Button>
           </Tooltip>
           <Button size="sm" variant="light" startContent={<FontAwesomeIcon icon={faForward} />} onPress={onSkip}>
-            跳過，直接給 prompt
+            {lang === "en" ? "Skip — write prompt" : "跳過，直接給 prompt"}
           </Button>
         </div>
       </div>
@@ -362,16 +371,16 @@ function DirectionsPhase({
               <span className="text-tiny text-default-500">{d.tone}</span>
             </div>
             <Divider />
-            <Pair label="構圖">{d.composition}</Pair>
-            <Pair label="色彩">{d.palette}</Pair>
-            <Pair label="情緒">{d.mood}</Pair>
-            <Pair label="風格參考">{d.styleRef}</Pair>
-            {kind === "video" && d.shotList && <Pair label="分鏡">{d.shotList}</Pair>}
-            <Pair label="為什麼這方向適合">{d.rationale}</Pair>
+            <Pair label={lang === "en" ? "Composition" : "構圖"}>{d.composition}</Pair>
+            <Pair label={lang === "en" ? "Palette" : "色彩"}>{d.palette}</Pair>
+            <Pair label={lang === "en" ? "Mood" : "情緒"}>{d.mood}</Pair>
+            <Pair label={lang === "en" ? "Style ref" : "風格參考"}>{d.styleRef}</Pair>
+            {kind === "video" && d.shotList && <Pair label={lang === "en" ? "Shots" : "分鏡"}>{d.shotList}</Pair>}
+            <Pair label={lang === "en" ? "Why this fits" : "為什麼這方向適合"}>{d.rationale}</Pair>
             <Button size="sm" color="primary" radius="md" className="self-end mt-2"
               endContent={<FontAwesomeIcon icon={faArrowRight} className="text-tiny" />}
               onPress={() => onPick(d)}>
-              選這個
+              {lang === "en" ? "Pick this" : "選這個"}
             </Button>
           </CardBody>
         </Card>
@@ -389,12 +398,13 @@ function PromptPhase({
   onProceed: () => void;
   onBackToDirections: () => void;
 }) {
+  const { lang } = useLang();
   return (
     <>
       {direction && (
         <Card shadow="none" className="border border-divider bg-default-50">
           <CardBody className="px-4 py-3">
-            <p className="text-tiny text-default-500 uppercase tracking-wider">已選方向</p>
+            <p className="text-tiny text-default-500 uppercase tracking-wider">{lang === "en" ? "Selected direction" : "已選方向"}</p>
             <p className="text-small font-medium">{direction.title}</p>
             <p className="text-tiny text-default-500">{direction.tone}</p>
           </CardBody>
@@ -402,7 +412,7 @@ function PromptPhase({
       )}
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label="AI Prompt（英文）" labelPlacement="outside"
+        label={lang === "en" ? "AI Prompt (English)" : "AI Prompt（英文）"} labelPlacement="outside"
         placeholder="Auto-crafted from your direction — edit if needed."
         minRows={6}
         value={promptEn}
@@ -410,16 +420,16 @@ function PromptPhase({
       />
       {summaryZh && (
         <p className="text-tiny text-default-500 leading-relaxed">
-          中文摘要：{summaryZh}
+          {lang === "en" ? `Summary: ${summaryZh}` : `中文摘要：${summaryZh}`}
         </p>
       )}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <Button variant="light" startContent={<FontAwesomeIcon icon={faPenNib} />} onPress={onBackToDirections}>
-          ← 上一步
+          {lang === "en" ? "← Back" : "← 上一步"}
         </Button>
         <Button color="primary" endContent={<FontAwesomeIcon icon={faArrowRight} />}
           isDisabled={!promptEn.trim()} onPress={onProceed}>
-          挑選 AI 模型
+          {lang === "en" ? "Pick AI model" : "挑選 AI 模型"}
         </Button>
       </div>
     </>
@@ -436,10 +446,11 @@ function ModelPhase({
   genResult: { ok: boolean; message?: string; url?: string } | null;
   busy: boolean;
 }) {
+  const { lang } = useLang();
   return (
     <>
       <p className="text-small text-default-500">
-        每個模型擅長的不同。挑一個最符合你方向的：
+        {lang === "en" ? "Each model has different strengths. Pick the one that fits your direction:" : "每個模型擅長的不同。挑一個最符合你方向的："}
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {models.map((m) => {
@@ -459,13 +470,13 @@ function ModelPhase({
                     <p className="text-small font-medium">{m.name}</p>
                     {m._recommended && (
                       <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
-                        ⭐ 推薦
+                        {lang === "en" ? "⭐ Recommended" : "⭐ 推薦"}
                       </Chip>
                     )}
                   </div>
-                  {m.status === "ready" && <Chip size="sm" variant="flat" color="success">可用</Chip>}
-                  {m.status === "manual" && <Chip size="sm" variant="flat" color="warning">手動複製</Chip>}
-                  {m.status === "soon" && <Chip size="sm" variant="flat" color="default">尚未串接</Chip>}
+                  {m.status === "ready" && <Chip size="sm" variant="flat" color="success">{lang === "en" ? "Ready" : "可用"}</Chip>}
+                  {m.status === "manual" && <Chip size="sm" variant="flat" color="warning">{lang === "en" ? "Manual copy" : "手動複製"}</Chip>}
+                  {m.status === "soon" && <Chip size="sm" variant="flat" color="default">{lang === "en" ? "Coming soon" : "尚未串接"}</Chip>}
                 </div>
                 <p className="text-tiny text-default-500">{m.vendor}</p>
                 <p className="text-tiny text-default-600 leading-relaxed">{m.strengths}</p>
@@ -495,12 +506,12 @@ function ModelPhase({
         </Card>
       )}
       <div className="flex items-center justify-end">
-        <Tooltip content="複製 prompt">
+        <Tooltip content={lang === "en" ? "Copy prompt" : "複製 prompt"}>
           <Button size="sm" variant="bordered" startContent={<FontAwesomeIcon icon={faCopy} className="text-tiny" />}
             onPress={async () => {
               try { await navigator.clipboard.writeText(promptEn); } catch { /* */ }
             }}>
-            複製 Prompt
+            {lang === "en" ? "Copy prompt" : "複製 Prompt"}
           </Button>
         </Tooltip>
       </div>

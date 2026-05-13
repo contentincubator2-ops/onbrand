@@ -10,6 +10,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 
 const C = {
   overlay:    "rgba(18,18,16,0.55)",
@@ -33,19 +34,19 @@ type Situation =
   | "new-market";
 type Stage = "early" | "growth" | "mature";
 
-const SITUATIONS: { id: Situation; label: string; desc: string }[] = [
-  { id: "new-launch",          label: "新品上市",  desc: "新產品 / 新服務即將或剛上線" },
-  { id: "competitor-pressure", label: "競品逼近",  desc: "對手拉近差距或搶走市佔" },
-  { id: "audience-unclear",    label: "受眾模糊",  desc: "不確定誰在買、為什麼買" },
-  { id: "pricing-stuck",       label: "定價卡住",  desc: "調漲困難、毛利被壓縮" },
-  { id: "rebranding",          label: "品牌重塑",  desc: "老品牌想換新形象或敘事" },
-  { id: "new-market",          label: "擴張新市場",desc: "跨品類、跨地區或跨通路" },
+const SITUATIONS: { id: Situation; label: string; desc: string; labelEn: string; descEn: string }[] = [
+  { id: "new-launch",          label: "新品上市",  desc: "新產品 / 新服務即將或剛上線", labelEn: "New launch", descEn: "A new product or service about to or just launched" },
+  { id: "competitor-pressure", label: "競品逼近",  desc: "對手拉近差距或搶走市佔",     labelEn: "Competitor pressure", descEn: "Rivals are closing in or taking share" },
+  { id: "audience-unclear",    label: "受眾模糊",  desc: "不確定誰在買、為什麼買",       labelEn: "Audience unclear", descEn: "Not sure who's buying — or why" },
+  { id: "pricing-stuck",       label: "定價卡住",  desc: "調漲困難、毛利被壓縮",         labelEn: "Pricing stuck", descEn: "Hard to raise prices, margins squeezed" },
+  { id: "rebranding",          label: "品牌重塑",  desc: "老品牌想換新形象或敘事",       labelEn: "Rebrand", descEn: "A legacy brand needs a fresh look or story" },
+  { id: "new-market",          label: "擴張新市場",desc: "跨品類、跨地區或跨通路",       labelEn: "New market", descEn: "Expanding to a new category, region, or channel" },
 ];
 
-const STAGES: { id: Stage; label: string; desc: string }[] = [
-  { id: "early",  label: "早期創業",  desc: "0–2 年、市場驗證中" },
-  { id: "growth", label: "成長期",    desc: "產品驗證完、要擴規模" },
-  { id: "mature", label: "成熟期",    desc: "穩定營收、要守或重啟" },
+const STAGES: { id: Stage; label: string; desc: string; labelEn: string; descEn: string }[] = [
+  { id: "early",  label: "早期創業",  desc: "0–2 年、市場驗證中",   labelEn: "Early stage", descEn: "0–2 years, still validating the market" },
+  { id: "growth", label: "成長期",    desc: "產品驗證完、要擴規模", labelEn: "Growth",      descEn: "Product validated, time to scale" },
+  { id: "mature", label: "成熟期",    desc: "穩定營收、要守或重啟", labelEn: "Mature",      descEn: "Stable revenue — defend or reinvent" },
 ];
 
 export function DiagnosticWizard({
@@ -57,6 +58,7 @@ export function DiagnosticWizard({
   onClose: () => void;
   onCreated: (strategyId: number) => void;
 }) {
+  const { lang } = useLang();
   const [step, setStep] = useState<1 | 2 | 3 | "catalog">(1);
   const [situation, setSituation] = useState<Situation | null>(null);
   const [stage, setStage] = useState<Stage | null>(null);
@@ -98,7 +100,7 @@ export function DiagnosticWizard({
       if (id) onCreated(id);
       else onClose();
     } catch (err: any) {
-      alert(`建立失敗：${err?.message ?? String(err)}`);
+      alert(lang === "en" ? `Create failed: ${err?.message ?? String(err)}` : `建立失敗：${err?.message ?? String(err)}`);
     } finally {
       setCreating(false);
     }
@@ -130,12 +132,12 @@ export function DiagnosticWizard({
           }}
         >
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>策略診斷精靈</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{lang === "en" ? "Strategy diagnosis" : "策略診斷精靈"}</div>
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>
-              {step === 1 && "Step 1 / 2 · 你現在想解決什麼？"}
-              {step === 2 && "Step 2 / 2 · 品牌處於哪個階段？"}
-              {step === 3 && "為你推薦 2–3 套方法論"}
-              {step === "catalog" && "從 10 套 L1 方法論中自選"}
+              {step === 1 && (lang === "en" ? "Step 1 / 2 · What are you tackling right now?" : "Step 1 / 2 · 你現在想解決什麼？")}
+              {step === 2 && (lang === "en" ? "Step 2 / 2 · What stage is the brand at?" : "Step 2 / 2 · 品牌處於哪個階段？")}
+              {step === 3 && (lang === "en" ? "Recommending 2–3 frameworks for you" : "為你推薦 2–3 套方法論")}
+              {step === "catalog" && (lang === "en" ? "Pick from the full set of 10 L1 frameworks" : "從 10 套 L1 方法論中自選")}
             </div>
           </div>
           <button
@@ -160,8 +162,8 @@ export function DiagnosticWizard({
               {SITUATIONS.map((s) => (
                 <OptionCard
                   key={s.id}
-                  label={s.label}
-                  desc={s.desc}
+                  label={lang === "en" ? s.labelEn : s.label}
+                  desc={lang === "en" ? s.descEn : s.desc}
                   selected={situation === s.id}
                   onClick={() => setSituation(s.id)}
                 />
@@ -174,8 +176,8 @@ export function DiagnosticWizard({
               {STAGES.map((s) => (
                 <OptionCard
                   key={s.id}
-                  label={s.label}
-                  desc={s.desc}
+                  label={lang === "en" ? s.labelEn : s.label}
+                  desc={lang === "en" ? s.descEn : s.desc}
                   selected={stage === s.id}
                   onClick={() => setStage(s.id)}
                 />
@@ -185,16 +187,16 @@ export function DiagnosticWizard({
 
           {step === 3 && (
             <div>
-              {diagnoseQuery.isLoading && <CenterText>推薦中…</CenterText>}
+              {diagnoseQuery.isLoading && <CenterText>{lang === "en" ? "Recommending…" : "推薦中…"}</CenterText>}
               {!diagnoseQuery.isLoading && recommendations.length === 0 && (
                 <CenterText>
-                  沒有強匹配，建議從完整目錄挑選。
+                  {lang === "en" ? "No strong match — try picking from the full catalog." : "沒有強匹配，建議從完整目錄挑選。"}
                   <br />
                   <button
                     style={linkBtn}
                     onClick={() => setStep("catalog")}
                   >
-                    查看全部 10 套
+                    {lang === "en" ? "Browse all 10" : "查看全部 10 套"}
                   </button>
                 </CenterText>
               )}
@@ -212,7 +214,7 @@ export function DiagnosticWizard({
               {recommendations.length > 0 && (
                 <div style={{ marginTop: 16, textAlign: "center" }}>
                   <button style={linkBtn} onClick={() => setStep("catalog")}>
-                    或從全部 10 套自己選 →
+                    {lang === "en" ? "Or pick from all 10 yourself →" : "或從全部 10 套自己選 →"}
                   </button>
                 </div>
               )}
@@ -220,12 +222,12 @@ export function DiagnosticWizard({
               {selectedSlug && (
                 <div style={{ marginTop: 22, padding: 16, background: C.bg, borderRadius: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 8 }}>
-                    幫這張策略卡取個名字（之後執行時會用這個名字引用）
+                    {lang === "en" ? "Name this card — execution will reference it by this name" : "幫這張策略卡取個名字（之後執行時會用這個名字引用）"}
                   </div>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="例如：2026 Q2 新品上市定位"
+                    placeholder={lang === "en" ? "e.g. 2026 Q2 new launch positioning" : "例如：2026 Q2 新品上市定位"}
                     style={{
                       width: "100%",
                       padding: "10px 12px",
@@ -243,7 +245,7 @@ export function DiagnosticWizard({
 
           {step === "catalog" && (
             <div>
-              {catalogQuery.isLoading && <CenterText>載入目錄中…</CenterText>}
+              {catalogQuery.isLoading && <CenterText>{lang === "en" ? "Loading catalog…" : "載入目錄中…"}</CenterText>}
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {catalog.map((m: any) => (
                   <RecommendationCard
@@ -258,12 +260,12 @@ export function DiagnosticWizard({
               {selectedSlug && (
                 <div style={{ marginTop: 22, padding: 16, background: C.bg, borderRadius: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 8 }}>
-                    幫這張策略卡取個名字
+                    {lang === "en" ? "Name this card" : "幫這張策略卡取個名字"}
                   </div>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="例如：2026 Q2 新品上市定位"
+                    placeholder={lang === "en" ? "e.g. 2026 Q2 new launch positioning" : "例如：2026 Q2 新品上市定位"}
                     style={{
                       width: "100%",
                       padding: "10px 12px",
@@ -292,7 +294,7 @@ export function DiagnosticWizard({
           }}
         >
           <div style={{ fontSize: 11, color: C.textDim }}>
-            不確定？<button style={linkBtn} onClick={() => setStep("catalog")}>跳過診斷，自己選</button>
+            {lang === "en" ? "Not sure? " : "不確定？"}<button style={linkBtn} onClick={() => setStep("catalog")}>{lang === "en" ? "Skip diagnosis, pick yourself" : "跳過診斷，自己選"}</button>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {(step === 2 || step === 3 || step === "catalog") && (
@@ -304,7 +306,7 @@ export function DiagnosticWizard({
                 }}
                 style={secondaryBtn}
               >
-                ← 上一步
+                {lang === "en" ? "← Back" : "← 上一步"}
               </button>
             )}
             {step === 1 && (
@@ -313,7 +315,7 @@ export function DiagnosticWizard({
                 onClick={() => setStep(2)}
                 style={situation ? primaryBtn : disabledBtn}
               >
-                下一步 →
+                {lang === "en" ? "Next →" : "下一步 →"}
               </button>
             )}
             {step === 2 && (
@@ -322,7 +324,7 @@ export function DiagnosticWizard({
                 onClick={() => setStep(3)}
                 style={stage ? primaryBtn : disabledBtn}
               >
-                查看推薦 →
+                {lang === "en" ? "See recommendations →" : "查看推薦 →"}
               </button>
             )}
             {(step === 3 || step === "catalog") && (
@@ -331,7 +333,7 @@ export function DiagnosticWizard({
                 onClick={submit}
                 style={selectedSlug && name.trim() && !creating ? primaryBtn : disabledBtn}
               >
-                {creating ? "建立中…" : "建立策略卡（草稿）"}
+                {creating ? (lang === "en" ? "Creating…" : "建立中…") : (lang === "en" ? "Create strategy card (draft)" : "建立策略卡（草稿）")}
               </button>
             )}
           </div>

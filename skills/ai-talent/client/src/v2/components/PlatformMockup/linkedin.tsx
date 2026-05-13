@@ -25,6 +25,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
 import { ImageGenSlot, type ImageGenPhase } from "../SquadMockups/ImageGenSlot";
+import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── LI Feed ─────────────── */
 
@@ -44,6 +45,7 @@ export function LIFeed({
   imageGenPhase, imageGenDesignDirection, imageGenAiPrompt,
   imageGenModelName, imageGenResultUrl, imageGenErrorMsg, onImageRetry,
 }: MockupFields & LIFeedImageGenProps) {
+  const { lang } = useLang();
   // LinkedIn blue per brand guidelines
   const LI_BLUE = "#0A66C2";
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
@@ -110,10 +112,10 @@ export function LIFeed({
                 <span className="text-[12px] font-medium" style={{ color: LI_BLUE }}>• 1st</span>
               </div>
               <p className="text-[12px] text-[#666] leading-tight">
-                行銷顧問 · 品牌策略師
+                {lang === "en" ? "Marketing Consultant · Brand Strategist" : "行銷顧問 · 品牌策略師"}
               </p>
               <div className="flex items-center gap-1 text-[11px] text-[#666] mt-0.5">
-                <span>1 小時前</span>
+                <span>{lang === "en" ? "1h ago" : "1 小時前"}</span>
                 <span>·</span>
                 <span>🌐</span>
               </div>
@@ -125,7 +127,7 @@ export function LIFeed({
               className="text-[13px] font-semibold flex items-center gap-1"
               style={{ color: LI_BLUE }}
             >
-              + 追蹤
+              {lang === "en" ? "+ Follow" : "+ 追蹤"}
             </button>
             <span className="text-[#666] text-lg leading-none px-1">…</span>
           </div>
@@ -149,7 +151,7 @@ export function LIFeed({
             </p>
           ) : (
             <p className="text-[13px] mt-1" style={{ color: LI_BLUE }}>
-              #品牌行銷 #LinkedIn策略 #等寫手
+              {lang === "en" ? "#brandmarketing #LinkedInstrategy #writer-pending" : "#品牌行銷 #LinkedIn策略 #等寫手"}
             </p>
           )}
         </div>
@@ -177,16 +179,16 @@ export function LIFeed({
             <span className="text-[15px]">💡</span>
             <span className="ml-1">1,234</span>
           </span>
-          <span>87 則留言 · 23 次轉發</span>
+          <span>{lang === "en" ? "87 comments · 23 reposts" : "87 則留言 · 23 次轉發"}</span>
         </div>
 
         {/* Action bar */}
         <div className="px-1 py-0.5 flex items-center">
           {[
-            { icon: faThumbsUp, label: "讚" },
-            { icon: faComment, label: "留言" },
-            { icon: faShareNodes, label: "轉發" },
-            { icon: faPaperPlane, label: "傳送" },
+            { icon: faThumbsUp, label: lang === "en" ? "Like" : "讚" },
+            { icon: faComment, label: lang === "en" ? "Comment" : "留言" },
+            { icon: faShareNodes, label: lang === "en" ? "Repost" : "轉發" },
+            { icon: faPaperPlane, label: lang === "en" ? "Send" : "傳送" },
           ].map((b, i) => (
             <button
               key={i}
@@ -205,9 +207,10 @@ export function LIFeed({
 /* ─────────────── LI Article ─────────────── */
 
 export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
-  const headline = title || lines[0] || "Article 標題";
+  const headline = title || lines[0] || (lang === "en" ? "Article title" : "Article 標題");
   const body = title ? liveCaption ?? "" : lines.slice(1).join("\n");
   return (
     <div className="w-full max-w-[640px] mx-auto">
@@ -220,7 +223,7 @@ export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCa
         ) : liveImageStyle ? (
           <div className="aspect-[3/1] bg-default-100 flex items-center justify-center p-4 text-default-500">
             <div className="text-center max-w-[80%]">
-              <p className="text-tiny font-semibold mb-1">封面風格方向</p>
+              <p className="text-tiny font-semibold mb-1">{lang === "en" ? "Cover direction" : "封面風格方向"}</p>
               <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
             </div>
           </div>
@@ -233,7 +236,7 @@ export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCa
             <Avatar src={avatarSrc} size="md" isBordered color="primary" />
             <div>
               <p className="text-small font-semibold">{brandName ?? "Your Brand"}</p>
-              <p className="text-tiny text-default-500">3,456 位追蹤者 · 5 分鐘閱讀</p>
+              <p className="text-tiny text-default-500">{lang === "en" ? "3,456 followers · 5 min read" : "3,456 位追蹤者 · 5 分鐘閱讀"}</p>
             </div>
           </div>
           <Divider />
@@ -248,10 +251,10 @@ export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCa
           )}
         </div>
         <div className="px-8 py-3 border-t border-divider flex items-center gap-4 text-default-500 text-tiny">
-          <span>👍 喜歡</span>
-          <span>💬 留言</span>
-          <span>↗ 轉發</span>
-          <span className="ml-auto">1.2K 次閱讀</span>
+          <span>{lang === "en" ? "👍 Like" : "👍 喜歡"}</span>
+          <span>{lang === "en" ? "💬 Comment" : "💬 留言"}</span>
+          <span>{lang === "en" ? "↗ Repost" : "↗ 轉發"}</span>
+          <span className="ml-auto">{lang === "en" ? "1.2K reads" : "1.2K 次閱讀"}</span>
         </div>
       </div>
     </div>
@@ -261,10 +264,11 @@ export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCa
 /* ─────────────── LI Newsletter (article + subscribe CTA) ─────────────── */
 
 export function LINewsletter({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   void avatarSrc;
   const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
-  const headline = title || lines[0] || "Newsletter 標題";
+  const headline = title || lines[0] || (lang === "en" ? "Newsletter title" : "Newsletter 標題");
   const body = title ? liveCaption ?? "" : lines.slice(1).join("\n");
   return (
     <div className="w-full max-w-[640px] mx-auto">
@@ -275,11 +279,11 @@ export function LINewsletter({ title, brandName, brandLogoUrl, variantLabel, liv
             <FontAwesomeIcon icon={faNewspaper} className="text-2xl" />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-small font-bold text-primary uppercase tracking-wider">電子報 · NEWSLETTER</p>
+            <p className="text-small font-bold text-primary uppercase tracking-wider">{lang === "en" ? "NEWSLETTER" : "電子報 · NEWSLETTER"}</p>
             <p className="text-medium font-semibold truncate">{brandName ?? "Your Brand"} Insights</p>
-            <p className="text-tiny text-default-500">每週四 · 1,234 位訂閱者</p>
+            <p className="text-tiny text-default-500">{lang === "en" ? "Every Thursday · 1,234 subscribers" : "每週四 · 1,234 位訂閱者"}</p>
           </div>
-          <Button color="primary" size="sm" radius="full">訂閱</Button>
+          <Button color="primary" size="sm" radius="full">{lang === "en" ? "Subscribe" : "訂閱"}</Button>
         </div>
         {liveImageUrl && liveImageStatus === "ready" ? (
           <div className="aspect-[3/1] bg-default-100 overflow-hidden">
@@ -287,13 +291,13 @@ export function LINewsletter({ title, brandName, brandLogoUrl, variantLabel, liv
           </div>
         ) : liveImageStyle ? (
           <div className="aspect-[3/1] bg-default-100 flex items-center justify-center p-4 text-default-500">
-            <div className="text-center max-w-[80%]"><p className="text-tiny font-semibold mb-1">封面風格</p><p className="text-tiny line-clamp-3">{liveImageStyle}</p></div>
+            <div className="text-center max-w-[80%]"><p className="text-tiny font-semibold mb-1">{lang === "en" ? "Cover style" : "封面風格"}</p><p className="text-tiny line-clamp-3">{liveImageStyle}</p></div>
           </div>
         ) : (
           <ImageGenSlot phase="idle" aspectRatio="3/1" />
         )}
         <div className="px-8 py-6 space-y-3">
-          <p className="text-tiny text-default-500 uppercase tracking-wider">第 042 期 · 5 月 15 日</p>
+          <p className="text-tiny text-default-500 uppercase tracking-wider">{lang === "en" ? "Issue 042 · May 15" : "第 042 期 · 5 月 15 日"}</p>
           <h2 className="text-2xl font-semibold leading-tight tracking-tight">{headline}</h2>
           <Divider />
           {body ? (
@@ -315,19 +319,20 @@ export function LINewsletter({ title, brandName, brandLogoUrl, variantLabel, liv
 /* ─────────────── LI Poll ─────────────── */
 
 export function LIPoll({ title, brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
+  const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   // Parse poll from liveCaption: line 1 = question, lines 2-5 = options
   const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
-  const question = lines[0] || title || "問題";
+  const question = lines[0] || title || (lang === "en" ? "Question" : "問題");
   const optTexts = lines.slice(1, 5);
   const optPcts = [42, 28, 18, 12];
   const options = optTexts.length >= 2
     ? optTexts.map((text, i) => ({ text: text.replace(/^[•\-\d.\)）\s]+/, ""), pct: optPcts[i] ?? 5, leading: i === 0 }))
     : [
-        { text: "選項 A", pct: 42, leading: true },
-        { text: "選項 B", pct: 28, leading: false },
-        { text: "選項 C", pct: 18, leading: false },
-        { text: "選項 D", pct: 12, leading: false },
+        { text: lang === "en" ? "Option A" : "選項 A", pct: 42, leading: true },
+        { text: lang === "en" ? "Option B" : "選項 B", pct: 28, leading: false },
+        { text: lang === "en" ? "Option C" : "選項 C", pct: 18, leading: false },
+        { text: lang === "en" ? "Option D" : "選項 D", pct: 12, leading: false },
       ];
   return (
     <div className="w-full max-w-[540px] mx-auto">
@@ -336,7 +341,7 @@ export function LIPoll({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         <div className="px-4 py-3 flex items-center justify-between">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">追蹤者 1,234 · 投票 · 結束於 6 天後</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "1,234 followers · Poll · ends in 6 days" : "追蹤者 1,234 · 投票 · 結束於 6 天後"}</span>}
             avatarProps={{ src: avatarSrc, size: "md", isBordered: true, color: "primary" }}
           />
           <FontAwesomeIcon icon={faChartSimple} className="text-default-400" />
@@ -363,15 +368,15 @@ export function LIPoll({ title, brandName, brandLogoUrl, variantLabel, liveCapti
               </button>
             ))}
           </div>
-          <p className="text-tiny text-default-500">567 票 · 您的選擇會公開顯示</p>
+          <p className="text-tiny text-default-500">{lang === "en" ? "567 votes · Your choice is public" : "567 票 · 您的選擇會公開顯示"}</p>
         </div>
         <Divider />
         <div className="px-2 py-1 flex items-center justify-around text-default-700 text-small">
           {[
-            { icon: faThumbsUp, label: "讚" },
-            { icon: faComment, label: "留言" },
-            { icon: faShareNodes, label: "轉發" },
-            { icon: faPaperPlane, label: "傳送" },
+            { icon: faThumbsUp, label: lang === "en" ? "Like" : "讚" },
+            { icon: faComment, label: lang === "en" ? "Comment" : "留言" },
+            { icon: faShareNodes, label: lang === "en" ? "Repost" : "轉發" },
+            { icon: faPaperPlane, label: lang === "en" ? "Send" : "傳送" },
           ].map((b, i) => (
             <button key={i} className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
               <FontAwesomeIcon icon={b.icon} /> {b.label}
@@ -386,11 +391,12 @@ export function LIPoll({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 /* ─────────────── LI Document (PDF carousel) ─────────────── */
 
 export function LIDocument({ title, brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
+  const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   // First page text from liveCaption (split by ---)
   const pages = (liveCaption ?? "").split(/---+/).map(p => p.trim()).filter(Boolean);
   const totalPages = pages.length || 12;
-  const pageOneText = pages[0] || title || "PDF 文件";
+  const pageOneText = pages[0] || title || (lang === "en" ? "PDF document" : "PDF 文件");
   return (
     <div className="w-full max-w-[540px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
@@ -398,7 +404,7 @@ export function LIDocument({ title, brandName, brandLogoUrl, variantLabel, liveC
         <div className="px-4 py-3">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">追蹤者 1,234 · 1 小時前</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "1,234 followers · 1h ago" : "追蹤者 1,234 · 1 小時前"}</span>}
             avatarProps={{ src: avatarSrc, size: "md", isBordered: true, color: "primary" }}
           />
         </div>
@@ -414,8 +420,8 @@ export function LIDocument({ title, brandName, brandLogoUrl, variantLabel, liveC
               ) : (
                 <div className="text-center text-default-400">
                   <FontAwesomeIcon icon={faFileLines} className="text-5xl mb-3" />
-                  <p className="text-small font-medium">第 1 / {totalPages} 頁</p>
-                  <p className="text-tiny mt-1">PDF 文件 · 等待 craft agent</p>
+                  <p className="text-small font-medium">{lang === "en" ? `Page 1 / ${totalPages}` : `第 1 / ${totalPages} 頁`}</p>
+                  <p className="text-tiny mt-1">{lang === "en" ? "PDF document · waiting for craft agent" : "PDF 文件 · 等待 craft agent"}</p>
                 </div>
               )}
             </div>
@@ -429,15 +435,15 @@ export function LIDocument({ title, brandName, brandLogoUrl, variantLabel, liveC
         </div>
         <div className="px-4 py-2 mt-2 flex items-center justify-between text-tiny text-default-500">
           <span>👍❤️💡 1,234</span>
-          <span>87 則留言 · 23 次轉發 · 156 次下載</span>
+          <span>{lang === "en" ? "87 comments · 23 reposts · 156 downloads" : "87 則留言 · 23 次轉發 · 156 次下載"}</span>
         </div>
         <Divider />
         <div className="px-2 py-1 flex items-center justify-around text-default-700 text-small">
           {[
-            { icon: faThumbsUp, label: "讚" },
-            { icon: faComment, label: "留言" },
-            { icon: faShareNodes, label: "轉發" },
-            { icon: faPaperPlane, label: "傳送" },
+            { icon: faThumbsUp, label: lang === "en" ? "Like" : "讚" },
+            { icon: faComment, label: lang === "en" ? "Comment" : "留言" },
+            { icon: faShareNodes, label: lang === "en" ? "Repost" : "轉發" },
+            { icon: faPaperPlane, label: lang === "en" ? "Send" : "傳送" },
           ].map((b, i) => (
             <button key={i} className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
               <FontAwesomeIcon icon={b.icon} /> {b.label}
@@ -452,6 +458,7 @@ export function LIDocument({ title, brandName, brandLogoUrl, variantLabel, liveC
 /* ─────────────── LI Native Video (feed + video player) ─────────────── */
 
 export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[540px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
@@ -459,7 +466,7 @@ export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) 
         <div className="px-4 py-3">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">追蹤者 1,234 · 1 小時前 · 🌐</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "1,234 followers · 1h ago · 🌐" : "追蹤者 1,234 · 1 小時前 · 🌐"}</span>}
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
           />
         </div>
@@ -470,7 +477,7 @@ export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) 
         </div>
         {/* Video player */}
         <div className="relative aspect-video bg-black flex items-center justify-center">
-          <div className="text-white/50 text-tiny">影片載入中…</div>
+          <div className="text-white/50 text-tiny">{lang === "en" ? "Loading video…" : "影片載入中…"}</div>
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
               <span className="ml-1 text-foreground text-xl">▶</span>
@@ -485,16 +492,16 @@ export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) 
           </div>
         </div>
         <div className="px-4 py-2 flex items-center justify-between text-tiny text-default-500">
-          <span>👍❤️💡 1,234 · 12K 次觀看</span>
-          <span>87 留言 · 23 次轉發</span>
+          <span>{lang === "en" ? "👍❤️💡 1,234 · 12K views" : "👍❤️💡 1,234 · 12K 次觀看"}</span>
+          <span>{lang === "en" ? "87 comments · 23 reposts" : "87 留言 · 23 次轉發"}</span>
         </div>
         <Divider />
         <div className="px-2 py-1 flex items-center justify-around text-default-700 text-small">
           {[
-            { icon: faThumbsUp, label: "讚" },
-            { icon: faComment, label: "留言" },
-            { icon: faShareNodes, label: "轉發" },
-            { icon: faPaperPlane, label: "傳送" },
+            { icon: faThumbsUp, label: lang === "en" ? "Like" : "讚" },
+            { icon: faComment, label: lang === "en" ? "Comment" : "留言" },
+            { icon: faShareNodes, label: lang === "en" ? "Repost" : "轉發" },
+            { icon: faPaperPlane, label: lang === "en" ? "Send" : "傳送" },
           ].map((b, i) => (
             <button key={i} className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
               <FontAwesomeIcon icon={b.icon} /> {b.label}
@@ -509,6 +516,7 @@ export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) 
 /* ─────────────── LI Ad (feed + Promoted + CTA) ─────────────── */
 
 export function LIAd({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[540px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
@@ -521,7 +529,7 @@ export function LIAd({ title, brandName, variantLabel }: MockupFields) {
               </span>
             }
             description={
-              <span className="text-tiny text-default-500">推廣 · Promoted · 1.2K 位追蹤者</span>
+              <span className="text-tiny text-default-500">{lang === "en" ? "Promoted · 1.2K followers" : "推廣 · Promoted · 1.2K 位追蹤者"}</span>
             }
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
           />
@@ -534,14 +542,14 @@ export function LIAd({ title, brandName, variantLabel }: MockupFields) {
         {/* CTA bar */}
         <div className="px-4 py-3 bg-default-50 border-y border-divider flex items-center justify-between">
           <div className="min-w-0">
-            <p className="text-small font-semibold truncate">下載白皮書</p>
+            <p className="text-small font-semibold truncate">{lang === "en" ? "Download whitepaper" : "下載白皮書"}</p>
             <p className="text-tiny text-default-500 truncate">your-brand.com</p>
           </div>
-          <Button color="primary" size="sm" radius="full" className="font-medium ml-2">了解更多</Button>
+          <Button color="primary" size="sm" radius="full" className="font-medium ml-2">{lang === "en" ? "Learn more" : "了解更多"}</Button>
         </div>
         <div className="px-4 py-2 flex items-center justify-between text-tiny text-default-500">
           <span>👍❤️💡 234</span>
-          <span>12 留言 · 5 次轉發</span>
+          <span>{lang === "en" ? "12 comments · 5 reposts" : "12 留言 · 5 次轉發"}</span>
         </div>
       </div>
     </div>
@@ -551,6 +559,7 @@ export function LIAd({ title, brandName, variantLabel }: MockupFields) {
 /* ─────────────── LI Event (event card + RSVP) ─────────────── */
 
 export function LIEvent({ title, brief, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
@@ -558,23 +567,23 @@ export function LIEvent({ title, brief, brandName, variantLabel }: MockupFields)
         <ImageGenSlot phase="idle" aspectRatio="2.5/1" />
         <div className="px-5 pt-4 pb-3 space-y-2">
           <Chip size="sm" variant="flat" color="primary" className="uppercase tracking-wider">
-            線上活動
+            {lang === "en" ? "Online event" : "線上活動"}
           </Chip>
-          <p className="text-tiny font-bold uppercase tracking-wider text-primary">5 月 15 日 (四) · 10:00 PM</p>
+          <p className="text-tiny font-bold uppercase tracking-wider text-primary">{lang === "en" ? "May 15 (Thu) · 10:00 PM" : "5 月 15 日 (四) · 10:00 PM"}</p>
           <h3 className="text-medium font-bold leading-snug">{title}</h3>
           <div className="flex items-center gap-2 text-tiny text-default-500">
             <Avatar src={dicebear(brandName ?? "brand")} size="sm" />
-            <span>{brandName ?? "Your Brand"} · 主辦</span>
+            <span>{lang === "en" ? `${brandName ?? "Your Brand"} · Host` : `${brandName ?? "Your Brand"} · 主辦`}</span>
           </div>
           {brief && <p className="text-tiny text-default-500 line-clamp-2">{brief}</p>}
           <div className="flex items-center gap-2 pt-1 text-tiny text-default-500">
-            <span><FontAwesomeIcon icon={faThumbsUp} /> 1,234 位有興趣</span>
-            <span>· 234 位將參加</span>
+            <span><FontAwesomeIcon icon={faThumbsUp} /> {lang === "en" ? "1,234 interested" : "1,234 位有興趣"}</span>
+            <span>{lang === "en" ? "· 234 attending" : "· 234 位將參加"}</span>
           </div>
         </div>
         <div className="px-5 pb-4 flex gap-2">
-          <Button color="primary" size="sm" radius="full" className="flex-1 font-medium">參加</Button>
-          <Button variant="bordered" size="sm" radius="full" className="flex-1">分享</Button>
+          <Button color="primary" size="sm" radius="full" className="flex-1 font-medium">{lang === "en" ? "Attend" : "參加"}</Button>
+          <Button variant="bordered" size="sm" radius="full" className="flex-1">{lang === "en" ? "Share" : "分享"}</Button>
         </div>
       </div>
     </div>

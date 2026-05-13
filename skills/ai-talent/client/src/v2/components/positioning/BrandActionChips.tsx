@@ -15,6 +15,7 @@
  */
 import { useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 import { FlaskConical, CheckCircle2, X, Sparkles, RefreshCw } from "lucide-react";
 
 interface ScenarioResult {
@@ -34,6 +35,7 @@ interface Props {
 export function BrandActionChipsRow({
   brandId, expanded, onToggle, status, isRunning,
 }: Props & { expanded: boolean; onToggle: () => void; status: "full"|"interim"|"empty"; isRunning: boolean }) {
+  const { lang } = useLang();
   const utils = trpc.useUtils();
   const lockTabsMut = (trpc as any).theater?.lockTabs?.useMutation?.({
     onSuccess: () => utils.theater?.getTabLocks?.invalidate?.(),
@@ -43,7 +45,9 @@ export function BrandActionChipsRow({
 
   const handleLock = async () => {
     if (!brandId) return;
-    if (!confirm("確定要鎖定 定位 / 文字 / 視覺 三個 tab？\n鎖定後：\n· 編輯欄變成唯讀\n· 全平台都會用這份做為單一真相\n隨時可以解鎖。")) return;
+    if (!confirm(lang === "en"
+      ? "Lock Positioning / Copy / Visual tabs?\nAfter locking:\n· Editors become read-only\n· This becomes the single source of truth everywhere\nYou can unlock anytime."
+      : "確定要鎖定 定位 / 文字 / 視覺 三個 tab？\n鎖定後：\n· 編輯欄變成唯讀\n· 全平台都會用這份做為單一真相\n隨時可以解鎖。")) return;
     try {
       if ((trpc as any).theater?.lockTabs) {
         await lockTabsMut?.mutateAsync?.({ brandId, tabs: ["positioning", "copy", "visual"] });
@@ -53,7 +57,7 @@ export function BrandActionChipsRow({
         }
       }
     } catch (e: any) {
-      alert("鎖定失敗：" + String(e?.message ?? e));
+      alert((lang === "en" ? "Lock failed: " : "鎖定失敗：") + String(e?.message ?? e));
     }
   };
 
@@ -69,16 +73,20 @@ export function BrandActionChipsRow({
         disabled={!brandId}
       >
         {expanded ? <X size={11} /> : <FlaskConical size={11} />}
-        {expanded ? "收起試寫" : "試寫"}
+        {expanded
+          ? (lang === "en" ? "Hide test" : "收起試寫")
+          : (lang === "en" ? "Test" : "試寫")}
       </button>
       <button
         onClick={handleLock}
         className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition text-white"
         style={{ background: status === "full" ? "#10B981" : "#9CA3AF" }}
         disabled={!brandId || status !== "full"}
-        title={status !== "full" ? "等完整定位完成後才可定案" : "一次鎖定 定位 / 文字 / 視覺"}
+        title={status !== "full"
+          ? (lang === "en" ? "Finish full positioning before locking" : "等完整定位完成後才可定案")
+          : (lang === "en" ? "Lock Positioning / Copy / Visual at once" : "一次鎖定 定位 / 文字 / 視覺")}
       >
-        <CheckCircle2 size={11} /> 定案
+        <CheckCircle2 size={11} /> {lang === "en" ? "Lock in" : "定案"}
       </button>
     </div>
   );
@@ -86,6 +94,7 @@ export function BrandActionChipsRow({
 
 /** The expanded panel (controlled). */
 export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | null; open: boolean; onClose: () => void }) {
+  const { lang } = useLang();
   const [results, setResults] = useState<ScenarioResult[] | null>(null);
   const [meta, setMeta] = useState<{ hasRealContent: boolean; sources: string[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -97,7 +106,7 @@ export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | n
     setErr(null); setResults(null); setMeta(null);
     try {
       const r = await testMut?.mutateAsync?.({ brandId });
-      if (!r?.ok) { setErr("測試失敗"); return; }
+      if (!r?.ok) { setErr(lang === "en" ? "Test failed" : "測試失敗"); return; }
       setResults(r.scenarios as ScenarioResult[]);
       setMeta({ hasRealContent: !!r.hasRealContent, sources: r.sources ?? [] });
     } catch (e: any) {
@@ -121,10 +130,10 @@ export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | n
           <div className="flex items-center gap-2 text-xs">
             <Sparkles size={12} className="text-violet-500" />
             {testMut?.isPending ? (
-              <span className="text-default-600">同時試寫 6 個情境中…約 10-15 秒</span>
+              <span className="text-default-600">{lang === "en" ? "Drafting 6 scenarios… ~10–15s" : "同時試寫 6 個情境中…約 10-15 秒"}</span>
             ) : results ? (
               <>
-                <span className="text-default-700 font-medium">6 情境試寫結果</span>
+                <span className="text-default-700 font-medium">{lang === "en" ? "6-scenario test results" : "6 情境試寫結果"}</span>
                 {meta && (
                   <span
                     className="px-2 py-0.5 rounded-full text-[10px]"
@@ -134,13 +143,17 @@ export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | n
                     }}
                   >
                     {meta.hasRealContent
-                      ? `已抓官網 / FB（${meta.sources.join(" + ")}）`
-                      : "⚠️ 沒抓到官網 / FB — 請先到「連結」tile 補上"}
+                      ? (lang === "en"
+                          ? `Pulled from website / FB (${meta.sources.join(" + ")})`
+                          : `已抓官網 / FB（${meta.sources.join(" + ")}）`)
+                      : (lang === "en"
+                          ? "⚠️ No website / FB content found — add links in the Links tile first"
+                          : "⚠️ 沒抓到官網 / FB — 請先到「連結」tile 補上")}
                   </span>
                 )}
               </>
             ) : (
-              <span className="text-default-500">準備中…</span>
+              <span className="text-default-500">{lang === "en" ? "Getting ready…" : "準備中…"}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -148,14 +161,14 @@ export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | n
               onClick={runBattery}
               disabled={!brandId || testMut?.isPending}
               className="flex items-center gap-1 text-xs text-default-600 hover:text-default-900 px-2 py-1 rounded transition"
-              title="重新跑一次"
+              title={lang === "en" ? "Run again" : "重新跑一次"}
             >
-              <RefreshCw size={11} className={testMut?.isPending ? "animate-spin" : ""} /> 重跑
+              <RefreshCw size={11} className={testMut?.isPending ? "animate-spin" : ""} /> {lang === "en" ? "Rerun" : "重跑"}
             </button>
             <button
               onClick={onClose}
               className="text-default-400 hover:text-default-700 p-1"
-              title="收起試寫"
+              title={lang === "en" ? "Hide test" : "收起試寫"}
             >
               <X size={14} />
             </button>
@@ -180,7 +193,7 @@ export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | n
                 </div>
                 {s.ok
                   ? <p className="text-[12px] text-default-800 whitespace-pre-wrap leading-relaxed">{s.caption}</p>
-                  : <p className="text-[11px] text-danger italic">{s.error || "產生失敗"}</p>}
+                  : <p className="text-[11px] text-danger italic">{s.error || (lang === "en" ? "Generation failed" : "產生失敗")}</p>}
               </div>
             ))}
           </div>

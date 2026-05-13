@@ -33,6 +33,7 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 import {
   Modal, ModalContent, ModalHeader, ModalBody,
   Button, Input, Textarea, Card, CardBody, Chip,
@@ -216,6 +217,56 @@ const GROUP_LABELS: Record<SourceDef["group"], string> = {
   manual:      "手動建立",
 };
 
+const GROUP_LABELS_EN: Record<SourceDef["group"], string> = {
+  recommended: "",
+  web:         "From the web",
+  tools:       "From code / tools",
+  files:       "From a file",
+  manual:      "Manual",
+};
+
+// zh → en lookups for source label/blurb/placeholder/hint
+const ZH_EN_MM: Record<string, string> = {
+  "新增任務範本": "Add task template",
+  "為你推薦": "Recommended for you",
+  "依你的品牌與最近任務，推薦最常用的任務範本來源。": "Based on your brand and recent missions, we recommend popular template sources.",
+  "網頁 / 文章": "Web / Article",
+  "貼上 Wikipedia、Medium、Substack、部落格、研究機構公開網址，系統閱讀後抽取任務範本。": "Paste a Wikipedia, Medium, Substack, blog, or research site URL — we read it and extract the template.",
+  "YouTube 影片": "YouTube video",
+  "貼上 YouTube 影片連結，系統會閱讀字幕（CC）並萃取出影片中的任務範本主軸。": "Paste a YouTube link — we read captions (CC) and extract the template.",
+  "目前僅支援有 CC 字幕的影片。系統會嘗試讀取頁面 metadata + transcript。": "Currently only videos with CC captions. We read page metadata + transcript.",
+  "書籍": "Book",
+  "輸入書名 + 作者，或直接貼上 Goodreads / Amazon / 出版社頁面 URL。系統會找書中提到的核心任務範本。": "Enter title + author, or paste a Goodreads / Amazon / publisher URL — we find the core template inside the book.",
+  "如果是還沒上 Goodreads 的書，可改貼出版社 / 作者官網的書籍介紹頁。": "If the book isn't on Goodreads, paste the publisher or author site instead.",
+  "貼上單集 Podcast 頁面 URL（Spotify / Apple Podcast / 各家官網），系統讀取節目逐字稿。": "Paste a single-episode podcast URL (Spotify, Apple Podcasts, etc.) — we read the transcript.",
+  "若該集沒有公開逐字稿，建議改用 YouTube 的同一集連結（多數 podcast 也上 YouTube）。": "If no public transcript, paste the YouTube link for the same episode (most podcasts also upload there).",
+  "競爭者案例": "Competitor case",
+  "貼上競爭品牌的案例頁、品牌故事頁、產品著陸頁，系統倒推他們在用的任務範本。": "Paste a competitor's case page, brand story, or landing page — we reverse-engineer the template they use.",
+  "適合用來分析市場領導者的定位邏輯，再 fork 成你自己的版本。": "Great for studying a market leader's positioning, then forking your own version.",
+  "貼上 GitHub repo / 子資料夾 / README 連結，系統抓 README 與 manifest 結構化成任務範本。": "Paste a GitHub repo / subfolder / README URL — we read the README and manifest to build the template.",
+  "Private repo 請改用 raw README 連結或上傳檔案。": "For private repos, use a raw README link or upload the file.",
+  "上傳或貼上 Anthropic Claude Skill 的 SKILL.md，系統依 skill 規範解析成 squad。": "Upload or paste an Anthropic Claude Skill's SKILL.md — we parse it into a squad.",
+  "貼上 SKILL.md 全文……": "Paste the full SKILL.md…",
+  "Claude Skill 的標準化結構（name / description / steps）會被直接 1:1 對應到 squad workflow。": "Claude Skill's standard structure (name / description / steps) maps 1:1 to the squad workflow.",
+  "貼上你建立的 Custom GPT 的指令 / 描述 / Knowledge 摘要，系統轉換成任務範本。": "Paste your Custom GPT's instructions / description / knowledge summary — we turn it into a template.",
+  "貼上 GPT 的 System Prompt 或匯出 JSON……": "Paste the GPT system prompt or exported JSON…",
+  "也可貼上 GPT Store 的公開 GPT 連結，系統會嘗試讀取 metadata。": "You can also paste a public GPT Store link — we'll try to read its metadata.",
+  "Notion 頁面": "Notion page",
+  "貼上公開分享的 Notion 頁面連結，系統讀取頁面內容萃取任務範本。": "Paste a public Notion page URL — we read it and extract the template.",
+  "頁面必須是公開分享狀態（右上角 Share → Publish to web）。": "The page must be publicly shared (top-right Share → Publish to web).",
+  "上傳檔案": "Upload file",
+  "上傳 SOP、操作手冊、任務範本草稿、skill 文件（.md / .txt / .json / .pdf）。": "Upload SOPs, manuals, template drafts, or skill files (.md / .txt / .json / .pdf).",
+  "支援 .md / .txt / .json / .markdown / .pdf。檔案上傳後在本地預覽，後端萃取下一輪上線。": "Supports .md / .txt / .json / .markdown / .pdf. Local preview only — backend extraction ships next round.",
+  "從零開始": "Start from scratch",
+  "建立空白任務範本，自訂步驟、所需技能、產出。適合內部獨家流程。": "Create a blank template — customize steps, skills, and outputs. Great for in-house flows.",
+};
+
+function trMM(s: string | undefined, lang: string): string {
+  if (!s) return s ?? "";
+  if (lang !== "en") return s;
+  return ZH_EN_MM[s] ?? s;
+}
+
 // Pre-compute groups once at module load — pure function of static SOURCES.
 const GROUPED_SOURCES: Array<{ key: SourceDef["group"]; items: SourceDef[] }> = (() => {
   const groups: Array<{ key: SourceDef["group"]; items: SourceDef[] }> = [];
@@ -271,6 +322,7 @@ export default function CreateMethodologyModal({
   onCreated: (slug: string) => void;
   initialSource?: SourceId;
 }) {
+  const { lang } = useLang();
   const [activeId, setActiveId] = useState<SourceId>(initialSource);
   const [phase, setPhase] = useState<Phase>("input");
   const [url, setUrl] = useState("");
@@ -402,7 +454,7 @@ export default function CreateMethodologyModal({
       <ModalContent>
         <ModalHeader className="px-8 py-5 border-b border-divider">
           <h2 className="font-semibold text-2xl text-foreground tracking-[-0.015em]">
-            新增任務範本
+            {lang === "en" ? "Add task template" : "新增任務範本"}
           </h2>
         </ModalHeader>
         <ModalBody className="p-0 flex flex-row min-h-0">
@@ -412,7 +464,7 @@ export default function CreateMethodologyModal({
               <div key={g.key} className="mb-3">
                 {GROUP_LABELS[g.key] && (
                   <div className="px-6 py-1.5 text-tiny tracking-[0.24em] uppercase text-default-400">
-                    {GROUP_LABELS[g.key]}
+                    {lang === "en" ? GROUP_LABELS_EN[g.key] : GROUP_LABELS[g.key]}
                   </div>
                 )}
                 {g.items.map((s) => (
@@ -438,7 +490,7 @@ export default function CreateMethodologyModal({
                     >
                       {s.glyph}
                     </span>
-                    <span className="text-small">{s.label}</span>
+                    <span className="text-small">{trMM(s.label, lang)}</span>
                     {!s.ready && (
                       <Chip
                         size="sm"
@@ -460,13 +512,13 @@ export default function CreateMethodologyModal({
             {/* Header for active source */}
             <div className="mb-6">
               <div className="text-tiny tracking-[0.28em] uppercase text-default-400">
-                {GROUP_LABELS[active.group] || "INGEST"}
+                {(lang === "en" ? GROUP_LABELS_EN[active.group] : GROUP_LABELS[active.group]) || "INGEST"}
               </div>
               <h3 className="mt-1 font-semibold text-xl text-foreground tracking-[-0.015em]">
-                {active.label}
+                {trMM(active.label, lang)}
               </h3>
               <p className="mt-2 text-small text-foreground max-w-[640px]">
-                {active.blurb}
+                {trMM(active.blurb, lang)}
               </p>
             </div>
 
@@ -501,7 +553,7 @@ export default function CreateMethodologyModal({
 
             {phase === "saving" && (
               <div className="text-small text-default-500 py-12 text-center">
-                寫入資料庫中…
+                {lang === "en" ? "Writing to database…" : "寫入資料庫中…"}
               </div>
             )}
 
@@ -518,7 +570,7 @@ export default function CreateMethodologyModal({
                     onPress={() => { setPhase("input"); setError(null); setJobId(null); }}
                     className="mt-2 self-start"
                   >
-                    重試
+                    {lang === "en" ? "Retry" : "重試"}
                   </Button>
                 </CardBody>
               </Card>
@@ -557,28 +609,29 @@ function SourcePane({
   onClose: () => void;
   onSwitchSource: (id: SourceId) => void;
 }) {
+  const { lang } = useLang();
   // ── Recommended landing ───────────────────────────────────────────
   if (source.id === "recommended") {
     return (
       <div className="space-y-4 max-w-[640px]">
         <RecoTile
-          label="從 YouTube 影片"
-          desc="貼上 1 條影片連結，30 秒生成任務範本。"
+          label={lang === "en" ? "From a YouTube video" : "從 YouTube 影片"}
+          desc={lang === "en" ? "Paste one video link — template ready in 30 seconds." : "貼上 1 條影片連結，30 秒生成任務範本。"}
           onClick={() => onSwitchSource("youtube")}
         />
         <RecoTile
-          label="從 GitHub repo"
-          desc="貼上 README，自動結構化為 squad。"
+          label={lang === "en" ? "From a GitHub repo" : "從 GitHub repo"}
+          desc={lang === "en" ? "Paste a README — auto-structured into a squad." : "貼上 README，自動結構化為 squad。"}
           onClick={() => onSwitchSource("github")}
         />
         <RecoTile
-          label="從網頁文章"
-          desc="Wikipedia / Medium / Substack 都行。"
+          label={lang === "en" ? "From a web article" : "從網頁文章"}
+          desc={lang === "en" ? "Wikipedia / Medium / Substack all work." : "Wikipedia / Medium / Substack 都行。"}
           onClick={() => onSwitchSource("web")}
         />
         <RecoTile
-          label="從零開始"
-          desc="自訂步驟，建立你的獨家任務範本。"
+          label={lang === "en" ? "Start from scratch" : "從零開始"}
+          desc={lang === "en" ? "Customize steps and build your own template." : "自訂步驟，建立你的獨家任務範本。"}
           onClick={() => onSwitchSource("blank")}
         />
       </div>
@@ -590,14 +643,14 @@ function SourcePane({
     return (
       <div className="max-w-[640px] space-y-4">
         <div className="text-small text-foreground">
-          先在型錄裡開一張空白任務範本卡片，再進入編輯器自訂步驟。
+          {lang === "en" ? "Open a blank template card in the catalog, then customize steps in the editor." : "先在型錄裡開一張空白任務範本卡片，再進入編輯器自訂步驟。"}
         </div>
         <Button
           color="primary"
           onPress={() => { onClose(); window.location.assign("/templates?new=blank"); }}
           endContent={<span aria-hidden>→</span>}
         >
-          建立空白任務範本
+          {lang === "en" ? "Create blank template" : "建立空白任務範本"}
         </Button>
       </div>
     );
@@ -611,11 +664,11 @@ function SourcePane({
           value={url}
           onValueChange={setUrl}
           onKeyDown={(e) => { if (e.key === "Enter") onSubmitUrl(); }}
-          placeholder={source.placeholder}
+          placeholder={trMM(source.placeholder, lang)}
           variant="bordered"
         />
         {source.hint && (
-          <p className="text-small text-default-500">{source.hint}</p>
+          <p className="text-small text-default-500">{trMM(source.hint, lang)}</p>
         )}
         <Button
           color="primary"
@@ -624,7 +677,7 @@ function SourcePane({
           isDisabled={!url.trim()}
           endContent={<span aria-hidden>→</span>}
         >
-          開始抽取
+          {lang === "en" ? "Start extraction" : "開始抽取"}
         </Button>
       </div>
     );
@@ -644,8 +697,8 @@ function SourcePane({
           ].join(" ")}
         >
           <div className="text-3xl leading-none mb-3" aria-hidden>☁</div>
-          <div className="text-medium text-foreground mb-1">將你的內容拖放至此</div>
-          <div className="text-small text-default-500 mb-5">或選擇檔案上傳</div>
+          <div className="text-medium text-foreground mb-1">{lang === "en" ? "Drop your content here" : "將你的內容拖放至此"}</div>
+          <div className="text-small text-default-500 mb-5">{lang === "en" ? "or pick a file to upload" : "或選擇檔案上傳"}</div>
           <label className="inline-block cursor-pointer">
             <input
               type="file"
@@ -662,13 +715,13 @@ function SourcePane({
               }}
             />
             <span className="inline-block px-5 py-2.5 text-tiny tracking-[0.18em] uppercase border border-foreground text-foreground hover:bg-foreground hover:text-white transition rounded">
-              上傳檔案
+              {lang === "en" ? "Upload file" : "上傳檔案"}
             </span>
           </label>
         </div>
         {pickedFile && (
           <div className="border border-divider bg-background px-4 py-3 rounded">
-            <div className="text-tiny tracking-[0.18em] uppercase text-default-400">已選取</div>
+            <div className="text-tiny tracking-[0.18em] uppercase text-default-400">{lang === "en" ? "Selected" : "已選取"}</div>
             <div className="text-small text-foreground mt-0.5">
               {pickedFile.name}{" "}
               <span className="text-default-500 text-small">({Math.round(pickedFile.size / 1024)} KB)</span>
@@ -682,11 +735,11 @@ function SourcePane({
         )}
         {!source.ready && (
           <div className="border border-divider bg-background px-4 py-3 rounded text-small text-default-500">
-            💡 檔案上傳的後端萃取將於下一輪上線。在這之前，請改用{" "}
+            💡 {lang === "en" ? "File upload extraction ships next round. For now, please use" : "檔案上傳的後端萃取將於下一輪上線。在這之前，請改用"}{" "}
             <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-foreground">GitHub</Button>
-            {" "}或{" "}
-            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-foreground">網頁</Button>
-            {" "}模式建立任務範本。
+            {" "}{lang === "en" ? "or" : "或"}{" "}
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-foreground">{lang === "en" ? "Web" : "網頁"}</Button>
+            {" "}{lang === "en" ? "to build the template." : "模式建立任務範本。"}
           </div>
         )}
       </div>
@@ -700,25 +753,25 @@ function SourcePane({
         <Textarea
           value={text}
           onValueChange={setText}
-          placeholder={source.placeholder}
+          placeholder={trMM(source.placeholder, lang)}
           minRows={14}
           variant="bordered"
           classNames={{ input: "font-mono" }}
         />
         {source.hint && (
-          <p className="text-small text-default-500">{source.hint}</p>
+          <p className="text-small text-default-500">{trMM(source.hint, lang)}</p>
         )}
         {!source.ready && (
           <div className="border border-divider bg-background px-4 py-3 rounded text-small text-default-500">
-            💡 文字貼上的後端萃取將於下一輪上線。先用{" "}
+            💡 {lang === "en" ? "Text paste extraction ships next round. For now, use" : "文字貼上的後端萃取將於下一輪上線。先用"}{" "}
             <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("github")} className="h-auto min-w-0 px-1 underline text-foreground">GitHub</Button>
-            {" "}或{" "}
-            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-foreground">網頁</Button>
-            {" "}抽取相同內容。
+            {" "}{lang === "en" ? "or" : "或"}{" "}
+            <Button size="sm" variant="light" radius="sm" onPress={() => onSwitchSource("web")} className="h-auto min-w-0 px-1 underline text-foreground">{lang === "en" ? "Web" : "網頁"}</Button>
+            {" "}{lang === "en" ? "to extract the same content." : "抽取相同內容。"}
           </div>
         )}
         <Button color="primary" fullWidth isDisabled>
-          開始抽取（敬請期待）
+          {lang === "en" ? "Start extraction (coming soon)" : "開始抽取（敬請期待）"}
         </Button>
       </div>
     );
@@ -883,6 +936,7 @@ function buildScript(source: SourceDef, url: string): FeedEvent[] {
 }
 
 function ExtractingFeed({ source, url }: { source: SourceDef; url: string }) {
+  const { lang } = useLang();
   const script = useMemo(() => buildScript(source, url), [source, url]);
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [activeAgent, setActiveAgent] = useState<AgentName>("Researcher");
@@ -920,7 +974,7 @@ function ExtractingFeed({ source, url }: { source: SourceDef; url: string }) {
             {activeAgent}
           </div>
           <div className="text-tiny text-default-500 truncate">
-            正在分析 {host}…
+            {lang === "en" ? `Analyzing ${host}…` : `正在分析 ${host}…`}
           </div>
         </div>
         <div className="flex gap-1 shrink-0">
@@ -976,6 +1030,7 @@ function ReviewPane({
   onBack: () => void;
   onCommit: () => void;
 }) {
+  const { lang } = useLang();
   const updateStep = (i: number, patch: Partial<ExtractedMethodology["steps"][number]>) => {
     const next = [...draft.steps];
     next[i] = { ...next[i], ...patch };
@@ -984,7 +1039,7 @@ function ReviewPane({
   return (
     <div className="max-w-[720px] space-y-4">
       <Input
-        label="名稱"
+        label={lang === "en" ? "Name" : "名稱"}
         labelPlacement="outside"
         isRequired
         variant="bordered"
@@ -993,14 +1048,14 @@ function ReviewPane({
       />
       <div className="grid grid-cols-2 gap-3">
         <Input
-          label="作者"
+          label={lang === "en" ? "Author" : "作者"}
           labelPlacement="outside"
           variant="bordered"
           value={draft.author ?? ""}
           onValueChange={(v) => setDraft({ ...draft, author: v })}
         />
         <Input
-          label="年份"
+          label={lang === "en" ? "Year" : "年份"}
           labelPlacement="outside"
           variant="bordered"
           value={draft.year ?? ""}
@@ -1008,7 +1063,7 @@ function ReviewPane({
         />
       </div>
       <Textarea
-        label="說明"
+        label={lang === "en" ? "Description" : "說明"}
         labelPlacement="outside"
         variant="bordered"
         value={draft.description ?? ""}
@@ -1016,7 +1071,7 @@ function ReviewPane({
         minRows={3}
       />
       <div>
-        <p className="text-small font-medium mb-2">步驟 ({draft.steps.length})</p>
+        <p className="text-small font-medium mb-2">{lang === "en" ? "Steps" : "步驟"} ({draft.steps.length})</p>
         <div className="space-y-2">
           {draft.steps.map((s, i) => (
             <Card key={i} shadow="none" className="border border-divider">
@@ -1030,14 +1085,14 @@ function ReviewPane({
                   <Input
                     variant="bordered"
                     size="sm"
-                    placeholder="所需技能"
+                    placeholder={lang === "en" ? "Required skill" : "所需技能"}
                     value={s.requiredSkill ?? ""}
                     onValueChange={(v) => updateStep(i, { requiredSkill: v })}
                   />
                   <Input
                     variant="bordered"
                     size="sm"
-                    placeholder="產出"
+                    placeholder={lang === "en" ? "Output" : "產出"}
                     value={s.outputType ?? ""}
                     onValueChange={(v) => updateStep(i, { outputType: v })}
                   />
@@ -1050,10 +1105,10 @@ function ReviewPane({
 
       <div className="flex items-center gap-3 pt-4 border-t border-divider">
         <Button variant="bordered" onPress={onBack} startContent={<span aria-hidden>←</span>}>
-          換來源
+          {lang === "en" ? "Change source" : "換來源"}
         </Button>
         <Button color="primary" onPress={onCommit} fullWidth endContent={<span aria-hidden>→</span>}>
-          確認新增任務範本
+          {lang === "en" ? "Confirm and add template" : "確認新增任務範本"}
         </Button>
       </div>
     </div>

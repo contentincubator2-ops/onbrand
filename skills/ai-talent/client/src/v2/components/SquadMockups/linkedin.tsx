@@ -24,6 +24,7 @@ import {
 } from "../PlatformMockup/linkedin";
 import type { MockupFields } from "../PlatformMockup/shared";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
+import { useLang } from "../../../lib/i18n";
 
 // ── Shared data shapes ──────────────────────────────────────────────────────
 
@@ -112,10 +113,11 @@ function toFields(brandHandle: string, extra: Partial<MockupFields> = {}): Mocku
 interface FeedProps extends SquadMockupCommonProps { data?: LIPostData; }
 
 export function LIFeedMockup({ data, isActive = false }: FeedProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="💼" eyebrow="SQUAD · LI FEED" title="LinkedIn 貼文" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="💼" eyebrow="SQUAD · LI FEED" title={lang === "en" ? "LinkedIn post" : "LinkedIn 貼文"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.brandHandle, {
@@ -127,14 +129,14 @@ export function LIFeedMockup({ data, isActive = false }: FeedProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="💼" eyebrow="SQUAD · LI FEED" title="LinkedIn 貼文" />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="💼" eyebrow="SQUAD · LI FEED" title={lang === "en" ? "LinkedIn post" : "LinkedIn 貼文"} />
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <LIFeed {...fields} />
       </NotionCard>
       {data.hashtags?.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="HASHTAGS" title="標籤策略" />
+          <SectionHeader eyebrow="HASHTAGS" title={lang === "en" ? "Hashtag strategy" : "標籤策略"} />
           <div className="flex flex-wrap gap-1.5">
             {data.hashtags.map((t, i) => (
               <Chip key={i} size="sm" variant="flat" color="primary" className="h-5 text-tiny">
@@ -146,7 +148,7 @@ export function LIFeedMockup({ data, isActive = false }: FeedProps) {
       )}
       {data.firstComment && (
         <NotionCard>
-          <SectionHeader eyebrow="FIRST COMMENT" title="首則留言（hashtag bundle）" />
+          <SectionHeader eyebrow="FIRST COMMENT" title={lang === "en" ? "First comment (hashtag bundle)" : "首則留言（hashtag bundle）"} />
           <p className="text-small text-default-700 leading-relaxed">{data.firstComment}</p>
         </NotionCard>
       )}
@@ -159,10 +161,11 @@ export function LIFeedMockup({ data, isActive = false }: FeedProps) {
 interface ArticleProps extends SquadMockupCommonProps { data?: LIArticleData; }
 
 export function LIArticleMockup({ data, isActive = false }: ArticleProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="📝" eyebrow="SQUAD · LI ARTICLE" title="LinkedIn 長文章" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="📝" eyebrow="SQUAD · LI ARTICLE" title={lang === "en" ? "LinkedIn article" : "LinkedIn 長文章"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.brandHandle, { title: data.title, brief: data.summary });
@@ -170,14 +173,14 @@ export function LIArticleMockup({ data, isActive = false }: ArticleProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="📝" eyebrow="SQUAD · LI ARTICLE" title="LinkedIn 長文章" />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="📝" eyebrow="SQUAD · LI ARTICLE" title={lang === "en" ? "LinkedIn article" : "LinkedIn 長文章"} />
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <LIArticle {...fields} />
       </NotionCard>
       {data.sections?.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="SECTIONS" title="文章段落結構" />
+          <SectionHeader eyebrow="SECTIONS" title={lang === "en" ? "Article structure" : "文章段落結構"} />
           <div className="flex flex-col gap-3">
             {data.sections.map((s, i) => (
               <div key={i} className="p-3 rounded-md border border-divider">
@@ -190,7 +193,7 @@ export function LIArticleMockup({ data, isActive = false }: ArticleProps) {
       )}
       {data.cta && (
         <NotionCard>
-          <SectionHeader eyebrow="CTA" title="行動呼籲" />
+          <SectionHeader eyebrow="CTA" title={lang === "en" ? "Call to action" : "行動呼籲"} />
           <p className="text-small text-primary font-medium">{data.cta}</p>
         </NotionCard>
       )}
@@ -203,10 +206,11 @@ export function LIArticleMockup({ data, isActive = false }: ArticleProps) {
 interface NewsletterProps extends SquadMockupCommonProps { data?: LINewsletterData; }
 
 export function LINewsletterMockup({ data, isActive = false }: NewsletterProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="📨" eyebrow="SQUAD · LI NEWSLETTER" title="LinkedIn Newsletter 期刊" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="📨" eyebrow="SQUAD · LI NEWSLETTER" title={lang === "en" ? "LinkedIn Newsletter" : "LinkedIn Newsletter 期刊"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.brandHandle, { title: data.issueTitle, brief: data.teaserText });
@@ -214,13 +218,13 @@ export function LINewsletterMockup({ data, isActive = false }: NewsletterProps) 
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="📨" eyebrow="SQUAD · LI NEWSLETTER" title="LinkedIn Newsletter 期刊" />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="📨" eyebrow="SQUAD · LI NEWSLETTER" title={lang === "en" ? "LinkedIn Newsletter" : "LinkedIn Newsletter 期刊"} />
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <LINewsletter {...fields} />
       </NotionCard>
       <NotionCard>
-        <SectionHeader eyebrow="ISSUE BRIEF" title="期刊企劃摘要" />
+        <SectionHeader eyebrow="ISSUE BRIEF" title={lang === "en" ? "Issue brief" : "期刊企劃摘要"} />
         {data.subtitle && <p className="text-tiny text-default-500 mb-1">{data.subtitle}</p>}
         <pre className="text-small leading-relaxed whitespace-pre-wrap font-sans bg-default-50 border border-divider rounded-md p-3">
           {data.teaserText}
@@ -236,10 +240,11 @@ export function LINewsletterMockup({ data, isActive = false }: NewsletterProps) 
 interface PollProps extends SquadMockupCommonProps { data?: LIPollData; }
 
 export function LIPollMockup({ data, isActive = false }: PollProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="📊" eyebrow="ATOMIC · LI POLL" title="LinkedIn 互動民調" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="📊" eyebrow="ATOMIC · LI POLL" title={lang === "en" ? "LinkedIn poll" : "LinkedIn 互動民調"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.brandHandle, { title: data.question, brief: data.contextBody ?? "" });
@@ -247,14 +252,14 @@ export function LIPollMockup({ data, isActive = false }: PollProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="📊" eyebrow="ATOMIC · LI POLL" title="LinkedIn 互動民調" />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="📊" eyebrow="ATOMIC · LI POLL" title={lang === "en" ? "LinkedIn poll" : "LinkedIn 互動民調"} />
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <LIPoll {...fields} />
       </NotionCard>
       {data.options?.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="OPTIONS" title="投票選項" />
+          <SectionHeader eyebrow="OPTIONS" title={lang === "en" ? "Poll options" : "投票選項"} />
           <div className="flex flex-col gap-1.5">
             {data.options.map((opt, i) => (
               <div key={i} className="flex items-center gap-2 p-2 rounded-md border border-divider">
@@ -274,10 +279,11 @@ export function LIPollMockup({ data, isActive = false }: PollProps) {
 interface DocumentProps extends SquadMockupCommonProps { data?: LIDocumentData; }
 
 export function LIDocumentMockup({ data, isActive = false }: DocumentProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="📄" eyebrow="SQUAD · LI DOCUMENT" title="LinkedIn Document 輪播" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="📄" eyebrow="SQUAD · LI DOCUMENT" title={lang === "en" ? "LinkedIn Document carousel" : "LinkedIn Document 輪播"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.brandHandle, { title: data.documentTitle });
@@ -285,14 +291,14 @@ export function LIDocumentMockup({ data, isActive = false }: DocumentProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="📄" eyebrow="SQUAD · LI DOCUMENT" title={`LinkedIn Document (${data.slides?.length ?? 0} 頁)`} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="📄" eyebrow="SQUAD · LI DOCUMENT" title={lang === "en" ? `LinkedIn Document (${data.slides?.length ?? 0} pages)` : `LinkedIn Document (${data.slides?.length ?? 0} 頁)`} />
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <LIDocument {...fields} />
       </NotionCard>
       {data.slides?.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="SLIDE DECK" title="投影片大綱" />
+          <SectionHeader eyebrow="SLIDE DECK" title={lang === "en" ? "Slide outline" : "投影片大綱"} />
           <div className="flex flex-col gap-2">
             {data.slides.map((s, i) => (
               <div key={i} className="flex gap-2 items-start p-2 rounded-md border border-divider">
@@ -317,10 +323,11 @@ export function LIDocumentMockup({ data, isActive = false }: DocumentProps) {
 interface NativeVideoProps extends SquadMockupCommonProps { data?: LINativeVideoData; }
 
 export function LINativeVideoMockup({ data, isActive = false }: NativeVideoProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="🎬" eyebrow="SQUAD · LI NATIVE VIDEO" title="LinkedIn 原生影片" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="🎬" eyebrow="SQUAD · LI NATIVE VIDEO" title={lang === "en" ? "LinkedIn native video" : "LinkedIn 原生影片"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.brandHandle, { title: data.videoTitle, liveCaption: data.body });
@@ -328,17 +335,17 @@ export function LINativeVideoMockup({ data, isActive = false }: NativeVideoProps
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🎬" eyebrow="SQUAD · LI NATIVE VIDEO" title="LinkedIn 原生影片腳本" />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="🎬" eyebrow="SQUAD · LI NATIVE VIDEO" title={lang === "en" ? "LinkedIn native video script" : "LinkedIn 原生影片腳本"} />
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <LINativeVideo {...fields} />
       </NotionCard>
       <NotionCard>
-        <SectionHeader eyebrow="SCRIPT" title="影片腳本結構" />
+        <SectionHeader eyebrow="SCRIPT" title={lang === "en" ? "Video script structure" : "影片腳本結構"} />
         <div className="flex flex-col gap-2">
           {[
-            { label: "🪝 Hook（前 3 秒）", text: data.hook },
-            { label: "📖 主體內容", text: data.body },
+            { label: lang === "en" ? "🪝 Hook (first 3s)" : "🪝 Hook（前 3 秒）", text: data.hook },
+            { label: lang === "en" ? "📖 Main body" : "📖 主體內容", text: data.body },
             { label: "🎯 CTA", text: data.cta },
           ].map((row, i) => (
             <div key={i} className="p-3 rounded-md border border-divider">
@@ -348,10 +355,10 @@ export function LINativeVideoMockup({ data, isActive = false }: NativeVideoProps
           ))}
         </div>
         {data.durationSec && (
-          <p className="text-tiny text-default-500 mt-1">建議時長：{data.durationSec} 秒</p>
+          <p className="text-tiny text-default-500 mt-1">{lang === "en" ? `Suggested duration: ${data.durationSec}s` : `建議時長：${data.durationSec} 秒`}</p>
         )}
         {data.thumbnailDesc && (
-          <p className="text-tiny text-default-500">縮圖方向：{data.thumbnailDesc}</p>
+          <p className="text-tiny text-default-500">{lang === "en" ? `Thumbnail direction: ${data.thumbnailDesc}` : `縮圖方向：${data.thumbnailDesc}`}</p>
         )}
       </NotionCard>
     </div>
@@ -363,10 +370,11 @@ export function LINativeVideoMockup({ data, isActive = false }: NativeVideoProps
 interface AdProps extends SquadMockupCommonProps { data?: LIAdData; }
 
 export function LIAdMockup({ data, isActive = false }: AdProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="🎯" eyebrow="SQUAD · LI AD" title="LinkedIn 廣告文案" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="🎯" eyebrow="SQUAD · LI AD" title={lang === "en" ? "LinkedIn ad copy" : "LinkedIn 廣告文案"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.brandHandle, { title: data.headline, liveCaption: data.introText });
@@ -374,13 +382,13 @@ export function LIAdMockup({ data, isActive = false }: AdProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🎯" eyebrow="SQUAD · LI AD" title="LinkedIn 廣告文案" />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="🎯" eyebrow="SQUAD · LI AD" title={lang === "en" ? "LinkedIn ad copy" : "LinkedIn 廣告文案"} />
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <LIAd {...fields} />
       </NotionCard>
       <NotionCard>
-        <SectionHeader eyebrow="AD BRIEF" title="廣告文案詳情" />
+        <SectionHeader eyebrow="AD BRIEF" title={lang === "en" ? "Ad brief details" : "廣告文案詳情"} />
         <div className="flex flex-col gap-2">
           <div className="p-2 rounded-md bg-default-50 border border-divider">
             <p className="text-tiny text-default-500">Headline</p>
@@ -411,10 +419,11 @@ export function LIAdMockup({ data, isActive = false }: AdProps) {
 interface EventProps extends SquadMockupCommonProps { data?: LIEventData; }
 
 export function LIEventMockup({ data, isActive = false }: EventProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="📅" eyebrow="ATOMIC · LI EVENT" title="LinkedIn 活動宣傳" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="📅" eyebrow="ATOMIC · LI EVENT" title={lang === "en" ? "LinkedIn event promo" : "LinkedIn 活動宣傳"} />
+      <EmptyHint>{lang === "en" ? "Not generated — tap to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.brandHandle, { title: data.eventName, brief: data.description });
@@ -422,16 +431,16 @@ export function LIEventMockup({ data, isActive = false }: EventProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="📅" eyebrow="ATOMIC · LI EVENT" title="LinkedIn 活動宣傳" />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">● agent 思考中…</Chip>}
+          <SectionHeader icon="📅" eyebrow="ATOMIC · LI EVENT" title={lang === "en" ? "LinkedIn event promo" : "LinkedIn 活動宣傳"} />
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
         </div>
         <LIEvent {...fields} />
       </NotionCard>
       <NotionCard>
-        <SectionHeader eyebrow="EVENT DETAILS" title="活動詳情" />
+        <SectionHeader eyebrow="EVENT DETAILS" title={lang === "en" ? "Event details" : "活動詳情"} />
         <div className="flex flex-col gap-1.5 text-small">
-          <p>🗓️ <strong>時間：</strong>{data.dateTime}</p>
-          {data.location && <p>📍 <strong>地點：</strong>{data.location}</p>}
+          <p>🗓️ <strong>{lang === "en" ? "Time: " : "時間："}</strong>{data.dateTime}</p>
+          {data.location && <p>📍 <strong>{lang === "en" ? "Location: " : "地點："}</strong>{data.location}</p>}
           <p className="text-default-700 leading-relaxed mt-1">{data.description}</p>
           {data.cta && <p className="text-primary font-medium mt-1">👉 {data.cta}</p>}
         </div>

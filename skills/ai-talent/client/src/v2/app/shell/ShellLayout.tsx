@@ -59,47 +59,32 @@ interface NavItem {
 // Tier nav items show the seconds badge AS THE ICON (replacing sparkle),
 // with the plain-language subtitle on the second row. Distinct visual
 // rhythm: tier items = numeric badge + verb; everything else = icon + noun.
-const NAV_ITEMS: NavItem[] = [
-  { to: "/30s",       label: "快寫",   tierBadge: "30s", icon: null,
-    tooltip: "30 秒一篇貼文 — 適合日常單篇、追熱點、緊急發文" },
-  { to: "/60s",       label: "製作包", tierBadge: "60s", icon: null,
-    tooltip: "60 秒一個製作包 — 5 種變體挑選 + 視覺 brief + QA" },
-  { to: "/99s",       label: "全企劃", tierBadge: "99s", icon: null, matchPrefix: "/99s",
-    tooltip: "99 秒一個 campaign — 30 天月曆、活動 launch 包、IG 重新定位" },
-  // 進階 hidden — direct URL /squads still works.
-  // { to: "/squads",    label: "進階",     icon: <FontAwesomeIcon icon={faHouse} /> },
-  { to: "/projects",  label: "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
-  // 2026-05-11 (CJ「P0-1 內容日曆」)
-  { to: "/calendar",  label: "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
-    tooltip: "月曆視圖 — 已排程 + 已發布內容一目了然，vs Buffer 的硬實力" },
-  // 2026-05-11 (CJ「這個功能可以晚一點再上，先處理別的」): 範本市集功能
-  // schema + endpoints 留著，nav 暫時下架。等做完 P0 (calendar / Team /
-  // multi-client workspace) 再回頭加上。設計留在 docs/template-marketplace-design.md。
-  // { to: "/community", label: "我的模板", icon: <FontAwesomeIcon icon={faBookBookmark} />,
-  //   tooltip: "把互動好的貼文存起來..." },
-  // 內容企劃台 — replaces 案例 (CJ 2026-05-07). 20-agent cast plans
-  // 6-platform calendar; brain bar shows the active speaker streaming
-  // strategy thoughts. Route /theater kept for backward compat.
-  { to: "/theater",   label: "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
-  { to: "/brands",    label: "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
-  // 2026-05-12 (CJ「加一個獨立的功能區叫做『連結』」): direct entry to
-  // brand settings (connector tab). Points to /brands/settings directly
-  // — BrandSettingsPage handles missing ?b= by falling back to ctx
-  // brandId. matchPrefix ensures this item highlights (not 品牌) when on
-  // /brands/settings.
-  { to: "/brands/settings", label: "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands/settings" },
-  // 2026-05-12 (CJ「策略顧問」): 5 scenario cards + McKinsey reports + Q&A
-  { to: "/consultant", label: "策略顧問", icon: <FontAwesomeIcon icon={faChessKnight} />,
-    tooltip: "策略顧問 — 5 大策略場景 × 20+ 方法論 × 麥肯錫水準報告 × 來回問答" },
-  // 範本 / 比稿 / 案例 hidden — direct URL access still works (/templates,
-  // /boardroom, /playbooks).
-];
+function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
+  const en = lang === "en";
+  return [
+    { to: "/30s",       label: en ? "Quick post" : "快寫",   tierBadge: "30s", icon: null,
+      tooltip: en ? "30s · one post — for daily singles, trend reactions, urgent shipping" : "30 秒一篇貼文 — 適合日常單篇、追熱點、緊急發文" },
+    { to: "/60s",       label: en ? "Package" : "製作包", tierBadge: "60s", icon: null,
+      tooltip: en ? "60s · full package — 5 variants + visual brief + QA" : "60 秒一個製作包 — 5 種變體挑選 + 視覺 brief + QA" },
+    { to: "/99s",       label: en ? "Campaign" : "全企劃", tierBadge: "99s", icon: null, matchPrefix: "/99s",
+      tooltip: en ? "99s · full campaign — 30-day calendar, launch pack, IG repositioning" : "99 秒一個 campaign — 30 天月曆、活動 launch 包、IG 重新定位" },
+    { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
+    { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
+      tooltip: en ? "Calendar view — scheduled + published at a glance, your edge over Buffer" : "月曆視圖 — 已排程 + 已發布內容一目了然，vs Buffer 的硬實力" },
+    { to: "/theater",   label: en ? "Theater" : "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
+    { to: "/brands",    label: en ? "Brands" : "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
+    { to: "/brands/settings", label: en ? "Connect" : "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands/settings" },
+    { to: "/consultant", label: en ? "Strategist" : "策略顧問", icon: <FontAwesomeIcon icon={faChessKnight} />,
+      tooltip: en ? "Strategist — 5 scenarios × 20+ frameworks × McKinsey-grade reports × Q&A" : "策略顧問 — 5 大策略場景 × 20+ 方法論 × 麥肯錫水準報告 × 來回問答" },
+  ];
+}
 
 /* ─────────────────────────── Root layout ─────────────────────────── */
 
 export default function ShellLayout() {
   const navigate = useNavigate();
   const loc = useLocation();
+  const { t, lang } = useLang();
 
   const brandsQuery = trpc.brand.listByMember.useQuery(undefined, { refetchOnWindowFocus: false });
   const brands = (brandsQuery.data as any[]) ?? [];
@@ -208,6 +193,7 @@ export default function ShellLayout() {
         scope={scope}
         setScope={setScope}
         onNavigate={(to) => navigate(to)}
+        sidebarLeft={contentLeft}
       />
 
       {/* Main content. 2026-05-12 (CJ「header 標題與品牌 bar 重疊」): the
@@ -236,15 +222,15 @@ export default function ShellLayout() {
         <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
         {/* 2026-05-10 global footer w/ legal links — shows on every authenticated page */}
         <footer className="mt-12 pt-6 pb-8 border-t border-neutral-200 text-center text-[11px] text-neutral-400 space-x-3">
-          <a href="/terms" className="hover:text-neutral-700">服務條款</a>
-          <a href="/privacy" className="hover:text-neutral-700">隱私政策</a>
-          <a href="/refund" className="hover:text-neutral-700">退費條款</a>
-          <a href="/pricing" className="hover:text-neutral-700">方案</a>
-          <a href="/settings/account" className="hover:text-neutral-700">帳號</a>
-          <a href="/achievements" className="hover:text-neutral-700">成就</a>
+          <a href="/terms" className="hover:text-neutral-700">{t("footer_terms")}</a>
+          <a href="/privacy" className="hover:text-neutral-700">{t("footer_privacy")}</a>
+          <a href="/refund" className="hover:text-neutral-700">{t("footer_refund")}</a>
+          <a href="/pricing" className="hover:text-neutral-700">{t("footer_pricing")}</a>
+          <a href="/settings/account" className="hover:text-neutral-700">{t("footer_account")}</a>
+          <a href="/achievements" className="hover:text-neutral-700">{lang === "en" ? "Achievements" : "成就"}</a>
           <a href="mailto:sowork@sowork.tw" className="hover:text-neutral-700">sowork@sowork.tw</a>
           <span>·</span>
-          <span>© SoWork 摘星社群行銷顧問</span>
+          <span>{lang === "en" ? "© SoWork" : "© SoWork 摘星社群行銷顧問"}</span>
         </footer>
       </div>
 
@@ -261,9 +247,9 @@ export default function ShellLayout() {
           boxShadow: "0 4px 16px rgba(249,115,22,0.35)",
           display: "flex", alignItems: "center", gap: 8,
         }}
-        title="遇到問題？卡住了？直接寫信給我們"
+        title={lang === "en" ? "Stuck? Email us directly." : "遇到問題？卡住了？直接寫信給我們"}
       >
-        💬 回報 / 求助
+        💬 {lang === "en" ? "Report / Help" : "回報 / 求助"}
       </a>
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}
@@ -301,6 +287,9 @@ function IconBar({
   onNotifToggle: () => void;
   brands: any[];
 }) {
+  const { lang } = useLang();
+  const isEn = lang === "en";
+  const NAV_ITEMS = React.useMemo(() => buildNavItems(lang), [lang]);
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
 
@@ -330,10 +319,10 @@ function IconBar({
 
       {/* Toggle — moved down to leave room for the floating brand pill above */}
       <div style={{ height: 48, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Tooltip content={collapsed ? "展開側邊欄" : "收合側邊欄"} placement="right">
+        <Tooltip content={collapsed ? (isEn ? "Expand sidebar" : "展開側邊欄") : (isEn ? "Collapse sidebar" : "收合側邊欄")} placement="right">
           <button
             onClick={onToggle}
-            aria-label="切換側邊欄"
+            aria-label={isEn ? "Toggle sidebar" : "切換側邊欄"}
             style={{
               width: 36, height: 36, borderRadius: 10, border: "none", background: "none",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -378,9 +367,9 @@ function IconBar({
         })}
 
         {/* More */}
-        <Tooltip content="顯示更多" placement="right">
+        <Tooltip content={isEn ? "Show more" : "顯示更多"} placement="right">
           <button
-            aria-label="顯示更多"
+            aria-label={isEn ? "Show more" : "顯示更多"}
             onClick={onToggle}
             style={{
               width: 64, height: 44, margin: "2px auto 0", display: "flex",
@@ -392,7 +381,7 @@ function IconBar({
             onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
           >
             <FontAwesomeIcon icon={faEllipsis} style={{ fontSize: 16 }} />
-            <span style={{ fontSize: 11, fontWeight: 500 }}>顯示更多</span>
+            <span style={{ fontSize: 11, fontWeight: 500 }}>{isEn ? "More" : "顯示更多"}</span>
           </button>
         </Tooltip>
       </nav>
@@ -400,10 +389,10 @@ function IconBar({
       {/* Bottom: bell + avatar */}
       <div style={{ flexShrink: 0, paddingBottom: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
         {/* Bell with badge */}
-        <Tooltip content="通知" placement="right">
+        <Tooltip content={isEn ? "Notifications" : "通知"} placement="right">
           <button
             onClick={onNotifToggle}
-            aria-label="通知"
+            aria-label={isEn ? "Notifications" : "通知"}
             style={{
               position: "relative", width: 36, height: 36, borderRadius: "50%", border: "none",
               background: notifOpen ? "#fff7ed" : "none",
@@ -432,7 +421,7 @@ function IconBar({
         <div ref={avatarRef} style={{ position: "relative" }}>
           <button
             onClick={() => setAvatarOpen((v) => !v)}
-            aria-label="帳號"
+            aria-label={isEn ? "Account" : "帳號"}
             style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: "none", padding: 0, cursor: "pointer" }}
           >
             <Avatar name="S" size="md" radius="full" color="primary" classNames={{ name: "font-bold text-sm" }} />
@@ -486,15 +475,20 @@ function brandColor(name: string): { bg: string; bgGradient: string; light: stri
    height 44px. Pushes IconBar's first child down via top padding.
 */
 function BrandHierarchyPill({
-  brands, scope, setScope, onNavigate,
+  brands, scope, setScope, onNavigate, sidebarLeft = 0,
 }: {
   brands: any[];
   scope: ScopeState;
   setScope: (s: ScopeState) => void;
   onNavigate: (to: string) => void;
+  /** 2026-05-12 (CJ「側邊欄出來會遮到品牌」): when sidebar expands the
+   *  pill must shift right so it doesn't get hidden under the panel. */
+  sidebarLeft?: number;
 }) {
   const [open, setOpen] = React.useState(false);
   const [addModal, setAddModal] = React.useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
+  const { lang } = useLang();
+  const isEn = lang === "en";
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!open) return;
@@ -528,7 +522,7 @@ function BrandHierarchyPill({
 
   // Display priority: event > product > brand (most specific scope wins as label)
   const displayName =
-    activeEvent?.name ?? activeProduct?.name ?? activeBrand?.name ?? "選擇品牌";
+    activeEvent?.name ?? activeProduct?.name ?? activeBrand?.name ?? (isEn ? "Pick a brand" : "選擇品牌");
   const displayInitial = (activeBrand?.name ?? "?").charAt(0);
   const activeBrandColor = activeBrand ? brandColor(activeBrand.name) : brandColor("");
 
@@ -623,10 +617,10 @@ function BrandHierarchyPill({
         >
           {/* BRAND section */}
           <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>
-            品牌
+            {isEn ? "Brand" : "品牌"}
           </p>
           {brands.length === 0 ? (
-            <p style={{ fontSize: 12, color: "#9ca3af", padding: "6px 10px" }}>還沒建立品牌</p>
+            <p style={{ fontSize: 12, color: "#9ca3af", padding: "6px 10px" }}>{isEn ? "No brands yet" : "還沒建立品牌"}</p>
           ) : brands.map((b: any) => {
             const isActive = b.id === scope.brandId;
             const bColor = brandColor(b.name);
@@ -667,7 +661,7 @@ function BrandHierarchyPill({
             <>
               <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
               <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "4px 10px", textTransform: "uppercase" }}>
-                產品 / Product
+                {isEn ? "Product" : "產品 / Product"}
               </p>
               {scope.productId && (
                 <button
@@ -680,7 +674,7 @@ function BrandHierarchyPill({
                   onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  ← 不限定產品
+                  {isEn ? "← Any product" : "← 不限定產品"}
                 </button>
               )}
               {products.map((p: any) => {
@@ -714,7 +708,7 @@ function BrandHierarchyPill({
             <>
               <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
               <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "4px 10px", textTransform: "uppercase" }}>
-                活動 / Event
+                {isEn ? "Event" : "活動 / Event"}
               </p>
               {scope.eventId && (
                 <button
@@ -727,7 +721,7 @@ function BrandHierarchyPill({
                   onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  ← 不限定活動
+                  {isEn ? "← Any event" : "← 不限定活動"}
                 </button>
               )}
               {events.map((ev: any) => {
@@ -766,9 +760,9 @@ function BrandHierarchyPill({
           {/* Add new — opens unified modal instead of navigating */}
           <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
           {([
-            { tab: "brand"   as const, label: "新增品牌",  icon: faRocket,        accent: "#7C3AED" },
-            { tab: "product" as const, label: "新增產品",  icon: faBoxOpen,       accent: "#059669" },
-            { tab: "event"   as const, label: "新增活動",  icon: faCalendarDays,  accent: "#F97316" },
+            { tab: "brand"   as const, label: isEn ? "New brand" : "新增品牌",  icon: faRocket,        accent: "#7C3AED" },
+            { tab: "product" as const, label: isEn ? "New product" : "新增產品",  icon: faBoxOpen,       accent: "#059669" },
+            { tab: "event"   as const, label: isEn ? "New event" : "新增活動",  icon: faCalendarDays,  accent: "#F97316" },
           ]).map((opt) => (
             <button
               key={opt.tab}
@@ -820,6 +814,8 @@ function BrandSwitcherButton({
   onAddBrand: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
+  const { lang } = useLang();
+  const isEn = lang === "en";
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!open) return;
@@ -832,16 +828,17 @@ function BrandSwitcherButton({
 
   const activeBrand = brands.find((b: any) => b.id === activeBrandId);
   const initial = activeBrand?.name?.charAt(0) ?? "?";
+  const pickBrandLabel = isEn ? "Pick a brand" : "選擇品牌";
   const truncatedName = activeBrand?.name && activeBrand.name.length > 8
     ? activeBrand.name.slice(0, 7) + "…"
-    : activeBrand?.name ?? "選擇品牌";
+    : activeBrand?.name ?? pickBrandLabel;
 
   return (
     <div ref={ref} style={{ padding: "0 8px 12px", flexShrink: 0, position: "relative" }}>
-      <Tooltip content={activeBrand ? `品牌：${activeBrand.name}（點擊切換）` : "選擇品牌"} placement="right">
+      <Tooltip content={activeBrand ? (isEn ? `Brand: ${activeBrand.name} (click to switch)` : `品牌：${activeBrand.name}（點擊切換）`) : pickBrandLabel} placement="right">
         <button
           onClick={() => setOpen((v) => !v)}
-          aria-label="切換品牌"
+          aria-label={isEn ? "Switch brand" : "切換品牌"}
           style={{
             width: "100%", minHeight: 48, borderRadius: 10,
             border: open ? "2px solid #7c3aed" : "1px solid rgba(124,58,237,0.2)",
@@ -872,16 +869,16 @@ function BrandSwitcherButton({
           {/* Show brand name when sidebar collapsed (icon-only mode hides text) — keep tiny label below logo */}
           {sidebarCollapsed ? (
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.1 }}>
-              <span style={{ fontSize: 9, color: "#7c3aed", fontWeight: 700, letterSpacing: "0.5px" }}>品牌</span>
+              <span style={{ fontSize: 9, color: "#7c3aed", fontWeight: 700, letterSpacing: "0.5px" }}>{isEn ? "BRAND" : "品牌"}</span>
               <span style={{ fontSize: 11, color: "#1f2937", fontWeight: 600, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {truncatedName}
               </span>
             </div>
           ) : (
             <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-              <span style={{ fontSize: 10, color: "#7c3aed", fontWeight: 700, display: "block", letterSpacing: "0.5px" }}>品牌</span>
+              <span style={{ fontSize: 10, color: "#7c3aed", fontWeight: 700, display: "block", letterSpacing: "0.5px" }}>{isEn ? "BRAND" : "品牌"}</span>
               <span style={{ fontSize: 13, color: "#1f2937", fontWeight: 700, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {activeBrand?.name ?? "選擇品牌"}
+                {activeBrand?.name ?? pickBrandLabel}
               </span>
             </div>
           )}
@@ -905,9 +902,9 @@ function BrandSwitcherButton({
             padding: 6,
           }}
         >
-          <p style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>切換品牌</p>
+          <p style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>{isEn ? "Switch brand" : "切換品牌"}</p>
           {brands.length === 0 && (
-            <p style={{ fontSize: 12, color: "#9ca3af", padding: "8px 10px" }}>還沒建立品牌</p>
+            <p style={{ fontSize: 12, color: "#9ca3af", padding: "8px 10px" }}>{isEn ? "No brands yet" : "還沒建立品牌"}</p>
           )}
           {brands.map((b: any) => {
             const isActive = b.id === activeBrandId;
@@ -961,7 +958,7 @@ function BrandSwitcherButton({
             }}>
               <FontAwesomeIcon icon={faPlus} />
             </span>
-            <span style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>新增品牌 / 管理</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>{isEn ? "Add / manage brands" : "新增品牌 / 管理"}</span>
           </button>
         </div>
       )}
@@ -1030,11 +1027,13 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
 
 /* ── Shared top buttons: 你的方案 + 邀請使用者 ── */
 function PlanInviteButtons({ onNavigate }: { onNavigate: (to: string) => void }) {
+  const { lang } = useLang();
+  const isEn = lang === "en";
   return (
     <div style={{ padding: "0 10px 8px", display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
       {[
-        { icon: faCrown, label: "你的方案",   to: "/settings/plan" },
-        { icon: faUserGroup, label: "邀請使用者", to: "/settings/team" },
+        { icon: faCrown, label: isEn ? "Your plan" : "你的方案",   to: "/settings/plan" },
+        { icon: faUserGroup, label: isEn ? "Invite people" : "邀請使用者", to: "/settings/team" },
       ].map(({ icon, label, to }) => (
         <button key={label} onClick={() => onNavigate(to)} style={{
           width: "100%", display: "flex", alignItems: "center", gap: 8,
@@ -1056,10 +1055,11 @@ function PlanInviteButtons({ onNavigate }: { onNavigate: (to: string) => void })
 
 /* ── Starred items section header ── */
 function StarredHeader() {
+  const { lang } = useLang();
   return (
     <div style={{ padding: "10px 14px 6px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
       <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-        已標記星號的內容
+        {lang === "en" ? "Starred items" : "已標記星號的內容"}
       </span>
       <button style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#A8A29E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 }}>
         <FontAwesomeIcon icon={faPlus} />
@@ -1090,6 +1090,7 @@ function NavRow({ icon, label, active, onClick }: { icon: any; label: string; ac
 
 /* ── Trash button ── */
 function TrashButton({ onNavigate }: { onNavigate: (to: string) => void }) {
+  const { lang } = useLang();
   return (
     <div style={{ flexShrink: 0, padding: "6px 10px 14px", borderTop: "1px solid #f3f4f6" }}>
       <button onClick={() => onNavigate("/trash")} style={{
@@ -1101,7 +1102,7 @@ function TrashButton({ onNavigate }: { onNavigate: (to: string) => void }) {
         onMouseLeave={e => e.currentTarget.style.background = "none"}
       >
         <FontAwesomeIcon icon={faTrash} style={{ fontSize: 13, width: 15 }} />
-        垃圾桶
+        {lang === "en" ? "Trash" : "垃圾桶"}
       </button>
     </div>
   );
@@ -1123,6 +1124,8 @@ function SlidePanel({
   onNavigate: (to: string) => void;
   currentPath: string;
 }) {
+  const { lang } = useLang();
+  const isEn = lang === "en";
   const isHome      = currentPath === "/";
   const isProjects  = currentPath.startsWith("/projects");
   const isTemplates = currentPath.startsWith("/templates");
@@ -1211,7 +1214,7 @@ function SlidePanel({
           <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
             {brands.length === 0 && (
               <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 8px 8px", lineHeight: 1.5 }}>
-                點擊品牌的星號圖示，即可從這裡快速找到。
+                {isEn ? "Star a brand to pin it here for quick access." : "點擊品牌的星號圖示，即可從這裡快速找到。"}
               </p>
             )}
             {brands.slice(0, 6).map((b: any) => (
@@ -1225,7 +1228,7 @@ function SlidePanel({
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 8px 6px" }}>
                   <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#A8A29E" }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>近期設計</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>{isEn ? "Recent designs" : "近期設計"}</span>
                 </div>
                 {recentMissions.map((m: any) => (
                   <PanelRow key={m.id}
@@ -1240,7 +1243,7 @@ function SlidePanel({
                 <button onClick={() => onNavigate("/")} style={{
                   width: "100%", textAlign: "center", padding: "6px 8px", border: "none",
                   background: "none", fontSize: 12, color: "#F97316", cursor: "pointer", fontWeight: 600,
-                }}>查看全部</button>
+                }}>{isEn ? "See all" : "查看全部"}</button>
               </>
             )}
           </div>
@@ -1255,10 +1258,10 @@ function SlidePanel({
           <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
           <nav style={{ padding: "8px 6px", flexShrink: 0 }}>
             {([
-              { id: "all",     label: "所有專案",   icon: faFolderOpen  },
-              { id: "mine",    label: "你的專案",   icon: faRocket      },
-              { id: "shared",  label: "與你分享",   icon: faUserGroup   },
-              { id: "offline", label: "可離線使用", icon: faCheckDouble },
+              { id: "all",     label: isEn ? "All projects" : "所有專案",   icon: faFolderOpen  },
+              { id: "mine",    label: isEn ? "Yours" : "你的專案",   icon: faRocket      },
+              { id: "shared",  label: isEn ? "Shared with you" : "與你分享",   icon: faUserGroup   },
+              { id: "offline", label: isEn ? "Offline" : "可離線使用", icon: faCheckDouble },
             ] as const).map(n => (
               <NavRow key={n.id} icon={n.icon} label={n.label}
                 active={activeSubNav === n.id}
@@ -1286,11 +1289,11 @@ function SlidePanel({
           <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
           <nav style={{ padding: "8px 6px", flex: 1 }}>
             {([
-              { id: "templates", label: "範本",         icon: faTableCells,   to: "/templates"           },
-              { id: "photos",    label: "照片",         icon: faImage,        to: "/templates?kind=photo" },
-              { id: "images",    label: "圖像",         icon: faPaintBrush,   to: "/templates?kind=image" },
-              { id: "creators",  label: "創作者",       icon: faUser,         to: "/templates?kind=agent" },
-              { id: "starred",   label: "已標記星號的內容", icon: faStar,       to: "/templates?kind=skill" },
+              { id: "templates", label: isEn ? "Templates" : "範本",         icon: faTableCells,   to: "/templates"           },
+              { id: "photos",    label: isEn ? "Photos" : "照片",         icon: faImage,        to: "/templates?kind=photo" },
+              { id: "images",    label: isEn ? "Images" : "圖像",         icon: faPaintBrush,   to: "/templates?kind=image" },
+              { id: "creators",  label: isEn ? "Creators" : "創作者",       icon: faUser,         to: "/templates?kind=agent" },
+              { id: "starred",   label: isEn ? "Starred" : "已標記星號的內容", icon: faStar,       to: "/templates?kind=skill" },
             ]).map(n => {
               const active =
                 n.id === "templates"
@@ -1320,7 +1323,7 @@ function SlidePanel({
             onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
             onMouseLeave={e => e.currentTarget.style.background = "none"}
           >
-            所有品牌範本
+            {isEn ? "All brand templates" : "所有品牌範本"}
           </button>
 
           {/* 品牌工具組 dropdown trigger */}
@@ -1347,7 +1350,7 @@ function SlidePanel({
                 </span>
               </div>
               <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                品牌工具組
+                {isEn ? "Brand kit" : "品牌工具組"}
               </span>
               <FontAwesomeIcon icon={faChevronDown} style={{
                 fontSize: 9, color: "#78716C",
@@ -1375,7 +1378,7 @@ function SlidePanel({
                     autoFocus
                     value={brandSearch}
                     onChange={e => setBrandSearch(e.target.value)}
-                    placeholder="搜尋品牌工具組"
+                    placeholder={isEn ? "Search brand kits" : "搜尋品牌工具組"}
                     style={{
                       width: "100%", padding: "5px 6px 5px 22px",
                       borderRadius: 6, border: "1px solid #E4E3E1",
@@ -1424,15 +1427,15 @@ function SlidePanel({
                       );
                     })}
                   {brands.filter((b: any) => !brandSearch || b.name?.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && (
-                    <p style={{ padding: "10px 14px", fontSize: 12, color: "#A8A29E" }}>找不到品牌</p>
+                    <p style={{ padding: "10px 14px", fontSize: 12, color: "#A8A29E" }}>{isEn ? "No brands match" : "找不到品牌"}</p>
                   )}
                 </div>
                 {/* Actions */}
                 <div style={{ borderTop: "1px solid #F0EFED", padding: "5px 0" }}>
                   {[
-                    { icon: faPlus,     label: "建立新的品牌工具組" },
-                    { icon: faPlus,     label: "建立個人品牌工具組" },
-                    { icon: faGear,     label: "品牌控制" },
+                    { icon: faPlus,     label: isEn ? "New brand kit" : "建立新的品牌工具組" },
+                    { icon: faPlus,     label: isEn ? "New personal brand kit" : "建立個人品牌工具組" },
+                    { icon: faGear,     label: isEn ? "Brand controls" : "品牌控制" },
                   ].map(({ icon, label }) => (
                     <button key={label} style={{
                       width: "100%", display: "flex", alignItems: "center", gap: 8,
@@ -1458,11 +1461,11 @@ function SlidePanel({
               fontSize: 10, fontWeight: 700, color: "#A8A29E",
               letterSpacing: "0.10em", textTransform: "uppercase",
               padding: "4px 6px 6px", margin: 0,
-            }}>分類</p>
+            }}>{isEn ? "Categories" : "分類"}</p>
             {([
-              { cat: "positioning", label: "定位", icon: faBookBookmark },
-              { cat: "copy",        label: "文字", icon: faFont         },
-              { cat: "visual",      label: "視覺", icon: faPaintBrush   },
+              { cat: "positioning", label: isEn ? "Positioning" : "定位", icon: faBookBookmark },
+              { cat: "copy",        label: isEn ? "Copy" : "文字", icon: faFont         },
+              { cat: "visual",      label: isEn ? "Visual" : "視覺", icon: faPaintBrush   },
             ] as Array<{ cat: string; label: string; icon: any }>).map(n => {
               const active = (searchParams.get("cat") ?? "positioning") === n.cat;
               return (
@@ -1502,25 +1505,28 @@ function SlidePanel({
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 14px 6px" }}>
             <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#A8A29E" }} />
             <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              {effTier} 歷史任務
+              {isEn ? `${effTier} history` : `${effTier} 歷史任務`}
             </span>
           </div>
           {effBrandId == null ? (
             <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.5 }}>
-              選擇品牌後顯示這個品牌在 {effTier} 跑過的任務。
+              {isEn ? `Pick a brand to see its ${effTier} runs.` : `選擇品牌後顯示這個品牌在 ${effTier} 跑過的任務。`}
             </p>
           ) : (
             <p style={{ fontSize: 11, color: "#A8A29E", padding: "0 14px 6px", lineHeight: 1.4 }}>
-              {brands.find((b: any) => b.id === effBrandId)?.name ?? runQuery.data?.brand?.name ?? "目前品牌"} · {effTier}
+              {brands.find((b: any) => b.id === effBrandId)?.name ?? runQuery.data?.brand?.name ?? (isEn ? "Current brand" : "目前品牌")} · {effTier}
             </p>
           )}
           <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
             {recentRunsQuery.isLoading ? (
-              <p style={{ fontSize: 11, color: "#A8A29E", padding: "8px 14px", textAlign: "center" }}>讀取中…</p>
+              <p style={{ fontSize: 11, color: "#A8A29E", padding: "8px 14px", textAlign: "center" }}>{isEn ? "Loading…" : "讀取中…"}</p>
             ) : recentRuns.length === 0 && effBrandId != null ? (
               <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.6 }}>
-                這個品牌還沒有 {effTier} 任務紀錄。<br/>
-                跑第一個任務後會出現在這裡。
+                {isEn ? (
+                  <>No {effTier} runs for this brand yet.<br/>Your first one will land here.</>
+                ) : (
+                  <>這個品牌還沒有 {effTier} 任務紀錄。<br/>跑第一個任務後會出現在這裡。</>
+                )}
               </p>
             ) : (
               recentRuns.map((r: any) => {
@@ -1530,7 +1536,7 @@ function SlidePanel({
                     initial={(r.title ?? r.taskId ?? "T").slice(0, 1).toUpperCase()}
                     initialBg={isCurrent ? "#EDE9FE" : "#FFF7ED"}
                     initialColor={isCurrent ? "#6366F1" : "#F97316"}
-                    label={r.title || r.taskId || "(無標題)"}
+                    label={r.title || r.taskId || (isEn ? "(Untitled)" : "(無標題)")}
                     onClick={() => onNavigate(`/run/${r.id}`)} />
                 );
               })
@@ -1597,6 +1603,8 @@ function GlobalScopeBar({ scope, setScope, brands }: {
 }) {
   const [open, setOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"brand" | "product" | "event">("brand");
+  const { lang } = useLang();
+  const isEn = lang === "en";
   const ref = React.useRef<HTMLDivElement>(null);
 
   // Load products + events based on selected brand
@@ -1661,7 +1669,7 @@ function GlobalScopeBar({ scope, setScope, brands }: {
           /* No scope selected — invite user to pick */
           <span style={{ padding: "0 14px", fontSize: 12, fontWeight: 500, color: "#9ca3af", display: "flex", alignItems: "center", gap: 6 }}>
             <FontAwesomeIcon icon={faBuilding} style={{ fontSize: 11 }} />
-            選擇品牌
+            {isEn ? "Pick a brand" : "選擇品牌"}
             <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 9, opacity: 0.5, transform: "rotate(90deg)" }} />
           </span>
         ) : (
@@ -1724,9 +1732,9 @@ function GlobalScopeBar({ scope, setScope, brands }: {
           {/* Tab header */}
           <div style={{ display: "flex", borderBottom: "1px solid #f3f4f6", padding: "0 6px" }}>
             {([
-              { key: "brand" as const,   label: "品牌",   color: "#F97316", icon: faBuilding },
-              { key: "product" as const, label: "產品",   color: "#16a34a", icon: faBoxOpen },
-              { key: "event" as const,   label: "活動",   color: "#2563eb", icon: faCalendarDays },
+              { key: "brand" as const,   label: isEn ? "Brand" : "品牌",   color: "#F97316", icon: faBuilding },
+              { key: "product" as const, label: isEn ? "Product" : "產品",   color: "#16a34a", icon: faBoxOpen },
+              { key: "event" as const,   label: isEn ? "Event" : "活動",   color: "#2563eb", icon: faCalendarDays },
             ] as const).map(tab => (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
                 flex: 1, padding: "10px 4px 8px", border: "none", background: "none", cursor: "pointer",
@@ -1749,7 +1757,7 @@ function GlobalScopeBar({ scope, setScope, brands }: {
                 items={brands}
                 selectedId={scope.brandId}
                 color="#F97316"
-                emptyText="尚無品牌 — 請先到「品牌」頁建立"
+                emptyText={isEn ? "No brands yet — add one on the Brands page" : "尚無品牌 — 請先到「品牌」頁建立"}
                 onSelect={(id) => {
                   setScope({ brandId: id, productId: null, eventId: null });
                   setOpen(false);
@@ -1758,24 +1766,24 @@ function GlobalScopeBar({ scope, setScope, brands }: {
             )}
             {activeTab === "product" && (
               !scope.brandId
-                ? <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>請先選擇品牌</p>
+                ? <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>{isEn ? "Pick a brand first" : "請先選擇品牌"}</p>
                 : <ScopeList
                     items={products}
                     selectedId={scope.productId}
                     color="#16a34a"
-                    emptyText="此品牌尚無產品"
+                    emptyText={isEn ? "No products for this brand" : "此品牌尚無產品"}
                     onSelect={(id) => { setScope({ ...scope, productId: id }); setOpen(false); }}
                     onClear={scope.productId ? () => setScope({ ...scope, productId: null, eventId: null }) : undefined}
                   />
             )}
             {activeTab === "event" && (
               !scope.brandId
-                ? <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>請先選擇品牌</p>
+                ? <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>{isEn ? "Pick a brand first" : "請先選擇品牌"}</p>
                 : <ScopeList
                     items={events}
                     selectedId={scope.eventId}
                     color="#2563eb"
-                    emptyText="此品牌尚無活動"
+                    emptyText={isEn ? "No events for this brand" : "此品牌尚無活動"}
                     onSelect={(id) => {
                       // 修：選 event 自動帶入該 event 的 brand（之前只更新 eventId
                       // 不動 brandId，造成 brand stale 不會跟著事件切換）
@@ -1795,10 +1803,12 @@ function GlobalScopeBar({ scope, setScope, brands }: {
 }
 
 function TeamSubPanel() {
+  const { lang } = useLang();
+  const isEn = lang === "en";
   return (
     <>
       <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>切換團隊</p>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{isEn ? "Switch team" : "切換團隊"}</p>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
         <PopupRow onClick={() => {}}>
@@ -1807,10 +1817,10 @@ function TeamSubPanel() {
             background: "linear-gradient(135deg, #F97316 0%, #ea580c 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: 13, fontWeight: 800,
-          }}>S的</span>
+          }}>{isEn ? "S" : "S的"}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>SoWork 的團隊</p>
-            <p style={{ fontSize: 11, color: "#9ca3af" }}>團隊版</p>
+            <p style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>{isEn ? "SoWork's team" : "SoWork 的團隊"}</p>
+            <p style={{ fontSize: 11, color: "#9ca3af" }}>{isEn ? "Team plan" : "團隊版"}</p>
           </div>
           <FontAwesomeIcon icon={faCheck} style={{ color: "#F97316", fontSize: 14 }} />
         </PopupRow>
@@ -1821,7 +1831,7 @@ function TeamSubPanel() {
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#6b7280", fontSize: 18,
           }}>+</span>
-          <span style={{ fontSize: 13, color: "#374151" }}>建立或加入團隊</span>
+          <span style={{ fontSize: 13, color: "#374151" }}>{isEn ? "Create or join a team" : "建立或加入團隊"}</span>
         </PopupRow>
       </div>
     </>
@@ -1832,6 +1842,7 @@ function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
   items: any[]; selectedId: number | null; color: string;
   emptyText: string; onSelect: (id: number) => void; onClear?: () => void;
 }) {
+  const { lang } = useLang();
   if (items.length === 0) {
     return <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>{emptyText}</p>;
   }
@@ -1845,7 +1856,7 @@ function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
           onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
           onMouseLeave={e => (e.currentTarget.style.background = "none")}
         >
-          ✕ 清除選擇
+          {lang === "en" ? "✕ Clear selection" : "✕ 清除選擇"}
         </button>
       )}
       {items.map((item: any) => (
@@ -1920,8 +1931,9 @@ function AccountPopup({ onLogout, onClose }: {
     })();
     return () => { cancelled = true; };
   }, []);
-  const userName = me?.name ?? "使用者";
+  const userName = me?.name ?? (lang === "en" ? "User" : "使用者");
   const userEmail = me?.email ?? "—";
+  const isEn = lang === "en";
 
   // Real wallet balance for the menu badge
   const balanceQuery = (trpc as any).credits?.getBalance?.useQuery?.(undefined, {
@@ -1935,23 +1947,23 @@ function AccountPopup({ onLogout, onClose }: {
   // 的功能。
   const menuItems = [
     {
-      icon: faGear, label: "帳號設定", arrow: true, badge: null, danger: false,
+      icon: faGear, label: isEn ? "Account settings" : "帳號設定", arrow: true, badge: null, danger: false,
       // 真實的帳號設定頁（電子郵件 / 密碼 / 訂閱 / 統編 / 帳號刪除）
       action: () => { navigate("/settings/account"); onClose(); },
     },
     {
-      icon: faShareNodes, label: "品牌與社群連結", arrow: true, badge: null, danger: false,
+      icon: faShareNodes, label: isEn ? "Brand & social connections" : "品牌與社群連結", arrow: true, badge: null, danger: false,
       // 連結社群帳號（FB OAuth / IG / LinkedIn）住在每個品牌的 publish tab。
       // 從這裡去品牌管理頁，點任何品牌 → 設定 → 發布即可連結。
       action: () => { navigate("/brands"); onClose(); },
     },
     {
-      icon: faBriefcase, label: "方案和定價", arrow: true, badge: null, danger: false,
+      icon: faBriefcase, label: isEn ? "Plans & pricing" : "方案和定價", arrow: true, badge: null, danger: false,
       // 已有 /pricing 路由（4 個 tier），不再開 modal。
       action: () => { navigate("/pricing"); onClose(); },
     },
     {
-      icon: faTrophy, label: "我的成就", arrow: true, badge: null, danger: false,
+      icon: faTrophy, label: isEn ? "Achievements" : "我的成就", arrow: true, badge: null, danger: false,
       // /achievements 已存在，原本 S 選單沒入口
       action: () => { navigate("/achievements"); onClose(); },
     },
@@ -1967,12 +1979,12 @@ function AccountPopup({ onLogout, onClose }: {
     // removed from S-menu. /settings/workspace route still exists for direct
     // access; re-add this entry when agency tier launches.
     {
-      icon: faCircleInfo, label: "聯絡客服", arrow: false, badge: null, danger: false,
+      icon: faCircleInfo, label: isEn ? "Contact support" : "聯絡客服", arrow: false, badge: null, danger: false,
       // 2026-05-12 — 信箱修正為 sowork@sowork.tw
       action: () => { window.location.href = "mailto:sowork@sowork.tw?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E6%94%AF%E6%8F%B4"; },
     },
     {
-      icon: faRightFromBracket, label: "登出", arrow: false, badge: null, danger: true,
+      icon: faRightFromBracket, label: isEn ? "Log out" : "登出", arrow: false, badge: null, danger: true,
       action: onLogout,
     },
   ];
@@ -2000,7 +2012,7 @@ function AccountPopup({ onLogout, onClose }: {
         {/* ① 帳號 — 2026-05-08: real user data from /api/auth/me, no
             sub-panel toggle (was fake hardcoded list of accounts). */}
         <div style={{ padding: "8px 8px 4px" }}>
-          <SectionLabel>帳號</SectionLabel>
+          <SectionLabel>{isEn ? "Account" : "帳號"}</SectionLabel>
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px" }}>
             <Avatar
               name={userName.slice(0, 1).toUpperCase()}
@@ -2024,7 +2036,7 @@ function AccountPopup({ onLogout, onClose }: {
         {totalCredits != null && (
           <>
             <div style={{ padding: "4px 8px" }}>
-              <SectionLabel>點數</SectionLabel>
+              <SectionLabel>{isEn ? "Credits" : "點數"}</SectionLabel>
               <PopupRow onClick={() => setPricingOpen(true)}>
                 <div style={{
                   width: 40, height: 40, borderRadius: 10, flexShrink: 0,
@@ -2038,7 +2050,7 @@ function AccountPopup({ onLogout, onClose }: {
                   <p style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>
                     {Number(totalCredits).toLocaleString()} credits
                   </p>
-                  <p style={{ fontSize: 12, color: "#9ca3af" }}>點此看方案</p>
+                  <p style={{ fontSize: 12, color: "#9ca3af" }}>{isEn ? "Tap to see plans" : "點此看方案"}</p>
                 </div>
                 <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />
               </PopupRow>
@@ -2105,6 +2117,8 @@ function PopupRow({ children, onClick, active }: { children: React.ReactNode; on
 }
 
 function AccountSubPanel() {
+  const { lang } = useLang();
+  const isEn = lang === "en";
   const accounts = [
     { name: "SoWork", email: "sowork@sowork.tw", active: true, color: "#7c3aed" },
     { name: "C.J. Wang", email: "biomba.cj@gmail.com", active: false, color: "#0891b2" },
@@ -2112,7 +2126,7 @@ function AccountSubPanel() {
   return (
     <>
       <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>切換帳號</p>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{isEn ? "Switch account" : "切換帳號"}</p>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
         {accounts.map(acc => (
@@ -2129,7 +2143,7 @@ function AccountSubPanel() {
         ))}
         <PopupRow onClick={() => {}}>
           <span style={{ width: 36, height: 36, borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", fontSize: 18 }}>+</span>
-          <span style={{ fontSize: 13, color: "#374151" }}>新增其他帳號</span>
+          <span style={{ fontSize: 13, color: "#374151" }}>{isEn ? "Add another account" : "新增其他帳號"}</span>
         </PopupRow>
       </div>
     </>
@@ -2164,6 +2178,8 @@ const MOCK_NOTIFS = [
 
 function NotifPanel({ onClose }: { onClose: () => void }) {
   const [readAll, setReadAll] = React.useState(false);
+  const { lang } = useLang();
+  const isEn = lang === "en";
   return (
     <div style={{
       /* Floating card — positioned to the right of the icon bar, bottom-anchored near bell */
@@ -2184,7 +2200,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
       overflow: "hidden",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 12px", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
-        <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>通知</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{isEn ? "Notifications" : "通知"}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={() => setReadAll(true)} style={{
             display: "flex", alignItems: "center", gap: 5, padding: "4px 10px",
@@ -2194,7 +2210,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
             onMouseLeave={e => (e.currentTarget.style.background = "none")}
           >
             <FontAwesomeIcon icon={faCheckDouble} style={{ fontSize: 11 }} />
-            將全部標示為已讀
+            {isEn ? "Mark all read" : "將全部標示為已讀"}
           </button>
           <button onClick={onClose} style={{
             width: 28, height: 28, borderRadius: "50%", border: "none", background: "none",
@@ -2236,7 +2252,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
                   <span>{n.time}</span>
                 </div>
                 <button style={{ marginTop: 4, fontSize: 12, fontWeight: 500, color: "#F97316", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                  來自「{n.from}」的 {n.fromCount} 個更新
+                  {isEn ? `${n.fromCount} updates from "${n.from}"` : `來自「${n.from}」的 ${n.fromCount} 個更新`}
                 </button>
               </div>
               {isUnread && <span style={{ position: "absolute", top: 14, right: 14, width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />}

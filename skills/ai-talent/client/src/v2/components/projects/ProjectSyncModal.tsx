@@ -13,6 +13,7 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 
 export type SyncSource =
   | "facebook" | "instagram" | "youtube" | "website"
@@ -33,61 +34,64 @@ interface SourceSpec {
   fields: ParamField[];
 }
 
-const SPECS: Record<SyncSource, SourceSpec> = {
-  "facebook": {
-    id: "facebook", label: "Facebook 粉絲團",
-    blurb: "從 Facebook 粉絲團抓取貼文、圖片、影片，作為素材庫。",
-    fields: [
-      { key: "pageUrl", label: "粉絲團網址", placeholder: "https://www.facebook.com/yourpage", required: true },
-      { key: "limit",   label: "抓取數量",  placeholder: "50", hint: "最近 N 篇貼文" },
-    ],
-  },
-  "instagram": {
-    id: "instagram", label: "Instagram 帳號",
-    blurb: "抓取 Instagram 圖文與限時動態（需要先在 Pipedream 連接帳號）。",
-    fields: [
-      { key: "username", label: "帳號名稱", placeholder: "yourbrand", required: true },
-      { key: "limit",    label: "抓取數量", placeholder: "30" },
-    ],
-  },
-  "youtube": {
-    id: "youtube", label: "YouTube 頻道",
-    blurb: "抓取頻道影片清單、縮圖、描述。",
-    fields: [
-      { key: "channel", label: "頻道網址或 ID", placeholder: "@yourchannel 或 UCxxxxx", required: true },
-      { key: "limit",   label: "抓取數量",     placeholder: "20" },
-    ],
-  },
-  "website": {
-    id: "website", label: "官網 / 部落格",
-    blurb: "爬取官網或部落格，收集品牌素材、文章內文與圖片。",
-    fields: [
-      { key: "url",        label: "網站網址",  placeholder: "https://yourbrand.com", required: true },
-      { key: "maxPages",   label: "最大頁數",  placeholder: "30" },
-    ],
-  },
-  "google-drive": {
-    id: "google-drive", label: "Google Drive",
-    blurb: "同步整個資料夾到專案。OAuth 授權由 Pipedream Connect 處理。",
-    fields: [
-      { key: "folderId", label: "資料夾 ID",  placeholder: "1AbCDeFgHiJk... (Drive URL 末段)", required: true },
-    ],
-  },
-  "onedrive": {
-    id: "onedrive", label: "OneDrive",
-    blurb: "同步 OneDrive 資料夾。",
-    fields: [
-      { key: "folderPath", label: "資料夾路徑", placeholder: "/Brand/Assets", required: true },
-    ],
-  },
-  "dropbox": {
-    id: "dropbox", label: "Dropbox",
-    blurb: "同步 Dropbox 資料夾。",
-    fields: [
-      { key: "folderPath", label: "資料夾路徑", placeholder: "/brand/assets", required: true },
-    ],
-  },
-};
+function getSpecs(lang: "zh-TW" | "en"): Record<SyncSource, SourceSpec> {
+  const en = lang === "en";
+  return {
+    "facebook": {
+      id: "facebook", label: en ? "Facebook Page" : "Facebook 粉絲團",
+      blurb: en ? "Pull posts, images, and videos from a Facebook Page into your asset library." : "從 Facebook 粉絲團抓取貼文、圖片、影片，作為素材庫。",
+      fields: [
+        { key: "pageUrl", label: en ? "Page URL" : "粉絲團網址", placeholder: "https://www.facebook.com/yourpage", required: true },
+        { key: "limit",   label: en ? "Count" : "抓取數量",  placeholder: "50", hint: en ? "Most recent N posts" : "最近 N 篇貼文" },
+      ],
+    },
+    "instagram": {
+      id: "instagram", label: en ? "Instagram Account" : "Instagram 帳號",
+      blurb: en ? "Pull Instagram posts and stories (connect the account in Pipedream first)." : "抓取 Instagram 圖文與限時動態（需要先在 Pipedream 連接帳號）。",
+      fields: [
+        { key: "username", label: en ? "Username" : "帳號名稱", placeholder: "yourbrand", required: true },
+        { key: "limit",    label: en ? "Count" : "抓取數量", placeholder: "30" },
+      ],
+    },
+    "youtube": {
+      id: "youtube", label: en ? "YouTube Channel" : "YouTube 頻道",
+      blurb: en ? "Pull channel video list, thumbnails, and descriptions." : "抓取頻道影片清單、縮圖、描述。",
+      fields: [
+        { key: "channel", label: en ? "Channel URL or ID" : "頻道網址或 ID", placeholder: en ? "@yourchannel or UCxxxxx" : "@yourchannel 或 UCxxxxx", required: true },
+        { key: "limit",   label: en ? "Count" : "抓取數量",     placeholder: "20" },
+      ],
+    },
+    "website": {
+      id: "website", label: en ? "Website / Blog" : "官網 / 部落格",
+      blurb: en ? "Crawl your website or blog for brand assets, articles, and images." : "爬取官網或部落格，收集品牌素材、文章內文與圖片。",
+      fields: [
+        { key: "url",        label: en ? "Website URL" : "網站網址",  placeholder: "https://yourbrand.com", required: true },
+        { key: "maxPages",   label: en ? "Max pages" : "最大頁數",  placeholder: "30" },
+      ],
+    },
+    "google-drive": {
+      id: "google-drive", label: "Google Drive",
+      blurb: en ? "Sync an entire folder to your project. Pipedream Connect handles OAuth." : "同步整個資料夾到專案。OAuth 授權由 Pipedream Connect 處理。",
+      fields: [
+        { key: "folderId", label: en ? "Folder ID" : "資料夾 ID",  placeholder: en ? "1AbCDeFgHiJk... (last part of Drive URL)" : "1AbCDeFgHiJk... (Drive URL 末段)", required: true },
+      ],
+    },
+    "onedrive": {
+      id: "onedrive", label: "OneDrive",
+      blurb: en ? "Sync a OneDrive folder." : "同步 OneDrive 資料夾。",
+      fields: [
+        { key: "folderPath", label: en ? "Folder path" : "資料夾路徑", placeholder: "/Brand/Assets", required: true },
+      ],
+    },
+    "dropbox": {
+      id: "dropbox", label: "Dropbox",
+      blurb: en ? "Sync a Dropbox folder." : "同步 Dropbox 資料夾。",
+      fields: [
+        { key: "folderPath", label: en ? "Folder path" : "資料夾路徑", placeholder: "/brand/assets", required: true },
+      ],
+    },
+  };
+}
 
 type Phase = "form" | "running" | "done" | "error";
 
@@ -100,6 +104,8 @@ export default function ProjectSyncModal({
   onClose: () => void;
   onComplete?: (jobId: number) => void;
 }) {
+  const { lang } = useLang();
+  const SPECS = getSpecs(lang);
   const [params, setParams] = useState<Record<string, string>>({});
   const [phase, setPhase] = useState<Phase>("form");
   const [jobId, setJobId] = useState<number | null>(null);
@@ -135,7 +141,7 @@ export default function ProjectSyncModal({
       onComplete?.(d.id);
     } else if (d.status === "failed") {
       setPhase("error");
-      setErrorMsg(d.errorMsg ?? "同步失敗");
+      setErrorMsg(d.errorMsg ?? (lang === "en" ? "Sync failed" : "同步失敗"));
     }
   }, [statusQuery.data]);
 
@@ -147,7 +153,7 @@ export default function ProjectSyncModal({
     // Required field check
     for (const f of spec.fields) {
       if (f.required && !(params[f.key] ?? "").trim()) {
-        setErrorMsg(`請填寫「${f.label}」`);
+        setErrorMsg(lang === "en" ? `Please fill in "${f.label}"` : `請填寫「${f.label}」`);
         return;
       }
     }
@@ -157,7 +163,7 @@ export default function ProjectSyncModal({
         params,
         brandId: brandId ?? null,
       });
-      if (!res?.jobId) throw new Error("後端沒有回傳 jobId");
+      if (!res?.jobId) throw new Error(lang === "en" ? "Server didn't return jobId" : "後端沒有回傳 jobId");
       setJobId(res.jobId);
       setPhase("running");
       if (res.ok === false) {
@@ -175,7 +181,7 @@ export default function ProjectSyncModal({
         {/* Header */}
         <div className="px-6 pt-5 pb-3 border-b border-divider">
           <div className="text-tiny tracking-[0.18em] uppercase text-default-400">
-            從雲端 / 網路同步
+            {lang === "en" ? "Sync from cloud / web" : "從雲端 / 網路同步"}
           </div>
           <div className="mt-0.5 text-medium text-foreground">{spec.label}</div>
           <div className="mt-1 text-small text-default-500 leading-snug">{spec.blurb}</div>
@@ -214,7 +220,7 @@ export default function ProjectSyncModal({
             <div className="text-center py-6">
               <div className="inline-flex items-center gap-2 text-small text-foreground">
                 <span className="inline-block w-2 h-2 rounded-full bg-foreground animate-pulse" />
-                透過 Pipedream 同步中…
+                {lang === "en" ? "Syncing via Pipedream…" : "透過 Pipedream 同步中…"}
               </div>
               <div className="mt-3 max-w-[320px] mx-auto">
                 <div className="h-1.5 bg-divider rounded-full overflow-hidden">
@@ -224,7 +230,7 @@ export default function ProjectSyncModal({
                   />
                 </div>
                 <div className="mt-2 text-tiny text-default-500">
-                  已同步 {statusQuery.data?.assetCount ?? 0} 個資產
+                  {lang === "en" ? `${statusQuery.data?.assetCount ?? 0} assets synced` : `已同步 ${statusQuery.data?.assetCount ?? 0} 個資產`}
                 </div>
               </div>
             </div>
@@ -233,9 +239,11 @@ export default function ProjectSyncModal({
           {phase === "done" && (
             <div className="text-center py-6">
               <div className="text-2xl">✓</div>
-              <div className="mt-1 text-small text-foreground font-medium">同步完成</div>
+              <div className="mt-1 text-small text-foreground font-medium">{lang === "en" ? "Sync complete" : "同步完成"}</div>
               <div className="mt-1 text-small text-default-500">
-                共匯入 {statusQuery.data?.assetCount ?? 0} 個資產到你的專案
+                {lang === "en"
+                  ? `Imported ${statusQuery.data?.assetCount ?? 0} assets into your project`
+                  : `共匯入 ${statusQuery.data?.assetCount ?? 0} 個資產到你的專案`}
               </div>
             </div>
           )}
@@ -243,12 +251,15 @@ export default function ProjectSyncModal({
           {phase === "error" && (
             <div className="py-2">
               <div className="px-3 py-2 text-small text-[#D14] bg-[#FEE] border border-[#FCC] rounded leading-relaxed">
-                <div className="font-medium mb-1">同步失敗</div>
-                <div className="break-all">{errorMsg ?? "未知錯誤"}</div>
+                <div className="font-medium mb-1">{lang === "en" ? "Sync failed" : "同步失敗"}</div>
+                <div className="break-all">{errorMsg ?? (lang === "en" ? "Unknown error" : "未知錯誤")}</div>
               </div>
               <div className="mt-3 text-tiny text-default-500 leading-relaxed">
-                若是 Pipedream workflow 未設定，請於後端 .env 加入 <code className="px-1 bg-divider/30 rounded">PIPEDREAM_WEBHOOK_{spec.id.toUpperCase().replace("-", "_")}</code>，
-                指向你建立的 Pipedream 工作流 HTTP trigger URL。
+                {lang === "en" ? (
+                  <>If the Pipedream workflow isn't set up, add <code className="px-1 bg-divider/30 rounded">PIPEDREAM_WEBHOOK_{spec.id.toUpperCase().replace("-", "_")}</code> to the server .env, pointing at your Pipedream workflow's HTTP trigger URL.</>
+                ) : (
+                  <>若是 Pipedream workflow 未設定，請於後端 .env 加入 <code className="px-1 bg-divider/30 rounded">PIPEDREAM_WEBHOOK_{spec.id.toUpperCase().replace("-", "_")}</code>，指向你建立的 Pipedream 工作流 HTTP trigger URL。</>
+                )}
               </div>
             </div>
           )}
@@ -262,14 +273,14 @@ export default function ProjectSyncModal({
                 onClick={onClose}
                 className="px-4 py-2 text-small text-default-500 hover:text-foreground transition"
               >
-                取消
+                {lang === "en" ? "Cancel" : "取消"}
               </button>
               <button
                 onClick={submit}
                 disabled={startMutation.isPending}
                 className="px-4 py-2 text-small bg-foreground text-white hover:bg-foreground/90 disabled:opacity-50 rounded-full transition"
               >
-                {startMutation.isPending ? "啟動中…" : "開始同步"}
+                {startMutation.isPending ? (lang === "en" ? "Starting…" : "啟動中…") : (lang === "en" ? "Start sync" : "開始同步")}
               </button>
             </>
           )}
@@ -278,7 +289,7 @@ export default function ProjectSyncModal({
               onClick={onClose}
               className="px-4 py-2 text-small text-default-500 hover:text-foreground transition"
             >
-              在背景繼續
+              {lang === "en" ? "Run in background" : "在背景繼續"}
             </button>
           )}
           {(phase === "done" || phase === "error") && (
@@ -286,7 +297,7 @@ export default function ProjectSyncModal({
               onClick={onClose}
               className="px-4 py-2 text-small bg-foreground text-white hover:bg-foreground/90 rounded-full transition"
             >
-              關閉
+              {lang === "en" ? "Close" : "關閉"}
             </button>
           )}
         </div>

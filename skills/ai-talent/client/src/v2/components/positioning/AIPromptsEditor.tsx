@@ -17,6 +17,7 @@
  */
 import { useEffect, useState } from "react";
 import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 import { Card, CardBody, Textarea, Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
@@ -31,14 +32,16 @@ const PLATFORMS: Array<{ id: string; label: string; icon: any; tone: string }> =
   { id: "tiktok",    label: "TikTok",    icon: faTiktok,    tone: "#000000" },
   { id: "linkedin",  label: "LinkedIn",  icon: faLinkedin,  tone: "#0A66C2" },
   { id: "email",     label: "EDM",       icon: faEnvelope,  tone: "#0EA5E9" },
-  { id: "press",     label: "新聞稿",     icon: faNewspaper, tone: "#64748B" },
+  { id: "press",     label: "Press",     icon: faNewspaper, tone: "#64748B" },
 ];
 
 interface PromptValue { text?: string; image?: string }
 
 export default function AIPromptsEditor({ brandId }: { brandId: number | null }) {
+  const { lang } = useLang();
+  const en = lang === "en";
   if (!brandId) {
-    return <div className="p-8 text-center text-default-500">請先選擇品牌</div>;
+    return <div className="p-8 text-center text-default-500">{en ? "Pick a brand first" : "請先選擇品牌"}</div>;
   }
 
   const utils = trpc.useUtils();
@@ -115,10 +118,12 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#7C3AED" }}>
               <FontAwesomeIcon icon={faRobot} style={{ color: "#fff", fontSize: 14 }} />
             </div>
-            <h1 className="text-2xl font-semibold text-default-900">AI 指令庫</h1>
+            <h1 className="text-2xl font-semibold text-default-900">{en ? "AI prompt library" : "AI 指令庫"}</h1>
           </div>
           <p className="text-sm text-default-500">
-            為每個社群平台設定品牌專屬的文字指令 + 圖片指令。30s / 60s / 99s / 企劃台 在該平台跑任務時會自動套用。
+            {en
+              ? "Set brand-specific text + image prompts for each platform. 30s / 60s / 99s / Theater auto-apply these when running on that platform."
+              : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。30s / 60s / 99s / 企劃台 在該平台跑任務時會自動套用。"}
           </p>
         </div>
       </div>
@@ -155,15 +160,15 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <FontAwesomeIcon icon={active.icon} style={{ color: active.tone, fontSize: 16 }} />
-              <h2 className="font-semibold text-default-900">{active.label} 指令</h2>
+              <h2 className="font-semibold text-default-900">{en ? `${active.label} prompts` : `${active.label} 指令`}</h2>
               {savingPlatform === active.id && (
                 <span className="text-[10px] text-default-500 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> 自動儲存中…
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> {en ? "Auto-saving…" : "自動儲存中…"}
                 </span>
               )}
               {saved === active.id && (
                 <span className="text-[10px] text-emerald-600 flex items-center gap-1">
-                  <FontAwesomeIcon icon={faCheck} className="text-[10px]" /> 已儲存
+                  <FontAwesomeIcon icon={faCheck} className="text-[10px]" /> {en ? "Saved" : "已儲存"}
                 </span>
               )}
             </div>
@@ -175,37 +180,43 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
               isLoading={filling === active.id}
               startContent={filling !== active.id && <Sparkles size={12} />}
             >
-              {filling === active.id ? "產生中…" : `AI 產生 ${active.label} 指令`}
+              {filling === active.id
+                ? (en ? "Generating…" : "產生中…")
+                : (en ? `AI: draft ${active.label} prompts` : `AI 產生 ${active.label} 指令`)}
             </Button>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <label className="text-xs font-semibold text-default-700 mb-1.5 block flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[10px]">文字指令</span>
-                寫文案時的 system prompt
+                <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[10px]">{en ? "Text prompt" : "文字指令"}</span>
+                {en ? "System prompt for copywriting" : "寫文案時的 system prompt"}
               </label>
               <Textarea
                 size="sm"
                 variant="flat"
                 minRows={10}
                 maxRows={20}
-                placeholder={`為 ${active.label} 寫貼文時要遵守的口吻、結構、長度、tone…\n例：寫 ${active.label} 短貼文，120-180 字，第一句 hook、不要套話、最後 1-2 個 hashtag…`}
+                placeholder={en
+                  ? `Voice, structure, length, tone to follow when writing for ${active.label}…\ne.g. Short ${active.label} post, 120–180 chars, hook in line 1, no clichés, 1–2 hashtags at the end…`
+                  : `為 ${active.label} 寫貼文時要遵守的口吻、結構、長度、tone…\n例：寫 ${active.label} 短貼文，120-180 字，第一句 hook、不要套話、最後 1-2 個 hashtag…`}
                 value={cur.text ?? ""}
                 onValueChange={(s) => updatePrompt(active.id, "text", s)}
               />
             </div>
             <div>
               <label className="text-xs font-semibold text-default-700 mb-1.5 block flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px]">圖片指令</span>
-                配圖 / Flux 風格 brief
+                <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px]">{en ? "Image prompt" : "圖片指令"}</span>
+                {en ? "Image / Flux style brief" : "配圖 / Flux 風格 brief"}
               </label>
               <Textarea
                 size="sm"
                 variant="flat"
                 minRows={10}
                 maxRows={20}
-                placeholder={`為 ${active.label} 配圖時的視覺風格指南…\n例：${active.label} 配圖採乾淨白底、品牌主色 + 一張產品實拍，留 30% 標題空間，9:16 直幅，色溫偏暖…`}
+                placeholder={en
+                  ? `Visual style guide for ${active.label} imagery…\ne.g. Clean white background, brand primary + one product shot, 30% headline space, 9:16 vertical, warm tone…`
+                  : `為 ${active.label} 配圖時的視覺風格指南…\n例：${active.label} 配圖採乾淨白底、品牌主色 + 一張產品實拍，留 30% 標題空間，9:16 直幅，色溫偏暖…`}
                 value={cur.image ?? ""}
                 onValueChange={(s) => updatePrompt(active.id, "image", s)}
               />
@@ -215,8 +226,10 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
       </Card>
 
       <div className="mt-4 text-xs text-default-500 bg-default-50 rounded-lg p-3 leading-relaxed">
-        <div className="font-medium text-default-700 mb-1">💡 使用說明</div>
-        每次跑該平台的任務（如 30s FB 短貼文）時，系統會自動把這裡的「文字指令」+「圖片指令」injection 進對應 agent 的 prompt。空白的平台會 fallback 到通用品牌口吻。
+        <div className="font-medium text-default-700 mb-1">{en ? "💡 How it works" : "💡 使用說明"}</div>
+        {en
+          ? "Every time a task runs for this platform (e.g. 30s FB short post), the system injects the Text prompt + Image prompt above into the matching agent's prompt. Empty platforms fall back to the general brand voice."
+          : "每次跑該平台的任務（如 30s FB 短貼文）時，系統會自動把這裡的「文字指令」+「圖片指令」injection 進對應 agent 的 prompt。空白的平台會 fallback 到通用品牌口吻。"}
       </div>
     </div>
   );

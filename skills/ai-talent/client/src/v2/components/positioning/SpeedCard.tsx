@@ -10,6 +10,7 @@
  * Missing fields render as "—" so the layout doesn't break.
  */
 import React from "react";
+import { useLang } from "../../../lib/i18n";
 import { Card, CardBody, Chip, Divider } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -26,14 +27,15 @@ interface SpeedCardProps {
 const dash = <span className="text-default-400">—</span>;
 
 export default function SpeedCard({ scopeMode, scopeName, data }: SpeedCardProps) {
-  if (scopeMode === "brand")   return <BrandSpeedCard   scopeName={scopeName} data={data} />;
-  if (scopeMode === "product") return <ProductSpeedCard scopeName={scopeName} data={data} />;
-  if (scopeMode === "event")   return <EventSpeedCard   scopeName={scopeName} data={data} />;
+  const { lang } = useLang();
+  if (scopeMode === "brand")   return <BrandSpeedCard   scopeName={scopeName} data={data} en={lang === "en"} />;
+  if (scopeMode === "product") return <ProductSpeedCard scopeName={scopeName} data={data} en={lang === "en"} />;
+  if (scopeMode === "event")   return <EventSpeedCard   scopeName={scopeName} data={data} en={lang === "en"} />;
   return null;
 }
 
 /* ─────────────────────────── Brand ─────────────────────────── */
-function BrandSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
+function BrandSpeedCard({ scopeName, data, en }: { scopeName: string; data: any; en: boolean }) {
   const origin = data?.origin ?? {};
   const competition = data?.competition ?? {};
   const audience = data?.audience ?? {};
@@ -44,14 +46,14 @@ function BrandSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionHeader icon={faTrademark} eyebrow="BRAND · 速查卡" title={scopeName} />
+      <SectionHeader icon={faTrademark} eyebrow={en ? "BRAND · QUICK CARD" : "BRAND · 速查卡"} title={scopeName} />
 
       {/* 5 Whys */}
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faQuoteLeft} title="5 Whys 深層動機分析" sub="逐層挖掘品牌創立的深層動機" />
+          <SubHeader icon={faQuoteLeft} title={en ? "5 Whys: deep motivation" : "5 Whys 深層動機分析"} sub={en ? "Dig layer by layer into the brand's founding motivation" : "逐層挖掘品牌創立的深層動機"} />
           {layers.length === 0 ? (
-            <EmptyHint label="尚未分析 — 在「2.1 品牌起源故事」段執行 Wizard Step 1" />
+            <EmptyHint label={en ? "Not analyzed yet — run Wizard Step 1 in \"2.1 Brand origin story\"" : "尚未分析 — 在「2.1 品牌起源故事」段執行 Wizard Step 1"} />
           ) : (
             <div className="flex flex-col gap-3">
               {layers.map((row: any, i: number) => (
@@ -73,21 +75,21 @@ function BrandSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
       {/* 競爭對手矩陣 */}
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faShieldHalved} title="競爭對手分析矩陣" sub="識別市場空白與差異化機會" />
+          <SubHeader icon={faShieldHalved} title={en ? "Competitor analysis matrix" : "競爭對手分析矩陣"} sub={en ? "Spot market gaps and differentiation" : "識別市場空白與差異化機會"} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Chip size="sm" variant="flat" className="mb-2">直接競爭 Direct</Chip>
-              {direct.length === 0 ? <EmptyHint label="尚未分析" inline /> : (
+              <Chip size="sm" variant="flat" className="mb-2">{en ? "Direct" : "直接競爭 Direct"}</Chip>
+              {direct.length === 0 ? <EmptyHint label={en ? "Not analyzed yet" : "尚未分析"} inline /> : (
                 <div className="flex flex-col gap-3">
                   {direct.map((c: any, i: number) => (
                     <div key={i} className="border border-divider rounded-md p-3">
                       <p className="text-small font-medium">{c.name ?? "—"}</p>
                       <p className="text-tiny text-default-500 mt-1">{c.position ?? "—"}</p>
                       {c.weakness && (
-                        <p className="text-tiny text-default-500 mt-1">弱點：{c.weakness}</p>
+                        <p className="text-tiny text-default-500 mt-1">{en ? "Weakness: " : "弱點："}{c.weakness}</p>
                       )}
                       {c.ourEdge && (
-                        <p className="text-tiny text-default-700 mt-1">差異點：{c.ourEdge}</p>
+                        <p className="text-tiny text-default-700 mt-1">{en ? "Our edge: " : "差異點："}{c.ourEdge}</p>
                       )}
                     </div>
                   ))}
@@ -95,14 +97,14 @@ function BrandSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
               )}
             </div>
             <div>
-              <Chip size="sm" variant="flat" className="mb-2">間接競爭 Indirect</Chip>
-              {indirect.length === 0 ? <EmptyHint label="尚未分析" inline /> : (
+              <Chip size="sm" variant="flat" className="mb-2">{en ? "Indirect" : "間接競爭 Indirect"}</Chip>
+              {indirect.length === 0 ? <EmptyHint label={en ? "Not analyzed yet" : "尚未分析"} inline /> : (
                 <div className="flex flex-col gap-3">
                   {indirect.map((c: any, i: number) => (
                     <div key={i} className="border border-divider rounded-md p-3">
                       <p className="text-small font-medium">{c.name ?? "—"}</p>
-                      {c.threat   && <p className="text-tiny text-default-500 mt-1">威脅：{c.threat}</p>}
-                      {c.response && <p className="text-tiny text-default-700 mt-1">應對：{c.response}</p>}
+                      {c.threat   && <p className="text-tiny text-default-500 mt-1">{en ? "Threat: " : "威脅："}{c.threat}</p>}
+                      {c.response && <p className="text-tiny text-default-700 mt-1">{en ? "Response: " : "應對："}{c.response}</p>}
                     </div>
                   ))}
                 </div>
@@ -115,33 +117,33 @@ function BrandSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
       {/* 目標受眾矩陣 */}
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faUsers} title="目標受眾細分矩陣" sub="不同族群的特徵、需求、行為模式" />
+          <SubHeader icon={faUsers} title={en ? "Audience segmentation matrix" : "目標受眾細分矩陣"} sub={en ? "Traits, needs, and behavior of each segment" : "不同族群的特徵、需求、行為模式"} />
           {audience?.primary || audience?.secondary ? (
             <>
               {audience?.primary && (
                 <div className="border border-divider rounded-md p-4">
-                  <Chip size="sm" variant="flat" color="primary" className="mb-2">主受眾</Chip>
+                  <Chip size="sm" variant="flat" color="primary" className="mb-2">{en ? "Primary" : "主受眾"}</Chip>
                   <p className="text-small text-default-700 leading-relaxed whitespace-pre-wrap">{audience.primary}</p>
                 </div>
               )}
               {audience?.secondary && (
                 <div className="border border-divider rounded-md p-4">
-                  <Chip size="sm" variant="flat" className="mb-2">次受眾</Chip>
+                  <Chip size="sm" variant="flat" className="mb-2">{en ? "Secondary" : "次受眾"}</Chip>
                   <p className="text-small text-default-700 leading-relaxed whitespace-pre-wrap">{audience.secondary}</p>
                 </div>
               )}
               {audienceMatrix.length > 0 && (
                 <>
                   <Divider />
-                  <p className="text-small font-medium">情感需求評分矩陣</p>
+                  <p className="text-small font-medium">{en ? "Emotional need scoring matrix" : "情感需求評分矩陣"}</p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-small">
                       <thead className="bg-default-50">
                         <tr>
-                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">需求維度</th>
-                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">主受眾</th>
-                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">粉絲</th>
-                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">重要性</th>
+                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Need dimension" : "需求維度"}</th>
+                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Primary" : "主受眾"}</th>
+                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Fans" : "粉絲"}</th>
+                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Weight" : "重要性"}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -160,7 +162,7 @@ function BrandSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
               )}
             </>
           ) : (
-            <EmptyHint label="尚未分析 — 在「3 目標受眾」段執行 Wizard Step 6/7/8" />
+            <EmptyHint label={en ? "Not analyzed yet — run Wizard Step 6/7/8 in \"3. Target audience\"" : "尚未分析 — 在「3 目標受眾」段執行 Wizard Step 6/7/8"} />
           )}
         </CardBody>
       </Card>
@@ -169,7 +171,7 @@ function BrandSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
 }
 
 /* ─────────────────────────── Product ─────────────────────────── */
-function ProductSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
+function ProductSpeedCard({ scopeName, data, en }: { scopeName: string; data: any; en: boolean }) {
   const core = data?.core ?? {};
   const audience = data?.audience ?? {};
   const competition = data?.competition ?? {};
@@ -179,19 +181,19 @@ function ProductSpeedCard({ scopeName, data }: { scopeName: string; data: any })
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionHeader icon={faBox} eyebrow="PRODUCT · 速查卡" title={scopeName} />
+      <SectionHeader icon={faBox} eyebrow={en ? "PRODUCT · QUICK CARD" : "PRODUCT · 速查卡"} title={scopeName} />
 
       {/* Core value */}
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faBullseye} title="產品核心價值 / Product Core Value"
-            sub="標語、一句話價值主張、差異化賣點" />
+          <SubHeader icon={faBullseye} title={en ? "Product Core Value" : "產品核心價值 / Product Core Value"}
+            sub={en ? "Tagline, one-line value prop, differentiating USPs" : "標語、一句話價值主張、差異化賣點"} />
           <Pair label="PRODUCT TAGLINE">{core?.zhTagline ?? dash}<span className="text-default-500"> / </span>{core?.enTagline ?? dash}</Pair>
           <Pair label="VALUE PROPOSITION">{core?.oneLineValueProp ?? dash}</Pair>
           <Divider />
-          <Pair label="獨家賣點">{competition?.uniqueUsp ?? dash}</Pair>
-          <Pair label="少數競品也說的賣點">{competition?.rareUsp ?? dash}</Pair>
-          <Pair label="多數競爭者都說的賣點">{competition?.commonUsp ?? dash}</Pair>
+          <Pair label={en ? "Exclusive USP" : "獨家賣點"}>{competition?.uniqueUsp ?? dash}</Pair>
+          <Pair label={en ? "Rare USP (few competitors claim)" : "少數競品也說的賣點"}>{competition?.rareUsp ?? dash}</Pair>
+          <Pair label={en ? "Common USP (most competitors claim)" : "多數競爭者都說的賣點"}>{competition?.commonUsp ?? dash}</Pair>
         </CardBody>
       </Card>
 
@@ -199,11 +201,11 @@ function ProductSpeedCard({ scopeName, data }: { scopeName: string; data: any })
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
           <SubHeader icon={faShieldHalved} title="Market & Competition Analysis"
-            sub="競爭者、目標受眾 MOT、市場缺口" />
+            sub={en ? "Competitors, audience MOTs, market gaps" : "競爭者、目標受眾 MOT、市場缺口"} />
 
           <div>
-            <Chip size="sm" variant="flat" className="mb-2">競爭者</Chip>
-            {competitors.length === 0 ? <EmptyHint label="尚未分析" inline /> : (
+            <Chip size="sm" variant="flat" className="mb-2">{en ? "Competitors" : "競爭者"}</Chip>
+            {competitors.length === 0 ? <EmptyHint label={en ? "Not analyzed yet" : "尚未分析"} inline /> : (
               <ul className="list-disc list-inside text-small text-default-700 space-y-1">
                 {competitors.map((c: any, i: number) => (
                   <li key={i}>{c.name ?? "—"}{c.position ? ` — ${c.position}` : ""}</li>
@@ -215,8 +217,8 @@ function ProductSpeedCard({ scopeName, data }: { scopeName: string; data: any })
           <Divider />
 
           <div>
-            <Chip size="sm" variant="flat" className="mb-2">目標受眾 & MOT</Chip>
-            {mots.length === 0 ? <EmptyHint label="尚未分析" inline /> : (
+            <Chip size="sm" variant="flat" className="mb-2">{en ? "Audience & MOT" : "目標受眾 & MOT"}</Chip>
+            {mots.length === 0 ? <EmptyHint label={en ? "Not analyzed yet" : "尚未分析"} inline /> : (
               <div className="flex flex-col gap-2">
                 {mots.map((m: any, i: number) => (
                   <div key={i} className="border border-divider rounded-md p-3">
@@ -231,11 +233,11 @@ function ProductSpeedCard({ scopeName, data }: { scopeName: string; data: any })
           <Divider />
 
           <div>
-            <Chip size="sm" variant="flat" className="mb-2">產品策略缺口</Chip>
-            <Pair label="市場受眾">{strategy?.marketGap ?? dash}</Pair>
-            <Pair label="銷售通路">{strategy?.channelGap ?? dash}</Pair>
-            <Pair label="價格區間">{strategy?.priceGap ?? dash}</Pair>
-            <Pair label="推廣策略">{strategy?.promotionGap ?? dash}</Pair>
+            <Chip size="sm" variant="flat" className="mb-2">{en ? "Product strategy gaps" : "產品策略缺口"}</Chip>
+            <Pair label={en ? "Market audience" : "市場受眾"}>{strategy?.marketGap ?? dash}</Pair>
+            <Pair label={en ? "Sales channel" : "銷售通路"}>{strategy?.channelGap ?? dash}</Pair>
+            <Pair label={en ? "Price range" : "價格區間"}>{strategy?.priceGap ?? dash}</Pair>
+            <Pair label={en ? "Promotion strategy" : "推廣策略"}>{strategy?.promotionGap ?? dash}</Pair>
           </div>
         </CardBody>
       </Card>
@@ -247,7 +249,7 @@ function ProductSpeedCard({ scopeName, data }: { scopeName: string; data: any })
 // Reads new 11-segment schema (CJ direction 2026-04-29). Falls back to
 // old segIds (overview/solution) so events created before the schema
 // rewrite still render something instead of going completely blank.
-function EventSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
+function EventSpeedCard({ scopeName, data, en }: { scopeName: string; data: any; en: boolean }) {
   // New schema segments
   const brief      = data?.brief      ?? {};
   const context    = data?.context    ?? {};
@@ -268,43 +270,43 @@ function EventSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionHeader icon={faCalendarDay} eyebrow="EVENT · 速查卡" title={scopeName} />
+      <SectionHeader icon={faCalendarDay} eyebrow={en ? "EVENT · QUICK CARD" : "EVENT · 速查卡"} title={scopeName} />
 
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faRocket} title="戰略 Brief" sub="intake 自動產出（活動類型 / 角色 / 摘要）" />
-          <Pair label="活動類型">{brief?.eventType ?? dash}</Pair>
-          <Pair label="本次角色">{brief?.roleThisRound ?? dash}</Pair>
-          <Pair label="活動定位摘要">{brief?.briefSummary ?? overview?.positioningStatement ?? dash}</Pair>
+          <SubHeader icon={faRocket} title={en ? "Strategic brief" : "戰略 Brief"} sub={en ? "Auto-generated from intake (type / role / summary)" : "intake 自動產出（活動類型 / 角色 / 摘要）"} />
+          <Pair label={en ? "Event type" : "活動類型"}>{brief?.eventType ?? dash}</Pair>
+          <Pair label={en ? "Role this round" : "本次角色"}>{brief?.roleThisRound ?? dash}</Pair>
+          <Pair label={en ? "Positioning summary" : "活動定位摘要"}>{brief?.briefSummary ?? overview?.positioningStatement ?? dash}</Pair>
         </CardBody>
       </Card>
 
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faMessage} title="背景與受眾" sub="商業現況 + 核心問題 + 受眾洞察" />
-          <Pair label="商業背景">{context?.businessBackground ?? dash}</Pair>
-          <Pair label="核心問題">{context?.coreProblem ?? dash}</Pair>
-          <Pair label="關鍵洞察">{audience?.keyInsight ?? dash}</Pair>
+          <SubHeader icon={faMessage} title={en ? "Context & audience" : "背景與受眾"} sub={en ? "Business reality + core problem + audience insight" : "商業現況 + 核心問題 + 受眾洞察"} />
+          <Pair label={en ? "Business background" : "商業背景"}>{context?.businessBackground ?? dash}</Pair>
+          <Pair label={en ? "Core problem" : "核心問題"}>{context?.coreProblem ?? dash}</Pair>
+          <Pair label={en ? "Key insight" : "關鍵洞察"}>{audience?.keyInsight ?? dash}</Pair>
         </CardBody>
       </Card>
 
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faRocket} title="SMP 單一核心命題" sub="整個活動最高指導原則" />
+          <SubHeader icon={faRocket} title={en ? "SMP — Single Minded Proposition" : "SMP 單一核心命題"} sub={en ? "Top-level guidance for the whole event" : "整個活動最高指導原則"} />
           <Pair label="SMP">{smp?.singleMindedProposition ?? dash}</Pair>
-          <Pair label="為什麼是這句">{smp?.rationale ?? dash}</Pair>
+          <Pair label={en ? "Why this line" : "為什麼是這句"}>{smp?.rationale ?? dash}</Pair>
         </CardBody>
       </Card>
 
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faMessage} title="創意 + 訊息" sub="創意主題 + 支撐訊息" />
-          <Pair label="創意主題">{creative?.creativeTheme ?? solution?.conceptName ?? dash}</Pair>
-          <Pair label="核心比喻">{creative?.coreMetaphor ?? solution?.coreConcept ?? dash}</Pair>
-          <Pair label="一句話 hook">{creative?.coreTranslation ?? dash}</Pair>
+          <SubHeader icon={faMessage} title={en ? "Creative + messaging" : "創意 + 訊息"} sub={en ? "Creative theme + supporting messages" : "創意主題 + 支撐訊息"} />
+          <Pair label={en ? "Creative theme" : "創意主題"}>{creative?.creativeTheme ?? solution?.conceptName ?? dash}</Pair>
+          <Pair label={en ? "Core metaphor" : "核心比喻"}>{creative?.coreMetaphor ?? solution?.coreConcept ?? dash}</Pair>
+          <Pair label={en ? "One-line hook" : "一句話 hook"}>{creative?.coreTranslation ?? dash}</Pair>
           <div>
-            <Chip size="sm" variant="flat" className="mb-2">支撐訊息</Chip>
-            {supporting.length === 0 ? <EmptyHint label="尚未設定" inline /> : (
+            <Chip size="sm" variant="flat" className="mb-2">{en ? "Supporting messages" : "支撐訊息"}</Chip>
+            {supporting.length === 0 ? <EmptyHint label={en ? "Not set yet" : "尚未設定"} inline /> : (
               <ul className="list-disc list-inside text-small text-default-700 space-y-1">
                 {supporting.map((s, i) => <li key={i}>{s}</li>)}
               </ul>
@@ -315,11 +317,11 @@ function EventSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
 
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faMessage} title="管道 / 旅程 / KPI" sub="活動執行藍圖" />
+          <SubHeader icon={faMessage} title={en ? "Channels / journey / KPI" : "管道 / 旅程 / KPI"} sub={en ? "Event execution blueprint" : "活動執行藍圖"} />
 
           <div>
-            <Chip size="sm" variant="flat" className="mb-2">階段 × 管道 × 內容型態</Chip>
-            {phases.length === 0 ? <EmptyHint label="尚未設定" inline /> : (
+            <Chip size="sm" variant="flat" className="mb-2">{en ? "Phase × channel × content" : "階段 × 管道 × 內容型態"}</Chip>
+            {phases.length === 0 ? <EmptyHint label={en ? "Not set yet" : "尚未設定"} inline /> : (
               <ol className="list-decimal list-inside text-small text-default-700 space-y-1">
                 {phases.map((p: any, i) => (
                   <li key={i}>
@@ -333,8 +335,8 @@ function EventSpeedCard({ scopeName, data }: { scopeName: string; data: any }) {
           <Divider />
 
           <div>
-            <Chip size="sm" variant="flat" className="mb-2">KPI 成效指標</Chip>
-            {kpis.length === 0 ? <EmptyHint label="尚未設定" inline /> : (
+            <Chip size="sm" variant="flat" className="mb-2">{en ? "KPIs" : "KPI 成效指標"}</Chip>
+            {kpis.length === 0 ? <EmptyHint label={en ? "Not set yet" : "尚未設定"} inline /> : (
               <div className="flex gap-2 flex-wrap">
                 {kpis.map((k, i) => <Chip key={i} size="sm" variant="flat" color="default" startContent={<FontAwesomeIcon icon={faChartLine} className="text-tiny ml-1" />}>{k}</Chip>)}
               </div>

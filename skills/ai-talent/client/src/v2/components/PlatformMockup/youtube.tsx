@@ -16,10 +16,12 @@ import {
   faMusic, faImages, faDownload, faBell, faScissors,
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, dicebear } from "./shared";
+import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── YT Video Card ─────────────── */
 
 export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
     <div className="w-full max-w-[640px] mx-auto">
@@ -35,11 +37,11 @@ export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, live
                 <FontAwesomeIcon icon={faVideo} className="text-3xl mb-2" />
                 {liveImageStyle ? (
                   <>
-                    <p className="text-tiny font-semibold mb-1">縮圖風格方向</p>
+                    <p className="text-tiny font-semibold mb-1">{lang === "en" ? "Thumbnail direction" : "縮圖風格方向"}</p>
                     <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
                   </>
                 ) : (
-                  <p className="text-tiny">縮圖 · 等待 craft agent</p>
+                  <p className="text-tiny">{lang === "en" ? "Thumbnail · waiting for craft agent" : "縮圖 · 等待 craft agent"}</p>
                 )}
               </div>
             </>
@@ -47,10 +49,10 @@ export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, live
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">12:34</div>
         </div>
         <div className="p-4 space-y-2">
-          <p className="text-medium font-semibold leading-snug line-clamp-2">{title || (liveCaption ? liveCaption.split("\n")[0] : "影片標題")}</p>
+          <p className="text-medium font-semibold leading-snug line-clamp-2">{title || (liveCaption ? liveCaption.split("\n")[0] : (lang === "en" ? "Video title" : "影片標題"))}</p>
           <User
             name={<span className="text-small">{brandName ?? "Your Channel"}</span>}
-            description={<span className="text-tiny text-default-500">12K 訂閱者 · 剛剛 · 1.2K 次觀看</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "12K subscribers · just now · 1.2K views" : "12K 訂閱者 · 剛剛 · 1.2K 次觀看"}</span>}
             avatarProps={{ src: avatarSrc, size: "sm" }}
           />
           <Divider />
@@ -58,7 +60,7 @@ export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, live
             <div className="text-tiny text-default-700 whitespace-pre-line leading-relaxed">{liveCaption}</div>
           ) : (
             <>
-              <p className="text-tiny text-default-500">影片描述</p>
+              <p className="text-tiny text-default-500">{lang === "en" ? "Video description" : "影片描述"}</p>
               <Skeleton className="h-2.5 w-[90%] rounded" />
               <Skeleton className="h-2.5 w-[78%] rounded" />
             </>
@@ -72,11 +74,12 @@ export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, live
 /* ─────────────── YT Watch (player + meta + actions) ─────────────── */
 
 export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   // For YT tasks the caption typically IS the deliverable (title list / chapter
   // list / description / opening script). First line → big title; rest → body.
   const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
-  const headline = title || lines[0] || "影片標題";
+  const headline = title || lines[0] || (lang === "en" ? "Video title" : "影片標題");
   const body = title ? liveCaption ?? "" : lines.slice(1).join("\n");
   return (
     <div className="w-full max-w-[800px] mx-auto">
@@ -91,11 +94,11 @@ export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCapt
               <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
               {liveImageStyle ? (
                 <>
-                  <p className="text-tiny font-semibold mb-1 text-white">縮圖風格方向</p>
+                  <p className="text-tiny font-semibold mb-1 text-white">{lang === "en" ? "Thumbnail direction" : "縮圖風格方向"}</p>
                   <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
                 </>
               ) : (
-                <p className="text-tiny">影片播放器 · 等待 craft agent</p>
+                <p className="text-tiny">{lang === "en" ? "Video player · waiting for craft agent" : "影片播放器 · 等待 craft agent"}</p>
               )}
             </div>
           )}
@@ -118,10 +121,10 @@ export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCapt
             <Avatar src={avatarSrc} size="md" />
             <div className="min-w-0 flex-1">
               <p className="text-small font-semibold truncate">{brandName ?? "Your Channel"}</p>
-              <p className="text-tiny text-default-500">12K 訂閱者</p>
+              <p className="text-tiny text-default-500">{lang === "en" ? "12K subscribers" : "12K 訂閱者"}</p>
             </div>
             <Button color="default" radius="full" size="sm" className="bg-foreground text-background ml-2">
-              訂閱
+              {lang === "en" ? "Subscribe" : "訂閱"}
             </Button>
             <Button isIconOnly variant="light" radius="full" size="sm" aria-label="bell">
               <FontAwesomeIcon icon={faBell} />
@@ -130,17 +133,17 @@ export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCapt
           <div className="flex items-center gap-1.5">
             <ActionPill icon={faThumbsUp} label="1.2K" />
             <ActionPill icon={faThumbsDown} />
-            <ActionPill icon={faShareNodes} label="分享" />
-            <ActionPill icon={faDownload} label="下載" />
-            <ActionPill icon={faScissors} label="片段" />
+            <ActionPill icon={faShareNodes} label={lang === "en" ? "Share" : "分享"} />
+            <ActionPill icon={faDownload} label={lang === "en" ? "Download" : "下載"} />
+            <ActionPill icon={faScissors} label={lang === "en" ? "Clip" : "片段"} />
           </div>
         </div>
 
         {/* Description / caption body — renders the bulk of the YT task output */}
         <div className="mx-4 mb-4 p-3 bg-default-100 rounded-medium">
           <div className="flex items-center gap-2 text-tiny text-default-700 mb-2">
-            <span className="font-semibold">1.2K 次觀看</span>
-            <span>· 5 分鐘前</span>
+            <span className="font-semibold">{lang === "en" ? "1.2K views" : "1.2K 次觀看"}</span>
+            <span>{lang === "en" ? "· 5 min ago" : "· 5 分鐘前"}</span>
           </div>
           {body ? (
             <p className="text-small text-default-800 whitespace-pre-line leading-relaxed">{body}</p>
@@ -169,6 +172,7 @@ function ActionPill({ icon, label }: { icon: any; label?: string }) {
 /* ─────────────── YT Community post ─────────────── */
 
 export function YTCommunity({ title, brief, brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
+  const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
     <div className="w-full max-w-[600px] mx-auto">
@@ -178,7 +182,7 @@ export function YTCommunity({ title, brief, brandName, brandLogoUrl, variantLabe
           <Avatar src={avatarSrc} size="md" />
           <div>
             <p className="text-small font-semibold">{brandName ?? "Your Channel"}</p>
-            <p className="text-tiny text-default-500">5 分鐘前</p>
+            <p className="text-tiny text-default-500">{lang === "en" ? "5 min ago" : "5 分鐘前"}</p>
           </div>
         </div>
         <div className="px-4 pb-3">
@@ -193,11 +197,11 @@ export function YTCommunity({ title, brief, brandName, brandLogoUrl, variantLabe
         </div>
         {/* Optional poll */}
         <div className="mx-4 mb-3 p-3 border border-divider rounded-medium space-y-2">
-          <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">投票</p>
+          <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">{lang === "en" ? "Poll" : "投票"}</p>
           {[
-            { text: "選項 A", pct: 56 },
-            { text: "選項 B", pct: 32 },
-            { text: "選項 C", pct: 12 },
+            { text: lang === "en" ? "Option A" : "選項 A", pct: 56 },
+            { text: lang === "en" ? "Option B" : "選項 B", pct: 32 },
+            { text: lang === "en" ? "Option C" : "選項 C", pct: 12 },
           ].map((opt, i) => (
             <div key={i} className="relative h-7 rounded-full bg-default-100 overflow-hidden border border-divider">
               <span className="absolute inset-y-0 left-0 bg-danger-100" style={{ width: `${opt.pct}%` }} />
@@ -207,13 +211,13 @@ export function YTCommunity({ title, brief, brandName, brandLogoUrl, variantLabe
               </span>
             </div>
           ))}
-          <p className="text-tiny text-default-500">567 票</p>
+          <p className="text-tiny text-default-500">{lang === "en" ? "567 votes" : "567 票"}</p>
         </div>
         <div className="px-4 py-2 border-t border-divider flex items-center gap-4 text-default-500 text-tiny">
           <span><FontAwesomeIcon icon={faThumbsUp} /> 1.2K</span>
           <span><FontAwesomeIcon icon={faThumbsDown} /></span>
           <span><FontAwesomeIcon icon={faComment} /> 87</span>
-          <span className="ml-auto">分享</span>
+          <span className="ml-auto">{lang === "en" ? "Share" : "分享"}</span>
         </div>
       </div>
     </div>
@@ -223,6 +227,7 @@ export function YTCommunity({ title, brief, brandName, brandLogoUrl, variantLabe
 /* ─────────────── YT Shorts ─────────────── */
 
 export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
     <div className="w-full max-w-[400px] mx-auto">
@@ -241,7 +246,7 @@ export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCap
             {liveImageStyle && (
               <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
                 <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">封面風格</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">{lang === "en" ? "Cover style" : "封面風格"}</p>
                 <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
               </div>
             )}
@@ -250,7 +255,7 @@ export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCap
         {/* Script overlay — render the Shorts script body so user sees the deliverable */}
         {liveCaption && (
           <div className="absolute top-12 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto pr-12">
-            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">Shorts 腳本</p>
+            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">{lang === "en" ? "Shorts script" : "Shorts 腳本"}</p>
             <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
           </div>
         )}
@@ -260,9 +265,9 @@ export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCap
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center text-tiny font-bold border-2 border-black">+</span>
           </div>
           <VerticalActionItem icon={faThumbsUp} count="12K" />
-          <VerticalActionItem icon={faThumbsDown} count="不喜歡" />
+          <VerticalActionItem icon={faThumbsDown} count={lang === "en" ? "Dislike" : "不喜歡"} />
           <VerticalActionItem icon={faComment} count="456" />
-          <VerticalActionItem icon={faShareNodes} count="分享" />
+          <VerticalActionItem icon={faShareNodes} count={lang === "en" ? "Share" : "分享"} />
           <span className="w-9 h-9 rounded-md bg-black/30 backdrop-blur-sm flex items-center justify-center text-white border border-white/30">
             <FontAwesomeIcon icon={faMusic} />
           </span>
@@ -270,12 +275,12 @@ export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCap
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1.5 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
           <div className="flex items-center gap-2">
             <span className="text-small font-semibold">@{(brandName ?? "your_channel").toLowerCase().replace(/\s+/g, "_")}</span>
-            <Button size="sm" radius="sm" className="h-6 min-w-0 px-2 text-tiny bg-white text-black">訂閱</Button>
+            <Button size="sm" radius="sm" className="h-6 min-w-0 px-2 text-tiny bg-white text-black">{lang === "en" ? "Subscribe" : "訂閱"}</Button>
           </div>
           <p className="text-small line-clamp-2">{title}</p>
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
-            <span>原創音訊</span>
+            <span>{lang === "en" ? "Original audio" : "原創音訊"}</span>
           </div>
         </div>
       </div>
@@ -297,6 +302,7 @@ function VerticalActionItem({ icon, count }: { icon: any; count: string }) {
 /* ─────────────── YT Premiere (countdown overlay) ─────────────── */
 
 export function YTPremiere({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[640px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
@@ -305,14 +311,14 @@ export function YTPremiere({ title, brandName, variantLabel }: MockupFields) {
           <Skeleton className="absolute inset-0 opacity-40" />
           {/* Premiere chip top-left */}
           <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
-            <span className="bg-danger text-white text-tiny font-bold px-2 py-0.5 rounded uppercase">首播</span>
-            <span className="bg-black/70 text-white text-tiny px-2 py-0.5 rounded">即將開始</span>
+            <span className="bg-danger text-white text-tiny font-bold px-2 py-0.5 rounded uppercase">{lang === "en" ? "Premiere" : "首播"}</span>
+            <span className="bg-black/70 text-white text-tiny px-2 py-0.5 rounded">{lang === "en" ? "Starting soon" : "即將開始"}</span>
           </div>
           {/* Countdown center */}
           <div className="relative z-10 text-center text-white">
-            <p className="text-tiny uppercase tracking-wider opacity-80 mb-1">距離首播</p>
+            <p className="text-tiny uppercase tracking-wider opacity-80 mb-1">{lang === "en" ? "Premiere in" : "距離首播"}</p>
             <p className="text-4xl font-bold tabular-nums tracking-tight">02:14:35</p>
-            <p className="text-tiny opacity-80 mt-2">提醒我 + 設定通知</p>
+            <p className="text-tiny opacity-80 mt-2">{lang === "en" ? "Remind me + Set notification" : "提醒我 + 設定通知"}</p>
           </div>
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">12:34</div>
         </div>
@@ -320,12 +326,12 @@ export function YTPremiere({ title, brandName, variantLabel }: MockupFields) {
           <p className="text-medium font-semibold leading-snug line-clamp-2">{title}</p>
           <User
             name={<span className="text-small">{brandName ?? "Your Channel"}</span>}
-            description={<span className="text-tiny text-default-500">12K 訂閱者 · 1.2K 人在等待</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "12K subscribers · 1.2K waiting" : "12K 訂閱者 · 1.2K 人在等待"}</span>}
             avatarProps={{ src: dicebear(brandName ?? "channel"), size: "sm" }}
           />
           <div className="flex gap-2 pt-1">
-            <Button color="danger" size="sm" radius="full" className="flex-1">設定提醒</Button>
-            <Button variant="bordered" size="sm" radius="full" className="flex-1">分享</Button>
+            <Button color="danger" size="sm" radius="full" className="flex-1">{lang === "en" ? "Set reminder" : "設定提醒"}</Button>
+            <Button variant="bordered" size="sm" radius="full" className="flex-1">{lang === "en" ? "Share" : "分享"}</Button>
           </div>
         </div>
       </div>
@@ -336,6 +342,7 @@ export function YTPremiere({ title, brandName, variantLabel }: MockupFields) {
 /* ─────────────── YT Live (LIVE chip + viewers + chat panel) ─────────────── */
 
 export function YTLive({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[640px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
@@ -343,14 +350,14 @@ export function YTLive({ title, brandName, variantLabel }: MockupFields) {
         <div className="relative aspect-video bg-black flex items-center justify-center">
           <div className="text-white/50 text-center relative z-10">
             <FontAwesomeIcon icon={faVideo} className="text-5xl mb-2" />
-            <p className="text-tiny">直播中 · 等待 craft agent</p>
+            <p className="text-tiny">{lang === "en" ? "Live · waiting for craft agent" : "直播中 · 等待 craft agent"}</p>
           </div>
           {/* LIVE chip top-left */}
           <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
             <span className="bg-danger text-white text-tiny font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
             </span>
-            <span className="bg-black/70 text-white text-tiny px-2 py-0.5 rounded">2,345 人觀看</span>
+            <span className="bg-black/70 text-white text-tiny px-2 py-0.5 rounded">{lang === "en" ? "2,345 watching" : "2,345 人觀看"}</span>
           </div>
           <Button isIconOnly radius="full" size="lg" color="danger" className="absolute opacity-90" aria-label="watch">
             <FontAwesomeIcon icon={faPlay} />
@@ -358,12 +365,19 @@ export function YTLive({ title, brandName, variantLabel }: MockupFields) {
         </div>
         {/* Live chat preview */}
         <div className="px-4 py-2.5 border-b border-divider bg-default-50 space-y-1 max-h-32 overflow-hidden">
-          <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">即時聊天</p>
-          {[
-            { user: "viewer_1", msg: "終於開播了!" },
-            { user: "viewer_2", msg: "音質很棒 👍" },
-            { user: "viewer_3", msg: "❤️❤️❤️" },
-          ].map((c, i) => (
+          <p className="text-tiny font-semibold uppercase tracking-wider text-default-500">{lang === "en" ? "Live chat" : "即時聊天"}</p>
+          {(lang === "en"
+            ? [
+                { user: "viewer_1", msg: "Finally live!" },
+                { user: "viewer_2", msg: "Audio sounds great 👍" },
+                { user: "viewer_3", msg: "❤️❤️❤️" },
+              ]
+            : [
+                { user: "viewer_1", msg: "終於開播了!" },
+                { user: "viewer_2", msg: "音質很棒 👍" },
+                { user: "viewer_3", msg: "❤️❤️❤️" },
+              ]
+          ).map((c, i) => (
             <p key={i} className="text-tiny">
               <span className="font-semibold mr-1.5">{c.user}</span>
               {c.msg}
@@ -374,7 +388,7 @@ export function YTLive({ title, brandName, variantLabel }: MockupFields) {
           <p className="text-medium font-semibold leading-snug line-clamp-2">{title}</p>
           <User
             name={<span className="text-small">{brandName ?? "Your Channel"}</span>}
-            description={<span className="text-tiny text-default-500">12K 訂閱者 · 直播中</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "12K subscribers · Live now" : "12K 訂閱者 · 直播中"}</span>}
             avatarProps={{ src: dicebear(brandName ?? "channel"), size: "sm" }}
           />
         </div>

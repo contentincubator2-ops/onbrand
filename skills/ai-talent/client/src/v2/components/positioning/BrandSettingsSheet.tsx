@@ -24,6 +24,7 @@ import { faFacebook } from "@fortawesome/free-brands-svg-icons";
 import ConnectorEditor from "./ConnectorEditor";
 import AIPromptsEditor from "./AIPromptsEditor";
 import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 
 type SettingsTab = "info" | "connector" | "publish" | "visual" | "ai" | "danger";
 
@@ -38,16 +39,21 @@ interface Props {
   onboardingHint?: string;
 }
 
-const TABS: Array<{ id: SettingsTab; label: string; Icon: any }> = [
-  { id: "info",      label: "基本資料",  Icon: IdCard  },
-  { id: "connector", label: "連結",      Icon: Link2   },
-  { id: "publish",   label: "發布",      Icon: Share2  },
-  { id: "visual",    label: "視覺",      Icon: Palette },
-  { id: "ai",        label: "AI 指令",   Icon: Bot     },
-  { id: "danger",    label: "危險區",    Icon: Trash2  },
-];
+function getTabs(en: boolean): Array<{ id: SettingsTab; label: string; Icon: any }> {
+  return [
+    { id: "info",      label: en ? "Info"        : "基本資料",  Icon: IdCard  },
+    { id: "connector", label: en ? "Links"       : "連結",      Icon: Link2   },
+    { id: "publish",   label: en ? "Publish"     : "發布",      Icon: Share2  },
+    { id: "visual",    label: en ? "Visual"      : "視覺",      Icon: Palette },
+    { id: "ai",        label: en ? "AI prompts"  : "AI 指令",   Icon: Bot     },
+    { id: "danger",    label: en ? "Danger zone" : "危險區",    Icon: Trash2  },
+  ];
+}
 
 export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName, initialTab, onboardingHint }: Props) {
+  const { lang } = useLang();
+  const en = lang === "en";
+  const TABS = getTabs(en);
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "connector");
   // When a fresh initialTab arrives (e.g., onboarding triggers connector), reflect it.
   useEffect(() => {
@@ -72,7 +78,7 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
           {/* Left rail — vertical tabs */}
           <div className="w-44 shrink-0 border-r border-default-100 bg-default-50/40 flex flex-col">
             <div className="px-4 py-4 border-b border-default-100">
-              <div className="text-tiny text-default-500 font-medium uppercase tracking-wider">設定</div>
+              <div className="text-tiny text-default-500 font-medium uppercase tracking-wider">{en ? "Settings" : "設定"}</div>
               <div className="text-sm font-semibold text-default-900 truncate mt-0.5" title={brandName ?? ""}>{brandName ?? "—"}</div>
             </div>
             <nav className="flex-1 px-2 py-3 flex flex-col gap-0.5">
@@ -93,7 +99,7 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
             </nav>
             <div className="px-2 py-3 border-t border-default-100">
               <Button variant="light" size="sm" onPress={onClose} startContent={<X size={13} />} className="w-full justify-start">
-                關閉
+                {en ? "Close" : "關閉"}
               </Button>
             </div>
           </div>
@@ -124,13 +130,15 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
 }
 
 export function InfoTab({ brandId, brandName }: { brandId: number | null; brandName: string | null }) {
+  const { lang } = useLang();
+  const en = lang === "en";
   return (
     <div className="max-w-[700px] mx-auto p-8">
-      <h2 className="text-2xl font-semibold text-default-900 mb-2">基本資料</h2>
-      <p className="text-sm text-default-500 mb-6">名稱 / 產業 / 描述</p>
+      <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Basic info" : "基本資料"}</h2>
+      <p className="text-sm text-default-500 mb-6">{en ? "Name / industry / description" : "名稱 / 產業 / 描述"}</p>
       <div className="bg-default-50 rounded-xl p-5 text-sm text-default-700 leading-relaxed">
-        <div className="mb-2"><span className="text-default-500">名稱：</span>{brandName ?? "—"}</div>
-        <div className="text-default-400 italic">產業 / 描述編輯介面接下來會接上（用 brand.update mutation）</div>
+        <div className="mb-2"><span className="text-default-500">{en ? "Name: " : "名稱："}</span>{brandName ?? "—"}</div>
+        <div className="text-default-400 italic">{en ? "Industry / description editor coming next (wired to brand.update)" : "產業 / 描述編輯介面接下來會接上（用 brand.update mutation）"}</div>
         <div className="text-default-400 italic mt-1">brandId: {brandId}</div>
       </div>
     </div>
@@ -138,6 +146,8 @@ export function InfoTab({ brandId, brandName }: { brandId: number | null; brandN
 }
 
 export function VisualTab({ brandId }: { brandId: number | null }) {
+  const { lang } = useLang();
+  const en = lang === "en";
   // 2026-05-12 (CJ「視覺還在開發，請開發完成」): real implementation.
   // Logo URL + 3 brand colors + font hint + guidelines, all wired to
   // brand.updateVisual which also feeds image-gen as brandContext.
@@ -183,7 +193,7 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
       });
       setDirty(false);
     } catch (e: any) {
-      alert(`儲存失敗：${e?.message ?? "未知錯誤"}`);
+      alert(en ? `Save failed: ${e?.message ?? "Unknown error"}` : `儲存失敗：${e?.message ?? "未知錯誤"}`);
     }
   };
 
@@ -198,9 +208,11 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
 
   return (
     <div className="max-w-[820px] mx-auto p-8">
-      <h2 className="text-2xl font-semibold text-default-900 mb-2">視覺識別</h2>
+      <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Visual identity" : "視覺識別"}</h2>
       <p className="text-sm text-default-500 mb-6">
-        Logo · 色票 · 字型 · 識別規範 — AI 生圖時會自動套用，確保不脫離品牌調性
+        {en
+          ? "Logo · palette · font · guidelines — AI applies these when generating images so output stays on-brand"
+          : "Logo · 色票 · 字型 · 識別規範 — AI 生圖時會自動套用，確保不脫離品牌調性"}
       </p>
 
       {/* Logo */}
@@ -213,17 +225,17 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
             {logoUrl ? (
               <img src={logoUrl} alt="logo" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
-              <span className="text-xs text-default-400">無 logo</span>
+              <span className="text-xs text-default-400">{en ? "No logo" : "無 logo"}</span>
             )}
           </div>
           <div className="flex-1">
             <Input
               size="sm"
               label="Logo URL"
-              placeholder="https://example.com/logo.png 或 /static/..."
+              placeholder={en ? "https://example.com/logo.png or /static/..." : "https://example.com/logo.png 或 /static/..."}
               value={logoUrl}
               onValueChange={onChange(setLogoUrl)}
-              description="貼上 logo 的網址（PNG / SVG / JPG 都可）。檔案上傳功能稍後上線。"
+              description={en ? "Paste the logo URL (PNG / SVG / JPG). File upload coming soon." : "貼上 logo 的網址（PNG / SVG / JPG 都可）。檔案上傳功能稍後上線。"}
             />
           </div>
         </div>
@@ -231,15 +243,17 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
 
       {/* Colors */}
       <section className="border border-default-200 rounded-xl p-5 bg-white mb-4">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">色票（HEX）</h3>
+        <h3 className="text-sm font-semibold text-default-900 mb-3">{en ? "Palette (HEX)" : "色票（HEX）"}</h3>
         <p className="text-xs text-default-500 mb-4">
-          AI 生圖時會以這三色為主視覺基調。建議：主色 = logo 主色 / 副色 = 互補色 / 強調色 = CTA 按鈕用色。
+          {en
+            ? "AI builds the visual foundation around these three colors. Tip: Primary = logo color / Secondary = complement / Accent = CTA button color."
+            : "AI 生圖時會以這三色為主視覺基調。建議：主色 = logo 主色 / 副色 = 互補色 / 強調色 = CTA 按鈕用色。"}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            { label: "主色",  val: primary,   setter: setPrimary },
-            { label: "副色",  val: secondary, setter: setSecondary },
-            { label: "強調色", val: accent,    setter: setAccent },
+            { label: en ? "Primary"   : "主色",   val: primary,   setter: setPrimary },
+            { label: en ? "Secondary" : "副色",   val: secondary, setter: setSecondary },
+            { label: en ? "Accent"    : "強調色", val: accent,    setter: setAccent },
           ].map((c) => (
             <label key={c.label} className="flex items-center gap-3 p-3 border border-default-200 rounded-lg bg-default-50">
               <input
@@ -264,34 +278,38 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
 
       {/* Font */}
       <section className="border border-default-200 rounded-xl p-5 bg-white mb-4">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">字型</h3>
+        <h3 className="text-sm font-semibold text-default-900 mb-3">{en ? "Font" : "字型"}</h3>
         <Input
           size="sm"
-          label="主要字型"
-          placeholder="例：Noto Sans TC, sans-serif 或 思源黑體"
+          label={en ? "Primary font" : "主要字型"}
+          placeholder={en ? "e.g. Noto Sans TC, sans-serif or Source Han Sans" : "例：Noto Sans TC, sans-serif 或 思源黑體"}
           value={fontFamily}
           onValueChange={onChange(setFontFamily)}
-          description="CSS font-family 寫法。AI 在生視覺草稿時會優先選擇相近風格的字型。"
+          description={en ? "CSS font-family. AI picks similar-styled fonts when drafting visuals." : "CSS font-family 寫法。AI 在生視覺草稿時會優先選擇相近風格的字型。"}
         />
         {fontFamily && (
           <div className="mt-3 p-3 bg-default-50 rounded-lg" style={{ fontFamily }}>
-            <div className="text-tiny text-default-500 mb-1">預覽：</div>
-            <div className="text-lg text-default-900">中文預覽 ABC abc 123 — {fontFamily}</div>
+            <div className="text-tiny text-default-500 mb-1">{en ? "Preview:" : "預覽："}</div>
+            <div className="text-lg text-default-900">{en ? "Preview ABC abc 123 — " : "中文預覽 ABC abc 123 — "}{fontFamily}</div>
           </div>
         )}
       </section>
 
       {/* Guidelines */}
       <section className="border border-default-200 rounded-xl p-5 bg-white mb-6">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">識別規範（自由填寫）</h3>
+        <h3 className="text-sm font-semibold text-default-900 mb-3">{en ? "Visual guidelines (free-form)" : "識別規範（自由填寫）"}</h3>
         <p className="text-xs text-default-500 mb-3">
-          給 AI 生圖時的視覺指引。例：「永遠用自然光、避免高對比、不要用堆疊文字、人物以亞洲面孔為主」。
+          {en
+            ? "Visual direction for AI image gen. e.g. \"Always natural light, avoid high contrast, no stacked text, Asian faces preferred.\""
+            : "給 AI 生圖時的視覺指引。例：「永遠用自然光、避免高對比、不要用堆疊文字、人物以亞洲面孔為主」。"}
         </p>
         <textarea
           value={guidelines}
           onChange={(e) => { setGuidelines(e.target.value); setDirty(true); }}
           rows={6}
-          placeholder="例：&#10;- 自然光為主，避免棚拍硬光&#10;- 構圖留白多，主體偏左&#10;- 木材、棉麻等天然材質為主&#10;- 不要使用 emoji 或文字疊圖"
+          placeholder={en
+            ? "e.g.:&#10;- Natural light, avoid harsh studio lighting&#10;- Generous whitespace, subject left of center&#10;- Wood / cotton / linen natural materials&#10;- No emojis or stacked text overlays"
+            : "例：&#10;- 自然光為主，避免棚拍硬光&#10;- 構圖留白多，主體偏左&#10;- 木材、棉麻等天然材質為主&#10;- 不要使用 emoji 或文字疊圖"}
           className="w-full text-sm border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-default-500"
         />
       </section>
@@ -305,10 +323,10 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
           isLoading={updateM?.isPending}
           onPress={save}
         >
-          儲存視覺識別
+          {en ? "Save visual identity" : "儲存視覺識別"}
         </Button>
-        {dirty && <span className="text-xs text-amber-600">有未儲存的變更</span>}
-        {!dirty && visualQ?.data && <span className="text-xs text-default-400">已儲存</span>}
+        {dirty && <span className="text-xs text-amber-600">{en ? "Unsaved changes" : "有未儲存的變更"}</span>}
+        {!dirty && visualQ?.data && <span className="text-xs text-default-400">{en ? "Saved" : "已儲存"}</span>}
       </div>
     </div>
   );
@@ -327,6 +345,8 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
  *      connect_external_user_id so Pipedream uses THIS user's token.
  */
 export function PublishTab({ brandId }: { brandId: number | null }) {
+  const { lang } = useLang();
+  const en = lang === "en";
   const statusQ = (trpc as any).publish?.getBrandFacebookStatus?.useQuery?.(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false },
@@ -361,7 +381,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         setConnectStarted(true);
       }
     } catch (e: any) {
-      alert(`無法開啟 Pipedream Connect：${e?.message ?? "未知錯誤"}`);
+      alert(en ? `Couldn't open Pipedream Connect: ${e?.message ?? "Unknown error"}` : `無法開啟 Pipedream Connect：${e?.message ?? "未知錯誤"}`);
     }
   }
 
@@ -374,27 +394,31 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         fbPageName: pageName.trim() || undefined,
       });
     } catch (e: any) {
-      alert(`儲存失敗：${e?.message ?? "未知錯誤"}`);
+      alert(en ? `Save failed: ${e?.message ?? "Unknown error"}` : `儲存失敗：${e?.message ?? "未知錯誤"}`);
     }
   }
 
   async function handleUnbind() {
     if (!brandId) return;
-    if (!confirm("確定要解除此品牌的 Facebook 綁定？已發出的貼文不會被刪除。")) return;
+    if (!confirm(en
+      ? "Disconnect Facebook from this brand? Posts already published won't be deleted."
+      : "確定要解除此品牌的 Facebook 綁定？已發出的貼文不會被刪除。")) return;
     try {
       await unbindM?.mutateAsync?.({ brandId });
       setPageId("");
       setPageName("");
     } catch (e: any) {
-      alert(`解除失敗：${e?.message ?? "未知錯誤"}`);
+      alert(en ? `Disconnect failed: ${e?.message ?? "Unknown error"}` : `解除失敗：${e?.message ?? "未知錯誤"}`);
     }
   }
 
   return (
     <div className="max-w-[760px] mx-auto p-8">
-      <h2 className="text-2xl font-semibold text-default-900 mb-2">發布設定</h2>
+      <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Publish settings" : "發布設定"}</h2>
       <p className="text-sm text-default-500 mb-6">
-        為這個品牌連接你自己的 Facebook 粉專，「直接發 FB」會用你的授權發到你選定的粉專。
+        {en
+          ? "Connect your own Facebook Page to this brand. \"Post to FB\" will use your authorization to publish to the page you pick."
+          : "為這個品牌連接你自己的 Facebook 粉專，「直接發 FB」會用你的授權發到你選定的粉專。"}
       </p>
 
       {/* Facebook section */}
@@ -402,12 +426,12 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         <div className="flex items-center gap-3 mb-4">
           <FontAwesomeIcon icon={faFacebook} style={{ color: "#1877F2", fontSize: 22 }} />
           <div className="flex-1">
-            <div className="text-sm font-semibold text-default-900">Facebook 粉專</div>
-            <div className="text-xs text-default-500">透過 Pipedream Connect 安全授權 · 隨時可解除</div>
+            <div className="text-sm font-semibold text-default-900">{en ? "Facebook Page" : "Facebook 粉專"}</div>
+            <div className="text-xs text-default-500">{en ? "Secure auth via Pipedream Connect · disconnect anytime" : "透過 Pipedream Connect 安全授權 · 隨時可解除"}</div>
           </div>
           {isConnected && (
             <span className="flex items-center gap-1 text-xs text-success-700 bg-success-50 border border-success-200 px-2 py-1 rounded-full">
-              <CheckCircle2 size={12} /> 已連接
+              <CheckCircle2 size={12} /> {en ? "Connected" : "已連接"}
             </span>
           )}
         </div>
@@ -419,7 +443,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
             {/* Step 1: OAuth */}
             <div className="mb-5">
               <div className="text-xs font-medium text-default-700 mb-2">
-                1. 授權 Facebook 帳號
+                {en ? "1. Authorize Facebook" : "1. 授權 Facebook 帳號"}
               </div>
               <Button
                 size="sm"
@@ -429,11 +453,13 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 isLoading={connectM?.isPending}
                 onPress={handleConnect}
               >
-                {isConnected ? "重新授權 / 換帳號" : "連接 Facebook"}
+                {isConnected
+                  ? (en ? "Re-authorize / switch account" : "重新授權 / 換帳號")
+                  : (en ? "Connect Facebook" : "連接 Facebook")}
               </Button>
               {connectStarted && !isConnected && (
                 <p className="text-xs text-default-500 mt-2">
-                  在新分頁完成授權後回來這裡填入粉專 ID。
+                  {en ? "Finish authorization in the new tab, then come back to fill in your Page ID." : "在新分頁完成授權後回來這裡填入粉專 ID。"}
                 </p>
               )}
             </div>
@@ -441,21 +467,21 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
             {/* Step 2: page ID */}
             <div className="mb-4">
               <div className="text-xs font-medium text-default-700 mb-2">
-                2. 想用哪個粉專？
+                {en ? "2. Which Page?" : "2. 想用哪個粉專？"}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
                   size="sm"
-                  label="粉專 ID"
-                  placeholder="例：123456789012345"
+                  label={en ? "Page ID" : "粉專 ID"}
+                  placeholder={en ? "e.g. 123456789012345" : "例：123456789012345"}
                   value={pageId}
                   onValueChange={setPageId}
-                  description="可在粉專「關於」頁面找到"
+                  description={en ? "Find it on your Page's About tab" : "可在粉專「關於」頁面找到"}
                 />
                 <Input
                   size="sm"
-                  label="粉專名稱（顯示用）"
-                  placeholder="選填，例：摘星行銷"
+                  label={en ? "Page name (display)" : "粉專名稱（顯示用）"}
+                  placeholder={en ? "Optional, e.g. SoWork Marketing" : "選填，例：摘星行銷"}
                   value={pageName}
                   onValueChange={setPageName}
                 />
@@ -470,7 +496,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 isLoading={setPageM?.isPending}
                 onPress={handleSave}
               >
-                儲存綁定
+                {en ? "Save binding" : "儲存綁定"}
               </Button>
               {isConnected && (
                 <Button
@@ -480,14 +506,14 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                   isLoading={unbindM?.isPending}
                   onPress={handleUnbind}
                 >
-                  解除綁定
+                  {en ? "Disconnect" : "解除綁定"}
                 </Button>
               )}
             </div>
 
             {status?.connectedAt && (
               <p className="text-xs text-default-400 mt-3">
-                上次連接：{new Date(status.connectedAt).toLocaleString("zh-TW")}
+                {en ? "Last connected: " : "上次連接："}{new Date(status.connectedAt).toLocaleString(en ? "en-US" : "zh-TW")}
               </p>
             )}
           </>
@@ -495,26 +521,32 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
       </div>
 
       <div className="mt-4 text-xs text-default-400 leading-relaxed">
-        說明：OnBrand 不會儲存你的 Facebook 密碼。OAuth token 由 Pipedream 代管，
-        每位用戶獨立。解除綁定只會從 OnBrand 端清除指向關係，要徹底撤銷請至
-        Facebook 設定 → 已連結應用程式移除 Pipedream。
+        {en
+          ? "Note: OnBrand never stores your Facebook password. OAuth tokens live with Pipedream, isolated per user. Disconnecting only clears the link on our side — to fully revoke, go to Facebook Settings → Linked apps and remove Pipedream."
+          : "說明：OnBrand 不會儲存你的 Facebook 密碼。OAuth token 由 Pipedream 代管，每位用戶獨立。解除綁定只會從 OnBrand 端清除指向關係，要徹底撤銷請至 Facebook 設定 → 已連結應用程式移除 Pipedream。"}
       </div>
     </div>
   );
 }
 
 export function DangerTab({ brandId, brandName, onClose }: { brandId: number | null; brandName: string | null; onClose: () => void }) {
+  const { lang } = useLang();
+  const en = lang === "en";
+  // onClose retained for API compatibility
+  void onClose;
   return (
     <div className="max-w-[700px] mx-auto p-8">
-      <h2 className="text-2xl font-semibold text-default-900 mb-2">危險區</h2>
-      <p className="text-sm text-default-500 mb-6">不可逆操作 — 慎用</p>
+      <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Danger zone" : "危險區"}</h2>
+      <p className="text-sm text-default-500 mb-6">{en ? "Irreversible actions — proceed with care" : "不可逆操作 — 慎用"}</p>
       <div className="border-2 border-danger-300 rounded-xl p-5 bg-danger-50">
-        <h3 className="font-semibold text-danger-800 mb-1.5">刪除品牌</h3>
+        <h3 className="font-semibold text-danger-800 mb-1.5">{en ? "Delete brand" : "刪除品牌"}</h3>
         <p className="text-sm text-default-700 mb-4">
-          這會永久刪除「{brandName ?? brandId}」及其所有定位 / 文字 / 視覺 / 知識資料。對應的產品、活動會變成孤兒。**此動作不可復原**。
+          {en
+            ? <>This permanently deletes "{brandName ?? brandId}" and all its positioning / copy / visual / knowledge data. Linked products and events will be orphaned. **This cannot be undone**.</>
+            : <>這會永久刪除「{brandName ?? brandId}」及其所有定位 / 文字 / 視覺 / 知識資料。對應的產品、活動會變成孤兒。**此動作不可復原**。</>}
         </p>
         <Button color="danger" variant="bordered" isDisabled>
-          刪除（接下來會接上）
+          {en ? "Delete (coming soon)" : "刪除（接下來會接上）"}
         </Button>
       </div>
     </div>

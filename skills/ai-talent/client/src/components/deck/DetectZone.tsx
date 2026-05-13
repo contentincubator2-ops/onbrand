@@ -18,6 +18,7 @@
 import React, { useMemo, useState } from "react";
 import { trpc } from "../../lib/trpc";
 import { ToolCredDrawer } from "./ToolCredDrawer";
+import { useLang } from "../../lib/i18n";
 
 // ─── Tokens ────────────────────────────────────────────────────────────────
 const C = {
@@ -46,22 +47,28 @@ type Relevance = "high" | "medium" | "low";
 type FeedType = "competitor_news" | "trending_topic" | "social_trend";
 type FeedFilter = "all" | FeedType;
 
-const TYPE_META: Record<SignalType, { label: string; emoji: string; color: string; bg: string }> = {
-  competitor: { label: "競品動態", emoji: "⚔️", color: "#B0410B", bg: "#FDEFE3" },
-  trend:      { label: "產業趨勢", emoji: "📈", color: "#1B5FA1", bg: "#E6F0FB" },
-  social:     { label: "社群聲量", emoji: "💬", color: "#6E3BA4", bg: "#F1EAFA" },
-  internal:   { label: "內部數據", emoji: "📊", color: "#2B8A3E", bg: "#E7F5EB" },
-  manual:     { label: "手動記錄", emoji: "📝", color: "#6B6A64", bg: "#F1F0EE" },
+const TYPE_META: Record<SignalType, { label: string; labelEn: string; emoji: string; color: string; bg: string }> = {
+  competitor: { label: "競品動態", labelEn: "Competitor move", emoji: "⚔️", color: "#B0410B", bg: "#FDEFE3" },
+  trend:      { label: "產業趨勢", labelEn: "Industry trend",  emoji: "📈", color: "#1B5FA1", bg: "#E6F0FB" },
+  social:     { label: "社群聲量", labelEn: "Social buzz",     emoji: "💬", color: "#6E3BA4", bg: "#F1EAFA" },
+  internal:   { label: "內部數據", labelEn: "Internal data",   emoji: "📊", color: "#2B8A3E", bg: "#E7F5EB" },
+  manual:     { label: "手動記錄", labelEn: "Manual note",     emoji: "📝", color: "#6B6A64", bg: "#F1F0EE" },
 };
-const REL_META: Record<Relevance, { label: string; color: string }> = {
-  high:   { label: "⭐ 高", color: "#C59A2E" },
-  medium: { label: "中",   color: "#6B6A64" },
-  low:    { label: "低",   color: "#9B9990" },
+const REL_META: Record<Relevance, { label: string; labelEn: string; color: string }> = {
+  high:   { label: "⭐ 高", labelEn: "⭐ High", color: "#C59A2E" },
+  medium: { label: "中",   labelEn: "Medium",  color: "#6B6A64" },
+  low:    { label: "低",   labelEn: "Low",     color: "#9B9990" },
 };
-const FEED_META: Record<FeedType, { label: string; emoji: string }> = {
-  competitor_news: { label: "競品動態", emoji: "⚔️" },
-  trending_topic:  { label: "市場熱點", emoji: "📈" },
-  social_trend:    { label: "社群趨勢", emoji: "💬" },
+const FEED_META: Record<FeedType, { label: string; labelEn: string; emoji: string }> = {
+  competitor_news: { label: "競品動態", labelEn: "Competitor news", emoji: "⚔️" },
+  trending_topic:  { label: "市場熱點", labelEn: "Market trends",    emoji: "📈" },
+  social_trend:    { label: "社群趨勢", labelEn: "Social trends",    emoji: "💬" },
+};
+const HEAT_LABEL_EN: Record<"extreme" | "high" | "medium" | "low", string> = {
+  extreme: "Very hot",
+  high: "Hot",
+  medium: "Warm",
+  low: "Quiet",
 };
 
 // relevanceScore → heat bucket
@@ -93,21 +100,22 @@ function scoutLabel(id: string): string {
   return SCOUT_LABELS[id] ?? id;
 }
 
-function timeAgo(iso?: string): string {
+function timeAgo(iso: string | undefined, lang: "zh-TW" | "en" = "zh-TW"): string {
   if (!iso) return "";
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return "";
   const diff = Math.max(0, Date.now() - t);
   const hours = Math.floor(diff / 3_600_000);
-  if (hours < 1) return "剛剛";
-  if (hours < 24) return `${hours} 小時前`;
+  if (hours < 1) return lang === "en" ? "Just now" : "剛剛";
+  if (hours < 24) return lang === "en" ? `${hours}h ago` : `${hours} 小時前`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} 天前`;
+  if (days < 7) return lang === "en" ? `${days}d ago` : `${days} 天前`;
   return new Date(iso).toISOString().slice(0, 10);
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 export function DetectZone({ brandId }: { brandId: number }) {
+  const { t, lang } = useLang();
   const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -173,7 +181,7 @@ export function DetectZone({ brandId }: { brandId: number }) {
       });
       await signalsQuery.refetch();
     } catch (e: any) {
-      alert("釘選失敗：" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "Pin failed: " : "釘選失敗：") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setPinning(null);
     }
@@ -189,19 +197,19 @@ export function DetectZone({ brandId }: { brandId: number }) {
       {/* ── Header ───────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>偵測情報</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{lang === "en" ? "Detect intel" : "偵測情報"}</div>
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-            自動情報 + 我的釘選 → 即時餵進 AI 策略產生
+            {lang === "en" ? "Auto intel + your pins → fed straight into AI strategy" : "自動情報 + 我的釘選 → 即時餵進 AI 策略產生"}
           </div>
         </div>
         <button style={btnGhost} onClick={() => setToolsOpen(true)}>
-          🔌 工具連線
+          {lang === "en" ? "🔌 Connect tools" : "🔌 工具連線"}
         </button>
         <button style={btnGhost} onClick={() => setWatchlistOpen(true)}>
-          🎯 關鍵字設定{hasWatchlist ? "" : " ·  建議"}
+          {lang === "en" ? `🎯 Keywords${hasWatchlist ? "" : " · suggest"}` : `🎯 關鍵字設定${hasWatchlist ? "" : " ·  建議"}`}
         </button>
         <button style={btnPrimary} onClick={() => setCreating(true)}>
-          + 手動新增
+          {lang === "en" ? "+ Add manually" : "+ 手動新增"}
         </button>
       </div>
 
@@ -218,34 +226,34 @@ export function DetectZone({ brandId }: { brandId: number }) {
         <section style={pane}>
           <div style={paneHeader}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>📡 自動情報</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{lang === "en" ? "📡 Auto intel" : "📡 自動情報"}</span>
               <span style={{ fontSize: 11, color: C.textMuted }}>
-                多來源即時抓取 · {authedScouts}/{availableScouts} 個情報員上工
+                {lang === "en" ? `Live pulls from multiple sources · ${authedScouts}/${availableScouts} scouts on duty` : `多來源即時抓取 · ${authedScouts}/${availableScouts} 個情報員上工`}
               </span>
             </div>
             <button
               style={btnMini}
               onClick={() => feedQuery.refetch()}
               disabled={feedQuery.isFetching}
-              title="重新抓取"
+              title={lang === "en" ? "Re-fetch" : "重新抓取"}
             >
-              {feedQuery.isFetching ? "更新中…" : "🔄 刷新"}
+              {feedQuery.isFetching ? (lang === "en" ? "Updating…" : "更新中…") : (lang === "en" ? "🔄 Refresh" : "🔄 刷新")}
             </button>
           </div>
 
           {/* Filter pills */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "4px 0 12px" }}>
             <FilterPill
-              label={`全部 ${feedItems.length}`}
+              label={lang === "en" ? `All ${feedItems.length}` : `全部 ${feedItems.length}`}
               active={feedFilter === "all"}
               onClick={() => setFeedFilter("all")}
             />
-            {(Object.keys(FEED_META) as FeedType[]).map((t) => (
+            {(Object.keys(FEED_META) as FeedType[]).map((ft) => (
               <FilterPill
-                key={t}
-                label={`${FEED_META[t].emoji} ${FEED_META[t].label} ${feedCountByType[t] ?? 0}`}
-                active={feedFilter === t}
-                onClick={() => setFeedFilter(t)}
+                key={ft}
+                label={`${FEED_META[ft].emoji} ${lang === "en" ? FEED_META[ft].labelEn : FEED_META[ft].label} ${feedCountByType[ft] ?? 0}`}
+                active={feedFilter === ft}
+                onClick={() => setFeedFilter(ft)}
               />
             ))}
           </div>
@@ -261,22 +269,22 @@ export function DetectZone({ brandId }: { brandId: number }) {
             >
               {feedSource === "scouts" && (
                 <span style={{ color: "#2B8A3E" }}>
-                  ✓ 共 {feedItems.length} 筆
-                  {feedData?.cached ? "（快取）" : ""}
+                  {lang === "en" ? `✓ ${feedItems.length} items` : `✓ 共 ${feedItems.length} 筆`}
+                  {feedData?.cached ? (lang === "en" ? " (cached)" : "（快取）") : ""}
                   {" · "}
                   {feedScouts.filter((s) => s.ok).map((s) => `${scoutLabel(s.id)} ${s.count}`).join(" / ")}
                 </span>
               )}
               {feedSource === "empty-scouts" && (
                 <span>
-                  情報員都有上工但沒抓到資料 · 試著調整關鍵字
+                  {lang === "en" ? "Scouts on duty but no hits — try tweaking your keywords" : "情報員都有上工但沒抓到資料 · 試著調整關鍵字"}
                 </span>
               )}
-              {feedSource === "empty-watchlist" && <span>watchlist 空的 — 去「關鍵字設定」加入</span>}
+              {feedSource === "empty-watchlist" && <span>{lang === "en" ? "Watchlist is empty — open Keywords to add some" : "watchlist 空的 — 去「關鍵字設定」加入"}</span>}
               {feedSource === "error" && (
-                <span>❌ 抓取失敗（{feedData?.error ?? "看 server log"}）</span>
+                <span>{lang === "en" ? `❌ Fetch failed (${feedData?.error ?? "check server log"})` : `❌ 抓取失敗（${feedData?.error ?? "看 server log"}）`}</span>
               )}
-              {feedSource === "none" && <span>DB 未連線</span>}
+              {feedSource === "none" && <span>{lang === "en" ? "DB not connected" : "DB 未連線"}</span>}
               {feedSource === undefined && <span>—</span>}
             </div>
           )}
@@ -298,53 +306,56 @@ export function DetectZone({ brandId }: { brandId: number }) {
                 flexWrap: "wrap",
               }}
             >
-              <span style={{ color: C.accent, fontWeight: 600 }}>💡 連更多工具、抓更深情報：</span>
+              <span style={{ color: C.accent, fontWeight: 600 }}>{lang === "en" ? "💡 Connect more tools for deeper intel:" : "💡 連更多工具、抓更深情報："}</span>
               <span>
-                目前還有 {unauthedScouts.length} 個情報員待授權（
-                {unauthedScouts.map((u) => scoutLabel(u.id)).join("、")}）
+                {lang === "en"
+                  ? `${unauthedScouts.length} more scouts waiting for access (${unauthedScouts.map((u) => scoutLabel(u.id)).join(", ")})`
+                  : `目前還有 ${unauthedScouts.length} 個情報員待授權（${unauthedScouts.map((u) => scoutLabel(u.id)).join("、")}）`}
               </span>
               <button
                 style={{ ...btnMini, borderColor: C.accent, color: C.accent, marginLeft: "auto" }}
                 onClick={() => setToolsOpen(true)}
               >
-                🔌 去連線
+                {lang === "en" ? "🔌 Connect" : "🔌 去連線"}
               </button>
             </div>
           )}
 
           {/* Feed list */}
           {feedQuery.isLoading ? (
-            <CenteredMessage text="載入情報中…" />
+            <CenteredMessage text={lang === "en" ? "Loading intel…" : "載入情報中…"} />
           ) : feedQuery.isError ? (
             <EmptyState
-              title="情報抓取失敗"
-              hint={(feedQuery.error as any)?.message ?? "請重試或檢查 server log"}
-              cta="🔄 重試"
+              title={lang === "en" ? "Couldn't fetch intel" : "情報抓取失敗"}
+              hint={(feedQuery.error as any)?.message ?? (lang === "en" ? "Retry, or check the server log" : "請重試或檢查 server log")}
+              cta={lang === "en" ? "🔄 Retry" : "🔄 重試"}
               onCta={() => feedQuery.refetch()}
             />
           ) : !hasWatchlist ? (
             <EmptyState
-              title="尚未設定追蹤關鍵字"
-              hint="點右上「關鍵字設定」→ 用 AI 建議一鍵填入"
-              cta="🎯 開啟設定"
+              title={lang === "en" ? "No tracking keywords yet" : "尚未設定追蹤關鍵字"}
+              hint={lang === "en" ? "Tap Keywords on the top right → let AI suggest some in one click" : "點右上「關鍵字設定」→ 用 AI 建議一鍵填入"}
+              cta={lang === "en" ? "🎯 Open settings" : "🎯 開啟設定"}
               onCta={() => setWatchlistOpen(true)}
             />
           ) : feedSource === "error" ? (
             <EmptyState
-              title="情報抓取失敗"
-              hint={(feedData?.error as string) ?? `${feedKeywordsUsed.length} 個關鍵字已送出但 orchestrator 報錯`}
-              cta="🔄 重試"
+              title={lang === "en" ? "Couldn't fetch intel" : "情報抓取失敗"}
+              hint={(feedData?.error as string) ?? (lang === "en" ? `${feedKeywordsUsed.length} keywords sent but the orchestrator errored` : `${feedKeywordsUsed.length} 個關鍵字已送出但 orchestrator 報錯`)}
+              cta={lang === "en" ? "🔄 Retry" : "🔄 重試"}
               onCta={() => feedQuery.refetch()}
             />
           ) : filteredFeed.length === 0 ? (
             <EmptyState
-              title={feedItems.length === 0 ? "近 14 天沒有匹配關鍵字的情報" : "這個分類近期沒有相關情報"}
+              title={feedItems.length === 0
+                ? (lang === "en" ? "No matching intel in the last 14 days" : "近 14 天沒有匹配關鍵字的情報")
+                : (lang === "en" ? "Nothing recent in this category" : "這個分類近期沒有相關情報")}
               hint={
                 feedItems.length === 0
-                  ? `已搜尋 ${feedKeywordsUsed.length} 個關鍵字 · 試著加入更通用的產業詞`
-                  : "試試其他分類，或去設定補充關鍵字"
+                  ? (lang === "en" ? `Searched ${feedKeywordsUsed.length} keywords — try adding broader industry terms` : `已搜尋 ${feedKeywordsUsed.length} 個關鍵字 · 試著加入更通用的產業詞`)
+                  : (lang === "en" ? "Try another category, or add more keywords" : "試試其他分類，或去設定補充關鍵字")
               }
-              cta="🎯 調整關鍵字"
+              cta={lang === "en" ? "🎯 Tweak keywords" : "🎯 調整關鍵字"}
               onCta={() => setWatchlistOpen(true)}
             />
           ) : (
@@ -355,6 +366,7 @@ export function DetectZone({ brandId }: { brandId: number }) {
                   item={item}
                   pinning={pinning === item.key}
                   onPin={() => handlePin(item)}
+                  lang={lang}
                 />
               ))}
             </div>
@@ -365,19 +377,19 @@ export function DetectZone({ brandId }: { brandId: number }) {
         <section style={pane}>
           <div style={paneHeader}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
-              ✍️ 我的釘選 ({signals.length})
+              {lang === "en" ? `✍️ My pins (${signals.length})` : `✍️ 我的釘選 (${signals.length})`}
             </div>
           </div>
           <div style={{ fontSize: 11, color: C.textMuted, padding: "0 0 10px" }}>
-            autoFill 會優先引用這些訊號
+            {lang === "en" ? "autoFill prioritizes these signals" : "autoFill 會優先引用這些訊號"}
           </div>
 
           {signalsQuery.isLoading ? (
-            <CenteredMessage text="載入中…" />
+            <CenteredMessage text={lang === "en" ? "Loading…" : "載入中…"} />
           ) : signals.length === 0 ? (
             <EmptyState
-              title="尚未有釘選情報"
-              hint="點左側卡片的 📌 釘選，或手動新增一筆"
+              title={lang === "en" ? "No pinned intel yet" : "尚未有釘選情報"}
+              hint={lang === "en" ? "Tap 📌 on a card on the left, or add one manually" : "點左側卡片的 📌 釘選，或手動新增一筆"}
             />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -386,6 +398,7 @@ export function DetectZone({ brandId }: { brandId: number }) {
                   key={s.id}
                   signal={s}
                   onEdit={() => setEditingId(s.id)}
+                  lang={lang}
                 />
               ))}
             </div>
@@ -442,13 +455,18 @@ function AutoFeedCard({
   item,
   pinning,
   onPin,
+  lang,
 }: {
   item: any;
   pinning: boolean;
   onPin: () => void;
+  lang: "zh-TW" | "en";
 }) {
-  const heat = C.heat[heatOf(Number(item.relevanceScore ?? 0))];
+  const heatKey = heatOf(Number(item.relevanceScore ?? 0));
+  const heat = C.heat[heatKey];
+  const heatLabel = lang === "en" ? HEAT_LABEL_EN[heatKey] : heat.label;
   const feed = FEED_META[item.type as FeedType] ?? FEED_META.competitor_news;
+  const feedLabel = lang === "en" ? feed.labelEn : feed.label;
   return (
     <div
       style={{
@@ -475,7 +493,7 @@ function AutoFeedCard({
               borderRadius: 6,
             }}
           >
-            {feed.emoji} {feed.label}
+            {feed.emoji} {feedLabel}
           </span>
           <span
             style={{
@@ -487,10 +505,10 @@ function AutoFeedCard({
               borderRadius: 999,
             }}
           >
-            {heat.label}
+            {heatLabel}
           </span>
         </div>
-        <span style={{ fontSize: 11, color: C.textDim }}>{timeAgo(item.publishedAt)}</span>
+        <span style={{ fontSize: 11, color: C.textDim }}>{timeAgo(item.publishedAt, lang)}</span>
       </div>
 
       {/* title */}
@@ -548,9 +566,9 @@ function AutoFeedCard({
           }}
           onClick={onPin}
           disabled={pinning}
-          title="釘選到我的情報"
+          title={lang === "en" ? "Pin to my intel" : "釘選到我的情報"}
         >
-          {pinning ? "釘選中…" : "📌 釘選"}
+          {pinning ? (lang === "en" ? "Pinning…" : "釘選中…") : (lang === "en" ? "📌 Pin" : "📌 釘選")}
         </button>
       </div>
     </div>
@@ -558,9 +576,11 @@ function AutoFeedCard({
 }
 
 // ─── SignalCardCompact (right rail) ─────────────────────────────────────────
-function SignalCardCompact({ signal, onEdit }: { signal: any; onEdit: () => void }) {
+function SignalCardCompact({ signal, onEdit, lang }: { signal: any; onEdit: () => void; lang: "zh-TW" | "en" }) {
   const meta = TYPE_META[signal.type as SignalType] ?? TYPE_META.manual;
   const rel = REL_META[signal.relevance as Relevance] ?? REL_META.medium;
+  const metaLabel = lang === "en" ? meta.labelEn : meta.label;
+  const relLabel = lang === "en" ? rel.labelEn : rel.label;
   return (
     <div
       style={{
@@ -586,9 +606,9 @@ function SignalCardCompact({ signal, onEdit }: { signal: any; onEdit: () => void
             borderRadius: 5,
           }}
         >
-          {meta.emoji} {meta.label}
+          {meta.emoji} {metaLabel}
         </span>
-        <span style={{ fontSize: 10.5, color: rel.color }}>{rel.label}</span>
+        <span style={{ fontSize: 10.5, color: rel.color }}>{relLabel}</span>
         <span style={{ marginLeft: "auto", fontSize: 10.5, color: C.textDim }}>
           {signal.capturedAt ? new Date(signal.capturedAt).toISOString().slice(5, 10) : ""}
         </span>
@@ -615,6 +635,7 @@ function WatchlistDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { lang } = useLang();
   const [keywords, setKeywords] = useState<string[]>(initial?.keywords ?? []);
   const [competitorNames, setCompetitorNames] = useState<string[]>(initial?.competitorNames ?? []);
   const [industryTags, setIndustryTags] = useState<string[]>(initial?.industryTags ?? []);
@@ -637,7 +658,7 @@ function WatchlistDrawer({
       });
       setRationale(r.rationale ?? "");
     } catch (e: any) {
-      alert("AI 建議失敗：" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "AI suggestion failed: " : "AI 建議失敗：") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setSuggesting(false);
     }
@@ -662,7 +683,7 @@ function WatchlistDrawer({
       await setMut.mutateAsync({ brandId, keywords, competitorNames, industryTags });
       onSaved();
     } catch (e: any) {
-      alert("儲存失敗：" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "Save failed: " : "儲存失敗：") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setSaving(false);
     }
@@ -695,9 +716,9 @@ function WatchlistDrawer({
           }}
         >
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>🎯 關鍵字設定</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{lang === "en" ? "🎯 Keywords" : "🎯 關鍵字設定"}</div>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
-              這裡設定的關鍵字會驅動左側自動情報流
+              {lang === "en" ? "These keywords drive the auto-intel feed on the left" : "這裡設定的關鍵字會驅動左側自動情報流"}
             </div>
           </div>
           <button style={btnMini} onClick={onClose}>✕</button>
@@ -719,10 +740,10 @@ function WatchlistDrawer({
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.accent }}>
-                🤖 AI 建議追蹤名單
+                {lang === "en" ? "🤖 AI-suggested watchlist" : "🤖 AI 建議追蹤名單"}
               </div>
               <button style={btnPrimary} onClick={handleSuggest} disabled={suggesting}>
-                {suggesting ? "分析中…" : suggestion ? "重新建議" : "讓 AI 分析品牌"}
+                {suggesting ? (lang === "en" ? "Analyzing…" : "分析中…") : suggestion ? (lang === "en" ? "Suggest again" : "重新建議") : (lang === "en" ? "Let AI scan your brand" : "讓 AI 分析品牌")}
               </button>
             </div>
             {rationale && (
@@ -735,9 +756,13 @@ function WatchlistDrawer({
                 {(["keywords", "competitorNames", "industryTags"] as const).map((k) => {
                   const items: string[] = suggestion[k] ?? [];
                   if (!items.length) return null;
-                  const label = k === "keywords" ? "建議關鍵字"
-                    : k === "competitorNames" ? "建議競品"
-                    : "建議產業標籤";
+                  const label = lang === "en"
+                    ? (k === "keywords" ? "Suggested keywords"
+                        : k === "competitorNames" ? "Suggested competitors"
+                        : "Suggested industry tags")
+                    : (k === "keywords" ? "建議關鍵字"
+                        : k === "competitorNames" ? "建議競品"
+                        : "建議產業標籤");
                   return (
                     <div key={k}>
                       <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>{label}</div>
@@ -762,7 +787,7 @@ function WatchlistDrawer({
                                   : [...prev, x]
                               );
                             }}
-                            title="點擊加入下方名單"
+                            title={lang === "en" ? "Tap to add" : "點擊加入下方名單"}
                           >
                             + {x}
                           </button>
@@ -772,7 +797,7 @@ function WatchlistDrawer({
                   );
                 })}
                 <button style={{ ...btnGhost, marginTop: 4, alignSelf: "flex-start" }} onClick={applyAllSuggestions}>
-                  一鍵全部加入
+                  {lang === "en" ? "Add all in one click" : "一鍵全部加入"}
                 </button>
               </div>
             )}
@@ -780,20 +805,20 @@ function WatchlistDrawer({
 
           {/* Edit sections */}
           <ChipEditor
-            label="🔑 關鍵字"
-            hint="產業術語、產品類型、趨勢名詞（非品牌自身的名字）"
+            label={lang === "en" ? "🔑 Keywords" : "🔑 關鍵字"}
+            hint={lang === "en" ? "Industry terms, product types, trend words (not your own brand name)" : "產業術語、產品類型、趨勢名詞（非品牌自身的名字）"}
             values={keywords}
             onChange={setKeywords}
           />
           <ChipEditor
-            label="⚔️ 競品名稱"
-            hint="真實品牌/公司名字，用來抓競品動態"
+            label={lang === "en" ? "⚔️ Competitor names" : "⚔️ 競品名稱"}
+            hint={lang === "en" ? "Real brand or company names — used to fetch competitor news" : "真實品牌/公司名字，用來抓競品動態"}
             values={competitorNames}
             onChange={setCompetitorNames}
           />
           <ChipEditor
-            label="🏷️ 產業標籤"
-            hint="用於篩選同產業趨勢"
+            label={lang === "en" ? "🏷️ Industry tags" : "🏷️ 產業標籤"}
+            hint={lang === "en" ? "Used to filter same-industry trends" : "用於篩選同產業趨勢"}
             values={industryTags}
             onChange={setIndustryTags}
           />
@@ -807,9 +832,9 @@ function WatchlistDrawer({
             display: "flex", justifyContent: "flex-end", gap: 8,
           }}
         >
-          <button style={btnGhost} onClick={onClose}>取消</button>
+          <button style={btnGhost} onClick={onClose}>{lang === "en" ? "Cancel" : "取消"}</button>
           <button style={btnPrimary} onClick={handleSave} disabled={saving}>
-            {saving ? "儲存中…" : "儲存"}
+            {saving ? (lang === "en" ? "Saving…" : "儲存中…") : (lang === "en" ? "Save" : "儲存")}
           </button>
         </div>
       </div>
@@ -828,6 +853,7 @@ function ChipEditor({
   values: string[];
   onChange: (v: string[]) => void;
 }) {
+  const { lang } = useLang();
   const [input, setInput] = useState("");
   function add() {
     const v = input.trim();
@@ -853,21 +879,21 @@ function ChipEditor({
                 marginLeft: 6, border: "none", background: "transparent",
                 color: C.accent, cursor: "pointer", fontSize: 12, lineHeight: 1,
               }}
-              title="移除"
+              title={lang === "en" ? "Remove" : "移除"}
             >✕</button>
           </span>
         ))}
-        {!values.length && <span style={{ fontSize: 11, color: C.textDim }}>尚未新增</span>}
+        {!values.length && <span style={{ fontSize: 11, color: C.textDim }}>{lang === "en" ? "Nothing added yet" : "尚未新增"}</span>}
       </div>
       <div style={{ display: "flex", gap: 6 }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-          placeholder="輸入後按 Enter 加入"
+          placeholder={lang === "en" ? "Type and press Enter to add" : "輸入後按 Enter 加入"}
           style={inputStyle}
         />
-        <button style={btnMini} onClick={add}>加入</button>
+        <button style={btnMini} onClick={add}>{lang === "en" ? "Add" : "加入"}</button>
       </div>
     </div>
   );
@@ -887,6 +913,7 @@ function SignalFormModal({
   onSaved: () => void;
   onDeleted?: () => void;
 }) {
+  const { lang } = useLang();
   const editing = !!signal;
   const [type, setType] = useState<SignalType>((signal?.type as SignalType) ?? "competitor");
   const [source, setSource] = useState<string>(signal?.source ?? "");
@@ -902,7 +929,7 @@ function SignalFormModal({
 
   async function handleSave() {
     if (!source.trim() || !headline.trim()) {
-      alert("請填寫來源與標題");
+      alert(lang === "en" ? "Please fill in source and title" : "請填寫來源與標題");
       return;
     }
     setBusy(true);
@@ -920,7 +947,7 @@ function SignalFormModal({
       }
       onSaved();
     } catch (e: any) {
-      alert("儲存失敗：" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "Save failed: " : "儲存失敗：") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setBusy(false);
     }
@@ -928,13 +955,13 @@ function SignalFormModal({
 
   async function handleDelete() {
     if (!editing) return;
-    if (!confirm("確定刪除這筆情報？")) return;
+    if (!confirm(lang === "en" ? "Delete this signal?" : "確定刪除這筆情報？")) return;
     setBusy(true);
     try {
       await removeMut.mutateAsync({ id: signal.id });
       onDeleted?.();
     } catch (e: any) {
-      alert("刪除失敗：" + (e?.message ?? "未知錯誤"));
+      alert((lang === "en" ? "Delete failed: " : "刪除失敗：") + (e?.message ?? (lang === "en" ? "Unknown error" : "未知錯誤")));
     } finally {
       setBusy(false);
     }
@@ -956,54 +983,54 @@ function SignalFormModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>
-          {editing ? "編輯情報" : "新增情報"}
+          {editing ? (lang === "en" ? "Edit signal" : "編輯情報") : (lang === "en" ? "Add signal" : "新增情報")}
         </div>
 
-        <FieldLabel label="類型">
+        <FieldLabel label={lang === "en" ? "Type" : "類型"}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {(Object.keys(TYPE_META) as SignalType[]).map((t) => (
+            {(Object.keys(TYPE_META) as SignalType[]).map((tt) => (
               <button
-                key={t}
-                onClick={() => setType(t)}
+                key={tt}
+                onClick={() => setType(tt)}
                 style={{
                   ...chipBase,
-                  background: type === t ? TYPE_META[t].bg : "#FFFFFF",
-                  color: type === t ? TYPE_META[t].color : C.textMuted,
-                  borderColor: type === t ? TYPE_META[t].color : C.border,
+                  background: type === tt ? TYPE_META[tt].bg : "#FFFFFF",
+                  color: type === tt ? TYPE_META[tt].color : C.textMuted,
+                  borderColor: type === tt ? TYPE_META[tt].color : C.border,
                   cursor: "pointer",
                 }}
               >
-                {TYPE_META[t].emoji} {TYPE_META[t].label}
+                {TYPE_META[tt].emoji} {lang === "en" ? TYPE_META[tt].labelEn : TYPE_META[tt].label}
               </button>
             ))}
           </div>
         </FieldLabel>
 
-        <FieldLabel label="來源 *">
+        <FieldLabel label={lang === "en" ? "Source *" : "來源 *"}>
           <input
             style={inputStyle}
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            placeholder="例如：TechCrunch, 自家電商後台, 某某競品官網"
+            placeholder={lang === "en" ? "e.g. TechCrunch, your ecom backend, a competitor's site" : "例如：TechCrunch, 自家電商後台, 某某競品官網"}
           />
         </FieldLabel>
-        <FieldLabel label="標題 *">
+        <FieldLabel label={lang === "en" ? "Title *" : "標題 *"}>
           <input
             style={inputStyle}
             value={headline}
             onChange={(e) => setHeadline(e.target.value)}
-            placeholder="一句話描述這個情報點"
+            placeholder={lang === "en" ? "One line that captures the signal" : "一句話描述這個情報點"}
           />
         </FieldLabel>
-        <FieldLabel label="內文（選填）">
+        <FieldLabel label={lang === "en" ? "Body (optional)" : "內文（選填）"}>
           <textarea
             style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="關鍵數字、引述、日期、細節"
+            placeholder={lang === "en" ? "Key numbers, quotes, dates, details" : "關鍵數字、引述、日期、細節"}
           />
         </FieldLabel>
-        <FieldLabel label="URL（選填）">
+        <FieldLabel label={lang === "en" ? "URL (optional)" : "URL（選填）"}>
           <input
             style={inputStyle}
             value={url}
@@ -1011,7 +1038,7 @@ function SignalFormModal({
             placeholder="https://..."
           />
         </FieldLabel>
-        <FieldLabel label="重要度">
+        <FieldLabel label={lang === "en" ? "Relevance" : "重要度"}>
           <div style={{ display: "flex", gap: 4 }}>
             {(Object.keys(REL_META) as Relevance[]).map((r) => (
               <button
@@ -1025,7 +1052,7 @@ function SignalFormModal({
                   cursor: "pointer",
                 }}
               >
-                {REL_META[r].label}
+                {lang === "en" ? REL_META[r].labelEn : REL_META[r].label}
               </button>
             ))}
           </div>
@@ -1039,14 +1066,14 @@ function SignalFormModal({
                 onClick={handleDelete}
                 disabled={busy}
               >
-                刪除
+                {lang === "en" ? "Delete" : "刪除"}
               </button>
             )}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={btnGhost} onClick={onClose} disabled={busy}>取消</button>
+            <button style={btnGhost} onClick={onClose} disabled={busy}>{lang === "en" ? "Cancel" : "取消"}</button>
             <button style={btnPrimary} onClick={handleSave} disabled={busy}>
-              {busy ? "儲存中…" : "儲存"}
+              {busy ? (lang === "en" ? "Saving…" : "儲存中…") : (lang === "en" ? "Save" : "儲存")}
             </button>
           </div>
         </div>

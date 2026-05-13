@@ -5,6 +5,7 @@
  * Renders inside the chat stream when positioning content is detected.
  */
 import React, { useState } from "react";
+import { useLang } from "../../lib/i18n";
 
 export interface PositioningBookData {
   brandName?: string;
@@ -29,6 +30,7 @@ interface Props {
 
 // ── Section header (black bar like QuickCard) ─────────────────────────────────
 function SectionHeader({ en, zh }: { en: string; zh: string }) {
+  const { lang } = useLang();
   return (
     <div style={{
       background: "#1A1A18",
@@ -39,7 +41,9 @@ function SectionHeader({ en, zh }: { en: string; zh: string }) {
       <span style={{ fontSize: 10, fontWeight: 700, color: "#9B9990", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginRight: 6 }}>
         {en}
       </span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: "#FFFFFF" }}>{zh}</span>
+      {lang !== "en" && (
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#FFFFFF" }}>{zh}</span>
+      )}
     </div>
   );
 }
@@ -78,6 +82,7 @@ function Tag({ text, color = "#F2F1EF", textColor = "#6B6A66" }: { text: string;
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) {
+  const { lang } = useLang();
   const [saved, setSaved] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -118,10 +123,10 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
             Brand Positioning Book
           </div>
           <div style={{ fontSize: 18, fontWeight: 700, color: "#FFFFFF", letterSpacing: "-0.3px" }}>
-            {data.brandName || "品牌定位書"}
+            {data.brandName || (lang === "en" ? "Brand Positioning Book" : "品牌定位書")}
           </div>
           <div style={{ fontSize: 11, color: "#6B6A66", marginTop: 3 }}>
-            AI Generated · {new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" })}
+            AI Generated · {new Date().toLocaleDateString(lang === "en" ? "en-US" : "zh-TW", { year: "numeric", month: "long", day: "numeric" })}
           </div>
         </div>
         <div style={{
@@ -159,7 +164,7 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
               {data.tagline && (
                 <div style={{ marginBottom: data.englishTagline ? 8 : 0 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#9B9990", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 4 }}>
-                    中文標語
+                    {lang === "en" ? "Chinese Tagline" : "中文標語"}
                   </div>
                   <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A18", margin: 0, letterSpacing: "-0.2px" }}>
                     {data.tagline}
@@ -288,7 +293,7 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
               <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2Z"/>
               <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2Z"/>
             </svg>
-            存入品牌大腦
+            {lang === "en" ? "Save to Brand Brain" : "存入品牌大腦"}
           </button>
         )}
         {saved && (
@@ -296,7 +301,7 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
-            已存入品牌大腦
+            {lang === "en" ? "Saved to Brand Brain" : "已存入品牌大腦"}
           </span>
         )}
         {!confirmed && (
@@ -313,7 +318,7 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
-            確認定位書
+            {lang === "en" ? "Confirm Positioning" : "確認定位書"}
           </button>
         )}
         {confirmed && (
@@ -321,7 +326,7 @@ export function BrandPositioningBook({ data, onSaveToBrain, onConfirm }: Props) 
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
-            品牌定位已確認
+            {lang === "en" ? "Positioning confirmed" : "品牌定位已確認"}
           </span>
         )}
       </div>

@@ -16,6 +16,7 @@ import {
   CheckboxGroup, Checkbox, Select, SelectItem,
 } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrademark, faBox, faCalendarDay, faGlobe, faCheck, faMagnifyingGlass,
@@ -31,10 +32,15 @@ interface CreateScopeModalProps {
   onCreated: (kind: CreateScopeKind, id: number) => void;
 }
 
-const KIND_META = {
+const KIND_META_ZH = {
   brand:   { icon: faTrademark,  label: "品牌",    eyebrow: "BRAND" },
   product: { icon: faBox,        label: "產品",    eyebrow: "PRODUCT" },
   event:   { icon: faCalendarDay,label: "活動",    eyebrow: "EVENT" },
+} as const;
+const KIND_META_EN = {
+  brand:   { icon: faTrademark,  label: "brand",   eyebrow: "BRAND" },
+  product: { icon: faBox,        label: "product", eyebrow: "PRODUCT" },
+  event:   { icon: faCalendarDay,label: "event",   eyebrow: "EVENT" },
 } as const;
 
 interface Candidate {
@@ -55,6 +61,8 @@ function slugify(s: string): string {
 }
 
 export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: CreateScopeModalProps) {
+  const { lang } = useLang();
+  const KIND_META = lang === "en" ? KIND_META_EN : KIND_META_ZH;
   const open = kind !== null;
   const meta = kind ? KIND_META[kind] : null;
 
@@ -118,15 +126,19 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
   const savePos       = (trpc as any).scope?.savePositioning?.useMutation?.() ?? null;
 
   const onCheck = async () => {
-    if (!kind || !name.trim()) { setErr("請輸入名稱"); return; }
+    if (!kind || !name.trim()) { setErr(lang === "en" ? "Name is required" : "請輸入名稱"); return; }
     if (!website.trim() && !facebook.trim() && !description.trim()) {
-      setErr("請至少提供官網、Facebook 或描述其中一項，系統才能驗證");
+      setErr(lang === "en"
+        ? "Add at least a website, Facebook, or description so we can verify"
+        : "請至少提供官網、Facebook 或描述其中一項，系統才能驗證");
       return;
     }
     setErr(null);
     setStep("checking");
     if (!disambiguate) {
-      setErr("系統暫時無法驗證（gateway 未連接）");
+      setErr(lang === "en"
+        ? "Verification offline (gateway not connected)"
+        : "系統暫時無法驗證（gateway 未連接）");
       setStep("input");
       return;
     }
@@ -150,7 +162,7 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
       }
       setStep("confirm");
     } catch (e: any) {
-      setErr(`驗證失敗：${e?.message ?? String(e)}`);
+      setErr(`${lang === "en" ? "Verification failed: " : "驗證失敗："}${e?.message ?? String(e)}`);
       setStep("input");
     }
   };
@@ -179,7 +191,7 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
         newId = Number(r?.id ?? r?.brandId ?? r?.[0]?.insertId ?? 0);
       } else if (kind === "product") {
         if (!productUpsert) throw new Error("product.upsert not available");
-        if (!pickedBrandId) throw new Error("產品需要綁定品牌，請先選擇");
+        if (!pickedBrandId) throw new Error(lang === "en" ? "Product needs a brand — pick one first" : "產品需要綁定品牌，請先選擇");
         const r: any = await productUpsert.mutateAsync({
           brandId: pickedBrandId, slug: slugify(name),
           name: chosen?.name?.trim() || name.trim(),
@@ -187,7 +199,7 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
         newId = Number(r?.id ?? 0);
       } else {
         if (!eventUpsert) throw new Error("event.upsert not available");
-        if (!pickedBrandId) throw new Error("活動需要綁定品牌，請先選擇");
+        if (!pickedBrandId) throw new Error(lang === "en" ? "Event needs a brand — pick one first" : "活動需要綁定品牌，請先選擇");
         const r: any = await eventUpsert.mutateAsync({
           brandId: pickedBrandId, slug: slugify(name),
           name: chosen?.name?.trim() || name.trim(),
@@ -241,12 +253,13 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
                 startContent={<FontAwesomeIcon icon={meta.icon} className="text-tiny ml-1" />}>
                 {meta.eyebrow}
               </Chip>
-              <h2 className="text-medium font-semibold">新增{meta.label}</h2>
-              <StepIndicator step={step} />
+              <h2 className="text-medium font-semibold">{lang === "en" ? `Add ${meta.label}` : `新增${meta.label}`}</h2>
+              <StepIndicator step={step} lang={lang} />
             </ModalHeader>
             <ModalBody className="gap-3">
               {step === "input" && (
                 <InputStep
+                  lang={lang}
                   kind={kind!}
                   name={name} setName={setName}
                   website={website} setWebsite={setWebsite}
@@ -265,15 +278,17 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
               {step === "checking" && (
                 <div className="flex flex-col items-center py-12 gap-3">
                   <Spinner size="lg" />
-                  <p className="text-medium font-medium">正在驗證…</p>
+                  <p className="text-medium font-medium">{lang === "en" ? "Verifying…" : "正在驗證…"}</p>
                   <p className="text-small text-default-500 text-center max-w-[400px]">
-                    系統正在使用 web_search 找出 「{name}」 的可能候選，
-                    確認你選的是對的{meta.label}。
+                    {lang === "en"
+                      ? `Using web_search to surface candidates for "${name}" — confirming you've got the right ${meta.label}.`
+                      : `系統正在使用 web_search 找出 「${name}」 的可能候選，確認你選的是對的${meta.label}。`}
                   </p>
                 </div>
               )}
               {step === "confirm" && (
                 <ConfirmStep
+                  lang={lang}
                   kind={kind!}
                   name={name}
                   candidates={candidates}
@@ -287,7 +302,7 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
             <ModalFooter>
               {step === "input" && (
                 <>
-                  <Button variant="light" onPress={onClose}>取消</Button>
+                  <Button variant="light" onPress={onClose}>{lang === "en" ? "Cancel" : "取消"}</Button>
                   <Button
                     color="primary"
                     isDisabled={
@@ -297,25 +312,25 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
                     onPress={onCheck}
                     startContent={<FontAwesomeIcon icon={faMagnifyingGlass} />}
                   >
-                    搜尋並驗證
+                    {lang === "en" ? "Search & verify" : "搜尋並驗證"}
                   </Button>
                 </>
               )}
               {step === "checking" && (
                 <Button variant="light" onPress={() => setStep("input")} isDisabled={busy}>
-                  取消
+                  {lang === "en" ? "Cancel" : "取消"}
                 </Button>
               )}
               {step === "confirm" && (
                 <>
-                  <Button variant="light" onPress={() => setStep("input")}>← 上一步</Button>
+                  <Button variant="light" onPress={() => setStep("input")}>{lang === "en" ? "← Back" : "← 上一步"}</Button>
                   <Button
                     color="primary"
                     isLoading={busy}
                     isDisabled={picked === null}
                     onPress={onSubmit}
                   >
-                    建立{meta.label}
+                    {lang === "en" ? `Create ${meta.label}` : `建立${meta.label}`}
                   </Button>
                 </>
               )}
@@ -327,7 +342,7 @@ export default function CreateScopeModal({ kind, brandId, onClose, onCreated }: 
   );
 }
 
-function StepIndicator({ step }: { step: Step }) {
+function StepIndicator({ step, lang }: { step: Step; lang: string }) {
   const pct = step === "input" ? 33 : step === "checking" ? 66 : 100;
   return (
     <Progress
@@ -335,12 +350,13 @@ function StepIndicator({ step }: { step: Step }) {
       value={pct}
       color={step === "confirm" ? "success" : "primary"}
       className="mt-1"
-      aria-label="進度"
+      aria-label={lang === "en" ? "Progress" : "進度"}
     />
   );
 }
 
 function InputStep({
+  lang,
   kind, name, setName, website, setWebsite, facebook, setFacebook,
   description, setDescription,
   brandsList, pickedBrandId, setPickedBrandId,
@@ -355,9 +371,11 @@ function InputStep({
       {(kind === "product" || kind === "event") && (
         <Select
           size="sm" radius="md" variant="bordered"
-          label="所屬品牌（必選）"
+          label={lang === "en" ? "Belongs to brand (required)" : "所屬品牌（必選）"}
           labelPlacement="outside"
-          placeholder={`選擇此${kind === "product" ? "產品" : "活動"}隸屬的品牌`}
+          placeholder={lang === "en"
+            ? `Pick which brand this ${kind === "product" ? "product" : "event"} belongs to`
+            : `選擇此${kind === "product" ? "產品" : "活動"}隸屬的品牌`}
           selectedKeys={pickedBrandId ? new Set([String(pickedBrandId)]) : new Set()}
           onSelectionChange={(keys) => {
             const k = Array.from(keys as Set<string>)[0];
@@ -372,9 +390,11 @@ function InputStep({
       )}
       <Input
         size="sm" radius="md" variant="bordered"
-        label="名稱（必填）"
+        label={lang === "en" ? "Name (required)" : "名稱（必填）"}
         labelPlacement="outside"
-        placeholder={kind === "event" ? "例：618 大檔活動" : kind === "product" ? "例：00991A 復華未來50 ETF" : "例：成吉思汗健身俱樂部"}
+        placeholder={lang === "en"
+          ? (kind === "event" ? "e.g. 618 mid-year sale" : kind === "product" ? "e.g. 00991A Fuh Hwa Future 50 ETF" : "e.g. Genghis Khan Fitness Club")
+          : (kind === "event" ? "例：618 大檔活動" : kind === "product" ? "例：00991A 復華未來50 ETF" : "例：成吉思汗健身俱樂部")}
         value={name}
         onValueChange={setName}
         autoFocus
@@ -383,14 +403,14 @@ function InputStep({
         <div className="grid grid-cols-2 gap-2">
           <Input
             size="sm" radius="md" variant="bordered" type="date"
-            label="活動開始日期（選填）"
+            label={lang === "en" ? "Start date (optional)" : "活動開始日期（選填）"}
             labelPlacement="outside"
             value={eventStartAt}
             onValueChange={setEventStartAt}
           />
           <Input
             size="sm" radius="md" variant="bordered" type="date"
-            label="活動結束日期（選填）"
+            label={lang === "en" ? "End date (optional)" : "活動結束日期（選填）"}
             labelPlacement="outside"
             value={eventEndAt}
             onValueChange={setEventEndAt}
@@ -401,7 +421,7 @@ function InputStep({
         <>
           <Input
             size="sm" radius="md" variant="bordered"
-            label="官網"
+            label={lang === "en" ? "Website" : "官網"}
             labelPlacement="outside"
             placeholder="https://example.com"
             startContent={<FontAwesomeIcon icon={faGlobe} className="text-tiny text-default-400" />}
@@ -410,7 +430,7 @@ function InputStep({
           />
           <Input
             size="sm" radius="md" variant="bordered"
-            label="Facebook 粉專"
+            label={lang === "en" ? "Facebook page" : "Facebook 粉專"}
             labelPlacement="outside"
             placeholder="https://facebook.com/yourbrand"
             startContent={<FontAwesomeIcon icon={faFacebook} className="text-tiny text-default-400" />}
@@ -421,9 +441,11 @@ function InputStep({
       )}
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label="補充描述"
+        label={lang === "en" ? "Extra description" : "補充描述"}
         labelPlacement="outside"
-        placeholder="任何能幫系統辨識這個品牌的資訊（產業、所在地、產品線…）"
+        placeholder={lang === "en"
+          ? "Anything that helps us identify this brand (industry, location, product line…)"
+          : "任何能幫系統辨識這個品牌的資訊（產業、所在地、產品線…）"}
         minRows={2}
         value={description}
         onValueChange={setDescription}
@@ -433,9 +455,13 @@ function InputStep({
           {pickedBrandId && candidateProducts.length > 0 && (
             <Card shadow="none" className="border border-divider">
               <CardBody className="px-3 py-3 gap-2">
-                <p className="text-tiny text-default-500 uppercase tracking-wider">關聯產品（可多選）</p>
+                <p className="text-tiny text-default-500 uppercase tracking-wider">
+                  {lang === "en" ? "Related products (multi-select)" : "關聯產品（可多選）"}
+                </p>
                 <p className="text-tiny text-default-500 leading-relaxed">
-                  此活動是針對哪些產品？選 0 個 = 品牌層級活動；選 1 個 = 產品檔；選 2+ 個 = 跨產品活動（如 Pokemon Go 五月活動同打 GO Battle League + GO Fest）。
+                  {lang === "en"
+                    ? "Which products is this event for? 0 = brand-level event; 1 = single product; 2+ = cross-product event (e.g. Pokémon GO May event covering GO Battle League + GO Fest)."
+                    : "此活動是針對哪些產品？選 0 個 = 品牌層級活動；選 1 個 = 產品檔；選 2+ 個 = 跨產品活動（如 Pokemon Go 五月活動同打 GO Battle League + GO Fest）。"}
                 </p>
                 <CheckboxGroup
                   value={eventProductIds.map(String)}
@@ -452,20 +478,27 @@ function InputStep({
             </Card>
           )}
           {pickedBrandId && candidateProducts.length === 0 && (
-            <p className="text-tiny text-default-500">此品牌尚無產品。活動會建立為「品牌層級」（不綁定特定產品）。</p>
+            <p className="text-tiny text-default-500">
+              {lang === "en"
+                ? "No products under this brand yet. The event will be created as brand-level (not tied to a specific product)."
+                : "此品牌尚無產品。活動會建立為「品牌層級」（不綁定特定產品）。"}
+            </p>
           )}
         </>
       )}
       <p className="text-tiny text-default-500">
-        提示：填寫官網 / FB 能幫系統更準確找對品牌，避免同名（如 sowork.tw vs sowork.com）。
+        {lang === "en"
+          ? "Tip: adding website / FB helps us pin the right brand and avoid same-name mix-ups (e.g. sowork.tw vs sowork.com)."
+          : "提示：填寫官網 / FB 能幫系統更準確找對品牌，避免同名（如 sowork.tw vs sowork.com）。"}
       </p>
     </>
   );
 }
 
 function ConfirmStep({
-  kind, name, candidates, summary, picked, onPick,
+  lang, kind, name, candidates, summary, picked, onPick,
 }: {
+  lang: string;
   kind: CreateScopeKind;
   name: string;
   candidates: Candidate[];
@@ -477,32 +510,44 @@ function ConfirmStep({
     <>
       <Card shadow="none" className="border border-divider">
         <CardBody className="px-4 py-3">
-          <p className="text-tiny text-default-500 uppercase tracking-wider">系統摘要</p>
-          <p className="text-small text-default-700 leading-relaxed mt-1">{summary || "（無摘要）"}</p>
+          <p className="text-tiny text-default-500 uppercase tracking-wider">{lang === "en" ? "Summary" : "系統摘要"}</p>
+          <p className="text-small text-default-700 leading-relaxed mt-1">{summary || (lang === "en" ? "(no summary)" : "（無摘要）")}</p>
         </CardBody>
       </Card>
 
       {candidates.length > 0 ? (
         <>
-          <p className="text-small text-default-500">請確認「{name}」是否為以下其中一個 — 或選擇下方「都不是」直接以你輸入的資料建立：</p>
+          <p className="text-small text-default-500">
+            {lang === "en"
+              ? `Is "${name}" one of these? Or pick "None of these" below to create it as you typed:`
+              : `請確認「${name}」是否為以下其中一個 — 或選擇下方「都不是」直接以你輸入的資料建立：`}
+          </p>
           {candidates.map((c, i) => (
             <CandidateCard
-              key={i} c={c} idx={i}
+              key={i} c={c} idx={i} lang={lang}
               selected={picked === i}
               onSelect={() => onPick(i)}
             />
           ))}
         </>
       ) : (
-        <p className="text-small text-default-500">系統沒找到候選 — 可直接以你輸入的資料建立。</p>
+        <p className="text-small text-default-500">
+          {lang === "en"
+            ? "No candidates found — you can create it with the info you entered."
+            : "系統沒找到候選 — 可直接以你輸入的資料建立。"}
+        </p>
       )}
 
       {candidates.length === 0 ? (
         <Card shadow="none" className="border-2 border-dashed border-warning-200 bg-warning-50">
           <CardBody className="px-4 py-4 gap-2">
-            <p className="text-small font-medium text-warning-700">需要更多資訊才能驗證</p>
+            <p className="text-small font-medium text-warning-700">
+              {lang === "en" ? "We need more info to verify" : "需要更多資訊才能驗證"}
+            </p>
             <p className="text-tiny text-default-600 leading-relaxed">
-              系統實際抓取你提供的 URL 後沒找到可信內容。請按「← 上一步」補上正確的官網 / Facebook / 描述，再驗證一次。
+              {lang === "en"
+                ? "We couldn't pull trusted content from your URL. Hit ← Back and add a correct website / Facebook / description, then verify again."
+                : "系統實際抓取你提供的 URL 後沒找到可信內容。請按「← 上一步」補上正確的官網 / Facebook / 描述，再驗證一次。"}
             </p>
           </CardBody>
         </Card>
@@ -518,8 +563,16 @@ function ConfirmStep({
               {picked === -1 && <FontAwesomeIcon icon={faCheck} className="text-tiny" />}
             </span>
             <div>
-              <p className="text-small font-medium">都不是 — 強制以我輸入的名稱建立（未驗證）</p>
-              <p className="text-tiny text-default-500">系統會在 _meta 標記 verified=false，未來資料品質可能受影響</p>
+              <p className="text-small font-medium">
+                {lang === "en"
+                  ? "None of these — create with my name (unverified)"
+                  : "都不是 — 強制以我輸入的名稱建立（未驗證）"}
+              </p>
+              <p className="text-tiny text-default-500">
+                {lang === "en"
+                  ? "We'll mark verified=false in _meta — data quality may suffer later."
+                  : "系統會在 _meta 標記 verified=false，未來資料品質可能受影響"}
+              </p>
             </div>
           </CardBody>
         </Card>
@@ -528,7 +581,7 @@ function ConfirmStep({
   );
 }
 
-function CandidateCard({ c, idx, selected, onSelect }: { c: Candidate; idx: number; selected: boolean; onSelect: () => void }) {
+function CandidateCard({ c, idx, selected, onSelect, lang }: { c: Candidate; idx: number; selected: boolean; onSelect: () => void; lang: string }) {
   return (
     <Card
       shadow="none"
@@ -542,10 +595,10 @@ function CandidateCard({ c, idx, selected, onSelect }: { c: Candidate; idx: numb
             <span className={`flex items-center justify-center w-7 h-7 rounded-full border ${selected ? "border-primary text-primary" : "border-divider text-default-400"}`}>
               {selected ? <FontAwesomeIcon icon={faCheck} className="text-tiny" /> : <span className="text-tiny font-medium">{idx + 1}</span>}
             </span>
-            <p className="text-small font-medium">{c.name || "(無名稱)"}</p>
+            <p className="text-small font-medium">{c.name || (lang === "en" ? "(no name)" : "(無名稱)")}</p>
           </div>
           <Chip size="sm" variant="flat" color={c.confidence >= 70 ? "success" : c.confidence >= 40 ? "warning" : "default"}>
-            匹配度 {c.confidence}%
+            {lang === "en" ? `${c.confidence}% match` : `匹配度 ${c.confidence}%`}
           </Chip>
         </div>
         {c.url && (

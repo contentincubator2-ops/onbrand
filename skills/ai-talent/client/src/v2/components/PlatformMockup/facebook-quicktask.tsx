@@ -16,9 +16,11 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, MarkdownText, dicebear } from "./shared";
 import { FBFeed } from "./facebook";
+import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── FB Live (broadcast preview) ─────────────── */
 export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[420px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook Live" variantLabel={variantLabel} />
@@ -30,7 +32,7 @@ export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageS
             <FontAwesomeIcon icon={faCircle} className="text-[8px] animate-pulse" /> LIVE
           </span>
           <span className="bg-black/60 text-white text-tiny px-2 py-0.5 rounded">
-            <FontAwesomeIcon icon={faUserGroup} className="text-[10px] mr-1" /> 觀看 1,234
+            <FontAwesomeIcon icon={faUserGroup} className="text-[10px] mr-1" /> {lang === "en" ? "1,234 watching" : "觀看 1,234"}
           </span>
         </div>
         <button className="absolute top-3 right-3 z-20 bg-black/60 text-white w-7 h-7 rounded-full flex items-center justify-center">
@@ -40,13 +42,13 @@ export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageS
           {liveImageStyle ? (
             <div className="text-center bg-black/40 backdrop-blur-sm rounded-medium p-4 max-w-[80%]">
               <FontAwesomeIcon icon={faVideo} className="text-3xl mb-2 text-default-100" />
-              <p className="text-tiny font-semibold text-default-100 mb-1">直播畫面風格</p>
+              <p className="text-tiny font-semibold text-default-100 mb-1">{lang === "en" ? "Live visual style" : "直播畫面風格"}</p>
               <p className="text-tiny text-default-200 leading-relaxed line-clamp-5">{liveImageStyle}</p>
             </div>
           ) : (
             <div className="text-center">
               <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-              <p className="text-tiny line-clamp-3">{liveImageDesc ?? "直播畫面 · 等待開播"}</p>
+              <p className="text-tiny line-clamp-3">{liveImageDesc ?? (lang === "en" ? "Live · waiting to start" : "直播畫面 · 等待開播")}</p>
             </div>
           )}
         </div>
@@ -61,7 +63,7 @@ export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageS
           )}
         </div>
         <div className="absolute bottom-2 left-3 right-3 z-20 flex items-center gap-2">
-          <div className="flex-1 bg-black/40 rounded-full px-3 py-1.5 text-default-300 text-tiny">說點什麼…</div>
+          <div className="flex-1 bg-black/40 rounded-full px-3 py-1.5 text-default-300 text-tiny">{lang === "en" ? "Say something…" : "說點什麼…"}</div>
           <button className="text-white text-small"><FontAwesomeIcon icon={faHeart} /></button>
           <button className="text-white text-small"><FontAwesomeIcon icon={faShare} /></button>
         </div>
@@ -73,6 +75,7 @@ export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageS
 
 /* ─────────────── FB Cover (851×315) ─────────────── */
 export function FBCover({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[680px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook Cover (851×315)" variantLabel={variantLabel} />
@@ -83,13 +86,13 @@ export function FBCover({ title, brandName, variantLabel, liveCaption, liveImage
             {liveImageStyle ? (
               <div className="bg-black/40 backdrop-blur-sm rounded-medium p-3">
                 <FontAwesomeIcon icon={faImages} className="text-2xl mb-1" />
-                <p className="text-tiny font-semibold mb-0.5">封面風格方向</p>
+                <p className="text-tiny font-semibold mb-0.5">{lang === "en" ? "Cover direction" : "封面風格方向"}</p>
                 <p className="text-tiny line-clamp-3 leading-relaxed">{liveImageStyle}</p>
               </div>
             ) : (
               <>
                 <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-                <p className="text-tiny line-clamp-2">{liveImageDesc ?? "封面 · 等待 craft agent"}</p>
+                <p className="text-tiny line-clamp-2">{liveImageDesc ?? (lang === "en" ? "Cover · waiting for craft agent" : "封面 · 等待 craft agent")}</p>
               </>
             )}
           </div>
@@ -103,7 +106,7 @@ export function FBCover({ title, brandName, variantLabel, liveCaption, liveImage
               <h2 className="text-medium font-bold truncate">{brandName ?? "Your Brand"}</h2>
               <p className="text-tiny text-default-500">{title}</p>
             </div>
-            <Button size="sm" color="primary" className="mb-2">+ 追蹤</Button>
+            <Button size="sm" color="primary" className="mb-2">{lang === "en" ? "+ Follow" : "+ 追蹤"}</Button>
           </div>
           {liveCaption && (
             <div className="mt-3 px-1">
@@ -118,17 +121,18 @@ export function FBCover({ title, brandName, variantLabel, liveCaption, liveImage
 
 /* ─────────────── FB Poll ─────────────── */
 export function FBPoll({ title, brandName, variantLabel, liveCaption, liveHashtags, liveDescription }: MockupFields) {
+  const { lang } = useLang();
   let options: { label: string; pct: number }[] = [
-    { label: "選項一", pct: 42 },
-    { label: "選項二", pct: 35 },
-    { label: "選項三", pct: 23 },
+    { label: lang === "en" ? "Option 1" : "選項一", pct: 42 },
+    { label: lang === "en" ? "Option 2" : "選項二", pct: 35 },
+    { label: lang === "en" ? "Option 3" : "選項三", pct: 23 },
   ];
   try {
     if (liveDescription) {
       const parsed = JSON.parse(liveDescription);
       if (Array.isArray(parsed)) {
         options = parsed.slice(0, 4).map((o: any, i: number) => ({
-          label: typeof o === "string" ? o : (o.label ?? `選項 ${i + 1}`),
+          label: typeof o === "string" ? o : (o.label ?? (lang === "en" ? `Option ${i + 1}` : `選項 ${i + 1}`)),
           pct: typeof o?.pct === "number" ? o.pct : Math.max(5, Math.round(100 / parsed.length - i * 5)),
         }));
       }
@@ -136,12 +140,12 @@ export function FBPoll({ title, brandName, variantLabel, liveCaption, liveHashta
   } catch { /* keep demo */ }
   return (
     <div className="w-full max-w-[520px] mx-auto">
-      <MockupHeader icon={faFacebook} label="Facebook 投票" variantLabel={variantLabel} />
+      <MockupHeader icon={faFacebook} label={lang === "en" ? "Facebook Poll" : "Facebook 投票"} variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         <div className="px-4 py-3 flex items-center gap-3">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">投票 · 剛剛</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "Poll · just now" : "投票 · 剛剛"}</span>}
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
           />
         </div>
@@ -165,7 +169,7 @@ export function FBPoll({ title, brandName, variantLabel, liveCaption, liveHashta
           )}
         </div>
         <div className="px-4 py-2 border-t border-divider text-tiny text-default-500">
-          <FontAwesomeIcon icon={faChartColumn} className="mr-1" /> 1,234 票
+          <FontAwesomeIcon icon={faChartColumn} className="mr-1" /> {lang === "en" ? "1,234 votes" : "1,234 票"}
         </div>
       </div>
     </div>
@@ -174,21 +178,22 @@ export function FBPoll({ title, brandName, variantLabel, liveCaption, liveHashta
 
 /* ─────────────── FB Comment Reply ─────────────── */
 export function FBComment({ title, brandName, variantLabel, liveCaption, liveDescription }: MockupFields) {
-  const userComment = liveDescription || "（用戶原始留言會顯示在這）";
+  const { lang } = useLang();
+  const userComment = liveDescription || (lang === "en" ? "(User's original comment goes here)" : "（用戶原始留言會顯示在這）");
   return (
     <div className="w-full max-w-[520px] mx-auto">
-      <MockupHeader icon={faFacebook} label="Facebook 留言回覆" variantLabel={variantLabel} />
+      <MockupHeader icon={faFacebook} label={lang === "en" ? "Facebook Reply" : "Facebook 留言回覆"} variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg p-4 space-y-3">
         <p className="text-tiny font-semibold text-default-500">{title}</p>
         <div className="flex items-start gap-2">
           <Avatar src={dicebear("user-customer")} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="bg-default-100 rounded-2xl px-3 py-2">
-              <p className="text-tiny font-semibold mb-0.5">某用戶</p>
+              <p className="text-tiny font-semibold mb-0.5">{lang === "en" ? "A user" : "某用戶"}</p>
               <p className="text-small text-default-800 break-words">{userComment}</p>
             </div>
             <div className="flex gap-3 px-3 mt-1 text-tiny text-default-500">
-              <span>讚</span><span>回覆</span><span>2 小時前</span>
+              <span>{lang === "en" ? "Like" : "讚"}</span><span>{lang === "en" ? "Reply" : "回覆"}</span><span>{lang === "en" ? "2h ago" : "2 小時前"}</span>
             </div>
           </div>
         </div>
@@ -197,15 +202,15 @@ export function FBComment({ title, brandName, variantLabel, liveCaption, liveDes
           <div className="flex-1 min-w-0">
             <div className="bg-primary-50 rounded-2xl px-3 py-2 border border-primary-200">
               <p className="text-tiny font-semibold mb-0.5 text-primary-700">
-                {brandName ?? "Your Brand"} <FontAwesomeIcon icon={faStar} className="text-[8px] text-warning-500 ml-1" /> 商家
+                {brandName ?? "Your Brand"} <FontAwesomeIcon icon={faStar} className="text-[8px] text-warning-500 ml-1" /> {lang === "en" ? "Business" : "商家"}
               </p>
               {liveCaption ? <MarkdownText content={liveCaption} className="text-small text-default-800" /> : <Skeleton className="h-3 w-3/4 rounded" />}
             </div>
             <div className="flex gap-3 px-3 mt-1 text-tiny text-default-500">
               <span className="text-primary-600 font-medium">
-                <FontAwesomeIcon icon={faReply} className="mr-1" /> 已回覆
+                <FontAwesomeIcon icon={faReply} className="mr-1" /> {lang === "en" ? "Replied" : "已回覆"}
               </span>
-              <span>剛剛</span>
+              <span>{lang === "en" ? "Just now" : "剛剛"}</span>
             </div>
           </div>
         </div>
@@ -216,20 +221,21 @@ export function FBComment({ title, brandName, variantLabel, liveCaption, liveDes
 
 /* ─────────────── FB Group post ─────────────── */
 export function FBGroup({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveHashtags }: MockupFields) {
+  const { lang } = useLang();
   const styleText = liveImageStyle || liveImageDesc;
   return (
     <div className="w-full max-w-[520px] mx-auto">
-      <MockupHeader icon={faFacebook} label="Facebook 社團" variantLabel={variantLabel} />
+      <MockupHeader icon={faFacebook} label={lang === "en" ? "Facebook Group" : "Facebook 社團"} variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         <div className="bg-blue-50 px-4 py-2 border-b border-divider flex items-center gap-2 text-tiny">
           <FontAwesomeIcon icon={faUserGroup} className="text-blue-600" />
-          <span className="font-semibold text-blue-900 truncate flex-1">{title || "行銷交流社團"}</span>
-          <span className="text-default-500">12.3K 成員</span>
+          <span className="font-semibold text-blue-900 truncate flex-1">{title || (lang === "en" ? "Marketing Community" : "行銷交流社團")}</span>
+          <span className="text-default-500">{lang === "en" ? "12.3K members" : "12.3K 成員"}</span>
         </div>
         <div className="px-4 py-3 flex items-center gap-3">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">在社團中發文 · 剛剛</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "Posted in group · just now" : "在社團中發文 · 剛剛"}</span>}
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true }}
           />
         </div>
@@ -250,7 +256,7 @@ export function FBGroup({ title, brandName, variantLabel, liveCaption, liveImage
               <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
               {liveImageStyle ? (
                 <>
-                  <p className="text-tiny font-semibold text-default-600 mb-1">圖片風格方向</p>
+                  <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Visual direction" : "圖片風格方向"}</p>
                   <p className="text-tiny line-clamp-3 text-default-700">{liveImageStyle}</p>
                 </>
               ) : <p className="text-tiny line-clamp-3">{liveImageDesc}</p>}
@@ -259,8 +265,8 @@ export function FBGroup({ title, brandName, variantLabel, liveCaption, liveImage
         )}
         <div className="px-4 py-2 border-t border-divider flex items-center gap-4 text-default-500 text-tiny">
           <span>👍 156</span>
-          <span><FontAwesomeIcon icon={faComment} className="mr-1" /> 23 留言</span>
-          <span className="ml-auto bg-warning-50 text-warning-700 px-2 py-0.5 rounded-full">需符合社團規範</span>
+          <span><FontAwesomeIcon icon={faComment} className="mr-1" /> {lang === "en" ? "23 comments" : "23 留言"}</span>
+          <span className="ml-auto bg-warning-50 text-warning-700 px-2 py-0.5 rounded-full">{lang === "en" ? "Follow group rules" : "需符合社團規範"}</span>
         </div>
       </div>
     </div>
@@ -269,35 +275,36 @@ export function FBGroup({ title, brandName, variantLabel, liveCaption, liveImage
 
 /* ─────────────── FB Recommendation Reply ─────────────── */
 export function FBRecommendation({ title, brandName, variantLabel, liveCaption, liveDescription }: MockupFields) {
-  const userReview = liveDescription || "（用戶評價內容會顯示在這）";
+  const { lang } = useLang();
+  const userReview = liveDescription || (lang === "en" ? "(User's review goes here)" : "（用戶評價內容會顯示在這）");
   const rating = (() => {
     const m = userReview.match(/(\d)\s*星/);
     return m ? Math.min(5, Math.max(1, Number(m[1]))) : 5;
   })();
   return (
     <div className="w-full max-w-[520px] mx-auto">
-      <MockupHeader icon={faFacebook} label="Facebook 推薦評價" variantLabel={variantLabel} />
+      <MockupHeader icon={faFacebook} label={lang === "en" ? "Facebook Recommendation" : "Facebook 推薦評價"} variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg p-4 space-y-3">
         <p className="text-tiny font-semibold text-default-500">{title}</p>
         <div className="flex items-start gap-2">
           <Avatar src={dicebear("user-reviewer")} size="sm" />
           <div className="flex-1 min-w-0">
-            <p className="text-small font-semibold">某客戶</p>
+            <p className="text-small font-semibold">{lang === "en" ? "A customer" : "某客戶"}</p>
             <div className="flex items-center gap-1 my-1">
               {[1,2,3,4,5].map(i => (
                 <FontAwesomeIcon key={i} icon={faStar}
                   className={`text-tiny ${i <= rating ? "text-warning-500" : "text-default-300"}`} />
               ))}
-              <span className="text-tiny text-default-500 ml-1">{rating}/5 推薦</span>
+              <span className="text-tiny text-default-500 ml-1">{lang === "en" ? `${rating}/5 recommend` : `${rating}/5 推薦`}</span>
             </div>
             <p className="text-small text-default-800 break-words">{userReview}</p>
-            <span className="text-tiny text-default-500">3 小時前</span>
+            <span className="text-tiny text-default-500">{lang === "en" ? "3h ago" : "3 小時前"}</span>
           </div>
         </div>
         <div className="flex items-start gap-2 pl-6 pt-2 border-t border-divider">
           <Avatar src={dicebear(brandName ?? "brand")} size="sm" isBordered color="primary" />
           <div className="flex-1 min-w-0">
-            <p className="text-tiny font-semibold text-primary-700">{brandName ?? "Your Brand"} 回覆</p>
+            <p className="text-tiny font-semibold text-primary-700">{lang === "en" ? `${brandName ?? "Your Brand"} replied` : `${brandName ?? "Your Brand"} 回覆`}</p>
             {liveCaption ? (
               <div className="bg-primary-50 rounded-medium px-3 py-2 mt-1 border border-primary-200">
                 <MarkdownText content={liveCaption} className="text-small text-default-800" />
@@ -312,19 +319,21 @@ export function FBRecommendation({ title, brandName, variantLabel, liveCaption, 
 
 /* ─────────────── FB Pinned (variant of FBFeed) ─────────────── */
 export function FBPinned(props: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="relative">
       <div className="absolute -top-2 left-4 z-10 bg-default-900 text-white text-tiny px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
         <FontAwesomeIcon icon={faThumbtack} className="text-[10px]" />
-        <span className="font-semibold">釘選貼文</span>
+        <span className="font-semibold">{lang === "en" ? "Pinned post" : "釘選貼文"}</span>
       </div>
-      <FBFeed {...props} variantLabel={`${props.variantLabel ?? ""}（釘選）`.trim()} />
+      <FBFeed {...props} variantLabel={`${props.variantLabel ?? ""}${lang === "en" ? " (Pinned)" : "（釘選）"}`.trim()} />
     </div>
   );
 }
 
 /* ─────────────── FB Album (multi-image grid) ─────────────── */
 export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveHashtags }: MockupFields) {
+  const { lang } = useLang();
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook Album" variantLabel={variantLabel} />
@@ -332,7 +341,7 @@ export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImage
         <div className="px-4 py-3 flex items-center gap-3">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">新增了 4 張相片 · 剛剛</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "Added 4 photos · just now" : "新增了 4 張相片 · 剛剛"}</span>}
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
           />
         </div>
@@ -355,14 +364,14 @@ export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImage
                   <p className="text-[10px] line-clamp-3 mt-1 text-default-700">{liveImageStyle}</p>
                 )}
                 {i > 0 && liveImageStyle && (
-                  <p className="text-[10px] mt-1 text-default-500">圖 {i + 1}</p>
+                  <p className="text-[10px] mt-1 text-default-500">{lang === "en" ? `Image ${i + 1}` : `圖 ${i + 1}`}</p>
                 )}
               </div>
             </div>
           ))}
         </div>
         <div className="px-4 py-2 border-t border-divider flex items-center gap-4 text-default-500 text-tiny">
-          <span>👍❤️ 856</span><span>42 留言</span>
+          <span>👍❤️ 856</span><span>{lang === "en" ? "42 comments" : "42 留言"}</span>
         </div>
       </div>
     </div>

@@ -8,73 +8,102 @@
 import { Modal, ModalContent, ModalBody, Button } from "@heroui/react";
 import { Sparkles, Mail } from "lucide-react";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const PLANS = [
-  {
-    name: "試用",
-    price: "免費",
-    badge: "現在",
-    credits: 500,
-    cap: "每日 ~$5 USD 上限",
-    features: [
-      "30s / 60s / 99s 任務",
-      "Theater 內容企劃台",
-      "品牌定位 14-step pipeline",
-      "全平台 mockup 預覽",
-    ],
-    cta: null,
-    highlight: true,
-  },
-  {
-    name: "Starter",
-    price: "NT$ 990 / 月",
-    credits: 1500,
-    cap: "每日 $50 USD 上限",
-    features: [
-      "試用全部功能",
-      "更多月度 credits",
-      "進階 AI 指令庫",
-      "Email 客服",
-    ],
-    cta: "聯絡客服",
-    highlight: false,
-  },
-  {
-    name: "Professional",
-    price: "NT$ 4,990 / 月",
-    credits: 15000,
-    cap: "每日 $50 USD 上限",
-    features: [
-      "Starter 全部功能",
-      "10× credits",
-      "99s 研究級 pipeline 加速",
-      "優先客服",
-    ],
-    cta: "聯絡客服",
-    highlight: false,
-  },
-  {
-    name: "Enterprise",
-    price: "客製",
-    credits: 150000,
-    cap: "彈性",
-    features: [
-      "Professional 全部功能",
-      "團隊共用點數池",
-      "API 整合 / 私有部署",
-      "專屬 CSM",
-    ],
-    cta: "洽談合作",
-    highlight: false,
-  },
-];
+function getPlans(lang: "zh-TW" | "en") {
+  const en = lang === "en";
+  return [
+    {
+      name: en ? "Trial" : "試用",
+      price: en ? "Free" : "免費",
+      badge: en ? "Now" : "現在",
+      credits: 500,
+      cap: en ? "Daily ~$5 USD cap" : "每日 ~$5 USD 上限",
+      features: en ? [
+        "30s / 60s / 99s tasks",
+        "Theater content planner",
+        "Brand positioning 14-step pipeline",
+        "All-platform mockup previews",
+      ] : [
+        "30s / 60s / 99s 任務",
+        "Theater 內容企劃台",
+        "品牌定位 14-step pipeline",
+        "全平台 mockup 預覽",
+      ],
+      cta: null as string | null,
+      highlight: true,
+    },
+    {
+      name: "Starter",
+      price: en ? "$32 / mo" : "NT$ 990 / 月",
+      badge: undefined as string | undefined,
+      credits: 1500,
+      cap: en ? "Daily $50 USD cap" : "每日 $50 USD 上限",
+      features: en ? [
+        "All trial features",
+        "More monthly credits",
+        "Advanced AI command library",
+        "Email support",
+      ] : [
+        "試用全部功能",
+        "更多月度 credits",
+        "進階 AI 指令庫",
+        "Email 客服",
+      ],
+      cta: en ? "Contact support" : "聯絡客服",
+      highlight: false,
+    },
+    {
+      name: "Professional",
+      price: en ? "$160 / mo" : "NT$ 4,990 / 月",
+      badge: undefined as string | undefined,
+      credits: 15000,
+      cap: en ? "Daily $50 USD cap" : "每日 $50 USD 上限",
+      features: en ? [
+        "All Starter features",
+        "10× credits",
+        "99s research pipeline boost",
+        "Priority support",
+      ] : [
+        "Starter 全部功能",
+        "10× credits",
+        "99s 研究級 pipeline 加速",
+        "優先客服",
+      ],
+      cta: en ? "Contact support" : "聯絡客服",
+      highlight: false,
+    },
+    {
+      name: "Enterprise",
+      price: en ? "Custom" : "客製",
+      badge: undefined as string | undefined,
+      credits: 150000,
+      cap: en ? "Flexible" : "彈性",
+      features: en ? [
+        "All Professional features",
+        "Shared team credit pool",
+        "API integration / private deploy",
+        "Dedicated CSM",
+      ] : [
+        "Professional 全部功能",
+        "團隊共用點數池",
+        "API 整合 / 私有部署",
+        "專屬 CSM",
+      ],
+      cta: en ? "Talk to sales" : "洽談合作",
+      highlight: false,
+    },
+  ];
+}
 
 export default function PricingInfoModal({ isOpen, onClose }: Props) {
+  const { lang } = useLang();
+  const PLANS = getPlans(lang);
   // Show user's current balance if available
   const balanceQuery = (trpc as any).credits?.getBalance?.useQuery?.(undefined, {
     enabled: isOpen,
@@ -93,12 +122,12 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
           >
             <div className="flex items-center gap-2 mb-1">
               <Sparkles size={16} />
-              <span className="text-xs font-semibold uppercase tracking-widest opacity-90">方案和定價</span>
+              <span className="text-xs font-semibold uppercase tracking-widest opacity-90">{lang === "en" ? "Plans & pricing" : "方案和定價"}</span>
             </div>
-            <h1 className="text-2xl font-semibold">選擇適合你的方案</h1>
+            <h1 className="text-2xl font-semibold">{lang === "en" ? "Pick the plan that fits" : "選擇適合你的方案"}</h1>
             {balance && (
               <p className="text-sm opacity-90 mt-1">
-                你目前還有 <span className="font-bold">{(balance as any)?.totalAvailable ?? 0}</span> credits
+                {lang === "en" ? "You have " : "你目前還有 "}<span className="font-bold">{(balance as any)?.totalAvailable ?? 0}</span> credits
               </p>
             )}
           </div>
@@ -124,7 +153,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                 </div>
                 <div className="text-lg font-semibold text-default-900 mb-1">{p.price}</div>
                 <div className="text-xs text-default-500 mb-3 leading-snug">
-                  <div>{p.credits.toLocaleString()} credits / 月</div>
+                  <div>{p.credits.toLocaleString()} {lang === "en" ? "credits / mo" : "credits / 月"}</div>
                   <div>{p.cap}</div>
                 </div>
                 <ul className="text-xs text-default-700 space-y-1 mb-4 flex-1">
@@ -141,7 +170,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                     color="primary"
                     variant="bordered"
                     as="a"
-                    href="mailto:cj@sowork.ai?subject=Marketing%20OS%20升級方案"
+                    href={lang === "en" ? "mailto:cj@sowork.ai?subject=Marketing%20OS%20Upgrade" : "mailto:cj@sowork.ai?subject=Marketing%20OS%20升級方案"}
                     startContent={<Mail size={12} />}
                     className="font-medium"
                   >
@@ -155,9 +184,11 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
           {/* Footer */}
           <div className="px-5 py-4 bg-default-50 border-t border-default-100 flex items-center justify-between flex-wrap gap-2">
             <p className="text-xs text-default-500 leading-relaxed">
-              💡 試用期間每天 LLM 成本上限 $5 USD（保護你不會誤超支）。需要更高用量請聯絡客服升級。
+              {lang === "en"
+                ? "💡 Trial has $5 USD daily LLM cap (to protect you from accidental spend). Contact support to upgrade for more."
+                : "💡 試用期間每天 LLM 成本上限 $5 USD（保護你不會誤超支）。需要更高用量請聯絡客服升級。"}
             </p>
-            <Button variant="light" onPress={onClose} size="sm">關閉</Button>
+            <Button variant="light" onPress={onClose} size="sm">{lang === "en" ? "Close" : "關閉"}</Button>
           </div>
         </ModalBody>
       </ModalContent>

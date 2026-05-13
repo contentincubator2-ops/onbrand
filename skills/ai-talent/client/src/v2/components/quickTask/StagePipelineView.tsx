@@ -13,6 +13,7 @@ import React, { useEffect, useState } from "react";
 import { Avatar } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPenNib, faPalette, faComments, faShieldHalved, faMagnifyingGlassChart, faSitemap, faGavel } from "@fortawesome/free-solid-svg-icons";
+import { useLang } from "../../../lib/i18n";
 
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
@@ -149,7 +150,13 @@ function statusColor(s: StageInfo["status"]): string {
     : "text-default-500 bg-default-50 border-default-200";
 }
 
-function statusLabel(s: StageInfo["status"]): string {
+function statusLabel(s: StageInfo["status"], lang: "zh-TW" | "en"): string {
+  if (lang === "en") {
+    return s === "done" ? "✓ Done"
+      : s === "failed" ? "✗ Failed"
+      : s === "running" ? "⋯ Running"
+      : "○ Standby";
+  }
   return s === "done" ? "✓ 完成"
     : s === "failed" ? "✗ 失敗"
     : s === "running" ? "⋯ 進行中"
@@ -176,6 +183,7 @@ function StageCard({
   stage: StageInfo;
   realAgent: { id: number; name: string; title: string; avatarUrl: string | null } | null;
 }) {
+  const { lang } = useLang();
   const thinkingIdx = useRotatingIndex(slot.thinking.length, 2200);
   const elapsed =
     stage.completedAt != null
@@ -192,8 +200,8 @@ function StageCard({
   const liveLine =
     stage.status === "running" ? slot.thinking[thinkingIdx]
     : stage.status === "done" ? slot.doneText
-    : stage.status === "failed" ? "此階段失敗 — 請看錯誤訊息"
-    : "等待上一階段完成…";
+    : stage.status === "failed" ? (lang === "en" ? "Stage failed — check error message" : "此階段失敗 — 請看錯誤訊息")
+    : (lang === "en" ? "Waiting for previous stage…" : "等待上一階段完成…");
 
   return (
     <div className={`border rounded-medium p-3 ${statusColor(stage.status)} transition-colors`}>
@@ -214,7 +222,7 @@ function StageCard({
         <FontAwesomeIcon icon={slot.icon} className="text-default-400 text-tiny" />
       </div>
       <div className="flex items-center justify-between text-[10px] mb-1.5">
-        <span className="font-medium">{statusLabel(stage.status)}</span>
+        <span className="font-medium">{statusLabel(stage.status, lang)}</span>
         <span className="tabular-nums opacity-70">{elapsed}</span>
       </div>
       {/* Live "thinking" / status text — animates while running */}
@@ -239,6 +247,7 @@ export function StagePipelineView({
   imageAgent?: { id: number; name: string; title: string; avatarUrl: string | null } | null;
   tier: "30s" | "60s" | "100s";
 }) {
+  const { lang } = useLang();
   if (!stages || stages.length === 0) return null;
 
   const byKey: Record<string, StageInfo> = {};
@@ -263,10 +272,10 @@ export function StagePipelineView({
     <div className="border border-default-200 rounded-medium bg-default-50 overflow-hidden">
       <div className="px-3 py-2 border-b border-default-200 flex items-center justify-between">
         <p className="text-tiny font-semibold text-default-700">
-          🎼 多 Agent 協作 · {tier}
+          {lang === "en" ? `🎼 Multi-agent collab · ${tier}` : `🎼 多 Agent 協作 · ${tier}`}
         </p>
         <p className="text-[10px] text-default-500 tabular-nums">
-          {completedCount} / {visibleSlots.length} 完成
+          {completedCount} / {visibleSlots.length} {lang === "en" ? "done" : "完成"}
         </p>
       </div>
 
