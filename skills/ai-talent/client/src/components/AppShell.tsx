@@ -3493,11 +3493,12 @@ export default function AppShell({ children, onMissionSelect, onNewTask, activeM
   });
 
   // Notifications for badge
+  // 2026-05-13: server now returns {items, unreadCount, total} (was just an array).
   const { data: notifData } = trpc.notifications.list.useQuery(
     { unreadOnly: true, limit: 20 },
     { refetchOnWindowFocus: false }
   );
-  const notifCount = (notifData as any[])?.length ?? 0;
+  const notifCount = (notifData as any)?.unreadCount ?? (notifData as any)?.items?.length ?? 0;
 
   // Brand for topbar
   const { data: brands } = trpc.brand.listByMember.useQuery(
