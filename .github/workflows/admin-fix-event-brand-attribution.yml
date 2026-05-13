@@ -40,7 +40,14 @@ jobs:
           EMAIL="${EMAIL:-contentincubator2@gmail.com}"
           USER_ID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL' LIMIT 1")
           echo "User id for $EMAIL → $USER_ID"
-          if [ -z "$USER_ID" ]; then echo "user not found"; exit 1; fi
+          if [ -z "$USER_ID" ]; then
+            echo "user not found by exact email — listing all users:"
+            $MYSQL -e "SELECT id, email, createdAt FROM users ORDER BY createdAt DESC LIMIT 20" -t
+            echo ""
+            echo "Trying to find user via brand owner of '數據為王' or 'Pokemon Go':"
+            $MYSQL -e "SELECT DISTINCT u.id, u.email, b.name FROM users u JOIN brands b ON b.userId=u.id WHERE b.name LIKE '%數據%' OR b.name LIKE '%Pokemon%'" -t
+            exit 1
+          fi
 
           echo ""
           echo "=== Brands ==="
