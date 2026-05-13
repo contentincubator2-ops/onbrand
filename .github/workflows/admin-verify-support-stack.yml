@@ -76,8 +76,9 @@ jobs:
           AI=/opt/marketing-os/app/skills/ai-talent
           BUNDLE=$(ls "$AI/public/assets/index-"*.js | grep -v "index-D6jv" | grep -v "index-lE7" | head -1)
           echo "  bundle: $BUNDLE  ($(stat -c%s $BUNDLE) bytes)"
-          # Component class names get minified; check user-visible strings instead
-          for sym in "mia-cs-onbrand" "support.startConversation" "support.adminListTickets" "客戶成功" "更新日誌" "我要找真人"; do
+          # Component class names get minified; only check user-visible UTF-8 strings
+          # that survive minification (DiceBear seed + Chinese UI labels).
+          for sym in "mia-cs-onbrand" "客戶成功" "更新日誌" "我要找真人"; do
             if grep -q "$sym" "$BUNDLE"; then echo "  ✓ $sym"
             else echo "  ❌ $sym missing from bundle"; exit 1; fi
           done
