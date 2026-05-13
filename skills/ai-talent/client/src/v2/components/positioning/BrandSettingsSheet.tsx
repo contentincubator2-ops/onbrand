@@ -40,12 +40,13 @@ interface Props {
 }
 
 function getTabs(en: boolean): Array<{ id: SettingsTab; label: string; Icon: any }> {
+  // 2026-05-13 (CJ「AI 指令不需要了，基本資料 + 視覺合併到主要工作區」):
+  // info / visual / ai 都從這個面板移除 — info + visual 變成主要工作區
+  // 的頁籤；AI 指令庫整個功能已下線。剩下連結（=發布）與危險區，但危險區
+  // 也在 基本資料 tab 內提供，這裡保留以利老用戶。
   return [
-    { id: "info",      label: en ? "Info"        : "基本資料",  Icon: IdCard  },
     { id: "connector", label: en ? "Links"       : "連結",      Icon: Link2   },
     { id: "publish",   label: en ? "Publish"     : "發布",      Icon: Share2  },
-    { id: "visual",    label: en ? "Visual"      : "視覺",      Icon: Palette },
-    { id: "ai",        label: en ? "AI prompts"  : "AI 指令",   Icon: Bot     },
     { id: "danger",    label: en ? "Danger zone" : "危險區",    Icon: Trash2  },
   ];
 }

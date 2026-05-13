@@ -35,7 +35,7 @@ import BrandAssetEditor, { type AssetKey } from "../components/positioning/Brand
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
-import BrandSettingsSheet from "../components/positioning/BrandSettingsSheet";
+import BrandSettingsSheet, { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab } from "../components/positioning/BrandSettingsSheet";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
@@ -51,6 +51,7 @@ import {
   Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage,
   Hash as LucideHash, MessageCircle as LucideMessage,
   FileText as LucideFileText,
+  IdCard as LucideIdCard, Trash2 as LucideTrash,
 } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -182,21 +183,13 @@ export default function BrandsPage() {
       null; // 兩個都有 → 不 nudge
     if (!stage) return;
 
-    const dismissedKey = `sowork.connector.dismissed.${activeBrandIdForLocks}.${stage}`;
-    if (localStorage.getItem(dismissedKey)) return;
-
-    const msg = stage === "none"
-      ? (lang === "en"
-          ? "Drop in your website or FB / IG link first. Auto-fill, test writes, and every 30s / 60s / 99s task grounds itself on these — without them, the AI is guessing from the brand name."
-          : "先填上品牌的官網或 FB / IG 連結。AI 自動填寫、試寫、30s/60s/99s 任務都會去抓這些連結的真實內容做 ground，不填的話 AI 只能用品牌名瞎猜。")
-      : (lang === "en"
-          ? "Website added ✓. Add FB / IG too for sharper results. Your real voice lives in social posts, not on the website — the AI needs that to sound like you."
-          : "官網已填 ✓。再補 FB / IG 連結會更準。網頁通常是正式中文，但你的真實品牌語氣（中英夾雜、口語、emoji）藏在社群貼文裡——填了 AI 才寫得像你。");
-
-    setSettingsInitialTab("connector");
-    setOnboardingHint(msg);
-    setSettingsOpen(true);
-    try { localStorage.setItem(dismissedKey, "1"); } catch {}
+    // 2026-05-13 (CJ「我按了品牌應該直接呈現定位文字知識，現在跳modal」):
+    // Auto-opening the settings sheet on landing is too aggressive — the
+    // workspace should render cleanly and the connector page is reachable
+    // via the gear icon. We keep the nudge logic but it no longer pops the
+    // modal automatically. (A passive in-page banner can be added later.)
+    void stage; // intentionally unused
+    return;
   }, [activeBrandIdForLocks, connData]);
   // Positioning segments live as top-level keys in `positioning` (e.g.
   // positioning.goldenCircle, positioning.tagline...) — written by the
@@ -307,13 +300,14 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "settings" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "settings" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
+    : urlCat === "info" ? "info"
     : urlCat === "settings" ? "settings"
     : "positioning";
-  const setCategory = (next: "positioning" | "copy" | "knowledge") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual") => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("cat", next);
     setSearchParams(nextParams, { replace: true });
@@ -866,9 +860,11 @@ export default function BrandsPage() {
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-3 w-max mx-auto px-2">
               {([
-                { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位", desc: lang === "en" ? "Brand core / slogan"          : "品牌核心 / Slogan", Icon: LucideTarget },
-                { v: "copy"        as const, label: lang === "en" ? "Copy"        : "文字", desc: lang === "en" ? "Words / banned / style"        : "用詞 / 禁忌詞 / 風格",  Icon: LucideType },
-                { v: "knowledge"   as const, label: lang === "en" ? "Knowledge"   : "知識", desc: lang === "en" ? "FAQ / fact library"            : "FAQ / 常識資料庫",      Icon: LucideBook },
+                { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位",     desc: lang === "en" ? "Brand core / slogan"     : "品牌核心 / Slogan",      Icon: LucideTarget },
+                { v: "copy"        as const, label: lang === "en" ? "Copy"        : "文字",     desc: lang === "en" ? "Words / banned / style"   : "用詞 / 禁忌詞 / 風格",   Icon: LucideType },
+                { v: "knowledge"   as const, label: lang === "en" ? "Knowledge"   : "知識",     desc: lang === "en" ? "FAQ / fact library"       : "FAQ / 常識資料庫",       Icon: LucideBook },
+                { v: "info"        as const, label: lang === "en" ? "Info"        : "基本資料", desc: lang === "en" ? "Name / industry / about"  : "名稱 / 產業 / 描述",      Icon: LucideIdCard },
+                { v: "visual"      as const, label: lang === "en" ? "Visual"      : "視覺",     desc: lang === "en" ? "Logo / palette / font"    : "Logo / 色票 / 字型",    Icon: LucidePalette },
               ]).map((t) => {
                 const active = category === t.v;
                 const locked = t.v === "positioning" || t.v === "copy"
@@ -1123,6 +1119,37 @@ export default function BrandsPage() {
               <KnowledgeEditor key={`knowledge-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
             </div>
           )}
+
+          {/* ── 基本資料 (info) — merged from settings sheet 2026-05-13 ─── */}
+          {derivedCategory === "info" && scopeMode === "brand" && (
+            <div style={{ padding: "16px 28px 32px" }}>
+              <BrandInfoTab
+                brandId={activeBrandIdForLocks}
+                brandName={scopeName}
+              />
+              {/* Danger zone — delete brand. CJ「危險區直接救出現在 定位
+                  文字知識的某個地方，作為刪除」: integrate the destructive
+                  action here instead of buried in a settings modal. */}
+              {activeBrandIdForLocks && (
+                <div className="mt-8 max-w-[700px] mx-auto">
+                  <div className="border border-rose-200 rounded-xl bg-rose-50/40 p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <LucideTrash size={14} className="text-rose-600" />
+                      <h3 className="text-sm font-semibold text-rose-700">
+                        {lang === "en" ? "Danger zone" : "危險區"}
+                      </h3>
+                    </div>
+                    <BrandDangerTab
+                      brandId={activeBrandIdForLocks}
+                      brandName={scopeName}
+                      onClose={() => { /* navigate back to /brands after delete */ }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
 
 
           {/* ── 品牌 / 產品 / 活動定位 ── */}
