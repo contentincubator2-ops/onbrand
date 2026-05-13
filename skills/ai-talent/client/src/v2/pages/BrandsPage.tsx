@@ -745,6 +745,23 @@ export default function BrandsPage() {
         onboardingHint={onboardingHint}
       />
 
+      {/* 2026-05-13 (CJ「建立好品牌後我點選左側品牌會是空白畫面」):
+          when scope just changed to a brand that hasn't landed in
+          scopeBrands yet (cache lag right after create), neither the
+          empty-state nor the hero branch was rendering visible content
+          for this newly-picked brand — show a loading skeleton instead
+          of falling through to a blank page. */}
+      {scopeBrands.length > 0 &&
+        scope?.brandId &&
+        !scopeBrands.some((b: any) => b.id === scope.brandId) && (
+          <div className="min-h-[60vh] flex items-center justify-center">
+            <div className="text-center text-default-500 text-sm">
+              <div className="inline-block w-5 h-5 border-2 border-default-300 border-t-default-700 rounded-full animate-spin mb-3" />
+              <p>{lang === "en" ? "Loading brand…" : "載入品牌中…"}</p>
+            </div>
+          </div>
+        )}
+
       {/* 2026-05-08: empty state — first-time user has zero brands.
           Auto-opens the BrandOnboardingWizard (4-step guided flow).
           Behind the wizard we keep a soft welcome screen so the page
@@ -757,11 +774,20 @@ export default function BrandsPage() {
               setOnboardingOpen(false);
               try { localStorage.setItem("sowork.onboarding.dismissed", "1"); } catch {}
             }}
-            onComplete={() => {
+            onComplete={(createdBrandId?: number) => {
               setOnboardingOpen(false);
               try { localStorage.setItem("sowork.onboarding.dismissed", "1"); } catch {}
               utils.scope?.options?.invalidate?.();
               utils.brand?.listByMember?.invalidate?.();
+              // 2026-05-13 (CJ「建立好品牌後我點選左側品牌會是空白畫面」):
+              // wizard previously only navigated to /brands?b=<id> without
+              // setting scope, so the page mounted with scope.brandId=null
+              // and the user had to manually click the brand pill again.
+              // Hydrate scope immediately so the editor renders directly.
+              if (createdBrandId) {
+                setBrandId(createdBrandId);
+                setScope({ brandId: createdBrandId, productId: null, eventId: null });
+              }
             }}
           />
           {/* 2026-05-10 (CJ「4A 代理商專業感, 不要彩色」): empty state
@@ -798,7 +824,8 @@ export default function BrandsPage() {
       {/* ─── Hero — /30s-style centered axis (CJ feedback 2026-05-07) ───
           eyebrow → title → stats → message bar → tiles → kicker.
           測試 / 定案 chips live in the kicker row, NOT in the bar. */}
-      {scopeBrands.length > 0 && (
+      {scopeBrands.length > 0 &&
+       (!scope?.brandId || scopeBrands.some((b: any) => b.id === scope.brandId)) && (
       <div className="relative pt-6 pb-6 px-6 text-center">
         {/* 2026-05-11 (CJ「品牌管理」): breadcrumb back to /brands manager */}
         <div className="absolute top-5 left-5 z-10">

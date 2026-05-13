@@ -75,6 +75,22 @@ export default function BrandsManagePage() {
   // the grid visible even with scope (useful for cross-brand switching).
   const [searchParams] = useSearchParams();
   const forceGrid = searchParams.get("all") === "1";
+  // 2026-05-13 (CJ「建立好品牌後我點選左側品牌會是空白畫面」):
+  // The onboarding wizard navigates to `/brands?b=<newId>` after creating
+  // a brand, but never calls setScope — so scope.brandId stayed null,
+  // scopeKind === "none" → redirect didn't fire → user landed on the
+  // grid with the new brand un-selected, and any click into the editor
+  // (or the sidebar pill) hit a half-hydrated state. Sync the URL param
+  // into scope here so /brands?b=X behaves the same as picking it from
+  // the ScopeBar.
+  const urlBrandId = Number(searchParams.get("b") || 0);
+  useEffect(() => {
+    if (!urlBrandId) return;
+    if (scope.brandId === urlBrandId) return;
+    if (ctx?.setScope) {
+      ctx.setScope({ brandId: urlBrandId, productId: null, eventId: null });
+    }
+  }, [urlBrandId, scope.brandId, ctx]);
   useEffect(() => {
     if (forceGrid) return;
     if (scopeKind === "none") return;
