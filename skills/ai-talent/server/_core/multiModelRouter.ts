@@ -105,12 +105,18 @@ export function detectTaskType(content: string): TaskType {
 //   coding            → DeepSeek-R1 (azure-northcentral) when key available
 //   chinese/general   → qwen (native Chinese LLM) first
 //   fallback chain    → qwen → zhipu → azure-foundry (all confirmed working)
-// 2026-05-09 (CJ direction「乾淨一條路」): qwen key is invalid (401),
-// azure-position key is missing → fallback chain was broken for half the
-// channels. Anthropic direct is confirmed working (curl 0.6s) and now
-// enabled. Promoted to FIRST in every chain so all tasks have a working
-// provider on attempt #1.
-const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
+// 2026-05-13 (CJ「我要怎麼確保品牌定位會成功 — 儲值前先把 anthropic 拉到
+// fallback」): Anthropic ran out of credits. Every call was hitting it
+// first, failing with 400 "credit balance too low", then cascading
+// through 2-3 fallback providers — adding 3-5s of wasted latency per
+// LLM call and 14× per positioning run = 60-90s wasted. Re-prioritized
+// so the actually-working providers come first; anthropic stays in
+// the chain as a final fallback so it auto-recovers the moment credits
+// are topped up. Set LLM_PRIMARY=anthropic in .env to restore the
+// previous behavior (one-line revert) once Plans & Billing is fixed.
+const ANTHROPIC_FIRST = process.env.LLM_PRIMARY === "anthropic";
+
+const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = ANTHROPIC_FIRST ? {
   //                  best choice          ↓ fallbacks ────────────────────────────────────
   chinese_content:  ["anthropic",         "azure-foundry","azure-position","zhipu",  "qwen"],
   creative_writing: ["anthropic",         "azure-position","azure-claude","azure-foundry","qwen"],
@@ -119,6 +125,18 @@ const TASK_PRIORITY_MAP: Record<TaskType, ModelProvider[]> = {
   classification:   ["anthropic",         "zhipu",      "azure-foundry",  "azure-position","qwen"],
   coding:           ["anthropic",         "azure-northcentral","azure-foundry","zhipu","qwen"],
   general:          ["anthropic",         "zhipu",      "azure-foundry",  "azure-position","qwen"],
+} : {
+  // Anthropic-OOC mode (default until credits topped up):
+  // - chinese / creative: qwen first (native Chinese branding quality)
+  // - analysis / coding:  azure-foundry first (gpt-5.4-mini / DeepSeek)
+  // - anthropic kept as last entry — works again automatically when balance > 0
+  chinese_content:  ["qwen",              "azure-foundry","zhipu",         "google",          "anthropic"],
+  creative_writing: ["qwen",              "azure-foundry","zhipu",         "google",          "anthropic"],
+  search_realtime:  ["azure-foundry",     "qwen",         "zhipu",         "google",          "anthropic"],
+  analysis:         ["azure-foundry",     "qwen",         "azure-northcentral","zhipu",       "anthropic"],
+  classification:   ["azure-foundry",     "qwen",         "zhipu",         "google",          "anthropic"],
+  coding:           ["azure-northcentral","azure-foundry","qwen",          "zhipu",           "anthropic"],
+  general:          ["qwen",              "azure-foundry","zhipu",         "google",          "anthropic"],
 };
 
 // Best model to use for each provider when called by this router

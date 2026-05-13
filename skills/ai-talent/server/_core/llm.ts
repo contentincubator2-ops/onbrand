@@ -619,16 +619,19 @@ function adaptPayloadForModel(payload: Record<string, unknown>, model: string): 
 function getFallbackChain(): string[] {
   const envChain = (process.env.LLM_FALLBACK_CHAIN ?? "").trim();
   if (envChain) return envChain.split(",").map((s) => s.trim()).filter(Boolean);
-  // 2026-05-12 default chain (CJ「all providers fallback」):
-  // anthropic → azure-foundry (gpt-5.4) → openai (gpt-4.1-mini) → gemini 2.5-flash
-  //   → qwen (zh-strong) → gemma 3-27b (open-weights) → deepseek
-  // 7 providers across 5 vendors. Override via LLM_FALLBACK_CHAIN.
-  // 2026-05-12 reordered after side-by-side benchmark (admin-bench-all-providers):
-  //   Qwen Plus API + DeepSeek V3 both outscore gpt-4.1-mini on zh brand voice
-  //   and are cheaper. Gemini truncates output on OpenAI-compat shim → demoted.
-  //   Gemma 3-27b returns 404 on AI Studio shim → removed (would need Vertex AI).
-  //   Ollama qwen2.5:7b is true last-resort (slow + simplified-zh leakage).
-  return ["anthropic", "azure-foundry", "qwen", "deepseek", "openai", "gemini", "ollama"];
+  // 2026-05-13 (CJ「我要怎麼確保品牌定位會成功」): Anthropic credit balance
+  // is currently $0 — every call to anthropic returns 400 "credit balance
+  // too low". Demoted to LAST so each LLM step wastes 0 RTTs on a known-
+  // bad vendor instead of 1-2. Auto-restores when balance is topped up.
+  //
+  // Set LLM_PRIMARY=anthropic in .env to revert to anthropic-first.
+  if (process.env.LLM_PRIMARY === "anthropic") {
+    return ["anthropic", "azure-foundry", "qwen", "deepseek", "openai", "gemini", "ollama"];
+  }
+  // Default (anthropic-OOC) order — qwen first (zh-strong, paid, working),
+  // azure-foundry second (gpt-5.4-mini, working), then deepseek/openai/gemini
+  // for diversity, anthropic LAST as a will-work-once-billed safety net.
+  return ["qwen", "azure-foundry", "deepseek", "openai", "gemini", "anthropic", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {
