@@ -1,0 +1,46 @@
+name: Admin — Probe bundle runtime crash
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - name: Run
+        run: |
+          set -e
+          echo "── pm2 status ──"
+          pm2 list
+
+          echo ""
+          echo "── current index.html script ──"
+          curl -s "http://localhost:3000/" | head -100 | grep -oE 'index-[^"]+\.js'
+
+          echo ""
+          echo "── searching the bundle for syntax-level issues ──"
+          BUNDLE=$(curl -s "http://localhost:3000/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+          echo "bundle: $BUNDLE"
+          if [ -n "$BUNDLE" ]; then
+            curl -s -o /tmp/b.js "http://localhost:3000$BUNDLE"
+            echo "  size: $(wc -c < /tmp/b.js)"
+            # Search for any leaked TS keywords / unterminated strings
+            echo "  syntax-error-ish patterns:"
+            grep -coE 'SyntaxError|Unexpected token|Module not found|Cannot find module' /tmp/b.js || true
+            echo "  first 200 chars:"
+            head -c 200 /tmp/b.js
+            echo ""
+          fi
+
+          echo ""
+          echo "── nginx access log (last 20) ──"
+          sudo tail -20 /var/log/nginx/access.log 2>/dev/null | tail -10 || true
+
+          echo ""
+          echo "── current bundle hash ──"
+          ls -la /opt/marketing-os/app/skills/ai-talent/client/dist/assets/index-*.js 2>/dev/null | tail -3
+
+          echo ""
+          echo "── git head on VM ──"
+          cd /opt/marketing-os/app && git log -1 --oneline
