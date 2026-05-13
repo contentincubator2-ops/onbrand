@@ -134,6 +134,14 @@ export default function ShellLayout() {
   };
 
   const [notifOpen, setNotifOpen] = React.useState(false);
+  // 2026-05-13: badge count comes from the same trpc query as the panel.
+  // Polled every 60s + when the user opens/closes the panel.
+  const notifLastSeen = readLastSeen();
+  const notifCountQ = (trpc as any).notifications?.list?.useQuery?.(
+    { limit: 20, lastSeenIso: notifLastSeen ?? undefined, lang },
+    { refetchOnWindowFocus: false, refetchInterval: 60_000 },
+  );
+  const notifUnread: number = notifCountQ?.data?.unreadCount ?? 0;
   // Content area always offset by ICON_W; panel slides on top without pushing content
   const contentLeft = collapsed ? ICON_W : ICON_W + PANEL_W;
 
@@ -151,6 +159,7 @@ export default function ShellLayout() {
         onLogout={handleLogout}
         notifOpen={notifOpen}
         onNotifToggle={() => setNotifOpen((v) => !v)}
+        notifUnread={notifUnread}
         brands={brands}
       />
 
@@ -275,7 +284,7 @@ export default function ShellLayout() {
 
 function IconBar({
   collapsed, onToggle, currentPath, onNavigate,
-  scope, setScope, onLogout, notifOpen, onNotifToggle, brands,
+  scope, setScope, onLogout, notifOpen, onNotifToggle, notifUnread, brands,
 }: {
   collapsed: boolean;
   onToggle: () => void;
@@ -284,6 +293,7 @@ function IconBar({
   scope: ScopeState;
   setScope: (s: ScopeState) => void;
   onLogout: () => void;
+  notifUnread?: number;
   notifOpen: boolean;
   onNotifToggle: () => void;
   brands: any[];
@@ -396,12 +406,14 @@ function IconBar({
             }}
           >
             <FontAwesomeIcon icon={faBell} />
-            <span style={{
-              position: "absolute", top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 8,
-              background: "#ef4444", color: "#fff", fontSize: 9, fontWeight: 700,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              padding: "0 3px", border: "1.5px solid white", pointerEvents: "none",
-            }}>9+</span>
+            {(notifUnread ?? 0) > 0 && (
+              <span style={{
+                position: "absolute", top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 8,
+                background: "#ef4444", color: "#fff", fontSize: 9, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: "0 3px", border: "1.5px solid white", pointerEvents: "none",
+              }}>{(notifUnread ?? 0) > 9 ? "9+" : String(notifUnread)}</span>
+            )}
           </button>
         </Tooltip>
 
@@ -2151,33 +2163,46 @@ function AccountSubPanel() {
    Notification panel
 ══════════════════════════════════════════════════════════════════ */
 
-function getMockNotifs(isEn: boolean) {
-  return [
-    {
-      id: 1, unread: true, avatar: "L", avatarColor: "#7c3aed",
-      title: isEn ? "Laila Chu commented on \"Brand calendar\"." : "Laila Chu 在任務「品牌月曆」撰寫了評論。",
-      excerpt: isEn ? "Highlight the community-day event time in a different color" : "社群日活動時間這串文字想要變色強調",
-      time: isEn ? "Mar 31, 6:45 PM" : "3月31日 下午6:45", from: "Laila Chu", fromCount: 2,
-    },
-    {
-      id: 2, unread: true, avatar: "Y", avatarColor: "#059669",
-      title: isEn ? "yirenyan resolved a comment on \"Facebook ad copy\"." : "「yirenyan」解決了有關「Facebook 廣告文案」的評論。",
-      excerpt: isEn ? "@SoWork can we remove the English subtitles on the image?" : "@SoWork 圖片上的英文字幕可以去除嗎",
-      time: isEn ? "Jan 22, 10:26 AM" : "1月22日 上午10:26", from: "yirenyan", fromCount: 1,
-    },
-    {
-      id: 3, unread: false, avatar: isEn ? "J" : "簡", avatarColor: "#0891b2",
-      title: isEn ? "Jane Chien commented on \"GO Tour DM\"." : "簡維德 在任務「GO Tour DM」撰寫了評論。",
-      excerpt: isEn ? "Try a bolder outline color on these two Pikachu instead of white" : "建議這兩隻皮卡丘的外框用更明顯的顏色替代白色",
-      time: isEn ? "4 days ago" : "4天前", from: isEn ? "Jane Chien" : "簡維德", fromCount: 1,
-    },
-  ];
+// 2026-05-13 (CJ「實作左下方通知」): mocks replaced by real notification
+// feed from notifications.list (positioning jobs + task runs + festivals).
+// Kept this stub returning [] so any straggling reference doesn't crash —
+// the real renderer uses trpc query directly.
+function getMockNotifs(_isEn: boolean): Array<any> { return []; }
+
+const NOTIF_LAST_SEEN_KEY = "sowork.notifications.lastSeenAt";
+function readLastSeen(): string | null {
+  try { return localStorage.getItem(NOTIF_LAST_SEEN_KEY); } catch { return null; }
+}
+function writeLastSeen(iso: string) {
+  try { localStorage.setItem(NOTIF_LAST_SEEN_KEY, iso); } catch {/* no-op */}
 }
 
 function NotifPanel({ onClose }: { onClose: () => void }) {
-  const [readAll, setReadAll] = React.useState(false);
+  const navigate = useNavigate();
   const { lang } = useLang();
   const isEn = lang === "en";
+  // 2026-05-13: localStorage-driven read state. Server is stateless; client
+  // sends current lastSeenAt so server can mark items above it as unread.
+  const [lastSeen, setLastSeen] = React.useState<string | null>(() => readLastSeen());
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const feedQ = (trpc as any).notifications?.list?.useQuery?.(
+    { limit: 20, lastSeenIso: lastSeen ?? undefined, lang },
+    { refetchOnWindowFocus: false, refetchInterval: 60_000 },
+  );
+  const markAllMut = (trpc as any).notifications?.markAllRead?.useMutation?.({
+    onSuccess: (r: any) => {
+      if (r?.lastSeenAtIso) {
+        writeLastSeen(r.lastSeenAtIso);
+        setLastSeen(r.lastSeenAtIso);
+      }
+      utils?.notifications?.list?.invalidate?.();
+    },
+  });
+  const items: Array<any> = feedQ?.data?.items ?? [];
+  const handleItemClick = (item: any) => {
+    if (item.navUrl) navigate(item.navUrl);
+    onClose();
+  };
   return (
     <div style={{
       /* Floating card — positioned to the right of the icon bar, bottom-anchored near bell */
@@ -2200,7 +2225,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 12px", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
         <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{isEn ? "Notifications" : "通知"}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => setReadAll(true)} style={{
+          <button onClick={() => markAllMut?.mutate?.({})} style={{
             display: "flex", alignItems: "center", gap: 5, padding: "4px 10px",
             borderRadius: 8, border: "none", background: "none", fontSize: 12, color: "#6b7280", cursor: "pointer",
           }}
@@ -2223,37 +2248,50 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", minHeight: 0 }}>
-        {getMockNotifs(isEn).map((n) => {
-          const isUnread = n.unread && !readAll;
+        {feedQ?.isLoading && (
+          <div style={{ padding: "32px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+            {isEn ? "Loading…" : "載入中…"}
+          </div>
+        )}
+        {!feedQ?.isLoading && items.length === 0 && (
+          <div style={{ padding: "40px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
+            {isEn
+              ? "No notifications yet. Finish a task or apply brand positioning to get started."
+              : "目前還沒有通知。跑一個任務或套用品牌定位就會出現。"}
+          </div>
+        )}
+        {items.map((n) => {
+          const isUnread = !!n.unread;
           return (
-            <div key={n.id} style={{
-              display: "flex", gap: 12, padding: "12px 16px",
-              background: isUnread ? "rgba(249,115,22,0.04)" : "transparent",
-              borderBottom: "1px solid #f9fafb", cursor: "pointer", position: "relative",
-              transition: "background 0.1s",
-            }}
+            <div key={n.id}
+              onClick={() => handleItemClick(n)}
+              style={{
+                display: "flex", gap: 12, padding: "12px 16px",
+                background: isUnread ? "rgba(249,115,22,0.04)" : "transparent",
+                borderBottom: "1px solid #f9fafb", cursor: "pointer", position: "relative",
+                transition: "background 0.1s",
+              }}
               onMouseEnter={e => (e.currentTarget.style.background = isUnread ? "rgba(249,115,22,0.08)" : "#f9fafb")}
               onMouseLeave={e => (e.currentTarget.style.background = isUnread ? "rgba(249,115,22,0.04)" : "transparent")}
             >
               <div style={{
                 width: 40, height: 40, borderRadius: "50%", flexShrink: 0, background: n.avatarColor,
-                display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 16, fontWeight: 700,
               }}>{n.avatar}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 13, color: "#111827", lineHeight: 1.45, marginBottom: 4 }}>{n.title}</p>
-                <div style={{
-                  fontSize: 12, color: "#6b7280", background: "#f9fafb", borderRadius: 6,
-                  padding: "4px 8px", marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                }}>{n.excerpt}</div>
+                <p style={{ fontSize: 13, color: "#111827", lineHeight: 1.45, marginBottom: 4, fontWeight: isUnread ? 600 : 400 }}>{n.title}</p>
+                {n.excerpt && (
+                  <div style={{
+                    fontSize: 12, color: "#6b7280", background: "#f9fafb", borderRadius: 6,
+                    padding: "4px 8px", marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>{n.excerpt}</div>
+                )}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#9ca3af" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3b82f6", flexShrink: 0 }} />
-                  <span>{n.time}</span>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: isUnread ? "#ef4444" : "#d1d5db", flexShrink: 0 }} />
+                  <span>{n.relativeTime}</span>
                 </div>
-                <button style={{ marginTop: 4, fontSize: 12, fontWeight: 500, color: "#F97316", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                  {isEn ? `${n.fromCount} updates from "${n.from}"` : `來自「${n.from}」的 ${n.fromCount} 個更新`}
-                </button>
               </div>
-              {isUnread && <span style={{ position: "absolute", top: 14, right: 14, width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />}
             </div>
           );
         })}
