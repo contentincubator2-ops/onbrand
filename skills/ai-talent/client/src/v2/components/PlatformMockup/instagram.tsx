@@ -281,7 +281,10 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
           <span className="font-semibold mr-1.5">{handle}</span>
           <span className="text-foreground">{title}</span>
           {liveCaption ? (
-            <MarkdownText content={liveCaption} lineClamp={5} className="mt-1.5 text-foreground" />
+            // 2026-05-13 (CJ「標題看起來都會不完整」): removed line-clamp
+            // — IG captions can be long (2200 char cap), trimming at 5 lines
+            // made 30s outputs look like the AI cut off mid-sentence.
+            <MarkdownText content={liveCaption} className="mt-1.5 text-foreground" />
           ) : (
             <div className="mt-1.5 space-y-1">
               <Skeleton className="h-2.5 w-[94%] rounded" />

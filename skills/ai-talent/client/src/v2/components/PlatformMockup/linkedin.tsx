@@ -136,7 +136,7 @@ export function LIFeed({
         {/* Post body */}
         <div className="px-4 pb-2 space-y-1.5">
           {liveCaption ? (
-            <MarkdownText content={liveCaption} lineClamp={8} className="text-[14px] text-[#191919] leading-relaxed" />
+            <MarkdownText content={liveCaption} className="text-[14px] text-[#191919] leading-relaxed" />
           ) : (
             <div className="space-y-2 py-0.5">
               <Skeleton className="h-3 w-[95%] rounded" />

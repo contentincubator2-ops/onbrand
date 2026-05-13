@@ -48,7 +48,13 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         <div className="px-4 py-2 space-y-2">
           {title && <p className="text-small font-medium">{title}</p>}
           {liveCaption ? (
-            <MarkdownText content={liveCaption} lineClamp={6} />
+            // 2026-05-13 (CJ「標題看起來都會不完整」): the caption was
+            // line-clamped at 6 lines, so 100-200 字 Chinese captions
+            // truncated mid-sentence in the mockup preview — users
+            // thought the AI cut it off when the DB row was fully
+            // complete. Removed the clamp; FB feed previews are meant
+            // to show the full post anyway.
+            <MarkdownText content={liveCaption} />
           ) : (
             <>
               <Skeleton className="h-2.5 w-[88%] rounded" />
