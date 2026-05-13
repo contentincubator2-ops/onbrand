@@ -1,0 +1,72 @@
+name: Admin — Migrate to points system + backfill existing users
+
+# 2026-05-14 (CJ「點數系統」):
+# 1. Run migrate.ts → add users.pointsBalance + pointsLastResetAt + point_transactions table
+# 2. Backfill existing 13 users:
+#    - planCode='trial'   → 300 pts (one-time grant)
+#    - planCode='drop_pro' → 3000 pts + set pointsLastResetAt=NOW()
+# 3. Print summary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 300s
+          script: |
+            set -e
+            cd /opt/marketing-os/app/skills/ai-talent
+            export MYSQL_PWD="mos_secure_2026"
+
+            echo "── 1. Run migrate.ts ─────"
+            npx tsx scripts/migrate.ts 2>&1 | grep -E "pointsBalance|pointsLastResetAt|point_transactions" | head -10
+
+            echo
+            echo "── 2. Backfill existing users ─────"
+            mysql -h localhost -u mos_user mos_db --default-character-set=utf8mb4 -e "
+              -- Trial users get 300 pts (one-time grant)
+              UPDATE users
+                 SET pointsBalance = 300, pointsLastResetAt = NULL
+               WHERE (planCode IS NULL OR planCode = 'trial')
+                 AND pointsBalance = 0;
+
+              -- Paid drop_pro users get 3000 pts + fresh cycle start NOW
+              UPDATE users
+                 SET pointsBalance = 3000, pointsLastResetAt = NOW(3)
+               WHERE planCode = 'drop_pro'
+                 AND pointsBalance = 0;
+
+              -- Log the grants to ledger
+              INSERT INTO point_transactions (userId, kind, delta, balanceAfter, reason)
+                SELECT id, 'grant', pointsBalance, pointsBalance, 'initial_backfill_2026_05_14'
+                  FROM users
+                 WHERE pointsBalance IN (300, 3000);
+            "
+
+            echo
+            echo "── 3. Summary ─────"
+            mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4 -e "
+              SELECT
+                IFNULL(planCode, 'trial') AS plan,
+                COUNT(*) AS users,
+                MIN(pointsBalance) AS min_pts,
+                ROUND(AVG(pointsBalance)) AS avg_pts,
+                MAX(pointsBalance) AS max_pts
+              FROM users
+              GROUP BY planCode;
+            "
+
+            echo
+            echo "── 4. Ledger sanity ─────"
+            mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4 -e "
+              SELECT kind, COUNT(*) AS txn_count, SUM(delta) AS total_delta
+                FROM point_transactions
+               GROUP BY kind;
+            "
