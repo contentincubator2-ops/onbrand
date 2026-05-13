@@ -62,12 +62,17 @@ interface NavItem {
 function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
   const en = lang === "en";
   return [
-    { to: "/30s",       label: en ? "Quick post" : "快寫",   tierBadge: "30s", icon: null,
-      tooltip: en ? "30s · one post — for daily singles, trend reactions, urgent shipping" : "30 秒一篇貼文 — 適合日常單篇、追熱點、緊急發文" },
-    { to: "/60s",       label: en ? "Package" : "製作包", tierBadge: "60s", icon: null,
-      tooltip: en ? "60s · full package — 5 variants + visual brief + QA" : "60 秒一個製作包 — 5 種變體挑選 + 視覺 brief + QA" },
-    { to: "/99s",       label: en ? "Campaign" : "全企劃", tierBadge: "99s", icon: null, matchPrefix: "/99s",
-      tooltip: en ? "99s · full campaign — 30-day calendar, launch pack, IG repositioning" : "99 秒一個 campaign — 30 天月曆、活動 launch 包、IG 重新定位" },
+    // 2026-05-12 (CJ「單品 / 套組 / 檔期」): final tier naming after auditing
+    // all 189 quickTask templates. 30s = single piece (98 micro-tasks like
+    // headlines / hashtags / DMs); 60s = related set (48 tasks like carousels,
+    // countdown sequences, ad packs); 99s = full slate (42 tasks like
+    // 30-day calendars, 6-ep series, launch toolkits).
+    { to: "/30s",       label: en ? "Single" : "單品",   tierBadge: "30s", icon: null,
+      tooltip: en ? "30s · single piece — one headline / caption / DM / hashtag set" : "30 秒寫完一件素材 — 一個 headline / caption / DM / hashtag 組" },
+    { to: "/60s",       label: en ? "Pack" : "套組", tierBadge: "60s", icon: null,
+      tooltip: en ? "60s · a related set of pieces — 5-day countdown, 7-slide carousel, 3-variant ad pack" : "60 秒寫完一套相關素材 — 5 天倒數、7 張輪播、3 種廣告變體" },
+    { to: "/99s",       label: en ? "Slate" : "檔期", tierBadge: "99s", icon: null, matchPrefix: "/99s",
+      tooltip: en ? "99s · full slate — 30-day calendar, 6-episode series, launch toolkit" : "99 秒企劃一個檔期 — 30 天月曆、6 集系列、上市 toolkit" },
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
       tooltip: en ? "Calendar view — scheduled + published at a glance, your edge over Buffer" : "月曆視圖 — 已排程 + 已發布內容一目了然，vs Buffer 的硬實力" },
