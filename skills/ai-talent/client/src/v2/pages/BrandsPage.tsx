@@ -164,11 +164,20 @@ export default function BrandsPage() {
   // fields are ignored.
   const rawPositioning = (scopeActiveQuery.data as any)?.brand?.positioning ?? {};
   const fullPositioning: Record<string, any> = (() => {
-    const merged: Record<string, any> = { ...rawPositioning };
+    // 2026-05-13 (post-deploy bug — "網站空白"): defensive wrapper.
+    // If any step of the shape translation throws (malformed JSON, unexpected
+    // primitive where an object is expected, etc.) we fall back to the raw
+    // positioning so the page still renders.
+    try {
+    const safeRaw = (rawPositioning && typeof rawPositioning === "object" && !Array.isArray(rawPositioning))
+      ? rawPositioning : {};
+    const merged: Record<string, any> = { ...safeRaw };
+    const isObj = (x: any) => x != null && typeof x === "object" && !Array.isArray(x);
     const setIfEmpty = (k: string, v: any) => {
-      if (v != null && (merged[k] == null || (typeof merged[k] === "object" && Object.keys(merged[k]).length === 0))) {
-        merged[k] = v;
-      }
+      if (v == null) return;
+      const existing = merged[k];
+      if (existing == null) { merged[k] = v; return; }
+      if (isObj(existing) && Object.keys(existing).length === 0) { merged[k] = v; return; }
     };
 
     // (1) origin: server brandOrigin{rootBelief, founderStory, triggerMoment}
@@ -246,6 +255,10 @@ export default function BrandsPage() {
     }
 
     return merged;
+    } catch (e) {
+      console.error("[BrandsPage] positioning normalizer crashed:", e);
+      return (rawPositioning && typeof rawPositioning === "object") ? rawPositioning : {};
+    }
   })();
   const brandAssets: Record<string, any> = (fullPositioning?._assets ?? {}) as Record<string, any>;
 
