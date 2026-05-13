@@ -219,7 +219,13 @@ if (existsSync(publicDir)) {
       }
     },
   }));
-  // SPA fallback — serve index.html with no-cache so browser always loads latest
+  // SPA fallback — serve index.html with no-cache so browser always loads latest.
+  // 2026-05-13 (CJ「整個網站是空白頁」): if a stale client requests an old
+  // hashed bundle (e.g. /assets/index-OLD-HASH.js after a new deploy), the
+  // express.static handler above calls next() and we used to fall through
+  // to index.html — the browser then executed HTML as JS → SyntaxError →
+  // blank page on the WHOLE site. Force 404 for /assets/* misses so the
+  // browser surfaces a real network error and a hard-refresh recovers.
   app.get("*", (req, res, next) => {
     if (
       req.path.startsWith("/trpc") ||
@@ -228,6 +234,10 @@ if (existsSync(publicDir)) {
       req.path === "/health"
     ) {
       return next();
+    }
+    if (req.path.startsWith("/assets/")) {
+      res.status(404).send("asset not found — your bundle is stale, please hard-refresh (Ctrl+Shift+R)");
+      return;
     }
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.setHeader("Pragma", "no-cache");

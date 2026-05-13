@@ -1,0 +1,75 @@
+name: Admin — Fix nginx SPA fallback for /assets/*
+
+# CJ「整個網站是空白頁」: nginx falls back to index.html for any path,
+# including /assets/index-OLD-HASH.js when an old client cache requests
+# a stale hashed bundle. Browser executes index.html as JS → SyntaxError
+# → blank page. Fix: /assets/* must return 404 if file is missing,
+# letting the browser surface a real "stale, refresh" error.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Show current config
+        run: |
+          set -e
+          echo "── current nginx config (relevant location blocks) ──"
+          sudo cat /etc/nginx/sites-enabled/* 2>/dev/null | grep -A 5 "location\s*/\|try_files\|assets" | head -60 || true
+
+      - name: Patch nginx
+        run: |
+          set -e
+          # Find the active conf file
+          CONF=$(grep -lE "server_name.*(sowork|marketing-os|onbrand|bebrand)" /etc/nginx/sites-enabled/* 2>/dev/null | head -1)
+          if [ -z "$CONF" ]; then
+            CONF=$(ls /etc/nginx/sites-enabled/* 2>/dev/null | head -1)
+          fi
+          echo "Patching: $CONF"
+
+          # Backup
+          sudo cp "$CONF" "${CONF}.bak-$(date +%s)"
+
+          # Add /assets/* exact-file rule BEFORE the SPA catch-all if not already present.
+          if sudo grep -q "location /assets/" "$CONF"; then
+            echo "  /assets/ block already exists — leaving alone"
+          else
+            # Insert before the catch-all `location /`
+            sudo python3 -c "
+            import re, pathlib
+            p = pathlib.Path('$CONF')
+            txt = p.read_text()
+            insert = '''
+            # 2026-05-13: stale-cache fix — assets must 404 if file missing,
+            # not fall through to index.html (which the browser would execute
+            # as JS and blow up with SyntaxError).
+            location /assets/ {
+              try_files \$uri =404;
+              add_header Cache-Control \"public, max-age=31536000, immutable\";
+            }
+            '''
+            # Match the first 'location / {' (catch-all)
+            new = re.sub(r'(\n\s*)(location\s*/\s*\{)', insert + r'\1\2', txt, count=1)
+            if new != txt:
+              p.write_text(new)
+              print('inserted /assets/ block')
+            else:
+              print('no insertion point found; manual fix needed')
+            "
+          fi
+
+          sudo nginx -t
+          sudo systemctl reload nginx
+          echo "Done."
+
+      - name: Verify
+        run: |
+          set -e
+          echo "── verify: bogus asset returns 404 ──"
+          curl -s -o /dev/null -w "  /assets/index-FAKEHASH.js  → %{http_code} %{size_download}b\n" "http://localhost:3000/assets/index-FAKEHASH.js"
+          echo "── verify: real bundle still 200 ──"
+          BUNDLE=$(curl -s "http://localhost:3000/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+          curl -s -o /dev/null -w "  $BUNDLE  → %{http_code} %{size_download}b\n" "http://localhost:3000$BUNDLE"
