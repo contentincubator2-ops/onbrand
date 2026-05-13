@@ -36,7 +36,13 @@ import localPool from "../localDb";
 const HARD_BUDGET_MS  = 100_000; // 30s tier
 const HARD_BUDGET_60S = 130_000; // 60s tier
 const HARD_BUDGET_100S= 150_000; // 100s tier
-const PER_IMAGE_MS    = 10_000;
+// 2026-05-13 (CJ「30~99秒的圖都生成不了」): PiAPI Flux Schnell takes 8–15s
+// in practice (poll loop adds 1s minimum between checks). The previous
+// 10s budget timed out almost every generation — variants came back with
+// status:"timeout" and thumbnailUrl ended up null. Bumped to 45s so a
+// typical 12s gen lands well within budget; per-tier hard budget still
+// caps the overall job. Variants run in parallel so wall time stays low.
+const PER_IMAGE_MS    = 45_000;
 const LLM_BUDGET_MS   = 40_000;
 const QA_BUDGET_MS    = 12_000;
 
@@ -1074,6 +1080,13 @@ export async function runOrchestra(args: {
       const ok = images.filter((i) => i.status === "ready").length;
       stGen.status = ok > 0 ? "done" : "failed";
       stGen.completedAt = Date.now() - startedAt;
+    }
+    // 2026-05-13: surface image-gen failures so the run page can show
+    // why thumbnailUrl ended up null (was previously silent).
+    for (const img of images) {
+      if ((img.status === "failed" || img.status === "timeout") && img.errorMsg) {
+        errors.push(`image(${img.status}): ${String(img.errorMsg).slice(0, 200)}`);
+      }
     }
 
     // ── Assemble variants ──────────────────────────────────────────────
