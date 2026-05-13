@@ -20,11 +20,11 @@ jobs:
             MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
 
             echo "=== recent mission_outputs (last 15) ==="
-            $MYSQL -e "SELECT id, userId, tier, status, imageUrl IS NOT NULL AS hasImg, LEFT(errorMsg, 80) AS err, createdAt FROM mission_outputs ORDER BY id DESC LIMIT 15" -t 2>&1 | head -25
+            $MYSQL -e "SELECT id, missionId, platform, status, JSON_EXTRACT(metadata, '$.image.url') AS imgUrl, JSON_EXTRACT(metadata, '$.image.status') AS imgStatus, JSON_EXTRACT(metadata, '$.image.errorMsg') AS imgErr, createdAt FROM mission_outputs ORDER BY id DESC LIMIT 15" -t 2>&1 | head -30
 
             echo ""
-            echo "=== variant-level imageUrl from latest task_run_variants ==="
-            $MYSQL -e "SELECT id, taskRunId, platform, imageStatus, LEFT(imageUrl, 60) AS url, LEFT(imageErrorMsg, 80) AS err FROM task_run_variants ORDER BY id DESC LIMIT 15" -t 2>&1 | head -25
+            echo "=== mission_outputs sample metadata JSON ==="
+            $MYSQL -e "SELECT id, JSON_PRETTY(metadata) FROM mission_outputs ORDER BY id DESC LIMIT 3" -t 2>&1 | head -60
 
             echo ""
             echo "=== piapi-related log lines (last 200 OUT) ==="
