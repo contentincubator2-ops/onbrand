@@ -200,12 +200,36 @@ export async function getPositioningJob(entityKind: EntityKind, entityId: number
     );
     const row = (rows as any[])[0];
     if (!row) return null;
+    let status = String(row.status) as JobStatus;
+    let lastError: string | null = row.lastError ?? null;
+    // 2026-05-13 (CJ「分析中 13/14，但內容沒有產出」): if status='running'
+    // but startedAt is older than 10 min, the runner process was killed
+    // (server restart mid-run is the usual cause). Auto-mark failed so the
+    // user can re-trigger instead of staring at a phantom progress bar.
+    if (status === "running" && row.startedAt) {
+      const ageMs = Date.now() - new Date(row.startedAt).getTime();
+      if (ageMs > 10 * 60_000) {
+        try {
+          await localPool.execute(
+            `UPDATE positioning_jobs
+                SET status = 'failed',
+                    lastError = COALESCE(lastError, 'auto-marked failed: runner appeared crashed (>10min since startedAt)'),
+                    finishedAt = NOW()
+              WHERE userId = ? AND entityKind = ? AND entityId = ?
+                AND status = 'running'`,
+            [userId, entityKind, entityId],
+          );
+          status = "failed";
+          lastError = lastError ?? "runner appeared crashed (server restarted mid-run)";
+        } catch { /* best-effort */ }
+      }
+    }
     return {
-      status:      String(row.status) as JobStatus,
+      status,
       currentStep: Number(row.currentStep),
       totalSteps:  Number(row.totalSteps),
       retryCount:  Number(row.retryCount),
-      lastError:   row.lastError ?? null,
+      lastError,
       startedAt:   row.startedAt ? new Date(row.startedAt).toISOString() : null,
       finishedAt:  row.finishedAt ? new Date(row.finishedAt).toISOString() : null,
     };
