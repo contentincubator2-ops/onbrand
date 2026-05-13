@@ -45,6 +45,11 @@ export default function PricingPage() {
         "影片功能加購中（暫時下架）",
       ],
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
+      // 2026-05-12 (CJ「solo 是主推」): highlight the solo plan since
+      // that's the only one we're actively selling right now. Team /
+      // Agency stay listed but de-emphasized.
+      highlight: true,
+      highlightLabel: isEn ? "EARLY BIRD · LOCKED FOREVER" : "早鳥優惠 · 永久保價",
     },
     {
       code: "drop_team",
@@ -61,10 +66,9 @@ export default function PricingPage() {
         "多客戶 workspace（一帳號管多客戶）",
         "邀請客戶以 viewer 角色看自己品牌",
         "月度客戶工作報表",
-        "OnBrand Pro 全部功能",
+        "OnBrand 個人全部功能",
       ],
       cta: isEn ? "Go Team" : "升級到 Team",
-      highlight: true,
     },
     {
       code: "drop_agency",
@@ -103,8 +107,25 @@ export default function PricingPage() {
     ["能開公司發票嗎？", "可以。在「帳號設定 → 發票資訊」填統編 + 公司名，下次扣款會自動開立 B2B 三聯式電子發票。"],
   ];
 
+  // 2026-05-12 (CJ「我要有訂價方案的建議，1500 定價，早鳥 900」):
+  // Show the early-bird offer prominently when applicable. Unauthenticated
+  // visitors see this by default (status is null → isEarlyBird falls to true)
+  // so /pricing functions as a conversion page.
+  const showEarlyBirdBanner =
+    (status?.isEarlyBird ?? true) && (TIERS[0] as any).standardMonthly > TIERS[0].monthly;
+
   return (
     <div className="min-h-screen bg-white">
+      {showEarlyBirdBanner && (
+        <div className="w-full py-3 text-center text-white text-sm font-medium"
+          style={{ background: "linear-gradient(90deg, #059669 0%, #10b981 60%, #34d399 100%)" }}
+        >
+          {isEn
+            ? <>⭐ <strong>Early-bird:</strong> NT$ <strong>900</strong>/mo (standard NT$ 1,500) — <strong>locked forever</strong> for accounts opened today.</>
+            : <>⭐ <strong>限時早鳥</strong>：NT$ <strong>900</strong>/月（標準價 NT$ 1,500）— <strong>現在開通永久保價</strong>，老用戶終身不漲</>
+          }
+        </div>
+      )}
       <div className="max-w-6xl mx-auto px-6 pt-14 pb-12">
         {/* Header */}
         <div className="text-center mb-10">
@@ -171,9 +192,14 @@ export default function PricingPage() {
               {tier.highlight && (
                 <span
                   className="absolute -top-3 left-6 text-[10px] font-bold uppercase tracking-[0.18em] px-2 py-0.5 rounded-md"
-                  style={{ background: "#171717", color: "white" }}
+                  style={{
+                    background: (tier as any).highlightLabel?.includes("早鳥") || (tier as any).highlightLabel?.includes("EARLY")
+                      ? "linear-gradient(90deg, #059669 0%, #10b981 100%)"
+                      : "#171717",
+                    color: "white",
+                  }}
                 >
-                  {isEn ? "BEST FOR AGENCIES" : "最適合 Agency"}
+                  {(tier as any).highlightLabel ?? (isEn ? "BEST FOR AGENCIES" : "最適合 Agency")}
                 </span>
               )}
               <div className="mb-1">
@@ -182,16 +208,19 @@ export default function PricingPage() {
                 </p>
                 <p className="text-xs text-neutral-700 mt-0.5">{tier.sub}</p>
               </div>
-              <div className="flex items-baseline gap-1.5 mt-3">
+              {/* 2026-05-12: strikethrough standard price ABOVE the big price
+                  so early-bird saving (NT$ 1500 → NT$ 900) is the first
+                  visual signal. Only renders for solo plan on monthly view. */}
+              {(tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && !annual && (
+                <div className="mt-3 text-sm text-neutral-400 line-through tabular-nums">
+                  NT$ {(tier as any).standardMonthly.toLocaleString()} / {isEn ? "month" : "月"}
+                </div>
+              )}
+              <div className="flex items-baseline gap-1.5 mt-1">
                 <span className="text-3xl font-bold text-neutral-900 tabular-nums">
                   {annual ? (tier.annual / 1000).toLocaleString() + "K" : tier.monthly.toLocaleString()}
                 </span>
                 <span className="text-sm text-neutral-700">NT$ {annual ? (isEn ? "/ year" : "/ 年") : (isEn ? "/ month" : "/ 月")}</span>
-                {(tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && !annual && (
-                  <span className="text-sm text-neutral-400 line-through tabular-nums ml-1">
-                    NT$ {(tier as any).standardMonthly.toLocaleString()}
-                  </span>
-                )}
               </div>
               <p className="text-xs text-neutral-700 mt-1">
                 {annual
