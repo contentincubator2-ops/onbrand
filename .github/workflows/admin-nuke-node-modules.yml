@@ -5,12 +5,17 @@ jobs:
     runs-on: [self-hosted, linux, vm-marketing-os]
     timeout-minutes: 20
     steps:
-      - run: |
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
           set -e
           AI=/opt/marketing-os/app/skills/ai-talent
-          cd "$AI"
+          APP=/opt/marketing-os/app
+          cd "$APP"
 
           echo "── git reset to latest main ──"
+          REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+          git remote set-url origin "$REPO"
           git fetch origin main
           git reset --hard origin/main
           echo "Commit: $(git log --oneline -1)"
