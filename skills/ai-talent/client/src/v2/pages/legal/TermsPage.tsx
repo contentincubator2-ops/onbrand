@@ -72,8 +72,8 @@ export default function TermsPage() {
             </li>
             <li>
               {isEn
-                ? "Payment methods: credit card and mobile payment (via ECPay — launching tomorrow)."
-                : "付款方式：信用卡、行動支付（綠界金流，明日上線）。"}
+                ? "Payment methods: credit card via Stripe (PCI-DSS compliant)."
+                : "付款方式：信用卡（由 Stripe 處理，符合 PCI-DSS 規範）。"}
             </li>
             <li>
               {isEn

@@ -199,6 +199,15 @@ export const billingRouter = router({
       const { getBalance } = await import("../_core/pointsService");
       const points = await getBalance(ctx.user!.id);
 
+      // 2026-05-14 (CJ「我們使用 Stripe」): expose the user's primary
+      // workspace so PricingPage can call stripe.createCheckout without
+      // an extra round-trip.
+      const [wsRows]: any = await localPool.execute(
+        `SELECT id FROM workspaces WHERE ownerUserId = ? ORDER BY id ASC LIMIT 1`,
+        [ctx.user!.id],
+      );
+      const workspaceId = (wsRows as any[])[0]?.id ?? null;
+
       return {
         planCode: u.planCode,
         planName: plan.name,
@@ -211,6 +220,7 @@ export const billingRouter = router({
         isEarlyBird: eff.isEarlyBird,
         isLocked:    eff.isLocked,
         standardPriceTwdMonthly: plan.standardPriceTwdMonthly ?? plan.priceTwdMonthly,
+        workspaceId,
         // Points (new primary gating signal)
         points: {
           balance: points.balance,

@@ -59,8 +59,8 @@ import { achievementsRouter } from "./achievementsRouter";
 import { communityRouter } from "./communityRouter";
 // 2026-05-11 (CJ「Team / Agency 方案 + 多客戶 workspace」): multi-tenant container.
 import { tenantRouter } from "./tenantRouter";
-// 2026-05-11 (CJ「ECPay 金流」): 綠界 checkout + callback.
-import { ecpayRouter } from "./ecpayRouter";
+// 2026-05-14 (CJ「我們使用 Stripe」): Stripe Checkout + webhook.
+import { stripeRouter } from "./stripeRouter";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」): proactive festival nudges.
 import { festivalRouter } from "./festivalRouter";
 // 2026-05-12 (CJ「Phase 1 prompt library」): Nano-Banana 175 image-prompt templates.
@@ -129,7 +129,7 @@ export const appRouter = router({
   achievements:    achievementsRouter,
   community:       communityRouter,
   tenant:          tenantRouter,
-  ecpay:           ecpayRouter,
+  stripe:          stripeRouter,
   festival:        festivalRouter,
   promptTemplate:      promptTemplateRouter,
   strategyConsultant:  strategyConsultantRouter,

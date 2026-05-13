@@ -294,21 +294,28 @@ app.get("/health", healthLimiter, async (_req, res) => {
   });
 });
 
-// 2026-05-11 (CJ「ECPay 金流」): callback endpoint must accept
-// application/x-www-form-urlencoded (ECPay posts that, not JSON). Sits
-// BEFORE tRPC so the JSON body parser doesn't try to consume it.
-app.use("/api/ecpay/callback", express.urlencoded({ extended: true, limit: "1mb" }));
-app.post("/api/ecpay/callback", async (req, res) => {
-  try {
-    const { verifyAndProcess } = await import("./routers/ecpayRouter");
-    const result = await verifyAndProcess(req.body ?? {});
-    // ECPay expects plain text "1|OK" or "0|ErrorMsg"
-    res.status(200).type("text/plain").send(result);
-  } catch (e: any) {
-    console.error("[ecpay callback] error:", e);
-    res.status(200).type("text/plain").send("0|server error");
-  }
-});
+// 2026-05-14 (CJ「我們使用 Stripe」): webhook endpoint needs the RAW body
+// (Buffer) for signature verification. Mount express.raw BEFORE the
+// global JSON parser so req.body stays a Buffer here.
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json", limit: "2mb" }),
+  async (req, res) => {
+    try {
+      const signature = req.header("stripe-signature") ?? "";
+      const { handleStripeWebhook } = await import("./routers/stripeRouter");
+      const result = await handleStripeWebhook(req.body as Buffer, signature);
+      if (result.ok) {
+        res.status(200).json({ received: true });
+      } else {
+        res.status(400).json({ error: result.message ?? "webhook failed" });
+      }
+    } catch (e: any) {
+      console.error("[stripe.webhook] handler error:", e);
+      res.status(500).json({ error: "server error" });
+    }
+  },
+);
 
 // Mount tRPC router
 app.use("/trpc", (req, res, next) => {

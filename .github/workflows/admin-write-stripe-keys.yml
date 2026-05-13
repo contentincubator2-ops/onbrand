@@ -1,0 +1,54 @@
+name: Admin — Write Stripe keys to prod .env
+
+# 2026-05-14 (CJ「我們使用 Stripe」)
+# Writes STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET into the VM's
+# skills/ai-talent/.env, then pm2 restart so the new env is picked up.
+#
+# How to use:
+#   1. In GitHub repo Settings → Secrets and variables → Actions, add:
+#        STRIPE_SECRET_KEY       (sk_test_... or sk_live_...)
+#        STRIPE_WEBHOOK_SECRET   (whsec_... from Stripe Dashboard webhook config)
+#   2. Run this workflow.
+#   3. In Stripe Dashboard → Developers → Webhooks, point a new endpoint at
+#        https://onbrand.sowork.ai/api/stripe/webhook
+#      listening to: checkout.session.completed, checkout.session.async_payment_succeeded
+#      Copy the signing secret into STRIPE_WEBHOOK_SECRET above.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  write:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET
+          script: |
+            set -e
+            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+
+            upsert() {
+              local key="$1" val="$2"
+              if grep -qE "^${key}=" "$ENV"; then
+                # macOS-style sed escape — VM uses GNU sed so just inline
+                sed -i "s|^${key}=.*|${key}=${val}|" "$ENV"
+                echo "[updated] ${key}"
+              else
+                echo "${key}=${val}" >> "$ENV"
+                echo "[added]   ${key}"
+              fi
+            }
+
+            upsert STRIPE_SECRET_KEY     "${{ secrets.STRIPE_SECRET_KEY }}"
+            upsert STRIPE_WEBHOOK_SECRET "${{ secrets.STRIPE_WEBHOOK_SECRET }}"
+
+            echo
+            echo "── Restarting pm2 to pick up new env ─────"
+            pm2 restart ai-talent --update-env
+            sleep 2
+            pm2 status ai-talent | head -20

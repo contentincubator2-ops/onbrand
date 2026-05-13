@@ -20,6 +20,17 @@ export default function PricingPage() {
 
   const isEn = lang === "en";
 
+  // 2026-05-14 (CJ「我們使用 Stripe」): wire CTA to Stripe Checkout.
+  const checkoutMut = (trpc as any).stripe?.createCheckout?.useMutation
+    ? (trpc as any).stripe.createCheckout.useMutation({
+        onSuccess: (data: any) => {
+          if (data?.url) window.location.assign(data.url);
+        },
+        onError: (e: any) =>
+          showToastGlobal((isEn ? "Checkout failed: " : "結帳失敗：") + (e?.message ?? e)),
+      })
+    : null;
+
   // 2026-05-11 — 4-tier pricing: Solo / Team / Agency / Enterprise.
   const TIERS = [
     {
@@ -249,12 +260,26 @@ export default function PricingPage() {
                 onClick={() => {
                   if (!status) {
                     navigate("/auth/register");
-                  } else {
-                    showToastGlobal(isEn
-                      ? "Payments launching soon (ECPay integration) — for now, please email sowork@sowork.tw"
-                      : "付款功能即將上線（綠界整合中）— 請先聯繫 sowork@sowork.tw");
+                    return;
                   }
+                  if (tier.code === "enterprise" || !checkoutMut) {
+                    window.location.href = "mailto:sowork@sowork.tw?subject=OnBrand Enterprise";
+                    return;
+                  }
+                  const wsId = (status as any)?.workspaceId ?? (status as any)?.defaultWorkspaceId;
+                  if (!wsId) {
+                    showToastGlobal(isEn
+                      ? "Couldn't find your workspace — please reload and try again."
+                      : "找不到 workspace，請重新整理頁面再試一次。");
+                    return;
+                  }
+                  checkoutMut.mutate({
+                    planCode: tier.code as any,
+                    workspaceId: Number(wsId),
+                    annual,
+                  });
                 }}
+                disabled={checkoutMut?.isPending}
                 className="w-full py-2.5 rounded-lg font-semibold text-sm transition"
                 style={{
                   background: tier.highlight ? "#171717" : "white",

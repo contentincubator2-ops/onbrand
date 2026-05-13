@@ -86,24 +86,14 @@ export default function AccountPage() {
     window.addEventListener("onbrand:open-topup", handler);
     return () => window.removeEventListener("onbrand:open-topup", handler);
   }, []);
-  const topupPacksQuery = (trpc as any).ecpay?.listTopupPacks?.useQuery
-    ? (trpc as any).ecpay.listTopupPacks.useQuery(undefined, { enabled: showTopupModal })
+  const topupPacksQuery = (trpc as any).stripe?.listTopupPacks?.useQuery
+    ? (trpc as any).stripe.listTopupPacks.useQuery(undefined, { enabled: showTopupModal })
     : { data: [] };
-  const topupMut = (trpc as any).ecpay?.createTopupCheckout?.useMutation
-    ? (trpc as any).ecpay.createTopupCheckout.useMutation({
+  const topupMut = (trpc as any).stripe?.createTopupCheckout?.useMutation
+    ? (trpc as any).stripe.createTopupCheckout.useMutation({
         onSuccess: (data: any) => {
-          // Auto-submit ECPay form
-          const form = document.createElement("form");
-          form.method = "POST";
-          form.action = data.actionUrl;
-          form.style.display = "none";
-          Object.entries(data.fields).forEach(([k, v]) => {
-            const i = document.createElement("input");
-            i.type = "hidden"; i.name = k; i.value = String(v);
-            form.appendChild(i);
-          });
-          document.body.appendChild(form);
-          form.submit();
+          // Stripe Checkout — redirect straight to hosted page.
+          if (data?.url) window.location.assign(data.url);
         },
         onError: (e: any) =>
           showToastGlobal((lang === "en" ? "Topup failed: " : "加購失敗：") + (e?.message ?? e)),
@@ -509,8 +499,8 @@ export default function AccountPage() {
               </div>
               <p className="text-[11px] text-neutral-400 mt-4">
                 {lang === "en"
-                  ? "Payment via ECPay credit card. Invoice issued automatically."
-                  : "綠界信用卡付款 · 自動開立電子發票"}
+                  ? "Secure payment by Stripe · receipt emailed automatically."
+                  : "Stripe 安全付款 · 收據自動寄到信箱"}
               </p>
             </div>
           </div>

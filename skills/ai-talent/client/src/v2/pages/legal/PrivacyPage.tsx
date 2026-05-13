@@ -49,8 +49,8 @@ export default function PrivacyPage() {
             <li>
               <strong>{isEn ? "Payment info: " : "付款資訊："}</strong>
               {isEn
-                ? "handled by ECPay — we don't store credit card numbers."
-                : "由綠界金流處理，我們不儲存信用卡卡號。"}
+                ? "handled by Stripe — we don't store credit card numbers."
+                : "由 Stripe 金流處理，我們不儲存信用卡卡號。"}
             </li>
             <li>
               <strong>{isEn ? "Support info: " : "通訊資訊："}</strong>
@@ -113,10 +113,10 @@ export default function PrivacyPage() {
                 : "處理圖片、影片生成請求。"}
             </li>
             <li>
-              <strong>{isEn ? "ECPay: " : "綠界 ECPay："}</strong>
+              <strong>Stripe:</strong>{" "}
               {isEn
-                ? "processes card payments and invoices."
-                : "處理刷卡、發票開立。"}
+                ? "processes card payments and issues receipts (PCI-DSS compliant; we never see card numbers)."
+                : "處理刷卡、寄送收據（符合 PCI-DSS 規範；我們不接觸卡號）。"}
             </li>
             <li>
               <strong>Pipedream:</strong>{" "}
