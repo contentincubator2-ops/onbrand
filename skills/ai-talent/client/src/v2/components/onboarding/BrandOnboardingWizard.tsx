@@ -236,11 +236,11 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   {(lang === "en" ? [
                     { num: "01", label: "Add your brand", desc: "Name, site, FB — entry points so AI pulls real content" },
                     { num: "02", label: "Run the method", desc: "14-step deep dive: Golden Circle → Differentiation → Voice" },
-                    { num: "03", label: "Auto-generate content", desc: "30s craft / 60s package / 99s campaign" },
+                    { num: "03", label: "Auto-generate content", desc: "30s Single / 60s Pack / 99s Slate" },
                   ] : [
                     { num: "01", label: "建立品牌", desc: "名稱、官網、FB — 給 AI 抓真實內容的入口" },
                     { num: "02", label: "套用定位法", desc: "14 步深度分析：黃金圈 → 差異化 → Voice" },
-                    { num: "03", label: "內容自動產出", desc: "30s 快寫 / 60s 製作包 / 99s 全企劃" },
+                    { num: "03", label: "內容自動產出", desc: "30s 單品 / 60s 套組 / 99s 檔期" },
                   ]).map((s, i, arr) => (
                     <div
                       key={s.num}
@@ -485,7 +485,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                       display: "inline-flex", alignItems: "center", gap: 6,
                     }}
                   >
-                    {lang === "en" ? "Start 30s craft" : "開始 30s 快寫"} <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
+                    {lang === "en" ? "Start 30s Single" : "開始 30s 單品"} <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
                   </button>
                   <button
                     onClick={() => {
@@ -499,7 +499,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                       background: "#FFFFFF", color: "#171717",
                     }}
                   >
-                    {lang === "en" ? "60s package" : "60s 製作包"}
+                    {lang === "en" ? "60s Pack" : "60s 套組"}
                   </button>
                   <button
                     onClick={() => {
@@ -513,7 +513,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                       background: "#FFFFFF", color: "#171717",
                     }}
                   >
-                    {lang === "en" ? "99s campaign" : "99s 全企劃"}
+                    {lang === "en" ? "99s Slate" : "99s 檔期"}
                   </button>
                   <button
                     onClick={() => {

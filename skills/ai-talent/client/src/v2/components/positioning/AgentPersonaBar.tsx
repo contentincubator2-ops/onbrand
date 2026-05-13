@@ -64,7 +64,7 @@ function getPersonas(lang: Lang): Record<PersonaId, PersonaMeta> {
       seed: "Creative-Drop",
       defaultLine: en
         ? "Once positioning + copy + knowledge are ready, I turn them into the skeleton of every post — 30s quick drafts, 60s production packs, 99s full plans."
-        : "定位 + 文字 + 知識備好後，我會把它們轉成每篇貼文的骨架 — 30s 快寫、60s 製作包、99s 全企劃。",
+        : "定位 + 文字 + 知識備好後，我會把它們轉成每篇貼文的骨架 — 30s 單品、60s 套組、99s 檔期。",
       domain: en ? "Creative Direction" : "Creative Direction",
     },
   };

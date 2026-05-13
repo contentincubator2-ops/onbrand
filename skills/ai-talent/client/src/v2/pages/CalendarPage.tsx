@@ -273,13 +273,13 @@ export default function CalendarPage() {
         <p className="mt-4 text-[11px] text-default-700 text-center">
           {lang === "en" ? (
             <>
-              Want to schedule a new post? Hit <a href="/30s" className="font-medium text-default-900 underline">30s craft</a>, then tap "Schedule" on the result page
+              Want to schedule a new post? Hit <a href="/30s" className="font-medium text-default-900 underline">30s Single</a>, then tap "Schedule" on the result page
               <span className="mx-2 text-default-500">|</span>
               v2 adds drag-to-reschedule + week view
             </>
           ) : (
             <>
-              想排新貼文？到 <a href="/30s" className="font-medium text-default-900 underline">30s 快寫</a> 跑一篇 → 結果頁按「排程發布」
+              想排新貼文？到 <a href="/30s" className="font-medium text-default-900 underline">30s 單品</a> 跑一篇 → 結果頁按「排程發布」
               <span className="mx-2 text-default-500">|</span>
               v2 將加入 drag/drop 改時間 + 週曆視圖
             </>

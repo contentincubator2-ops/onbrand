@@ -451,7 +451,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     : (tier === "30s"
         ? "今天，要寫哪一篇 30 秒搞定的貼文？"
         : tier === "60s"
-        ? "今天，要做哪一個 60 秒製作包？"
+        ? "今天，要做哪一個 60 秒套組？"
         : "今天，要做哪一個 99 秒研究驗證版？");
 
   const runQuickMut = (trpc as any).quickTask?.runQuick?.useMutation();
@@ -698,7 +698,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     ? {
         emoji: "🎼",
         kicker: "PRODUCTION PACKAGE",
-        headline: lang === "en" ? "A full production pack in 60 seconds" : "60 秒交付一份完整製作包",
+        headline: lang === "en" ? "A full production pack in 60 seconds" : "60 秒交付一個完整套組",
         sub: lang === "en" ? "Multi-agent · 5 variants + real images + reply templates + posting time + QA" : "多 Agent 協作 · 5 變體 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
         bullets: lang === "en" ? ["5 variants", "7-9 agents", "Real Flux images", "Jordan QA"] : ["5 變體", "7-9 位 agent 協作", "Flux 真生圖", "Jordan QA 審核"],
         accent: "#7c3aed",
@@ -729,7 +729,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     : (tier === "30s"
         ? "今天，要寫哪一篇 30 秒搞定的貼文？"
         : tier === "60s"
-        ? "今天，要做哪一個 60 秒製作包？"
+        ? "今天，要做哪一個 60 秒套組？"
         : "今天，要做哪一個 99 秒研究驗證版？");
 
   // 2026-05-11 (CJ「整個因果鏈在最後一公里斷掉了」): replace the tech-spec
@@ -751,7 +751,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   // 2026-05-11 (CJ「字數儘量精簡」): trimmed subtitle copy.
   const tierKicker = lang === "en"
     ? (tier === "30s" ? "a 30-second post" : tier === "60s" ? "a 60-second production pack" : "a 99-second campaign")
-    : (tier === "30s" ? "30 秒一篇貼文" : tier === "60s" ? "60 秒一個製作包" : "99 秒一個 campaign");
+    : (tier === "30s" ? "30 秒寫一件素材" : tier === "60s" ? "60 秒寫一套素材" : "99 秒企劃一個檔期");
   const heroSubtitle = !brandId
     ? (lang === "en"
         ? "Lock in who you are first so the AI knows what every post should say."

@@ -2459,16 +2459,16 @@ function PositioningCompletionBridge({
           maxWidth: 620,
         }}>
           {lang === "en"
-            ? "This positioning becomes the backbone for 30s crafts, 60s packages, 99s campaigns, and Theater — every post is built from it, so the AI never sounds off-brand again."
-            : "這份定位現在會自動成為 30s 快寫、60s 製作包、99s 全企劃、企劃台 的內容骨架 — 每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。"}
+            ? "This positioning becomes the backbone for 30s Singles, 60s Packs, 99s Slates, and Theater — every post is built from it, so the AI never sounds off-brand again."
+            : "這份定位現在會自動成為 30s 單品、60s 套組、99s 檔期、企劃台 的內容骨架 — 每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。"}
         </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {/* 2026-05-12 pre-launch zombie audit: routes were /b/X/30s which
             don't exist (404). Real routes are /30s?b=X */}
-        <BridgeBtn label={lang === "en" ? "30s craft"    : "30s 快寫"}    onClick={() => navigate(`/30s?b=${brandId}`)} primary />
-        <BridgeBtn label={lang === "en" ? "60s package"  : "60s 製作包"}  onClick={() => navigate(`/60s?b=${brandId}`)} />
-        <BridgeBtn label={lang === "en" ? "99s campaign" : "99s 全企劃"}  onClick={() => navigate(`/99s?b=${brandId}`)} />
+        <BridgeBtn label={lang === "en" ? "30s Single"    : "30s 單品"}    onClick={() => navigate(`/30s?b=${brandId}`)} primary />
+        <BridgeBtn label={lang === "en" ? "60s Pack"  : "60s 套組"}  onClick={() => navigate(`/60s?b=${brandId}`)} />
+        <BridgeBtn label={lang === "en" ? "99s Slate" : "99s 檔期"}  onClick={() => navigate(`/99s?b=${brandId}`)} />
         <BridgeBtn label={lang === "en" ? "Theater"      : "企劃台"}      onClick={() => navigate(`/theater?b=${brandId}`)} />
       </div>
     </div>
