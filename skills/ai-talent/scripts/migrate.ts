@@ -1174,6 +1174,12 @@ async function main() {
         KEY idx_entity (entityKind, entityId, ts)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+    // 2026-05-13 (CJ「我要怎麼確保品牌定位會成功」): kind was VARCHAR(32)
+    // but `positioning_step:<longStepId>` (e.g. valueProposition,
+    // messagingPillars) overflows. Widening to 64 — non-breaking ALTER.
+    try {
+      await conn.execute(`ALTER TABLE usage_log MODIFY COLUMN kind VARCHAR(64) NOT NULL`);
+    } catch { /* idempotent: ignore if already widened */ }
     console.log("[migrate] usage_log: OK");
 
     // ── brand_knowledge_items (NotebookLM-style knowledge tile) ─────────
