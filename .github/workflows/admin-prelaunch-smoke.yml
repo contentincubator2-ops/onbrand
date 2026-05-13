@@ -1,0 +1,128 @@
+name: Admin — Pre-launch functional smoke
+
+# End-to-end check that the trial-user happy path still works.
+# Does NOT actually run a 30s task (would burn LLM $); just probes
+# the procedures exist + auth challenge + no crashes.
+
+on: { workflow_dispatch: {} }
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - run: |
+          set +e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N --silent"
+
+          echo "════════════════════════════════════════"
+          echo "1. KEY ROUTES return SPA shell (200)"
+          echo "════════════════════════════════════════"
+          for route in / /auth/login /auth/register /brands /30s /60s /99s /projects /calendar /admin/support /changelog /pricing /terms /privacy; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3101$route")
+            echo "  $route → $STATUS"
+            if [ "$STATUS" != "200" ]; then echo "    ❌ broken"; fi
+          done
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "2. KEY TRPC PROCEDURES exist + auth-gated"
+          echo "════════════════════════════════════════"
+          PROCS=(
+            "auth.me"
+            "brand.listByMember"
+            "brand.listWithStats"
+            "scope.options"
+            "scope.active"
+            "scope.savePositioning"
+            "product.get"
+            "event.get"
+            "mission.listAllForUser"
+            "output.getById"
+            "output.recent"
+            "output.updateVariantCaption"
+            "output.updateVariantImage"
+            "image.generate"
+            "quickTask.runOrchestra30"
+            "quickTask.runOrchestra60"
+            "quickTask.runOrchestra100"
+            "positioningJobs.start"
+            "positioningJobs.getStatus"
+            "notifications.list"
+            "festival.upcoming"
+            "support.startConversation"
+            "support.sendMessage"
+            "support.adminListTickets"
+            "billing.getStatus"
+          )
+          for p in "${PROCS[@]}"; do
+            RESP=$(curl -s "http://localhost:3101/trpc/$p?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%7D%7D%7D" --max-time 5)
+            if echo "$RESP" | grep -q "UNAUTHORIZED\|UNAUTHENTICATED\|invalid_input\|BAD_REQUEST\|requires.*input\|expected.*object"; then
+              echo "  ✓ $p (auth-challenge or input-validation as expected)"
+            elif echo "$RESP" | grep -q "no procedure\|No procedure"; then
+              echo "  ❌ $p NOT MOUNTED"
+            else
+              echo "  ⚠ $p — unexpected (200 without auth? leak?)"
+              echo "    $(echo "$RESP" | head -c 200)"
+            fi
+          done
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "3. DB INTEGRITY — orphan check"
+          echo "════════════════════════════════════════"
+          echo "── events.brandId NULL count ──"
+          $MYSQL -e "SELECT COUNT(*) AS orphan_events FROM events WHERE brandId IS NULL"
+          echo "── support tickets without conversation ──"
+          $MYSQL -e "
+            SELECT COUNT(*) AS orphan_tickets
+              FROM support_tickets t
+             WHERE NOT EXISTS (SELECT 1 FROM support_conversations c WHERE c.id = t.conversationId)
+          "
+          echo "── mission_outputs with metadata.tier IN ('100s') (should be 0 after rename) ──"
+          $MYSQL -e "
+            SELECT COUNT(*) FROM mission_outputs
+             WHERE JSON_UNQUOTE(JSON_EXTRACT(metadata, '\$.tier')) = '100s'
+          "
+          echo "── positioning_jobs stuck running > 10 min ──"
+          $MYSQL -e "
+            SELECT COUNT(*) FROM positioning_jobs
+             WHERE status = 'running'
+               AND startedAt < NOW() - INTERVAL 10 MINUTE
+          "
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "4. ENV — required keys present"
+          echo "════════════════════════════════════════"
+          for k in QWEN_API_KEY AZURE_FOUNDRY_API_KEY GEMINI_API_KEY OPENAI_API_KEY PIAPI_KEY \
+                   ANTHROPIC_API_KEY RESEND_API_KEY EMAIL_FROM APP_URL JWT_SECRET LOCAL_DB_PASSWORD; do
+            v=$(printenv "$k" 2>/dev/null || true)
+            if [ -z "$v" ]; then echo "  ❌ $k MISSING"; else echo "  ✓ $k (${#v} chars)"; fi
+          done
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "5. STORAGE — covers + boardroom-exports writable"
+          echo "════════════════════════════════════════"
+          for d in /opt/marketing-os/covers /opt/marketing-os/boardroom-exports; do
+            if [ -d "$d" ] && [ -w "$d" ]; then echo "  ✓ $d writable"; else echo "  ❌ $d missing or not writable"; fi
+          done
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "6. RECENT CRASHES — last 200 ERROR log lines"
+          echo "════════════════════════════════════════"
+          tail -200 ~/.pm2/logs/marketing-os-error.log 2>/dev/null \
+            | grep -iE "uncaught|unhandled|TypeError|ReferenceError|fatal|crash|EADDRINUSE|connection terminated" \
+            | grep -v "(retryable|continuing)" \
+            | tail -10 \
+            || echo "  ✓ no fatal errors in recent log"
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "DONE"
+          echo "════════════════════════════════════════"

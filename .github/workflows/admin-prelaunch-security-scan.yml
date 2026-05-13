@@ -1,0 +1,171 @@
+name: Admin — Pre-launch security scan
+
+# Static + runtime checks before opening trial. Covers:
+#  1. Secrets accidentally committed
+#  2. Raw SQL with string interpolation (injection vector)
+#  3. npm audit (known CVEs)
+#  4. Auth bypass: hit admin endpoints with unauth + non-admin tokens
+#  5. CORS / CSP headers present
+#  6. Body size limit on /trpc
+#  7. Rate-limiter applied to /api/auth
+#  8. PII exposure (response includes only the calling user's data)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e   # don't bail on individual non-fatal findings
+          APP=/opt/marketing-os/app
+          AI=$APP/skills/ai-talent
+          REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+          cd "$APP"
+          git remote set-url origin "$REPO"
+          git fetch origin main && git reset --hard origin/main
+
+          echo "════════════════════════════════════════"
+          echo "1. SECRETS SCAN (committed in git history)"
+          echo "════════════════════════════════════════"
+          # Look for high-confidence secret patterns in the working tree
+          PATTERNS='(sk-(proj|ant|or)-|ghp_|gho_|ghr_|AKIA[0-9A-Z]{16}|aws_secret|-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----|google_oauth_client_secret|service_role.*ey[A-Za-z0-9_-]{20,}|tvly-[A-Za-z0-9]{20,}|pplx-[a-z0-9]{30,}|re_[A-Za-z0-9_-]{30,})'
+          MATCHES=$(grep -rEn "$PATTERNS" "$APP" \
+            --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist \
+            --exclude="*.lock" --exclude="*.log" --exclude="*-lock.json" 2>/dev/null | head -20)
+          if [ -z "$MATCHES" ]; then
+            echo "  ✓ no obvious secret patterns in working tree"
+          else
+            echo "  ❌ FOUND POTENTIAL SECRETS:"
+            echo "$MATCHES"
+          fi
+
+          echo ""
+          echo "── any .env files committed? ──"
+          # .env files in repo are smell — should be .env.example only
+          ENV_FILES=$(git ls-files "$APP" 2>/dev/null | grep -E '(^|/)\.env$|(^|/)\.env\.(local|production|development)$')
+          if [ -z "$ENV_FILES" ]; then
+            echo "  ✓ no .env files tracked"
+          else
+            echo "  ❌ .env files in git:"
+            echo "$ENV_FILES"
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "2. SQL INJECTION (string-interpolated SQL)"
+          echo "════════════════════════════════════════"
+          # Look for SQL with template-literal interpolation of unvalidated values
+          # (allowed: \`...\${input.something | safeIdent | tableName}...\`)
+          # We grep for backtick SQL with ${} that LOOKS user-driven
+          INJECTABLE=$(grep -rnE 'execute\(\s*\`[^`]{0,200}\$\{[^}]*input\.' "$AI/server" 2>/dev/null | head -10)
+          if [ -z "$INJECTABLE" ]; then
+            echo "  ✓ no execute() with \${input.*} interpolation"
+          else
+            echo "  ⚠ POTENTIAL SQL INJECTION (review each):"
+            echo "$INJECTABLE"
+          fi
+
+          echo ""
+          echo "── any raw \`db.execute(sql\` with user-controlled values? ──"
+          DRIZZLE_INJ=$(grep -rnE 'sql\`[^`]{0,200}\$\{[^}]*input\.[a-z]' "$AI/server" 2>/dev/null | head -10)
+          if [ -z "$DRIZZLE_INJ" ]; then
+            echo "  ✓ no sql\`\${input.*}\` interpolation"
+          else
+            echo "  ⚠ POTENTIAL DRIZZLE INJECTION:"
+            echo "$DRIZZLE_INJ"
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "3. npm audit (server + client)"
+          echo "════════════════════════════════════════"
+          cd "$AI"
+          npm audit --omit=dev --audit-level=high 2>&1 | tail -15 || true
+          echo ""
+          echo "── client audit ──"
+          cd "$AI/client"
+          npm audit --omit=dev --audit-level=high 2>&1 | tail -15 || true
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "4. AUTH BYPASS — admin endpoints reject unauth"
+          echo "════════════════════════════════════════"
+          # adminListTickets without auth → must return UNAUTHORIZED
+          RESP=$(curl -s "http://localhost:3101/trpc/support.adminListTickets?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22status%22%3A%22all%22%7D%7D%7D")
+          if echo "$RESP" | grep -q "UNAUTHORIZED\|UNAUTHENTICATED"; then
+            echo "  ✓ adminListTickets (no auth) → UNAUTHORIZED"
+          else
+            echo "  ❌ adminListTickets (no auth) — unexpected response:"
+            echo "    $(echo "$RESP" | head -c 300)"
+          fi
+
+          # adminGetTicket
+          RESP=$(curl -s "http://localhost:3101/trpc/support.adminGetTicket?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22ticketId%22%3A1%7D%7D%7D")
+          if echo "$RESP" | grep -q "UNAUTHORIZED\|UNAUTHENTICATED"; then
+            echo "  ✓ adminGetTicket (no auth) → UNAUTHORIZED"
+          else
+            echo "  ❌ adminGetTicket (no auth) — leak risk"
+          fi
+
+          echo ""
+          echo "── any procedure that does NOT use protectedProcedure? ──"
+          # Whitelist allowed publicProcedure paths
+          PUBLIC_PROCS=$(grep -rEn "publicProcedure" "$AI/server/routers" --include="*.ts" 2>/dev/null | head -20)
+          if [ -z "$PUBLIC_PROCS" ]; then
+            echo "  ✓ all router procedures are protected"
+          else
+            echo "  ℹ public procedures (review if intended):"
+            echo "$PUBLIC_PROCS"
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "5. SECURITY HEADERS (helmet / CSP)"
+          echo "════════════════════════════════════════"
+          curl -s -I "http://localhost:3101/" | grep -iE "content-security|x-frame|x-content-type|strict-transport|referrer-policy|cross-origin" | head -10
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "6. /trpc body-size limit"
+          echo "════════════════════════════════════════"
+          grep -n "json(\\|limit:" "$AI/server/index.ts" | grep -iE "limit|json" | head -5
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "7. Rate limiter on /api/auth"
+          echo "════════════════════════════════════════"
+          grep -n "rate-?limit\|rateLimit\|express-rate" "$AI/server/index.ts" "$AI/server/auth"/*.ts 2>/dev/null | head -10
+
+          echo ""
+          echo "── attempt 10 rapid /api/auth/login calls (rate-limit triggers?) ──"
+          for i in $(seq 1 10); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:3101/api/auth/login" \
+              -H "Content-Type: application/json" -d '{"email":"x@x.x","password":"x"}')
+            echo "  attempt $i → $CODE"
+          done | tail -5
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "8. PII EXPOSURE — public endpoints don't leak"
+          echo "════════════════════════════════════════"
+          # /api/health should not leak version/build info beyond what's intended
+          curl -s "http://localhost:3101/health" | head -c 200
+          echo ""
+          # Try a non-trpc endpoint that might leak
+          curl -s "http://localhost:3101/api/debug" -o /tmp/d.txt -w "  /api/debug → http=%{http_code} size=%{size_download}\n"
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "9. PROD .env not world-readable"
+          echo "════════════════════════════════════════"
+          stat -c '%a %U:%G %n' /opt/marketing-os/app/skills/ai-talent/.env 2>/dev/null
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "DONE — read findings above. Anything marked ❌ blocks launch."
+          echo "════════════════════════════════════════"
