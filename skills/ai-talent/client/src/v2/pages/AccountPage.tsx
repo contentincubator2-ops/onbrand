@@ -179,44 +179,76 @@ export default function AccountPage() {
           </div>
         </section>
 
-        {/* Quota usage — 2026-05-12 */}
-        {status?.usage && status?.quota && (
-          <section className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
-            <h2 className="text-lg font-semibold text-neutral-900 mb-4">{t("account_usage")}</h2>
-            <div className="space-y-3 text-sm">
-              {[
-                { key: "task_30s", label: lang === "en" ? "30s tasks" : "30 秒任務" },
-                { key: "task_60s", label: lang === "en" ? "60s tasks" : "60 秒任務" },
-                { key: "task_99s", label: lang === "en" ? "99s tasks" : "99 秒任務" },
-                { key: "image_gen", label: lang === "en" ? "AI images" : "AI 圖片" },
-                { key: "video_gen", label: lang === "en" ? "AI videos" : "AI 影片" },
-              ].map(({ key, label }) => {
-                const used = (status.usage as any)[key] ?? 0;
-                const cap = (status.quota as any)[key];
-                if (cap === undefined) return null;
-                const unlimited = cap < 0;
-                const pct = unlimited ? 0 : Math.min(100, Math.round((used / cap) * 100));
-                const isHigh = !unlimited && pct >= 80;
-                return (
-                  <div key={key}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-neutral-700">{label}</span>
-                      <span className={`font-medium ${isHigh ? "text-amber-700" : "text-neutral-600"}`}>
-                        {used}{unlimited ? (lang === "en" ? " · Unlimited" : " · 無限") : ` / ${cap}`}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all ${isHigh ? "bg-amber-500" : "bg-neutral-900"}`}
-                        style={{ width: unlimited ? "0%" : `${pct}%` }}
-                      />
-                    </div>
+        {/* Points balance — 2026-05-14 (CJ「點數系統」) replaces fixed quotas */}
+        {(status as any)?.points && (
+          (() => {
+            const pts = (status as any).points as {
+              balance: number; perCycle: number; cycleDays: number;
+              nextRefillAt: string | null;
+              costs: Record<string, number>;
+            };
+            const pctRemaining = pts.perCycle > 0
+              ? Math.max(0, Math.min(100, Math.round((pts.balance / pts.perCycle) * 100)))
+              : 0;
+            const isLow = pts.perCycle > 0 && pts.balance < pts.perCycle * 0.2;
+            const unlimited = pts.perCycle < 0;
+            const refillLabel = pts.nextRefillAt
+              ? new Date(pts.nextRefillAt).toLocaleDateString("zh-TW", { month: "numeric", day: "numeric" })
+              : "—";
+            return (
+              <section className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
+                <div className="flex items-baseline justify-between mb-3">
+                  <h2 className="text-lg font-semibold text-neutral-900">
+                    {lang === "en" ? "Point balance" : "點數餘額"}
+                  </h2>
+                  <span className={`text-2xl font-bold tabular-nums ${isLow ? "text-amber-700" : "text-neutral-900"}`}>
+                    {pts.balance.toLocaleString()}
+                    <span className="text-sm font-normal text-neutral-500 ml-1">
+                      {unlimited ? (lang === "en" ? "/ unlimited" : "/ 無限") : ` / ${pts.perCycle.toLocaleString()}`}
+                    </span>
+                  </span>
+                </div>
+                {!unlimited && (
+                  <div className="h-2 bg-neutral-100 rounded-full overflow-hidden mb-3">
+                    <div
+                      className={`h-full transition-all ${isLow ? "bg-amber-500" : "bg-neutral-900"}`}
+                      style={{ width: `${pctRemaining}%` }}
+                    />
                   </div>
-                );
-              })}
-            </div>
-            <p className="mt-4 text-xs text-neutral-400">{lang === "en" ? "Resets on the 1st of each month" : "每月 1 號重置"}</p>
-          </section>
+                )}
+                <p className="text-xs text-neutral-500 mb-4">
+                  {unlimited
+                    ? (lang === "en" ? "Enterprise — no limit" : "企業版 · 無上限")
+                    : pts.cycleDays === 7
+                      ? (lang === "en" ? "Trial allocation · one-time grant" : "試用點數 · 一次性贈送")
+                      : (lang === "en"
+                          ? `Resets to ${pts.perCycle.toLocaleString()} on ${refillLabel}`
+                          : `${refillLabel} 自動補滿 ${pts.perCycle.toLocaleString()} 點`)}
+                </p>
+                {/* Cost cheatsheet */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  {[
+                    { key: "task_30s",   label: lang === "en" ? "30s · Single"  : "30s 單品" },
+                    { key: "task_60s",   label: lang === "en" ? "60s · Pack"    : "60s 套組" },
+                    { key: "task_99s",   label: lang === "en" ? "99s · Slate"   : "99s 檔期" },
+                    { key: "image_flux", label: lang === "en" ? "AI image"      : "AI 圖片" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="bg-neutral-50 rounded-lg px-3 py-2">
+                      <div className="text-neutral-500 text-[11px]">{label}</div>
+                      <div className="text-neutral-900 font-semibold tabular-nums">{pts.costs[key]} 點</div>
+                    </div>
+                  ))}
+                </div>
+                {isLow && !unlimited && (
+                  <p className="mt-4 text-xs text-amber-700">
+                    {lang === "en"
+                      ? "⚠ Low balance — top-up packs coming soon, or wait until refill."
+                      : "⚠ 點數快用完了 — 加購包即將上線，或等下次補滿。"}
+                  </p>
+                )}
+              </section>
+            );
+          })()
         )}
 
         {/* Invoices */}

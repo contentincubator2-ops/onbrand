@@ -195,6 +195,10 @@ export const billingRouter = router({
         usage[r.kind] = Number(r.used ?? 0);
       }
 
+      // 2026-05-14: points balance + cycle info (replaces fixed quota counts)
+      const { getBalance } = await import("../_core/pointsService");
+      const points = await getBalance(ctx.user!.id);
+
       return {
         planCode: u.planCode,
         planName: plan.name,
@@ -202,15 +206,29 @@ export const billingRouter = router({
         planEndsAt: u.planEndsAt?.toISOString() ?? null,
         daysLeft,
         expired,
-        // Effective price for THIS user (early-bird grandfathered or
-        // locked custom or standard). Used by /pricing + /settings/account
-        // + ECPay checkout.
         priceTwdMonthly:  eff.monthly,
         priceTwdAnnually: eff.annually,
         isEarlyBird: eff.isEarlyBird,
         isLocked:    eff.isLocked,
-        // Also expose the sticker price so UI can show "原價 1500 / 早鳥 900"
         standardPriceTwdMonthly: plan.standardPriceTwdMonthly ?? plan.priceTwdMonthly,
+        // Points (new primary gating signal)
+        points: {
+          balance: points.balance,
+          perCycle: points.pointsPerCycle,
+          cycleDays: points.cycleDays,
+          nextRefillAt: points.nextRefillAt?.toISOString() ?? null,
+          // Per-action costs so UI can preview "this 60s task = 60 pts"
+          costs: {
+            task_30s: 30,
+            task_60s: 60,
+            task_99s: 99,
+            image_flux: 30,
+            image_gpt: 100,
+            image_imagen: 50,
+            image_ideogram: 50,
+          },
+        },
+        // Legacy quota object kept for back-compat (some old UI reads it)
         quota: plan.quota,
         usage,
       };

@@ -52,10 +52,17 @@ export const imageRouter = router({
     .mutation(async ({ input, ctx }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
-      // 2026-05-12: paywall quota check (plan image_gen cap)
-      const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
-      await assertWithinPlan(ctx.user.id, "image_gen");
-      await recordQuotaUsage(ctx.user.id, "image_gen", "brand", input.brandId);
+      // 2026-05-14: per-model image point cost.
+      // Flux (default) = 30 pts ≈ 30s task; gpt-image-1 premium = 100 pts;
+      // Imagen/Ideogram middle = 50 pts.
+      const { assertPoints, deductPoints } = await import("../_core/pointsService");
+      const imageAction =
+        input.modelChoice === "gpt-image-1"   ? "image_gpt"      :
+        input.modelChoice === "imagen-3"      ? "image_imagen"   :
+        input.modelChoice === "ideogram-v3"   ? "image_ideogram" :
+        /* default flux-schnell / flux-realism / auto */          "image_flux";
+      await assertPoints(ctx.user.id, imageAction as any);
+      await deductPoints(ctx.user.id, imageAction as any, { kind: "brand", id: input.brandId });
 
       const resolved = await resolveBrandVisualContext(
         input.brandId,

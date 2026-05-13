@@ -54,7 +54,10 @@ export const videoRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      // 2026-05-12: paywall quota check (plan video_gen cap)
+      // 2026-05-14: video is paused (CJ「先拿掉」); when re-enabled, gating
+      // is per-clip via pointsService. 1 Kling clip = 1500 pts (~NT$15
+      // cost). Most plans set video_gen=0 — this still blocks at the
+      // legacy quota check until video re-launches.
       const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
       await assertWithinPlan(ctx.user.id, "video_gen");
       await recordQuotaUsage(ctx.user.id, "video_gen", "brand", input.brandId ?? null);
@@ -111,11 +114,13 @@ export const videoRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      // Paywall quota check — storyboard images count against image_gen quota
-      // (5-6 Flux Schnell calls per storyboard).
-      const { assertWithinPlan, recordQuotaUsage } = await import("./billingRouter");
-      await assertWithinPlan(ctx.user.id, "image_gen");
-      await recordQuotaUsage(ctx.user.id, "image_gen", "brand", input.brandId ?? null);
+      // 2026-05-14: points-based. Storyboard = ~6 Flux Schnell images,
+      // gate ONLY the entry call here (1 image's worth, 30 pts); the
+      // worker pre-spends the rest as it goes. Future improvement:
+      // pre-debit 180 pts upfront and refund unused.
+      const { assertPoints, deductPoints } = await import("../_core/pointsService");
+      await assertPoints(ctx.user.id, "image_flux");
+      await deductPoints(ctx.user.id, "image_flux", { kind: "brand", id: input.brandId ?? null });
 
       const [result] = await db.insert(videoJobs).values({
         userId:   ctx.user.id,
