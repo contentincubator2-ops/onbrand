@@ -106,16 +106,19 @@ export default function RunPage() {
     : { data: [] };
   const updateMut = trpc.output.updateVariantCaption.useMutation({
     onSuccess: () => {
-      // 2026-05-13 (CJ「編輯完文案回上一頁找不到存檔，要翻專案才看到」):
-      // tell the user WHERE it landed and offer a 1-tap path to /projects.
-      // The HeroUI toast helper renders an action button when given one.
+      // 2026-05-13 (CJ「編輯完文案回上一頁找不到存檔，要翻專案才看到」
+      // + 「要把 toast 文字也做成可點按鈕」): toast now has a real
+      // action button on the right — 1-tap to /projects.
       const missionTitle = (data as any)?.mission?.title
         ?? (data as any)?.mission?.taskLabel
         ?? "";
       const where = missionTitle
         ? (lang === "en" ? `Saved to 「${missionTitle}」` : `已存到「${missionTitle}」`)
         : (lang === "en" ? "Saved to Projects" : "已存到專案");
-      showToastGlobal(`${where} · ${lang === "en" ? "Open Projects →" : "去專案 →"}`);
+      showToastGlobal(where, "success", {
+        label: lang === "en" ? "Open Projects" : "去專案",
+        onClick: () => navigate("/projects"),
+      });
       utils.output.getById.invalidate({ id });
     },
     onError: (e) => showToastGlobal(
