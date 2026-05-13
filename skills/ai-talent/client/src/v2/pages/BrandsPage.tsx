@@ -341,6 +341,19 @@ export default function BrandsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode]);
 
+  // When scope switches to event/product, copy/knowledge/visual tiles
+  // aren't shown — force category back to positioning so the content
+  // area doesn't render a hidden tab's contents. CJ 2026-05-13.
+  React.useEffect(() => {
+    if ((scopeMode === "event" || scopeMode === "product") &&
+        (category === "copy" || category === "knowledge" || category === "visual")) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set("cat", "positioning");
+      setSearchParams(nextParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeMode, category]);
+
   const currentBrand = useMemo(
     () => scopeBrands.find((b: any) => b.id === (scope?.brandId ?? brandId)) ?? null,
     [scopeBrands, scope?.brandId, brandId]
@@ -859,13 +872,36 @@ export default function BrandsPage() {
           {/* Tab tiles — /30s circular colored style (5 tiles incl. 連結) */}
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-3 w-max mx-auto px-2">
-              {([
-                { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位",     desc: lang === "en" ? "Brand core / slogan"     : "品牌核心 / Slogan",      Icon: LucideTarget },
-                { v: "copy"        as const, label: lang === "en" ? "Copy"        : "文字",     desc: lang === "en" ? "Words / banned / style"   : "用詞 / 禁忌詞 / 風格",   Icon: LucideType },
-                { v: "knowledge"   as const, label: lang === "en" ? "Knowledge"   : "知識",     desc: lang === "en" ? "FAQ / fact library"       : "FAQ / 常識資料庫",       Icon: LucideBook },
-                { v: "info"        as const, label: lang === "en" ? "Info"        : "基本資料", desc: lang === "en" ? "Name / industry / about"  : "名稱 / 產業 / 描述",      Icon: LucideIdCard },
-                { v: "visual"      as const, label: lang === "en" ? "Visual"      : "視覺",     desc: lang === "en" ? "Logo / palette / font"    : "Logo / 色票 / 字型",    Icon: LucidePalette },
-              ]).map((t) => {
+              {(() => {
+                // Tile set adapts to scope:
+                //  - Brand:   all 5 (定位 / 文字 / 知識 / 基本資料 / 視覺)
+                //  - Product: 定位 + 基本資料 (copy / knowledge / visual inherit from brand)
+                //  - Event:   定位 + 基本資料 (same — events are seasonal overlays on a brand)
+                // CJ 2026-05-13「左上選活動時，這一頁就呈現該活動的定位等等資訊」.
+                const allTiles = [
+                  { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位",     desc:
+                      scopeMode === "event"   ? (lang === "en" ? "Campaign positioning (11 steps)" : "活動定位（11 步）")
+                    : scopeMode === "product" ? (lang === "en" ? "Product positioning (6 steps)"   : "產品定位（6 步）")
+                    : (lang === "en" ? "Brand core / slogan" : "品牌核心 / Slogan"),
+                      Icon: LucideTarget,    scopes: ["brand", "product", "event"] as string[] },
+                  { v: "copy"        as const, label: lang === "en" ? "Copy"        : "文字",     desc: lang === "en" ? "Words / banned / style"   : "用詞 / 禁忌詞 / 風格",
+                      Icon: LucideType,      scopes: ["brand"] },
+                  { v: "knowledge"   as const, label: lang === "en" ? "Knowledge"   : "知識",     desc: lang === "en" ? "FAQ / fact library"       : "FAQ / 常識資料庫",
+                      Icon: LucideBook,      scopes: ["brand"] },
+                  { v: "info"        as const, label: lang === "en" ? "Info"        : "基本資料",
+                      desc:
+                        scopeMode === "event"   ? (lang === "en" ? "Dates / brand / products"    : "起訖時間 / 品牌 / 產品")
+                      : scopeMode === "product" ? (lang === "en" ? "Name / SKU / brand link"     : "名稱 / SKU / 所屬品牌")
+                      : (lang === "en" ? "Name / industry / about" : "名稱 / 產業 / 描述"),
+                      Icon: LucideIdCard,    scopes: ["brand", "product", "event"] },
+                  { v: "visual"      as const, label: lang === "en" ? "Visual"      : "視覺",     desc: lang === "en" ? "Logo / palette / font"    : "Logo / 色票 / 字型",
+                      Icon: LucidePalette,   scopes: ["brand"] },
+                ];
+                const visibleTiles = allTiles.filter((tile) =>
+                  tile.scopes.includes(scopeMode === "none" ? "brand" : scopeMode),
+                );
+                return visibleTiles;
+              })().map((t) => {
                 const active = category === t.v;
                 const locked = t.v === "positioning" || t.v === "copy"
                   ? !!tabLocks[t.v as "positioning"|"copy"]
@@ -1120,7 +1156,7 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* ── 基本資料 (info) — merged from settings sheet 2026-05-13 ─── */}
+          {/* ── 基本資料 (info) — scope-aware: brand / product / event ── */}
           {derivedCategory === "info" && scopeMode === "brand" && (
             <div style={{ padding: "16px 28px 32px" }}>
               <BrandInfoTab
@@ -1147,6 +1183,33 @@ export default function BrandsPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+          {/* Event info — reuses the existing EventSettingsPanel which
+              edits dates / brand / linked products. */}
+          {derivedCategory === "info" && scopeMode === "event" && scope?.eventId && (
+            <div style={{ padding: "24px" }}>
+              <EventSettingsPanel eventId={scope.eventId} brands={scopeBrands} />
+            </div>
+          )}
+          {/* Product info — minimal placeholder; product editor lives
+              in CreateScopeModal / AddEntityModal for now. */}
+          {derivedCategory === "info" && scopeMode === "product" && scope?.productId && (
+            <div style={{ padding: "24px" }}>
+              <div className="max-w-[700px] mx-auto">
+                <h2 className="text-2xl font-semibold text-default-900 mb-2">
+                  {lang === "en" ? "Product info" : "產品基本資料"}
+                </h2>
+                <p className="text-sm text-default-500 mb-6">
+                  {lang === "en"
+                    ? "Product name / SKU / brand link — edit via the + Add menu for now"
+                    : "產品名稱 / SKU / 所屬品牌 — 目前先用右下「+ 新增」選單管理"}
+                </p>
+                <div className="bg-default-50 rounded-xl p-5 text-sm text-default-700 leading-relaxed">
+                  <div><span className="text-default-500">{lang === "en" ? "Name: " : "名稱："}</span>{scopeName}</div>
+                  <div className="text-default-400 italic mt-1">productId: {scope.productId}</div>
+                </div>
+              </div>
             </div>
           )}
 
