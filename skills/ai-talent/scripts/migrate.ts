@@ -1470,6 +1470,14 @@ async function main() {
     }
     console.log("[migrate] invoices ECPay columns: OK");
 
+    // 2026-05-14 (CJ「加值點數方案」): top-up pack columns. packType
+    // distinguishes 'subscription' (plan upgrade) vs 'topup' (point pack)
+    // so the ECPay callback knows whether to extend planEndsAt or to
+    // credit pointsBalance via pointsService.addPoints().
+    await ensureCol("invoices", "packType",      "VARCHAR(16) NULL COMMENT 'subscription | topup'");
+    await ensureCol("invoices", "pointsGranted", "INT NULL COMMENT 'how many points to credit on successful payment'");
+    console.log("[migrate] invoices topup columns: OK");
+
     // error_log (Sentry-lite for prod anomalies)
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS error_log (

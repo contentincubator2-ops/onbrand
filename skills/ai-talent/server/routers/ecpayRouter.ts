@@ -140,6 +140,80 @@ export const ecpayRouter = router({
       };
     }),
 
+  /**
+   * 2026-05-14 (CJ「加值點數方案」): create an ECPay checkout for a point
+   * top-up pack. Distinct from createCheckout (subscription) — the
+   * callback grants pointsBalance instead of upgrading plan.
+   */
+  createTopupCheckout: protectedProcedure
+    .input(z.object({
+      packId: z.enum(["small", "medium", "large"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const env = process.env;
+      const merchantId = env.ECPAY_MERCHANT_ID;
+      const hashKey    = env.ECPAY_HASH_KEY;
+      const hashIv     = env.ECPAY_HASH_IV;
+      const apiBase    = env.ECPAY_API_BASE ?? "https://payment-stage.ecpay.com.tw";
+      const appUrl     = env.APP_URL ?? "https://onbrand.sowork.ai";
+      if (!merchantId || !hashKey || !hashIv) {
+        console.error("[ecpay.createTopupCheckout] missing env: ECPAY_MERCHANT_ID / ECPAY_HASH_KEY / ECPAY_HASH_IV");
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "金流服務尚未啟用，請稍後再試或聯絡 sowork@sowork.tw。",
+        });
+      }
+
+      const { TOPUP_PACKS } = await import("../_core/plans");
+      const pack = TOPUP_PACKS[input.packId];
+      if (!pack) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown topup pack" });
+
+      const { default: localPool } = await import("../localDb");
+      const tradeNo = `T${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`.slice(0, 20);
+      const tradeDate = new Date().toLocaleString("zh-TW", {
+        timeZone: "Asia/Taipei",
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+        hour12: false,
+      }).replace(/\//g, "/").replace(",", "");
+
+      // Record pending topup invoice. packType=topup so callback knows to
+      // credit points (not extend plan).
+      await localPool.execute(
+        `INSERT INTO invoices
+            (userId, merchantTradeNo, amount, amountTwd, packType, pointsGranted, status, createdAt)
+         VALUES (?, ?, ?, ?, 'topup', ?, 'pending', NOW(3))
+         ON DUPLICATE KEY UPDATE status = 'pending'`,
+        [ctx.user.id, tradeNo, pack.twdAmount, pack.twdAmount, pack.points],
+      );
+
+      const params: Record<string, string> = {
+        MerchantID:        merchantId,
+        MerchantTradeNo:   tradeNo,
+        MerchantTradeDate: tradeDate,
+        PaymentType:       "aio",
+        TotalAmount:       String(pack.twdAmount),
+        TradeDesc:         encodeURIComponent(`OnBrand 加購點數 ${pack.points} 點`),
+        ItemName:          `OnBrand 點數加購 · ${pack.labelZh} (${pack.points} 點)`,
+        ReturnURL:         `${appUrl}/api/ecpay/callback`,
+        ClientBackURL:     `${appUrl}/settings/account?topup=${input.packId}`,
+        OrderResultURL:    `${appUrl}/settings/account?paid=1&topup=1`,
+        ChoosePayment:     "Credit",
+        EncryptType:       "1",
+      };
+      params.CheckMacValue = computeCheckMacValue(params, hashKey, hashIv);
+      return {
+        actionUrl: `${apiBase}/Cashier/AioCheckOut/V5`,
+        fields: params,
+      };
+    }),
+
+  /** List available top-up packs (single source: plans.ts TOPUP_PACKS). */
+  listTopupPacks: protectedProcedure.query(async () => {
+    const { TOPUP_PACKS } = await import("../_core/plans");
+    return Object.values(TOPUP_PACKS);
+  }),
+
   /** Read status of a tradeNo (frontend polls after redirect). */
   getInvoiceStatus: protectedProcedure
     .input(z.object({ merchantTradeNo: z.string().min(1).max(32) }))
@@ -182,7 +256,8 @@ export async function verifyAndProcess(body: Record<string, string>): Promise<st
   const { default: localPool } = await import("../localDb");
   // Idempotent — second callback for same tradeNo no-ops if already paid.
   const [inv]: any = await localPool.execute(
-    `SELECT id, userId, workspaceId, planCode, billingCycle, status
+    `SELECT id, userId, workspaceId, planCode, billingCycle, status,
+            packType, pointsGranted
      FROM invoices WHERE merchantTradeNo = ? LIMIT 1`,
     [tradeNo],
   );
@@ -196,16 +271,30 @@ export async function verifyAndProcess(body: Record<string, string>): Promise<st
   );
 
   if (status === "paid") {
-    // Extend the workspace's planEndsAt.
-    const isAnnual = invoice.billingCycle === "annual";
-    const days = isAnnual ? 365 : 30;
-    await localPool.execute(
-      `UPDATE workspaces
-       SET planCode = ?, planStatus = 'active',
-           planEndsAt = GREATEST(COALESCE(planEndsAt, NOW(3)), NOW(3)) + INTERVAL ? DAY
-       WHERE id = ?`,
-      [invoice.planCode, days, invoice.workspaceId],
-    );
+    if (invoice.packType === "topup") {
+      // 2026-05-14 (CJ「加值點數方案」): credit points instead of extending plan.
+      const pts = Number(invoice.pointsGranted) || 0;
+      if (pts > 0) {
+        try {
+          const { addPoints } = await import("../_core/pointsService");
+          await addPoints(invoice.userId, pts, "topup", `ecpay:${tradeNo}`);
+        } catch (err) {
+          console.error("[ecpay.verifyAndProcess] addPoints failed", { tradeNo, err });
+          return "0|Failed to credit points";
+        }
+      }
+    } else {
+      // Subscription — extend the workspace's planEndsAt.
+      const isAnnual = invoice.billingCycle === "annual";
+      const days = isAnnual ? 365 : 30;
+      await localPool.execute(
+        `UPDATE workspaces
+         SET planCode = ?, planStatus = 'active',
+             planEndsAt = GREATEST(COALESCE(planEndsAt, NOW(3)), NOW(3)) + INTERVAL ? DAY
+         WHERE id = ?`,
+        [invoice.planCode, days, invoice.workspaceId],
+      );
+    }
   }
   return "1|OK";
 }

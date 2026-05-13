@@ -41,6 +41,16 @@ export interface PlanQuota {
   pointsCycleDays: number;   // 7 for trial, 30 for monthly subs
 }
 
+/** 2026-05-14: top-up packs (加購點數). Volume discount — bigger pack
+ *  = better per-point rate. Same point unit as plan allocation; topup
+ *  points NEVER expire (vs monthly refill which resets balance). */
+export const TOPUP_PACKS = {
+  small:  { id: "small",  points: 1000,  twdAmount: 350,  perPointTwd: 0.35, discountPct: 0,  labelZh: "小份",  labelEn: "Small" },
+  medium: { id: "medium", points: 5000,  twdAmount: 1500, perPointTwd: 0.30, discountPct: 15, labelZh: "中份",  labelEn: "Medium" },
+  large:  { id: "large",  points: 10000, twdAmount: 2500, perPointTwd: 0.25, discountPct: 29, labelZh: "大份",  labelEn: "Large" },
+} as const;
+export type TopupPackId = keyof typeof TOPUP_PACKS;
+
 /** 2026-05-14: per-action point costs. Keep this single-source so
  *  pricing changes don't drift across the codebase. */
 export const POINT_COSTS = {

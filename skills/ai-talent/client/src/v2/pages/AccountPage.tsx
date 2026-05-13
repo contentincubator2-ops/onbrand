@@ -7,7 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { useLang } from "../../lib/i18n";
-import { ChevronLeft, Download, Trash2, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Download, Trash2, AlertTriangle, Plus, X, Sparkles } from "lucide-react";
 
 export default function AccountPage() {
   const navigate = useNavigate();
@@ -69,6 +69,44 @@ export default function AccountPage() {
           showToastGlobal(
             (lang === "en" ? "Couldn't delete: " : "刪除失敗：") + (e?.message ?? e)
           ),
+      })
+    : null;
+
+  // ─── 2026-05-14 (CJ「加值點數方案」): Top-up packs ───
+  const [showTopupModal, setShowTopupModal] = useState(false);
+  // Auto-open from ?topup=1 (sent when user hits FORBIDDEN points-not-enough)
+  React.useEffect(() => {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      if (qs.get("topup") === "1" || qs.get("topup") === "open") {
+        setShowTopupModal(true);
+      }
+    } catch {}
+    const handler = () => setShowTopupModal(true);
+    window.addEventListener("onbrand:open-topup", handler);
+    return () => window.removeEventListener("onbrand:open-topup", handler);
+  }, []);
+  const topupPacksQuery = (trpc as any).ecpay?.listTopupPacks?.useQuery
+    ? (trpc as any).ecpay.listTopupPacks.useQuery(undefined, { enabled: showTopupModal })
+    : { data: [] };
+  const topupMut = (trpc as any).ecpay?.createTopupCheckout?.useMutation
+    ? (trpc as any).ecpay.createTopupCheckout.useMutation({
+        onSuccess: (data: any) => {
+          // Auto-submit ECPay form
+          const form = document.createElement("form");
+          form.method = "POST";
+          form.action = data.actionUrl;
+          form.style.display = "none";
+          Object.entries(data.fields).forEach(([k, v]) => {
+            const i = document.createElement("input");
+            i.type = "hidden"; i.name = k; i.value = String(v);
+            form.appendChild(i);
+          });
+          document.body.appendChild(form);
+          form.submit();
+        },
+        onError: (e: any) =>
+          showToastGlobal((lang === "en" ? "Topup failed: " : "加購失敗：") + (e?.message ?? e)),
       })
     : null;
 
@@ -239,12 +277,22 @@ export default function AccountPage() {
                     </div>
                   ))}
                 </div>
-                {isLow && !unlimited && (
-                  <p className="mt-4 text-xs text-amber-700">
-                    {lang === "en"
-                      ? "⚠ Low balance — top-up packs coming soon, or wait until refill."
-                      : "⚠ 點數快用完了 — 加購包即將上線，或等下次補滿。"}
-                  </p>
+                {!unlimited && (
+                  <div className="mt-4 flex items-center gap-2">
+                    <button
+                      onClick={() => setShowTopupModal(true)}
+                      className="px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition flex items-center gap-1.5"
+                    >
+                      <Plus size={14} /> {lang === "en" ? "Buy more points" : "加購點數"}
+                    </button>
+                    {isLow && (
+                      <span className="text-xs text-amber-700">
+                        {lang === "en"
+                          ? "⚠ Low balance — top up or wait for refill"
+                          : "⚠ 點數快用完了"}
+                      </span>
+                    )}
+                  </div>
                 )}
               </section>
             );
@@ -393,6 +441,80 @@ export default function AccountPage() {
             </div>
           )}
         </section>
+
+        {/* 2026-05-14 (CJ「加值點數方案」) Top-up modal */}
+        {showTopupModal && (
+          <div
+            className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+            onClick={() => setShowTopupModal(false)}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold text-neutral-900 flex items-center gap-2">
+                  <Sparkles size={18} className="text-amber-500" />
+                  {lang === "en" ? "Top-up points" : "加購點數方案"}
+                </h3>
+                <button
+                  onClick={() => setShowTopupModal(false)}
+                  className="text-neutral-400 hover:text-neutral-700"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <p className="text-xs text-neutral-500 mb-5">
+                {lang === "en"
+                  ? "Points purchased here never expire — they stack on top of your monthly refill."
+                  : "加購點數永不過期，會疊加在月配額之上。"}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {((topupPacksQuery as any)?.data ?? []).map((pack: any) => (
+                  <button
+                    key={pack.id}
+                    disabled={topupMut?.isPending}
+                    onClick={() => topupMut?.mutate({ packId: pack.id })}
+                    className={`text-left rounded-xl border-2 p-4 transition disabled:opacity-50 ${
+                      pack.id === "medium"
+                        ? "border-neutral-900 bg-neutral-50 hover:bg-neutral-100"
+                        : "border-neutral-200 hover:border-neutral-400 bg-white"
+                    }`}
+                  >
+                    {pack.id === "medium" && (
+                      <div className="text-[10px] inline-block px-2 py-0.5 rounded-full bg-neutral-900 text-white font-medium mb-2">
+                        {lang === "en" ? "MOST POPULAR" : "最熱門"}
+                      </div>
+                    )}
+                    <div className="text-xs text-neutral-500">{lang === "en" ? pack.labelEn : pack.labelZh}</div>
+                    <div className="text-2xl font-bold tabular-nums text-neutral-900 mt-1">
+                      {pack.points.toLocaleString()}
+                      <span className="text-xs font-normal text-neutral-500 ml-1">{lang === "en" ? "pts" : "點"}</span>
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-neutral-900">
+                      NT$ {pack.twdAmount.toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-neutral-500 mt-0.5">
+                      {lang === "en"
+                        ? `NT$ ${pack.perPointTwd.toFixed(2)} / pt`
+                        : `每點 NT$ ${pack.perPointTwd.toFixed(2)}`}
+                    </div>
+                    {pack.discountPct > 0 && (
+                      <div className="mt-2 inline-block text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">
+                        {lang === "en" ? `Save ${pack.discountPct}%` : `省 ${pack.discountPct}%`}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-4">
+                {lang === "en"
+                  ? "Payment via ECPay credit card. Invoice issued automatically."
+                  : "綠界信用卡付款 · 自動開立電子發票"}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="mt-8 text-center text-xs text-neutral-400 space-x-3">
