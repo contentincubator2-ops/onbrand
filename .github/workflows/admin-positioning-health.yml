@@ -1,0 +1,112 @@
+name: Admin — Positioning pipeline health check
+
+# What does it take for a positioning job to succeed end-to-end? This
+# probes every dependency in one pass: LLM provider keys, recent failure
+# patterns, brand seed data, and the runner's history.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Optional: brandId to deep-check (default = most recent)"
+        required: false
+        default: ""
+
+jobs:
+  health:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Run
+        run: |
+          set -e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+
+          echo "════════════════════════════════════════"
+          echo "1. LLM provider keys"
+          echo "════════════════════════════════════════"
+          for k in ANTHROPIC_API_KEY OPENAI_API_KEY GEMINI_API_KEY QWEN_API_KEY \
+                   AZURE_OPENAI_API_KEY AZURE_FOUNDRY_API_KEY \
+                   PERPLEXITY_API_KEY TAVILY_API_KEY; do
+            v=$(printenv "$k" || true)
+            if [ -z "$v" ]; then echo "  ❌ $k = MISSING"
+            else echo "  ✓ $k = ${v:0:6}... (${#v} chars)"
+            fi
+          done
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "2. Anthropic credit balance probe"
+          echo "════════════════════════════════════════"
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            RESP=$(curl -s --max-time 15 -X POST "https://api.anthropic.com/v1/messages" \
+              -H "x-api-key: $ANTHROPIC_API_KEY" \
+              -H "anthropic-version: 2023-06-01" \
+              -H "content-type: application/json" \
+              -d '{"model":"claude-3-5-haiku-20241022","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}')
+            if echo "$RESP" | grep -q "credit balance is too low"; then
+              echo "  ❌ ANTHROPIC OUT OF CREDITS — primary LLM will fail every call"
+              echo "     → top up at https://console.anthropic.com/settings/billing"
+            elif echo "$RESP" | grep -q "\"type\":\"message\""; then
+              echo "  ✓ Anthropic responding normally"
+            else
+              echo "  ⚠ unexpected response:"
+              echo "$RESP" | head -c 400
+            fi
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "3. Recent positioning job outcomes (last 14 days)"
+          echo "════════════════════════════════════════"
+          $MYSQL -e "
+            SELECT status, COUNT(*) AS n,
+                   MAX(startedAt) AS lastSeen
+              FROM positioning_jobs
+             WHERE startedAt > NOW() - INTERVAL 14 DAY
+             GROUP BY status
+             ORDER BY n DESC
+          " -t
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "4. Recent failures — error patterns"
+          echo "════════════════════════════════════════"
+          $MYSQL -e "
+            SELECT id, entityKind, entityId, currentStep, totalSteps,
+                   LEFT(lastError, 120) AS err, startedAt
+              FROM positioning_jobs
+             WHERE status = 'failed'
+               AND startedAt > NOW() - INTERVAL 7 DAY
+             ORDER BY startedAt DESC LIMIT 10
+          " -t
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "5. Brand seed-data sanity (last 5 brands)"
+          echo "════════════════════════════════════════"
+          $MYSQL -e "
+            SELECT b.id, b.name,
+                   LENGTH(b.website) > 0 AS hasWebsite,
+                   JSON_LENGTH(b.socialLinks) AS socialCount,
+                   b.tagline IS NOT NULL AS hasTagline,
+                   b.createdAt
+              FROM brands b
+             ORDER BY b.id DESC LIMIT 5
+          " -t
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "6. Recent server restarts (pm2)"
+          echo "════════════════════════════════════════"
+          pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="marketing-os") | "  uptime: \(.pm2_env.pm_uptime | (now*1000 - .) / 60000 | floor) min · restarts: \(.pm2_env.restart_time)"' 2>/dev/null || echo "  (jq unavailable — skipping)"
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "7. Last 50 ERR-log lines mentioning positioning"
+          echo "════════════════════════════════════════"
+          LOG_ERR=/home/$(whoami)/.pm2/logs/marketing-os-error.log
+          tail -2000 "$LOG_ERR" 2>/dev/null | grep -iE "positioning|positioningJob|14[/-]step" | tail -20
