@@ -153,8 +153,12 @@ export default function ProjectsPage() {
 
   const goToMission = (m: MissionRow) => {
     const ws = m.workspace || "_";
-    if (m.brandId) navigate(`/b/${m.brandId}/${ws}/m/${m.id}`);
-    else navigate(`/m/${m.id}`);
+    // 2026-05-14: row.id is now mission_output.id (per-run unique); the
+    // mission-detail page key lives on row.missionId. Fall back to row.id
+    // for legacy callers that still ship mission rows.
+    const missionId = (m as any).missionId ?? m.id;
+    if (m.brandId) navigate(`/b/${m.brandId}/${ws}/m/${missionId}`);
+    else navigate(`/m/${missionId}`);
   };
 
   const isLoading = !!allQuery && allQuery.isLoading;

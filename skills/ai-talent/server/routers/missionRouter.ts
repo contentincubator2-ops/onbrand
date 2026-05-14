@@ -35,23 +35,30 @@ export const missionRouter = router({
     .query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      // NOTE: missions + brands tables use camelCase column names (Drizzle
-      // schema), squads table uses snake_case (created via raw SQL).
-      // Don't "normalize" these — mixing is intentional and matches the DB.
-      // COLLATE coercion — `missions.squadSlug` (Drizzle, default
-      // utf8mb4_0900_ai_ci) and `squads.slug` (raw SQL, utf8mb4_unicode_ci
-      // or utf8mb4_general_ci) have mismatched collations. Without an
-      // explicit COLLATE on the JOIN, MySQL throws "Illegal mix of
-      // collations" and tRPC returns 500, leaving the missions page blank.
-      // 2026-05-11 (CJ「選了 product / event 也要 filter 專案區」):
-      // Pull the latest output's scope (productId/eventId) for each
-      // mission so the frontend can filter projects by active scope.
-      // Subquery uses ANY_VALUE() because GROUP BY semantics; mission's
-      // latest output's metadata scope is good-enough heuristic.
+      // 2026-05-14 (CJ「每次跑任務都該是一張獨立卡」):
+      // Changed from one-row-per-mission to one-row-per-mission_output.
+      // Multiple runs of the same task = multiple cards, each pinned to
+      // the timestamp it was generated.
+      //   - card key `id`     = mission_output.id (UNIQUE per run)
+      //   - navigation field  = `missionId` (still points to the mission
+      //     detail page, which lists all runs in chronological order)
+      //   - sort by output.createdAt DESC so newest runs surface first
+      //
+      // The previous design merged repeat runs into the latest version
+      // of one mission card — bad UX when user expects "I ran 3 times,
+      // I want to see 3 cards".
       const rows = await db.execute(sql`
-        SELECT m.id, m.title, m.description, m.workspace, m.methodology,
+        SELECT mo.id AS id,
+               m.id  AS missionId,
+               m.title, m.description, m.workspace, m.methodology,
                m.squadSlug AS squadSlug, m.brandId AS brandId,
-               m.status, m.updatedAt AS updatedAt,
+               m.status,
+               mo.createdAt AS updatedAt,
+               mo.title AS outputTitle,
+               mo.version AS outputVersion,
+               mo.platform AS outputPlatform,
+               mo.outputType AS outputType,
+               JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.thumbnailUrl')) AS outputThumbUrl,
                m.output_image_url AS outputImageUrl,
                m.cover_image_url  AS coverImageUrl,
                b.name AS brandName,
@@ -60,21 +67,15 @@ export const missionRouter = router({
                s.steps AS squadSteps,
                s.hero_image_url AS squadHeroImageUrl,
                s.mockup_images  AS squadMockupImages,
-               sc.productId AS scopeProductId,
-               sc.eventId   AS scopeEventId
-          FROM missions m
+               CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')) AS UNSIGNED) AS scopeProductId,
+               CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.eventId'))   AS UNSIGNED) AS scopeEventId
+          FROM mission_outputs mo
+          JOIN missions m ON m.id = mo.missionId
           LEFT JOIN brands b ON b.id = m.brandId
           LEFT JOIN squads s ON s.slug COLLATE utf8mb4_unicode_ci
                               = m.squadSlug COLLATE utf8mb4_unicode_ci
-          LEFT JOIN (
-            SELECT mo.missionId,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')) AS UNSIGNED) AS productId,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.eventId'))   AS UNSIGNED) AS eventId,
-                   ROW_NUMBER() OVER (PARTITION BY mo.missionId ORDER BY mo.id DESC) AS rn
-            FROM mission_outputs mo
-          ) sc ON sc.missionId = m.id AND sc.rn = 1
          WHERE m.userId = ${ctx.user.id}
-         ORDER BY m.updatedAt DESC
+         ORDER BY mo.createdAt DESC, mo.id DESC
          LIMIT 60
       `);
       // drizzle returns [rows, fields] for raw execute on mysql2
@@ -94,13 +95,14 @@ export const missionRouter = router({
           try { squadMockupImages = JSON.parse(r.squadMockupImages); } catch { /* ignore */ }
         }
 
-        // Resolved thumbnail priority:
-        //   1. missions.output_image_url  — real output after execution
-        //   2. missions.cover_image_url   — user-set cover
-        //   3. squads.hero_image_url      — squad mockup (fallback)
+        // Resolved thumbnail priority (now output-aware):
+        //   1. mission_output.metadata.thumbnailUrl — THIS specific run's thumb
+        //   2. missions.output_image_url            — latest output (legacy)
+        //   3. missions.cover_image_url             — user-set cover
+        //   4. squads.hero_image_url                — squad mockup (fallback)
         // squadMockupImages[] is passed separately for hover slideshow
         const thumbnailUrl: string | null =
-          r.outputImageUrl ?? r.coverImageUrl ?? r.squadHeroImageUrl ?? null;
+          r.outputThumbUrl ?? r.outputImageUrl ?? r.coverImageUrl ?? r.squadHeroImageUrl ?? null;
 
         const { squadSteps, squadMockupImages: _raw, ...rest } = r;
         return {
