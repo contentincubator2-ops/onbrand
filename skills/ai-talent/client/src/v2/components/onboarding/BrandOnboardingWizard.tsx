@@ -530,11 +530,72 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     {lang === "en" ? "Back to brand workspace" : "回品牌工作區"}
                   </button>
                 </div>
-                <p style={{ fontSize: 11, color: "#525252" }}>
+                <p style={{ fontSize: 11, color: "#525252", marginBottom: 20 }}>
                   {lang === "en"
                     ? "You can re-run the SoWork Brand Method anytime from Brand → Settings"
                     : "日後可隨時在「品牌 → 設定」重新跑 SoWork 品牌定位法"}
                 </p>
+
+                {/* 2026-05-14 (CJ「Onboarding 加一題」): nudge plan choice based on
+                    brand-count intent. Pure nudge — no auto-subscribe, just a
+                    soft pricing recommendation. */}
+                <div style={{
+                  borderTop: "1px solid #E5E5E5",
+                  paddingTop: 16,
+                }}>
+                  <p style={{
+                    fontSize: 10, fontWeight: 700, color: "#525252",
+                    letterSpacing: "0.22em", textTransform: "uppercase",
+                    marginBottom: 10,
+                  }}>
+                    {lang === "en" ? "Pick your plan" : "選擇你的方案"}
+                  </p>
+                  <p style={{ fontSize: 13, color: "#404040", marginBottom: 12, lineHeight: 1.6 }}>
+                    {lang === "en" ? "How many brands will you manage on OnBrand?" : "你計畫在 OnBrand 管理幾個品牌？"}
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => navigate("/pricing?recommend=solo")}
+                      style={{
+                        padding: "8px 14px", fontSize: 12, fontWeight: 600,
+                        borderRadius: 6, cursor: "pointer",
+                        border: "1px solid #D4D4D4",
+                        background: "#FFFFFF", color: "#171717",
+                      }}
+                    >
+                      {lang === "en" ? "Just 1 → Solo $100/mo" : "就 1 個 → Solo $100/月"}
+                    </button>
+                    <button
+                      onClick={() => navigate("/pricing?recommend=studio")}
+                      style={{
+                        padding: "8px 14px", fontSize: 12, fontWeight: 600,
+                        borderRadius: 6, cursor: "pointer",
+                        border: "1px solid #D4D4D4",
+                        background: "#FFFFFF", color: "#171717",
+                      }}
+                    >
+                      {lang === "en" ? "2–3 → Studio $250/mo" : "2–3 個 → Studio $250/月"}
+                    </button>
+                    <a
+                      href="mailto:sowork@sowork.ai?subject=Agency 方案洽詢"
+                      style={{
+                        padding: "8px 14px", fontSize: 12, fontWeight: 600,
+                        borderRadius: 6, cursor: "pointer",
+                        border: "1px solid #D4D4D4",
+                        background: "#FFFFFF", color: "#171717",
+                        textDecoration: "none",
+                        display: "inline-flex", alignItems: "center",
+                      }}
+                    >
+                      {lang === "en" ? "4+ → Contact sales" : "4 個以上 → 聯繫業務"}
+                    </a>
+                  </div>
+                  <p style={{ fontSize: 11, color: "#737373", marginTop: 8, fontStyle: "italic" }}>
+                    {lang === "en"
+                      ? "Early-bird locked forever — sign up today, your price never goes up."
+                      : "早鳥永久保價 — 今天訂閱、之後不漲。"}
+                  </p>
+                </div>
               </div>
             )}
           </div>
