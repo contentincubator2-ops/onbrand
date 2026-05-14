@@ -38,7 +38,7 @@ jobs:
           AI=/opt/onbrand/app/skills/ai-talent
           set -a; source "$AI/.env" 2>/dev/null; set +a
           export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
-          UID=$(mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N -e "SELECT id FROM users ORDER BY id ASC LIMIT 1")
+          TEST_UID=$(mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N -e "SELECT id FROM users ORDER BY id ASC LIMIT 1")
           echo "test userId: $UID"
           echo "userId=$UID" >> $GITHUB_OUTPUT
 

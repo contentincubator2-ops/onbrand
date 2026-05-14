@@ -887,6 +887,12 @@ export async function runOrchestra(args: {
       .map(([k, v]) => `[${k}] ${v}`)
       .join("\n") || "(no extra inputs)";
 
+  // 2026-05-14 (CJ「async polling」): when onCheckpoint persists a partial
+  // row, these track the row id so the end-of-orchestra block UPDATEs
+  // instead of inserting a duplicate row.
+  let persistedOutputId: number | null = null;
+  let persistedMissionId: number | null = null;
+
   // Wrap in 20s hard budget
   const orchestra = (async (): Promise<OrchestraResult> => {
     // ── Stage 1: parallel pre-work (URL fetch, persona loads, brand) ──
@@ -1078,6 +1084,99 @@ export async function runOrchestra(args: {
           })
         : Promise.resolve<string[]>([]),
     ]);
+
+    // ── Checkpoint (2026-05-14 「先回 caption + brief、image 跟 QA 變 async polling」) ─
+    // Captions + briefs are ready. If the caller passed `onCheckpoint`,
+    // (a) persist a PARTIAL mission_outputs row now with progress='caption_ready',
+    // (b) attach outputId/missionId to the partial result,
+    // (c) signal the caller — they can return to the user immediately.
+    // The orchestra keeps running; when it finishes we UPDATE the same
+    // row to progress='done' (or 'failed') instead of inserting a new one.
+    if (args.onCheckpoint && args.userId) {
+      try {
+        const partialVariants: OrchestraVariant[] = Array.from({ length: args.config.variants }, (_, i) => {
+          const cap = captions[i];
+          return {
+            label: cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`,
+            caption: (cap?.caption ?? "").trim(),
+            hashtags: cap?.hashtags ?? [],
+            image: { style: briefs[i] ?? null, url: null, status: "pending" as any },
+          };
+        });
+        const partial: OrchestraResult = {
+          taskId: args.template.id,
+          totalLatencyMs: Date.now() - startedAt,
+          fetchedUrl,
+          captionAgent: captionLoad.meta,
+          imageAgent: imageLoad.meta,
+          variants: partialVariants,
+          stages: [...stages],
+          ok: partialVariants.some((v) => v.caption.length > 0),
+          errors: [...errors],
+          strategist: strategistMeta && strategistAnchor
+            ? { agentName: strategistMeta.name, agentTitle: strategistMeta.title, anchor: strategistAnchor }
+            : null,
+          // specialtyMeta is only loaded in the 60s/100s extras stage which
+          // runs AFTER this checkpoint, so it's always null at checkpoint
+          // time. The final result re-populates it when extras complete.
+          specialtyAgent: null,
+        };
+
+        if (partial.ok) {
+          const { recordTaskRun } = await import("./recordTaskRun");
+          const { titleFromCaption } = await import("./titleFromCaption");
+          const idPrefix = (args.template.id ?? "").split("-")[0] ?? "";
+          const idChannelMap: Record<string, string> = {
+            fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+            li: "linkedin", em: "email", pr: "press", br: "brand", rs: "audience",
+          };
+          const channel = String(
+            (args.template as any).channel
+              ?? args.template.outputDefaults?.platform
+              ?? idChannelMap[idPrefix]
+              ?? "other"
+          );
+          const tierStr = (tier as "30s" | "60s" | "100s");
+          const flatLabel: string = typeof args.template.label === "string"
+            ? args.template.label
+            : (args.template.label?.zh ?? args.template.label?.en ?? args.template.id);
+          const persisted = await recordTaskRun({
+            userId: args.userId,
+            brandId: args.brandId ?? null,
+            workspace: channel,
+            taskId: args.template.id,
+            taskLabel: flatLabel,
+            tier: tierStr,
+            title: titleFromCaption(partialVariants[0]?.caption, flatLabel),
+            content: JSON.stringify(partialVariants, null, 2),
+            metadata: {
+              latencyMs: Date.now() - startedAt,
+              captionAgent: captionLoad.meta ?? null,
+              imageAgent: imageLoad.meta ?? null,
+              stages: [...stages],
+              fetchedUrl: fetchedUrl ?? null,
+              errors: [...errors],
+              ok: true,
+              variantCount: partialVariants.length,
+              inputs: args.inputs ?? {},
+              productId: args.productId ?? null,
+              eventId: args.eventId ?? null,
+            },
+            thumbnailUrl: null,
+            progress: "caption_ready",
+          });
+          persistedOutputId = persisted.outputId;
+          persistedMissionId = persisted.missionId;
+          (partial as any).outputId = persistedOutputId;
+          (partial as any).missionId = persistedMissionId;
+          (partial as any).progress = "caption_ready";
+        }
+
+        args.onCheckpoint(partial);
+      } catch (e) {
+        console.warn("[orchestra] onCheckpoint persistence failed (non-fatal):", (e as Error)?.message);
+      }
+    }
 
     // ── Stage 3: parallel image gen — only when runImageGen=true ───────
     // 30s tier: runImageGen=false → briefs are written but no Flux call.

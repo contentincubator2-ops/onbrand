@@ -96,6 +96,73 @@ interface RecordArgs {
   thumbnailUrl?: string | null;
   platform?: Platform;
   outputType?: OutputType;
+  /**
+   * 2026-05-14 (CJ「async orchestra」): when the orchestra splits its work
+   * across captions-first + image/QA-background, the INITIAL write uses
+   * progress='caption_ready'. When the background continuation completes,
+   * call `finaliseTaskRun(outputId, …)` to update the row to 'done'.
+   * Defaults to 'done' for the existing single-write callers.
+   */
+  progress?: "caption_ready" | "done" | "failed";
+}
+
+/**
+ * Update a previously-written mission_outputs row with the final
+ * (image-resolved, QA-reviewed) data after the orchestra's background
+ * continuation finishes. Mirrors the write path of recordTaskRun's
+ * INSERT but as an UPDATE keyed by outputId.
+ */
+export async function finaliseTaskRun(args: {
+  outputId: number;
+  content: string;
+  metadata?: Record<string, any>;
+  thumbnailUrl?: string | null;
+  title?: string;
+  progress: "done" | "failed";
+  progressDetail?: string;
+}): Promise<{ ok: boolean }> {
+  try {
+    const MAX_CONTENT = 2_000_000;
+    const MAX_METADATA = 200_000;
+    let safeContent = args.content ?? "";
+    if (safeContent.length > MAX_CONTENT) safeContent = safeContent.slice(0, MAX_CONTENT);
+    let metadata = JSON.stringify({
+      ...(args.metadata ?? {}),
+      thumbnailUrl: args.thumbnailUrl ?? null,
+    });
+    if (metadata.length > MAX_METADATA) {
+      metadata = JSON.stringify({
+        thumbnailUrl: args.thumbnailUrl ?? null,
+        _truncated: true,
+        _originalSize: metadata.length,
+      });
+    }
+    const titleClause = args.title ? `, title = ?` : "";
+    const params: any[] = [
+      safeContent,
+      metadata,
+      args.progress,
+      args.progressDetail ?? null,
+    ];
+    if (args.title) params.push(args.title.slice(0, 250));
+    params.push(args.outputId);
+    await localPool.execute(
+      `UPDATE mission_outputs
+         SET content = ?, metadata = ?, progress = ?, progressDetail = ?${titleClause}, updatedAt = NOW()
+       WHERE id = ?`,
+      params,
+    );
+    return { ok: true };
+  } catch (e: any) {
+    console.error("[finaliseTaskRun] FAILED", {
+      outputId: args.outputId,
+      progress: args.progress,
+      sqlCode: e?.code,
+      sqlMessage: e?.sqlMessage,
+      message: String(e?.message ?? e),
+    });
+    return { ok: false };
+  }
 }
 
 const WORKSPACE_TO_PLATFORM: Record<string, Platform> = {
@@ -258,13 +325,17 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
     let oRes: any = null;
     let lastError: any = null;
     let succeededTier: string | null = null;
+    // 2026-05-14: progress defaults to 'done' (single-write callers), or
+    // 'caption_ready' for the new async path (caller will UPDATE to 'done'
+    // when image gen + QA finish in the background).
+    const progress = args.progress ?? "done";
     for (const a of attempts) {
       try {
         [oRes] = await localPool.execute(
           `INSERT INTO mission_outputs
-             (missionId, platform, outputType, title, content, metadata, status, version, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, NOW(), NOW())`,
-          [missionId, a.platform, a.outputType, a.title, a.content, a.metadata, version],
+             (missionId, platform, outputType, title, content, metadata, status, version, progress, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, NOW(), NOW())`,
+          [missionId, a.platform, a.outputType, a.title, a.content, a.metadata, version, progress],
         );
         succeededTier = a.tier;
         if (a.tier !== "normal") {
