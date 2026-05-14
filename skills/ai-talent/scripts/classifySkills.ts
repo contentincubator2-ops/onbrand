@@ -38,7 +38,7 @@ const AZURE_KEY = process.env.AZURE_FOUNDRY_API_KEY ?? process.env.AZURE_AI_API_
 const AZURE_ENDPOINT = (
   process.env.AZURE_FOUNDRY_PROJECT_ENDPOINT ??
   process.env.AZURE_AI_ENDPOINT ??
-  "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law"
+  "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/onbrand"
 ).replace(/\/+$/, "");
 const AZURE_DEPLOYMENT = process.env.AZURE_FOUNDRY_MODEL ?? "gpt-4o-mini";
 
