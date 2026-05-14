@@ -1482,6 +1482,29 @@ async function main() {
     // 2026-05-14 (CJ「TWD + USD 雙幣」): record what currency the invoice was paid in.
     await ensureCol("invoices", "currency",      "VARCHAR(3) NOT NULL DEFAULT 'TWD' COMMENT 'TWD | USD'");
 
+    // 2026-05-14 (CJ「先回 caption + brief、image 跟 QA 變 async polling」):
+    // Async orchestra stages. After captions+briefs return, mission_outputs
+    // row is created with progress='caption_ready' so the user can hit /run
+    // and edit the captions while image gen + QA + extras finish in the
+    // background. RunPage polls until progress='done' (or 'failed').
+    //
+    // States:
+    //   caption_ready — captions + briefs persisted, image/QA still running
+    //   done          — image gen, extras, QA all complete and persisted
+    //   failed        — background continuation threw, see progressDetail
+    //
+    // Default 'done' for back-compat so existing rows (synchronously written
+    // before this column existed) don't appear "stuck in progress".
+    await ensureCol("mission_outputs", "progress",       "VARCHAR(20) NOT NULL DEFAULT 'done' COMMENT 'caption_ready | done | failed'");
+    await ensureCol("mission_outputs", "progressDetail", "TEXT NULL COMMENT 'error msg if failed, or stage notes'");
+    // Index so the cleanup-stale-orphans cron can scan efficiently.
+    try {
+      await conn.execute(`CREATE INDEX idx_mo_progress_updated ON mission_outputs (progress, updatedAt)`);
+      console.log("[migrate] mission_outputs progress index: created");
+    } catch (e: any) {
+      if (!String(e?.message ?? "").includes("Duplicate")) throw e;
+    }
+
     // 2026-05-14 (CJ「美金為準，每天匯率動」): FX snapshot table.
     // server/_core/fx.ts writes one row per successful provider fetch.
     await conn.execute(`

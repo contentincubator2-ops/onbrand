@@ -818,6 +818,24 @@ export async function runOrchestra(args: {
   userId?: number;
   /** Tier override — 60s/100s scale variants + add QA stage. Default 30s. */
   tier?: OrchestraTier;
+  /**
+   * 2026-05-14 (CJ「先回 caption + brief、image 跟 QA 變 async polling」):
+   * Optional checkpoint — fires AFTER captions + briefs are assembled but
+   * BEFORE image gen / extras / QA. Caller can persist this partial result,
+   * return a fast response to the user (~30-40s), and let the rest of the
+   * orchestra continue running in the background. Caller is responsible
+   * for awaiting the full `runOrchestra` Promise to capture the final
+   * variants (with image URLs + QA + extras) and writing them to the same
+   * mission_output row.
+   *
+   * The checkpoint result has:
+   *   - variants[i].caption  — fully assembled
+   *   - variants[i].hashtags — fully assembled
+   *   - variants[i].image    — { style: brief, url: null, status: "pending" }
+   *   - qa: undefined        — runs after checkpoint
+   *   - extras: undefined    — runs after checkpoint
+   */
+  onCheckpoint?: (partial: OrchestraResult) => void;
 }): Promise<OrchestraResult> {
   // Tier-based config scaling (additive, doesn't mutate original config).
   // 60s/100s bumps variants 3 → 5 but task config typically only has 3
