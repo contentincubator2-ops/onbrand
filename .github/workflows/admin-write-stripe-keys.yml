@@ -1,17 +1,17 @@
 name: Admin — Write Stripe keys to prod .env
 
-# 2026-05-14 (CJ「我們使用 Stripe」)
-# Writes STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET into the VM's
-# skills/ai-talent/.env, then pm2 restart so the new env is picked up.
+# 2026-05-14 — Securely inject STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET
+# into the VM's .env without ever putting them in git or in chat.
 #
 # How to use:
-#   1. In GitHub repo Settings → Secrets and variables → Actions, add:
-#        STRIPE_SECRET_KEY       (sk_test_... or sk_live_...)
-#        STRIPE_WEBHOOK_SECRET   (whsec_... from Stripe Dashboard webhook config)
+#   1. Repo Settings → Secrets and variables → Actions → add:
+#        STRIPE_SECRET_KEY      (sk_live_... or sk_test_...)
+#        STRIPE_WEBHOOK_SECRET  (whsec_... from Stripe Dashboard webhook)
 #   2. Run this workflow.
-#   3. In Stripe Dashboard → Developers → Webhooks, point a new endpoint at
+#   3. In Stripe Dashboard → Webhooks, point a new endpoint at
 #        https://onbrand.sowork.ai/api/stripe/webhook
-#      listening to: checkout.session.completed, checkout.session.async_payment_succeeded
+#      listening to: checkout.session.completed,
+#                    checkout.session.async_payment_succeeded
 #      Copy the signing secret into STRIPE_WEBHOOK_SECRET above.
 
 on:
@@ -19,36 +19,66 @@ on:
 
 jobs:
   write:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
     steps:
-      - uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 120s
-          envs: STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET
-          script: |
-            set -e
-            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+      - name: Mask secrets in any echo
+        run: |
+          echo "::add-mask::${{ secrets.STRIPE_SECRET_KEY }}"
+          echo "::add-mask::${{ secrets.STRIPE_WEBHOOK_SECRET }}"
 
-            upsert() {
-              local key="$1" val="$2"
-              if grep -qE "^${key}=" "$ENV"; then
-                # macOS-style sed escape — VM uses GNU sed so just inline
-                sed -i "s|^${key}=.*|${key}=${val}|" "$ENV"
-                echo "[updated] ${key}"
-              else
-                echo "${key}=${val}" >> "$ENV"
-                echo "[added]   ${key}"
-              fi
-            }
+      - name: Verify shape (no value echoed)
+        env:
+          SK: ${{ secrets.STRIPE_SECRET_KEY }}
+          WS: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: |
+          if [ -z "$SK" ] || [ -z "$WS" ]; then
+            echo "❌ STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET missing in repo Secrets."
+            echo "   Go to Settings → Secrets and variables → Actions, add both, re-run."
+            exit 1
+          fi
+          case "$SK" in
+            sk_live_*) echo "  ✓ secret key = LIVE";;
+            sk_test_*) echo "  ✓ secret key = TEST";;
+            *) echo "  ❌ unrecognized secret key prefix"; exit 1;;
+          esac
+          case "$WS" in
+            whsec_*) echo "  ✓ webhook secret format OK";;
+            *) echo "  ❌ webhook secret should start with whsec_"; exit 1;;
+          esac
+          echo "  sk length: ${#SK} chars · ws length: ${#WS} chars"
 
-            upsert STRIPE_SECRET_KEY     "${{ secrets.STRIPE_SECRET_KEY }}"
-            upsert STRIPE_WEBHOOK_SECRET "${{ secrets.STRIPE_WEBHOOK_SECRET }}"
+      - name: Upsert into .env
+        env:
+          SK: ${{ secrets.STRIPE_SECRET_KEY }}
+          WS: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: |
+          set -e
+          ENV=/opt/marketing-os/app/skills/ai-talent/.env
+          TMP=$(mktemp)
+          if [ -f "$ENV" ]; then
+            grep -v -E '^(STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET)=' "$ENV" > "$TMP" || true
+          fi
+          {
+            echo ""
+            echo "# Stripe — written by admin-write-stripe-keys @ $(date -Iseconds)"
+            echo "STRIPE_SECRET_KEY=$SK"
+            echo "STRIPE_WEBHOOK_SECRET=$WS"
+          } >> "$TMP"
+          mv "$TMP" "$ENV"
+          chmod 600 "$ENV"
+          chown azureuser:azureuser "$ENV"
+          echo "── Stripe lines now in .env (values masked) ──"
+          grep -E '^STRIPE_' "$ENV" | sed -E 's/=.*/=***MASKED***/'
 
-            echo
-            echo "── Restarting pm2 to pick up new env ─────"
-            pm2 restart ai-talent --update-env
-            sleep 2
-            pm2 status ai-talent | head -20
+      - name: Restart pm2
+        run: |
+          pm2 restart marketing-os --update-env 2>&1 | tail -5
+          sleep 3
+          curl -s -o /dev/null -w "  /health → %{http_code}\n" "http://localhost:3101/health" || true
+
+      - name: Reminder
+        run: |
+          echo ""
+          echo "✓ Done. Stripe keys are live on the VM."
+          echo "  Test: /pricing → click a paid plan → should reach Stripe Checkout"
