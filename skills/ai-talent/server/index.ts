@@ -30,6 +30,7 @@ import { authRouter } from "./auth/authRouter";
 import { exportRouter } from "./routes/exportRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
+import { missionChatRouter } from "./routes/missionChatRouter";
 import pmRouter from "./routes/pmRoute";
 import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
@@ -267,7 +268,7 @@ app.use("/api/a2a", a2aStreamRouter);
 
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
 app.use("/slack", slackOAuthRouter);
-// /api/chat removed 2026-05-14 — only v1 MissionChatCore consumed it.
+app.use("/api/chat", missionChatRouter);  // Mission chat 統一入口 (squad-first routing)
 app.use("/api/pm", pmRouter);
 app.use("/api/brand-brain", brandBrainRouter);
 app.use("/api/exports", exportsRouter);

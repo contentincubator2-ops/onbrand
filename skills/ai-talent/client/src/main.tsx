@@ -5,9 +5,12 @@ import { QueryClient, QueryClientProvider, MutationCache, QueryCache } from "@ta
 import { trpc, trpcClient } from "./lib/trpc";
 import { ToastProvider, showToastGlobal } from "./components/ui/Toast";
 import { HeroUIProvider } from "@heroui/react";
-// v2 frontend (Sprint 1, 2026-04-25). Legacy v1 App was removed
-// 2026-05-14 — see git history if you need the old behavior.
+// v2 frontend rebuild — Sprint 1 (2026-04-25). The legacy App is kept on
+// disk for one cycle then removed. Flip USE_V2 to false to fall back.
+import App from "./App";
 import AppV2 from "./v2/app/AppV2";
+const USE_V2 = true;
+const RootApp = USE_V2 ? AppV2 : App;
 import "./index.css";
 
 // 2026-05-08 (P1-2): global mutation / query error toast.
@@ -174,7 +177,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <trpc.Provider client={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
               <BrowserRouter>
-                <AppV2 />
+                <RootApp />
               </BrowserRouter>
             </QueryClientProvider>
           </trpc.Provider>
