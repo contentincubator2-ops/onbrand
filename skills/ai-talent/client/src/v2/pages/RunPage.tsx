@@ -1782,7 +1782,7 @@ function PublishTemplateModal({
                     : `已發布到範本庫（#${r?.id ?? "?"}）— 被別人用一次 +2 credits ✓`
                 );
                 onClose();
-                setTimeout(() => navigate("/community"), 800);
+                // /community retired 2026-05-14 — just close, no redirect.
               } catch (e: any) {
                 showToastGlobal(
                   lang === "en" ? `Publish failed: ${e?.message ?? e}` : `發布失敗：${e?.message ?? e}`

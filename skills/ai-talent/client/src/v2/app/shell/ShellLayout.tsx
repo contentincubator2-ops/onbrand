@@ -1344,30 +1344,7 @@ function SlidePanel({
         </>
       )}
 
-      {/* ── 範本 panel (Screenshot 3) ── */}
-      {isTemplates && (
-        <>
-          <PlanInviteButtons onNavigate={onNavigate} />
-          <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
-          <nav style={{ padding: "8px 6px", flex: 1 }}>
-            {([
-              { id: "templates", label: isEn ? "Templates" : "範本",         icon: faTableCells,   to: "/templates"           },
-              { id: "photos",    label: isEn ? "Photos" : "照片",         icon: faImage,        to: "/templates?kind=photo" },
-              { id: "images",    label: isEn ? "Images" : "圖像",         icon: faPaintBrush,   to: "/templates?kind=image" },
-              { id: "creators",  label: isEn ? "Creators" : "創作者",       icon: faUser,         to: "/templates?kind=agent" },
-              { id: "starred",   label: isEn ? "Starred" : "已標記星號的內容", icon: faStar,       to: "/templates?kind=skill" },
-            ]).map(n => {
-              const active =
-                n.id === "templates"
-                  ? currentPath === "/templates" && !searchParams.get("kind")
-                  : searchParams.get("kind") === n.id.replace("photos","photo").replace("images","image").replace("creators","agent").replace("starred","skill");
-              return (
-                <NavRow key={n.id} icon={n.icon} label={n.label} active={active} onClick={() => onNavigate(n.to)} />
-              );
-            })}
-          </nav>
-        </>
-      )}
+      {/* 範本 panel retired 2026-05-14 — /templates route removed. */}
 
       {/* ── 品牌 panel (Screenshots 4 & 5) ── */}
       {isBrands && (

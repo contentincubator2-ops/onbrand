@@ -25,7 +25,6 @@ import { Search, Plus, Folder, Clock, Trash2, Copy, Info, Pencil } from "lucide-
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe, faNewspaper, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
-import CreateMissionModal from "../components/CreateMissionModal";
 
 interface MissionRow {
   id: number;
@@ -115,7 +114,7 @@ export default function ProjectsPage() {
     // without it getting overridden until shell brand changes again).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shellBrandId]);
-  const [createOpen, setCreateOpen] = useState(false);
+  // createOpen state removed 2026-05-14 along with CreateMissionModal.
 
   // Filter
   const filtered = useMemo(() => {
@@ -289,7 +288,7 @@ export default function ProjectsPage() {
           <EmptyState
             search={search}
             onClear={() => { setSearch(""); setActiveBrandId("all"); }}
-            onCreate={() => setCreateOpen(true)}
+            onCreate={() => { /* New-task entry retired; users go to /30s etc. */ }}
             lang={lang}
           />
         ) : (
@@ -301,21 +300,9 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* ─── Bottom-right FAB ────────────────────────────────────────── */}
-      <button
-        onClick={() => setCreateOpen(true)}
-        className="fixed bottom-8 right-8 flex items-center gap-2 px-5 py-3 rounded-full text-white font-semibold shadow-lg transition hover:translate-y-[-1px]"
-        style={{
-          background: "linear-gradient(135deg, #7C3AED, #6366F1)",
-          boxShadow: "0 8px 24px rgba(99,102,241,0.45)",
-          zIndex: 40,
-        }}
-      >
-        <Plus size={16} />
-        {lang === "en" ? "New project" : "新任務"}
-      </button>
-
-      <CreateMissionModal open={createOpen} initialWorkspace="all" onClose={() => setCreateOpen(false)} />
+      {/* 2026-05-14 (CJ): retired the +New FAB and CreateMissionModal.
+          Users enter tasks via the sidebar /30s /60s /99s pages instead;
+          /projects is now read-only history. */}
     </div>
   );
 }

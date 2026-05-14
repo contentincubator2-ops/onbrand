@@ -30,21 +30,16 @@ import OnboardingWizard from "../../pages/OnboardingWizard";
 // v2
 import RequireAuthV2 from "./RequireAuthV2";
 import ShellLayout from "./shell/ShellLayout";
-import MissionsHome from "../pages/MissionsHome";
-// MissionDetail retired 2026-04-27 (C1) — replaced by in-picker WorkflowRunner.
-// /m/:missionId now redirects to /picker?mission=:id.
+// 2026-05-14 (CJ): retired MissionsHome / MethodologyCatalog / MethodologyDetail /
+// PickerWorkspace / BoardroomPage / PlaybooksPage / CommunityPage. Sidebar
+// has no entries for these and there are no remaining navigation paths.
 import MissionRedirect from "./MissionRedirect";
-import MethodologyCatalog from "../pages/MethodologyCatalog";
-import MethodologyDetail from "../pages/MethodologyDetail";
-import PickerWorkspace from "../pages/PickerWorkspace";
 import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
 import QuickTasksPage from "../pages/QuickTasksPage";
 import QuickTask30sPage from "../pages/QuickTask30sPage";
 import RunPage from "../pages/RunPage";
-import BoardroomPage from "../pages/BoardroomPage";
 import StrategyConsultantPage from "../pages/StrategyConsultantPage";
-import PlaybooksPage from "../pages/PlaybooksPage";
 import TheaterPage from "../pages/TheaterPage";
 import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
 import SquadLabPage from "../pages/admin/SquadLabPage";
@@ -64,8 +59,6 @@ import BrandSettingsPage from "../pages/BrandSettingsPage";
 // 2026-05-11 (CJ「補 Sentry-style error tracking」): admin dashboard for
 // auto-captured tRPC / frontend errors. Gated server-side by adminProcedure.
 import AdminErrorsPage from "../pages/AdminErrorsPage";
-// 2026-05-11 (CJ「Spotify 模式」): community template marketplace
-import CommunityPage from "../pages/CommunityPage";
 // 2026-05-11 (CJ「P0-1 內容日曆」): vs Buffer
 import CalendarPage from "../pages/CalendarPage";
 
@@ -205,16 +198,6 @@ export default function AppV2() {
           }
         />
 
-        {/* Picker — full-screen workspace, no shell chrome (Canva-style new tab) */}
-        <Route
-          path="/picker"
-          element={
-            <RequireAuthV2>
-              <PickerWorkspace />
-            </RequireAuthV2>
-          }
-        />
-
         {/* v2 protected routes — share ShellLayout */}
         <Route
           element={
@@ -246,7 +229,6 @@ export default function AppV2() {
           {/* Backwards-compat redirects */}
           <Route path="/100s" element={<Navigate to="/99s" replace />} />
           <Route path="/90s"  element={<Navigate to="/99s" replace />} />
-          <Route path="/squads" element={<MissionsHome />} />
           <Route path="/quicktask" element={<Navigate to="/30s" replace />} />
           <Route path="/fb" element={<Navigate to="/30s" replace />} />
           <Route path="/quicktask-legacy" element={<QuickTasksPage />} />
@@ -261,21 +243,15 @@ export default function AppV2() {
           {/* 2026-05-12 (CJ「不想要變成 modal，想跟品牌頁面一樣」): full-page
               brand settings (replaces the modal sheet for direct navigation). */}
           <Route path="/brands/settings" element={<BrandSettingsPage />} />
-          <Route path="/boardroom" element={<BoardroomPage />} />
           <Route path="/consultant" element={<StrategyConsultantPage />} />
-          <Route path="/playbooks" element={<PlaybooksPage />} />
           <Route path="/theater"   element={<TheaterPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
-          <Route path="/templates" element={<MethodologyCatalog />} />
-          <Route path="/templates/:slug" element={<MethodologyDetail />} />
           <Route path="/squad-mockups" element={<SquadMockupsGalleryPage />} />
           <Route path="/admin/squads" element={<SquadLabPage />} />
           {/* 2026-05-11 — error tracking dashboard. adminProcedure-gated on
               server; non-admins see a friendly FORBIDDEN screen. */}
           <Route path="/admin/errors" element={<AdminErrorsPage />} />
-          {/* 2026-05-11 — community template marketplace (Spotify model) */}
-          <Route path="/community" element={<CommunityPage />} />
           {/* 2026-05-11 — content calendar (P0-1) */}
           <Route path="/calendar" element={<CalendarPage />} />
           {/* 2026-05-10 account settings + achievements */}
