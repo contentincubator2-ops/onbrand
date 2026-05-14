@@ -43,6 +43,16 @@ jobs:
           AI=$APP/skills/ai-talent
           cd "$AI/client"
           npm install --legacy-peer-deps 2>&1 | tail -5
+          # 2026-05-14 (white-screen post-mortem): purge public/assets/ before
+          # build. Vite writes new hashed chunks but doesn't delete old ones —
+          # so over multiple builds, public/assets/ accumulates stale .js/.css.
+          # If any process snapshots index.html separately from assets/ (rsync,
+          # static-serve caching), drift = white-screen. Wipe-then-build keeps
+          # the dir in sync with index.html every time.
+          if [ -d "$AI/public/assets" ]; then
+            rm -rf "$AI/public/assets"
+            echo "[deploy] purged old assets/"
+          fi
           # 2026-05-13: previous version masked tsc/vite failures with
           # `2>&1 | tail -10` — when tsc errored, build silently succeeded
           # and public/ stayed stale. set -eo pipefail makes pipe failures
@@ -55,7 +65,15 @@ jobs:
             ls "$AI/public/assets/" | head
             exit 1
           fi
-          echo "✓ index.html → $BUNDLE ($(stat -c%s $AI/public/assets/$BUNDLE) bytes)"
+          # Sanity 2: verify the bundle is real JS, not the nginx fallback stub.
+          # (78 bytes = "asset not found — your bundle is stale, please hard-refresh")
+          BUNDLE_SIZE=$(stat -c%s "$AI/public/assets/$BUNDLE")
+          if [ "$BUNDLE_SIZE" -lt 1000 ]; then
+            echo "❌ bundle $BUNDLE is suspiciously small ($BUNDLE_SIZE bytes) — likely the stub"
+            head -c 200 "$AI/public/assets/$BUNDLE"
+            exit 1
+          fi
+          echo "✓ index.html → $BUNDLE ($BUNDLE_SIZE bytes)"
           stat -c '%y %s bytes' "$AI/public/index.html"
 
       - name: Restart pm2
