@@ -3147,7 +3147,7 @@ function EventSettingsPanel({
   const { t, lang } = useLang();
   const utils = (trpc as any).useUtils?.() ?? null;
   const eventQuery = (trpc as any).event?.get?.useQuery
-    ? (trpc as any).event.get.useQuery({ id: eventId }, { refetchOnWindowFocus: false })
+    ? (trpc as any).event.get.useQuery({ id: eventId }, { refetchOnWindowFocus: false, enabled: eventId > 0 })
     : { data: null, isLoading: false };
   const event = eventQuery.data as any;
 

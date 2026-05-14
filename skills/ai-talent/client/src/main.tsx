@@ -40,6 +40,25 @@ function shouldSilentSkip(err: any): boolean {
     if (msg.includes('"too_small"') && msg.includes('"brandId"')) return true;
     if (msg.includes('"path": [ "id" ]') && msg.includes('"too_small"')) return true;
   }
+  // 2026-05-15 (CJ「stale tRPC client」): if the bundle is so old it
+  // calls a router we've removed server-side (workflow / market / etc.
+  // killed 2026-05-14), the server returns "No procedure found". Tell
+  // the user once, then force a hard reload to pick up the new bundle.
+  const msg = String(err?.message ?? err?.shape?.message ?? "");
+  if (/No.*procedure.*found|Router.*not.*found|"code"\s*:\s*"NOT_FOUND".*procedure/.test(msg)) {
+    if (typeof window !== "undefined") {
+      const w = window as any;
+      if (!w.__staleBundleReloading) {
+        w.__staleBundleReloading = true;
+        try {
+          showToastGlobal("應用程式已更新，正在重新載入…", "error");
+        } catch {}
+        // Wait 1.5s so the user sees the toast, then hard-reload
+        setTimeout(() => { window.location.reload(); }, 1500);
+      }
+    }
+    return true;
+  }
   return false;
 }
 function formatErr(err: any): string {
@@ -62,6 +81,16 @@ const queryClient = new QueryClient({
       if ((query as any)?.options?.onError) return;
       // Skip background refetches (only toast initial load)
       if ((query as any)?.state?.dataUpdateCount > 0) return;
+      // 2026-05-15 (CJ「背景 polling 失敗」): queries with refetchInterval
+      // are background pollers (achievements / notifications / theater
+      // status). A transient network blip would toast on every poll —
+      // suppress all errors on those, they self-heal next tick.
+      if ((query as any)?.options?.refetchInterval) return;
+      // 2026-05-15: also skip toast for transient gateway errors on
+      // first load. tRPC clients auto-retry; if it eventually fails for
+      // real, the user-initiated action will surface its own error UI.
+      const msg = String(err?.message ?? "");
+      if (/\b50[234]\b|伺服器忙碌|ECONNRESET|fetch failed|Network error/.test(msg)) return;
       showToastGlobal(`載入失敗：${formatErr(err)}`, "error");
     },
   }),

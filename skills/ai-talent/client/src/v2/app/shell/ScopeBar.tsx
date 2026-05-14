@@ -170,6 +170,24 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
   const product = products.find((p: any) => p.id === scope.productId) ?? null;
   const event = events.find((e: any) => e.id === scope.eventId) ?? null;
 
+  // 2026-05-15 (CJ「localStorage 殘留舊 scope」): if the stored scope
+  // brandId doesn't match anything in the user's actual brands list
+  // (different account, deleted brand, etc.), clear scope. Otherwise
+  // every page query fires with brandId=2830 → server returns NOT_FOUND
+  // and the UI shows stale/wrong data. Wait until brands query has
+  // actually resolved (length > 0 OR explicitly empty array from a
+  // settled query) so we don't false-clear during initial load.
+  React.useEffect(() => {
+    const brandsSettled =
+      (optionsQuery.data != null) || (legacyBrandsQuery.isFetched && !legacyBrandsQuery.isLoading);
+    if (!brandsSettled) return;
+    if (scope.brandId && !brands.find((b: any) => b.id === scope.brandId)) {
+      console.warn("[scope] clearing stale brandId", scope.brandId, "(not in user's brands)");
+      setScope({ brandId: null, productId: null, eventId: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionsQuery.data, legacyBrandsQuery.isFetched, scope.brandId]);
+
   // Hierarchical scope picker. Picking a product / event resolves its
   // parent brand from the FK column on the row (server-side scope.options
   // returns products.brandId, events.brandId, events.productId).
