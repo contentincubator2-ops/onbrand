@@ -53,18 +53,11 @@ jobs:
             exit 0
           fi
 
-          # Extract script + cwd from the current marketing-os process
-          eval "$(pm2 jlist 2>/dev/null | python3 -c '
-          import json, sys
-          procs = json.load(sys.stdin)
-          for p in procs:
-            if p[\"name\"] == \"marketing-os\":
-              env = p[\"pm2_env\"]
-              print(f\"SCRIPT={env[\\\"pm_exec_path\\\"]}\")
-              print(f\"CWD={env[\\\"pm_cwd\\\"]}\")
-              print(f\"INTERP={env.get(\\\"exec_interpreter\\\",\\\"none\\\")}\")
-              break
-          ')"
+          # Extract script + cwd from the current marketing-os process via jq
+          JLIST=$(pm2 jlist 2>/dev/null)
+          SCRIPT=$(echo "$JLIST" | jq -r '.[] | select(.name=="marketing-os") | .pm2_env.pm_exec_path // empty')
+          CWD=$(echo "$JLIST" | jq -r '.[] | select(.name=="marketing-os") | .pm2_env.pm_cwd // empty')
+          INTERP=$(echo "$JLIST" | jq -r '.[] | select(.name=="marketing-os") | .pm2_env.exec_interpreter // "none"')
 
           if [ -z "$SCRIPT" ]; then
             echo "❌ no pm2 process named 'marketing-os' found — aborting"
