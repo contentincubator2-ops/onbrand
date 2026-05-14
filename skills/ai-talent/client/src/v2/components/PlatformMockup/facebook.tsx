@@ -127,15 +127,26 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
               {!hasContent && <Skeleton className="absolute inset-0" />}
               <div className={`text-center relative z-10 p-4 ${hasContent ? "bg-default-50/80 backdrop-blur-sm rounded-medium m-3" : ""}`}>
                 <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
+                {/* 2026-05-14 (CJ「圖片還是跑很久」): status-aware placeholder.
+                    Drops the misleading "等待 craft agent" generic copy.
+                    Each branch now matches a real OrchestraVariant.image.status. */}
                 {liveImageStatus === "timeout" ? (
                   <>
-                    <p className="text-tiny font-semibold text-warning-600 mb-1">{lang === "en" ? "Finishing… (over 20s)" : "補完中…（20s 已超）"}</p>
-                    <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>
+                    <p className="text-tiny font-semibold text-warning-600 mb-1">{lang === "en" ? "Image generation timed out" : "圖片生成超時"}</p>
+                    {liveImageStyle && <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>}
+                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to retry" : "點此重試"}</p>
                   </>
                 ) : liveImageStatus === "failed" ? (
                   <>
-                    <p className="text-tiny font-semibold text-danger-600 mb-1">{lang === "en" ? "Image failed" : "生圖失敗"}</p>
-                    <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>
+                    <p className="text-tiny font-semibold text-danger-600 mb-1">{lang === "en" ? "Image generation failed" : "圖片生成失敗"}</p>
+                    {liveImageStyle && <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>}
+                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to retry" : "點此重新生成"}</p>
+                  </>
+                ) : liveImageStatus === "skipped" ? (
+                  <>
+                    <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "This task doesn't include images" : "此任務不含主圖"}</p>
+                    {liveImageStyle && <p className="text-tiny line-clamp-3 text-default-500">{liveImageStyle}</p>}
+                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to generate manually" : "點此手動生圖"}</p>
                   </>
                 ) : liveImageStyle ? (
                   <>
@@ -144,7 +155,9 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                     <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to generate via MediaGenFlow" : "點此用 MediaGenFlow 生圖"}</p>
                   </>
                 ) : (
-                  <p className="text-tiny line-clamp-3">{liveImageDesc ?? (lang === "en" ? "Hero image · waiting for craft agent" : "主圖 · 等待 craft agent")}</p>
+                  <p className="text-tiny line-clamp-3 text-default-500">
+                    {liveImageDesc ?? (lang === "en" ? "No image generated" : "尚未生成圖片 · 點此手動生圖")}
+                  </p>
                 )}
               </div>
             </div>

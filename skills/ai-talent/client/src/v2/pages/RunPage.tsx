@@ -411,8 +411,26 @@ export default function RunPage() {
     if (!data) return [];
     try {
       const parsed = JSON.parse(data.content);
-      if (Array.isArray(parsed)) return parsed;
-      if (parsed?.variants) return parsed.variants;
+      const raw: any[] = Array.isArray(parsed) ? parsed : (parsed?.variants ?? []);
+      // 2026-05-14 (CJ「圖片還是跑很久」根因): orchestra persists nested
+      //   { image: { url, status, style, errorMsg } }
+      // but the VariantData interface + mockup expect FLAT
+      //   { imageUrl, imageStatus, imageStyle }.
+      // Without this normalize, even a successfully-generated image showed
+      // as "等待 craft agent" because imageUrl was always undefined.
+      return raw.map((v: any) => {
+        const img = v.image ?? {};
+        return {
+          label: v.label,
+          caption: v.caption,
+          hashtags: v.hashtags ?? [],
+          imageUrl: v.imageUrl ?? img.url ?? null,
+          imageStatus: v.imageStatus ?? img.status ?? undefined,
+          imageStyle: v.imageStyle ?? img.style ?? undefined,
+          qa: v.qa,
+          extras: v.extras,
+        } as VariantData;
+      });
     } catch { /* ignore */ }
     return [{ label: lang === "en" ? "Main version" : "主版本", caption: data.content || "" }];
   }, [data]);
