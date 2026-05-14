@@ -54,10 +54,8 @@ export default function PricingPage() {
       code: "drop_pro",
       name: isEn ? "OnBrand Solo" : "OnBrand Solo",
       sub: isEn ? "One brand · unlimited captions + images" : "一個品牌 · 無限文案 + 圖",
-      // 2026-05-14 (CJ「定價頁面要按照新版的定價 USD300 早鳥USD100」):
-      // Pricing page shows the MARKETING offer, not the logged-in user's
-      // grandfather lock. Always derive from `defaults` so the page is
-      // the same for visitors + existing users.
+      // 2026-05-15 (CJ「nt$900 已確定無效，全改」): grandfather lock 已 wipe，
+      // 所有用戶都吃 US$100 早鳥。Pricing page 永遠顯示 marketing offer。
       monthly: defaults.soloEarly,
       annual:  defaults.soloAnnual,
       standardMonthly: defaults.soloStd,

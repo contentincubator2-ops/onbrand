@@ -1,0 +1,60 @@
+name: Ops — Clear grandfather lockedPriceTwdMonthly (2026-05-15)
+
+# 2026-05-15 (CJ「nt$900 已經確定無效了，全改。目前登入進來的，都是我認識的測試的人」)
+#
+# Reverses op-grandfather-early-bird-2026-05-14:
+#   - Wipes users.lockedPriceTwdMonthly → NULL for ALL users
+#   - Keeps earlyBird = 1 so test cohort still gets US$100 early-bird price
+#     (via plan.earlyBirdPriceTwdMonthly path in getEffectivePrice)
+#
+# Result: every existing user flips from NT$900 grandfather lock to the
+# new US$100 / month early-bird offer. New plan tier = OnBrand Solo
+# (1 brand, unlimited captions + images).
+#
+# Run ONCE. Idempotent.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  clear-lock:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
+
+          echo "════ Cohort BEFORE clear ════"
+          $MYSQL -e "
+            SELECT id, email, planCode, earlyBird, lockedPriceTwdMonthly, billingCountry
+              FROM users
+             WHERE lockedPriceTwdMonthly IS NOT NULL
+             ORDER BY id;
+          "
+
+          echo ""
+          echo "════ Applying UPDATE (wipe lock, keep earlyBird=1) ════"
+          $MYSQL -e "
+            UPDATE users
+               SET lockedPriceTwdMonthly = NULL,
+                   earlyBird = 1
+             WHERE 1=1;
+          "
+
+          echo ""
+          echo "════ AFTER ════"
+          $MYSQL -e "
+            SELECT
+              earlyBird,
+              COUNT(*) AS users,
+              SUM(CASE WHEN lockedPriceTwdMonthly IS NOT NULL THEN 1 ELSE 0 END) AS still_locked
+            FROM users
+            GROUP BY earlyBird;
+          "
+
+          echo ""
+          echo "✅ Lock cleared. All users now resolve to US\$100/月 early-bird via plan path."
