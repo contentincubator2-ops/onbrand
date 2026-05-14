@@ -24,8 +24,8 @@ interface Props {
 }
 
 type MiaAction =
-  | { kind: "navigate"; url: string; label: string }
-  | { kind: "open_task"; tier: "30s" | "60s" | "99s"; topic?: string; label: string };
+  | { kind: "navigate"; url: string; label: string; auto?: boolean }
+  | { kind: "open_task"; tier: "30s" | "60s" | "99s"; topic?: string; label: string; auto?: boolean };
 type Message = { id: number; role: string; content: string; createdAt: string; actions?: MiaAction[] };
 
 const MIA_AVATAR =
@@ -42,6 +42,10 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
   const [sending, setSending] = useState(false);
   const [showEscalate, setShowEscalate] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // 2026-05-14 (CJ「同意，帶 auto 標誌」): pending auto-navigate state.
+  // Only set on FRESH replies (not history reload) so refreshing the page
+  // doesn't re-trigger a navigate from an old <<action:...:auto>> marker.
+  const [pendingAuto, setPendingAuto] = useState<{ action: MiaAction; secondsLeft: number } | null>(null);
 
   const startMut    = (trpc as any).support?.startConversation?.useMutation?.();
   const sendMut     = (trpc as any).support?.sendMessage?.useMutation?.();
@@ -72,6 +76,24 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
     }
   }, [messages.length, sending]);
 
+  // 2026-05-14: tick countdown for pendingAuto. Fires every 1s; when
+  // secondsLeft hits 0, run the action and clear. Cancelled by user
+  // click in the banner (setPendingAuto(null)).
+  useEffect(() => {
+    if (!pendingAuto) return;
+    if (pendingAuto.secondsLeft <= 0) {
+      // Run the navigate
+      runAction(pendingAuto.action);
+      setPendingAuto(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setPendingAuto((p) => (p ? { ...p, secondsLeft: p.secondsLeft - 1 } : null));
+    }, 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAuto]);
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || sending || !conversationId) return;
@@ -99,6 +121,13 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
             : m;
           return [...replaced, r.miaMessage];
         });
+        // 2026-05-14: auto-trigger first auto action on the FRESH reply
+        // only (history reloads do NOT trigger). 3-second countdown with
+        // cancel via the top banner.
+        const autoAction = (r.miaMessage.actions as MiaAction[] | undefined)?.find((a) => a.auto);
+        if (autoAction) {
+          setPendingAuto({ action: autoAction, secondsLeft: 3 });
+        }
       }
     } catch (e: any) {
       setMessages((m) => [
@@ -209,6 +238,43 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
           <X size={16} />
         </button>
       </div>
+
+      {/* Auto-navigate countdown banner (Gmail-undo-send style) */}
+      {pendingAuto && (
+        <div style={{
+          padding: "10px 14px",
+          background: "#171717",
+          color: "white",
+          display: "flex", alignItems: "center", gap: 10,
+          fontSize: 12,
+          animation: "miaPopIn 0.18s ease-out",
+        }}>
+          <span style={{
+            width: 22, height: 22, borderRadius: "50%",
+            background: "rgba(255,255,255,0.18)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, fontWeight: 700, flexShrink: 0,
+          }}>
+            {pendingAuto.secondsLeft}
+          </span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            {isEn
+              ? <>Navigating to <strong>{pendingAuto.action.kind === "navigate" ? pendingAuto.action.url : pendingAuto.action.label}</strong>…</>
+              : <>{pendingAuto.secondsLeft} 秒後帶你去 <strong>{pendingAuto.action.kind === "navigate" ? pendingAuto.action.url : pendingAuto.action.label}</strong></>}
+          </span>
+          <button
+            onClick={() => setPendingAuto(null)}
+            style={{
+              padding: "4px 10px", borderRadius: 6, border: "none",
+              background: "rgba(255,255,255,0.2)", color: "white",
+              fontSize: 11, fontWeight: 600, cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {isEn ? "Cancel" : "取消"}
+          </button>
+        </div>
+      )}
 
       {/* Message list */}
       <div ref={scrollRef} style={{

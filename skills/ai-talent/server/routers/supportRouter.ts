@@ -167,16 +167,29 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 你不能直接幫用戶點按鈕，但你可以在訊息裡塞「行動標記」，前端會渲染成可點按鈕。**只在用戶明確要求「幫我做」「直接帶我去」「給我連結」時才放**，不要每則訊息都塞。
 
 格式（一行一個，可放多個）：
-<<action:navigate:/path>>顯示文字
+<<action:navigate:/path>>顯示文字                  ← 用戶要點才跳
+<<action:navigate:/path:auto>>顯示文字             ← 3 秒後自動跳（可取消）
 <<action:open_task_30s:topic=主題文字>>跑 30 秒任務：主題
 <<action:open_task_60s:topic=主題文字>>跑 60 秒任務：主題
 <<action:open_task_99s:topic=主題文字>>跑 99 秒任務：主題
 
+【auto 何時用】
+- ✅ 用戶說「直接帶我去」「幫我切到」「給我連結」「自動跳」這類「主動催促」語氣 → 加 `:auto`
+- ✅ 純讀取頁面（/calendar /projects /changelog /brands）→ 可以 auto
+- ❌ 用戶只是問「在哪裡」「怎麼去」→ 不要 auto，給按鈕讓他自己決定
+- ❌ open_task（會花錢的）→ 永遠不能 auto（server 強制忽略 :auto 標記）
+
 範例對話：
-用戶：「給我連結」
-你：「點下面進 60s 任務頁。
-<<action:navigate:/60s>>去 /60s 看任務
-要我幫你開父親節任務嗎？
+用戶：「給我連結」（明確要求）
+你：「3 秒後帶你進日曆 →
+<<action:navigate:/calendar:auto>>去日曆」
+
+用戶：「我要去哪看任務？」（只是問路）
+你：「點下方按鈕進 /60s。
+<<action:navigate:/60s>>去 /60s 看任務」
+
+用戶：「幫我開父親節任務」（會花錢）
+你：「按下方按鈕確認，會跑 60s 任務（~60 秒，花 ~$0.04）。
 <<action:open_task_60s:topic=父親節 · 復華穩健傳承>>幫我開父親節任務」
 
 不要假裝你已經幫用戶觸發了任何後端動作（不要寫「已遠端觸發」「任務 ID #811」這種幻覺）。
@@ -203,8 +216,8 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 
 // ── action marker parsing ──────────────────────────────────────────────────
 export type MiaAction =
-  | { kind: "navigate"; url: string; label: string }
-  | { kind: "open_task"; tier: "30s" | "60s" | "99s"; topic?: string; label: string };
+  | { kind: "navigate"; url: string; label: string; auto?: boolean }
+  | { kind: "open_task"; tier: "30s" | "60s" | "99s"; topic?: string; label: string; auto?: boolean };
 
 const ACTION_RE = /<<action:([a-z_0-9]+)(?::([^>]*))?>>\s*([^\n<]*)/gi;
 
@@ -221,14 +234,23 @@ function parseActions(raw: string): { clean: string; actions: MiaAction[] } {
   const clean = raw.replace(ACTION_RE, (_full, kind: string, payload: string | undefined, label: string) => {
     const trimmedLabel = (label ?? "").trim() || _full;
     const lower = kind.toLowerCase();
+    // 2026-05-14: optional `:auto` trailing flag → 3-sec auto-navigate
+    // on client. Only honored for read-only actions (navigate).
+    let payloadStr = (payload ?? "").trim();
+    let auto = false;
+    if (payloadStr.endsWith(":auto")) {
+      payloadStr = payloadStr.slice(0, -":auto".length);
+      auto = true;
+    }
     if (lower === "navigate") {
-      const url = (payload ?? "").trim();
-      if (url.startsWith("/")) actions.push({ kind: "navigate", url, label: trimmedLabel });
+      const url = payloadStr;
+      if (url.startsWith("/")) actions.push({ kind: "navigate", url, label: trimmedLabel, auto });
     } else if (lower === "open_task_30s" || lower === "open_task_60s" || lower === "open_task_99s") {
       const tier = (lower.replace("open_task_", "") as "30s" | "60s" | "99s");
-      const topicMatch = /topic=([^]*)$/.exec((payload ?? "").trim());
+      const topicMatch = /topic=([^]*)$/.exec(payloadStr);
       const topic = topicMatch ? topicMatch[1]!.trim() : undefined;
-      actions.push({ kind: "open_task", tier, topic, label: trimmedLabel });
+      // open_task spends LLM credits → NEVER auto, always require user click.
+      actions.push({ kind: "open_task", tier, topic, label: trimmedLabel, auto: false });
     }
     return ""; // strip the marker from displayed text
   });
