@@ -99,11 +99,11 @@ export default function BrandsManagePage() {
     const bid = scope.brandId ?? activeBrand?.id ?? "";
     navigate(`/brands/edit${bid ? `?b=${bid}` : ""}`, { replace: true });
   }, [forceGrid, scopeKind, scope.brandId, activeBrand?.id, navigate]);
-  // While redirecting, render nothing (avoids a flash of the grid).
-  if (!forceGrid && scopeKind !== "none") {
-    return null;
-  }
 
+  // 2026-05-14 (CJ「Logo 點擊 → 首頁空白」): all hooks MUST be called
+  // before any early return. The previous version returned null then
+  // called useState / useMutation below it — Rules of Hooks violation
+  // that React bails on with a blank screen. Move all hook calls up.
   const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
 
@@ -124,6 +124,12 @@ export default function BrandsManagePage() {
           ),
       })
     : null;
+
+  // While redirecting (scope picked → forward to editor), render nothing.
+  // Placed AFTER all hooks so React's render order stays stable.
+  if (!forceGrid && scopeKind !== "none") {
+    return null;
+  }
 
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";

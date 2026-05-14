@@ -442,6 +442,9 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const tierLabel = lang === "en"
     ? (tier === "30s" ? "30s" : tier === "60s" ? "60s" : "99s")
     : (tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "99 秒");
+  // 2026-05-14 (CJ「99s 檔期任務卡片角標標示為 100s」): map the internal
+  // tier id "100s" → user-facing "99s". Used for all badge / chip renders.
+  const tierBadge = tier === "100s" ? "99s" : tier;
   const tierTagline = lang === "en"
     ? (tier === "30s"
         ? "Which post are we crafting in 30 seconds today?"
@@ -984,7 +987,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                           className="absolute top-2 right-2 text-tiny font-semibold px-2 py-0.5 rounded-full text-white shadow-sm"
                           style={{ background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}cc)` }}
                         >
-                          {tier}
+                          {tierBadge}
                         </span>
                       </div>
                       {/* Card info */}
@@ -1083,7 +1086,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       background: `linear-gradient(135deg, ${tierAccent(tier)}, ${tierAccent(tier)}cc)`,
                     }}
                   >
-                    {tier}
+                    {tierBadge}
                   </span>
                 </div>
               </ModalHeader>

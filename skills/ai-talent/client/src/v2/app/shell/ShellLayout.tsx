@@ -174,6 +174,7 @@ export default function ShellLayout() {
         notifOpen={notifOpen}
         onNotifToggle={() => setNotifOpen((v) => !v)}
         notifUnread={notifUnread}
+        onOpenSupport={() => setSupportOpen(true)}
         brands={brands}
       />
 
@@ -320,7 +321,7 @@ export default function ShellLayout() {
 
 function IconBar({
   collapsed, onToggle, currentPath, onNavigate,
-  scope, setScope, onLogout, notifOpen, onNotifToggle, notifUnread, brands,
+  scope, setScope, onLogout, notifOpen, onNotifToggle, notifUnread, onOpenSupport, brands,
 }: {
   collapsed: boolean;
   onToggle: () => void;
@@ -332,6 +333,7 @@ function IconBar({
   notifUnread?: number;
   notifOpen: boolean;
   onNotifToggle: () => void;
+  onOpenSupport?: () => void;
   brands: any[];
 }) {
   const { lang } = useLang();
@@ -470,6 +472,7 @@ function IconBar({
                 setScope={setScope}
                 onLogout={onLogout}
                 onClose={() => setAvatarOpen(false)}
+                onOpenSupport={onOpenSupport}
                 brands={brands}
               />
             </>
@@ -1957,9 +1960,10 @@ function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
    Account popup (S button) — Canva-style with sub-panels
 ══════════════════════════════════════════════════════════════════ */
 
-function AccountPopup({ onLogout, onClose }: {
+function AccountPopup({ onLogout, onClose, onOpenSupport }: {
   onLogout: () => void;
   onClose: () => void;
+  onOpenSupport?: () => void;
   scope?: ScopeState;
   setScope?: (s: ScopeState) => void;
   brands?: any[];
@@ -2036,8 +2040,17 @@ function AccountPopup({ onLogout, onClose }: {
     // access; re-add this entry when agency tier launches.
     {
       icon: faCircleInfo, label: isEn ? "Contact support" : "聯絡客服", arrow: false, badge: null, danger: false,
-      // 2026-05-12 — 信箱修正為 sowork@sowork.ai
-      action: () => { window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E6%94%AF%E6%8F%B4"; },
+      // 2026-05-14 (CJ「聯絡客服點擊無反應」): open the Mia support drawer
+      // instead of opening the user's mail client. Mailto kept as a
+      // fallback if the drawer prop isn't wired (defensive).
+      action: () => {
+        onClose();
+        if (onOpenSupport) {
+          onOpenSupport();
+        } else {
+          window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E6%94%AF%E6%8F%B4";
+        }
+      },
     },
     {
       icon: faRightFromBracket, label: isEn ? "Log out" : "登出", arrow: false, badge: null, danger: true,
