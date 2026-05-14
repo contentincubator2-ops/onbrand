@@ -1,15 +1,18 @@
 module.exports = {
   apps: [{
-    name: 'marketing-os',
+    name: 'onbrand',
     script: './node_modules/.bin/tsx',
     args: 'server/index.ts',
-    cwd: '/home/azureuser/marketing-os/skills/ai-talent',
-    // 2026-05-14: cluster mode for 100-user trial scale. 2 workers use
-    // 2 cores; node event loop is no longer the single choke point under
-    // burst LLM traffic. See .github/workflows/admin-pm2-cluster-mode.yml
-    // for caveats (per-worker in-memory rate limiters / OAuth state).
-    instances: 2,
-    exec_mode: 'cluster',
+    cwd: '/opt/onbrand/app/skills/ai-talent',
+    // 2026-05-14: reverted to fork mode — cluster mode with tsx loader
+    // crashed all workers (restart loop ↺ 52). tsx spawns a subprocess
+    // and pm2 cluster expects the script to be a real node module so it
+    // can `cluster.fork()`. Workaround would be to compile to .js first.
+    // Deferred until trial scale actually needs >1 core. For now the
+    // per-user LLM semaphore + client retry + nginx 180s timeouts are
+    // enough headroom for moderate concurrent load.
+    instances: 1,
+    exec_mode: 'fork',
     max_restarts: 10,
     restart_delay: 5000,
     max_memory_restart: '768M',
@@ -29,8 +32,8 @@ module.exports = {
       // via dotenv (loaded in server/index.ts bootstrap-env block).
       // pm2 inherits process env when this file's env block is empty.
     },
-    error_file: '/home/azureuser/logs/marketing-os-error.log',
-    out_file: '/home/azureuser/logs/marketing-os-out.log',
+    error_file: '/home/azureuser/.pm2/logs/onbrand-error.log',
+    out_file: '/home/azureuser/.pm2/logs/onbrand-out.log',
     merge_logs: true,
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     autorestart: true,

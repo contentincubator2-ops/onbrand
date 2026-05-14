@@ -1,49 +1,76 @@
 name: Admin — Rollback onbrand pm2 to fork mode
+# Emergency recovery: nuke any onbrand or marketing-os pm2 process,
+# rewrite ecosystem.config.cjs to known-good fork mode + correct cwd/name,
+# then start fresh.
 on: { workflow_dispatch: {} }
 jobs:
   rollback:
     runs-on: [self-hosted, linux, vm-marketing-os]
     timeout-minutes: 5
     steps:
-      - name: Diagnose current state
+      - name: Diagnose
         run: |
           set +e
           pm2 list
-          echo "── pm2 describe ──"
-          pm2 describe onbrand 2>&1 | head -40
-          echo "── recent logs ──"
-          pm2 logs onbrand --lines 60 --nostream 2>&1 | tail -80
           echo "── port 3101 listening? ──"
-          ss -ltnp | grep :3101 || echo "nothing on 3101"
+          ss -ltnp 2>/dev/null | grep :3101 || echo "nothing on 3101"
 
-      - name: Force fork mode + restart
+      - name: Force-write correct ecosystem
         run: |
           set -e
-          ECO=/opt/onbrand/app/skills/ai-talent/ecosystem.config.cjs
-          python3 <<'PY'
-          import re, pathlib
-          p = pathlib.Path("/opt/onbrand/app/skills/ai-talent/ecosystem.config.cjs")
-          s = p.read_text()
-          s = re.sub(r"instances:\s*\d+", "instances: 1", s)
-          s = re.sub(r"exec_mode:\s*'cluster'", "exec_mode: 'fork'", s)
-          p.write_text(s)
-          print(s)
-          PY
-          pm2 delete onbrand 2>/dev/null || true
+          cat > /opt/onbrand/app/skills/ai-talent/ecosystem.config.cjs <<'CFG'
+          module.exports = {
+            apps: [{
+              name: 'onbrand',
+              script: './node_modules/.bin/tsx',
+              args: 'server/index.ts',
+              cwd: '/opt/onbrand/app/skills/ai-talent',
+              instances: 1,
+              exec_mode: 'fork',
+              max_restarts: 10,
+              restart_delay: 5000,
+              max_memory_restart: '768M',
+              env: {
+                NODE_ENV: 'production',
+                PORT: '3101',
+                TRUST_PROXY: '1',
+              },
+              error_file: '/home/azureuser/.pm2/logs/onbrand-error.log',
+              out_file: '/home/azureuser/.pm2/logs/onbrand-out.log',
+              merge_logs: true,
+              log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+              autorestart: true,
+              watch: false,
+            }]
+          };
+          CFG
+          cat /opt/onbrand/app/skills/ai-talent/ecosystem.config.cjs
+
+      - name: Nuke + restart
+        run: |
+          set +e
+          # Delete every variant pm2 might have lingering
+          pm2 delete onbrand 2>/dev/null
+          pm2 delete marketing-os 2>/dev/null
+          # Belt and suspenders — kill anything on port 3101
+          fuser -k 3101/tcp 2>/dev/null
+          sleep 1
+          set -e
           cd /opt/onbrand/app/skills/ai-talent
           pm2 start ecosystem.config.cjs
-          pm2 save
+          pm2 save --force
           sleep 3
           pm2 list
 
       - name: Smoke
         run: |
-          for i in 1 2 3 4 5 6 7 8; do
+          set +e
+          for i in 1 2 3 4 5 6 7 8 9 10; do
             code=$(curl -sk -o /dev/null -w "%{http_code}" https://marketing-os.sowork.ai/api/healthz 2>/dev/null)
             echo "try $i: $code"
             [ "$code" = "200" ] && exit 0
             sleep 3
           done
-          echo "still down after rollback"
-          pm2 logs onbrand --lines 80 --nostream
+          echo "── still down — dump logs ──"
+          pm2 logs onbrand --lines 100 --nostream
           exit 1
