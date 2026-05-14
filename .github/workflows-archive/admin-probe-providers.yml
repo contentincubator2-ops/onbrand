@@ -128,7 +128,7 @@ jobs:
             # ── Azure Foundry ─────────────────────────────────────────────────
             AZURE_KEY=$(get_key AZURE_FOUNDRY_API_KEY)
             AZURE_ENDPOINT=$(get_key AZURE_FOUNDRY_PROJECT_ENDPOINT)
-            AZURE_ENDPOINT="${AZURE_ENDPOINT:-https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law}"
+            AZURE_ENDPOINT="${AZURE_ENDPOINT:-https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/onbrand}"
             AZURE_BASE="${AZURE_ENDPOINT%/}/openai/v1"
             if [ -z "$AZURE_KEY" ]; then
               printf "%-22s | %-3s | %-6s | %s\n" "azure-foundry" "NO " "N/A" "NO  (no key)"
