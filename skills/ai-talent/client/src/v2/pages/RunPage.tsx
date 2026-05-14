@@ -638,9 +638,19 @@ export default function RunPage() {
       </div>
 
       {/* ─── Task label + status row (slim, non-overlapping) ────────── */}
+      {/* 2026-05-14 (CJ「標題很長」): min-w-0 lets flex item shrink so
+          `truncate` works; cap visible length explicitly as a defense net
+          for legacy data that has caption.slice(0,80) baked in. */}
       <div className="flex items-center gap-2 mb-3 px-1">
-        <p className="text-tiny text-default-500 truncate flex-1">
-          {data.title || data.mission?.taskLabel || (lang === "en" ? "(Untitled)" : "(無標題)")}
+        <p
+          className="text-tiny text-default-500 truncate flex-1 min-w-0"
+          title={data.title || data.mission?.taskLabel || ""}
+        >
+          {(() => {
+            const raw = data.title || data.mission?.taskLabel || (lang === "en" ? "(Untitled)" : "(無標題)");
+            const cps = Array.from(raw);
+            return cps.length > 40 ? cps.slice(0, 38).join("") + "…" : raw;
+          })()}
         </p>
         {/* DEBUG (2026-05-09): show mockup variant + taskId so we can trace
             which mockup is being chosen. Remove after verification. */}

@@ -777,7 +777,7 @@ ${importantHint}
               taskId: `theater-${input.platform}-${input.date}`,
               taskLabel: `Theater · ${input.platform.toUpperCase()} · ${dateLabel}`,
               tier: "theater",
-              title: caption.slice(0, 80) || `Theater · ${dateLabel}`,
+              title: (await import("../_core/titleFromCaption")).titleFromCaption(caption, `Theater · ${dateLabel}`),
               content: JSON.stringify({ caption, structured }, null, 2),
               metadata: {
                 date: input.date,

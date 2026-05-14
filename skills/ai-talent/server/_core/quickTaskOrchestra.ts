@@ -1354,7 +1354,8 @@ export async function runOrchestra(args: {
           taskId: args.template.id,
           taskLabel: flatLabel,
           tier: tierStr,
-          title: result.variants[0]?.caption?.slice(0, 80) || flatLabel,
+          // 2026-05-14 (CJ「標題很長」): use first-sentence helper, not blind slice(0,80)
+          title: (await import("../_core/titleFromCaption")).titleFromCaption(result.variants[0]?.caption, flatLabel),
           content: JSON.stringify(result.variants, null, 2),
           metadata: {
             latencyMs: result.totalLatencyMs,

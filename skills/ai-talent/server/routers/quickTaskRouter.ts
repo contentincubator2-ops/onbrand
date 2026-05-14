@@ -1359,7 +1359,7 @@ export const quickTaskRouter = router({
             taskId: input.squadSlug,
             taskLabel: squad.name ?? input.squadSlug,
             tier: "100s",
-            title: variants[0]?.caption?.slice(0, 80) || squad.name,
+            title: (await import("../_core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
             content: JSON.stringify(variants, null, 2),
             metadata: {
               latencyMs: Date.now() - startedAt,
