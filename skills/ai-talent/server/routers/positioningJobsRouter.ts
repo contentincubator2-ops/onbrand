@@ -14,6 +14,7 @@ import {
   startPositioningJob,
   getPositioningJob,
   getRecentJobCompletions,
+  finalizeBrandAfterPipeline,
 } from "../_core/positioningJobRunner";
 import {
   buildBrandPositioningSteps,
@@ -303,6 +304,105 @@ ${fullCtx.block}${real.context}${knowledgeBlock}`;
         scenarios: results,
         hasRealContent: real.hasContent,
         sources: real.sources,
+      };
+    }),
+
+  /**
+   * 2026-05-15 (CJ「自動定位流程要跑完，資料要填完，自己修正後自己驗收」):
+   * Verify a brand's auto-positioning state and self-heal if needed.
+   *
+   * Returns a checklist of what's filled + auto-runs finalizeBrandAfterPipeline
+   * if the pipeline finished (positioning_jobs.status='done') but the brand
+   * was never marked completed (the headline gap before this patch).
+   *
+   * Idempotent — safe to call any time. Frontend can use this as a
+   * "verify auto-positioning" button on the brand details page.
+   */
+  verifyAndFinalize: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      // 1. Snapshot current state
+      const [brandRows]: any = await localPool.execute(
+        `SELECT id, name, brandName, positioningStatus, onboardingStep, isEstimate,
+                tagline, valueProposition, targetMarket, audienceA, audienceB,
+                emotionalDiff, functionalDiff,
+                soworkAnalysis
+           FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, userId],
+      );
+      const brand = (brandRows as any[])[0];
+      if (!brand) return { ok: false as const, error: "brand not found" };
+
+      const [jobRows]: any = await localPool.execute(
+        `SELECT status, currentStep, totalSteps, lastError, startedAt, finishedAt
+           FROM positioning_jobs
+          WHERE userId = ? AND entityKind = 'brand' AND entityId = ?
+          ORDER BY id DESC LIMIT 1`,
+        [userId, input.brandId],
+      );
+      const job = (jobRows as any[])[0] ?? null;
+
+      // 2. Decide what to do
+      const jobDone = job?.status === "done";
+      const brandFinalized = brand.positioningStatus === "completed";
+
+      let action: "none" | "finalized" | "stuck" | "no-job" = "none";
+      let finalizeResult: any = null;
+      if (jobDone && !brandFinalized) {
+        finalizeResult = await finalizeBrandAfterPipeline(userId, input.brandId);
+        action = "finalized";
+      } else if (!job) {
+        action = "no-job";
+      } else if (!jobDone && job.status !== "running") {
+        action = "stuck";
+      }
+
+      // 3. Re-snapshot after any finalize
+      const [after]: any = action === "finalized"
+        ? await localPool.execute(
+            `SELECT positioningStatus, onboardingStep, isEstimate,
+                    tagline, valueProposition, targetMarket, audienceA, audienceB,
+                    emotionalDiff, functionalDiff
+               FROM brands WHERE id = ? LIMIT 1`,
+            [input.brandId],
+          )
+        : [[brand]];
+      const cur = (after as any[])[0] ?? brand;
+
+      const fieldStatus = {
+        tagline:          !!(cur.tagline?.toString().trim()),
+        valueProposition: !!(cur.valueProposition?.toString().trim()),
+        targetMarket:     !!(cur.targetMarket?.toString().trim()),
+        audienceA:        !!(cur.audienceA?.toString().trim()),
+        audienceB:        !!(cur.audienceB?.toString().trim()),
+        emotionalDiff:    !!(cur.emotionalDiff?.toString().trim()),
+        functionalDiff:   !!(cur.functionalDiff?.toString().trim()),
+      };
+      const filledCount = Object.values(fieldStatus).filter(Boolean).length;
+
+      return {
+        ok: true as const,
+        action,
+        job: job ? {
+          status: job.status,
+          currentStep: Number(job.currentStep ?? 0),
+          totalSteps: Number(job.totalSteps ?? 14),
+          lastError: job.lastError ?? null,
+          startedAt: job.startedAt,
+          finishedAt: job.finishedAt,
+        } : null,
+        brand: {
+          id: brand.id,
+          name: brand.brandName ?? brand.name,
+          positioningStatus: cur.positioningStatus,
+          onboardingStep: cur.onboardingStep,
+          isEstimate: cur.isEstimate,
+        },
+        fieldStatus,
+        filledCount,
+        readyToUse: cur.positioningStatus === "completed" && filledCount >= 4,
+        finalizeResult,
       };
     }),
 

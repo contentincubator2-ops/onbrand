@@ -373,5 +373,134 @@ async function runPipelineDetached(args: {
     }
   }
 
+  // 2026-05-15 (CJ「自動定位流程要跑完，資料要填完」):
+  // Project the soworkAnalysis JSON into the 7 estimate columns that the
+  // rest of the app actually reads (tagline / valueProposition /
+  // targetMarket / audienceA / audienceB / emotionalDiff / functionalDiff),
+  // mark positioningStatus='completed', onboardingStep=11, isEstimate=0.
+  // Without this projection, the pipeline finishes but every downstream
+  // "is this brand ready?" check still reports unlocked.
+  if (args.entityKind === "brand") {
+    try {
+      await finalizeBrandAfterPipeline(args.userId, args.entityId);
+    } catch (e) {
+      console.error("[positioningJobRunner] finalize step failed:", e);
+      // Pipeline data still in soworkAnalysis — user can re-run finalize
+      // via positioningJobs.verifyAndFinalize. Don't mark whole job failed.
+    }
+  }
   await setJobStatus(jobId, "done", { currentStep: args.steps.length, finishedAt: true });
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ *  Brand finalization: soworkAnalysis JSON → 7 estimate columns + flags
+ * ───────────────────────────────────────────────────────────────────── */
+
+/** Extract the first non-empty string from a list of candidate paths.
+ *  Each candidate is a chain of property accessors as a dot-path. */
+function pickStr(obj: any, ...paths: string[]): string | null {
+  for (const p of paths) {
+    let cur: any = obj;
+    for (const key of p.split(".")) {
+      if (cur == null) break;
+      cur = cur[key];
+    }
+    if (typeof cur === "string" && cur.trim()) return cur.trim();
+    if (Array.isArray(cur) && cur.length > 0) {
+      const first = cur[0];
+      if (typeof first === "string" && first.trim()) return first.trim();
+      if (first && typeof first === "object") {
+        const s = (first.text ?? first.title ?? first.headline ?? first.name ?? "")
+          .toString().trim();
+        if (s) return s;
+      }
+    }
+  }
+  return null;
+}
+
+/** Read brands.soworkAnalysis, project to 7 estimate columns, mark complete. */
+export async function finalizeBrandAfterPipeline(userId: number, brandId: number): Promise<{
+  updated: number;
+  filled: Record<string, boolean>;
+}> {
+  const [rows]: any = await localPool.execute(
+    `SELECT soworkAnalysis FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+    [brandId, userId],
+  );
+  const row = (rows as any[])[0];
+  if (!row) throw new Error(`brand ${brandId} not found for user ${userId}`);
+  let a: any = row.soworkAnalysis;
+  if (typeof a === "string") { try { a = JSON.parse(a); } catch { a = {}; } }
+  a = a ?? {};
+
+  const tagline = pickStr(a,
+    "messagingStrategy.tagline",
+    "taglineCandidates",
+    "taglineCreative.tagline",
+    "taglineCreative.candidates",
+    "messagingStrategy.headlineConcept",
+  );
+  const valueProposition = pickStr(a,
+    "valueProposition.headline",
+    "valueProposition.statement",
+    "valueProposition.summary",
+    "differentiation.positioningStatement",
+  );
+  const targetMarket = pickStr(a,
+    "targetAudience.primarySegment",
+    "targetAudience.segment",
+    "targetAudience.summary",
+    "marketInsight.targetMarket",
+  );
+  const audienceA = pickStr(a,
+    "targetAudience.primary",
+    "targetAudience.personaA",
+    "targetAudience.primarySegment",
+    "targetAudience.segments",
+  );
+  const audienceB = pickStr(a,
+    "targetAudience.secondary",
+    "targetAudience.personaB",
+    "targetAudience.secondarySegment",
+  );
+  const emotionalDiff = pickStr(a,
+    "differentiation.emotional",
+    "brandPersonality.emotionalDriver",
+    "brandValues.emotional",
+  );
+  const functionalDiff = pickStr(a,
+    "differentiation.functional",
+    "valueProposition.functionalBenefit",
+    "differentiation.summary",
+  );
+
+  // Build COALESCE-style UPDATE: only overwrite columns where we extracted
+  // a non-null value. Existing manual edits stay put.
+  const sets: string[] = [];
+  const params: any[] = [];
+  const filled: Record<string, boolean> = {};
+  const maybeSet = (col: string, val: string | null) => {
+    filled[col] = !!val;
+    if (val) { sets.push(`${col} = COALESCE(NULLIF(${col}, ''), ?)`); params.push(val); }
+  };
+  maybeSet("tagline", tagline);
+  maybeSet("valueProposition", valueProposition);
+  maybeSet("targetMarket", targetMarket);
+  maybeSet("audienceA", audienceA);
+  maybeSet("audienceB", audienceB);
+  maybeSet("emotionalDiff", emotionalDiff);
+  maybeSet("functionalDiff", functionalDiff);
+
+  // Always flip status + step + isEstimate, regardless of whether we found
+  // every field. Pipeline successfully completed → user shouldn't be told
+  // "not ready" just because one column couldn't be picked.
+  sets.push("positioningStatus = 'completed'");
+  sets.push("onboardingStep = 11");
+  sets.push("isEstimate = 0");
+
+  const sql = `UPDATE brands SET ${sets.join(", ")} WHERE id = ? AND userId = ?`;
+  params.push(brandId, userId);
+  const [res]: any = await localPool.execute(sql, params);
+  return { updated: Number(res?.affectedRows ?? 0), filled };
 }

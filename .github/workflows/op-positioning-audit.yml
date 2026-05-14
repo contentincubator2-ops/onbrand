@@ -1,0 +1,99 @@
+name: Ops — Audit auto-positioning state per brand
+
+# 2026-05-15 (CJ「自動定位流程要跑完，資料要填完，自己驗收」):
+# Surveys positioning state across all brands. For each brand reports:
+#   - positioning_jobs.status (latest job)
+#   - brands.positioningStatus / onboardingStep / isEstimate
+#   - how many of the 7 estimate columns are non-empty
+#   - whether soworkAnalysis JSON has executiveSummary (pipeline completed)
+#
+# Flags the 「pipeline finished but brand not finalized」 mismatch
+# (the headline bug this work fixes). Run after deploy to confirm.
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
+
+          echo "════ Aggregate ════"
+          $MYSQL -e "
+            SELECT
+              COUNT(*)                                           AS total_brands,
+              SUM(positioningStatus='completed')                 AS finalized,
+              SUM(positioningStatus='in_progress')               AS in_progress,
+              SUM(positioningStatus IS NULL OR positioningStatus='')              AS unstarted,
+              SUM(isEstimate=1)                                  AS still_marked_estimate,
+              SUM(tagline IS NOT NULL AND tagline <> '')         AS has_tagline,
+              SUM(valueProposition IS NOT NULL AND valueProposition <> '')  AS has_vp,
+              SUM(soworkAnalysis IS NOT NULL AND JSON_LENGTH(soworkAnalysis) > 0) AS has_analysis
+            FROM brands;
+          "
+
+          echo ""
+          echo "════ Latest positioning_jobs per brand ════"
+          $MYSQL -e "
+            SELECT pj.entityId AS brandId, b.brandName,
+                   pj.status, pj.currentStep, pj.totalSteps,
+                   LEFT(IFNULL(pj.lastError,''), 50) AS lastErr,
+                   pj.startedAt, pj.finishedAt
+              FROM (
+                SELECT entityId, MAX(id) AS maxId FROM positioning_jobs
+                 WHERE entityKind='brand' GROUP BY entityId
+              ) latest
+              JOIN positioning_jobs pj ON pj.id = latest.maxId
+              LEFT JOIN brands b ON b.id = pj.entityId
+             ORDER BY pj.id DESC LIMIT 20;
+          "
+
+          echo ""
+          echo "════ ⚠ Pipeline DONE but brand NOT finalized (headline bug) ════"
+          $MYSQL -e "
+            SELECT pj.entityId AS brandId, b.brandName,
+                   pj.status AS jobStatus, pj.finishedAt,
+                   b.positioningStatus AS brandStatus,
+                   b.isEstimate
+              FROM positioning_jobs pj
+              JOIN brands b ON b.id = pj.entityId
+             WHERE pj.entityKind='brand' AND pj.status='done'
+               AND (b.positioningStatus IS NULL OR b.positioningStatus <> 'completed')
+             ORDER BY pj.id DESC LIMIT 20;
+          "
+
+          echo ""
+          echo "════ ⚠ Stale 'running' jobs (> 10 min) ════"
+          $MYSQL -e "
+            SELECT entityId, status, currentStep, totalSteps,
+                   TIMESTAMPDIFF(MINUTE, startedAt, NOW()) AS ageMin,
+                   LEFT(IFNULL(lastError,''), 60) AS lastErr
+              FROM positioning_jobs
+             WHERE entityKind='brand' AND status='running'
+               AND startedAt < NOW() - INTERVAL 10 MINUTE
+             ORDER BY startedAt LIMIT 10;
+          "
+
+          echo ""
+          echo "════ Field-fill rate among 'completed' brands ════"
+          $MYSQL -e "
+            SELECT
+              COUNT(*) AS n_completed,
+              SUM(tagline IS NOT NULL AND tagline <> '')                  AS tagline,
+              SUM(valueProposition IS NOT NULL AND valueProposition <> '') AS vp,
+              SUM(targetMarket IS NOT NULL AND targetMarket <> '')         AS targetMkt,
+              SUM(audienceA IS NOT NULL AND audienceA <> '')               AS audA,
+              SUM(audienceB IS NOT NULL AND audienceB <> '')               AS audB,
+              SUM(emotionalDiff IS NOT NULL AND emotionalDiff <> '')       AS emo,
+              SUM(functionalDiff IS NOT NULL AND functionalDiff <> '')     AS func
+            FROM brands
+            WHERE positioningStatus = 'completed';
+          "
