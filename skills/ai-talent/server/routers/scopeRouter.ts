@@ -68,7 +68,10 @@ export const productRouter = router({
            FROM products WHERE id = ? AND userId = ? LIMIT 1`,
         [input.id, userId],
       );
-      if (!r) throw new TRPCError({ code: "NOT_FOUND", message: "product not found" });
+      // 2026-05-15 (CJ「完整後端測試」): return null instead of NOT_FOUND.
+      // Stale scope.productId pointing at deleted/foreign products caused
+      // ~2s log spam. Frontend already null-tolerant (data?.name pattern).
+      if (!r) return null;
       return { ...r, positioning: safeJson(r.positioning) };
     }),
 
@@ -158,7 +161,9 @@ export const eventRouter = router({
            FROM events WHERE id = ? AND userId = ? LIMIT 1`,
         [input.id, userId],
       );
-      if (!r) throw new TRPCError({ code: "NOT_FOUND", message: "event not found" });
+      // 2026-05-15 (CJ「完整後端測試」): null over NOT_FOUND — same rationale
+      // as product.get above.
+      if (!r) return null;
       const productIds = await rows(
         `SELECT productId FROM event_products WHERE eventId = ? ORDER BY productId`,
         [input.id],

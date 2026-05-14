@@ -397,6 +397,16 @@ app.use(
     router: appRouter,
     createContext,
     onError: ({ error, type, path, input, ctx }) => {
+      // 2026-05-15 (CJ digest cleanup): skip expected codes that fire as
+      // part of normal UI flow — stale scope (NOT_FOUND), unauth race
+      // (UNAUTHORIZED), zod validation (BAD_REQUEST), rate limit
+      // (TOO_MANY_REQUESTS) etc. They're not bugs and they were drowning
+      // out real issues in pm2 log.
+      const expected = new Set([
+        "UNAUTHORIZED", "BAD_REQUEST", "NOT_FOUND", "FORBIDDEN",
+        "PRECONDITION_FAILED", "CONFLICT", "TOO_MANY_REQUESTS",
+      ]);
+      if (expected.has(error.code)) return;
       console.error('[trpc] Error:', {
         type,
         path: path ?? 'unknown',
