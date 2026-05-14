@@ -133,6 +133,22 @@ export default function ShellLayout() {
       return next;
     });
   };
+  // 2026-05-14 (CJ「視覺引導 / 缺乏 hover 提示」): keyboard shortcut.
+  // Press '[' to toggle the sidebar — discoverable via the tooltip.
+  // Skip when user is typing in an input / textarea / contenteditable.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "[" && e.key !== "]") return;
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      const tag = t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable) return;
+      e.preventDefault();
+      toggleCollapsed();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const handleLogout = async () => {
     try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
@@ -354,34 +370,96 @@ function IconBar({
 
   return (
     <aside
+      className="sowork-icon-bar"
       style={{
         position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 40,
         width: ICON_W,
         background: "#fff",
         borderRight: "1px solid #f3f4f6",
         display: "flex", flexDirection: "column",
-        overflow: "hidden",   /* prevent any horizontal scrollbar from appearing */
+        overflow: "visible",   /* let edge chevron poke out */
       }}
     >
+      {/* 2026-05-14 (CJ「切換側邊欄按鈕太隱匿」+「缺乏視覺引導 < 箭頭」):
+          edge-chevron affordance. When collapsed, hovering the right edge
+          of the icon bar reveals a small ◗ chevron + 8px-wide hot zone
+          inviting click to expand. On the iconbar's right edge, fully
+          out-of-flow so it doesn't shift content. */}
+      {collapsed && (
+        <button
+          onClick={onToggle}
+          aria-label={isEn ? "Expand sidebar" : "展開側邊欄"}
+          title={isEn ? "Expand sidebar (or press [)" : "展開側邊欄（或按 [ 鍵）"}
+          className="sowork-edge-chevron"
+          style={{
+            position: "absolute",
+            top: "50%", right: -12,
+            transform: "translateY(-50%)",
+            width: 22, height: 56, borderRadius: "0 10px 10px 0",
+            border: "1px solid #E5E5E5", borderLeft: "none",
+            background: "white",
+            display: "flex", alignItems: "center", justifyContent: "flex-end",
+            paddingRight: 4,
+            fontSize: 14, color: "#7C3AED", fontWeight: 700,
+            cursor: "pointer", zIndex: 41,
+            boxShadow: "2px 0 8px rgba(124,58,237,0.10)",
+            opacity: 0,
+            transition: "opacity 0.2s ease, transform 0.2s ease",
+            transformOrigin: "left center",
+          }}
+        >›</button>
+      )}
+      <style>{`
+        .sowork-icon-bar:hover .sowork-edge-chevron {
+          opacity: 1;
+        }
+        .sowork-edge-chevron:hover {
+          background: #F5F3FF !important;
+          transform: translateY(-50%) translateX(2px) !important;
+        }
+        @keyframes ssidebarPulse {
+          0%, 100% { box-shadow: 2px 0 8px rgba(124,58,237,0.10); }
+          50%      { box-shadow: 2px 0 14px rgba(124,58,237,0.30); }
+        }
+      `}</style>
       {/* Top spacer for floating BrandHierarchyPill (44px pill + 10px top + 10px gap) */}
       <div style={{ height: 64, flexShrink: 0 }} />
 
-      {/* Toggle — moved down to leave room for the floating brand pill above */}
-      <div style={{ height: 48, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Tooltip content={collapsed ? (isEn ? "Expand sidebar" : "展開側邊欄") : (isEn ? "Collapse sidebar" : "收合側邊欄")} placement="right">
+      {/* 2026-05-14 (CJ「切換側邊欄按鈕太隱匿」): bigger, clearer toggle.
+          - 44x44 instead of 36x36 (touch target)
+          - Default state has subtle border so it doesn't disappear
+          - Chevron icon (← collapse / → expand) is semantic, not the
+            ambiguous ⊟ table-columns glyph
+          - On hover: turn brand purple so user knows it's interactive
+          - First-visit attention pulse (3 cycles) to draw the eye */}
+      <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
+        <Tooltip content={collapsed ? (isEn ? "Expand sidebar (or press [)" : "展開側邊欄（或按 [ 鍵）") : (isEn ? "Collapse sidebar" : "收合側邊欄")} placement="right">
           <button
             onClick={onToggle}
             aria-label={isEn ? "Toggle sidebar" : "切換側邊欄"}
+            className="sidebar-toggle-btn"
             style={{
-              width: 36, height: 36, borderRadius: 10, border: "none", background: "none",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 14, color: "#9ca3af", cursor: "pointer",
-              transition: "background 0.1s, color 0.1s",
+              width: 44, height: 36, borderRadius: 10,
+              border: "1px solid #E5E5E5", background: "white",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+              fontSize: 12, color: "#525252", cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+              transition: "all 0.15s",
+              position: "relative",
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#f3f4f6"; e.currentTarget.style.color = "#374151"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "#9ca3af"; }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = "#F5F3FF";
+              e.currentTarget.style.borderColor = "#C4B5FD";
+              e.currentTarget.style.color = "#7C3AED";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = "white";
+              e.currentTarget.style.borderColor = "#E5E5E5";
+              e.currentTarget.style.color = "#525252";
+            }}
           >
-            <FontAwesomeIcon icon={faTableColumns} />
+            <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1 }}>{collapsed ? "›" : "‹"}</span>
+            <FontAwesomeIcon icon={faTableColumns} style={{ fontSize: 11 }} />
           </button>
         </Tooltip>
       </div>
@@ -1047,19 +1125,31 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
         background: active ? "rgba(249,115,22,0.10)" : "transparent",
         transition: "background 0.1s",
       }} />
-      {/* 2026-05-10: tier items render the seconds badge AS the icon
-          (replacing sparkle), then plain Chinese verb on row 2. Other
-          nav items keep icon + label two-row layout. */}
-      <span style={{
-        width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: item.tierBadge ? 13 : 18,
-        fontWeight: item.tierBadge ? 700 : 400,
-        letterSpacing: item.tierBadge ? "-0.02em" : 0,
-        position: "relative",
-        color: item.tierBadge && active ? "rgb(249,115,22)" : undefined,
-      }}>
-        {item.tierBadge ?? item.icon}
-      </span>
+      {/* 2026-05-10: tier items render the seconds badge AS the icon.
+          2026-05-14 (CJ「收合後 30s/60s/99s 識別度低」): rendered as a
+          coloured rounded chip (not bare text) so it reads as a button
+          and the tier number stands out. */}
+      {item.tierBadge ? (
+        <span style={{
+          width: 30, height: 22, borderRadius: 6,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 11, fontWeight: 700, letterSpacing: "-0.02em",
+          position: "relative",
+          color: active ? "white" : "#7C3AED",
+          background: active ? "rgb(249,115,22)" : "rgba(124,58,237,0.10)",
+          border: active ? "none" : "1px solid rgba(124,58,237,0.20)",
+          transition: "background 0.12s, color 0.12s",
+        }}>
+          {item.tierBadge}
+        </span>
+      ) : (
+        <span style={{
+          width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 18, position: "relative",
+        }}>
+          {item.icon}
+        </span>
+      )}
       <span style={{ fontSize: 12, fontWeight: active ? 600 : 500, textAlign: "center", position: "relative" }}>
         {item.label}
       </span>
