@@ -36,9 +36,12 @@ export default function PricingPage() {
   // visitors too.
   const currency: "TWD" | "USD" = (status as any)?.currency ?? "TWD";
   const sym = currency === "USD" ? "US$" : "NT$";
+  // 2026-05-14 (CJ「美金為準，每天匯率動」): USD truth, TWD derives at live rate.
+  const usdToTwd = (status as any)?.usdToTwd ?? 32;
+  const r = (usd: number) => Math.round(usd * usdToTwd);
   const defaults = currency === "USD"
-    ? { soloEarly: 30, soloStd: 50, soloAnnual: 300, team: 156, teamAnnual: 1560, agency: 469, agencyAnnual: 4690 }
-    : { soloEarly: 900, soloStd: 1500, soloAnnual: 9000, team: 4990, teamAnnual: 49900, agency: 14990, agencyAnnual: 149900 };
+    ? { soloEarly: 30, soloStd: 50, soloAnnual: 300, team: 160, teamAnnual: 1600, agency: 500, agencyAnnual: 5000 }
+    : { soloEarly: r(30), soloStd: r(50), soloAnnual: r(300), team: r(160), teamAnnual: r(1600), agency: r(500), agencyAnnual: r(5000) };
 
   // 2026-05-11 — 4-tier pricing: Solo / Team / Agency / Enterprise.
   const TIERS = [
@@ -253,6 +256,14 @@ export default function PricingPage() {
                       : `每月平均 ${sym} ${Math.round(tier.annual / 12).toLocaleString()}`)
                   : (isEn ? "Cancel anytime" : "隨時取消")}
               </p>
+              {/* 2026-05-14 (CJ「美金為準，每天匯率動」): hint that TWD floats. */}
+              {currency === "TWD" && (
+                <p className="text-[11px] text-neutral-500 mt-1">
+                  {isEn
+                    ? `Billed in TWD at today's USD rate (1 USD ≈ ${usdToTwd.toFixed(2)} NTD)`
+                    : `依當日匯率計算（1 USD ≈ ${usdToTwd.toFixed(2)} NTD），每天浮動`}
+                </p>
+              )}
               {(tier as any).isEarlyBird && (tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && (
                 <p className="text-xs text-emerald-700 mt-1 font-medium">
                   {isEn ? "⭐ Early-bird price · locked in forever" : "⭐ 早鳥優惠 · 永久保價"}

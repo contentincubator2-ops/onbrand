@@ -173,20 +173,22 @@ export const billingRouter = router({
         (u.planStatus === "trial" && u.planEndsAt !== null && u.planEndsAt < now);
 
       const plan = getPlan(u.planCode);
-      // 2026-05-12 (CJ「老用戶永遠保 900」): resolve actual price for THIS user.
-      // 2026-05-14 (CJ「TWD + USD 雙幣」): pick currency from billingCountry.
+      // 2026-05-14 (CJ「美金為準，每天匯率動」): USD = truth, TWD = USD × rate.
       const { getEffectivePrice, currencyFromCountry } = await import("../_core/plans");
+      const { getUsdToTwd } = await import("../_core/fx");
       const currency = currencyFromCountry(u.billingCountry);
+      const usdToTwdRate = await getUsdToTwd();
       const eff = getEffectivePrice(plan, {
         earlyBird: u.earlyBird,
         lockedPriceTwdMonthly: u.lockedPriceTwdMonthly,
         currency,
+        usdToTwd: usdToTwdRate,
       });
-      // Also resolve TWD prices in case UI wants to show "≈ NT$ X" comparison
       const effTwd = getEffectivePrice(plan, {
         earlyBird: u.earlyBird,
         lockedPriceTwdMonthly: u.lockedPriceTwdMonthly,
         currency: "TWD",
+        usdToTwd: usdToTwdRate,
       });
 
       // Current calendar month usage counts (matches assertWithinPlan window)
@@ -231,15 +233,16 @@ export const billingRouter = router({
         // now in the user's currency. Keep priceTwdMonthly for back-compat.
         currency,
         billingCountry: u.billingCountry,
+        usdToTwd: usdToTwdRate,
         priceMonthly:  eff.monthly,
         priceAnnually: eff.annually,
         standardPriceMonthly: currency === "USD"
           ? (plan.standardPriceUsdMonthly ?? plan.priceUsdMonthly ?? 0)
-          : (plan.standardPriceTwdMonthly ?? plan.priceTwdMonthly),
+          : Math.round((plan.standardPriceUsdMonthly ?? plan.priceUsdMonthly ?? 0) * usdToTwdRate),
         // Legacy TWD-only fields (kept so old clients don't crash)
         priceTwdMonthly:  effTwd.monthly,
         priceTwdAnnually: effTwd.annually,
-        standardPriceTwdMonthly: plan.standardPriceTwdMonthly ?? plan.priceTwdMonthly,
+        standardPriceTwdMonthly: Math.round((plan.standardPriceUsdMonthly ?? plan.priceUsdMonthly ?? 0) * usdToTwdRate),
         isEarlyBird: eff.isEarlyBird,
         isLocked:    eff.isLocked,
         workspaceId,

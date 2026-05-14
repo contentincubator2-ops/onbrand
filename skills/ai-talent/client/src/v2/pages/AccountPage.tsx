@@ -229,8 +229,8 @@ export default function AccountPage() {
                 </h2>
                 <p className="text-xs text-neutral-500">
                   {lang === "en"
-                    ? "Pricing follows your billing country (TW → TWD, others → USD). Locked while a subscription is active."
-                    : "計費幣別依國家自動帶（台灣 → 台幣，其他 → 美金）。訂閱期間無法變更。"}
+                    ? "USD is our primary price. TWD bills convert at today's FX rate (refreshed daily). Locked while a subscription is active."
+                    : "美金為主要計價幣別。台幣依當日匯率換算（每日更新）。訂閱期間無法變更。"}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -507,8 +507,15 @@ export default function AccountPage() {
               </div>
               <p className="text-xs text-neutral-500 mb-5">
                 {lang === "en"
-                  ? "Points purchased here never expire — they stack on top of your monthly refill."
+                  ? "Points never expire — they stack on top of your monthly refill."
                   : "加購點數永不過期，會疊加在月配額之上。"}
+                {((topupPacksQuery as any)?.data?.currency === "TWD") && (
+                  <span className="block mt-1">
+                    {lang === "en"
+                      ? `Billed in TWD · today's rate 1 USD ≈ ${Number((topupPacksQuery as any)?.data?.usdToTwd ?? 32).toFixed(2)} NTD`
+                      : `依當日匯率計算 · 1 USD ≈ ${Number((topupPacksQuery as any)?.data?.usdToTwd ?? 32).toFixed(2)} NTD`}
+                  </span>
+                )}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {(((topupPacksQuery as any)?.data?.packs) ?? []).map((pack: any) => (

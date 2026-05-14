@@ -94,10 +94,13 @@ export const stripeRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "只有 workspace owner 可以訂閱" });
       }
 
-      // 2026-05-14 (CJ「TWD + USD 雙幣」): resolve currency from the user's
-      // billingCountry, then effective price (early-bird grandfathering).
+      // 2026-05-14 (CJ「美金為準，每天匯率動」): USD is the truth, TWD derives
+      // from today's FX rate. Resolve currency, fetch rate, then run the
+      // pricing helper with both.
       const currency = await getUserCurrency(ctx.user.id);
       const { getPlan, getEffectivePrice, toStripeUnitAmount } = await import("../_core/plans");
+      const { getUsdToTwd } = await import("../_core/fx");
+      const usdToTwdRate = await getUsdToTwd();
       const [uRows]: any = await localPool.execute(
         `SELECT IFNULL(earlyBird,0) AS earlyBird, lockedPriceTwdMonthly FROM users WHERE id = ? LIMIT 1`,
         [ctx.user.id],
@@ -107,6 +110,7 @@ export const stripeRouter = router({
         earlyBird: Number(flags.earlyBird),
         lockedPriceTwdMonthly: flags.lockedPriceTwdMonthly,
         currency,
+        usdToTwd: usdToTwdRate,
       });
       const amount = input.annual ? eff.annually : eff.monthly;
       if (!amount || amount <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown plan" });
@@ -172,12 +176,14 @@ export const stripeRouter = router({
     .mutation(async ({ ctx, input }) => {
       const stripe = getStripe();
       const appUrl = process.env.APP_URL ?? "https://onbrand.sowork.ai";
-      const { TOPUP_PACKS, toStripeUnitAmount } = await import("../_core/plans");
+      const { TOPUP_PACKS, toStripeUnitAmount, topupAmountIn } = await import("../_core/plans");
+      const { getUsdToTwd } = await import("../_core/fx");
       const pack = TOPUP_PACKS[input.packId];
       if (!pack) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown topup pack" });
 
       const currency = await getUserCurrency(ctx.user.id);
-      const amount = currency === "TWD" ? pack.twdAmount : pack.usdAmount;
+      const rate = await getUsdToTwd();
+      const { amount } = topupAmountIn(pack, currency, rate);
 
       const { default: localPool } = await import("../localDb");
       const tempTradeNo = `pending_topup_${Date.now()}_${ctx.user.id}`;
@@ -229,22 +235,28 @@ export const stripeRouter = router({
       return { url: session.url, sessionId: session.id };
     }),
 
-  /** List top-up packs in the caller's billing currency. */
+  /** List top-up packs in the caller's billing currency at today's FX rate. */
   listTopupPacks: protectedProcedure.query(async ({ ctx }) => {
-    const { TOPUP_PACKS } = await import("../_core/plans");
+    const { TOPUP_PACKS, topupAmountIn } = await import("../_core/plans");
+    const { getUsdToTwd } = await import("../_core/fx");
     const currency = await getUserCurrency(ctx.user.id);
+    const rate = await getUsdToTwd();
     return {
       currency,
-      packs: Object.values(TOPUP_PACKS).map((p) => ({
-        id: p.id,
-        points: p.points,
-        labelZh: p.labelZh,
-        labelEn: p.labelEn,
-        discountPct: p.discountPct,
-        amount: currency === "TWD" ? p.twdAmount : p.usdAmount,
-        perPoint: currency === "TWD" ? p.perPointTwd : p.perPointUsd,
-        currency,
-      })),
+      usdToTwd: rate,
+      packs: Object.values(TOPUP_PACKS).map((p) => {
+        const { amount, perPoint } = topupAmountIn(p, currency, rate);
+        return {
+          id: p.id,
+          points: p.points,
+          labelZh: p.labelZh,
+          labelEn: p.labelEn,
+          discountPct: p.discountPct,
+          amount,
+          perPoint,
+          currency,
+        };
+      }),
     };
   }),
 

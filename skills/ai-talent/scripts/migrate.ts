@@ -1481,6 +1481,19 @@ async function main() {
     await ensureCol("invoices", "pointsGranted", "INT NULL COMMENT 'how many points to credit on successful payment'");
     // 2026-05-14 (CJ「TWD + USD 雙幣」): record what currency the invoice was paid in.
     await ensureCol("invoices", "currency",      "VARCHAR(3) NOT NULL DEFAULT 'TWD' COMMENT 'TWD | USD'");
+
+    // 2026-05-14 (CJ「美金為準，每天匯率動」): FX snapshot table.
+    // server/_core/fx.ts writes one row per successful provider fetch.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fx_rates (
+        id        INT AUTO_INCREMENT PRIMARY KEY,
+        pair      VARCHAR(16)  NOT NULL COMMENT 'e.g. USD_TWD',
+        rate      DECIMAL(10,4) NOT NULL,
+        fetchedAt DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_pair_fetched (pair, fetchedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("[migrate] fx_rates: ensured");
     console.log("[migrate] invoices topup columns: OK");
 
     // error_log (Sentry-lite for prod anomalies)
