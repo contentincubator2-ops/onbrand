@@ -11,7 +11,7 @@
  * Each provider's failure (auth / billing / timeout / 5xx) is logged and
  * we try the next one. callLLM throws only after EVERY provider has
  * failed, so a single key going dark never breaks the system.
- *
+ *h
  * Usage:
  *   const text = await callLLM({ system: "...", user: "...", maxTokens: 4000 });
  */
@@ -29,7 +29,7 @@ interface CallArgs {
   budgetMs?: number;
 }
 
-type Provider = "anthropic" | "azure-foundry" | "azure-openai" | "openrouter";
+type Provider = "anthropic" | "azure-foundry" | "azure-openai";
 
 interface ProviderAttempt {
   provider: Provider;
@@ -60,12 +60,10 @@ const AZURE_OPENAI_KEY = process.env.AZURE_OPENAI_API_KEY ?? "";
 const AZURE_OPENAI_ENDPOINT = (process.env.AZURE_OPENAI_ENDPOINT ?? "").replace(/\/+$/, "");
 const AZURE_OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT ?? "gpt-4o-mini";
 
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY ?? "";
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "anthropic/claude-sonnet-4.5";
 
 // Provider order: Anthropic direct first (cheapest + best for our use case),
 // Azure Foundry second (cheap stable), Azure OpenAI third, OpenRouter last.
-const PROVIDER_ORDER: Provider[] = ["anthropic", "azure-foundry", "azure-openai", "openrouter"];
+const PROVIDER_ORDER: Provider[] = ["anthropic", "azure-foundry", "azure-openai"];
 
 async function callAnthropic(key: string, args: CallArgs): Promise<string> {
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -239,11 +237,7 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
     } else if (provider === "azure-openai") {
       const text = await tryProvider("azure-openai", "default", (t) => callAzureOpenAI({ ...args, timeoutMs: t }));
       if (text) return { text, attempts };
-    } else if (provider === "openrouter") {
-      const text = await tryProvider("openrouter", "default", (t) => callOpenRouter({ ...args, timeoutMs: t }));
-      if (text) return { text, attempts };
-    }
-  }
+    
 
   const summary = attempts.map((a) => `${a.provider}/${a.key}: ${a.ok ? "OK" : a.error ?? "fail"}`).join(" | ");
   throw new Error(`All LLM providers failed — ${summary}`);
