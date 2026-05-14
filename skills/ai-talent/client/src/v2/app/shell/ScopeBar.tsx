@@ -170,23 +170,28 @@ export default function ScopeBar({ scope, setScope }: ScopeBarProps) {
   const product = products.find((p: any) => p.id === scope.productId) ?? null;
   const event = events.find((e: any) => e.id === scope.eventId) ?? null;
 
-  // 2026-05-15 (CJ「localStorage 殘留舊 scope」): if the stored scope
-  // brandId doesn't match anything in the user's actual brands list
-  // (different account, deleted brand, etc.), clear scope. Otherwise
-  // every page query fires with brandId=2830 → server returns NOT_FOUND
-  // and the UI shows stale/wrong data. Wait until brands query has
-  // actually resolved (length > 0 OR explicitly empty array from a
-  // settled query) so we don't false-clear during initial load.
+  // 2026-05-15 (CJ「localStorage 殘留舊 scope」): if any part of stored
+  // scope (brand / product / event) doesn't match the user's actual
+  // entities, clear it. Otherwise every page query fires with the stale
+  // ids → server returns NOT_FOUND continuously (saw 'event.get NOT_FOUND'
+  // + 'product.get NOT_FOUND' spam in digest). Wait until queries
+  // actually resolved so we don't false-clear during initial load.
   React.useEffect(() => {
     const brandsSettled =
       (optionsQuery.data != null) || (legacyBrandsQuery.isFetched && !legacyBrandsQuery.isLoading);
     if (!brandsSettled) return;
-    if (scope.brandId && !brands.find((b: any) => b.id === scope.brandId)) {
-      console.warn("[scope] clearing stale brandId", scope.brandId, "(not in user's brands)");
+    const brandValid   = !scope.brandId   || brands.some((b: any)   => b.id === scope.brandId);
+    const productValid = !scope.productId || products.some((p: any) => p.id === scope.productId);
+    const eventValid   = !scope.eventId   || events.some((e: any)   => e.id === scope.eventId);
+    if (!brandValid) {
+      console.warn("[scope] clearing stale scope — brandId", scope.brandId, "not in user's brands");
       setScope({ brandId: null, productId: null, eventId: null });
+    } else if (!productValid || !eventValid) {
+      console.warn("[scope] clearing stale product/event — productId", scope.productId, "eventId", scope.eventId);
+      setScope({ brandId: scope.brandId, productId: null, eventId: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optionsQuery.data, legacyBrandsQuery.isFetched, scope.brandId]);
+  }, [optionsQuery.data, legacyBrandsQuery.isFetched, scope.brandId, scope.productId, scope.eventId]);
 
   // Hierarchical scope picker. Picking a product / event resolves its
   // parent brand from the FK column on the row (server-side scope.options

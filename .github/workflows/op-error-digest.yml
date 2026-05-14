@@ -19,7 +19,7 @@ jobs:
           $MYSQL -t -e "
             SELECT source, COUNT(*) AS n, MAX(ts) AS latest
               FROM error_log
-             WHERE ts > NOW() - INTERVAL 1 HOUR
+             WHERE createdAt > NOW() - INTERVAL 1 HOUR
              GROUP BY source
              ORDER BY n DESC
              LIMIT 20" 2>&1
@@ -29,7 +29,7 @@ jobs:
           $MYSQL -t -e "
             SELECT COUNT(*) AS n, source, LEFT(message, 100) AS message_head, MAX(ts) AS latest
               FROM error_log
-             WHERE ts > NOW() - INTERVAL 1 HOUR
+             WHERE createdAt > NOW() - INTERVAL 1 HOUR
              GROUP BY fingerprint, source, message_head
              ORDER BY n DESC
              LIMIT 10" 2>&1
@@ -43,15 +43,15 @@ jobs:
               COUNT(DISTINCT CASE WHEN source LIKE 'frontend.%' THEN fingerprint END) AS frontend_unique,
               COUNT(DISTINCT CASE WHEN source LIKE 'trpc.%' THEN fingerprint END) AS trpc_unique
               FROM error_log
-             WHERE ts > NOW() - INTERVAL 24 HOUR" 2>&1
+             WHERE createdAt > NOW() - INTERVAL 24 HOUR" 2>&1
 
           echo ""
           echo "════ Recent unresolved (5 latest where resolvedAt IS NULL) ════"
           $MYSQL -t -e "
-            SELECT id, source, LEFT(message, 80) AS message, ts
+            SELECT id, source, LEFT(message, 80) AS message, createdAt
               FROM error_log
              WHERE resolvedAt IS NULL
-             ORDER BY ts DESC
+             ORDER BY createdAt DESC
              LIMIT 5" 2>&1
 
           echo ""
