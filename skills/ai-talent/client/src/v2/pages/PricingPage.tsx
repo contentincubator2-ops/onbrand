@@ -37,7 +37,7 @@ export default function PricingPage() {
   const currency: "TWD" | "USD" = (status as any)?.currency ?? "TWD";
   const sym = currency === "USD" ? "US$" : "NT$";
   const defaults = currency === "USD"
-    ? { soloEarly: 28, soloStd: 47, soloAnnual: 280, team: 156, teamAnnual: 1560, agency: 469, agencyAnnual: 4690 }
+    ? { soloEarly: 30, soloStd: 50, soloAnnual: 300, team: 156, teamAnnual: 1560, agency: 469, agencyAnnual: 4690 }
     : { soloEarly: 900, soloStd: 1500, soloAnnual: 9000, team: 4990, teamAnnual: 49900, agency: 14990, agencyAnnual: 149900 };
 
   // 2026-05-11 — 4-tier pricing: Solo / Team / Agency / Enterprise.

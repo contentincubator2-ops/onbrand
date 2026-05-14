@@ -182,10 +182,11 @@ export const PLANS: Record<PlanCode, Plan> = {
     priceTwdAnnually: 15000,               // 標準年費
     earlyBirdPriceTwdMonthly: 900,         // 早鳥永久價（grandfathered 用戶）
     standardPriceTwdMonthly: 1500,         // 同 priceTwdMonthly，明示語意
-    priceUsdMonthly: 47,                   // standard USD
-    priceUsdAnnually: 470,                 // annual USD
-    earlyBirdPriceUsdMonthly: 28,          // early-bird USD
-    standardPriceUsdMonthly: 47,
+    // 2026-05-14 (CJ「美金為準」): USD = primary; TWD derives from it at NT$30/USD.
+    priceUsdMonthly: 50,                   // standard USD (= NT$1500 @ 30)
+    priceUsdAnnually: 500,                 // 10× monthly
+    earlyBirdPriceUsdMonthly: 30,          // early-bird USD (= NT$900 @ 30)
+    standardPriceUsdMonthly: 50,
     trialDays: 0,
     quota: {
       // 2026-05-14: legacy per-task quotas removed (-1). Gating is
