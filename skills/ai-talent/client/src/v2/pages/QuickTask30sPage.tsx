@@ -10,7 +10,7 @@
  *  - Tab "30 秒" (default) + future filter for EDM / IG when those tiers ship
  */
 import React, { useMemo, useState, useEffect } from "react";
-import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import { showToastGlobal } from "../../components/ui/Toast";
@@ -255,21 +255,21 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     return list.find((b) => b?.id === brandId)?.name ?? null;
   }, [ctx, brandId]);
 
-  // 2026-05-08: first-time user redirect — if user has zero brands,
-  // bounce to /brands so the BrandOnboardingWizard can take over.
-  // 2026-05-09 (CJ): only redirect AFTER brandsQuery actually finished
-  // loading. Previous version used a 600ms delay which still fired
-  // when brands list was just slow to fetch on reload — every reload
-  // bounced to /brands.
-  React.useEffect(() => {
-    const brandsLoaded = (ctx as any)?.brandsLoaded === true;
-    const brands = (ctx?.brands as any[]) ?? [];
-    if (brandsLoaded && brands.length === 0) {
-      if (window.location.pathname !== "/brands") {
-        window.location.href = "/brands";
-      }
-    }
-  }, [(ctx as any)?.brandsLoaded, ctx?.brands]);
+  // 2026-05-14 (CJ「60s 頁面在任務完成後返回時，會出現空白頁」):
+  // Bug was: window.location.href = "/brands" triggers a FULL PAGE RELOAD.
+  // During the brief moment between brandsLoaded toggling true with brands
+  // still hydrating, the redirect could fire and the user saw a blank
+  // page (URL changing, fresh React mount). Worse, it tore the SPA shell
+  // mid-mount, so any unmount cleanup in child components could throw.
+  //
+  // We replace the hard nav with a render-time check at the bottom of
+  // this function — it sets `needsOnboardingRedirect = true` and the JSX
+  // return below short-circuits to <Navigate to="/brands" replace />.
+  // <Navigate> swaps inside the same render commit — no flash, no
+  // forced reload.
+  const brandsLoaded = (ctx as any)?.brandsLoaded === true;
+  const brandsList = (ctx?.brands as any[]) ?? [];
+  const needsOnboardingRedirect = brandsLoaded && brandsList.length === 0;
   // Pull the active brand row to access logoUrl. Refetched every 30s so a
   // freshly-saved FB logo shows up without a full page reload.
   const brandQuery = (trpc as any).brand?.get?.useQuery
@@ -785,6 +785,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         : tier === "60s"
           ? "值得打磨的單篇 · 5 變體 + 視覺 brief + QA"
           : "30 天月曆 · 活動 launch 包 · IG 帳號重新定位");
+
+  // 2026-05-14: render-time onboarding redirect — synchronous, no blank flash.
+  // All hooks above have already run, so order stays stable across renders.
+  if (needsOnboardingRedirect) {
+    return <Navigate to="/brands" replace />;
+  }
 
   return (
     <div>

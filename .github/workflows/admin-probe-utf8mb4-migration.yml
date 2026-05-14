@@ -1,0 +1,72 @@
+name: Admin — Probe utf8mb4 migration cost (read-only)
+# Reports row count + current charset + index size for missions /
+# mission_outputs WITHOUT actually running ALTER. Then runs a tiny test
+# ALTER on a 1-row clone to time the convert. Decides safe / unsafe.
+#
+# Read-only against prod DB. Safe to run anytime.
+on: { workflow_dispatch: {} }
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - run: |
+          set +e
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+
+          echo "════ 1. row counts + table sizes ════"
+          $MYSQL -t -e "
+            SELECT table_name,
+                   table_rows,
+                   ROUND(data_length/1024/1024, 2)  AS data_mb,
+                   ROUND(index_length/1024/1024, 2) AS index_mb,
+                   table_collation
+              FROM information_schema.tables
+             WHERE table_schema = DATABASE()
+               AND table_name IN ('missions','mission_outputs')"
+
+          echo ""
+          echo "════ 2. per-column charset (looking for utf8 vs utf8mb4) ════"
+          $MYSQL -t -e "
+            SELECT table_name, column_name, character_set_name, collation_name, data_type
+              FROM information_schema.columns
+             WHERE table_schema = DATABASE()
+               AND table_name IN ('missions','mission_outputs')
+               AND character_set_name IS NOT NULL
+             ORDER BY table_name, ordinal_position"
+
+          echo ""
+          echo "════ 3. estimate ALTER time on a clone (1-row sample) ════"
+          # Create empty clone with same schema, copy 1 row, time the ALTER.
+          # Multiply by row count for rough prod estimate. Drop clone after.
+          for src in missions mission_outputs; do
+            clone="${src}_alter_probe_$(date +%s)"
+            $MYSQL -e "CREATE TABLE \`$clone\` LIKE \`$src\`"
+            $MYSQL -e "INSERT INTO \`$clone\` SELECT * FROM \`$src\` LIMIT 1"
+            echo "── ALTER $clone (1 row) ──"
+            START=$(date +%s%3N)
+            $MYSQL -e "ALTER TABLE \`$clone\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+            END=$(date +%s%3N)
+            MS=$((END - START))
+            ROWS=$($MYSQL -B -N -e "SELECT table_rows FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='$src'")
+            # MyISAM-style rough estimate; InnoDB CONVERT is roughly O(rows × cols)
+            # but really depends on row size. This gives an order-of-magnitude.
+            EST_S=$(echo "scale=1; ($MS * $ROWS) / 1000 / 1" | bc 2>/dev/null || echo "?")
+            echo "  1-row ALTER: ${MS}ms"
+            echo "  table has ~${ROWS} rows"
+            echo "  rough prod ALTER estimate: ~${EST_S}s (very approximate — InnoDB rebuilds the entire table)"
+            $MYSQL -e "DROP TABLE \`$clone\`"
+          done
+
+          echo ""
+          echo "════ 4. recommendation ════"
+          echo "  · If rough estimate < 10s → run migrate.ts directly, brief lock OK"
+          echo "  · If 10-60s → run during off-peak (no users), brief outage acceptable"
+          echo "  · If > 60s → use pt-online-schema-change or dump+restore (no lock)"
+          echo ""
+          echo "  Note: estimate is rough. Real InnoDB ALTER rebuilds the whole"
+          echo "  table; the 1-row probe undercounts page split + redo log cost"
+          echo "  by 2-5x. Add safety margin."

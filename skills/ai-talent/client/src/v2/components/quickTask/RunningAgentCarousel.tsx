@@ -62,10 +62,24 @@ export default function RunningAgentCarousel({
   const activeAgent = safeAgents[activeIdx] ?? safeAgents[0];
 
   // Pick most relevant running stage line for the caption beneath the avatar.
+  // 2026-05-14 (CJ「執行中，已超過 103 秒還在 Jordan Hayes 審核」): the simulator
+  // runs out of stages around 60s for 100s-tier tasks. After that EVERY stage
+  // is "done" → old code fell back to showing the last done stage's label
+  // (QA), making it look like QA was stuck for 100s+. Real cause was the
+  // task running past the simulator's scripted timeline. Show a "wrapping up"
+  // message instead so users don't think a specific agent is hanging.
   const runningStageLabel = useMemo(() => {
     if (!stages || stages.length === 0) return null;
     const running = stages.find((s) => s.status === "running");
     if (running) return running.label;
+    // All stages done but task still rendering → backend is finalising
+    // (LLM finishing, image still gen-ing, recording to DB, etc.)
+    const allDone = stages.length > 0 && stages.every((s) => s.status === "done");
+    if (allDone) {
+      return typeof navigator !== "undefined" && /^en/i.test(navigator.language ?? "")
+        ? "Wrapping up…"
+        : "收尾中…（最後幾秒）";
+    }
     const lastDone = [...stages].reverse().find((s) => s.status === "done");
     return lastDone?.label ?? stages[0]?.label ?? null;
   }, [stages]);

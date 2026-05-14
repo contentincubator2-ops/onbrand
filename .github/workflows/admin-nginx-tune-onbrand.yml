@@ -1,0 +1,81 @@
+name: Admin — Tune nginx timeouts on the onbrand.sowork.ai site
+# Previous admin-nginx-tune-100users.yml picked head -1 of sites-enabled,
+# which is alphabetically aiteam.sowork.ai — wrong site. This one greps
+# for the file that actually contains "server_name ... onbrand.sowork.ai"
+# and tunes only that one.
+#
+# Idempotent: runs the awk rewrite each time so re-running is safe.
+on: { workflow_dispatch: {} }
+jobs:
+  tune:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Locate onbrand site
+        run: |
+          set -e
+          # Find which file in sites-enabled handles onbrand.sowork.ai
+          SITE=$(sudo grep -l "server_name[^;]*onbrand\.sowork\.ai" /etc/nginx/sites-enabled/* 2>/dev/null | head -1)
+          if [ -z "$SITE" ]; then
+            echo "no site config with server_name onbrand.sowork.ai found"
+            sudo ls /etc/nginx/sites-enabled/
+            exit 1
+          fi
+          REAL=$(readlink -f "$SITE")
+          echo "active site link: $SITE"
+          echo "real file:        $REAL"
+          echo "── current timeouts in this file (if any) ──"
+          sudo grep -nE "proxy_(read|send|connect)_timeout|client_max_body_size" "$REAL" || echo "  (none set — using nginx defaults of 60s)"
+          # Save for next step
+          echo "ONBRAND_SITE=$REAL" >> $GITHUB_ENV
+
+      - name: Back up + rewrite timeouts
+        run: |
+          set -e
+          SITE="$ONBRAND_SITE"
+          sudo cp "$SITE" "${SITE}.bak.$(date +%s)"
+
+          # The site config has multiple `server {` blocks (HTTP redirect +
+          # HTTPS). We want to inject proxy timeouts inside the location /
+          # block(s) that proxy_pass to the node app. Idempotent: strip
+          # any existing proxy_*_timeout lines first, then insert ours
+          # after each `location / {` line.
+          TMP=$(mktemp)
+          sudo awk '
+            {
+              # Drop old timeout/body-size lines so re-runs converge
+              if ($0 ~ /proxy_(read|send|connect)_timeout/) next
+              if ($0 ~ /client_max_body_size/) next
+              print
+              # After every location / { opening, insert our block
+              if ($0 ~ /location[[:space:]]*\/[[:space:]]*\{/) {
+                print "        proxy_connect_timeout 10s;"
+                print "        proxy_send_timeout    180s;"
+                print "        proxy_read_timeout    180s;"
+                print "        client_max_body_size  25m;"
+                print "        proxy_http_version    1.1;"
+                print "        proxy_set_header      Connection \"\";"
+              }
+            }
+          ' "$SITE" > "$TMP"
+          sudo mv "$TMP" "$SITE"
+
+          echo "── new timeouts in this file ──"
+          sudo grep -nE "proxy_(read|send|connect)_timeout|client_max_body_size|location.*\{" "$SITE" | head -30
+
+          echo "── nginx -t ──"
+          sudo nginx -t
+
+      - name: Reload nginx + smoke
+        run: |
+          set -e
+          sudo systemctl reload nginx
+          sleep 1
+          for i in 1 2 3 4 5; do
+            code=$(curl -sk -o /dev/null -w "%{http_code}" https://onbrand.sowork.ai/health 2>/dev/null)
+            echo "try $i: $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 2
+          done
+          echo "health check did not return 200 after reload"
+          exit 1
