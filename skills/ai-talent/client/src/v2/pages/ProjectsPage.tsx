@@ -328,7 +328,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
   // Optimistic title displayed while the mutation is in flight.
   // Cleared once mission.title (from refetched server data) catches up.
   const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
-  React.useEffect(() => {
+  useEffect(() => {
     // Server caught up → drop the optimistic value.
     if (optimisticTitle !== null && mission.title === optimisticTitle) {
       setOptimisticTitle(null);
