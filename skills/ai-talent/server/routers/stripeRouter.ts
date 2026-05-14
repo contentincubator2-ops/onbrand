@@ -333,10 +333,21 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
   }
   if (invoice.status === "paid") return { ok: true }; // idempotent noop
 
-  await localPool.execute(
-    `UPDATE invoices SET status = 'paid', paidAt = NOW(3), rawPayload = ? WHERE id = ?`,
+  // 2026-05-14 (P1): CAS update — if a duplicate webhook race-arrives
+  // between the SELECT above and this UPDATE, only ONE of them gets
+  // affectedRows=1. The loser bails before crediting points.
+  const [upd]: any = await localPool.execute(
+    `UPDATE invoices SET status = 'paid', paidAt = NOW(3), rawPayload = ?
+       WHERE id = ? AND status != 'paid'`,
     [JSON.stringify({ event: event.type, sessionId, amount_total: session.amount_total }), invoice.id],
   );
+  const affected = Number((upd as any)?.affectedRows ?? 0);
+  if (affected === 0) {
+    // Another concurrent webhook won the CAS race — it already credited
+    // points/extended plan. Ack and exit so Stripe stops retrying.
+    console.log("[stripe.webhook] duplicate event lost CAS race; idempotent noop", { sessionId });
+    return { ok: true };
+  }
 
   if (invoice.packType === "topup") {
     const pts = Number(invoice.pointsGranted) || 0;
