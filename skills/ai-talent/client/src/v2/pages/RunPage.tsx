@@ -59,9 +59,20 @@ export default function RunPage() {
   const { t, lang } = useLang();
   const id = Number(outputId);
 
+  // 2026-05-14 (CJ「async polling」): when the orchestra wrote a partial
+  // row (progress='caption_ready'), poll every 4s so image / QA show up
+  // as they complete. Stop polling once progress reaches done/failed.
   const { data, isLoading, error } = trpc.output.getById.useQuery(
     { id },
-    { enabled: !!id, refetchOnWindowFocus: false },
+    {
+      enabled: !!id,
+      refetchOnWindowFocus: false,
+      refetchInterval: (q: any) => {
+        const p = q?.state?.data?.progress;
+        if (p === "caption_ready") return 4000;
+        return false;
+      },
+    },
   );
 
   const [activeIdx, setActiveIdx] = useState(0);
@@ -654,6 +665,36 @@ export default function RunPage() {
           {lang === "en" ? `Version #${(data as any)?.version ?? 1}` : `版本 #${(data as any)?.version ?? 1}`}
         </span>
       </div>
+
+      {/* 2026-05-14 (async polling): progress banner — only shown when the
+          orchestra wrote captions early and is still working on images/QA */}
+      {(() => {
+        const p = (data as any)?.progress;
+        if (p === "caption_ready") {
+          return (
+            <div className="mb-3 mx-1 flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-tiny text-primary-700">
+              <span className="inline-block w-3 h-3 border-2 border-primary-400 border-t-primary-700 rounded-full animate-spin" />
+              <span className="flex-1">
+                {lang === "en"
+                  ? "Captions are ready — images and QA are still finishing in the background. This card will refresh automatically."
+                  : "文案已就緒 · 圖片與 QA 還在背景生成，這張卡會自動更新（約 30-60 秒）"}
+              </span>
+            </div>
+          );
+        }
+        if (p === "failed") {
+          const detail = (data as any)?.progressDetail;
+          return (
+            <div className="mb-3 mx-1 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-tiny text-danger-700">
+              <p className="font-semibold">
+                {lang === "en" ? "Background generation failed" : "背景處理失敗"}
+              </p>
+              <p className="mt-0.5 line-clamp-2">{detail ?? (lang === "en" ? "Image gen or QA threw — captions above are still usable." : "圖片或 QA 階段失敗，但上面的文案仍可使用。")}</p>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* ─── Task label + status row (slim, non-overlapping) ────────── */}
       {/* 2026-05-14 (CJ「標題很長」): min-w-0 lets flex item shrink so

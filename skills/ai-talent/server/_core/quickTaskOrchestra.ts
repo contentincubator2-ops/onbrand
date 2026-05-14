@@ -1443,7 +1443,7 @@ export async function runOrchestra(args: {
     const hasUsableVariant = result.variants.some((v) => (v.caption ?? "").trim().length > 0);
     if (args.userId && hasUsableVariant) {
       try {
-        const { recordTaskRun } = await import("./recordTaskRun");
+        const { recordTaskRun, finaliseTaskRun } = await import("./recordTaskRun");
         const firstImage = result.variants.find((v) => v.image?.url)?.image?.url ?? null;
         // 2026-05-09 (CJ fix): templates have no .channel field — pull
         // platform from outputDefaults (which IS set). Fallback to
@@ -1464,41 +1464,60 @@ export async function runOrchestra(args: {
         const flatLabel: string = typeof args.template.label === "string"
           ? args.template.label
           : (args.template.label?.zh ?? args.template.label?.en ?? args.template.id);
-        const persisted = await recordTaskRun({
-          userId: args.userId,
-          brandId: args.brandId ?? null,
-          workspace: channel,
-          taskId: args.template.id,
-          taskLabel: flatLabel,
-          tier: tierStr,
-          // 2026-05-14 (CJ「標題很長」): use first-sentence helper, not blind slice(0,80)
-          title: (await import("../_core/titleFromCaption")).titleFromCaption(result.variants[0]?.caption, flatLabel),
-          content: JSON.stringify(result.variants, null, 2),
-          metadata: {
-            latencyMs: result.totalLatencyMs,
-            // 2026-05-09 (P2 — agent thinking panel): persist FULL agent
-            // objects (id/name/title/avatarUrl) + stages + fetchedUrl so
-            // /run/:id can render the agent workflow without reconstructing.
-            captionAgent: result.captionAgent ?? null,
-            imageAgent: result.imageAgent ?? null,
-            stages: result.stages ?? [],
-            fetchedUrl: result.fetchedUrl ?? null,
-            errors: result.errors ?? [],
-            ok: result.ok ?? true,
-            variantCount: result.variants.length,
-            // 2026-05-09 (CJ): persist inputs so /run/:id 重跑同任務 can
-            // navigate back to the task with the user's prior answers
-            // pre-filled (no need to re-type 主問題 input).
-            inputs: args.inputs ?? {},
-            // 2026-05-11 (CJ): persist scope so /projects can filter
-            // missions by product/event and /run page can re-apply scope.
-            productId: args.productId ?? null,
-            eventId: args.eventId ?? null,
-          },
-          thumbnailUrl: firstImage,
-        });
-        (result as any).outputId = persisted.outputId;
-        (result as any).missionId = persisted.missionId;
+        const titleFor = (await import("../_core/titleFromCaption")).titleFromCaption(result.variants[0]?.caption, flatLabel);
+        const fullMetadata = {
+          latencyMs: result.totalLatencyMs,
+          // 2026-05-09 (P2 — agent thinking panel): persist FULL agent
+          // objects (id/name/title/avatarUrl) + stages + fetchedUrl so
+          // /run/:id can render the agent workflow without reconstructing.
+          captionAgent: result.captionAgent ?? null,
+          imageAgent: result.imageAgent ?? null,
+          stages: result.stages ?? [],
+          fetchedUrl: result.fetchedUrl ?? null,
+          errors: result.errors ?? [],
+          ok: result.ok ?? true,
+          variantCount: result.variants.length,
+          // 2026-05-09 (CJ): persist inputs so /run/:id 重跑同任務 can
+          // navigate back to the task with the user's prior answers
+          // pre-filled (no need to re-type 主問題 input).
+          inputs: args.inputs ?? {},
+          // 2026-05-11 (CJ): persist scope so /projects can filter
+          // missions by product/event and /run page can re-apply scope.
+          productId: args.productId ?? null,
+          eventId: args.eventId ?? null,
+        };
+
+        if (persistedOutputId) {
+          // 2026-05-14 (async path): row was inserted at checkpoint with
+          // progress='caption_ready'. UPDATE it now to 'done' with the
+          // full image/extras/QA payload.
+          await finaliseTaskRun({
+            outputId: persistedOutputId,
+            content: JSON.stringify(result.variants, null, 2),
+            metadata: fullMetadata,
+            thumbnailUrl: firstImage,
+            title: titleFor,
+            progress: "done",
+          });
+          (result as any).outputId = persistedOutputId;
+          (result as any).missionId = persistedMissionId;
+        } else {
+          // Sync path: no checkpoint was used — insert as before.
+          const persisted = await recordTaskRun({
+            userId: args.userId,
+            brandId: args.brandId ?? null,
+            workspace: channel,
+            taskId: args.template.id,
+            taskLabel: flatLabel,
+            tier: tierStr,
+            title: titleFor,
+            content: JSON.stringify(result.variants, null, 2),
+            metadata: fullMetadata,
+            thumbnailUrl: firstImage,
+          });
+          (result as any).outputId = persisted.outputId;
+          (result as any).missionId = persisted.missionId;
+        }
       } catch (e) {
         console.warn("[runOrchestra] recordTaskRun failed:", (e as Error).message);
       }

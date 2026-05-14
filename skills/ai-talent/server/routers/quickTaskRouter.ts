@@ -1400,6 +1400,12 @@ export const quickTaskRouter = router({
       brandId: z.number().optional(),
       productId: z.number().optional().nullable(),
       eventId: z.number().optional().nullable(),
+      // 2026-05-14 (CJ「先回 caption + brief、image 跟 QA 變 async polling」):
+      // When true, return after captions+briefs (~30-45s) with progress=
+      // 'caption_ready'. The full orchestra continues in background and
+      // UPDATEs the same mission_outputs row. Frontend polls
+      // output.getById until progress='done' or 'failed'.
+      asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -1414,42 +1420,105 @@ export const quickTaskRouter = router({
       await deductPoints(userId, "task_99s", { kind: "task", id: null });
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
-      // Priority 1: 100s campaign-level tasks (FB100/IG100/YT100/Multi100)
+
+      // Pick template + config (same priority chain as before).
       const tier100Template = get100Template(input.taskId);
       const tier100Config = get100OrchestraConfig(input.taskId);
+      let template: any = null; let config: any = null;
       if (tier100Template && tier100Config) {
-        return runOrchestra({ template: tier100Template, config: tier100Config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "100s" });
+        template = tier100Template; config = tier100Config;
+      } else {
+        const tier60Template =
+          getFB60Template(input.taskId) ?? getIG60Template(input.taskId) ??
+          getYT60Template(input.taskId) ?? getMulti60Template(input.taskId);
+        const tier60Config =
+          getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
+          getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
+        if (tier60Template && tier60Config) {
+          template = tier60Template; config = tier60Config;
+        } else {
+          template =
+            FB_30S_TASKS.find((t) => t.id === input.taskId) ??
+            IG_30S_TASKS.find((t) => t.id === input.taskId) ??
+            YT_30S_TASKS.find((t) => t.id === input.taskId) ??
+            TT_30S_TASKS.find((t) => t.id === input.taskId) ??
+            LI_30S_TASKS.find((t) => t.id === input.taskId) ??
+            EMAIL_30S_TASKS.find((t) => t.id === input.taskId) ??
+            PR_30S_TASKS.find((t) => t.id === input.taskId) ??
+            BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
+            RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
+            KOL_30S_TASKS.find((t) => t.id === input.taskId);
+          if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
+          const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
+          config =
+            _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
+            getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
+            getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId);
+          if (!config) throw new Error(`No config for: ${input.taskId}`);
+        }
       }
-      // Priority 2: 60s production-package pools (legacy fallback)
-      const tier60Template =
-        getFB60Template(input.taskId) ?? getIG60Template(input.taskId) ??
-        getYT60Template(input.taskId) ?? getMulti60Template(input.taskId);
-      const tier60Config =
-        getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
-        getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
-      if (tier60Template && tier60Config) {
-        return runOrchestra({ template: tier60Template, config: tier60Config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "100s" });
+
+      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "100s" as const };
+
+      if (!input.asyncMode) {
+        // Legacy sync path — fully await, return final result.
+        return runOrchestra(baseArgs);
       }
-      // Legacy fallback to 30s pool
-      const template =
-        FB_30S_TASKS.find((t) => t.id === input.taskId) ??
-        IG_30S_TASKS.find((t) => t.id === input.taskId) ??
-        YT_30S_TASKS.find((t) => t.id === input.taskId) ??
-        TT_30S_TASKS.find((t) => t.id === input.taskId) ??
-        LI_30S_TASKS.find((t) => t.id === input.taskId) ??
-        EMAIL_30S_TASKS.find((t) => t.id === input.taskId) ??
-        PR_30S_TASKS.find((t) => t.id === input.taskId) ??
-        BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
-        RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-        KOL_30S_TASKS.find((t) => t.id === input.taskId);
-      if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
-      const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
-      const config =
-        _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
-        getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
-        getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId);
-      if (!config) throw new Error(`No config for: ${input.taskId}`);
-      return runOrchestra({ template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "100s" });
+
+      // ── Async path ─────────────────────────────────────────────────
+      // Return after captions+briefs; let image gen + extras + QA run
+      // in the background and UPDATE the same mission_outputs row.
+      let resolvePartial!: (p: any) => void;
+      let rejectPartial!: (e: any) => void;
+      const partialPromise = new Promise<any>((resolve, reject) => {
+        resolvePartial = resolve;
+        rejectPartial = reject;
+      });
+      let checkpointFired = false;
+      let capturedOutputId: number | null = null;
+
+      // Fire-and-forget the full orchestra.
+      // If checkpoint fires, partial resolves and we return to the user.
+      // If the FULL Promise rejects AFTER checkpoint, we mark the row failed.
+      // If it rejects BEFORE checkpoint, we reject the partial (caller gets error).
+      runOrchestra({
+        ...baseArgs,
+        onCheckpoint: (partial) => {
+          checkpointFired = true;
+          capturedOutputId = (partial as any).outputId ?? null;
+          resolvePartial(partial);
+        },
+      })
+        .then((full) => {
+          // If checkpoint never fired (e.g., task too short or didn't reach
+          // captions stage), the orchestra fell through synchronously and
+          // we still owe the partial-resolve so the mutation can return.
+          if (!checkpointFired) resolvePartial(full);
+        })
+        .catch(async (err) => {
+          console.error("[runOrchestra100 async tail] failed:", (err as Error)?.message);
+          // If checkpoint fired and we captured an outputId, mark THAT row
+          // as failed so the frontend stops polling. If no outputId yet,
+          // reject the partial so the caller sees the error.
+          if (checkpointFired && capturedOutputId) {
+            try {
+              const { finaliseTaskRun } = await import("../_core/recordTaskRun");
+              await finaliseTaskRun({
+                outputId: capturedOutputId,
+                // Don't pass content → keep partial caption from checkpoint
+                progress: "failed",
+                progressDetail: String((err as Error)?.message ?? err).slice(0, 1000),
+              });
+            } catch (e2) {
+              console.error("[runOrchestra100 async tail] mark failed also failed:", e2);
+            }
+          } else if (!checkpointFired) {
+            rejectPartial(err);
+          }
+        });
+
+      // Block on partial result only.
+      return await partialPromise;
     }),
 
   runOrchestra: protectedProcedure

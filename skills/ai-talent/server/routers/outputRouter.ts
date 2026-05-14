@@ -360,6 +360,35 @@ export const outputRouter = router({
       );
       const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
       if (!row) return null;
+      // 2026-05-14 (CJ「async polling」): self-healing stale-guard. If the
+      // background continuation crashed (pm2 restart mid-task, process
+      // OOM, etc.) the row sits at progress='caption_ready' forever and
+      // RunPage polls indefinitely. After 5 min, flip to 'failed' so the
+      // user sees an actionable state.
+      if ((row as any).progress === "caption_ready") {
+        const updated = (row as any).updatedAt instanceof Date
+          ? (row as any).updatedAt.getTime()
+          : Date.parse(String((row as any).updatedAt));
+        if (Number.isFinite(updated) && Date.now() - updated > 5 * 60_000) {
+          {
+            try {
+              const { default: localPool } = await import("../localDb");
+              await localPool.execute(
+                `UPDATE mission_outputs
+                   SET progress = 'failed',
+                       progressDetail = '背景任務超過 5 分鐘未完成（process restart 或內部錯誤）',
+                       updatedAt = NOW()
+                 WHERE id = ? AND progress = 'caption_ready'`,
+                [input.id],
+              );
+              (row as any).progress = "failed";
+              (row as any).progressDetail = "背景任務超過 5 分鐘未完成（process restart 或內部錯誤）";
+            } catch (e) {
+              console.warn("[output.getById] stale-guard UPDATE failed:", (e as Error).message);
+            }
+          }
+        }
+      }
       const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
       // SQL extracted values are the canonical source — string or null.
       const taskId: string | null = row.extracted_task_id ?? md.taskId ?? null;
@@ -375,6 +404,10 @@ export const outputRouter = router({
         previewHtml: row.previewHtml,
         status: row.status,
         version: row.version,
+        // 2026-05-14 (CJ「async polling」): expose progress so RunPage can
+        // poll until the orchestra's background continuation completes.
+        progress: (row as any).progress ?? "done",
+        progressDetail: (row as any).progressDetail ?? null,
         scheduledAt: row.scheduledAt,
         publishedAt: row.publishedAt,
         createdAt: row.createdAt,

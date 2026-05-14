@@ -114,7 +114,9 @@ interface RecordArgs {
  */
 export async function finaliseTaskRun(args: {
   outputId: number;
-  content: string;
+  /** Pass `undefined` to keep the existing content (e.g. on failure where
+   *  we don't want to overwrite the partial caption already written). */
+  content?: string;
   metadata?: Record<string, any>;
   thumbnailUrl?: string | null;
   title?: string;
@@ -124,32 +126,41 @@ export async function finaliseTaskRun(args: {
   try {
     const MAX_CONTENT = 2_000_000;
     const MAX_METADATA = 200_000;
-    let safeContent = args.content ?? "";
-    if (safeContent.length > MAX_CONTENT) safeContent = safeContent.slice(0, MAX_CONTENT);
-    let metadata = JSON.stringify({
-      ...(args.metadata ?? {}),
-      thumbnailUrl: args.thumbnailUrl ?? null,
-    });
-    if (metadata.length > MAX_METADATA) {
-      metadata = JSON.stringify({
-        thumbnailUrl: args.thumbnailUrl ?? null,
-        _truncated: true,
-        _originalSize: metadata.length,
-      });
+
+    const sets: string[] = ["progress = ?", "progressDetail = ?", "updatedAt = NOW()"];
+    const params: any[] = [args.progress, args.progressDetail ?? null];
+
+    if (args.content !== undefined) {
+      let safeContent = args.content;
+      if (safeContent.length > MAX_CONTENT) safeContent = safeContent.slice(0, MAX_CONTENT);
+      sets.push("content = ?");
+      params.push(safeContent);
     }
-    const titleClause = args.title ? `, title = ?` : "";
-    const params: any[] = [
-      safeContent,
-      metadata,
-      args.progress,
-      args.progressDetail ?? null,
-    ];
-    if (args.title) params.push(args.title.slice(0, 250));
+
+    if (args.metadata !== undefined || args.thumbnailUrl !== undefined) {
+      let metadata = JSON.stringify({
+        ...(args.metadata ?? {}),
+        thumbnailUrl: args.thumbnailUrl ?? null,
+      });
+      if (metadata.length > MAX_METADATA) {
+        metadata = JSON.stringify({
+          thumbnailUrl: args.thumbnailUrl ?? null,
+          _truncated: true,
+          _originalSize: metadata.length,
+        });
+      }
+      sets.push("metadata = ?");
+      params.push(metadata);
+    }
+
+    if (args.title) {
+      sets.push("title = ?");
+      params.push(args.title.slice(0, 250));
+    }
+
     params.push(args.outputId);
     await localPool.execute(
-      `UPDATE mission_outputs
-         SET content = ?, metadata = ?, progress = ?, progressDetail = ?${titleClause}, updatedAt = NOW()
-       WHERE id = ?`,
+      `UPDATE mission_outputs SET ${sets.join(", ")} WHERE id = ?`,
       params,
     );
     return { ok: true };
