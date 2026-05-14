@@ -31,7 +31,7 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
         </div>
         <div className="flex-1 bg-content1 rounded-md px-3 py-1 text-tiny text-default-400 flex items-center gap-2">
           <FontAwesomeIcon icon={faInbox} className="text-tiny" />
-          {liveTitle ? liveTitle.slice(0, 60) : "主旨行 · 等待 copy agent 填入"}
+          {liveTitle ? liveTitle.slice(0, 60) : "主旨行 · 等待 AI 撰寫 填入"}
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
           <Skeleton className="absolute inset-0 rounded-none" />
           <div className="relative z-10 text-center text-default-400 p-4">
             <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-            <p className="text-tiny">{liveDescription ? liveDescription.slice(0, 80) : "Hero 圖 · 等待 visual agent"}</p>
+            <p className="text-tiny">{liveDescription ? liveDescription.slice(0, 80) : "Hero 圖 · 等待 AI 圖像"}</p>
           </div>
         </div>
 

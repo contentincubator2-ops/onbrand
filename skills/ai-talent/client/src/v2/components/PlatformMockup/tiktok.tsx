@@ -153,7 +153,7 @@ export function TTCarousel({ title, brandName, variantLabel }: MockupFields) {
           <Skeleton className="absolute inset-0 opacity-30" />
           <div className="relative z-10 text-center text-white/60">
             <FontAwesomeIcon icon={faPlay} className="text-4xl mb-2" />
-            <p className="text-tiny">圖文 1 / 8 · 等待 craft agent</p>
+            <p className="text-tiny">圖文 1 / 8 · 等待 AI 生成</p>
           </div>
         </div>
         <div className="absolute top-12 right-3 z-10 bg-black/50 backdrop-blur-sm text-white text-tiny px-2 py-0.5 rounded-full">

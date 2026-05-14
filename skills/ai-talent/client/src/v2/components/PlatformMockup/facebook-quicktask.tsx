@@ -92,7 +92,7 @@ export function FBCover({ title, brandName, variantLabel, liveCaption, liveImage
             ) : (
               <>
                 <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-                <p className="text-tiny line-clamp-2">{liveImageDesc ?? (lang === "en" ? "Cover · waiting for craft agent" : "封面 · 等待 craft agent")}</p>
+                <p className="text-tiny line-clamp-2">{liveImageDesc ?? (lang === "en" ? "Cover · waiting for craft agent" : "封面 · 等待 AI 生成")}</p>
               </>
             )}
           </div>

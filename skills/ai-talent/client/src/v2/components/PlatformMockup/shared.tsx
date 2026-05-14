@@ -188,7 +188,7 @@ export interface MockupFields {
    * Quick-task link-post pivot (2026-05-05): when caption contains a URL the
    * server already fetched, this carries the OG card metadata so the mockup
    * renders an actual link preview (image + title + description + domain)
-   * instead of an empty "等待 craft agent" image slot. Real FB behaviour is
+   * instead of an empty "等待 AI 生成" image slot. Real FB behaviour is
    * to auto-render OG cards for link posts; we mirror that.
    */
   ogCard?: {

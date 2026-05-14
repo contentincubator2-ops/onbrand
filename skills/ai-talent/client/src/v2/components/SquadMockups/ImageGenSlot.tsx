@@ -1,10 +1,10 @@
 /**
  * ImageGenSlot — in-mockup image generation area.
  *
- * Replaces the static "等待 craft agent" skeleton placeholder in every
+ * Replaces the static "等待 AI 生成" skeleton placeholder in every
  * mockup that has an image area. The same physical space shows:
  *
- *   Phase 1  idle       → gray placeholder ("🎨 圖片方向 · 等待 agent")
+ *   Phase 1  idle       → gray placeholder ("🎨 圖片方向 · 等待 AI")
  *   Phase 2  designing  → pulsing + "🤔 設計方向思考中…" streaming text
  *   Phase 3  direction  → design direction card (dark overlay)
  *   Phase 4  prompting  → AI Prompt being written (within same overlay)
@@ -57,7 +57,7 @@ export interface ImageGenSlotProps {
 // ── Step label mapping ────────────────────────────────────────────────────────
 
 const STEP_LABELS: Record<ImageGenPhase, { step: number; label: string; icon: string }> = {
-  idle:       { step: 0, label: "等待 agent",      icon: "🎨" },
+  idle:       { step: 0, label: "等待 AI",      icon: "🎨" },
   designing:  { step: 1, label: "設計方向提案",     icon: "🤔" },
   direction:  { step: 1, label: "設計方向確認",     icon: "✅" },
   prompting:  { step: 2, label: "AI Prompt 生成",  icon: "✍️" },
@@ -223,7 +223,7 @@ export function ImageGenSlot({
       {phase === "idle" && (
         <div className="absolute inset-0 flex items-center justify-center text-default-400 flex-col gap-1">
           <span className="text-3xl">🎨</span>
-          <p className="text-tiny text-center px-4">圖片方向 · 等待 agent 產出</p>
+          <p className="text-tiny text-center px-4">圖片方向 · 等待 AI 產出</p>
         </div>
       )}
 
@@ -265,10 +265,10 @@ export function ImageGenSlot({
 
 /**
  * Drop-in replacement for the old gray skeleton + icon pattern.
- * Usage: <ImageGenPlaceholder text="封面圖 · 等待 craft agent" aspectRatio="3/1" />
+ * Usage: <ImageGenPlaceholder text="封面圖 · 等待 AI 生成" aspectRatio="3/1" />
  */
 export function ImageGenPlaceholder({
-  text = "圖片方向 · 等待 agent 產出",
+  text = "圖片方向 · 等待 AI 產出",
   aspectRatio = "16/9",
   className = "",
 }: {

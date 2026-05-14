@@ -421,7 +421,7 @@ export function LIDocument({ title, brandName, brandLogoUrl, variantLabel, liveC
                 <div className="text-center text-default-400">
                   <FontAwesomeIcon icon={faFileLines} className="text-5xl mb-3" />
                   <p className="text-small font-medium">{lang === "en" ? `Page 1 / ${totalPages}` : `第 1 / ${totalPages} 頁`}</p>
-                  <p className="text-tiny mt-1">{lang === "en" ? "PDF document · waiting for craft agent" : "PDF 文件 · 等待 craft agent"}</p>
+                  <p className="text-tiny mt-1">{lang === "en" ? "PDF document · waiting for craft agent" : "PDF 文件 · 等待 AI 生成"}</p>
                 </div>
               )}
             </div>

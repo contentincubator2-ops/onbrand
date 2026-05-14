@@ -80,7 +80,7 @@ export function XTweet({ title, brandName, variantLabel, liveCaption, liveHashta
               <div className="relative z-10 text-center p-4">
                 <FontAwesomeIcon icon={faImages} className="text-[#71767b] text-2xl mb-1" />
                 <p className="text-[#71767b] text-tiny line-clamp-2">
-                  {liveImageDesc ?? "推文圖 · 等待 visual agent"}
+                  {liveImageDesc ?? "推文圖 · 等待 AI 圖像"}
                 </p>
               </div>
             </div>

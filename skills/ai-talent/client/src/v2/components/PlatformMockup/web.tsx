@@ -87,7 +87,7 @@ export function WebLanding({ title, brandName, variantLabel, liveTitle, liveDesc
           <Skeleton className="absolute inset-0 rounded-none" />
           <div className="relative z-10 text-center p-4">
             <FontAwesomeIcon icon={faImages} className="text-3xl text-default-300 mb-2" />
-            <p className="text-tiny text-default-400">{liveImageDesc ?? "Hero 圖 · 等待 visual agent"}</p>
+            <p className="text-tiny text-default-400">{liveImageDesc ?? "Hero 圖 · 等待 AI 圖像"}</p>
           </div>
         </div>
 

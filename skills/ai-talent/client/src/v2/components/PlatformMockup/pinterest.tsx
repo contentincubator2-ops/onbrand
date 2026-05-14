@@ -113,7 +113,7 @@ export function PinterestPin({
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mb-2">
                 <FontAwesomeIcon icon={faBookmark} className="text-white text-lg" />
               </div>
-              <p className="text-white/80 text-[11px]">{liveImageDesc ?? "Pin 圖片 · 等待 visual agent"}</p>
+              <p className="text-white/80 text-[11px]">{liveImageDesc ?? "Pin 圖片 · 等待 AI 圖像"}</p>
             </div>
 
             {/* Save button */}
@@ -352,7 +352,7 @@ export function PinterestStoryPin({
               <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mb-3">
                 <FontAwesomeIcon icon={faArrowUpFromBracket} className="text-white text-xl" />
               </div>
-              <p className="text-white/70 text-[12px]">{liveImageDesc ?? "Idea Pin 圖片 · 等待 visual agent"}</p>
+              <p className="text-white/70 text-[12px]">{liveImageDesc ?? "Idea Pin 圖片 · 等待 AI 圖像"}</p>
             </div>
 
             {/* Bottom */}

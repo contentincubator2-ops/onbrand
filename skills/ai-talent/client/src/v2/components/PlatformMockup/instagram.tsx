@@ -106,7 +106,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                       <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
                     </>
                   ) : (
-                    <p className="text-tiny line-clamp-3">{effectiveImageDesc ?? (lang === "en" ? "Hero image · waiting for craft agent" : "主圖 · 等待 craft agent")}</p>
+                    <p className="text-tiny line-clamp-3">{effectiveImageDesc ?? (lang === "en" ? "Hero image · waiting for craft agent" : "主圖 · 等待 AI 生成")}</p>
                   )}
                 </div>
               </div>
@@ -261,7 +261,7 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
                       <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
                     </>
                   ) : (
-                    <p className="text-tiny line-clamp-3">{liveImageDesc ?? (lang === "en" ? `Slide 1 / ${carouselCount} · waiting for craft agent` : `輪播 1 / ${carouselCount} · 等待 craft agent`)}</p>
+                    <p className="text-tiny line-clamp-3">{liveImageDesc ?? (lang === "en" ? `Slide 1 / ${carouselCount} · waiting for craft agent` : `輪播 1 / ${carouselCount} · 等待 AI 生成`)}</p>
                   )}
                 </div>
               </div>
@@ -351,7 +351,7 @@ export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCapt
                   <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
                 </>
               ) : (
-                <p className="text-tiny line-clamp-3">{liveVideoDesc ?? (lang === "en" ? "9:16 video · waiting for craft agent" : "9:16 影片 · 等待 craft agent")}</p>
+                <p className="text-tiny line-clamp-3">{liveVideoDesc ?? (lang === "en" ? "9:16 video · waiting for craft agent" : "9:16 影片 · 等待 AI 生成")}</p>
               )}
             </div>
           </div>
@@ -503,7 +503,7 @@ export function IGProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
           {liveCaption ? (
             <p className="text-tiny text-default-700 whitespace-pre-line leading-relaxed">{liveCaption}</p>
           ) : (
-            <p className="text-tiny text-default-400">{lang === "en" ? "(bio pending — agent will write)" : "（bio 等待 agent 寫入）"}</p>
+            <p className="text-tiny text-default-400">{lang === "en" ? "(bio pending — agent will write)" : "（bio 等待 AI 寫入）"}</p>
           )}
           <p className="text-tiny text-primary">your-brand.com</p>
         </div>
@@ -636,7 +636,7 @@ export function IGAd({ title, brandName, variantLabel }: MockupFields) {
           <div className="absolute inset-0 flex items-center justify-center text-default-400">
             <div className="text-center">
               <FontAwesomeIcon icon={faShoppingBag} className="text-4xl mb-2" />
-              <p className="text-tiny">{lang === "en" ? "Ad image · waiting for craft agent" : "廣告主圖 · 等待 craft agent"}</p>
+              <p className="text-tiny">{lang === "en" ? "Ad image · waiting for craft agent" : "廣告主圖 · 等待 AI 生成"}</p>
             </div>
           </div>
         </div>

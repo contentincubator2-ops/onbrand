@@ -129,7 +129,7 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
               <div className={`text-center relative z-10 p-4 ${hasContent ? "bg-default-50/80 backdrop-blur-sm rounded-medium m-3" : ""}`}>
                 <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
                 {/* 2026-05-14 (CJ「圖片還是跑很久」): status-aware placeholder.
-                    Drops the misleading "等待 craft agent" generic copy.
+                    Drops the misleading "等待 AI 生成" generic copy.
                     Each branch now matches a real OrchestraVariant.image.status. */}
                 {liveImageStatus === "timeout" ? (
                   <>
@@ -204,7 +204,7 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
           <Skeleton className="absolute inset-0 opacity-30" />
           <div className="relative z-10 text-center text-white/60">
             <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "9:16 video · waiting for craft agent" : "9:16 影片 · 等待 craft agent"}</p>
+            <p className="text-tiny">{lang === "en" ? "9:16 video · waiting for craft agent" : "9:16 影片 · 等待 AI 生成"}</p>
           </div>
         </div>
         <div className="absolute right-2 bottom-20 z-10 flex flex-col items-center gap-3.5 text-white drop-shadow-lg">
@@ -261,7 +261,7 @@ export function FBStory({ title, brandName, variantLabel }: MockupFields) {
           <Skeleton className="absolute inset-0 opacity-30" />
           <div className="relative z-10 text-center text-white/60">
             <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "Story image · waiting for craft agent" : "限動圖 · 等待 craft agent"}</p>
+            <p className="text-tiny">{lang === "en" ? "Story image · waiting for craft agent" : "限動圖 · 等待 AI 生成"}</p>
           </div>
         </div>
         <div className="absolute bottom-16 inset-x-3 z-10">
@@ -294,7 +294,7 @@ export function FBMarketplace({ title, brandName, variantLabel }: MockupFields) 
           <Skeleton className="absolute inset-0" />
           <div className="text-center relative z-10">
             <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "Product image · waiting for craft agent" : "商品圖 · 等待 craft agent"}</p>
+            <p className="text-tiny">{lang === "en" ? "Product image · waiting for craft agent" : "商品圖 · 等待 AI 生成"}</p>
           </div>
           <span className="absolute top-2 right-2 bg-black/60 text-white text-tiny px-2 py-0.5 rounded-full backdrop-blur-sm">
             <FontAwesomeIcon icon={faBookmark} className="mr-1" /> {lang === "en" ? "Save" : "儲存"}
@@ -336,7 +336,7 @@ export function FBEvent({ title, brief, brandName, variantLabel }: MockupFields)
           <Skeleton className="absolute inset-0" />
           <div className="text-center relative z-10">
             <FontAwesomeIcon icon={faCalendarDays} className="text-4xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "Event cover · waiting for craft agent" : "活動封面 · 等待 craft agent"}</p>
+            <p className="text-tiny">{lang === "en" ? "Event cover · waiting for craft agent" : "活動封面 · 等待 AI 生成"}</p>
           </div>
         </div>
         <div className="px-4 py-3 flex items-start gap-3">
@@ -406,7 +406,7 @@ export function FBAd({ title, brandName, variantLabel }: MockupFields) {
           <Skeleton className="absolute inset-0" />
           <div className="text-center relative z-10">
             <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "Ad image · waiting for craft agent" : "廣告主圖 · 等待 craft agent"}</p>
+            <p className="text-tiny">{lang === "en" ? "Ad image · waiting for craft agent" : "廣告主圖 · 等待 AI 生成"}</p>
           </div>
         </div>
         {/* CTA bar (FB ad signature) */}

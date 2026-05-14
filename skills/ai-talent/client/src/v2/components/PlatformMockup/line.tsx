@@ -50,7 +50,7 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
                   <div className="relative z-10 text-center p-3">
                     <FontAwesomeIcon icon={faImages} className="text-[#9e9e9e] text-2xl mb-1" />
                     <p className="text-[10px] text-[#757575] line-clamp-2">
-                      {liveImageDesc ?? "訊息圖 · 等待 visual agent"}
+                      {liveImageDesc ?? "訊息圖 · 等待 AI 圖像"}
                     </p>
                   </div>
                 </div>

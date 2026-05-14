@@ -74,7 +74,7 @@ export function XHSNote({
                 <FontAwesomeIcon icon={faHeart} className="text-white text-lg" />
               </div>
               <p className="text-white/80 text-[11px] leading-tight">
-                {liveImageDesc ?? "封面圖 · 等待 visual agent"}
+                {liveImageDesc ?? "封面圖 · 等待 AI 圖像"}
               </p>
             </div>
 

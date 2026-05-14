@@ -118,7 +118,7 @@ export function PodcastEpisode({
               <Skeleton className="absolute inset-0 rounded-none" />
               <div className="absolute inset-0 flex flex-col items-center justify-center z-10 text-center px-4">
                 <FontAwesomeIcon icon={faMicrophone} className="text-white/30 text-4xl mb-2" />
-                <p className="text-white/50 text-[11px]">{liveImageDesc ?? "單集封面圖 · 等待 visual agent"}</p>
+                <p className="text-white/50 text-[11px]">{liveImageDesc ?? "單集封面圖 · 等待 AI 圖像"}</p>
               </div>
             </div>
           </div>

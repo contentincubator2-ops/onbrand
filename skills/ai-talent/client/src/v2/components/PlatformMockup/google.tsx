@@ -159,7 +159,7 @@ export function GoogleDisplayAd({ title, brandName, variantLabel, liveTitle, liv
                 <div className="relative z-10 text-center p-2">
                   <FontAwesomeIcon icon={faImages} className="text-2xl text-default-400 mb-1" />
                   <p className="text-[10px] text-default-500 line-clamp-2">
-                    {liveImageDesc ?? "廣告圖 · 等待 visual agent"}
+                    {liveImageDesc ?? "廣告圖 · 等待 AI 圖像"}
                   </p>
                 </div>
               </div>
@@ -244,7 +244,7 @@ export function GooglePMax({ title, brandName, variantLabel, liveTitle, liveDesc
           <Skeleton className="absolute inset-0 rounded-xl" />
           <div className="relative z-10 text-center">
             <FontAwesomeIcon icon={faImages} className="text-2xl text-default-400 mb-1" />
-            <p className="text-tiny text-default-400">{liveImageDesc ?? "素材圖片 (多格式) · 等待 visual agent"}</p>
+            <p className="text-tiny text-default-400">{liveImageDesc ?? "素材圖片 (多格式) · 等待 AI 圖像"}</p>
           </div>
         </div>
       </div>

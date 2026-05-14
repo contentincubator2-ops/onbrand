@@ -138,7 +138,7 @@ export function DocMockup({
                   value={editedBody}
                   onValueChange={setEditedBody}
                   className="font-mono text-small"
-                  placeholder="編輯 agent 預填的內容…"
+                  placeholder="編輯 AI 預填的內容…"
                 />
               ) : (
                 <article
@@ -185,7 +185,7 @@ export function DocMockup({
             ) : (
               <div className="space-y-3">
                 <p className="text-small text-default-500 italic">
-                  {brief || "等待 agent 開始填寫…"}
+                  {brief || "等待 AI 開始填寫…"}
                 </p>
                 <Skeleton className="h-3 w-[88%] rounded opacity-50" />
                 <Skeleton className="h-3 w-[72%] rounded opacity-50" />

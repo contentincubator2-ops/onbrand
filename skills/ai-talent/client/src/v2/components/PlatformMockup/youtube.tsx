@@ -41,7 +41,7 @@ export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, live
                     <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
                   </>
                 ) : (
-                  <p className="text-tiny">{lang === "en" ? "Thumbnail · waiting for craft agent" : "縮圖 · 等待 craft agent"}</p>
+                  <p className="text-tiny">{lang === "en" ? "Thumbnail · waiting for craft agent" : "縮圖 · 等待 AI 生成"}</p>
                 )}
               </div>
             </>
@@ -98,7 +98,7 @@ export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCapt
                   <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
                 </>
               ) : (
-                <p className="text-tiny">{lang === "en" ? "Video player · waiting for craft agent" : "影片播放器 · 等待 craft agent"}</p>
+                <p className="text-tiny">{lang === "en" ? "Video player · waiting for craft agent" : "影片播放器 · 等待 AI 生成"}</p>
               )}
             </div>
           )}
@@ -350,7 +350,7 @@ export function YTLive({ title, brandName, variantLabel }: MockupFields) {
         <div className="relative aspect-video bg-black flex items-center justify-center">
           <div className="text-white/50 text-center relative z-10">
             <FontAwesomeIcon icon={faVideo} className="text-5xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "Live · waiting for craft agent" : "直播中 · 等待 craft agent"}</p>
+            <p className="text-tiny">{lang === "en" ? "Live · waiting for craft agent" : "直播中 · 等待 AI 生成"}</p>
           </div>
           {/* LIVE chip top-left */}
           <div className="absolute top-3 left-3 flex items-center gap-2 z-10">

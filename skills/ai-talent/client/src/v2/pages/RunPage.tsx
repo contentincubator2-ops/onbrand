@@ -428,7 +428,7 @@ export default function RunPage() {
       // but the VariantData interface + mockup expect FLAT
       //   { imageUrl, imageStatus, imageStyle }.
       // Without this normalize, even a successfully-generated image showed
-      // as "等待 craft agent" because imageUrl was always undefined.
+      // as "等待 AI 生成" because imageUrl was always undefined.
       return raw.map((v: any) => {
         const img = v.image ?? {};
         return {
