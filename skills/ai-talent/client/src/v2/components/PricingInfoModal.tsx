@@ -31,9 +31,9 @@ function getPlans(lang: "zh-TW" | "en") {
         "All-platform mockup previews",
       ] : [
         "30s / 60s / 99s 任務",
-        "Theater 內容企劃台",
-        "品牌定位 14-step pipeline",
-        "全平台 mockup 預覽",
+        "內容企劃台",
+        "品牌定位 14 步驟流程",
+        "全平台預覽圖",
       ],
       cta: null as string | null,
       highlight: true,

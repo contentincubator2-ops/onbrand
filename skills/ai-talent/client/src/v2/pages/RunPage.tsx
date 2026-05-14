@@ -933,7 +933,7 @@ export default function RunPage() {
                 <>
                   <p className="text-tiny font-semibold">{t("run_mode_edit")}</p>
                   <p className="text-[10px] text-default-500">
-                    {lang === "en" ? "Edit here — the mockup updates live." : "在這裡改文字，左邊 mockup 即時更新。"}
+                    {lang === "en" ? "Edit here — the mockup updates live." : "在這裡改文字，左邊預覽即時更新。"}
                   </p>
                   <Textarea
                     value={editText ?? slide?.caption ?? ""}

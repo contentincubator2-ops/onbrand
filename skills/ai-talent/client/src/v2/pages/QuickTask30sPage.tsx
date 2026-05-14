@@ -115,7 +115,7 @@ function synthesizeStages(elapsedMs: number, tier: "30s" | "60s" | "100s", lang:
     stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   }
   stages.push(mk("caption", L("Caption Writer 寫變體", "Caption writer drafts variants"), capStart, capEnd));
-  stages.push(mk("brief", L("Image Director 寫視覺 brief", "Image director writes the visual brief"), capStart, capEnd));
+  stages.push(mk("brief", L("視覺指導寫風格指示", "Image director writes the visual brief"), capStart, capEnd));
   stages.push(mk("gen", L("Flux 生圖", "Flux paints the image"), capEnd, genEnd));
   if (isProd) {
     stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), capEnd, extrasEnd));
@@ -790,7 +790,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     : (tier === "30s"
         ? "日常單篇 · 追熱點 · 客戶感謝 · 緊急發文"
         : tier === "60s"
-          ? "值得打磨的單篇 · 5 變體 + 視覺 brief + QA"
+          ? "值得打磨的單篇 · 5 變體 + 視覺指示 + 品質審核"
           : "30 天月曆 · 活動 launch 包 · IG 帳號重新定位");
 
   // 2026-05-14: render-time onboarding redirect — synchronous, no blank flash.
@@ -942,7 +942,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               <FontAwesomeIcon icon={faBolt} className="text-3xl mb-2 text-default-300" />
               <p className="font-semibold mb-1">{lang === "en" ? `${tierLabel} tasks in the works` : `${tierLabel} 任務製作中`}</p>
               <p className="text-tiny text-default-400">
-                {tier === "60s" && (lang === "en" ? "60-second tasks (with full visual brief) launch next wave." : "60 秒任務（含完整視覺 brief）將於下一波上線")}
+                {tier === "60s" && (lang === "en" ? "60-second tasks (with full visual brief) launch next wave." : "60 秒任務（含完整視覺指示）將於下一波上線")}
                 {tier === "100s" && (lang === "en" ? "99s: real-data validation + video generation (Phase 3 rolling out)" : "99 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）")}
                 {tier === "30s" && (lang === "en" ? "Hang tight — agents are warming up." : "請稍候，Agent 正在準備中")}
               </p>
@@ -1357,7 +1357,7 @@ function SavePanel({ slide, accent, onClose }: {
       )}
       {projectsAvailable && (
         <>
-          <p className="text-[10px] text-default-500">{lang === "en" ? "Pick a project to save this version's caption + visual brief:" : "挑一個專案，把這個版本的文案 + 圖片風格存進去："}</p>
+          <p className="text-[10px] text-default-500">{lang === "en" ? "Pick a project to save this version's caption + visual brief:" : "挑一個專案，把這個版本的文案 + 視覺指示存進去："}</p>
           {projects.length === 0 && !listQuery.isLoading && (
             <p className="text-tiny text-default-400 italic py-3 text-center">{lang === "en" ? "No projects yet" : "尚未建立專案"}</p>
           )}
@@ -1942,7 +1942,7 @@ function OutputCarousel({
                 <p className="text-[10px] text-default-500 leading-relaxed">
                   {lang === "en"
                     ? "Edit here — the mockup updates live. Copy it or save to a project when you're done."
-                    : "在這裡改文字，左邊 mockup 會即時跟著變。改好就直接複製或存到 Mission。"}
+                    : "在這裡改文字，左邊預覽會即時跟著變。改好就直接複製或存到專案。"}
                 </p>
                 <Textarea
                   value={slide.caption}
@@ -2049,7 +2049,7 @@ function OutputCarousel({
                     {/* Inline result — image appears here when ready, no popup */}
                     {imageGenStatus === "ready" && imageOverrides[idx] && (
                       <div className="rounded-xl border border-success-200 bg-success-50 p-3 space-y-2">
-                        <p className="text-tiny font-semibold text-success-700">{lang === "en" ? "✓ Applied to mockup" : "✓ 已套用到 mockup"}</p>
+                        <p className="text-tiny font-semibold text-success-700">{lang === "en" ? "✓ Applied to mockup" : "✓ 已套用到預覽"}</p>
                         <img
                           src={imageOverrides[idx]}
                           alt="generated"
