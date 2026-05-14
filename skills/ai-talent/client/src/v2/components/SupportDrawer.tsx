@@ -11,7 +11,7 @@
  * /admin/support and replies; the reply comes back into the same thread.
  */
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import { X, Send, UserRound } from "lucide-react";
@@ -35,6 +35,7 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
   const { lang } = useLang();
   const isEn = lang === "en";
   const loc = useLocation();
+  const navigate = useNavigate();
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
