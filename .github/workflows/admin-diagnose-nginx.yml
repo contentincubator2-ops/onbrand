@@ -1,0 +1,56 @@
+name: Admin — Diagnose nginx + restore if broken
+on: { workflow_dispatch: {} }
+jobs:
+  diag:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Probes
+        run: |
+          set +e
+          echo "── localhost:3101/health ──"
+          curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3101/health
+          echo "── localhost:80 (nginx) ──"
+          curl -s -o /dev/null -w "%{http_code}\n" http://localhost/
+          echo "── nginx -t ──"
+          sudo nginx -t
+          echo "── systemctl status nginx (head) ──"
+          sudo systemctl status nginx --no-pager 2>&1 | head -20
+          echo "── ss -ltnp 443/80/3101 ──"
+          ss -ltnp 2>/dev/null | grep -E ':(80|443|3101)' || true
+          echo "── current site config ──"
+          SITE=$(ls /etc/nginx/sites-enabled/ 2>/dev/null | head -1)
+          echo "site: $SITE"
+          sudo cat "/etc/nginx/sites-enabled/$SITE" 2>&1 | head -80
+          echo "── nginx error log tail ──"
+          sudo tail -50 /var/log/nginx/error.log 2>&1
+          echo "── recent .bak files ──"
+          ls -lat /etc/nginx/sites-enabled/*.bak* /etc/nginx/sites-available/*.bak* 2>/dev/null | head -5
+
+      - name: Restore most recent .bak if nginx is broken
+        run: |
+          set +e
+          # If nginx -t fails OR external curl gets 000, restore last backup
+          sudo nginx -t 2>&1
+          if [ $? -ne 0 ]; then
+            echo "nginx config is broken — restoring last .bak"
+            SITE=$(readlink -f /etc/nginx/sites-enabled/* 2>/dev/null | head -1)
+            BAK=$(ls -t "${SITE}.bak."* 2>/dev/null | head -1)
+            if [ -n "$BAK" ]; then
+              echo "restoring $BAK → $SITE"
+              sudo cp "$BAK" "$SITE"
+              sudo nginx -t && sudo systemctl reload nginx
+            else
+              echo "no .bak found — cannot auto-restore"
+              exit 1
+            fi
+          fi
+          # Confirm external works
+          for i in 1 2 3 4 5; do
+            code=$(curl -sk -o /dev/null -w "%{http_code}" https://marketing-os.sowork.ai/health 2>/dev/null)
+            echo "try $i external: $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 2
+          done
+          echo "external still down"
+          exit 1
