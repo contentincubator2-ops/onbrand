@@ -85,8 +85,16 @@ async function ensureMission(args: {
     );
     const id = Number(r?.insertId ?? 0);
     return id || null;
-  } catch (e) {
-    console.warn("[recordTaskRun] ensureMission failed:", (e as Error).message);
+  } catch (e: any) {
+    console.error("[recordTaskRun] ensureMission FAILED", {
+      userId: args.userId,
+      brandId: args.brandId,
+      workspace: args.workspace,
+      taskId: args.taskId,
+      sqlCode: e?.code,
+      sqlMessage: e?.sqlMessage,
+      message: String(e?.message ?? e),
+    });
     return null;
   }
 }
@@ -119,19 +127,71 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
     const platform = args.platform ?? WORKSPACE_TO_PLATFORM[args.workspace] ?? "other";
     const outputType = args.outputType ?? "post";
     const title = args.title ?? args.taskLabel;
-    const metadata = JSON.stringify({
+
+    // 2026-05-14 (CJ「有些任務存到專案的時候，會無法顯示」):
+    // INSERT was failing silently for some runs and the catch below
+    // returned null missionId/outputId without logging WHY. Tighten:
+    //   · cap content + metadata to safe sizes (MEDIUMTEXT = 16MB, but
+    //     row-level packet limits + index keys can bite earlier).
+    //   · log the actual SQL error (code + sqlMessage) so we can see
+    //     which constraint is being violated.
+    const MAX_CONTENT = 2_000_000;  // 2MB — generous, well under MEDIUMTEXT
+    const MAX_METADATA = 200_000;   // 200KB — enough for variants array
+    let safeContent = args.content ?? "";
+    if (safeContent.length > MAX_CONTENT) {
+      console.warn(`[recordTaskRun] content ${safeContent.length} > ${MAX_CONTENT}, truncating`);
+      safeContent = safeContent.slice(0, MAX_CONTENT);
+    }
+    let metadata = JSON.stringify({
       ...(args.metadata ?? {}),
       taskId: args.taskId,
       tier: displayTier,
       thumbnailUrl: args.thumbnailUrl ?? null,
     });
+    if (metadata.length > MAX_METADATA) {
+      console.warn(`[recordTaskRun] metadata ${metadata.length} > ${MAX_METADATA}, stripping variants`);
+      // Drop the heaviest fields and re-serialize a minimal version
+      metadata = JSON.stringify({
+        taskId: args.taskId,
+        tier: displayTier,
+        thumbnailUrl: args.thumbnailUrl ?? null,
+        _truncated: true,
+        _originalSize: metadata.length,
+      });
+    }
 
-    const [oRes]: any = await localPool.execute(
-      `INSERT INTO mission_outputs
-         (missionId, platform, outputType, title, content, metadata, status, version, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, NOW(), NOW())`,
-      [missionId, platform, outputType, title.slice(0, 250), args.content, metadata, version],
-    );
+    let oRes: any;
+    try {
+      [oRes] = await localPool.execute(
+        `INSERT INTO mission_outputs
+           (missionId, platform, outputType, title, content, metadata, status, version, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, NOW(), NOW())`,
+        [missionId, platform, outputType, title.slice(0, 250), safeContent, metadata, version],
+      );
+    } catch (e: any) {
+      // Surface the real SQL error so we can diagnose. Common culprits:
+      //   ER_DATA_TOO_LONG, ER_TRUNCATED_WRONG_VALUE (enum mismatch),
+      //   ER_INCORRECT_STRING_VALUE (4-byte emoji into utf8 column),
+      //   ER_NET_PACKET_TOO_LARGE.
+      console.error("[recordTaskRun] INSERT mission_outputs FAILED", {
+        missionId,
+        platform,
+        outputType,
+        titleLen: (title ?? "").length,
+        contentLen: safeContent.length,
+        metadataLen: metadata.length,
+        sqlCode: e?.code,
+        sqlMessage: e?.sqlMessage,
+        errno: e?.errno,
+        sqlState: e?.sqlState,
+        message: String(e?.message ?? e),
+      });
+      // Don't return — fall through. outputId will be null, but the
+      // mission row exists and the LEFT JOIN in listAllForUser will
+      // still surface it as an orphan card so the user knows something
+      // happened.
+      return { missionId, outputId: null };
+    }
     const outputId = Number(oRes?.insertId ?? 0);
 
     // Touch mission's updatedAt so /projects sorts it to top
@@ -150,8 +210,18 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
     });
 
     return { missionId, outputId: outputId || null };
-  } catch (e) {
-    console.warn("[recordTaskRun] failed:", (e as Error).message);
+  } catch (e: any) {
+    console.error("[recordTaskRun] unexpected failure", {
+      userId: args.userId,
+      brandId: args.brandId,
+      workspace: args.workspace,
+      taskId: args.taskId,
+      tier: args.tier,
+      sqlCode: e?.code,
+      sqlMessage: e?.sqlMessage,
+      message: String(e?.message ?? e),
+      stack: (e as Error)?.stack,
+    });
     return { missionId: null, outputId: null };
   }
 }

@@ -35,25 +35,32 @@ export const missionRouter = router({
     .query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      // 2026-05-14 (CJ「每次跑任務都該是一張獨立卡」):
-      // Changed from one-row-per-mission to one-row-per-mission_output.
-      // Multiple runs of the same task = multiple cards, each pinned to
-      // the timestamp it was generated.
-      //   - card key `id`     = mission_output.id (UNIQUE per run)
-      //   - navigation field  = `missionId` (still points to the mission
-      //     detail page, which lists all runs in chronological order)
-      //   - sort by output.createdAt DESC so newest runs surface first
+      // 2026-05-14 (CJ「有些任務存到專案的時候，會無法顯示」):
+      //   Was INNER JOIN missions ON mo — meaning if mission_outputs INSERT
+      //   silently failed in recordTaskRun (e.g. emoji into utf8 column,
+      //   content > MEDIUMTEXT, enum mismatch), the mission row existed
+      //   but had no outputs → INNER JOIN dropped it → card vanished
+      //   entirely from /projects.
       //
-      // The previous design merged repeat runs into the latest version
-      // of one mission card — bad UX when user expects "I ran 3 times,
-      // I want to see 3 cards".
+      //   Changed to: select FROM missions m LEFT JOIN mission_outputs mo
+      //   on the *latest* output (or NULL if none). Orphan missions now
+      //   appear as cards with no version/platform/thumb — at least the
+      //   user sees the task exists, can click into the detail page, and
+      //   we can investigate. Latest-only sub-select keeps the
+      //   "one card per run" semantic for missions that DO have outputs.
+      //
+      // Earlier (2026-05-14) note: rack now shows one row per run, not
+      // per mission. We preserve that by joining each mission to its
+      // latest output via a correlated sub-select; multiple runs still
+      // show as multiple cards via the original FROM mo path. To keep
+      // the simpler "card per latest output OR per orphan mission":
       const rows = await db.execute(sql`
         SELECT mo.id AS id,
                m.id  AS missionId,
                m.title, m.description, m.workspace, m.methodology,
                m.squadSlug AS squadSlug, m.brandId AS brandId,
                m.status,
-               mo.createdAt AS updatedAt,
+               COALESCE(mo.createdAt, m.updatedAt) AS updatedAt,
                mo.title AS outputTitle,
                mo.version AS outputVersion,
                mo.platform AS outputPlatform,
@@ -69,13 +76,17 @@ export const missionRouter = router({
                s.mockup_images  AS squadMockupImages,
                CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')) AS UNSIGNED) AS scopeProductId,
                CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.eventId'))   AS UNSIGNED) AS scopeEventId
-          FROM mission_outputs mo
-          JOIN missions m ON m.id = mo.missionId
+          FROM missions m
+          LEFT JOIN mission_outputs mo ON mo.missionId = m.id
           LEFT JOIN brands b ON b.id = m.brandId
           LEFT JOIN squads s ON s.slug COLLATE utf8mb4_unicode_ci
                               = m.squadSlug COLLATE utf8mb4_unicode_ci
          WHERE m.userId = ${ctx.user.id}
-         ORDER BY mo.createdAt DESC, mo.id DESC
+           -- Show every output as its own card, OR show the mission
+           -- once if it has zero outputs (orphan recovery path).
+           AND (mo.id IS NOT NULL
+                OR NOT EXISTS (SELECT 1 FROM mission_outputs mo2 WHERE mo2.missionId = m.id))
+         ORDER BY COALESCE(mo.createdAt, m.updatedAt) DESC, mo.id DESC
          LIMIT 60
       `);
       // drizzle returns [rows, fields] for raw execute on mysql2

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { missionOutputs } from "../../drizzle/schema";
@@ -483,6 +484,33 @@ export const outputRouter = router({
       return { success: true, count: input.ids.length };
     }),
 
+
+  /**
+   * 2026-05-14 (CJ「專案名稱要可以編輯」): rename a single output card.
+   * Updates mission_outputs.title. Ownership enforced via the mission's
+   * userId. Title is capped at 120 chars; whitespace-only rejected.
+   */
+  updateTitle: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      title: z.string().trim().min(1).max(120),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      // Check ownership: the output's mission must belong to caller.
+      const [own]: any = await localPool.execute(
+        `SELECT mo.id FROM mission_outputs mo
+         JOIN missions m ON m.id = mo.missionId
+         WHERE mo.id = ? AND m.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      if (!(own as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Output not found" });
+      await localPool.execute(
+        `UPDATE mission_outputs SET title = ?, updatedAt = NOW() WHERE id = ?`,
+        [input.title, input.id],
+      );
+      return { ok: true, id: input.id, title: input.title };
+    }),
 
   finalize: protectedProcedure
     .input(z.object({
