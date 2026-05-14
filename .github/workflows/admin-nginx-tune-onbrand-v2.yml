@@ -1,0 +1,99 @@
+name: Admin — Tune nginx onbrand timeouts v2 (recover + targeted)
+# v1 broke the file on disk:
+#   - The marketing-os site config already had `proxy_http_version 1.1;`
+#     somewhere at server level, and v1 added another one inside location /
+#     → "duplicate" directive → nginx -t fail.
+#   - File on disk is broken; nginx is still running the old loaded config
+#     (no reload happened because nginx -t failed). Site is up FOR NOW.
+# This v2:
+#   1. Restore the most recent .bak (file goes back to a valid state)
+#   2. Re-patch only the timeout + body-size lines (not http_version /
+#      Connection — those already exist at server-level)
+#   3. Target /trpc/ AND /api/ AND / location blocks (theater LLM is /trpc/)
+#   4. nginx -t before reload; if fails, restore .bak again and exit non-zero
+on: { workflow_dispatch: {} }
+jobs:
+  retune:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Restore most recent .bak so we start from a valid state
+        run: |
+          set -e
+          SITE=/etc/nginx/sites-enabled/marketing-os
+          BAK=$(ls -t "${SITE}.bak."* 2>/dev/null | head -1)
+          if [ -z "$BAK" ]; then
+            echo "no .bak found! aborting"; exit 1
+          fi
+          echo "restoring $BAK → $SITE"
+          sudo cp "$BAK" "$SITE"
+          sudo nginx -t
+
+      - name: Inspect location blocks
+        run: |
+          set +e
+          SITE=/etc/nginx/sites-enabled/marketing-os
+          echo "── location blocks ──"
+          sudo grep -nE "location\s" "$SITE"
+          echo ""
+          echo "── existing proxy_* and body_size ──"
+          sudo grep -nE "proxy_(read|send|connect)_timeout|proxy_http_version|client_max_body_size" "$SITE"
+
+      - name: Patch timeouts into /trpc/, /api/, /  (skip /roster* and /assets/)
+        run: |
+          set -e
+          SITE=/etc/nginx/sites-enabled/marketing-os
+          sudo cp "$SITE" "${SITE}.bak.$(date +%s)"
+
+          # Targeted awk: strip existing timeout + body-size lines, then
+          # insert just timeouts (NOT http_version / Connection — those
+          # exist elsewhere) after each of the three node-app location
+          # blocks: /trpc/, /api/, /
+          # Skip /roster /roster-app /assets since those proxy elsewhere
+          # or serve static.
+          TMP=$(mktemp)
+          sudo awk '
+            BEGIN { in_target = 0 }
+            {
+              # Drop old timeouts/body-size lines globally (re-runs converge)
+              if ($0 ~ /proxy_(read|send|connect)_timeout/) next
+              if ($0 ~ /client_max_body_size/) next
+              print
+              # Detect entry into a target location block
+              if ($0 ~ /location[[:space:]]+(\/trpc\/|\/api\/|\/)[[:space:]]*\{/ &&
+                  $0 !~ /\/roster/ &&
+                  $0 !~ /\/assets/ &&
+                  $0 !~ /\/ws/) {
+                print "        proxy_connect_timeout 10s;"
+                print "        proxy_send_timeout    180s;"
+                print "        proxy_read_timeout    180s;"
+                print "        client_max_body_size  25m;"
+              }
+            }
+          ' "$SITE" > "$TMP"
+          sudo mv "$TMP" "$SITE"
+
+          echo "── new state ──"
+          sudo grep -nE "location\s|proxy_(read|send|connect)_timeout|client_max_body_size" "$SITE"
+
+          echo "── nginx -t ──"
+          if ! sudo nginx -t; then
+            echo "nginx -t failed; rolling back"
+            BAK=$(ls -t "${SITE}.bak."* 2>/dev/null | head -1)
+            sudo cp "$BAK" "$SITE"
+            sudo nginx -t
+            exit 1
+          fi
+          sudo systemctl reload nginx
+
+      - name: Smoke
+        run: |
+          set +e
+          for i in 1 2 3 4 5; do
+            code=$(curl -sk -o /dev/null -w "%{http_code}" https://onbrand.sowork.ai/health 2>/dev/null)
+            echo "try $i: $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 2
+          done
+          echo "health check did not return 200"
+          exit 1
