@@ -1,0 +1,59 @@
+name: Ops — Grandfather existing early-bird users at NT$900 (2026-05-14)
+
+# 2026-05-14 (CJ Solo pricing pivot):
+#   Solo early-bird US$30 → US$100. Standard US$50 → US$300.
+#   The 13 users who registered before today were promised the old
+#   NT$900 / US$30 永久保價. This workflow locks them at NT$900 via
+#   users.lockedPriceTwdMonthly so plan price changes don't reach them.
+#
+#   getEffectivePrice() prefers lockedPriceTwdMonthly over earlyBird.
+#   For TWD billing users this returns NT$900 directly.
+#   For USD billing users this returns lockedTWD / fxRate = ~US$30.
+#
+# Run ONCE. Idempotent (WHERE lockedPriceTwdMonthly IS NULL).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  grandfather:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
+
+          echo "════ Cohort BEFORE grandfather ════"
+          $MYSQL -e "
+            SELECT id, email, planCode, earlyBird, lockedPriceTwdMonthly, billingCountry
+              FROM users
+             WHERE earlyBird = 1
+             ORDER BY id;
+          "
+
+          echo ""
+          echo "════ Applying UPDATE ════"
+          $MYSQL -e "
+            UPDATE users
+               SET lockedPriceTwdMonthly = 900
+             WHERE earlyBird = 1
+               AND lockedPriceTwdMonthly IS NULL;
+          "
+
+          echo ""
+          echo "════ AFTER ════"
+          $MYSQL -e "
+            SELECT
+              earlyBird,
+              COUNT(*) AS users,
+              SUM(CASE WHEN lockedPriceTwdMonthly IS NOT NULL THEN 1 ELSE 0 END) AS locked
+            FROM users
+            GROUP BY earlyBird;
+          "
+
+          echo ""
+          echo "✅ Existing early-bird users locked at NT\$900. New signups see new US\$100/\$300."

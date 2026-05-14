@@ -27,14 +27,14 @@ import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faHouse, faFolderOpen, faTableCells, faUserGroup, faWandMagicSparkles, faRocket,
+  faHouse, faFolderOpen, faUserGroup, faWandMagicSparkles, faRocket,
   faMicrophone, faBookBookmark, faEllipsis, faBell, faChessKnight,
   faPlus, faRightFromBracket,
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
   faCircleHalfStroke, faCircleInfo, faBorderAll, faDisplay, faBriefcase,
   faShareNodes, faTrophy, faUsers, faLanguage,
-  faStar, faImage, faUser, faPaintBrush, faFont, faMagnifyingGlass,
+  faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
 } from "@fortawesome/free-solid-svg-icons";
 

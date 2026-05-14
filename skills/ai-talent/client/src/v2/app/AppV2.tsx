@@ -36,7 +36,6 @@ import ShellLayout from "./shell/ShellLayout";
 import MissionRedirect from "./MissionRedirect";
 import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
-import QuickTasksPage from "../pages/QuickTasksPage";
 import QuickTask30sPage from "../pages/QuickTask30sPage";
 import RunPage from "../pages/RunPage";
 import StrategyConsultantPage from "../pages/StrategyConsultantPage";
@@ -231,7 +230,6 @@ export default function AppV2() {
           <Route path="/90s"  element={<Navigate to="/99s" replace />} />
           <Route path="/quicktask" element={<Navigate to="/30s" replace />} />
           <Route path="/fb" element={<Navigate to="/30s" replace />} />
-          <Route path="/quicktask-legacy" element={<QuickTasksPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           {/* 2026-05-11 (CJ): /brands is now the manager dashboard.
               Old single-brand editor moved to /brands/edit?b=:id */}
