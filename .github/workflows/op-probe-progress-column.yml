@@ -1,0 +1,30 @@
+name: Ops — Verify mission_outputs.progress column exists
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B"
+
+          echo "── columns we care about ──"
+          $MYSQL -e "
+            SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_DEFAULT, IS_NULLABLE
+              FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'mission_outputs'
+               AND COLUMN_NAME IN ('progress','progressDetail','content','title','metadata')
+             ORDER BY COLUMN_NAME;
+          "
+
+          echo ""
+          echo "── progress distribution ──"
+          $MYSQL -e "SELECT progress, COUNT(*) AS n FROM mission_outputs GROUP BY progress;" || echo "(column may not exist yet)"
