@@ -6,16 +6,16 @@ const mysql = require('mysql2/promise');
 const https = require('https');
 
 const DB_CONFIG = {
-  host: 'ytcreator-ai-server.mysql.database.azure.com',
+  host: process.env.DB_HOST,
   port: 3306,
-  user: 'openclaw',
-  password: 'u40d6d070db7e92982940a62ee40c4261',
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
   database: 'sowork_db',
   ssl: { rejectUnauthorized: false },
 };
 
 const AZURE_ENDPOINT = 'https://sowork-foundry-claw-api-router.openai.azure.com';
-const AZURE_KEY = 'FQV8iUhxE67wByWpUfVCgBLmDW338pQecBNYFRg7Xkz400MgUb8nJQQJ99CCACYeBjFXJ3w3AAAAACOGuzAa';
+const AZURE_KEY = process.env.AZURE_FOUNDRY_API_KEY;
 const DEPLOYMENT = 'text-embedding-3-large';
 const BATCH_SIZE = 20;
 const DELAY_MS = 500; // rate limit buffer
