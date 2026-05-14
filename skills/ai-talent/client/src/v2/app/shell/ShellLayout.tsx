@@ -21,6 +21,7 @@ import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher"
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
 import FestivalGlobalNudge from "../../components/FestivalGlobalNudge";
 import SupportDrawer from "../../components/SupportDrawer";
+import OnBrandLogo from "../../components/OnBrandLogo";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
@@ -133,22 +134,7 @@ export default function ShellLayout() {
       return next;
     });
   };
-  // 2026-05-14 (CJ「視覺引導 / 缺乏 hover 提示」): keyboard shortcut.
-  // Press '[' to toggle the sidebar — discoverable via the tooltip.
-  // Skip when user is typing in an input / textarea / contenteditable.
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "[" && e.key !== "]") return;
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      const tag = t.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable) return;
-      e.preventDefault();
-      toggleCollapsed();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // 2026-05-14: '[' shortcut removed — sidebar is permanent.
 
   const handleLogout = async () => {
     try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
@@ -165,8 +151,13 @@ export default function ShellLayout() {
     { refetchOnWindowFocus: false, refetchInterval: 60_000 },
   );
   const notifUnread: number = notifCountQ?.data?.unreadCount ?? 0;
-  // Content area always offset by ICON_W; panel slides on top without pushing content
-  const contentLeft = collapsed ? ICON_W : ICON_W + PANEL_W;
+  // 2026-05-14 (CJ「歷史任務當 tile 更一致」): collapsed the entire
+  // expand-panel concept. Shell is now just the 70px icon bar; recent
+  // runs / projects-filters / calendar-tools live as in-page tiles
+  // (RecentRunsTile etc.) inside their respective pages. Eliminates
+  // sidebar-open/closed visual jumps and the per-route panel-content
+  // routing logic that was building up.
+  const contentLeft = ICON_W;
 
   return (
     <div className="min-h-screen" style={{ background: "rgb(252,251,254)" }}>
@@ -186,21 +177,12 @@ export default function ShellLayout() {
         brands={brands}
       />
 
-      {/* Layer 2: Slide panel — 210px, left:70px, slides in/out */}
-      <SlidePanel
-        open={!collapsed}
-        onClose={toggleCollapsed}
-        brands={brands}
-        brandId={brandId}
-        setBrandId={setBrandId}
-        scope={scope}
-        setScope={setScope}
-        onNavigate={(to) => navigate(to)}
-        currentPath={loc.pathname}
-      />
-
-      {/* Backdrop for slide panel */}
-      {!collapsed && (
+      {/* 2026-05-14: SlidePanel removed. Content lives as in-page tiles
+          (RecentRunsTile etc) rather than off-canvas. SlidePanel + its
+          PanelRow / NavItemRow helpers retained below for future re-use
+          but not mounted. */}
+      {/* Backdrop kept disabled — collapsed is now permanent */}
+      {false && !collapsed && (
         <div
           onClick={toggleCollapsed}
           style={{ position: "fixed", inset: 0, zIndex: 28, background: "rgba(0,0,0,0.06)" }}
@@ -380,89 +362,27 @@ function IconBar({
         overflow: "visible",   /* let edge chevron poke out */
       }}
     >
-      {/* 2026-05-14 (CJ「切換側邊欄按鈕太隱匿」+「缺乏視覺引導 < 箭頭」):
-          edge-chevron affordance. When collapsed, hovering the right edge
-          of the icon bar reveals a small ◗ chevron + 8px-wide hot zone
-          inviting click to expand. On the iconbar's right edge, fully
-          out-of-flow so it doesn't shift content. */}
-      {collapsed && (
-        <button
-          onClick={onToggle}
-          aria-label={isEn ? "Expand sidebar" : "展開側邊欄"}
-          title={isEn ? "Expand sidebar (or press [)" : "展開側邊欄（或按 [ 鍵）"}
-          className="sowork-edge-chevron"
-          style={{
-            position: "absolute",
-            top: "50%", right: -12,
-            transform: "translateY(-50%)",
-            width: 22, height: 56, borderRadius: "0 10px 10px 0",
-            border: "1px solid #E5E5E5", borderLeft: "none",
-            background: "white",
-            display: "flex", alignItems: "center", justifyContent: "flex-end",
-            paddingRight: 4,
-            fontSize: 14, color: "#7C3AED", fontWeight: 700,
-            cursor: "pointer", zIndex: 41,
-            boxShadow: "2px 0 8px rgba(124,58,237,0.10)",
-            opacity: 0,
-            transition: "opacity 0.2s ease, transform 0.2s ease",
-            transformOrigin: "left center",
-          }}
-        >›</button>
-      )}
-      <style>{`
-        .sowork-icon-bar:hover .sowork-edge-chevron {
-          opacity: 1;
-        }
-        .sowork-edge-chevron:hover {
-          background: #F5F3FF !important;
-          transform: translateY(-50%) translateX(2px) !important;
-        }
-        @keyframes ssidebarPulse {
-          0%, 100% { box-shadow: 2px 0 8px rgba(124,58,237,0.10); }
-          50%      { box-shadow: 2px 0 14px rgba(124,58,237,0.30); }
-        }
-      `}</style>
-      {/* Top spacer for floating BrandHierarchyPill (44px pill + 10px top + 10px gap) */}
-      <div style={{ height: 64, flexShrink: 0 }} />
-
-      {/* 2026-05-14 (CJ「切換側邊欄按鈕太隱匿」): bigger, clearer toggle.
-          - 44x44 instead of 36x36 (touch target)
-          - Default state has subtle border so it doesn't disappear
-          - Chevron icon (← collapse / → expand) is semantic, not the
-            ambiguous ⊟ table-columns glyph
-          - On hover: turn brand purple so user knows it's interactive
-          - First-visit attention pulse (3 cycles) to draw the eye */}
-      <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
-        <Tooltip content={collapsed ? (isEn ? "Expand sidebar (or press [)" : "展開側邊欄（或按 [ 鍵）") : (isEn ? "Collapse sidebar" : "收合側邊欄")} placement="right">
-          <button
-            onClick={onToggle}
-            aria-label={isEn ? "Toggle sidebar" : "切換側邊欄"}
-            className="sidebar-toggle-btn"
-            style={{
-              width: 44, height: 36, borderRadius: 10,
-              border: "1px solid #E5E5E5", background: "white",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-              fontSize: 12, color: "#525252", cursor: "pointer",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-              transition: "all 0.15s",
-              position: "relative",
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = "#F5F3FF";
-              e.currentTarget.style.borderColor = "#C4B5FD";
-              e.currentTarget.style.color = "#7C3AED";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = "white";
-              e.currentTarget.style.borderColor = "#E5E5E5";
-              e.currentTarget.style.color = "#525252";
-            }}
-          >
-            <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1 }}>{collapsed ? "›" : "‹"}</span>
-            <FontAwesomeIcon icon={faTableColumns} style={{ fontSize: 11 }} />
-          </button>
+      {/* 2026-05-14: edge chevron removed — no expand panel anymore. */}
+      {/* 2026-05-14 (CJ「最左上方要有 LOGO，回到首頁的概念」):
+          glyph-only logo at the top of the icon bar. Click → '/'.
+          The full wordmark with 'OnBrand AI / by SoWork' subtitle is on
+          /pricing, login, etc. (where there's horizontal room). */}
+      <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Tooltip content={isEn ? "OnBrand AI · home" : "OnBrand AI · 回首頁"} placement="right">
+          <span>
+            <OnBrandLogo
+              glyphOnly
+              size={32}
+              onClick={() => onNavigate("/")}
+              style={{ padding: 4, borderRadius: 8 }}
+            />
+          </span>
         </Tooltip>
       </div>
+
+      {/* 2026-05-14: toggle button removed — sidebar is always fixed at
+          70px now. Tier history, project filters etc. moved into
+          in-page tiles (RecentRunsTile). */}
 
       {/* Brand pill moved out of IconBar — now floats top-left of viewport
           as horizontal hierarchy bar (BrandHierarchyPill in main layout) */}

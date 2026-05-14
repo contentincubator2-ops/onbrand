@@ -17,6 +17,7 @@ import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
+import RecentRunsTile from "../components/RecentRunsTile";
 import {
   Avatar, Badge, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Progress, Skeleton, Spinner,
@@ -1289,6 +1290,13 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           )}
         </ModalContent>
       </Modal>
+
+      {/* 2026-05-14 (CJ「歷史任務當成一個 tile，更有一致性」):
+          recent runs of this tier × current brand. Lives in-page now
+          instead of in the shell sidebar. */}
+      <div style={{ maxWidth: 1100, margin: "32px auto 0", padding: "0 24px" }}>
+        <RecentRunsTile tier={tier} brandId={brandId ?? undefined} limit={8} />
+      </div>
     </div>
   );
 }
