@@ -1,0 +1,57 @@
+name: Admin — Replay failed task runs from DLQ
+# Reads /home/azureuser/.pm2/logs/task-runs-failed.jsonl and re-runs each
+# recordTaskRun. Successful replays are removed; persistent failures stay
+# in the file for the next attempt. Idempotent — safe to run repeatedly.
+on: { workflow_dispatch: {} }
+jobs:
+  replay:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Inspect DLQ
+        run: |
+          set +e
+          DLQ=/home/azureuser/.pm2/logs/task-runs-failed.jsonl
+          if [ ! -f "$DLQ" ]; then
+            echo "DLQ empty (no file)"; exit 0
+          fi
+          echo "── line count ──"
+          wc -l "$DLQ"
+          echo "── last 5 lines ──"
+          tail -5 "$DLQ"
+          echo "── reason histogram ──"
+          jq -r '.reason' "$DLQ" 2>/dev/null | sort | uniq -c | sort -rn
+
+      - name: Replay via Node one-shot
+        run: |
+          set -e
+          DLQ=/home/azureuser/.pm2/logs/task-runs-failed.jsonl
+          [ -f "$DLQ" ] || { echo "nothing to replay"; exit 0; }
+          cd /opt/onbrand/app/skills/ai-talent
+          # Move current DLQ aside so new failures don't race the replay
+          STAMP=$(date +%s)
+          IN="${DLQ}.replaying.${STAMP}"
+          OUT="${DLQ}.failed.${STAMP}"
+          mv "$DLQ" "$IN"
+          node --import tsx -e "
+            const fs = require('node:fs');
+            const { recordTaskRun } = await import('./server/_core/recordTaskRun.ts');
+            const lines = fs.readFileSync('${IN}', 'utf-8').split('\n').filter(Boolean);
+            console.log('replaying', lines.length, 'lines');
+            let ok = 0, fail = 0;
+            const remain = [];
+            for (const ln of lines) {
+              try {
+                const rec = JSON.parse(ln);
+                const r = await recordTaskRun(rec.args);
+                if (r.outputId) { ok++; }
+                else { fail++; remain.push(ln); }
+              } catch (e) {
+                fail++; remain.push(ln);
+              }
+            }
+            console.log('replay done — ok=' + ok + ' fail=' + fail);
+            if (remain.length) fs.writeFileSync('${OUT}', remain.join('\n') + '\n');
+          " || true
+          echo "── result ──"
+          ls -la /home/azureuser/.pm2/logs/task-runs-failed* 2>/dev/null || echo "all replayed cleanly"

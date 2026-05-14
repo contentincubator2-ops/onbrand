@@ -15,6 +15,66 @@
  * user even if persistence fails.
  */
 import localPool from "../localDb";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+/**
+ * 2026-05-14 (CJ「我要確保任務會被移到任務卡片，不光是要記錄錯誤」):
+ * Disaster-recovery sink for task runs whose INSERT into mission_outputs
+ * failed even after sanitization + minimal-fallback. The args object is
+ * appended as a single JSON line so an admin job can replay later via
+ * the admin-replay-failed-task-runs.yml workflow.
+ */
+function appendDLQ(args: RecordArgs, missionId: number | null, reason: string, sqlCode?: string): void {
+  try {
+    // Default to user-writable PM2 logs dir on the VM (~/.pm2/logs/),
+    // not /var/log which requires root. Override via TASK_DLQ_DIR if
+    // you want a system path with appropriate permissions.
+    const dir = process.env.TASK_DLQ_DIR
+      ?? `${process.env.HOME ?? "/home/azureuser"}/.pm2/logs`;
+    try { fs.mkdirSync(dir, { recursive: true }); } catch {/* may already exist */}
+    const file = path.join(dir, "task-runs-failed.jsonl");
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      reason,
+      sqlCode: sqlCode ?? null,
+      missionId,
+      args: {
+        userId: args.userId,
+        brandId: args.brandId,
+        workspace: args.workspace,
+        taskId: args.taskId,
+        taskLabel: args.taskLabel,
+        tier: args.tier,
+        title: args.title,
+        // Cap content for the DLQ too; full payload may be huge
+        content: (args.content ?? "").slice(0, 100_000),
+        metadata: args.metadata,
+        thumbnailUrl: args.thumbnailUrl,
+        platform: args.platform,
+        outputType: args.outputType,
+      },
+    }) + "\n";
+    fs.appendFileSync(file, line, "utf-8");
+  } catch (e) {
+    // If even the DLQ write fails, nothing we can do beyond log.
+    console.error("[recordTaskRun] DLQ append failed:", (e as Error).message);
+  }
+}
+
+/**
+ * Strip characters that can't fit in a 3-byte utf8 column (i.e. surrogate
+ * pairs / emoji / supplementary plane). Replaces them with a Unicode
+ * replacement glyph so the user can still see something happened. Used
+ * as a second-pass fallback when the original INSERT trips
+ * ER_INCORRECT_STRING_VALUE.
+ */
+function stripNonBMP(s: string): string {
+  if (!s) return s;
+  // \u{D800}-\u{DFFF} are surrogate halves; any code point >= 0x10000
+  // is represented by a surrogate pair in JS strings.
+  return s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "□");
+}
 
 type Platform = "facebook" | "instagram" | "linkedin" | "youtube" | "google_ads" | "email" | "ppt" | "doc" | "script" | "other";
 type OutputType = "post" | "story" | "reel" | "ad_copy" | "email_html" | "slide" | "script" | "product_desc" | "report" | "other";
@@ -115,7 +175,13 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
       taskLabel: args.taskLabel,
       tier: displayTier as any,
     });
-    if (!missionId) return { missionId: null, outputId: null };
+    if (!missionId) {
+      // ensureMission failed (already logged inside). Last resort: DLQ
+      // so the data isn't lost when admin fixes whatever schema/auth
+      // problem is blocking the missions INSERT.
+      appendDLQ(args, null, "ensure_mission_failed");
+      return { missionId: null, outputId: null };
+    }
 
     // Bump version: count existing outputs for this mission
     const [vRows]: any = await localPool.execute(
@@ -160,36 +226,80 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
       });
     }
 
-    let oRes: any;
-    try {
-      [oRes] = await localPool.execute(
-        `INSERT INTO mission_outputs
-           (missionId, platform, outputType, title, content, metadata, status, version, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, NOW(), NOW())`,
-        [missionId, platform, outputType, title.slice(0, 250), safeContent, metadata, version],
-      );
-    } catch (e: any) {
-      // Surface the real SQL error so we can diagnose. Common culprits:
-      //   ER_DATA_TOO_LONG, ER_TRUNCATED_WRONG_VALUE (enum mismatch),
-      //   ER_INCORRECT_STRING_VALUE (4-byte emoji into utf8 column),
-      //   ER_NET_PACKET_TOO_LARGE.
-      console.error("[recordTaskRun] INSERT mission_outputs FAILED", {
-        missionId,
-        platform,
-        outputType,
-        titleLen: (title ?? "").length,
-        contentLen: safeContent.length,
-        metadataLen: metadata.length,
-        sqlCode: e?.code,
-        sqlMessage: e?.sqlMessage,
-        errno: e?.errno,
-        sqlState: e?.sqlState,
-        message: String(e?.message ?? e),
-      });
-      // Don't return — fall through. outputId will be null, but the
-      // mission row exists and the LEFT JOIN in listAllForUser will
-      // still surface it as an orphan card so the user knows something
-      // happened.
+    // 3-tier defensive INSERT: try the normal payload, then a sanitized
+    // version (BMP-only chars, fallback enums), then a minimal placeholder.
+    // Whichever tier succeeds, the user gets a card; only the rare case
+    // where ALL three fail falls into the JSONL DLQ for offline replay.
+    const SAFE_PLATFORMS = new Set(["facebook","instagram","linkedin","youtube","google_ads","email","ppt","doc","script","other"]);
+    const SAFE_OUTPUT_TYPES = new Set(["post","story","reel","ad_copy","email_html","slide","script","product_desc","report","other"]);
+    const safePlatform = SAFE_PLATFORMS.has(platform) ? platform : "other";
+    const safeOutputType = SAFE_OUTPUT_TYPES.has(outputType) ? outputType : "other";
+
+    type InsertAttempt = { tier: string; title: string; content: string; metadata: string; platform: string; outputType: string };
+    const attempts: InsertAttempt[] = [
+      // Tier 1: as-given (already size-capped above)
+      { tier: "normal", title: title.slice(0, 250), content: safeContent, metadata, platform: safePlatform, outputType: safeOutputType },
+      // Tier 2: strip non-BMP chars (the most common silent killer:
+      // ER_INCORRECT_STRING_VALUE when emoji or 4-byte CJK lands in
+      // a utf8 — not utf8mb4 — column)
+      { tier: "stripped", title: stripNonBMP(title).slice(0, 250), content: stripNonBMP(safeContent), metadata: stripNonBMP(metadata), platform: safePlatform, outputType: safeOutputType },
+      // Tier 3: bare minimum placeholder — guaranteed to fit. User at
+      // least gets a card; can click into detail and see the placeholder.
+      {
+        tier: "minimal",
+        title: (stripNonBMP(title).slice(0, 100) || args.taskLabel.slice(0, 100) || "未命名任務"),
+        content: "（內容過大或包含資料庫不支援的字元，已暫存為佔位卡片。請從詳情頁查看完整紀錄。）",
+        metadata: JSON.stringify({ taskId: args.taskId, tier: displayTier, _recovered: true }),
+        platform: "other",
+        outputType: "other",
+      },
+    ];
+
+    let oRes: any = null;
+    let lastError: any = null;
+    let succeededTier: string | null = null;
+    for (const a of attempts) {
+      try {
+        [oRes] = await localPool.execute(
+          `INSERT INTO mission_outputs
+             (missionId, platform, outputType, title, content, metadata, status, version, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, NOW(), NOW())`,
+          [missionId, a.platform, a.outputType, a.title, a.content, a.metadata, version],
+        );
+        succeededTier = a.tier;
+        if (a.tier !== "normal") {
+          console.warn(`[recordTaskRun] INSERT recovered at tier=${a.tier}`, {
+            missionId,
+            originalSqlCode: lastError?.code,
+            originalSqlMessage: lastError?.sqlMessage,
+          });
+        }
+        break;
+      } catch (e: any) {
+        lastError = e;
+        console.error(`[recordTaskRun] INSERT tier=${a.tier} FAILED`, {
+          missionId,
+          platform: a.platform,
+          outputType: a.outputType,
+          titleLen: a.title.length,
+          contentLen: a.content.length,
+          metadataLen: a.metadata.length,
+          sqlCode: e?.code,
+          sqlMessage: e?.sqlMessage,
+          errno: e?.errno,
+          sqlState: e?.sqlState,
+        });
+      }
+    }
+
+    if (!oRes) {
+      // All three tiers failed — extraordinarily unlikely (would mean DB
+      // is down or mission_outputs schema is fundamentally broken).
+      // Persist to the DLQ so the run isn't lost forever and an admin
+      // can replay once the underlying issue is fixed.
+      appendDLQ(args, missionId, "all_tiers_failed", lastError?.code);
+      // The mission row still exists; LEFT JOIN in listAllForUser will
+      // surface it as an orphan card so the user knows the task ran.
       return { missionId, outputId: null };
     }
     const outputId = Number(oRes?.insertId ?? 0);
@@ -222,6 +332,7 @@ export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: numb
       message: String(e?.message ?? e),
       stack: (e as Error)?.stack,
     });
+    appendDLQ(args, null, "unexpected_exception", e?.code);
     return { missionId: null, outputId: null };
   }
 }

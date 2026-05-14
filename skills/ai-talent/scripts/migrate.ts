@@ -2009,6 +2009,25 @@ async function main() {
     await ensureCol("brands", "fbConnectedAt", "DATETIME(3) NULL");
     console.log("[migrate] brands FB binding columns: OK");
 
+    // ─── 2026-05-14 (CJ「我要確保任務會被移到任務卡片」): mission_outputs utf8mb4 ───
+    // The original mission_outputs.content + title + metadata columns may
+    // have been created as utf8 (3-byte). 4-byte chars (emoji, some CJK
+    // supplementary plane glyphs) trip ER_INCORRECT_STRING_VALUE → INSERT
+    // fails → task vanishes from /projects. Force the whole table to
+    // utf8mb4 so that's no longer a failure mode.
+    try {
+      await conn.query(`ALTER TABLE mission_outputs CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      console.log("[migrate] mission_outputs → utf8mb4: OK");
+    } catch (e: any) {
+      console.warn("[migrate] mission_outputs CONVERT TO utf8mb4 skipped:", e?.message ?? e);
+    }
+    try {
+      await conn.query(`ALTER TABLE missions CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      console.log("[migrate] missions → utf8mb4: OK");
+    } catch (e: any) {
+      console.warn("[migrate] missions CONVERT TO utf8mb4 skipped:", e?.message ?? e);
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
