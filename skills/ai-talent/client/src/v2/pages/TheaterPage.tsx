@@ -994,8 +994,8 @@ export default function TheaterPage() {
         }
 
         try {
-          const r = await withTimeout(
-            generateCellMut.mutateAsync({
+          const r = await callWithRetry(
+            () => generateCellMut.mutateAsync({
               brandId,
               platform: task.platform,
               date: task.date,
@@ -1018,8 +1018,7 @@ export default function TheaterPage() {
               // 2026-05-12: anti-repetition (server forbids these openings)
               priorOpenings: priorOpenings.length > 0 ? priorOpenings : undefined,
             }),
-            90_000,
-            `generateCell ${task.key}`,
+            { label: `generateCell ${task.key}`, timeoutMs: 90_000 },
           );
           if (stopRef.current) return;
           if (r.ok && r.caption) {
@@ -1031,16 +1030,15 @@ export default function TheaterPage() {
             if (stopRef.current) return;
             updateCell(task.key, { status: "qa", caption: r.caption, structured });
             try {
-              const qa = await withTimeout(
-                qaReviewMut.mutateAsync({
+              const qa = await callWithRetry(
+                () => qaReviewMut.mutateAsync({
                   draft: r.caption,
                   platform: task.platform,
                   hook: task.hook as any,
                   cta:  task.cta  as any,
                   usp:  task.usp,
                 }),
-                45_000,
-                `qaReview ${task.key}`,
+                { label: `qaReview ${task.key}`, timeoutMs: 45_000, maxAttempts: 2 },
               );
               if (stopRef.current) return;
               if (qa.ok && qa.caption) {
@@ -1079,15 +1077,14 @@ export default function TheaterPage() {
           continue;
         }
         try {
-          const r = await withTimeout(
-            generateImageMut.mutateAsync({
+          const r = await callWithRetry(
+            () => generateImageMut.mutateAsync({
               brandId,
               platform: task.platform,
               caption: captionFromState,
               brandTagline: plan.brandTagline,
             }),
-            120_000,
-            `generateImage ${task.key}`,
+            { label: `generateImage ${task.key}`, timeoutMs: 120_000 },
           );
           if (stopRef.current) return;
           if (r.ok && r.imageUrl) {
@@ -1845,4 +1842,45 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
       setTimeout(() => reject(new Error(`[theater] ${label} timeout after ${ms}ms`)), ms),
     ),
   ]);
+}
+
+/**
+ * 2026-05-14: retry transient gateway errors. With ~100 concurrent users
+ * each running 7d × 3 platforms = 21 cells, nginx upstream gets brief 502/504
+ * bursts. One retry after exponential backoff typically clears the spike.
+ * Non-transient errors (400/401/403/422 etc.) bubble immediately — no retry.
+ */
+function isTransientError(e: unknown): boolean {
+  const msg = (e as Error)?.message ?? "";
+  // tRPC formats it like "伺服器忙碌（502）" or includes "TRPCClientError"
+  return (
+    /\b50[234]\b/.test(msg) ||         // 502, 503, 504
+    /忙碌/.test(msg) ||                  // 「伺服器忙碌」
+    /timeout/i.test(msg) ||
+    /network/i.test(msg) ||
+    /fetch failed/i.test(msg) ||
+    /ECONNRESET|ETIMEDOUT|EAI_AGAIN/.test(msg)
+  );
+}
+
+async function callWithRetry<T>(
+  fn: () => Promise<T>,
+  opts: { label: string; timeoutMs: number; maxAttempts?: number },
+): Promise<T> {
+  const max = opts.maxAttempts ?? 3;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= max; attempt++) {
+    try {
+      return await withTimeout(fn(), opts.timeoutMs, opts.label);
+    } catch (e) {
+      lastErr = e;
+      if (attempt === max || !isTransientError(e)) throw e;
+      // Backoff: 1.5s, 4s, 8s (with ±30% jitter to de-sync clients)
+      const base = attempt === 1 ? 1500 : attempt === 2 ? 4000 : 8000;
+      const jitter = base * (0.7 + Math.random() * 0.6);
+      console.warn(`[theater] ${opts.label} attempt ${attempt}/${max} failed (${(e as Error).message}); retrying in ${Math.round(jitter)}ms`);
+      await sleep(jitter);
+    }
+  }
+  throw lastErr;
 }
