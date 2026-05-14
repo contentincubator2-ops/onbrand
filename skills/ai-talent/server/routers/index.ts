@@ -1,52 +1,24 @@
 import { router } from "../_core/trpc";
-import { marketRouter } from "./marketRouter";
 import { brandRouter } from "./brandRouter";
 import { creditsRouter } from "./creditsRouter";
 import { notificationRouter } from "./notificationRouter";
 import { supportRouter } from "./supportRouter";
-import { taskRouter } from "./taskRouter";
-import { a2aRouter } from "./a2aRouter";
-import { conversationRouter } from "./conversationRouter";
 import { videoRouter } from "./videoRouter";
 import { agentRouter } from "./agentRouter";
-import { campaignRouter } from "./campaignRouter";
 import { missionRouter } from "./missionRouter";
-import { workspaceRouter } from "./workspaceRouter";
-import { companyRouter } from "./companyRouter";
-import { sopRouter } from "./sopRouter";
 import { outputRouter } from "./outputRouter";
-import { knowledgeRouter } from "./knowledgeRouter";
-import { resourceRouter } from "./resourceRouter";
-import { reviewRouter } from "./reviewRouter";
-import { messageRouter } from "./messageRouter";
 import { squadTemplateRouter } from "./squadTemplateRouter";
-import { reportRouter } from "./reportRouter";
 import { brandBrainRouter } from "./brandBrainRouter";
-import { strategyDeckRouter } from "./strategyDeckRouter";
-import { brandIntelRouter } from "./brandIntelRouter";
-import { toolCredRouter } from "./toolCredRouter";
-import { decisionRouter } from "./decisionRouter";
-import { triageRouter } from "./triageRouter";
-import { auditRouter } from "./auditRouter";
-import { templateRouter } from "./templateRouter";
-import { boardRouter } from "./boardRouter";
 import { calendarRouter } from "./calendarRouter";
 import { imageRouter } from "./imageRouter";
-import { methodologyRouter } from "./methodologyRouter";
 import { projectSyncRouter } from "./projectSyncRouter";
 import { quickTaskRouter } from "./quickTaskRouter";
-import { boardroomRouter } from "./boardroomRouter";
-import { mediaHubRouter } from "./mediaHubRouter";
-import { playbookRouter } from "./playbookRouter";
 import { entityRouter } from "./entityRouter";
 import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
 import { pipelineRouter } from "./pipelineRouter";
 import { mediaRouter } from "./mediaRouter";
 import { taskCatalogRouter } from "./taskCatalogRouter";
-import { positioningRouter } from "./positioningRouter";
 import { platformConnectRouter } from "./platformConnectRouter";
-import { feedbackRouter } from "./feedbackRouter";
-import { squadLeadRouter } from "./squadLeadRouter";
 import { theaterRouter } from "./theaterRouter";
 import { positioningJobsRouter } from "./positioningJobsRouter";
 import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
@@ -67,46 +39,31 @@ import { promptTemplateRouter } from "./promptTemplateRouter";
 // 2026-05-12 (CJ「策略顧問 — 5 scenario cards + McKinsey reports + Q&A + 比稿」)
 import { strategyConsultantRouter } from "./strategyConsultantRouter";
 
+// 2026-05-14: removed 28 dead routers — none of them had any v2 callers
+// after the v1 frontend deletion. See git history (commit before this)
+// for the full list. The retired routers were: workflow, market, task,
+// a2a, conversation, campaign, workspace, company, sop, knowledge,
+// review, message, resource, report, strategyDeck, brandIntel, toolCred,
+// decision, triage, audit, template, board, methodology, boardroom,
+// mediaHub, playbook, positioning, feedback, squadLead. Together with
+// their two helper files (_core/auditAgent.ts + _core/scouts/credTesters.ts)
+// this is ~7,000 LOC of dead server code removed.
+
 export const appRouter = router({
-  market:        marketRouter,
   brand:         brandRouter,
   credits:       creditsRouter,
   notifications: notificationRouter,
   support:       supportRouter,
-  task:          taskRouter,
-  a2a:           a2aRouter,
-  conversation:  conversationRouter,
   video:         videoRouter,
   agent:         agentRouter,
   mission:       missionRouter,
-  campaign:      campaignRouter,
-  workspace:     workspaceRouter,
-  company:       companyRouter,
-  sop:           sopRouter,
   output:        outputRouter,
-  knowledge:     knowledgeRouter,
-  review:        reviewRouter,
-  message:       messageRouter,
-  resource:      resourceRouter,
-  squad:         squadTemplateRouter,  // TRPC key kept as "squad" for backward compatibility (frontend uses trpc.squad.*)
-  report:        reportRouter,
+  squad:         squadTemplateRouter,
   brandBrain:    brandBrainRouter,
-  strategyDeck:  strategyDeckRouter,
-  brandIntel:    brandIntelRouter,
-  toolCred:      toolCredRouter,
-  decision:      decisionRouter,
-  triage:        triageRouter,
-  audit:         auditRouter,
-  template:      templateRouter,
-  board:         boardRouter,
   calendar:      calendarRouter,
   image:         imageRouter,
-  methodology:   methodologyRouter,
   projectSync:   projectSyncRouter,
   quickTask:     quickTaskRouter,
-  boardroom:     boardroomRouter,
-  mediaHub:      mediaHubRouter,
-  playbook:      playbookRouter,
   entity:        entityRouter,
   product:       productRouter,
   event:         eventRouter,
@@ -114,10 +71,7 @@ export const appRouter = router({
   pipeline:      pipelineRouter,
   media:         mediaRouter,
   taskCatalog:   taskCatalogRouter,
-  positioning:   positioningRouter,
   platformConnect: platformConnectRouter,
-  feedback:        feedbackRouter,
-  squadLead:       squadLeadRouter,
   theater:         theaterRouter,
   positioningJobs: positioningJobsRouter,
   brandKnowledge:  brandKnowledgeRouter,

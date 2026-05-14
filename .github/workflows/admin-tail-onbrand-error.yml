@@ -1,0 +1,20 @@
+name: Admin — Tail onbrand error log
+on: { workflow_dispatch: {} }
+jobs:
+  tail:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 1
+    steps:
+      - run: |
+          set +e
+          echo "── pm2 list ──"
+          pm2 list 2>&1 | grep -E "onbrand|name|---"
+          echo ""
+          echo "── last 50 error lines ──"
+          tail -50 /home/azureuser/.pm2/logs/onbrand-error.log 2>&1
+          echo ""
+          echo "── last 30 out lines ──"
+          tail -30 /home/azureuser/.pm2/logs/onbrand-out.log 2>&1
+          echo ""
+          echo "── port 3101 ──"
+          ss -ltnp 2>/dev/null | grep :3101 || echo "nothing on 3101"
