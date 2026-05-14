@@ -1,0 +1,13 @@
+name: Admin — Tail orchestra persistence warnings
+on: { workflow_dispatch: {} }
+jobs:
+  tail:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 1
+    steps:
+      - run: |
+          set +e
+          for log in /home/azureuser/.pm2/logs/onbrand-out.log /home/azureuser/.pm2/logs/onbrand-error.log; do
+            echo "════ $log ════"
+            tail -3000 "$log" 2>&1 | grep -iE "orchestra|onCheckpoint persistence|persistence failed|recordTaskRun|finaliseTaskRun|caption_ready" | tail -40
+          done
