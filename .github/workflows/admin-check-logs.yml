@@ -19,22 +19,22 @@ jobs:
 
             echo ""
             echo "===== PM2 error log (last 60 lines) ====="
-            pm2 logs marketing-os --err --nostream --lines 60 2>/dev/null || \
-              cat ~/.pm2/logs/marketing-os-error.log 2>/dev/null | tail -60
+            pm2 logs onbrand --err --nostream --lines 60 2>/dev/null || \
+              cat ~/.pm2/logs/onbrand-error.log 2>/dev/null | tail -60
 
             echo ""
             echo "===== PM2 out log (last 20 lines) ====="
-            pm2 logs marketing-os --out --nostream --lines 20 2>/dev/null || \
-              cat ~/.pm2/logs/marketing-os-out.log 2>/dev/null | tail -20
+            pm2 logs onbrand --out --nostream --lines 20 2>/dev/null || \
+              cat ~/.pm2/logs/onbrand-out.log 2>/dev/null | tail -20
 
             echo ""
             echo "===== Full error log tail (last 30 lines, fresh) ====="
-            tail -30 ~/.pm2/logs/marketing-os-error.log 2>/dev/null
+            tail -30 ~/.pm2/logs/onbrand-error.log 2>/dev/null
 
             echo ""
             echo "===== tsx available? ====="
-            ls /opt/marketing-os/app/skills/ai-talent/node_modules/.bin/tsx 2>/dev/null && echo "tsx OK" || echo "tsx NOT FOUND"
+            ls /opt/onbrand/app/skills/ai-talent/node_modules/.bin/tsx 2>/dev/null && echo "tsx OK" || echo "tsx NOT FOUND"
 
             echo ""
             echo "===== .env exists? ====="
-            ls -la /opt/marketing-os/app/skills/ai-talent/.env 2>/dev/null || echo "NO .env"
+            ls -la /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || echo "NO .env"

@@ -47,7 +47,7 @@ jobs:
           envs: NEW_VAL,TEST_TO
           script: |
             set -e
-            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+            ENV_FILE=/opt/onbrand/app/skills/ai-talent/.env
 
             if [ ! -f "$ENV_FILE" ]; then
               echo "❌ .env not found at $ENV_FILE"; exit 1
@@ -74,8 +74,8 @@ jobs:
             echo "  EMAIL_FROM = $v"
 
             echo ""
-            echo "── Restarting marketing-os ──"
-            pm2 restart marketing-os --update-env 2>&1 | tail -3
+            echo "── Restarting onbrand ──"
+            pm2 restart onbrand --update-env 2>&1 | tail -3
             sleep 3
             curl -s -o /dev/null -w "Health: HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
             echo ""

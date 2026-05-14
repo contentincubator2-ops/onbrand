@@ -57,7 +57,7 @@ jobs:
           envs: GH_TOKEN
           script: |
             set -e
-            APP=/opt/marketing-os/app
+            APP=/opt/onbrand/app
             AI=$APP/skills/ai-talent
 
             echo "===== Pull latest code ====="
@@ -123,8 +123,8 @@ jobs:
             set +a
             echo "JWT_SECRET present: $([ -n "$JWT_SECRET" ] && echo YES || echo NO)"
 
-            pm2 delete marketing-os 2>/dev/null || true
-            pm2 start "$TSX" --name marketing-os --cwd "$AI" --update-env -- server/index.ts
+            pm2 delete onbrand 2>/dev/null || true
+            pm2 start "$TSX" --name onbrand --cwd "$AI" --update-env -- server/index.ts
             pm2 save --force
 
             echo "===== Health check ====="
@@ -133,4 +133,4 @@ jobs:
             curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
 
             echo "===== PM2 error log (last 20 lines) ====="
-            tail -20 ~/.pm2/logs/marketing-os-error.log 2>/dev/null || true
+            tail -20 ~/.pm2/logs/onbrand-error.log 2>/dev/null || true

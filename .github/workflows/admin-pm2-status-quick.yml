@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       force_restart:
-        description: "restart pm2 marketing-os"
+        description: "restart pm2 onbrand"
         required: false
         default: "no"
 
@@ -19,16 +19,16 @@ jobs:
           pm2 list
 
           echo ""
-          echo "── pm2 describe marketing-os ──"
-          pm2 describe marketing-os 2>/dev/null | grep -E "status|uptime|restarts|pid|exec cwd" | head -10
+          echo "── pm2 describe onbrand ──"
+          pm2 describe onbrand 2>/dev/null | grep -E "status|uptime|restarts|pid|exec cwd" | head -10
 
           echo ""
           echo "── last 40 ERROR log ──"
-          tail -40 ~/.pm2/logs/marketing-os-error.log 2>/dev/null
+          tail -40 ~/.pm2/logs/onbrand-error.log 2>/dev/null
 
           echo ""
           echo "── last 20 OUT log ──"
-          tail -20 ~/.pm2/logs/marketing-os-out.log 2>/dev/null
+          tail -20 ~/.pm2/logs/onbrand-out.log 2>/dev/null
 
           echo ""
           echo "── direct curl localhost:3101 ──"
@@ -37,7 +37,7 @@ jobs:
           if [ "${{ github.event.inputs.force_restart }}" = "yes" ]; then
             echo ""
             echo "── forcing pm2 restart ──"
-            pm2 restart marketing-os --update-env
+            pm2 restart onbrand --update-env
             sleep 5
-            pm2 list | grep marketing-os
+            pm2 list | grep onbrand
           fi

@@ -30,7 +30,7 @@ jobs:
             --exclude='skills/ai-talent/client/node_modules' \
             --exclude='skills/ai-talent/public' \
             --exclude='skills/ai-talent/.env' \
-            ./ "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/marketing-os/app/"
+            ./ "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/onbrand/app/"
 
       # 4. Install deps, build frontend, restart PM2
       - uses: appleboy/ssh-action@v1.0.3
@@ -41,7 +41,7 @@ jobs:
           command_timeout: 600s
           script: |
             set -e
-            APP=/opt/marketing-os/app
+            APP=/opt/onbrand/app
             AI=$APP/skills/ai-talent
 
             echo "===== 1. Code already synced by rsync ====="
@@ -64,14 +64,14 @@ jobs:
             echo ""
             echo "===== 4. Restart PM2 ====="
             cd "$AI"
-            pm2 restart marketing-os 2>/dev/null || \
+            pm2 restart onbrand 2>/dev/null || \
               pm2 start "node_modules/.bin/tsx server/index.ts" \
-                --name marketing-os --cwd "$AI"
+                --name onbrand --cwd "$AI"
             pm2 save --force
 
             echo ""
             echo "===== 5. Health check ====="
             sleep 5
             curl -s -o /dev/null -w "Backend HTTP %{http_code}\n" http://127.0.0.1:3101/health
-            pm2 list | grep marketing-os
+            pm2 list | grep onbrand
             echo "===== Deploy complete ====="

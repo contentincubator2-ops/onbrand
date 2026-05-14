@@ -14,14 +14,14 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 120s
           script: |
-            cd /opt/marketing-os/app/skills/ai-talent
+            cd /opt/onbrand/app/skills/ai-talent
 
             echo "════════ pm2 logs (last 100, before restart) ════════"
-            pm2 logs marketing-os --lines 100 --nostream --raw 2>&1 | grep -iE "outputRouter|getById|extracted_task_id|caption|orchestra|error|recordTaskRun" | tail -30
+            pm2 logs onbrand --lines 100 --nostream --raw 2>&1 | grep -iE "outputRouter|getById|extracted_task_id|caption|orchestra|error|recordTaskRun" | tail -30
 
             echo ""
             echo "════════ Hard restart ════════"
-            pm2 delete marketing-os 2>&1 || true
+            pm2 delete onbrand 2>&1 || true
             sleep 2
             # Recreate from ecosystem or saved process
             pm2 resurrect 2>&1 || true
@@ -29,17 +29,17 @@ jobs:
             pm2 status
 
             echo ""
-            echo "════════ If still no marketing-os, start manually ════════"
-            if ! pm2 status | grep -q marketing-os; then
-              cd /opt/marketing-os/app/skills/ai-talent
+            echo "════════ If still no onbrand, start manually ════════"
+            if ! pm2 status | grep -q onbrand; then
+              cd /opt/onbrand/app/skills/ai-talent
               # Find the start script
               if [ -f ecosystem.config.cjs ]; then
-                pm2 start ecosystem.config.cjs --only marketing-os 2>&1 | tail -5
+                pm2 start ecosystem.config.cjs --only onbrand 2>&1 | tail -5
               elif [ -f ecosystem.config.js ]; then
-                pm2 start ecosystem.config.js --only marketing-os 2>&1 | tail -5
+                pm2 start ecosystem.config.js --only onbrand 2>&1 | tail -5
               else
                 # Direct start with tsx
-                pm2 start "npx tsx server/index.ts" --name marketing-os --update-env 2>&1 | tail -5
+                pm2 start "npx tsx server/index.ts" --name onbrand --update-env 2>&1 | tail -5
               fi
               pm2 save 2>&1 | tail -2
             fi
@@ -57,4 +57,4 @@ jobs:
             echo ""
             echo "════════ Fresh logs after restart ════════"
             sleep 3
-            pm2 logs marketing-os --lines 30 --nostream --raw 2>&1 | tail -30
+            pm2 logs onbrand --lines 30 --nostream --raw 2>&1 | tail -30

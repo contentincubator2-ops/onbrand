@@ -17,8 +17,8 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 60s
           script: |
-            ERR=~/.pm2/logs/marketing-os-error.log
-            OUT=~/.pm2/logs/marketing-os-out.log
+            ERR=~/.pm2/logs/onbrand-error.log
+            OUT=~/.pm2/logs/onbrand-out.log
 
             echo "════════════ ERROR LOG (last 80) ════════════"
             tail -80 "$ERR" 2>/dev/null

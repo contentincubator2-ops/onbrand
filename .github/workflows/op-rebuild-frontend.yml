@@ -18,7 +18,7 @@ jobs:
           envs: GH_TOKEN
           script: |
             set -e
-            APP=/opt/marketing-os/app
+            APP=/opt/onbrand/app
             AI=$APP/skills/ai-talent
 
             echo "════ Pull latest ════"
@@ -65,5 +65,5 @@ jobs:
 
             echo ""
             echo "════ Restart pm2 ════"
-            pm2 restart marketing-os --update-env 2>&1 | tail -5
+            pm2 restart onbrand --update-env 2>&1 | tail -5
             pm2 save

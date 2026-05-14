@@ -1,7 +1,7 @@
 name: Admin — Verify VM state
 
 # Run after consolidation to confirm:
-# - Only ONE PM2 process running (marketing-os from /opt/marketing-os/app)
+# - Only ONE PM2 process running (onbrand from /opt/onbrand/app)
 # - Site responds correctly
 # - Old split repos are no longer serving traffic
 
@@ -19,17 +19,17 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 60s
           script: |
-            APP=/opt/marketing-os/app
+            APP=/opt/onbrand/app
             AI=$APP/skills/ai-talent
 
-            echo "===== PM2 processes (should be exactly 1: marketing-os) ====="
+            echo "===== PM2 processes (should be exactly 1: onbrand) ====="
             pm2 list
 
             echo ""
             echo "===== Active version info ====="
             echo "Commit: $(cd $APP && git log --oneline -1 2>/dev/null || echo 'NOT FOUND')"
             echo "Frontend build: $(stat -c '%y' $AI/public/index.html 2>/dev/null || echo 'NOT FOUND')"
-            echo "Backend process CWD: $(pm2 info marketing-os 2>/dev/null | grep 'exec cwd' | head -1 || echo 'unknown')"
+            echo "Backend process CWD: $(pm2 info onbrand 2>/dev/null | grep 'exec cwd' | head -1 || echo 'unknown')"
 
             echo ""
             echo "===== Health check ====="
@@ -41,4 +41,4 @@ jobs:
 
             echo ""
             echo "===== Old split repos still exist? (should be yes, not yet deleted) ====="
-            ls /opt/marketing-os/ 2>/dev/null
+            ls /opt/onbrand/ 2>/dev/null

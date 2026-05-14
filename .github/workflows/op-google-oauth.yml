@@ -8,8 +8,8 @@ name: Ops — Write Google OAuth credentials to prod .env
 # (A) Google Cloud Console
 #   1. Project → APIs & Services → Credentials
 #   2. Create OAuth 2.0 Client ID (type: Web application)
-#   3. Authorized JavaScript origins: https://marketing-os.sowork.ai
-#   4. Authorized redirect URIs:    https://marketing-os.sowork.ai/api/auth/google/callback
+#   3. Authorized JavaScript origins: https://onbrand.sowork.ai
+#   4. Authorized redirect URIs:    https://onbrand.sowork.ai/api/auth/google/callback
 #   5. Copy the Client ID + Client Secret
 #
 # (B) GitHub repo secrets — Settings → Secrets and variables → Actions
@@ -57,7 +57,7 @@ jobs:
           envs: GID,GSEC
           script: |
             set -e
-            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+            ENV_FILE=/opt/onbrand/app/skills/ai-talent/.env
 
             if [ ! -f "$ENV_FILE" ]; then
               echo "❌ .env not found at $ENV_FILE"
@@ -84,7 +84,7 @@ jobs:
 
             # Make sure APP_URL is set — needed for the callback URL build
             if ! grep -qE "^APP_URL=" "$ENV_FILE"; then
-              echo "APP_URL=https://marketing-os.sowork.ai" >> "$ENV_FILE"
+              echo "APP_URL=https://onbrand.sowork.ai" >> "$ENV_FILE"
               echo "  ✓ appended APP_URL (was missing)"
             fi
 
@@ -108,8 +108,8 @@ jobs:
 
             # Restart so PM2 picks up new env
             echo ""
-            echo "── Restarting marketing-os ──"
-            pm2 restart marketing-os --update-env 2>&1 | tail -5
+            echo "── Restarting onbrand ──"
+            pm2 restart onbrand --update-env 2>&1 | tail -5
             sleep 3
             curl -s -o /dev/null -w "Health: HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
 

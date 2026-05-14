@@ -9,8 +9,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          AI=/opt/marketing-os/app/skills/ai-talent
-          APP=/opt/marketing-os/app
+          AI=/opt/onbrand/app/skills/ai-talent
+          APP=/opt/onbrand/app
           cd "$APP"
 
           echo "── git reset to latest main ──"
@@ -47,4 +47,4 @@ jobs:
 
           echo ""
           echo "── restart pm2 ──"
-          pm2 restart marketing-os --update-env
+          pm2 restart onbrand --update-env

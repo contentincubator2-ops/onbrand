@@ -6,7 +6,7 @@ name: Admin — Verify support stack end-to-end
 #   3. /changelog.md served as text/markdown
 #   4. /admin/support and /changelog routes return the SPA shell (200)
 #   5. Client bundle includes SupportDrawer + AdminSupportPage + ChangelogPage
-#   6. pm2 marketing-os healthy, no crash
+#   6. pm2 onbrand healthy, no crash
 #   7. Direct LLM smoke test (Mia would respond)
 
 on:
@@ -20,7 +20,7 @@ jobs:
       - name: 1 · DB tables exist
         run: |
           set -e
-          AI=/opt/marketing-os/app/skills/ai-talent
+          AI=/opt/onbrand/app/skills/ai-talent
           set -a; source "$AI/.env" 2>/dev/null; set +a
           export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
           MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N --silent"
@@ -73,7 +73,7 @@ jobs:
       - name: 5 · client bundle includes the new components
         run: |
           set -e
-          AI=/opt/marketing-os/app/skills/ai-talent
+          AI=/opt/onbrand/app/skills/ai-talent
           # Pick the LARGEST bundle (main app code; minor chunks are small)
           BUNDLE=$(ls -S "$AI/public/assets/index-"*.js | head -1)
           echo "  bundle: $BUNDLE  ($(stat -c%s $BUNDLE) bytes)"
@@ -84,14 +84,14 @@ jobs:
             else echo "  ❌ $sym missing from bundle"; exit 1; fi
           done
 
-      - name: 6 · pm2 marketing-os healthy
+      - name: 6 · pm2 onbrand healthy
         run: |
           set -e
-          STATUS=$(pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="marketing-os") | .pm2_env.status')
-          UPTIME=$(pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="marketing-os") | (.pm2_env.pm_uptime / 1000 | floor)')
+          STATUS=$(pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="onbrand") | .pm2_env.status')
+          UPTIME=$(pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="onbrand") | (.pm2_env.pm_uptime / 1000 | floor)')
           NOW=$(date +%s)
           AGE=$((NOW - UPTIME))
-          RESTARTS=$(pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="marketing-os") | .pm2_env.restart_time')
+          RESTARTS=$(pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="onbrand") | .pm2_env.restart_time')
           echo "  status=$STATUS  uptime=${AGE}s  restart_time=$RESTARTS"
           if [ "$STATUS" = "online" ] && [ "$AGE" -gt 5 ]; then
             echo "  ✓ healthy"
@@ -102,7 +102,7 @@ jobs:
       - name: 7 · LLM smoke test (Mia would respond)
         run: |
           set -e
-          AI=/opt/marketing-os/app/skills/ai-talent
+          AI=/opt/onbrand/app/skills/ai-talent
           set -a; source "$AI/.env" 2>/dev/null; set +a
           cd "$AI"
           npx tsx -e "
@@ -120,4 +120,4 @@ jobs:
       - name: 8 · recent ERROR log (any crashes?)
         run: |
           set -e
-          tail -50 ~/.pm2/logs/marketing-os-error.log 2>/dev/null | grep -iE "ENOENT|TypeError|Cannot read|SyntaxError|crash|killed" | tail -10 || echo "  ✓ no fatal errors in last 50 ERR lines"
+          tail -50 ~/.pm2/logs/onbrand-error.log 2>/dev/null | grep -iE "ENOENT|TypeError|Cannot read|SyntaxError|crash|killed" | tail -10 || echo "  ✓ no fatal errors in last 50 ERR lines"

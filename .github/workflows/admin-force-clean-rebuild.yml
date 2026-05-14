@@ -13,7 +13,7 @@ jobs:
     steps:
       - run: |
           set -e
-          AI=/opt/marketing-os/app/skills/ai-talent
+          AI=/opt/onbrand/app/skills/ai-talent
           cd "$AI"
 
           echo "── before: public/index.html script tag ──"
@@ -53,8 +53,8 @@ jobs:
           fi
 
           echo ""
-          echo "── restart pm2 marketing-os ──"
-          pm2 restart marketing-os --update-env
+          echo "── restart pm2 onbrand ──"
+          pm2 restart onbrand --update-env
 
           sleep 3
           echo ""

@@ -30,7 +30,7 @@ jobs:
             --exclude='.git' \
             -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
             ./skills/ai-talent/ \
-            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/marketing-os/app/skills/ai-talent/
+            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/opt/onbrand/app/skills/ai-talent/
 
       - name: Build + restart on VM
         uses: appleboy/ssh-action@v1.0.3
@@ -41,7 +41,7 @@ jobs:
           command_timeout: 600s
           script: |
             set -e
-            cd /opt/marketing-os/app/skills/ai-talent
+            cd /opt/onbrand/app/skills/ai-talent
 
             echo "════════ BACKUP public ════════"
             rm -rf public.bak 2>/dev/null
@@ -58,9 +58,9 @@ jobs:
 
             echo ""
             echo "════════ RESTART pm2 ════════"
-            pm2 restart marketing-os --update-env
+            pm2 restart onbrand --update-env
             sleep 3
-            pm2 status | grep marketing-os
+            pm2 status | grep onbrand
 
             echo ""
             echo "════════ VERIFY new code in main bundle ════════"

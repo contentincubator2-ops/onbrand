@@ -22,7 +22,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e   # don't bail on individual non-fatal findings
-          APP=/opt/marketing-os/app
+          APP=/opt/onbrand/app
           AI=$APP/skills/ai-talent
           REPO="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
           cd "$APP"
@@ -163,7 +163,7 @@ jobs:
           echo "════════════════════════════════════════"
           echo "9. PROD .env not world-readable"
           echo "════════════════════════════════════════"
-          stat -c '%a %U:%G %n' /opt/marketing-os/app/skills/ai-talent/.env 2>/dev/null
+          stat -c '%a %U:%G %n' /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null
 
           echo ""
           echo "════════════════════════════════════════"

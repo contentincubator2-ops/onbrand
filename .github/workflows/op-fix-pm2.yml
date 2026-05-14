@@ -15,7 +15,7 @@ jobs:
           command_timeout: 60s
           script: |
             set -e
-            AI=/opt/marketing-os/app/skills/ai-talent
+            AI=/opt/onbrand/app/skills/ai-talent
             TSX=$AI/node_modules/.bin/tsx
 
             echo "===== Check .env key names (no values) ====="
@@ -28,7 +28,7 @@ jobs:
             echo ""
             echo "===== Fix: copy JWT_SECRET from old backend .env if missing ====="
             if ! grep -q "JWT_SECRET" "$AI/.env"; then
-              OLD_SECRET=$(grep "JWT_SECRET" /opt/marketing-os/marketing-os-backend/.env 2>/dev/null || true)
+              OLD_SECRET=$(grep "JWT_SECRET" /opt/onbrand/marketing-os-backend/.env 2>/dev/null || true)
               if [ -n "$OLD_SECRET" ]; then
                 echo "$OLD_SECRET" >> "$AI/.env"
                 echo "JWT_SECRET copied from old backend"
@@ -39,10 +39,10 @@ jobs:
 
             echo ""
             echo "===== Restart PM2 with absolute paths ====="
-            pm2 delete marketing-os 2>/dev/null || true
+            pm2 delete onbrand 2>/dev/null || true
 
             pm2 start "$TSX" \
-              --name marketing-os \
+              --name onbrand \
               --cwd "$AI" \
               -- server/index.ts
 

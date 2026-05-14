@@ -15,7 +15,7 @@ jobs:
           command_timeout: 300s
           script: |
             set +e
-            APP=/opt/marketing-os/app
+            APP=/opt/onbrand/app
             AI=$APP/skills/ai-talent
 
             echo "════ index.html locations ════"
@@ -34,9 +34,9 @@ jobs:
             sudo nginx -T 2>/dev/null | grep -E "root|server_name|try_files" | grep -v "#" | head -30
 
             echo ""
-            echo "════ nginx site for marketing-os ════"
+            echo "════ nginx site for OnBrand ════"
             for f in /etc/nginx/sites-enabled/*; do
-              if grep -l "marketing-os" "$f" 2>/dev/null; then
+              if grep -l "onbrand" "$f" 2>/dev/null; then
                 echo "[FILE] $f"
                 cat "$f"
               fi

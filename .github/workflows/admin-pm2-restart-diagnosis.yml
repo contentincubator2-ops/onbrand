@@ -1,6 +1,6 @@
 name: Admin — Diagnose PM2 OnBrand restarts (B-03)
 
-# Smoke test showed `marketing-os` PM2 process restarted 87 times in
+# Smoke test showed `onbrand` PM2 process restarted 87 times in
 # 3 days = ~1.2 crashes per hour. This workflow surfaces the actual
 # crash causes from PM2 logs so we can fix root cause(s).
 
@@ -19,11 +19,11 @@ jobs:
           command_timeout: 120s
           script: |
             set +e
-            ERR=~/.pm2/logs/marketing-os-error.log
-            OUT=~/.pm2/logs/marketing-os-out.log
+            ERR=~/.pm2/logs/onbrand-error.log
+            OUT=~/.pm2/logs/onbrand-out.log
 
             echo "════════════════════════════════════════"
-            echo "  PM2 marketing-os restart diagnosis"
+            echo "  PM2 onbrand restart diagnosis"
             echo "  $(date -u '+%Y-%m-%d %H:%M UTC')"
             echo "════════════════════════════════════════"
 
@@ -33,7 +33,7 @@ jobs:
             import sys, json
             data = json.loads(sys.stdin.read())
             for p in data:
-                if p['name'] == 'marketing-os':
+                if p['name'] == 'onbrand':
                     print(f\"  pid={p['pid']}\")
                     print(f\"  status={p['pm2_env']['status']}\")
                     print(f\"  uptime_ms={p['pm2_env']['pm_uptime']}\")

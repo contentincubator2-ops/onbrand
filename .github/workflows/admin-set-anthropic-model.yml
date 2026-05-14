@@ -14,7 +14,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 90s
           script: |
-            cd /opt/marketing-os/app/skills/ai-talent
+            cd /opt/onbrand/app/skills/ai-talent
 
             echo "════════ BEFORE ════════"
             grep "^ANTHROPIC_MODEL=" .env || echo "(not set)"
@@ -30,9 +30,9 @@ jobs:
 
             echo ""
             echo "════════ pm2 restart with new env ════════"
-            pm2 restart marketing-os --update-env
+            pm2 restart onbrand --update-env
             sleep 3
-            pm2 status | grep marketing-os
+            pm2 status | grep onbrand
 
             echo ""
             echo "════════ Smoke test direct curl with new model ════════"

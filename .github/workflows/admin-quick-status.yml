@@ -14,7 +14,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 30s
           script: |
-            pm2 status | grep marketing-os
+            pm2 status | grep onbrand
             echo ""
             echo "── /api/health ──"
             curl -sS --max-time 5 http://localhost:3101/api/health -w "\nHTTP %{http_code}\n"
@@ -27,4 +27,4 @@ jobs:
               -w "\nHTTP %{http_code} time %{time_total}s\n" | head -c 800
             echo ""
             echo "── pm2 last 30 lines ──"
-            pm2 logs marketing-os --lines 30 --nostream --raw 2>&1 | tail -30
+            pm2 logs onbrand --lines 30 --nostream --raw 2>&1 | tail -30

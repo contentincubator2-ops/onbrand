@@ -20,7 +20,7 @@ jobs:
       - name: Run
         run: |
           set -e
-          AI=/opt/marketing-os/app/skills/ai-talent
+          AI=/opt/onbrand/app/skills/ai-talent
           set -a; source "$AI/.env" 2>/dev/null; set +a
           export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
           MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
@@ -102,11 +102,11 @@ jobs:
           echo "════════════════════════════════════════"
           echo "6. Recent server restarts (pm2)"
           echo "════════════════════════════════════════"
-          pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="marketing-os") | "  uptime: \(.pm2_env.pm_uptime | (now*1000 - .) / 60000 | floor) min · restarts: \(.pm2_env.restart_time)"' 2>/dev/null || echo "  (jq unavailable — skipping)"
+          pm2 jlist 2>/dev/null | jq -r '.[] | select(.name=="onbrand") | "  uptime: \(.pm2_env.pm_uptime | (now*1000 - .) / 60000 | floor) min · restarts: \(.pm2_env.restart_time)"' 2>/dev/null || echo "  (jq unavailable — skipping)"
 
           echo ""
           echo "════════════════════════════════════════"
           echo "7. Last 50 ERR-log lines mentioning positioning"
           echo "════════════════════════════════════════"
-          LOG_ERR=/home/$(whoami)/.pm2/logs/marketing-os-error.log
+          LOG_ERR=/home/$(whoami)/.pm2/logs/onbrand-error.log
           tail -2000 "$LOG_ERR" 2>/dev/null | grep -iE "positioning|positioningJob|14[/-]step" | tail -20

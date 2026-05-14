@@ -14,7 +14,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 30s
           script: |
-            cd /opt/marketing-os/app/skills/ai-talent
+            cd /opt/onbrand/app/skills/ai-talent
             echo "════════ Email env vars ════════"
             grep -E "^(RESEND_API_KEY|SENDGRID_API_KEY|EMAIL_FROM|EMAIL_SERVICE)" .env | sed 's/_API_KEY=.*/_API_KEY=<set>/' | sed 's/RESEND_API_KEY=.*/RESEND_API_KEY=<set>/'
 
@@ -31,4 +31,4 @@ jobs:
 
             echo ""
             echo "════════ pm2 recent email errors ════════"
-            pm2 logs marketing-os --lines 100 --nostream --raw 2>&1 | grep -iE "resend|email.*fail|sendEmail" | tail -10
+            pm2 logs onbrand --lines 100 --nostream --raw 2>&1 | grep -iE "resend|email.*fail|sendEmail" | tail -10

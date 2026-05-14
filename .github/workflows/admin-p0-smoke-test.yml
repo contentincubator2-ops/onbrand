@@ -7,7 +7,7 @@ name: Admin — P0 smoke test (server-side)
 #      source of what the user sees — historical error text written to DB).
 #   2. Curl the tRPC endpoints from inside the VM with the active session
 #      cookie, exercising briefSearch / squadLead.chat / quickTask.runOne.
-#   3. Confirm pm2 marketing-os process is healthy.
+#   3. Confirm pm2 onbrand process is healthy.
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
           command_timeout: 180s
           script: |
             set +e
-            AI=/opt/marketing-os/app/skills/ai-talent
+            AI=/opt/onbrand/app/skills/ai-talent
             ENV_FILE="$AI/.env"
 
             echo "════════════════════════════════════════"

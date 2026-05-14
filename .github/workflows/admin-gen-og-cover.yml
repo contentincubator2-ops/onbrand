@@ -2,7 +2,7 @@ name: Admin — Generate OG cover image
 
 # CJ「幫我產一張具備 SoWork.ai 風格的 OG 圖」.
 # Uses PiAPI Ideogram (best at in-image text) to produce a 1200×630
-# share card. Saves to /opt/marketing-os/covers/og-onbrand-cover.png
+# share card. Saves to /opt/onbrand/covers/og-onbrand-cover.png
 # (served at /static/covers/og-onbrand-cover.png via the existing
 # coversPrefix static handler).
 
@@ -21,7 +21,7 @@ jobs:
     steps:
       - run: |
           set -e
-          AI=/opt/marketing-os/app/skills/ai-talent
+          AI=/opt/onbrand/app/skills/ai-talent
           set -a; source "$AI/.env" 2>/dev/null; set +a
           KEY="${PIAPI_KEY:-$PIAPI_API_KEY}"
           if [ -z "$KEY" ]; then echo "PIAPI_KEY missing"; exit 1; fi
@@ -66,11 +66,11 @@ jobs:
           echo "  remote: $REMOTE_URL"
 
           echo ""
-          echo "── download to /opt/marketing-os/covers/og-onbrand-cover.png ──"
-          sudo mkdir -p /opt/marketing-os/covers
-          sudo curl -sL "$REMOTE_URL" -o /opt/marketing-os/covers/og-onbrand-cover.png
-          sudo chown azureuser:azureuser /opt/marketing-os/covers/og-onbrand-cover.png
-          ls -la /opt/marketing-os/covers/og-onbrand-cover.png
+          echo "── download to /opt/onbrand/covers/og-onbrand-cover.png ──"
+          sudo mkdir -p /opt/onbrand/covers
+          sudo curl -sL "$REMOTE_URL" -o /opt/onbrand/covers/og-onbrand-cover.png
+          sudo chown azureuser:azureuser /opt/onbrand/covers/og-onbrand-cover.png
+          ls -la /opt/onbrand/covers/og-onbrand-cover.png
 
           echo ""
           echo "── verify served via /static/covers/ ──"

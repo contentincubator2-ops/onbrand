@@ -55,7 +55,7 @@ jobs:
           envs: KEY_VALUE
           script: |
             set -e
-            ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
+            ENV_FILE=/opt/onbrand/app/skills/ai-talent/.env
 
             if [ ! -f "$ENV_FILE" ]; then
               echo "❌ .env not found at $ENV_FILE"
@@ -85,7 +85,7 @@ jobs:
               fi
             }
             upsert_kv "EMAIL_FROM" "noreply@sowork.ai"
-            upsert_kv "APP_URL"    "https://marketing-os.sowork.ai"
+            upsert_kv "APP_URL"    "https://onbrand.sowork.ai"
 
             # Verify (without printing secret value)
             echo ""
@@ -102,8 +102,8 @@ jobs:
 
             # Restart so PM2 picks up the new env
             echo ""
-            echo "── Restarting marketing-os ──"
-            pm2 restart marketing-os --update-env 2>&1 | tail -5
+            echo "── Restarting onbrand ──"
+            pm2 restart onbrand --update-env 2>&1 | tail -5
             sleep 3
             curl -s -o /dev/null -w "Health endpoint: HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
 

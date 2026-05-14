@@ -43,7 +43,7 @@ jobs:
           envs: PIPEDREAM_API_KEY,PIPEDREAM_CLIENT_ID,PIPEDREAM_CLIENT_SECRET,PIPEDREAM_PROJECT_ID,PIPEDREAM_PROJECT_ENV,PIPEDREAM_WORKSPACE_ID
           script: |
             set -e
-            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+            ENV=/opt/onbrand/app/skills/ai-talent/.env
             touch "$ENV"
             cp "$ENV" "${ENV}.bak.$(date +%s)"
 
@@ -72,8 +72,8 @@ jobs:
             upsert PIPEDREAM_WORKSPACE_ID  "$PIPEDREAM_WORKSPACE_ID"
 
             echo
-            echo "  Restarting pm2 marketing-os to pick up env..."
-            pm2 restart marketing-os --update-env 2>&1 | tail -3 || echo "(pm2 restart skipped)"
+            echo "  Restarting pm2 onbrand to pick up env..."
+            pm2 restart onbrand --update-env 2>&1 | tail -3 || echo "(pm2 restart skipped)"
 
             echo
             echo "✓ Done. Run admin-probe-pipedream.yml to verify."

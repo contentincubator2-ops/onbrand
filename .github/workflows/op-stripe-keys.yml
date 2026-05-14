@@ -54,7 +54,7 @@ jobs:
           WS: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
         run: |
           set -e
-          ENV=/opt/marketing-os/app/skills/ai-talent/.env
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
           TMP=$(mktemp)
           if [ -f "$ENV" ]; then
             grep -v -E '^(STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET)=' "$ENV" > "$TMP" || true
@@ -73,7 +73,7 @@ jobs:
 
       - name: Restart pm2
         run: |
-          pm2 restart marketing-os --update-env 2>&1 | tail -5
+          pm2 restart onbrand --update-env 2>&1 | tail -5
           sleep 3
           curl -s -o /dev/null -w "  /health → %{http_code}\n" "http://localhost:3101/health" || true
 

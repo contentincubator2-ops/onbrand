@@ -12,7 +12,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 30s
           script: |
-            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+            ENV=/opt/onbrand/app/skills/ai-talent/.env
             echo "=== .env key names (values hidden) ==="
             grep -v '^#' "$ENV" | grep '=' | cut -d= -f1 | sort
             echo "=== total lines ==="

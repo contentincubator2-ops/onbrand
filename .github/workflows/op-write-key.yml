@@ -30,7 +30,7 @@ jobs:
             # Mask value from logs immediately
             echo "::add-mask::${KEY_VALUE}"
             set -e
-            ENV=/opt/marketing-os/app/skills/ai-talent/.env
+            ENV=/opt/onbrand/app/skills/ai-talent/.env
             touch "$ENV"
             cp "$ENV" "${ENV}.bak.$(date +%s)"
             if grep -qE "^${KEY_NAME}=" "$ENV"; then
@@ -43,5 +43,5 @@ jobs:
             # Verify key is present (masked)
             echo "  ✅ .env now has $(wc -l < "$ENV") lines"
             # Restart server to pick up new env
-            pm2 restart marketing-os --update-env 2>&1 | tail -2
-            echo "  ✅ marketing-os restarted"
+            pm2 restart onbrand --update-env 2>&1 | tail -2
+            echo "  ✅ onbrand restarted"

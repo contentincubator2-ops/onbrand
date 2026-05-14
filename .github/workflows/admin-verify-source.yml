@@ -14,7 +14,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 60s
           script: |
-            cd /opt/marketing-os/app/skills/ai-talent
+            cd /opt/onbrand/app/skills/ai-talent
 
             echo "════════ RunPage.tsx — does it have outputTypeToFormat? ════════"
             grep -n "outputTypeToFormat\|此 run 缺少\|3-layer fallback" client/src/v2/pages/RunPage.tsx | head -10

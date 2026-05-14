@@ -29,8 +29,8 @@ jobs:
             ps -ef | grep -E "tsx|node " | grep -v grep | head -20
 
             echo ""
-            echo "════ Stop marketing-os PM2 process ════"
-            pm2 stop marketing-os 2>&1 | tail -3
+            echo "════ Stop OnBrand PM2 process ════"
+            pm2 stop onbrand 2>&1 | tail -3
             sleep 2
 
             echo ""
@@ -50,8 +50,8 @@ jobs:
             sudo ss -tlnp 2>/dev/null | grep ":3101" && echo "  STILL IN USE" || echo "  ✓ port free"
 
             echo ""
-            echo "════ Start marketing-os fresh ════"
-            pm2 start marketing-os --update-env 2>&1 | tail -5
+            echo "════ Start OnBrand fresh ════"
+            pm2 start onbrand --update-env 2>&1 | tail -5
             sleep 6
 
             echo ""
@@ -64,6 +64,6 @@ jobs:
             import sys, json, time
             data = json.loads(sys.stdin.read())
             for p in data:
-                if p['name'] == 'marketing-os':
+                if p['name'] == 'onbrand':
                     age_s = (time.time() * 1000 - p['pm2_env']['pm_uptime']) / 1000
                     print(f'  pid={p[\"pid\"]}  age={age_s:.1f}s  status={p[\"pm2_env\"][\"status\"]}  restarts={p[\"pm2_env\"][\"restart_time\"]}')" 2>/dev/null

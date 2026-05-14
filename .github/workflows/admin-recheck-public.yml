@@ -10,7 +10,7 @@ jobs:
     steps:
       - run: |
           set -e
-          AI=/opt/marketing-os/app/skills/ai-talent
+          AI=/opt/onbrand/app/skills/ai-talent
           echo "── ls -la $AI/public ──"
           ls -la "$AI/public"
           echo ""
@@ -22,7 +22,7 @@ jobs:
           echo ""
           echo ""
           echo "── pm2 status ──"
-          pm2 list | grep marketing-os
+          pm2 list | grep onbrand
           echo ""
           echo "── curl localhost:3101/ ──"
           curl -s "http://localhost:3101/" -w "\n[size=%{size_download}]\n"
