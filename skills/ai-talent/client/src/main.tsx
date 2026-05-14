@@ -7,10 +7,9 @@ import { ToastProvider, showToastGlobal } from "./components/ui/Toast";
 import { HeroUIProvider } from "@heroui/react";
 // v2 frontend rebuild — Sprint 1 (2026-04-25). The legacy App is kept on
 // disk for one cycle then removed. Flip USE_V2 to false to fall back.
-import App from "./App";
+// 2026-05-14: v1 App import removed but file kept on disk; nothing else
+// in src/ uses it so vite tree-shakes the entire v1 tree out of bundle.
 import AppV2 from "./v2/app/AppV2";
-const USE_V2 = true;
-const RootApp = USE_V2 ? AppV2 : App;
 import "./index.css";
 
 // 2026-05-08 (P1-2): global mutation / query error toast.
@@ -177,7 +176,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <trpc.Provider client={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
               <BrowserRouter>
-                <RootApp />
+                <AppV2 />
               </BrowserRouter>
             </QueryClientProvider>
           </trpc.Provider>
