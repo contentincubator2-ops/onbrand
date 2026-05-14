@@ -5,10 +5,8 @@ import { QueryClient, QueryClientProvider, MutationCache, QueryCache } from "@ta
 import { trpc, trpcClient } from "./lib/trpc";
 import { ToastProvider, showToastGlobal } from "./components/ui/Toast";
 import { HeroUIProvider } from "@heroui/react";
-// v2 frontend rebuild — Sprint 1 (2026-04-25). The legacy App is kept on
-// disk for one cycle then removed. Flip USE_V2 to false to fall back.
-// 2026-05-14: v1 App import removed but file kept on disk; nothing else
-// in src/ uses it so vite tree-shakes the entire v1 tree out of bundle.
+// v2 frontend (Sprint 1, 2026-04-25). Legacy v1 App was removed 2026-05-14
+// — see git history if you need the old behavior.
 import AppV2 from "./v2/app/AppV2";
 import "./index.css";
 
