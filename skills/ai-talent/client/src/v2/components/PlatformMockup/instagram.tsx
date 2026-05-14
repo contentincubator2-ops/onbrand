@@ -25,7 +25,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
-  dicebear, handleOf, SlotContent, MarkdownText,
+  dicebear, handleOf, SlotContent, MarkdownText, titleEchoesCaption,
 } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
@@ -144,8 +144,8 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           {(() => {
             const t = (title ?? "").trim();
             if (!t) return null;
-            const capStart = (liveCaption ?? "").trim().slice(0, t.length + 30);
-            if (capStart && capStart.startsWith(t)) return null;
+            // 2026-05-14: shared ellipsis-aware dedup (was inline startsWith).
+            if (titleEchoesCaption(t, liveCaption)) return null;
             return <span className="text-foreground">{t}</span>;
           })()}
 
@@ -294,8 +294,8 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
           {(() => {
             const t = (title ?? "").trim();
             if (!t) return null;
-            const capStart = (liveCaption ?? "").trim().slice(0, t.length + 30);
-            if (capStart && capStart.startsWith(t)) return null;
+            // 2026-05-14: shared ellipsis-aware dedup (was inline startsWith).
+            if (titleEchoesCaption(t, liveCaption)) return null;
             return <span className="text-foreground">{t}</span>;
           })()}
           {liveCaption ? (

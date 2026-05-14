@@ -1,0 +1,155 @@
+name: Ops — Reset brand (wipe positioning + knowledge + outputs)
+
+# 2026-05-14 (CJ「換品牌需要聯繫客服」流程):
+#   When a Solo subscriber wants to swap their 1 brand for a new one,
+#   customer service runs this workflow with the brand id + new name.
+#   It wipes everything tied to that brand record so the AI re-trains
+#   from scratch on the new identity:
+#
+#     - brand.name                  → renamed (provided by CS)
+#     - brand.positioning           → NULL
+#     - brand.industry / desc / ... → NULL
+#     - brand.logoUrl / colors      → NULL
+#     - brand_caption_rules         → DELETE all rows for this brand
+#     - brand_knowledge entries     → DELETE all rows for this brand
+#     - mission_outputs             → status='archived' (kept for audit)
+#     - missions                    → status='archived' (kept for audit)
+#     - fb_page_binding etc.        → cleared (user has to re-connect)
+#
+#   The user is then dropped back into onboarding for the new brand name.
+#   They don't lose their account / subscription / points balance.
+#
+#   ⚠️  IRREVERSIBLE. Run only after explicit user email request.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand ID to reset (numeric)"
+        required: true
+      new_name:
+        description: "New brand name (will be set after reset). Required to prove intent."
+        required: true
+      confirm:
+        description: "Type RESET to proceed (safety check)"
+        required: true
+
+jobs:
+  reset:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: 0. Safety
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          BRAND_ID: ${{ inputs.brand_id }}
+          NEW_NAME: ${{ inputs.new_name }}
+        run: |
+          if [ "$CONFIRM" != "RESET" ]; then
+            echo "❌ Aborted — confirm field must be 'RESET'"
+            exit 1
+          fi
+          if ! echo "$BRAND_ID" | grep -qE '^[0-9]+$'; then
+            echo "❌ brand_id must be numeric"
+            exit 1
+          fi
+          if [ -z "$NEW_NAME" ]; then
+            echo "❌ new_name required"
+            exit 1
+          fi
+          echo "✓ Safety checks passed. brand=$BRAND_ID, new_name=$NEW_NAME"
+
+      - name: 1. Snapshot before reset (for audit)
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
+
+          echo "════ Brand row ════"
+          $MYSQL -e "SELECT id, userId, name, slug, createdAt FROM brands WHERE id = $BRAND_ID"
+
+          echo ""
+          echo "════ Related data counts ════"
+          $MYSQL -e "
+            SELECT
+              (SELECT COUNT(*) FROM missions WHERE brandId = $BRAND_ID) AS missions,
+              (SELECT COUNT(*) FROM mission_outputs mo JOIN missions m ON m.id=mo.missionId WHERE m.brandId = $BRAND_ID) AS outputs,
+              (SELECT COUNT(*) FROM brand_caption_rules WHERE brandId = $BRAND_ID) AS caption_rules
+          "
+
+      - name: 2. Reset brand record
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+          NEW_NAME: ${{ inputs.new_name }}
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db"
+
+          # Wipe identity + positioning, set new name, keep userId / createdAt / row id.
+          $MYSQL -e "
+            UPDATE brands
+               SET name = '${NEW_NAME//\'/\'\'}',
+                   slug = CONCAT('brand-', $BRAND_ID, '-', UNIX_TIMESTAMP()),
+                   positioning = NULL,
+                   industry = NULL,
+                   description = NULL,
+                   targetAudience = NULL,
+                   targetMarket = NULL,
+                   websiteUrl = NULL,
+                   logoUrl = NULL,
+                   primaryColor = NULL,
+                   secondaryColor = NULL,
+                   accentColor = NULL,
+                   fontFamily = NULL,
+                   visualGuidelines = NULL,
+                   soworkAnalysis = NULL,
+                   tabLocks = NULL,
+                   output_image_url = NULL,
+                   cover_image_url = NULL,
+                   updatedAt = NOW()
+             WHERE id = $BRAND_ID;
+          "
+          echo "✓ brands row updated"
+
+          # Wipe positioning rules
+          $MYSQL -e "DELETE FROM brand_caption_rules WHERE brandId = $BRAND_ID;" || true
+          echo "✓ brand_caption_rules wiped"
+
+          # Archive missions + their outputs (kept for audit, hidden from /projects)
+          $MYSQL -e "UPDATE missions SET status='archived', updatedAt=NOW() WHERE brandId = $BRAND_ID;"
+          $MYSQL -e "UPDATE mission_outputs mo JOIN missions m ON m.id=mo.missionId SET mo.status='archived', mo.updatedAt=NOW() WHERE m.brandId = $BRAND_ID;"
+          echo "✓ missions + outputs archived"
+
+          # Clear FB / IG / other social bindings — table names vary, best-effort
+          for tbl in fb_page_bindings brand_publish_credentials brand_knowledge brand_competitors mission_resources; do
+            $MYSQL -e "DELETE FROM $tbl WHERE brandId = $BRAND_ID;" 2>/dev/null \
+              && echo "  ✓ $tbl cleared" \
+              || echo "  · $tbl skipped (table absent or no rows)"
+          done
+
+      - name: 3. Verify final state
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
+
+          echo "════ After reset ════"
+          $MYSQL -e "SELECT id, userId, name, slug, positioning IS NULL AS pos_null, logoUrl IS NULL AS logo_null FROM brands WHERE id = $BRAND_ID"
+          $MYSQL -e "
+            SELECT
+              (SELECT COUNT(*) FROM missions WHERE brandId = $BRAND_ID AND status != 'archived') AS active_missions,
+              (SELECT COUNT(*) FROM brand_caption_rules WHERE brandId = $BRAND_ID) AS caption_rules
+          "
+          echo ""
+          echo "✅ Brand $BRAND_ID reset to '${{ inputs.new_name }}'. User must redo onboarding."

@@ -213,6 +213,42 @@ export const brandRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { brands } = await import("../../drizzle/schema");
+
+      // 2026-05-14 (CJ Solo pricing pivot): enforce brand-count quota.
+      // Solo = 1 brand, Studio = 3 brands, Trial = 1 brand, Agency / enterprise = unlimited.
+      // Refusing at create-time is the right boundary (not delete-time)
+      // so the user gets a clear upgrade CTA instead of accidentally
+      // creating a brand they can't use.
+      try {
+        const { default: localPool } = await import("../localDb");
+        const [pRows]: any = await localPool.execute(
+          `SELECT planCode FROM users WHERE id = ? LIMIT 1`,
+          [ctx.user.id],
+        );
+        const planCode = (pRows as any[])[0]?.planCode ?? "trial";
+        const { getPlan } = await import("../_core/plans");
+        const plan = getPlan(planCode);
+        const cap = plan.quota.brands;
+        if (typeof cap === "number" && cap > 0) {
+          const [cRows]: any = await localPool.execute(
+            `SELECT COUNT(*) AS n FROM brands WHERE userId = ?`,
+            [ctx.user.id],
+          );
+          const used = Number((cRows as any[])[0]?.n ?? 0);
+          if (used >= cap) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: cap === 1
+                ? `您的方案（${plan.name}）只支援 1 個品牌。需要管理多個品牌請升級到 Studio（3 個品牌），或聯繫業務洽詢 Agency 方案。`
+                : `您的方案（${plan.name}）最多 ${cap} 個品牌。升級到 Agency 方案以支援更多品牌，或聯繫業務洽詢。`,
+            });
+          }
+        }
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
+        console.warn("[brand.create] quota check failed (non-fatal):", (e as Error)?.message);
+      }
+
       // Auto-generate a unique slug from the brand name (lowercase,
       // ascii/CJK-safe). brands.slug has NOT NULL with no default.
       const slugBase = input.name.toLowerCase().trim()

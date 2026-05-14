@@ -221,6 +221,41 @@ export const dicebear = (name: string) =>
 export const handleOf = (brandName: string | null, fallback = "your_brand") =>
   (brandName ?? fallback).toLowerCase().replace(/\s+/g, "_").slice(0, 30);
 
+/**
+ * 2026-05-14 (CJ「標題重複問題已經解決很多次，怎都無法根除」):
+ * Decide whether to render the standalone title line ABOVE the caption.
+ * Returns true if the title is a duplicate prefix of the caption — in
+ * which case the caller should NOT render the title to avoid the
+ * sandwich-effect screenshot bug.
+ *
+ * Handles the 3 ways title can shadow caption:
+ *   1. exact prefix:        title="因為 Pokemon GO"  caption="因為 Pokemon GO，..."
+ *   2. ellipsis-suffix:     title="因為 Pokemon GO…"   caption starts with same text
+ *      ← this is what slipped past the previous fix; titleFromCaption
+ *        appends "…" when truncating at 32 cps, breaking startsWith.
+ *   3. punctuation drift:   title="「因為 Pokemon GO」" caption="「因為 Pokemon GO，..."
+ *      (trailing 」/。/, before ellipsis)
+ *
+ * Strip trailing ellipsis + punctuation from BOTH sides before comparing.
+ */
+export function titleEchoesCaption(title: string | null | undefined, caption: string | null | undefined): boolean {
+  const t = (title ?? "").trim();
+  const c = (caption ?? "").trim();
+  if (!t || !c) return false;
+  // Normalize trailing ellipsis / dots / punctuation on title.
+  const tNorm = t.replace(/[….…]+$/u, "")  // trailing ellipses
+                 .replace(/[」』）\)。，、]+$/u, "") // trailing closing punctuation
+                 .trim();
+  if (!tNorm) return false;
+  // Compare leading slice of caption (also normalized: strip leading 「『 etc.)
+  // to title without its own punctuation noise.
+  if (c.startsWith(tNorm)) return true;
+  // If caption starts with quote marks, peek past them too.
+  const cInner = c.replace(/^[「『（\(\s]+/u, "").trim();
+  if (cInner.startsWith(tNorm.replace(/^[「『（\(\s]+/u, ""))) return true;
+  return false;
+}
+
 export function MockupHeader({
   icon, label, variantLabel,
 }: {

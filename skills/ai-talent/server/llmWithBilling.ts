@@ -64,7 +64,8 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
     }
   } catch {/* checkEnoughCredits is best-effort; continue */}
 
-  // 2. Rolling 24h $ cap from usage_log
+  // 2. Rolling 24h $ cap from usage_log — plan-aware:
+  //    Trial=$3 · Solo=$5 · Studio=$15 · Agency/Enterprise=∞ (returned earlier).
   try {
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString().slice(0, 19).replace("T", " ");
     const [rows]: any = await localPool.execute(
@@ -72,9 +73,22 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
       [userId, since],
     );
     const total = Number((rows as any[])[0]?.total ?? 0);
-    const cap = DAILY_USD_CAP_TRIAL;
+    const [pRows]: any = await localPool.execute(
+      `SELECT planCode FROM users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    const planCode = (pRows as any[])[0]?.planCode ?? "trial";
+    const { DAILY_USD_CAP_SOLO, DAILY_USD_CAP_STUDIO } = await import("./_core/timeout");
+    const cap =
+      planCode === "drop_team" ? DAILY_USD_CAP_STUDIO :
+      planCode === "drop_pro"  ? DAILY_USD_CAP_SOLO :
+      DAILY_USD_CAP_TRIAL;
     if (total >= cap) {
-      return { ok: false, reason: `今日 LLM 成本已達上限（$${total.toFixed(2)} / $${cap}）。明天再試或聯絡客服升級方案。` };
+      const planLabel =
+        planCode === "drop_team" ? "Studio" :
+        planCode === "drop_pro"  ? "Solo" :
+        "試用";
+      return { ok: false, reason: `今日 LLM 成本已達 ${planLabel} 方案上限（$${total.toFixed(2)} / $${cap}）。明天 24 小時後重置，或聯繫業務洽詢 Agency 方案。` };
     }
   } catch {/* daily-cap check best-effort; don't block on DB transient */}
 

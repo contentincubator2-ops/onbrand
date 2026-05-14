@@ -1092,8 +1092,11 @@ export async function runOrchestra(args: {
     // (c) signal the caller — they can return to the user immediately.
     // The orchestra keeps running; when it finishes we UPDATE the same
     // row to progress='done' (or 'failed') instead of inserting a new one.
+    // 2026-05-14 (fb-60-serial-3 forensic): granular trace so when a task
+    // run doesn't save, we can pinpoint which gate skipped recordTaskRun.
     if (args.onCheckpoint && args.userId) {
       try {
+        console.log(`[orchestra:trace] task=${args.template.id} tier=${tier} userId=${args.userId} brandId=${args.brandId} → checkpoint gate entered`);
         const partialVariants: OrchestraVariant[] = Array.from({ length: args.config.variants }, (_, i) => {
           const cap = captions[i];
           return {
@@ -1122,6 +1125,7 @@ export async function runOrchestra(args: {
           specialtyAgent: null,
         };
 
+        console.log(`[orchestra:trace] task=${args.template.id} partial.ok=${partial.ok} variants=${partial.variants.length} firstCaptionLen=${partial.variants[0]?.caption?.length ?? 0}`);
         if (partial.ok) {
           const { recordTaskRun } = await import("./recordTaskRun");
           const { titleFromCaption } = await import("./titleFromCaption");
@@ -1167,6 +1171,7 @@ export async function runOrchestra(args: {
           });
           persistedOutputId = persisted.outputId;
           persistedMissionId = persisted.missionId;
+          console.log(`[orchestra:trace] task=${args.template.id} checkpoint recordTaskRun returned outputId=${persistedOutputId} missionId=${persistedMissionId}`);
           (partial as any).outputId = persistedOutputId;
           (partial as any).missionId = persistedMissionId;
           (partial as any).progress = "caption_ready";
@@ -1441,6 +1446,7 @@ export async function runOrchestra(args: {
     // — user wants to see the other variants AND keep nav consistent
     // (always go to /run/:id). Filtering on result.ok hid valid runs.
     const hasUsableVariant = result.variants.some((v) => (v.caption ?? "").trim().length > 0);
+    console.log(`[orchestra:trace] task=${args.template.id} final gate: hasUsableVariant=${hasUsableVariant} persistedOutputId=${persistedOutputId} userId=${args.userId} → ${args.userId && hasUsableVariant ? "WILL SAVE" : "SKIP"}`);
     if (args.userId && hasUsableVariant) {
       try {
         const { recordTaskRun, finaliseTaskRun } = await import("./recordTaskRun");

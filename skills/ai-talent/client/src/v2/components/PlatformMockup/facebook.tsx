@@ -16,7 +16,7 @@ import {
   faMusic, faVolumeHigh, faXmark, faChevronLeft, faVideo, faHeart,
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, MarkdownText, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── FB Feed ─────────────── */
@@ -46,13 +46,14 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           />
         </div>
         <div className="px-4 py-2 space-y-2">
-          {/* 2026-05-13 (CJ「標題還是有重複」): hide the standalone title
-              line when it's just a duplicate of the caption's opener. */}
+          {/* 2026-05-14 (CJ「標題重複問題已經解決很多次，怎都無法根除」):
+              use shared titleEchoesCaption helper — handles ellipsis,
+              punctuation, leading-bracket cases that the previous inline
+              startsWith() comparison kept missing. */}
           {(() => {
             const t = (title ?? "").trim();
             if (!t) return null;
-            const capStart = (liveCaption ?? "").trim().slice(0, t.length + 30);
-            if (capStart && capStart.startsWith(t)) return null;
+            if (titleEchoesCaption(t, liveCaption)) return null;
             return <p className="text-small font-medium">{t}</p>;
           })()}
           {liveCaption ? (
