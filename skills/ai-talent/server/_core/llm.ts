@@ -165,7 +165,7 @@ const PROVIDER_CONFIG: Record<
   },
   // ─── Azure AI Foundry endpoints ─────────────────────────────────────────────
   //
-  // Resource 1: sowork-foundry-claw-api-router / proj-mkt-agent-law
+  // Resource 1: sowork-foundry-claw-api-router / onbrand
   //   Models: gpt-5.4, gpt-5.4-mini, gpt-5.4-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano,
   //           gpt-4o-mini, o3, o4-mini, grok-4-1-fast, grok-4-20-reasoning,
   //           Kimi-K2.5, Llama-3.3-70B, FW-MiniMax-M2.5, Phi-4-multimodal,
@@ -175,7 +175,7 @@ const PROVIDER_CONFIG: Record<
   "azure-foundry": {
     baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
       ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
-      : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law/openai/v1",
+      : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/onbrand/openai/v1",
     defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-5.4-mini",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
