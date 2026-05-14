@@ -429,13 +429,30 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             className="w-full text-sm font-medium text-default-900 mb-0.5 px-1 py-0.5 -mx-1 -my-0.5 rounded border-2 border-primary-400 bg-white focus:outline-none focus:border-primary-600"
           />
         ) : (
-          <h3
-            className="text-sm font-medium text-default-900 mb-0.5 line-clamp-1 cursor-text hover:bg-default-50 rounded px-1 -mx-1 transition"
-            title={displayTitle + (lang === "en" ? " · double-click to rename" : " · 雙擊重新命名")}
-            onDoubleClick={startEditing}
-          >
-            {displayTitle || (lang === "en" ? "(Untitled)" : "（未命名）")}
-          </h3>
+          /* 2026-05-14 (CJ「按標題的地方跟點進去任務的地方一樣，無法編輯」):
+             single-click title was racing with card onClick and always lost.
+             Title text → still navigates (matches user expectation: "click
+             the card to open it"). Rename is now an explicit pencil-icon
+             button that appears on card hover — also still available via
+             kebab menu's 「重新命名」. Double-click also works as a power-user
+             shortcut. */
+          <div className="relative flex items-start gap-1 mb-0.5">
+            <h3
+              className="text-sm font-medium text-default-900 line-clamp-1 flex-1 min-w-0"
+              title={displayTitle}
+              onDoubleClick={startEditing}
+            >
+              {displayTitle || (lang === "en" ? "(Untitled)" : "（未命名）")}
+            </h3>
+            <button
+              onClick={(e) => { e.stopPropagation(); startEditing(); }}
+              className="shrink-0 opacity-0 group-hover:opacity-100 transition w-5 h-5 rounded hover:bg-default-100 flex items-center justify-center text-default-400 hover:text-default-700"
+              title={lang === "en" ? "Rename" : "重新命名"}
+              aria-label={lang === "en" ? "Rename" : "重新命名"}
+            >
+              <Pencil size={11} />
+            </button>
+          </div>
         )}
         <div className="flex items-center justify-between text-[11px] text-default-500">
           <span className="truncate">{mission.brandName ?? (lang === "en" ? "(No brand)" : "（未指定品牌）")}</span>
