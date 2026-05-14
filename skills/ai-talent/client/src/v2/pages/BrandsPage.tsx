@@ -3322,7 +3322,7 @@ function EventSettingsPanel({
 function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName: string | null }) {
   const { lang } = useLang();
   const brandQuery = (trpc as any).brand?.get?.useQuery
-    ? (trpc as any).brand.get.useQuery({ id: brandId }, { refetchOnWindowFocus: false })
+    ? (trpc as any).brand.get.useQuery({ id: brandId }, { refetchOnWindowFocus: false, enabled: brandId > 0 })
     : { data: null, refetch: () => {} };
   const logoUrl: string | null = (brandQuery.data as any)?.logoUrl ?? null;
 

@@ -66,7 +66,13 @@ app.use(helmet({
       // — needed by Vite + HeroUI runtime; migration to nonce-based CSP is
       // a separate workstream.
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      // 2026-05-14 (CJ console screenshot): allow Google Fonts stylesheet
+      // load. fonts.googleapis.com serves the CSS, fonts.gstatic.com serves
+      // the actual font files (woff2). Without these, the CSP blocks the
+      // import and the page falls back to system fonts — visible flicker
+      // and console errors during onboarding.
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
       // 2026-05-12: onbrand.sowork.ai is the new primary; drop.sowork.ai retired
       // (marketing-os kept alive for backward compat).

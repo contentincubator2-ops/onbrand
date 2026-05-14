@@ -28,6 +28,18 @@ function shouldSilentSkip(err: any): boolean {
   // fire them before the new scope settles. Real not-found pages handle
   // their own UX inline.
   if (code === "NOT_FOUND") return true;
+  // 2026-05-14 (CJ onboarding screenshot): suppress Zod validation
+  // errors for empty-scope cases. When a fresh user has no brand yet,
+  // stale URL params (?b=2830 from a previous user) or default-0
+  // fallbacks can fire queries with brandId=0, which fail server-side
+  // with code="too_small" + path=["brandId"]. These are caller-mistake
+  // bugs we want to fix at the source, not user-facing problems — the
+  // UI's `enabled:` gate will settle within a tick anyway.
+  if (code === "BAD_REQUEST") {
+    const msg = String(err?.message ?? err?.shape?.message ?? "");
+    if (msg.includes('"too_small"') && msg.includes('"brandId"')) return true;
+    if (msg.includes('"path": [ "id" ]') && msg.includes('"too_small"')) return true;
+  }
   return false;
 }
 function formatErr(err: any): string {
