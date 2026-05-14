@@ -1,0 +1,59 @@
+name: Ops — Error digest (last 1h / 24h)
+# 2026-05-14 (P1): summary of error_log rows so you can check it in 30s
+# instead of opening /admin/errors. Useful during 100-user trial when
+# checking every few hours.
+on: { workflow_dispatch: {} }
+jobs:
+  digest:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+
+          echo "════ Last 1h error_log counts by source ════"
+          $MYSQL -t -e "
+            SELECT source, COUNT(*) AS n, MAX(ts) AS latest
+              FROM error_log
+             WHERE ts > NOW() - INTERVAL 1 HOUR
+             GROUP BY source
+             ORDER BY n DESC
+             LIMIT 20" 2>&1
+
+          echo ""
+          echo "════ Top 10 error messages in last 1h (by fingerprint) ════"
+          $MYSQL -t -e "
+            SELECT COUNT(*) AS n, source, LEFT(message, 100) AS message_head, MAX(ts) AS latest
+              FROM error_log
+             WHERE ts > NOW() - INTERVAL 1 HOUR
+             GROUP BY fingerprint, source, message_head
+             ORDER BY n DESC
+             LIMIT 10" 2>&1
+
+          echo ""
+          echo "════ Last 24h error_log totals ════"
+          $MYSQL -t -e "
+            SELECT
+              COUNT(*) AS total_24h,
+              COUNT(DISTINCT fingerprint) AS unique_fingerprints,
+              COUNT(DISTINCT CASE WHEN source LIKE 'frontend.%' THEN fingerprint END) AS frontend_unique,
+              COUNT(DISTINCT CASE WHEN source LIKE 'trpc.%' THEN fingerprint END) AS trpc_unique
+              FROM error_log
+             WHERE ts > NOW() - INTERVAL 24 HOUR" 2>&1
+
+          echo ""
+          echo "════ Recent unresolved (5 latest where resolvedAt IS NULL) ════"
+          $MYSQL -t -e "
+            SELECT id, source, LEFT(message, 80) AS message, ts
+              FROM error_log
+             WHERE resolvedAt IS NULL
+             ORDER BY ts DESC
+             LIMIT 5" 2>&1
+
+          echo ""
+          echo "════ pm2 onbrand last 50 error lines ════"
+          tail -50 /home/azureuser/.pm2/logs/onbrand-error.log 2>&1
