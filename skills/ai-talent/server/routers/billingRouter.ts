@@ -216,11 +216,19 @@ export const billingRouter = router({
       // 2026-05-14 (CJ「我們使用 Stripe」): expose the user's primary
       // workspace so PricingPage can call stripe.createCheckout without
       // an extra round-trip.
-      const [wsRows]: any = await localPool.execute(
-        `SELECT id FROM workspaces WHERE ownerUserId = ? ORDER BY id ASC LIMIT 1`,
-        [ctx.user!.id],
-      );
-      const workspaceId = (wsRows as any[])[0]?.id ?? null;
+      // 2026-05-14 (CJ「Unknown column 'ownerUserId'」): defensive — if
+      // the migration hasn't run yet (or table predates ownerUserId),
+      // skip silently instead of 500.
+      let workspaceId: number | null = null;
+      try {
+        const [wsRows]: any = await localPool.execute(
+          `SELECT id FROM workspaces WHERE ownerUserId = ? ORDER BY id ASC LIMIT 1`,
+          [ctx.user!.id],
+        );
+        workspaceId = (wsRows as any[])[0]?.id ?? null;
+      } catch (e) {
+        console.warn("[billing.getStatus] workspace lookup skipped:", (e as Error).message);
+      }
 
       return {
         planCode: u.planCode,

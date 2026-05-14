@@ -1755,6 +1755,34 @@ async function main() {
         INDEX idx_ws_plan (planCode, planStatus)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+    // 2026-05-14 (CJ「Unknown column 'ownerUserId' in 'where clause'」):
+    // older workspaces tables predate the multi-tenant rewrite and lack
+    // these columns. CREATE TABLE IF NOT EXISTS is a no-op when the
+    // table exists, so we ALTER each missing column idempotently.
+    const wsCols = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'workspaces'`,
+    );
+    const wsColSet = new Set<string>(((wsCols as any)[0] as any[]).map((r) => r.COLUMN_NAME));
+    const wsAlters: Array<[string, string]> = [
+      ["slug",            "ADD COLUMN slug VARCHAR(64) NOT NULL DEFAULT '' AFTER id"],
+      ["ownerUserId",     "ADD COLUMN ownerUserId INT NOT NULL DEFAULT 0 AFTER name"],
+      ["planCode",        "ADD COLUMN planCode VARCHAR(24) NOT NULL DEFAULT 'solo'"],
+      ["planStatus",      "ADD COLUMN planStatus VARCHAR(16) NOT NULL DEFAULT 'trial'"],
+      ["planEndsAt",      "ADD COLUMN planEndsAt DATETIME(3) NULL"],
+      ["billingMode",     "ADD COLUMN billingMode VARCHAR(12) NOT NULL DEFAULT 'solo'"],
+      ["whiteLabelLogo",  "ADD COLUMN whiteLabelLogo VARCHAR(500) NULL"],
+      ["whiteLabelName",  "ADD COLUMN whiteLabelName VARCHAR(160) NULL"],
+    ];
+    for (const [col, ddl] of wsAlters) {
+      if (!wsColSet.has(col)) {
+        try { await conn.execute(`ALTER TABLE workspaces ${ddl}`); }
+        catch (e) { console.warn(`[migrate] workspaces ALTER ${col} failed:`, (e as Error).message); }
+      }
+    }
+    // Ensure the idx_ws_owner index exists (for ownerUserId queries).
+    try { await conn.execute(`ALTER TABLE workspaces ADD INDEX idx_ws_owner (ownerUserId)`); }
+    catch { /* index exists */ }
     console.log("[migrate] workspaces: OK");
 
     await conn.execute(`

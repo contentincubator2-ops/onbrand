@@ -86,11 +86,21 @@ export const stripeRouter = router({
 
       // Verify workspace ownership.
       const { default: localPool } = await import("../localDb");
-      const [wRows]: any = await localPool.execute(
-        `SELECT id, name FROM workspaces WHERE id = ? AND ownerUserId = ? LIMIT 1`,
-        [input.workspaceId, ctx.user.id],
-      );
-      if (!(wRows as any[])[0]) {
+      let wRows: any[] = [];
+      try {
+        const [rows]: any = await localPool.execute(
+          `SELECT id, name FROM workspaces WHERE id = ? AND ownerUserId = ? LIMIT 1`,
+          [input.workspaceId, ctx.user.id],
+        );
+        wRows = rows as any[];
+      } catch (e) {
+        console.warn("[stripe.createCheckout] workspace lookup failed:", (e as Error).message);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Workspace 資料未就緒，請稍後再試或聯絡 SoWork",
+        });
+      }
+      if (!wRows[0]) {
         throw new TRPCError({ code: "FORBIDDEN", message: "只有 workspace owner 可以訂閱" });
       }
 
