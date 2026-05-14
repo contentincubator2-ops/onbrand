@@ -56,6 +56,8 @@ const AZURE_FOUNDRY_ENDPOINT = (
 // gpt-5-nano was removed. Override via AZURE_FOUNDRY_MODEL env. Default: Kimi-K2.5 (strong, handles zh).
 const AZURE_FOUNDRY_MODEL = process.env.AZURE_FOUNDRY_MODEL ?? "Kimi-K2.5";
 
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY ?? "";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? "anthropic/claude-3.5-sonnet";
 const AZURE_OPENAI_KEY = process.env.AZURE_OPENAI_API_KEY ?? "";
 const AZURE_OPENAI_ENDPOINT = (process.env.AZURE_OPENAI_ENDPOINT ?? "").replace(/\/+$/, "");
 const AZURE_OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT ?? "gpt-4o-mini";
@@ -237,7 +239,8 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
     } else if (provider === "azure-openai") {
       const text = await tryProvider("azure-openai", "default", (t) => callAzureOpenAI({ ...args, timeoutMs: t }));
       if (text) return { text, attempts };
-    
+    }
+  }
 
   const summary = attempts.map((a) => `${a.provider}/${a.key}: ${a.ok ? "OK" : a.error ?? "fail"}`).join(" | ");
   throw new Error(`All LLM providers failed — ${summary}`);
