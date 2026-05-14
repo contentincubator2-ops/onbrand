@@ -20,7 +20,7 @@ import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Skeleton } from "@heroui/react";
-import { Search, Plus, Folder, Clock, Trash2, Copy, Info } from "lucide-react";
+import { Search, Plus, Folder, Clock, Trash2, Copy, Info, Pencil } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe, faNewspaper, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
@@ -322,6 +322,35 @@ export default function ProjectsPage() {
 /* ─────────────────────── ProjectCard ─────────────────────── */
 function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick: () => void; lang: "zh-TW" | "en" }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // 2026-05-14 (CJ「專案名稱要可以編輯」): inline rename mode.
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState<string>(mission.title ?? "");
+  const utils = trpc.useUtils();
+  const renameMut = (trpc as any).output?.updateTitle?.useMutation
+    ? (trpc as any).output.updateTitle.useMutation({
+        onSuccess: () => {
+          (utils as any).mission?.listAllForUser?.invalidate?.();
+        },
+      })
+    : null;
+  const startEditing = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setDraftTitle(mission.title ?? "");
+    setEditing(true);
+  };
+  const commitEdit = () => {
+    const next = draftTitle.trim();
+    if (!next) { setEditing(false); return; }
+    if (next === (mission.title ?? "").trim()) { setEditing(false); return; }
+    if (renameMut) renameMut.mutate({ id: mission.id, title: next.slice(0, 120) });
+    setEditing(false);
+  };
+  const cancelEdit = (e?: React.KeyboardEvent | React.FocusEvent) => {
+    e?.stopPropagation();
+    setEditing(false);
+    setDraftTitle(mission.title ?? "");
+  };
+
   const ws = (mission.workspace ?? "other").toLowerCase();
   const icon = WORKSPACE_ICONS[ws] ?? faPenNib;
   const tone = WORKSPACE_TONE[ws] ?? "#64748B";
@@ -329,7 +358,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
   return (
     <div
       className="group relative rounded-xl bg-white border border-default-100 hover:shadow-md hover:border-default-300 transition overflow-hidden cursor-pointer"
-      onClick={onClick}
+      onClick={editing ? undefined : onClick}
     >
       {/* Thumbnail (or coloured fallback) */}
       <div
@@ -358,9 +387,32 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
 
       {/* Body */}
       <div className="p-3">
-        <h3 className="text-sm font-medium text-default-900 mb-0.5 line-clamp-1" title={mission.title ?? ""}>
-          {mission.title || (lang === "en" ? "(Untitled)" : "（未命名）")}
-        </h3>
+        {editing ? (
+          <input
+            autoFocus
+            type="text"
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
+              else if (e.key === "Escape") { e.preventDefault(); cancelEdit(e); }
+            }}
+            onBlur={commitEdit}
+            maxLength={120}
+            placeholder={lang === "en" ? "Untitled" : "未命名"}
+            className="w-full text-sm font-medium text-default-900 mb-0.5 px-1 py-0.5 -mx-1 -my-0.5 rounded border-2 border-primary-400 bg-white focus:outline-none focus:border-primary-600"
+          />
+        ) : (
+          <h3
+            className="text-sm font-medium text-default-900 mb-0.5 line-clamp-1 cursor-text hover:bg-default-50 rounded px-1 -mx-1 transition"
+            title={(mission.title ?? "") + (lang === "en" ? " · double-click to rename" : " · 雙擊重新命名")}
+            onDoubleClick={startEditing}
+          >
+            {mission.title || (lang === "en" ? "(Untitled)" : "（未命名）")}
+          </h3>
+        )}
         <div className="flex items-center justify-between text-[11px] text-default-500">
           <span className="truncate">{mission.brandName ?? (lang === "en" ? "(No brand)" : "（未指定品牌）")}</span>
           <span className="shrink-0">{formatRelative(mission.updatedAt, lang)}</span>
@@ -384,6 +436,12 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
           >
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onClick(); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2">
               <Info size={11} /> {lang === "en" ? "View details" : "查看詳細"}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); startEditing(); }}
+              className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2"
+            >
+              <Pencil size={11} /> {lang === "en" ? "Rename" : "重新命名"}
             </button>
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2 text-default-600">
               <Copy size={11} /> {lang === "en" ? "Duplicate" : "建立複本"}
