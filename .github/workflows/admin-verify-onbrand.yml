@@ -1,0 +1,17 @@
+name: Admin — Verify onbrand.sowork.ai is up
+on: { workflow_dispatch: {} }
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          echo "── localhost direct ──"
+          curl -s -o /dev/null -w "code=%{http_code} time=%{time_total}s\n" http://localhost:3101/health
+          echo "── onbrand.sowork.ai ──"
+          curl -sk -o /dev/null -w "code=%{http_code} time=%{time_total}s\n" https://onbrand.sowork.ai/health
+          echo "── marketing-os.sowork.ai (legacy?) ──"
+          curl -sk -o /dev/null -w "code=%{http_code} time=%{time_total}s\n" https://marketing-os.sowork.ai/health
+          echo "── nginx server_names configured ──"
+          sudo grep -h server_name /etc/nginx/sites-enabled/* 2>/dev/null | head -10
