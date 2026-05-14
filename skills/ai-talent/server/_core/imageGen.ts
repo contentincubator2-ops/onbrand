@@ -232,16 +232,31 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
     out = await run(effectivePrimary, primaryModelId);
   } catch (e: any) {
     errorMsg = `${effectivePrimary}: ${e?.message ?? e}`;
-    // Fall back to the env default (different from the user's pick to maximize
-    // chance of recovery). If user picked something that IS the env default,
-    // fall back to the other-half default.
-    const fbProvider: ImageProvider =
-      effectivePrimary === fallback ? primary : fallback;
-    try {
-      out = await run(fbProvider);
-      provider = fbProvider;
-    } catch (e2: any) {
-      errorMsg = `${errorMsg}\n${fbProvider}: ${e2?.message ?? e2}`;
+    // 2026-05-14 (CJ「生圖生不出來」— Pokémon 角色被 OpenAI safety
+    // system 拒絕): when the primary failure is a content-policy /
+    // safety-system block, jump STRAIGHT to PiAPI Flux Schnell instead
+    // of the env default fallback. Flux has the loosest content policy
+    // and is the most likely to succeed for branded characters.
+    const isSafetyBlock = /safety system|content_policy|rejected by the safety|content policy|moderation/i.test(errorMsg);
+    // Build a 2-step fallback list:
+    //   1) preferred fallback (PiAPI if safety-block, else env default)
+    //   2) other half of the env default
+    const fallbacks: Array<{ p: ImageProvider; modelId?: string | null }> = isSafetyBlock
+      ? [{ p: "piapi", modelId: "piapi/flux-schnell" }, { p: fallback }, { p: primary }]
+      : [{ p: effectivePrimary === fallback ? primary : fallback }, { p: "piapi", modelId: "piapi/flux-schnell" }];
+    // De-duplicate (skip the one we already tried)
+    const tried = new Set<string>([`${effectivePrimary}:${primaryModelId ?? ""}`]);
+    for (const fb of fallbacks) {
+      const key = `${fb.p}:${fb.modelId ?? ""}`;
+      if (tried.has(key)) continue;
+      tried.add(key);
+      try {
+        out = await run(fb.p, fb.modelId);
+        provider = fb.p;
+        break;
+      } catch (e2: any) {
+        errorMsg = `${errorMsg}\n${fb.p}: ${String(e2?.message ?? e2).slice(0, 200)}`;
+      }
     }
   }
 

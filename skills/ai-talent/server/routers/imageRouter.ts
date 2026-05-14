@@ -84,9 +84,24 @@ export const imageRouter = router({
       // Previously a failed result still returned 200 with url:null, leading
       // to the misleading "產圖完成但沒拿到 URL/b64" toast.
       if (result.status === "failed") {
+        // 2026-05-14: translate raw provider errors into human-readable
+        // Chinese messages so users know what to do, not just what broke.
+        const raw = String(result.errorMsg ?? "unknown");
+        let friendly = "生圖失敗，請稍後再試";
+        if (/safety system|content_policy|rejected by the safety|moderation/i.test(raw)) {
+          friendly = "OpenAI 的內容政策擋下了這個 prompt（常見原因：提到版權角色如 Pokémon / Disney / 寶可夢）。已嘗試切換到 Flux 但也失敗。建議修改 prompt — 把角色名稱換成形容（例：「圓滾滾的卡通生物」）。";
+        } else if (/quota|insufficient.*credit|balance/i.test(raw)) {
+          friendly = "AI 圖片額度暫時不足，已通知 SoWork 團隊。";
+        } else if (/rate.?limit|429/i.test(raw)) {
+          friendly = "AI 圖片服務速率限制中，請等 30 秒再試。";
+        } else if (/timeout|timed out/i.test(raw)) {
+          friendly = "生圖超時（>60 秒）。建議用 Flux Schnell 模型（最快 5-10 秒）。";
+        } else if (/key|unauthorized|api_key/i.test(raw)) {
+          friendly = "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。";
+        }
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `生圖失敗：${(result.errorMsg ?? "unknown").slice(0, 400)}`,
+          message: `${friendly}\n\n[技術細節] ${raw.slice(0, 300)}`,
         });
       }
       return result;
