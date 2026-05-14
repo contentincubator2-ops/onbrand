@@ -53,11 +53,15 @@ export default function PricingPage() {
     {
       code: "drop_pro",
       name: isEn ? "OnBrand Solo" : "OnBrand Solo",
-      sub: isEn ? "One brand, all-in" : "一個品牌、無限文案 + 圖",
-      monthly: (status as any)?.priceMonthly ?? defaults.soloEarly,
-      annual:  (status as any)?.priceAnnually ?? defaults.soloAnnual,
-      standardMonthly: (status as any)?.standardPriceMonthly ?? defaults.soloStd,
-      isEarlyBird: status?.isEarlyBird ?? true,
+      sub: isEn ? "One brand · unlimited captions + images" : "一個品牌 · 無限文案 + 圖",
+      // 2026-05-14 (CJ「定價頁面要按照新版的定價 USD300 早鳥USD100」):
+      // Pricing page shows the MARKETING offer, not the logged-in user's
+      // grandfather lock. Always derive from `defaults` so the page is
+      // the same for visitors + existing users.
+      monthly: defaults.soloEarly,
+      annual:  defaults.soloAnnual,
+      standardMonthly: defaults.soloStd,
+      isEarlyBird: true,
       members: isEn ? "1 brand · 1 user" : "1 個品牌 · 1 位用戶",
       features: isEn ? [
         "Unlimited captions (30s / 60s / 99s templates)",
