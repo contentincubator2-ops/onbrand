@@ -155,8 +155,8 @@ async function callOpenRouter(args: CallArgs): Promise<string> {
     headers: {
       Authorization: `Bearer ${OPENROUTER_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://marketing-os.sowork.ai",
-      "X-Title": "SoWork Marketing OS",
+      "HTTP-Referer": "https://onbrand.sowork.ai",
+      "X-Title": "SoWork OnBrand AI",
     },
     body: JSON.stringify({
       model: OPENROUTER_MODEL,

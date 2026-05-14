@@ -52,7 +52,7 @@ const ENV_KEY: Record<Source, string> = {
 };
 
 function callbackUrl(jobId: number): string {
-  const base = process.env.PUBLIC_APP_URL ?? "https://marketing-os.sowork.ai";
+  const base = process.env.PUBLIC_APP_URL ?? "https://onbrand.sowork.ai";
   return `${base.replace(/\/$/, "")}/api/project-sync/callback?jobId=${jobId}`;
 }
 

@@ -66,7 +66,7 @@ jobs:
         run: |
           set +e
           for i in 1 2 3 4 5 6 7 8 9 10; do
-            code=$(curl -sk -o /dev/null -w "%{http_code}" https://marketing-os.sowork.ai/api/healthz 2>/dev/null)
+            code=$(curl -sk -o /dev/null -w "%{http_code}" https://onbrand.sowork.ai/health 2>/dev/null)
             echo "try $i: $code"
             [ "$code" = "200" ] && exit 0
             sleep 3

@@ -47,7 +47,7 @@ jobs:
           fi
           # Confirm external works
           for i in 1 2 3 4 5; do
-            code=$(curl -sk -o /dev/null -w "%{http_code}" https://marketing-os.sowork.ai/health 2>/dev/null)
+            code=$(curl -sk -o /dev/null -w "%{http_code}" https://onbrand.sowork.ai/health 2>/dev/null)
             echo "try $i external: $code"
             [ "$code" = "200" ] && exit 0
             sleep 2

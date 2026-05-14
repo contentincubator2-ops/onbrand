@@ -57,4 +57,4 @@ jobs:
 
       - name: Verify
         run: |
-          curl -sk -o /dev/null -w "code=%{http_code} time=%{time_total}s\n" https://marketing-os.sowork.ai/ || true
+          curl -sk -o /dev/null -w "code=%{http_code} time=%{time_total}s\n" https://onbrand.sowork.ai/ || true
