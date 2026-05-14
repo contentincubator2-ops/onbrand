@@ -244,21 +244,36 @@ if (existsSync(publicDir)) {
   });
 }
 
-// DEBT-3: Rate limiting — 100 req/min per IP on all /api routes
-const limiter = rateLimit({
-  windowMs:        60 * 1000, // 1 min window
-  max:             100,       // max requests per window per IP
+// 2026-05-14 (CJ「系統安全穩定」P0): tiered rate limits.
+//   · General /trpc and /api: 300/min — tRPC clients batch many calls
+//     into one HTTP req but background pollers (achievements.evaluate
+//     every ~90s, support drawer poll) plus app interaction can hit 100
+//     under normal use. 300 gives 3x headroom.
+//   · /api/auth/*: 20/min — login/register/reset endpoints get a much
+//     tighter cap to slow down brute-force credential attacks. Each
+//     individual endpoint also has per-email logic (forgotByEmail map
+//     in authRouter) but raw HTTP limit catches the IP-rotation case.
+//   · /health: lenient 60/min (monitoring tools poll frequently)
+const generalLimiter = rateLimit({
+  windowMs:        60 * 1000,
+  max:             300,
   standardHeaders: true,
   legacyHeaders:   false,
-  // SEC-8: validate=false suppresses the X-Forwarded-For warning when
-  // running behind Traefik/Nginx reverse proxy with trust proxy enabled.
   validate:        false,
 });
-app.use("/api", limiter);
-app.use("/trpc", limiter);
+const authLimiter = rateLimit({
+  windowMs:        60 * 1000,
+  max:             20,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  validate:        false,
+  message:         { error: "Too many auth attempts; please wait a minute" },
+});
+app.use("/api/auth", authLimiter);  // tighter — mounted FIRST so it wins
+app.use("/api", generalLimiter);
+app.use("/trpc", generalLimiter);
 
-// SEC-7: Separate, more lenient rate limiter for /health (no version info leaked)
-const healthLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, validate: false });
+const healthLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, validate: false });
 
 // ─── Auth routes (SEC-1) ─────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
