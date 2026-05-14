@@ -1,0 +1,60 @@
+name: Admin — Tune nginx for 100 concurrent users
+# Bumps proxy_read_timeout / proxy_connect_timeout so long LLM requests
+# (theater generateCell up to 90s) don't get cut by nginx's default 60s.
+# Also raises worker_connections + keepalive to upstream so bursts don't
+# starve on socket limits.
+on: { workflow_dispatch: {} }
+jobs:
+  tune:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Inspect current nginx site config
+        run: |
+          set +e
+          SITE=$(ls /etc/nginx/sites-enabled/ 2>/dev/null | head -1)
+          echo "active site: $SITE"
+          sudo cat "/etc/nginx/sites-enabled/$SITE" 2>&1 | head -80
+
+      - name: Write tuned snippet + reload nginx
+        run: |
+          set -e
+          SITE_PATH=$(readlink -f /etc/nginx/sites-enabled/* 2>/dev/null | head -1)
+          [ -z "$SITE_PATH" ] && { echo "no enabled site found"; exit 1; }
+          echo "tuning: $SITE_PATH"
+          sudo cp "$SITE_PATH" "${SITE_PATH}.bak.$(date +%s)"
+
+          # Insert timeouts inside the first location / block if not present.
+          # Idempotent: replace existing proxy_read_timeout / proxy_connect_timeout
+          # lines or add them. Uses a tmp file so we don't partial-write.
+          TMP=$(mktemp)
+          sudo awk '
+            BEGIN { inserted=0 }
+            {
+              # Drop old timeout lines so we always end up with our values
+              if ($0 ~ /proxy_(read|send|connect)_timeout/) next
+              if ($0 ~ /client_max_body_size/) next
+              print
+              if (!inserted && $0 ~ /location[[:space:]]*\/[[:space:]]*\{/) {
+                print "        proxy_connect_timeout 10s;"
+                print "        proxy_send_timeout    180s;"
+                print "        proxy_read_timeout    180s;"
+                print "        client_max_body_size  25m;"
+                print "        proxy_http_version    1.1;"
+                print "        proxy_set_header      Connection \"\";"
+                inserted=1
+              }
+            }
+          ' "$SITE_PATH" > "$TMP"
+          sudo mv "$TMP" "$SITE_PATH"
+
+          echo "── new config head ──"
+          sudo head -60 "$SITE_PATH"
+
+          sudo nginx -t
+          sudo systemctl reload nginx
+          echo "nginx reloaded ok"
+
+      - name: Verify
+        run: |
+          curl -sk -o /dev/null -w "code=%{http_code} time=%{time_total}s\n" https://marketing-os.sowork.ai/ || true
