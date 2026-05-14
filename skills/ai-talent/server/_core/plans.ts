@@ -189,84 +189,95 @@ export const PLANS: Record<PlanCode, Plan> = {
     ],
   },
 
-  /** OnBrand 個人 — Solo plan. 1 user, single workspace.
-   *  2026-05-12 (CJ pricing decision):
-   *    - 早鳥價 NT$ 900/月 (現價)
-   *    - 標準價 NT$ 1,500/月 (之後)
-   *    - 影片功能不穩，先從方案抽掉
-   *    - 加購包之後上線（文字 + 圖像，不含影片）
+  /** OnBrand Solo — for one founder, one brand.
+   *  2026-05-14 (CJ pricing pivot):
+   *    - 早鳥 US$100/月（永久保價、現在 13 個 grandfathered 用戶用 lockedPriceTwdMonthly=900 鎖在舊價）
+   *    - 標準 US$300/月
+   *    - 1 個品牌 · 無限文案 + 無限圖 · 影片另計（roadmap）
+   *    - Fair-use: 內部每日 LLM cost cap = $5（UI 不顯示）
+   *    - 改名 / 換品牌：聯繫客服（admin tool reset）
    */
   drop_pro: {
     code: "drop_pro",
-    name: "OnBrand 個人",
-    priceTwdMonthly: 1500,                 // 標準價（新用戶看到的）
-    priceTwdAnnually: 15000,               // 標準年費
-    earlyBirdPriceTwdMonthly: 900,         // 早鳥永久價（grandfathered 用戶）
-    standardPriceTwdMonthly: 1500,         // 同 priceTwdMonthly，明示語意
-    // 2026-05-14 (CJ「美金為準」): USD = primary; TWD derives from it at NT$30/USD.
-    priceUsdMonthly: 50,                   // standard USD (= NT$1500 @ 30)
-    priceUsdAnnually: 500,                 // 10× monthly
-    earlyBirdPriceUsdMonthly: 30,          // early-bird USD (= NT$900 @ 30)
-    standardPriceUsdMonthly: 50,
+    name: "OnBrand Solo",
+    priceTwdMonthly: 9000,                 // standard (derived via FX, kept for back-compat)
+    priceTwdAnnually: 90000,
+    earlyBirdPriceTwdMonthly: 3000,        // early-bird (NT$3000 ≈ US$100)
+    standardPriceTwdMonthly: 9000,
+    // 2026-05-14 (CJ Solo pivot): USD is the canonical price.
+    priceUsdMonthly: 300,                  // standard US$300
+    priceUsdAnnually: 3000,                // 10× monthly
+    earlyBirdPriceUsdMonthly: 100,         // early-bird US$100 (永久保價 for 早鳥)
+    standardPriceUsdMonthly: 300,
     trialDays: 0,
     quota: {
-      // 2026-05-14: legacy per-task quotas removed (-1). Gating is
-      // now purely point-based — see pointsPerCycle below.
+      // 2026-05-14: legacy per-task quotas removed (-1).
       task_30s: -1,
       task_60s: -1,
       task_99s: -1,
       image_gen: -1,
-      video_gen: 0,                // 2026-05-12: 影片暫時下架
-      brands: 1,
+      video_gen: 0,                // 影片暫時下架（roadmap 加購包）
+      brands: 1,                   // ← Solo = 1 個品牌
       fb_publish: -1,
       team_members: 1,
       multi_client: false,
-      // Solo plan = 3,000 points / month
-      //   = 100× 30s tasks, or 50× 60s, or 30× 99s, or 100× Flux images
-      //   = ~10× the trial allocation
-      // Worst-case cost (all 99s @ NT$15): NT$ 450 → 50% margin vs NT$900
-      pointsPerCycle: 3000,
+      // 2026-05-14 (CJ「無限文案 + 無限圖」): pointsPerCycle = -1 means
+      // points gating is bypassed. Daily LLM cost cap (preflightCostCheck
+      // → $5/day) is the real fair-use guard for abuse cases.
+      pointsPerCycle: -1,
       pointsCycleDays: 30,
     },
     features: [
-      "1 位用戶 · 1 個品牌",
-      "30s / 60s / 99s 全部任務模板",
-      "150 張 AI 圖（Flux / GPT Image-1 / Imagen）",
-      "FB 直接發布 + 排程（無限）",
+      "1 個品牌 · 1 位用戶",
+      "無限文案（30s / 60s / 99s 全任務模板）",
+      "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
+      "FB / IG 直接發布 + 排程（無限）",
       "電子發票",
-      "影片功能優化中（之後開放加購）",
+      "影片：roadmap 加購包",
+      "改名 / 換品牌：聯繫客服",
     ],
-    highlight: "早鳥 NT$ 900／正常 NT$ 1,500",
+    highlight: "早鳥 US$100／標準 US$300",
   },
 
-  /** OnBrand Team — 5 users, multi-client workspace, monthly client reports. */
+  /** OnBrand Studio — for solo brand owners managing 2-3 brands.
+   *  2026-05-14 (CJ pricing pivot — replaces old drop_team Team plan):
+   *    - 早鳥 US$250/月
+   *    - 標準 US$750/月
+   *    - 最多 3 個品牌（self-serve 切換、不用聯繫客服）
+   *    - 1 位用戶（5 user seats 是 Q3+ roadmap）
+   *    - Fair-use: 內部每日 LLM cost cap = $15
+   */
   drop_team: {
     code: "drop_team",
-    name: "OnBrand Team · 小團隊",
-    priceTwdMonthly: 4990,
-    priceTwdAnnually: 49900,    // 12 × 4158 NTD (省 17%)
-    priceUsdMonthly: 156,
-    priceUsdAnnually: 1560,
+    name: "OnBrand Studio",
+    priceTwdMonthly: 22500,                 // standard (US$750 @ 30)
+    priceTwdAnnually: 225000,
+    earlyBirdPriceTwdMonthly: 7500,         // early-bird (US$250 @ 30)
+    standardPriceTwdMonthly: 22500,
+    priceUsdMonthly: 750,                   // standard US$750
+    priceUsdAnnually: 7500,                 // 10× monthly
+    earlyBirdPriceUsdMonthly: 250,          // early-bird US$250
+    standardPriceUsdMonthly: 750,
     trialDays: 0,
     quota: {
       task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1,
-      video_gen: 40,
-      brands: 20,
+      video_gen: 0,                // 影片暫時下架
+      brands: 3,                   // ← Studio = 最多 3 個品牌
       fb_publish: -1,
-      team_members: 5,
+      team_members: 1,             // 5 user seats 是 Q3+ roadmap
       multi_client: true,
-      // Team plan = 15,000 pts/month (5× solo)
-      pointsPerCycle: 15000,
+      pointsPerCycle: -1,          // 無限文案 + 無限圖（fair-use daily $15 cap）
       pointsCycleDays: 30,
     },
     features: [
-      "5 位用戶 · 20 個品牌",
-      "多客戶 workspace（一個帳號管多個客戶）",
-      "邀請客戶看自己品牌（viewer 角色）",
-      "月度客戶工作報表",
-      "OnBrand Pro 全部功能",
+      "最多 3 個品牌（自助切換）",
+      "每個品牌都是 Solo 規格（無限文案 + 圖）",
+      "FB / IG 直接發布 + 排程（無限）",
+      "跨品牌切換、跨品牌數據比較",
+      "電子發票（B2B）",
+      "1 位用戶（多 user seats 是 roadmap）",
     ],
-    highlight: "最適合 Agency",
+    highlight: "適合 Solo 多品牌主 / 內部工作室",
     prioritySupport: false,
   },
 

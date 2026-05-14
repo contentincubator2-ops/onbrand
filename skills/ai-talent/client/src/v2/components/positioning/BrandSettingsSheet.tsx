@@ -137,10 +137,53 @@ export function InfoTab({ brandId, brandName }: { brandId: number | null; brandN
     <div className="max-w-[700px] mx-auto p-8">
       <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Basic info" : "基本資料"}</h2>
       <p className="text-sm text-default-500 mb-6">{en ? "Name / industry / description" : "名稱 / 產業 / 描述"}</p>
-      <div className="bg-default-50 rounded-xl p-5 text-sm text-default-700 leading-relaxed">
-        <div className="mb-2"><span className="text-default-500">{en ? "Name: " : "名稱："}</span>{brandName ?? "—"}</div>
+
+      {/* 2026-05-14 (CJ Solo pricing pivot): brand name is locked post-creation.
+          The "1 brand per Solo subscription" boundary depends on the AI being
+          trained on this specific brand's positioning + voice + knowledge.
+          Allowing self-serve rename would let users effectively get 2 brands
+          on one $100 subscription. To swap or rename, customer service runs
+          a Reset-Brand admin tool that wipes positioning/knowledge/outputs. */}
+      <div className="bg-default-50 rounded-xl border border-default-200 p-5">
+        <div className="text-xs font-semibold uppercase tracking-widest text-default-500 mb-2">
+          {en ? "BRAND NAME" : "品牌名稱"}
+        </div>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg font-semibold text-default-900">{brandName ?? "—"}</span>
+          {/* Lock icon — uses inline SVG so we don't pull in another icon dep */}
+          <span title={en ? "Locked — contact support to rename" : "已鎖定 · 需要改名請聯繫客服"} className="inline-flex">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-default-400">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </span>
+        </div>
+        <p className="text-xs text-default-500 leading-relaxed">
+          {en ? (
+            <>
+              Brand name is locked after creation. The Solo plan covers <strong>one brand</strong> — the AI's
+              voice + knowledge + positioning is trained on this specific name.{" "}
+              <a href="mailto:sowork@sowork.ai?subject=Brand rename request" className="text-primary-600 hover:underline">
+                Contact support
+              </a>{" "}
+              to rename or swap to a new brand (we'll reset positioning + knowledge + outputs).
+            </>
+          ) : (
+            <>
+              品牌名稱建立後不能自助修改。Solo 方案包含 <strong>一個品牌</strong> — AI 的語氣、知識、定位都是針對這個名字訓練的。
+              {" "}
+              <a href="mailto:sowork@sowork.ai?subject=品牌改名 / 換品牌申請" className="text-primary-600 hover:underline">
+                聯繫客服
+              </a>
+              {" "}申請改名或換成新品牌（會清空目前的定位 / 知識 / 產出紀錄）。
+            </>
+          )}
+        </p>
+      </div>
+
+      <div className="bg-default-50 rounded-xl p-5 mt-4 text-sm text-default-700 leading-relaxed">
         <div className="text-default-400 italic">{en ? "Industry / description editor coming next (wired to brand.update)" : "產業 / 描述編輯介面接下來會接上（用 brand.update mutation）"}</div>
-        <div className="text-default-400 italic mt-1">brandId: {brandId}</div>
+        <div className="text-default-400 italic mt-1 font-mono text-tiny">brandId: {brandId}</div>
       </div>
     </div>
   );

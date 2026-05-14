@@ -39,78 +39,70 @@ export default function PricingPage() {
   // 2026-05-14 (CJ「美金為準，每天匯率動」): USD truth, TWD derives at live rate.
   const usdToTwd = (status as any)?.usdToTwd ?? 32;
   const r = (usd: number) => Math.round(usd * usdToTwd);
+  // 2026-05-14 (CJ Solo + Studio pricing pivot):
+  //   Solo  US$100 early / US$300 std · 1 brand · unlimited text+image
+  //   Studio US$250 early / US$750 std · 3 brands · unlimited each
+  //   Agency = roadmap, replaced with "聯繫業務" CTA below the grid
   const defaults = currency === "USD"
-    ? { soloEarly: 30, soloStd: 50, soloAnnual: 300, team: 160, teamAnnual: 1600, agency: 500, agencyAnnual: 5000 }
-    : { soloEarly: r(30), soloStd: r(50), soloAnnual: r(300), team: r(160), teamAnnual: r(1600), agency: r(500), agencyAnnual: r(5000) };
+    ? { soloEarly: 100, soloStd: 300, soloAnnual: 1000, studioEarly: 250, studioStd: 750, studioAnnual: 2500 }
+    : { soloEarly: r(100), soloStd: r(300), soloAnnual: r(1000), studioEarly: r(250), studioStd: r(750), studioAnnual: r(2500) };
 
-  // 2026-05-11 — 4-tier pricing: Solo / Team / Agency / Enterprise.
+  // 2-tier pricing: Solo (1 brand) + Studio (3 brands). Agency moved out
+  // of the grid into a "聯繫業務" footer card.
   const TIERS = [
     {
       code: "drop_pro",
-      name: isEn ? "OnBrand Solo" : "OnBrand 個人",
-      sub: isEn ? "For solo operators" : "個人操盤者",
+      name: isEn ? "OnBrand Solo" : "OnBrand Solo",
+      sub: isEn ? "One brand, all-in" : "一個品牌、無限文案 + 圖",
       monthly: (status as any)?.priceMonthly ?? defaults.soloEarly,
       annual:  (status as any)?.priceAnnually ?? defaults.soloAnnual,
       standardMonthly: (status as any)?.standardPriceMonthly ?? defaults.soloStd,
       isEarlyBird: status?.isEarlyBird ?? true,
-      members: isEn ? "1 user · 1 brand" : "1 位用戶 · 1 個品牌",
+      members: isEn ? "1 brand · 1 user" : "1 個品牌 · 1 位用戶",
       features: isEn ? [
-        "All 30s / 60s / 99s task templates",
-        "30 posts · 150 AI images / month",
-        "Publish + schedule to Facebook (unlimited)",
+        "Unlimited captions (30s / 60s / 99s templates)",
+        "Unlimited AI images (Flux / GPT Image-1 / Imagen / Ideogram)",
+        "Publish + schedule to FB / IG (unlimited)",
         "E-invoices (personal / B2B)",
-        "Video features coming (paused for now)",
+        "Video: roadmap add-on",
+        "Rename / swap brand: contact support",
       ] : [
-        "30s / 60s / 99s 全部任務模板",
-        "30 篇貼文 · 150 張 AI 圖 / 月",
-        "FB 直接發布 + 排程（無限）",
+        "無限文案（30s / 60s / 99s 全任務模板）",
+        "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
+        "FB / IG 直接發布 + 排程（無限）",
         "電子發票（個人 / B2B）",
-        "影片功能加購中（暫時下架）",
+        "影片：roadmap 加購包",
+        "改名 / 換品牌：聯繫客服",
       ],
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
-      // 2026-05-12 (CJ「solo 是主推」): highlight the solo plan since
-      // that's the only one we're actively selling right now. Team /
-      // Agency stay listed but de-emphasized.
       highlight: true,
       highlightLabel: isEn ? "EARLY BIRD · LOCKED FOREVER" : "早鳥優惠 · 永久保價",
     },
     {
       code: "drop_team",
-      name: "OnBrand Team",
-      sub: isEn ? "5-person teams · agency starter" : "5 人小團隊 / Agency 入門",
-      monthly: defaults.team, annual: defaults.teamAnnual,
-      members: isEn ? "5 users · 20 brands" : "5 位用戶 · 20 個品牌",
+      name: "OnBrand Studio",
+      sub: isEn ? "Up to 3 brands, self-serve switching" : "最多 3 個品牌、自助切換",
+      monthly: defaults.studioEarly,
+      annual: defaults.studioAnnual,
+      standardMonthly: defaults.studioStd,
+      isEarlyBird: status?.isEarlyBird ?? true,
+      members: isEn ? "3 brands · 1 user" : "3 個品牌 · 1 位用戶",
       features: isEn ? [
-        "Multi-client workspace (one account, many clients)",
-        "Invite clients as viewers of their own brand",
-        "Monthly client work report",
-        "Everything in OnBrand Solo",
+        "Up to 3 brands (self-serve switching)",
+        "Each brand at Solo spec (unlimited text + image)",
+        "Cross-brand analytics + comparison",
+        "Publish + schedule to FB / IG (unlimited)",
+        "E-invoices (B2B)",
+        "1 user · more seats on roadmap",
       ] : [
-        "多客戶 workspace（一帳號管多客戶）",
-        "邀請客戶以 viewer 角色看自己品牌",
-        "月度客戶工作報表",
-        "OnBrand 個人全部功能",
+        "最多 3 個品牌（自助切換、不用聯繫客服）",
+        "每個品牌都是 Solo 規格（無限文案 + 圖）",
+        "跨品牌數據比較",
+        "FB / IG 直接發布 + 排程（無限）",
+        "電子發票（B2B）",
+        "1 位用戶 · 多 user seats 是 roadmap",
       ],
-      cta: isEn ? "Go Team" : "升級到 Team",
-    },
-    {
-      code: "drop_agency",
-      name: "OnBrand Agency",
-      sub: isEn ? "Agencies · multi-client ops" : "代理商 / 多客戶營運",
-      monthly: defaults.agency, annual: defaults.agencyAnnual,
-      members: isEn ? "Unlimited users · unlimited brands" : "無限用戶 · 無限品牌",
-      features: isEn ? [
-        "White label (your logo + name)",
-        "API access (plug into your workflow)",
-        "Priority support + 1-on-1 onboarding",
-        "Everything in OnBrand Team",
-      ] : [
-        "White Label（換 logo + 公司名）",
-        "API 存取（接你自己的 workflow）",
-        "優先客服 + 1 對 1 onboarding",
-        "OnBrand Team 全部功能",
-      ],
-      cta: isEn ? "Go Agency" : "升級到 Agency",
+      cta: isEn ? "Go Studio" : "升級到 Studio",
     },
   ];
 
@@ -200,8 +192,8 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* 3-tier grid */}
-        <div className="grid gap-5 md:grid-cols-3 mb-10">
+        {/* 2-tier grid + Agency contact card */}
+        <div className="grid gap-5 md:grid-cols-2 mb-6 max-w-3xl mx-auto">
           {TIERS.map((tier) => (
             <div
               key={tier.code}
@@ -317,21 +309,21 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Enterprise row */}
-        <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3">
+        {/* Agency / Enterprise — placeholder for future tier */}
+        <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3 max-w-3xl mx-auto">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">
-              ENTERPRISE · CUSTOM
+              AGENCY · CUSTOM
             </p>
-            <p className="text-base font-semibold text-neutral-900">{isEn ? "Enterprise" : "企業版"}</p>
+            <p className="text-base font-semibold text-neutral-900">{isEn ? "Agency / Enterprise" : "Agency / 企業版"}</p>
             <p className="text-sm text-neutral-700 mt-1 max-w-xl">
               {isEn
-                ? "Unlimited quota · custom LoRA brand style library · SLA · dedicated CSM · on-prem deployment"
-                : "無限額度 · 客製 LoRA 品牌風格庫 · SLA 承諾 · 專屬 CSM · On-prem 部署"}
+                ? "Unlimited brands · multi-user seats · white label · API access · priority support — pricing tailored to your team"
+                : "無限品牌 · 多 user seats · White Label · API access · 優先客服 — 依團隊規模客製報價"}
             </p>
           </div>
           <a
-            href={isEn ? "mailto:sowork@sowork.ai?subject=Enterprise inquiry" : "mailto:sowork@sowork.ai?subject=企業版洽詢"}
+            href={isEn ? "mailto:sowork@sowork.ai?subject=Agency / Enterprise inquiry" : "mailto:sowork@sowork.ai?subject=Agency 方案洽詢"}
             className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
           >
             {isEn ? "Talk to sales →" : "聯繫業務 →"}
