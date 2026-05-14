@@ -3,7 +3,7 @@
  * Automatically selects the best AI model based on task type and available API keys.
  *
  * Azure AI Foundry endpoints (4 resources, 42+ deployments):
- *   azure-foundry    — sowork-foundry-claw-api-router / proj-mkt-agent-law
+ *   azure-foundry    — sowork-foundry-claw-api-router / onbrand
  *                      gpt-5.4/mini/nano, gpt-4.1/mini/nano, gpt-4o-mini, o3, o4-mini,
  *                      grok-4-1/grok-4-20, Kimi-K2.5, Llama-3.3-70B, FLUX.2, embeddings
  *   azure-position   — sowork-ai-position-resource
