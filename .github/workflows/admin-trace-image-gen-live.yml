@@ -1,0 +1,33 @@
+name: Admin — Trace recent image.generate calls
+on: { workflow_dispatch: {} }
+jobs:
+  trace:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          AI=/opt/marketing-os/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+
+          echo "════ Last 10 generated_images rows ════"
+          $MYSQL -e "SELECT id, brandId, provider, model, LEFT(prompt,40) AS prompt40, status, LEFT(errorMsg,120) AS err, createdAt FROM generated_images ORDER BY id DESC LIMIT 10" -t
+
+          echo ""
+          echo "════ Last 200 ERROR log lines mentioning image / OpenAI / PiAPI / generate ════"
+          LOG_ERR=/home/$(whoami)/.pm2/logs/marketing-os-error.log
+          tail -400 "$LOG_ERR" 2>/dev/null | grep -iE "image\.generate|generateImage|OpenAI image|PiAPI|invokeLLM.*image|image gen|Image (gen|provider)|insufficient.*credit|content_policy" | tail -40
+
+          echo ""
+          echo "════ Last 100 OUT log lines mentioning image.generate ════"
+          LOG_OUT=/home/$(whoami)/.pm2/logs/marketing-os-out.log
+          tail -1500 "$LOG_OUT" 2>/dev/null | grep -iE "image\.generate|generateImage|Trial wallet|assertWithinPlan|image_gen quota" | tail -30
+
+          echo ""
+          echo "════ Plans / billing: user 199 status ════"
+          $MYSQL -e "SELECT id, email, planCode, planEndsAt FROM users WHERE id=199" -t 2>&1 | head -5
+          echo ""
+          echo "── quota usage today (image_gen) ──"
+          $MYSQL -e "SELECT kind, COUNT(*) AS n, MAX(ts) AS lastAt FROM quota_usage WHERE userId=199 AND DATE(ts)=CURDATE() GROUP BY kind" -t 2>&1 | head -10
