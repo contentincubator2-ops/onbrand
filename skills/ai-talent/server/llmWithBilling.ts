@@ -57,12 +57,17 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
   } catch {/* if plan lookup fails, fall through to standard checks */}
 
   // 1. Wallet floor check (re-uses checkEnoughCredits from deductCredits)
+  //    2026-05-15 (CJ「完整後端測試」): SEC — fail CLOSED. Previously this
+  //    catch swallowed DB blips, letting a $0 user start a $$-burning task.
   try {
     const c = await checkEnoughCredits(userId, MIN_CREDITS_TO_RUN);
     if (!c.enough) {
       return { ok: false, reason: `餘額不足（剩 ${c.totalAvailable} credits，需要至少 ${MIN_CREDITS_TO_RUN}）。請充值或聯絡客服。` };
     }
-  } catch {/* checkEnoughCredits is best-effort; continue */}
+  } catch (err) {
+    console.error("[preflightCostCheck] wallet check failed", err);
+    return { ok: false, reason: "計費系統暫時無法驗證額度，請稍後再試或聯絡客服。" };
+  }
 
   // 2. Rolling 24h $ cap from usage_log — plan-aware:
   //    Trial=$3 · Solo=$5 · Studio=$15 · Agency/Enterprise=∞ (returned earlier).

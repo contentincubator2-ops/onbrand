@@ -348,7 +348,8 @@ export const brandRouter = router({
       const rows = await db.select().from(brands)
         .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
         .limit(1);
-      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      // 2026-05-15: read-side — null over NOT_FOUND. Frontend null-safe.
+      if (!rows[0]) return null;
 
       const cleanLinks: Record<string, string> = {};
       if (input.socialLinks) {
@@ -389,14 +390,30 @@ export const brandRouter = router({
     .query(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
       // Ownership check + base brand data
+      // 2026-05-15 (CJ「完整後端測試」): `fb_page_id` column does not
+      // exist on brands — FB binding lives in `socialLinks` JSON. The old
+      // SELECT was throwing on every call, which is why the brain panel
+      // showed all zeros (whole query crashed before counting).
       const [bRows]: any = await localPool.execute(
         `SELECT id, name, positioning, positioningStatus, logoUrl,
-                primaryColor, fb_page_id AS fbPageId
+                primaryColor, socialLinks
            FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
         [input.brandId, ctx.user.id],
       );
       const brand = (bRows as any[])[0];
       if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
+      // Derive FB / IG connection from socialLinks json
+      let fbPageId: string | null = null;
+      let igUserId: string | null = null;
+      try {
+        const sl = typeof brand.socialLinks === "string"
+          ? JSON.parse(brand.socialLinks || "{}")
+          : (brand.socialLinks ?? {});
+        fbPageId = sl?.facebook?.pageId ?? sl?.fb?.pageId ?? sl?.facebookPageId ?? null;
+        igUserId = sl?.instagram?.userId ?? sl?.ig?.userId ?? sl?.instagramUserId ?? null;
+      } catch { /* tolerated */ }
+      (brand as any).fbPageId = fbPageId;
+      (brand as any).igUserId = igUserId;
 
       // Positioning completion — count keys in the JSON. Treat
       // positioningStatus='completed' as "locked", anything else as unlocked.
@@ -471,7 +488,7 @@ export const brandRouter = router({
         },
         connections: {
           fb: !!brand.fbPageId,
-          ig: false,  // wired when IG binding lands
+          ig: !!brand.igUserId,
         },
         outputs: {
           totalCount: totalOutputs,
@@ -498,7 +515,8 @@ export const brandRouter = router({
       }).from(brands)
         .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
         .limit(1);
-      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      // 2026-05-15: read-side — null over NOT_FOUND. Frontend null-safe.
+      if (!rows[0]) return null;
       return rows[0];
     }),
 
@@ -521,7 +539,8 @@ export const brandRouter = router({
       const rows = await db.select().from(brands)
         .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
         .limit(1);
-      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      // 2026-05-15: read-side — null over NOT_FOUND. Frontend null-safe.
+      if (!rows[0]) return null;
       const patch: Record<string, any> = {};
       if (input.primaryColor     !== undefined) patch.primaryColor     = input.primaryColor;
       if (input.secondaryColor   !== undefined) patch.secondaryColor   = input.secondaryColor;
@@ -1101,10 +1120,12 @@ export const brandRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) return null;
+      // 2026-05-15 (CJ「完整後端測試」): SEC — was missing userId clause,
+      // any logged-in user could read any brand's positioning. Tighten.
       const [rows] = await db.execute(
         sql`SELECT tagline, valueProposition, targetMarket, audienceA, audienceB,
                emotionalDiff, functionalDiff, isEstimate, positioningStatus, name, description, industry
-          FROM brands WHERE id=${input.brandId}
+          FROM brands WHERE id=${input.brandId} AND userId=${ctx.user.id}
           LIMIT 1`
       ) as any;
       const row = rows?.[0] ?? null;
