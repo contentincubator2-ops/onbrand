@@ -1,0 +1,75 @@
+name: Ops — Probe prod backend (one-shot smoke)
+
+# 2026-05-15 (CJ「完整後端測試」):
+# Health-checks the running onbrand process: pm2 status, error log tail,
+# HTTP probe of common endpoints, DB row counts, grandfather state.
+# Use this to surface "where is it actually broken in prod" without
+# guessing from local code.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - run: |
+          set +e
+          echo "════ pm2 status ════"
+          pm2 jlist 2>/dev/null | jq -r '.[] | "\(.name)\t\(.pm2_env.status)\trestarts=\(.pm2_env.restart_time)"' 2>/dev/null || pm2 list | head -20
+          echo ""
+          echo "════ Last 80 lines onbrand error log ════"
+          tail -80 /root/.pm2/logs/onbrand-error.log 2>/dev/null \
+            || tail -80 ~/.pm2/logs/onbrand-error.log 2>/dev/null \
+            || echo "no error log"
+          echo ""
+          echo "════ Recent error/fail lines in onbrand-out.log ════"
+          (tail -300 /root/.pm2/logs/onbrand-out.log 2>/dev/null \
+             || tail -300 ~/.pm2/logs/onbrand-out.log 2>/dev/null) \
+            | grep -i -E "error|fail|exception|TRPCError|throw |undefined|cannot find" \
+            | tail -40
+          echo ""
+          echo "════ Health endpoints (anon) ════"
+          for p in /health /api/trpc/auth.me /api/trpc/billing.getStatus /api/trpc/brand.list ; do
+            code=$(curl -s -o /tmp/r -w "%{http_code}" "http://127.0.0.1:3101$p")
+            echo "  $p → HTTP $code"
+            head -c 240 /tmp/r ; echo
+          done
+          echo ""
+          echo "════ DB row counts ════"
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV" 2>/dev/null; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
+          for t in users brands missions mission_outputs brand_knowledge_items brand_caption_rules user_wallets billing_charges ; do
+            n=$($MYSQL -N -s -e "SELECT COUNT(*) FROM $t" 2>&1)
+            printf "  %-28s %s\n" "$t" "$n"
+          done
+          echo ""
+          echo "════ users state ════"
+          $MYSQL -e "
+            SELECT earlyBird, COUNT(*) AS n,
+              SUM(CASE WHEN lockedPriceTwdMonthly IS NOT NULL THEN 1 ELSE 0 END) still_locked,
+              SUM(CASE WHEN isActive = 1 THEN 1 ELSE 0 END) active,
+              SUM(CASE WHEN emailVerified = 1 THEN 1 ELSE 0 END) verified
+            FROM users GROUP BY earlyBird;
+          " 2>&1 | head -10
+          echo ""
+          echo "════ Missions stuck in running state (> 5min) ════"
+          $MYSQL -e "
+            SELECT id, brandId, status, kind, createdAt
+              FROM missions
+             WHERE status IN ('running','pending','queued')
+               AND createdAt < NOW() - INTERVAL 5 MINUTE
+             ORDER BY id DESC LIMIT 10;
+          " 2>&1 | head -15
+          echo ""
+          echo "════ Recent mission_outputs sample (last 5) ════"
+          $MYSQL -e "
+            SELECT id, missionId, status, LEFT(IFNULL(title,''), 30) AS title, createdAt
+              FROM mission_outputs
+             ORDER BY id DESC LIMIT 5;
+          " 2>&1 | head -10
+          echo ""
+          echo "════ Done ════"
