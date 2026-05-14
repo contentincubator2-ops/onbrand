@@ -4,11 +4,15 @@ module.exports = {
     script: './node_modules/.bin/tsx',
     args: 'server/index.ts',
     cwd: '/home/azureuser/marketing-os/skills/ai-talent',
-    instances: 1,
-    exec_mode: 'fork',
+    // 2026-05-14: cluster mode for 100-user trial scale. 2 workers use
+    // 2 cores; node event loop is no longer the single choke point under
+    // burst LLM traffic. See .github/workflows/admin-pm2-cluster-mode.yml
+    // for caveats (per-worker in-memory rate limiters / OAuth state).
+    instances: 2,
+    exec_mode: 'cluster',
     max_restarts: 10,
     restart_delay: 5000,
-    max_memory_restart: '512M',
+    max_memory_restart: '768M',
     env: {
       NODE_ENV: 'production',
       SKILLS_PATH: '/home/azureuser/A2A-Marketing-Claw/skills',

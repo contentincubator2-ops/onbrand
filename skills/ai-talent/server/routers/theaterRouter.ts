@@ -20,6 +20,7 @@ import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywrit
 import { resolveAgentId } from "../_core/agentAssignments";
 import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
+import { withUserLLMSlot } from "../_core/userLLMSemaphore";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
 import localPool from "../localDb";
@@ -581,7 +582,7 @@ ${platformAsks}
       // across the whole week.
       priorOpenings: z.array(z.string()).max(20).optional(),
     }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
       const [brandRules, knowledgeBlock, realContent] = await Promise.all([
         loadBrandRules(input.brandId, ctx.user.id),
         loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
@@ -796,7 +797,7 @@ ${importantHint}
       } catch (e: any) {
         return { ok: false as const, caption: "", structured: {}, error: String(e?.message ?? e) };
       }
-    }),
+    })),
 
   /**
    * QA pass — Chun-Hao Chen (資深社群編輯) reviews the writer's draft.
@@ -820,7 +821,7 @@ ${importantHint}
       cta:      z.enum(CTA_KEYS).optional(),
       usp:      z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
       // 1) Cheap programmatic dedupe (the restart-pattern we already know)
       let cleaned = dedupeRestart(input.draft);
 
@@ -889,7 +890,7 @@ ${cleaned}
         // QA fail → return programmatic-clean version (still better than draft)
         return { ok: true as const, caption: dedupeRestart(cleaned), polished: false as const, error: String(e?.message ?? e) };
       }
-    }),
+    })),
 
   /**
    * Generate the cell's hero image via PiAPI flux-schnell. ~6-12s.
@@ -903,7 +904,7 @@ ${cleaned}
       caption: z.string().min(1).max(3000),
       brandTagline: z.string().nullable().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
       // 1) Caption → short visual brief
       let brief = "";
       try {
@@ -945,7 +946,7 @@ ${cleaned}
       } catch (e: any) {
         return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
       }
-    }),
+    })),
 
   // ─── Brand caption rules CRUD (Phase 3a) ────────────────────────────
   // User adds rules via the 修改規則 modal. Only brand-scope rules are
