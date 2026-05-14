@@ -43,7 +43,7 @@ jobs:
           echo ""
           echo "════ Latest positioning_jobs per brand ════"
           $MYSQL -e "
-            SELECT pj.entityId AS brandId, b.brandName,
+            SELECT pj.entityId AS brandId, b.name,
                    pj.status, pj.currentStep, pj.totalSteps,
                    LEFT(IFNULL(pj.lastError,''), 50) AS lastErr,
                    pj.startedAt, pj.finishedAt
@@ -59,7 +59,7 @@ jobs:
           echo ""
           echo "════ ⚠ Pipeline DONE but brand NOT finalized (headline bug) ════"
           $MYSQL -e "
-            SELECT pj.entityId AS brandId, b.brandName,
+            SELECT pj.entityId AS brandId, b.name,
                    pj.status AS jobStatus, pj.finishedAt,
                    b.positioningStatus AS brandStatus,
                    b.isEstimate

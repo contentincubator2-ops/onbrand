@@ -1,0 +1,109 @@
+name: Ops — Finalize all positioned brands (backfill 2026-05-15)
+
+# 2026-05-15 (CJ「自動定位流程要跑完，資料要填完」):
+# Audit showed 35/35 brands have soworkAnalysis populated (pipeline ran)
+# but 0/35 marked positioningStatus='completed'. This workflow walks
+# every brand with non-empty soworkAnalysis JSON and:
+#   1. Projects 7 estimate columns via SQL JSON_EXTRACT (defensive)
+#   2. Sets positioningStatus='completed', onboardingStep=11, isEstimate=0
+#   3. Only fills empty columns (COALESCE NULLIF) — manual edits preserved
+#
+# Idempotent. Safe to re-run. Reports BEFORE/AFTER counts.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
+
+          echo "════ BEFORE ════"
+          $MYSQL -e "
+            SELECT
+              COUNT(*) AS total,
+              SUM(positioningStatus='completed') AS finalized,
+              SUM(isEstimate=1) AS marked_estimate,
+              SUM(soworkAnalysis IS NOT NULL AND JSON_LENGTH(soworkAnalysis) > 0) AS has_analysis
+            FROM brands;
+          "
+
+          echo ""
+          echo "════ Backfilling … ════"
+          # 7 column projections via JSON_UNQUOTE(JSON_EXTRACT(...)). Each
+          # COALESCE chain mirrors the dot-path candidates in
+          # positioningJobRunner.pickStr().
+          $MYSQL -e "
+            UPDATE brands
+               SET tagline = COALESCE(NULLIF(tagline, ''),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.messagingStrategy.tagline')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.taglineCreative.tagline')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.taglineCandidates[0]'))
+                   ),
+                   valueProposition = COALESCE(NULLIF(valueProposition, ''),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.valueProposition.headline')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.valueProposition.statement')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.differentiation.positioningStatement'))
+                   ),
+                   targetMarket = COALESCE(NULLIF(targetMarket, ''),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.targetAudience.primarySegment')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.targetAudience.segment')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.targetAudience.summary'))
+                   ),
+                   audienceA = COALESCE(NULLIF(audienceA, ''),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.targetAudience.primary')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.targetAudience.personaA'))
+                   ),
+                   audienceB = COALESCE(NULLIF(audienceB, ''),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.targetAudience.secondary')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.targetAudience.personaB'))
+                   ),
+                   emotionalDiff = COALESCE(NULLIF(emotionalDiff, ''),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.differentiation.emotional')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.brandPersonality.emotionalDriver'))
+                   ),
+                   functionalDiff = COALESCE(NULLIF(functionalDiff, ''),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.differentiation.functional')),
+                     JSON_UNQUOTE(JSON_EXTRACT(soworkAnalysis, '\$.valueProposition.functionalBenefit'))
+                   ),
+                   positioningStatus = 'completed',
+                   onboardingStep = 11,
+                   isEstimate = 0
+             WHERE soworkAnalysis IS NOT NULL
+               AND JSON_LENGTH(soworkAnalysis) > 0;
+          "
+
+          echo ""
+          echo "════ AFTER ════"
+          $MYSQL -e "
+            SELECT
+              COUNT(*) AS total,
+              SUM(positioningStatus='completed') AS finalized,
+              SUM(isEstimate=1) AS marked_estimate,
+              SUM(tagline IS NOT NULL AND tagline <> '')                  AS has_tagline,
+              SUM(valueProposition IS NOT NULL AND valueProposition <> '') AS has_vp,
+              SUM(targetMarket IS NOT NULL AND targetMarket <> '')         AS has_tm,
+              SUM(audienceA IS NOT NULL AND audienceA <> '')               AS has_audA,
+              SUM(emotionalDiff IS NOT NULL AND emotionalDiff <> '')       AS has_emo,
+              SUM(functionalDiff IS NOT NULL AND functionalDiff <> '')     AS has_func
+            FROM brands;
+          "
+
+          echo ""
+          echo "════ Sample of newly-projected fields (first 5 brands) ════"
+          $MYSQL -e "
+            SELECT id, LEFT(name, 14) AS name, positioningStatus,
+                   LEFT(IFNULL(tagline,''), 30) AS tagline,
+                   LEFT(IFNULL(valueProposition,''), 30) AS vp,
+                   LEFT(IFNULL(audienceA,''), 30) AS audA
+              FROM brands
+             WHERE soworkAnalysis IS NOT NULL AND JSON_LENGTH(soworkAnalysis) > 0
+             ORDER BY id LIMIT 5;
+          "
