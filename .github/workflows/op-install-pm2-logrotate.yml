@@ -1,0 +1,29 @@
+name: Ops — Install pm2-logrotate
+# 2026-05-14 (P0-2): pm2 logs grow unbounded. At ~100 users / day we'd write
+# 0.5-2GB/day to onbrand-out.log + onbrand-error.log. pm2-logrotate rolls
+# files at size, keeps a retention window, and optionally gzips.
+on: { workflow_dispatch: {} }
+jobs:
+  install:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Install module + configure
+        run: |
+          set -e
+          pm2 install pm2-logrotate
+          # 10MB per file, keep 14 rotations (so ~140MB max per process)
+          pm2 set pm2-logrotate:max_size 10M
+          pm2 set pm2-logrotate:retain 14
+          pm2 set pm2-logrotate:compress true
+          pm2 set pm2-logrotate:dateFormat YYYY-MM-DD_HH-mm-ss
+          pm2 set pm2-logrotate:workerInterval 30
+          pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
+          echo "── pm2-logrotate config ──"
+          pm2 conf pm2-logrotate
+
+      - name: Verify
+        run: |
+          ls -la /home/azureuser/.pm2/logs/ | head -10
+          echo ""
+          du -sh /home/azureuser/.pm2/logs/ 2>/dev/null
