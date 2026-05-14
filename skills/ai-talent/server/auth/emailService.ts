@@ -116,21 +116,21 @@ export async function sendEmailVerification(data: {
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">歡迎加入 SoWork Marketing</h1>
+          <h1 style="color: white; margin: 0; font-size: 28px;">歡迎加入 OnBrand</h1>
         </div>
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px; margin-bottom: 20px;">您好 <strong>${data.name}</strong>，</p>
-          <p style="font-size: 16px; margin-bottom: 20px;">感謝您註冊 SoWork Marketing！請點擊下方按鈕驗證您的電子郵件地址：</p>
+          <p style="font-size: 16px; margin-bottom: 20px;">感謝您註冊 OnBrand！請點擊下方按鈕驗證您的電子郵件地址：</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${data.verifyUrl}" style="display: inline-block; background: #667eea; color: white; padding: 15px 40px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">驗證電子郵件</a>
           </div>
           <p style="font-size: 14px; color: #666; margin-bottom: 10px;">或複製以下連結到瀏覽器：</p>
           <p style="font-size: 12px; color: #999; word-break: break-all; background: #eee; padding: 10px; border-radius: 5px;">${data.verifyUrl}</p>
           <p style="font-size: 14px; color: #666; margin-top: 20px;">此連結將在 24 小時後失效。</p>
-          <p style="font-size: 14px; color: #999; margin-top: 30px;">如果您沒有註冊 SoWork Marketing，請忽略此郵件。</p>
+          <p style="font-size: 14px; color: #999; margin-top: 30px;">如果您沒有註冊 OnBrand，請忽略此郵件。</p>
         </div>
         <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #999;">
-          <p>&copy; 2025 SoWork Marketing. All rights reserved.</p>
+          <p>&copy; 2025 OnBrand. All rights reserved.</p>
         </div>
       </body>
     </html>
@@ -138,7 +138,7 @@ export async function sendEmailVerification(data: {
 
   await sendEmail({
     to: data.to,
-    subject: "驗證您的電子郵件 - SoWork Marketing",
+    subject: "驗證您的電子郵件 - OnBrand",
     html,
   });
 }
@@ -175,7 +175,7 @@ export async function sendPasswordReset(data: {
           <p style="font-size: 14px; color: #999; margin-top: 30px;">如果您沒有請求重設密碼，請忽略此郵件。</p>
         </div>
         <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #999;">
-          <p>&copy; 2025 SoWork Marketing. All rights reserved.</p>
+          <p>&copy; 2025 OnBrand. All rights reserved.</p>
         </div>
       </body>
     </html>
@@ -183,7 +183,7 @@ export async function sendPasswordReset(data: {
 
   await sendEmail({
     to: data.to,
-    subject: "重設您的密碼 - SoWork Marketing",
+    subject: "重設您的密碼 - OnBrand",
     html,
   });
 }

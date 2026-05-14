@@ -1,0 +1,75 @@
+name: Ops — Set APP_URL in prod .env
+
+# 2026-05-14 (CJ「驗證連結 host 要調整為 onbrand.sowork.ai」)
+#
+# APP_URL is used to build verify-email + password-reset links in emails.
+# Change it from marketing-os.sowork.ai → onbrand.sowork.ai (or whatever
+# the public-facing host is) so users get clickable links to the right
+# host.
+#
+# Common values:
+#   - https://onbrand.sowork.ai           ← current public host
+#   - https://marketing-os.sowork.ai      ← legacy host (pre-rebrand)
+#
+# Safe to re-run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "APP_URL value (no trailing slash, must include https://)"
+        required: true
+        default: "https://onbrand.sowork.ai"
+
+jobs:
+  set-app-url:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update .env on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          NEW_VAL: ${{ inputs.app_url }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: NEW_VAL
+          script: |
+            set -e
+            ENV_FILE=/opt/onbrand/app/skills/ai-talent/.env
+
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "❌ .env not found at $ENV_FILE"; exit 1
+            fi
+
+            # Basic URL shape check
+            case "$NEW_VAL" in
+              https://*) ;;
+              *) echo "❌ value '$NEW_VAL' must start with https://"; exit 1 ;;
+            esac
+
+            # Strip any trailing slash
+            NEW_VAL="${NEW_VAL%/}"
+
+            if grep -qE "^APP_URL=" "$ENV_FILE"; then
+              awk -v val="$NEW_VAL" '
+                /^APP_URL=/ { print "APP_URL=" val; next }
+                { print }
+              ' "$ENV_FILE" > "${ENV_FILE}.tmp" && mv "${ENV_FILE}.tmp" "$ENV_FILE"
+              echo "  ✓ updated APP_URL"
+            else
+              echo "APP_URL=$NEW_VAL" >> "$ENV_FILE"
+              echo "  ✓ appended APP_URL"
+            fi
+
+            v=$(grep -E "^APP_URL=" "$ENV_FILE" | head -1 | cut -d= -f2-)
+            echo "  APP_URL = $v"
+
+            echo ""
+            echo "── Restarting onbrand ──"
+            pm2 restart onbrand --update-env 2>&1 | tail -3
+            sleep 3
+            curl -s -o /dev/null -w "Health: HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
+            echo ""
+            echo "✓ Done. Next registration / forgot-password email will use the new host."
