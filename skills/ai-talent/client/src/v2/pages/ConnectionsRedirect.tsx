@@ -12,8 +12,7 @@
  *
  * This page renders nothing itself; it just routes.
  */
-import { useEffect } from "react";
-import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
+import { Navigate, useOutletContext, useSearchParams } from "react-router-dom";
 
 interface ShellCtx {
   brandId: number | null;
@@ -21,31 +20,21 @@ interface ShellCtx {
 }
 
 export default function ConnectionsRedirect() {
-  const navigate = useNavigate();
   const ctx = useOutletContext<ShellCtx | null>();
   const [search] = useSearchParams();
 
-  useEffect(() => {
-    // Priority: URL ?b= override → shell context brandId → first brand in list → /brands list
-    const fromUrl = search.get("b");
-    const urlBrandId = fromUrl ? parseInt(fromUrl, 10) : null;
-    const activeBrandId =
-      (urlBrandId && Number.isFinite(urlBrandId) ? urlBrandId : null) ??
-      ctx?.brandId ??
-      (ctx?.brands?.[0]?.id ?? null);
+  // 2026-05-14 (CJ「點選不同的地方時，會不斷跳出這個畫面」):
+  // <Navigate> renders synchronously and React Router swaps the route in
+  // the same render commit — no useEffect/blank-flash dance.
+  const fromUrl = search.get("b");
+  const urlBrandId = fromUrl ? parseInt(fromUrl, 10) : null;
+  const activeBrandId =
+    (urlBrandId && Number.isFinite(urlBrandId) ? urlBrandId : null) ??
+    ctx?.brandId ??
+    (ctx?.brands?.[0]?.id ?? null);
 
-    if (activeBrandId) {
-      // 2026-05-12: route to full-page settings (replaces modal sheet).
-      navigate(`/brands/settings?b=${activeBrandId}&tab=connector`, { replace: true });
-    } else {
-      // No active brand — go to manager list so user picks
-      navigate("/brands", { replace: true });
-    }
-  }, [ctx?.brandId, ctx?.brands, search, navigate]);
-
-  return (
-    <div className="min-h-[60vh] flex items-center justify-center text-sm text-default-400">
-      開啟連結設定…
-    </div>
-  );
+  if (activeBrandId) {
+    return <Navigate to={`/brands/settings?b=${activeBrandId}&tab=connector`} replace />;
+  }
+  return <Navigate to="/brands" replace />;
 }

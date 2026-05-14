@@ -16,7 +16,7 @@
  * Editor (current /brands content) moves to /brands/edit?b=:id
  */
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { useOutletContext } from "react-router-dom";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
@@ -91,14 +91,13 @@ export default function BrandsManagePage() {
       ctx.setScope({ brandId: urlBrandId, productId: null, eventId: null });
     }
   }, [urlBrandId, scope.brandId, ctx]);
-  useEffect(() => {
-    if (forceGrid) return;
-    if (scopeKind === "none") return;
-    // Forward into the editor — it reads scope state and renders the
-    // correct mode (brand / product / event) automatically.
-    const bid = scope.brandId ?? activeBrand?.id ?? "";
-    navigate(`/brands/edit${bid ? `?b=${bid}` : ""}`, { replace: true });
-  }, [forceGrid, scopeKind, scope.brandId, activeBrand?.id, navigate]);
+  // 2026-05-14 (CJ「點選不同的地方時，會不斷跳出這個畫面」): replaced
+  // the imperative `useEffect → navigate` redirect with a render-time
+  // <Navigate> below. Imperative navigate from inside useEffect fires
+  // AFTER paint, so the browser shows one blank frame (just the global
+  // footer) before the new route mounts. <Navigate> renders synchronously
+  // and React Router swaps the route in the same commit — no flash.
+  // Effect kept only for fixing query-string ?b=<id> hydration.
 
   // 2026-05-14 (CJ「Logo 點擊 → 首頁空白」): all hooks MUST be called
   // before any early return. The previous version returned null then
@@ -125,10 +124,10 @@ export default function BrandsManagePage() {
       })
     : null;
 
-  // While redirecting (scope picked → forward to editor), render nothing.
-  // Placed AFTER all hooks so React's render order stays stable.
+  // Render-time redirect — fires synchronously, no blank flash.
   if (!forceGrid && scopeKind !== "none") {
-    return null;
+    const bid = scope.brandId ?? activeBrand?.id ?? "";
+    return <Navigate to={`/brands/edit${bid ? `?b=${bid}` : ""}`} replace />;
   }
 
   const formatDate = (iso: string | null) => {
