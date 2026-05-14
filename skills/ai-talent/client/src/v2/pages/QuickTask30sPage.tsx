@@ -642,18 +642,25 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           navigate(`/run/${(r as any).outputId}`);
           return;
         }
-        // 2026-05-10 (pre-launch): friendlier error UX. Don't expose
-        // technical 'Orchestra/兩次嘗試' jargon to trial users — they
-        // see a calmer message + suggestion. Engineers can see real
-        // error in pm2 log.
+        // 2026-05-14 (CJ Bug#2 follow-up): more specific error UX. Three cases:
+        //   (a) errors present + at least 1 caption succeeded → soft "busy" msg
+        //   (b) errors present + NO caption succeeded → "this agent is dead, try another"
+        //   (c) no errors, no outputId → DB write failed (specific message)
+        const hasErrors = r.errors && r.errors.length > 0;
+        const hasAnyCaption = (r.variants ?? []).some((v: any) => (v?.caption ?? "").trim().length > 0);
+        const errorPreview = hasErrors ? r.errors.slice(0, 2).join(" · ").slice(0, 200) : "";
         setErrorMsg(
-          (r.errors && r.errors.length > 0)
+          hasErrors && !hasAnyCaption
+            ? (lang === "en"
+                ? `This agent failed to write any content (likely LLM provider down). Try a different task. Detail: ${errorPreview}`
+                : `這個 agent 寫不出文案（可能 LLM provider 暫時離線）。請改試其他任務或回報客服。詳情：${errorPreview}`)
+            : hasErrors
             ? (lang === "en"
                 ? "AI is a bit busy — hit Make it again (usually rush-hour traffic)."
                 : `AI 暫時忙不過來，再按一次「立即產出」就好（多半是熱門時段塞車）。`)
             : (lang === "en"
-                ? "The result didn't save. Hit Make it again — contact support if it keeps happening."
-                : "結果沒順利存下來，請按「立即產出」再試一次。如果反覆出現請聯絡客服。")
+                ? "Captions wrote OK but persistence failed — your work isn't lost, please contact support with this task ID."
+                : `文案寫出來了但沒存進資料庫（task: ${activeTask.id}），請聯絡客服貼這個 ID。`)
         );
         return;
       }
