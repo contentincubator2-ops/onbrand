@@ -1705,27 +1705,11 @@ export default function BrandsPage() {
         </div>
       </div>
 
-      {/* Page-level always-visible 「+ 新增」FAB — clicks open the unified
-          modal with a sensible default tab based on current scope. */}
-      <button
-        onClick={() => setAddModal({ open: true, tab: scopeMode === "brand" ? "product" : scopeMode === "product" ? "event" : "brand" })}
-        title={lang === "en" ? "Add brand / product / campaign" : "新增 品牌 / 產品 / 活動"}
-        style={{
-          position: "fixed", bottom: 32, right: 32, zIndex: 60,
-          padding: "12px 20px", borderRadius: 999,
-          background: "linear-gradient(135deg, #7C3AED, #6366F1)",
-          border: "none", cursor: "pointer",
-          display: "flex", alignItems: "center", gap: 8,
-          color: "white", fontSize: 14, fontWeight: 600,
-          boxShadow: "0 6px 20px rgba(99,102,241,0.45)",
-          transition: "transform 0.15s, box-shadow 0.15s",
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 10px 28px rgba(99,102,241,0.55)"; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(99,102,241,0.45)"; }}
-      >
-        <FontAwesomeIcon icon={faPlus} />
-        <span>{lang === "en" ? "Add" : "新增"}</span>
-      </button>
+      {/* 2026-05-13 (CJ「右下方的客服，被新增擋住了」):
+          page-level + 新增 FAB removed — it overlapped Mia avatar at the
+          same screen corner. Same actions are reachable from the
+          BrandHierarchyPill 「+ 新增品牌 / 產品 / 活動」 menu top-left.
+          AddEntityModal is still mounted below (other triggers fire it). */}
 
       {/* AddEntityModal — shared dialog for 品牌 / 產品 / 活動 */}
       <AddEntityModal
