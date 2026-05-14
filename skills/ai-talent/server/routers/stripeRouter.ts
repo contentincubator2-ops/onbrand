@@ -54,18 +54,23 @@ function getStripe(): Stripe {
   return _stripe;
 }
 
-// Fallback prices for team / agency (drop_pro uses getEffectivePrice).
-const PLAN_TO_AMOUNT_FALLBACK: Record<string, { monthly: number; annual: number }> = {
-  drop_pro:    { monthly: 1500,  annual: 15000  },
-  drop_team:   { monthly: 4990,  annual: 49900  },
-  drop_agency: { monthly: 14990, annual: 149900 },
-};
-
 const PLAN_LABEL: Record<string, string> = {
   drop_pro:    "OnBrand · 一人公司方案",
   drop_team:   "OnBrand · 小團隊方案",
   drop_agency: "OnBrand · 代理商方案",
 };
+
+/** Look up the user's billing currency (defaults TWD). */
+async function getUserCurrency(userId: number): Promise<"TWD" | "USD"> {
+  const { default: localPool } = await import("../localDb");
+  const [rows]: any = await localPool.execute(
+    `SELECT billingCountry FROM users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  const country = (rows as any[])[0]?.billingCountry ?? "TW";
+  const { currencyFromCountry } = await import("../_core/plans");
+  return currencyFromCountry(country);
+}
 
 export const stripeRouter = router({
   /** Subscription checkout — monthly or annual. */
@@ -89,33 +94,33 @@ export const stripeRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "只有 workspace owner 可以訂閱" });
       }
 
-      // Resolve effective price (early-bird grandfathering on drop_pro).
-      let amount: number | undefined;
-      if (input.planCode === "drop_pro") {
-        const { getPlan, getEffectivePrice } = await import("../_core/plans");
-        const [uRows]: any = await localPool.execute(
-          `SELECT IFNULL(earlyBird,0) AS earlyBird, lockedPriceTwdMonthly FROM users WHERE id = ? LIMIT 1`,
-          [ctx.user.id],
-        );
-        const flags = (uRows as any[])[0] ?? { earlyBird: 0, lockedPriceTwdMonthly: null };
-        const eff = getEffectivePrice(getPlan("drop_pro"), {
-          earlyBird: Number(flags.earlyBird),
-          lockedPriceTwdMonthly: flags.lockedPriceTwdMonthly,
-        });
-        amount = input.annual ? eff.annually : eff.monthly;
-      } else {
-        amount = PLAN_TO_AMOUNT_FALLBACK[input.planCode]?.[input.annual ? "annual" : "monthly"];
-      }
-      if (!amount) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown plan" });
+      // 2026-05-14 (CJ「TWD + USD 雙幣」): resolve currency from the user's
+      // billingCountry, then effective price (early-bird grandfathering).
+      const currency = await getUserCurrency(ctx.user.id);
+      const { getPlan, getEffectivePrice, toStripeUnitAmount } = await import("../_core/plans");
+      const [uRows]: any = await localPool.execute(
+        `SELECT IFNULL(earlyBird,0) AS earlyBird, lockedPriceTwdMonthly FROM users WHERE id = ? LIMIT 1`,
+        [ctx.user.id],
+      );
+      const flags = (uRows as any[])[0] ?? { earlyBird: 0, lockedPriceTwdMonthly: null };
+      const eff = getEffectivePrice(getPlan(input.planCode), {
+        earlyBird: Number(flags.earlyBird),
+        lockedPriceTwdMonthly: flags.lockedPriceTwdMonthly,
+        currency,
+      });
+      const amount = input.annual ? eff.annually : eff.monthly;
+      if (!amount || amount <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown plan" });
 
       const interval: "month" | "year" = input.annual ? "year" : "month";
 
       // Pending invoice (placeholder tradeNo — replaced with session.id once Stripe returns).
       const tempTradeNo = `pending_${Date.now()}_${ctx.user.id}`;
+      // `amountTwd` is a legacy column — we keep storing the human-readable
+      // amount the user paid (which may be USD); old reports just read `amount`.
       const [r]: any = await localPool.execute(
-        `INSERT INTO invoices (userId, workspaceId, merchantTradeNo, planCode, amount, amountTwd, billingCycle, packType, status, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'subscription', 'pending', NOW(3))`,
-        [ctx.user.id, input.workspaceId, tempTradeNo, input.planCode, amount, amount, interval === "year" ? "annual" : "monthly"],
+        `INSERT INTO invoices (userId, workspaceId, merchantTradeNo, planCode, amount, amountTwd, billingCycle, packType, currency, status, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'subscription', ?, 'pending', NOW(3))`,
+        [ctx.user.id, input.workspaceId, tempTradeNo, input.planCode, amount, amount, interval === "year" ? "annual" : "monthly", currency],
       );
       const invoiceId = (r as any).insertId;
 
@@ -125,12 +130,12 @@ export const stripeRouter = router({
         line_items: [{
           quantity: 1,
           price_data: {
-            currency: "twd",
+            currency: currency.toLowerCase(),
             product_data: {
               name: PLAN_LABEL[input.planCode] ?? input.planCode,
-              description: input.annual ? "年繳" : "月繳",
+              description: input.annual ? "年繳 / Annual" : "月繳 / Monthly",
             },
-            unit_amount: amount,
+            unit_amount: toStripeUnitAmount(amount, currency),
             recurring: { interval },
           },
         }],
@@ -143,6 +148,7 @@ export const stripeRouter = router({
           planCode: input.planCode,
           billingCycle: interval === "year" ? "annual" : "monthly",
           packType: "subscription",
+          currency,
         },
         success_url: `${appUrl}/settings/account?paid=1&plan=${input.planCode}`,
         cancel_url:  `${appUrl}/pricing?canceled=1`,
@@ -166,17 +172,20 @@ export const stripeRouter = router({
     .mutation(async ({ ctx, input }) => {
       const stripe = getStripe();
       const appUrl = process.env.APP_URL ?? "https://onbrand.sowork.ai";
-      const { TOPUP_PACKS } = await import("../_core/plans");
+      const { TOPUP_PACKS, toStripeUnitAmount } = await import("../_core/plans");
       const pack = TOPUP_PACKS[input.packId];
       if (!pack) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown topup pack" });
+
+      const currency = await getUserCurrency(ctx.user.id);
+      const amount = currency === "TWD" ? pack.twdAmount : pack.usdAmount;
 
       const { default: localPool } = await import("../localDb");
       const tempTradeNo = `pending_topup_${Date.now()}_${ctx.user.id}`;
       const [r]: any = await localPool.execute(
         `INSERT INTO invoices
-            (userId, merchantTradeNo, amount, amountTwd, packType, pointsGranted, status, createdAt)
-         VALUES (?, ?, ?, ?, 'topup', ?, 'pending', NOW(3))`,
-        [ctx.user.id, tempTradeNo, pack.twdAmount, pack.twdAmount, pack.points],
+            (userId, merchantTradeNo, amount, amountTwd, packType, pointsGranted, currency, status, createdAt)
+         VALUES (?, ?, ?, ?, 'topup', ?, ?, 'pending', NOW(3))`,
+        [ctx.user.id, tempTradeNo, amount, amount, pack.points, currency],
       );
       const invoiceId = (r as any).insertId;
 
@@ -186,12 +195,16 @@ export const stripeRouter = router({
         line_items: [{
           quantity: 1,
           price_data: {
-            currency: "twd",
+            currency: currency.toLowerCase(),
             product_data: {
-              name: `OnBrand 點數加購 · ${pack.labelZh}`,
-              description: `${pack.points.toLocaleString()} 點 · 永不過期`,
+              name: currency === "TWD"
+                ? `OnBrand 點數加購 · ${pack.labelZh}`
+                : `OnBrand Top-up · ${pack.labelEn}`,
+              description: currency === "TWD"
+                ? `${pack.points.toLocaleString()} 點 · 永不過期`
+                : `${pack.points.toLocaleString()} points · never expire`,
             },
-            unit_amount: pack.twdAmount,
+            unit_amount: toStripeUnitAmount(amount, currency),
           },
         }],
         customer_email: (ctx.user as any).email ?? undefined,
@@ -202,6 +215,7 @@ export const stripeRouter = router({
           packType: "topup",
           packId: pack.id,
           pointsGranted: String(pack.points),
+          currency,
         },
         success_url: `${appUrl}/settings/account?paid=1&topup=ok`,
         cancel_url:  `${appUrl}/settings/account?topup=canceled`,
@@ -215,10 +229,23 @@ export const stripeRouter = router({
       return { url: session.url, sessionId: session.id };
     }),
 
-  /** List available top-up packs (single source: plans.ts TOPUP_PACKS). */
-  listTopupPacks: protectedProcedure.query(async () => {
+  /** List top-up packs in the caller's billing currency. */
+  listTopupPacks: protectedProcedure.query(async ({ ctx }) => {
     const { TOPUP_PACKS } = await import("../_core/plans");
-    return Object.values(TOPUP_PACKS);
+    const currency = await getUserCurrency(ctx.user.id);
+    return {
+      currency,
+      packs: Object.values(TOPUP_PACKS).map((p) => ({
+        id: p.id,
+        points: p.points,
+        labelZh: p.labelZh,
+        labelEn: p.labelEn,
+        discountPct: p.discountPct,
+        amount: currency === "TWD" ? p.twdAmount : p.usdAmount,
+        perPoint: currency === "TWD" ? p.perPointTwd : p.perPointUsd,
+        currency,
+      })),
+    };
   }),
 
   /** Frontend can poll this after redirect to confirm status. */

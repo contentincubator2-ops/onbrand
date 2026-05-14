@@ -72,6 +72,18 @@ export default function AccountPage() {
       })
     : null;
 
+  // ─── 2026-05-14 (CJ「TWD + USD 雙幣」): Billing country toggle ───
+  const setCountryMut = (trpc as any).billing?.setBillingCountry?.useMutation
+    ? (trpc as any).billing.setBillingCountry.useMutation({
+        onSuccess: () => {
+          showToastGlobal(lang === "en" ? "Billing country updated" : "計費國家已更新", "success");
+          (statusQuery as any)?.refetch?.();
+        },
+        onError: (e: any) =>
+          showToastGlobal((lang === "en" ? "Update failed: " : "更新失敗：") + (e?.message ?? e)),
+      })
+    : null;
+
   // ─── 2026-05-14 (CJ「加值點數方案」): Top-up packs ───
   const [showTopupModal, setShowTopupModal] = useState(false);
   // Auto-open from ?topup=1 (sent when user hits FORBIDDEN points-not-enough)
@@ -207,6 +219,43 @@ export default function AccountPage() {
           </div>
         </section>
 
+        {/* 2026-05-14 (CJ「TWD + USD 雙幣」) — billing country toggle */}
+        {status && (
+          <section className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-neutral-900 mb-1">
+                  {lang === "en" ? "Billing country & currency" : "計費國家與幣別"}
+                </h2>
+                <p className="text-xs text-neutral-500">
+                  {lang === "en"
+                    ? "Pricing follows your billing country (TW → TWD, others → USD). Locked while a subscription is active."
+                    : "計費幣別依國家自動帶（台灣 → 台幣，其他 → 美金）。訂閱期間無法變更。"}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {(["TW", "US"] as const).map((c) => {
+                  const active = (status as any)?.billingCountry === c;
+                  return (
+                    <button
+                      key={c}
+                      disabled={!setCountryMut || setCountryMut.isPending || (status as any)?.planStatus === "active"}
+                      onClick={() => setCountryMut?.mutate({ country: c })}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition border ${
+                        active
+                          ? "bg-neutral-900 text-white border-neutral-900"
+                          : "bg-white text-neutral-700 border-neutral-300 hover:border-neutral-500"
+                      } disabled:opacity-50`}
+                    >
+                      {c === "TW" ? "🇹🇼 TWD" : "🌐 USD"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Points balance — 2026-05-14 (CJ「點數系統」) replaces fixed quotas */}
         {(status as any)?.points && (
           (() => {
@@ -309,7 +358,9 @@ export default function AccountPage() {
                   <tr key={inv.id} className="border-b border-neutral-100">
                     <td className="py-2">{new Date(inv.createdAt).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW")}</td>
                     <td className="py-2 font-mono text-xs">{inv.invoiceNumber ?? "—"}</td>
-                    <td className="py-2 text-right">NT$ {inv.amountTwd.toLocaleString(lang === "en" ? "en-US" : "zh-TW")}</td>
+                    <td className="py-2 text-right">
+                      {inv.currency === "USD" ? "US$" : "NT$"} {Number(inv.amount ?? inv.amountTwd).toLocaleString("en-US")}
+                    </td>
                     <td className="py-2 text-right">
                       {inv.downloadUrl && (
                         <a href={inv.downloadUrl} className="text-blue-600 hover:underline text-xs">{t("download")}</a>
@@ -460,7 +511,7 @@ export default function AccountPage() {
                   : "加購點數永不過期，會疊加在月配額之上。"}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {((topupPacksQuery as any)?.data ?? []).map((pack: any) => (
+                {(((topupPacksQuery as any)?.data?.packs) ?? []).map((pack: any) => (
                   <button
                     key={pack.id}
                     disabled={topupMut?.isPending}
@@ -482,12 +533,12 @@ export default function AccountPage() {
                       <span className="text-xs font-normal text-neutral-500 ml-1">{lang === "en" ? "pts" : "點"}</span>
                     </div>
                     <div className="mt-2 text-sm font-semibold text-neutral-900">
-                      NT$ {pack.twdAmount.toLocaleString()}
+                      {pack.currency === "USD" ? "US$" : "NT$"} {pack.amount.toLocaleString()}
                     </div>
                     <div className="text-[11px] text-neutral-500 mt-0.5">
                       {lang === "en"
-                        ? `NT$ ${pack.perPointTwd.toFixed(2)} / pt`
-                        : `每點 NT$ ${pack.perPointTwd.toFixed(2)}`}
+                        ? `${pack.currency === "USD" ? "US$" : "NT$"} ${pack.perPoint.toFixed(pack.currency === "USD" ? 4 : 2)} / pt`
+                        : `每點 ${pack.currency === "USD" ? "US$" : "NT$"} ${pack.perPoint.toFixed(pack.currency === "USD" ? 4 : 2)}`}
                     </div>
                     {pack.discountPct > 0 && (
                       <div className="mt-2 inline-block text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">

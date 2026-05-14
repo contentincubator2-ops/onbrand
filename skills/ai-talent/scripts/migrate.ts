@@ -1353,6 +1353,9 @@ async function main() {
     for (const [col, def] of [
       ["earlyBird",               "TINYINT(1) NOT NULL DEFAULT 0"],
       ["lockedPriceTwdMonthly",   "INT NULL"],
+      // 2026-05-14 (CJ「TWD + USD 雙幣」): ISO-3166-1 alpha-2 country.
+      // 'TW' → TWD billing, anything else → USD billing.
+      ["billingCountry",          "VARCHAR(2) NOT NULL DEFAULT 'TW'"],
     ] as const) {
       const [rows] = await conn.execute(`
         SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -1476,6 +1479,8 @@ async function main() {
     // credit pointsBalance via pointsService.addPoints().
     await ensureCol("invoices", "packType",      "VARCHAR(16) NULL COMMENT 'subscription | topup'");
     await ensureCol("invoices", "pointsGranted", "INT NULL COMMENT 'how many points to credit on successful payment'");
+    // 2026-05-14 (CJ「TWD + USD 雙幣」): record what currency the invoice was paid in.
+    await ensureCol("invoices", "currency",      "VARCHAR(3) NOT NULL DEFAULT 'TWD' COMMENT 'TWD | USD'");
     console.log("[migrate] invoices topup columns: OK");
 
     // error_log (Sentry-lite for prod anomalies)

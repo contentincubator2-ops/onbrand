@@ -140,11 +140,16 @@ authRouter.post("/register", async (req: Request, res: Response) => {
     try {
       const { default: localPool } = await import("../localDb");
       const trialEnds = new Date(Date.now() + 7 * 24 * 3600_000);
+      // 2026-05-14 (CJ「TWD + USD 雙幣」): infer billing country from
+      // Accept-Language. zh-* → TW (TWD), else US (USD). User can flip
+      // this later in /settings/account.
+      const { inferBillingCountryFromAcceptLanguage } = await import("../_core/plans");
+      const billingCountry = inferBillingCountryFromAcceptLanguage(req.header("accept-language"));
       await localPool.execute(
-        `UPDATE users SET planCode='trial', planStatus='trial', planEndsAt=? WHERE id=?`,
+        `UPDATE users SET planCode='trial', planStatus='trial', planEndsAt=?, billingCountry=? WHERE id=?`,
         // 2026-05-11 — type fix: `user` shape uses `id`, not `userId`.
         // Pre-existing bug from da4787b that's been failing CI ever since.
-        [trialEnds, user.id],
+        [trialEnds, billingCountry, user.id],
       );
     } catch (e) {
       console.warn("[auth] planEndsAt set failed (non-blocking):", e);

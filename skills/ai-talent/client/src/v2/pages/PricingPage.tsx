@@ -31,15 +31,24 @@ export default function PricingPage() {
       })
     : null;
 
+  // 2026-05-14 (CJ「TWD + USD 雙幣」): derive currency + amounts from status.
+  // Falls back to TWD with default sticker so /pricing works for logged-out
+  // visitors too.
+  const currency: "TWD" | "USD" = (status as any)?.currency ?? "TWD";
+  const sym = currency === "USD" ? "US$" : "NT$";
+  const defaults = currency === "USD"
+    ? { soloEarly: 28, soloStd: 47, soloAnnual: 280, team: 156, teamAnnual: 1560, agency: 469, agencyAnnual: 4690 }
+    : { soloEarly: 900, soloStd: 1500, soloAnnual: 9000, team: 4990, teamAnnual: 49900, agency: 14990, agencyAnnual: 149900 };
+
   // 2026-05-11 — 4-tier pricing: Solo / Team / Agency / Enterprise.
   const TIERS = [
     {
       code: "drop_pro",
       name: isEn ? "OnBrand Solo" : "OnBrand 個人",
       sub: isEn ? "For solo operators" : "個人操盤者",
-      monthly: status?.priceTwdMonthly ?? 900,
-      annual:  status?.priceTwdAnnually ?? 9000,
-      standardMonthly: status?.standardPriceTwdMonthly ?? 1500,
+      monthly: (status as any)?.priceMonthly ?? defaults.soloEarly,
+      annual:  (status as any)?.priceAnnually ?? defaults.soloAnnual,
+      standardMonthly: (status as any)?.standardPriceMonthly ?? defaults.soloStd,
       isEarlyBird: status?.isEarlyBird ?? true,
       members: isEn ? "1 user · 1 brand" : "1 位用戶 · 1 個品牌",
       features: isEn ? [
@@ -66,7 +75,7 @@ export default function PricingPage() {
       code: "drop_team",
       name: "OnBrand Team",
       sub: isEn ? "5-person teams · agency starter" : "5 人小團隊 / Agency 入門",
-      monthly: 4990, annual: 49900,
+      monthly: defaults.team, annual: defaults.teamAnnual,
       members: isEn ? "5 users · 20 brands" : "5 位用戶 · 20 個品牌",
       features: isEn ? [
         "Multi-client workspace (one account, many clients)",
@@ -85,7 +94,7 @@ export default function PricingPage() {
       code: "drop_agency",
       name: "OnBrand Agency",
       sub: isEn ? "Agencies · multi-client ops" : "代理商 / 多客戶營運",
-      monthly: 14990, annual: 149900,
+      monthly: defaults.agency, annual: defaults.agencyAnnual,
       members: isEn ? "Unlimited users · unlimited brands" : "無限用戶 · 無限品牌",
       features: isEn ? [
         "White label (your logo + name)",
@@ -132,8 +141,8 @@ export default function PricingPage() {
           style={{ background: "linear-gradient(90deg, #059669 0%, #10b981 60%, #34d399 100%)" }}
         >
           {isEn
-            ? <>⭐ <strong>Early-bird:</strong> NT$ <strong>900</strong>/mo (standard NT$ 1,500) — <strong>locked forever</strong> for accounts opened today.</>
-            : <>⭐ <strong>限時早鳥</strong>：NT$ <strong>900</strong>/月（標準價 NT$ 1,500）— <strong>現在開通永久保價</strong>，老用戶終身不漲</>
+            ? <>⭐ <strong>Early-bird:</strong> {sym} <strong>{defaults.soloEarly}</strong>/mo (standard {sym} {defaults.soloStd.toLocaleString()}) — <strong>locked forever</strong> for accounts opened today.</>
+            : <>⭐ <strong>限時早鳥</strong>：{sym} <strong>{defaults.soloEarly}</strong>/月（標準價 {sym} {defaults.soloStd.toLocaleString()}）— <strong>現在開通永久保價</strong>，老用戶終身不漲</>
           }
         </div>
       )}
@@ -224,20 +233,24 @@ export default function PricingPage() {
                   visual signal. Only renders for solo plan on monthly view. */}
               {(tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && !annual && (
                 <div className="mt-3 text-sm text-neutral-400 line-through tabular-nums">
-                  NT$ {(tier as any).standardMonthly.toLocaleString()} / {isEn ? "month" : "月"}
+                  {sym} {(tier as any).standardMonthly.toLocaleString()} / {isEn ? "month" : "月"}
                 </div>
               )}
               <div className="flex items-baseline gap-1.5 mt-1">
                 <span className="text-3xl font-bold text-neutral-900 tabular-nums">
-                  {annual ? (tier.annual / 1000).toLocaleString() + "K" : tier.monthly.toLocaleString()}
+                  {annual
+                    ? (currency === "USD"
+                        ? tier.annual.toLocaleString()
+                        : (tier.annual / 1000).toLocaleString() + "K")
+                    : tier.monthly.toLocaleString()}
                 </span>
-                <span className="text-sm text-neutral-700">NT$ {annual ? (isEn ? "/ year" : "/ 年") : (isEn ? "/ month" : "/ 月")}</span>
+                <span className="text-sm text-neutral-700">{sym} {annual ? (isEn ? "/ year" : "/ 年") : (isEn ? "/ month" : "/ 月")}</span>
               </div>
               <p className="text-xs text-neutral-700 mt-1">
                 {annual
                   ? (isEn
-                      ? `~NT$ ${Math.round(tier.annual / 12).toLocaleString()} / month`
-                      : `每月平均 NT$ ${Math.round(tier.annual / 12).toLocaleString()}`)
+                      ? `~${sym} ${Math.round(tier.annual / 12).toLocaleString()} / month`
+                      : `每月平均 ${sym} ${Math.round(tier.annual / 12).toLocaleString()}`)
                   : (isEn ? "Cancel anytime" : "隨時取消")}
               </p>
               {(tier as any).isEarlyBird && (tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && (

@@ -26,12 +26,14 @@ async function loadUserPlan(userId: number): Promise<{
   isActive: boolean;
   earlyBird: number;
   lockedPriceTwdMonthly: number | null;
+  billingCountry: string;
 }> {
   const { default: localPool } = await import("../localDb");
   const [rows]: any = await localPool.execute(
     `SELECT planCode, planStatus, planEndsAt, isActive,
             IFNULL(earlyBird, 0) AS earlyBird,
-            lockedPriceTwdMonthly
+            lockedPriceTwdMonthly,
+            IFNULL(billingCountry, 'TW') AS billingCountry
        FROM users WHERE id = ? LIMIT 1`,
     [userId],
   );
@@ -43,6 +45,7 @@ async function loadUserPlan(userId: number): Promise<{
     isActive: Number(r?.isActive ?? 0) === 1,
     earlyBird: Number(r?.earlyBird ?? 0),
     lockedPriceTwdMonthly: r?.lockedPriceTwdMonthly ?? null,
+    billingCountry: r?.billingCountry ?? "TW",
   };
 }
 
@@ -171,10 +174,19 @@ export const billingRouter = router({
 
       const plan = getPlan(u.planCode);
       // 2026-05-12 (CJ「老用戶永遠保 900」): resolve actual price for THIS user.
-      const { getEffectivePrice } = await import("../_core/plans");
+      // 2026-05-14 (CJ「TWD + USD 雙幣」): pick currency from billingCountry.
+      const { getEffectivePrice, currencyFromCountry } = await import("../_core/plans");
+      const currency = currencyFromCountry(u.billingCountry);
       const eff = getEffectivePrice(plan, {
         earlyBird: u.earlyBird,
         lockedPriceTwdMonthly: u.lockedPriceTwdMonthly,
+        currency,
+      });
+      // Also resolve TWD prices in case UI wants to show "≈ NT$ X" comparison
+      const effTwd = getEffectivePrice(plan, {
+        earlyBird: u.earlyBird,
+        lockedPriceTwdMonthly: u.lockedPriceTwdMonthly,
+        currency: "TWD",
       });
 
       // Current calendar month usage counts (matches assertWithinPlan window)
@@ -215,11 +227,21 @@ export const billingRouter = router({
         planEndsAt: u.planEndsAt?.toISOString() ?? null,
         daysLeft,
         expired,
-        priceTwdMonthly:  eff.monthly,
-        priceTwdAnnually: eff.annually,
+        // 2026-05-14 (CJ「TWD + USD 雙幣」): `price{Monthly,Annually}` is
+        // now in the user's currency. Keep priceTwdMonthly for back-compat.
+        currency,
+        billingCountry: u.billingCountry,
+        priceMonthly:  eff.monthly,
+        priceAnnually: eff.annually,
+        standardPriceMonthly: currency === "USD"
+          ? (plan.standardPriceUsdMonthly ?? plan.priceUsdMonthly ?? 0)
+          : (plan.standardPriceTwdMonthly ?? plan.priceTwdMonthly),
+        // Legacy TWD-only fields (kept so old clients don't crash)
+        priceTwdMonthly:  effTwd.monthly,
+        priceTwdAnnually: effTwd.annually,
+        standardPriceTwdMonthly: plan.standardPriceTwdMonthly ?? plan.priceTwdMonthly,
         isEarlyBird: eff.isEarlyBird,
         isLocked:    eff.isLocked,
-        standardPriceTwdMonthly: plan.standardPriceTwdMonthly ?? plan.priceTwdMonthly,
         workspaceId,
         // Points (new primary gating signal)
         points: {
@@ -247,6 +269,35 @@ export const billingRouter = router({
   /** All public plans for /pricing page */
   listPlans: protectedProcedure
     .query(async () => Object.values(PLANS)),
+
+  /**
+   * 2026-05-14 (CJ「TWD + USD 雙幣」): let the user flip their billing
+   * country. Only allowed if they currently have no active paid
+   * subscription — Stripe won't switch currency on an existing
+   * subscription, so we'd have to cancel + resub, which is messy.
+   */
+  setBillingCountry: protectedProcedure
+    .input(z.object({ country: z.string().length(2) }))
+    .mutation(async ({ ctx, input }) => {
+      const country = input.country.toUpperCase();
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT planStatus FROM users WHERE id = ? LIMIT 1`,
+        [ctx.user!.id],
+      );
+      const ps = (rows as any[])[0]?.planStatus ?? "trial";
+      if (ps === "active") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "目前訂閱中無法變更計費國家 — 請先取消訂閱、待當期結束後再變更。",
+        });
+      }
+      await localPool.execute(
+        `UPDATE users SET billingCountry = ? WHERE id = ?`,
+        [country, ctx.user!.id],
+      );
+      return { ok: true, country };
+    }),
 
   /**
    * Manual subscribe stub. After 金流 lands tomorrow this gets replaced
@@ -281,7 +332,9 @@ export const billingRouter = router({
     .query(async ({ ctx }) => {
       const { default: localPool } = await import("../localDb");
       const [rows]: any = await localPool.execute(
-        `SELECT id, invoiceNumber, amountTwd, status, taxId, companyName,
+        `SELECT id, invoiceNumber, amount, amountTwd,
+                IFNULL(currency,'TWD') AS currency,
+                status, taxId, companyName,
                 downloadUrl, issuedAt, createdAt
          FROM invoices WHERE userId=? ORDER BY id DESC LIMIT 50`,
         [ctx.user!.id],

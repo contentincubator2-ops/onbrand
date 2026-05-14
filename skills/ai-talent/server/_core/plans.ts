@@ -44,12 +44,51 @@ export interface PlanQuota {
 /** 2026-05-14: top-up packs (加購點數). Volume discount — bigger pack
  *  = better per-point rate. Same point unit as plan allocation; topup
  *  points NEVER expire (vs monthly refill which resets balance). */
+// 2026-05-14 (CJ「TWD + USD 雙幣」). Roughly NT$32 ≈ US$1; rounded to
+// clean USD numbers so checkout doesn't show ugly $27.85.
 export const TOPUP_PACKS = {
-  small:  { id: "small",  points: 1000,  twdAmount: 350,  perPointTwd: 0.35, discountPct: 0,  labelZh: "小份",  labelEn: "Small" },
-  medium: { id: "medium", points: 5000,  twdAmount: 1500, perPointTwd: 0.30, discountPct: 15, labelZh: "中份",  labelEn: "Medium" },
-  large:  { id: "large",  points: 10000, twdAmount: 2500, perPointTwd: 0.25, discountPct: 29, labelZh: "大份",  labelEn: "Large" },
+  small:  { id: "small",  points: 1000,  twdAmount: 350,  usdAmount: 11, perPointTwd: 0.35, perPointUsd: 0.011, discountPct: 0,  labelZh: "小份",  labelEn: "Small" },
+  medium: { id: "medium", points: 5000,  twdAmount: 1500, usdAmount: 47, perPointTwd: 0.30, perPointUsd: 0.0094, discountPct: 15, labelZh: "中份",  labelEn: "Medium" },
+  large:  { id: "large",  points: 10000, twdAmount: 2500, usdAmount: 78, perPointTwd: 0.25, perPointUsd: 0.0078, discountPct: 29, labelZh: "大份",  labelEn: "Large" },
 } as const;
 export type TopupPackId = keyof typeof TOPUP_PACKS;
+
+/**
+ * 2026-05-14 (CJ「TWD + USD 雙幣」): currency derives from
+ * users.billingCountry. TW → TWD, anything else → USD. We don't tie
+ * currency to display language — same user always pays the same currency
+ * regardless of language toggle.
+ */
+export type Currency = "TWD" | "USD";
+
+export function currencyFromCountry(country: string | null | undefined): Currency {
+  if (!country) return "TWD";
+  const c = country.toUpperCase().trim();
+  return c === "TW" ? "TWD" : "USD";
+}
+
+/** Map an Accept-Language header to a sensible billing country. */
+export function inferBillingCountryFromAcceptLanguage(header: string | null | undefined): string {
+  if (!header) return "TW";
+  const first = header.split(",")[0]?.toLowerCase() ?? "";
+  if (first.startsWith("zh-tw") || first.startsWith("zh-hant") || first === "zh") return "TW";
+  if (first.startsWith("zh")) return "TW"; // be generous — zh-CN users on a TW product likely want TWD
+  return "US";
+}
+
+/** Stripe-compatible unit_amount. TWD is zero-decimal; USD needs cents. */
+export function toStripeUnitAmount(amount: number, currency: Currency): number {
+  return currency === "TWD" ? Math.round(amount) : Math.round(amount * 100);
+}
+
+/** Format a price for display. Always shows the user's currency. */
+export function formatPrice(amount: number, currency: Currency): string {
+  if (amount < 0) return currency === "TWD" ? "聯繫業務" : "Contact sales";
+  if (amount === 0) return currency === "TWD" ? "免費" : "Free";
+  return currency === "TWD"
+    ? `NT$ ${amount.toLocaleString("en-US")}`
+    : `US$ ${amount.toLocaleString("en-US")}`;
+}
 
 /** 2026-05-14: per-action point costs. Keep this single-source so
  *  pricing changes don't drift across the codebase. */
@@ -77,6 +116,13 @@ export interface Plan {
    *  earlyBirdPriceTwdMonthly is what flagged users actually pay. */
   earlyBirdPriceTwdMonthly?: number;
   standardPriceTwdMonthly?: number;
+  // 2026-05-14 (CJ「TWD + USD 雙幣」): USD prices for users with
+  // billingCountry != 'TW'. Rounded to clean USD values; we don't track
+  // FX day-to-day, so these stay fixed until manually bumped.
+  priceUsdMonthly?: number;
+  priceUsdAnnually?: number;
+  earlyBirdPriceUsdMonthly?: number;
+  standardPriceUsdMonthly?: number;
   trialDays: number;
   quota: PlanQuota;
   features: string[];          // human-readable bullets for /pricing
@@ -136,6 +182,10 @@ export const PLANS: Record<PlanCode, Plan> = {
     priceTwdAnnually: 15000,               // 標準年費
     earlyBirdPriceTwdMonthly: 900,         // 早鳥永久價（grandfathered 用戶）
     standardPriceTwdMonthly: 1500,         // 同 priceTwdMonthly，明示語意
+    priceUsdMonthly: 47,                   // standard USD
+    priceUsdAnnually: 470,                 // annual USD
+    earlyBirdPriceUsdMonthly: 28,          // early-bird USD
+    standardPriceUsdMonthly: 47,
     trialDays: 0,
     quota: {
       // 2026-05-14: legacy per-task quotas removed (-1). Gating is
@@ -173,6 +223,8 @@ export const PLANS: Record<PlanCode, Plan> = {
     name: "OnBrand Team · 小團隊",
     priceTwdMonthly: 4990,
     priceTwdAnnually: 49900,    // 12 × 4158 NTD (省 17%)
+    priceUsdMonthly: 156,
+    priceUsdAnnually: 1560,
     trialDays: 0,
     quota: {
       task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1,
@@ -202,6 +254,8 @@ export const PLANS: Record<PlanCode, Plan> = {
     name: "OnBrand Agency · 代理商",
     priceTwdMonthly: 14990,
     priceTwdAnnually: 149900,
+    priceUsdMonthly: 469,
+    priceUsdAnnually: 4690,
     trialDays: 0,
     quota: {
       task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1,
@@ -266,29 +320,66 @@ export function getPlan(code: PlanCode | string): Plan {
  */
 export function getEffectivePrice(
   plan: Plan,
-  userFlags: { earlyBird?: number | boolean; lockedPriceTwdMonthly?: number | null },
-): { monthly: number; annually: number; isEarlyBird: boolean; isLocked: boolean } {
-  // 1. Locked custom price wins
+  userFlags: {
+    earlyBird?: number | boolean;
+    lockedPriceTwdMonthly?: number | null;
+    // 2026-05-14: optional — when set, returns the USD-equivalent
+    // monthly/annually instead of TWD. Other fields (isEarlyBird, isLocked)
+    // are unaffected.
+    currency?: Currency;
+  },
+): { monthly: number; annually: number; isEarlyBird: boolean; isLocked: boolean; currency: Currency } {
+  const currency: Currency = userFlags.currency ?? "TWD";
+  // 1. Locked custom price wins (TWD only — custom-deal users are TW)
   const locked = userFlags.lockedPriceTwdMonthly;
   if (typeof locked === "number" && locked > 0) {
-    return { monthly: locked, annually: locked * 10, isEarlyBird: false, isLocked: true };
+    // If they're being charged in USD but have a locked TWD price, fall
+    // back to converting at the sticker ratio (cheap & predictable).
+    if (currency === "USD") {
+      const ratio = (plan.priceUsdMonthly ?? 47) / (plan.priceTwdMonthly || 1500);
+      const usd = Math.round(locked * ratio);
+      return { monthly: usd, annually: usd * 10, isEarlyBird: false, isLocked: true, currency };
+    }
+    return { monthly: locked, annually: locked * 10, isEarlyBird: false, isLocked: true, currency };
   }
   // 2. Early-bird (grandfathered) users
   const isEarlyBird = Boolean(userFlags.earlyBird);
-  if (isEarlyBird && plan.earlyBirdPriceTwdMonthly && plan.earlyBirdPriceTwdMonthly > 0) {
-    return {
-      monthly:  plan.earlyBirdPriceTwdMonthly,
-      annually: plan.earlyBirdPriceTwdMonthly * 10,
-      isEarlyBird: true,
-      isLocked: false,
-    };
+  if (isEarlyBird) {
+    if (currency === "USD" && plan.earlyBirdPriceUsdMonthly && plan.earlyBirdPriceUsdMonthly > 0) {
+      return {
+        monthly:  plan.earlyBirdPriceUsdMonthly,
+        annually: plan.earlyBirdPriceUsdMonthly * 10,
+        isEarlyBird: true,
+        isLocked: false,
+        currency,
+      };
+    }
+    if (currency === "TWD" && plan.earlyBirdPriceTwdMonthly && plan.earlyBirdPriceTwdMonthly > 0) {
+      return {
+        monthly:  plan.earlyBirdPriceTwdMonthly,
+        annually: plan.earlyBirdPriceTwdMonthly * 10,
+        isEarlyBird: true,
+        isLocked: false,
+        currency,
+      };
+    }
   }
   // 3. Standard sticker
+  if (currency === "USD") {
+    return {
+      monthly:  plan.priceUsdMonthly  ?? 0,
+      annually: plan.priceUsdAnnually ?? 0,
+      isEarlyBird: false,
+      isLocked: false,
+      currency,
+    };
+  }
   return {
     monthly:  plan.priceTwdMonthly,
     annually: plan.priceTwdAnnually,
     isEarlyBird: false,
     isLocked: false,
+    currency,
   };
 }
 
