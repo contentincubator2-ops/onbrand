@@ -27,7 +27,7 @@ import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faHouse, faFolderOpen, faUserGroup, faWandMagicSparkles, faRocket,
+  faHouse, faFolderOpen, faUserGroup, faBrain, faWandMagicSparkles, faRocket,
   faMicrophone, faBookBookmark, faEllipsis, faBell, faChessKnight,
   faPlus, faRightFromBracket,
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
@@ -79,7 +79,10 @@ function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
       tooltip: en ? "Calendar view — scheduled + published at a glance, your edge over Buffer" : "月曆視圖 — 已排程 + 已發布內容一目了然" },
     { to: "/theater",   label: en ? "Theater" : "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
-    { to: "/brands",    label: en ? "Brands" : "品牌",     icon: <FontAwesomeIcon icon={faUserGroup} /> },
+    // 2026-05-14 (CJ「品牌大腦」概念導入): icon faUserGroup → faBrain。
+    // 概念校正：positioning 鎖定 + 累積的知識/偏好/規則 = 「品牌大腦」、
+    // sidebar label 跟 panel 命名一致。
+    { to: "/brands",    label: en ? "Brand Brain" : "品牌大腦",     icon: <FontAwesomeIcon icon={faBrain} /> },
     { to: "/brands/settings", label: en ? "Connect" : "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands/settings" },
     // 2026-05-12 (CJ「請把策略顧問拿掉」): /consultant route still works
     // for power users / direct URL access, but no sidebar entry. Solo
@@ -201,15 +204,17 @@ export default function ShellLayout() {
         </>
       )}
 
-      {/* Brand hierarchy pill — fixed top-left, always-expanded horizontal bar
-          showing the active brand → product → event. Click for hierarchical
-          dropdown to switch or add. Replaces old vertical circle button. */}
+      {/* 2026-05-14 (CJ「右上方放品牌大腦」): moved from top-left to top-right.
+          Rationale: for Solo users (1 brand) the pill is rarely a switcher and
+          mostly a status indicator — putting it with notifications / avatar
+          (right-side "personal state" zone) is the right mental model. The
+          colour-tinted letter monogram is preserved for brand identification;
+          the panel below it carries the 「品牌大腦」 narrative. */}
       <BrandHierarchyPill
         brands={brands}
         scope={scope}
         setScope={setScope}
         onNavigate={(to) => navigate(to)}
-        sidebarLeft={contentLeft}
       />
 
       {/* Main content. 2026-05-12 (CJ「header 標題與品牌 bar 重疊」): the
@@ -517,15 +522,12 @@ function brandColor(name: string): { bg: string; bgGradient: string; light: stri
    height 44px. Pushes IconBar's first child down via top padding.
 */
 function BrandHierarchyPill({
-  brands, scope, setScope, onNavigate, sidebarLeft = 0,
+  brands, scope, setScope, onNavigate,
 }: {
   brands: any[];
   scope: ScopeState;
   setScope: (s: ScopeState) => void;
   onNavigate: (to: string) => void;
-  /** 2026-05-12 (CJ「側邊欄出來會遮到品牌」): when sidebar expands the
-   *  pill must shift right so it doesn't get hidden under the panel. */
-  sidebarLeft?: number;
 }) {
   const [open, setOpen] = React.useState(false);
   const [addModal, setAddModal] = React.useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
@@ -573,14 +575,14 @@ function BrandHierarchyPill({
       ref={ref}
       style={{
         position: "fixed",
-        // 2026-05-12 (CJ「側邊欄出來會遮到品牌」): track sidebar width so
-        // expanded sidebar doesn't cover the pill. sidebarLeft = ICON_W
-        // (collapsed) or ICON_W+PANEL_W (expanded).
-        left: sidebarLeft + 12,
+        // 2026-05-14 (CJ「品牌大腦放右上方」): moved from left to right anchor.
+        // Sidebar is collapsed icon-only (ICON_W=70px) and doesn't overlap
+        // the right side, so no shift tracking needed.
+        right: 12,
         top: 10,
         zIndex: 50,
-        width: 260,
-        transition: "left 0.22s cubic-bezier(0.4,0,0.2,1)",
+        width: 280,
+        transition: "right 0.22s cubic-bezier(0.4,0,0.2,1)",
       }}
     >
       <button
@@ -647,7 +649,7 @@ function BrandHierarchyPill({
         />
       </button>
 
-      {/* Hierarchical popover: Brand → Product → Event */}
+      {/* Hierarchical popover: Brain summary → Brand → Product → Event */}
       {open && (
         <div
           style={{
@@ -661,9 +663,24 @@ function BrandHierarchyPill({
             overflowY: "auto",
           }}
         >
+          {/* 2026-05-14 (CJ「品牌大腦」): brain summary panel at top.
+              Positioning is locked (read-only) + accumulated reference
+              material counts. No "AI learned X" copy — positioning never
+              auto-updates from user behaviour; only user-curated entries
+              and AI usage stats are surfaced. */}
+          {activeBrand && (
+            <BrainSummaryPanel
+              brandId={activeBrand.id}
+              brandName={activeBrand.name}
+              isEn={isEn}
+              onClose={() => setOpen(false)}
+              onNavigate={onNavigate}
+            />
+          )}
+
           {/* BRAND section */}
           <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>
-            {isEn ? "Brand" : "品牌"}
+            {isEn ? "Switch brand" : "切換品牌"}
           </p>
           {brands.length === 0 ? (
             <p style={{ fontSize: 12, color: "#9ca3af", padding: "6px 10px" }}>{isEn ? "No brands yet" : "還沒建立品牌"}</p>
@@ -850,6 +867,147 @@ function BrandHierarchyPill({
           else if (kind === "event") setScope({ brandId: scope.brandId ?? null, productId: scope.productId ?? null, eventId: id });
         }}
       />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   BrainSummaryPanel — top section of the BrandHierarchyPill dropdown
+   ══════════════════════════════════════════════════════════════════
+   2026-05-14 (CJ「品牌大腦」):
+   Shows the "what's in this brand brain" narrative above the brand
+   switcher. Three sub-sections matching the locked-vs-curated mental
+   model:
+     1. 鎖定憲法 — positioning summary, marked read-only with lock icon.
+        Customer service is the only way to change.
+     2. 你加進來的 — knowledge / preferred terms / banned terms counts.
+        User-curated material, user-controlled.
+     3. AI 引用 — usage stats from past 7 days (placeholder copy until
+        instrumentation lands; for now reads from output count).
+   Uses brand.getBrainSummary if available, falls back to existing brand.get.
+   ══════════════════════════════════════════════════════════════════ */
+function BrainSummaryPanel({
+  brandId, brandName, isEn, onClose, onNavigate,
+}: {
+  brandId: number;
+  brandName: string;
+  isEn: boolean;
+  onClose: () => void;
+  onNavigate: (to: string) => void;
+}) {
+  const summaryQ = (trpc as any).brand?.getBrainSummary?.useQuery
+    ? (trpc as any).brand.getBrainSummary.useQuery(
+        { brandId },
+        { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 60_000 },
+      )
+    : { data: null, isLoading: false };
+  const s: any = summaryQ?.data ?? null;
+
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div style={{ padding: "8px 10px 6px" }}>
+      <p style={{
+        fontSize: 9, fontWeight: 700, color: "#525252",
+        letterSpacing: "0.22em", textTransform: "uppercase",
+        marginBottom: 6,
+      }}>{title}</p>
+      {children}
+    </div>
+  );
+
+  const Row = ({ label, value, dim }: { label: string; value: string; dim?: boolean }) => (
+    <div style={{
+      display: "flex", justifyContent: "space-between", alignItems: "baseline",
+      fontSize: 12, color: dim ? "#9ca3af" : "#374151", padding: "2px 0",
+    }}>
+      <span>{label}</span>
+      <span style={{ fontWeight: 600, color: dim ? "#9ca3af" : "#171717" }}>{value}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ borderBottom: "1px solid #f3f4f6", paddingBottom: 4, marginBottom: 4 }}>
+      {/* Heading */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "10px 10px 6px",
+      }}>
+        <FontAwesomeIcon icon={faBrain} style={{ fontSize: 14, color: "#171717" }} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>
+          {isEn ? "Brand Brain" : "品牌大腦"} · {brandName}
+        </span>
+      </div>
+
+      {/* 1. 鎖定憲法 */}
+      <Section title={isEn ? "01 · Locked Constitution" : "01 · 鎖定憲法"}>
+        <Row
+          label={isEn ? "Positioning" : "14 步定位"}
+          value={
+            s?.positioning?.completedSections != null
+              ? `${s.positioning.completedSections}/14 ${s.positioning.isLocked ? "🔒" : ""}`
+              : "—"
+          }
+        />
+        {!s?.positioning?.isLocked && (
+          <p style={{ fontSize: 10, color: "#9ca3af", marginTop: 4, lineHeight: 1.5 }}>
+            {isEn
+              ? "Not locked yet — finish onboarding to lock the brand identity."
+              : "尚未鎖定 · 完成 14 步定位後會自動鎖定"}
+          </p>
+        )}
+      </Section>
+
+      {/* 2. 你加進來的 */}
+      <Section title={isEn ? "02 · Your References" : "02 · 你加進來的"}>
+        <Row label={isEn ? "Knowledge" : "知識條目"} value={String(s?.knowledge?.count ?? 0)} />
+        <Row label={isEn ? "Preferred terms" : "偏好詞"} value={String(s?.preferences?.preferredCount ?? 0)} />
+        <Row label={isEn ? "Banned terms" : "禁用詞"} value={String(s?.preferences?.bannedCount ?? 0)} />
+        <Row
+          label={isEn ? "Visual identity" : "視覺識別"}
+          value={s?.visual?.hasLogo ? "✓" : "—"}
+          dim={!s?.visual?.hasLogo}
+        />
+        <Row
+          label={isEn ? "Platform binding" : "平台連結"}
+          value={
+            [s?.connections?.fb && "FB", s?.connections?.ig && "IG"]
+              .filter(Boolean).join(" / ") || "—"
+          }
+          dim={!s?.connections?.fb && !s?.connections?.ig}
+        />
+      </Section>
+
+      {/* 3. AI 引用 */}
+      <Section title={isEn ? "03 · AI Usage (this week)" : "03 · AI 本週引用"}>
+        <Row
+          label={isEn ? "Outputs produced" : "本週產出"}
+          value={String(s?.outputs?.last7DaysCount ?? 0)}
+        />
+        <Row
+          label={isEn ? "Total outputs" : "歷史總產出"}
+          value={String(s?.outputs?.totalCount ?? 0)}
+        />
+        {/* Term-use instrumentation lands in a follow-up — see ROADMAP. */}
+      </Section>
+
+      {/* CTA */}
+      <div style={{ padding: "4px 10px 8px" }}>
+        <button
+          onClick={() => {
+            onNavigate(`/brands/edit?b=${brandId}`);
+            onClose();
+          }}
+          style={{
+            width: "100%", padding: "8px 10px", borderRadius: 6,
+            border: "1px solid #171717", background: "#171717", color: "#fff",
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "#262626"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "#171717"; }}
+        >
+          {isEn ? "Open full brain →" : "完整品牌大腦 →"}
+        </button>
+      </div>
     </div>
   );
 }

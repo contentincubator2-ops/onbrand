@@ -372,6 +372,114 @@ export const brandRouter = router({
       return { ok: true as const };
     }),
 
+  /**
+   * 2026-05-14 (CJ「品牌大腦」panel data source).
+   * Returns the aggregate "brand brain" state powering the top-right pill
+   * dropdown. Three semantic groups matching the locked-vs-curated model:
+   *
+   *   1. Locked Constitution — positioning lock state + completion count
+   *   2. User-Curated References — knowledge / preferred / banned / visual / bindings
+   *   3. AI Usage — output counts (term-use instrumentation lands later)
+   *
+   * Designed to be CHEAP (single round-trip, indexed counts) so the pill
+   * dropdown stays snappy. Per-brand cache 60s on client side.
+   */
+  getBrainSummary: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      // Ownership check + base brand data
+      const [bRows]: any = await localPool.execute(
+        `SELECT id, name, positioning, positioningStatus, logoUrl,
+                primaryColor, fb_page_id AS fbPageId
+           FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      const brand = (bRows as any[])[0];
+      if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Positioning completion — count keys in the JSON. Treat
+      // positioningStatus='completed' as "locked", anything else as unlocked.
+      let completedSections = 0;
+      try {
+        const p = typeof brand.positioning === "string"
+          ? JSON.parse(brand.positioning || "{}")
+          : (brand.positioning ?? {});
+        completedSections = Object.keys(p).filter(
+          (k) => p[k] != null && (typeof p[k] !== "object" || Object.keys(p[k]).length > 0),
+        ).length;
+      } catch { /* non-fatal */ }
+      const isLocked = brand.positioningStatus === "completed";
+
+      // Knowledge count
+      let knowledgeCount = 0;
+      try {
+        const [kRows]: any = await localPool.execute(
+          `SELECT COUNT(*) AS n FROM brand_knowledge_items WHERE brandId = ?`,
+          [input.brandId],
+        );
+        knowledgeCount = Number((kRows as any[])[0]?.n ?? 0);
+      } catch { /* table may not exist on older deploys */ }
+
+      // Preferred / banned terms (lives in brand_caption_rules)
+      let preferredCount = 0, bannedCount = 0;
+      try {
+        const [rRows]: any = await localPool.execute(
+          `SELECT kind, COUNT(*) AS n FROM brand_caption_rules
+            WHERE brandId = ? GROUP BY kind`,
+          [input.brandId],
+        );
+        for (const r of (rRows as any[])) {
+          if (r.kind === "preferred" || r.kind === "preferred_term") preferredCount = Number(r.n);
+          else if (r.kind === "banned" || r.kind === "banned_word") bannedCount = Number(r.n);
+        }
+      } catch { /* non-fatal */ }
+
+      // Output counts: total + last 7 days
+      let totalOutputs = 0, last7DaysOutputs = 0;
+      try {
+        const [oRows]: any = await localPool.execute(
+          `SELECT
+              COUNT(*) AS total,
+              SUM(CASE WHEN mo.createdAt >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) AS last7
+            FROM mission_outputs mo
+            JOIN missions m ON m.id = mo.missionId
+            WHERE m.brandId = ?`,
+          [input.brandId],
+        );
+        const row = (oRows as any[])[0];
+        totalOutputs = Number(row?.total ?? 0);
+        last7DaysOutputs = Number(row?.last7 ?? 0);
+      } catch { /* non-fatal */ }
+
+      return {
+        positioning: {
+          isLocked,
+          completedSections,
+          totalSections: 14,
+        },
+        knowledge: {
+          count: knowledgeCount,
+        },
+        preferences: {
+          preferredCount,
+          bannedCount,
+        },
+        visual: {
+          hasLogo: !!brand.logoUrl,
+          hasColors: !!brand.primaryColor,
+        },
+        connections: {
+          fb: !!brand.fbPageId,
+          ig: false,  // wired when IG binding lands
+        },
+        outputs: {
+          totalCount: totalOutputs,
+          last7DaysCount: last7DaysOutputs,
+        },
+      };
+    }),
+
   /** 2026-05-12 (CJ「視覺還在開發，請開發完成」): visual identity getter.
    *  Returns logoUrl + 3 brand colors + font + guidelines. */
   getVisual: protectedProcedure
