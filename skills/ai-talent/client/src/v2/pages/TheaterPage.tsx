@@ -994,29 +994,33 @@ export default function TheaterPage() {
         }
 
         try {
-          const r = await generateCellMut.mutateAsync({
-            brandId,
-            platform: task.platform,
-            date: task.date,
-            weekday: task.weekday,
-            usp: task.usp,
-            importantDateName: task.importantDateName,
-            brandTagline: plan.brandTagline,
-            brandVoice: plan.brandVoice,
-            // Phase 1: enforce hook + CTA diversity
-            hook: task.hook as any,
-            cta:  task.cta  as any,
-            // Phase 1.5: real scouted viral patterns for this platform
-            scoutPatterns: task.scoutPatterns,
-            // Phase 3a: run-scope ad-hoc rules (brand-scope rules are
-            // loaded server-side from DB)
-            adhocRules: runRules,
-            // Phase 3b: 素材 context
-            products: products.map((p) => ({ name: p.name, usp: p.usp, launchDate: p.launchDate })),
-            photoTags: photos.map((ph) => ph.tag),
-            // 2026-05-12: anti-repetition (server forbids these openings)
-            priorOpenings: priorOpenings.length > 0 ? priorOpenings : undefined,
-          });
+          const r = await withTimeout(
+            generateCellMut.mutateAsync({
+              brandId,
+              platform: task.platform,
+              date: task.date,
+              weekday: task.weekday,
+              usp: task.usp,
+              importantDateName: task.importantDateName,
+              brandTagline: plan.brandTagline,
+              brandVoice: plan.brandVoice,
+              // Phase 1: enforce hook + CTA diversity
+              hook: task.hook as any,
+              cta:  task.cta  as any,
+              // Phase 1.5: real scouted viral patterns for this platform
+              scoutPatterns: task.scoutPatterns,
+              // Phase 3a: run-scope ad-hoc rules (brand-scope rules are
+              // loaded server-side from DB)
+              adhocRules: runRules,
+              // Phase 3b: 素材 context
+              products: products.map((p) => ({ name: p.name, usp: p.usp, launchDate: p.launchDate })),
+              photoTags: photos.map((ph) => ph.tag),
+              // 2026-05-12: anti-repetition (server forbids these openings)
+              priorOpenings: priorOpenings.length > 0 ? priorOpenings : undefined,
+            }),
+            90_000,
+            `generateCell ${task.key}`,
+          );
           if (stopRef.current) return;
           if (r.ok && r.caption) {
             // Show writer's raw draft + structured fields (rewrites and all — visible on purpose)
@@ -1027,13 +1031,17 @@ export default function TheaterPage() {
             if (stopRef.current) return;
             updateCell(task.key, { status: "qa", caption: r.caption, structured });
             try {
-              const qa = await qaReviewMut.mutateAsync({
-                draft: r.caption,
-                platform: task.platform,
-                hook: task.hook as any,
-                cta:  task.cta  as any,
-                usp:  task.usp,
-              });
+              const qa = await withTimeout(
+                qaReviewMut.mutateAsync({
+                  draft: r.caption,
+                  platform: task.platform,
+                  hook: task.hook as any,
+                  cta:  task.cta  as any,
+                  usp:  task.usp,
+                }),
+                45_000,
+                `qaReview ${task.key}`,
+              );
               if (stopRef.current) return;
               if (qa.ok && qa.caption) {
                 updateCell(task.key, { status: "qa", caption: qa.caption, structured });
@@ -1071,12 +1079,16 @@ export default function TheaterPage() {
           continue;
         }
         try {
-          const r = await generateImageMut.mutateAsync({
-            brandId,
-            platform: task.platform,
-            caption: captionFromState,
-            brandTagline: plan.brandTagline,
-          });
+          const r = await withTimeout(
+            generateImageMut.mutateAsync({
+              brandId,
+              platform: task.platform,
+              caption: captionFromState,
+              brandTagline: plan.brandTagline,
+            }),
+            120_000,
+            `generateImage ${task.key}`,
+          );
           if (stopRef.current) return;
           if (r.ok && r.imageUrl) {
             updateCell(task.key, { status: "done", imageUrl: r.imageUrl, doneAt: Date.now() });
@@ -1817,3 +1829,20 @@ export default function TheaterPage() {
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * 2026-05-14 (CJ「企劃台動作比昨天慢，第二天的跑不出來」): wrap each
+ * per-cell mutation in a Promise.race against a timeout. Previously a hung
+ * LLM call would block a caption/image worker indefinitely — with concurrency
+ * 2 captions, two hung calls on day-2 cells froze the whole 7-day pipeline.
+ * Now the worker bails after `ms` and the cell is marked failed so the loop
+ * advances to day 3+.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`[theater] ${label} timeout after ${ms}ms`)), ms),
+    ),
+  ]);
+}
