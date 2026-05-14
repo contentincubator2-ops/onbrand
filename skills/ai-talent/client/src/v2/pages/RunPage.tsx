@@ -503,7 +503,7 @@ export default function RunPage() {
       const seed = subject
         ? `開頭 3 秒（hook）：${subject} —— 鏡頭抓住一個吸睛瞬間。\n` +
           `中段（10-20 秒）：產品 / 場景特寫 + 一個具體動作（手部、表情、物件接觸）。\n` +
-          `結尾（3-5 秒）：字卡呼應 caption 核心，3-8 字。可配「定格 + 留白」收尾。\n` +
+          `結尾（3-5 秒）：字卡呼應文案核心，3-8 字。可配「定格 + 留白」收尾。\n` +
           `風格：自然光、節奏穩、不刻意配音、字卡簡潔。`
         : "";
       setImagePrompt(seed);
@@ -783,7 +783,7 @@ export default function RunPage() {
               {/* <ToolbarBtn icon={Video}         label={lang === "en" ? "Redo video" : "改影片"}        active={mode==="video"} onClick={() => setMode("video")} /> */}
               <Divider />
               {/* Agent avatars — click to see that agent's thinking */}
-              <Tooltip content={lang === "en" ? "Caption agent — see thinking" : "撰寫 agent — 看思考過程"}>
+              <Tooltip content={lang === "en" ? "Caption agent — see thinking" : "撰寫者 — 看思考過程"}>
                 <button
                   onClick={() => { setMode("agent"); setFocusedAgent("caption"); }}
                   className={`w-7 h-7 rounded-full overflow-hidden ring-1 transition ${mode==="agent" && focusedAgent==="caption" ? "ring-secondary ring-2" : "ring-default-200 hover:ring-secondary"}`}
@@ -1119,7 +1119,7 @@ export default function RunPage() {
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
                     {lang === "en"
                       ? "Step 1: Describe what the video should show (we'll pull in this caption too)"
-                      : "Step 1：寫影片想呈現什麼（會自動帶入這篇的 caption 當補充）"}
+                      : "第 1 步：寫影片想呈現什麼（會自動帶入這篇的文案當補充）"}
                   </div>
                   <Textarea
                     label={lang === "en" ? "Video brief" : "影片指令"}
@@ -1132,7 +1132,7 @@ export default function RunPage() {
                     maxRows={6}
                     description={lang === "en"
                       ? "Can be blank — we'll use this variant's caption as the topic"
-                      : "可空白 — 留空就用此 variant 的 caption 當題目"}
+                      : "可空白 — 留空就用此變體的文案當題目"}
                     autoFocus
                   />
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
@@ -1264,7 +1264,7 @@ export default function RunPage() {
                 const focusedAg = focusedAgent === "image" ? imageAg : captionAg;
                 const focusedAgName = focusedAg?.name ?? (focusedAgent === "image"
                   ? (lang === "en" ? "Visual agent" : "視覺 agent")
-                  : (lang === "en" ? "Caption agent" : "撰寫 agent"));
+                  : (lang === "en" ? "Caption agent" : "撰寫者"));
                 const focusedAgTitle = focusedAg?.title ?? "";
                 const stages: Array<{key: string; label: string; status: string; startedAt?: number; completedAt?: number}> = Array.isArray(md.stages) ? md.stages : [];
                 const totalMs = md.latencyMs ?? 0;
@@ -1367,7 +1367,7 @@ export default function RunPage() {
                   <p className="text-[10px] text-default-400">
                     {lang === "en"
                       ? <>Will call {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "the caption agent"} to regenerate variant {activeIdx + 1}.</>
-                      : <>將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫 agent"} 重新產出 variant {activeIdx + 1}。</>}
+                      : <>將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫者"} 重新產出第 {activeIdx + 1} 個變體。</>}
                   </p>
                   {Array.isArray(data.metadata?.archivedVariants) && data.metadata.archivedVariants.length > 0 && (
                     <p className="text-[10px] text-default-500">
@@ -1386,7 +1386,7 @@ export default function RunPage() {
                     <div className="flex justify-between"><span>Tier</span><span>{data.mission?.tier ?? "—"}</span></div>
                     <div className="flex justify-between"><span>{lang === "en" ? "Versions" : "變體數"}</span><span>{variants.length}</span></div>
                     <div className="flex justify-between"><span>{lang === "en" ? "Latency" : "產出延遲"}</span><span>{data.metadata?.latencyMs ? `${(data.metadata.latencyMs/1000).toFixed(1)}s` : "—"}</span></div>
-                    <div className="flex justify-between"><span>{lang === "en" ? "Caption agent" : "撰寫 agent"}</span><span>{(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "—"}</span></div>
+                    <div className="flex justify-between"><span>{lang === "en" ? "Caption agent" : "撰寫者"}</span><span>{(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "—"}</span></div>
                     <div className="flex justify-between"><span>{lang === "en" ? "Visual agent" : "視覺 agent"}</span><span>{(typeof data.metadata?.imageAgent === "object" ? data.metadata.imageAgent?.name : data.metadata?.imageAgent) ?? "—"}</span></div>
                   </div>
                 </>
@@ -1530,7 +1530,7 @@ export default function RunPage() {
               onChange={(e) => setEmailNote(e.target.value)}
               minRows={3}
             />
-            <p className="text-tiny text-default-500">{lang === "en" ? "We'll include the full caption and brand context." : "寄出時會附上完整 caption + 品牌資訊。"}</p>
+            <p className="text-tiny text-default-500">{lang === "en" ? "We'll include the full caption and brand context." : "寄出時會附上完整文案 + 品牌資訊。"}</p>
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={() => setEmailDialogOpen(false)}>{t("cancel")}</Button>

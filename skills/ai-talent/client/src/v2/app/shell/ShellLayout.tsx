@@ -70,7 +70,7 @@ function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
     // countdown sequences, ad packs); 99s = full slate (42 tasks like
     // 30-day calendars, 6-ep series, launch toolkits).
     { to: "/30s",       label: en ? "Single" : "單品",   tierBadge: "30s", icon: null,
-      tooltip: en ? "30s · single piece — one headline / caption / DM / hashtag set" : "30 秒寫完一件素材 — 一個 headline / caption / DM / hashtag 組" },
+      tooltip: en ? "30s · single piece — one headline / caption / DM / hashtag set" : "30 秒寫完一件素材 — 一組標題 / 文案 / 私訊 / hashtag" },
     { to: "/60s",       label: en ? "Pack" : "套組", tierBadge: "60s", icon: null,
       tooltip: en ? "60s · a related set of pieces — 5-day countdown, 7-slide carousel, 3-variant ad pack" : "60 秒寫完一套相關素材 — 5 天倒數、7 張輪播、3 種廣告變體" },
     { to: "/99s",       label: en ? "Slate" : "檔期", tierBadge: "99s", icon: null, matchPrefix: "/99s",

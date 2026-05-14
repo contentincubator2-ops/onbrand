@@ -699,7 +699,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         emoji: "⚡",
         kicker: "QUICK DRAFT",
         headline: lang === "en" ? "Make a post in 30 seconds" : "30 秒搞定一篇貼文",
-        sub: lang === "en" ? "Light output · 3 caption variants · visual brief (image on demand)" : "輕量產出 · 3 個 caption 變體 · 風格 brief（按需生圖）",
+        sub: lang === "en" ? "Light output · 3 caption variants · visual brief (image on demand)" : "輕量產出 · 3 個文案變體 · 風格指示（按需生圖）",
         bullets: lang === "en" ? ["3 variants", "<20s", "URL / brand voice"] : ["3 變體", "<20 秒", "URL/品牌語氣支援"],
         accent: "#00b4bc",
         gradientFrom: "rgba(0,180,188,0.10)",
@@ -1750,7 +1750,7 @@ function OutputCarousel({
                             {a.output ? a.output.slice(0, 360) + (a.output.length > 360 ? "…" : "")
                               : (a.role === "文案主寫" || a.role === "Lead writer") ? (lang === "en"
                                   ? `Wrote ${slides.length} caption variants. Current "${slide?.label}":\n${slide?.caption?.slice(0, 200) ?? ""}…`
-                                  : `撰寫了 ${slides.length} 個變體的 caption。當前版本「${slide?.label}」：\n${slide?.caption?.slice(0, 200) ?? ""}…`)
+                                  : `撰寫了 ${slides.length} 個變體的文案。當前版本「${slide?.label}」：\n${slide?.caption?.slice(0, 200) ?? ""}…`)
                               : (a.role === "視覺方向" || a.role === "Visual direction") ? (lang === "en"
                                   ? `Wrote the visual brief:\n${slide?.imageStyle?.slice(0, 200) ?? "(no brief)"}`
                                   : `產出視覺風格 brief：\n${slide?.imageStyle?.slice(0, 200) ?? "（沒有 brief）"}`)
@@ -2215,7 +2215,7 @@ function OutputCarousel({
                   {chatHistory.length === 0 && (
                     <div className="rounded-xl bg-default-50 p-3 text-tiny text-default-700 leading-relaxed">
                       <p className="font-semibold mb-1">{agentMeta?.name ?? "Aiden Hsu"}{lang === "en" ? ":" : "："}</p>
-                      <p>{lang === "en" ? "The caption is done (see the mockup on the left). Tell me what you'd like to tweak — for example:" : "目前的文案已經寫好（看左邊 mockup）。告訴我你想怎麼調整？例如："}</p>
+                      <p>{lang === "en" ? "The caption is done (see the mockup on the left). Tell me what you'd like to tweak — for example:" : "目前的文案已經寫好（看左邊預覽）。告訴我你想怎麼調整？例如："}</p>
                       <ul className="mt-1.5 space-y-0.5 text-[11px] text-default-600 list-disc list-inside">
                         {lang === "en" ? (
                           <>
