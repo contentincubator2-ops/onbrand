@@ -279,17 +279,59 @@ app.use("/api/intake", intakeRouter);
 app.use("/api/missions", missionStepStreamRouter);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
+// 2026-05-14 (CJ「系統安全穩定」P0): real health check that monitors can act on.
+//   · 503 status code when degraded so nginx / uptime monitors can alert
+//   · verify critical env vars are present (catches deploy-misconfig)
+//   · verify at least one LLM provider key is set (router has fallback chain)
+//   · include memory + uptime for capacity planning
 app.get("/health", healthLimiter, async (_req, res) => {
   const [dbOk, soworkDbOk] = await Promise.all([pingDb(), pingSoworkDb()]);
   const billingQueueLength = getBillingRetryQueueLength();
-  res.json({
-    status:  dbOk && soworkDbOk && billingQueueLength === 0 ? "ok" : "degraded",
+
+  // Critical env vars — if any missing, server can't function. Don't leak
+  // the values; just confirm presence so health checks can fail loudly
+  // when a deploy accidentally drops a secret.
+  const criticalEnvPresent =
+    !!process.env.JWT_SECRET &&
+    !!process.env.LOCAL_DB_PASSWORD &&
+    !!process.env.RESEND_API_KEY;
+
+  // At least ONE LLM provider key must work. Router will fallback through
+  // all of them, but with zero keys nothing can run.
+  const anyLLMKey =
+    !!process.env.AZURE_FOUNDRY_API_KEY ||
+    !!process.env.OPENAI_API_KEY ||
+    !!process.env.ANTHROPIC_API_KEY ||
+    !!process.env.GOOGLE_AI_KEY ||
+    !!process.env.QWEN_API_KEY ||
+    !!process.env.ZHIPU_API_KEY ||
+    !!process.env.DEEPSEEK_API_KEY ||
+    !!process.env.GROQ_API_KEY;
+
+  const checks = {
+    db: dbOk,
+    soworkDb: soworkDbOk,
+    billingQueueOk: billingQueueLength < 100,  // 100+ stuck billing rows = bad
+    criticalEnvPresent,
+    anyLLMKey,
+  };
+  const allOk = Object.values(checks).every(Boolean);
+
+  const mem = process.memoryUsage();
+  res.status(allOk ? 200 : 503).json({
+    status:  allOk ? "ok" : "degraded",
     service: "ai-talent",
-    // SEC-7: version intentionally omitted
-    db:      dbOk ? "connected" : "unreachable",
-    soworkDb: soworkDbOk ? "connected" : "unreachable",
-    billingQueueLength,          // monitor: alert if > 10
-    ts:      new Date().toISOString(),
+    checks: {
+      db:                checks.db ? "ok" : "fail",
+      soworkDb:          checks.soworkDb ? "ok" : "fail",
+      billingQueue:      checks.billingQueueOk ? "ok" : `${billingQueueLength} stuck`,
+      criticalEnv:       checks.criticalEnvPresent ? "ok" : "missing",
+      llmKey:            checks.anyLLMKey ? "ok" : "no_keys",
+    },
+    billingQueueLength,
+    uptimeSec: Math.floor(process.uptime()),
+    memMb:     Math.round(mem.rss / 1024 / 1024),
+    ts:        new Date().toISOString(),
   });
 });
 
