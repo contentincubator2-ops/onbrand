@@ -1190,7 +1190,7 @@ function SlidePanel({
   const isEn = lang === "en";
   const isHome      = currentPath === "/";
   const isProjects  = currentPath.startsWith("/projects");
-  const isTemplates = currentPath.startsWith("/templates");
+  // isTemplates retired 2026-05-14 — /templates route deleted.
   const isBrands    = currentPath.startsWith("/brands");
   // 2026-05-09 (CJ direction): on tier pages (/30s /60s /100s) AND
   // /run/:outputId, the sidebar shows the brand's recent task runs
@@ -1586,7 +1586,7 @@ function SlidePanel({
       )}
 
       {/* ── Other pages — generic home-style panel ── */}
-      {!isHome && !isProjects && !isTemplates && !isBrands && !showTierHistory && (
+      {!isHome && !isProjects && !isBrands && !showTierHistory && (
         <>
           <PlanInviteButtons onNavigate={onNavigate} />
           <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
