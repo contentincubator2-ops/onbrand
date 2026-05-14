@@ -1,10 +1,20 @@
 name: Admin — Set EMAIL_FROM in prod .env
 
-# 2026-05-08: quick toggle for the EMAIL_FROM env var without touching
-# anything else. Use cases:
-#   - Temp set to onboarding@resend.dev (Resend's verified test sender)
-#     while the sowork.ai domain DNS is still pending verification.
-#   - Switch back to noreply@sowork.ai once domain is verified.
+# 2026-05-08 + 2026-05-14 (CJ「客服信箱統一 sowork@sowork.ai」)
+#
+# Quick toggle for the EMAIL_FROM env var without touching anything else.
+#
+# ⚠️ Pre-flight checklist before running this with a sowork.ai address:
+#   1. Resend Dashboard → Domains → sowork.ai must show "Verified"
+#      (DKIM + SPF + Return-Path DNS records all green)
+#   2. If you switch to an unverified domain, Resend rejects sends with
+#      HTTP 403 — registration / forgot-password emails silently fail
+#      (the auth flow falls through to best-effort).
+#
+# Common values:
+#   - sowork@sowork.ai          ← current target (unified customer-service inbox)
+#   - noreply@sowork.ai         ← classic no-reply sender, harder to look spammy
+#   - onboarding@resend.dev     ← Resend's pre-verified fallback (use only if DNS broken)
 #
 # Safe to re-run.
 
@@ -12,9 +22,13 @@ on:
   workflow_dispatch:
     inputs:
       email_from:
-        description: "EMAIL_FROM value (e.g. onboarding@resend.dev or noreply@sowork.ai)"
+        description: "EMAIL_FROM value (Resend sender). Verify domain in Resend first."
         required: true
-        default: "onboarding@resend.dev"
+        default: "sowork@sowork.ai"
+      test_to:
+        description: "Optional: send a test email to this address after the switch (leave blank to skip)"
+        required: false
+        default: ""
 
 jobs:
   set-email-from:
@@ -24,12 +38,13 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           NEW_VAL: ${{ inputs.email_from }}
+          TEST_TO: ${{ inputs.test_to }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 60s
-          envs: NEW_VAL
+          command_timeout: 90s
+          envs: NEW_VAL,TEST_TO
           script: |
             set -e
             ENV_FILE=/opt/marketing-os/app/skills/ai-talent/.env
@@ -65,3 +80,27 @@ jobs:
             curl -s -o /dev/null -w "Health: HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
             echo ""
             echo "✓ Done."
+
+            # ── Optional smoke test: send a real email via Resend ─────
+            if [ -n "$TEST_TO" ]; then
+              echo ""
+              echo "── Sending test email to $TEST_TO ──"
+              set -a; source "$ENV_FILE" 2>/dev/null; set +a
+              if [ -z "$RESEND_API_KEY" ]; then
+                echo "⚠ RESEND_API_KEY not set — skipping test send"
+              else
+                http_code=$(curl -s -o /tmp/resend.out -w "%{http_code}" \
+                  -X POST https://api.resend.com/emails \
+                  -H "Authorization: Bearer $RESEND_API_KEY" \
+                  -H "Content-Type: application/json" \
+                  --data "{\"from\":\"$NEW_VAL\",\"to\":[\"$TEST_TO\"],\"subject\":\"OnBrand EMAIL_FROM probe\",\"text\":\"This is a probe send confirming EMAIL_FROM=$NEW_VAL works end-to-end. If you got this, the Resend sender domain is verified.\"}")
+                echo "  HTTP $http_code"
+                head -c 600 /tmp/resend.out; echo
+                if [ "$http_code" = "200" ]; then
+                  echo "  ✓ Resend accepted the send — check $TEST_TO inbox in <1min."
+                else
+                  echo "  ✗ Resend rejected — most common cause: sender domain not verified."
+                  echo "    Fix: Resend Dashboard → Domains → sowork.ai → add DNS records → wait for Verified."
+                fi
+              fi
+            fi
