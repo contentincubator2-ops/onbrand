@@ -1,0 +1,63 @@
+name: Ops — Monitor bundle hash drift (white-screen guard)
+# 2026-05-14 (P1): tonight's blank-screen issue could have been caught
+# by this. After every deploy, verify index.html references a JS bundle
+# that actually exists on disk + curl returns 200. Surfaces stale-deploy
+# failure mode (where tsc errored mid-build and public/ has half-written
+# files).
+on:
+  workflow_dispatch: {}
+jobs:
+  check:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 1
+    steps:
+      - name: Verify on disk
+        run: |
+          set +e
+          PUB=/opt/onbrand/app/skills/ai-talent/public
+          echo "── index.html mtime ──"
+          stat -c '%y %s bytes' "$PUB/index.html" 2>&1
+          echo ""
+          BUNDLE_REFS=$(grep -oE 'index-[A-Za-z0-9_-]+\.(js|css)' "$PUB/index.html" 2>/dev/null | sort -u)
+          if [ -z "$BUNDLE_REFS" ]; then
+            echo "❌ index.html references no bundle — corrupt"
+            exit 1
+          fi
+          echo "── referenced bundles ──"
+          echo "$BUNDLE_REFS"
+          echo ""
+          echo "── verify each exists on disk ──"
+          MISSING=0
+          for b in $BUNDLE_REFS; do
+            if [ -f "$PUB/assets/$b" ]; then
+              size=$(stat -c '%s' "$PUB/assets/$b")
+              echo "  ✓ $b (${size} bytes)"
+            else
+              echo "  ❌ $b MISSING IN assets/"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo ""
+            echo "❌ DRIFT: $MISSING bundle reference(s) missing on disk"
+            echo "── actual assets/ contents ──"
+            ls "$PUB/assets/" | head -10
+            exit 1
+          fi
+
+      - name: Verify served bundle hash matches disk
+        run: |
+          set +e
+          DISK_BUNDLE=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' /opt/onbrand/app/skills/ai-talent/public/index.html | head -1)
+          SERVED_BUNDLE=$(curl -sk https://onbrand.sowork.ai/ | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1)
+          echo "disk:   $DISK_BUNDLE"
+          echo "served: $SERVED_BUNDLE"
+          if [ "$DISK_BUNDLE" != "$SERVED_BUNDLE" ]; then
+            echo "❌ HASH DRIFT — nginx serving stale index.html"
+            exit 1
+          fi
+          # Probe the bundle URL externally to confirm 200
+          code=$(curl -sk -o /dev/null -w "%{http_code}" "https://onbrand.sowork.ai/assets/$SERVED_BUNDLE")
+          echo "bundle external probe: $code"
+          [ "$code" = "200" ] || exit 1
+          echo "✓ all aligned"
