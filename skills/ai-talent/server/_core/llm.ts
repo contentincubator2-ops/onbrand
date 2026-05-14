@@ -200,8 +200,8 @@ const PROVIDER_CONFIG: Record<
   //   Key: AZURE_CLAUDE_SWEDEN_API_KEY  Endpoint: AZURE_CLAUDE_SWEDEN_ENDPOINT
   "azure-claude": {
     baseUrl:      (ENV as any).AZURE_CLAUDE_SWEDEN_ENDPOINT
-      ? `${((ENV as any).AZURE_CLAUDE_SWEDEN_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
-      : "https://proj-claude-sweden-resource.cognitiveservices.azure.com/openai/v1",
+      ? `${((ENV as any).AZURE_CLAUDE_SWEDEN_ENDPOINT as string).replace(/\/$/, "")}/anthropic/v1`
+      : "https://proj-claude-sweden-resource.services.ai.azure.com/anthropic/v1",
     defaultModel: "claude-sonnet-4-6",
     getKey:       () => (ENV as any).AZURE_CLAUDE_SWEDEN_API_KEY ?? "",
   },
