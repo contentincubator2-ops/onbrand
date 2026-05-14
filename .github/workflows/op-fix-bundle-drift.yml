@@ -1,0 +1,63 @@
+name: Ops — Fix bundle drift (force rebuild + restart nginx cache)
+on: { workflow_dispatch: {} }
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Diagnose current state
+        run: |
+          set +e
+          PUB=/opt/onbrand/app/skills/ai-talent/public
+          echo "── public/index.html mtime + bundle refs ──"
+          stat -c '%y' "$PUB/index.html" 2>&1
+          grep -oE 'index-[A-Za-z0-9_-]+\.(js|css)' "$PUB/index.html" 2>&1
+          echo ""
+          echo "── public/assets/ contents ──"
+          ls -la "$PUB/assets/" | head -20
+          echo ""
+          echo "── what nginx is actually serving ──"
+          curl -sk -o /tmp/served.html http://localhost/ 2>&1
+          grep -oE 'index-[A-Za-z0-9_-]+\.(js|css)' /tmp/served.html
+
+      - name: Rebuild client fresh
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent/client
+          npm run build 2>&1 | tail -15
+
+      - name: Verify aligned
+        run: |
+          set -e
+          PUB=/opt/onbrand/app/skills/ai-talent/public
+          BUNDLE=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' "$PUB/index.html" | head -1)
+          if [ ! -f "$PUB/assets/$BUNDLE" ]; then
+            echo "❌ STILL BROKEN: $BUNDLE missing"
+            ls "$PUB/assets/"
+            exit 1
+          fi
+          echo "✓ disk OK: $BUNDLE ($(stat -c%s $PUB/assets/$BUNDLE) bytes)"
+
+      - name: Purge nginx cache + reload
+        run: |
+          set +e
+          # If nginx has proxy cache or any cached dir, clear it
+          sudo find /var/cache/nginx/ -type f -delete 2>/dev/null
+          sudo nginx -s reload
+          echo "nginx reloaded"
+
+      - name: Smoke
+        run: |
+          set +e
+          # Hard-refresh equivalent — fetch with no-cache headers
+          SERVED=$(curl -sk -H 'Cache-Control: no-cache' https://onbrand.sowork.ai/ | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1)
+          echo "external serves: $SERVED"
+          code=$(curl -sk -o /tmp/b.js -w "%{http_code}" "https://onbrand.sowork.ai/assets/$SERVED")
+          size=$(stat -c%s /tmp/b.js)
+          echo "bundle status: $code, size: $size bytes"
+          if [ "$size" -lt 1000 ]; then
+            echo "❌ bundle is still tiny stub — drift persists"
+            head -c 200 /tmp/b.js
+            exit 1
+          fi
+          echo "✓ healthy bundle served"
