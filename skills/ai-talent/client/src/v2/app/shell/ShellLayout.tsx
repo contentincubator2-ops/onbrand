@@ -235,7 +235,9 @@ export default function ShellLayout() {
         {/* 2026-05-11 (CJ「節慶日曆 + 自動提醒」): global festival nudge,
             shows only when priority ≥ 4 festival is within 7 days. */}
         <FestivalGlobalNudge />
-        <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
+        <RouteErrorBoundary>
+          <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
+        </RouteErrorBoundary>
         {/* 2026-05-10 global footer w/ legal links — shows on every authenticated page */}
         <footer className="mt-12 pt-6 pb-8 border-t border-neutral-200 text-center text-[11px] text-neutral-400 space-x-3">
           <a href="/terms" className="hover:text-neutral-700">{t("footer_terms")}</a>
@@ -2360,6 +2362,91 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Route-level Error Boundary
+   ══════════════════════════════════════════════════════════════════
+   2026-05-14 (CJ Bug#3「跨頁面的渲染崩潰，重新整理無效」):
+   The app-level AppErrorBoundary (AppV2.tsx) replaces the entire UI
+   including the shell when ANY page crashes — drastic and disorienting.
+   This route-level boundary wraps just the <Outlet />, so a single page
+   crash shows a recoverable error card while the sidebar / brand pill /
+   navigation stay intact. User can click a different sidebar item and
+   continue working without a hard refresh.
+   ══════════════════════════════════════════════════════════════════ */
+class RouteErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null; resetKey: number }
+> {
+  state = { error: null as Error | null, resetKey: 0 };
+  static getDerivedStateFromError(error: Error) { return { error, resetKey: 0 }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // eslint-disable-next-line no-console
+    console.error("[RouteErrorBoundary] route render error:", error, info);
+    try {
+      const firstLine = String(error?.message ?? "").split("\n")[0] ?? "route render error";
+      fetch("/api/trpc/ops.logError?batch=0", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          json: {
+            level: "error",
+            source: "frontend.route",
+            route: window.location.pathname + window.location.search,
+            message: firstLine.slice(0, 500),
+            stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
+            fingerprint: `route:${firstLine.slice(0, 80)}`,
+            meta: {
+              componentStack: info?.componentStack?.slice(0, 1000),
+            },
+          },
+        }),
+      }).catch(() => {});
+    } catch {}
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: "32px 24px", maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ padding: 20, border: "1px solid #fca5a5", background: "#fef2f2", borderRadius: 12 }}>
+            <p style={{ fontSize: 11, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>頁面載入失敗</p>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 6, color: "#0f172a" }}>
+              這個頁面目前無法顯示
+            </h2>
+            <p style={{ marginTop: 6, color: "#475569", fontSize: 13, lineHeight: 1.6 }}>
+              側邊欄還能用 — 試著切到別的功能，或按下方「重試」再渲染一次。
+              <br />
+              {this.state.error.message}
+            </p>
+            <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+                onClick={() => this.setState({ error: null, resetKey: this.state.resetKey + 1 })}
+              >
+                重試
+              </button>
+              <button
+                style={{ padding: "6px 12px", background: "white", border: "1px solid #cbd5e1", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+                onClick={() => window.location.assign("/30s")}
+              >
+                回到首頁
+              </button>
+              <a
+                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("OnBrand 頁面錯誤 " + window.location.pathname)}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
+                style={{ fontSize: 12, color: "#3b82f6", textDecoration: "underline", marginLeft: "auto", alignSelf: "center" }}
+              >
+                聯絡客服
+              </a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    // resetKey re-mounts children on retry so any stuck state clears.
+    return <React.Fragment key={this.state.resetKey}>{this.props.children}</React.Fragment>;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
