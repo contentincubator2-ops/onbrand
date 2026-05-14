@@ -70,14 +70,14 @@ async function loadMessages(conversationId: number, limit = 100) {
   // doesn't load 10k+ messages per sendMessage call (DoS vector).
   const safe = Math.max(1, Math.min(500, Math.floor(limit)));
   const [rows]: any = await localPool.execute(
-    `SELECT id, role, content, createdAt FROM support_messages
+    `SELECT id, role, content, contextSnapshot, createdAt FROM support_messages
       WHERE conversationId = ?
       ORDER BY id DESC
       LIMIT ${safe}`,
     [conversationId],
   );
   // We selected DESC for LIMIT; flip back to ASC for caller.
-  return (rows as Array<{ id: number; role: string; content: string; createdAt: Date }>).reverse();
+  return (rows as Array<{ id: number; role: string; content: string; contextSnapshot: any; createdAt: Date }>).reverse();
 }
 
 async function insertMessage(args: {
@@ -163,6 +163,25 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 2) 再給簡短原因（最多 1 句）
 3) 不確定就老實說「我幫你發給 SoWork 團隊，預計 4 小時內回」並建議用戶點下方「我要找真人 →」
 
+【你可以發送行動按鈕（重要）】
+你不能直接幫用戶點按鈕，但你可以在訊息裡塞「行動標記」，前端會渲染成可點按鈕。**只在用戶明確要求「幫我做」「直接帶我去」「給我連結」時才放**，不要每則訊息都塞。
+
+格式（一行一個，可放多個）：
+<<action:navigate:/path>>顯示文字
+<<action:open_task_30s:topic=主題文字>>跑 30 秒任務：主題
+<<action:open_task_60s:topic=主題文字>>跑 60 秒任務：主題
+<<action:open_task_99s:topic=主題文字>>跑 99 秒任務：主題
+
+範例對話：
+用戶：「給我連結」
+你：「點下面進 60s 任務頁。
+<<action:navigate:/60s>>去 /60s 看任務
+要我幫你開父親節任務嗎？
+<<action:open_task_60s:topic=父親節 · 復華穩健傳承>>幫我開父親節任務」
+
+不要假裝你已經幫用戶觸發了任何後端動作（不要寫「已遠端觸發」「任務 ID #811」這種幻覺）。
+你只能：產生「行動按鈕」讓用戶自己點。
+
 關於 OnBrand AI（你必須知道的）：
 - 核心：先用「SoWork 14 步品牌定位法」鎖定品牌定位，AI 寫文案才會像用戶的品牌
 - 30 秒任務：3 個 caption 變體 + 視覺 brief（不直接生圖，按「用此風格生圖」才生）
@@ -178,8 +197,44 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 
 不要做：
 - 編造功能（不確定有沒有的功能直接說「這個功能還沒做，我幫你回報」）
+- 編造「已觸發」「任務 ID」（沒有就沒有 — 用行動按鈕代替）
 - 講超過 4 句話（用戶在客服面板等你回，越短越好）
 - 用 markdown 列表（用「①②③」或直接編號）`;
+
+// ── action marker parsing ──────────────────────────────────────────────────
+export type MiaAction =
+  | { kind: "navigate"; url: string; label: string }
+  | { kind: "open_task"; tier: "30s" | "60s" | "99s"; topic?: string; label: string };
+
+const ACTION_RE = /<<action:([a-z_0-9]+)(?::([^>]*))?>>\s*([^\n<]*)/gi;
+
+function extractActionsFromSnapshot(snap: any): MiaAction[] {
+  try {
+    const parsed = typeof snap === "string" ? JSON.parse(snap) : snap;
+    return Array.isArray(parsed?.actions) ? (parsed.actions as MiaAction[]) : [];
+  } catch { return []; }
+}
+
+function parseActions(raw: string): { clean: string; actions: MiaAction[] } {
+  if (!raw) return { clean: "", actions: [] };
+  const actions: MiaAction[] = [];
+  const clean = raw.replace(ACTION_RE, (_full, kind: string, payload: string | undefined, label: string) => {
+    const trimmedLabel = (label ?? "").trim() || _full;
+    const lower = kind.toLowerCase();
+    if (lower === "navigate") {
+      const url = (payload ?? "").trim();
+      if (url.startsWith("/")) actions.push({ kind: "navigate", url, label: trimmedLabel });
+    } else if (lower === "open_task_30s" || lower === "open_task_60s" || lower === "open_task_99s") {
+      const tier = (lower.replace("open_task_", "") as "30s" | "60s" | "99s");
+      const topicMatch = /topic=([^]*)$/.exec((payload ?? "").trim());
+      const topic = topicMatch ? topicMatch[1]!.trim() : undefined;
+      actions.push({ kind: "open_task", tier, topic, label: trimmedLabel });
+    }
+    return ""; // strip the marker from displayed text
+  });
+  // Clean up any stray double newlines from removed markers
+  return { clean: clean.replace(/\n{3,}/g, "\n\n").trim(), actions };
+}
 
 // ── router ─────────────────────────────────────────────────────────────────
 
@@ -207,6 +262,7 @@ export const supportRouter = router({
         conversationId,
         messages: messages.map((m) => ({
           ...m,
+          actions: extractActionsFromSnapshot(m.contextSnapshot),
           createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt),
         })),
       };
@@ -267,25 +323,30 @@ export const supportRouter = router({
         })),
       ];
 
-      let miaReply = "";
+      let miaReplyRaw = "";
       try {
         const r = await callModel(llmMessages, "general");
-        miaReply = (r.content ?? "").trim();
+        miaReplyRaw = (r.content ?? "").trim();
       } catch (e: any) {
-        miaReply = `我這邊 LLM 出了狀況（${String(e?.message ?? e).slice(0, 80)}）。先點下方「我要找真人 →」直接給 SoWork 團隊看看。`;
+        miaReplyRaw = `我這邊 LLM 出了狀況（${String(e?.message ?? e).slice(0, 80)}）。先點下方「我要找真人 →」直接給 SoWork 團隊看看。`;
       }
-      if (!miaReply) {
-        miaReply = "我不太確定怎麼回答這個。請點下方「我要找真人 →」，SoWork 會在 4 小時內回。";
+      if (!miaReplyRaw) {
+        miaReplyRaw = "我不太確定怎麼回答這個。請點下方「我要找真人 →」，SoWork 會在 4 小時內回。";
       }
+      // 2026-05-14 (CJ「他直接幫我切換頁面」): parse <<action:...>> markers
+      // out of Mia's reply into structured action buttons. Stored content
+      // is the clean version; actions ride on the response payload only.
+      const { clean: miaReply, actions } = parseActions(miaReplyRaw);
       const miaMsgId = await insertMessage({
         conversationId: input.conversationId,
         role: "mia",
         content: miaReply,
+        contextSnapshot: actions.length > 0 ? { actions } : undefined,
       });
 
       return {
         userMessage: { id: userMsgId, role: "user", content: input.content, createdAt: new Date().toISOString() },
-        miaMessage:  { id: miaMsgId, role: "mia",  content: miaReply, createdAt: new Date().toISOString() },
+        miaMessage:  { id: miaMsgId, role: "mia",  content: miaReply, createdAt: new Date().toISOString(), actions },
       };
     }),
 
@@ -298,6 +359,7 @@ export const supportRouter = router({
       const messages = await loadMessages(input.conversationId);
       return messages.map((m) => ({
         ...m,
+        actions: extractActionsFromSnapshot(m.contextSnapshot),
         createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt),
       }));
     }),

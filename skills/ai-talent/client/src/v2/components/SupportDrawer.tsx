@@ -23,7 +23,10 @@ interface Props {
   scope: ScopeState;
 }
 
-type Message = { id: number; role: string; content: string; createdAt: string };
+type MiaAction =
+  | { kind: "navigate"; url: string; label: string }
+  | { kind: "open_task"; tier: "30s" | "60s" | "99s"; topic?: string; label: string };
+type Message = { id: number; role: string; content: string; createdAt: string; actions?: MiaAction[] };
 
 const MIA_AVATAR =
   "https://api.dicebear.com/7.x/notionists/svg?seed=mia-cs-onbrand&backgroundColor=ede9fe&backgroundType=solid&radius=50";
@@ -108,6 +111,22 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
     } finally {
       setSending(false);
     }
+  };
+
+  const runAction = (a: MiaAction) => {
+    // 2026-05-14 (CJ「他直接幫我切換頁面，到他幫我創造好的任務」):
+    // Mia can return action buttons; user clicks → we navigate.
+    // We DON'T auto-execute mutations (e.g. spending LLM credits) —
+    // navigate-only is the right safety boundary for now.
+    let url = "/";
+    if (a.kind === "navigate") {
+      url = a.url;
+    } else if (a.kind === "open_task") {
+      const base = a.tier === "30s" ? "/30s" : a.tier === "60s" ? "/60s" : "/99s";
+      url = a.topic ? `${base}?topic=${encodeURIComponent(a.topic)}` : base;
+    }
+    onClose();
+    navigate(url);
   };
 
   const handleEscalate = async () => {
@@ -203,7 +222,7 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
           </div>
         )}
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble key={m.id} message={m} onAction={runAction} />
         ))}
         {sending && (
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
@@ -317,10 +336,11 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, onAction }: { message: Message; onAction: (a: MiaAction) => void }) {
   const isUser = message.role === "user";
   const isAdmin = message.role === "admin";
   const showAvatar = !isUser;
+  const actions = (message.actions ?? []) as MiaAction[];
   return (
     <div style={{
       display: "flex", gap: 8, alignItems: "flex-end",
@@ -359,6 +379,36 @@ function MessageBubble({ message }: { message: Message }) {
           </div>
         )}
         {message.content}
+        {actions.length > 0 && (
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
+            {actions.map((a, i) => (
+              <button key={i} onClick={() => onAction(a)} style={{
+                textAlign: "left",
+                padding: "6px 10px",
+                borderRadius: 8,
+                border: "1px solid rgba(124,58,237,0.25)",
+                background: "rgba(124,58,237,0.06)",
+                color: "#5B21B6",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(124,58,237,0.12)";
+                  e.currentTarget.style.borderColor = "rgba(124,58,237,0.45)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(124,58,237,0.06)";
+                  e.currentTarget.style.borderColor = "rgba(124,58,237,0.25)";
+                }}
+              >
+                <span style={{ fontSize: 13 }}>→</span>
+                <span>{a.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
