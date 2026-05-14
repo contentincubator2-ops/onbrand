@@ -322,33 +322,56 @@ export default function ProjectsPage() {
 /* ─────────────────────── ProjectCard ─────────────────────── */
 function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick: () => void; lang: "zh-TW" | "en" }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  // 2026-05-14 (CJ「專案名稱要可以編輯」): inline rename mode.
+  // 2026-05-14 (CJ「專案名稱要可以編輯」): inline rename mode + optimistic UI.
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState<string>(mission.title ?? "");
+  // Optimistic title displayed while the mutation is in flight.
+  // Cleared once mission.title (from refetched server data) catches up.
+  const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
+  React.useEffect(() => {
+    // Server caught up → drop the optimistic value.
+    if (optimisticTitle !== null && mission.title === optimisticTitle) {
+      setOptimisticTitle(null);
+    }
+  }, [mission.title, optimisticTitle]);
   const utils = trpc.useUtils();
   const renameMut = (trpc as any).output?.updateTitle?.useMutation
     ? (trpc as any).output.updateTitle.useMutation({
         onSuccess: () => {
           (utils as any).mission?.listAllForUser?.invalidate?.();
         },
+        onError: (e: any) => {
+          // Revert the optimistic value + tell the user
+          setOptimisticTitle(null);
+          showToastGlobal(
+            (lang === "en" ? "Rename failed: " : "重新命名失敗：") + (e?.message ?? e),
+          );
+        },
       })
     : null;
+  const displayTitle = optimisticTitle ?? mission.title ?? "";
   const startEditing = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setDraftTitle(mission.title ?? "");
+    setDraftTitle(displayTitle);
     setEditing(true);
   };
   const commitEdit = () => {
     const next = draftTitle.trim();
     if (!next) { setEditing(false); return; }
-    if (next === (mission.title ?? "").trim()) { setEditing(false); return; }
-    if (renameMut) renameMut.mutate({ id: mission.id, title: next.slice(0, 120) });
+    if (next === displayTitle.trim()) { setEditing(false); return; }
+    setOptimisticTitle(next); // show the new name immediately
+    if (renameMut) {
+      renameMut.mutate({ id: mission.id, title: next.slice(0, 120) });
+    } else {
+      // No mutation available (e.g. type stub) — keep optimistic, no save.
+      console.warn("[rename] output.updateTitle mutation not available");
+    }
     setEditing(false);
   };
   const cancelEdit = (e?: React.KeyboardEvent | React.FocusEvent) => {
     e?.stopPropagation();
     setEditing(false);
-    setDraftTitle(mission.title ?? "");
+    setDraftTitle(displayTitle);
   };
 
   const ws = (mission.workspace ?? "other").toLowerCase();
@@ -407,10 +430,10 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
         ) : (
           <h3
             className="text-sm font-medium text-default-900 mb-0.5 line-clamp-1 cursor-text hover:bg-default-50 rounded px-1 -mx-1 transition"
-            title={(mission.title ?? "") + (lang === "en" ? " · double-click to rename" : " · 雙擊重新命名")}
+            title={displayTitle + (lang === "en" ? " · double-click to rename" : " · 雙擊重新命名")}
             onDoubleClick={startEditing}
           >
-            {mission.title || (lang === "en" ? "(Untitled)" : "（未命名）")}
+            {displayTitle || (lang === "en" ? "(Untitled)" : "（未命名）")}
           </h3>
         )}
         <div className="flex items-center justify-between text-[11px] text-default-500">

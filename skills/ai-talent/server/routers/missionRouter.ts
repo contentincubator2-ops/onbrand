@@ -54,10 +54,17 @@ export const missionRouter = router({
       // latest output via a correlated sub-select; multiple runs still
       // show as multiple cards via the original FROM mo path. To keep
       // the simpler "card per latest output OR per orphan mission":
+      // 2026-05-14 (CJ「專案名稱可以編輯，按 enter 會恢復原狀」):
+      // output.updateTitle writes to mission_outputs.title; the card on
+      // /projects shows `title`. Previously we returned `m.title` here, so
+      // a rename did save but the next refetch overwrote the UI with the
+      // (untouched) mission title. COALESCE picks the per-output title if
+      // the user has renamed this card, else falls back to mission title.
       const rows = await db.execute(sql`
         SELECT mo.id AS id,
                m.id  AS missionId,
-               m.title, m.description, m.workspace, m.methodology,
+               COALESCE(NULLIF(mo.title, ''), m.title) AS title,
+               m.description, m.workspace, m.methodology,
                m.squadSlug AS squadSlug, m.brandId AS brandId,
                m.status,
                COALESCE(mo.createdAt, m.updatedAt) AS updatedAt,
