@@ -25,6 +25,7 @@ import OnBrandLogo from "../../components/OnBrandLogo";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
+import { Brain as LucideBrain } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHouse, faFolderOpen, faUserGroup, faBrain, faWandMagicSparkles, faRocket,
@@ -589,36 +590,35 @@ function BrandHierarchyPill({
         onClick={() => setOpen((v) => !v)}
         style={{
           width: "100%",
-          height: 44,
-          borderRadius: 12,
-          border: open ? `1.5px solid ${activeBrandColor.bg}` : "1px solid #e5e7eb",
-          // Active brand: tint the entire pill background with brand color (10% opacity)
-          background: activeBrand ? activeBrandColor.light : "#fff",
+          height: 40,
+          borderRadius: 8,
+          // Notion-style: subtle border, never tint background with brand color
+          border: open ? "1px solid #d4d4d4" : "1px solid #e5e7eb",
+          background: "#fff",
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "0 10px 0 6px",
+          padding: "0 10px 0 8px",
           cursor: "pointer",
           boxShadow: open
-            ? `0 8px 24px ${activeBrandColor.bg}33`
-            : "0 2px 8px rgba(0,0,0,0.06)",
-          transition: "border-color 0.12s, box-shadow 0.12s, background 0.12s",
+            ? "0 4px 12px rgba(0,0,0,0.06)"
+            : "0 1px 2px rgba(0,0,0,0.04)",
+          transition: "border-color 0.12s, box-shadow 0.12s",
         }}
       >
-        {/* Logo / initial square — uses brand-specific color */}
+        {/* 品牌大腦 — Brain icon ALWAYS visible (Notion-style outline) */}
         <span style={{
-          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-          background: activeBrand
-            ? activeBrandColor.bgGradient
-            : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
-          color: "#fff",
+          width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+          background: "#fafafa",
+          border: "1px solid #ececec",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 13, fontWeight: 700,
           overflow: "hidden",
         }}>
           {activeBrand?.logoUrl ? (
             <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : displayInitial}
+          ) : (
+            <LucideBrain size={15} strokeWidth={1.5} color="#404040" />
+          )}
         </span>
         {/* Hierarchy text — breadcrumbs Brand › Product › Event */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15 }}>
@@ -931,7 +931,7 @@ function BrainSummaryPanel({
         display: "flex", alignItems: "center", gap: 8,
         padding: "10px 10px 6px",
       }}>
-        <FontAwesomeIcon icon={faBrain} style={{ fontSize: 14, color: "#171717" }} />
+        <LucideBrain size={15} strokeWidth={1.5} color="#171717" />
         <span style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>
           {isEn ? "Brand Brain" : "品牌大腦"} · {brandName}
         </span>
