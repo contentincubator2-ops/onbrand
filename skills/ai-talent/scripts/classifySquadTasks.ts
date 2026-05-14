@@ -11,11 +11,11 @@
  *   - squads.output_kind          strategic|content
  *   - squads.classified_task_at   now
  *
- * Cost: ~688 squads × ~600 tok in + ~120 tok out, batched 20 per call,
+ * Cost: ~688 squads × ~600 tok in + ~120 tok out, batched 20 per call,h
  * ~$0.20 USD on gpt-4o-mini.
  *
  * Auto-migrates the 6 columns on first run (idempotent ALTER TABLE).
- *
+ *h
  * Flags:
  *   --limit N         only classify first N unclassified squads
  *   --reclassify      include rows that already have classified_task_at
@@ -39,7 +39,7 @@ const AZURE_KEY = process.env.AZURE_FOUNDRY_API_KEY ?? process.env.AZURE_AI_API_
 const AZURE_ENDPOINT = (
   process.env.AZURE_FOUNDRY_PROJECT_ENDPOINT ??
   process.env.AZURE_AI_ENDPOINT ??
-  "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law"
+  "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/onbrand"
 ).replace(/\/+$/, "");
 const AZURE_DEPLOYMENT = process.env.AZURE_FOUNDRY_MODEL ?? "gpt-4o-mini";
 
