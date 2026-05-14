@@ -1,4 +1,4 @@
-name: Admin — Force rebuild frontend
+name: Ops — Force rebuild frontend
 
 on:
   workflow_dispatch:

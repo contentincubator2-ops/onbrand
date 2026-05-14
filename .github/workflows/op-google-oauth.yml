@@ -1,4 +1,4 @@
-name: Admin — Write Google OAuth credentials to prod .env
+name: Ops — Write Google OAuth credentials to prod .env
 
 # 2026-05-08: write GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET so the
 # /api/auth/google flow works.

@@ -1,4 +1,4 @@
-name: Admin — Diagnose PM2 marketing-os restarts (B-03)
+name: Admin — Diagnose PM2 OnBrand restarts (B-03)
 
 # Smoke test showed `marketing-os` PM2 process restarted 87 times in
 # 3 days = ~1.2 crashes per hour. This workflow surfaces the actual

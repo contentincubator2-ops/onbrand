@@ -1,4 +1,4 @@
-name: Admin — Write RESEND_API_KEY to prod .env
+name: Ops — Write RESEND_API_KEY to prod .env
 
 # 2026-05-08: write Resend API key into prod .env so registration /
 # forgot-password emails actually send. Reads from GitHub secret

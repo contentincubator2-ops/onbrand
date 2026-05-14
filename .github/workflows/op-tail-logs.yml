@@ -1,4 +1,4 @@
-name: Admin — tail pm2 logs (last 80 lines)
+name: Ops — tail pm2 logs (last 80 lines)
 
 on:
   workflow_dispatch:

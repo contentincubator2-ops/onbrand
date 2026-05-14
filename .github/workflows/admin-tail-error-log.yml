@@ -1,4 +1,4 @@
-name: Admin — Tail marketing-os error log (last 80 lines, raw)
+name: Admin — Tail OnBrand error log (last 80 lines, raw)
 
 # Quick raw-tail of PM2 error log. No filtering, no grep.
 # Useful when you need to see what's actually crashing right now.

@@ -1,4 +1,4 @@
-name: Admin — Set EMAIL_FROM in prod .env
+name: Ops — Set EMAIL_FROM in prod .env
 
 # 2026-05-08 + 2026-05-14 (CJ「客服信箱統一 sowork@sowork.ai」)
 #

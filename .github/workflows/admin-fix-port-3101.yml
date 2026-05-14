@@ -1,4 +1,4 @@
-name: Admin — Free port 3101 + restart marketing-os cleanly
+name: Admin — Free port 3101 + restart OnBrand cleanly
 
 # Diagnoses why port 3101 is already in use, kills the orphan, then
 # brings PM2 process up cleanly. Should break the restart loop.

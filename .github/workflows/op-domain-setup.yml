@@ -1,4 +1,4 @@
-name: Admin — Set up onbrand.sowork.ai nginx + HTTPS cert
+name: Ops — Set up onbrand.sowork.ai nginx + HTTPS cert
 
 # 2026-05-12 (CJ「我現在剛剛設定好 onbrand.sowork.ai 了」):
 # DNS is set up by CJ. This workflow:

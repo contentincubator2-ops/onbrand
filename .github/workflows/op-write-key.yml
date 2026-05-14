@@ -1,4 +1,4 @@
-name: Admin — Write single key to VM .env (one-shot, delete after use)
+name: Ops — Write single key to VM .env (one-shot, delete after use)
 
 on:
   workflow_dispatch:

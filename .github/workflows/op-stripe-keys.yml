@@ -1,4 +1,4 @@
-name: Admin — Write Stripe keys to prod .env
+name: Ops — Write Stripe keys to prod .env
 
 # 2026-05-14 — Securely inject STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET
 # into the VM's .env without ever putting them in git or in chat.

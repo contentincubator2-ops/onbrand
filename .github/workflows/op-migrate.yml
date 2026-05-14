@@ -1,4 +1,4 @@
-name: Admin — Run DB migrations (one-shot)
+name: Ops — Run DB migrations (one-shot)
 
 # Manual trigger to run scripts/migrate.ts on the VM.
 # Use this when you push a schema change but ci.yml's auto-migrate step

@@ -1,4 +1,4 @@
-name: Admin — Push all API keys from GH Secrets to VM .env
+name: Ops — Push all API keys from GH Secrets to VM .env
 
 # One-shot writer that takes every API key stored in GitHub Repo Secrets
 # and merges them into /opt/marketing-os/app/skills/ai-talent/.env on the VM.

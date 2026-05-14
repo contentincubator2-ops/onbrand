@@ -1,4 +1,4 @@
-name: Admin — Fix PM2 startup (JWT_SECRET + CWD)
+name: Ops — Fix PM2 startup (JWT_SECRET + CWD)
 
 on:
   workflow_dispatch:

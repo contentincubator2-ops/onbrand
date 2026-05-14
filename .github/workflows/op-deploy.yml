@@ -1,4 +1,4 @@
-name: Admin — Deploy to VM (git pull + build + restart)
+name: Ops — Deploy to VM (git pull + build + restart)
 
 on:
   workflow_dispatch:
