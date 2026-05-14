@@ -365,17 +365,18 @@ function IconBar({
       }}
     >
       {/* 2026-05-14: edge chevron removed — no expand panel anymore. */}
-      {/* 2026-05-14 (CJ「最左上方要有 LOGO，回到首頁的概念」):
-          glyph-only logo at the top of the icon bar. Click → '/'.
-          The full wordmark with 'OnBrand AI / by SoWork' subtitle is on
-          /pricing, login, etc. (where there's horizontal room). */}
+      {/* 2026-05-14 (CJ「Logo 點擊 → /?b=XXX 空白」 follow-up): land users
+          on /30s directly. The previous '/' → '/brands' → '/brands/edit'
+          redirect chain had several failure modes (Rules-of-Hooks bug,
+          scope race conditions). /30s is the actual entry point users
+          use 90% of the time, and it works without a redirect chain. */}
       <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Tooltip content={isEn ? "OnBrand AI · home" : "OnBrand AI · 回首頁"} placement="right">
           <span>
             <OnBrandLogo
               glyphOnly
               size={32}
-              onClick={() => onNavigate("/")}
+              onClick={() => onNavigate("/30s")}
               style={{ padding: 4, borderRadius: 8 }}
             />
           </span>

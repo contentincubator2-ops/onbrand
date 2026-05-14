@@ -229,10 +229,11 @@ export default function AppV2() {
           {/* 2026-05-05 pivot v2: tier = top-level route. 30S/60S/90S are
               siblings, each rendering QuickTask30sPage with a different
               tier prop. / redirects to /30s. */}
-          {/* 2026-05-12 (CJ「登入第一頁應該是品牌頁」): root redirects to
-              /brands so users land on their brand portfolio. From there
-              they pick a brand to operate on, then jump into 30s/60s/99s. */}
-          <Route path="/" element={<Navigate to="/brands" replace />} />
+          {/* 2026-05-14 (CJ「Logo → / → 空白」): / redirects to /30s,
+              the action-oriented main entry. Previous /brands target had
+              a redirect chain that exposed Rules-of-Hooks bugs and
+              scope-race failure modes. /30s renders independently. */}
+          <Route path="/" element={<Navigate to="/30s" replace />} />
           <Route path="/30s" element={<QuickTask30sPage tier="30s" />} />
           <Route path="/60s" element={<QuickTask30sPage tier="60s" />} />
           {/* 2026-05-10 brand rename: 100s → 99s (久久 雙關 + 設計感).
