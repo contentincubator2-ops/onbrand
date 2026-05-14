@@ -160,8 +160,8 @@ export default function TermsPage() {
             {isEn ? "11. Contact" : "11. 聯絡方式"}
           </h2>
           <p>
-            <a href="mailto:sowork@sowork.tw" className="text-blue-600 underline">
-              sowork@sowork.tw
+            <a href="mailto:sowork@sowork.ai" className="text-blue-600 underline">
+              sowork@sowork.ai
             </a>
           </p>
         </section>

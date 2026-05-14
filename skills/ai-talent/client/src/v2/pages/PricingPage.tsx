@@ -287,7 +287,7 @@ export default function PricingPage() {
                     return;
                   }
                   if (tier.code === "enterprise" || !checkoutMut) {
-                    window.location.href = "mailto:sowork@sowork.tw?subject=OnBrand Enterprise";
+                    window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand Enterprise";
                     return;
                   }
                   const wsId = (status as any)?.workspaceId ?? (status as any)?.defaultWorkspaceId;
@@ -331,7 +331,7 @@ export default function PricingPage() {
             </p>
           </div>
           <a
-            href={isEn ? "mailto:sowork@sowork.tw?subject=Enterprise inquiry" : "mailto:sowork@sowork.tw?subject=企業版洽詢"}
+            href={isEn ? "mailto:sowork@sowork.ai?subject=Enterprise inquiry" : "mailto:sowork@sowork.ai?subject=企業版洽詢"}
             className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
           >
             {isEn ? "Talk to sales →" : "聯繫業務 →"}
@@ -354,7 +354,7 @@ export default function PricingPage() {
           <Link to="/terms" className="hover:text-neutral-900">{t("footer_terms")}</Link>
           <Link to="/privacy" className="hover:text-neutral-900">{t("footer_privacy")}</Link>
           <Link to="/refund" className="hover:text-neutral-900">{t("footer_refund")}</Link>
-          <a href="mailto:sowork@sowork.tw" className="hover:text-neutral-900">sowork@sowork.tw</a>
+          <a href="mailto:sowork@sowork.ai" className="hover:text-neutral-900">sowork@sowork.ai</a>
         </div>
       </div>
     </div>

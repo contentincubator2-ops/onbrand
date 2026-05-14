@@ -223,8 +223,8 @@ export default function PrivacyPage() {
             {isEn ? "9. Data protection contact" : "9. 聯絡個資專責"}
           </h2>
           <p>
-            <a href="mailto:sowork@sowork.tw" className="text-blue-600 underline">
-              sowork@sowork.tw
+            <a href="mailto:sowork@sowork.ai" className="text-blue-600 underline">
+              sowork@sowork.ai
             </a>
             {isEn
               ? ' (use subject line "Privacy" to speed things up)'

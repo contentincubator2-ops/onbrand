@@ -161,10 +161,10 @@ class AppErrorBoundary extends React.Component<
                   even on error-recovery screen — users stuck here have no
                   shell/footer to reach customer service. */}
               <a
-                href={`mailto:sowork@sowork.tw?subject=${encodeURIComponent("OnBrand 應用程式錯誤")}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
+                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("OnBrand 應用程式錯誤")}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
                 style={{ marginLeft: "auto", fontSize: 12, color: "#3b82f6", textDecoration: "underline" }}
               >
-                聯絡客服 sowork@sowork.tw
+                聯絡客服 sowork@sowork.ai
               </a>
             </div>
           </div>

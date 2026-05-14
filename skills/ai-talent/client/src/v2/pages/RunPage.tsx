@@ -222,8 +222,8 @@ export default function RunPage() {
       if (!tk?.token) {
         showToastGlobal(
           lang === "en"
-            ? "Couldn't fetch auth token — contact sowork@sowork.tw"
-            : "無法取得授權 token — 請聯絡 sowork@sowork.tw"
+            ? "Couldn't fetch auth token — contact sowork@sowork.ai"
+            : "無法取得授權 token — 請聯絡 sowork@sowork.ai"
         );
         return;
       }
@@ -296,8 +296,8 @@ export default function RunPage() {
           } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
             showToastGlobal(
               lang === "en"
-                ? "Facebook publishing not enabled — contact sowork@sowork.tw"
-                : "FB 發布服務尚未啟用 — 請聯絡 sowork@sowork.tw"
+                ? "Facebook publishing not enabled — contact sowork@sowork.ai"
+                : "FB 發布服務尚未啟用 — 請聯絡 sowork@sowork.ai"
             );
           } else {
             showToastGlobal(

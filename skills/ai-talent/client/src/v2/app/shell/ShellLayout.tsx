@@ -245,7 +245,7 @@ export default function ShellLayout() {
           <a href="/pricing" className="hover:text-neutral-700">{t("footer_pricing")}</a>
           <a href="/settings/account" className="hover:text-neutral-700">{t("footer_account")}</a>
           <a href="/achievements" className="hover:text-neutral-700">{lang === "en" ? "Achievements" : "成就"}</a>
-          <a href="mailto:sowork@sowork.tw" className="hover:text-neutral-700">sowork@sowork.tw</a>
+          <a href="mailto:sowork@sowork.ai" className="hover:text-neutral-700">sowork@sowork.ai</a>
           <span>·</span>
           <span>{lang === "en" ? "© SoWork" : "© SoWork 摘星社群行銷顧問"}</span>
         </footer>
@@ -2026,8 +2026,8 @@ function AccountPopup({ onLogout, onClose }: {
     // access; re-add this entry when agency tier launches.
     {
       icon: faCircleInfo, label: isEn ? "Contact support" : "聯絡客服", arrow: false, badge: null, danger: false,
-      // 2026-05-12 — 信箱修正為 sowork@sowork.tw
-      action: () => { window.location.href = "mailto:sowork@sowork.tw?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E6%94%AF%E6%8F%B4"; },
+      // 2026-05-12 — 信箱修正為 sowork@sowork.ai
+      action: () => { window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E6%94%AF%E6%8F%B4"; },
     },
     {
       icon: faRightFromBracket, label: isEn ? "Log out" : "登出", arrow: false, badge: null, danger: true,
@@ -2166,7 +2166,7 @@ function AccountSubPanel() {
   const { lang } = useLang();
   const isEn = lang === "en";
   const accounts = [
-    { name: "SoWork", email: "sowork@sowork.tw", active: true, color: "#7c3aed" },
+    { name: "SoWork", email: "sowork@sowork.ai", active: true, color: "#7c3aed" },
     { name: "C.J. Wang", email: "biomba.cj@gmail.com", active: false, color: "#0891b2" },
   ];
   return (

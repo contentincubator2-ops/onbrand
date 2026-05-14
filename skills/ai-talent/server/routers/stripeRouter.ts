@@ -47,7 +47,7 @@ function getStripe(): Stripe {
   if (!key) {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
-      message: "金流服務尚未啟用，請稍後再試或聯絡 sowork@sowork.tw。",
+      message: "金流服務尚未啟用，請稍後再試或聯絡 sowork@sowork.ai。",
     });
   }
   _stripe = new Stripe(key, { apiVersion: "2024-12-18.acacia" as any });

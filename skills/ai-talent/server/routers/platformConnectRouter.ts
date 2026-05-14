@@ -40,7 +40,7 @@ async function getPipedreamToken(externalUserId: string): Promise<{ token: strin
     console.error("[platformConnect] missing env: PIPEDREAM_CLIENT_ID / CLIENT_SECRET / PROJECT_ID");
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: "平台連接服務尚未啟用，請聯絡 sowork@sowork.tw。",
+      message: "平台連接服務尚未啟用，請聯絡 sowork@sowork.ai。",
     });
   }
 

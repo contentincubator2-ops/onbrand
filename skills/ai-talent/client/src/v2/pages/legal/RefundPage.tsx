@@ -128,8 +128,8 @@ export default function RefundPage() {
           <ol className="list-decimal pl-6 space-y-1">
             <li>
               {isEn ? "Email " : "email 至 "}
-              <a href="mailto:sowork@sowork.tw" className="text-blue-600 underline">
-                sowork@sowork.tw
+              <a href="mailto:sowork@sowork.ai" className="text-blue-600 underline">
+                sowork@sowork.ai
               </a>
               {isEn ? ' with the subject "Refund request".' : "，標題「退費申請」。"}
             </li>
