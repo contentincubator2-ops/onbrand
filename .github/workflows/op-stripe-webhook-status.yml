@@ -1,0 +1,159 @@
+name: Ops — Stripe webhook recent activity
+
+# 2026-05-14 — Cross-check last N Stripe checkout events against our
+# local invoices table. If Stripe has a successful checkout but our
+# `invoices.status` is still 'pending', the webhook didn't deliver
+# (or our handler crashed). One workflow, one screen, one truth.
+#
+# Reads STRIPE_SECRET_KEY from the VM .env — does NOT need the GH Secret.
+# Read-only: no writes to Stripe, no writes to DB.
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many recent events to look at (default 20)"
+        required: false
+        default: "20"
+
+jobs:
+  status:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Fetch recent checkout events + cross-check invoices
+        env:
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          set -e
+          ENV_FILE=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV_FILE" 2>/dev/null; set +a
+          ::add-mask::$STRIPE_SECRET_KEY 2>/dev/null || true
+
+          if [ -z "$STRIPE_SECRET_KEY" ]; then
+            echo "❌ STRIPE_SECRET_KEY not in VM .env — run 'Ops — Write Stripe keys to prod .env' first"
+            exit 1
+          fi
+
+          MODE=$([ "${STRIPE_SECRET_KEY:0:7}" = "sk_live" ] && echo "LIVE" || echo "TEST")
+          echo "════════════════════════════════════════════════"
+          echo "  Stripe mode: $MODE · checking last ${LIMIT:-20} events"
+          echo "════════════════════════════════════════════════"
+          echo ""
+
+          # ── Pull recent checkout events from Stripe ──
+          curl -s -u "$STRIPE_SECRET_KEY:" \
+            "https://api.stripe.com/v1/events?limit=${LIMIT:-20}&type=checkout.session.completed" \
+            > /tmp/stripe-events.json
+
+          if ! jq -e '.data' /tmp/stripe-events.json > /dev/null 2>&1; then
+            echo "❌ Stripe API returned no .data — response:"
+            cat /tmp/stripe-events.json | head -c 800
+            exit 1
+          fi
+
+          COUNT=$(jq '.data | length' /tmp/stripe-events.json)
+          echo "── Stripe events (checkout.session.completed) ──  [$COUNT events]"
+          if [ "$COUNT" = "0" ]; then
+            echo "  (none yet — nobody has completed a checkout via Stripe)"
+            echo ""
+            echo "  If you've tested but see 0 here, you may have switched between"
+            echo "  test/live modes; events are mode-specific."
+            exit 0
+          fi
+
+          # ── Extract session IDs ──
+          jq -r '.data[] | [
+            (.created | strftime("%Y-%m-%d %H:%M:%S")),
+            .data.object.id,
+            (.data.object.amount_total / 100 | tostring),
+            .data.object.currency,
+            .data.object.payment_status,
+            (.data.object.metadata.packType // "subscription"),
+            (.data.object.customer_email // "—")
+          ] | @tsv' /tmp/stripe-events.json > /tmp/stripe-events.tsv
+
+          # Print table
+          printf "%-20s %-50s %8s %s %-12s %-13s %s\n" "TIME" "SESSION_ID" "AMOUNT" "CUR" "STATUS" "TYPE" "EMAIL"
+          printf "%-20s %-50s %8s %s %-12s %-13s %s\n" "----" "----------" "------" "---" "------" "----" "-----"
+          cat /tmp/stripe-events.tsv | while IFS=$'\t' read -r ts sid amt cur status type email; do
+            printf "%-20s %-50s %8s %s %-12s %-13s %s\n" "$ts" "$sid" "$amt" "$cur" "$status" "$type" "$email"
+          done
+
+          echo ""
+          echo "── Cross-check against local invoices table ──"
+
+          # Get session IDs as comma-separated quoted list for SQL
+          SIDS=$(cut -f2 /tmp/stripe-events.tsv | awk '{printf "%s\"%s\"", sep, $0; sep=","}')
+
+          export MYSQL_PWD="mos_secure_2026"
+          DB_RESULT=$(mysql -h localhost -u mos_user mos_db --default-character-set=utf8mb4 -B -N -e "
+            SELECT merchantTradeNo, status, paidAt, planCode, packType, pointsGranted, amount, currency
+              FROM invoices
+             WHERE merchantTradeNo IN ($SIDS)
+             ORDER BY id DESC;
+          " 2>&1)
+
+          if echo "$DB_RESULT" | grep -qi "ERROR"; then
+            echo "❌ DB query failed: $DB_RESULT"
+            exit 1
+          fi
+
+          # Map session_id → DB row
+          declare -A LOCAL_STATUS
+          while IFS=$'\t' read -r sid st paidAt planCode packType pts amt cur; do
+            [ -z "$sid" ] && continue
+            LOCAL_STATUS["$sid"]="$st|$paidAt|$packType|$pts"
+          done <<< "$DB_RESULT"
+
+          ok=0
+          missing=0
+          pending=0
+
+          echo ""
+          printf "%-50s %-12s %-12s %s\n" "SESSION_ID" "STRIPE" "LOCAL" "WEBHOOK"
+          printf "%-50s %-12s %-12s %s\n" "----------" "------" "-----" "-------"
+          cut -f2,5 /tmp/stripe-events.tsv | while IFS=$'\t' read -r sid stripe_status; do
+            row="${LOCAL_STATUS[$sid]:-}"
+            if [ -z "$row" ]; then
+              printf "%-50s %-12s %-12s %s\n" "$sid" "$stripe_status" "—" "❌ NOT IN DB"
+            else
+              local_status="${row%%|*}"
+              if [ "$local_status" = "paid" ]; then
+                printf "%-50s %-12s %-12s %s\n" "$sid" "$stripe_status" "$local_status" "✓ delivered"
+              elif [ "$local_status" = "pending" ]; then
+                printf "%-50s %-12s %-12s %s\n" "$sid" "$stripe_status" "$local_status" "⚠ webhook missed — still pending"
+              else
+                printf "%-50s %-12s %-12s %s\n" "$sid" "$stripe_status" "$local_status" "? unusual local state"
+              fi
+            fi
+          done
+
+          echo ""
+          echo "════════════════════════════════════════════════"
+          echo "  Webhook health summary"
+          echo "════════════════════════════════════════════════"
+          OK=$(grep -c "✓ delivered" /dev/stdin <<< "$(cut -f2 /tmp/stripe-events.tsv | while read sid; do
+            row="${LOCAL_STATUS[$sid]:-}"
+            local_status="${row%%|*}"
+            [ "$local_status" = "paid" ] && echo "✓ delivered" || true
+          done)" || echo "0")
+
+          TOTAL=$(wc -l < /tmp/stripe-events.tsv)
+          PAID_LOCALLY=$(echo "$DB_RESULT" | grep -c "paid")
+          echo "  Stripe completed sessions:   $TOTAL"
+          echo "  Local invoices.status=paid:  $PAID_LOCALLY"
+          echo ""
+          if [ "$TOTAL" = "$PAID_LOCALLY" ]; then
+            echo "  ✅ All recent Stripe checkouts are reflected in our DB."
+          else
+            DELTA=$((TOTAL - PAID_LOCALLY))
+            echo "  ⚠ $DELTA event(s) on Stripe NOT marked paid locally."
+            echo "     Possible causes:"
+            echo "       1. Webhook endpoint URL wrong / not reachable"
+            echo "       2. Webhook signature secret (whsec_) doesn't match Stripe's"
+            echo "       3. Stripe Dashboard webhook missing 'checkout.session.completed' event"
+            echo "       4. Our handler crashed — check 'Ops — tail pm2 logs'"
+            echo "     Check Stripe Dashboard → Webhooks → your endpoint → Recent attempts"
+            echo "     for the exact HTTP response we returned."
+          fi
