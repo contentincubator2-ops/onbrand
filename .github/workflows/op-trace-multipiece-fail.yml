@@ -1,0 +1,56 @@
+name: Ops — Trace multi-piece task DB failures
+# Bug B: fb-60-album-4 / fb-60-carousel-5 / fb-60-live-suite /
+# fb-60-serial-3 / cw-60-crosspost-4platform consistently don't persist.
+# orchestra:trace + recordTaskRun structured logs are now deployed —
+# pull everything mentioning these task ids.
+on: { workflow_dispatch: {} }
+jobs:
+  trace:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          ERR=/home/azureuser/.pm2/logs/onbrand-error.log
+          OUT=/home/azureuser/.pm2/logs/onbrand-out.log
+          IDS='fb-60-album-4|fb-60-carousel-5|fb-60-live-suite|fb-60-serial-3|cw-60-crosspost-4platform'
+
+          echo "════ orchestra:trace lines for the 5 failing tasks (out log) ════"
+          tail -4000 "$OUT" 2>&1 | grep -E "orchestra:trace" | grep -E "$IDS" | tail -40
+
+          echo ""
+          echo "════ recordTaskRun structured errors (error log) ════"
+          tail -3000 "$ERR" 2>&1 | grep -iE "recordTaskRun|INSERT mission_outputs|ensureMission|tier=|DLQ|all_tiers_failed" | tail -30
+
+          echo ""
+          echo "════ Any [orchestra:trace] final gate SKIP ════"
+          tail -4000 "$OUT" 2>&1 | grep -E "orchestra:trace.*final gate" | tail -20
+
+          echo ""
+          echo "════ DLQ file ════"
+          DLQ=/home/azureuser/.pm2/logs/task-runs-failed.jsonl
+          if [ -f "$DLQ" ]; then
+            wc -l "$DLQ"
+            tail -5 "$DLQ" | cut -c1-300
+          else
+            echo "  (no DLQ file — all_tiers_failed never hit)"
+          fi
+
+          echo ""
+          echo "════ max_allowed_packet + mission_outputs.content type ════"
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+          $MYSQL -e "SHOW VARIABLES LIKE 'max_allowed_packet'" -t
+          $MYSQL -e "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='mission_outputs' AND COLUMN_NAME IN ('content','metadata','title')" -t
+
+          echo ""
+          echo "════ recent missions for these task ids (orphan check) ════"
+          $MYSQL -e "
+            SELECT m.id, m.title, LEFT(m.description,40) AS d,
+                   (SELECT COUNT(*) FROM mission_outputs mo WHERE mo.missionId=m.id) AS outputs,
+                   m.createdAt
+              FROM missions m
+             WHERE m.description REGEXP 'album-4|carousel-5|live-suite|serial-3|crosspost-4'
+             ORDER BY m.id DESC LIMIT 15" -t
