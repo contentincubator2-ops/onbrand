@@ -646,11 +646,18 @@ function getFallbackChain(): string[] {
   // azure-foundry near-last (dead 401 subscription). ollama last (not
   // running on the VM).
   //
-  // 2026-05-15 update — Anthropic credit topped up + probe confirmed
-  // (claude-sonnet-4-6 replies 繁體 in ~1s). Claude is the BEST zh-TW
-  // provider, so it leads. openai strong #2. gemini #3 (still needs
-  // GOOGLE_AI_KEY — skipped until set). qwen/zhipu last-resort only.
-  return ["anthropic", "openai", "gemini", "qwen", "zhipu", "azure-foundry", "ollama"];
+  // 2026-05-15 final — all key rotations applied + probed:
+  //   · anthropic    — credit topped up, claude-sonnet-4-6 ✓ (best zh-TW)
+  //   · azure-claude  — Sweden Claude, key updated ✓ (real Claude, +cap)
+  //   · azure-foundry — stale-key 401 fixed ✓ (gpt-5.4-mini; OK zh-TW)
+  //   · openai        — funded ✓ (strong zh-TW)
+  //   · qwen          — enable_thinking=false fix shipped (clean output
+  //                     but still Simplified-leaning — last-resort only)
+  // Four non-Chinese providers now lead so 100-user load spreads across
+  // Claude×2 + gpt + openai before EVER touching a Chinese model. gemini
+  // stays listed (skipped until GOOGLE_AI_KEY set). zhipu/qwen are the
+  // final safety net so a multi-provider outage degrades, not dies.
+  return ["anthropic", "openai", "azure-claude", "azure-foundry", "gemini", "qwen", "zhipu", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {
