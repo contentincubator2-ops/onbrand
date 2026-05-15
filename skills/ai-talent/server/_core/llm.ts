@@ -645,7 +645,12 @@ function getFallbackChain(): string[] {
   // degrades to working-but-Simplified rather than total failure.
   // azure-foundry near-last (dead 401 subscription). ollama last (not
   // running on the VM).
-  return ["openai", "gemini", "anthropic", "qwen", "zhipu", "azure-foundry", "ollama"];
+  //
+  // 2026-05-15 update — Anthropic credit topped up + probe confirmed
+  // (claude-sonnet-4-6 replies 繁體 in ~1s). Claude is the BEST zh-TW
+  // provider, so it leads. openai strong #2. gemini #3 (still needs
+  // GOOGLE_AI_KEY — skipped until set). qwen/zhipu last-resort only.
+  return ["anthropic", "openai", "gemini", "qwen", "zhipu", "azure-foundry", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {

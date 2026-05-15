@@ -134,21 +134,19 @@ export interface OrchestraResult {
  *  Exported so theaterRouter (and other places) can derive provider from
  *  agent.aiModel consistently. */
 export function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
-  // 2026-05-15 (CJ「針對台灣使用者，不能用中國的 AI 模型，會出現詭異的
-  // 圖和文」): product is Taiwan-only (zh-TW). Chinese models (qwen =
-  // Alibaba, zhipu/glm = Zhipu) reliably emit Simplified Chinese,
-  // mainland phrasing, and culturally-off copy + image prompts. The
-  // Azure subscription (azure-foundry/position/northcentral) is also
-  // DEAD (401 invalid subscription). The one solid, billed, non-Chinese
-  // provider with strong Traditional-Chinese output is OpenAI. So every
-  // agent's aiModel pins to OpenAI regardless of what it requested.
-  // Provider DIVERSITY is now the fallback chain's job
-  // (openai → gemini → … → qwen/zhipu only as a last-resort so a total
-  // OpenAI outage degrades rather than dies). Revert per-model mapping
-  // once (a) Azure billing renewed AND (b) a zh-TW quality gate exists
-  // for Chinese models.
+  // 2026-05-15 (CJ「針對台灣使用者，不能用中國的 AI 模型」+ Anthropic
+  // credit 已加值並 probe 確認可用 claude-sonnet-4-6): product is
+  // Taiwan-only (zh-TW). Chinese models (qwen=Alibaba, zhipu/glm=Zhipu)
+  // emit Simplified + mainland phrasing → "詭異的圖和文". Azure subscription
+  // still DEAD (401). Now that Anthropic is funded again, Claude is the
+  // BEST zh-TW quality + non-Chinese, so every agent pins to anthropic.
+  // Diversity = fallback chain (anthropic → openai → gemini → … →
+  // qwen/zhipu only as last-resort so a total Claude/OpenAI outage
+  // degrades to Simplified-but-working rather than dying). Revert to
+  // per-model mapping once Azure billing renewed AND a zh-TW quality
+  // gate exists for Chinese models.
   void aiModel; // intentionally ignored — see comment
-  return "openai";
+  return "anthropic";
 }
 
 /**
