@@ -60,6 +60,7 @@ import BrandSettingsPage from "../pages/BrandSettingsPage";
 import AdminErrorsPage from "../pages/AdminErrorsPage";
 import AdminDashboardPage from "../pages/AdminDashboardPage";
 import AdminUserDetailPage from "../pages/AdminUserDetailPage";
+import LandingPage from "../pages/LandingPage";
 // 2026-05-11 (CJ「P0-1 內容日曆」): vs Buffer
 import CalendarPage from "../pages/CalendarPage";
 
@@ -182,6 +183,11 @@ export default function AppV2() {
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/login" element={<Navigate to="/auth/login" replace />} />
 
+        {/* 2026-05-16 (CJ「主打品牌定位鎖定」): public marketing landing
+            at /. Cold traffic used to hit /auth/login directly (funnel
+            leak). LandingPage self-redirects authed users to /30s. */}
+        <Route path="/" element={<LandingPage />} />
+
         {/* 2026-05-10: Public legal + pricing pages (no auth required so
             unregistered prospects can read T&C / Privacy / Refund + see pricing) */}
         <Route path="/pricing" element={<PricingPage />} />
@@ -213,11 +219,9 @@ export default function AppV2() {
           {/* 2026-05-05 pivot v2: tier = top-level route. 30S/60S/90S are
               siblings, each rendering QuickTask30sPage with a different
               tier prop. / redirects to /30s. */}
-          {/* 2026-05-14 (CJ「Logo → / → 空白」): / redirects to /30s,
-              the action-oriented main entry. Previous /brands target had
-              a redirect chain that exposed Rules-of-Hooks bugs and
-              scope-race failure modes. /30s renders independently. */}
-          <Route path="/" element={<Navigate to="/30s" replace />} />
+          {/* 2026-05-16: public LandingPage now owns "/" and self-redirects
+              authed users to /30s, so the old protected "/"→/30s Navigate
+              was removed (two routes for "/" is ambiguous in v6). */}
           <Route path="/30s" element={<QuickTask30sPage tier="30s" />} />
           <Route path="/60s" element={<QuickTask30sPage tier="60s" />} />
           {/* 2026-05-10 brand rename: 100s → 99s (久久 雙關 + 設計感).
