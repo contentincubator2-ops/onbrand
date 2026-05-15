@@ -854,6 +854,8 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
   if (typeof anyP.temperature === "number")        payload.temperature       = anyP.temperature;
   if (typeof anyP.presence_penalty === "number")   payload.presence_penalty  = anyP.presence_penalty;
   if (typeof anyP.frequency_penalty === "number")  payload.frequency_penalty = anyP.frequency_penalty;
+  // Qwen/DashScope: disable thinking for non-streaming calls (prevents 400 error)
+  if (providerKey === "qwen") payload.enable_thinking = false;
 
   if (tools && tools.length > 0) {
     payload.tools = tools;
