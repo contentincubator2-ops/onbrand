@@ -1,0 +1,29 @@
+name: Ops — Probe Anthropic (verify credit topup)
+on: { workflow_dispatch: {} }
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          node --import tsx -e "
+            import('./server/_core/llm.ts').then(async ({ invokeLLM }) => {
+              const t0 = Date.now();
+              try {
+                const r = await invokeLLM({
+                  provider: 'anthropic',
+                  messages: [{ role: 'user', content: '用繁體中文回一句「測試成功」四個字，不要其他內容。' }],
+                });
+                const txt = r?.choices?.[0]?.message?.content ?? '';
+                console.log('ANTHROPIC OK in', Date.now()-t0, 'ms');
+                console.log('model:', r?.model);
+                console.log('reply:', JSON.stringify(String(txt).slice(0,80)));
+                process.exit(0);
+              } catch (e) {
+                console.error('ANTHROPIC FAILED:', String(e?.message ?? e).slice(0, 400));
+                process.exit(1);
+              }
+            }).catch(e => { console.error('IMPORT FAILED:', e); process.exit(1); });
+          "
