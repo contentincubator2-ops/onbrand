@@ -1,0 +1,110 @@
+name: Ops — E2E smoke (onbrand.sowork.ai full chain)
+
+# 2026-05-15 (CJ「要：完整 e2e smoke」):
+# Full auth+brand chain against the PUBLIC host https://onbrand.sowork.ai
+# (real DNS + nginx + SSL), with DB peeks for the verification token and
+# cleanup. Proves: register → verify-email → login → Google OAuth start
+# → create brand → list brand. Self-cleaning (deletes the throwaway user).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - run: |
+          set +e
+          BASE="https://onbrand.sowork.ai"
+          TS=$(date +%s)
+          EMAIL="smoke+${TS}@sowork.ai"
+          PASS="SmokeTest1234"
+          NAME="smoke ${TS}"
+          JAR=/tmp/smoke_${TS}.cookies
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV" 2>/dev/null; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -N -s"
+          PASS_ALL=1
+          step() { echo ""; echo "════ $1 ════"; }
+          ok()   { echo "  ✓ $1"; }
+          bad()  { echo "  ✗ $1"; PASS_ALL=0; }
+
+          step "0. DNS + SSL reachable"
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BASE/health")
+          [ "$code" = "200" ] && ok "GET $BASE/health → 200" || bad "health → $code"
+
+          step "1. Register"
+          reg=$(curl -s -w "\n__%{http_code}__" --max-time 20 -X POST "$BASE/api/auth/register" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"$NAME\",\"email\":\"$EMAIL\",\"password\":\"$PASS\"}")
+          code=$(echo "$reg" | grep -o "__[0-9]*__" | tr -dc 0-9)
+          body=$(echo "$reg" | sed 's/__[0-9]*__//')
+          if [ "$code" = "200" ] || [ "$code" = "201" ]; then ok "register → $code"; else bad "register → $code : $(echo $body|head -c160)"; fi
+
+          step "2. Verification token written to DB"
+          TOKEN=$($MYSQL -e "SELECT emailVerificationToken FROM users WHERE email='$EMAIL' LIMIT 1")
+          if [ -n "$TOKEN" ] && [ "$TOKEN" != "NULL" ]; then ok "token present (${#TOKEN} chars)"; else bad "no verification token in DB"; fi
+          ACTIVE0=$($MYSQL -e "SELECT isActive FROM users WHERE email='$EMAIL' LIMIT 1")
+          echo "  (isActive at register = $ACTIVE0  ← trial bypass expected 1)"
+
+          step "3. Verify email via token (the bug we just fixed)"
+          ver=$(curl -s -w "\n__%{http_code}__" --max-time 20 -X POST "$BASE/api/auth/verifyEmail" \
+            -H "Content-Type: application/json" -d "{\"token\":\"$TOKEN\"}")
+          code=$(echo "$ver" | grep -o "__[0-9]*__" | tr -dc 0-9)
+          body=$(echo "$ver" | sed 's/__[0-9]*__//')
+          if echo "$body" | grep -q '"success":true'; then ok "verifyEmail → success"; else bad "verifyEmail → $code : $(echo $body|head -c160)"; fi
+          TOKEN_AFTER=$($MYSQL -e "SELECT IFNULL(emailVerificationToken,'CLEARED') FROM users WHERE email='$EMAIL'")
+          [ "$TOKEN_AFTER" = "CLEARED" ] && ok "token cleared after verify (idempotent-safe)" || bad "token not cleared"
+
+          step "4. Login"
+          log=$(curl -s -w "\n__%{http_code}__" --max-time 20 -c "$JAR" -X POST "$BASE/api/auth/login" \
+            -H "Content-Type: application/json" -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}")
+          code=$(echo "$log" | grep -o "__[0-9]*__" | tr -dc 0-9)
+          body=$(echo "$log" | sed 's/__[0-9]*__//')
+          if [ "$code" = "200" ] && grep -qi "session" "$JAR"; then ok "login → 200 + session cookie"; else bad "login → $code : $(echo $body|head -c160)"; fi
+
+          step "5. Authenticated /api/auth/me"
+          me=$(curl -s -w "\n__%{http_code}__" --max-time 15 -b "$JAR" "$BASE/api/auth/me")
+          code=$(echo "$me" | grep -o "__[0-9]*__" | tr -dc 0-9)
+          echo "$me" | grep -q "$EMAIL" && ok "me → returns our user" || bad "me → $code : $(echo "$me"|sed 's/__[0-9]*__//'|head -c160)"
+
+          step "6. Google OAuth start (302 → accounts.google.com)"
+          loc=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 15 "$BASE/api/auth/google")
+          echo "  redirect: $(echo $loc | head -c 120)…"
+          echo "$loc" | grep -q "accounts.google.com" && echo "$loc" | grep -q "onbrand.sowork.ai%2Fapi%2Fauth%2Fgoogle%2Fcallback" \
+            && ok "OAuth redirect_uri = onbrand callback" || bad "OAuth redirect wrong: $loc"
+
+          step "7. Create brand (tRPC, authed)"
+          cb=$(curl -s -w "\n__%{http_code}__" --max-time 30 -b "$JAR" -X POST "$BASE/api/trpc/brand.createWithMember?batch=1" \
+            -H "Content-Type: application/json" \
+            -d "{\"0\":{\"json\":{\"name\":\"SmokeBrand $TS\",\"industry\":\"測試\",\"description\":\"e2e smoke\"}}}")
+          code=$(echo "$cb" | grep -o "__[0-9]*__" | tr -dc 0-9)
+          body=$(echo "$cb" | sed 's/__[0-9]*__//')
+          BRAND_ID=$(echo "$body" | grep -o '"id":[0-9]*' | head -1 | tr -dc 0-9)
+          if [ -n "$BRAND_ID" ]; then ok "brand created id=$BRAND_ID"; else bad "create brand → $code : $(echo $body|head -c220)"; fi
+
+          step "8. Brand visible in DB + owned by smoke user"
+          if [ -n "$BRAND_ID" ]; then
+            row=$($MYSQL -e "SELECT b.id,b.name FROM brands b JOIN users u ON u.id=b.userId WHERE b.id=$BRAND_ID AND u.email='$EMAIL'")
+            [ -n "$row" ] && ok "brand row OK: $row" || bad "brand not linked to smoke user"
+          fi
+
+          step "9. Cleanup (delete throwaway user + brand)"
+          UID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL' LIMIT 1")
+          if [ -n "$UID" ]; then
+            $MYSQL -e "DELETE FROM brands WHERE userId=$UID; DELETE FROM brand_members WHERE userId=$UID; DELETE FROM users WHERE id=$UID;" 2>&1 | head -1
+            left=$($MYSQL -e "SELECT COUNT(*) FROM users WHERE email='$EMAIL'")
+            [ "$left" = "0" ] && ok "cleaned up uid=$UID" || bad "cleanup left $left rows"
+          fi
+          rm -f "$JAR"
+
+          echo ""
+          echo "════════════════════════════════"
+          if [ "$PASS_ALL" = "1" ]; then
+            echo "  ✅ FULL E2E SMOKE PASSED (onbrand.sowork.ai)"
+          else
+            echo "  ❌ SMOKE HAD FAILURES — see ✗ lines above"
+            exit 1
+          fi
