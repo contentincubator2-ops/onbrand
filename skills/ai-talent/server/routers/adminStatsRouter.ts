@@ -241,7 +241,10 @@ export const adminStatsRouter = router({
     .input(z.object({ limit: z.number().int().min(1).max(200).default(50) }).optional())
     .query(async ({ input }) => {
       const { default: localPool } = await import("../localDb");
-      const limit = input?.limit ?? 50;
+      // 2026-05-16: mysql2 execute() (prepared stmt) rejects `LIMIT ?`
+      // → "Incorrect arguments to mysqld_stmt_execute". zod already
+      // bounds this 1..200, so inlining the clamped int is safe.
+      const limit = Math.max(1, Math.min(200, Math.floor(input?.limit ?? 50)));
       const [rows]: any = await localPool.execute(
         `SELECT u.id, u.email, u.name, u.isActive, u.role, u.earlyBird,
                 u.authMethod, u.createdAt, u.activatedAt,
@@ -250,8 +253,7 @@ export const adminStatsRouter = router({
                 (SELECT COALESCE(SUM(ul.costUsd),0) FROM usage_log ul WHERE ul.userId = u.id) AS usdSpent
            FROM users u
           ORDER BY u.id DESC
-          LIMIT ?`,
-        [limit],
+          LIMIT ${limit}`,
       );
       return (rows as any[]).map((r) => ({
         id: n(r.id),
@@ -391,13 +393,14 @@ export const adminStatsRouter = router({
       const status = input?.status ?? "all";
       const where = status === "all" ? "" : "WHERE status = ?";
       const params: any[] = status === "all" ? [] : [status];
-      params.push(input?.limit ?? 80);
+      // mysql2 execute() rejects `LIMIT ?` — inline the clamped int.
+      const limit = Math.max(1, Math.min(200, Math.floor(input?.limit ?? 80)));
       const [rows]: any = await localPool.execute(
         `SELECT id, userId, userEmail, title, body, pageUrl, status,
                 triageVerdict, triageReason, bountyPoints, dispatchRef,
                 adminNotes, createdAt, resolvedAt
            FROM bug_reports ${where}
-          ORDER BY id DESC LIMIT ?`, params);
+          ORDER BY id DESC LIMIT ${limit}`, params);
       const iso = (d: any) => d ? (d instanceof Date ? d.toISOString() : String(d)) : null;
       return (rows as any[]).map((b) => ({
         id: n(b.id), userId: n(b.userId), userEmail: b.userEmail ?? "",
