@@ -59,6 +59,7 @@ import BrandSettingsPage from "../pages/BrandSettingsPage";
 // auto-captured tRPC / frontend errors. Gated server-side by adminProcedure.
 import AdminErrorsPage from "../pages/AdminErrorsPage";
 import AdminDashboardPage from "../pages/AdminDashboardPage";
+import AdminUserDetailPage from "../pages/AdminUserDetailPage";
 // 2026-05-11 (CJ「P0-1 內容日曆」): vs Buffer
 import CalendarPage from "../pages/CalendarPage";
 
@@ -253,6 +254,7 @@ export default function AppV2() {
           <Route path="/admin/errors" element={<AdminErrorsPage />} />
           {/* 2026-05-16 (CJ「後台監控使用者」) — growth/usage/health dashboard */}
           <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+          <Route path="/admin/user/:id" element={<AdminUserDetailPage />} />
           {/* 2026-05-11 — content calendar (P0-1) */}
           <Route path="/calendar" element={<CalendarPage />} />
           {/* 2026-05-10 account settings + achievements */}

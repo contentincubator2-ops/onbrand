@@ -16,8 +16,9 @@
  * Numbers are the content. Auto-refreshes every 30s.
  */
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
-import { RefreshCw, TrendingUp, DollarSign, Activity, AlertTriangle } from "lucide-react";
+import { RefreshCw, TrendingUp, DollarSign, Activity, AlertTriangle, Bug, Download } from "lucide-react";
 
 const card: React.CSSProperties = {
   border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff",
@@ -50,11 +51,36 @@ const grid = (min = 150): React.CSSProperties => ({
 });
 
 export default function AdminDashboardPage() {
+  const navigate = useNavigate();
   const opt = { refetchInterval: 30_000, refetchOnWindowFocus: false } as const;
   const ovQ = (trpc as any).adminStats?.overview?.useQuery?.(undefined, opt);
   const ucQ = (trpc as any).adminStats?.usageCost?.useQuery?.(undefined, opt);
   const hQ  = (trpc as any).adminStats?.health?.useQuery?.(undefined, opt);
   const ruQ = (trpc as any).adminStats?.recentUsers?.useQuery?.({ limit: 50 }, opt);
+  const bugsQ = (trpc as any).adminStats?.listBugReports?.useQuery?.({ status: "all", limit: 60 }, opt);
+  const utils = (trpc as any).useUtils?.() ?? null;
+  const refetchBugs = () => { bugsQ?.refetch?.(); utils?.adminStats?.userDetail?.invalidate?.(); };
+
+  const triageM  = (trpc as any).adminStats?.triageBug?.useMutation?.({ onSuccess: refetchBugs });
+  const confirmM = (trpc as any).adminStats?.confirmBug?.useMutation?.({ onSuccess: refetchBugs });
+  const dispatchM= (trpc as any).adminStats?.dispatchBugFix?.useMutation?.({
+    onSuccess: (r: any) => { refetchBugs(); if (r?.howTo) window.prompt("在終端機跑這行觸發修復 workflow（人工把關）：", r.howTo); },
+  });
+  const resolveM = (trpc as any).adminStats?.resolveBug?.useMutation?.({ onSuccess: refetchBugs });
+  const csvUtils = (trpc as any).useUtils?.() ?? null;
+
+  const exportCsv = async () => {
+    try {
+      const r = await csvUtils?.adminStats?.exportUsersCsv?.fetch?.();
+      if (!r?.csv) return;
+      const blob = new Blob(["﻿" + r.csv], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `onbrand-users-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { alert("匯出失敗：" + String((e as any)?.message ?? e)); }
+  };
 
   const forbidden =
     ovQ?.error?.data?.code === "FORBIDDEN" ||
@@ -79,16 +105,25 @@ export default function AdminDashboardPage() {
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 22px 80px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: "#171717" }}>監控後台</h1>
-        <button
-          onClick={() => { ovQ?.refetch?.(); ucQ?.refetch?.(); hQ?.refetch?.(); ruQ?.refetch?.(); }}
-          style={{
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={exportCsv} style={{
             display: "flex", alignItems: "center", gap: 6, fontSize: 12,
             border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 12px",
             background: "#fff", cursor: "pointer", color: "#525252",
-          }}
-        >
-          <RefreshCw size={13} /> 重新整理
-        </button>
+          }}>
+            <Download size={13} /> 匯出 CSV
+          </button>
+          <button
+            onClick={() => { ovQ?.refetch?.(); ucQ?.refetch?.(); hQ?.refetch?.(); ruQ?.refetch?.(); refetchBugs(); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, fontSize: 12,
+              border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 12px",
+              background: "#fff", cursor: "pointer", color: "#525252",
+            }}
+          >
+            <RefreshCw size={13} /> 重新整理
+          </button>
+        </div>
       </div>
       {loading && <p style={{ color: "#9ca3af", fontSize: 13, marginTop: 20 }}>載入中…</p>}
 
@@ -181,8 +216,63 @@ export default function AdminDashboardPage() {
           sub={`NT$ ${(h?.revenue.twd30d ?? 0).toLocaleString()}`} />
       </div>
 
+      {/* ── Bug 回報佇列 ── */}
+      <div style={sectionTitle}><Bug size={13} /> Bug 回報佇列</div>
+      <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+        {(bugsQ?.data ?? []).length === 0 && (
+          <div style={{ padding: 16, fontSize: 12, color: "#9ca3af" }}>目前沒有 bug 回報</div>
+        )}
+        {(bugsQ?.data ?? []).map((b: any) => (
+          <div key={b.id} style={{ borderBottom: "1px solid #f3f4f6", padding: "10px 14px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#171717" }}>
+                #{b.id} {b.title}
+                <span style={{ ...tagS, marginLeft: 8 }}>{b.status}</span>
+                {b.triageVerdict && (
+                  <span style={{
+                    ...tagS,
+                    background: b.triageVerdict === "likely_bug" ? "#fee2e2"
+                      : b.triageVerdict === "likely_misuse" ? "#dcfce7" : "#fef9c3",
+                    color: "#525252",
+                  }}>{b.triageVerdict}</span>
+                )}
+                {b.bountyPoints > 0 && <span style={{ ...tagS }}>+{b.bountyPoints} 點</span>}
+              </div>
+              <span style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>
+                {b.userEmail} · {new Date(b.createdAt).toLocaleString("zh-TW", { hour12: false })}
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: "#525252", margin: "5px 0", whiteSpace: "pre-wrap" }}>
+              {b.body.slice(0, 280)}{b.body.length > 280 ? "…" : ""}
+            </div>
+            {b.triageReason && (
+              <div style={{ fontSize: 11, color: "#737373", fontStyle: "italic", marginBottom: 6 }}>
+                triage：{b.triageReason}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <BugBtn label="AI 分流" onClick={() => triageM?.mutate?.({ bugId: b.id })}
+                busy={triageM?.isPending} />
+              <BugBtn label="✓ 確認是 bug（送點）" onClick={() => confirmM?.mutate?.({ bugId: b.id, isBug: true })}
+                busy={confirmM?.isPending} />
+              <BugBtn label="✗ 非 bug" onClick={() => confirmM?.mutate?.({ bugId: b.id, isBug: false })}
+                busy={confirmM?.isPending} />
+              <BugBtn label="🤖 派給修復 agent" onClick={() => dispatchM?.mutate?.({ bugId: b.id })}
+                busy={dispatchM?.isPending} />
+              <BugBtn label="🎉 標記已解決＋通知" onClick={() => {
+                const note = window.prompt("給用戶的備註（可空白）：") ?? undefined;
+                resolveM?.mutate?.({ bugId: b.id, note });
+              }} busy={resolveM?.isPending} />
+              {b.userId ? (
+                <BugBtn label="看用戶" onClick={() => navigate(`/admin/user/${b.userId}`)} />
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* ── 最近註冊 ── */}
-      <div style={sectionTitle}>最近註冊</div>
+      <div style={sectionTitle}>最近註冊（點列進 drill-down）</div>
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
@@ -194,7 +284,12 @@ export default function AdminDashboardPage() {
           </thead>
           <tbody>
             {(ruQ?.data ?? []).map((u: any) => (
-              <tr key={u.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+              <tr key={u.id}
+                onClick={() => navigate(`/admin/user/${u.id}`)}
+                style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#fafafa")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+              >
                 <td style={td}>{u.id}</td>
                 <td style={td}>
                   {u.email}{u.role === "admin" && <span style={tagS}>admin</span>}
@@ -230,3 +325,13 @@ const tagS: React.CSSProperties = {
   borderRadius: 4, padding: "1px 5px", marginLeft: 6,
 };
 const Empty = () => <div style={{ fontSize: 12, color: "#9ca3af", padding: "8px 0" }}>無資料</div>;
+
+function BugBtn({ label, onClick, busy }: { label: string; onClick: () => void; busy?: boolean }) {
+  return (
+    <button onClick={onClick} disabled={busy} style={{
+      fontSize: 11, border: "1px solid #e5e7eb", borderRadius: 6,
+      padding: "4px 9px", background: busy ? "#f3f4f6" : "#fff",
+      cursor: busy ? "default" : "pointer", color: "#374151",
+    }}>{label}</button>
+  );
+}

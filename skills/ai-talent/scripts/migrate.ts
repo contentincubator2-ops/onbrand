@@ -2083,6 +2083,35 @@ async function main() {
       console.warn("[migrate] missions CONVERT TO utf8mb4 skipped:", e?.message ?? e);
     }
 
+    // 2026-05-16 (CJ「用戶 report bug → 自動除錯 → 送點數 → 通知」):
+    // bug_reports drives report→triage→fix→reward→notify.
+    // status: reported → triaged → (confirmed_bug | not_a_bug)
+    //         confirmed_bug → dispatched → fix_proposed → resolved
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS bug_reports (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId          INT          NOT NULL,
+        userEmail       VARCHAR(320) NULL,
+        conversationId  INT          NULL,
+        title           VARCHAR(200) NOT NULL,
+        body            TEXT         NOT NULL,
+        pageUrl         VARCHAR(512) NULL,
+        status          VARCHAR(20)  NOT NULL DEFAULT 'reported',
+        triageVerdict   VARCHAR(20)  NULL,
+        triageReason    TEXT         NULL,
+        triageModel     VARCHAR(64)  NULL,
+        bountyPoints    INT          NOT NULL DEFAULT 0,
+        dispatchRef     VARCHAR(256) NULL,
+        adminNotes      TEXT         NULL,
+        resolvedAt      DATETIME(3)  NULL,
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_status (status, createdAt),
+        KEY idx_user (userId, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] bug_reports: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

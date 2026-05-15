@@ -50,6 +50,7 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
   const startMut    = (trpc as any).support?.startConversation?.useMutation?.();
   const sendMut     = (trpc as any).support?.sendMessage?.useMutation?.();
   const escalateMut = (trpc as any).support?.escalateToHuman?.useMutation?.();
+  const reportBugMut = (trpc as any).support?.reportBug?.useMutation?.();
 
   // Bootstrap conversation on open
   useEffect(() => {
@@ -383,16 +384,53 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
                 <Send size={14} />
               </button>
             </div>
-            <button
-              onClick={() => setShowEscalate(true)}
-              style={{
-                marginTop: 8, fontSize: 11, color: "#6b7280",
-                background: "transparent", border: "none", cursor: "pointer",
-                padding: "2px 4px",
-              }}
-            >
-              {isEn ? "Need a real human? →" : "我要找真人 →"}
-            </button>
+            <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+              <button
+                onClick={() => setShowEscalate(true)}
+                style={{
+                  fontSize: 11, color: "#6b7280",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  padding: "2px 4px",
+                }}
+              >
+                {isEn ? "Need a real human? →" : "我要找真人 →"}
+              </button>
+              <button
+                onClick={async () => {
+                  const title = window.prompt(isEn ? "Bug title (short)" : "Bug 標題（簡短）");
+                  if (!title || title.trim().length < 3) return;
+                  const body = window.prompt(isEn
+                    ? "What happened? Steps + what you expected"
+                    : "發生了什麼？操作步驟 + 你預期的結果");
+                  if (!body || body.trim().length < 5) return;
+                  try {
+                    const r = await reportBugMut?.mutateAsync?.({
+                      title: title.trim(), body: body.trim(),
+                      pageUrl: loc.pathname,
+                      conversationId: conversationId ?? undefined,
+                    });
+                    if (r?.bugId) {
+                      setMessages((m) => [...m, {
+                        id: Date.now(), role: "mia",
+                        content: isEn
+                          ? `Bug #${r.bugId} reported. If it's a real bug we'll fix it and add bonus points — you'll be notified here. 🙏`
+                          : `已收到 Bug #${r.bugId}。如果確認是系統問題，我們會修復並加贈點數，修好會在這裡通知你 🙏`,
+                        createdAt: new Date().toISOString(),
+                      }]);
+                    }
+                  } catch (e: any) {
+                    alert((isEn ? "Report failed: " : "回報失敗：") + String(e?.message ?? e));
+                  }
+                }}
+                style={{
+                  fontSize: 11, color: "#7c3aed", fontWeight: 600,
+                  background: "transparent", border: "none", cursor: "pointer",
+                  padding: "2px 4px",
+                }}
+              >
+                {isEn ? "🐛 Report a bug (earn points) →" : "🐛 回報 Bug（修好送點數）→"}
+              </button>
+            </div>
           </>
         )}
       </div>

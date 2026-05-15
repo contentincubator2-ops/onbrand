@@ -40,7 +40,7 @@ function checkRateLimit(userId: number): { allowed: boolean; reason?: string } {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-async function ensureOpenConversation(userId: number, brandId?: number | null): Promise<number> {
+export async function ensureOpenConversation(userId: number, brandId?: number | null): Promise<number> {
   const [rows]: any = await localPool.execute(
     `SELECT id FROM support_conversations
       WHERE userId = ? AND status = 'open'
@@ -80,7 +80,7 @@ async function loadMessages(conversationId: number, limit = 100) {
   return (rows as Array<{ id: number; role: string; content: string; contextSnapshot: any; createdAt: Date }>).reverse();
 }
 
-async function insertMessage(args: {
+export async function insertMessage(args: {
   conversationId: number;
   role: "user" | "mia" | "admin";
   content: string;
@@ -583,10 +583,77 @@ export const supportRouter = router({
       );
       return { ok: true };
     }),
+
+  /**
+   * 2026-05-16 (CJ「用戶可以透過客服 report bug，有 bug 就多送點數」):
+   * Structured bug report. Creates a bug_reports row + a support ticket
+   * + drops a confirmation line into the chat. Bounty points are NOT
+   * granted here — only after an admin (or triage) confirms it's a real
+   * bug, to stop farming. Returns the bug id.
+   */
+  reportBug: protectedProcedure
+    .input(z.object({
+      title: z.string().min(3).max(200),
+      body: z.string().min(5).max(4000),
+      pageUrl: z.string().max(512).optional(),
+      conversationId: z.number().int().positive().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const [uRow]: any = await localPool.execute(
+        `SELECT email FROM users WHERE id = ? LIMIT 1`, [userId],
+      );
+      const userEmail = (uRow as any[])[0]?.email ?? null;
+      const convId = input.conversationId ?? await ensureOpenConversation(userId, null);
+
+      const [ins]: any = await localPool.execute(
+        `INSERT INTO bug_reports
+           (userId, userEmail, conversationId, title, body, pageUrl, status)
+         VALUES (?, ?, ?, ?, ?, ?, 'reported')`,
+        [userId, userEmail, convId, input.title.slice(0, 200),
+         input.body.slice(0, 4000), input.pageUrl ?? null],
+      );
+      const bugId = Number(ins?.insertId ?? 0);
+
+      // Mirror into the support ticket queue (tag=bug) so it shows in
+      // the existing admin support inbox too.
+      await localPool.execute(
+        `INSERT INTO support_tickets
+           (conversationId, userId, userEmail, status, tag, subject, autoContext)
+         VALUES (?, ?, ?, 'open', 'bug', ?, ?)`,
+        [convId, userId, userEmail, input.title.slice(0, 240),
+         JSON.stringify({ bugReportId: bugId, pageUrl: input.pageUrl ?? null })],
+      );
+
+      await insertMessage({
+        conversationId: convId,
+        role: "mia",
+        content:
+          `收到你的 Bug 回報 #${bugId}：「${input.title.slice(0, 60)}」。\n` +
+          `我們會先判定是不是真的 bug。如果確認是系統問題，會自動進入修復流程，` +
+          `修好後在這裡通知你，並加贈點數作為感謝 🙏`,
+      });
+
+      return { ok: true as const, bugId };
+    }),
 });
 
+/**
+ * Push a system-authored message into the user's open support
+ * conversation (role 'mia'). Used by the bug pipeline to tell the
+ * reporter their issue was fixed. Best-effort — never throws.
+ */
+export async function pushSystemSupportMessage(userId: number, content: string): Promise<void> {
+  try {
+    const convId = await ensureOpenConversation(userId, null);
+    await insertMessage({ conversationId: convId, role: "mia", content });
+  } catch (e) {
+    console.error("[support] pushSystemSupportMessage failed:", e);
+  }
+}
+
 // Admin = CJ (userId 199) or any sowork.tw email. Trivial allowlist.
-function isAdminUser(userId: number, email?: string | null): boolean {
+export function isAdminUser(userId: number, email?: string | null): boolean {
   if (userId === 199) return true;
   if (email && /@sowork\.(tw|ai)$/i.test(email)) return true;
   return false;
