@@ -48,11 +48,30 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
   // 2026-05-12 (CJ「移除 sowork.tw 帳號的額度限制」).
   try {
     const [prows]: any = await localPool.execute(
-      `SELECT planCode FROM users WHERE id = ? LIMIT 1`,
+      `SELECT planCode, planStatus, planEndsAt FROM users WHERE id = ? LIMIT 1`,
       [userId],
     );
-    if ((prows as any[])[0]?.planCode === "enterprise") {
+    const p = (prows as any[])[0];
+    if (p?.planCode === "enterprise") {
       return { ok: true };
+    }
+    // 2026-05-16 (CJ「金流＋試用到期」audit): enforce expiry at the single
+    // chokepoint every task path already calls. Before this, an expired
+    // trial / lapsed subscription was NOT blocked here (only the points
+    // quota was) — assertWithinPlan exists but was wired only to video.
+    const endsAt = p?.planEndsAt
+      ? (p.planEndsAt instanceof Date ? p.planEndsAt : new Date(p.planEndsAt))
+      : null;
+    const expired = endsAt != null && endsAt.getTime() < Date.now();
+    if (expired) {
+      if (p?.planStatus === "trial" || p?.planCode === "trial") {
+        return { ok: false, reason:
+          "免費試用已到期。升級方案即可繼續使用 —— 前往「方案」頁面開通（早鳥 US$100/月）。" };
+      }
+      if (p?.planStatus === "active") {
+        return { ok: false, reason:
+          "訂閱已到期或續訂失敗，請至「方案」頁面更新付款方式以恢復使用。" };
+      }
     }
   } catch {/* if plan lookup fails, fall through to standard checks */}
 

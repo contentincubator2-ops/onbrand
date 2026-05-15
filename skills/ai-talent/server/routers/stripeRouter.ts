@@ -419,6 +419,23 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
        WHERE id = ?`,
       [invoice.planCode, days, invoice.workspaceId],
     );
+    // 2026-05-16 (CJ「金流＋試用到期」audit): CRITICAL — every enforcement
+    // path + the points engine read users.planCode/planStatus/planEndsAt,
+    // NOT workspaces.*. Without this the customer pays and stays on the
+    // trial plan (300 pts, planStatus='trial') — they get nothing.
+    // Flipping users.planCode to a paid plan auto-unlocks unlimited
+    // points (drop_pro/drop_team pointsPerCycle = -1 → refillIfDue
+    // bypass), so no explicit points grant is needed here.
+    await localPool.execute(
+      `UPDATE users
+       SET planCode = ?, planStatus = 'active',
+           planEndsAt = GREATEST(COALESCE(planEndsAt, NOW(3)), NOW(3)) + INTERVAL ? DAY
+       WHERE id = ?`,
+      [invoice.planCode, days, invoice.userId],
+    );
+    console.log("[stripe.webhook] subscription activated", {
+      sessionId, userId: invoice.userId, planCode: invoice.planCode, days,
+    });
   }
   return { ok: true };
 }

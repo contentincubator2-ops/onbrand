@@ -1,0 +1,59 @@
+name: Ops — Extend existing users' trial (2026-05-16)
+
+# 2026-05-16 (CJ「金流＋試用到期」audit):
+# We just wired a real trial-expiry gate into preflightCostCheck. Every
+# existing user registered with planEndsAt = register+7d, so most of the
+# known test cohort is already past it — deploying the gate would lock
+# them all out instantly. This pushes every CURRENT user's planEndsAt
+# comfortably forward so only NEW signups meet the gate cleanly.
+#
+# Paid (planStatus='active') users are left untouched. Run ONCE.
+# Idempotent (GREATEST guard).
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Trial days from today for existing trial users"
+        required: true
+        default: "90"
+
+jobs:
+  extend:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
+          D="${{ github.event.inputs.days }}"
+
+          echo "════ BEFORE ════"
+          $MYSQL -e "
+            SELECT planStatus,
+                   COUNT(*) AS users,
+                   SUM(planEndsAt < NOW()) AS expired
+              FROM users GROUP BY planStatus;
+          "
+
+          echo ""
+          echo "════ Extending trial/non-active users by ${D} days ════"
+          $MYSQL -e "
+            UPDATE users
+               SET planEndsAt = GREATEST(COALESCE(planEndsAt, NOW(3)), NOW(3)) + INTERVAL ${D} DAY
+             WHERE COALESCE(planStatus,'trial') <> 'active';
+          "
+
+          echo ""
+          echo "════ AFTER ════"
+          $MYSQL -e "
+            SELECT planStatus,
+                   COUNT(*) AS users,
+                   SUM(planEndsAt < NOW()) AS still_expired,
+                   MIN(planEndsAt) AS earliest_end
+              FROM users GROUP BY planStatus;
+          "
+          echo "✅ Existing users extended ${D}d. New signups still get the 7d gate."
