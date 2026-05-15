@@ -65,8 +65,8 @@ jobs:
           body=$(echo "$log" | sed 's/__[0-9]*__//')
           if [ "$code" = "200" ] && grep -qi "session" "$JAR"; then ok "login → 200 + session cookie"; else bad "login → $code : $(echo $body|head -c160)"; fi
 
-          step "5. Authenticated /api/auth/me"
-          me=$(curl -s -w "\n__%{http_code}__" --max-time 15 -b "$JAR" "$BASE/api/auth/me")
+          step "5. Authenticated /api/auth/me (POST)"
+          me=$(curl -s -w "\n__%{http_code}__" --max-time 15 -b "$JAR" -X POST "$BASE/api/auth/me" -H "Content-Type: application/json" -d "{}")
           code=$(echo "$me" | grep -o "__[0-9]*__" | tr -dc 0-9)
           echo "$me" | grep -q "$EMAIL" && ok "me → returns our user" || bad "me → $code : $(echo "$me"|sed 's/__[0-9]*__//'|head -c160)"
 
@@ -77,7 +77,7 @@ jobs:
             && ok "OAuth redirect_uri = onbrand callback" || bad "OAuth redirect wrong: $loc"
 
           step "7. Create brand (tRPC, authed)"
-          cb=$(curl -s -w "\n__%{http_code}__" --max-time 30 -b "$JAR" -X POST "$BASE/api/trpc/brand.createWithMember?batch=1" \
+          cb=$(curl -s -w "\n__%{http_code}__" --max-time 30 -b "$JAR" -X POST "$BASE/trpc/brand.createWithMember?batch=1" \
             -H "Content-Type: application/json" \
             -d "{\"0\":{\"json\":{\"name\":\"SmokeBrand $TS\",\"industry\":\"測試\",\"description\":\"e2e smoke\"}}}")
           code=$(echo "$cb" | grep -o "__[0-9]*__" | tr -dc 0-9)
@@ -92,11 +92,11 @@ jobs:
           fi
 
           step "9. Cleanup (delete throwaway user + brand)"
-          UID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL' LIMIT 1")
-          if [ -n "$UID" ]; then
-            $MYSQL -e "DELETE FROM brands WHERE userId=$UID; DELETE FROM brand_members WHERE userId=$UID; DELETE FROM users WHERE id=$UID;" 2>&1 | head -1
+          SMOKE_UID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL' LIMIT 1")
+          if [ -n "$SMOKE_UID" ]; then
+            $MYSQL -e "DELETE FROM brands WHERE userId=$SMOKE_UID; DELETE FROM brand_members WHERE userId=$SMOKE_UID; DELETE FROM users WHERE id=$SMOKE_UID;" 2>&1 | head -1
             left=$($MYSQL -e "SELECT COUNT(*) FROM users WHERE email='$EMAIL'")
-            [ "$left" = "0" ] && ok "cleaned up uid=$UID" || bad "cleanup left $left rows"
+            [ "$left" = "0" ] && ok "cleaned up uid=$SMOKE_UID" || bad "cleanup left $left rows"
           fi
           rm -f "$JAR"
 
