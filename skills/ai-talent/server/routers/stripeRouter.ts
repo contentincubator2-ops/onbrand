@@ -155,6 +155,11 @@ export const stripeRouter = router({
         }],
         customer_email: (ctx.user as any).email ?? undefined,
         client_reference_id: String(invoiceId),
+        // 2026-05-16 (CJ「只用 Stripe」): B2B 統編 + 帳單地址，讓 Stripe
+        // 自動產生帶統編的 invoice/收據（取代綠界）。subscription mode
+        // 本來就會自動開 invoice;這裡補上台灣 B2B 需要的稅籍欄位。
+        billing_address_collection: "required",
+        tax_id_collection: { enabled: true },
         metadata: {
           invoiceId: String(invoiceId),
           userId: String(ctx.user.id),
@@ -225,6 +230,11 @@ export const stripeRouter = router({
         }],
         customer_email: (ctx.user as any).email ?? undefined,
         client_reference_id: String(invoiceId),
+        // 2026-05-16 (CJ「只用 Stripe」): one-time top-up — payment mode
+        // doesn't auto-invoice, so explicitly enable it + collect 統編.
+        billing_address_collection: "required",
+        tax_id_collection: { enabled: true },
+        invoice_creation: { enabled: true },
         metadata: {
           invoiceId: String(invoiceId),
           userId: String(ctx.user.id),
