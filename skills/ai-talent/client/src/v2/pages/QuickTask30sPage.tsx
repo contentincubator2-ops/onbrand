@@ -390,6 +390,18 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     setSearchParams(next, { replace: true });
   }, [rerunId, rerunQuery.data, allTasks]);
 
+  // 2026-05-15 (CJ「客服連結按下去」): Mia 客服按鈕會帶 ?topic=<主題>
+  // 過來（例：父親節 · 復華穩健傳承）。把它預填到主問題輸入，使用者
+  // 落地後選任務即可直接生，不用再打一次。清掉 param 防重新整理重觸發。
+  useEffect(() => {
+    const topic = searchParams.get("topic");
+    if (!topic) return;
+    setPrimaryAnswer((prev) => prev || topic);
+    const next = new URLSearchParams(searchParams);
+    next.delete("topic");
+    setSearchParams(next, { replace: true });
+  }, [searchParams]);
+
   // 30s tier: simple/quick tasks (3 variants, no extras).
   // 60s tier: production-package multi-agent (5 variants + extras + QA).
   // 100s tier: campaign-level deliverables (multi-week / month-long / series)

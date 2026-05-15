@@ -155,8 +155,12 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
       const base = a.tier === "30s" ? "/30s" : a.tier === "60s" ? "/60s" : "/99s";
       url = a.topic ? `${base}?topic=${encodeURIComponent(a.topic)}` : base;
     }
-    onClose();
+    // 2026-05-15 (CJ「客服連結按下去沒跑到該頁面」): navigate FIRST,
+    // then close. Calling onClose() first unmounts this drawer (parent
+    // flips open=false) before navigate() runs → the navigation was
+    // being dropped on a torn-down component. Order matters.
     navigate(url);
+    onClose();
   };
 
   const handleEscalate = async () => {
