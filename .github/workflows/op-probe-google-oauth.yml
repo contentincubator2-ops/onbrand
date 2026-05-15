@@ -1,0 +1,60 @@
+name: Ops — Probe Google OAuth + APP_URL consistency
+
+# 2026-05-15 (CJ「對外是 onbrand.sowork.ai，google 加好了」):
+# Verifies the prod box agrees with what was registered in Google
+# Cloud Console. Checks:
+#   - APP_URL value in .env
+#   - GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET present (masked)
+#   - the exact redirect_uri the server will send to Google
+#   - GET /api/auth/google returns a 302 to accounts.google.com
+#     (not 500 "Google OAuth 未配置")
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV" 2>/dev/null; set +a
+
+          echo "════ APP_URL ════"
+          echo "  APP_URL = ${APP_URL:-<unset>}"
+          echo "  → redirect_uri = ${APP_URL}/api/auth/google/callback"
+
+          echo ""
+          echo "════ Google creds present? ════"
+          if [ -n "$GOOGLE_CLIENT_ID" ]; then
+            echo "  GOOGLE_CLIENT_ID = ${GOOGLE_CLIENT_ID:0:18}…(${#GOOGLE_CLIENT_ID} chars)"
+          else
+            echo "  ❌ GOOGLE_CLIENT_ID NOT set — /api/auth/google will 500"
+          fi
+          if [ -n "$GOOGLE_CLIENT_SECRET" ]; then
+            echo "  GOOGLE_CLIENT_SECRET = set (${#GOOGLE_CLIENT_SECRET} chars)"
+          else
+            echo "  ❌ GOOGLE_CLIENT_SECRET NOT set"
+          fi
+
+          echo ""
+          echo "════ GET /api/auth/google (expect 302 → accounts.google.com) ════"
+          out=$(curl -s -i -o - -w "\n__HTTP_%{http_code}__" http://127.0.0.1:3101/api/auth/google)
+          code=$(echo "$out" | grep -o "__HTTP_[0-9]*__" | tr -dc 0-9)
+          echo "  HTTP $code"
+          loc=$(echo "$out" | grep -i "^location:" | head -1)
+          echo "  $loc"
+          # Pull redirect_uri param out of the Location header for eyeball check
+          echo "$loc" | grep -o 'redirect_uri=[^&]*' | sed 's/^/  /' | head -1
+          if [ "$code" = "500" ]; then
+            echo "  ⚠ 500 — likely GOOGLE_CLIENT_ID unset. Run Admin — Write Google OAuth credentials."
+          elif [ "$code" = "302" ]; then
+            echo "  ✓ OAuth start OK. If browser still shows redirect_uri_mismatch,"
+            echo "    the exact string above must be in Google Console Authorized"
+            echo "    redirect URIs (no trailing slash, https, exact host)."
+          fi
+
+          echo ""
+          echo "════ Done ════"
