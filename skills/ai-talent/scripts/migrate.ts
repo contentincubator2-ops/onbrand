@@ -2032,6 +2032,38 @@ async function main() {
     await ensureCol("brands", "fbConnectedAt", "DATETIME(3) NULL");
     console.log("[migrate] brands FB binding columns: OK");
 
+    // ─── 2026-05-15 (P1): failed_stripe_events for webhook audit/replay ───
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS failed_stripe_events (
+        id           BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        eventId      VARCHAR(64)  NULL,
+        sessionId    VARCHAR(128) NULL,
+        eventType    VARCHAR(64)  NULL,
+        reason       VARCHAR(200) NOT NULL,
+        rawPayload   MEDIUMTEXT   NULL,
+        userId       INT          NULL,
+        createdAt    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        resolvedAt   DATETIME(3)  NULL,
+        INDEX idx_fse_unresolved (resolvedAt, createdAt),
+        INDEX idx_fse_session (sessionId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] failed_stripe_events: OK");
+
+    // ─── 2026-05-15 (P1): oauth_failures for OAuth callback audit ───
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS oauth_failures (
+        id           BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        provider     VARCHAR(32)  NOT NULL,
+        userId       INT          NULL,
+        reason       VARCHAR(200) NOT NULL,
+        meta         JSON         NULL,
+        createdAt    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_oauth_provider (provider, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] oauth_failures: OK");
+
     // ─── 2026-05-14 (CJ「我要確保任務會被移到任務卡片」): mission_outputs utf8mb4 ───
     // The original mission_outputs.content + title + metadata columns may
     // have been created as utf8 (3-byte). 4-byte chars (emoji, some CJK

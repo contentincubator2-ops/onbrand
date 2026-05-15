@@ -94,11 +94,23 @@ router.get("/install", (_req: Request, res: Response) => {
 });
 
 // ─── ② OAuth Callback — exchange code → bot token → store in DB ──────────────
+// 2026-05-15 (P1 OAuth failure audit): record callback errors in DB.
+async function logOAuthFailure(args: { provider: string; reason: string; meta?: any; userId?: number | null }): Promise<void> {
+  try {
+    const { default: localPool } = await import("../localDb");
+    await localPool.execute(
+      `INSERT INTO oauth_failures (provider, userId, reason, meta) VALUES (?, ?, ?, ?)`,
+      [args.provider, args.userId ?? null, args.reason.slice(0, 200), args.meta ? JSON.stringify(args.meta).slice(0, 5000) : null],
+    );
+  } catch (e) { console.error("[oauth] failed to log oauth_failures:", (e as Error)?.message); }
+}
+
 router.get("/oauth/callback", async (req: Request, res: Response) => {
   const { code, state, error } = req.query as Record<string, string>;
 
   if (error) {
     console.error("[slack-oauth] user denied:", error);
+    await logOAuthFailure({ provider: "slack", reason: `user denied: ${error}` });
     res.redirect("https://marketing-claw.sowork.ai/install?error=access_denied");
     return;
   }
@@ -106,6 +118,7 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
   // CSRF check
   if (!state || !pendingStates.has(state)) {
     console.warn("[slack-oauth] invalid state:", state);
+    await logOAuthFailure({ provider: "slack", reason: "invalid state — possible CSRF", meta: { state: state?.slice(0, 32) } });
     res.status(400).send("Invalid state — possible CSRF. Please try again.");
     return;
   }
@@ -155,6 +168,7 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
 
     if (!data.ok) {
       console.error("[slack-oauth] token exchange failed:", data.error);
+      await logOAuthFailure({ provider: "slack", reason: `token exchange failed: ${data.error}` });
       res.status(500).send(`Slack error: ${data.error}`);
       return;
     }

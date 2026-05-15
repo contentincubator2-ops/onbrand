@@ -1,0 +1,29 @@
+name: Ops — List OAuth failures (Slack/FB/Google)
+on: { workflow_dispatch: {} }
+jobs:
+  list:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 1
+    steps:
+      - run: |
+          set +e
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+
+          echo "════ OAuth failures — last 7 days ════"
+          $MYSQL -t -e "
+            SELECT id, provider, userId, LEFT(reason, 80) AS reason, createdAt
+              FROM oauth_failures
+             WHERE createdAt > NOW() - INTERVAL 7 DAY
+             ORDER BY createdAt DESC LIMIT 20" 2>&1
+
+          echo ""
+          echo "════ Failure counts by provider × reason ════"
+          $MYSQL -t -e "
+            SELECT provider, LEFT(reason, 60) AS reason_head, COUNT(*) AS n
+              FROM oauth_failures
+             WHERE createdAt > NOW() - INTERVAL 7 DAY
+             GROUP BY provider, reason_head
+             ORDER BY n DESC LIMIT 15" 2>&1

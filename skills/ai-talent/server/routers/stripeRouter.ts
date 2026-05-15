@@ -293,11 +293,42 @@ export const stripeRouter = router({
  * for this path BEFORE the json body parser. Otherwise the signature
  * check will always fail.
  */
+/** 2026-05-15: persist failed/anomalous webhooks for audit + replay. */
+async function logFailedWebhook(args: {
+  eventId?: string | null;
+  sessionId?: string | null;
+  eventType?: string | null;
+  reason: string;
+  rawPayload?: string;
+  userId?: number | null;
+}): Promise<void> {
+  try {
+    const { default: localPool } = await import("../localDb");
+    await localPool.execute(
+      `INSERT INTO failed_stripe_events
+         (eventId, sessionId, eventType, reason, rawPayload, userId)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        args.eventId ?? null,
+        args.sessionId ?? null,
+        args.eventType ?? null,
+        args.reason.slice(0, 200),
+        args.rawPayload ? args.rawPayload.slice(0, 50_000) : null,
+        args.userId ?? null,
+      ],
+    );
+  } catch (e) {
+    // DB failure to log shouldn't crash webhook ack flow
+    console.error("[stripe.webhook] failed to log failed_stripe_events:", (e as Error)?.message);
+  }
+}
+
 export async function handleStripeWebhook(rawBody: Buffer, signature: string): Promise<{ ok: boolean; message?: string }> {
   const stripe = getStripe();
   const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!whSecret) {
     console.error("[stripe.webhook] STRIPE_WEBHOOK_SECRET not set");
+    await logFailedWebhook({ reason: "STRIPE_WEBHOOK_SECRET not set", rawPayload: rawBody.toString("utf-8") });
     return { ok: false, message: "webhook secret not configured" };
   }
 
@@ -306,6 +337,10 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
     event = stripe.webhooks.constructEvent(rawBody, signature, whSecret);
   } catch (e: any) {
     console.error("[stripe.webhook] signature verification failed:", e?.message);
+    await logFailedWebhook({
+      reason: `signature verification failed: ${e?.message ?? ""}`.slice(0, 200),
+      rawPayload: rawBody.toString("utf-8"),
+    });
     return { ok: false, message: "signature verification failed" };
   }
 
@@ -329,6 +364,12 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
   const invoice = (inv as any[])[0];
   if (!invoice) {
     console.error("[stripe.webhook] no local invoice for session", sessionId);
+    await logFailedWebhook({
+      eventId: event.id,
+      sessionId,
+      eventType: event.type,
+      reason: "no local invoice for session (orphan webhook)",
+    });
     return { ok: false, message: "unknown session" };
   }
   if (invoice.status === "paid") return { ok: true }; // idempotent noop
@@ -357,6 +398,13 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
         await addPoints(invoice.userId, pts, "topup", `stripe:${sessionId}`);
       } catch (err) {
         console.error("[stripe.webhook] addPoints failed", { sessionId, err });
+        await logFailedWebhook({
+          eventId: event.id,
+          sessionId,
+          eventType: event.type,
+          reason: `addPoints failed: ${(err as Error)?.message ?? err}`.slice(0, 200),
+          userId: invoice.userId,
+        });
         return { ok: false, message: "failed to credit points" };
       }
     }

@@ -172,6 +172,73 @@ export const opsRouter = router({
       );
       return rows;
     }),
+
+  /**
+   * 2026-05-15 (P1): inspect LLM circuit breaker state.
+   * Returns one row per provider with state (CLOSED/OPEN/HALF_OPEN),
+   * recent failure ratio, and how long since OPEN trip.
+   */
+  llmCircuitState: adminProcedure
+    .input(z.object({}).optional())
+    .query(async () => {
+      const { snapshot } = await import("../_core/llmCircuitBreaker");
+      return snapshot();
+    }),
+  /** 2026-05-15: manual reset, in case a provider recovered and we want
+   *  to clear OPEN state without waiting for cooloff. */
+  llmCircuitReset: adminProcedure
+    .input(z.object({ provider: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      const { reset } = await import("../_core/llmCircuitBreaker");
+      reset(input.provider);
+      return { ok: true };
+    }),
+
+  /**
+   * 2026-05-15 (P1): post-deploy self-test for the recordTaskRun pipeline.
+   * Exercises the same code path a real task run does (ensureMission →
+   * mission_outputs INSERT → cleanup). If this fails after a deploy, the
+   * 'task disappears after run' bug is back. Cleans up its own rows.
+   */
+  selfTestRecordTaskRun: adminProcedure
+    .input(z.object({}).optional())
+    .mutation(async ({ ctx }) => {
+      const t0 = Date.now();
+      try {
+        const { recordTaskRun } = await import("../_core/recordTaskRun");
+        const stampId = `__selftest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const r = await recordTaskRun({
+          userId: ctx.user.id,
+          brandId: null,
+          workspace: "facebook",
+          taskId: stampId,
+          taskLabel: "Self-test",
+          tier: "30s",
+          content: JSON.stringify([{ label: "test", caption: "hello 自我測試 🚀" }]),
+          metadata: { selfTest: true },
+        });
+        // Cleanup — delete the row we just created
+        const { default: localPool } = await import("../localDb");
+        if (r.outputId) await localPool.execute("DELETE FROM mission_outputs WHERE id = ?", [r.outputId]);
+        if (r.missionId) await localPool.execute("DELETE FROM missions WHERE id = ?", [r.missionId]);
+        const ok = !!r.outputId && !!r.missionId;
+        return {
+          ok,
+          latencyMs: Date.now() - t0,
+          missionId: r.missionId,
+          outputId: r.outputId,
+          message: ok ? "recordTaskRun pipeline healthy" : "recordTaskRun returned null IDs",
+        };
+      } catch (e: any) {
+        return {
+          ok: false,
+          latencyMs: Date.now() - t0,
+          missionId: null,
+          outputId: null,
+          message: `EXCEPTION: ${e?.code ?? ""} ${String(e?.message ?? e).slice(0, 200)}`,
+        };
+      }
+    }),
 });
 
 function safeParseJson(s: string): any {

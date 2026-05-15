@@ -1,0 +1,61 @@
+name: Ops — Self-test recordTaskRun pipeline
+# 2026-05-15 (P1): post-deploy smoke. Calls ops.selfTestRecordTaskRun
+# which exercises the same path a real task save uses (ensureMission +
+# mission_outputs INSERT), then cleans up. If this fails, the 'task
+# disappears after run' regression is back.
+on: { workflow_dispatch: {} }
+jobs:
+  selftest:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - name: Invoke selftest via internal tRPC endpoint
+        run: |
+          set -e
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+
+          # Pick an admin user to authenticate the selftest mutation
+          ADMIN_ID=$(mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N -e "
+            SELECT id FROM users WHERE email = 'contentincubator2@gmail.com' LIMIT 1")
+          if [ -z "$ADMIN_ID" ]; then
+            ADMIN_ID=$(mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -N -e "
+              SELECT id FROM users ORDER BY id ASC LIMIT 1")
+          fi
+          echo "using admin userId: $ADMIN_ID"
+
+          # Run via tsx so we get a fresh signed JWT for this admin
+          cd /opt/onbrand/app/skills/ai-talent
+          node --import tsx -e "
+            import('./server/auth/usersDb.ts').then(async ({ signJwt }) => {
+              const token = await signJwt({ userId: ${ADMIN_ID} });
+              console.log('TOKEN_READY');
+              const res = await fetch('http://localhost:3101/trpc/ops.selfTestRecordTaskRun?batch=1', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: 'mosToken=' + token },
+                body: JSON.stringify({ '0': { json: {} } }),
+              });
+              const body = await res.text();
+              console.log('HTTP', res.status);
+              console.log(body);
+              const parsed = JSON.parse(body);
+              const result = parsed?.[0]?.result?.data?.json;
+              if (!result?.ok) {
+                console.error('SELFTEST FAILED:', result?.message);
+                process.exit(1);
+              }
+              console.log('✓ selftest passed in', result.latencyMs, 'ms');
+            }).catch(e => { console.error('IMPORT FAILED:', e); process.exit(1); });
+          "
+
+      - name: Check no orphan rows left
+        run: |
+          set +e
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -t -e "
+            SELECT id, title, description FROM missions
+             WHERE description LIKE '%__selftest_%'" 2>&1

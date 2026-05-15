@@ -1,0 +1,31 @@
+name: Ops — List failed Stripe webhook events
+on: { workflow_dispatch: {} }
+jobs:
+  list:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 1
+    steps:
+      - run: |
+          set +e
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+
+          echo "════ Failed Stripe events — last 7 days, unresolved ════"
+          $MYSQL -t -e "
+            SELECT id, eventType, LEFT(reason, 80) AS reason,
+                   sessionId, userId, createdAt
+              FROM failed_stripe_events
+             WHERE resolvedAt IS NULL
+               AND createdAt > NOW() - INTERVAL 7 DAY
+             ORDER BY createdAt DESC LIMIT 20" 2>&1
+
+          echo ""
+          echo "════ Count by reason (last 7 days) ════"
+          $MYSQL -t -e "
+            SELECT COUNT(*) AS n, LEFT(reason, 80) AS reason_head
+              FROM failed_stripe_events
+             WHERE createdAt > NOW() - INTERVAL 7 DAY
+             GROUP BY reason_head
+             ORDER BY n DESC LIMIT 10" 2>&1

@@ -660,11 +660,21 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     if (!chainSet.has(p)) { chain.push(p); chainSet.add(p); }
   }
 
+  // 2026-05-15 (P1): per-provider circuit breaker. If a provider has
+  // been failing repeatedly, skip it for COOLOFF rather than waste an
+  // RTT on every task call. Auto-recovers via HALF_OPEN probe.
+  const { shouldAttempt, recordOutcome } = await import("./llmCircuitBreaker");
+
   const errors: string[] = [];
   for (const provider of chain) {
     // Skip providers whose key isn't configured
     const cfg = PROVIDER_CONFIG[provider];
     if (!cfg || !cfg.getKey()) continue;
+    // Skip if circuit breaker is OPEN for this provider
+    if (!shouldAttempt(provider)) {
+      errors.push(`${provider}: SKIPPED (circuit OPEN)`);
+      continue;
+    }
     try {
       // When falling to a non-pinned provider, drop the pinned model so each
       // provider uses its own defaultModel (e.g. "claude-sonnet-4-6" doesn't
@@ -680,6 +690,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       if (typeof text !== "string" || text.trim().length === 0) {
         errors.push(`${provider}: empty content`);
         console.warn(`[invokeLLM] ${provider} returned empty content, trying next…`);
+        recordOutcome(provider, false);
         continue;
       }
       // CoT leakage detection: if the model dumped its chain-of-thought
@@ -688,15 +699,18 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       if (looksLikeChainOfThought(text)) {
         errors.push(`${provider}: CoT leakage`);
         console.warn(`[invokeLLM] ${provider} CoT leaked (first 100 chars: ${text.slice(0,100)}…), trying next…`);
+        recordOutcome(provider, false);
         continue;
       }
       if (errors.length > 0) {
         console.warn(`[invokeLLM] succeeded with ${provider} after ${errors.length} failed providers`);
       }
+      recordOutcome(provider, true);
       return out;
     } catch (e: any) {
       const msg = String(e?.message ?? e);
       errors.push(`${provider}: ${msg.slice(0, 120)}`);
+      recordOutcome(provider, false);
       if (!isRetryableLLMError(msg)) {
         // Non-retryable (config / auth typo / payload error) — but still
         // try the next provider since site-wide fallback is more important
