@@ -37,21 +37,21 @@ jobs:
           EMAIL_IN="${{ github.event.inputs.email }}"
 
           if [ -n "$UID_IN" ]; then
-            UID="$UID_IN"
+            TUID="$UID_IN"
           elif [ -n "$EMAIL_IN" ]; then
-            UID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL_IN' ORDER BY id DESC LIMIT 1")
+            TUID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL_IN' ORDER BY id DESC LIMIT 1")
           else
             echo "❌ provide user_id or email"; exit 1
           fi
-          if [ -z "$UID" ]; then echo "❌ user not found"; exit 1; fi
-          echo "Resolved userId = $UID"
+          if [ -z "$TUID" ]; then echo "❌ user not found"; exit 1; fi
+          echo "Resolved userId = $TUID"
 
           echo ""
           echo "════ users.* (what enforcement + points read) ════"
           $MYSQLT -e "
             SELECT id, email, planCode, planStatus, planEndsAt,
                    pointsBalance, isActive
-              FROM users WHERE id=$UID;
+              FROM users WHERE id=$TUID;
           "
 
           echo ""
@@ -59,7 +59,7 @@ jobs:
           $MYSQLT -e "
             SELECT id, packType, planCode, billingCycle, status,
                    amountTwd, pointsGranted, paidAt, createdAt
-              FROM invoices WHERE userId=$UID
+              FROM invoices WHERE userId=$TUID
              ORDER BY id DESC LIMIT 5;
           "
 
@@ -69,30 +69,30 @@ jobs:
             SELECT w.id, w.planCode, w.planStatus, w.planEndsAt
               FROM workspaces w
              WHERE w.id IN (
-               SELECT workspaceId FROM invoices WHERE userId=$UID
-               UNION SELECT id FROM workspaces WHERE ownerId=$UID
+               SELECT workspaceId FROM invoices WHERE userId=$TUID
+               UNION SELECT id FROM workspaces WHERE ownerId=$TUID
              )
              LIMIT 10;
           " 2>/dev/null || $MYSQLT -e "
             SELECT id, planCode, planStatus, planEndsAt FROM workspaces
-             WHERE id IN (SELECT workspaceId FROM invoices WHERE userId=$UID) LIMIT 10;
+             WHERE id IN (SELECT workspaceId FROM invoices WHERE userId=$TUID) LIMIT 10;
           "
 
           echo ""
           echo "════ point_transactions (last 8) ════"
           $MYSQLT -e "
             SELECT kind, delta, balanceAfter, reason, createdAt
-              FROM point_transactions WHERE userId=$UID
+              FROM point_transactions WHERE userId=$TUID
              ORDER BY id DESC LIMIT 8;
           "
 
           echo ""
           echo "════ VERDICT ════"
-          U_PLAN=$($MYSQL -e "SELECT planCode FROM users WHERE id=$UID")
-          U_STAT=$($MYSQL -e "SELECT planStatus FROM users WHERE id=$UID")
-          U_EXP=$($MYSQL -e "SELECT IF(planEndsAt < NOW(),'EXPIRED','valid') FROM users WHERE id=$UID")
-          PAID_CNT=$($MYSQL -e "SELECT COUNT(*) FROM invoices WHERE userId=$UID AND status='paid' AND packType<>'topup'")
-          LAST_PAID_PLAN=$($MYSQL -e "SELECT planCode FROM invoices WHERE userId=$UID AND status='paid' AND packType<>'topup' ORDER BY id DESC LIMIT 1")
+          U_PLAN=$($MYSQL -e "SELECT planCode FROM users WHERE id=$TUID")
+          U_STAT=$($MYSQL -e "SELECT planStatus FROM users WHERE id=$TUID")
+          U_EXP=$($MYSQL -e "SELECT IF(planEndsAt < NOW(),'EXPIRED','valid') FROM users WHERE id=$TUID")
+          PAID_CNT=$($MYSQL -e "SELECT COUNT(*) FROM invoices WHERE userId=$TUID AND status='paid' AND packType<>'topup'")
+          LAST_PAID_PLAN=$($MYSQL -e "SELECT planCode FROM invoices WHERE userId=$TUID AND status='paid' AND packType<>'topup' ORDER BY id DESC LIMIT 1")
 
           echo "  users.planCode   = $U_PLAN"
           echo "  users.planStatus = $U_STAT ($U_EXP)"
