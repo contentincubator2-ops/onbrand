@@ -134,26 +134,21 @@ export interface OrchestraResult {
  *  Exported so theaterRouter (and other places) can derive provider from
  *  agent.aiModel consistently. */
 export function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
-  if (!aiModel) return "qwen";
-  const m = aiModel.toLowerCase();
-  if (m.includes("qwen")) return "qwen";
-  // 2026-05-15 (60S Bug B): the Azure subscription behind azure-foundry /
-  // azure-position / azure-northcentral is DEAD — every call returns
-  // 401 "Access denied due to invalid subscription". Agents whose
-  // aiModel was kimi / claude / deepseek used to pin to those dead
-  // endpoints, so their caption fanout produced empty output (whole
-  // task didn't persist — looked like a DB bug). Remap to working
-  // providers until the Azure subscription is renewed:
-  //   kimi    → qwen  (was azure-foundry)
-  //   claude  → zhipu (was azure-position) — glm-4 strong in zh-TW
-  //   deepseek→ qwen  (was azure-northcentral; no direct deepseek
-  //             provider in PROVIDER_CONFIG, so qwen is the safe pick)
-  // Revert these lines once Azure billing is restored.
-  if (m.includes("kimi")) return "qwen";
-  if (m.includes("glm") || m.includes("zhipu")) return "zhipu";
-  if (m.includes("claude")) return "zhipu";
-  if (m.includes("deepseek")) return "qwen";
-  return "qwen"; // safe default
+  // 2026-05-15 (CJ「針對台灣使用者，不能用中國的 AI 模型，會出現詭異的
+  // 圖和文」): product is Taiwan-only (zh-TW). Chinese models (qwen =
+  // Alibaba, zhipu/glm = Zhipu) reliably emit Simplified Chinese,
+  // mainland phrasing, and culturally-off copy + image prompts. The
+  // Azure subscription (azure-foundry/position/northcentral) is also
+  // DEAD (401 invalid subscription). The one solid, billed, non-Chinese
+  // provider with strong Traditional-Chinese output is OpenAI. So every
+  // agent's aiModel pins to OpenAI regardless of what it requested.
+  // Provider DIVERSITY is now the fallback chain's job
+  // (openai → gemini → … → qwen/zhipu only as a last-resort so a total
+  // OpenAI outage degrades rather than dies). Revert per-model mapping
+  // once (a) Azure billing renewed AND (b) a zh-TW quality gate exists
+  // for Chinese models.
+  void aiModel; // intentionally ignored — see comment
+  return "openai";
 }
 
 /**

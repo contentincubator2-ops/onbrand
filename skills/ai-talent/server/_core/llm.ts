@@ -637,7 +637,15 @@ function getFallbackChain(): string[] {
   // qwen / zhipu / deepseek / openai / gemini. zhipu added explicitly
   // (glm-4-flash agents map here and it works). Restores automatically
   // when the Azure subscription is renewed (or set LLM_FALLBACK_CHAIN).
-  return ["qwen", "zhipu", "openai", "gemini", "azure-foundry", "anthropic", "ollama"];
+  // 2026-05-15 (CJ「台灣不能用中國模型」): zh-TW market. Order non-Chinese
+  // first — openai (billed, strong Traditional output), gemini (needs
+  // GOOGLE_AI_KEY — currently MISSING, will be skipped until set),
+  // anthropic ($0 credits — skipped until topped up but harmless to list).
+  // qwen / zhipu kept ONLY as last-resort so a total OpenAI outage
+  // degrades to working-but-Simplified rather than total failure.
+  // azure-foundry near-last (dead 401 subscription). ollama last (not
+  // running on the VM).
+  return ["openai", "gemini", "anthropic", "qwen", "zhipu", "azure-foundry", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {
