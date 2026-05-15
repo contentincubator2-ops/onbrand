@@ -42,6 +42,25 @@ import {
 const ICON_W  = 70;   // icon bar — never changes
 const PANEL_W = 210;  // slide panel width
 
+// 2026-05-16 (CJ「進行手機版」): the shell had ZERO mobile breakpoints —
+// pages were fine, the frame wasn't. Single source of truth for "is
+// this a phone-width viewport" so the hardcoded-px fixed elements
+// (brand pill / notif panel / trial bar) stop overflowing on ≤640px.
+function useIsMobile(maxWidth = 640): boolean {
+  const [m, setM] = React.useState(
+    typeof window !== "undefined" && window.innerWidth <= maxWidth,
+  );
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const on = () => setM(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, [maxWidth]);
+  return m;
+}
+
 /* ─────────────────────────── Nav items ─────────────────────────── */
 
 interface NavItem {
@@ -581,6 +600,7 @@ function BrandHierarchyPill({
     activeEvent?.name ?? activeProduct?.name ?? activeBrand?.name ?? (isEn ? "Pick a brand" : "選擇品牌");
   const displayInitial = (activeBrand?.name ?? "?").charAt(0);
   const activeBrandColor = activeBrand ? brandColor(activeBrand.name) : brandColor("");
+  const isMobile = useIsMobile();
 
   return (
     <div
@@ -593,7 +613,10 @@ function BrandHierarchyPill({
         right: 12,
         top: 10,
         zIndex: 50,
-        width: 280,
+        // Mobile: a fixed 280px pill spans 78% of a 375px screen and
+        // covers every page header. Cap to the space left of the 70px
+        // rail with a hard max so it never overflows.
+        width: isMobile ? "min(220px, calc(100vw - 90px))" : 280,
         transition: "right 0.22s cubic-bezier(0.4,0,0.2,1)",
       }}
     >
@@ -2122,6 +2145,7 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
   // toasts so trial users don't hit silent no-ops.
   const navigate = useNavigate();
   const [pricingOpen, setPricingOpen] = React.useState(false);
+  const isMobile = useIsMobile();
   // 2026-05-12 Phase 0 i18n: language toggle in S-menu
   const { lang, setLang } = useLang();
 
@@ -2217,7 +2241,9 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
 
       {/* ── Main card ── */}
       <div style={{
-        width: 360,
+        // Mobile: 360px from x=78 overflows a 375px screen.
+        width: isMobile ? "calc(100vw - 90px)" : 360,
+        maxWidth: "calc(100vw - 90px)",
         borderRadius: 16,
         border: "1px solid #e5e7eb",
         background: "#fff",
@@ -2391,6 +2417,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const { lang } = useLang();
   const isEn = lang === "en";
+  const isMobile = useIsMobile();
   // 2026-05-13: localStorage-driven read state. Server is stateless; client
   // sends current lastSeenAt so server can mark items above it as unread.
   const [lastSeen, setLastSeen] = React.useState<string | null>(() => readLastSeen());
@@ -2419,7 +2446,9 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
       position: "fixed",
       left: ICON_W + 8,
       bottom: 60,          /* just above the bell button */
-      width: 380,
+      // Mobile: 380px from x=78 clips ~83px off a 375px screen (action
+      // buttons lost). Fit the gap between rail and right edge.
+      width: isMobile ? "calc(100vw - 86px)" : 380,
       maxHeight: "calc(100vh - 80px)",
       background: "#fff",
       borderRadius: 16,
