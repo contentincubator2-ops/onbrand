@@ -8,6 +8,7 @@ jobs:
       - run: |
           set -e
           cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
           node --import tsx -e "
             import('./server/_core/llm.ts').then(async ({ invokeLLM }) => {
               const t0 = Date.now();
