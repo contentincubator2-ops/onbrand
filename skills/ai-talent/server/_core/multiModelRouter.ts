@@ -97,8 +97,9 @@ export function detectTaskType(content: string): TaskType {
 //                  azure-northcentral (DeepSeek-V3.2/R1 via /openai/deployments/.../chat/completions
 //                  with api-version=2024-10-21), anthropic-direct (api.anthropic.com),
 //                  gemini-native (search only via perplexityScout)
-//   BROKEN: azure-foundry/gpt-4o (404), azure-claude-sweden (400),
+//   BROKEN: azure-foundry/gpt-4o (404),
 //           openai (401), perplexity (401), cohere (401), gemini-oai-compat (400)
+//   FIXED:  azure-claude-sweden → now working via services.ai.azure.com/anthropic/v1 (2026-05-15)
 //
 // Priority strategy:
 //   creative/analysis → claude-sonnet-4-6 (azure-position) when key available
