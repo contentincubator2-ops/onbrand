@@ -161,8 +161,10 @@ authRouter.post("/register", async (req: Request, res: Response) => {
     await setEmailVerificationToken(db, email, verificationToken, verificationExpires);
 
     // Send verification email
+    // 2026-05-15 (CJ「resend 驗證信網址」): path must match AppV2 route
+    // `/auth/verify-email` (was `/verify-email` → 404 on click).
     const appUrl = process.env.APP_URL || "http://localhost:3001";
-    const verifyUrl = `${appUrl}/verify-email?token=${verificationToken}`;
+    const verifyUrl = `${appUrl}/auth/verify-email?token=${verificationToken}`;
 
     // 2026-05-08 (CJ): email verification is best-effort. Try to send;
     // log failures but don't block registration. With auto-activate
