@@ -79,7 +79,7 @@ jobs:
           step "7. Create brand (tRPC, authed)"
           cb=$(curl -s -w "\n__%{http_code}__" --max-time 30 -b "$JAR" -X POST "$BASE/trpc/brand.createWithMember?batch=1" \
             -H "Content-Type: application/json" \
-            -d "{\"0\":{\"json\":{\"name\":\"SmokeBrand $TS\",\"industry\":\"測試\",\"description\":\"e2e smoke\"}}}")
+            -d "{\"0\":{\"name\":\"SmokeBrand $TS\",\"industry\":\"測試\",\"description\":\"e2e smoke\"}}")
           code=$(echo "$cb" | grep -o "__[0-9]*__" | tr -dc 0-9)
           body=$(echo "$cb" | sed 's/__[0-9]*__//')
           BRAND_ID=$(echo "$body" | grep -o '"id":[0-9]*' | head -1 | tr -dc 0-9)
