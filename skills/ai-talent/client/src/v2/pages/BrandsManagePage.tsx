@@ -130,6 +130,23 @@ export default function BrandsManagePage() {
     return <Navigate to={`/brands/edit${bid ? `?b=${bid}` : ""}`} replace />;
   }
 
+  // 2026-05-16 (CJ「按下左側品牌功能時，總會先出現空白畫面」):
+  // When the URL carries ?b=<id> we KNOW a redirect into the editor is
+  // imminent (the effect above is mid-flight syncing it into scope).
+  // Rendering the empty grid for that one frame is the blank flash the
+  // user sees. Show a spinner until scope catches up and the <Navigate>
+  // above fires.
+  if (!forceGrid && urlBrandId && scopeKind === "none") {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center text-neutral-500 text-sm">
+          <div className="inline-block w-5 h-5 border-2 border-neutral-300 border-t-neutral-700 rounded-full animate-spin mb-3" />
+          <p>{lang === "en" ? "Opening brand…" : "開啟品牌中…"}</p>
+        </div>
+      </div>
+    );
+  }
+
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";
     const d = new Date(iso);

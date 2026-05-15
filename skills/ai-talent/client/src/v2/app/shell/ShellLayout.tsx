@@ -171,7 +171,18 @@ export default function ShellLayout() {
         collapsed={collapsed}
         onToggle={toggleCollapsed}
         currentPath={loc.pathname}
-        onNavigate={(to) => navigate(to)}
+        onNavigate={(to) => {
+          // 2026-05-16 (CJ「按下左側品牌功能時，總會先出現空白畫面」):
+          // /brands (BrandsManagePage) immediately render-redirects into
+          // /brands/edit when a brand is in scope — that double hop +
+          // cold mount is the blank flash. When a brand is already
+          // active, jump straight to the editor and skip the bounce.
+          if (to === "/brands" && scope.brandId) {
+            navigate(`/brands/edit?b=${scope.brandId}`);
+            return;
+          }
+          navigate(to);
+        }}
         scope={scope}
         setScope={setScope}
         onLogout={handleLogout}
