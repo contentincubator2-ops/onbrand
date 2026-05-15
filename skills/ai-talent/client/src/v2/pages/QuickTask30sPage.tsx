@@ -445,17 +445,18 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   // 2026-05-14 (CJ「99s 檔期任務卡片角標標示為 100s」): map the internal
   // tier id "100s" → user-facing "99s". Used for all badge / chip renders.
   const tierBadge = tier === "100s" ? "99s" : tier;
+  // 2026-05-15: keep in sync with heroTitle (parallel, no redundant 秒數).
   const tierTagline = lang === "en"
     ? (tier === "30s"
-        ? "Which post are we crafting in 30 seconds today?"
+        ? "What post are we writing today?"
         : tier === "60s"
-        ? "Which 60-second package are we making today?"
-        : "Which 99-second research-backed piece are we making today?")
+        ? "What content set are we building today?"
+        : "What campaign are we planning today?")
     : (tier === "30s"
-        ? "今天，要寫哪一篇 30 秒搞定的貼文？"
+        ? "今天想寫哪一篇貼文？"
         : tier === "60s"
-        ? "今天，要做哪一個 60 秒套組？"
-        : "今天，要做哪一個 99 秒研究驗證版？");
+        ? "今天想做哪一套內容？"
+        : "今天想規劃哪一檔活動？");
 
   const runQuickMut = (trpc as any).quickTask?.runQuick?.useMutation();
   // Plan B 20s parallel orchestra (caption_writer + image_director + Flux Schnell ×N)
@@ -730,17 +731,20 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
 
   // Hero copy adapts to tier but the visual structure is identical to /squads
   // (eyebrow → gradient title → EntityStats → search → channel icons).
+  // 2026-05-15 (CJ「標題不好念」): parallel structure, drop the redundant
+  // seconds (the eyebrow + 「適合」line already carry timing/detail), one
+  // consistent verb cadence: 想 + 動詞 + 名詞.
   const heroTitle = lang === "en"
     ? (tier === "30s"
-        ? "Which post are we crafting in 30 seconds today?"
+        ? "What post are we writing today?"
         : tier === "60s"
-        ? "Which 60-second package are we making today?"
-        : "Which 99-second research-backed piece are we making today?")
+        ? "What content set are we building today?"
+        : "What campaign are we planning today?")
     : (tier === "30s"
-        ? "今天，要寫哪一篇 30 秒搞定的貼文？"
+        ? "今天想寫哪一篇貼文？"
         : tier === "60s"
-        ? "今天，要做哪一個 60 秒套組？"
-        : "今天，要做哪一個 99 秒研究驗證版？");
+        ? "今天想做哪一套內容？"
+        : "今天想規劃哪一檔活動？");
 
   // 2026-05-11 (CJ「整個因果鏈在最後一公里斷掉了」): replace the tech-spec
   // EntityStats subtitle with a methodology value-prop that explicitly
@@ -802,7 +806,9 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   return (
     <div>
       {/* ─── HERO (matches /squads layout) ────────────────────────────── */}
-      <div className="relative pt-14 pb-10 px-6 text-center">
+      {/* 2026-05-15 (CJ「tile 被遮住頂部」): pt-14 → pt-24. The shell's
+          top chrome was clipping the eyebrow + tile row on first paint. */}
+      <div className="relative pt-24 pb-10 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
           {/* Three lines above search: eyebrow / gradient title / stats */}
           <div className="mb-6 w-full">
@@ -873,7 +879,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               size="lg"
               radius="lg"
               variant="flat"
-              placeholder={lang === "en" ? `Search ${tierLabel} tasks, agents, or skills…` : `搜尋 ${tierLabel} 任務、Agent 或 skill…`}
+              placeholder={lang === "en" ? "Search tasks, platforms, or keywords…" : "搜尋任務、平台或關鍵字…"}
               value={searchQuery}
               onValueChange={setSearchQuery}
               isClearable
