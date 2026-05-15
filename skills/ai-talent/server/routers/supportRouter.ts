@@ -450,6 +450,12 @@ export const supportRouter = router({
         content: `已開單給 SoWork（#${ticketId}, tag: ${tag}）。\n你會在 4 小時內收到回覆（用 ${userEmail ?? "你註冊的信箱"}）。`,
       });
 
+      // Push notify the SoWork inbox (best-effort, non-blocking).
+      void notifyAdminNewTicket({
+        kind: "ticket", refId: ticketId, userEmail,
+        subject: input.summary.slice(0, 120), tag,
+      });
+
       return { ticketId, tag };
     }),
 
@@ -634,9 +640,51 @@ export const supportRouter = router({
           `修好後在這裡通知你，並加贈點數作為感謝 🙏`,
       });
 
+      void notifyAdminNewTicket({
+        kind: "bug", refId: bugId, userEmail,
+        subject: input.title, body: input.body, tag: "bug",
+      });
+
       return { ok: true as const, bugId };
     }),
 });
+
+/**
+ * 2026-05-16 (CJ「客服有人接：工單升級時通知你」): email the SoWork
+ * inbox the moment a ticket / bug is filed, so escalations aren't
+ * silently sitting in /admin/support waiting for someone to look.
+ * Best-effort — never throws, never blocks the user's request.
+ */
+export async function notifyAdminNewTicket(args: {
+  kind: "ticket" | "bug";
+  refId: number;
+  userEmail: string | null;
+  subject: string;
+  body?: string;
+  tag?: string | null;
+}): Promise<void> {
+  try {
+    const to = process.env.SUPPORT_NOTIFY_TO || "sowork@sowork.ai";
+    const { sendEmail } = await import("../auth/emailService");
+    const label = args.kind === "bug" ? "🐛 Bug 回報" : "🎧 客服升級";
+    await sendEmail({
+      to,
+      subject: `[OnBrand] ${label} #${args.refId}：${args.subject.slice(0, 80)}`,
+      html: `
+        <div style="font-family:-apple-system,sans-serif;line-height:1.6;color:#333">
+          <h2 style="margin:0 0 8px">${label} #${args.refId}</h2>
+          <p><b>來自：</b>${args.userEmail ?? "(未知)"}</p>
+          ${args.tag ? `<p><b>分類：</b>${args.tag}</p>` : ""}
+          <p><b>主旨：</b>${args.subject}</p>
+          ${args.body ? `<p><b>內容：</b><br>${String(args.body).slice(0, 1500).replace(/\n/g, "<br>")}</p>` : ""}
+          <hr>
+          <p><a href="https://onbrand.sowork.ai/admin/support">→ 開啟客服收件匣</a></p>
+        </div>`,
+    });
+  } catch (e) {
+    console.error("[support] notifyAdminNewTicket failed:", e);
+  }
+}
 
 /**
  * Push a system-authored message into the user's open support

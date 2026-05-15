@@ -1,0 +1,79 @@
+name: Ops — Alert digest (daily push, threshold alerts)
+
+# 2026-05-16 (CJ「告警：錯誤暴衝/付款失敗/卡住的定位任務要主動推」)
+#
+# The monitoring dashboard is pull ("你要去看才知道"). This pushes a
+# daily health digest + fires immediately on threshold breach, by
+# emailing the SoWork inbox via Resend (RESEND_API_KEY already on VM).
+#
+# Runs daily; also dispatchable. "Alert" lines (🔴) are what needs you;
+# the digest always sends so you know it's alive (no email = something
+# wrong with the cron/runner itself).
+
+on:
+  schedule:
+    - cron: "30 1 * * *"      # 09:30 Asia/Taipei
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          Q() { mysql -h localhost -u mos_user mos_db -N -s -e "$1" 2>/dev/null || echo "ERR"; }
+
+          ERR24=$(Q "SELECT COUNT(*) FROM error_log WHERE createdAt >= NOW()-INTERVAL 1 DAY")
+          STUCK=$(Q "SELECT COUNT(*) FROM positioning_jobs WHERE status='running' AND startedAt < NOW()-INTERVAL 10 MINUTE")
+          PJFAIL=$(Q "SELECT COUNT(*) FROM positioning_jobs WHERE status='failed' AND finishedAt >= NOW()-INTERVAL 1 DAY")
+          FAILPAY=$(Q "SELECT COUNT(*) FROM failed_stripe_events WHERE createdAt >= NOW()-INTERVAL 1 DAY")
+          OPENTIX=$(Q "SELECT COUNT(*) FROM support_tickets WHERE status='open'")
+          NEWBUGS=$(Q "SELECT COUNT(*) FROM bug_reports WHERE status IN ('reported','triaged') ")
+          SIGN24=$(Q "SELECT COUNT(*) FROM users WHERE createdAt >= NOW()-INTERVAL 1 DAY")
+          MISMATCH=$(Q "SELECT COUNT(*) FROM users u WHERE EXISTS (SELECT 1 FROM invoices i WHERE i.userId=u.id AND i.status='paid' AND i.packType<>'topup') AND (u.planStatus<>'active' OR u.planCode='trial')")
+
+          ALERTS=""
+          add() { ALERTS="${ALERTS}<li>🔴 $1</li>"; }
+          [ "$ERR24" != "0" ] && [ "$ERR24" != "ERR" ] && [ "$ERR24" -gt 30 ] 2>/dev/null && add "錯誤暴衝：24h 內 $ERR24 筆 error_log"
+          [ "$STUCK" != "0" ] && [ "$STUCK" != "ERR" ] && add "定位任務卡住 >10min：$STUCK 筆"
+          [ "$FAILPAY" != "0" ] && [ "$FAILPAY" != "ERR" ] && add "付款 webhook 失敗：24h 內 $FAILPAY 筆 failed_stripe_events"
+          [ "$MISMATCH" != "0" ] && [ "$MISMATCH" != "ERR" ] && add "金流 Bug A 疑似受害者：$MISMATCH 個帳號付了費但 users.* 沒啟用"
+          [ "$PJFAIL" != "0" ] && [ "$PJFAIL" != "ERR" ] && [ "$PJFAIL" -gt 5 ] 2>/dev/null && add "定位失敗偏高：24h 內 $PJFAIL 筆"
+
+          STATUS_LINE="✅ 一切正常"
+          [ -n "$ALERTS" ] && STATUS_LINE="🔴 有 $(echo "$ALERTS" | grep -o '<li>' | wc -l) 項需要你處理"
+
+          HTML="<div style='font-family:-apple-system,sans-serif;line-height:1.6;color:#333'>
+            <h2>OnBrand 每日健康摘要 — $(date -u +%Y-%m-%d)</h2>
+            <p><b>$STATUS_LINE</b></p>
+            ${ALERTS:+<ul>$ALERTS</ul>}
+            <hr>
+            <p><b>數據（近 24h / 目前）</b></p>
+            <ul>
+              <li>新註冊：$SIGN24</li>
+              <li>error_log：$ERR24</li>
+              <li>定位卡住：$STUCK · 定位失敗：$PJFAIL</li>
+              <li>付款失敗事件：$FAILPAY · 金流不一致帳號：$MISMATCH</li>
+              <li>客服未處理工單：$OPENTIX · 待分流 bug：$NEWBUGS</li>
+            </ul>
+            <p><a href='https://onbrand.sowork.ai/admin/dashboard'>→ 開啟監控後台</a></p>
+          </div>"
+
+          TO="${SUPPORT_NOTIFY_TO:-sowork@sowork.ai}"
+          FROM="${EMAIL_FROM:-onboarding@resend.dev}"
+          if [ -z "$RESEND_API_KEY" ]; then
+            echo "⚠ RESEND_API_KEY unset — printing digest instead of emailing"
+            echo "$HTML"
+            exit 0
+          fi
+          code=$(curl -s -o /tmp/r -w "%{http_code}" -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" -H "Content-Type: application/json" \
+            --data "$(jq -n --arg from "$FROM" --arg to "$TO" \
+               --arg subj "[OnBrand] 每日摘要 — $STATUS_LINE" --arg html "$HTML" \
+               '{from:$from,to:[$to],subject:$subj,html:$html}')")
+          echo "Resend HTTP $code"; head -c 300 /tmp/r; echo
+          [ "$code" = "200" ] && echo "✅ digest sent to $TO" || { echo "❌ send failed"; exit 1; }

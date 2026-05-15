@@ -1,0 +1,63 @@
+name: Ops — DB backup (mysqldump, daily)
+
+# 2026-05-16 (CJ「DB 備份：有真實付費客戶後，沒備份 = 一次意外全毀」)
+#
+# Daily mysqldump → gzip → /opt/onbrand/backups, 14-day retention on the
+# VM disk. Runs on the self-hosted VM runner (same box as the DB).
+# Also dispatchable manually before risky migrations.
+#
+# RESTORE (manual, deliberate):
+#   gunzip -c /opt/onbrand/backups/mos_db-YYYYMMDD-HHMM.sql.gz \
+#     | mysql -h localhost -u mos_user mos_db
+#   (stop pm2 onbrand first; verify on a scratch DB before prod restore)
+#
+# NOTE: this is on-box backup (protects against app/data corruption &
+# bad migrations, NOT full-VM loss). Off-site copy = follow-up; see the
+# final echo for the rsync/object-storage hook point.
+
+on:
+  schedule:
+    - cron: "0 18 * * *"      # 02:00 Asia/Taipei (UTC+8)
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          DIR=/opt/onbrand/backups
+          mkdir -p "$DIR"
+          STAMP=$(date +%Y%m%d-%H%M)
+          OUT="$DIR/mos_db-$STAMP.sql.gz"
+
+          echo "── Dumping mos_db → $OUT ──"
+          mysqldump -h localhost -u mos_user \
+            --single-transaction --quick --routines --triggers \
+            --default-character-set=utf8mb4 \
+            mos_db | gzip -c > "$OUT"
+
+          SIZE=$(stat -c%s "$OUT")
+          echo "  size = $SIZE bytes"
+          if [ "$SIZE" -lt 50000 ]; then
+            echo "❌ backup suspiciously small (<50KB) — dump likely failed"
+            head -c 300 <(gunzip -c "$OUT") || true
+            exit 1
+          fi
+
+          # Integrity: gzip must decompress cleanly
+          gunzip -t "$OUT" && echo "  ✓ gzip integrity OK"
+
+          echo "── Pruning backups older than 14 days ──"
+          find "$DIR" -name 'mos_db-*.sql.gz' -mtime +14 -print -delete || true
+
+          echo "── Current backups ──"
+          ls -lh "$DIR" | tail -8
+          echo ""
+          echo "✅ Backup done: $OUT"
+          echo "ℹ️ Off-site copy not yet configured — add an rsync / object-"
+          echo "   storage push here once a destination + creds are decided."

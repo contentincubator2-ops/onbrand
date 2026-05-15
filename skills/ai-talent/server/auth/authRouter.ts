@@ -105,6 +105,16 @@ authRouter.post("/register", async (req: Request, res: Response) => {
       return;
     }
 
+    // 2026-05-16: per-IP registration throttle (anti bot-farm — trial
+    // bypass grants 300 LLM points on every signup).
+    const regIp = getClientIp(req);
+    const rl = checkRegisterRateLimit(regIp);
+    if (!rl.ok) {
+      console.warn(`[auth] register throttled ip=${regIp}`);
+      res.status(429).json({ error: rl.reason });
+      return;
+    }
+
     const { name, email, password } = result.data;
     const db = await getDb();
 
@@ -516,6 +526,34 @@ export function checkForgotRateLimit(email: string): { ok: true } | { ok: false;
   }
   arr.push(now);
   forgotByEmail.set(email, arr);
+  return { ok: true };
+}
+
+// 2026-05-16 (CJ「註冊濫用節流：機器人灌註冊會燒錢」): trial bypass means
+// every register grants 300 LLM points immediately. A bot farm could
+// register thousands of throwaway emails and drain budget. Per-IP cap:
+// generous enough for a shared office / co-working NAT (一間公司多人註冊
+// 沒問題) but kills automated floods. In-memory is fine at trial scale
+// (single process); resets on restart, which is acceptable.
+const REGISTER_WINDOW_MS = 60 * 60 * 1000;   // 1 hour
+const REGISTER_MAX_PER_IP = 8;               // 8 signups / IP / hour
+const REGISTER_MAX_PER_IP_DAY = 20;          // hard daily ceiling / IP
+const registerByIp = new Map<string, number[]>();
+
+function checkRegisterRateLimit(ip: string): { ok: true } | { ok: false; reason: string } {
+  if (!ip || ip === "unknown") return { ok: true }; // can't throttle what we can't identify
+  const now = Date.now();
+  const dayAgo = now - 24 * 3600 * 1000;
+  const arr = (registerByIp.get(ip) ?? []).filter((t) => t > dayAgo);
+  const lastHour = arr.filter((t) => now - t < REGISTER_WINDOW_MS);
+  if (lastHour.length >= REGISTER_MAX_PER_IP) {
+    return { ok: false, reason: "此 IP 短時間內註冊次數過多，請稍後再試（約 1 小時後）。" };
+  }
+  if (arr.length >= REGISTER_MAX_PER_IP_DAY) {
+    return { ok: false, reason: "此 IP 今日註冊數已達上限，若為團隊註冊請聯絡客服 sowork@sowork.ai。" };
+  }
+  arr.push(now);
+  registerByIp.set(ip, arr);
   return { ok: true };
 }
 
