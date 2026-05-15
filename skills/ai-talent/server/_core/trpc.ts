@@ -157,11 +157,19 @@ export const protectedProcedure = t.procedure
 export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   const { default: localPool } = await import("../localDb");
   const [rows]: any = await localPool.execute(
-    `SELECT role FROM users WHERE id = ? LIMIT 1`,
+    `SELECT role, email FROM users WHERE id = ? LIMIT 1`,
     [ctx.user.id],
   );
-  const role = (rows as any[])[0]?.role;
-  if (role !== "admin") {
+  const u = (rows as any[])[0] ?? {};
+  // 2026-05-16 (CJ「後台監控」): accept role='admin' OR the SoWork staff
+  // allowlist (mirrors supportRouter.isAdminUser) so internal team gets
+  // in without a manual users.role flip. CJ = userId 199 / @sowork.tw.
+  const email = String(u.email ?? ctx.user.email ?? "");
+  const isAdmin =
+    u.role === "admin" ||
+    ctx.user.id === 199 ||
+    /@sowork\.(tw|ai)$/i.test(email);
+  if (!isAdmin) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
   }
   return next({ ctx });

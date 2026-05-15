@@ -25,6 +25,7 @@ import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
 import { publishRouter } from "./publishRouter";
 import { billingRouter } from "./billingRouter";
 import { opsRouter } from "./opsRouter";
+import { adminStatsRouter } from "./adminStatsRouter";
 import { achievementsRouter } from "./achievementsRouter";
 // 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」)
 import { communityRouter } from "./communityRouter";
@@ -78,6 +79,7 @@ export const appRouter = router({
   publish:         publishRouter,
   billing:         billingRouter,
   ops:             opsRouter,
+  adminStats:      adminStatsRouter,
   achievements:    achievementsRouter,
   community:       communityRouter,
   tenant:          tenantRouter,

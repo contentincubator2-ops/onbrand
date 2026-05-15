@@ -58,6 +58,7 @@ import BrandSettingsPage from "../pages/BrandSettingsPage";
 // 2026-05-11 (CJ「補 Sentry-style error tracking」): admin dashboard for
 // auto-captured tRPC / frontend errors. Gated server-side by adminProcedure.
 import AdminErrorsPage from "../pages/AdminErrorsPage";
+import AdminDashboardPage from "../pages/AdminDashboardPage";
 // 2026-05-11 (CJ「P0-1 內容日曆」): vs Buffer
 import CalendarPage from "../pages/CalendarPage";
 
@@ -250,6 +251,8 @@ export default function AppV2() {
           {/* 2026-05-11 — error tracking dashboard. adminProcedure-gated on
               server; non-admins see a friendly FORBIDDEN screen. */}
           <Route path="/admin/errors" element={<AdminErrorsPage />} />
+          {/* 2026-05-16 (CJ「後台監控使用者」) — growth/usage/health dashboard */}
+          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
           {/* 2026-05-11 — content calendar (P0-1) */}
           <Route path="/calendar" element={<CalendarPage />} />
           {/* 2026-05-10 account settings + achievements */}
