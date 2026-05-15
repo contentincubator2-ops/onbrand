@@ -83,7 +83,7 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
       signal: controller.signal,
       redirect: "follow",
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; MarketingOS-Bot/1.0; +https://marketing-os.sowork.ai)",
+        "User-Agent": "Mozilla/5.0 (compatible; OnBrand-Bot/1.0; +https://onbrand.sowork.ai)",
         "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
       },

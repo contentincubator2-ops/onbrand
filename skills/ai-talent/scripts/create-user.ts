@@ -68,7 +68,7 @@ async function main() {
   );
   console.log("✅ user created:");
   console.table(created[0]);
-  console.log(`\n→ Login at: https://marketing-os.sowork.ai`);
+  console.log(`\n→ Login at: https://onbrand.sowork.ai`);
   console.log(`→ Email:    ${email}`);
   console.log(`→ Password: (set via PASSWORD env var, not echoed)`);
 

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const BASE_URL = process.env.E2E_BASE_URL ?? "https://marketing-os.sowork.ai";
+const BASE_URL = process.env.E2E_BASE_URL ?? "https://onbrand.sowork.ai";
 
 export default defineConfig({
   testDir: "./specs",

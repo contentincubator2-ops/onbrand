@@ -1,6 +1,6 @@
 import { APIRequestContext, expect, request } from "@playwright/test";
 
-export const BASE_URL = process.env.E2E_BASE_URL ?? "https://marketing-os.sowork.ai";
+export const BASE_URL = process.env.E2E_BASE_URL ?? "https://onbrand.sowork.ai";
 export const USER_EMAIL = process.env.E2E_USER_EMAIL ?? "caesar.chi@sowork.tw";
 export const USER_PASSWORD = process.env.E2E_USER_PASSWORD ?? "test1234";
 

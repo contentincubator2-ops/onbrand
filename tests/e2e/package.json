@@ -2,7 +2,7 @@
   "name": "marketing-os-e2e",
   "version": "0.1.0",
   "private": true,
-  "description": "Playwright e2e + light stress tests for marketing-os.sowork.ai",
+  "description": "Playwright e2e + light stress tests for onbrand.sowork.ai",
   "scripts": {
     "test": "playwright test",
     "test:auth": "playwright test specs/auth.spec.ts",

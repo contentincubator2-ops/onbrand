@@ -171,7 +171,7 @@ export const publishRouter = router({
         },
         body: JSON.stringify({
           external_user_id: String(ctx.user.id),
-          allowed_origins: ["https://marketing-os.sowork.ai"],
+          allowed_origins: ["https://onbrand.sowork.ai", "https://marketing-os.sowork.ai"],
         }),
         signal: AbortSignal.timeout(15_000),
       });
