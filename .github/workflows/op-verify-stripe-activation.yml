@@ -1,0 +1,112 @@
+name: Ops — Verify Stripe activation (users vs invoices vs workspaces)
+
+# 2026-05-16 (CJ「金流＋試用到期」audit follow-up):
+# After a real payment, confirm the customer was actually activated.
+# The Bug A class was: webhook wrote workspaces.* but enforcement reads
+# users.* — so a paid user stayed on trial. This read-only probe
+# cross-checks all three tables for one user and prints a blunt verdict.
+#
+# Input: a userId OR an email (one of them).
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: "users.id (leave blank if using email)"
+        required: false
+        default: ""
+      email:
+        description: "user email (used if user_id blank)"
+        required: false
+        default: ""
+
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          MYSQL="mysql -h localhost -u mos_user mos_db -N -s"
+          MYSQLT="mysql -h localhost -u mos_user mos_db -B -t"
+
+          UID_IN="${{ github.event.inputs.user_id }}"
+          EMAIL_IN="${{ github.event.inputs.email }}"
+
+          if [ -n "$UID_IN" ]; then
+            UID="$UID_IN"
+          elif [ -n "$EMAIL_IN" ]; then
+            UID=$($MYSQL -e "SELECT id FROM users WHERE email='$EMAIL_IN' ORDER BY id DESC LIMIT 1")
+          else
+            echo "❌ provide user_id or email"; exit 1
+          fi
+          if [ -z "$UID" ]; then echo "❌ user not found"; exit 1; fi
+          echo "Resolved userId = $UID"
+
+          echo ""
+          echo "════ users.* (what enforcement + points read) ════"
+          $MYSQLT -e "
+            SELECT id, email, planCode, planStatus, planEndsAt,
+                   pointsBalance, isActive
+              FROM users WHERE id=$UID;
+          "
+
+          echo ""
+          echo "════ invoices (most recent 5) ════"
+          $MYSQLT -e "
+            SELECT id, packType, planCode, billingCycle, status,
+                   amountTwd, pointsGranted, paidAt, createdAt
+              FROM invoices WHERE userId=$UID
+             ORDER BY id DESC LIMIT 5;
+          "
+
+          echo ""
+          echo "════ workspaces owned (webhook writes here) ════"
+          $MYSQLT -e "
+            SELECT w.id, w.planCode, w.planStatus, w.planEndsAt
+              FROM workspaces w
+             WHERE w.id IN (
+               SELECT workspaceId FROM invoices WHERE userId=$UID
+               UNION SELECT id FROM workspaces WHERE ownerId=$UID
+             )
+             LIMIT 10;
+          " 2>/dev/null || $MYSQLT -e "
+            SELECT id, planCode, planStatus, planEndsAt FROM workspaces
+             WHERE id IN (SELECT workspaceId FROM invoices WHERE userId=$UID) LIMIT 10;
+          "
+
+          echo ""
+          echo "════ point_transactions (last 8) ════"
+          $MYSQLT -e "
+            SELECT kind, delta, balanceAfter, reason, createdAt
+              FROM point_transactions WHERE userId=$UID
+             ORDER BY id DESC LIMIT 8;
+          "
+
+          echo ""
+          echo "════ VERDICT ════"
+          U_PLAN=$($MYSQL -e "SELECT planCode FROM users WHERE id=$UID")
+          U_STAT=$($MYSQL -e "SELECT planStatus FROM users WHERE id=$UID")
+          U_EXP=$($MYSQL -e "SELECT IF(planEndsAt < NOW(),'EXPIRED','valid') FROM users WHERE id=$UID")
+          PAID_CNT=$($MYSQL -e "SELECT COUNT(*) FROM invoices WHERE userId=$UID AND status='paid' AND packType<>'topup'")
+          LAST_PAID_PLAN=$($MYSQL -e "SELECT planCode FROM invoices WHERE userId=$UID AND status='paid' AND packType<>'topup' ORDER BY id DESC LIMIT 1")
+
+          echo "  users.planCode   = $U_PLAN"
+          echo "  users.planStatus = $U_STAT ($U_EXP)"
+          echo "  paid subs invoices = $PAID_CNT (last paid plan: ${LAST_PAID_PLAN:-none})"
+          echo ""
+          if [ "$PAID_CNT" -gt 0 ]; then
+            if [ "$U_STAT" = "active" ] && [ "$U_PLAN" = "$LAST_PAID_PLAN" ] && [ "$U_EXP" = "valid" ]; then
+              echo "  ✅ ACTIVATED CORRECTLY — users.* matches the paid invoice."
+            else
+              echo "  ❌ MISMATCH — user paid but users.* not activated to the paid plan."
+              echo "     (Bug A symptom. Check webhook ran + the users UPDATE landed.)"
+              exit 1
+            fi
+          else
+            echo "  ℹ️ No paid subscription invoice yet — nothing to verify."
+            echo "     (trial/top-up only; this is expected for unpaid users.)"
+          fi
