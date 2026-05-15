@@ -1,0 +1,33 @@
+name: Ops — Trace callOneVariant failures
+on: { workflow_dispatch: {} }
+jobs:
+  trace:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          ERR=/home/azureuser/.pm2/logs/onbrand-error.log
+          OUT=/home/azureuser/.pm2/logs/onbrand-out.log
+          echo "════ callOneVariant failures (error log, last 4000) ════"
+          tail -4000 "$ERR" 2>&1 | grep -iE "callOneVariant|callCaptionWriter|caption\[|All LLM providers failed|empty caption|invokeLLM\] .* error|circuitBreaker|strategist:" | tail -50
+          echo ""
+          echo "════ callOneVariant failures (out log, last 4000) ════"
+          tail -4000 "$OUT" 2>&1 | grep -iE "callOneVariant|All LLM providers failed|empty caption|circuitBreaker|\[invokeLLM\]" | tail -40
+          echo ""
+          echo "════ caption agent ids for the 5 failing tasks ════"
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+          # The 5 failing tasks' lead agent_ids: fb-60-album-4=60068,
+          # carousel-5=224061, serial-3=?, live-suite=?, crosspost=?
+          # Just dump aiModel for the suspects.
+          $MYSQL -e "
+            SELECT id, name, aiModel
+              FROM agents
+             WHERE id IN (60068, 224061, 220863, 60032, 180006, 180030, 30008)
+             ORDER BY id" -t 2>&1
+          echo ""
+          echo "════ circuit breaker state via ops endpoint ════"
+          curl -sk https://onbrand.sowork.ai/health | python3 -m json.tool 2>/dev/null | head -5
