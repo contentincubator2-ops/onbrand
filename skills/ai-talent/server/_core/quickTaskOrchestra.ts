@@ -137,10 +137,22 @@ export function aiModelToProvider(aiModel: string | null | undefined): ModelProv
   if (!aiModel) return "qwen";
   const m = aiModel.toLowerCase();
   if (m.includes("qwen")) return "qwen";
-  if (m.includes("kimi")) return "azure-foundry";
+  // 2026-05-15 (60S Bug B): the Azure subscription behind azure-foundry /
+  // azure-position / azure-northcentral is DEAD — every call returns
+  // 401 "Access denied due to invalid subscription". Agents whose
+  // aiModel was kimi / claude / deepseek used to pin to those dead
+  // endpoints, so their caption fanout produced empty output (whole
+  // task didn't persist — looked like a DB bug). Remap to working
+  // providers until the Azure subscription is renewed:
+  //   kimi    → qwen  (was azure-foundry)
+  //   claude  → zhipu (was azure-position) — glm-4 strong in zh-TW
+  //   deepseek→ qwen  (was azure-northcentral; no direct deepseek
+  //             provider in PROVIDER_CONFIG, so qwen is the safe pick)
+  // Revert these lines once Azure billing is restored.
+  if (m.includes("kimi")) return "qwen";
   if (m.includes("glm") || m.includes("zhipu")) return "zhipu";
-  if (m.includes("claude")) return "azure-position"; // claude-haiku/sonnet/opus
-  if (m.includes("deepseek")) return "azure-northcentral";
+  if (m.includes("claude")) return "zhipu";
+  if (m.includes("deepseek")) return "qwen";
   return "qwen"; // safe default
 }
 

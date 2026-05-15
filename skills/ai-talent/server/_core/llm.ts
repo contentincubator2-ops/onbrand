@@ -628,10 +628,16 @@ function getFallbackChain(): string[] {
   if (process.env.LLM_PRIMARY === "anthropic") {
     return ["anthropic", "azure-foundry", "qwen", "deepseek", "openai", "gemini", "ollama"];
   }
-  // Default (anthropic-OOC) order — qwen first (zh-strong, paid, working),
-  // azure-foundry second (gpt-5.4-mini, working), then deepseek/openai/gemini
-  // for diversity, anthropic LAST as a will-work-once-billed safety net.
-  return ["qwen", "azure-foundry", "deepseek", "openai", "gemini", "anthropic", "ollama"];
+  // 2026-05-15 (60S test post-mortem — Bug B): azure-foundry returns
+  // 401 "Access denied due to invalid subscription" on EVERY call —
+  // the Azure subscription is dead. It was in slot 2, so every caption
+  // fanout wasted an RTT (× N variants × 100 users) on a known-401
+  // vendor. Demoted to just-before-ollama. Also confirmed dead:
+  // anthropic ($0 credits), ollama (not running on VM). Working tier:
+  // qwen / zhipu / deepseek / openai / gemini. zhipu added explicitly
+  // (glm-4-flash agents map here and it works). Restores automatically
+  // when the Azure subscription is renewed (or set LLM_FALLBACK_CHAIN).
+  return ["qwen", "zhipu", "openai", "gemini", "azure-foundry", "anthropic", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {
