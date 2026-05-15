@@ -51,15 +51,16 @@ export async function getUserById(db: DB, userId: number) {
  * Get user by email verification token
  */
 export async function getUserByEmailVerificationToken(db: DB, token: string) {
+  // 2026-05-15 (CJ「連結點開是驗證失敗」): the trial-bypass flow sets
+  // isActive=1 at registration so users can start immediately. The old
+  // `eq(users.isActive, 0)` filter meant the verify link could NEVER
+  // resolve (user already active) → every click showed
+  // 「無效或過期的驗證連結」. Match by token only; verifyUserEmail is
+  // idempotent (sets isActive=1, clears token) so re-clicks are safe.
   const rows = await db
     .select()
     .from(users)
-    .where(
-      and(
-        eq(users.emailVerificationToken, token),
-        eq(users.isActive, 0) // not yet activated
-      )
-    )
+    .where(eq(users.emailVerificationToken, token))
     .limit(1);
   return rows[0] || null;
 }
