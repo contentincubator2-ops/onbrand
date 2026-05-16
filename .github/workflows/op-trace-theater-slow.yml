@@ -1,0 +1,34 @@
+name: Ops — Trace theater slowness + LLM provider state
+on: { workflow_dispatch: {} }
+jobs:
+  trace:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          ERR=/home/azureuser/.pm2/logs/onbrand-error.log
+          OUT=/home/azureuser/.pm2/logs/onbrand-out.log
+
+          echo "════ theater.generateCell / qaReview / generateImage (last 30 min) ════"
+          tail -5000 "$OUT" 2>&1 | grep -E "theater\.(generateCell|qaReviewCell|generateImage)|withUserLLMSlot|userLLMSemaphore" | tail -30
+
+          echo ""
+          echo "════ invokeLLM provider outcomes (last 4000 err lines) ════"
+          tail -4000 "$ERR" 2>&1 | grep -E "\[invokeLLM\]|circuitBreaker|All LLM providers|429|rate.?limit|retryable error" | tail -40
+
+          echo ""
+          echo "════ provider failure tally (last 4000) ════"
+          tail -4000 "$ERR" 2>&1 | grep -oE "\[invokeLLM\] [a-z-]+ (retryable|hard) error" | sort | uniq -c | sort -rn | head -15
+
+          echo ""
+          echo "════ circuit breaker OPEN events ════"
+          tail -4000 "$ERR" 2>&1 | grep -E "llmCircuitBreaker.*OPEN" | tail -10
+
+          echo ""
+          echo "════ userLLMSemaphore queue timeouts ════"
+          tail -4000 "$ERR" 2>&1 | grep -E "userLLMSemaphore.*queue timeout" | tail -10
+
+          echo ""
+          echo "════ anthropic-specific errors ════"
+          tail -4000 "$ERR" 2>&1 | grep -iE "anthropic.*(error|429|rate|overload|529)" | tail -15
