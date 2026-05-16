@@ -56,6 +56,8 @@ export default function AdminDashboardPage() {
   const ovQ = (trpc as any).adminStats?.overview?.useQuery?.(undefined, opt);
   const ucQ = (trpc as any).adminStats?.usageCost?.useQuery?.(undefined, opt);
   const hQ  = (trpc as any).adminStats?.health?.useQuery?.(undefined, opt);
+  const fbQ = (trpc as any).adminStats?.featureBreakdown?.useQuery?.({ days: 30, limit: 60 }, opt);
+  const fmQ = (trpc as any).adminStats?.frictionMap?.useQuery?.({ days: 7 }, opt);
   const ruQ = (trpc as any).adminStats?.recentUsers?.useQuery?.({ limit: 50 }, opt);
   const bugsQ = (trpc as any).adminStats?.listBugReports?.useQuery?.({ status: "all", limit: 60 }, opt);
   const utils = (trpc as any).useUtils?.() ?? null;
@@ -114,7 +116,7 @@ export default function AdminDashboardPage() {
             <Download size={13} /> 匯出 CSV
           </button>
           <button
-            onClick={() => { ovQ?.refetch?.(); ucQ?.refetch?.(); hQ?.refetch?.(); ruQ?.refetch?.(); refetchBugs(); }}
+            onClick={() => { ovQ?.refetch?.(); ucQ?.refetch?.(); hQ?.refetch?.(); fbQ?.refetch?.(); fmQ?.refetch?.(); ruQ?.refetch?.(); refetchBugs(); }}
             style={{
               display: "flex", alignItems: "center", gap: 6, fontSize: 12,
               border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 12px",
@@ -214,6 +216,82 @@ export default function AdminDashboardPage() {
           warn={(h?.errors24h ?? 0) > 0} />
         <Stat label="付費單 30d" value={h?.revenue.paidCount30d ?? "—"}
           sub={`NT$ ${(h?.revenue.twd30d ?? 0).toLocaleString()}`} />
+      </div>
+
+      {/* ── 逐功能使用 + 完成率 ── */}
+      <div style={sectionTitle}>
+        <TrendingUp size={13} /> 逐功能使用 + 完成率（近 {fbQ?.data?.days ?? 30} 天）
+      </div>
+      <div style={{ fontSize: 11, color: "#9ca3af", margin: "-4px 0 8px" }}>
+        完成率 = 乾淨完成 ÷ 總次數。<b>高使用 + 低完成率</b> = 用戶想用但會卡住的功能，最該優先修。
+      </div>
+      <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: "#fafafa", color: "#737373", textAlign: "left" }}>
+              {["功能", "平台", "使用", "用戶", "完成", "卡住", "失敗", "完成率", "最後使用"].map((hd) => (
+                <th key={hd} style={{ padding: "8px 10px", fontWeight: 600, borderBottom: "1px solid #e5e7eb" }}>{hd}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(fbQ?.data?.features ?? []).map((f: any) => {
+              const rate = f.completionRate;
+              const rateColor = rate >= 80 ? "#15803d" : rate >= 50 ? "#b45309" : "#b91c1c";
+              return (
+                <tr key={f.taskId + f.workspace} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <td style={{ ...td, whiteSpace: "normal", maxWidth: 260 }}>{f.label}</td>
+                  <td style={td}>{f.workspace}</td>
+                  <td style={{ ...td, fontWeight: 600 }}>{f.uses}</td>
+                  <td style={td}>{f.users}</td>
+                  <td style={{ ...td, color: "#15803d" }}>{f.done}</td>
+                  <td style={{ ...td, color: (f.stuck ?? 0) > 0 ? "#b45309" : "#9ca3af" }}>{f.stuck}</td>
+                  <td style={{ ...td, color: (f.failed ?? 0) > 0 ? "#b91c1c" : "#9ca3af" }}>{f.failed}</td>
+                  <td style={{ ...td, fontWeight: 700, color: rateColor }}>{rate}%</td>
+                  <td style={{ ...td, color: "#9ca3af" }}>
+                    {f.lastUsed ? new Date(f.lastUsed).toLocaleDateString("zh-TW") : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+            {(fbQ?.data?.features ?? []).length === 0 && (
+              <tr><td colSpan={9} style={{ ...td, color: "#9ca3af", textAlign: "center" }}>尚無使用資料</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── 摩擦地圖（哪個頁面錯誤最多） ── */}
+      <div style={sectionTitle}>
+        <AlertTriangle size={13} /> 摩擦地圖 · 錯誤集中點（近 {fmQ?.data?.days ?? 7} 天）
+      </div>
+      <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: "#fafafa", color: "#737373", textAlign: "left" }}>
+              {["頁面 / 路由", "來源", "錯誤數", "影響用戶", "範例訊息", "最後發生"].map((hd) => (
+                <th key={hd} style={{ padding: "8px 10px", fontWeight: 600, borderBottom: "1px solid #e5e7eb" }}>{hd}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(fmQ?.data?.rows ?? []).map((r: any, i: number) => (
+              <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <td style={{ ...td, whiteSpace: "normal", maxWidth: 220 }}>{r.route}</td>
+                <td style={td}>{r.source}</td>
+                <td style={{ ...td, fontWeight: 700, color: r.errors > 5 ? "#b91c1c" : "#374151" }}>{r.errors}</td>
+                <td style={td}>{r.users}</td>
+                <td style={{ ...td, whiteSpace: "normal", maxWidth: 320, color: "#737373" }}>{r.sampleMessage}</td>
+                <td style={{ ...td, color: "#9ca3af" }}>
+                  {r.lastSeen ? new Date(r.lastSeen).toLocaleString("zh-TW", { hour12: false }) : "—"}
+                </td>
+              </tr>
+            ))}
+            {(fmQ?.data?.rows ?? []).length === 0 && (
+              <tr><td colSpan={6} style={{ ...td, color: "#9ca3af", textAlign: "center" }}>近期無錯誤紀錄 🎉</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* ── Bug 回報佇列 ── */}

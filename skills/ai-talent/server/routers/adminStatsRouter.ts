@@ -355,6 +355,125 @@ export const adminStatsRouter = router({
       };
     }),
 
+  /**
+   * Per-feature usage + completion rate — answers "which features do
+   * users love / hate" without any new instrumentation.
+   *
+   * Signal source: every task run lands a mission_outputs row whose
+   * progress is one of:
+   *   done          → finished cleanly  (satisfied)
+   *   caption_ready  → caption done but image/continuation never finished
+   *                    → stuck/abandoned (implicit dissatisfaction)
+   *   failed         → hard error
+   * missions.description carries "[task:<taskId>] <tier> 任務"; title is
+   * the human task label; workspace is the platform. We group by the
+   * extracted taskId so each feature gets one row: how often it's used,
+   * and how often it actually completes.
+   */
+  featureBreakdown: adminProcedure
+    .input(z.object({
+      days: z.number().int().min(1).max(90).default(30),
+      limit: z.number().int().min(1).max(200).default(60),
+    }).optional())
+    .query(async ({ input }) => {
+      const { default: localPool } = await import("../localDb");
+      const days = Math.max(1, Math.min(90, Math.floor(input?.days ?? 30)));
+      const limit = Math.max(1, Math.min(200, Math.floor(input?.limit ?? 60)));
+
+      // Extract taskId from "[task:<id>] ..." in description; fall back
+      // to title when the tag is absent (older / non-orchestra rows).
+      const taskIdExpr = `
+        CASE
+          WHEN m.description LIKE '[task:%]%'
+          THEN SUBSTRING_INDEX(SUBSTRING_INDEX(m.description, '[task:', -1), ']', 1)
+          ELSE COALESCE(NULLIF(m.title, ''), '(未命名)')
+        END`;
+
+      const [rows]: any = await localPool.execute(
+        `SELECT
+            ${taskIdExpr}                                        AS taskId,
+            COALESCE(NULLIF(m.title, ''), '(未命名)')             AS label,
+            COALESCE(NULLIF(m.workspace, ''), '(none)')          AS workspace,
+            COUNT(*)                                             AS uses,
+            SUM(mo.progress = 'done')                            AS done,
+            SUM(mo.progress = 'caption_ready')                   AS stuck,
+            SUM(mo.progress = 'failed')                          AS failed,
+            COUNT(DISTINCT m.userId)                             AS users,
+            MAX(mo.createdAt)                                    AS lastUsed
+           FROM mission_outputs mo
+           JOIN missions m ON m.id = mo.missionId
+          WHERE mo.createdAt >= NOW() - INTERVAL ${days} DAY
+          GROUP BY taskId, label, workspace
+          ORDER BY uses DESC
+          LIMIT ${limit}`,
+      );
+
+      const iso = (d: any) => d ? (d instanceof Date ? d.toISOString() : String(d)) : null;
+      return {
+        days,
+        features: (rows as any[]).map((r) => {
+          const uses = n(r.uses);
+          const done = n(r.done);
+          return {
+            taskId: String(r.taskId ?? "").slice(0, 64),
+            label: String(r.label ?? "").slice(0, 80),
+            workspace: r.workspace ?? "(none)",
+            uses,
+            done,
+            stuck: n(r.stuck),
+            failed: n(r.failed),
+            users: n(r.users),
+            // completion rate = clean finishes / total attempts.
+            // low rate + high uses = a feature people want but that
+            // frustrates them (highest-priority fix target).
+            completionRate: uses ? Math.round((done / uses) * 100) : 0,
+            lastUsed: iso(r.lastUsed),
+          };
+        }),
+      };
+    }),
+
+  /**
+   * Friction map — which pages/sources throw the most client + server
+   * errors. error_log pipeline is verified working (2026-05-16), so
+   * this is now a reliable "where do users hit walls" view.
+   */
+  frictionMap: adminProcedure
+    .input(z.object({ days: z.number().int().min(1).max(30).default(7) }).optional())
+    .query(async ({ input }) => {
+      const { default: localPool } = await import("../localDb");
+      const days = Math.max(1, Math.min(30, Math.floor(input?.days ?? 7)));
+      let rows: any[] = [];
+      try {
+        const [r]: any = await localPool.execute(
+          `SELECT COALESCE(NULLIF(route, ''), '(no route)') AS route,
+                  COALESCE(NULLIF(source, ''), '(no source)') AS source,
+                  COUNT(*)                  AS errors,
+                  COUNT(DISTINCT userId)    AS users,
+                  MAX(message)              AS sampleMessage,
+                  MAX(createdAt)            AS lastSeen
+             FROM error_log
+            WHERE createdAt >= NOW() - INTERVAL ${days} DAY
+            GROUP BY route, source
+            ORDER BY errors DESC
+            LIMIT 40`,
+        );
+        rows = r as any[];
+      } catch { /* error_log may lag on older deploys */ }
+      const iso = (d: any) => d ? (d instanceof Date ? d.toISOString() : String(d)) : null;
+      return {
+        days,
+        rows: rows.map((r) => ({
+          route: String(r.route ?? "").slice(0, 120),
+          source: String(r.source ?? "").slice(0, 64),
+          errors: n(r.errors),
+          users: n(r.users),
+          sampleMessage: String(r.sampleMessage ?? "").slice(0, 200),
+          lastSeen: iso(r.lastSeen),
+        })),
+      };
+    }),
+
   /** CSV export of all users + key metrics. Returns a raw CSV string. */
   exportUsersCsv: adminProcedure.query(async () => {
     const { default: localPool } = await import("../localDb");
