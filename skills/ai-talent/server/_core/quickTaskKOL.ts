@@ -52,7 +52,14 @@ ${KOL_TONE}`,
     tier: "30s", postType: "generic",
     label: { en: "Influencer Brief", zh: "KOL 合作 Brief（可直接給網紅）" },
     description: "一份結構化的網紅合作 brief：背景、目標、核心訊息、必提必避、產出規格、時程",
-    agent_id: 25, skill_slug: "kol-outreach",
+    // 2026-05-16 (CJ「人設應該 follow 熟悉 KOL 的 agent」+ 全類別稽核):
+    // was agent_id 25 = Kevin Lee「SEO Strategist (E-commerce)」— a
+    // leftover generic agent from the old "brand-oneliner" concept,
+    // mismatched for a KOL brief. Realigned to 30015 = Tom Chang
+    // 「KOL Word-of-Mouth Marketing Exec」, the same verified KOL
+    // specialist as kl-30-invite-opener so the whole KOL 30s set is
+    // consistent.
+    agent_id: 30015, skill_slug: "kol-outreach",
     primary_question: "這次合作的品牌 / 活動 + 想達成什麼？",
     primary_input: {
       key: "core_message",
