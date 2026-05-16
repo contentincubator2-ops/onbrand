@@ -510,7 +510,16 @@ export async function invokeVertexGrounding(opts: {
 // Any caller that still passes provider="perplexity" gets silently rerouted to
 // the default provider so we never hit the dead Perplexity endpoint again.
 // openai / cohere / forge added for the same reason (keys expired or unavailable).
-const DEPRECATED_PROVIDERS = new Set(["openrouter", "perplexity", "openai", "cohere", "forge"]);
+//
+// 2026-05-16 (Option B post-mortem): "openai" REMOVED from this set. Its key
+// was re-funded long ago (OPENAI_API_KEY present + working — verified by live
+// probe). Leaving it deprecated silently rerouted EVERY provider:"openai"
+// call to anthropic, so Option B's intended 25% openai share collapsed back
+// onto Claude and the load never actually spread. openai is now a real,
+// first-class provider again. (perplexity/openrouter/cohere/forge stay —
+// perplexity keys still dead, openrouter is a deprecated alias, cohere/forge
+// unused by the current chain.)
+const DEPRECATED_PROVIDERS = new Set(["openrouter", "perplexity", "cohere", "forge"]);
 function resolveProvider(requested: string | undefined): string {
   // Default: Anthropic (best quality, stable). Override with LLM_DEFAULT_PROVIDER env.
   const def = (process.env.LLM_DEFAULT_PROVIDER as any) || "anthropic";
