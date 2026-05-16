@@ -134,39 +134,32 @@ export interface OrchestraResult {
  *  Exported so theaterRouter (and other places) can derive provider from
  *  agent.aiModel consistently. */
 export function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
-  // 2026-05-16 (CJ「剛剛的決定似乎不好」→ Option B): Taiwan-only product,
-  // no Chinese models (qwen/zhipu emit Simplified + mainland phrasing).
-  // All 4 non-Chinese providers now have working keys (anthropic credit
-  // topped, azure-claude Sweden key updated, azure-foundry key rotated,
-  // openai funded). Forcing 100% → anthropic (the old "Option A") makes
-  // anthropic a single bottleneck — its tier RPM/TPM throttles under
-  // 100-user load and the circuit breaker only spills REACTIVELY after
-  // saturation. Instead, weighted-random across the 4 non-Chinese
-  // providers so load spreads PROACTIVELY:
-  //   anthropic    40%  ┐ Claude total ≈65% (best zh-TW). anthropic +
-  //   azure-claude 25%  ┘ azure-claude are SEPARATE quotas → no mutual
-  //                       throttle, both run claude-sonnet-4-6.
-  //   openai       35%  (gpt-4.1-mini, strong zh-TW)
+  // 2026-05-16 (CJ「剛剛的決定似乎不好」→ Option B, FINAL): Taiwan-only
+  // product, no Chinese models (qwen/zhipu emit Simplified + mainland
+  // phrasing). Spread load across non-Chinese providers so anthropic
+  // isn't a single bottleneck under 100-user load.
   //
-  // 2026-05-16: azure-foundry DROPPED from the weighted pick. Live
-  // probe showed provider:"azure-foundry" returned claude-sonnet-4-6
-  // (not gpt-5.4-mini) — its key is invalid/missing so invokeLLM skips
-  // it and silently lands on anthropic (chain head). Including it in
-  // the weights just meant a hidden +10% to anthropic, defeating the
-  // spread. Its 10% reallocated to openai (proven working). azure-
-  // foundry stays in the fallback CHAIN so it auto-recovers as a
-  // backstop the moment its key is fixed — no code change needed then.
-  // The agent's aiModel string is intentionally ignored: it's Azure /
-  // Chinese vendor naming, not meaningful for routing under this policy,
-  // and callers already pass model=undefined so each provider uses its
-  // own proven default (no cross-provider 404). The fallback chain still
-  // backstops every pick; a provider that errors trips the circuit
-  // breaker and the chain rescues (qwen/zhipu only as final last-resort).
+  // Definitive raw-endpoint probes (2026-05-16) — what's ACTUALLY real:
+  //   ✅ anthropic     — claude-sonnet-4-6, confirmed real
+  //   ✅ openai         — gpt-4.1-mini, confirmed real (had been wrongly
+  //                       deprecated → secretly anthropic; un-deprecated)
+  //   ❌ azure-claude   — raw POST → HTTP 401 "invalid subscription"
+  //   ❌ azure-foundry  — raw POST → HTTP 401 "invalid subscription"
+  // BOTH Azure resources are dead (subscription-level, not key — the
+  // 84-char rotated keys are present but rejected). Putting either in
+  // the weights only meant a hidden boost to anthropic via fallback,
+  // which defeats the spread. So the weighted pick is ONLY the two
+  // proven-independent backends. anthropic leads (best zh-TW); openai
+  // takes a large minority to genuinely offload it.
+  //   anthropic 55%  ·  openai 45%
+  // Both Azure providers stay in the fallback CHAIN — they auto-recover
+  // as backstops the instant the Azure subscription is reactivated
+  // (ops action; not a code fix). Chinese models remain chain
+  // last-resort only. Callers pass model=undefined so each provider
+  // uses its proven default (no cross-provider 404). Circuit breaker
+  // still backstops each pick.
   void aiModel;
-  const r = Math.random();
-  if (r < 0.40) return "anthropic";
-  if (r < 0.65) return "azure-claude";
-  return "openai"; // 0.65–1.00 = 35%
+  return Math.random() < 0.55 ? "anthropic" : "openai";
 }
 
 /**
