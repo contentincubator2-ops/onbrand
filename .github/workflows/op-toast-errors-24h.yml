@@ -1,0 +1,48 @@
+name: Ops — Toast / error digest (24h)
+on: { workflow_dispatch: {} }
+jobs:
+  digest:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+
+          echo "════ error_log — frontend.* (last 24h, grouped) ════"
+          $MYSQL -t -e "
+            SELECT source, COUNT(*) AS n, LEFT(message,90) AS message_head, MAX(createdAt) AS latest
+              FROM error_log
+             WHERE createdAt > NOW() - INTERVAL 24 HOUR
+               AND source LIKE 'frontend.%'
+             GROUP BY source, message_head
+             ORDER BY n DESC LIMIT 25" 2>&1
+
+          echo ""
+          echo "════ error_log — trpc.* (server errors that surfaced, 24h) ════"
+          $MYSQL -t -e "
+            SELECT source, COUNT(*) AS n, LEFT(message,90) AS message_head, MAX(createdAt) AS latest
+              FROM error_log
+             WHERE createdAt > NOW() - INTERVAL 24 HOUR
+               AND source LIKE 'trpc.%'
+             GROUP BY source, message_head
+             ORDER BY n DESC LIMIT 25" 2>&1
+
+          echo ""
+          echo "════ error_log — totals by source (24h) ════"
+          $MYSQL -t -e "
+            SELECT source, COUNT(*) AS n
+              FROM error_log
+             WHERE createdAt > NOW() - INTERVAL 24 HOUR
+             GROUP BY source ORDER BY n DESC LIMIT 20" 2>&1
+
+          echo ""
+          echo "════ pm2 [trpc] Error lines (real, non-expected codes) last 24h ════"
+          # onError now filters expected codes, so what's here = errors
+          # that genuinely surfaced a red toast to the user.
+          grep -aE "\[trpc\] Error:" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null | tail -40 \
+            | grep -oE "path: '[^']+'|errorCode: '[^']+'|errorMessage: '[^']{0,80}'" \
+            | paste - - - 2>/dev/null | sort | uniq -c | sort -rn | head -25
