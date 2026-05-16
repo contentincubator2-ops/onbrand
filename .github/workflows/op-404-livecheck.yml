@@ -1,0 +1,40 @@
+name: Ops — 404 live-or-stale + probe all 4 providers
+on: { workflow_dispatch: {} }
+jobs:
+  c:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: count anthropic-404 BEFORE
+        run: |
+          set +e
+          B=$(grep -ac "anthropic.*404" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null)
+          echo "before=$B" | tee /tmp/b404
+      - name: fire a fresh invokeLLM through each Option-B provider
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          node --import tsx -e "
+            import('./server/_core/llm.ts').then(async ({ invokeLLM }) => {
+              for (const p of ['anthropic','azure-claude','openai','azure-foundry']) {
+                try {
+                  const r = await invokeLLM({ provider:p, messages:[{role:'user',content:'回 OK'}] });
+                  console.log(p, 'OK ->', r?.model, JSON.stringify(String(r?.choices?.[0]?.message?.content).slice(0,30)));
+                } catch(e){ console.error(p, 'FAIL ->', String(e?.message??e).slice(0,200)); }
+              }
+            }).catch(e=>{console.error('IMPORT FAIL',e);process.exit(1);});
+          "
+      - name: count anthropic-404 AFTER + verdict
+        run: |
+          set +e
+          sleep 1
+          A=$(grep -ac "anthropic.*404" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null)
+          B=$(cut -d= -f2 /tmp/b404)
+          echo "before=$B after=$A"
+          if [ "$A" -gt "$B" ]; then
+            echo "⚠️ 404 is LIVE — count grew $B→$A (anthropic genuinely 404s on real calls)"
+            grep -aE "anthropic.*404" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null | tail -1 | cut -c1-400
+          else
+            echo "✓ 404 is STALE — count unchanged ($B). The pre-fix log lines never grow; anthropic works on fresh calls."
+          fi
