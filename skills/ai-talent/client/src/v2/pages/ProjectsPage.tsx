@@ -27,7 +27,8 @@ import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } f
 import { faGlobe, faNewspaper, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
 
 interface MissionRow {
-  id: number;
+  id: number;            // mission_outputs.id (output row) — NOT the mission PK
+  missionId?: number;    // the real missions.id — use for mission.* mutations
   title?: string | null;
   description?: string | null;
   workspace?: string | null;
@@ -338,9 +339,13 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
       })
     : null;
 
-  // 2026-05-16 (CJ「任務的四個按鍵，只有重新命名有用」): 建立複本 + 移到
-  // 垃圾桶 had empty onClick (dead). Wire to the existing
-  // mission.duplicate / mission.delete procedures (both take {id}).
+  // 2026-05-16 (CJ「任務的四個按鍵，只有重新命名有用」→「建立複本失敗：
+  // Mission not found」): 建立複本 + 移到垃圾桶 were dead; first wiring
+  // passed mission.id but listAllForUser returns id=mission_outputs.id
+  // and missionId=missions.id, so mission.duplicate/delete (keyed on
+  // missions.id) said "Mission not found". Rename worked because it
+  // targets the OUTPUT row. Use the real missions PK here.
+  const realMissionId = (mission as any).missionId ?? mission.id;
   const duplicateMut = (trpc as any).mission?.duplicate?.useMutation
     ? (trpc as any).mission.duplicate.useMutation({
         onSuccess: () => {
@@ -498,7 +503,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             <button
               onClick={(e) => {
                 e.stopPropagation(); setMenuOpen(false);
-                duplicateMut?.mutate?.({ id: mission.id });
+                duplicateMut?.mutate?.({ id: realMissionId });
               }}
               disabled={duplicateMut?.isPending}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2 text-default-600 disabled:opacity-50"
@@ -515,7 +520,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
                     ? `Move "${name}" to trash? This cannot be undone.`
                     : `確定把「${name}」移到垃圾桶？此動作無法復原。`
                 )) return;
-                deleteMut?.mutate?.({ id: mission.id });
+                deleteMut?.mutate?.({ id: realMissionId });
               }}
               disabled={deleteMut?.isPending}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-danger-50 flex items-center gap-2 text-danger disabled:opacity-50"
