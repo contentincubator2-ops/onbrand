@@ -1,0 +1,69 @@
+name: Ops — Schema vs prod table reconciliation
+
+# 2026-05-16 (CJ「schema 跟 migrate 不同步，抓出所有孤兒表」):
+# Two delete-path bugs were caused by drizzle/schema.ts declaring
+# tables that scripts/migrate.ts never creates → absent in prod →
+# db.delete(thatTable) throws at runtime. This read-only audit lists,
+# for every table the CODE references via drizzle (schema.ts
+# mysqlTable), whether it actually exists in prod. Missing ones are
+# landmines: any unguarded drizzle query against them throws.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          Q() { mysql -h localhost -u mos_user mos_db -N -s -e "$1"; }
+
+          # Tables the CODE expects (drizzle/schema.ts mysqlTable names).
+          SCHEMA_TABLES="agent_learnings agent_memories agents artifact_reviews artifacts brand_integrations brands chat_messages credits_usage_log enterprise_credits_allocation enterprise_credits_pool enterprise_credits_tx enterprise_members mission_knowledge_chunks mission_knowledge_files mission_messages mission_outputs mission_resources mission_review_queue mission_sop_steps mission_sops mission_task_units missions mos_companies mos_company_agents mos_departments notification_preferences notifications point_transactions session_event_logs subscriptions task_executions task_workflows tasks tenant_markets token_usage_logs user_api_keys user_credits user_workspaces users video_jobs"
+
+          echo "════ Prod table count ════"
+          Q "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='mos_db'"
+
+          echo ""
+          echo "════ schema.ts tables MISSING in prod (🔴 landmines) ════"
+          MISSING=""
+          for t in $SCHEMA_TABLES; do
+            n=$(Q "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='$t'")
+            if [ "$n" = "0" ]; then
+              echo "  🔴 $t"
+              MISSING="$MISSING $t"
+            fi
+          done
+          [ -z "$MISSING" ] && echo "  ✅ none — every schema.ts table exists in prod"
+
+          echo ""
+          echo "════ For each MISSING table: row-count proof + code refs hint ════"
+          for t in $MISSING; do
+            echo "  - $t : table does NOT exist (any drizzle query → throws)"
+          done
+
+          echo ""
+          echo "════ schema.ts tables present but EMPTY (ℹ️ maybe unused) ════"
+          for t in $SCHEMA_TABLES; do
+            n=$(Q "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='mos_db' AND TABLE_NAME='$t'")
+            if [ "$n" = "1" ]; then
+              c=$(Q "SELECT COUNT(*) FROM \`$t\`" 2>/dev/null || echo "ERR")
+              [ "$c" = "0" ] && echo "  ℹ️ $t (0 rows)"
+            fi
+          done
+
+          echo ""
+          echo "════ Summary ════"
+          if [ -n "$MISSING" ]; then
+            echo "🔴 MISSING tables:$MISSING"
+            echo "→ Each needs either: (a) added to scripts/migrate.ts +"
+            echo "  run op-migrate, OR (b) all drizzle calls wrapped in"
+            echo "  try/catch, OR (c) removed from schema.ts if dead."
+          else
+            echo "✅ No schema/prod drift among code-referenced tables."
+          fi
