@@ -42,7 +42,13 @@ jobs:
           APP=/opt/onbrand/app
           AI=$APP/skills/ai-talent
           cd "$AI/client"
-          npm install --legacy-peer-deps 2>&1 | tail -5
+          # 2026-05-16: was `npm install --legacy-peer-deps` which drifts
+          # from package-lock and drops transitive peers (e.g.
+          # @heroui/system-rsc) → vite "failed to resolve import" build
+          # failure. `npm ci` installs the EXACT locked tree
+          # reproducibly. Fallback to install only if ci fails (no/old
+          # lockfile) so a bad lock never hard-blocks deploys.
+          (npm ci 2>&1 | tail -5) || (echo "npm ci failed → fallback npm install" && npm install --legacy-peer-deps 2>&1 | tail -5)
           # 2026-05-14 (white-screen post-mortem): purge public/assets/ before
           # build. Vite writes new hashed chunks but doesn't delete old ones —
           # so over multiple builds, public/assets/ accumulates stale .js/.css.
