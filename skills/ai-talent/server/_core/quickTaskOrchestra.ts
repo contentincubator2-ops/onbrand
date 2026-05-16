@@ -400,8 +400,13 @@ async function callOneVariant(args: {
   // distilled into the document, NOT rewritten into a post.
   const docMode = template.outputMode === "document";
   const system = docMode
-    ? `你是專業行銷文件撰寫者。嚴格依「任務說明」產出一份**結構化文件**。\n\n` +
-      `# 任務說明（最高指令 — 必須完全遵循其章節結構與順序）\n` +
+    ? // 2026-05-16 (CJ「人設應該 follow agent，不要到處都是人設指令」):
+      // doc tasks use the ASSIGNED agent's persona as the voice/role —
+      // no hardcoded "文件撰寫者", no social master. captionPersona is
+      // the KOL-savvy agent we picked for this task.
+      `# 你的角色（用此專業背景與口吻撰寫）\n` +
+      captionPersona +
+      `\n# 任務說明（最高指令 — 必須完全遵循其章節結構與順序）\n` +
       filledSystemPrompt +
       strategistSection +
       `\n\n【本次只產 1 個變體】**${label}**：在不更動章節結構的前提下，` +

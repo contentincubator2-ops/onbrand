@@ -48,7 +48,7 @@ ${KOL_TONE}`,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
-    id: "kl-30-brief-oneliner",
+    id: "kl-30-influencer-brief",
     tier: "30s", postType: "generic",
     label: { en: "Influencer Brief", zh: "KOL 合作 Brief（可直接給網紅）" },
     description: "一份結構化的網紅合作 brief：背景、目標、核心訊息、必提必避、產出規格、時程",
@@ -145,7 +145,7 @@ export const KOL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     captionMinChars: 180, captionMaxChars: 320,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
   },
-  "kl-30-brief-oneliner": {
+  "kl-30-influencer-brief": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: 60030,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["完整正式版", "精簡重點版", "活動主題版"],

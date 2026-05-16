@@ -547,7 +547,7 @@ export default function RunPage() {
     }
     // KOL 合作 Brief is a structured document handed to the influencer
     // → render as a spec-sheet doc, not a letter / one-liner card.
-    if (taskId === "kl-30-brief-oneliner") {
+    if (taskId === "kl-30-influencer-brief" || taskId === "kl-30-brief-oneliner") {
       return { platform: "generic" as any, format: "proposal-spec" as any, label: "generic:proposal-spec" };
     }
 
