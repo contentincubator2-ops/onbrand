@@ -159,7 +159,9 @@ function reportGlobalError(args: {
 }) {
   try {
     const firstLine = args.message.split("\n")[0] ?? args.message;
-    const fingerprint = `global:${args.source}:${firstLine.slice(0, 80)}`;
+    // server zod caps fingerprint at 64 + DB column is VARCHAR(64) —
+    // slice or the whole logError call fails zod validation.
+    const fingerprint = `global:${args.source}:${firstLine}`.slice(0, 64);
     if (__reportedFingerprints.has(fingerprint)) return;
     __reportedFingerprints.add(fingerprint);
     // 2026-05-16 (error_log was 0 rows ever): the tRPC server is mounted
@@ -167,20 +169,21 @@ function reportGlobalError(args: {
     // were POSTing to /api/trpc/ops.logError?batch=0 → 404 every time →
     // zero frontend errors ever reached error_log. Fixed path + batch
     // wire format to match the rest of the app's tRPC client.
+    // tRPC v11 with NO transformer (no superjson) — httpBatchLink wire
+    // format is {"0": <input>}, NOT {"0":{"json":<input>}}. The json
+    // envelope only exists with a data transformer.
     const body = {
       "0": {
-        json: {
-          level: "error",
-          source: args.source,
-          route: window.location.pathname,
-          message: firstLine.slice(0, 500),
-          stack: args.stack?.slice(0, 4000),
-          fingerprint,
-          meta: {
-            ...args.meta,
-            href: window.location.href,
-            ua: navigator.userAgent.slice(0, 200),
-          },
+        level: "error",
+        source: args.source,
+        route: window.location.pathname,
+        message: firstLine.slice(0, 500),
+        stack: args.stack?.slice(0, 4000),
+        fingerprint,
+        meta: {
+          ...args.meta,
+          href: window.location.href,
+          ua: navigator.userAgent.slice(0, 200),
         },
       },
     };

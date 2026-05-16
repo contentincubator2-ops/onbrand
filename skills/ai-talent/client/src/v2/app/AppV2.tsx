@@ -85,26 +85,25 @@ class AppErrorBoundary extends React.Component<
     // recovery screen below.
     try {
       const firstLine = String(error?.message ?? "").split("\n")[0] ?? "render error";
-      const fingerprint = `react:${firstLine.slice(0, 80)}`;
+      const fingerprint = `react:${firstLine}`.slice(0, 64); // zod max 64 + VARCHAR(64)
       // Use the trpc proxy directly via fetch (avoids importing the React
       // hook outside a component). The endpoint is publicProcedure so it
       // works pre-login too.
       // 2026-05-16: /trpc (not /api/trpc) + batch wire format — see
       // main.tsx note. Was 404ing → no render errors ever logged.
+      // tRPC v11 no-transformer wire format: {"0": <input>} (no json env)
       const body = {
         "0": {
-          json: {
-            level: "error",
-            source: "frontend.render",
-            route: window.location.pathname,
-            message: firstLine.slice(0, 500),
-            stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
-            fingerprint,
-            meta: {
-              componentStack: info?.componentStack?.slice(0, 1000),
-              href: window.location.href,
-              ua: navigator.userAgent.slice(0, 200),
-            },
+          level: "error",
+          source: "frontend.render",
+          route: window.location.pathname,
+          message: firstLine.slice(0, 500),
+          stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
+          fingerprint,
+          meta: {
+            componentStack: info?.componentStack?.slice(0, 1000),
+            href: window.location.href,
+            ua: navigator.userAgent.slice(0, 200),
           },
         },
       };

@@ -2569,16 +2569,14 @@ class RouteErrorBoundary extends React.Component<
         credentials: "include",
         body: JSON.stringify({
           "0": {
-            json: {
-              level: "error",
-              source: "frontend.route",
-              route: window.location.pathname + window.location.search,
-              message: firstLine.slice(0, 500),
-              stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
-              fingerprint: `route:${firstLine.slice(0, 80)}`,
-              meta: {
-                componentStack: info?.componentStack?.slice(0, 1000),
-              },
+            level: "error",
+            source: "frontend.route",
+            route: window.location.pathname + window.location.search,
+            message: firstLine.slice(0, 500),
+            stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
+            fingerprint: `route:${firstLine}`.slice(0, 64), // zod max 64 + VARCHAR(64)
+            meta: {
+              componentStack: info?.componentStack?.slice(0, 1000),
             },
           },
         }),
