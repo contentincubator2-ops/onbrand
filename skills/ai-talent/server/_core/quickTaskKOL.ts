@@ -52,14 +52,12 @@ ${KOL_TONE}`,
     tier: "30s", postType: "generic",
     label: { en: "Influencer Brief", zh: "KOL 合作 Brief（可直接給網紅）" },
     description: "一份結構化的網紅合作 brief：背景、目標、核心訊息、必提必避、產出規格、時程",
-    // 2026-05-16 (CJ「人設應該 follow 熟悉 KOL 的 agent」+ 全類別稽核):
-    // was agent_id 25 = Kevin Lee「SEO Strategist (E-commerce)」— a
-    // leftover generic agent from the old "brand-oneliner" concept,
-    // mismatched for a KOL brief. Realigned to 30015 = Tom Chang
-    // 「KOL Word-of-Mouth Marketing Exec」, the same verified KOL
-    // specialist as kl-30-invite-opener so the whole KOL 30s set is
-    // consistent.
-    agent_id: 30015, skill_slug: "kol-outreach",
+    // 2026-05-16 全 KOL 稽核 + CJ「每任務配不同的真 KOL agent」:
+    // was 25 = Kevin Lee「SEO Strategist (E-commerce)」(舊 oneliner
+    // 遺留、錯配)。改派 210214 = Ming-Chang Ko「Senior Word-of-Mouth
+    // Marketing Specialist」— Senior、人設最厚，最適合擬正式結構化
+    // 合作 brief；與 invite-opener / followup 各用不同 KOL 專家。
+    agent_id: 210214, skill_slug: "kol-outreach",
     primary_question: "這次合作的品牌 / 活動 + 想達成什麼？",
     primary_input: {
       key: "core_message",
@@ -124,10 +122,11 @@ ${KOL_TONE}`,
     tier: "30s", postType: "generic",
     label: { en: "KOL Follow-Up Message", zh: "KOL 追蹤訊息（沒回 / 已聊 / 已合作後）" },
     description: "3 種情境的後續追蹤訊息，自然不催促",
-    // 2026-05-16 全 KOL 稽核：原 60067 = Victor Liao「SEO Data
-    // Analysis Report」，與 KOL 追蹤訊息不匹配。改派 30015 =
-    // Tom Chang「KOL Word-of-Mouth Marketing Exec」，整組 KOL 一致。
-    agent_id: 30015, skill_slug: "kol-outreach",
+    // 2026-05-16 全 KOL 稽核 + CJ「每任務配不同的真 KOL agent」:
+    // was 60067 = Victor Liao「SEO Data Analysis Report」(錯配)。
+    // 改派 180150 = Brian Lin「Influencer Marketing Manager」—
+    // Manager 角色、人設厚，偏關係維護／跟進，最貼合追蹤訊息。
+    agent_id: 180150, skill_slug: "kol-outreach",
     primary_question: "上次溝通到哪裡？",
     primary_input: {
       key: "last_touch",
