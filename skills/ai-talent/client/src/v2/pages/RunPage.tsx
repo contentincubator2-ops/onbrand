@@ -606,6 +606,24 @@ export default function RunPage() {
     return { platform: "generic" as any, format: formatFromOutput as any, label: `generic:${formatFromOutput}` };
   }, [data]);
 
+  // 2026-05-16 (CJ「pr-30-launch-social 其實是三平台貼文，個別要 FB /
+  // LinkedIn / Threads 的 mockup」): some tasks fan out variants by
+  // PLATFORM TONE, not stylistic tone. When the active variant's label
+  // names a platform, render THAT platform's mockup instead of the
+  // task-level one. Tone labels (真誠版 / 事實式…) match no platform
+  // keyword → base variant kept, so this is safe globally.
+  const effectiveVariant: MockupVariant = useMemo(() => {
+    const lbl = String(slide?.label ?? "");
+    const v = (platform: string, format: string): MockupVariant =>
+      ({ platform: platform as any, format: format as any, label: `${platform}:${format}` });
+    if (/threads/i.test(lbl)) return v("threads", "post");
+    if (/linkedin|領英/i.test(lbl)) return v("linkedin", "feed");
+    if (/facebook|臉書|\bFB\b/i.test(lbl)) return v("facebook", "feed");
+    if (/instagram|\bIG\b/i.test(lbl)) return v("instagram", "feed");
+    if (/\bLINE\b/i.test(lbl)) return v("line", "broadcast");
+    return mockupVariant;
+  }, [mockupVariant, slide?.label]);
+
   if (!id || isNaN(id)) {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;
   }
@@ -729,7 +747,7 @@ export default function RunPage() {
         {/* DEBUG (2026-05-09): show mockup variant + taskId so we can trace
             which mockup is being chosen. Remove after verification. */}
         <Chip size="sm" variant="flat" className="font-mono text-[10px]">
-          {mockupVariant ? `${mockupVariant.platform}:${mockupVariant.format}` : "?"} · {data.mission?.taskId ?? "no-task"}
+          {effectiveVariant ? `${effectiveVariant.platform}:${effectiveVariant.format}` : "?"} · {data.mission?.taskId ?? "no-task"}
         </Chip>
         {data.mission?.tier && <Chip size="sm" variant="flat" color="secondary">{data.mission.tier}</Chip>}
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
@@ -763,9 +781,9 @@ export default function RunPage() {
         {/* CENTER: pure mockup, no toolbar above (CJ direction 2026-05-09) */}
         <section className="min-w-0 flex flex-col gap-3">
           <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
-            {mockupVariant && slide && (
+            {effectiveVariant && slide && (
               <PlatformMockup
-                variant={{ ...mockupVariant, label: `${mockupVariant.label} · ${slide.label}` }}
+                variant={{ ...effectiveVariant, label: `${effectiveVariant.label} · ${slide.label}` }}
                 title={data.title ?? ""}
                 brief={""}
                 brandName={data.brand?.name ?? ""}
