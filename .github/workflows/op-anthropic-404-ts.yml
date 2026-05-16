@@ -1,0 +1,17 @@
+name: Ops — Anthropic 404 timestamp check
+on: { workflow_dispatch: {} }
+jobs:
+  c:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 1
+    steps:
+      - run: |
+          set +e
+          echo "── now (UTC) ──"; date -u
+          echo "── newest 3 anthropic-404 timestamps in current log ──"
+          grep -aE "anthropic.*404" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null | tail -3 | grep -oE "^[0-9T:.-]+Z" 
+          echo "── newest anthropic SUCCESS line ──"
+          grep -aE "succeeded with anthropic|invokeLLM\] anthropic" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null | tail -2 | cut -c1-120
+          echo "── last 5 min: any anthropic 404? ──"
+          FIVE=$(date -u -d '5 min ago' +%Y-%m-%dT%H:%M)
+          grep -aE "anthropic.*404" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null | awk -v t="$FIVE" '$0 > t' | wc -l
