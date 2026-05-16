@@ -2561,20 +2561,24 @@ class RouteErrorBoundary extends React.Component<
     console.error("[RouteErrorBoundary] route render error:", error, info);
     try {
       const firstLine = String(error?.message ?? "").split("\n")[0] ?? "route render error";
-      fetch("/api/trpc/ops.logError?batch=0", {
+      // 2026-05-16: /trpc (not /api/trpc) + batch wire format — see
+      // main.tsx note. Was 404ing → no route errors ever logged.
+      fetch("/trpc/ops.logError?batch=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          json: {
-            level: "error",
-            source: "frontend.route",
-            route: window.location.pathname + window.location.search,
-            message: firstLine.slice(0, 500),
-            stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
-            fingerprint: `route:${firstLine.slice(0, 80)}`,
-            meta: {
-              componentStack: info?.componentStack?.slice(0, 1000),
+          "0": {
+            json: {
+              level: "error",
+              source: "frontend.route",
+              route: window.location.pathname + window.location.search,
+              message: firstLine.slice(0, 500),
+              stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
+              fingerprint: `route:${firstLine.slice(0, 80)}`,
+              meta: {
+                componentStack: info?.componentStack?.slice(0, 1000),
+              },
             },
           },
         }),

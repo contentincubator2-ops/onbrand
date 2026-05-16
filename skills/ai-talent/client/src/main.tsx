@@ -162,22 +162,29 @@ function reportGlobalError(args: {
     const fingerprint = `global:${args.source}:${firstLine.slice(0, 80)}`;
     if (__reportedFingerprints.has(fingerprint)) return;
     __reportedFingerprints.add(fingerprint);
+    // 2026-05-16 (error_log was 0 rows ever): the tRPC server is mounted
+    // at /trpc (httpBatchLink), NOT /api/trpc. These raw-fetch reporters
+    // were POSTing to /api/trpc/ops.logError?batch=0 → 404 every time →
+    // zero frontend errors ever reached error_log. Fixed path + batch
+    // wire format to match the rest of the app's tRPC client.
     const body = {
-      json: {
-        level: "error",
-        source: args.source,
-        route: window.location.pathname,
-        message: firstLine.slice(0, 500),
-        stack: args.stack?.slice(0, 4000),
-        fingerprint,
-        meta: {
-          ...args.meta,
-          href: window.location.href,
-          ua: navigator.userAgent.slice(0, 200),
+      "0": {
+        json: {
+          level: "error",
+          source: args.source,
+          route: window.location.pathname,
+          message: firstLine.slice(0, 500),
+          stack: args.stack?.slice(0, 4000),
+          fingerprint,
+          meta: {
+            ...args.meta,
+            href: window.location.href,
+            ua: navigator.userAgent.slice(0, 200),
+          },
         },
       },
     };
-    fetch("/api/trpc/ops.logError?batch=0", {
+    fetch("/trpc/ops.logError?batch=1", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

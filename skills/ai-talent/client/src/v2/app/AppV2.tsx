@@ -89,22 +89,26 @@ class AppErrorBoundary extends React.Component<
       // Use the trpc proxy directly via fetch (avoids importing the React
       // hook outside a component). The endpoint is publicProcedure so it
       // works pre-login too.
+      // 2026-05-16: /trpc (not /api/trpc) + batch wire format — see
+      // main.tsx note. Was 404ing → no render errors ever logged.
       const body = {
-        json: {
-          level: "error",
-          source: "frontend.render",
-          route: window.location.pathname,
-          message: firstLine.slice(0, 500),
-          stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
-          fingerprint,
-          meta: {
-            componentStack: info?.componentStack?.slice(0, 1000),
-            href: window.location.href,
-            ua: navigator.userAgent.slice(0, 200),
+        "0": {
+          json: {
+            level: "error",
+            source: "frontend.render",
+            route: window.location.pathname,
+            message: firstLine.slice(0, 500),
+            stack: typeof error?.stack === "string" ? error.stack.slice(0, 4000) : undefined,
+            fingerprint,
+            meta: {
+              componentStack: info?.componentStack?.slice(0, 1000),
+              href: window.location.href,
+              ua: navigator.userAgent.slice(0, 200),
+            },
           },
         },
       };
-      fetch("/api/trpc/ops.logError?batch=0", {
+      fetch("/trpc/ops.logError?batch=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
