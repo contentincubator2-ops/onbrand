@@ -1,0 +1,53 @@
+name: Ops — Probe error_log pipeline (end-to-end)
+# POSTs the EXACT corrected wire format the frontend reporters now use
+# (tRPC v11, no transformer, httpBatchLink single-call) to the real
+# /trpc/ops.logError endpoint, then checks a row landed in error_log.
+# Proves the e823ed42→ccb4512d fix works without waiting for a real
+# frontend crash.
+on: { workflow_dispatch: {} }
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - name: POST a synthetic error via the real endpoint
+        run: |
+          set +e
+          STAMP="__pipeline_probe_$(date +%s)"
+          echo "marker: $STAMP"
+          RESP=$(curl -sk -w "\nHTTP:%{http_code}" \
+            -X POST "https://onbrand.sowork.ai/trpc/ops.logError?batch=1" \
+            -H "Content-Type: application/json" \
+            --data "{\"0\":{\"level\":\"warn\",\"source\":\"frontend.window.error\",\"route\":\"/__probe\",\"message\":\"$STAMP synthetic pipeline check\",\"fingerprint\":\"probe:$STAMP\",\"meta\":{\"probe\":true}}}")
+          echo "── response ──"
+          echo "$RESP"
+          echo "$STAMP" > /tmp/errlog_probe_marker
+
+      - name: Verify the row landed
+        run: |
+          set +e
+          sleep 2
+          STAMP=$(cat /tmp/errlog_probe_marker)
+          AI=/opt/onbrand/app/skills/ai-talent
+          set -a; source "$AI/.env" 2>/dev/null; set +a
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db}"
+          echo "── error_log rows matching probe marker ──"
+          $MYSQL -t -e "
+            SELECT id, level, source, route, LEFT(message,60) AS m, fingerprint, createdAt
+              FROM error_log
+             WHERE message LIKE '%${STAMP}%'
+             ORDER BY id DESC LIMIT 3" 2>&1
+          N=$($MYSQL -B -N -e "SELECT COUNT(*) FROM error_log WHERE message LIKE '%${STAMP}%'" 2>/dev/null)
+          echo ""
+          if [ "$N" -ge 1 ]; then
+            echo "✓ PIPELINE WORKS — $N row(s) written"
+            # cleanup the synthetic probe row
+            $MYSQL -e "DELETE FROM error_log WHERE message LIKE '%${STAMP}%'" 2>/dev/null
+            echo "(probe row cleaned up)"
+          else
+            echo "❌ PIPELINE STILL BROKEN — no row for marker $STAMP"
+            echo "── total error_log rows ──"
+            $MYSQL -t -e "SELECT COUNT(*) AS total FROM error_log" 2>&1
+            exit 1
+          fi
