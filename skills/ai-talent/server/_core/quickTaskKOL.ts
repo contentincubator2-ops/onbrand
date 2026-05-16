@@ -109,6 +109,7 @@ ${KOL_TONE}`,
 **規則**：繁體中文、台灣用語、具體可執行。缺的具體資訊一律用「[待補：例如 上稿日期]」當場標出，**絕不反問使用者、絕不省略任何一節**。只輸出 brief 文件本身，不要前言或結語。
 ${KOL_TONE}`,
     preferredModel: "anthropic", maxTokens: 2600,
+    outputMode: "document",
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {

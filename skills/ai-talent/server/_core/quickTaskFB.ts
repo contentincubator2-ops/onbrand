@@ -96,6 +96,17 @@ export interface FBTaskTemplate {
     platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "generic";
     post_type: string;
   };
+  /**
+   * 2026-05-16 (CJ「KOL Brief 完全不符標準 — 還是被改寫成貼文」):
+   * "document" tasks (structured brief / spec / doc) must NOT go
+   * through the social-caption scaffolding (台灣社群 master persona +
+   * 「主角必須是輸入內容」+ 貼文格式規則) which forces the model to
+   * rewrite input into a FB post. When set, the orchestra builds a
+   * lean doc-oriented prompt where template.systemPrompt is dominant
+   * and the caption field carries the full Markdown document verbatim.
+   * Defaults to social when omitted.
+   */
+  outputMode?: "social" | "document";
 }
 
 /**

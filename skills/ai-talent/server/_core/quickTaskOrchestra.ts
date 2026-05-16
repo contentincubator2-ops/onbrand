@@ -391,8 +391,33 @@ async function callOneVariant(args: {
   const platformCode = (template.outputDefaults?.platform ?? "facebook") as PlatformCode;
   const masterBlock = getCopywritingMasterPrompt({ market: "zh-TW", platform: platformCode });
 
-  const system =
-    masterBlock + "\n\n" +
+  // 2026-05-16 (CJ「KOL Brief 完全不符標準」root cause): document
+  // tasks bypass the social-caption scaffolding entirely. The 台灣社群
+  // master persona + 「主角必須是輸入內容」+ 貼文格式規則 jointly force
+  // the model to rewrite the pasted material into a FB post, ignoring
+  // the structured-document systemPrompt. Lean prompt: template
+  // instruction is dominant; input is explicitly raw material to be
+  // distilled into the document, NOT rewritten into a post.
+  const docMode = template.outputMode === "document";
+  const system = docMode
+    ? `你是專業行銷文件撰寫者。嚴格依「任務說明」產出一份**結構化文件**。\n\n` +
+      `# 任務說明（最高指令 — 必須完全遵循其章節結構與順序）\n` +
+      filledSystemPrompt +
+      strategistSection +
+      `\n\n【本次只產 1 個變體】**${label}**：在不更動章節結構的前提下，` +
+      `用此變體的風格詮釋（完整正式版＝最詳盡；精簡重點版＝每節更精煉；活動主題版＝圍繞本次活動主軸）。\n` +
+      `${lengthHint}\n\n` +
+      `【素材使用 — 關鍵】\n` +
+      `user message / URL / 品牌資訊都只是**素材**。你的工作是從中萃取資訊、` +
+      `填進文件對應章節，**嚴禁把素材照抄或改寫成一篇文章 / 社群貼文**。` +
+      `缺的具體資訊一律用「[待補：例如 上稿日期]」標出，絕不反問使用者、絕不省略任何章節。\n\n` +
+      `【輸出格式】\n` +
+      `輸出嚴格 JSON 物件：{"caption":"<文件完整內容>","hashtags":[]}\n` +
+      `caption 內就是完整 Markdown 文件本身，**完整保留 # 標題、表格、> 引言等 Markdown 結構**。` +
+      `第一個字元就是 {。不要 code fence、不要前言、不要在 caption 外多寫任何字。\n` +
+      brandSection +
+      (hasUrl ? `\n# 素材：URL 抓到的內容（萃取用，不要照抄）\n${urlContext}` : "")
+    : masterBlock + "\n\n" +
     `# 你的角色 / 寫作風格參考\n` +
     captionPersona +
     `\n# 任務說明（特定任務規範 — 蓋過上方平台通則）\n` +
