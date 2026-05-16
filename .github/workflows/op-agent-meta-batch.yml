@@ -1,0 +1,27 @@
+name: Ops — Batch dump agent meta by ids
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: comma-separated agent ids
+        default: "210279,30012,30001,30015"
+jobs:
+  d:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: dump metas
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          node --import tsx -e "
+            (async () => {
+              const { loadAgent } = await import('./server/_core/quickTaskOrchestra.ts');
+              const ids = '${{ github.event.inputs.ids }}'.split(',').map(s => Number(s.trim())).filter(Boolean);
+              for (const id of ids) {
+                const r = await loadAgent(id);
+                console.log('AGENT', id, '=>', JSON.stringify(r.meta), 'aiModel=', r.aiModel);
+              }
+            })().catch(e => { console.error(e); process.exit(1); });
+          "

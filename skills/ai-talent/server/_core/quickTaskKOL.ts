@@ -124,7 +124,10 @@ ${KOL_TONE}`,
     tier: "30s", postType: "generic",
     label: { en: "KOL Follow-Up Message", zh: "KOL 追蹤訊息（沒回 / 已聊 / 已合作後）" },
     description: "3 種情境的後續追蹤訊息，自然不催促",
-    agent_id: 60067, skill_slug: "kol-outreach",
+    // 2026-05-16 全 KOL 稽核：原 60067 = Victor Liao「SEO Data
+    // Analysis Report」，與 KOL 追蹤訊息不匹配。改派 30015 =
+    // Tom Chang「KOL Word-of-Mouth Marketing Exec」，整組 KOL 一致。
+    agent_id: 30015, skill_slug: "kol-outreach",
     primary_question: "上次溝通到哪裡？",
     primary_input: {
       key: "last_touch",
