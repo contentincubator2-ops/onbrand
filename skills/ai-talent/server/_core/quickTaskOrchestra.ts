@@ -335,9 +335,20 @@ async function callOneVariant(args: {
   // substitute the actual post slot before sending to LLM.
   const filledSystemPrompt = template.systemPrompt.replace(/\{label\}/g, label);
 
+  // 2026-05-16 (CJ「一句話 brand brief 變成長文改寫 — 指令太短還是
+  // agent 不準？」root cause): a single soft "字數 X-Y 字" line gets
+  // buried under the master persona + guardrails, so micro-tasks
+  // (headline / one-liner) blow past the cap and rewrite the pasted
+  // source instead of compressing. For small caps make the constraint
+  // authoritative + explicitly frame it as compression, not rewrite.
   const lengthHint =
     config.captionMaxChars > 0
-      ? `字數 ${config.captionMinChars}-${config.captionMaxChars} 字。`
+      ? (config.captionMaxChars <= 60
+          ? `【嚴格字數 — 最高優先】整個 caption 必須在 ${config.captionMinChars}-${config.captionMaxChars} 字以內，` +
+            `只能是 1 句，不分段、不加 hashtag、不加開場白或解釋。` +
+            `這是「濃縮」任務：使用者貼的長文只是素材，你的工作是把它` +
+            `提煉成符合任務要求的那一句，**嚴禁改寫或摘要成多段**。`
+          : `字數 ${config.captionMinChars}-${config.captionMaxChars} 字。`)
       : "字數依任務本身規範。";
 
   // Critical ordering: urlContext goes AFTER brandPrefix so URL content is

@@ -536,10 +536,13 @@ export default function RunPage() {
       return { platform: "generic" as any, format: format as any, label: `generic:${format}` };
     }
 
-    // ── Layer 1: KOL outreach (kl-*) → 1:1 email letter mockup ──
-    // 2026-05-16 (CJ「KOL類別…我想要用的是email的mockup」). All KOL
-    // DM/invite tasks share the 寄件人/收件人/主旨 letter layout.
-    if (taskId.startsWith("kl-")) {
+    // ── Layer 1: KOL outreach → 1:1 email letter mockup ──
+    // 2026-05-16: only the actual MESSAGE tasks (invite opener /
+    // follow-up) use the 寄件人/收件人/主旨 letter layout. kl-30-
+    // brief-oneliner is a single-sentence brand brief, NOT a letter
+    // (CJ「這只是剪短改寫，不是濃縮」) — let it fall through to the
+    // clean generic card instead of being dressed as an email.
+    if (taskId === "kl-30-invite-opener" || taskId === "kl-30-followup") {
       return { platform: "email" as any, format: "dm" as any, label: "email:dm" };
     }
 
