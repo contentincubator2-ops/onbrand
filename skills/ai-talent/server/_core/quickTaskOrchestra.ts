@@ -146,9 +146,16 @@ export function aiModelToProvider(aiModel: string | null | undefined): ModelProv
   //   anthropic    40%  ┐ Claude total ≈65% (best zh-TW). anthropic +
   //   azure-claude 25%  ┘ azure-claude are SEPARATE quotas → no mutual
   //                       throttle, both run claude-sonnet-4-6.
-  //   openai       25%  (gpt-4.1-mini, strong zh-TW)
-  //   azure-foundry10%  (gpt-5.4-mini, OK zh-TW; smallest share —
-  //                       reasoning-budget-empty risk seen historically)
+  //   openai       35%  (gpt-4.1-mini, strong zh-TW)
+  //
+  // 2026-05-16: azure-foundry DROPPED from the weighted pick. Live
+  // probe showed provider:"azure-foundry" returned claude-sonnet-4-6
+  // (not gpt-5.4-mini) — its key is invalid/missing so invokeLLM skips
+  // it and silently lands on anthropic (chain head). Including it in
+  // the weights just meant a hidden +10% to anthropic, defeating the
+  // spread. Its 10% reallocated to openai (proven working). azure-
+  // foundry stays in the fallback CHAIN so it auto-recovers as a
+  // backstop the moment its key is fixed — no code change needed then.
   // The agent's aiModel string is intentionally ignored: it's Azure /
   // Chinese vendor naming, not meaningful for routing under this policy,
   // and callers already pass model=undefined so each provider uses its
@@ -159,8 +166,7 @@ export function aiModelToProvider(aiModel: string | null | undefined): ModelProv
   const r = Math.random();
   if (r < 0.40) return "anthropic";
   if (r < 0.65) return "azure-claude";
-  if (r < 0.90) return "openai";
-  return "azure-foundry";
+  return "openai"; // 0.65–1.00 = 35%
 }
 
 /**

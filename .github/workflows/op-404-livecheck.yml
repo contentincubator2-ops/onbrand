@@ -25,6 +25,17 @@ jobs:
               }
             }).catch(e=>{console.error('IMPORT FAIL',e);process.exit(1);});
           "
+      - name: azure-claude isolation — key present + direct endpoint reachable
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          echo "AZURE_CLAUDE_SWEDEN_API_KEY len: ${#AZURE_CLAUDE_SWEDEN_API_KEY}"
+          echo "AZURE_CLAUDE_SWEDEN_ENDPOINT: ${AZURE_CLAUDE_SWEDEN_ENDPOINT:-<unset→code default>}"
+          echo "AZURE_FOUNDRY_API_KEY len: ${#AZURE_FOUNDRY_API_KEY}"
+          # If key len is 0 → invokeLLM skips the provider → it was
+          # silently anthropic-via-fallback all along.
+
       - name: count anthropic-404 AFTER + verdict
         run: |
           set +e
