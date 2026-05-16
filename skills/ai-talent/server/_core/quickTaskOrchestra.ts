@@ -414,9 +414,21 @@ async function callOneVariant(args: {
   //      claude-haiku, not silently downgraded to claude-sonnet via DEFAULT)
   //   2. Template's preferredModel (per-task hardcoded provider only)
   //   3. qwen as final default
+  // 2026-05-16 (CJ「新聞稿品質太差，agent 是否也很差」root cause):
+  // when the assigned agent has NO aiModel, this used to fall back to
+  // template.preferredModel — which is hardcoded "qwen" (a Chinese
+  // model) for almost EVERY quick-task template (FB / PR / KOL / …).
+  // For a Taiwan-only product that emits weird Simplified / mainland
+  // phrasing → the systemic "agent quality" complaint. Fix: route the
+  // no-agent path through the SAME zh-TW Option-B policy. Only honour
+  // preferredModel when it explicitly names a safe non-Chinese
+  // provider; "qwen"/"zhipu"/azure-*/"any" all get the weighted
+  // non-Chinese pick (anthropic 55% / openai 45%).
+  const zhSafePick = (): ModelProvider => (Math.random() < 0.55 ? "anthropic" : "openai");
+  const pm = template.preferredModel as string;
   const provider: ModelProvider = agentAiModel
     ? aiModelToProvider(agentAiModel)
-    : (template.preferredModel === "any" ? "qwen" : (template.preferredModel as any));
+    : (pm === "anthropic" || pm === "openai" ? (pm as ModelProvider) : zhSafePick());
   // 2026-05-16 (CJ「企劃台慢」root cause): aiModelToProvider now FORCE-
   // returns "anthropic" (zh-TW policy). The agent's aiModel string
   // (e.g. "glm-4-flash", "qwen3-32b", "claude-haiku-4-5") is Azure /
