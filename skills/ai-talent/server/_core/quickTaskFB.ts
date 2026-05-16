@@ -83,7 +83,10 @@ export interface FBTaskTemplate {
    */
   contextSources?: DerivePath[];
   systemPrompt: string;                    // task-specific instruction, appended AFTER agent persona
-  preferredModel: "qwen" | "zhipu" | "azure-foundry" | "azure-position" | "hermes" | "any";
+  // 2026-05-16: added "anthropic" | "openai" so zh-TW tasks (e.g. KOL)
+  // can pin a non-Chinese provider explicitly. aiModelToProvider still
+  // overrides when the assigned agent has an aiModel.
+  preferredModel: "qwen" | "zhipu" | "azure-foundry" | "azure-position" | "hermes" | "anthropic" | "openai" | "any";
   /** maxTokens cap — 30s aim ~400, 60s ~900, 90s ~1800 */
   maxTokens: number;
   /** Default platform & post_type the quickTask output should embed.
