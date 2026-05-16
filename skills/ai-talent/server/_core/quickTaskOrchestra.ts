@@ -134,19 +134,33 @@ export interface OrchestraResult {
  *  Exported so theaterRouter (and other places) can derive provider from
  *  agent.aiModel consistently. */
 export function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
-  // 2026-05-15 (CJ「針對台灣使用者，不能用中國的 AI 模型」+ Anthropic
-  // credit 已加值並 probe 確認可用 claude-sonnet-4-6): product is
-  // Taiwan-only (zh-TW). Chinese models (qwen=Alibaba, zhipu/glm=Zhipu)
-  // emit Simplified + mainland phrasing → "詭異的圖和文". Azure subscription
-  // still DEAD (401). Now that Anthropic is funded again, Claude is the
-  // BEST zh-TW quality + non-Chinese, so every agent pins to anthropic.
-  // Diversity = fallback chain (anthropic → openai → gemini → … →
-  // qwen/zhipu only as last-resort so a total Claude/OpenAI outage
-  // degrades to Simplified-but-working rather than dying). Revert to
-  // per-model mapping once Azure billing renewed AND a zh-TW quality
-  // gate exists for Chinese models.
-  void aiModel; // intentionally ignored — see comment
-  return "anthropic";
+  // 2026-05-16 (CJ「剛剛的決定似乎不好」→ Option B): Taiwan-only product,
+  // no Chinese models (qwen/zhipu emit Simplified + mainland phrasing).
+  // All 4 non-Chinese providers now have working keys (anthropic credit
+  // topped, azure-claude Sweden key updated, azure-foundry key rotated,
+  // openai funded). Forcing 100% → anthropic (the old "Option A") makes
+  // anthropic a single bottleneck — its tier RPM/TPM throttles under
+  // 100-user load and the circuit breaker only spills REACTIVELY after
+  // saturation. Instead, weighted-random across the 4 non-Chinese
+  // providers so load spreads PROACTIVELY:
+  //   anthropic    40%  ┐ Claude total ≈65% (best zh-TW). anthropic +
+  //   azure-claude 25%  ┘ azure-claude are SEPARATE quotas → no mutual
+  //                       throttle, both run claude-sonnet-4-6.
+  //   openai       25%  (gpt-4.1-mini, strong zh-TW)
+  //   azure-foundry10%  (gpt-5.4-mini, OK zh-TW; smallest share —
+  //                       reasoning-budget-empty risk seen historically)
+  // The agent's aiModel string is intentionally ignored: it's Azure /
+  // Chinese vendor naming, not meaningful for routing under this policy,
+  // and callers already pass model=undefined so each provider uses its
+  // own proven default (no cross-provider 404). The fallback chain still
+  // backstops every pick; a provider that errors trips the circuit
+  // breaker and the chain rescues (qwen/zhipu only as final last-resort).
+  void aiModel;
+  const r = Math.random();
+  if (r < 0.40) return "anthropic";
+  if (r < 0.65) return "azure-claude";
+  if (r < 0.90) return "openai";
+  return "azure-foundry";
 }
 
 /**
