@@ -549,7 +549,15 @@ export default function RunPage() {
       li: "linkedin", em: "email", pr: "press",
     };
     const formatFromTaskId = (id: string): string => {
-      if (id.includes("ad-")) return "ad";
+      // 2026-05-16 (CJ「pr-30-lead-paragraph mockup 格式不對」):
+      // press (pr-) + email (em-) each have ONE mockup family. Decide
+      // by prefix FIRST — otherwise generic keyword scans below
+      // misfire, e.g. "pr-30-le[ad-]paragraph".includes("ad-") → "ad".
+      if (id.startsWith("pr-")) return "press-release";
+      if (id.startsWith("em-")) return "edm";
+      // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"
+      // inside words like "lead-paragraph" / "broadcast".
+      if (/(?:^|-)ad(?:-|$)/.test(id)) return "ad";
       if (id.includes("comment")) return "comment";
       if (id.includes("pinned")) return "pinned";
       if (id.includes("story")) return "story";
