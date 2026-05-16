@@ -50,26 +50,57 @@ ${KOL_TONE}`,
   {
     id: "kl-30-brief-oneliner",
     tier: "30s", postType: "generic",
-    label: { en: "Brand Brief One-Liner", zh: "一句話 Brand Brief 給 KOL" },
-    description: "把品牌定位濃縮成 KOL 可消化的一句話 brief",
+    label: { en: "Influencer Brief", zh: "KOL 合作 Brief（可直接給網紅）" },
+    description: "一份結構化的網紅合作 brief：背景、目標、核心訊息、必提必避、產出規格、時程",
     agent_id: 25, skill_slug: "kol-outreach",
-    primary_question: "想讓 KOL 抓到的核心訊息？",
+    primary_question: "這次合作的品牌 / 活動 + 想達成什麼？",
     primary_input: {
       key: "core_message",
-      placeholder: "例：我們的童書是給害怕讀中文的海外華人小孩用的",
+      placeholder: "例：家扶基金會母親節認養活動，想讓 KOL 帶動每月 700 元認養，貼一篇有溫度的故事文",
       type: "textarea",
     },
-    inputs: [{ key: "core_message", label: "核心訊息", type: "textarea", required: true }],
+    inputs: [{ key: "core_message", label: "品牌 / 活動 + 目標", type: "textarea", required: true }],
     contextSources: [
       "brand.positioning.goldenCircle.why",
       "brand.positioning.tagline.zhTagline",
     ],
-    systemPrompt: `產出 1 個一句話 brand brief（20-40 字）。
-**目標**：KOL 看過一次能記住 + 能在自己的內容裡自然講出來。
-**結構**：For [target] who [pain], we [unique solution]. 中文化、口語化。
-**輸出**：只寫那一句，不要解釋。
+    systemPrompt: `產出 1 份可直接交給網紅的「KOL 合作 Brief」文件（不是貼文、不是信、不是一句話）。
+使用者貼的長文 / 輸入只是素材 — 你要**萃取**成 brief，不是照抄或改寫成文章。
+**用 Markdown 標題分節，嚴格照以下結構與順序，每節 1-4 句具體可執行內容**：
+
+## 品牌 / 活動一句話
+（這次合作是誰、為誰、想推動什麼，一句講清楚）
+
+## 合作目標
+（這支內容要達成的具體成效，例如：帶動認養數 / 觸及 / 導流連結）
+
+## 受眾輪廓
+（這支內容主要要打到誰）
+
+## 核心訊息（KOL 必須帶到，2-3 點）
+- …
+- …
+
+## 內容方向與調性
+（建議切入角度 + 語氣；給創作空間，不要寫死逐字稿）
+
+## 產出規格
+（平台 / 形式 / 則數 / 長度或秒數 / 必附連結）
+
+## 必提 / 必避
+- 必提：指定 hashtag、@帳號、優惠或行動呼籲
+- 必避：不可出現的說法、競品、敏感詞
+- 揭露：依台灣規範標註合作關係（如 #合作 #廣告）
+
+## 時程
+（草稿交付 / 修改 / 上稿日；未知用 [待補：日期]）
+
+## 素材與連結
+（可用的圖文素材、官方連結；未知用 [待補：連結]）
+
+**規則**：具體、可執行、繁體中文、台灣用語。缺的具體資訊用「[待補：例如 上稿日期]」標出，不要反問使用者。只輸出 brief 本身，不要前言或結語。
 ${KOL_TONE}`,
-    preferredModel: "anthropic", maxTokens: 80,
+    preferredModel: "anthropic", maxTokens: 1400,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
@@ -108,8 +139,8 @@ export const KOL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "kl-30-brief-oneliner": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: 60030,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["短版", "情感版", "對比版"],
-    captionMinChars: 20, captionMaxChars: 60,
+    variantLabels: ["完整正式版", "精簡重點版", "活動主題版"],
+    captionMinChars: 350, captionMaxChars: 1400,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
   },
   "kl-30-followup": {

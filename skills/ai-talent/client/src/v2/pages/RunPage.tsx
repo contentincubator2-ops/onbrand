@@ -545,6 +545,11 @@ export default function RunPage() {
     if (taskId === "kl-30-invite-opener" || taskId === "kl-30-followup") {
       return { platform: "email" as any, format: "dm" as any, label: "email:dm" };
     }
+    // KOL 合作 Brief is a structured document handed to the influencer
+    // → render as a spec-sheet doc, not a letter / one-liner card.
+    if (taskId === "kl-30-brief-oneliner") {
+      return { platform: "generic" as any, format: "proposal-spec" as any, label: "generic:proposal-spec" };
+    }
 
     // ── Layer 1: taskId prefix → platform/format (richest mapping) ──
     const idPrefixMap: Record<string, string> = {
