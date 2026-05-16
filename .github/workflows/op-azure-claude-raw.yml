@@ -1,0 +1,28 @@
+name: Ops — Azure-Claude raw endpoint test (bypass fallback)
+on: { workflow_dispatch: {} }
+jobs:
+  raw:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          EP="${AZURE_CLAUDE_SWEDEN_ENDPOINT:-https://proj-claude-sweden-resource.services.ai.azure.com}"
+          EP="${EP%/}/anthropic/v1/messages"
+          echo "POST $EP"
+          RESP=$(curl -sk -w "\nHTTP:%{http_code}" -X POST "$EP" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: ${AZURE_CLAUDE_SWEDEN_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            --data '{"model":"claude-sonnet-4-6","max_tokens":20,"messages":[{"role":"user","content":"回 OK"}]}')
+          echo "── azure-claude raw response ──"
+          echo "$RESP" | cut -c1-500
+          echo ""
+          CODE=$(echo "$RESP" | grep -oE "HTTP:[0-9]+" | cut -d: -f2)
+          if [ "$CODE" = "200" ]; then
+            echo "✅ azure-claude is a REAL independent Claude backend (HTTP 200)"
+          else
+            echo "❌ azure-claude FAILED raw (HTTP $CODE) — it's been silently anthropic-via-fallback"
+          fi
