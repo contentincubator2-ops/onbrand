@@ -1,0 +1,19 @@
+name: Ops — Reset client node_modules (fix ENOTEMPTY)
+on: { workflow_dispatch: {} }
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+      - name: nuke + reinstall client node_modules
+        run: |
+          set -e
+          AI=/opt/onbrand/app/skills/ai-talent
+          cd "$AI/client"
+          echo "before:"; ls -la node_modules/@pipedream 2>/dev/null || echo "(no @pipedream)"
+          rm -rf node_modules/@pipedream
+          rm -rf node_modules .vite 2>/dev/null || true
+          npm cache verify >/dev/null 2>&1 || true
+          npm install --legacy-peer-deps 2>&1 | tail -8
+          echo "after: node_modules present?"; ls node_modules >/dev/null 2>&1 && echo OK || (echo MISSING; exit 1)
+          test -d node_modules/@pipedream/sdk && echo "@pipedream/sdk OK" || echo "@pipedream/sdk absent (ok if not a dep)"
