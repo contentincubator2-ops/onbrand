@@ -49,5 +49,8 @@ jobs:
               const [rows] = await pool.query(sql);
               for (const r of rows) console.log('POOL', r.id, '|', r.name, '|', r.title, '|', r.spLen);
               console.log('POOLCOUNT', rows.length);
+              const [k] = await pool.query(\"SELECT id, name, title, CHAR_LENGTH(COALESCE(specialty,'')) AS spLen FROM agents WHERE (title LIKE '%KOL%' OR title LIKE '%Influencer%' OR title LIKE '%Word-of-Mouth%' OR title LIKE '%Newsletter%' OR title LIKE '%LinkedIn%' OR title LIKE '%B2B%' OR title LIKE '%Brand Strategist%' OR title LIKE '%Press Release%' OR title LIKE '%Public Relations%' OR title LIKE '%Crisis%' OR title LIKE '%Research%' OR id BETWEEN 220511 AND 220520) AND id > 180430 ORDER BY id LIMIT 200\");
+              for (const r of k) console.log('POOL2', r.id, '|', r.name, '|', r.title, '|', r.spLen);
+              console.log('POOL2COUNT', k.length);
             })().catch(e => { console.error(e); process.exit(1); });
           "
