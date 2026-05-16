@@ -1,0 +1,36 @@
+name: Ops — Anthropic 404 full detail
+on: { workflow_dispatch: {} }
+jobs:
+  d:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - name: Full 404 body from pm2 log
+        run: |
+          set +e
+          grep -aE "anthropic.*404" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null | tail -3 | cut -c1-600
+          echo ""
+          echo "── deprecation reroute logic ──"
+          grep -rn 'openai.*is deprecated\|deprecated.*rerouting\|DEPRECATED_PROVIDERS\|LLM_DEFAULT_PROVIDER' /opt/onbrand/app/skills/ai-talent/server/_core/llm.ts | head -8
+
+      - name: Live anthropic call w/ default model (isolate endpoint vs model)
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          node --import tsx -e "
+            import('./server/_core/llm.ts').then(async ({ invokeLLM }) => {
+              try {
+                const r = await invokeLLM({ provider:'anthropic', messages:[{role:'user',content:'回 OK 兩字'}] });
+                console.log('DEFAULT-MODEL OK:', r?.model, JSON.stringify(String(r?.choices?.[0]?.message?.content).slice(0,40)));
+              } catch(e){ console.error('DEFAULT-MODEL FAIL:', String(e?.message??e).slice(0,300)); }
+            }).catch(e=>{console.error('IMPORT FAIL',e);process.exit(1);});
+          "
+      - name: Show anthropic PROVIDER_CONFIG resolved baseUrl + key presence
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          echo "ANTHROPIC_API_KEY length: ${#ANTHROPIC_API_KEY}"
+          echo "ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-<unset, code default https://api.anthropic.com/v1>}"
+          grep -n 'anthropic: {' -A5 server/_core/llm.ts | head -8
