@@ -13,9 +13,41 @@ jobs:
           node --import tsx -e "
             (async () => {
               const { default: pool } = await import('./server/localDb.ts');
-              const ids = [24,26,29,32,35,39,30001,30002,30003,30004,30005,30006,30008,30009,30011,30012,30013,30014,30016,30017,30018,30019,30020,60002,60005,60008,60011,60012,60013,60021,60022,60029,60030,60031,60033,60035,60036,60037,60038,60046,60048,60055,60056,60060,60061,60062,60063,60064,60066,60068,60071,60072,60073,60080,90002,90004,90005,90006,90011,90015,90022,90031,90032,180003,180009,180015,180038,180039,180054,180062,180068,180141,180143,180150,180157,180159,180162,180165,180166,180167,180168,180170,180172,180173,180175,180176,180186,180193,180196,180197,180199,180203,180360,180437,180461,180479,180491,180509,180515,180521,180545,180567,180630,180797,210001,210011,210018,210019,210173,210206,210225,210252,210261,210266,210279,210303,210310,210311,210337,211502,220001,220164,220506,220507,220508,220528,220529,220583,220584,220751,220752,220755,220862,220869,220870,220871,220887,220896,220915,220927,220949,221080,222204,222206,222211,222311,222392,222504,222638,222665,223197,223253,223755,223993,223995,223996,224000,224001,224005,224007,224054,224056,224059,224061,224067,224071,224079,224081,224086,224089,224091,224094,224101,224114,224116,224121,224154,224156,224159,224167,224171,224179,224196,238853,239023,239024];
-              const [rows] = await pool.query('SELECT id, name, title FROM agents WHERE id IN (' + ids.join(',') + ')');
-              const m = {}; for (const r of rows) m[r.id] = r.name + ' | ' + r.title;
-              for (const id of ids) console.log('A', id, '=>', m[id] || '(NOT FOUND)');
+              const likes = [
+                \"title LIKE '%Social Media%'\",
+                \"title LIKE '%Social Content%'\",
+                \"title LIKE '%Facebook%'\",
+                \"title LIKE '%Instagram%'\",
+                \"title LIKE '%Social Copywriter%'\",
+                \"title LIKE '%Short%Video%'\",
+                \"title LIKE '%Reel%'\",
+                \"title LIKE '%Short-form%'\",
+                \"title LIKE '%Video Producer%'\",
+                \"title LIKE '%Script%'\",
+                \"title LIKE '%LinkedIn%'\",
+                \"title LIKE '%B2B%'\",
+                \"title LIKE '%Newsletter%'\",
+                \"title LIKE '%Thought Leader%'\",
+                \"title LIKE '%PR %'\",
+                \"title LIKE '%Press Release%'\",
+                \"title LIKE '%Public Relations%'\",
+                \"title LIKE '%Crisis%'\",
+                \"title LIKE '%Research%'\",
+                \"title LIKE '%User Research%'\",
+                \"title LIKE '%Insight%'\",
+                \"title LIKE '%UX%'\",
+                \"title LIKE '%Brand Strategist%'\",
+                \"title LIKE '%Brand Narrative%'\",
+                \"title LIKE '%Brand%Strategy%'\",
+                \"title LIKE '%Creative Director%'\",
+                \"title LIKE '%Copywriter%'\",
+                \"title LIKE '%KOL%'\",
+                \"title LIKE '%Influencer%'\",
+                \"title LIKE '%Word-of-Mouth%'\"
+              ];
+              const sql = 'SELECT id, name, title, CHAR_LENGTH(COALESCE(specialty,\\'\\')) AS spLen FROM agents WHERE ' + likes.join(' OR ') + ' ORDER BY id LIMIT 200';
+              const [rows] = await pool.query(sql);
+              for (const r of rows) console.log('POOL', r.id, '|', r.name, '|', r.title, '|', r.spLen);
+              console.log('POOLCOUNT', rows.length);
             })().catch(e => { console.error(e); process.exit(1); });
           "
