@@ -2112,6 +2112,69 @@ async function main() {
     `);
     console.log("[migrate] bug_reports: OK");
 
+    // 2026-05-16 (CJ「schema 跟 migrate 不同步，抓出孤兒表」):
+    // op-schema-audit found 8 schema.ts tables absent in prod. 3 are
+    // actually referenced by code (the rest are dead/doc-only). Create
+    // the 3 so unguarded drizzle queries stop throwing. DDL mirrors
+    // drizzle/schema.ts; DATETIME(3) matches the existing convention.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS mission_task_units (
+        id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        missionId   INT NOT NULL,
+        agentId     INT NULL,
+        label       VARCHAR(255) NOT NULL,
+        status      ENUM('not_started','running','needs_input','review','approved')
+                      NOT NULL DEFAULT 'not_started',
+        sortOrder   INT DEFAULT 0,
+        taskId      INT NULL,
+        createdAt   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_mission (missionId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] mission_task_units: OK");
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS agent_learnings (
+        id               INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        agentId          INT NOT NULL,
+        userId           INT NOT NULL,
+        brandId          INT NULL,
+        taskId           INT NULL,
+        subscriptionPlan ENUM('per_task','monthly','team') NOT NULL,
+        isPrivate        TINYINT(1) NOT NULL DEFAULT 0,
+        taskTitle        VARCHAR(255) NOT NULL,
+        taskDescription  TEXT NULL,
+        taskType         VARCHAR(64) NULL,
+        outputSummary    TEXT NULL,
+        fullOutput       LONGTEXT NULL,
+        userRating       INT NULL,
+        userFeedback     TEXT NULL,
+        feedbackAt       DATETIME(3) NULL,
+        brandContext     JSON NULL,
+        createdAt        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_agent (agentId), KEY idx_user (userId), KEY idx_brand (brandId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] agent_learnings: OK");
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS agent_memories (
+        id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId      INT NOT NULL,
+        agentSlug   VARCHAR(64) NOT NULL,
+        brandId     INT NULL,
+        memoryType  ENUM('preference','forbidden','audience','style','other') DEFAULT 'other',
+        content     TEXT NOT NULL,
+        isActive    TINYINT(1) NOT NULL DEFAULT 1,
+        createdAt   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_user_agent (userId, agentSlug), KEY idx_brand (brandId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] agent_memories: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
