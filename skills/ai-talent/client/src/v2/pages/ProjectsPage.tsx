@@ -337,6 +337,30 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
         },
       })
     : null;
+
+  // 2026-05-16 (CJ「任務的四個按鍵，只有重新命名有用」): 建立複本 + 移到
+  // 垃圾桶 had empty onClick (dead). Wire to the existing
+  // mission.duplicate / mission.delete procedures (both take {id}).
+  const duplicateMut = (trpc as any).mission?.duplicate?.useMutation
+    ? (trpc as any).mission.duplicate.useMutation({
+        onSuccess: () => {
+          (utils as any).mission?.listAllForUser?.invalidate?.();
+          showToastGlobal(lang === "en" ? "Duplicate created" : "已建立複本", "success");
+        },
+        onError: (e: any) =>
+          showToastGlobal((lang === "en" ? "Duplicate failed: " : "建立複本失敗：") + (e?.message ?? e)),
+      })
+    : null;
+  const deleteMut = (trpc as any).mission?.delete?.useMutation
+    ? (trpc as any).mission.delete.useMutation({
+        onSuccess: () => {
+          (utils as any).mission?.listAllForUser?.invalidate?.();
+          showToastGlobal(lang === "en" ? "Moved to trash" : "已移到垃圾桶", "success");
+        },
+        onError: (e: any) =>
+          showToastGlobal((lang === "en" ? "Delete failed: " : "刪除失敗：") + (e?.message ?? e)),
+      })
+    : null;
   const displayTitle = optimisticTitle ?? mission.title ?? "";
   const startEditing = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -471,11 +495,31 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             >
               <Pencil size={11} /> {lang === "en" ? "Rename" : "重新命名"}
             </button>
-            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2 text-default-600">
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); setMenuOpen(false);
+                duplicateMut?.mutate?.({ id: mission.id });
+              }}
+              disabled={duplicateMut?.isPending}
+              className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2 text-default-600 disabled:opacity-50"
+            >
               <Copy size={11} /> {lang === "en" ? "Duplicate" : "建立複本"}
             </button>
             <div className="border-t border-default-100 my-1" />
-            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-danger-50 flex items-center gap-2 text-danger">
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); setMenuOpen(false);
+                const name = (optimisticTitle ?? mission.title ?? "").slice(0, 40);
+                if (!window.confirm(
+                  lang === "en"
+                    ? `Move "${name}" to trash? This cannot be undone.`
+                    : `確定把「${name}」移到垃圾桶？此動作無法復原。`
+                )) return;
+                deleteMut?.mutate?.({ id: mission.id });
+              }}
+              disabled={deleteMut?.isPending}
+              className="w-full px-3 py-1.5 text-xs text-left hover:bg-danger-50 flex items-center gap-2 text-danger disabled:opacity-50"
+            >
               <Trash2 size={11} /> {lang === "en" ? "Move to trash" : "移到垃圾桶"}
             </button>
           </div>
