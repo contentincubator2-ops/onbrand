@@ -1,0 +1,35 @@
+name: Ops — Dump agent persona for a task
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: quick-task id
+        default: kl-30-influencer-brief
+      agent_id:
+        description: fallback agent id
+        default: "25"
+jobs:
+  d:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: resolve + dump persona
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          node --import tsx -e "
+            (async () => {
+              const { resolveAgentId } = await import('./server/_core/agentAssignments.ts');
+              const { loadAgent } = await import('./server/_core/quickTaskOrchestra.ts');
+              const tid = '${{ github.event.inputs.task_id }}';
+              const fb = Number('${{ github.event.inputs.agent_id }}');
+              const id = resolveAgentId(tid, 'lead', fb);
+              console.log('resolved agent id:', id);
+              const r = await loadAgent(id);
+              console.log('meta:', JSON.stringify(r.meta));
+              console.log('aiModel:', r.aiModel);
+              console.log('── persona ──');
+              console.log(r.persona);
+            })().catch(e => { console.error(e); process.exit(1); });
+          "
