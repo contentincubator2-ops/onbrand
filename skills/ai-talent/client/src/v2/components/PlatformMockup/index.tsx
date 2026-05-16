@@ -176,7 +176,14 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "generic:research-doc":   return <ResearchDoc   {...f} />;
     case "generic:persona-card":   return <PersonaCard   {...f} />;
 
-    // Defensive: unknown variant → honest placeholder
-    default: return <UnsupportedVariantPlaceholder variant={variant} {...f} />;
+    // Any other generic:* (e.g. generic:feed from RunPage's "last
+    // resort" layer for tasks without a platform prefix like
+    // kl-30-invite-opener) → GenericMockup, which renders the actual
+    // produced copy. 2026-05-16: previously fell to the placeholder
+    // below and silently dropped liveCaption.
+    default:
+      if (variant.platform === "generic") return <GenericMockup {...f} />;
+      // Defensive: unknown non-generic variant → honest placeholder
+      return <UnsupportedVariantPlaceholder variant={variant} {...f} />;
   }
 }
