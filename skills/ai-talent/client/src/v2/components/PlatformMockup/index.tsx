@@ -43,7 +43,7 @@ import {
   YTVideoCard, YTShorts, YTWatch, YTCommunity, YTPremiere, YTLive,
 } from "./youtube";
 import { TTForYou, TTProfile, TTCarousel, TTLive } from "./tiktok";
-import { EDMMockup, EmailNewsletterMockup } from "./email";
+import { EDMMockup, EmailNewsletterMockup, KOLEmailMockup } from "./email";
 import { GoogleSearchAd, GoogleDisplayAd, GooglePMax } from "./google";
 import { XTweet, XThread } from "./twitter";
 import { LINEBroadcast, LINECard, LINERichMenu } from "./line";
@@ -120,6 +120,7 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     // ── Email / EDM (2) ───────────────────────────────────────────────
     case "email:edm":              return <EDMMockup           {...f} />;
     case "email:email-newsletter": return <EmailNewsletterMockup {...f} />;
+    case "email:dm":               return <KOLEmailMockup       {...f} />;
 
     // ── Google Ads (5) ────────────────────────────────────────────────
     case "google:search-ad":   return <GoogleSearchAd  {...f} />;

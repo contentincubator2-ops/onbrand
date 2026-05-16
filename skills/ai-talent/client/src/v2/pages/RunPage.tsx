@@ -536,6 +536,13 @@ export default function RunPage() {
       return { platform: "generic" as any, format: format as any, label: `generic:${format}` };
     }
 
+    // ── Layer 1: KOL outreach (kl-*) → 1:1 email letter mockup ──
+    // 2026-05-16 (CJ「KOL類別…我想要用的是email的mockup」). All KOL
+    // DM/invite tasks share the 寄件人/收件人/主旨 letter layout.
+    if (taskId.startsWith("kl-")) {
+      return { platform: "email" as any, format: "dm" as any, label: "email:dm" };
+    }
+
     // ── Layer 1: taskId prefix → platform/format (richest mapping) ──
     const idPrefixMap: Record<string, string> = {
       fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",

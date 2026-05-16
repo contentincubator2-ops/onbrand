@@ -69,6 +69,7 @@ export type Format =
   // Email / EDM
   | "edm"             // full HTML email
   | "email-newsletter"// simple single-column newsletter
+  | "dm"              // 1:1 outreach letter (KOL invite etc.)
   // Google Ads
   | "search-ad"       // text search result ad
   | "display-ad"      // banner / image display ad
@@ -151,6 +152,7 @@ const VARIANT_LABELS: Record<string, string> = {
   // Email
   "email:edm":            "EDM 電子郵件",
   "email:email-newsletter": "電子報",
+  "email:dm":             "KOL 邀約信",
   // Google
   "google:search-ad":     "Google 搜尋廣告",
   "google:display-ad":    "Google 多媒體廣告",

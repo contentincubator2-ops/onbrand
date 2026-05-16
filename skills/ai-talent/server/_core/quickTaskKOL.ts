@@ -33,12 +33,18 @@ export const KOL_30S_TASKS: FBTaskTemplate[] = [
       type: "textarea",
     },
     inputs: [{ key: "context", label: "KOL + 合作主題", type: "textarea", required: true }],
-    systemPrompt: `產出 1 個 KOL 邀請開場 DM（80-150 字）。
-**結構**：先 hook（為什麼是你 — 提一個對方近期 post / 觀點） → 簡述合作邀請 → 不立刻丟條件。
-**禁區：** 不要寫「您好我是 XX 品牌的行銷專員」這種模板開頭。
-**輸出**：只寫 DM 本身，不要 prefix「以下是 DM 範例」。
+    systemPrompt: `產出 1 封 KOL 邀請開場 email（180-300 字，文情並茂）。
+這是一封正式但溫度高的邀約信，不是一句話 DM。
+**結構**：
+1. 開場 hook — 具體提一個對方近期 post／觀點／作品，講出你真的看過、被觸動的點（最關鍵，決定對方要不要往下讀）。
+2. 為什麼是你 — 把對方的特質和這次合作的精神連起來，讓對方覺得「這是為我量身找的」。
+3. 合作邀請 — 說清楚是什麼樣的合作、想一起達成什麼，描繪畫面但先不丟價碼／硬條件。
+4. 收尾 — 一個低壓力、容易回覆的邀請（"想先聽聽你的想法" 而非 "請問願不願意"）。
+**文筆要求**：句子有節奏、有真誠的情感溫度，像一個懂對方的人寫的信，不是模板。可適度分段。
+**禁區：** 不要寫「您好我是 XX 品牌的行銷專員」這種模板開頭；不要列點式生硬條列。
+**輸出**：只寫信件本文（可含簡短稱呼與署名感的收尾），不要 prefix「以下是範例」、不要寫主旨行。
 ${KOL_TONE}`,
-    preferredModel: "qwen", maxTokens: 300,
+    preferredModel: "anthropic", maxTokens: 600,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
@@ -63,7 +69,7 @@ ${KOL_TONE}`,
 **結構**：For [target] who [pain], we [unique solution]. 中文化、口語化。
 **輸出**：只寫那一句，不要解釋。
 ${KOL_TONE}`,
-    preferredModel: "qwen", maxTokens: 80,
+    preferredModel: "anthropic", maxTokens: 80,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
   {
@@ -86,7 +92,7 @@ ${KOL_TONE}`,
 - 已合作完：感謝 + 為下次留口（不要立刻問下個合作）
 **禁區**：不要寫「想跟您確認一下」這種催促感。
 ${KOL_TONE}`,
-    preferredModel: "qwen", maxTokens: 250,
+    preferredModel: "anthropic", maxTokens: 250,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
 ];
@@ -96,7 +102,7 @@ export const KOL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: 60030,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["真誠版", "互惠版", "新聞點切入版"],
-    captionMinChars: 80, captionMaxChars: 150,
+    captionMinChars: 180, captionMaxChars: 320,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
   },
   "kl-30-brief-oneliner": {
