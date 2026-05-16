@@ -209,7 +209,7 @@ ${FB_TONE_SUFFIX}`,
     postType: "comment",
     label: "FB 留言回覆（一般）",
     description: "正面 / 中性留言的品牌回覆",
-    agent_id: 222206,             // Huang Zi-Hao — Crisis PR Specialist (1080 char persona)
+    agent_id: 180162,             // Jason Peng | Social Media Copywriter
     skill_slug: "social-copy",
     primary_question: "貼上原始用戶留言，或留言所在的貼文連結",
     primary_input: { key: "user_comment", placeholder: "用戶說了什麼？整段留言貼進來", type: "textarea" },
@@ -319,7 +319,7 @@ caption 欄位放 5 個編號 description（每行一個）。${FB_TONE_SUFFIX}`
     postType: "pinned",
     label: "FB 釘選貼文短文案",
     description: "粉專置頂用，講清楚「我們是誰」「為什麼追蹤」",
-    agent_id: 60064,             // Kevin Tan — Social Media Strategist eCommerce MY (1147 char)
+    agent_id: 60024,             // Jason Gong | Tech Brand Social Copywriter
     skill_slug: "fb-copywriting",
     primary_question: "想讓第一次來粉專的人，3 秒內知道你做什麼？",
     primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼值得追蹤", type: "textarea" },

@@ -46,7 +46,7 @@ export const FB_60S_TASKS_V2: FBTaskTemplate[] = [
     postType: "feed",
     label: "FB 單篇完整貼文",
     description: "5 variants + 5 真生圖 + 留言模板 + 發文時段 + 24h 跟進",
-    agent_id: 222211, // Hsieh Jia-Rong — Meta Ads Creative Strategist (1322 char)
+    agent_id: 60021, // Tina Ji | Facebook/Instagram Social Copywriter
     skill_slug: "fb-copywriting",
     primary_question: "今天這篇貼文要講什麼？",
     primary_input: { key: "topic", placeholder: "例：春季新品 / 客戶感謝 / 產品 lifestyle", type: "textarea" },
@@ -69,7 +69,7 @@ ${FB60_TONE}`,
     postType: "feed",
     label: "FB 連結貼文（完整版）",
     description: "OG 文案 + 縮圖風格 + 引言 + 留言模板 + 發文時段",
-    agent_id: 180437, // Tina Ji
+    agent_id: 60025, // Fiona Fei | F&B Brand Social Copywriter
     skill_slug: "social-copy",
     primary_question: "貼上要分享的連結",
     primary_input: { key: "url", placeholder: "https://...", type: "text" },
@@ -114,7 +114,7 @@ ${FB60_TONE}`,
     postType: "carousel",
     label: "FB Carousel 5 卡輪播",
     description: "Hook-Build-Turn-Payoff-CTA + Strategist 結構 + 5 卡敘事",
-    agent_id: 224061, // Xiu Yi Chen — Email & CRM Strategist Beauty SG (1250 char)
+    agent_id: 180148, // David Chen | Social Media Manager
     skill_slug: "social-copy",
     primary_question: "輪播主題是什麼？",
     primary_input: { key: "topic", placeholder: "輪播 5 卡要傳達的主題", type: "textarea" },
@@ -136,7 +136,7 @@ ${FB60_TONE}`,
     postType: "feed",
     label: "FB 5 天倒數系列",
     description: "Strategist 設計倒數弧 + 5 天 5 篇平行寫作 + 各自配圖",
-    agent_id: 224056, // Priya Nair — Email & CRM Strategist Health SG (1253 char)
+    agent_id: 180159, // Claire Hsu | Social Media Brand Strategist
     skill_slug: "social-media-manager",
     primary_question: "活動名稱是？",
     primary_input: { key: "event_name", placeholder: "例：週年慶 / 新品上市 / 限時優惠", type: "text" },
@@ -316,7 +316,7 @@ ${FB60_TONE}`,
     postType: "feed",
     label: "FB 客戶見證改寫文",
     description: "Kurt Chen 找見證結構 + Yawen Ma 改寫敘事 + Jason Evans 法務檢核",
-    agent_id: 224156, // Qory Andini — Email & CRM Strategist Health ID (1227 char)
+    agent_id: 60026, // Kevin Chiang | Financial Brand Social Copywriter
     skill_slug: "fb-copywriting",
     primary_question: "貼上原始客戶見證 / 訪談 / 評價",
     primary_input: { key: "testimonial_source", placeholder: "客戶原話、訪談逐字、評論截圖文字", type: "textarea" },

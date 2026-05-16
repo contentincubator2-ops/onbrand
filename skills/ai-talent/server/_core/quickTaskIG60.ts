@@ -37,7 +37,7 @@ export const IG_60S_TASKS: FBTaskTemplate[] = [
     postType: "feed",
     label: "IG 單篇完整貼文",
     description: "5 variants + 5 真生圖 + hashtag + 留言模板 + 發文時段",
-    agent_id: 224071, // Khai Ming Ng — Email & CRM Strategist B2B SaaS SG (1212 char)
+    agent_id: 60027, // Tina Lin | Travel Brand Social Copywriter
     skill_slug: "instagram-copywriting",
     primary_question: "今天這篇 IG 貼文要講什麼？",
     primary_input: { key: "topic", placeholder: "例：新品上市、客戶分享、幕後花絮", type: "textarea" },
@@ -59,7 +59,7 @@ ${IG_TONE}`,
     postType: "reel",
     label: "IG Reel 完整腳本",
     description: "Strategist 規劃 Hook-Hold-Payoff + 完整腳本 + 9:16 視覺",
-    agent_id: 224196, // Paolo Domingo — Email & CRM Strategist B2B SaaS PH (1181 char)
+    agent_id: 60031, // Yawen Ma | Brand Short Video Scriptwriter - Beauty
     skill_slug: "short-video-scriptwriter",
     primary_question: "這支 Reel 主題 / 賣點？",
     primary_input: { key: "topic", placeholder: "例：30 秒教學 / 開箱 / 反差展示", type: "textarea" },
@@ -104,7 +104,7 @@ ${IG_TONE}`,
     postType: "story",
     label: "IG Story 3 幀完整組",
     description: "前情 / 重點 / CTA 三幀連貫敘事 + sticker 互動建議",
-    agent_id: 210337, // Wendy Su
+    agent_id: 180182, // Brian Hsieh | Social Media Specialist
     skill_slug: "social-copy",
     primary_question: "Story 想傳達什麼？",
     primary_input: { key: "topic", placeholder: "例：新品預告、限時優惠、提問互動", type: "textarea" },
@@ -175,7 +175,7 @@ ${IG_TONE}`,
     postType: "live",
     label: "IG Live 直播完整配套 (5 段)",
     description: "預告 / 開場 / 高潮 / 結尾 / 精華 5 段平行",
-    agent_id: 180461, // Yiting Tsai
+    agent_id: 60072, // Yiting Tsai | Live Shopping Script - Beauty
     skill_slug: "live-content",
     primary_question: "直播主題？",
     primary_input: { key: "live_topic", placeholder: "Q&A / 新品試用 / 創辦故事", type: "text" },
@@ -198,7 +198,7 @@ ${IG_TONE}`,
     postType: "feed",
     label: "IG 3 篇連載敘事",
     description: "Strategist 設計 3 集弧 + 3 篇有勾連的連載貼文",
-    agent_id: 224086, // Stephanie Wong — Email & CRM Strategist Beauty MY (1282 char)
+    agent_id: 60028, // Wendy Chi | EdTech Social Copywriter
     skill_slug: "social-copy",
     primary_question: "想連載講什麼故事？",
     primary_input: { key: "story_topic", placeholder: "客戶轉型 / 團隊成長 / 產品歷程", type: "textarea" },
@@ -221,7 +221,7 @@ ${IG_TONE}`,
     postType: "feed",
     label: "IG 爆款改寫",
     description: "Strategist 找原爆款結構 + 改寫品牌版 + 對照表",
-    agent_id: 180479, // Jake Chou
+    agent_id: 180145, // Sophia Lin | Social Content Creator
     skill_slug: "instagram-copywriting",
     primary_question: "貼上爆款原文 / 連結 / 主題",
     primary_input: { key: "viral_source", placeholder: "原爆款貼文 / 連結 / 主題", type: "textarea" },
@@ -244,7 +244,7 @@ ${IG_TONE}`,
     postType: "feed",
     label: "IG 客戶見證改寫",
     description: "Strategist 找見證結構 + 改寫敘事 + 法務檢核",
-    agent_id: 210206, // Emily Wang
+    agent_id: 180152, // Tom Huang | Social Media Content Strategist
     skill_slug: "instagram-copywriting",
     primary_question: "貼上客戶見證 / 訪談 / 評價",
     primary_input: { key: "testimonial_source", placeholder: "客戶原話、訪談逐字、評論截圖文字", type: "textarea" },

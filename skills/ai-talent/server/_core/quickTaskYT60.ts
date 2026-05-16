@@ -47,7 +47,7 @@ ${YT_TONE}`,
     tier: "60s", postType: "thumbnail",
     label: "YT 縮圖 5 種風格",
     description: "5 種縮圖視覺方向 + 配合的 title 變體",
-    agent_id: 30006, // David Wu — Meta Ads Strategy PM (2030 char)
+    agent_id: 36, // Nina Yeh | YouTube Scriptwriter
     skill_slug: "youtube-thumbnail",
     primary_question: "影片主題 / 縮圖要傳達什麼？",
     primary_input: { key: "topic", placeholder: "影片主題或關鍵畫面", type: "textarea" },
@@ -79,7 +79,7 @@ ${YT_TONE}`,
     tier: "60s", postType: "community",
     label: "YT Community 貼文",
     description: "5 種社群貼文（投票 / 圖片 / 文字 / 問答 / 預告）",
-    agent_id: 30019, // Henry Ho — Marketing Data Analyst (1997 char)
+    agent_id: 180157, // Nina Cheng | Social Media Engagement Manager
     skill_slug: "youtube-community",
     primary_question: "Community 想傳達什麼？",
     primary_input: { key: "topic", placeholder: "新片預告 / 互動問答 / 幕後", type: "textarea" },

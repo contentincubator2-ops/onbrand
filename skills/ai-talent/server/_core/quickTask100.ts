@@ -73,7 +73,7 @@ ${TONE_100}`,
     tier: "100s", postType: "event",
     label: "FB 完整 Launch Toolkit (8 篇)",
     description: "預告 ×3 / 當日 / 即時 ×2 / 事後 / 跨平台 IG 改寫 + scout 抓節慶/時事",
-    agent_id: 30001, // Tom Chang — KOL Word-of-Mouth Marketing Exec (2274 char)
+    agent_id: 60014, // Cindy Mo | Social Media Marketing (F&B)
     skill_slug: "fb-copywriting",
     primary_question: "活動名稱 + 日期 + 重點？",
     primary_input: { key: "event_name", placeholder: "例：5/20 線上發表會", type: "text" },
@@ -136,7 +136,7 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "feed",
     label: "IG 30 天內容月曆",
     description: "30 天 feed/reel/story 配比 + 每篇 hook + hashtag 策略 + 真實爆款參考",
-    agent_id: 224067, // Yong Qi Chua — Meta Ads Specialist B2B SaaS SG (1199 char)
+    agent_id: 60008, // Fiona Hsieh | Social Media Marketing Strategist (Beauty)
     skill_slug: "instagram-strategy",
     primary_question: "本月主題？",
     primary_input: { key: "monthly_focus", placeholder: "本月主推", type: "textarea" },
@@ -151,7 +151,7 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "reel",
     label: "IG Reel 6 集系列",
     description: "Strategist 設計 6 集弧 + 每集完整腳本（hook + hold + payoff）+ 縮圖 brief",
-    agent_id: 224121, // Dinh Van Nam — Email & CRM Strategist B2B SaaS VN (1157 char)
+    agent_id: 60033, // Yawen Yeh | E-commerce Short Video Scriptwriter
     skill_slug: "short-video-scriptwriter",
     primary_question: "6 集系列主題？",
     primary_input: { key: "series_topic", placeholder: "教學系列 / 故事系列", type: "textarea" },
@@ -166,7 +166,7 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "profile",
     label: "IG 帳號重新定位完整套組",
     description: "新 bio + 9 個 highlight 主題 + 9 篇 launch posts + visual direction",
-    agent_id: 180003, // David Lin — Google Ads Specialist (1745 char)
+    agent_id: 180141, // Rachel Chen | Social Media Strategy Director
     skill_slug: "instagram-strategy",
     primary_question: "想重新定位的方向？",
     primary_input: { key: "new_direction", placeholder: "想轉成什麼方向 / 受眾", type: "textarea" },
@@ -236,7 +236,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "foryou",
     label: "TikTok 30 天 ForYou 配方",
     description: "30 天每天 1 支腳本 + trend 對應 + sound 建議 + scout 抓節慶/時事",
-    agent_id: 210011, skill_slug: "short-video-script", // Wendy Lu — AI Email List Nurturing (1926 char)
+    agent_id: 27, skill_slug: "short-video-script", // Chloe Chen | Short Video Strategist (Beauty)
     primary_question: "本月想衝什麼方向？",
     primary_input: { key: "monthly_theme", placeholder: "教學 / 反差 / 開箱 為主", type: "textarea" },
     inputs: [{ key: "monthly_theme", label: "本月方向", type: "textarea", required: true }],
@@ -264,7 +264,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "feed",
     label: "LI 30 天 Thought-Leadership 月曆",
     description: "30 天 = 10 觀點 / 10 案例 / 10 趨勢預測 + scout 抓即時節慶",
-    agent_id: 224171, skill_slug: "linkedin-b2b", // Purnama Sari — Email & CRM Strategist B2B SaaS ID (1184 char)
+    agent_id: 222342, skill_slug: "linkedin-b2b", // Hung Ya-Wen | Social Media Strategist – B2B SaaS
     primary_question: "這個月想立什麼專業 image？",
     primary_input: { key: "expertise_area", placeholder: "AI / 領導力 / SaaS 等", type: "textarea" },
     inputs: [{ key: "expertise_area", label: "專業領域", type: "textarea", required: true }],
@@ -278,7 +278,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "newsletter",
     label: "LI 季度 Newsletter 4 期",
     description: "季度 4 期 newsletter 完整內容 + 訂閱成長策略",
-    agent_id: 220164, skill_slug: "linkedin-b2b", // Sophia Hsu — Digital Transformation Consultant
+    agent_id: 60062, skill_slug: "linkedin-b2b", // Nathan Lu | Media Newsletter Copywriter
     primary_question: "newsletter 季度大主題？",
     primary_input: { key: "quarter_topic", placeholder: "本季想串什麼主題", type: "textarea" },
     inputs: [{ key: "quarter_topic", label: "季度主題", type: "textarea", required: true }],
@@ -335,7 +335,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: { en: "Brand Reposition Toolkit", zh: "品牌重新定位完整 Toolkit" },
     description: "Positioning + Tagline 套 + Voice guide + Visual direction + 應用範例",
-    agent_id: 222665, skill_slug: "brand-strategy", // Chih-Ming Yang — PR Strategist 電商/DTC (477 char)
+    agent_id: 60002, skill_slug: "brand-strategy", // Ethan Chiang | DTC E-commerce Brand Strategist
     primary_question: "想往什麼方向轉？（已讀入現有定位作為起點）",
     primary_input: { key: "new_position", placeholder: "新定位方向 / 想拋下的舊包袱", type: "textarea" },
     inputs: [{ key: "new_position", label: "新定位方向", type: "textarea", required: true }],
@@ -355,7 +355,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: { en: "Brand Voice Playbook", zh: "品牌語氣完整 Playbook" },
     description: "8 個應用情境 + Do/Don't 詳細 + 5 個範例 + 跨平台 voice 適配",
-    agent_id: 26, skill_slug: "brand-strategy", // Emma Wu — Meta Ads Strategist (specialty 4338 chars)
+    agent_id: 32, skill_slug: "brand-strategy", // Fiona Hsu | Copywriter
     primary_question: "想補充或微調哪些情境？（已讀入既有 Voice — 留空即直接展開 8 情境 playbook）",
     primary_input: { key: "voice_direction", placeholder: "選填 — 想強化的特定情境，如客服 / 危機 / 跨國", type: "textarea" },
     inputs: [{ key: "voice_direction", label: "情境補充（選填）", type: "textarea", required: false }],
@@ -373,7 +373,7 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     tier: "100s", postType: "press",
     label: { en: "User Research · Discovery Sprint", zh: "用戶研究 5 天 Discovery Sprint" },
     description: "訪綱 + 5 personas + JTBD map + insights synthesis + 行動建議",
-    agent_id: 222638, skill_slug: "user-research", // Chun-Chieh Hung — PR Strategist 製藥/醫藥 (470 char)
+    agent_id: 90043, skill_slug: "user-research", // Lydia Chiu | Qualitative Research Director
     primary_question: "想了解用戶什麼？（已讀入既有受眾定位 — 留空即用既有 persona 延伸研究假設）",
     primary_input: {
       key: "research_goal",
@@ -488,7 +488,7 @@ ${TONE_100}`,
     tier: "100s", postType: "press",
     label: { en: "KOL Campaign Toolkit", zh: "KOL Campaign 完整話術包" },
     description: "多 KOL 分層邀請 + 漏斗訊息 + brief 模板 + 報價回應 + 結案報告",
-    agent_id: 30012, skill_slug: "kol-outreach", // Tom Chang — KOL Word-of-Mouth (2274 char)
+    agent_id: 220920, skill_slug: "kol-outreach", // Chloe Chen | Senior KOL & Influencer Manager
     primary_question: "活動主題 + 預計合作量級？",
     primary_input: {
       key: "campaign_brief",

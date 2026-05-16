@@ -112,7 +112,7 @@ caption 結構（每變體）：
     postType: "story",
     label: "IG Story 文案 + sticker 建議",
     description: "9:16 主標 + 內文 + 推薦 sticker",
-    agent_id: 224081, // Amir Farouk — Email & CRM Strategist Health MY (1290 char)
+    agent_id: 180170, // Nancy Yeh | Social Media Visual Designer
     skill_slug: "brand-story",
     primary_question: "今天的 Story 想說什麼？",
     primary_input: { key: "topic", placeholder: "例：幕後 / 限時優惠 / 提問 / 投票", type: "textarea" },
@@ -185,7 +185,7 @@ emoji 適度，不要每行都塞。bio 有字數限制，每字都要算。`,
     postType: "feed",
     label: "IG hashtag 30 個套組",
     description: "3 階分層：核心 5 / 中型 15 / 長尾 10",
-    agent_id: 30005, // Emma Zhang — SEO Strategy PM
+    agent_id: 180176, // Michael Wu | Social Media Specialist
     skill_slug: "hashtag-discoverability",
     primary_question: "貼文主題 / 你的利基領域是？",
     primary_input: { key: "topic", placeholder: "例：手沖咖啡 / 北美室內設計 / SaaS B2B", type: "textarea" },
@@ -231,7 +231,7 @@ caption 放回覆文。description 可放原始用戶留言（mockup 顯示用�
     postType: "feed", // no dedicated DM mockup yet — fallback to feed
     label: "IG DM 自動回覆腳本",
     description: "3 種情境：詢價 / 售後 / 合作邀約",
-    agent_id: 60056, // Derek Tang — Customer Service Copywriter (E-commerce)
+    agent_id: 180163, // Helen Sung | Social Media Community Builder
     skill_slug: "customer-service-copy",
     primary_question: "你想處理哪類 DM？貼上常見訊息範例",
     primary_input: { key: "scenario", placeholder: "例：『請問還有貨嗎？』 / 『產品不滿意』 / 『想合作』", type: "textarea" },

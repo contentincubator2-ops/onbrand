@@ -28,7 +28,7 @@ export const TT_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "foryou",
     label: "TikTok ForYou 完整影片包",
     description: "Hook + hold + payoff 完整 60 秒腳本 + 5 變體",
-    agent_id: 210001, skill_slug: "short-video-script", // Jason Tsai — AI Customer Service Strategy Director (1767 char)
+    agent_id: 30011, skill_slug: "short-video-script", // Jason Huang | Short Video Script Creator
     primary_question: "這支 TikTok 主題？",
     primary_input: { key: "topic", placeholder: "教學 / 反差 / 揭密 / 開箱", type: "textarea" },
     inputs: [{ key: "topic", label: "影片主題", type: "textarea", required: true }],
@@ -107,7 +107,7 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "feed",
     label: "LI Thought Leadership 完整貼文",
     description: "Strategist 設計觀點 + 800 字深度文 + 配圖",
-    agent_id: 224167, skill_slug: "linkedin-b2b", // Budi Santoso — Meta Ads Specialist B2B SaaS ID (1172 char)
+    agent_id: 30018, skill_slug: "linkedin-b2b", // Fiona Fang | LinkedIn B2B Marketing Exec
     primary_question: "想分享什麼 B2B 觀點？",
     primary_input: { key: "topic", placeholder: "例：AI 工具用 6 個月的 3 個體悟", type: "textarea" },
     inputs: [{ key: "topic", label: "觀點主題", type: "textarea", required: true }],
@@ -121,7 +121,7 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "newsletter",
     label: "LI Newsletter 一期",
     description: "Strategist 設計目錄 + 完整 newsletter（標題 + 引言 + 3 段 + CTA）",
-    agent_id: 180491, skill_slug: "linkedin-b2b", // Penny Lee — LinkedIn Authority Builder
+    agent_id: 60060, skill_slug: "linkedin-b2b", // Zeyu Hsu | B2B Newsletter Copywriter
     primary_question: "本期主題？",
     primary_input: { key: "topic", placeholder: "本期 newsletter 想講什麼", type: "textarea" },
     inputs: [{ key: "topic", label: "Newsletter 主題", type: "textarea", required: true }],
@@ -290,7 +290,7 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: "品牌 Tagline 5 種版本",
     description: "Strategist 定原型 + 5 個 tagline 候選 + 應用情境",
-    agent_id: 223253, skill_slug: "brand-strategy", // Hsin-Jung Wang — PR Strategist 醫材 (483 char)
+    agent_id: 30016, skill_slug: "brand-strategy", // Grace Lin | Brand Copywriter
     primary_question: "品牌精神 / 核心差異？",
     primary_input: { key: "spirit", placeholder: "品牌精神、信念、做什麼", type: "textarea" },
     inputs: [{ key: "spirit", label: "品牌精神", type: "textarea", required: true }],
@@ -370,7 +370,7 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
     tier: "60s", postType: "generic",
     label: "用戶訪談大綱完整版",
     description: "Strategist 設計研究問題 + 開放式問題 + 探查 prompt",
-    agent_id: 223755, skill_slug: "user-research", // Chih-Hao Hsieh — PR Strategist 電商/DTC (476 char)
+    agent_id: 90060, skill_slug: "user-research", // [AI] Qualitative Researcher | Qualitative Researcher
     primary_question: "想了解用戶什麼？",
     primary_input: { key: "research_goal", placeholder: "研究目標 / 想驗證的假設", type: "textarea" },
     inputs: [{ key: "research_goal", label: "研究目標", type: "textarea", required: true }],
