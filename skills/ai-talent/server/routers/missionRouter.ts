@@ -386,7 +386,14 @@ export const missionRouter = router({
         .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)))
         .limit(1);
       if (!orig) throw new Error('Mission not found');
-      await db.delete(missionTaskUnits).where(eq(missionTaskUnits.missionId, input.id));
+      // 2026-05-16 (CJ「刪除失敗：Failed query ... mission_task_units」):
+      // mission_task_units is in the drizzle schema but was never added
+      // to scripts/migrate.ts, so it doesn't exist in prod — the
+      // unguarded delete threw and aborted the whole mission delete.
+      // Best-effort cleanup of child rows (same pattern as the
+      // mission_step_progress line below).
+      try { await db.delete(missionTaskUnits).where(eq(missionTaskUnits.missionId, input.id)); }
+      catch { /* table may not exist yet */ }
       try { await db.execute(sql`DELETE FROM mission_step_progress WHERE mission_id = ${input.id}`); }
       catch { /* table may not exist yet */ }
       await db.delete(missions)
