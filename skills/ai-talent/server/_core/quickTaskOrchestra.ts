@@ -404,7 +404,17 @@ async function callOneVariant(args: {
   const provider: ModelProvider = agentAiModel
     ? aiModelToProvider(agentAiModel)
     : (template.preferredModel === "any" ? "qwen" : (template.preferredModel as any));
-  const explicitModel: string | undefined = agentAiModel || undefined;
+  // 2026-05-16 (CJ「企劃台慢」root cause): aiModelToProvider now FORCE-
+  // returns "anthropic" (zh-TW policy). The agent's aiModel string
+  // (e.g. "glm-4-flash", "qwen3-32b", "claude-haiku-4-5") is Azure /
+  // vendor naming — passing it as the explicit model to the *direct*
+  // Anthropic API → 404 not_found on EVERY call → wasted RTT then
+  // fallback to openai. That 404-then-retry on every single LLM call
+  // is why theater (63 calls/run) crawled. Fix: stop pinning the
+  // per-agent model. Let each provider use its own proven default
+  // (anthropic → claude-sonnet-4-6, confirmed working via probe).
+  const explicitModel: string | undefined = undefined;
+  void agentAiModel; // provider already derived above; model intentionally unset
 
   // 2026-05-09 (CJ direction「掃描 ai provider + agent model 匹配」):
   // Resilient parse. LLM sometimes returns valid Chinese caption but in a

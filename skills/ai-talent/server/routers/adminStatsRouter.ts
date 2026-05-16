@@ -453,7 +453,9 @@ export const adminStatsRouter = router({
       let verdict = "needs_human", reason = "(triage 無法判定)", model = "unknown";
       try {
         const r: any = await invokeLLM({
-          provider: "anthropic", model: "claude-haiku-4-5",
+          // 2026-05-16: dropped model:"claude-haiku-4-5" — Azure naming,
+          // invalid on direct Anthropic API → 404. Use proven default.
+          provider: "anthropic",
           messages: [{ role: "user", content: prompt }],
           maxTokens: 200,
         });

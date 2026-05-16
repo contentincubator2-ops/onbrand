@@ -403,7 +403,10 @@ export const theaterRouter = router({
       try {
         const r = await invokeLLM({
           provider: "anthropic",
-          model: "claude-haiku-4-5",
+          // 2026-05-16: removed model:"claude-haiku-4-5" — invalid on the
+          // direct Anthropic API (Azure naming) → 404 every theater cell
+          // → fallback chain → 企劃台 crawl. Let anthropic use its
+          // proven default (claude-sonnet-4-6).
           maxTokens: 800,
           messages: [
             {
@@ -730,7 +733,11 @@ ${importantHint}
         const derivedProvider = agentAiModel ? aiModelToProvider(agentAiModel) : undefined;
         const r = await invokeLLM({
           ...(derivedProvider ? { provider: derivedProvider as any } : {}),
-          ...(agentAiModel ? { model: agentAiModel } : {}),
+          // 2026-05-16: do NOT pass the agent's vendor model string as
+          // `model` — aiModelToProvider force-maps to anthropic (zh-TW
+          // policy) and "glm-4-flash"/"qwen3-32b"/"claude-haiku-4-5" are
+          // not valid direct-Anthropic models → 404 every call. Provider
+          // uses its proven default instead.
           maxTokens: 800,
           // Higher temperature + presence_penalty pushes the model off its
           // template prior. Reasoning models will strip these automatically.
@@ -837,7 +844,10 @@ ${importantHint}
       try {
         const r = await invokeLLM({
           provider: "anthropic",
-          model: "claude-haiku-4-5",
+          // 2026-05-16: removed model:"claude-haiku-4-5" — invalid on the
+          // direct Anthropic API (Azure naming) → 404 every theater cell
+          // → fallback chain → 企劃台 crawl. Let anthropic use its
+          // proven default (claude-sonnet-4-6).
           maxTokens: 800,
           messages: [
             {
@@ -910,7 +920,10 @@ ${cleaned}
       try {
         const r = await invokeLLM({
           provider: "anthropic",
-          model: "claude-haiku-4-5",
+          // 2026-05-16: removed model:"claude-haiku-4-5" — invalid on the
+          // direct Anthropic API (Azure naming) → 404 every theater cell
+          // → fallback chain → 企劃台 crawl. Let anthropic use its
+          // proven default (claude-sonnet-4-6).
           maxTokens: 180,
           messages: [
             {
