@@ -388,9 +388,12 @@ const FB60_DIR_DREW   = 220726; // Drew Chen — Decision Design Consultant
 
 export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 1. 單篇完整貼文
+  // 2026-05-18 (CJ「承諾是完整貼文，圖完成才展示；60s 來不及 5 個就 2 個」):
+  // 此任務交付的是「完整貼文」(文+圖)，不該先給沒圖的半成品。降到 2 版
+  // 讓文+圖能在 60s 內都完成；holdForImages 讓前端在圖好之前不顯示 mockup。
   "fb-60-single-full": {
-    variants: 5,
-    images: 5,
+    variants: 2,
+    images: 2,
     runImageGen: true,
     imageDirectorId: MANDY,
     aspectRatio: "1:1",
@@ -399,6 +402,7 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["情感版", "理性版", "故事版", "數據版", "懸念版"],
     captionMinChars: 200,
     captionMaxChars: 400,
+    holdForImages: true,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
 

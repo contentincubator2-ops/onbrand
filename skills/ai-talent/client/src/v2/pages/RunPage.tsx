@@ -84,6 +84,13 @@ const PR_CRAFT_REF: Record<string, { case: string; award: string; principle: str
   "pr-99-newsjack":        { case: "Oreo「Dunk in the Dark」", award: "2013 即時 newsjack 經典", principle: "在對的時刻、用對的角度、夠快且自然地把品牌接上正在發燒的話題——不硬蹭。" },
 };
 
+// 2026-05-18 (CJ「承諾是完整貼文 → 圖完成才展示 mockup」): tasks whose
+// deliverable is a complete post (copy + image). For these, while the
+// orchestra is still on the caption_ready checkpoint (image pending) we
+// hold the mockup and show a "generating" state, then reveal the full
+// post once images finish. Mirrors OrchestraConfig.holdForImages server-side.
+const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full"]);
+
 function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
   const [open, setOpen] = React.useState(false);
   const ref = taskId ? PR_CRAFT_REF[taskId] : undefined;
@@ -825,6 +832,11 @@ export default function RunPage() {
           orchestra wrote captions early and is still working on images/QA */}
       {(() => {
         const p = (data as any)?.progress;
+        // hold-for-images tasks show their own full-card generating state
+        // (the mockup is replaced) — skip the redundant slim banner.
+        if (p === "caption_ready" && HOLD_FOR_IMAGES.has(data.mission?.taskId ?? "")) {
+          return null;
+        }
         if (p === "caption_ready") {
           return (
             <div className="mb-3 mx-1 flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-tiny text-primary-700">
@@ -925,7 +937,26 @@ export default function RunPage() {
         {/* CENTER: pure mockup, no toolbar above (CJ direction 2026-05-09) */}
         <section className="min-w-0 flex flex-col gap-3">
           <div ref={mockupRef} className="relative bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
-            {effectiveVariant && slide && (
+            {(() => {
+              const holdMockup =
+                HOLD_FOR_IMAGES.has(data.mission?.taskId ?? "") &&
+                (data as any)?.progress === "caption_ready";
+              if (holdMockup) {
+                return (
+                  <div className="flex flex-col items-center justify-center gap-3 py-24 px-6 text-center">
+                    <span className="inline-block w-8 h-8 border-[3px] border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                    <p className="text-small font-medium text-default-700">
+                      {lang === "en" ? "Crafting your complete post…" : "完整貼文生成中…"}
+                    </p>
+                    <p className="text-tiny text-default-400 max-w-xs">
+                      {lang === "en"
+                        ? "Copy is done — images are rendering. The full post (copy + image) will appear here automatically (~30-60s)."
+                        : "文案已完成，圖片生成中。完整貼文（文案＋圖片）會在這裡自動顯示（約 30-60 秒）"}
+                    </p>
+                  </div>
+                );
+              }
+              return effectiveVariant && slide ? (
               <PlatformMockup
                 variant={{ ...effectiveVariant, label: `${effectiveVariant.label} · ${slide.label}` }}
                 title={data.title ?? ""}
@@ -938,7 +969,8 @@ export default function RunPage() {
                 liveImageUrl={slide.imageUrl ?? undefined}
                 liveImageStatus={slide.imageStatus as any}
               />
-            )}
+              ) : null;
+            })()}
             {/* 2026-05-18 (CJ「下載圖示出現在圖片某個地方就好」): a small
                 download ICON floating over the mockup (top-right), instead
                 of a separate button below. fetch→blob forces a real save

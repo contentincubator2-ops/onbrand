@@ -570,6 +570,15 @@ export interface OrchestraConfig {
    * - news: thought-leadership / quarterly — scout 抓產業最新
    */
   scoutKind?: "viral" | "festivals" | "trending" | "news";
+  /**
+   * 2026-05-18 (CJ「承諾是完整貼文 → 圖完成才展示 mockup」): when true,
+   * the deliverable is a complete post (copy + image) and the UI must NOT
+   * show the mockup at the caption-ready checkpoint — it stays in a
+   * "generating" state until images finish, then reveals the full post.
+   * The orchestra still fires the checkpoint (fast return, no 502, polling
+   * continues); this flag is surfaced to the client so it holds rendering.
+   */
+  holdForImages?: boolean;
 }
 
 const MANDY_ID = 220887;     // Claire Chen — Brand Visual Designer (977 char persona, was Mandy 199)
