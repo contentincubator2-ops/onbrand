@@ -22,6 +22,10 @@ import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListen
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText } from "./brandContext";
 import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
+import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
+import { isLinkedInBodyTask, LI_CRAFT_RUBRIC, liPlaybookFor } from "./liCraft";
+import { isTikTokBodyTask, TT_CRAFT_RUBRIC, ttPlaybookFor } from "./ttCraft";
+import { isYouTubeBodyTask, YT_CRAFT_RUBRIC, ytPlaybookFor } from "./ytCraft";
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
 import { getBrandRealContent } from "./brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
@@ -418,6 +422,22 @@ async function callOneVariant(args: {
   const igBlock = isInstagramBodyTask(template)
     ? `\n\n${IG_CRAFT_RUBRIC}\n\n${igPlaybookFor(template.id)}\n`
     : "";
+  // 2026-05-17 (CJ「所有平台都要得獎工藝層」): FB / LI / TT / YT body tasks
+  // each get a platform-specific award-grade rubric + per-task playbook,
+  // same architecture as edmBlock / igBlock. Atomic fragments excluded by
+  // their respective isXxxBodyTask guards.
+  const fbBlock = isFacebookBodyTask(template)
+    ? `\n\n${FB_CRAFT_RUBRIC}\n\n${fbPlaybookFor(template.id)}\n`
+    : "";
+  const liBlock = isLinkedInBodyTask(template)
+    ? `\n\n${LI_CRAFT_RUBRIC}\n\n${liPlaybookFor(template.id)}\n`
+    : "";
+  const ttBlock = isTikTokBodyTask(template)
+    ? `\n\n${TT_CRAFT_RUBRIC}\n\n${ttPlaybookFor(template.id)}\n`
+    : "";
+  const ytBlock = isYouTubeBodyTask(template)
+    ? `\n\n${YT_CRAFT_RUBRIC}\n\n${ytPlaybookFor(template.id)}\n`
+    : "";
 
   const docMode = template.outputMode === "document";
   const system = docMode
@@ -431,6 +451,10 @@ async function callOneVariant(args: {
       filledSystemPrompt +
       edmBlock +
       igBlock +
+      fbBlock +
+      liBlock +
+      ttBlock +
+      ytBlock +
       strategistSection +
       `\n\n【本次只產 1 個變體】**${label}**：在不更動章節結構的前提下，` +
       `用此變體的風格詮釋（完整正式版＝最詳盡；精簡重點版＝每節更精煉；活動主題版＝圍繞本次活動主軸）。\n` +
@@ -452,6 +476,10 @@ async function callOneVariant(args: {
     filledSystemPrompt +
     edmBlock +
     igBlock +
+    fbBlock +
+    liBlock +
+    ttBlock +
+    ytBlock +
     strategistSection +
     `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
     `${lengthHint}\n\n` +
