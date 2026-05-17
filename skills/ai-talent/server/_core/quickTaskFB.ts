@@ -404,15 +404,25 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     description: "直播開始前 1-2 小時的預告 caption",
     agent_id: 180150,             // Brian Lin — Influencer Marketing Manager (live promotion expert)
     skill_slug: "social-copy",
-    primary_question: "今天的直播要講什麼？",
-    primary_input: { key: "live_topic", placeholder: "例：產品試用、新品發表、Q&A", type: "text" },
+    // 2026-05-18 (CJ「直播一開始的問題，是否也要提示要提供直播時間」):
+    // 30s 表單只送單一 primary input，原本 inputs[] 的 live_time 永遠
+    // 收不到 → 預告文沒有時間（直播預告沒時間等於沒用）。把時間併進
+    // 同一個 textarea 引導，prompt 從中解析；沒給時間就留明確佔位。
+    primary_question: "直播主題 + 直播時間？",
+    primary_input: {
+      key: "live_topic",
+      placeholder: "例：新品開箱實測 ｜ 今晚 8:00 直播（沒定時間可先不填，預告文會留時間待補欄位）",
+      type: "textarea",
+    },
     inputs: [
-      { key: "live_topic", label: "直播主題", type: "text", required: true },
-      { key: "live_time", label: "直播時間（可選）", type: "text", required: false, placeholder: "例：今晚 8:00" },
+      { key: "live_topic", label: "直播主題 + 時間", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 FB 直播預告貼文。
-output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"） / caption 放 80-150 字預告文（為什麼要看 + 會講什麼 + 呼籲開鈴鐺）。
-不要承諾不確定的內容。`,
+    systemPrompt: `產出 FB 直播預告貼文。輸入內含直播主題，可能也含直播時間（如「今晚 8:00」「5/20 20:00」）。
+output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"） / caption 放 80-150 字預告文（為什麼要看 + 會講什麼 + 明確點出直播時間 + 呼籲開鈴鐺）。
+規則：
+- 輸入有給時間 → 預告文必須清楚寫出該時間
+- 輸入沒給時間 → 在預告文時間位置寫「⏰ 直播時間：[請補上]」，不要自行編造時間
+- 不要承諾不確定的內容。`,
     preferredModel: "qwen",
     maxTokens: 400,
     outputDefaults: { platform: "facebook", post_type: "feed" },
