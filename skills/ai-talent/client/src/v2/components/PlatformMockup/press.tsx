@@ -214,6 +214,139 @@ export function PressRelease({ title, brandName, variantLabel, liveTitle, liveCa
   );
 }
 
+/* ─────────────── Spokesperson Q&A / FAQ ───────────────
+ *
+ * 2026-05-17 (CJ「QA 任務應該是 Q&A 卡片形式，不是報紙」):
+ * Renders the 發言人 Q&A / FAQ output as paired question/answer cards
+ * (social-FAQ banner style — Q bubble + A bubble, numbered), NOT the
+ * newspaper press sheet. Parser is forgiving: Q:/A:, 問：/答：, Q1.,
+ * 1. ... markers, blank-line separated.
+ */
+interface QAPair { q: string; a: string }
+
+function parseQA(text: string): QAPair[] {
+  if (!text) return [];
+  const lines = text.split(/\r?\n/);
+  const Q = /^\s*(?:[QqＱ問]\s*\d*|問題\s*\d*|Q\d+)\s*[:：.\)、]\s*/;
+  const A = /^\s*(?:[AaＡ答]\s*\d*|答案|A\d+)\s*[:：.\)、]\s*/;
+  const pairs: QAPair[] = [];
+  let cur: QAPair | null = null;
+  let mode: "q" | "a" | null = null;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (Q.test(line)) {
+      if (cur && cur.q) pairs.push(cur);
+      cur = { q: line.replace(Q, "").trim(), a: "" };
+      mode = "q";
+    } else if (A.test(line) && cur) {
+      cur.a = line.replace(A, "").trim();
+      mode = "a";
+    } else if (cur) {
+      // continuation of whichever side we're on
+      if (mode === "a") cur.a += (cur.a ? " " : "") + line;
+      else cur.q += (cur.q ? " " : "") + line;
+    }
+  }
+  if (cur && cur.q) pairs.push(cur);
+  return pairs.filter((p) => p.q);
+}
+
+export function QAMockup({ title, brandName, variantLabel, liveTitle, liveCaption }: MockupFields) {
+  const brand = (brandName ?? "Your Brand").trim();
+  const topic = (liveTitle ?? title ?? "媒體採訪準備").trim();
+  const pairs = parseQA(liveCaption ?? "");
+  const ACCENT = "#7c3aed";
+
+  return (
+    <div className="w-full max-w-[640px] mx-auto">
+      <MockupHeader icon={faNewspaper} label="發言人 Q&A · 媒體準備" variantLabel={variantLabel} />
+
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{
+          background: "#ffffff",
+          border: "1px solid #ececf3",
+          boxShadow: "0 20px 44px -18px rgba(80,40,160,0.20)",
+          fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif",
+        }}
+      >
+        {/* Header band with soft geometric accent */}
+        <div className="relative px-7 pt-7 pb-6 overflow-hidden"
+          style={{ background: "linear-gradient(135deg,#f6f3ff 0%,#eef6ff 100%)" }}>
+          <div aria-hidden style={{
+            position: "absolute", right: -28, top: -28, width: 120, height: 120,
+            borderRadius: "50%", background: "rgba(124,58,237,0.10)",
+          }} />
+          <div aria-hidden style={{
+            position: "absolute", right: 44, bottom: -22, width: 60, height: 60,
+            borderRadius: 16, background: "rgba(0,180,188,0.12)", transform: "rotate(18deg)",
+          }} />
+          <p className="text-[10px] font-bold tracking-[0.24em] uppercase mb-2" style={{ color: ACCENT }}>
+            {brand} · Media Q&A
+          </p>
+          <h2 className="font-extrabold leading-snug" style={{ fontSize: "clamp(17px,2.4vw,22px)", color: "#1a1530" }}>
+            {topic}
+          </h2>
+          <p className="text-[11px] mt-1.5" style={{ color: "#6b6480" }}>
+            記者預期會問的問題 + 發言人標準答案
+          </p>
+        </div>
+
+        {/* Q&A list */}
+        <div className="px-6 py-6 space-y-4">
+          {pairs.length > 0 ? pairs.map((p, i) => (
+            <div key={i} className="rounded-xl border" style={{ borderColor: "#eceaf4" }}>
+              {/* Question bubble */}
+              <div className="flex gap-3 px-4 py-3" style={{ background: "#faf8ff", borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                <span className="shrink-0 flex items-center justify-center font-bold text-white"
+                  style={{ width: 24, height: 24, borderRadius: 8, background: ACCENT, fontSize: 12 }}>Q</span>
+                <p className="font-bold leading-snug" style={{ fontSize: 14, color: "#1a1530" }}>
+                  {p.q}
+                </p>
+              </div>
+              {/* Answer bubble */}
+              <div className="flex gap-3 px-4 py-3">
+                <span className="shrink-0 flex items-center justify-center font-bold"
+                  style={{ width: 24, height: 24, borderRadius: 8, background: "#e8f7f8", color: "#0a8a92", fontSize: 12 }}>A</span>
+                <p className="leading-relaxed" style={{ fontSize: 13, color: "#3a3450" }}>
+                  {p.a || <span style={{ color: "#b5afc4" }}>（答案待補）</span>}
+                </p>
+              </div>
+              <div className="px-4 pb-2 text-right text-[10px]" style={{ color: "#c3bdd4" }}>
+                {String(i + 1).padStart(2, "0")} / {String(pairs.length).padStart(2, "0")}
+              </div>
+            </div>
+          )) : liveCaption ? (
+            // Couldn't detect Q/A markers — show raw so nothing is lost.
+            <div className="rounded-xl border p-4 whitespace-pre-wrap leading-relaxed"
+              style={{ borderColor: "#eceaf4", fontSize: 13, color: "#3a3450" }}>
+              {liveCaption}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {[1, 2, 3].map((k) => (
+                <div key={k} className="rounded-xl border p-4 space-y-2" style={{ borderColor: "#eceaf4" }}>
+                  <Skeleton className="h-4 w-[70%] rounded" />
+                  <Skeleton className="h-3 w-full rounded" />
+                  <Skeleton className="h-3 w-[88%] rounded" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t flex items-center justify-between text-[10px]"
+          style={{ borderColor: "#f0eef7", color: "#9b95ad" }}>
+          <span>內部媒體準備 · 非對外發布</span>
+          <span>{brand}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────── Presentation / Deck ─────────────── */
 
 export function DeckMockup({ title, brandName, variantLabel, liveTitle, liveCaption, liveDescription, liveImageDesc }: MockupFields) {

@@ -48,7 +48,7 @@ import { GoogleSearchAd, GoogleDisplayAd, GooglePMax } from "./google";
 import { XTweet, XThread } from "./twitter";
 import { LINEBroadcast, LINECard, LINERichMenu } from "./line";
 import { WebLanding, WebBlog, WebProduct } from "./web";
-import { PressRelease, DeckMockup } from "./press";
+import { PressRelease, DeckMockup, QAMockup } from "./press";
 import { GenericMockup } from "./generic";
 import { ProposalCover, ProposalSpec, ResearchDoc, PersonaCard } from "./proposal";
 import { XHSNote, XHSVideo, XHSSearch } from "./xiaohongshu";
@@ -145,6 +145,9 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
 
     // ── Press Release (1) ─────────────────────────────────────────────
     case "press:press-release": return <PressRelease {...f} />;
+
+    // ── Spokesperson Q&A / FAQ (2026-05-17) ───────────────────────────
+    case "press:qa": return <QAMockup {...f} />;
 
     // ── Deck / Presentation (1) ───────────────────────────────────────
     case "deck:slide": return <DeckMockup {...f} />;

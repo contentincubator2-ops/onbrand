@@ -567,6 +567,10 @@ export default function RunPage() {
       // press (pr-) + email (em-) each have ONE mockup family. Decide
       // by prefix FIRST — otherwise generic keyword scans below
       // misfire, e.g. "pr-30-le[ad-]paragraph".includes("ad-") → "ad".
+      // 2026-05-17 (CJ「QA 任務不該長得像報紙，要 Q&A 卡片」):
+      // spokesperson-qa / any -qa / faq → dedicated Q&A mockup, not the
+      // newspaper press-release sheet.
+      if (id === "pr-30-spokesperson-qa" || /(?:^|-)qa(?:-|$)/.test(id) || id.includes("faq")) return "qa";
       if (id.startsWith("pr-")) return "press-release";
       if (id.startsWith("em-")) return "edm";
       // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"

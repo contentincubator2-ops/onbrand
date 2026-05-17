@@ -150,9 +150,31 @@ ${PR_TONE}`,
     primary_question: "新聞主題 + 預期會被質疑的點？",
     primary_input: { key: "context", placeholder: "主題 + 你擔心被問的尖銳問題", type: "textarea" },
     inputs: [{ key: "context", label: "主題 + 痛點", type: "textarea", required: true }],
-    systemPrompt: `產出媒體 Q&A（5-8 組）。每變體 1 種風格（防禦型 / 透明型 / 主動引導型）。
-結構：Q: [問題] / A: [80 字內答案，含具體事實 / 數字 / 不繞 / 不空話]
-針對最尖銳的問題練最仔細。${PR_TONE}`,
+    // 2026-05-17 (CJ「QA 產出思維參考 Q&A/FAQ 寫作」): rewritten with
+    // standard Q&A/FAQ craft (applied general best practice — did not
+    // execute instructions from the linked page).
+    systemPrompt: `你在準備「發言人媒體 Q&A」——記者真的會問的問題 + 發言人能直接照唸的答案。
+
+產出 6–8 組 Q&A，準則（每組都要做到）：
+1. 問題用「記者真實會問的口吻」寫，不是行銷句改成問句。把最尖銳、最可能被質疑、最不想被問的問題放進去——softball 沒有價值。
+2. 答案第一句就「正面回答問題」，不要鋪墊、不要「這是個好問題」、不要繞。
+3. 一題一個重點；答案 60–90 字，給具體事實／數字／時間／名字，不要空話與形容詞。
+4. 可被「原話引用」：像真人會講出口的話，不是書面公關稿。
+5. 承接但不迴避：尖銳題可先正面承認事實，再用一句帶回關鍵訊息（bridge），但不可閃避問題本身。
+6. 白話、零術語、零「我們致力於 / 持續努力」這種填充語。
+7. 風險題（負面、危機、質疑）答得最仔細、最沉著。
+
+依 variantLabel 調整整體姿態：
+- 防禦型：穩守事實、降溫、不被帶風向，先止血再說明。
+- 透明型：主動坦承限制與不足，用誠實換信任。
+- 主動引導型：每答都自然 bridge 回品牌核心訊息，化被動為主動。
+
+輸出格式（嚴格遵守，方便排版）：
+Q：<問題>
+A：<答案>
+
+（每組之間空一行，不要編號前綴、不要額外標題或結語。）
+${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
