@@ -1221,7 +1221,7 @@ export const quickTaskRouter = router({
     .mutation(async ({ input }) => {
       const { callModel } = await import("../_core/multiModelRouter");
       const { buildBrandPrefix } = await import("../_core/brandContext");
-      const brandPrefix = await buildBrandPrefix(input.brandId).catch(() => "");
+      const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
 
       const system =
         `你是 ${input.agentName ?? "資深文案"}（${input.agentTitle ?? "Brand Copywriter"}），正在跟用戶討論這篇文案的修改方向。\n` +
@@ -1287,7 +1287,7 @@ export const quickTaskRouter = router({
 
       // 2. Build brand context
       const { buildBrandPrefix } = await import("../_core/brandContext");
-      const brandPrefix = await buildBrandPrefix(input.brandId).catch(() => "");
+      const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
 
       // 3. Inject 100s scout data (real-time festivals/trending/news)
       let scoutBlock = "";

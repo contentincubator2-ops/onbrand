@@ -1038,7 +1038,14 @@ export async function runOrchestra(args: {
       // grounding signal — without it AI hallucinates industry from brand
       // name (e.g. 桂冠營養研究室 → 美妝). 2026-05-08 (CJ direction).
       Promise.all([
-        buildBrandContext(args.brandId, args.productId, args.eventId).catch(() => ""),
+        // 2026-05-17 蒸餾+分層: short/atomic tasks (30s/60s) get the
+        // distilled brand core (focused → faster, cheaper, more
+        // on-brand); only strategic/long-form (100s or document) get
+        // the full heavy block that needs golden-circle/story depth.
+        buildBrandContext(
+          args.brandId, args.productId, args.eventId,
+          (tier === "100s" || args.template.outputMode === "document") ? "full" : "core",
+        ).catch(() => ""),
         args.brandId ? loadBrandKnowledgeForPrompt(args.brandId).catch(() => "") : Promise.resolve(""),
         args.brandId
           ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")

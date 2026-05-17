@@ -116,14 +116,58 @@ export async function enforceBrandRulesOnText(
   } catch { return text; }
 }
 
+/**
+ * 2026-05-17 (CJ「全部塞進每個任務怕拖慢/稀釋品質」→ 蒸餾+分層):
+ * Distil the brand essence into a tight ~500-char digest. Short/atomic
+ * tasks inject ONLY this (focused context → faster, cheaper, and
+ * usually MORE on-brand — avoids "lost in the middle"). Hard rules
+ * (banned/substitutions) are NOT here — the post-gen enforcement layer
+ * guarantees them deterministically, so they don't need prompt tokens.
+ */
+function buildBrandCoreDigest(positioning: any): string {
+  if (!positioning || typeof positioning !== "object") return "";
+  const a = positioning._assets ?? {};
+  const firstSentence = (s: any, n: number) =>
+    String(s ?? "").split(/[。\n！？!?]/).map((x) => x.trim()).filter(Boolean)[0]?.slice(0, n) ?? "";
+  const lines: string[] = [];
+  const tagline = positioning.tagline?.zhTagline ?? positioning.tagline?.enTagline;
+  if (tagline) lines.push(`標語：${String(tagline).slice(0, 60)}`);
+  const posOneLiner = positioning.differentiation?.summary;
+  if (posOneLiner) lines.push(`定位：${String(posOneLiner).slice(0, 120)}`);
+  const tone = Array.isArray(positioning.voice?.tone) ? positioning.voice.tone.slice(0, 5).join("、") : "";
+  if (tone) lines.push(`語氣：${tone}`);
+  const aud = firstSentence(positioning.audience?.primary, 100);
+  if (aud) lines.push(`主受眾：${aud}`);
+  const diff = firstSentence(positioning.differentiation?.emotional, 110)
+    || firstSentence(positioning.differentiation?.functional, 110);
+  if (diff) lines.push(`核心差異：${diff}`);
+  const story = firstSentence(positioning.origin?.story, 110);
+  if (story) lines.push(`品牌故事精華：${story}`);
+  const pref = Array.isArray(a.preferred_terms?.items)
+    ? a.preferred_terms.items.filter((s: any) => String(s ?? "").trim()).slice(0, 8).join("、") : "";
+  if (pref) lines.push(`偏好用詞：${pref}`);
+  if (!lines.length) return "";
+  return "\n\n[品牌核心 — 所有產出必須貼合此精神]\n" + lines.map((l) => `- ${l}`).join("\n") + "\n";
+}
+
+/**
+ * mode:
+ *   "core" — distilled digest only (default for short/atomic tasks:
+ *            30s/60s caption, hooks, KOL DM, Theater cells, inline
+ *            rewrite). Lean, focused, on-brand without bloat.
+ *   "full" — full rich block (strategic/long-form: 100s, document
+ *            tasks, manifesto/PR-full) that genuinely need golden
+ *            circle / story / competition depth.
+ */
 export async function buildBrandPrefix(
   brandId: number | undefined | null,
   productId?: number | null,
   eventId?: number | null,
+  mode: "core" | "full" = "full",
 ): Promise<string> {
   if (!brandId) return "";
 
-  const ck = cacheKey(brandId, productId, eventId);
+  const ck = `${cacheKey(brandId, productId, eventId)}:${mode}`;
   const cached = CACHE.get(ck);
   if (cached && cached.expiresAt > Date.now()) return cached.prefix;
 
@@ -151,6 +195,10 @@ export async function buildBrandPrefix(
       if (typeof brandRow.positioning === "string") return safeParse(brandRow.positioning);
       return brandRow.positioning;
     })();
+
+    // Distilled core — short tasks get this (+ product/event narrowing)
+    // instead of the full heavy block. Chosen at final assembly.
+    const coreDigest = buildBrandCoreDigest(positioning);
 
     const [rows] = (await db.execute(
       sql`SELECT category, title, content
@@ -240,7 +288,9 @@ export async function buildBrandPrefix(
       grab("voice", "聲音指南", 600);
       grab("voice_principles", "聲音原則");
       grab("preferred_terms", "偏好用詞");
-      grab("banned_words", "禁用詞");
+      // 2026-05-17: banned_words / term_substitutions removed from the
+      // prompt — the post-gen enforcement layer guarantees them
+      // deterministically, so they no longer need prompt tokens.
       grab("cta_library", "CTA 範例");
       grab("audience", "目標受眾");
     }
@@ -331,6 +381,7 @@ export async function buildBrandPrefix(
       voiceBlock.length > 0 ||
       assetsBlock.length > 0 ||
       contextBlock.length > 0 ||
+      coreDigest ||
       productSection ||
       eventSection;
     if (!hasAny) {
@@ -362,7 +413,11 @@ export async function buildBrandPrefix(
     // 順序：鎖定屬性 → 聲音指南（含中英夾雜 samples）→ 寫手指引 →
     // 脈絡 → 補充 → product/event narrow。
     // LLM 對「靠後出現」內容更易執行，product/event 放最後。
-    const prefix = "\n\n" + lockedSection + voiceSection + assetsSection + contextSection + brainSection + productSection + eventSection;
+    // mode="core": only the distilled digest + product/event narrowing
+    // (short tasks). mode="full": the rich block (strategic/long-form).
+    const prefix = mode === "core"
+      ? (coreDigest + productSection + eventSection) || ""
+      : "\n\n" + lockedSection + voiceSection + assetsSection + contextSection + brainSection + productSection + eventSection;
 
     CACHE.set(ck, { prefix, expiresAt: Date.now() + TTL_MS });
     return prefix;
