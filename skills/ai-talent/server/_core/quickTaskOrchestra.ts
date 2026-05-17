@@ -21,6 +21,7 @@ import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } 
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText } from "./brandContext";
 import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
+import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
 import { getBrandRealContent } from "./brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
@@ -410,6 +411,13 @@ async function callOneVariant(args: {
   const edmBlock = isEmailBodyTask(template)
     ? `\n\n${EDM_CRAFT_RUBRIC}\n\n${edmPlaybookFor(template.id)}\n`
     : "";
+  // 2026-05-17 (CJ「IG 也要得獎工藝層」): IG-family body tasks get the
+  // visual+copy dual-track rubric + per-use-case playbook, mirroring
+  // edmBlock. Atomic fragments (hashtag/bio/dm/comment) excluded by
+  // isInstagramBodyTask — their own per-{label} prompt handles craft.
+  const igBlock = isInstagramBodyTask(template)
+    ? `\n\n${IG_CRAFT_RUBRIC}\n\n${igPlaybookFor(template.id)}\n`
+    : "";
 
   const docMode = template.outputMode === "document";
   const system = docMode
@@ -422,6 +430,7 @@ async function callOneVariant(args: {
       `\n# 任務說明（最高指令 — 必須完全遵循其章節結構與順序）\n` +
       filledSystemPrompt +
       edmBlock +
+      igBlock +
       strategistSection +
       `\n\n【本次只產 1 個變體】**${label}**：在不更動章節結構的前提下，` +
       `用此變體的風格詮釋（完整正式版＝最詳盡；精簡重點版＝每節更精煉；活動主題版＝圍繞本次活動主軸）。\n` +
@@ -442,6 +451,7 @@ async function callOneVariant(args: {
     `\n# 任務說明（特定任務規範 — 蓋過上方平台通則）\n` +
     filledSystemPrompt +
     edmBlock +
+    igBlock +
     strategistSection +
     `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
     `${lengthHint}\n\n` +
@@ -634,10 +644,22 @@ async function callOneBrief(args: {
   const subjectRule = hasUrl
     ? `視覺主題=URL 抓到的影片 / 文章內容。**不要**把品牌主商品畫進視覺。\n`
     : "";
+  // 2026-05-17 (CJ「IG 視覺也要得獎工藝」): IG-family tasks get the
+  // 【視覺 craft】 portion of the IG rubric so style direction follows
+  // award-grade composition + correct aspect ratio + brand visual
+  // identity. IG-gated — non-IG image flows unchanged.
+  const igVisualBlock = isInstagramTask(args.template)
+    ? `\n# IG 視覺工藝（嚴格遵守）\n` +
+      `- 首屏鉤子：0.5 秒內讓人停下；高對比、單一焦點、留白給文字。\n` +
+      `- 比例正確（${config.aspectRatio ?? "1:1"}），錯比例＝被裁切＝失敗。\n` +
+      `- 構圖服務內容（封面承諾/輪播遞進/Reel 字卡空間）。\n` +
+      `- 品牌視覺一致：色彩/字體/濾鏡/構圖語言與品牌大腦一致，可一眼認出。\n`
+    : "";
   const system =
     imagePersona +
     `任務：寫 1 條**繁體中文**視覺方向描述，呼應「${label}」這個口吻。\n` +
     `比例：${config.aspectRatio ?? "1:1"}\n` +
+    igVisualBlock +
     subjectRule +
     `規則：30-60 字繁中、涵蓋主體 / 構圖 / 光線 / 色彩 / 氛圍、不要疊文字、不要 logo。\n\n` +
     `輸出嚴格 JSON 物件：{"summary":"<中文視覺描述>"}\n` +
@@ -1239,6 +1261,47 @@ export async function runOrchestra(args: {
               `依 EDM 工藝準則收緊這封 email：移除垃圾觸發詞（${SPAM.slice(0, 8).join("、")} 等濫用語）、` +
               `收斂成「單一主要 CTA」（最多重複 2 次）、行動裝置可掃讀、利益導向。` +
               `保持原意、品牌語氣、長度與換行，只輸出收緊後文字本身，不要前言：\n\n${t}` }],
+            maxTokens: 1200,
+          });
+          const tightened = String(r?.content ?? r?.text ?? "").trim();
+          if (tightened) {
+            // re-apply brand hard rules (rewrite must not reintroduce)
+            v.caption = args.brandId
+              ? await enforceBrandRulesOnText(args.brandId, tightened).catch(() => tightened)
+              : tightened;
+          }
+        } catch { /* fail-safe: keep caption */ }
+      }
+    }
+
+    // ── IG craft self-check: 視覺優先媒介產出後守門 (2026-05-17) ──
+    // IG-family body tasks only. Cheap deterministic gate (missing
+    // first-line hook / hashtag spam / CTA proliferation); only when
+    // it fails do ONE LLM tighten pass against the IG rubric —
+    // ~zero cost when output is already good (same proven pattern
+    // as EDM self-check / brand-rule enforcement). Fail-safe.
+    if (Array.isArray(captions) && captions.length && isInstagramBodyTask(args.template)) {
+      const ctaCount = (t: string) =>
+        (t.match(/立即|馬上|點此|點擊|了解更多|現在就|搶先|報名|購買|訂閱|前往|查看|按此|留言|分享|儲存|收藏|追蹤|here|now|shop|buy|join|register|save|share|follow|link in bio/gi) || []).length;
+      for (const v of captions) {
+        if (!v?.caption) continue;
+        const t = v.caption;
+        const firstLine = (t.split(/\r?\n/).find((l) => l.trim().length > 0) ?? "").trim();
+        // weak first-line hook heuristic: empty, generic opener, or
+        // long bland sentence with no curiosity/benefit/contrast cue.
+        const genericOpener = /^(大家好|哈囉|嗨|你好|各位|今天(要|想)?(分享|跟大家|來)|歡迎)/.test(firstLine);
+        const noHook = firstLine.length === 0 || genericOpener;
+        const hashtagCount = (t.match(/#[^\s#]+/g) || []).length;
+        const hashtagSpam = hashtagCount > 12;
+        const ctaBloat = ctaCount(t) > 4;
+        if (!noHook && !hashtagSpam && !ctaBloat) continue; // already good → no LLM cost
+        try {
+          const { invokeLLM } = await import("./llm");
+          const r: any = await invokeLLM({
+            provider: "anthropic",
+            messages: [{ role: "user", content:
+              `依 IG 工藝準則收緊：第一行強 hook、單一 CTA、hashtag 3-8 個放文末、可掃讀，` +
+              `保持原意/品牌語氣/長度，只輸出收緊後文字：\n\n${t}` }],
             maxTokens: 1200,
           });
           const tightened = String(r?.content ?? r?.text ?? "").trim();

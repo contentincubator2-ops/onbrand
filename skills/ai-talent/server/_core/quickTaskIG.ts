@@ -51,7 +51,8 @@ ${FB_TONE_SUFFIX}
     systemPrompt: `任務：用戶提供「原本要發的 IG 貼文內文」(article_body)。
 你只要寫 hook（開場句），**不要重複貼用戶的原文** — orchestra 會在後端自動把原文接到你寫的 hook 後面。
 
-每個 variant.caption = 那個口吻的 hook（30-60 字，1-2 句即可）。
+本則固定走「{label}」這一種（反問式＝用問句直擊讀者；數字式＝以具體數字製造張力；反差式＝用預期落差勾住注意），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+caption = 那個口吻的 hook（30-60 字，1-2 句即可）。
 ${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
     maxTokens: 400,
@@ -69,7 +70,8 @@ ${FB_TONE_SUFFIX}`,
     primary_input: { key: "topic", placeholder: "例：30 秒教學 / 開箱 / 反差展示", type: "textarea" },
     inputs: [{ key: "topic", label: "Reel 主題", type: "textarea", required: true }],
     systemPrompt: `產出 IG Reel 前 3 秒 hook（給開場用）。
-caption 結構（每變體）：
+本則固定走「{label}」這一種（懸念開場＝拋未解的鉤子；反差開場＝用預期落差製造張力；直接挑釁＝點名痛點直球切入），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+caption 結構：
   口播原話（粗體）：[15-25 字，第 0-1 秒就要說]
   螢幕字幕：[搭配口播的字幕，可比口播再簡短]
   視覺開場（給拍攝者）：[1 句鏡頭建議]
@@ -91,7 +93,8 @@ caption 結構（每變體）：
     primary_input: { key: "topic", placeholder: "例：3 個 IG 演算法迷思 / 我如何用 90 天從 0 到 10K", type: "textarea" },
     inputs: [{ key: "topic", label: "Reel 主題 / 想傳達的價值", type: "textarea", required: true }],
     systemPrompt: `產出 IG Reel 完整腳本（15-30 秒）。
-caption 結構（每變體）：
+本支固定走「{label}」這一種（教學型＝給可操作的步驟知識；故事型＝用敘事帶觀眾走一遍；反差型＝以預期落差貫穿全片），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+caption 結構：
   [0-3s] HOOK：[一句懸念 / 反差 / 數字 hook]
   [3-10s] 承諾：[告訴觀眾接下來會看到什麼價值]
   [10-25s] 3 段內容：
@@ -118,7 +121,8 @@ caption 結構（每變體）：
     primary_input: { key: "topic", placeholder: "例：幕後 / 限時優惠 / 提問 / 投票", type: "textarea" },
     inputs: [{ key: "topic", label: "Story 主題", type: "textarea", required: true }],
     systemPrompt: `產出 IG Story 文案。caption 純文字，**絕對不要**夾雜視覺描述、英文 prompt。
-caption 結構（每變體）— 用換行分段：
+本則固定走「{label}」這一種（驚奇式＝用意外資訊勾住；提問式＝拋問題引互動；幕後式＝給未公開的真實畫面感），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+caption 結構 — 用換行分段：
   主標（5-12 字，疊在圖上 — 最大字）
   內文（30-60 字，補充訊息）
   推薦 sticker：[poll / question / quiz / countdown / emoji-slider / link 選 1-2 個 + sticker 上的文字]
@@ -141,7 +145,8 @@ caption 結構（每變體）— 用換行分段：
     primary_input: { key: "topic", placeholder: "例：5 個被低估的 IG 演算法技巧 / 我從 0 學設計的 3 個錯誤", type: "textarea" },
     inputs: [{ key: "topic", label: "Carousel 主題", type: "textarea", required: true }],
     systemPrompt: `產出 IG Carousel（10 頁）的每頁文字。
-caption 結構（每變體）：
+本組固定走「{label}」這一種（教學清單型＝可操作的編號清單；故事型＝用敘事弧串起每頁；反差型＝用預期落差貫穿輪播），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+caption 結構：
 
 頁 1（標題）：[3-7 字大標 + 1 句副標]
 頁 2-9（內容 8 頁）：[每頁 1 個重點 + 30-50 字補充。標號從 #1 到 #8]
@@ -169,7 +174,8 @@ caption 欄位請用「---」分隔每一頁。標號用 1. 2. 3. 結構清楚�
 絕對不要寫「我是 Wendy Su」、「Link in Bio 專家」、「幫小品牌做 ___」等任何關於你 / agent 的描述。
 讀 [context]：用戶是誰、做什麼、想吸引誰 → 寫的是**那個人**的 bio。
 
-caption 結構（每變體，用換行排版）：
+本則固定走「{label}」這一種（專家定位＝強調權威與專業；個性風格＝凸顯人味與個性；結果導向＝強調能帶來的具體成果），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+caption 結構（用換行排版）：
   L1: 一句 positioning（**用戶**是誰 + 做什麼 + 為誰）
   L2-3: 2-3 個亮點（用 emoji 條列）
   L4: CTA（"👇 點 link in bio" 或 "📩 DM 我「____」")
@@ -190,11 +196,9 @@ emoji 適度，不要每行都塞。bio 有字數限制，每字都要算。`,
     primary_question: "貼文主題 / 你的利基領域是？",
     primary_input: { key: "topic", placeholder: "例：手沖咖啡 / 北美室內設計 / SaaS B2B", type: "textarea" },
     inputs: [{ key: "topic", label: "主題 / 利基", type: "textarea", required: true }],
-    systemPrompt: `產出 IG hashtag 30 個套組。
-caption 結構（每變體用不同策略）：
-變體 1（曝光導向 20 個）：大流量 hashtag (1M+ post)
-變體 2（品牌導向 8 個）：偏品牌 / 利基 (50K-500K post)
-變體 3（利基導向 12 個）：小眾高匹配 (5K-50K post)
+    systemPrompt: `產出 IG hashtag 套組。
+本組固定走「{label}」這一種（曝光導向 (20)＝20 個大流量 hashtag 1M+ post；品牌導向 (8)＝8 個偏品牌/利基 50K-500K post；利基導向 (12)＝12 個小眾高匹配 5K-50K post），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+數量與大小分層嚴格依「{label}」的定義。
 
 caption 直接列 hashtag（每個 # 前綴 + 空格分隔，可換行）。
 不需要 image_style_direction。`,
@@ -236,7 +240,8 @@ caption 放回覆文。description 可放原始用戶留言（mockup 顯示用�
     primary_question: "你想處理哪類 DM？貼上常見訊息範例",
     primary_input: { key: "scenario", placeholder: "例：『請問還有貨嗎？』 / 『產品不滿意』 / 『想合作』", type: "textarea" },
     inputs: [{ key: "scenario", label: "DM 情境 / 範例訊息", type: "textarea", required: true }],
-    systemPrompt: `產出 IG DM 自動回覆腳本（每變體針對 1 種情境）。
+    systemPrompt: `產出 IG DM 自動回覆腳本。
+本則固定走「{label}」這一種情境（詢價回覆＝回應商品/價格詢問；售後安撫＝處理不滿與售後問題；合作回覆＝回應合作/業配邀約），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
 caption 結構：
 1. 開場（個人化，不要 "Hi 您好"）
 2. 直接給答案 / 動作（不要繞）
@@ -260,7 +265,8 @@ caption 結構：
     primary_input: { key: "topic", placeholder: "例：新品試色 / Q&A / 開箱 / 教學", type: "textarea" },
     inputs: [{ key: "topic", label: "直播主題", type: "textarea", required: true }],
     systemPrompt: `產出 IG Live 開場 30 秒腳本。
-caption 結構（每變體）：
+本則固定走「{label}」這一種（懸念式＝拋未解鉤子吊胃口；互動式＝立刻拉觀眾留言參與；直球式＝開門見山講價值），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+caption 結構：
 [0-10s] 開場詞：[第一句要 hook，不要 "大家好我是 ___"]
 [10-20s] 暖場：[1 個讓觀眾留言的問題 / 投票，明確說 "在留言打 ___"]
 [20-30s] 預告：[今晚會講什麼，給留下來的理由]
@@ -282,12 +288,8 @@ caption 結構（每變體）：
     primary_question: "原本那則限動是什麼內容？",
     primary_input: { key: "original_story", placeholder: "貼上限動文字 / 主題", type: "textarea" },
     inputs: [{ key: "original_story", label: "原限動內容", type: "textarea", required: true }],
-    systemPrompt: `產出限動 24h 失效後的「重發 3 路徑」（每變體 1 路徑）。
-caption 結構（每變體）：
-
-路徑 1：精選到 Highlight（給「分類名稱」+「封面圖建議」+「保留哪些 sticker」）
-路徑 2：改編成 Feed Post（給「caption 節錄」+「視覺改造方向」）
-路徑 3：發後續限動（給「下一則限動文字」+「sticker 建議」+「掛 stories link / mention」）
+    systemPrompt: `產出限動 24h 失效後的重發策略。
+本則固定走「{label}」這一條路徑（精選封面型＝精選到 Highlight：給「分類名稱」+「封面圖建議」+「保留哪些 sticker」；Feed 改編型＝改編成 Feed Post：給「caption 節錄」+「視覺改造方向」；後續限動型＝發後續限動：給「下一則限動文字」+「sticker 建議」+「掛 stories link / mention」），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
 
 直接給可動作的內容（不要寫「思考一下要不要…」這種廢話）。
 另外給 image_style_direction.summary（路徑 1 / 2 用，aspect_ratio="9:16"）。`,
@@ -312,10 +314,7 @@ caption 結構（每變體）：
 - 短文 + 引發討論的 hook（提問 / 反差 / 觀點）
 - 不要 IG 的 emoji 海
 
-每變體用不同策略：
-變體 1：純觀點貼文（150-250 字，像在發見解）
-變體 2：提問式（拋問題 + 自己 1-2 句看法，引討論）
-變體 3：故事縮短版（IG 1000 字精煉到 200 字）
+本則固定走「{label}」這一種（觀點式＝純觀點貼文 150-250 字，像在發見解；提問式＝拋問題＋自己 1-2 句看法，引討論；故事縮短＝IG 長文精煉到 200 字以內），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
 
 不需要 image_style_direction（Threads 也不依賴主圖）。`,
     preferredModel: "qwen",
