@@ -76,11 +76,11 @@ const TT_TASK_REF: Record<string, string> = {
 
   // ── 60s ───────────────────────────────────────────────────────────────
   "tt-60-foryou-full":
-    "E.l.f. Cosmetics「#EyesLipsFace」完整 TikTok 格式 (Shorty Award 2020；TikTok 原創音樂 × challenge 的完整腳本格式標竿)：完整 TikTok = hook/promise/主體/反差高潮/loop；每秒有存在理由；靜音也能看懂；至少 1 個可截圖時刻。",
+    "Washington Post @washingtonpost TikTok 完整腳本格式 (Shorty Award Best in News & Politics 2021；傳統媒體轉型 TikTok 最成功案例)：完整 ForYou 腳本 = 0-3s 反直覺新聞主張 → 3-8s 為何你要在意 → 主體 3 段（每段換鏡頭/格式防滑走）→ 45s 反差後果 → CTA 留言辯論；嚴肅新聞用 TikTok 原生語言傳播的教科書。",
   "tt-60-series-3":
-    "Duolingo TikTok 連載系列格式 (Shorty Award Best Brand Presence on TikTok；Duo 貓頭鷹角色的跨影片連載是 TikTok 品牌連載的教科書)：3 集 = 1 個故事弧；集 1 setup，集 2 complication，集 3 resolution + 重啟循環；角色弧比劇情更重要。",
+    "Ryanair TikTok 自嘲幽默連載系列 (Shorty Award Best Airline Social Media 2022；歐洲追蹤數最高的航空品牌 TikTok 帳號)：3 集 = 1 個可重複的「品牌拿自己開玩笑」前提；每集新的自嘲場景但相同角色邏輯（廉價航空的驕傲與無奈）；粉絲追劇的理由是看品牌繼續拆自己台；角色弧比劇情更重要。",
   "tt-60-viral-rewrite":
-    "Wendy's TikTok 病毒回應策略 (Ad Age Best Social Campaign；以「反應」他人內容創造自己的病毒時刻)：分析原作分享機制（反差/情緒/可截圖）→ 萃取 → 用品牌素材重建；不抄創意，只借機制。",
+    "Dove「反有害美容濾鏡」TikTok 病毒回應 (Cannes Lions Bronze Digital Craft 2022；Dove 反擊 TikTok 上有害濾鏡趨勢)：鎖定傷害品牌價值觀的病毒趨勢 → 以品牌立場反向回應（#NoDigitalDistortion）→ 品牌成為文化對話的一方而非旁觀者；病毒改寫 = 選擇立場，不只是搭便車；分享機制是「我支持這個立場」。",
 
   // ── 99s ───────────────────────────────────────────────────────────────
   "tt-99-30day-foryou":

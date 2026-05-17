@@ -61,7 +61,7 @@ export const EDM_CRAFT_RUBRIC = `
 const EDM_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "em-30-welcome":
-    "Airbnb 歡迎信序列 (IAC Award Winner Retention Email；Airbnb 的歡迎信是業界引用最廣的 onboarding email 範本)：第一封定錨在進度里程碑（你完成了設定步驟 1/3）而非促銷；創辦人故事 × 社群歸屬感 × 明確下一步；開信率比行業平均高 46%。",
+    "Dropbox 歡迎信序列 (IAC Award Winner Onboarding Email；Dropbox 以進度里程碑式歡迎信讓試用轉正率提升)：第一封定錨在「你完成了第 1 步，還差 2 步就能體驗完整功能」而非促銷；進度指示 + 創辦人故事 + 明確下一步；讓用戶感覺在完成自己的任務，不是在接受品牌的 push。",
   "em-30-promo":
     "Chubbies Shorts 促銷電子報 (IAC Award Winner Email Marketing；以幽默人格化聲音扭轉傳統促銷 email 的教科書)：促銷錨在文化鉤子（週五/夏天/假期）而非折扣深度；一個 offer + 一個場景故事；讓讀者覺得「買這個」是在完成故事、不是在接受推銷。",
   "em-30-drip":

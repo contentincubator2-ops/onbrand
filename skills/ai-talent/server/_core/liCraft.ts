@@ -76,7 +76,7 @@ const LI_TASK_REF: Record<string, string> = {
   "li-30-poll":
     "LinkedIn 官方「Global Talent Trends」報告配套 polls (LinkedIn 平台自有數據顯示 poll 留言率高 3-5x；LinkedIn 官方行銷案例)：最好的 poll 問題是「你這週正在面對的決策」——投票感覺像自我反思。",
   "li-30-event-invite":
-    "Salesforce「Dreamforce」LinkedIn 活動推廣 (Cannes Lions B2B Lions Grand Prix 2022；年度 17 萬人參加的最大 B2B 活動)：邀請錨定在「與會者的轉化」（「你離開時會知道 X」）而非活動後勤。",
+    "TED Conferences LinkedIn 活動邀請策略 (LinkedIn Marketing Award；TED 活動邀請是 LinkedIn 互動率最高的非商業活動邀請格式)：邀請錨定在「你帶走什麼能力或見解」而非活動後勤（日期/地點/議程）；邀請文案讓讀者感覺「這場改變的是我的思考方式，不只是我的行事曆」。",
   "li-30-newsletter":
     "Microsoft「Work Trend Index」LinkedIn Newsletter (Microsoft 官方發布；每期超過 100 萬訂閱者，LinkedIn 訂閱量最高的企業 Newsletter 之一)：標題 = 具體可測試主張；開頭用讀者的真實場景啟動。",
   "li-30-document":
@@ -86,13 +86,13 @@ const LI_TASK_REF: Record<string, string> = {
   "li-60-thought-leader":
     "McKinsey「McKinsey Global Institute」LinkedIn 長文思想領袖策略 (LinkedIn 最多被分享的管顧品牌之一；McKinsey Insights 為 LinkedIn 思想領袖長文的行業標竿)：個人故事 + 產業數據 + 3 個可帶走的行動點；讀完感覺像被點撥。",
   "li-60-newsletter":
-    "Morning Brew「Emerging Tech Brew」LinkedIn Newsletter 格式 (Morning Brew 是 B2B newsletter 成長速度最快的媒體之一；CMI Award Best B2B Newsletter)：完整 newsletter：標題 = 具體可測試主張；opener = 讀者的親身場景；每節賺到繼續讀。",
+    "James Clear「Atomic Habits」LinkedIn Newsletter (LinkedIn 官方精選 Top Newsletter；James Clear 以「1 個可執行概念 per issue」格式建立 300 萬+ 訂閱的個人品牌)：完整 newsletter = 標題 = 具體可測試主張（不是第幾期）；opener = 1 個讀者本週已遇到的場景；每節賺到繼續讀；結尾 1 個具體行動概念，讓讀者收藏這封。",
   "li-60-case-study":
-    "Salesforce「Customer Success」LinkedIn Case Study 格式 (Salesforce Cannes Lions B2B Lions Grand Prix 2022；業界引用最廣的 B2B case study 模板)：客戶是主角；品牌是工具不是主詞；量化結果嵌入感性故事。",
+    "IBM「Watson」B2B Case Study LinkedIn 格式 (Cannes Lions B2B Lions Silver 2022；IBM 讓 AI 技術透過用戶故事變得有人性)：客戶是主角解決真實業務挑戰；IBM Watson 是使能工具，不是主詞；量化結果（縮短決策時間 X 週）嵌入感性敘事；讓複雜技術產品透過具體人物故事變得可理解。",
 
   // ── 99s ───────────────────────────────────────────────────────────────
   "li-99-30day-thought-leadership":
-    "Adam Grant 30 天 LinkedIn 內容節奏 (LinkedIn 官方評選「Top Voice」多年；超過 500 萬追蹤者；其 30 天節奏被 LinkedIn 官方作為個人品牌案例研究)：30 天 = 1 個一致 POV 從不同角度探索；每週不同互動機制。",
+    "Arianna Huffington 30 天 LinkedIn 思想領袖節奏 (LinkedIn Top Voice；Thrive Global 創辦人在 LinkedIn 的每日職場洞察建立跨媒體個人品牌)：30 天 = 1 個一致 POV（職場幸福與高效能不衝突）從不同角度探索；每週交替格式（個人故事/研究數據/反問/Poll）；跨 30 天建立讀者期待的節律感。",
   "li-99-newsletter-quarterly":
     "Microsoft「Work Trend Index」季度 LinkedIn Newsletter 系列 (Microsoft 官方出版；每季超過 500 萬人次閱讀；LinkedIn 平台上最被引用的商業研究 newsletter)：每期錨在 1 個可量化的產業轉變；累積跨期觀點權威。",
 };

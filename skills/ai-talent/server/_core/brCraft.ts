@@ -67,7 +67,7 @@ const BR_TASK_REF: Record<string, string> = {
   "br-30-naming":          "Häagen-Dazs 命名策略（Harvard Business School Case Study）：虛構的外語感名字創造高端感知；音韻美學先於字義，感知先於事實。",
   "br-30-archetype":       "Dove「真實美麗」品牌原型演進（Cannes Lions Grand Prix Titanium + Effie Grand Prix）：從美妝品牌重定位為社會使命；原型轉換需要全面行為改變，不只換 slogan。",
   "br-30-competitor-map":  "Apple vs IBM「1984」競爭定位（Cannes Lions Grand Prix）：透過定義敵人來定義自己；競爭地圖最有力的軸線是受眾在乎的價值取捨，非功能清單。",
-  "br-30-elevator-pitch":  "Dollar Shave Club 投資人/媒體 pitch（Webby Award Best Viral Campaign 2012）：90 秒重新定義一個品類；pitch 的工作是讓聽者看到不同的競爭地圖。",
+  "br-30-elevator-pitch":  "Slack 早期 Beta 測試 Elevator Pitch（Andreessen Horowitz 投資案例；「email killer」重新定義工作通訊品類）：90 秒讓聽者看到不同的競爭地圖——競爭對手不是 HipChat，是「電子郵件這個習慣」；最強 pitch 都在重新定義品類，不在強調功能。",
   "br-30-forbidden-words": "Innocent Drinks 品牌聲音指南（Marketing Week Brand of the Year）：禁用詞清單透過「排除」定義品牌個性；負空間比正空間更精確。",
   "br-60-tagline-suite":   "Old Spice 品牌重定位 tagline 套組（Cannes Lions Grand Prix Titanium 2010）：套組＝一個策略主張的多執行角度；不同 tagline 攻不同受眾但出自同一核心。",
   "br-60-value-prop":      "Spotify Premium 價值主張套組（Cannes Lions Grand Prix）：價值主張層次由功能→情感→身分認同遞進；每層吸引不同決策階段的受眾。",

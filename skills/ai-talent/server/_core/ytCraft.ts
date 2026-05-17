@@ -73,43 +73,43 @@ YouTube 是搜尋發現 + 留存媒介——標題/縮圖決定點擊；開場 h
 const YT_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "yt-30-title-strategies":
-    "MrBeast YouTube 頻道 (Streamy Award Top Creator 2022；Streamy Award Creator of the Year 2023；超過 3 億訂閱者)：標題公式：WHAT + 數字/最高級 + 好奇缺口（告訴你是什麼但不告訴你怎麼或誰贏）；好奇缺口是工程設計，不是意外。",
+    "MrBeast YouTube 頻道 (Streamy Award Creator of the Year 2023；超過 3 億訂閱者)：標題公式 WHAT + 數字/最高級 + 好奇缺口（告訴你是什麼但不說怎麼或誰贏）；好奇缺口是工程設計，不是意外；每個標題都在 A/B 測試後才上線。",
   "yt-30-thumbnail-text":
-    "Mark Rober YouTube 頻道 (Streamy Award Science/Education 2022；NASA 前工程師，縮圖 CTR 業界最高之一)：3-5 字、高對比、放在情緒表情旁——人臉 + 情緒表情 + 補充標題缺口的字 = 最高 CTR 組合。",
+    "Mark Rober YouTube 頻道 (Streamy Award Science/Education 2022；NASA 前工程師，縮圖 CTR 業界最高之一)：單張縮圖 = 人臉情緒表情 + 3-5 字補充標題缺口 + 高對比色；手機 100px 也能秒讀；縮圖與標題是一套系統，不是兩件事。",
   "yt-30-description-seo":
-    "TED Talks YouTube 頻道 (Webby Award Best Education/Reference Channel 多次；超過 2 千萬訂閱者；Google 搜尋最高被引用的 YouTube 頻道之一)：前 2 行 = searchable + 情緒 hook；章節 = 導覽禮物，直接延長觀看時長。",
+    "TED Talks YouTube 頻道 (Webby Award Best Education/Reference Channel 多次；Google 搜尋被引用最多的 YouTube 頻道)：前 2 行 = searchable + 情緒 hook（含主關鍵字 1-2 次）；章節時間戳讓 Google 在搜尋結果直接展示段落；description 是 SEO 文章，不是元數據。",
   "yt-30-chapter-timeline":
-    "Lex Fridman Podcast YouTube 章節策略 (Spotify 第 2 名最受歡迎 podcast；YouTube 上最多訂閱的訪談頻道之一)：章節標題 = 獨立搜尋查詢（不是「主題 3」，是「為何 X 認為 AGI 在 5 年內」）；每個標題都能被搜到。",
+    "Lex Fridman Podcast YouTube 章節策略 (YouTube 訪談類最多訂閱頻道之一；其章節標題是業界引用最廣的可搜尋章節設計)：每個章節標題 = 獨立搜尋查詢（不是「主題 3」，是「為何 X 認為 AGI 在 5 年內」）；章節是額外的 SEO 關鍵字機會。",
   "yt-30-shorts-script":
-    "Google「Search On '22」YouTube Shorts 系列 (Webby Award Best Brand Shorts 2023；Google 官方 Shorts 格式標竿)：Shorts = 垂直、單一揭示、最後 2 秒是分享時刻（不是 CTA）；沒有浪費的幀。",
+    "Google「Search On '22」YouTube Shorts 系列 (Webby Award Best Brand Shorts 2023；Google 官方 Shorts 格式標竿)：單支 Shorts = 垂直、單一揭示弧、最後 2 秒是分享時刻（不是 CTA）；每幀有目的，沒有浪費的幀。",
   "yt-30-opening-hook":
-    "Kurzgesagt「In a Nutshell」開場設計 (Webby Award Best Animation 多次；Shorty Award Best Science & Education；超過 2 千 2 百萬訂閱者)：前 10 秒 = 大膽主張 + 視覺佐證 + 「留下來的回報」；hook 本身就是論點，不是論點的簡介。",
+    "Kurzgesagt「In a Nutshell」開場設計 (Webby Award Best Animation 多次；Shorty Award Best Science & Education)：前 3 秒 = 大膽主張 + 視覺佐證；15 秒說清楚「留下來的回報」；hook 本身就是論點，不是論點的目錄。",
   "yt-30-end-cta":
-    "MKBHD (Marques Brownlee) YouTube 頻道 (Streamy Award Best Tech Channel 多次；Webby Award Best Technology Channel；超過 1 千 8 百萬訂閱者)：CTA 放在情緒峰值（大揭示後立刻）；感覺像自然延伸；推薦相關下一支，不是隨機。",
+    "MKBHD (Marques Brownlee) YouTube 結尾 CTA 策略 (Streamy Award Best Tech Channel；Webby Award Best Technology Channel)：CTA 放在影片情緒峰值（大揭示後立刻，不是片尾 30 秒）；End Screen 推薦主題相連的下一支，感覺像自然延伸，不是廣告。",
   "yt-30-community-post":
-    "National Geographic YouTube Community 策略 (Shorty Award Best Brand in Travel 多次；YouTube 品牌頻道最佳社群互動率之一)：社群貼文 = 訂閱者優先的幕後線索；1 張圖 + 1 個真實問題 = 留言率 10x；不要廣播，要對話。",
+    "National Geographic YouTube Community Post 策略 (Shorty Award Best Brand in Travel 多次；YouTube 品牌頻道最佳社群互動率之一)：單則 Community Post = 訂閱者優先的幕後線索；1 張圖 + 1 個真實開放問題 = 留言率比廣播型高 10 倍；不要公告，要對話。",
 
   // ── 60s ───────────────────────────────────────────────────────────────
   "yt-60-video-package":
-    "TED Talks YouTube 全頻道製作系統 (Webby Award Best Education/Reference Channel 多次；超過 20 億次觀看；YouTube 最高 SEO 效益的教育頻道)：標題/縮圖/描述/章節/end screen 是統一系統；每個元件強化同一個影片的可發現性。",
+    "Tasty by BuzzFeed YouTube 完整影片製作套組 (Webby Award Best Food & Drink Channel；YouTube 食物類史上成長最快頻道)：標題/縮圖/描述/章節/end screen 是統一系統；Tasty 的 60 秒食譜格式讓每個元件都強化同一支影片的可發現性與留存率。",
   "yt-60-shorts-script":
-    "Google「Search On」YouTube Shorts 腳本系列 (Webby Award Best Brand Shorts 2023；Google 官方 Shorts 創意標竿)：Shorts 腳本：單一揭示弧；每秒有目的；最後 2 秒 = 分享時刻；系列建立頻道 Shorts 視覺語言。",
+    "Khan Academy YouTube Shorts 教育腳本系列 (Webby Award Best Education/Reference Channel；全球最大免費教育機構)：「1 概念 per short」格式是教育型 Shorts 的黃金標準；每支完整解釋 1 個知識點，靜音也能看懂，最後 2 秒留下可分享的結論。",
   "yt-60-thumbnail-suite":
-    "MrBeast YouTube 縮圖系統 (Streamy Award Top Creator 2022-2023；縮圖 A/B testing 業界最高標準；全球 CTR 最高的 YouTube 頻道之一)：縮圖套組 = 跨影片的一致視覺語言；好奇缺口公式 + 情緒表情 + 高對比文字。",
+    "Linus Tech Tips (LTT) YouTube 縮圖套組系統 (Shorty Award Best in Technology；跨 100+ 影片的一致縮圖視覺語言)：縮圖套組 = 跨系列影片的品牌視覺識別系統；同一套高對比色/字型/人臉構圖讓觀眾在演算法推薦列表中秒辨認 LTT。",
   "yt-60-series-3ep":
-    "Kurzgesagt 系列影片設計 (Webby Award Best Animation 多次；其宇宙/科學系列是 YouTube 教育連載的設計標竿)：3 集 = 1 個主題的 3 個深度層次；每集獨立但累積理解；訂閱在第 2 集中段最自然；末集 = 整合 + 下一系列預告。",
+    "Wendover Productions YouTube 3 集系列格式 (Webby Award Best Informational/Educational；地理/系統分析類頻道標竿)：3 集 = 1 個主題的入門/深化/應用三個深度層次；每集獨立搜尋但積累完整理解；訂閱鉤子在第 2 集中段情緒最投入時自然出現。",
   "yt-60-community-post":
-    "National Geographic YouTube Community 套組策略 (Shorty Award Best Brand in Travel 多次；YouTube 官方社群功能早期採用標竿)：Community 套組 = 發布前/中/後生命週期；每個時機點有不同的觀眾參與理由。",
+    "NASA YouTube Community Post 完整生命週期策略 (NASA 是政府頻道 YouTube 社群互動率最高的帳號)：Community Post 套組 = 發布前預熱（任務倒數）+ 發布當天（即時互動）+ 發布後追蹤（結果揭示）；每個時間點有不同的觀眾再參與鉤子。",
   "yt-60-viral-rewrite":
-    "MKBHD 影片格式演進策略 (Streamy Award Best Tech Channel 多次；MKBHD 對「為何某支影片病毒」的系統分析是 YouTube 創作者的標竿做法)：分析原作被分享的機制（洞察/驚喜/觸動哪種）→ 萃取 → 以自己主題重建；不抄，借機制。",
+    "Veritasium (Derek Muller) YouTube 病毒機制分析策略 (Webby Award Best Science & Education；Derek Muller 曾公開發表《The Illusion of Truth》等病毒傳播機制研究)：分析原作被分享的核心機制（洞察衝突/驚喜反轉/情感觸動三選一）→ 萃取 → 以自己主題重建；不抄創意，借機制。",
 
   // ── 99s ───────────────────────────────────────────────────────────────
   "yt-99-series-6ep":
-    "Lex Fridman Podcast YouTube 長系列格式 (Spotify 全球前 5 podcast；YouTube 訪談類最多訂閱頻道之一；其 Playlist 系列是 YouTube SEO 長系列的標竿)：6 集 = 完整課程感；每集 = 獨立搜尋查詢 + 系列一部分；末集總結 + 下一系列鉤子。",
+    "3Blue1Brown YouTube 數學長系列格式 (Webby Award Best Animation；Grant Sanderson 的《Essence of Calculus》/《Essence of Linear Algebra》是 YouTube 6 集以上教育系列的設計標竿)：6 集 = 完整課程感；每集 = 獨立搜尋查詢 + 系列一部分；末集總結全局觀點 + 預告下一系列；建立「追劇」訂閱習慣。",
   "yt-99-quarterly-strategy":
-    "TED Talks YouTube 季度內容策略 (Webby Award Best Education/Reference Channel 多次；YouTube 上持續成長最穩的頻道之一；Evergreen + Trending 混搭策略的業界標竿)：季度 = Evergreen 支柱 + 重複系列 + 季節時刻三種類型的節奏混搭。",
+    "Ali Abdaal YouTube 季度內容策略 (Entrepreneur.com 年度最佳個人品牌創業者；生產力類 YouTube 頻道全球訂閱增速最快)：季度 = Evergreen 支柱（長期 SEO 流量）+ 重複系列（訂閱理由）+ 季節時刻（觸及爆發）三種類型的節奏表；每月有 1 個高峰旗艦內容。",
   "yt-99-premiere-kit":
-    "MrBeast Premiere 首映事件套組 (Streamy Award Top Creator 2022-2023；其首映策略讓每次上傳成為媒體事件；Premiere 同時在線觀看人數 YouTube 記錄持有者之一)：Community Post 預熱 → 計劃首映 → Live Chat 互動 → 首映後 Community 追蹤；把上傳變成事件。",
+    "BTS「Permission to Dance on Stage」YouTube Premiere 首映套組 (YouTube Music Awards；打破 YouTube 同時在線觀看紀錄)：Community Post 預熱（發布前 3 天）→ 計劃首映設定 → 首映 Live Chat 互動腳本 → 首映後 Community 追蹤問答；把每次上傳變成一個全球同步的社群事件。",
 };
 
 /** Per-use-case playbook — per taskId pattern + award reference appended. */
