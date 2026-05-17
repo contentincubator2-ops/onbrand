@@ -57,11 +57,51 @@ Instagram 是視覺優先媒介——圖/影是內容本體，文案是輔助。
 【zh-TW 在地化｜最高優先】不要套美式節慶/用語；用台灣節點與口語（過年/中秋/母親節/雙11/在地梗）。繁體中文、台灣用語。
 `.trim();
 
-/** Per-use-case playbook — keyed by taskId pattern. The 2-4
- *  highest-leverage moves for that IG content type. */
+/**
+ * Per-task award reference — 2026-05-17 (CJ「列出個別參考哪個得獎案例」
+ * → 內化進 playbook). Each IG task is anchored to the most relevant IAC
+ * Social-Media-Campaign winner; the line is the *transferable craft
+ * pattern* that case teaches (principle, NOT the campaign's creative).
+ * Appended to the pattern playbook so generation is guided by a proven
+ * award model, brand-agnostic.
+ */
+const IG_TASK_REF: Record<string, string> = {
+  "ig-30-caption-short":        "Veronika NYC「Feast For The Eyes」(IAC 餐飲)：一則一個簡化的引人概念，抽象勾引勝過列功能，一句一情緒。",
+  "ig-30-pure-text-hook":       "Adobe「The Unfinished Film」(IAC Best of Show)：hook 設計成開放邀請/挑釁，把滑過變參與。",
+  "ig-30-reel-hook":            "93 Boyz「Channel 93」(IAC)：首幀＝有風險的真實行動（非 logo/開場），真實感勝過精緻。",
+  "ig-30-reel-script-full":     "Adobe「The Unfinished Film」(IAC)：15-30s 圍繞單一轉變/參與弧，結尾要求行動而非觀看。",
+  "ig-30-story-text":           "Genesis「G90 Artist Series」(IAC 汽車)：Story 當引導式敘事層（序列揭曉＋互動貼紙）導向更深 hub。",
+  "ig-30-carousel-structure":   "Genesis「G90 Artist Series」(IAC Guide)：10 頁＝策展導覽弧，鉤子卡→逐張升級→payoff/CTA，張張誘下滑。",
+  "ig-30-bio-rewrite":          "Lilly Pulitzer「New Generation of Originals」(IAC 時尚)：一句身分定位橋接傳承＋新受眾。",
+  "ig-30-hashtag-set":          "Explore Louisiana「Gumbo Day」(IAC 旅遊)：錨在可擁有的活動/節點主題＋創作者/地點標籤，綁日曆時刻。",
+  "ig-30-comment-reply":        "8x8「The Power of You」(IAC B2B)：回覆讓留言者成為主角，肯定/認可語氣非打發。",
+  "ig-30-dm-script":            "Pink Shell Resort 網紅活動 (IAC 飯店)：DM 當高精準下一步（分眾→相關 offer→低摩擦行動）。",
+  "ig-30-live-opening":         "Florida Lottery「Scratch Factor Live」(IAC)：30 秒內即時互動有風險的 hook（現在正發生、觀眾能左右）。",
+  "ig-30-story-repost-strategy":"Genesis「G90 Artist Series」(IAC)：重發成週期性序列 guide，讓限時內容累積成持久敘事。",
+  "ig-30-threads-cross-post":   "Adobe「The Unfinished Film」(IAC)：改寫成文字原生挑釁/邀請，保留參與鉤子、去掉視覺依賴。",
+  "ig-60-feed-full":            "Veronika NYC「Feast For The Eyes」(IAC 餐飲)：完整貼文＝連貫視覺敘事＋單一簡化訊息，feed 美學一致建品牌世界。",
+  "ig-60-reel-full":            "Adobe「The Unfinished Film」(IAC)：完整 Reel 建在參與/轉變弧＋收尾行動，為 remix/分享而設計。",
+  "ig-60-carousel-7":           "Genesis「G90 Artist Series」(IAC)：7 卡策展弧，鉤子→5 張升級→payoff/CTA，每卡控節奏拉下滑。",
+  "ig-60-story-3frame":         "Genesis「G90 Artist Series」(IAC)：3 幀小弧 預告→揭曉→互動/CTA，末幀貼紙互動。",
+  "ig-60-countdown-5day":       "Select Registry「Stay for the Story」(IAC 飯店)：5 天分眾升級（認知→意圖→轉換），每天獨立目標。",
+  "ig-60-highlight-suite":      "Genesis「G90 Artist Series」(IAC)：5 個 Highlight 封面組成永久主題畫廊，視覺系統一致。",
+  "ig-60-live-suite":           "Florida Lottery「Scratch Factor Live」(IAC)：5 段 Live 圍繞重複的即時互動/風險節拍維持全程參與。",
+  "ig-60-serial-3":             "93 Boyz「Channel 93」(IAC)：連載建在可重複的真實前提＋品牌標語，集集獨立又累積。",
+  "ig-60-viral-rewrite":        "93 Boyz「Channel 93」(IAC)：為被轉發而設計——具體、出乎意料、可截圖的行動，真實勝過製作。",
+  "ig-60-testimonial-rewrite":  "8x8「The Power of You」(IAC B2B)：把客戶寫成解決真實挑戰的主角（短片敘事），非產品為主詞。",
+  "ig-99-30day-calendar":       "Explore Louisiana「Gumbo Day」(IAC 旅遊)：一個月錨一個可擁有主題，多格式混搭，跨自有＋夥伴帳號分發。",
+  "ig-99-reel-series-6":        "Genesis「G90」＋ Adobe (IAC)：6 集＝一個可重複格式/前提，每集不同主角，靠協作者帳號擴散。",
+  "ig-99-account-reposition":   "Lilly Pulitzer「New Generation of Originals」(IAC 時尚)：保留核心資產同時為新世代重構，全帳號視覺一致刷新。",
+};
+
+/** Per-use-case playbook — keyed by taskId pattern, plus the specific
+ *  award reference for this exact task appended when known. */
 export function igPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
-  const P = (s: string) => `# 本任務 playbook（IG 得獎模式）\n${s}`;
+  const ref = IG_TASK_REF[id];
+  const P = (s: string) =>
+    `# 本任務 playbook（IG 得獎模式）\n${s}` +
+    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
   if (/feed|caption-short/.test(id))
     return P("單圖/feed：首圖一個視覺主張＋首行 hook；文案先給價值再 CTA；3-8 hashtag 文末。");
   if (/carousel/.test(id))
