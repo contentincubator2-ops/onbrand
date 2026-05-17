@@ -40,19 +40,23 @@ export const PR_30S_TASKS: FBTaskTemplate[] = [
 1. 倒金字塔：最有新聞價值的事實放最前面（誰 + 做了什麼），不要鋪陳。
 2. 主動語態 + 強動詞（推出 / 宣布 / 達成 / 攜手 / 突破），不要「致力於」「持續努力」這種軟詞。
 3. 一個具體錨點：數字、金額、名字、地點或日期擇一，且必須來自輸入事實，不可杜撰。
-4. 一行讀完：12–24 個中文字最佳，最多不超過 30 字；不用驚嘆號、不用問號、不用冒號堆砌。
+4. 一行讀完：12–24 個中文字最佳，最多不超過 30 字；不用驚嘆號、不用冒號堆砌（問號**僅「反問式」變體**可用，其餘不用）。
 5. 記者可「原封不動」引用：客觀第三人稱，無行銷形容詞、無 buzzword、無 clickbait、無「業界領先 / 顛覆 / 革命性」。
 6. 一眼看懂價值：標題本身要能回答「為什麼這值得報導」。
 
-每個變體用「不同的新聞角度」切入（依 variantLabel）：
-- 事實式：純粹陳述發生了什麼，最安全可靠。
-- 數據式：用最有力的那個數字當主詞或主軸。
-- 突破式：強調這是首次 / 最大 / 最快 / 唯一（有事實支撐才用）。
-- 影響式：點出對市場 / 用戶 / 產業的具體改變。
-- 引述式：用發言人一句有力短話帶出新聞（需像真的會被講出口的話）。
-- 時機式：扣連時間點 / 檔期 / 趨勢，說明「為什麼是現在」。
-- 對比式：用前後對照或與既有做法的差異凸顯新意。
-- 懸念式：留一個讓記者想往下讀的具體鉤子（仍須是事實，不可標題黨）。
+【角度必須真的不同｜最高優先 — 不可違反】
+每個變體是「完全不同的視角／句構」，不是同一句換詞。判定失敗的情形：兩條主詞相同、句子骨架相同、或只是同義詞替換（如「發布/首發」「揭露/指出」互換）。每一條都要能讓記者下一個**不同的標**。請依下方 variantLabel 從「根本不同的切入點」下手：
+
+- 事實式：中性陳述「誰＋做了什麼＋最關鍵衝擊」。（主詞＝機構）
+- 受影響者視角：以「那個孩子／當事人／受影響的人」為主詞或開頭，不是機構。例：「23萬個孩子，4成沒看過牙醫」。
+- 對比式：用一組反差／對照當骨架（多 vs 少、看得見 vs 看不見、A 卻 B）。例：「全台最會看牙的城市，藏著4成沒看過牙醫的孩子」。
+- 反問式：用一個讓人停下來的具體問句當標（此任務允許問號）。例：「23萬個孩子的牙，為什麼沒人看見？」。
+- 數據衝擊式：把「一個」最震撼的數字放句首當主角，其餘全刪。例：「4成貧窮兒童，一輩子沒看過牙醫」。
+- 時機式：扣「為什麼是現在／首份」，把時間點變成新聞點。
+- 引述式：用一句像真的會被講出口的短話帶出新聞（不是場面話）。
+- 懸念式：留一個具體鉤子讓記者想點開（仍須是事實，不可標題黨）。
+
+自我檢查：把 8 條並排，若任兩條交換主詞或句構後意思幾乎一樣 → 失敗，重寫該條。
 
 只輸出標題本身，不要前綴、不要編號、不要解釋。
 ${PR_TONE}`,
@@ -94,12 +98,17 @@ ${PR_TONE}`,
     systemPrompt: `【得獎工藝參考】The Lost Class（Change the Ref / Leo Burnett，Cannes Lions 2022）：威力來自第一個事實揭露就讓人倒抽一口氣、重新理解整件事。導言第一句＝那個一說出口就改變讀者認知的事實，不是鋪陳。
 你在寫新聞稿的「導言第一段」——記者掃過信件、決定「這值不值得我往下讀」就看這幾句。
 
-第一句（最關鍵，決定生死）：
-- 【硬性字數規則｜最高優先】第一句（到第一個句號為止）**必須 ≤ 35 個中文字元**。寫完後**逐字數一次**，超過就刪修或拆成兩句，把 WHEN/WHERE/細節移到第二句——寧可資訊往後挪，第一句也不可破 35 字。理想 20–30 字。
-- 直接是新聞本身：WHAT + WHO 放最前面；WHEN / WHERE 可移到第二句以守住字數；不要用公司名或「很高興宣布」開場。
-- 內含一個具體錨點：數字 / 規模 / 金額 / 名字 / 日期（必須來自輸入事實，不可杜撰）。
-- 能單獨成立——記者只讀這一句也抓得到核心故事。
-- 句子本身要回答「為什麼這值得現在被報導」，不是事後補。
+第一句（最關鍵，決定生死）——以下為**最高優先、不可違反的硬規則**：
+- 【結構規則】第一句必須是「單一獨立事實句」：**只能有一組主詞＋動詞，整句最多 1 個逗號**。**禁止**用逗號串接多個事實／並列子句／「指出…，令人震驚的是…」這種堆疊。寫不下的資訊一律丟到第二句。
+- 【字數規則】第一句（到第一個句號為止）**≤ 30 個中文字元**。寫完**逐字數**，超過就刪到剩核心。
+- 【WHEN/WHERE 規則】時間、地點、機構全名、數字清單**一律不放第一句**，移到第二句。第一句只回答「誰＋做了什麼＋最關鍵的那一個衝擊」。
+- 一個具體錨點（數字或名字，來自輸入、不可杜撰）可放第一句，但只能一個。
+- 能單獨成立——記者只讀這一句就懂核心。
+
+❌ 壞例（違反，68 字、多個並列子句）：「家扶基金會攜手台灣大學，針對兒童貧困問題，首次發布白皮書，指出全台約23萬名兒童生活在貧窮線下，令人震驚的是39%孩子從未接受牙科檢查。」
+✅ 好例（第一句 19 字、單一事實、可單獨成立）：「全台逾23萬名貧窮兒童，4成從未看過牙醫。」（第二句再補：家扶基金會與台灣大學5月17日發布首份「台灣兒童貧窮白皮書」揭露此現況……）
+
+故事感型例外提醒：即使是故事感型，第一句仍須是上述「事實句」（不可純場景鋪陳如「某個午後孩子在操場玩耍」）；場景可放第二句。
 
 第二、三句（支撐，總長 80–170 字）：
 - 第二句補 WHY（意義 / 影響面），第三句補 HOW 或規模延伸（若重要才寫）。
@@ -363,7 +372,7 @@ export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // POOL of 8 distinct-angle headlines in one run. RunPage surfaces 3,
   // 「再給我幾個標題」reveals the rest from this already-persisted pool —
   // zero extra cost/latency. captionMax tightened to one-line headline.
-  "pr-30-headline":           { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實式", "數據式", "突破式", "影響式", "引述式", "時機式", "對比式", "懸念式"], captionMinChars: 12, captionMaxChars: 42 },
+  "pr-30-headline":           { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實式", "受影響者視角", "對比式", "反問式", "數據衝擊", "時機式", "引述式", "懸念式"], captionMinChars: 12, captionMaxChars: 42 },
   "pr-30-subhead":            { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["影響面", "規模延伸", "時程感"], captionMinChars: 30, captionMaxChars: 80 },
   "pr-30-lead-paragraph":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實密度型", "影響面型", "故事感型"], captionMinChars: 70, captionMaxChars: 180 },
   "pr-30-ceo-quote":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["願景式", "客戶價值", "市場觀察"], captionMinChars: 1800, captionMaxChars: 3200 },
