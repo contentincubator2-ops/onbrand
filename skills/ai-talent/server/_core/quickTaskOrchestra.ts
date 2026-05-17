@@ -715,9 +715,24 @@ async function callOneBrief(args: {
       `- 構圖服務內容（封面承諾/輪播遞進/Reel 字卡空間）。\n` +
       `- 品牌視覺一致：色彩/字體/濾鏡/構圖語言與品牌大腦一致，可一眼認出。\n`
     : "";
+  // 2026-05-18 (CJ「每個版本的圖應該要不一樣，現在都是一樣」): every
+  // brief got the same userMsg + only a one-word tone label, so the 5
+  // visuals converged. Give each label a CONCRETELY different visual
+  // lens (subject framing / scene / composition / palette) and an
+  // explicit must-differ rule so the set diverges.
+  const labelLens: Record<string, string> = {
+    "情感版": "聚焦人物表情與肢體情緒、特寫、暖色光、淺景深",
+    "理性版": "簡潔資訊式構圖、幾何排版、冷調、留白、產品/介面為主體",
+    "故事版": "敘事場景、環境帶入、中景、自然光、生活感瞬間",
+    "數據版": "視覺化數字/圖表元素、強對比、單一焦點、現代極簡",
+    "懸念版": "局部遮蔽/未揭曉的構圖、戲劇光影、暗調、引發好奇",
+  };
+  const lens = labelLens[label] ?? `緊扣「${label}」的獨特視覺概念，與其他版本明顯不同`;
   const system =
     imagePersona +
     `任務：寫 1 條**繁體中文**視覺方向描述，呼應「${label}」這個口吻。\n` +
+    `此版本的視覺切角（務必照此走，不要寫成通用品牌圖）：${lens}。\n` +
+    `這是一組多版本中的「${label}」，**必須與其他版本在主體、場景、構圖、色調上明顯不同**，不可雷同。\n` +
     `比例：${config.aspectRatio ?? "1:1"}\n` +
     igVisualBlock +
     subjectRule +
@@ -968,17 +983,32 @@ async function callLegalAssistant(args: { caption: string; testimonialSource: st
 async function genOneImage(prompt: string, config: OrchestraConfig): Promise<OrchestraVariant["image"]> {
   if (!prompt) return { style: null, url: null, status: "skipped" };
   try {
-    // 2026-05-05: switched from fal/flux-schnell to piapi/flux-pro
-    // (CJ direction — fal.ai account was billing-locked, refund irrecoverable;
-    // PiAPI Flux Pro is sync, ~5–13s per image, no fal dependency).
-    const r = await Promise.race([
-      dispatchGenerate("piapi/flux-schnell", {
-        prompt,
-        aspectRatio: (config.aspectRatio === "1.91:1" ? "16:9" : config.aspectRatio) as any,
-        quality: config.imageQualitySteps >= 8 ? "high" : "medium",
-      }),
-      timeoutPromise<never>(PER_IMAGE_MS, "piapi-flux-schnell"),
-    ]);
+    // 2026-05-18 (CJ「目前的圖很不行，最好的生圖模型是什麼」): quick-task
+    // images were hardcoded to piapi/flux-schnell — the fastest/lowest-
+    // quality Flux tier (draft-grade, weak prompt adherence). Upgrade the
+    // default to Google Imagen 4 (best quality/speed balance for branded
+    // marketing visuals, robust prompt adherence, fewer safety false-
+    // positives than gpt-image-1). Flux Schnell stays as the reliability
+    // fallback so a provider hiccup never blanks the card.
+    const aspect = (config.aspectRatio === "1.91:1" ? "16:9" : config.aspectRatio) as any;
+    const opts = {
+      prompt,
+      aspectRatio: aspect,
+      quality: "high" as const,
+    };
+    const tryModel = async (modelId: string, label: string) =>
+      Promise.race([
+        dispatchGenerate(modelId, opts),
+        timeoutPromise<never>(PER_IMAGE_MS, label),
+      ]);
+    let r;
+    try {
+      r = await tryModel("google/imagen-4-default", "imagen-4");
+      if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? "imagen-4 no url");
+    } catch {
+      // fall back to the fast, content-permissive Flux tier
+      r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell");
+    }
     if (r.status === "ready" && r.url) {
       return { style: prompt, url: r.url, status: "ready" };
     }
