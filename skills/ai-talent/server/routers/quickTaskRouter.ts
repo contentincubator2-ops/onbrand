@@ -1164,6 +1164,27 @@ export const quickTaskRouter = router({
         if (!config) throw new Error(`No config for: ${input.taskId}`);
       }
 
+      // 2026-05-18 (CJ「所有 60s 任務都要：圖完成才展示，非套組降到 2 版」):
+      // every 60s task generates images and promised a "complete post".
+      // Apply one central rule instead of hand-editing ~47 configs:
+      //  - holdForImages=true (UI stays in countdown modal until images done)
+      //  - alternative-version tasks (NOT multi-post packs) → clamp to 2
+      //    versions so copy+image both finish in the 60s budget.
+      //  - multi-post packs (postsCount / postLabels define the deliverable,
+      //    e.g. 5-day countdown, launch kit, suites) keep their piece count.
+      // Shallow-copy so we never mutate the shared *_60S_ORCHESTRA object.
+      if (config && config.runImageGen && (config.images ?? 0) > 0) {
+        const isPack = !!(config.extras?.postsCount || (config.postLabels && config.postLabels.length > 0));
+        config = {
+          ...config,
+          holdForImages: true,
+          ...(isPack ? {} : {
+            variants: Math.min(config.variants ?? 2, 2),
+            images: Math.min(config.images ?? 2, 2),
+          }),
+        };
+      }
+
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" as const };
 
       if (!input.asyncMode) {

@@ -834,7 +834,8 @@ export default function RunPage() {
         const p = (data as any)?.progress;
         // hold-for-images tasks show their own full-card generating state
         // (the mockup is replaced) — skip the redundant slim banner.
-        if (p === "caption_ready" && HOLD_FOR_IMAGES.has(data.mission?.taskId ?? "")) {
+        if (p === "caption_ready" &&
+            (HOLD_FOR_IMAGES.has(data.mission?.taskId ?? "") || data.mission?.tier === "60s")) {
           return null;
         }
         if (p === "caption_ready") {
@@ -939,7 +940,8 @@ export default function RunPage() {
           <div ref={mockupRef} className="relative bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
             {(() => {
               const holdMockup =
-                HOLD_FOR_IMAGES.has(data.mission?.taskId ?? "") &&
+                (HOLD_FOR_IMAGES.has(data.mission?.taskId ?? "") ||
+                  data.mission?.tier === "60s") &&
                 (data as any)?.progress === "caption_ready";
               if (holdMockup) {
                 return (

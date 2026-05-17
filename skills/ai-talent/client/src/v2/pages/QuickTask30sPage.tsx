@@ -667,7 +667,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
           // of navigating now and showing a spinner on /run, keep the
           // running countdown modal open and poll until the full post
           // (image) is done/failed, THEN navigate. 95s safety cap.
-          if (HOLD_FOR_IMAGES.has(activeTask.id) && holdUtils?.output?.getById?.fetch) {
+          if ((tier === "60s" || HOLD_FOR_IMAGES.has(activeTask.id)) && holdUtils?.output?.getById?.fetch) {
             const deadline = Date.now() + 95_000;
             while (Date.now() < deadline) {
               await new Promise((res) => setTimeout(res, 3000));
@@ -732,8 +732,9 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   // hold-for-images tasks wait for copy + image before leaving the modal,
   // so the countdown target is longer (else it reads "85s / 60s").
   const expectedSec =
+    tier === "60s" ? 90 :
     activeTask && HOLD_FOR_IMAGES.has(activeTask.id) ? 90 :
-    tier === "30s" ? 30 : tier === "60s" ? 60 : 100;
+    tier === "30s" ? 30 : 100;
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 
   // Tier-distinct hero metadata — user feels the difference immediately
