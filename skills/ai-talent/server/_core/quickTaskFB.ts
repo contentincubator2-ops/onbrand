@@ -383,9 +383,15 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     inputs: [
       { key: "topic", label: "Story 想傳達什麼", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 FB Story 文案。
-output: caption 放完整 Story 文（30-60 字，會疊在圖片上） / title 放 1 個 5-8 字的 overlay 主標 / image_style_direction 是 9:16 直式風格描述。
-不要寫長段。Story 要快速吸睛即拋。`,
+    // 2026-05-18 (CJ「FB Story 文案任務沒有產出文字」): orchestra 只抽
+    // caption 欄位，title/image_style_direction 會被丟掉或污染 caption。
+    // 改成只回乾淨 JSON {caption}，caption 內第一行就是 5-8 字主標、
+    // 換行後接 Story 文，全部疊圖呈現，確保一定有文字產出。
+    systemPrompt: `產出 1 則 FB Story 文案，只輸出 JSON：{"caption":"<主標>\\n<Story文>"}
+規則：
+- 第 1 行 = 5-8 字 overlay 主標（強鉤、可單獨成立）
+- 換行後 = Story 文 30-60 字，口語、快速吸睛即拋，不要長段、不要 hashtag
+- caption 以外不要任何欄位、不要解釋、不要 markdown 圍欄`,
     preferredModel: "qwen",
     maxTokens: 300,
     outputDefaults: { platform: "facebook", post_type: "story" },

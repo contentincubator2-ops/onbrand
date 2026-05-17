@@ -238,13 +238,30 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── FB Story ─────────────── */
 
-export function FBStory({ title, brandName, variantLabel }: MockupFields) {
+export function FBStory({ title, brandName, variantLabel, liveCaption, liveTitle, liveImageUrl, liveImageStatus, liveImageStyle }: MockupFields) {
   const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
+  // 2026-05-18 (CJ「FB Story 文案任務沒有產出文字」): FBStory previously
+  // rendered only `title` (the run title) and never showed the generated
+  // Story 文案 at all. The whole deliverable of fb-30-story-text IS the
+  // caption (30-60 字 疊在圖上的文) + a short overlay 主標 (liveTitle).
+  // Now: caption is the prominent text, liveTitle the small 主標 chip,
+  // live image as background when ready (mirrors the approved FBAd fix).
+  const storyText = (liveCaption ?? "").trim();
+  const overlayTitle = (liveTitle ?? "").trim();
+  const hasImage = !!liveImageUrl && liveImageStatus === "ready";
   return (
     <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
       <div className="relative bg-default-900 rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
+        {hasImage && (
+          <img
+            src={liveImageUrl}
+            alt={liveImageStyle ?? "Story image"}
+            className="absolute inset-0 w-full h-full object-cover z-0"
+          />
+        )}
+        {hasImage && <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />}
         <div className="absolute top-2 inset-x-2 z-20 flex gap-1">
           {Array.from({ length: 4 }).map((_, i) => (
             <span key={i} className="flex-1 h-0.5 rounded-full bg-white/30 overflow-hidden">
@@ -263,15 +280,37 @@ export function FBStory({ title, brandName, variantLabel }: MockupFields) {
             <FontAwesomeIcon icon={faXmark} className="text-medium" />
           </div>
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "Story image · waiting for craft agent" : "限動圖 · 等待 AI 生成"}</p>
+        {!hasImage && (
+          <div className="absolute inset-0 flex items-center justify-center z-0">
+            <Skeleton className="absolute inset-0 opacity-30" />
+            <div className="relative z-10 text-center text-white/50 px-4">
+              <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
+              <p className="text-tiny">
+                {liveImageStyle
+                  ? liveImageStyle
+                  : liveImageStatus === "failed" || liveImageStatus === "timeout"
+                    ? (lang === "en" ? "Story image failed · tap to retry" : "限動圖生成失敗 · 點此重試")
+                    : (lang === "en" ? "Story image · tap to generate" : "限動背景圖 · 點此生成")}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="absolute bottom-16 inset-x-3 z-10">
-          <div className="bg-white/20 backdrop-blur-sm rounded-medium p-2 text-white text-small line-clamp-2">{title}</div>
+        )}
+        {/* Overlay 主標 (5-8 字) + Story 文案 (30-60 字) — the actual deliverable */}
+        <div className="absolute inset-x-3 bottom-20 z-10 flex flex-col items-center text-center gap-2">
+          {overlayTitle && (
+            <div className="bg-white text-default-900 font-bold text-medium px-3 py-1 rounded-md shadow-md -rotate-1">
+              {overlayTitle}
+            </div>
+          )}
+          {storyText ? (
+            <div className="bg-black/45 backdrop-blur-sm rounded-medium px-3 py-2 text-white text-small leading-relaxed whitespace-pre-wrap max-h-[42%] overflow-y-auto">
+              {storyText}
+            </div>
+          ) : (
+            <div className="bg-white/15 backdrop-blur-sm rounded-medium px-3 py-2 text-white/70 text-small line-clamp-2">
+              {title}
+            </div>
+          )}
         </div>
         <div className="absolute bottom-3 inset-x-3 z-10 flex items-center gap-2">
           <div className="flex-1 bg-white/15 border border-white/30 rounded-full px-3 py-1.5 text-tiny text-white/70">
