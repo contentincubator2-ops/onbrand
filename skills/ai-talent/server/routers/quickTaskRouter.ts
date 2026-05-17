@@ -675,8 +675,9 @@ import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA, getFB60OrchestraConfig, getFB60Templ
 import { IG_60S_TASKS, getIG60OrchestraConfig, getIG60Template } from "../_core/quickTaskIG60";
 import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../_core/quickTaskYT60";
 import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../_core/quickTaskMulti60";
-import { ALL_100S_TASKS, get100Template, get100OrchestraConfig } from "../_core/quickTask100";
-import { ALL_100S_SQUADS } from "../_core/quickTask100Squads";
+import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../_core/quickTask100";
+import { ALL_99S_SQUADS } from "../_core/quickTask100Squads";
+import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
 import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
@@ -785,6 +786,7 @@ export const quickTaskRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      input = { ...input, taskId: normalizeTaskId(input.taskId) }; // 100s→99s compat
       const def = TASKS[input.taskId];
       if (!def) throw new Error(`Unknown taskId: ${input.taskId}`);
       const stage = def.stages.find((s) => s.id === input.stageId);
@@ -898,14 +900,21 @@ export const quickTaskRouter = router({
     //  - Orchestra-based fallback (other channels — Phase 2: build squads)
     // Resolve real squad rosters from DB so each card shows its actual lead
     // agent + team members (not generic AI Agent avatar).
-    const squadSlugs = ALL_100S_SQUADS.map((s) => s.squad_slug);
+    // 100s→99s rename compat: the in-code index uses new "fb-99-…" slugs;
+    // the production `squads` table may still hold legacy "fb-100-…" slugs
+    // (no DB migration). Query BOTH forms and key the map by the NEW slug
+    // so squad cards keep their real lead-agent + team avatars regardless.
+    const squadSlugs = ALL_99S_SQUADS.map((s) => s.squad_slug);
+    const squadSlugQuery = Array.from(
+      new Set(squadSlugs.flatMap((s) => [s, legacyTaskId(s)].filter(Boolean) as string[])),
+    );
     const squadAgentMap: Record<string, { leadAgentId: number | null; agentIds: number[] }> = {};
-    if (squadSlugs.length > 0) {
+    if (squadSlugQuery.length > 0) {
       try {
-        const placeholders = squadSlugs.map(() => "?").join(",");
+        const placeholders = squadSlugQuery.map(() => "?").join(",");
         const [rows]: any = await localPool.execute(
           `SELECT slug, lead_agent_id, agents FROM squads WHERE slug IN (${placeholders})`,
-          squadSlugs,
+          squadSlugQuery,
         );
         for (const r of rows as any[]) {
           let agentIds: number[] = [];
@@ -917,15 +926,15 @@ export const quickTaskRouter = router({
                 .filter((n: number) => Number.isFinite(n) && n > 0);
             }
           } catch { /* ignore parse errors */ }
-          squadAgentMap[r.slug] = { leadAgentId: r.lead_agent_id ?? null, agentIds };
+          squadAgentMap[normalizeTaskId(r.slug)] = { leadAgentId: r.lead_agent_id ?? null, agentIds };
         }
       } catch { /* squads table query failure non-fatal */ }
     }
-    const tasks100Squads = ALL_100S_SQUADS.map((s) => {
+    const tasks99Squads = ALL_99S_SQUADS.map((s) => {
       const sq = squadAgentMap[s.squad_slug];
       return {
         id: s.id,
-        tier: "100s" as const,
+        tier: "99s" as const,
         postType: s.postType,
         platform: s.platform,
         label: s.label,
@@ -940,7 +949,7 @@ export const quickTaskRouter = router({
     });
     // Orchestra-based 100s tasks for channels without squads yet (filtered to
     // exclude FB + IG since those now have proper squads above)
-    const tasks100Orchestra = ALL_100S_TASKS.filter((t) => !t.id.startsWith("fb-") && !t.id.startsWith("ig-")).map((t) => {
+    const tasks99Orchestra = ALL_99S_TASKS.filter((t) => !t.id.startsWith("fb-") && !t.id.startsWith("ig-")).map((t) => {
       const id = t.id;
       const platform =
         id.startsWith("yt-") ? "youtube"
@@ -953,7 +962,7 @@ export const quickTaskRouter = router({
         : "facebook";
       return { ...t, kind: "fast" as const, platform };
     });
-    const tasks100 = [...tasks100Squads, ...tasks100Orchestra];
+    const tasks100 = [...tasks99Squads, ...tasks99Orchestra];
     const multi60Tasks = MULTI_60S_TASKS.map((t) => {
       const id = t.id;
       const platform =
@@ -1106,11 +1115,12 @@ export const quickTaskRouter = router({
       // 2026-05-14 (CJ Bug#2「60s 任務 3/4 持續 502」): 60s tier orchestra
       // sometimes runs past nginx's 60s upstream timeout → 502 even when
       // the backend is still working. Same async-checkpoint pattern as
-      // runOrchestra100 fixes this: return after captions+briefs (~30s),
+      // runOrchestra99 fixes this: return after captions+briefs (~30s),
       // run image gen + extras + QA in background, UI polls until done.
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
+      input = { ...input, taskId: normalizeTaskId(input.taskId) }; // 100s→99s compat
       const userId = ctx.user!.id;
       // P0-D pre-flight cost guard
       const { preflightCostCheck } = await import("../llmWithBilling");
@@ -1160,7 +1170,7 @@ export const quickTaskRouter = router({
         return runOrchestra(baseArgs);
       }
 
-      // ── Async path (same as runOrchestra100) ──────────────────────
+      // ── Async path (same as runOrchestra99) ──────────────────────
       let resolvePartial!: (p: any) => void;
       let rejectPartial!: (e: any) => void;
       const partialPromise = new Promise<any>((resolve, reject) => {
@@ -1272,11 +1282,18 @@ export const quickTaskRouter = router({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       const startedAt = Date.now();
-      // 1. Load squad + agents + steps
+      // 1. Load squad + agents + steps.
+      // 100s→99s rename compat: the in-code squad index was renamed to the
+      // new "fb-99-…" slugs, but the production `squads` table may still
+      // hold the legacy "fb-100-…" slug (no DB migration). Match BOTH so
+      // the lookup resolves regardless of which form the row has.
+      const sqSlugNew = normalizeTaskId(input.squadSlug);
+      const sqSlugLegacy = legacyTaskId(sqSlugNew);
+      const sqSlugs = sqSlugLegacy ? [sqSlugNew, sqSlugLegacy] : [sqSlugNew];
       const [sqRows]: any = await localPool.execute(
         `SELECT id, slug, name, agents, steps, methodology, lead_agent_id
-           FROM squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
-        [input.squadSlug],
+           FROM squads WHERE slug IN (${sqSlugs.map(() => "?").join(",")}) AND is_active = 1 LIMIT 1`,
+        sqSlugs,
       );
       const squad = (sqRows as any[])?.[0];
       if (!squad) throw new Error(`squad ${input.squadSlug} not found`);
@@ -1294,8 +1311,8 @@ export const quickTaskRouter = router({
       // 3. Inject 100s scout data (real-time festivals/trending/news)
       let scoutBlock = "";
       try {
-        const { ALL_100S_SQUADS } = await import("../_core/quickTask100Squads");
-        const matched = ALL_100S_SQUADS.find((s) => s.squad_slug === input.squadSlug);
+        const { ALL_99S_SQUADS } = await import("../_core/quickTask100Squads");
+        const matched = ALL_99S_SQUADS.find((s) => s.squad_slug === sqSlugNew);
         if (matched) {
           const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../_core/socialListeningScout");
           const kind: "festivals" | "trending" | "news" | "viral" =
@@ -1422,7 +1439,7 @@ export const quickTaskRouter = router({
             workspace: "facebook", // squad 100s default — could be inferred from squad
             taskId: input.squadSlug,
             taskLabel: squad.name ?? input.squadSlug,
-            tier: "100s",
+            tier: "99s",
             title: (await import("../_core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
             content: JSON.stringify(variants, null, 2),
             metadata: {
@@ -1456,8 +1473,8 @@ export const quickTaskRouter = router({
 
   // 100s tier — research-validated (scout) + video-where-applicable.
   // Uses same 60s production-package task pool; orchestra adds scout stage
-  // automatically when tier="100s". Falls through to 30s pool for legacy.
-  runOrchestra100: protectedProcedure
+  // automatically when tier="99s". Falls through to 30s pool for legacy.
+  runOrchestra99: protectedProcedure
     .input(z.object({
       taskId: z.string().min(1).max(64),
       inputs: z.record(z.string(), z.string()).default({}),
@@ -1472,8 +1489,12 @@ export const quickTaskRouter = router({
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
+      // 100s→99s compat: a stale client may still POST a legacy "fb-100-…"
+      // taskId. Normalize once here so every lookup below resolves to the
+      // renamed definition. Idempotent for new "fb-99-…" ids.
+      input = { ...input, taskId: normalizeTaskId(input.taskId) };
       const userId = ctx.user!.id;
-      // P0-D pre-flight cost guard (100s tier is the most expensive)
+      // P0-D pre-flight cost guard (99s tier is the most expensive)
       const { preflightCostCheck } = await import("../llmWithBilling");
       const guard100 = await preflightCostCheck(userId);
       if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
@@ -1486,11 +1507,11 @@ export const quickTaskRouter = router({
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
 
       // Pick template + config (same priority chain as before).
-      const tier100Template = get100Template(input.taskId);
-      const tier100Config = get100OrchestraConfig(input.taskId);
+      const tier99Template = get99Template(input.taskId);
+      const tier99Config = get99OrchestraConfig(input.taskId);
       let template: any = null; let config: any = null;
-      if (tier100Template && tier100Config) {
-        template = tier100Template; config = tier100Config;
+      if (tier99Template && tier99Config) {
+        template = tier99Template; config = tier99Config;
       } else {
         const tier60Template =
           getFB60Template(input.taskId) ?? getIG60Template(input.taskId) ??
@@ -1522,7 +1543,7 @@ export const quickTaskRouter = router({
         }
       }
 
-      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "100s" as const };
+      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const };
 
       if (!input.asyncMode) {
         // Legacy sync path — fully await, return final result.
@@ -1560,7 +1581,7 @@ export const quickTaskRouter = router({
           if (!checkpointFired) resolvePartial(full);
         })
         .catch(async (err) => {
-          console.error("[runOrchestra100 async tail] failed:", (err as Error)?.message);
+          console.error("[runOrchestra99 async tail] failed:", (err as Error)?.message);
           // If checkpoint fired and we captured an outputId, mark THAT row
           // as failed so the frontend stops polling. If no outputId yet,
           // reject the partial so the caller sees the error.
@@ -1574,7 +1595,7 @@ export const quickTaskRouter = router({
                 progressDetail: String((err as Error)?.message ?? err).slice(0, 1000),
               });
             } catch (e2) {
-              console.error("[runOrchestra100 async tail] mark failed also failed:", e2);
+              console.error("[runOrchestra99 async tail] mark failed also failed:", e2);
             }
           } else if (!checkpointFired) {
             rejectPartial(err);
@@ -1597,6 +1618,7 @@ export const quickTaskRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      input = { ...input, taskId: normalizeTaskId(input.taskId) }; // 100s→99s compat
       const userId = ctx.user!.id;
       // 2026-05-08 (P0-D): pre-flight cost guard. Trial users hitting
       // wallet floor or daily $5 cap are stopped before LLM fan-out.
@@ -1760,6 +1782,7 @@ export const quickTaskRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
+      input = { ...input, taskId: normalizeTaskId(input.taskId) }; // 100s→99s compat
       // Look up template across all 30s + FB-60s
       const template =
         FB_30S_TASKS.find((t) => t.id === input.taskId) ??

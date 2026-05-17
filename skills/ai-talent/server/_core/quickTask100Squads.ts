@@ -41,9 +41,9 @@ export interface SquadIndexEntry {
 // ─── FB 100s squads (11 — slugs verified to exist in DB 2026-05-06) ────
 // Each squad has been assigned a DISTINCT lead via admin-squad-leads-100s.yml
 // so the cards show 11 different real faces.
-export const FB_100S_SQUADS: SquadIndexEntry[] = [
+export const FB_99S_SQUADS: SquadIndexEntry[] = [
   {
-    id: "fb-100-monthly-calendar",
+    id: "fb-99-monthly-calendar",
     squad_slug: "fb-monthly-calendar-pulizzi",
     platform: "facebook", postType: "feed",
     label: "FB 30 天內容行事曆",
@@ -51,7 +51,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Joe Pulizzi 內容支柱法",
   },
   {
-    id: "fb-100-monthly-calendar-promo",
+    id: "fb-99-monthly-calendar-promo",
     squad_slug: "fb-monthly-calendar-product-promo",
     platform: "facebook", postType: "feed",
     label: "FB 30 天促銷月曆（多商品）",
@@ -59,7 +59,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "促銷型內容支柱變體",
   },
   {
-    id: "fb-100-event-launch",
+    id: "fb-99-event-launch",
     squad_slug: "fb-garyvee-jab-hook",
     platform: "facebook", postType: "event",
     label: "FB 活動上線完整劇本",
@@ -67,7 +67,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "GaryVee Jab-Jab-Right-Hook",
   },
   {
-    id: "fb-100-countdown-series",
+    id: "fb-99-countdown-series",
     squad_slug: "fb-countdown-series",
     platform: "facebook", postType: "feed",
     label: "FB 倒數活動系列 7-14 天",
@@ -75,7 +75,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Cialdini Scarcity",
   },
   {
-    id: "fb-100-account-reposition",
+    id: "fb-99-account-reposition",
     squad_slug: "fb-account-reposition",
     platform: "facebook", postType: "feed",
     label: "FB 帳號重新定位",
@@ -83,7 +83,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Trout & Ries Positioning",
   },
   {
-    id: "fb-100-quarterly-strategy",
+    id: "fb-99-quarterly-strategy",
     squad_slug: "fb-quarterly-strategy",
     platform: "facebook", postType: "feed",
     label: "FB 一季的內容策略",
@@ -91,7 +91,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Pulizzi Quarterly Cadence",
   },
   {
-    id: "fb-100-monthly-analytics",
+    id: "fb-99-monthly-analytics",
     squad_slug: "fb-monthly-analytics",
     platform: "facebook", postType: "feed",
     label: "FB 一個月成效檢討報告",
@@ -99,7 +99,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Kaushik Web Analytics 2.0",
   },
   {
-    id: "fb-100-carousel-cvo",
+    id: "fb-99-carousel-cvo",
     squad_slug: "fb-deiss-cvo",
     platform: "facebook", postType: "carousel",
     label: "FB 多卡輪播：從認識到下單的故事",
@@ -107,7 +107,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Ryan Deiss CVO 漏斗",
   },
   {
-    id: "fb-100-offer-first",
+    id: "fb-99-offer-first",
     squad_slug: "fb-hormozi-offer-first",
     platform: "facebook", postType: "feed",
     label: "FB 直接主打優惠的貼文",
@@ -115,7 +115,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Hormozi 不可拒絕的提案",
   },
   {
-    id: "fb-100-magnetic-marketing",
+    id: "fb-99-magnetic-marketing",
     squad_slug: "fb-kennedy-magnetic",
     platform: "facebook", postType: "feed",
     label: "FB 把自己變磁鐵：吸客貼文",
@@ -123,7 +123,7 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Kennedy Magnetic Marketing",
   },
   {
-    id: "fb-100-mass-control",
+    id: "fb-99-mass-control",
     squad_slug: "fb-kern-mass-control",
     platform: "facebook", postType: "feed",
     label: "FB 大型發表會行銷劇本",
@@ -133,9 +133,9 @@ export const FB_100S_SQUADS: SquadIndexEntry[] = [
 ];
 
 // ─── IG 100s squads (7 — slugs verified to exist in DB 2026-05-06) ─────
-export const IG_100S_SQUADS: SquadIndexEntry[] = [
+export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
-    id: "ig-100-monthly-calendar",
+    id: "ig-99-monthly-calendar",
     squad_slug: "ig-monthly-calendar-pulizzi",
     platform: "instagram", postType: "feed",
     label: "IG 30 天內容行事曆",
@@ -143,7 +143,7 @@ export const IG_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Pulizzi 內容支柱",
   },
   {
-    id: "ig-100-youtility",
+    id: "ig-99-youtility",
     squad_slug: "ig-baer-youtility",
     platform: "instagram", postType: "feed",
     label: "IG 純實用型內容策略",
@@ -151,7 +151,7 @@ export const IG_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Baer Youtility",
   },
   {
-    id: "ig-100-visual-story",
+    id: "ig-99-visual-story",
     squad_slug: "ig-chrisdo-visual-story",
     platform: "instagram", postType: "feed",
     label: "IG 視覺一致型品牌貼文",
@@ -159,7 +159,7 @@ export const IG_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Chris Do Visual Story",
   },
   {
-    id: "ig-100-live-first",
+    id: "ig-99-live-first",
     squad_slug: "ig-fanzo-live-first",
     platform: "instagram", postType: "live",
     label: "IG 直播優先型內容策略",
@@ -167,7 +167,7 @@ export const IG_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Fanzo Live-First",
   },
   {
-    id: "ig-100-document",
+    id: "ig-99-document",
     squad_slug: "ig-garyvee-document",
     platform: "instagram", postType: "feed",
     label: "IG 紀實型內容（不刻意製作）",
@@ -175,7 +175,7 @@ export const IG_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "GaryVee Document",
   },
   {
-    id: "ig-100-radical-transparency",
+    id: "ig-99-radical-transparency",
     squad_slug: "ig-hollis-radical-transparency",
     platform: "instagram", postType: "feed",
     label: "IG 真實透明型品牌貼文",
@@ -183,7 +183,7 @@ export const IG_100S_SQUADS: SquadIndexEntry[] = [
     methodology: "Hollis Radical Transparency",
   },
   {
-    id: "ig-100-save-worthy",
+    id: "ig-99-save-worthy",
     squad_slug: "ig-hormozi-save-worthy",
     platform: "instagram", postType: "feed",
     label: "IG 高收藏型實用貼文",
@@ -193,11 +193,11 @@ export const IG_100S_SQUADS: SquadIndexEntry[] = [
 ];
 
 /** Combined index — used by router listFB merge */
-export const ALL_100S_SQUADS: SquadIndexEntry[] = [
-  ...FB_100S_SQUADS,
-  ...IG_100S_SQUADS,
+export const ALL_99S_SQUADS: SquadIndexEntry[] = [
+  ...FB_99S_SQUADS,
+  ...IG_99S_SQUADS,
 ];
 
-export function get100SquadEntry(taskId: string): SquadIndexEntry | null {
-  return ALL_100S_SQUADS.find((e) => e.id === taskId) ?? null;
+export function get99SquadEntry(taskId: string): SquadIndexEntry | null {
+  return ALL_99S_SQUADS.find((e) => e.id === taskId) ?? null;
 }

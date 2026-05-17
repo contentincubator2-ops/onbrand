@@ -17,6 +17,7 @@
 import localPool from "../localDb";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { normalizeTaskId, normalizeTier, legacyTaskId } from "./tierCompat";
 
 /**
  * 2026-05-14 (CJ「我要確保任務會被移到任務卡片，不光是要記錄錯誤」):
@@ -85,7 +86,7 @@ interface RecordArgs {
   workspace: string;          // e.g. "facebook" / "instagram" / "theater" / "youtube"
   taskId: string;             // e.g. "fb-30-single-post" / "ig-60-carousel"
   taskLabel: string;          // human-readable; e.g. "FB 短貼文 (介紹)"
-  tier: "30s" | "60s" | "100s" | "theater";
+  tier: "30s" | "60s" | "99s" | "theater";
   /** Title to show on the project card. Falls back to taskLabel. */
   title?: string;
   /** Long-form body — JSON-stringified or rendered text of all variants. */
@@ -197,17 +198,26 @@ async function ensureMission(args: {
     // Look up by description tag (we store taskId in description as
     // "[task:<taskId>]" since missions has no taskId column). Falls
     // back to title match within (userId, brandId, workspace).
-    const tag = `[task:${args.taskId}]`;
+    //
+    // 2026-05-17 100s→99s compat: incoming taskId is normalized to the
+    // new id (fb-99-…). Legacy missions were tagged with the OLD id
+    // (fb-100-…). Match BOTH tags so an existing legacy mission is
+    // reused (no orphaned duplicate) — no DB migration needed.
+    const newId = normalizeTaskId(args.taskId);
+    const legacyId = legacyTaskId(newId);
+    const tag = `[task:${newId}]`;
+    const legacyTag = legacyId ? `[task:${legacyId}]` : tag;
+    const tagsDiffer = legacyTag !== tag;
     const [rows]: any = await localPool.execute(
       `SELECT id FROM missions
         WHERE userId = ?
           AND ${args.brandId ? "brandId = ?" : "brandId IS NULL"}
           AND workspace = ?
-          AND description LIKE ?
+          AND (description LIKE ?${tagsDiffer ? " OR description LIKE ?" : ""})
         ORDER BY id DESC LIMIT 1`,
       args.brandId
-        ? [args.userId, args.brandId, args.workspace, `%${tag}%`]
-        : [args.userId, args.workspace, `%${tag}%`],
+        ? [args.userId, args.brandId, args.workspace, `%${tag}%`, ...(tagsDiffer ? [`%${legacyTag}%`] : [])]
+        : [args.userId, args.workspace, `%${tag}%`, ...(tagsDiffer ? [`%${legacyTag}%`] : [])],
     );
     const existing = (rows as any[])[0];
     if (existing?.id) return Number(existing.id);
@@ -238,13 +248,18 @@ async function ensureMission(args: {
 }
 
 /** Persist a completed task run's output. Non-fatal on error. */
-export async function recordTaskRun(args: RecordArgs): Promise<{ missionId: number | null; outputId: number | null }> {
+export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: number | null; outputId: number | null }> {
+  // 2026-05-17 (CJ「現在應該沒有100S」): the "100s" tier was fully renamed to
+  // "99s" (久久 wordplay) — code + ids. Normalize at this single ingress so
+  // every downstream write (mission tag, metadata, DLQ) persists the NEW id
+  // even if a legacy caller still passes "fb-100-…" / "100s". Idempotent.
+  const args: RecordArgs = {
+    ...rawArgs,
+    taskId: normalizeTaskId(rawArgs.taskId),
+    tier: normalizeTier(rawArgs.tier) as RecordArgs["tier"],
+  };
   try {
-    // 2026-05-13 (CJ「現在應該沒有100S」): user-facing tier label is now
-    // "99s" (久久 wordplay). Internal orchestra config keys still use
-    // "100s" to avoid touching every config map; we normalize at the
-    // single boundary where the tier hits the DB.
-    const displayTier = args.tier === "100s" ? "99s" : args.tier;
+    const displayTier = args.tier;
     const missionId = await ensureMission({
       userId: args.userId,
       brandId: args.brandId,

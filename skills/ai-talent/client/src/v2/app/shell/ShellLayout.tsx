@@ -1384,19 +1384,18 @@ function SlidePanel({
   const isProjects  = currentPath.startsWith("/projects");
   // isTemplates retired 2026-05-14 — /templates route deleted.
   const isBrands    = currentPath.startsWith("/brands");
-  // 2026-05-09 (CJ direction): on tier pages (/30s /60s /100s) AND
+  // 2026-05-09 (CJ direction): on tier pages (/30s /60s /99s) AND
   // /run/:outputId, the sidebar shows the brand's recent task runs
   // in this tier. Click a row → /run/:outputId.
-  // 2026-05-10: /100s renamed to /99s — match both for backward compat.
-  // currentTier value normalized to "100s" so getById metadata.tier filter
-  // still finds historic outputs persisted under the old tier label.
+  // 2026-05-17: 100s→99s rename is internal now. /100s still redirects
+  // to /99s but match the legacy token too in case a stale path lands
+  // here; normalize "100s"→"99s" (the value the DB stores) before query.
   const tierMatch = currentPath.match(/^\/(30s|60s|99s|100s)\b/);
   const runMatch = currentPath.match(/^\/run\/(\d+)/);
   const isTier = !!tierMatch;
   const isRun = !!runMatch;
   const rawTier = tierMatch?.[1];
-  // Normalize 99s alias → 100s so DB queries still match historic outputs.
-  const currentTier = (rawTier === "99s" ? "100s" : rawTier) as ("30s"|"60s"|"100s"|undefined);
+  const currentTier = (rawTier === "100s" ? "99s" : rawTier) as ("30s"|"60s"|"99s"|undefined);
 
   // For /run/:id pages, fetch the run to get its tier (so sidebar shows
   // the same tier's history). Cheap — already cached if user came from
@@ -1408,7 +1407,7 @@ function SlidePanel({
         { enabled: isRun && !!runOutputId, staleTime: 60_000 },
       )
     : { data: null };
-  const inferredTier = runQuery.data?.mission?.tier as ("30s"|"60s"|"100s"|undefined);
+  const inferredTier = runQuery.data?.mission?.tier as ("30s"|"60s"|"99s"|undefined);
   const inferredBrandId = runQuery.data?.mission?.brandId ?? null;
 
   // Effective context: tier page uses URL tier + shell brand;

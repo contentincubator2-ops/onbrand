@@ -19,7 +19,7 @@ import { useLang } from "../../lib/i18n";
 import { Clock, ChevronRight } from "lucide-react";
 
 interface Props {
-  tier?: "30s" | "60s" | "99s" | "100s";
+  tier?: "30s" | "60s" | "99s";
   brandId?: number | null;
   limit?: number;
   /** Compact mode — 3 rows, no header. Used inside narrow content areas. */

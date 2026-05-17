@@ -9,7 +9,7 @@
  * Tier breakdown:
  *   30s — single message (DM opener / one-line brief / follow-up)
  *   60s — full pitch pack with 5 stages   (see quickTaskMulti60.KOL_60S_TASKS)
- *   100s — multi-KOL campaign toolkit     (see quickTask100.MULTI_100S_TASKS)
+ *   100s — multi-KOL campaign toolkit     (see quickTask100.MULTI_99S_TASKS)
  */
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 

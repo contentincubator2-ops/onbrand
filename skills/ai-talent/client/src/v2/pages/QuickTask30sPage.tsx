@@ -67,9 +67,9 @@ const dicebear = (seed: string) =>
  *  30s = teal (quick / fast), 60s = purple (production / depth),
  *  100s = amber (premium / research-validated). Used for mockup frame
  *  glow, variant active dot, accordion icon backgrounds. */
-function tierAccent(tier: "30s" | "60s" | "90s" | "100s" | undefined | null): string {
+function tierAccent(tier: "30s" | "60s" | "90s" | "99s" | undefined | null): string {
   if (tier === "60s") return "#7c3aed";   // purple
-  if (tier === "100s") return "#f59e0b";  // amber
+  if (tier === "99s") return "#f59e0b";  // amber
   if (tier === "90s") return "#f59e0b";   // legacy → amber
   return "#00b4bc";                        // 30s teal (default)
 }
@@ -84,11 +84,11 @@ function tierAccent(tier: "30s" | "60s" | "90s" | "100s" | undefined | null): st
  *   60s tier: pre / strategist / caption / brief / gen / extras / qa (~50s)
  *   100s tier: + scout at front (~60-90s)
  */
-function synthesizeStages(elapsedMs: number, tier: "30s" | "60s" | "100s", lang: "zh-TW" | "en" = "zh-TW"): any[] {
+function synthesizeStages(elapsedMs: number, tier: "30s" | "60s" | "99s", lang: "zh-TW" | "en" = "zh-TW"): any[] {
   const L = (zh: string, en: string) => (lang === "en" ? en : zh);
   const t = elapsedMs;
-  const isResearch = tier === "100s";
-  const isProd = tier === "60s" || tier === "100s";
+  const isResearch = tier === "99s";
+  const isProd = tier === "60s" || tier === "99s";
 
   // Scout offset: 100s adds 12s scout up-front; other tiers start at 0
   const scoutEnd = isResearch ? 12000 : 0;
@@ -153,7 +153,7 @@ interface FBTaskCard {
   methodology?: string;
 }
 
-type Tier = "30s" | "60s" | "100s";
+type Tier = "30s" | "60s" | "99s";
 type Channel = "facebook" | "instagram" | "youtube" | "tiktok" | "linkedin" | "email" | "pr" | "audience" | "brand" | "kol" | "all";
 
 interface ChannelTile {
@@ -455,8 +455,8 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     ? (tier === "30s" ? "30s" : tier === "60s" ? "60s" : "99s")
     : (tier === "30s" ? "30 秒" : tier === "60s" ? "60 秒" : "99 秒");
   // 2026-05-14 (CJ「99s 檔期任務卡片角標標示為 100s」): map the internal
-  // tier id "100s" → user-facing "99s". Used for all badge / chip renders.
-  const tierBadge = tier === "100s" ? "99s" : tier;
+  // tier id "99s" → user-facing "99s". Used for all badge / chip renders.
+  const tierBadge = tier === "99s" ? "99s" : tier;
   // 2026-05-15: keep in sync with heroTitle (parallel, no redundant 秒數).
   const tierTagline = lang === "en"
     ? (tier === "30s"
@@ -474,7 +474,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   // Plan B 20s parallel orchestra (caption_writer + image_director + Flux Schnell ×N)
   const runOrchestraMut = (trpc as any).quickTask?.runOrchestra?.useMutation();
   const runOrchestra60Mut = (trpc as any).quickTask?.runOrchestra60?.useMutation();
-  const runOrchestra100Mut = (trpc as any).quickTask?.runOrchestra100?.useMutation();
+  const runOrchestra99Mut = (trpc as any).quickTask?.runOrchestra99?.useMutation();
   const runSquadAutoMut = (trpc as any).quickTask?.runSquadAuto?.useMutation();
   const [orchestraStages, setOrchestraStages] = useState<any[] | null>(null);
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
@@ -582,7 +582,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
       // mutation. Tier scales variants (3 → 5) + adds QA stage (60s+).
       const tierMut =
         tier === "60s" ? runOrchestra60Mut :
-        tier === "100s" ? runOrchestra100Mut :
+        tier === "99s" ? runOrchestra99Mut :
         runOrchestraMut;
       if (tierMut) {
         // 2026-05-11 (CJ「product / event 也要 narrow LLM context」):
@@ -961,7 +961,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               <p className="font-semibold mb-1">{lang === "en" ? `${tierLabel} tasks in the works` : `${tierLabel} 任務製作中`}</p>
               <p className="text-tiny text-default-400">
                 {tier === "60s" && (lang === "en" ? "60-second tasks (with full visual brief) launch next wave." : "60 秒任務（含完整視覺指示）將於下一波上線")}
-                {tier === "100s" && (lang === "en" ? "99s: real-data validation + video generation (Phase 3 rolling out)" : "99 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）")}
+                {tier === "99s" && (lang === "en" ? "99s: real-data validation + video generation (Phase 3 rolling out)" : "99 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）")}
                 {tier === "30s" && (lang === "en" ? "Hang tight — agents are warming up." : "請稍候，Agent 正在準備中")}
               </p>
             </CardBody>
@@ -1352,7 +1352,7 @@ export default function QuickTask30sPage({ tier = "30s" }: { tier?: Tier }) {
  *  Falls back to a placeholder message when projects API isn't wired yet. */
 function SavePanel({ slide, accent, onClose }: {
   slide: any;
-  pageTier: "30s" | "60s" | "100s";
+  pageTier: "30s" | "60s" | "99s";
   accent: string;
   brandId: number | null;
   onClose: () => void;
@@ -1426,11 +1426,11 @@ function OutputCarousel({
 }: {
   output: any;
   activeTask: FBTaskCard;
-  /** Page-level tier ("30s" / "60s" / "100s") — drives ALL visual tier identity
+  /** Page-level tier ("30s" / "60s" / "99s") — drives ALL visual tier identity
    *  (chip color, gradient, accordion availability), independent of the
    *  task's data tier (FB60V2 tasks always have tier="60s" but appear on
    *  both /60s and /100s pages — visual tier follows page, not data). */
-  pageTier: "30s" | "60s" | "100s";
+  pageTier: "30s" | "60s" | "99s";
   brandName: string | null;
   brandId: number | null;
   brandLogoUrl: string | null;

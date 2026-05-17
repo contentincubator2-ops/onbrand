@@ -672,7 +672,7 @@
       "imageDirector": 220902,
       "replyWriter": 180828
     },
-    "fb-100-30day-calendar": {
+    "fb-99-30day-calendar": {
       "lead": 224144,
       "imageDirector": 222339,
       "strategist": 223565,
@@ -680,7 +680,7 @@
       "timingAdvisor": 180227,
       "followupWriter": 220319
     },
-    "fb-100-14day-countdown": {
+    "fb-99-14day-countdown": {
       "lead": 224124,
       "imageDirector": 222834,
       "strategist": 223291,
@@ -688,7 +688,7 @@
       "timingAdvisor": 180263,
       "followupWriter": 220359
     },
-    "fb-100-launch-toolkit": {
+    "fb-99-launch-toolkit": {
       "lead": 224149,
       "imageDirector": 222378,
       "strategist": 180153,
@@ -696,7 +696,7 @@
       "timingAdvisor": 180409,
       "followupWriter": 180649
     },
-    "fb-100-livestream-9seg": {
+    "fb-99-livestream-9seg": {
       "lead": 60017,
       "imageDirector": 223690,
       "strategist": 180147,
@@ -704,7 +704,7 @@
       "timingAdvisor": 180570,
       "followupWriter": 220307
     },
-    "fb-100-crisis-playbook": {
+    "fb-99-crisis-playbook": {
       "lead": 60014,
       "strategist": 180152,
       "specialty": 90066,
@@ -713,7 +713,7 @@
       "followupWriter": 220347,
       "legalAssistant": 180854
     },
-    "ig-100-30day-calendar": {
+    "ig-99-30day-calendar": {
       "lead": 60008,
       "imageDirector": 220898,
       "strategist": 211523,
@@ -721,7 +721,7 @@
       "timingAdvisor": 30015,
       "followupWriter": 220377
     },
-    "ig-100-reel-series-6": {
+    "ig-99-reel-series-6": {
       "lead": 223788,
       "imageDirector": 220907,
       "strategist": 220919,
@@ -729,7 +729,7 @@
       "timingAdvisor": 180569,
       "followupWriter": 220327
     },
-    "ig-100-account-reposition": {
+    "ig-99-account-reposition": {
       "lead": 223236,
       "imageDirector": 220909,
       "strategist": 223437,
@@ -737,7 +737,7 @@
       "timingAdvisor": 220392,
       "followupWriter": 220367
     },
-    "yt-100-series-6ep": {
+    "yt-99-series-6ep": {
       "lead": 224006,
       "imageDirector": 223304,
       "strategist": 223997,
@@ -745,7 +745,7 @@
       "timingAdvisor": 220435,
       "followupWriter": 180008
     },
-    "yt-100-quarterly-strategy": {
+    "yt-99-quarterly-strategy": {
       "lead": 224002,
       "imageDirector": 223834,
       "strategist": 223999,
@@ -753,7 +753,7 @@
       "timingAdvisor": 220425,
       "followupWriter": 180078
     },
-    "yt-100-premiere-kit": {
+    "yt-99-premiere-kit": {
       "lead": 224004,
       "imageDirector": 223452,
       "strategist": 224000,
@@ -761,7 +761,7 @@
       "timingAdvisor": 220445,
       "followupWriter": 223311
     },
-    "tt-100-30day-foryou": {
+    "tt-99-30day-foryou": {
       "lead": 180622,
       "imageDirector": 223122,
       "strategist": 180633,
@@ -769,21 +769,21 @@
       "timingAdvisor": 223567,
       "followupWriter": 222392
     },
-    "tt-100-trend-week": {
+    "tt-99-trend-week": {
       "lead": 180553,
       "imageDirector": 222760,
       "replyWriter": 222918,
       "timingAdvisor": 222983,
       "followupWriter": 223663
     },
-    "li-100-30day-thought-leadership": {
+    "li-99-30day-thought-leadership": {
       "lead": 222940,
       "imageDirector": 222662,
       "replyWriter": 223084,
       "timingAdvisor": 223051,
       "followupWriter": 223049
     },
-    "li-100-newsletter-quarterly": {
+    "li-99-newsletter-quarterly": {
       "lead": 222571,
       "imageDirector": 223368,
       "strategist": 224096,
@@ -791,7 +791,7 @@
       "timingAdvisor": 223069,
       "followupWriter": 223288
     },
-    "em-100-4week-nurture": {
+    "em-99-4week-nurture": {
       "lead": 222464,
       "imageDirector": 223135,
       "strategist": 222811,
@@ -799,7 +799,7 @@
       "timingAdvisor": 223434,
       "followupWriter": 223010
     },
-    "em-100-launch-sequence": {
+    "em-99-launch-sequence": {
       "lead": 222915,
       "imageDirector": 223210,
       "strategist": 222654,
@@ -807,26 +807,26 @@
       "timingAdvisor": 223013,
       "followupWriter": 224056
     },
-    "pr-100-launch-toolkit": {
+    "pr-99-launch-toolkit": {
       "lead": 60038,
       "replyWriter": 222973
     },
-    "br-100-reposition-toolkit": {
+    "br-99-reposition-toolkit": {
       "lead": 60035,
       "imageDirector": 60037,
       "strategist": 223378,
       "replyWriter": 222828
     },
-    "br-100-voice-playbook": {
+    "br-99-voice-playbook": {
       "lead": 223676,
       "imageDirector": 220593,
       "replyWriter": 223417
     },
-    "rs-100-discovery-sprint": {
+    "rs-99-discovery-sprint": {
       "lead": 60036,
       "replyWriter": 223668
     },
-    "rs-100-competitor-mapping": {
+    "rs-99-competitor-mapping": {
       "lead": 180623,
       "replyWriter": 223208
     },
@@ -848,7 +848,7 @@
     "theater-cell-blog": {
       "lead": 220504
     },
-    "squad-fb-100-monthly-calendar": {
+    "squad-fb-99-monthly-calendar": {
       "lead": 223042,
       "imageDirector": 223720,
       "strategist": 222856,
@@ -856,7 +856,7 @@
       "replyWriter": 222645,
       "compareTable": 220527
     },
-    "squad-fb-100-monthly-calendar-promo": {
+    "squad-fb-99-monthly-calendar-promo": {
       "lead": 222688,
       "imageDirector": 222829,
       "strategist": 222981,
@@ -864,7 +864,7 @@
       "replyWriter": 180014,
       "compareTable": 220528
     },
-    "squad-fb-100-event-launch": {
+    "squad-fb-99-event-launch": {
       "lead": 180158,
       "imageDirector": 222451,
       "strategist": 222455,
@@ -872,7 +872,7 @@
       "replyWriter": 180016,
       "compareTable": 220529
     },
-    "squad-fb-100-countdown-series": {
+    "squad-fb-99-countdown-series": {
       "lead": 223798,
       "imageDirector": 223086,
       "strategist": 222901,
@@ -880,7 +880,7 @@
       "replyWriter": 180021,
       "compareTable": 220526
     },
-    "squad-fb-100-account-reposition": {
+    "squad-fb-99-account-reposition": {
       "lead": 223881,
       "imageDirector": 222468,
       "strategist": 180635,
@@ -888,7 +888,7 @@
       "replyWriter": 220583,
       "compareTable": 180701
     },
-    "squad-fb-100-quarterly-strategy": {
+    "squad-fb-99-quarterly-strategy": {
       "lead": 223867,
       "imageDirector": 223090,
       "strategist": 223262,
@@ -896,7 +896,7 @@
       "replyWriter": 180029,
       "compareTable": 90057
     },
-    "squad-fb-100-monthly-analytics": {
+    "squad-fb-99-monthly-analytics": {
       "lead": 223182,
       "imageDirector": 180607,
       "strategist": 222990,
@@ -904,7 +904,7 @@
       "replyWriter": 180497,
       "compareTable": 220317
     },
-    "squad-fb-100-carousel-cvo": {
+    "squad-fb-99-carousel-cvo": {
       "lead": 222921,
       "imageDirector": 223141,
       "strategist": 222646,
@@ -912,7 +912,7 @@
       "replyWriter": 180084,
       "compareTable": 90044
     },
-    "squad-fb-100-offer-first": {
+    "squad-fb-99-offer-first": {
       "lead": 222641,
       "imageDirector": 223510,
       "strategist": 223783,
@@ -920,7 +920,7 @@
       "replyWriter": 180086,
       "compareTable": 220339
     },
-    "squad-fb-100-magnetic-marketing": {
+    "squad-fb-99-magnetic-marketing": {
       "lead": 222400,
       "imageDirector": 223515,
       "strategist": 180231,
@@ -928,7 +928,7 @@
       "replyWriter": 210032,
       "compareTable": 220485
     },
-    "squad-fb-100-mass-control": {
+    "squad-fb-99-mass-control": {
       "lead": 222985,
       "imageDirector": 222525,
       "strategist": 223359,
@@ -936,7 +936,7 @@
       "replyWriter": 180091,
       "compareTable": 220387
     },
-    "squad-ig-100-monthly-calendar": {
+    "squad-ig-99-monthly-calendar": {
       "lead": 223476,
       "imageDirector": 220905,
       "strategist": 222491,
@@ -944,7 +944,7 @@
       "replyWriter": 180099,
       "compareTable": 222881
     },
-    "squad-ig-100-youtility": {
+    "squad-ig-99-youtility": {
       "lead": 223781,
       "imageDirector": 220596,
       "strategist": 222817,
@@ -952,7 +952,7 @@
       "replyWriter": 180031,
       "compareTable": 222460
     },
-    "squad-ig-100-visual-story": {
+    "squad-ig-99-visual-story": {
       "lead": 222518,
       "imageDirector": 220595,
       "strategist": 222724,
@@ -960,7 +960,7 @@
       "replyWriter": 180101,
       "compareTable": 222766
     },
-    "squad-ig-100-live-first": {
+    "squad-ig-99-live-first": {
       "lead": 223133,
       "imageDirector": 220594,
       "strategist": 223305,
@@ -968,7 +968,7 @@
       "replyWriter": 223420,
       "compareTable": 223120
     },
-    "squad-ig-100-document": {
+    "squad-ig-99-document": {
       "lead": 222787,
       "imageDirector": 220572,
       "strategist": 223329,
@@ -976,7 +976,7 @@
       "replyWriter": 180011,
       "compareTable": 90052
     },
-    "squad-ig-100-radical-transparency": {
+    "squad-ig-99-radical-transparency": {
       "lead": 222960,
       "imageDirector": 220571,
       "strategist": 223918,
@@ -984,7 +984,7 @@
       "replyWriter": 180026,
       "compareTable": 180022
     },
-    "squad-ig-100-save-worthy": {
+    "squad-ig-99-save-worthy": {
       "lead": 222752,
       "imageDirector": 180559,
       "strategist": 222938,

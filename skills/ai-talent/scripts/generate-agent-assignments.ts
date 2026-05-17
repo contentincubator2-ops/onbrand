@@ -54,7 +54,7 @@ import { FB_60S_TASKS_V2 } from "../server/_core/quickTaskFB60";
 import { IG_60S_TASKS } from "../server/_core/quickTaskIG60";
 import { YT_60S_TASKS } from "../server/_core/quickTaskYT60";
 import { MULTI_60S_TASKS } from "../server/_core/quickTaskMulti60";
-import { ALL_100S_TASKS, ALL_100S_ORCHESTRA } from "../server/_core/quickTask100";
+import { ALL_99S_TASKS, ALL_99S_ORCHESTRA } from "../server/_core/quickTask100";
 
 // Configs (with extras / strategist / specialty info)
 import { FB_30S_ORCHESTRA } from "../server/_core/quickTaskFB";
@@ -212,7 +212,7 @@ async function main() {
   addSlots(IG_60S_TASKS, IG_60S_ORCHESTRA);
   addSlots(YT_60S_TASKS, YT_60S_ORCHESTRA);
   addSlots(MULTI_60S_TASKS, MULTI_60S_ORCHESTRA);
-  addSlots(ALL_100S_TASKS, ALL_100S_ORCHESTRA);
+  addSlots(ALL_99S_TASKS, ALL_99S_ORCHESTRA);
 
   // Theater per-platform writers (6 platforms — FB / IG / YT / Threads / LINE / Blog)
   for (const p of ["facebook","instagram","youtube","threads","line","blog"]) {
@@ -227,8 +227,8 @@ async function main() {
   // assigned agent slots so the planning room can show distinct agents
   // for every step.
   try {
-    const { ALL_100S_SQUADS } = await import("../server/_core/quickTask100Squads");
-    for (const sq of ALL_100S_SQUADS) {
+    const { ALL_99S_SQUADS } = await import("../server/_core/quickTask100Squads");
+    for (const sq of ALL_99S_SQUADS) {
       const platform = (sq as any).platform ?? inferPlatformFromTaskId(sq.id);
       const hint = `${sq.label ?? ""} ${sq.methodology ?? ""}`;
       // 6 step slots per squad (lead + 5 specialists)
@@ -237,7 +237,7 @@ async function main() {
         slots.push({ taskId: `squad-${sq.id}`, role, hint, platform });
       }
     }
-    console.log(`    → +${ALL_100S_SQUADS.length * 6} squad slots`);
+    console.log(`    → +${ALL_99S_SQUADS.length * 6} squad slots`);
   } catch (e) {
     console.warn(`    ⚠ squad import failed: ${(e as Error).message}`);
   }

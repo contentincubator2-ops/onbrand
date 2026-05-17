@@ -22,6 +22,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
+import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import localPool from "../localDb";
@@ -1922,10 +1923,15 @@ ${agentCtx.systemPromptPrefix}`;
       `).catch(() => { /* table exists */ });
 
       // Load squad row + steps + agents (localPool — same shape as listByBrand)
+      // 100s→99s rename compat: match both new ("fb-99-…") and legacy
+      // ("fb-100-…") slug forms so historic DB rows still resolve.
+      const stSlugNew = normalizeTaskId(input.squadSlug);
+      const stSlugLegacy = legacyTaskId(stSlugNew);
+      const stSlugs = stSlugLegacy ? [stSlugNew, stSlugLegacy] : [stSlugNew];
       const [sqRows] = await localPool.execute(
         `SELECT id, slug, name, agents, steps, methodology
-           FROM squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
-        [input.squadSlug],
+           FROM squads WHERE slug IN (${stSlugs.map(() => "?").join(",")}) AND is_active = 1 LIMIT 1`,
+        stSlugs,
       ) as any[];
       const squad = (sqRows as any[])?.[0];
       if (!squad) throw new TRPCError({ code: "NOT_FOUND", message: `squad slug ${input.squadSlug} not found` });
@@ -2087,8 +2093,8 @@ ${agentCtx.systemPromptPrefix}`;
       // avoid hitting the API on every step. Per CJ direction: 100s squads
       // must have actual market data, not just LLM internal knowledge.
       try {
-        const { ALL_100S_SQUADS } = await import("../_core/quickTask100Squads");
-        const matched = ALL_100S_SQUADS.find((s) => s.squad_slug === input.squadSlug);
+        const { ALL_99S_SQUADS } = await import("../_core/quickTask100Squads");
+        const matched = ALL_99S_SQUADS.find((s) => s.squad_slug === normalizeTaskId(input.squadSlug));
         if (matched) {
           const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../_core/socialListeningScout");
           // Decide kind from squad slug pattern

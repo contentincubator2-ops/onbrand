@@ -53,7 +53,7 @@ export interface TaskInput {
 
 export interface FBTaskTemplate {
   id: string;                              // e.g. "fb-30-caption-short"
-  tier: "30s" | "60s" | "90s" | "100s";
+  tier: "30s" | "60s" | "90s" | "99s";
   postType: string;                        // matches mockup format key
   /**
    * Display label. Legacy form was a single string. 2026-05-11 introduced

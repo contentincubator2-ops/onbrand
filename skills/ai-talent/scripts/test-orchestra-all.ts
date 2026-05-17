@@ -36,10 +36,10 @@ import {
 } from "../server/_core/quickTaskMulti60";
 // 100s collections
 import {
-  FB_100S_TASKS, FB_100S_ORCHESTRA,
-  IG_100S_TASKS, IG_100S_ORCHESTRA,
-  YT_100S_TASKS, YT_100S_ORCHESTRA,
-  MULTI_100S_TASKS, MULTI_100S_ORCHESTRA,
+  FB_99S_TASKS, FB_99S_ORCHESTRA,
+  IG_99S_TASKS, IG_99S_ORCHESTRA,
+  YT_99S_TASKS, YT_99S_ORCHESTRA,
+  MULTI_99S_TASKS, MULTI_99S_ORCHESTRA,
 } from "../server/_core/quickTask100";
 import { runOrchestra } from "../server/_core/quickTaskOrchestra";
 
@@ -51,7 +51,7 @@ const fromMap = (m: Record<string, any>) => (id: string) => m[id] ?? null;
 
 interface ChannelDef {
   channel: string;
-  tier: "30s" | "60s" | "100s";
+  tier: "30s" | "60s" | "99s";
   tasks: any[];
   getConfig: (id: string) => any;
 }
@@ -79,10 +79,10 @@ const channels60s: ChannelDef[] = [
   { channel: "RS60", tier: "60s", tasks: RESEARCH_60S_TASKS, getConfig: fromMap(RESEARCH_60S_ORCHESTRA) },
 ];
 const channels99s: ChannelDef[] = [
-  { channel: "FB99", tier: "100s", tasks: FB_100S_TASKS, getConfig: fromMap(FB_100S_ORCHESTRA) },
-  { channel: "IG99", tier: "100s", tasks: IG_100S_TASKS, getConfig: fromMap(IG_100S_ORCHESTRA) },
-  { channel: "YT99", tier: "100s", tasks: YT_100S_TASKS, getConfig: fromMap(YT_100S_ORCHESTRA) },
-  { channel: "MULTI99", tier: "100s", tasks: MULTI_100S_TASKS, getConfig: fromMap(MULTI_100S_ORCHESTRA) },
+  { channel: "FB99", tier: "99s", tasks: FB_99S_TASKS, getConfig: fromMap(FB_99S_ORCHESTRA) },
+  { channel: "IG99", tier: "99s", tasks: IG_99S_TASKS, getConfig: fromMap(IG_99S_ORCHESTRA) },
+  { channel: "YT99", tier: "99s", tasks: YT_99S_TASKS, getConfig: fromMap(YT_99S_ORCHESTRA) },
+  { channel: "MULTI99", tier: "99s", tasks: MULTI_99S_TASKS, getConfig: fromMap(MULTI_99S_ORCHESTRA) },
 ];
 
 const channels: ChannelDef[] =
@@ -117,7 +117,7 @@ interface Result {
   error?: string;
 }
 
-async function testTask(channel: string, tier: "30s"|"60s"|"100s", template: any, getConfig: (id: string) => any): Promise<Result> {
+async function testTask(channel: string, tier: "30s"|"60s"|"99s", template: any, getConfig: (id: string) => any): Promise<Result> {
   const t0 = Date.now();
   try {
     const config = getConfig(template.id);

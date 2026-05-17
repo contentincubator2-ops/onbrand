@@ -4,6 +4,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { missionOutputs } from "../../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { normalizeTaskId, normalizeTier } from "../_core/tierCompat";
 
 const PLATFORM_PREVIEW_TEMPLATES: Record<string, (content: string, title?: string) => string> = {
   facebook: (content, title) => `<div style="font-family:Helvetica,Arial,sans-serif;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><div style="padding:12px 16px;display:flex;align-items:center;gap:10px"><div style="width:40px;height:40px;border-radius:50%;background:#1877F2;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:16px">B</div><div><div style="font-weight:600;font-size:14px">品牌頁面</div><div style="font-size:12px;color:#65676b">剛剛 · 🌐</div></div></div><div style="padding:0 16px 12px;font-size:15px;line-height:1.6;color:#1c1e21;white-space:pre-wrap">${content}</div></div>`,
@@ -270,9 +271,10 @@ export const outputRouter = router({
   recent: protectedProcedure
     .input(z.object({
       brandId: z.number().nullable().optional(),
-      // 2026-05-13 (CJ「現在應該沒有100S」): accept both "100s" and "99s"
-      // as the orchestra config still keys on "100s" but DB now stores "99s".
-      tier: z.enum(["30s", "60s", "100s", "99s"]).optional(),
+      // 2026-05-17 (CJ「現在應該沒有100S」): tier renamed 100s→99s. Still
+      // accept the legacy "100s" id from old clients/bookmarks; normalized
+      // to "99s" (the value the DB has always stored) before querying.
+      tier: z.enum(["30s", "60s", "99s", "100s"]).optional(),
       limit: z.number().min(1).max(50).default(15),
     }))
     .query(async ({ ctx, input }) => {
@@ -286,9 +288,9 @@ export const outputRouter = router({
       if (input.brandId) { brandSql = `AND m.brandId = ?`; params.push(input.brandId); }
       let tierSql = ``;
       if (input.tier) {
-        // Map "100s" → "99s" so old callers pointing at the legacy tier id
-        // still find current records.
-        const queryTier = input.tier === "100s" ? "99s" : input.tier;
+        // Map legacy "100s" → "99s" so old callers still find current
+        // records (DB metadata.tier has stored "99s" since the rename).
+        const queryTier = normalizeTier(input.tier);
         tierSql = `AND JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) = ?`;
         params.push(queryTier);
       }
@@ -318,8 +320,8 @@ export const outputRouter = router({
         outputType: r.outputType,
         status: r.status,
         createdAt: r.createdAt,
-        tier: r.tier,
-        taskId: r.taskId,
+        tier: r.tier ? normalizeTier(r.tier) : r.tier,
+        taskId: r.taskId ? normalizeTaskId(r.taskId) : r.taskId,
         missionTitle: r.missionTitle,
         workspace: r.workspace,
         brandId: r.brandId,
@@ -391,8 +393,13 @@ export const outputRouter = router({
       }
       const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
       // SQL extracted values are the canonical source — string or null.
-      const taskId: string | null = row.extracted_task_id ?? md.taskId ?? null;
-      const tier: string | null = row.extracted_tier ?? md.tier ?? null;
+      // 2026-05-17 100s→99s compat: legacy rows persisted "fb-100-…" /
+      // "100s". Normalize on read so RunPage mockup inference + the shell
+      // history sidebar resolve legacy runs to the renamed logic.
+      const rawTaskId: string | null = row.extracted_task_id ?? md.taskId ?? null;
+      const rawTier: string | null = row.extracted_tier ?? md.tier ?? null;
+      const taskId: string | null = rawTaskId ? normalizeTaskId(rawTaskId) : null;
+      const tier: string | null = rawTier ? normalizeTier(rawTier) : null;
       return {
         id: row.id,
         missionId: row.missionId,

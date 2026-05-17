@@ -27,6 +27,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../_core/trpc";
+import { normalizeTaskId, normalizeTier } from "../_core/tierCompat";
 
 const CREDITS_PER_USE = 2;       // contributor reward per successful use
 const DAILY_CONTRIB_CAP = 50;    // max credits an author can earn / day
@@ -45,6 +46,7 @@ export const communityRouter = router({
       title: z.string().min(2).max(160),
       description: z.string().max(2000).optional(),
       kind: TemplateKind,
+      // 100s→99s rename (2026-05-17): still accept legacy "100s" input.
       tier: z.enum(["30s", "60s", "99s", "100s"]).optional(),
       platform: z.string().max(24).optional(),
       taskId: z.string().max(64).optional(),
@@ -86,9 +88,10 @@ export const communityRouter = router({
           input.title,
           input.description ?? null,
           input.kind,
-          input.tier ?? null,
+          // 100s→99s rename: persist the normalized id/tier for new shares.
+          input.tier ? normalizeTier(input.tier) : null,
           input.platform ?? null,
-          input.taskId ?? null,
+          input.taskId ? normalizeTaskId(input.taskId) : null,
           input.tags ? JSON.stringify(input.tags) : null,
           JSON.stringify(input.content),
           input.previewText ?? null,
@@ -171,7 +174,7 @@ export const communityRouter = router({
         params.push(ctx.user.id);
       }
       if (input.kind)     { where.push("t.kind = ?");     params.push(input.kind); }
-      if (input.tier)     { where.push("t.tier = ?");     params.push(input.tier); }
+      if (input.tier)     { where.push("t.tier = ?");     params.push(normalizeTier(input.tier)); }
       if (input.platform) { where.push("t.platform = ?"); params.push(input.platform); }
       if (input.featuredOnly) where.push("t.featured = 1");
       if (input.search) {

@@ -24,7 +24,7 @@ import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA as FB60_ORCH } from "../server/_core/
 import { IG_60S_TASKS, IG_60S_ORCHESTRA as IG60_ORCH } from "../server/_core/quickTaskIG60";
 import { YT_60S_TASKS, YT_60S_ORCHESTRA as YT60_ORCH } from "../server/_core/quickTaskYT60";
 import { MULTI_60S_TASKS, MULTI_60S_ORCHESTRA as M60_ORCH } from "../server/_core/quickTaskMulti60";
-import { ALL_100S_TASKS, ALL_100S_ORCHESTRA as ORCH_100 } from "../server/_core/quickTask100";
+import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/_core/quickTask100";
 
 (async () => {
   const taskId = process.env.TASK_ID || "fb-30-pure-text-hook";
@@ -42,7 +42,7 @@ import { ALL_100S_TASKS, ALL_100S_ORCHESTRA as ORCH_100 } from "../server/_core/
     IG_60S_TASKS.find((t) => t.id === taskId) ??
     YT_60S_TASKS.find((t) => t.id === taskId) ??
     MULTI_60S_TASKS.find((t) => t.id === taskId) ??
-    ALL_100S_TASKS.find((t) => t.id === taskId);
+    ALL_99S_TASKS.find((t) => t.id === taskId);
   const config =
     FB_30S_ORCHESTRA[taskId] ?? IG_30S_ORCHESTRA[taskId] ?? YT_30S_ORCHESTRA[taskId] ?? TT_30S_ORCHESTRA[taskId] ?? LI_30S_ORCHESTRA[taskId] ?? EMAIL_30S_ORCHESTRA[taskId] ?? PR_30S_ORCHESTRA[taskId] ?? BRAND_30S_ORCHESTRA[taskId] ?? RESEARCH_30S_ORCHESTRA[taskId] ?? FB60_ORCH[taskId] ?? IG60_ORCH[taskId] ?? YT60_ORCH[taskId] ?? M60_ORCH[taskId] ?? ORCH_100[taskId];
   if (!template || !config) {
@@ -61,7 +61,7 @@ import { ALL_100S_TASKS, ALL_100S_ORCHESTRA as ORCH_100 } from "../server/_core/
   console.log(`Input [${inputKey}]: ${(inputs[inputKey] ?? "").slice(0, 80)}…\n`);
 
   const startedAt = Date.now();
-  const tierEnv = (process.env.TIER as "30s" | "60s" | "100s") || "30s";
+  const tierEnv = (process.env.TIER as "30s" | "60s" | "99s") || "30s";
   const result = await runOrchestra({ template, config, inputs, tier: tierEnv });
   console.log(`Tier: ${tierEnv}`);
   const elapsedMs = Date.now() - startedAt;

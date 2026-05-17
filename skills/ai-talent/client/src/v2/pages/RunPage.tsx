@@ -550,7 +550,10 @@ export default function RunPage() {
   //   2. output.platform + output.outputType (always present from DB)
   //   3. generic:feed (last resort — never errors out)
   const mockupVariant: MockupVariant = useMemo(() => {
-    const taskId = data?.mission?.taskId ?? "";
+    // 100s→99s rename compat: server already normalizes output.getById,
+    // but a legacy "fb-100-…" id reaching here from any other path must
+    // still resolve to the renamed mockup/prefix logic. Inline + idempotent.
+    const taskId = (data?.mission?.taskId ?? "").replace(/^([a-z]+)-100-/, "$1-99-");
 
     // ── Layer 1: Brand + Research (proposal-style mockups) ──
     if (taskId.startsWith("br-") || taskId.startsWith("rs-")) {

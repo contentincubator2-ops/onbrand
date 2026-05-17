@@ -25,10 +25,10 @@ const TONE_100 = `
 **即時資料**：scout 階段已抓回即時節慶 / 時事 / 趨勢資料，請扣回這些真實 context，不要寫得通用。`;
 
 // ─── FB 100s (5 tasks) ────────────────────────────────────────────────
-export const FB_100S_TASKS: FBTaskTemplate[] = [
+export const FB_99S_TASKS: FBTaskTemplate[] = [
   {
-    id: "fb-100-30day-calendar",
-    tier: "100s", postType: "feed",
+    id: "fb-99-30day-calendar",
+    tier: "99s", postType: "feed",
     label: "FB 30 天內容月曆",
     description: "30 天每日貼文大綱 + 內容支柱配比 + 真實爆款參考 + scout 抓即時節慶",
     agent_id: 224089, // Kevin Tan — Social Media Strategist eCommerce MY (1147 char)
@@ -47,8 +47,8 @@ export const FB_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
   {
-    id: "fb-100-14day-countdown",
-    tier: "100s", postType: "feed",
+    id: "fb-99-14day-countdown",
+    tier: "99s", postType: "feed",
     label: "FB 14 天倒數活動",
     description: "14 天倒數 + 每天獨立 hook + 中段轉折 + 高潮收束 + scout 抓節慶/時事",
     agent_id: 224116, // Hoàng Thị Mai — Email & CRM Strategist eCommerce VN (1251 char)
@@ -69,8 +69,8 @@ ${TONE_100}`,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
   {
-    id: "fb-100-launch-toolkit",
-    tier: "100s", postType: "event",
+    id: "fb-99-launch-toolkit",
+    tier: "99s", postType: "event",
     label: "FB 完整 Launch Toolkit (8 篇)",
     description: "預告 ×3 / 當日 / 即時 ×2 / 事後 / 跨平台 IG 改寫 + scout 抓節慶/時事",
     agent_id: 60014, // Cindy Mo | Social Media Marketing (F&B)
@@ -89,8 +89,8 @@ ${TONE_100}`,
     outputDefaults: { platform: "facebook", post_type: "event" },
   },
   {
-    id: "fb-100-livestream-9seg",
-    tier: "100s", postType: "feed",
+    id: "fb-99-livestream-9seg",
+    tier: "99s", postType: "feed",
     label: "FB 直播完整 9 段配套",
     description: "預告 + 開場 + 5 爆點 + 結尾 + 精華回顧 + reel 剪輯指南",
     agent_id: 224154, // Dewi Rahayu — Social Media Strategist Health ID (1135 char)
@@ -108,8 +108,8 @@ ${TONE_100}`,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
   {
-    id: "fb-100-crisis-playbook",
-    tier: "100s", postType: "comment",
+    id: "fb-99-crisis-playbook",
+    tier: "99s", postType: "comment",
     label: "FB 完整危機公關劇本",
     description: "偵測 + 第一份聲明 + 中期更新 ×3 + 後期 follow-up + 內部 talking points",
     agent_id: 222204, // Chen Jing-Yi — Senior Press Release Writer (1040 char)
@@ -130,10 +130,10 @@ ${TONE_100}`,
 ];
 
 // ─── IG 100s (3 tasks) ────────────────────────────────────────────────
-export const IG_100S_TASKS: FBTaskTemplate[] = [
+export const IG_99S_TASKS: FBTaskTemplate[] = [
   {
-    id: "ig-100-30day-calendar",
-    tier: "100s", postType: "feed",
+    id: "ig-99-30day-calendar",
+    tier: "99s", postType: "feed",
     label: "IG 30 天內容月曆",
     description: "30 天 feed/reel/story 配比 + 每篇 hook + hashtag 策略 + 真實爆款參考",
     agent_id: 60008, // Fiona Hsieh | Social Media Marketing Strategist (Beauty)
@@ -147,8 +147,8 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "instagram", post_type: "feed" },
   },
   {
-    id: "ig-100-reel-series-6",
-    tier: "100s", postType: "reel",
+    id: "ig-99-reel-series-6",
+    tier: "99s", postType: "reel",
     label: "IG Reel 6 集系列",
     description: "Strategist 設計 6 集弧 + 每集完整腳本（hook + hold + payoff）+ 縮圖 brief",
     agent_id: 60033, // Yawen Yeh | E-commerce Short Video Scriptwriter
@@ -162,8 +162,8 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "instagram", post_type: "reel" },
   },
   {
-    id: "ig-100-account-reposition",
-    tier: "100s", postType: "profile",
+    id: "ig-99-account-reposition",
+    tier: "99s", postType: "profile",
     label: "IG 帳號重新定位完整套組",
     description: "新 bio + 9 個 highlight 主題 + 9 篇 launch posts + visual direction",
     agent_id: 180141, // Rachel Chen | Social Media Strategy Director
@@ -180,10 +180,10 @@ export const IG_100S_TASKS: FBTaskTemplate[] = [
 ];
 
 // ─── YT 100s (3 tasks) ────────────────────────────────────────────────
-export const YT_100S_TASKS: FBTaskTemplate[] = [
+export const YT_99S_TASKS: FBTaskTemplate[] = [
   {
-    id: "yt-100-series-6ep",
-    tier: "100s", postType: "video",
+    id: "yt-99-series-6ep",
+    tier: "99s", postType: "video",
     label: "YT 6 集系列完整製作包",
     description: "6 集 title + description 800-1200 字 + 縮圖 brief 各 3 種 + community 配套",
     agent_id: 224005, // Pin-Chen Lin — YouTube Marketing Strategist 金融科技 (~1000 char)
@@ -197,8 +197,8 @@ export const YT_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "youtube", post_type: "video" },
   },
   {
-    id: "yt-100-quarterly-strategy",
-    tier: "100s", postType: "video",
+    id: "yt-99-quarterly-strategy",
+    tier: "99s", postType: "video",
     label: "YT 季度頻道策略",
     description: "12 個 video title + 內容支柱 + community 月曆 + competitor 分析",
     agent_id: 224001, // Yun-Hsuan Chen — YouTube Marketing Strategist 服飾時尚 (~1019 char)
@@ -213,8 +213,8 @@ ${TONE_100}`,
     outputDefaults: { platform: "youtube", post_type: "video" },
   },
   {
-    id: "yt-100-premiere-kit",
-    tier: "100s", postType: "premiere",
+    id: "yt-99-premiere-kit",
+    tier: "99s", postType: "premiere",
     label: "YT Premiere 完整 kit",
     description: "預告影片 + 倒數 community 貼文 + 直播配套 + 精華剪輯指南",
     agent_id: 223995, // Pei-Hsuan Liu — YouTube Marketing Strategist 電商/DTC (1025 char)
@@ -230,10 +230,10 @@ ${TONE_100}`,
 ];
 
 // ─── Multi-channel 100s (TT/LI/Email/PR/Brand/Research) ───────────────
-export const MULTI_100S_TASKS: FBTaskTemplate[] = [
+export const MULTI_99S_TASKS: FBTaskTemplate[] = [
   {
-    id: "tt-100-30day-foryou",
-    tier: "100s", postType: "foryou",
+    id: "tt-99-30day-foryou",
+    tier: "99s", postType: "foryou",
     label: "TikTok 30 天 ForYou 配方",
     description: "30 天每天 1 支腳本 + trend 對應 + sound 建議 + scout 抓節慶/時事",
     agent_id: 27, skill_slug: "short-video-script", // Chloe Chen | Short Video Strategist (Beauty)
@@ -246,8 +246,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
-    id: "tt-100-trend-week",
-    tier: "100s", postType: "foryou",
+    id: "tt-99-trend-week",
+    tier: "99s", postType: "foryou",
     label: "TikTok 1 週追熱點完整套組",
     description: "7 天每天 1 個 trend + 品牌 hook + 3 種 hook 變化 + sound 建議",
     agent_id: 220507, skill_slug: "short-video-script", // Pin-Yen Liu — Short-form Video Producer Beauty
@@ -260,8 +260,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
-    id: "li-100-30day-thought-leadership",
-    tier: "100s", postType: "feed",
+    id: "li-99-30day-thought-leadership",
+    tier: "99s", postType: "feed",
     label: "LI 30 天 Thought-Leadership 月曆",
     description: "30 天 = 10 觀點 / 10 案例 / 10 趨勢預測 + scout 抓即時節慶",
     agent_id: 222342, skill_slug: "linkedin-b2b", // Hung Ya-Wen | Social Media Strategist – B2B SaaS
@@ -274,8 +274,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "linkedin", post_type: "feed" },
   },
   {
-    id: "li-100-newsletter-quarterly",
-    tier: "100s", postType: "newsletter",
+    id: "li-99-newsletter-quarterly",
+    tier: "99s", postType: "newsletter",
     label: "LI 季度 Newsletter 4 期",
     description: "季度 4 期 newsletter 完整內容 + 訂閱成長策略",
     agent_id: 60062, skill_slug: "linkedin-b2b", // Nathan Lu | Media Newsletter Copywriter
@@ -288,8 +288,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "linkedin", post_type: "newsletter" },
   },
   {
-    id: "em-100-4week-nurture",
-    tier: "100s", postType: "edm",
+    id: "em-99-4week-nurture",
+    tier: "99s", postType: "edm",
     label: "Email 4 週 Onboarding Nurture",
     description: "4 週 8-12 封 emails + 行為觸發分支 + scout 抓即時節慶",
     agent_id: 224161, skill_slug: "email-marketing", // Xenia Anggraini — Email & CRM Strategist Beauty ID (1229 char)
@@ -302,8 +302,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "email", post_type: "edm" },
   },
   {
-    id: "em-100-launch-sequence",
-    tier: "100s", postType: "edm",
+    id: "em-99-launch-sequence",
+    tier: "99s", postType: "edm",
     label: "Email 產品上線完整自動化 Sequence",
     description: "預告 ×2 / 上線 / 提醒 ×2 / 最後機會 / 後續 follow-up = 7 封",
     agent_id: 60061, skill_slug: "email-marketing", // Yahan Tsai — Retail E-commerce Newsletter Copywriter
@@ -316,8 +316,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "email", post_type: "edm" },
   },
   {
-    id: "pr-100-launch-toolkit",
-    tier: "100s", postType: "press",
+    id: "pr-99-launch-toolkit",
+    tier: "99s", postType: "press",
     label: "PR 完整 Launch 媒體 Toolkit",
     description: "新聞稿 + Q&A + 媒體聯絡話術 + 後續追蹤 + spokesperson talking points",
     agent_id: 223197, skill_slug: "pr-writing", // Yi-Wen Wu — PR Strategist B2B SaaS (476 char)
@@ -339,10 +339,10 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     preferredModel: "qwen", maxTokens: 1300,
     outputDefaults: { platform: "press", post_type: "press" },
   },
-  // pr-100-crisis-toolkit removed per CJ direction 2026-05-06 — risky.
+  // pr-99-crisis-toolkit removed per CJ direction 2026-05-06 — risky.
   {
-    id: "br-100-reposition-toolkit",
-    tier: "100s", postType: "press",
+    id: "br-99-reposition-toolkit",
+    tier: "99s", postType: "press",
     label: { en: "Brand Reposition Toolkit", zh: "品牌重新定位完整 Toolkit" },
     description: "Positioning + Tagline 套 + Voice guide + Visual direction + 應用範例",
     agent_id: 60002, skill_slug: "brand-strategy", // Ethan Chiang | DTC E-commerce Brand Strategist
@@ -361,8 +361,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "press", post_type: "press" },
   },
   {
-    id: "br-100-voice-playbook",
-    tier: "100s", postType: "press",
+    id: "br-99-voice-playbook",
+    tier: "99s", postType: "press",
     label: { en: "Brand Voice Playbook", zh: "品牌語氣完整 Playbook" },
     description: "8 個應用情境 + Do/Don't 詳細 + 5 個範例 + 跨平台 voice 適配",
     agent_id: 32, skill_slug: "brand-strategy", // Fiona Hsu | Copywriter
@@ -379,8 +379,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "press", post_type: "press" },
   },
   {
-    id: "rs-100-discovery-sprint",
-    tier: "100s", postType: "press",
+    id: "rs-99-discovery-sprint",
+    tier: "99s", postType: "press",
     label: { en: "User Research · Discovery Sprint", zh: "用戶研究 5 天 Discovery Sprint" },
     description: "訪綱 + 5 personas + JTBD map + insights synthesis + 行動建議",
     agent_id: 90043, skill_slug: "user-research", // Lydia Chiu | Qualitative Research Director
@@ -403,8 +403,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "press", post_type: "press" },
   },
   {
-    id: "rs-100-competitor-mapping",
-    tier: "100s", postType: "press",
+    id: "rs-99-competitor-mapping",
+    tier: "99s", postType: "press",
     // 2026-05-11 (CJ「中英文研究意圖不一樣」): split label + correct EN
     // (this is competitor research, not user research).
     label: { en: "Competitor Research Map", zh: "競品研究完整地圖" },
@@ -453,8 +453,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
   // 不直接 scrape（避免 TOS 風險）。資料量大時請求 Claude 搭 web_search
   // 翻譯成可讀的競品 report。
   {
-    id: "rs-100-competitor-ads",
-    tier: "100s", postType: "press",
+    id: "rs-99-competitor-ads",
+    tier: "99s", postType: "press",
     label: { en: "Competitor Ad Intelligence", zh: "競品廣告偵察報告（Meta Ads Library）" },
     description: "撈最多 5 個競品在 Meta Ads Library 的近期投放 → LLM 分析比例 / 訴求 / 視覺",
     agent_id: 210225, skill_slug: "competitive-intel",
@@ -494,8 +494,8 @@ ${TONE_100}`,
 
   // ─── 2026-05-12 (CJ「KOL 我們提供說法，不提供名單」)──────────
   {
-    id: "kl-100-campaign-toolkit",
-    tier: "100s", postType: "press",
+    id: "kl-99-campaign-toolkit",
+    tier: "99s", postType: "press",
     label: { en: "KOL Campaign Toolkit", zh: "KOL Campaign 完整話術包" },
     description: "多 KOL 分層邀請 + 漏斗訊息 + brief 模板 + 報價回應 + 結案報告",
     agent_id: 220920, skill_slug: "kol-outreach", // Chloe Chen | Senior KOL & Influencer Manager
@@ -552,13 +552,13 @@ const fb100Common = {
 // Legacy squad mapping (these 100s tasks reuse the SHAPE of existing
 // FB squads — same multi-post deliverable structure; orchestra runner
 // instead of stepExecute pipeline for unified UX):
-//   fb-100-30day-calendar     ← fb-monthly-calendar squad
-//   fb-100-14day-countdown    ← fb-countdown-series squad
-//   fb-100-launch-toolkit     ← fb-event-launch-kit squad
-//   fb-100-livestream-9seg    ← fb-livestream-prep squad
-//   fb-100-crisis-playbook    ← fb-crisis-comms squad
-export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "fb-100-30day-calendar": {
+//   fb-99-30day-calendar     ← fb-monthly-calendar squad
+//   fb-99-14day-countdown    ← fb-countdown-series squad
+//   fb-99-launch-toolkit     ← fb-event-launch-kit squad
+//   fb-99-livestream-9seg    ← fb-livestream-prep squad
+//   fb-99-crisis-playbook    ← fb-crisis-comms squad
+export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  "fb-99-30day-calendar": {
     ...fb100Common, variants: 4, images: 4,
     aspectRatio: "1:1", fluxSize: "square_hd",
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
@@ -568,7 +568,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "festivals", // 月曆 → 抓即時節慶
     extras: { ...fb100Common.extras, postsCount: 4 },
   },
-  "fb-100-14day-countdown": {
+  "fb-99-14day-countdown": {
     ...fb100Common, variants: 7, images: 7,
     aspectRatio: "1:1", fluxSize: "square_hd",
     variantLabels: ["Day 14", "Day 12", "Day 10", "Day 7", "Day 5", "Day 3", "Day 1"],
@@ -578,7 +578,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "festivals", // 倒數活動 → 抓相關節慶 / 行銷檔期
     extras: { ...fb100Common.extras, postsCount: 7 },
   },
-  "fb-100-launch-toolkit": {
+  "fb-99-launch-toolkit": {
     ...fb100Common, variants: 8, images: 8,
     aspectRatio: "1:1", fluxSize: "square_hd",
     variantLabels: ["預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
@@ -588,7 +588,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "viral", // 看同類 launch 通常用什麼 hook
     extras: { ...fb100Common.extras, postsCount: 8 },
   },
-  "fb-100-livestream-9seg": {
+  "fb-99-livestream-9seg": {
     ...fb100Common, variants: 9, images: 9,
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "爆點 4", "爆點 5", "結尾", "Reel 剪輯"],
@@ -598,7 +598,7 @@ export const FB_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "viral",
     extras: { ...fb100Common.extras, postsCount: 9 },
   },
-  "fb-100-crisis-playbook": {
+  "fb-99-crisis-playbook": {
     ...fb100Common, variants: 7, images: 0, runImageGen: false, imageDirectorId: null as any,
     aspectRatio: null as any, fluxSize: null as any,
     variantLabels: ["偵測警示", "第一份聲明", "24h 更新", "48h 更新", "72h 更新", "1 週 follow-up", "媒體 talking points"],
@@ -618,11 +618,11 @@ const ig100Common = {
 };
 
 // IG 100s — legacy squad mapping:
-//   ig-100-30day-calendar     ← (no exact IG squad; reuses fb-monthly-calendar shape)
-//   ig-100-reel-series-6      ← (new — adapted from fb-reels-script squad)
-//   ig-100-account-reposition ← fb-account-reposition squad shape
-export const IG_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "ig-100-30day-calendar": {
+//   ig-99-30day-calendar     ← (no exact IG squad; reuses fb-monthly-calendar shape)
+//   ig-99-reel-series-6      ← (new — adapted from fb-reels-script squad)
+//   ig-99-account-reposition ← fb-account-reposition squad shape
+export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  "ig-99-30day-calendar": {
     ...ig100Common, variants: 4, images: 4,
     aspectRatio: "1:1", fluxSize: "square_hd",
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
@@ -632,7 +632,7 @@ export const IG_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "festivals",
     extras: { ...ig100Common.extras, postsCount: 4 },
   },
-  "ig-100-reel-series-6": {
+  "ig-99-reel-series-6": {
     ...ig100Common, variants: 6, images: 6,
     aspectRatio: "9:16", fluxSize: "portrait_9_16",
     variantLabels: ["第 1 集", "第 2 集", "第 3 集", "第 4 集", "第 5 集", "第 6 集"],
@@ -642,7 +642,7 @@ export const IG_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "viral",
     extras: { ...ig100Common.extras, postsCount: 6 },
   },
-  "ig-100-account-reposition": {
+  "ig-99-account-reposition": {
     ...ig100Common, variants: 5, images: 5,
     aspectRatio: "1:1", fluxSize: "square_hd",
     variantLabels: ["新 Bio", "Highlight 套組", "Launch Post 1-3", "Launch Post 4-6", "Launch Post 7-9"],
@@ -661,11 +661,11 @@ const yt100Common = {
 };
 
 // YT 100s — legacy squad mapping:
-//   yt-100-quarterly-strategy ← fb-quarterly-strategy squad shape
-//   yt-100-series-6ep         ← (new — extends 60s yt-60-series-3ep)
-//   yt-100-premiere-kit       ← (new — adapted from fb-livestream-prep)
-export const YT_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "yt-100-series-6ep": {
+//   yt-99-quarterly-strategy ← fb-quarterly-strategy squad shape
+//   yt-99-series-6ep         ← (new — extends 60s yt-60-series-3ep)
+//   yt-99-premiere-kit       ← (new — adapted from fb-livestream-prep)
+export const YT_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  "yt-99-series-6ep": {
     ...yt100Common, variants: 6, images: 6,
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["EP1", "EP2", "EP3", "EP4", "EP5", "EP6"],
@@ -675,7 +675,7 @@ export const YT_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "viral",
     extras: { ...yt100Common.extras, postsCount: 6 },
   },
-  "yt-100-quarterly-strategy": {
+  "yt-99-quarterly-strategy": {
     ...yt100Common, variants: 5, images: 5,
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["內容支柱", "12 影片 title", "Community 月曆", "Competitor 分析", "即時趨勢報告"],
@@ -685,7 +685,7 @@ export const YT_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "news", // 季度策略 → 抓產業最新
     extras: { ...yt100Common.extras, postsCount: 5 },
   },
-  "yt-100-premiere-kit": {
+  "yt-99-premiere-kit": {
     ...yt100Common, variants: 4, images: 4,
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
     variantLabels: ["Trailer 腳本", "Community 倒數 ×5", "直播配套", "精華剪輯指南"],
@@ -698,14 +698,14 @@ export const YT_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
 };
 
 // Multi-channel 100s — legacy squad mapping (where applicable):
-//   tt-100-trend-week → (new — TikTok trend chasing)
-//   tt-100-30day-foryou → (new — extends fb-monthly-calendar shape)
-//   li-100-newsletter-quarterly → (new)
-//   em-100-launch-sequence → fb-event-launch-kit shape adapted to email
-//   pr-100-crisis-toolkit → fb-crisis-comms shape adapted to PR
-//   rs-100-competitor-mapping → fb-account-reposition + competitor-audit shape
-export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "tt-100-30day-foryou": {
+//   tt-99-trend-week → (new — TikTok trend chasing)
+//   tt-99-30day-foryou → (new — extends fb-monthly-calendar shape)
+//   li-99-newsletter-quarterly → (new)
+//   em-99-launch-sequence → fb-event-launch-kit shape adapted to email
+//   pr-99-crisis-toolkit → fb-crisis-comms shape adapted to PR
+//   rs-99-competitor-mapping → fb-account-reposition + competitor-audit shape
+export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  "tt-99-30day-foryou": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: ANNA,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
@@ -715,7 +715,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "festivals",
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
-  "tt-100-trend-week": {
+  "tt-99-trend-week": {
     variants: 7, images: 7, runImageGen: true, imageDirectorId: TT100_IMG2,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"],
@@ -724,7 +724,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "trending", // 追熱點 → 抓即時時事
     extras: { postsCount: 7, replyTemplates: 5, postingTime: true, followupPost: true },
   },
-  "li-100-30day-thought-leadership": {
+  "li-99-30day-thought-leadership": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: ZEYU,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
@@ -733,7 +733,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "news", // thought-leadership → 抓產業最新
     extras: { postsCount: 4, replyTemplates: 5, postingTime: true, followupPost: true },
   },
-  "li-100-newsletter-quarterly": {
+  "li-99-newsletter-quarterly": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: LI100_IMG2,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["第 1 期", "第 2 期", "第 3 期", "第 4 期"],
@@ -743,7 +743,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "news",
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
-  "em-100-4week-nurture": {
+  "em-99-4week-nurture": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: NATHAN,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
@@ -753,7 +753,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "viral",
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 3, postingTime: true, followupPost: true },
   },
-  "em-100-launch-sequence": {
+  "em-99-launch-sequence": {
     variants: 7, images: 7, runImageGen: true, imageDirectorId: EM100_IMG2,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
@@ -763,7 +763,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "viral",
     extras: { postsCount: 7, narrativeArc: true, replyTemplates: 3, postingTime: true, followupPost: true },
   },
-  "pr-100-launch-toolkit": {
+  "pr-99-launch-toolkit": {
     variants: 5, images: 0, runImageGen: false, imageDirectorId: null as any,
     aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
     variantLabels: ["新聞稿", "Q&A", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
@@ -772,8 +772,8 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "news",
     extras: { postsCount: 5, replyTemplates: 3 },
   },
-  // pr-100-crisis-toolkit orchestra config removed.
-  "br-100-reposition-toolkit": {
+  // pr-99-crisis-toolkit orchestra config removed.
+  "br-99-reposition-toolkit": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["Positioning", "Tagline 5 套", "Voice guide", "Visual direction", "5 應用範例"],
@@ -783,7 +783,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "news",
     extras: { postsCount: 5, narrativeArc: true, replyTemplates: 3 },
   },
-  "br-100-voice-playbook": {
+  "br-99-voice-playbook": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: BR100_IMG2,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["8 應用情境", "Do/Don't", "5 範例", "跨平台適配"],
@@ -792,7 +792,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "viral",
     extras: { postsCount: 4, replyTemplates: 3 },
   },
-  "rs-100-discovery-sprint": {
+  "rs-99-discovery-sprint": {
     variants: 5, images: 0, runImageGen: false, imageDirectorId: null as any,
     aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
     variantLabels: ["Day 1 訪綱", "Day 2-3 Personas", "Day 4 JTBD map", "Day 5 Synthesis", "行動建議"],
@@ -801,7 +801,7 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "news",
     extras: { postsCount: 5, replyTemplates: 3 },
   },
-  "rs-100-competitor-mapping": {
+  "rs-99-competitor-mapping": {
     variants: 5, images: 0, runImageGen: false, imageDirectorId: null as any,
     aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
     variantLabels: ["市場 overview", "競品 deep dive ×5", "定位 map", "Opportunity gaps", "推薦策略"],
@@ -813,17 +813,17 @@ export const MULTI_100S_ORCHESTRA: Record<string, OrchestraConfig> = {
 };
 
 // ─── Unified lookup ─────────────────────────────────────────────────────
-const ALL_100_TASKS = [...FB_100S_TASKS, ...IG_100S_TASKS, ...YT_100S_TASKS, ...MULTI_100S_TASKS];
-const ALL_100_ORCH: Record<string, OrchestraConfig> = {
-  ...FB_100S_ORCHESTRA, ...IG_100S_ORCHESTRA, ...YT_100S_ORCHESTRA, ...MULTI_100S_ORCHESTRA,
+const ALL_99_TASKS = [...FB_99S_TASKS, ...IG_99S_TASKS, ...YT_99S_TASKS, ...MULTI_99S_TASKS];
+const ALL_99_ORCH: Record<string, OrchestraConfig> = {
+  ...FB_99S_ORCHESTRA, ...IG_99S_ORCHESTRA, ...YT_99S_ORCHESTRA, ...MULTI_99S_ORCHESTRA,
 };
 
-export const ALL_100S_TASKS = ALL_100_TASKS;
-export const ALL_100S_ORCHESTRA = ALL_100_ORCH;
+export const ALL_99S_TASKS = ALL_99_TASKS;
+export const ALL_99S_ORCHESTRA = ALL_99_ORCH;
 
-export function get100Template(taskId: string): FBTaskTemplate | null {
-  return ALL_100_TASKS.find((t) => t.id === taskId) ?? null;
+export function get99Template(taskId: string): FBTaskTemplate | null {
+  return ALL_99_TASKS.find((t) => t.id === taskId) ?? null;
 }
-export function get100OrchestraConfig(taskId: string): OrchestraConfig | null {
-  return ALL_100_ORCH[taskId] ?? null;
+export function get99OrchestraConfig(taskId: string): OrchestraConfig | null {
+  return ALL_99_ORCH[taskId] ?? null;
 }

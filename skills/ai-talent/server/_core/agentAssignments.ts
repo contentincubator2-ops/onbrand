@@ -13,6 +13,7 @@
  * (≥400 char persona) from mos_db's qualified pool of 3,010 agents.
  */
 import assignmentsData from "../../data/agent-assignments.json" with { type: "json" };
+import { normalizeTaskId } from "./tierCompat";
 
 type Role =
   | "lead"
@@ -41,7 +42,9 @@ const data = assignmentsData as AssignmentsFile;
 /** Returns the assigned agent_id for a (taskId, role) pair, or null
  *  if no assignment exists (caller should fall back to hardcoded). */
 export function getAssignedAgent(taskId: string, role: Role): number | null {
-  return data.assignments[taskId]?.[role] ?? null;
+  // 100s→99s rename: JSON keys were renamed to the new ids. Normalize the
+  // incoming taskId so a legacy "fb-100-…" still resolves. Idempotent.
+  return data.assignments[normalizeTaskId(taskId)]?.[role] ?? null;
 }
 
 /** Resolve an agent_id with fallback chain: JSON assignment > hardcoded > null */

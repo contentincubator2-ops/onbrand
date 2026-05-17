@@ -36,7 +36,7 @@ import localPool from "../localDb";
 // timeouts (40s) + retry (40s) + brief stage (10s) = 90s, fits in 100s.
 const HARD_BUDGET_MS  = 100_000; // 30s tier
 const HARD_BUDGET_60S = 130_000; // 60s tier
-const HARD_BUDGET_100S= 150_000; // 100s tier
+const HARD_BUDGET_99S= 150_000; // 100s tier
 // 2026-05-13 (CJ「30~99秒的圖都生成不了」): PiAPI Flux Schnell takes 8–15s
 // in practice (poll loop adds 1s minimum between checks). The previous
 // 10s budget timed out almost every generation — variants came back with
@@ -47,7 +47,7 @@ const PER_IMAGE_MS    = 45_000;
 const LLM_BUDGET_MS   = 40_000;
 const QA_BUDGET_MS    = 12_000;
 
-export type OrchestraTier = "30s" | "60s" | "100s";
+export type OrchestraTier = "30s" | "60s" | "99s";
 
 export interface AgentMeta {
   id: number;
@@ -947,7 +947,7 @@ export async function runOrchestra(args: {
   // variantLabels. Pad with extra labels so each new variant has a usable
   //口吻 instead of "版本 4" fallback.
   const tier: OrchestraTier = args.tier ?? "30s";
-  if (tier === "60s" || tier === "100s") {
+  if (tier === "60s" || tier === "99s") {
     const baseLabels = args.config.variantLabels;
     const extraLabels = ["進階版", "替代版", "極簡版", "完整版"]; // generic fallbacks
     const scaledLabels = baseLabels.length >= 5
@@ -975,7 +975,7 @@ export async function runOrchestra(args: {
       },
     };
   }
-  const tierBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "100s" ? HARD_BUDGET_100S : HARD_BUDGET_MS;
+  const tierBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "99s" ? HARD_BUDGET_99S : HARD_BUDGET_MS;
 
   const startedAt = Date.now();
   const stages: OrchestraStage[] = [];
@@ -1010,7 +1010,7 @@ export async function runOrchestra(args: {
     const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
 
     // 100s tier: also kick off scout (viral patterns research) in parallel
-    const isResearchTier = tier === "100s";
+    const isResearchTier = tier === "99s";
     const taskTopic = inputValues[0]?.slice(0, 200) ?? "";
     const taskChannel =
       args.template.outputDefaults?.platform ??
@@ -1059,7 +1059,7 @@ export async function runOrchestra(args: {
         // the full heavy block that needs golden-circle/story depth.
         buildBrandContext(
           args.brandId, args.productId, args.eventId,
-          (tier === "100s" || args.template.outputMode === "document") ? "full" : "core",
+          (tier === "99s" || args.template.outputMode === "document") ? "full" : "core",
         ).catch(() => ""),
         args.brandId ? loadBrandKnowledgeForPrompt(args.brandId).catch(() => "") : Promise.resolve(""),
         args.brandId
@@ -1131,7 +1131,7 @@ export async function runOrchestra(args: {
     let strategistAnchor = "";
     let strategistMeta: AgentMeta | null = null;
     const useStrategist =
-      (tier === "60s" || tier === "100s") &&
+      (tier === "60s" || tier === "99s") &&
       !!resolvedStrategistId &&
       !!args.config.extras?.narrativeArc;
     if (useStrategist) {
@@ -1307,7 +1307,7 @@ export async function runOrchestra(args: {
               ?? idChannelMap[idPrefix]
               ?? "other"
           );
-          const tierStr = (tier as "30s" | "60s" | "100s");
+          const tierStr = (tier as "30s" | "60s" | "99s");
           const flatLabel: string = typeof args.template.label === "string"
             ? args.template.label
             : (args.template.label?.zh ?? args.template.label?.en ?? args.template.id);
@@ -1436,7 +1436,7 @@ export async function runOrchestra(args: {
     let specialtyMeta: AgentMeta | null = null;
     let specialtyPersona = "";
     const useSpecialty =
-      (tier === "60s" || tier === "100s") &&
+      (tier === "60s" || tier === "99s") &&
       !!resolvedSpecialtyId &&
       !!extrasCfg &&
       (extrasCfg.compareTable || extrasCfg.timingAdvisor || extrasCfg.legalAssistant);
@@ -1449,7 +1449,7 @@ export async function runOrchestra(args: {
     // variant fanout) so each variant's helper LLM call gets the agent's
     // real-person persona prepended. JSON-driven, zero runtime resolution.
     let replyPersona = "", timingPersona = "", followupPersona = "";
-    if ((tier === "60s" || tier === "100s") && extrasCfg) {
+    if ((tier === "60s" || tier === "99s") && extrasCfg) {
       const replyId    = resolveAgentId(taskId, "replyWriter",    null);
       const timingId   = resolveAgentId(taskId, "timingAdvisor",  null);
       const followupId = resolveAgentId(taskId, "followupWriter", null);
@@ -1460,7 +1460,7 @@ export async function runOrchestra(args: {
       ]);
       replyPersona = r1; timingPersona = r2; followupPersona = r3;
     }
-    if ((tier === "60s" || tier === "100s") && extrasCfg) {
+    if ((tier === "60s" || tier === "99s") && extrasCfg) {
       const stExtras = stage("extras", "撰寫留言模板 / 發文時段 / 追蹤貼文" + (useSpecialty ? " / 專業檢核" : ""));
       try {
         await Promise.all(
@@ -1515,7 +1515,7 @@ export async function runOrchestra(args: {
     // ── Stage 4: QA review (60s/100s tier only, parallel per variant) ─────
     // Jordan Hayes (squadLeadQA) reviews each variant against task + brand.
     // QA runs AFTER caption assembly so it sees the final user-facing text.
-    if (tier === "60s" || tier === "100s") {
+    if (tier === "60s" || tier === "99s") {
       const stQA = stage("qa", `Jordan Hayes 審核 ${variants.length} 個變體`);
       try {
         const { runSquadLeadQA } = await import("../squadLeadQA");
@@ -1632,7 +1632,7 @@ export async function runOrchestra(args: {
             ?? idChannelMap[idPrefix]
             ?? "other"
         );
-        const tierStr = (tier as "30s" | "60s" | "100s");
+        const tierStr = (tier as "30s" | "60s" | "99s");
         // 2026-05-11 — flatten { en, zh } | string label to string for DB.
         const flatLabel: string = typeof args.template.label === "string"
           ? args.template.label

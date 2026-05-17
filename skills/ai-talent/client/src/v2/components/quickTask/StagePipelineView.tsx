@@ -245,7 +245,7 @@ export function StagePipelineView({
   stages: StageInfo[] | null | undefined;
   captionAgent?: { id: number; name: string; title: string; avatarUrl: string | null } | null;
   imageAgent?: { id: number; name: string; title: string; avatarUrl: string | null } | null;
-  tier: "30s" | "60s" | "100s";
+  tier: "30s" | "60s" | "99s";
 }) {
   const { lang } = useLang();
   if (!stages || stages.length === 0) return null;
