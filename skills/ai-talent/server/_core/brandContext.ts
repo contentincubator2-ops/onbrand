@@ -413,11 +413,16 @@ export async function buildBrandPrefix(
     // 順序：鎖定屬性 → 聲音指南（含中英夾雜 samples）→ 寫手指引 →
     // 脈絡 → 補充 → product/event narrow。
     // LLM 對「靠後出現」內容更易執行，product/event 放最後。
-    // mode="core": only the distilled digest + product/event narrowing
-    // (short tasks). mode="full": the rich block (strategic/long-form).
-    const prefix = mode === "core"
-      ? (coreDigest + productSection + eventSection) || ""
-      : "\n\n" + lockedSection + voiceSection + assetsSection + contextSection + brainSection + productSection + eventSection;
+    const fullPrefix =
+      "\n\n" + lockedSection + voiceSection + assetsSection + contextSection + brainSection + productSection + eventSection;
+    // mode="core" → distilled digest + product/event narrowing (short
+    // tasks). SAFETY: if coreDigest is empty (brand not re-run after the
+    // single-source refactor → positioning has no segments yet), fall
+    // back to the full block so un-migrated brands don't silently lose
+    // ALL brand grounding on short tasks. mode="full" → rich block.
+    const prefix = (mode === "core" && coreDigest)
+      ? coreDigest + productSection + eventSection
+      : fullPrefix;
 
     CACHE.set(ck, { prefix, expiresAt: Date.now() + TTL_MS });
     return prefix;

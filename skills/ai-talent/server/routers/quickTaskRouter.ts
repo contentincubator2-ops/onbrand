@@ -1285,9 +1285,11 @@ export const quickTaskRouter = router({
       stepsRaw = Array.isArray(stepsRaw) ? stepsRaw : [];
       if (stepsRaw.length === 0) throw new Error(`squad ${input.squadSlug} has no steps`);
 
-      // 2. Build brand context
+      // 2. Build brand context — runSquadAuto = strategic/long-form
+      // squad work → full brand depth (golden circle / story /
+      // competition), NOT the lean core digest.
       const { buildBrandPrefix } = await import("../_core/brandContext");
-      const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
+      const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "full").catch(() => "");
 
       // 3. Inject 100s scout data (real-time festivals/trending/news)
       let scoutBlock = "";
