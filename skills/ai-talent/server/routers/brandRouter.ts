@@ -415,15 +415,22 @@ export const brandRouter = router({
       (brand as any).fbPageId = fbPageId;
       (brand as any).igUserId = igUserId;
 
-      // Positioning completion — count keys in the JSON. Treat
-      // positioningStatus='completed' as "locked", anything else as unlocked.
+      // Positioning completion — count only real segment keys. 2026-05-17:
+      // after the single-source refactor, positioning holds 10 segment
+      // keys + meta keys (_assets/_aiPrompts/_interim). Exclude any
+      // "_"-prefixed meta key, and report against the real segment
+      // total (10) so the panel shows N/10 not N/14.
+      const BRAND_SEGMENT_TOTAL = 10;
       let completedSections = 0;
+      let positioningAssets: any = {};
       try {
         const p = typeof brand.positioning === "string"
           ? JSON.parse(brand.positioning || "{}")
           : (brand.positioning ?? {});
+        positioningAssets = p?._assets ?? {};
         completedSections = Object.keys(p).filter(
-          (k) => p[k] != null && (typeof p[k] !== "object" || Object.keys(p[k]).length > 0),
+          (k) => !k.startsWith("_") && p[k] != null &&
+            (typeof p[k] !== "object" || Object.keys(p[k]).length > 0),
         ).length;
       } catch { /* non-fatal */ }
       const isLocked = brand.positioningStatus === "completed";
@@ -438,19 +445,32 @@ export const brandRouter = router({
         knowledgeCount = Number((kRows as any[])[0]?.n ?? 0);
       } catch { /* table may not exist on older deploys */ }
 
-      // Preferred / banned terms (lives in brand_caption_rules)
+      // Preferred / banned terms. 2026-05-17 (CJ「偏好詞/禁用詞沒正確
+      //顯示，實際 _assets 有資料」): canonical source is
+      // positioning._assets (what BrandAssetEditor reads/writes:
+      // preferred_terms.items[] / banned_words.items[]). The old
+      // brand_caption_rules table is legacy and usually empty → panel
+      // showed 0 despite filled assets. Read _assets first, fall back
+      // to the legacy table only when _assets has nothing.
       let preferredCount = 0, bannedCount = 0;
-      try {
-        const [rRows]: any = await localPool.execute(
-          `SELECT kind, COUNT(*) AS n FROM brand_caption_rules
-            WHERE brandId = ? GROUP BY kind`,
-          [input.brandId],
-        );
-        for (const r of (rRows as any[])) {
-          if (r.kind === "preferred" || r.kind === "preferred_term") preferredCount = Number(r.n);
-          else if (r.kind === "banned" || r.kind === "banned_word") bannedCount = Number(r.n);
-        }
-      } catch { /* non-fatal */ }
+      const arrLen = (x: any) =>
+        Array.isArray(x?.items) ? x.items.filter((s: any) => String(s ?? "").trim()).length
+        : Array.isArray(x) ? x.filter((s: any) => String(s ?? "").trim()).length : 0;
+      preferredCount = arrLen(positioningAssets?.preferred_terms);
+      bannedCount = arrLen(positioningAssets?.banned_words);
+      if (preferredCount === 0 && bannedCount === 0) {
+        try {
+          const [rRows]: any = await localPool.execute(
+            `SELECT kind, COUNT(*) AS n FROM brand_caption_rules
+              WHERE brandId = ? GROUP BY kind`,
+            [input.brandId],
+          );
+          for (const r of (rRows as any[])) {
+            if (r.kind === "preferred" || r.kind === "preferred_term") preferredCount = Number(r.n);
+            else if (r.kind === "banned" || r.kind === "banned_word") bannedCount = Number(r.n);
+          }
+        } catch { /* non-fatal */ }
+      }
 
       // Output counts: total + last 7 days
       let totalOutputs = 0, last7DaysOutputs = 0;
@@ -473,7 +493,7 @@ export const brandRouter = router({
         positioning: {
           isLocked,
           completedSections,
-          totalSections: 14,
+          totalSections: BRAND_SEGMENT_TOTAL,
         },
         knowledge: {
           count: knowledgeCount,

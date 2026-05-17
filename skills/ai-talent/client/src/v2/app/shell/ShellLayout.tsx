@@ -974,10 +974,10 @@ function BrainSummaryPanel({
       {/* 1. 鎖定憲法 */}
       <Section title={isEn ? "01 · Locked Constitution" : "01 · 鎖定憲法"}>
         <Row
-          label={isEn ? "Positioning" : "14 步定位"}
+          label={isEn ? "Positioning" : "品牌定位"}
           value={
             s?.positioning?.completedSections != null
-              ? `${s.positioning.completedSections}/14 ${s.positioning.isLocked ? "🔒" : ""}`
+              ? `${s.positioning.completedSections}/${s.positioning.totalSections ?? 10} ${s.positioning.isLocked ? "🔒" : ""}`
               : "—"
           }
         />
@@ -985,7 +985,7 @@ function BrainSummaryPanel({
           <p style={{ fontSize: 10, color: "#9ca3af", marginTop: 4, lineHeight: 1.5 }}>
             {isEn
               ? "Not locked yet — finish onboarding to lock the brand identity."
-              : "尚未鎖定 · 完成 14 步定位後會自動鎖定"}
+              : `尚未鎖定 · 完成 ${s?.positioning?.totalSections ?? 10} 步定位後會自動鎖定`}
           </p>
         )}
       </Section>
