@@ -2039,7 +2039,7 @@ function OutputCarousel({
                         <option value="piapi/flux-schnell">{lang === "en" ? "⚡ Flux Schnell (fast, cheap)" : "⚡ Flux Schnell（快、便宜）"}</option>
                         <option value="piapi/flux-pro">{lang === "en" ? "Flux Pro (high quality)" : "Flux Pro（高品質）"}</option>
                         <option value="openai/gpt-image-1">{lang === "en" ? "🧠 GPT Image 1 (OpenAI)" : "🧠 GPT Image 1（OpenAI）"}</option>
-                        <option value="google/imagen-3">{lang === "en" ? "🌈 Imagen 3 (Google)" : "🌈 Imagen 3（Google）"}</option>
+                        <option value="google/imagen-3">{lang === "en" ? "🌈 Imagen 4 (Google)" : "🌈 Imagen 4（Google）"}</option>
                       </select>
                     </div>
                     <div className="flex gap-2">

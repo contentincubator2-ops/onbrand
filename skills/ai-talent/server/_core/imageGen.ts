@@ -137,7 +137,11 @@ async function runGoogleImagen(
     .filter(Boolean);
   if (!pool.length) throw new Error("GEMINI_API_KEY not set");
   const apiKey = pool[Math.floor(Math.random() * pool.length)];
-  const model = process.env.IMAGE_GEN_MODEL_GOOGLE || "imagen-3.0-generate-002";
+  // 2026-05-18 (CJ「Imagen 3 產圖失敗」): ListModels on the prod key
+  // shows imagen-3.0-* is GONE (404 not_found for predict); only
+  // imagen-4.0-generate-001 / -fast / -ultra remain. Default to
+  // Imagen 4 so the "Imagen" choice works again.
+  const model = process.env.IMAGE_GEN_MODEL_GOOGLE || "imagen-4.0-generate-001";
 
   const aspect =
     size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";

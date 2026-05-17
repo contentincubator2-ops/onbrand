@@ -1311,7 +1311,7 @@ export default function RunPage() {
                     <option value="gpt-image-1">{lang === "en" ? "Photo-real — GPT Image-1 (15-25s, most photo-like)" : "寫實 — GPT Image-1（15-25 秒，最像照片）"}</option>
                     <option value="flux-realism">{lang === "en" ? "Photographic — Flux Realism (15-30s)" : "攝影感 — Flux Realism（15-30 秒）"}</option>
                     <option value="ideogram-v3">{lang === "en" ? "With text — Ideogram V3 (best in-image text)" : "含文字 — Ideogram V3（圖中文字最強）"}</option>
-                    <option value="imagen-3">Google Imagen 3</option>
+                    <option value="imagen-3">Google Imagen 4</option>
                   </select>
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
                     {lang === "en"
