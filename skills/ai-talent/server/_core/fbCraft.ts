@@ -118,6 +118,30 @@ const FB_TASK_REF: Record<string, string> = {
   "fb-60-ad-pack-3":
     "Dollar Shave Club 廣告包 (Webby Award Best Viral Campaign 2012；AICP Next Award 2012；全球最高 ROI 的品牌發表之一)：3 支覆蓋漏斗認知/考慮/轉換；共用 1 條 campaign 主軸；每支單獨完整。",
 
+  // ── 90s (squad-based: monthly / event / analytics / reels / crisis) ────
+  "fb-90-monthly-calendar":
+    "Coca-Cola「Share a Coke」多平台月曆策略 (Cannes Lions Grand Prix + Creative Effectiveness Grand Prix；80+ 國執行)：1 個可擁有主題錨整月；多格式混搭（影片/圖文/故事/直播）；UGC 鼓勵貫穿全月；每週一個高峰內容拉升整體觸及。",
+  "fb-90-monthly-calendar-promo":
+    "Oreo「Cookie of the Year」促銷月曆 (Shorty Award Best Brand in Food & Beverage + Cannes Lions Bronze Social 多年)：促銷月曆 = 懸念→揭示→行動三階段鋪陳；不只公告折扣，而是把每一週打造成有敘事弧的等待報酬。",
+  "fb-90-event-launch":
+    "Nike「Dream Crazy」全平台活動發表 (Cannes Lions Grand Prix Outdoor 2018；One Show Grand Prix 2019)：活動發表 = 1 個文化主張跨所有觸點；預告→發表日→後期 3 階段各有獨立鉤子；每件內容強化同一個核心訴求。",
+  "fb-90-countdown-series":
+    "HBO《Game of Thrones》最終季社群倒數 (Shorty Award Best in Entertainment 2019；創下 HBO 平台流量紀錄)：倒數系列 = 每天獨立 hook 不只是數字倒數——先給線索或問題，讓等待本身成為事件；社群集體期待累積 momentum。",
+  "fb-90-account-reposition":
+    "Burberry 數位品牌重定位 (Cannes Lions Grand Prix Cyber 2015；傳統奢侈品牌數位轉型標竿)：帳號重定位 = 一致的新視覺語言 × 新語氣 × 新互動機制同步推進；不是一次爆發而是持續訊號更新；每一則貼文都在重複新定位。",
+  "fb-90-quarterly-strategy":
+    "Red Bull 季度 Facebook 內容策略 (Shorty Award Best in Sports 多屆；Red Bull Media House 是 Facebook 最高觸及的能量飲料品牌)：季度策略 = 1 個一致 POV × 多格式探索；每月有主題弧；使用者生成內容（UGC）作為季中社群黏著劑；數據回顧驅動下季調整。",
+  "fb-90-monthly-analytics":
+    "HubSpot 社群內容績效框架 (CMO Survey Award Best Marketing Analytics Practice 2022；HubSpot 每月 Facebook 績效分析是行業引用最廣的 B2B 社群報告格式)：月度分析報告 = 原始數字→品牌意義解讀→可行動調整建議；不是數字清單而是決策文件；每個指標都連結到明確的業務目標。",
+  "fb-90-carousel-10frame":
+    "Airbnb「Experiences」Facebook 輪播廣告系列 (Cannes Lions Titanium Grand Prix 2014；Facebook 輪播廣告格式的早期標竿)：10 張輪播 = 封面承諾→中段深化每一個角度→末張 CTA；每張賺到滑動；視覺語言一致；最後一張是最強的單張還要加 CTA。",
+  "fb-90-reels-full":
+    "Duolingo Facebook/Instagram Reels 整合策略 (Shorty Award Best Brand Presence on TikTok 延伸至跨平台；Fast Company 最具創意品牌 2024)：Reels 完整腳本 = 前 3 秒 hook + promise + 主體 3 點 + 反差高潮 + loop/CTA；每秒有存在理由；靜音也能看懂；至少 1 個可截圖時刻。",
+  "fb-90-livestream-suite":
+    "Red Bull「Stratos」平流層跳傘 Facebook Live 套組 (Shorty Award Best in Sports 2013；打破 YouTube 直播同時在線紀錄)：直播套組 = 預告→直播錨→事後回顧；9 個節點各有不同再參與鉤子；直播事件 = 媒體財產，不只是一次播出；每階段訊息清晰獨立。",
+  "fb-90-crisis-full":
+    "Domino's Pizza「Pizza Turnaround」社群危機完整回應 (Effie Gold Crisis & Issue Management 2010；危機發生 48h 內用影片/Facebook 公開道歉重建信任的教科書)：危機完整 playbook = 承認→調查→修正→重建 4 階段各有內容策略；語氣從緊急危機管理逐漸回到品牌正常溫度；透明度是最強的危機文案策略。",
+
   // ── 99s ───────────────────────────────────────────────────────────────
   "fb-99-30day-calendar":
     "Coca-Cola「Share a Coke」30 天多平台月曆 (Cannes Lions Grand Prix + Creative Effectiveness Grand Prix；在超過 80 個國家執行)：1 個可擁有主題錨 30 天；多格式混搭；UGC 鼓勵貫穿全月。",
@@ -172,6 +196,16 @@ export function fbPlaybookFor(taskId: string): string {
     return P("輪播：封面承諾 payoff；每張一重點且視覺連貫；末張 CTA + 儲存誘因；5 張 = 完整故事弧。");
   if (/pinned-suite/.test(id))
     return P("置頂套組：品牌永久建構架構；組合回答「我是誰/做什麼/你為何在乎」；視覺一致性讓帳號看起來有策略。");
+
+  // ── 90s squad 任務（月曆/活動/品牌/分析/直播/危機）────────────────────
+  if (/account-reposition/.test(id))
+    return P("帳號重定位：新視覺語言 + 新語氣 + 新互動機制同步推進；每則貼文都是重複新定位的訊號；不是一次爆發而是持續一致的轉型訊號；包含前後對比建議。");
+  if (/quarterly-strategy/.test(id))
+    return P("季度策略：1 個一致 POV × 多格式探索；每月主題弧 + 高峰內容；UGC 機制作為季中社群黏著劑；月度數據回顧驅動下季調整建議。");
+  if (/monthly-analytics/.test(id))
+    return P("月度分析報告：原始數字→品牌意義解讀→可行動調整建議；每個指標連結明確業務目標；不是數字清單而是決策文件；格式：指標/趨勢/洞察/建議 4 欄。");
+  if (/monthly-calendar-promo/.test(id))
+    return P("促銷月曆：懸念→揭示→行動 3 階段鋪陳；不只公告折扣；每週打造有敘事弧的等待報酬；高峰日前 3 天預熱、後 1 天收尾。");
 
   // ── 99s 活動任務 ──────────────────────────────────────────────────────
   if (/30day-calendar/.test(id))

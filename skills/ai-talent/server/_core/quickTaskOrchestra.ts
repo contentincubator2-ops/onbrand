@@ -26,6 +26,11 @@ import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
 import { isLinkedInBodyTask, LI_CRAFT_RUBRIC, liPlaybookFor } from "./liCraft";
 import { isTikTokBodyTask, TT_CRAFT_RUBRIC, ttPlaybookFor } from "./ttCraft";
 import { isYouTubeBodyTask, YT_CRAFT_RUBRIC, ytPlaybookFor } from "./ytCraft";
+import { isPRBodyTask, PR_CRAFT_RUBRIC, prPlaybookFor } from "./prCraft";
+import { isBrandStrategyBodyTask, BR_CRAFT_RUBRIC, brPlaybookFor } from "./brCraft";
+import { isKOLBodyTask, KL_CRAFT_RUBRIC, klPlaybookFor } from "./klCraft";
+import { isResearchBodyTask, RS_CRAFT_RUBRIC, rsPlaybookFor } from "./rsCraft";
+import { isCrossplatformBodyTask, CW_CRAFT_RUBRIC, cwPlaybookFor } from "./cwCraft";
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
 import { getBrandRealContent } from "./brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
@@ -438,6 +443,23 @@ async function callOneVariant(args: {
   const ytBlock = isYouTubeBodyTask(template)
     ? `\n\n${YT_CRAFT_RUBRIC}\n\n${ytPlaybookFor(template.id)}\n`
     : "";
+  // 2026-05-17 (CJ「所有平台都要得獎工藝層」): PR / Brand Strategy / KOL /
+  // Research / Cross-Platform craft layers — same architecture as above.
+  const prBlock = isPRBodyTask(template)
+    ? `\n\n${PR_CRAFT_RUBRIC}\n\n${prPlaybookFor(template.id)}\n`
+    : "";
+  const brBlock = isBrandStrategyBodyTask(template)
+    ? `\n\n${BR_CRAFT_RUBRIC}\n\n${brPlaybookFor(template.id)}\n`
+    : "";
+  const klBlock = isKOLBodyTask(template)
+    ? `\n\n${KL_CRAFT_RUBRIC}\n\n${klPlaybookFor(template.id)}\n`
+    : "";
+  const rsBlock = isResearchBodyTask(template)
+    ? `\n\n${RS_CRAFT_RUBRIC}\n\n${rsPlaybookFor(template.id)}\n`
+    : "";
+  const cwBlock = isCrossplatformBodyTask(template)
+    ? `\n\n${CW_CRAFT_RUBRIC}\n\n${cwPlaybookFor(template.id)}\n`
+    : "";
 
   const docMode = template.outputMode === "document";
   const system = docMode
@@ -455,6 +477,11 @@ async function callOneVariant(args: {
       liBlock +
       ttBlock +
       ytBlock +
+      prBlock +
+      brBlock +
+      klBlock +
+      rsBlock +
+      cwBlock +
       strategistSection +
       `\n\n【本次只產 1 個變體】**${label}**：在不更動章節結構的前提下，` +
       `用此變體的風格詮釋（完整正式版＝最詳盡；精簡重點版＝每節更精煉；活動主題版＝圍繞本次活動主軸）。\n` +
@@ -480,6 +507,11 @@ async function callOneVariant(args: {
     liBlock +
     ttBlock +
     ytBlock +
+    prBlock +
+    brBlock +
+    klBlock +
+    rsBlock +
+    cwBlock +
     strategistSection +
     `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
     `${lengthHint}\n\n` +
