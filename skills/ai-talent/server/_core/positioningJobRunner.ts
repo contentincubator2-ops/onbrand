@@ -486,9 +486,15 @@ export async function finalizeBrandAfterPipeline(userId: number, brandId: number
   const sets: string[] = [];
   const params: any[] = [];
   const filled: Record<string, boolean> = {};
+  // 2026-05-17: derived values come from the new positioning.<segment>
+  // prose which is far longer than these LEGACY varchar columns →
+  // "Data too long for column 'audienceB'" threw and aborted finalize
+  // (status never flipped to completed). These columns are legacy
+  // fallbacks (agentContextLoader); a trimmed value is sufficient.
   const maybeSet = (col: string, val: string | null) => {
-    filled[col] = !!val;
-    if (val) { sets.push(`${col} = COALESCE(NULLIF(${col}, ''), ?)`); params.push(val); }
+    const v = val ? String(val).slice(0, 480) : val;
+    filled[col] = !!v;
+    if (v) { sets.push(`${col} = COALESCE(NULLIF(${col}, ''), ?)`); params.push(v); }
   };
   maybeSet("tagline", tagline);
   maybeSet("valueProposition", valueProposition);
@@ -507,6 +513,18 @@ export async function finalizeBrandAfterPipeline(userId: number, brandId: number
 
   const sql = `UPDATE brands SET ${sets.join(", ")} WHERE id = ? AND userId = ?`;
   params.push(brandId, userId);
-  const [res]: any = await localPool.execute(sql, params);
-  return { updated: Number(res?.affectedRows ?? 0), filled };
+  try {
+    const [res]: any = await localPool.execute(sql, params);
+    return { updated: Number(res?.affectedRows ?? 0), filled };
+  } catch (e) {
+    // Never let a legacy-column write block completion. The canonical
+    // data already lives in brands.positioning.<segment>; flip status
+    // so the user isn't told "not ready" over a legacy fallback column.
+    console.error("[positioningJobRunner] finalize flat-column UPDATE failed; status-only fallback:", (e as Error)?.message);
+    await localPool.execute(
+      `UPDATE brands SET positioningStatus='completed', onboardingStep=11, isEstimate=0 WHERE id = ? AND userId = ?`,
+      [brandId, userId],
+    );
+    return { updated: 1, filled };
+  }
 }

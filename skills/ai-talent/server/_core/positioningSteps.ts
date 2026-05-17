@@ -40,13 +40,23 @@ function costFor(inputTokens: number, outputTokens: number): number {
 }
 
 function safeJSON<T>(text: string, fallback: T): T {
-  try {
-    const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (m) return JSON.parse(m[1]!.trim());
-    return JSON.parse(text);
-  } catch {
-    return fallback;
+  const tryParse = (s: string): T | undefined => {
+    try { return JSON.parse(s); } catch { return undefined; }
+  };
+  const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw = (m ? m[1]! : text).trim();
+  let v = tryParse(raw);
+  if (v !== undefined) return v;
+  // 2026-05-17: heavy steps (e.g. competition) can truncate mid-JSON →
+  // parse fails → silent empty segment. Recover by slicing from the
+  // first { to the last balanced } and retrying before giving up.
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    v = tryParse(raw.slice(start, end + 1));
+    if (v !== undefined) return v;
   }
+  return fallback;
 }
 
 async function callJSON(ctx: StepContext, stepId: string, system: string, user: string, fallback: any, maxTokens = 1500): Promise<any> {
@@ -118,10 +128,10 @@ matrix 至少 5 個維度。`,
       deps: [],
       run: async (c) => ({
         competition: await callJSON(c, "competition", sys,
-          `${brandCtx(c)}\n\n分析此品牌的競爭格局。輸出 JSON，鍵名固定如下：
-{"intensity":"競爭強度評估（一段）","direct":[{"name":"競品名","position":"市場地位","tone":"品牌調性","weakness":"弱點","ourEdge":"我方差異點"}],"indirect":[{"name":"間接競品","threat":"威脅程度","response":"應對策略"}],"map":"競爭定位地圖描述（一段）"}
-direct 至少 2 個，indirect 至少 1 個。`,
-          { intensity: "", direct: [], indirect: [], map: "" }, 1500),
+          `${brandCtx(c)}\n\n分析此品牌的競爭格局。只輸出 JSON，鍵名固定如下：
+{"intensity":"競爭強度評估（2-3 句）","direct":[{"name":"競品名","position":"市場地位","tone":"品牌調性","weakness":"弱點（精簡一句）","ourEdge":"我方差異點（精簡一句）"}],"indirect":[{"name":"間接競品","threat":"威脅程度","response":"應對策略（精簡一句）"}],"map":"競爭定位地圖描述（2-3 句）"}
+direct 2-3 個、indirect 1-2 個；每個欄位精簡一句，控制總長度，務必輸出完整且可解析的 JSON。`,
+          { intensity: "", direct: [], indirect: [], map: "" }, 2600),
       }),
     },
     {
