@@ -771,6 +771,15 @@ ${importantHint}
             caption = caption.slice(1, -1).trim();
           }
         }
+        // 2026-05-17 (CJ「是否所有任務都按照規範」): same deterministic
+        // brand-rule enforcement as the quick-task orchestra, applied
+        // BEFORE persist + return so Theater cells also obey
+        // term_substitutions / banned_words.
+        try {
+          const { enforceBrandRulesOnText } = await import("../_core/brandContext");
+          const enforced = await enforceBrandRulesOnText(input.brandId, caption);
+          if (enforced && enforced !== caption) caption = enforced;
+        } catch { /* fail-safe: keep caption */ }
         // Auto-record into mission_outputs so /projects shows this cell.
         // Non-fatal: failure here doesn't break the user-facing response.
         if (caption) {

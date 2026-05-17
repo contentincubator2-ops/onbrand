@@ -1239,12 +1239,20 @@ export const quickTaskRouter = router({
         { role: "user", content: input.userFeedback },
       ];
       try {
-        const r = await callModel(messages, undefined, "qwen");
+        // 2026-05-17: was "qwen" (Chinese model, zh-TW policy violation)
+        // → anthropic for Taiwan-correct output.
+        const r = await callModel(messages, undefined, "anthropic");
         const text = (r.content ?? "").trim();
         // Split on triple newline to separate explanation from rewritten caption
         const parts = text.split(/\n\n\n+/);
         const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
-        const rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
+        let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
+        // Brand-rule hard enforcement: an inline rewrite must not
+        // reintroduce banned words / skip substitutions.
+        try {
+          const { enforceBrandRulesOnText } = await import("../_core/brandContext");
+          rewritten = await enforceBrandRulesOnText(input.brandId, rewritten);
+        } catch { /* fail-safe */ }
         return { explanation, rewritten, ok: true };
       } catch (e: any) {
         return { explanation: "", rewritten: "", ok: false, error: e?.message ?? String(e) };

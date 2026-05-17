@@ -74,6 +74,48 @@ export async function getBrandRuleAssets(
   } catch { return empty; }
 }
 
+/**
+ * 2026-05-17 (CJ「重新檢查，是否所有任務都按照規範」): the single
+ * deterministic brand-rule enforcement used by EVERY caption-output
+ * boundary (quick-task orchestra, Theater cell/polish, refineCaption).
+ * Apply term_substitutions (X→Y); if a banned word survives, rewrite
+ * once via anthropic with a hard "must not contain" instruction, then
+ * re-apply subs. Fail-safe: any error → returns the input unchanged.
+ */
+export async function enforceBrandRulesOnText(
+  brandId: number | undefined | null,
+  text: string,
+): Promise<string> {
+  if (!brandId || !text || !text.trim()) return text;
+  try {
+    const rules = await getBrandRuleAssets(brandId);
+    if (!rules.subs.length && !rules.banned.length) return text;
+    const applySubs = (t: string) => {
+      let s = t;
+      for (const { from, to } of rules.subs) if (from) s = s.split(from).join(to);
+      return s;
+    };
+    const bannedHits = (t: string) => rules.banned.filter((b) => b && t.includes(b));
+    let c = applySubs(text);
+    if (bannedHits(c).length) {
+      try {
+        const { invokeLLM } = await import("./llm");
+        const r: any = await invokeLLM({
+          provider: "anthropic",
+          messages: [{ role: "user", content:
+            `改寫以下文字。嚴禁出現這些詞：${bannedHits(c).join("、")}。` +
+            (rules.subs.length ? `並務必套用替換：${rules.subs.map((s) => `「${s.from}」改說「${s.to}」`).join("、")}。` : "") +
+            `保持原意、語氣、長度與換行，只輸出改寫後文字本身，不要前言：\n\n${c}` }],
+          maxTokens: 1200,
+        });
+        const rewritten = String(r?.content ?? r?.text ?? "").trim();
+        if (rewritten) c = applySubs(rewritten);
+      } catch { /* keep substituted version */ }
+    }
+    return c || text;
+  } catch { return text; }
+}
+
 export async function buildBrandPrefix(
   brandId: number | undefined | null,
   productId?: number | null,

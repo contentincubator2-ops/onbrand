@@ -19,7 +19,7 @@ import { dispatchGenerate } from "./mediaGen";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
-import { buildBrandPrefix as buildBrandContext, getBrandRuleAssets } from "./brandContext";
+import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText } from "./brandContext";
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
 import { getBrandRealContent } from "./brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
@@ -1183,34 +1183,10 @@ export async function runOrchestra(args: {
     // re-apply subs. Guarantees the checkable brand-brain rules.
     if (Array.isArray(captions) && captions.length && args.brandId) {
       try {
-        const rules = await getBrandRuleAssets(args.brandId);
-        if (rules.subs.length || rules.banned.length) {
-          const applySubs = (t: string) => {
-            let s = t;
-            for (const { from, to } of rules.subs) if (from) s = s.split(from).join(to);
-            return s;
-          };
-          const bannedHits = (t: string) => rules.banned.filter((b) => b && t.includes(b));
-          for (const v of captions) {
-            if (!v?.caption) continue;
-            let c = applySubs(v.caption);
-            if (bannedHits(c).length) {
-              try {
-                const { invokeLLM } = await import("./llm");
-                const r: any = await invokeLLM({
-                  provider: "anthropic",
-                  messages: [{ role: "user", content:
-                    `改寫以下文字。嚴禁出現這些詞：${bannedHits(c).join("、")}。` +
-                    (rules.subs.length ? `並務必套用替換：${rules.subs.map((s) => `「${s.from}」改說「${s.to}」`).join("、")}。` : "") +
-                    `保持原意、語氣、長度與換行，只輸出改寫後文字本身，不要前言：\n\n${c}` }],
-                  maxTokens: 1200,
-                });
-                const rewritten = String(r?.content ?? r?.text ?? "").trim();
-                if (rewritten) c = applySubs(rewritten);
-              } catch { /* keep substituted version */ }
-            }
-            if (c && c !== v.caption) v.caption = c;
-          }
+        for (const v of captions) {
+          if (!v?.caption) continue;
+          const enforced = await enforceBrandRulesOnText(args.brandId, v.caption);
+          if (enforced && enforced !== v.caption) v.caption = enforced;
         }
       } catch (e) {
         console.warn("[orchestra] brand-rule enforcement skipped:", (e as Error)?.message);
