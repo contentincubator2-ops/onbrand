@@ -16,7 +16,7 @@
  *   🪄 重生  🎚️ 設定  📋 複製  💾 存
  *   ↻ 重跑  ✕ 關閉
  */
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Avatar, Button, Card, CardBody, Chip, Spinner, Textarea, Tooltip,
@@ -82,6 +82,33 @@ export default function RunPage() {
   // so "再給我幾個" is instant and free.
   const REVEAL_STEP = 3;
   const [revealCount, setRevealCount] = useState(REVEAL_STEP);
+  // 2026-05-17 (CJ「下載成帶版型的簡報圖」): capture the mockup node.
+  const mockupRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+  const exportSlidePng = async () => {
+    const node = mockupRef.current;
+    if (!node) return;
+    setExporting(true);
+    try {
+      const h2c = (await import("html2canvas")).default;
+      const canvas = await h2c(node, {
+        backgroundColor: "#ffffff",
+        scale: 2,                 // retina-crisp slide
+        useCORS: true,
+        logging: false,
+      });
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      const safe = (data?.title ?? "ceo-speech").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
+      a.download = `${safe || "ceo-speech"}.png`;
+      a.click();
+    } catch (e) {
+      alert((lang === "en" ? "Export failed: " : "匯出失敗：") + String((e as any)?.message ?? e));
+    } finally {
+      setExporting(false);
+    }
+  };
   const [mode, setMode] = useState<Mode>("chat");
   const [focusedAgent, setFocusedAgent] = useState<"caption"|"image"|null>(null);
   const [editText, setEditText] = useState<string | null>(null);
@@ -822,7 +849,7 @@ export default function RunPage() {
       <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-4 items-start">
         {/* CENTER: pure mockup, no toolbar above (CJ direction 2026-05-09) */}
         <section className="min-w-0 flex flex-col gap-3">
-          <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
+          <div ref={mockupRef} className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
             {effectiveVariant && slide && (
               <PlatformMockup
                 variant={{ ...effectiveVariant, label: `${effectiveVariant.label} · ${slide.label}` }}
@@ -842,22 +869,34 @@ export default function RunPage() {
               download. Uses the current (edited) caption + the same
               <a download> blob pattern as the .ics export. */}
           {(effectiveVariant?.format as string) === "speech" && slide?.caption && (
-            <button
-              onClick={() => {
-                const md = slide.caption;
-                const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                const safe = (data.title ?? "ceo-speech").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
-                a.download = `${safe || "ceo-speech"}.md`;
-                a.click();
-                URL.revokeObjectURL(a.href);
-              }}
-              className="self-start px-4 py-2 rounded-lg text-tiny font-semibold text-white"
-              style={{ background: "#1f2a4d" }}
-            >
-              {lang === "en" ? "Download speech (.md)" : "下載講稿全文（.md）"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={exportSlidePng}
+                disabled={exporting}
+                className="px-4 py-2 rounded-lg text-tiny font-semibold text-white disabled:opacity-60"
+                style={{ background: "#1f2a4d" }}
+              >
+                {exporting
+                  ? (lang === "en" ? "Rendering…" : "產生簡報圖中…")
+                  : (lang === "en" ? "Download slide (PNG)" : "下載簡報圖（PNG）")}
+              </button>
+              <button
+                onClick={() => {
+                  const md = slide.caption;
+                  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(blob);
+                  const safe = (data.title ?? "ceo-speech").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
+                  a.download = `${safe || "ceo-speech"}.md`;
+                  a.click();
+                  URL.revokeObjectURL(a.href);
+                }}
+                className="px-4 py-2 rounded-lg text-tiny font-semibold border"
+                style={{ borderColor: "#1f2a4d", color: "#1f2a4d" }}
+              >
+                {lang === "en" ? "Speech text (.md)" : "講稿全文（.md）"}
+              </button>
+            </div>
           )}
         </section>
 

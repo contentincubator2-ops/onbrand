@@ -477,7 +477,7 @@ export function SpeechMockup({ title, brandName, variantLabel, liveTitle, liveCa
         <div className="px-8 py-3 border-t flex items-center justify-between text-[10px]"
           style={{ borderColor: "#eee", color: "#9aa0b4" }}>
           <span>{s.occasion || "企業致辭"}</span>
-          <span>可編輯 · 下載講稿全文於右側工具列</span>
+          <span>可編輯 · 下方可下載簡報圖（PNG）／講稿全文</span>
         </div>
       </div>
     </div>

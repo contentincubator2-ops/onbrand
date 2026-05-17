@@ -22,16 +22,17 @@
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "framer-motion": "^12.38.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^1.14.0",
+    "mdast-util-to-hast": "^13.2.0",
+    "micromark-util-sanitize-uri": "^2.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.1.0",
     "react-nice-avatar": "^1.5.0",
     "react-router-dom": "^6.22.0",
     "rehype-highlight": "^7.0.0",
-    "remark-gfm": "^4.0.1",
-    "micromark-util-sanitize-uri": "^2.0.0",
-    "mdast-util-to-hast": "^13.2.0"
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.28",
