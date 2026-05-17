@@ -303,16 +303,25 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     description: "5 個 CTA 按鈕文字 + 每個 CTA 的搭配情境建議",
     agent_id: 239024,             // Emerson Huang — VP Customer Value Optimization（funnel CTA）
     skill_slug: "fb-ad-copy",
-    primary_question: "想引導用戶做什麼動作？（購買 / 加入會員 / 預約 / 試用）",
-    primary_input: { key: "goal", placeholder: "例：希望用戶點到產品頁加入購物車", type: "text" },
+    // 2026-05-18 (CJ「只給一個但承諾五個 + 需要產品與動作才寫得有意義」):
+    // variants 1→5 (one CTA per variant). 30s 表單只送一個 input → 用單
+    // 一 textarea 同時收「要推的產品 + 想引導的動作」。
+    primary_question: "要推的產品/服務 + 想引導用戶做什麼動作？",
+    primary_input: { key: "context", placeholder: "例：SoWork AI 諮詢預約系統，想引導潛在客戶『預約 demo』", type: "textarea" },
     inputs: [
-      { key: "goal", label: "廣告目標", type: "text", required: true },
+      { key: "context", label: "要推的產品/服務 + 想引導的動作", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 5 個 FB 廣告 CTA 按鈕文字（每個 6-12 字）+ 50 字搭配情境說明。
-5 種 CTA 風格：① 急迫感（限時/數量）② 利益強調 ③ 軟性邀請（試/看/體驗）④ 對話感（聊聊/談談）⑤ 直接動作（購買/加入）
-caption 欄位用清單格式：「① CTA 文字 — 適合：（情境）」每行一個。${FB_TONE_SUFFIX}`,
+    systemPrompt: `根據用戶提供的「產品/服務 + 想引導的動作」，產出「一個」FB 廣告 CTA。
+依本變體的 CTA 風格（variantLabel）：
+- 急迫感：扣限時/數量/名額。
+- 利益強調：點出按下去馬上得到什麼。
+- 軟性邀請：試/看/體驗，低承諾。
+- 對話感：聊聊/談談，像找人說話。
+- 直接動作：購買/加入/預約，乾脆。
+輸出格式：第一行＝CTA 按鈕文字（6–12 字，貼合該產品與動作，不要泛用「了解更多」）；第二行＝「適合：<一句搭配情境>」。
+不要編號、不要解釋。${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
-    maxTokens: 500,
+    maxTokens: 150,
     outputDefaults: { platform: "facebook", post_type: "ad" },
   },
   {
@@ -328,11 +337,16 @@ caption 欄位用清單格式：「① CTA 文字 — 適合：（情境）」�
     inputs: [
       { key: "link_purpose", label: "連結目的 / 著陸頁主題", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 5 個 FB 連結廣告 description（每個 30 字內）。
-5 種切角：① 數據（價格/數量/時效）② 利益強調 ③ 信任強化（保固/評價）④ 急迫感 ⑤ 簡短直白
-caption 欄位放 5 個編號 description（每行一個）。${FB_TONE_SUFFIX}`,
+    // 2026-05-18 (CJ「只給一個但承諾五個」): variants 1→5, one per variant.
+    systemPrompt: `產出「一個」FB 連結廣告 description（30 字內），依本變體切角（variantLabel）：
+- 數據：價格/數量/時效。
+- 利益強調：點進去得到什麼。
+- 信任強化：保固/評價/背書。
+- 急迫感：限時/限量。
+- 簡短直白：最短、最直接。
+緊扣用戶提供的著陸頁主題，不要泛用。只輸出這一句 description，不要編號、不要解釋。${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
-    maxTokens: 350,
+    maxTokens: 90,
     outputDefaults: { platform: "facebook", post_type: "ad" },
   },
   {
@@ -633,28 +647,28 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     captionMaxChars: 220,
   },
   "fb-30-ad-cta": {
-    variants: 1,
+    variants: 5,
     images: 0,
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
     fluxSize: null,
     imageQualitySteps: 0,
-    variantLabels: ["5 種 CTA"],
-    captionMinChars: 50,
-    captionMaxChars: 500,
+    variantLabels: ["急迫感", "利益強調", "軟性邀請", "對話感", "直接動作"],
+    captionMinChars: 6,
+    captionMaxChars: 90,
   },
   "fb-30-ad-description": {
-    variants: 1,
+    variants: 5,
     images: 0,
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
     fluxSize: null,
     imageQualitySteps: 0,
-    variantLabels: ["5 種 description"],
-    captionMinChars: 30,
-    captionMaxChars: 350,
+    variantLabels: ["數據", "利益強調", "信任強化", "急迫感", "簡短直白"],
+    captionMinChars: 6,
+    captionMaxChars: 40,
   },
   "fb-30-pinned-short": {
     variants: 3,
