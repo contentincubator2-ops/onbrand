@@ -1,0 +1,41 @@
+name: Ops — Probe Google Imagen 3 (one-shot)
+
+# 2026-05-18 (CJ「用 Imagen 3 產圖失敗」): reveal the REAL HTTP error
+# from the imagen predict endpoint so we know if it's missing key /
+# 403 permission (free key can't use Imagen) / wrong model name.
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - run: |
+          set +e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV" 2>/dev/null; set +a
+          POOL="${GEMINI_API_KEY_POOL:-$GEMINI_API_KEY}"
+          KEY=$(echo "$POOL" | cut -d, -f1 | tr -d ' ')
+          MODEL="${IMAGE_GEN_MODEL_GOOGLE:-imagen-3.0-generate-002}"
+          echo "GEMINI key present? $([ -n "$KEY" ] && echo yes\(${#KEY}\ chars\) || echo NO)"
+          echo "model = $MODEL"
+          if [ -z "$KEY" ]; then echo "❌ no GEMINI_API_KEY — that's the failure"; exit 0; fi
+          echo ""
+          echo "── POST :predict (imagen) ──"
+          code=$(curl -s -o /tmp/im -w "%{http_code}" -X POST \
+            "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:predict?key=${KEY}" \
+            -H "Content-Type: application/json" \
+            --data '{"instances":[{"prompt":"a simple red circle on white"}],"parameters":{"sampleCount":1,"aspectRatio":"1:1"}}')
+          echo "HTTP $code"
+          head -c 600 /tmp/im; echo
+          echo ""
+          echo "── interpretation ──"
+          case "$code" in
+            200) echo "✅ Imagen works — failure is elsewhere (size/aspect/quota in app code)";;
+            400) echo "⚠ 400 — bad model name or params. Try IMAGE_GEN_MODEL_GOOGLE=imagen-3.0-generate-002 / -001";;
+            403) echo "🔴 403 — this API key has NO Imagen access (free-tier keys can't; needs a billing-enabled Google AI Studio / Vertex key)";;
+            404) echo "🔴 404 — model path/name wrong for this key's API surface";;
+            429) echo "🟡 429 — quota/rate limited";;
+            *)   echo "see body above";;
+          esac

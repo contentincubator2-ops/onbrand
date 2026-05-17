@@ -913,7 +913,7 @@ export default function RunPage() {
       <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-4 items-start">
         {/* CENTER: pure mockup, no toolbar above (CJ direction 2026-05-09) */}
         <section className="min-w-0 flex flex-col gap-3">
-          <div ref={mockupRef} className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
+          <div ref={mockupRef} className="relative bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
             {effectiveVariant && slide && (
               <PlatformMockup
                 variant={{ ...effectiveVariant, label: `${effectiveVariant.label} · ${slide.label}` }}
@@ -928,37 +928,42 @@ export default function RunPage() {
                 liveImageStatus={slide.imageStatus as any}
               />
             )}
+            {/* 2026-05-18 (CJ「下載圖示出現在圖片某個地方就好」): a small
+                download ICON floating over the mockup (top-right), instead
+                of a separate button below. fetch→blob forces a real save
+                (cross-origin PiAPI/storage); falls back to a new tab. */}
+            {slide?.imageUrl && slide?.imageStatus === "ready" && (
+              <button
+                title={lang === "en" ? "Download image" : "下載圖片"}
+                aria-label={lang === "en" ? "Download image" : "下載圖片"}
+                onClick={async () => {
+                  const url = slide.imageUrl as string;
+                  try {
+                    const res = await fetch(url, { mode: "cors" });
+                    const blob = await res.blob();
+                    const obj = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = obj;
+                    const safe = (data?.title ?? "image").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
+                    const ext = (blob.type.split("/")[1] || "png").split("+")[0];
+                    a.download = `${safe || "image"}.${ext}`;
+                    a.click();
+                    URL.revokeObjectURL(obj);
+                  } catch {
+                    window.open(url, "_blank", "noopener");
+                  }
+                }}
+                className="absolute top-3 right-3 z-20 flex items-center justify-center w-9 h-9 rounded-full shadow-md transition hover:scale-105"
+                style={{ background: "rgba(31,42,77,0.88)", color: "#fff", backdropFilter: "blur(2px)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+            )}
           </div>
-          {/* 2026-05-18 (CJ「圖片產出後不知道怎麼下載」): download the
-              generated AI image directly. fetch→blob handles cross-origin
-              (PiAPI/storage) where <a download> wouldn't force a save;
-              falls back to opening the image in a new tab. */}
-          {slide?.imageUrl && slide?.imageStatus === "ready" && (
-            <button
-              onClick={async () => {
-                const url = slide.imageUrl as string;
-                try {
-                  const res = await fetch(url, { mode: "cors" });
-                  const blob = await res.blob();
-                  const obj = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = obj;
-                  const safe = (data?.title ?? "image").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
-                  const ext = (blob.type.split("/")[1] || "png").split("+")[0];
-                  a.download = `${safe || "image"}.${ext}`;
-                  a.click();
-                  URL.revokeObjectURL(obj);
-                } catch {
-                  // CORS-blocked → open in a new tab so the user can long-press / right-click save
-                  window.open(url, "_blank", "noopener");
-                }
-              }}
-              className="self-start px-4 py-2 rounded-lg text-tiny font-semibold text-white"
-              style={{ background: "#1f2a4d" }}
-            >
-              {lang === "en" ? "Download image" : "下載圖片"}
-            </button>
-          )}
           {/* 2026-05-17 (CJ「可以讓用戶編輯後直接下載」): speech script
               download. Uses the current (edited) caption + the same
               <a download> blob pattern as the .ics export. */}
