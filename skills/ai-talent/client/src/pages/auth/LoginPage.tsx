@@ -97,20 +97,20 @@ export default function LoginPage() {
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
               {lang === "en"
-                ? "3× output with parallel AI agents"
-                : "多 Agent 並行執行，3 倍行銷產出效率"}
+                ? "168 tasks, each backed by a named award or market-proven case"
+                : "168 個任務，每個內建獨立得獎工藝案例"}
             </li>
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
               {lang === "en"
-                ? "Facebook, LinkedIn, YouTube — all in one"
-                : "Facebook、LinkedIn、YouTube 全管道整合"}
+                ? "FB · IG · TikTok · YouTube · Email · PR · Brand Strategy — all channels"
+                : "FB、IG、TikTok、YouTube、EDM、PR、品牌策略全管道"}
             </li>
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
               {lang === "en"
-                ? "Strategy to execution in a single flow"
-                : "A2A 架構，策略到執行一氣呵成"}
+                ? "Brand positioning locked — A2A strategy to execution, always on-brand"
+                : "品牌定位一鍵鎖定，A2A 策略到執行永遠 on-brand"}
             </li>
           </ul>
           {/* Language toggle on auth pages (pre-login users can't reach S-menu) */}
