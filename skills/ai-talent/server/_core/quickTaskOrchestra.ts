@@ -403,7 +403,11 @@ async function callOneVariant(args: {
   // award-grade craft rubric + per-use-case playbook appended after the
   // task instruction. Brand-agnostic craft (HOW); brand essence still
   // from the digest, hard rules from the post-gen enforcement layer.
-  const edmBlock = isEmailTask(template)
+  // 2026-05-17: inject the heavy rubric ONLY for full-body email tasks.
+  // Atomic fragments (subject-line / preview-text, 3 distinct angle
+  // variants in ≤30 chars) were homogenised by the big shared block —
+  // their own per-{label} prompt handles craft.
+  const edmBlock = isEmailBodyTask(template)
     ? `\n\n${EDM_CRAFT_RUBRIC}\n\n${edmPlaybookFor(template.id)}\n`
     : "";
 

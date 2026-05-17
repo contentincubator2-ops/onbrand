@@ -19,8 +19,12 @@ export const EMAIL_30S_TASKS: FBTaskTemplate[] = [
     primary_question: "這封 email 想讓人打開做什麼？",
     primary_input: { key: "context", placeholder: "例：通知新品上市 / 提醒未完成訂單 / 月報 / 邀請活動", type: "textarea" },
     inputs: [{ key: "context", label: "Email 目的 + 內容", type: "textarea", required: true }],
-    systemPrompt: `產出 Email 主旨。每變體 1 種策略（好奇心 / 數字 / 個人化）。
-規則：30 字內、避免 ALL CAPS、避免 ! 連發、避免 "FREE" "urgent" 等 spam 詞。
+    systemPrompt: `產出 1 個 Email 主旨，策略**固定為「{label}」這一種**：
+- 好奇心：製造資訊缺口/懸念，不把答案講白，讓人想點開。
+- 數字反差：用具體數字或對比張力（如「3 分鐘」「省 47%」「1 件事」）。
+- 個人化：針對收件人情境/身分/行為說話（如「給還在猶豫的你」）。
+**只能用「{label}」這個角度，必須與其他變體明顯不同，嚴禁混用或寫成通用主旨。**
+規則：30 字內、避免 ALL CAPS、避免 ! 連發、避免 "FREE"/"urgent" 等 spam 詞。只輸出主旨本身。
 ${EMAIL_TONE}`,
     preferredModel: "qwen", maxTokens: 250,
     outputDefaults: { platform: "email", post_type: "edm" },
@@ -34,8 +38,11 @@ ${EMAIL_TONE}`,
     primary_question: "subject 主旨是？",
     primary_input: { key: "subject", placeholder: "貼上你的 subject line", type: "textarea" },
     inputs: [{ key: "subject", label: "Subject + 內文摘要", type: "textarea", required: true }],
-    systemPrompt: `產出 Email preview text（80 字內）。每變體 1 種策略（懸念延伸 / 補充資訊 / 個人化）。
-preview 不要重複 subject 內容 — 要補強開信誘因。${EMAIL_TONE}`,
+    systemPrompt: `產出 1 個 Email preview text（80 字內），策略**固定為「{label}」這一種**：
+- 懸念延伸：延續主旨的懸念、再勾一下，不解答。
+- 補充資訊：補上主旨沒講的具體誘因（時間/數字/好處）。
+- 個人化：針對收件人情境/身分說話。
+**只能用「{label}」這個角度，必須與其他變體明顯不同。** preview 不要重複 subject 內容——要補強開信誘因。只輸出 preview 本身。${EMAIL_TONE}`,
     preferredModel: "qwen", maxTokens: 200,
     outputDefaults: { platform: "email", post_type: "edm" },
   },
