@@ -164,42 +164,42 @@ export default function LandingPage() {
       </section>
 
       {/* Award-craft (option B — marketing surface) */}
-      <section className=”bg-neutral-50 border-t border-neutral-200”>
-        <div className=”max-w-5xl mx-auto px-6 py-16”>
-          <p className=”text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-neutral-500 mb-3”>
-            {en ? “Built on award craft” : “內建 168 個得獎工藝案例”}
+      <section className="bg-neutral-50 border-t border-neutral-200">
+        <div className="max-w-5xl mx-auto px-6 py-16">
+          <p className="text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-neutral-500 mb-3">
+            {en ? "Built on award craft" : "內建 168 個得獎工藝案例"}
           </p>
-          <h2 className=”text-center text-2xl font-bold mb-3”>
+          <h2 className="text-center text-2xl font-bold mb-3">
             {en
-              ? “168 tasks. 168 unique named award or market-proven cases.”
-              : “168 個任務，每個對應一個命名得獎或市場成功案例”}
+              ? "168 tasks. 168 unique named award or market-proven cases."
+              : "168 個任務，每個對應一個命名得獎或市場成功案例"}
           </h2>
-          <p className=”text-center text-neutral-600 text-sm mb-10 max-w-2xl mx-auto”>
+          <p className="text-center text-neutral-600 text-sm mb-10 max-w-2xl mx-auto">
             {en
-              ? “Across Facebook, Instagram, TikTok, YouTube, Email, PR, LinkedIn, Brand Strategy, KOL, and Research — every task type encodes the transferable craft of a real documented award or industry-proven campaign, so your output reads like an expert wrote it, not a generic AI.”
-              : “涵蓋 Facebook、Instagram、TikTok、YouTube、Email、PR、LinkedIn、品牌策略、KOL、研究調查——每一種任務類型，都內建一個有公開記錄的得獎或市場驗證案例的「可轉移工藝」，讓產出像專家執行的，不是通用 AI 套版。”}
+              ? "Across Facebook, Instagram, TikTok, YouTube, Email, PR, LinkedIn, Brand Strategy, KOL, and Research — every task type encodes the transferable craft of a real documented award or industry-proven campaign, so your output reads like an expert wrote it, not a generic AI."
+              : "涵蓋 Facebook、Instagram、TikTok、YouTube、Email、PR、LinkedIn、品牌策略、KOL、研究調查——每一種任務類型，都內建一個有公開記錄的得獎或市場驗證案例的「可轉移工藝」，讓產出像專家執行的，不是通用 AI 套版。"}
           </p>
-          <div className=”grid gap-4 md:grid-cols-3 max-w-4xl mx-auto”>
+          <div className="grid gap-4 md:grid-cols-3 max-w-4xl mx-auto">
             {(en ? [
-              [“TikTok Hook”, “Duolingo @duolingo · Shorty Award Best Brand on TikTok”, “Character arc + unresolved tension: every clip is complete but makes you need the next one.”],
-              [“Welcome Email”, “Dropbox Onboarding · IAC Award Winner”, “Anchor on progress milestones, not discounts — the user feels they're completing their own task.”],
-              [“PR News Hook”, “Liquid Death · Clio Award Grand Prix”, “A slightly counter-intuitive claim makes journalists write the story themselves — 20× earned media vs. ad spend.”],
+              ["TikTok Hook", "Duolingo @duolingo · Shorty Award Best Brand on TikTok", "Character arc + unresolved tension: every clip is complete but makes you need the next one."],
+              ["Welcome Email", "Dropbox Onboarding · IAC Award Winner", "Anchor on progress milestones, not discounts — the user feels they're completing their own task."],
+              ["PR News Hook", "Liquid Death · Clio Award Grand Prix", "A slightly counter-intuitive claim makes journalists write the story themselves — 20× earned media vs. ad spend."],
             ] : [
-              [“TikTok 腳本”, “Duolingo @duolingo · Shorty Award 多屆最佳品牌”, “角色弧 + 未解張力：每支完整但讓人必須看下一集。”],
-              [“歡迎信”, “Dropbox 歡迎序列 · IAC Award 最佳 Onboarding”, “進度里程碑定錨，不是促銷——讓用戶覺得在完成自己的任務。”],
-              [“PR 新聞鉤”, “Liquid Death · Clio Award Grand Prix”, “反常識主張讓媒體自動報導，PR 曝光超過廣告投入 20 倍。”],
+              ["TikTok 腳本", "Duolingo @duolingo · Shorty Award 多屆最佳品牌", "角色弧 + 未解張力：每支完整但讓人必須看下一集。"],
+              ["歡迎信", "Dropbox 歡迎序列 · IAC Award 最佳 Onboarding", "進度里程碑定錨，不是促銷——讓用戶覺得在完成自己的任務。"],
+              ["PR 新聞鉤", "Liquid Death · Clio Award Grand Prix", "反常識主張讓媒體自動報導，PR 曝光超過廣告投入 20 倍。"],
             ]).map(([t, c, d]) => (
-              <div key={t} className=”bg-white rounded-2xl border border-neutral-200 p-6”>
-                <div className=”font-bold mb-1”>{t}</div>
-                <div className=”text-[11px] text-neutral-500 mb-3”>{c}</div>
-                <p className=”text-sm text-neutral-600 leading-relaxed”>{d}</p>
+              <div key={t} className="bg-white rounded-2xl border border-neutral-200 p-6">
+                <div className="font-bold mb-1">{t}</div>
+                <div className="text-[11px] text-neutral-500 mb-3">{c}</div>
+                <p className="text-sm text-neutral-600 leading-relaxed">{d}</p>
               </div>
             ))}
           </div>
-          <p className=”text-center text-[11px] text-neutral-400 mt-8”>
+          <p className="text-center text-[11px] text-neutral-400 mt-8">
             {en
-              ? “Transferable craft principles applied across 168 tasks. Not an award certification or endorsement; case names are illustrative references.”
-              : “可轉移工藝原則套用於 168 個任務，非得獎認證或案例背書；案例名稱為示意參考。”}
+              ? "Transferable craft principles applied across 168 tasks. Not an award certification or endorsement; case names are illustrative references."
+              : "可轉移工藝原則套用於 168 個任務，非得獎認證或案例背書；案例名稱為示意參考。"}
           </p>
         </div>
       </section>
