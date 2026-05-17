@@ -19,7 +19,7 @@ jobs:
             (async () => {
               const { default: pool } = await import('./server/localDb.ts');
               const [b] = await pool.query(
-                \"SELECT id, userId, name, brandName, positioningStatus, onboardingStep, isEstimate, CHAR_LENGTH(COALESCE(positioning,'')) AS posLen, CHAR_LENGTH(COALESCE(soworkAnalysis,'')) AS swLen, LEFT(COALESCE(tagline,''),60) AS tagline FROM brands WHERE name LIKE '%${{ github.event.inputs.brand_name }}%' OR brandName LIKE '%${{ github.event.inputs.brand_name }}%' ORDER BY id DESC LIMIT 5\");
+                \"SELECT id, userId, name, positioningStatus, onboardingStep, CHAR_LENGTH(COALESCE(positioning,'')) AS posLen FROM brands WHERE name LIKE '%${{ github.event.inputs.brand_name }}%' ORDER BY id DESC LIMIT 5\");
               for (const r of b) {
                 console.log('BRAND', JSON.stringify(r));
                 let posKeys = '(none)', assetKeys = '(none)';
