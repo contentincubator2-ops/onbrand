@@ -110,12 +110,18 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           </a>
         ) : (
           liveImageUrl && liveImageStatus === "ready" ? (
-            // Plan B: real generated image (Flux Schnell) — render directly
-            <div className="aspect-[16/9] bg-default-100 overflow-hidden relative">
+            // 2026-05-18 (CJ「指令寫 1:1 但 mockup 用自己的比例裁切」):
+            // was a hard aspect-[16/9] + object-cover that CROPPED a
+            // square/portrait generated image. Show the real generated
+            // image at its NATURAL ratio (the gen ratio = the task's
+            // fluxSize, e.g. square_hd → 1:1). object-contain + capped
+            // height so a tall image doesn't blow the card.
+            <div className="bg-default-100 overflow-hidden relative flex items-center justify-center">
               <img
                 src={liveImageUrl}
                 alt={liveImageStyle ?? "Generated image"}
-                className="w-full h-full object-cover"
+                className="w-full h-auto object-contain"
+                style={{ maxHeight: 560 }}
               />
               {liveImageStyle && (
                 <div className="absolute bottom-2 left-2 right-2 bg-black/55 backdrop-blur-sm rounded px-2 py-1">
