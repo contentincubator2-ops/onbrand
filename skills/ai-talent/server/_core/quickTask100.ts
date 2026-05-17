@@ -324,8 +324,17 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     primary_question: "Launch 主題？",
     primary_input: { key: "launch_topic", placeholder: "新品 / 募資 / 重大合作", type: "textarea" },
     inputs: [{ key: "launch_topic", label: "Launch 主題", type: "textarea", required: true }],
-    systemPrompt: `產出 PR launch toolkit 其中 1 部分（300-700 字）。
-本次你寫的是「{label}」（新聞稿 / Q&A / 媒體聯絡 / 後續追蹤 / Spokesperson talking points）。${TONE_100}`,
+    // 2026-05-17 (CJ「參考 PR 獎項得獎工藝」): earned-media craft inline
+    // (TONE_100 is shared with non-PR toolkits — must not globally edit).
+    systemPrompt: `產出 PR launch toolkit 其中 1 部分（300–700 字）。本次你寫的是「{label}」（新聞稿 / Q&A / 媒體聯絡 / 後續追蹤 / Spokesperson talking points）。
+
+【earned-media 工藝 — 每一部分都適用】
+- 先找「新聞鉤」：這個 launch 為什麼值得被報導？最強角度是什麼？整套 toolkit 都圍繞這一個鉤，不要每部分各說各話。
+- 通過記者測試：記者會主動選擇報嗎？用可查證事實（數字/名字/日期/第三方背書）贏得關注，不用形容詞宣稱。沒有的事實標「[待補]」，不杜撰。
+- 扣文化與時機：點出「為什麼是現在」，連結此刻受眾已在乎的事。
+- 倒金字塔、客觀第三人稱（社群/talking points 可口語但事實一致）；句子寫成記者能原句引用。
+- 禁 buzzword、「業界領先／顛覆」、「我們很高興宣布」、暖身式開頭。
+- 各部分要能互相銜接成一套（新聞稿的角度＝pitch 賣的角度＝Q&A 防守的點＝talking points 的金句）。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1300,
     outputDefaults: { platform: "press", post_type: "press" },
   },

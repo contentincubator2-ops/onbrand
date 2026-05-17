@@ -5,10 +5,19 @@
  */
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 
+// 2026-05-17 (CJ「參考 PR 獎項得獎工藝，強化所有新聞稿任務」):
+// shared earned-media craft prepended to every PR task. Distilled from
+// what Cannes Lions PR / PR Awards Asia / Marketing-Interactive PR
+// reward (general industry knowledge applied — award pages NOT executed).
 const PR_TONE = `
-新聞稿要客觀、第三人稱、倒金字塔結構（重要事實在前）。
-不要過度形容詞、不要「業界領導」這種陳腔濫調。
-記者偏好可直接引用的數字 + 名字 + 時間 + 地點。`;
+【共同準則 — earned-media 工藝】
+1. 通過「記者測試」：記者會不會主動選擇報導這件事？要用事實贏得關注，不是用形容詞宣稱關注。寫之前先想「so what／為什麼是現在」，並把它放第一句。
+2. 具體勝過修辭：用數字、名字、日期、第三方背書取代形容詞。沒有可查證事實寧可標「[待補]」也不要灌水，絕不杜撰。
+3. 文化與時機連結：扣住此刻人們已經在乎的事（趨勢、節點、社會情緒），讓新聞「可被傳播」而非只是「被發出」。
+4. 一個銳利角度：聚焦單一最強角度，不要把所有訊息塞進去。
+5. 客觀、第三人稱、倒金字塔（最重要的事實在最前，往後刪不影響理解）。
+6. 可被原句引用：寫成記者能直接 copy 進報導的句子。
+7. 禁：過度形容詞、buzzword、「業界領導／顛覆／革命性」、「我們很高興／自豪宣布」、暖身式開頭（近年來／隨著／在這個…時代）。`;
 
 export const PR_30S_TASKS: FBTaskTemplate[] = [
   {
@@ -58,7 +67,12 @@ ${PR_TONE}`,
     primary_question: "標題重點 + 想擴充什麼面向？",
     primary_input: { key: "context", placeholder: "標題 + 你想引申的", type: "textarea" },
     inputs: [{ key: "context", label: "標題 + 引申", type: "textarea", required: true }],
-    systemPrompt: `產出新聞稿副標（30-80 字）。每變體 1 種延伸（影響面 / 規模 / 時程）。
+    systemPrompt: `產出新聞稿副標 / 引言（subhead，30–80 字）。
+副標的工作：在標題之外「加一個記者沒料到的角度」，讓人更想讀內文——不是把標題換句話再講一次。
+- 補標題沒講的那層：影響面（對誰造成什麼改變）、規模（多大／多快／多少）、或時程（為什麼是現在／接下來會怎樣）。
+- 一定要帶一個標題裡沒出現過的具體事實或數字。
+- 不與標題重複用詞；讀起來像「延伸」不是「重述」。
+每個變體一種延伸角度（影響面 / 規模 / 時程）。
 ${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 200,
     outputDefaults: { platform: "press", post_type: "press-release" },
@@ -158,9 +172,10 @@ ${PR_TONE}`,
     primary_question: "公司核心業務 / 規模 / 重要里程碑？",
     primary_input: { key: "context", placeholder: "業務 + 規模 + 創辦時間 + 主要產品", type: "textarea" },
     inputs: [{ key: "context", label: "公司資料", type: "textarea", required: true }],
-    systemPrompt: `產出 boilerplate（150-250 字）。
-結構：1 句定位 → 主要產品 / 服務 → 規模（員工 / 客戶數 / 營收）→ 重要里程碑 → 聯絡方式。
-不要"業界領先"、"全球頂尖"這種空話。${PR_TONE}`,
+    systemPrompt: `產出新聞稿底部「關於 XXX」boilerplate（150–250 字，一段或兩段）。
+這是會被原封不動轉貼到每一篇報導末尾的固定段落——必須事實精準、可長期沿用、不過期。
+結構：第一句用「可驗證的事實」定位公司（在做什麼、服務誰），不要用願景或形容詞當定位 → 核心產品/服務 → 規模（成立年、員工/客戶/用戶數、營收或市佔，能查證才寫）→ 1–2 個關鍵里程碑或第三方背書（獲獎、認證、知名客戶）→ 官網/媒體聯絡。
+記者引用 boilerplate 是要「交代這家公司是誰」，所以具體可查證 > 動聽。${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 500,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
@@ -218,9 +233,16 @@ ${PR_TONE}`,
     primary_question: "新聞主題 + 為何這個記者會感興趣？",
     primary_input: { key: "context", placeholder: "新聞主題 + 記者過往報導 + 為何相關", type: "textarea" },
     inputs: [{ key: "context", label: "Pitch 脈絡", type: "textarea", required: true }],
-    systemPrompt: `產出 media pitch email（120-200 字）。
-結構：subject 30 字內 → 第一句 personalize（提到他過去寫的 XX 文章）→ 我們有 X，跟你寫的 Y 有什麼關係 → 1 個 hook 數字 → 我可以提供（採訪 / 獨家 / 數據）→ 期限。
-${PR_TONE}`,
+    systemPrompt: `產出 media pitch email（總長 120–200 字，越短越強）。
+這封信只有一個目的：讓這位記者覺得「這是寫給我的、而且值得我報」。得獎級 pitch 的共通點是「站在記者的讀者角度賣角度，不是賣公司」。
+結構：
+- Subject ≤30 字：直接是新聞角度＋一個具體鉤子（數字/名字），不要寫「新聞稿」「邀請報導」這種字。
+- 第一句 personalize：具體提到這位記者寫過的某篇/某主題，並說明「為什麼這條新聞延續他關心的線」。
+- 一句話講清楚 news 是什麼＋為什麼現在（so what）。
+- 一個 hook 數字或獨家點（他在別處拿不到的）。
+- 明確 offer：可給專訪 / 獨家 / 第一手數據 / 受訪者，二選一即可，不要全給。
+- 一句行動與時間（embargo / 截稿前）。
+語氣像人對人，不是新聞稿；不要附整篇稿，只賣角度。${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 500,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
@@ -279,8 +301,14 @@ ${PR_TONE}`,
     primary_question: "新聞主題 + 想讓社群點進新聞稿做什麼？",
     primary_input: { key: "context", placeholder: "新聞核心 + CTA", type: "textarea" },
     inputs: [{ key: "context", label: "新聞 + CTA", type: "textarea", required: true }],
-    systemPrompt: `產出新聞同步社群文（每變體 1 個平台口吻：FB / LinkedIn / Threads）。
-規則：100-200 字、第一句鉤子（不要"我們今天宣布..."）、含 1 個數字或名字、CTA 連結到完整新聞稿。
+    systemPrompt: `產出新聞發布同步社群文（每變體 1 個平台口吻：FB / LinkedIn / Threads）。
+這是新聞稿發出當天，品牌官方帳號用「人話」把新聞推出去、引導點進完整稿。社群版要做新聞稿做不到的事：有觀點、有情緒、可被分享。
+規則：
+- 100–200 字。第一句是鉤子或一個反直覺事實，不要「我們今天宣布／很高興分享」。
+- 用第一人稱品牌口吻（社群可以有態度，不必第三人稱），但事實仍須與新聞稿一致。
+- 含 1 個具體數字或名字；點出「對讀者而言為什麼值得在意」。
+- 平台差異：FB 口語帶情緒、LinkedIn 講產業意義與專業觀點、Threads 短句直接有梗。
+- 結尾一個明確 CTA，連到完整新聞稿。
 ${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 700,
     outputDefaults: { platform: "press", post_type: "press-release" },
