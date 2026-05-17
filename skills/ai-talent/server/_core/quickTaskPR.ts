@@ -72,9 +72,34 @@ ${PR_TONE}`,
     primary_question: "事件的 5W1H？",
     primary_input: { key: "event", placeholder: "誰 / 做了什麼 / 何時 / 何地 / 為何 / 如何", type: "textarea" },
     inputs: [{ key: "event", label: "5W1H 細節", type: "textarea", required: true }],
-    systemPrompt: `產出新聞稿第一段（lead，80-150 字）。
-規則：第一句必須包含 What + Who + When + Where；第二句補 Why；第三句補 How（如果重要）。
-不要繞、不要鋪陳、不要"近年來..."這種廢話開頭。${PR_TONE}`,
+    // 2026-05-17 (CJ): rewritten with press-release first-line / lead
+    // craft (general PR best practice applied; page used as reference,
+    // not executed).
+    systemPrompt: `你在寫新聞稿的「導言第一段」——記者掃過信件、決定「這值不值得我往下讀」就看這幾句。
+
+第一句（最關鍵，決定生死）：
+- 直接是新聞本身：WHAT + WHO 放最前面，緊接 WHEN / WHERE；不要用公司名或「很高興宣布」開場。
+- 一句講完，控制在 35 字內，能單獨成立——記者只讀這一句也抓得到完整故事。
+- 內含一個具體錨點：數字 / 規模 / 金額 / 名字 / 日期（必須來自輸入事實，不可杜撰）。
+- 句子本身要回答「為什麼這值得現在被報導」，不是事後補。
+
+第二、三句（支撐，總長 80–170 字）：
+- 第二句補 WHY（意義 / 影響面），第三句補 HOW 或規模延伸（若重要才寫）。
+- 倒金字塔：重要性遞減，後面刪掉也不影響理解。
+
+絕對禁止的開頭與寫法：
+- 「近年來…」「隨著…」「在這個…的時代」「X 公司很高興 / 自豪地宣布」這類暖身。
+- 被動語態、堆形容詞、buzzword、「業界領先 / 顛覆 / 革命性」。
+- 反問、感嘆、設問句當開頭。
+
+自我檢查：記者能不能幾乎原句拿去當報導第一段？不行就重寫。
+
+每個變體用 variantLabel 的不同 lead 角度切入：
+- 事實密度型：單位時間塞進最多可查證事實，最像通訊社電頭。
+- 影響面型：第一句就點出對市場 / 用戶 / 產業的具體改變。
+- 故事感型：用一個具體場景或人物動作開場，但第一句仍須含 WHAT+WHO（不可純情境鋪陳）。
+
+只輸出導言段落本身，不要標題、不要前綴、不要解釋。${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 400,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
@@ -210,7 +235,7 @@ export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // zero extra cost/latency. captionMax tightened to one-line headline.
   "pr-30-headline":           { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實式", "數據式", "突破式", "影響式", "引述式", "時機式", "對比式", "懸念式"], captionMinChars: 12, captionMaxChars: 42 },
   "pr-30-subhead":            { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["影響面", "規模延伸", "時程感"], captionMinChars: 30, captionMaxChars: 80 },
-  "pr-30-lead-paragraph":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實密度型", "影響面型", "故事感型"], captionMinChars: 80, captionMaxChars: 200 },
+  "pr-30-lead-paragraph":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實密度型", "影響面型", "故事感型"], captionMinChars: 70, captionMaxChars: 180 },
   "pr-30-ceo-quote":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["願景式", "客戶價值", "市場觀察"], captionMinChars: 60, captionMaxChars: 150 },
   "pr-30-boilerplate":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品導向", "規模導向", "里程碑導向"], captionMinChars: 150, captionMaxChars: 300 },
   "pr-30-fact-sheet":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品優先", "公司優先", "市場優先"], captionMinChars: 200, captionMaxChars: 600 },
