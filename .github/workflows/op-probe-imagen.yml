@@ -30,6 +30,11 @@ jobs:
           echo "HTTP $code"
           head -c 600 /tmp/im; echo
           echo ""
+          echo "── ListModels: image-capable models this key supports ──"
+          curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${KEY}&pageSize=200" \
+            | tr ',' '\n' | grep -iE '"name"|imagen|image-gen|generateimage|predict' \
+            | grep -iE 'imagen|image' | head -30
+          echo ""
           echo "── interpretation ──"
           case "$code" in
             200) echo "✅ Imagen works — failure is elsewhere (size/aspect/quota in app code)";;
