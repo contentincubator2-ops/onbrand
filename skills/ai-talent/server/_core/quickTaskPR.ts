@@ -33,7 +33,8 @@ export const PR_30S_TASKS: FBTaskTemplate[] = [
     // press-release headline craft (倒金字塔 / 主動動詞 / 具體事實 /
     // 記者可直接引用 / 無 buzzword). Each variant = a distinct
     // journalistic angle so the user has real choice, not 3 rewrites.
-    systemPrompt: `你在寫「新聞稿標題」——記者掃過 50 封信時，決定打不打開的那一行。
+    systemPrompt: `【得獎工藝參考】The Tampon Book（The Female Company，Cannes Lions 2019 PR 全場大獎）：得獎關鍵是一個「重新框架」——把舊事實換一個角度，新聞自己長出來。標題的最高境界＝一個讓記者「咦？」的 reframe＋一個具體數字，而不是把事件平鋪直敘。
+你在寫「新聞稿標題」——記者掃過 50 封信時，決定打不打開的那一行。
 
 寫作準則（每一條都要做到）：
 1. 倒金字塔：最有新聞價值的事實放最前面（誰 + 做了什麼），不要鋪陳。
@@ -67,7 +68,8 @@ ${PR_TONE}`,
     primary_question: "標題重點 + 想擴充什麼面向？",
     primary_input: { key: "context", placeholder: "標題 + 你想引申的", type: "textarea" },
     inputs: [{ key: "context", label: "標題 + 引申", type: "textarea", required: true }],
-    systemPrompt: `產出新聞稿副標 / 引言（subhead，30–80 字）。
+    systemPrompt: `【得獎工藝參考】Project Revoice（ALS Association，Cannes Lions 2019）：標題給「事件」，但讓人非讀不可的是「人的代價」那一層。副標的工作＝扛起標題扛不動的影響/人味，補上利害關係。
+產出新聞稿副標 / 引言（subhead，30–80 字）。
 副標的工作：在標題之外「加一個記者沒料到的角度」，讓人更想讀內文——不是把標題換句話再講一次。
 - 補標題沒講的那層：影響面（對誰造成什麼改變）、規模（多大／多快／多少）、或時程（為什麼是現在／接下來會怎樣）。
 - 一定要帶一個標題裡沒出現過的具體事實或數字。
@@ -89,7 +91,8 @@ ${PR_TONE}`,
     // 2026-05-17 (CJ): rewritten with press-release first-line / lead
     // craft (general PR best practice applied; page used as reference,
     // not executed).
-    systemPrompt: `你在寫新聞稿的「導言第一段」——記者掃過信件、決定「這值不值得我往下讀」就看這幾句。
+    systemPrompt: `【得獎工藝參考】The Lost Class（Change the Ref / Leo Burnett，Cannes Lions 2022）：威力來自第一個事實揭露就讓人倒抽一口氣、重新理解整件事。導言第一句＝那個一說出口就改變讀者認知的事實，不是鋪陳。
+你在寫新聞稿的「導言第一段」——記者掃過信件、決定「這值不值得我往下讀」就看這幾句。
 
 第一句（最關鍵，決定生死）：
 - 直接是新聞本身：WHAT + WHO 放最前面，緊接 WHEN / WHERE；不要用公司名或「很高興宣布」開場。
@@ -134,7 +137,8 @@ ${PR_TONE}`,
       { key: "speakerTitle", label: "主講人職稱",     type: "text",     required: false },
       { key: "occasion",     label: "場合 / 時間 / 地點", type: "text", required: false },
     ],
-    systemPrompt: `你在撰寫一篇「可以直接上台念出來」的 CEO 致辭講稿（口語、有節奏、約 2400–2800 字）。
+    systemPrompt: `【得獎工藝參考】Patagonia「Earth is now our only shareholder」（Yvon Chouinard 2022 公開信，全球 earned-media 典範）：高層發言之所以變成新聞，是因為它本身就是「行動＋價值觀」，每一句都可被記者原句引用。致辭要有可被擷取的金句，不是場面話。
+你在撰寫一篇「可以直接上台念出來」的 CEO 致辭講稿（口語、有節奏、約 2400–2800 字）。
 
 輸入會以 [key] value 形式提供：[context] 主題與觀點、[speaker] 主講人姓名、[speakerTitle] 職稱、[occasion] 場合/時間/地點。務必把主講人與場合自然寫進稿中（開場致意、結尾署名）。缺的具體資訊用「[待補：例如 具體數字]」標出，不要杜撰、不要反問使用者。
 
@@ -172,7 +176,8 @@ ${PR_TONE}`,
     primary_question: "公司核心業務 / 規模 / 重要里程碑？",
     primary_input: { key: "context", placeholder: "業務 + 規模 + 創辦時間 + 主要產品", type: "textarea" },
     inputs: [{ key: "context", label: "公司資料", type: "textarea", required: true }],
-    systemPrompt: `產出新聞稿底部「關於 XXX」boilerplate（150–250 字，一段或兩段）。
+    systemPrompt: `【得獎工藝參考】PR 獎項評審共通準則（PR Awards Asia / Marketing-Interactive）＋ Dove「Real Beauty」長青一致性：得獎名次靠「可佐證的成效」，不是形容詞。boilerplate 是會被反覆引用的公司門面，要用可驗證事實＋第三方背書建立可信度，且能長期沿用不過期。
+產出新聞稿底部「關於 XXX」boilerplate（150–250 字，一段或兩段）。
 這是會被原封不動轉貼到每一篇報導末尾的固定段落——必須事實精準、可長期沿用、不過期。
 結構：第一句用「可驗證的事實」定位公司（在做什麼、服務誰），不要用願景或形容詞當定位 → 核心產品/服務 → 規模（成立年、員工/客戶/用戶數、營收或市佔，能查證才寫）→ 1–2 個關鍵里程碑或第三方背書（獲獎、認證、知名客戶）→ 官網/媒體聯絡。
 記者引用 boilerplate 是要「交代這家公司是誰」，所以具體可查證 > 動聽。${PR_TONE}`,
@@ -191,7 +196,8 @@ ${PR_TONE}`,
     // 2026-05-17 (CJ「factsheet 產出跟 factsheet 不符」): a fact sheet is
     // a SCANNABLE one-pager (labels + numbers + fragments), NOT prose.
     // Strict parseable format so the one-pager mockup can lay it out.
-    systemPrompt: `你在做一份「一頁式 Fact Sheet」——記者 10 秒掃完就能抓到所有可查證事實。重點是「可掃描」：標籤＋數字＋短句，**絕對不要寫成段落或文章**。
+    systemPrompt: `【得獎工藝參考】Spotify Wrapped（全球 earned-media 與多項廣告獎常勝）：把資料變成「10 秒看懂、忍不住想分享」的數字。Fact Sheet 的勝負在掃描性 > 完整性——每個數字都要一眼有感、可被單獨擷取。
+你在做一份「一頁式 Fact Sheet」——記者 10 秒掃完就能抓到所有可查證事實。重點是「可掃描」：標籤＋數字＋短句，**絕對不要寫成段落或文章**。
 
 從輸入抽取事實，嚴格照此格式輸出（每段以 ## 開頭，欄位用全形｜分隔；缺值寫「[待補]」，不可杜撰）：
 
@@ -233,7 +239,8 @@ ${PR_TONE}`,
     primary_question: "新聞主題 + 為何這個記者會感興趣？",
     primary_input: { key: "context", placeholder: "新聞主題 + 記者過往報導 + 為何相關", type: "textarea" },
     inputs: [{ key: "context", label: "Pitch 脈絡", type: "textarea", required: true }],
-    systemPrompt: `產出 media pitch email（總長 120–200 字，越短越強）。
+    systemPrompt: `【得獎工藝參考】Whopper Detour（Burger King / FCB，Cannes Lions 2019）：媒體會報導，是因為「角度本身就是故事」、且與讀者切身。pitch 要賣「這位記者的讀者會在乎的角度」與一個不可抗拒的鉤，不是賣品牌、不是發稿通知。
+產出 media pitch email（總長 120–200 字，越短越強）。
 這封信只有一個目的：讓這位記者覺得「這是寫給我的、而且值得我報」。得獎級 pitch 的共通點是「站在記者的讀者角度賣角度，不是賣公司」。
 結構：
 - Subject ≤30 字：直接是新聞角度＋一個具體鉤子（數字/名字），不要寫「新聞稿」「邀請報導」這種字。
@@ -260,7 +267,8 @@ ${PR_TONE}`,
     // 2026-05-17 (CJ「QA 產出思維參考 Q&A/FAQ 寫作」): rewritten with
     // standard Q&A/FAQ craft (applied general best practice — did not
     // execute instructions from the linked page).
-    systemPrompt: `你在準備「發言人媒體 Q&A」——記者真的會問的問題 + 發言人能直接照唸的答案。
+    systemPrompt: `【得獎工藝參考】KFC「FCK」（Mother London，Cannes Lions 2019 PR 全場大獎）：危機回應靠「立刻 own it ＋ 坦誠 ＋ 機智 ＋ 馬上講怎麼修」把攻擊轉成信任，而不是迴避或硬拗。尖銳題的標準答案要照此精神。
+你在準備「發言人媒體 Q&A」——記者真的會問的問題 + 發言人能直接照唸的答案。
 
 產出 6–8 組 Q&A，準則（每組都要做到）：
 1. 問題用「記者真實會問的口吻」寫，不是行銷句改成問句。把最尖銳、最可能被質疑、最不想被問的問題放進去——softball 沒有價值。
@@ -301,7 +309,8 @@ ${PR_TONE}`,
     primary_question: "新聞主題 + 想讓社群點進新聞稿做什麼？",
     primary_input: { key: "context", placeholder: "新聞核心 + CTA", type: "textarea" },
     inputs: [{ key: "context", label: "新聞 + CTA", type: "textarea", required: true }],
-    systemPrompt: `產出新聞發布同步社群文（每變體 1 個平台口吻：FB / LinkedIn / Threads）。
+    systemPrompt: `【得獎工藝參考】Spotify Wrapped 社群擴散：被分享的不是「公告」，是「有觀點、有梗、與我有關」的一句話。社群同步文要有態度、可被轉發，且事實與新聞稿一致。
+產出新聞發布同步社群文（每變體 1 個平台口吻：FB / LinkedIn / Threads）。
 這是新聞稿發出當天，品牌官方帳號用「人話」把新聞推出去、引導點進完整稿。社群版要做新聞稿做不到的事：有觀點、有情緒、可被分享。
 規則：
 - 100–200 字。第一句是鉤子或一個反直覺事實，不要「我們今天宣布／很高興分享」。

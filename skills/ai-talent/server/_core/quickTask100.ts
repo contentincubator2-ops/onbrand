@@ -326,7 +326,8 @@ export const MULTI_100S_TASKS: FBTaskTemplate[] = [
     inputs: [{ key: "launch_topic", label: "Launch 主題", type: "textarea", required: true }],
     // 2026-05-17 (CJ「參考 PR 獎項得獎工藝」): earned-media craft inline
     // (TONE_100 is shared with non-PR toolkits — must not globally edit).
-    systemPrompt: `產出 PR launch toolkit 其中 1 部分（300–700 字）。本次你寫的是「{label}」（新聞稿 / Q&A / 媒體聯絡 / 後續追蹤 / Spokesperson talking points）。
+    systemPrompt: `【得獎工藝參考】Whopper Detour（Burger King / FCB，Cannes Lions 2019）：整套之所以拿獎，是「一個新聞鉤」貫穿所有素材——新聞稿、pitch、社群、Q&A 講的是同一個不可抗拒的角度，互相加乘而非各說各話。
+產出 PR launch toolkit 其中 1 部分（300–700 字）。本次你寫的是「{label}」（新聞稿 / Q&A / 媒體聯絡 / 後續追蹤 / Spokesperson talking points）。
 
 【earned-media 工藝 — 每一部分都適用】
 - 先找「新聞鉤」：這個 launch 為什麼值得被報導？最強角度是什麼？整套 toolkit 都圍繞這一個鉤，不要每部分各說各話。
