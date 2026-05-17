@@ -48,7 +48,7 @@ import { GoogleSearchAd, GoogleDisplayAd, GooglePMax } from "./google";
 import { XTweet, XThread } from "./twitter";
 import { LINEBroadcast, LINECard, LINERichMenu } from "./line";
 import { WebLanding, WebBlog, WebProduct } from "./web";
-import { PressRelease, DeckMockup, QAMockup, SpeechMockup, FactSheetMockup, WebAboutMockup } from "./press";
+import { PressRelease, DeckMockup, QAMockup, SpeechMockup, FactSheetMockup, WebAboutMockup, NewsHookMockup } from "./press";
 import { GenericMockup } from "./generic";
 import { ProposalCover, ProposalSpec, ResearchDoc, PersonaCard } from "./proposal";
 import { XHSNote, XHSVideo, XHSSearch } from "./xiaohongshu";
@@ -157,6 +157,9 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
 
     // ── Company boilerplate · 官網關於我們 (2026-05-17) ─────────────────
     case "press:about": return <WebAboutMockup {...f} />;
+
+    // ── News hook · 新聞點子 (2026-05-17) ──────────────────────────────
+    case "press:hook": return <NewsHookMockup {...f} />;
 
     // ── Deck / Presentation (1) ───────────────────────────────────────
     case "deck:slide": return <DeckMockup {...f} />;

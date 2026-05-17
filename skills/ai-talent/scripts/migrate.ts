@@ -2203,6 +2203,7 @@ async function main() {
         ["pr-30-launch-social", "Spotify Wrapped 社群擴散", "全球 earned", "被分享的是「有觀點、有梗、與我有關」，不是公告。"],
         ["pr-100-launch-toolkit", "Whopper Detour（整合 earned）", "Cannes Lions 2019", "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。"],
         ["pr-99-launch-toolkit", "Whopper Detour（整合 earned）", "Cannes Lions 2019", "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。"],
+        ["pr-30-news-hook", "The Tampon Book + Whopper Detour", "Cannes Lions 2019 PR", "得獎不是把公告寫好，而是先找到「記者會主動報、群眾會主動傳」的角度（earned idea）。"],
       ];
       for (const [tid, c, a, p] of rows) {
         await conn.execute(

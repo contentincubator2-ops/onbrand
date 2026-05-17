@@ -697,6 +697,76 @@ export function WebAboutMockup({ title, brandName, variantLabel, liveTitle, live
   );
 }
 
+/* ─────────────── News Hook · 新聞點子卡 ───────────────
+ *
+ * 2026-05-17 (CJ「新聞點子產生器」): each variant = one earned-idea
+ * angle. Parses the 【角度】/【為什麼會被報】/【一句 pitch】/
+ * 【建議下一步】 block into a clean idea card. Pool/「再給我幾個」 is
+ * handled by RunPage's existing >4-variant reveal mode.
+ */
+export function NewsHookMockup({ title, brandName, variantLabel, liveCaption }: MockupFields) {
+  const brand = (brandName ?? "Your Brand").trim();
+  const raw = (liveCaption ?? "").trim();
+  const g = (re: RegExp) => (raw.match(re)?.[1] ?? "").trim();
+  const angle  = g(/【角度】\s*([\s\S]*?)(?=【|$)/);
+  const why    = g(/【為什麼會被報】\s*([\s\S]*?)(?=【|$)/);
+  const pitch  = g(/【一句\s*pitch】\s*([\s\S]*?)(?=【|$)/i);
+  const next   = g(/【建議下一步】\s*([\s\S]*?)(?=【|$)/);
+  const ACCENT = "#b3541e";
+  const Row = ({ k, v, mono }: { k: string; v: string; mono?: boolean }) =>
+    v ? (
+      <div className="mb-4">
+        <div className="text-[10px] font-bold tracking-[0.2em] uppercase mb-1" style={{ color: "#a08c6b" }}>{k}</div>
+        <div className="leading-relaxed" style={{ fontSize: mono ? 13 : 14, color: "#2c2620", fontStyle: mono ? "italic" : "normal" }}>{v}</div>
+      </div>
+    ) : null;
+
+  return (
+    <div className="w-full max-w-[640px] mx-auto">
+      <MockupHeader icon={faNewspaper} label="新聞點子 · earned idea" variantLabel={variantLabel} />
+      <div className="rounded-xl overflow-hidden"
+        style={{ background: "#fffdf7", border: "1px solid #ece2cc",
+          boxShadow: "0 18px 40px -18px rgba(120,80,20,0.20)",
+          fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif" }}>
+        <div className="px-7 py-4 border-b flex items-center justify-between"
+          style={{ borderColor: "#efe6d2", background: "#faf3e2" }}>
+          <span className="text-[11px] font-bold tracking-[0.22em] uppercase" style={{ color: ACCENT }}>
+            {brand} · News Angle
+          </span>
+          <span className="text-[10px]" style={{ color: "#b0a384" }}>{variantLabel}</span>
+        </div>
+        <div className="px-7 py-6">
+          {angle ? (
+            <h2 className="font-extrabold leading-snug mb-5" style={{ fontSize: "clamp(17px,2.4vw,22px)", color: "#1d1813" }}>
+              {angle}
+            </h2>
+          ) : raw ? (
+            <p className="whitespace-pre-wrap leading-relaxed" style={{ fontSize: 13.5, color: "#2c2620" }}>{raw}</p>
+          ) : (
+            <div className="space-y-3">
+              {[80, 100, 92].map((w, i) => (
+                <div key={i} className="h-3 rounded" style={{ width: `${w}%`, background: "rgba(0,0,0,0.07)" }} />
+              ))}
+            </div>
+          )}
+          {angle && (
+            <>
+              <Row k="為什麼會被報" v={why} />
+              <Row k="一句 Pitch（可直接寄）" v={pitch} mono />
+              <Row k="建議下一步" v={next} />
+            </>
+          )}
+        </div>
+        <div className="px-7 py-3 border-t text-[10px] flex items-center justify-between"
+          style={{ borderColor: "#efe6d2", color: "#b0a384" }}>
+          <span>用上方版本切換看更多角度（不滿意可「再給我幾個」）</span>
+          <span>{brand}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────── Presentation / Deck ─────────────── */
 
 export function DeckMockup({ title, brandName, variantLabel, liveTitle, liveCaption, liveDescription, liveImageDesc }: MockupFields) {

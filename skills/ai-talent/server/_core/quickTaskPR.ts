@@ -324,6 +324,36 @@ ${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 700,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
+  {
+    // 2026-05-17 (CJ「新聞稿類別增加新聞點子產生器，先 30s 測最完整版」):
+    // upstream task — turns "公司想講的事" into "記者會主動報的角度".
+    // Pool of 8 distinct earned-idea angles (reuse headline reveal-more).
+    id: "pr-30-news-hook",
+    tier: "30s", postType: "press-release",
+    label: "新聞點子產生器",
+    description: "把「公司想講的事」變成「記者會主動報的角度」",
+    agent_id: 29, skill_slug: "press-release",
+    primary_question: "公司想對外講的事 / 素材是什麼？（越具體越好）",
+    primary_input: { key: "context", placeholder: "你想宣布/想讓外界知道的事＋手上有的事實、數字、人、時間點", type: "textarea" },
+    inputs: [{ key: "context", label: "想對外講的事 + 手上素材", type: "textarea", required: true }],
+    systemPrompt: `【得獎工藝參考】The Tampon Book（Cannes Lions 2019 PR 全場大獎）＋ Whopper Detour（Cannes Lions 2019）：得獎不是「把公告寫好」，而是先找到一個「記者會主動想報、群眾會主動想傳」的角度（earned idea）。你的工作就是產出這個角度，不是寫稿。
+
+輸入是公司「想講的事」與手上素材。請產出「一個」可被記者報導的新聞角度（每個變體＝一個完全不同的切入），嚴格照此格式輸出：
+
+【角度】<一句話：這則新聞的鉤是什麼，不是公司想說什麼，而是記者會怎麼下標>
+【為什麼會被報】<2–3 句：對記者的讀者/社會為何重要、為什麼是現在；扣一個具體事實或數字（沒有就標[待補]）>
+【一句 pitch】<可直接貼給記者的一句話，賣角度不賣品牌>
+【建議下一步】<接哪個新聞稿任務展開：例「用『新聞稿標題』生標題」「用『media pitch』寫信給科技記者」>
+
+準則：
+- 角度要通過「記者測試」：記者會主動選嗎？不要把公關公告改寫成問句。
+- 善用 reframe（換框架）、newsjack（借時事/趨勢）、反直覺數據、人的故事、產業意義——每個變體用不同手法，不要同一招換句話。
+- 具體勝過修辭；不杜撰，缺的事實標 [待補]。
+- 只輸出上面四個欄位，不要前言或結語。
+${PR_TONE}`,
+    preferredModel: "qwen", maxTokens: 500,
+    outputDefaults: { platform: "press", post_type: "press-release" },
+  },
 ];
 
 const VINCENT_ID = 60011;
@@ -341,6 +371,8 @@ export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "pr-30-media-pitch":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["共同議題切入", "獨家數據切入", "採訪邀請切入"], captionMinChars: 100, captionMaxChars: 250 },
   "pr-30-spokesperson-qa":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["防禦型", "透明型", "主動引導"], captionMinChars: 300, captionMaxChars: 1000 },
   "pr-30-launch-social":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: VINCENT_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["FB 口吻", "LinkedIn 口吻", "Threads 口吻"], captionMinChars: 100, captionMaxChars: 250 },
+  // 8-angle pool; RunPage pool mode (>4) gives 再給我幾個 reveal-more.
+  "pr-30-news-hook":          { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["Reframe 換框架", "Newsjack 借時事", "反直覺數據", "人的故事", "產業意義", "對比衝突", "首次/之最", "在地連結"], captionMinChars: 80, captionMaxChars: 400 },
 };
 
 export function getPROrchestraConfig(taskId: string): OrchestraConfig | null {

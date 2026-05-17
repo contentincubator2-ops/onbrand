@@ -69,6 +69,7 @@ const PR_CRAFT_REF: Record<string, { case: string; award: string; principle: str
   "pr-30-launch-social":   { case: "Spotify Wrapped 社群擴散", award: "全球 earned", principle: "被分享的是「有觀點、有梗、與我有關」，不是公告。" },
   "pr-100-launch-toolkit": { case: "Whopper Detour（整合 earned）", award: "Cannes Lions 2019", principle: "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。" },
   "pr-99-launch-toolkit":  { case: "Whopper Detour（整合 earned）", award: "Cannes Lions 2019", principle: "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。" },
+  "pr-30-news-hook":       { case: "The Tampon Book + Whopper Detour", award: "Cannes Lions 2019 PR", principle: "得獎不是把公告寫好，而是先找到「記者會主動報、群眾會主動傳」的角度（earned idea）。" },
 };
 
 function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
@@ -660,6 +661,8 @@ export default function RunPage() {
       // 2026-05-17 (CJ「公司簡介改成官網版型，好複製」): boilerplate →
       // official-website "About" page mockup, not the newspaper sheet.
       if (id.includes("boilerplate") || id.includes("about")) return "about";
+      // 2026-05-17 (CJ「新聞點子產生器」): earned-idea angle card.
+      if (id.includes("news-hook") || id.includes("newshook")) return "hook";
       if (id.startsWith("pr-")) return "press-release";
       if (id.startsWith("em-")) return "edm";
       // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"
