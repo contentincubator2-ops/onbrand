@@ -127,12 +127,14 @@ export function PressRelease({ title, brandName, variantLabel, liveTitle, liveCa
           {/* ── 主標 headline ── */}
           <Kicker>主標 · Headline</Kicker>
           {headline ? (
+            // 2026-05-17 (CJ 驗收 task1): NO line-clamp — the headline IS
+            // the deliverable; truncating it hid per-variant differences.
+            // Length-aware font keeps it visually contained instead.
             <h2
               className="text-center font-black mb-4"
               style={{
-                fontSize: hlSize, lineHeight: 1.2, letterSpacing: "0.005em",
-                display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                overflow: "hidden",
+                fontSize: hlSize, lineHeight: 1.25, letterSpacing: "0.005em",
+                overflowWrap: "anywhere",
               }}
             >
               {headline}
