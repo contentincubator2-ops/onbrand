@@ -339,6 +339,35 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     preferredModel: "qwen", maxTokens: 1300,
     outputDefaults: { platform: "press", post_type: "press" },
   },
+  {
+    // 2026-05-17 (CJ B「繼續深化」→ 借時事 Newsjack，需 99s 即時 scout):
+    // scout 抓回「此刻正在發燒的趨勢/新聞」，把品牌安全地接上去。
+    id: "pr-99-newsjack",
+    tier: "99s", postType: "press",
+    label: "借時事新聞鉤（Newsjack）",
+    description: "把品牌安全接上此刻正在發燒的時事，產出可報導的角度",
+    agent_id: 223197, skill_slug: "pr-writing",
+    primary_question: "品牌想被看見的點 / 可連結的專業或產品是什麼？",
+    primary_input: { key: "context", placeholder: "品牌的專業領域/產品/觀點，以及任何手上的事實或數字（系統會自動帶入此刻熱門時事）", type: "textarea" },
+    inputs: [{ key: "context", label: "品牌可連結的點 + 手上素材", type: "textarea", required: true }],
+    systemPrompt: `【得獎工藝參考】Oreo「Dunk in the Dark」（2013 超級盃停電即時 newsjack，earned-media 經典）：贏在「在對的時刻、用對的角度，把品牌接上一個正在發燒的公共話題」，而且快、自然、不尷尬。
+
+系統已透過 scout 帶入「此刻正在發燒的時事/趨勢」（見下方即時資料區塊）。你的工作：從這些真實時事中，挑出品牌能「自然且有正當性」接上的，產出一個可被記者報導的 newsjack 角度。每個變體＝接一個不同的時事 / 不同接法。
+
+嚴格照此格式輸出：
+【角度】<一句話：品牌如何接上哪個正在發燒的時事，記者會怎麼下標>
+【為什麼會被報】<2–3 句：這個時事為何正熱、品牌切入的正當性與貢獻、為什麼是現在；扣具體事實/數字（無則[待補]）>
+【一句 pitch】<可直接寄給記者的一句，賣「品牌×時事」的角度，不賣品牌本身>
+【建議下一步】<接哪個任務展開：如「用『新聞稿標題』生標題」「用『media pitch』寄科技記者」；並標註此鉤的時效（多久內要發）>
+
+準則：
+- 只接「品牌有正當發言權」的時事；不蹭悲劇、不蹭爭議性政治、不硬湊——寧可少給也不要尷尬蹭流量（這會傷品牌，評審也會扣分）。
+- 必須引用 scout 帶回的「真實時事」，不要自己編一個趨勢。沒有合適可接的就明說「此批時事無適合切入點」。
+- 具體勝過修辭、不杜撰、可被記者原句引用。
+- 只輸出上面四欄，不要前言或結語。${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 600,
+    outputDefaults: { platform: "press", post_type: "press" },
+  },
   // pr-99-crisis-toolkit removed per CJ direction 2026-05-06 — risky.
   {
     id: "br-99-reposition-toolkit",
@@ -771,6 +800,14 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     postLabels: ["新聞稿", "Q&A", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
     scoutKind: "news",
     extras: { postsCount: 5, replyTemplates: 3 },
+  },
+  "pr-99-newsjack": {
+    // pool of 6 distinct trend-hooks; RunPage >4 = 「再給我幾個」.
+    variants: 6, images: 0, runImageGen: false, imageDirectorId: null as any,
+    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
+    variantLabels: ["時事 A", "時事 B", "時事 C", "另一接法 D", "另一接法 E", "長尾 F"],
+    captionMinChars: 80, captionMaxChars: 420,
+    scoutKind: "trending", // 借時事 → 抓此刻正在發燒的趨勢/新聞
   },
   // pr-99-crisis-toolkit orchestra config removed.
   "br-99-reposition-toolkit": {

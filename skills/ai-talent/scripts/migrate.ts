@@ -2204,6 +2204,7 @@ async function main() {
         ["pr-100-launch-toolkit", "Whopper Detour（整合 earned）", "Cannes Lions 2019", "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。"],
         ["pr-99-launch-toolkit", "Whopper Detour（整合 earned）", "Cannes Lions 2019", "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。"],
         ["pr-30-news-hook", "The Tampon Book + Whopper Detour", "Cannes Lions 2019 PR", "得獎不是把公告寫好，而是先找到「記者會主動報、群眾會主動傳」的角度（earned idea）。"],
+        ["pr-99-newsjack", "Oreo「Dunk in the Dark」", "2013 即時 newsjack 經典", "在對的時刻、用對的角度、夠快且自然地把品牌接上正在發燒的話題——不硬蹭。"],
       ];
       for (const [tid, c, a, p] of rows) {
         await conn.execute(

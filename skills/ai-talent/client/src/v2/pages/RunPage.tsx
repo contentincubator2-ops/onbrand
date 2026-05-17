@@ -70,6 +70,7 @@ const PR_CRAFT_REF: Record<string, { case: string; award: string; principle: str
   "pr-100-launch-toolkit": { case: "Whopper Detour（整合 earned）", award: "Cannes Lions 2019", principle: "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。" },
   "pr-99-launch-toolkit":  { case: "Whopper Detour（整合 earned）", award: "Cannes Lions 2019", principle: "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。" },
   "pr-30-news-hook":       { case: "The Tampon Book + Whopper Detour", award: "Cannes Lions 2019 PR", principle: "得獎不是把公告寫好，而是先找到「記者會主動報、群眾會主動傳」的角度（earned idea）。" },
+  "pr-99-newsjack":        { case: "Oreo「Dunk in the Dark」", award: "2013 即時 newsjack 經典", principle: "在對的時刻、用對的角度、夠快且自然地把品牌接上正在發燒的話題——不硬蹭。" },
 };
 
 function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
@@ -662,7 +663,7 @@ export default function RunPage() {
       // official-website "About" page mockup, not the newspaper sheet.
       if (id.includes("boilerplate") || id.includes("about")) return "about";
       // 2026-05-17 (CJ「新聞點子產生器」): earned-idea angle card.
-      if (id.includes("news-hook") || id.includes("newshook")) return "hook";
+      if (id.includes("news-hook") || id.includes("newshook") || id.includes("newsjack")) return "hook";
       if (id.startsWith("pr-")) return "press-release";
       if (id.startsWith("em-")) return "edm";
       // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"
