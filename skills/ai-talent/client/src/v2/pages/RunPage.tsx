@@ -76,6 +76,12 @@ export default function RunPage() {
   );
 
   const [activeIdx, setActiveIdx] = useState(0);
+  // 2026-05-17 (CJ「存很多產出，每次給幾個，不滿意再多給」): for a large
+  // candidate pool (e.g. 8 press-headline variants) surface a few and
+  // reveal more on demand — the rest are already generated & persisted,
+  // so "再給我幾個" is instant and free.
+  const REVEAL_STEP = 3;
+  const [revealCount, setRevealCount] = useState(REVEAL_STEP);
   const [mode, setMode] = useState<Mode>("chat");
   const [focusedAgent, setFocusedAgent] = useState<"caption"|"image"|null>(null);
   const [editText, setEditText] = useState<string | null>(null);
@@ -764,24 +770,45 @@ export default function RunPage() {
       </div>
 
       {/* ─── Variant pills (horizontal) ─────────────────────────────── */}
-      {variants.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1.5 mb-3">
-          <span className="text-[10px] text-default-500 mr-1">{lang === "en" ? "Versions:" : "版本："}</span>
-          {variants.map((v, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveIdx(i)}
-              className={`px-3 py-1 rounded-full text-tiny transition border ${
-                i === activeIdx
-                  ? "bg-secondary text-white border-secondary"
-                  : "bg-white text-default-700 border-default-200 hover:border-secondary"
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {variants.length > 1 && (() => {
+        // Pool mode: >4 variants → progressive reveal (headline pool).
+        // ≤4 → show all (normal multi-variant task, unchanged behavior).
+        const pool = variants.length > 4;
+        const shown = pool ? Math.min(revealCount, variants.length) : variants.length;
+        const more = variants.length - shown;
+        return (
+          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+            <span className="text-[10px] text-default-500 mr-1">
+              {pool
+                ? (lang === "en" ? "Headlines:" : "標題：")
+                : (lang === "en" ? "Versions:" : "版本：")}
+            </span>
+            {variants.slice(0, shown).map((v, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveIdx(i)}
+                className={`px-3 py-1 rounded-full text-tiny transition border ${
+                  i === activeIdx
+                    ? "bg-secondary text-white border-secondary"
+                    : "bg-white text-default-700 border-default-200 hover:border-secondary"
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+            {pool && more > 0 && (
+              <button
+                onClick={() => setRevealCount((c) => Math.min(variants.length, c + REVEAL_STEP))}
+                className="px-3 py-1 rounded-full text-tiny border border-dashed border-secondary text-secondary hover:bg-secondary/5 transition"
+              >
+                {lang === "en"
+                  ? `+ ${Math.min(REVEAL_STEP, more)} more (${more} left)`
+                  : `再給我 ${Math.min(REVEAL_STEP, more)} 個（還有 ${more} 個）`}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── 2-COL: mockup big (no toolbar) + right tool panel ──────── */}
       {/* 2026-05-10: mobile responsive — stack on small screens. md+ keeps 2-col. */}

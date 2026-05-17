@@ -20,8 +20,31 @@ export const PR_30S_TASKS: FBTaskTemplate[] = [
     primary_question: "這則新聞核心事件是？",
     primary_input: { key: "event", placeholder: "誰 + 做了什麼 + 何時 / 何地", type: "textarea" },
     inputs: [{ key: "event", label: "新聞事件", type: "textarea", required: true }],
-    systemPrompt: `產出新聞稿標題。每變體 1 種角度（事實式 / 突破式 / 數據式）。
-規則：50 字內、含 1 個具體數字或名字、不要 buzzword。
+    // 2026-05-17 (CJ「調整新聞稿標題品質」): rewritten with standard
+    // press-release headline craft (倒金字塔 / 主動動詞 / 具體事實 /
+    // 記者可直接引用 / 無 buzzword). Each variant = a distinct
+    // journalistic angle so the user has real choice, not 3 rewrites.
+    systemPrompt: `你在寫「新聞稿標題」——記者掃過 50 封信時，決定打不打開的那一行。
+
+寫作準則（每一條都要做到）：
+1. 倒金字塔：最有新聞價值的事實放最前面（誰 + 做了什麼），不要鋪陳。
+2. 主動語態 + 強動詞（推出 / 宣布 / 達成 / 攜手 / 突破），不要「致力於」「持續努力」這種軟詞。
+3. 一個具體錨點：數字、金額、名字、地點或日期擇一，且必須來自輸入事實，不可杜撰。
+4. 一行讀完：12–24 個中文字最佳，最多不超過 30 字；不用驚嘆號、不用問號、不用冒號堆砌。
+5. 記者可「原封不動」引用：客觀第三人稱，無行銷形容詞、無 buzzword、無 clickbait、無「業界領先 / 顛覆 / 革命性」。
+6. 一眼看懂價值：標題本身要能回答「為什麼這值得報導」。
+
+每個變體用「不同的新聞角度」切入（依 variantLabel）：
+- 事實式：純粹陳述發生了什麼，最安全可靠。
+- 數據式：用最有力的那個數字當主詞或主軸。
+- 突破式：強調這是首次 / 最大 / 最快 / 唯一（有事實支撐才用）。
+- 影響式：點出對市場 / 用戶 / 產業的具體改變。
+- 引述式：用發言人一句有力短話帶出新聞（需像真的會被講出口的話）。
+- 時機式：扣連時間點 / 檔期 / 趨勢，說明「為什麼是現在」。
+- 對比式：用前後對照或與既有做法的差異凸顯新意。
+- 懸念式：留一個讓記者想往下讀的具體鉤子（仍須是事實，不可標題黨）。
+
+只輸出標題本身，不要前綴、不要編號、不要解釋。
 ${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 250,
     outputDefaults: { platform: "press", post_type: "press-release" },
@@ -152,7 +175,11 @@ ${PR_TONE}`,
 
 const VINCENT_ID = 60011;
 export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "pr-30-headline":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實式", "突破式", "數據式"], captionMinChars: 20, captionMaxChars: 50 },
+  // 2026-05-17 (CJ「存很多產出，每次給幾個，不滿意再多給」): generate a
+  // POOL of 8 distinct-angle headlines in one run. RunPage surfaces 3,
+  // 「再給我幾個標題」reveals the rest from this already-persisted pool —
+  // zero extra cost/latency. captionMax tightened to one-line headline.
+  "pr-30-headline":           { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實式", "數據式", "突破式", "影響式", "引述式", "時機式", "對比式", "懸念式"], captionMinChars: 12, captionMaxChars: 42 },
   "pr-30-subhead":            { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["影響面", "規模延伸", "時程感"], captionMinChars: 30, captionMaxChars: 80 },
   "pr-30-lead-paragraph":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實密度型", "影響面型", "故事感型"], captionMinChars: 80, captionMaxChars: 200 },
   "pr-30-ceo-quote":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["願景式", "客戶價值", "市場觀察"], captionMinChars: 60, captionMaxChars: 150 },

@@ -35,154 +35,134 @@ import remarkGfm from "remark-gfm";
  *   (derived from brand) → MEDIA CONTACT column (right)
  */
 
-/** Split caption into [subhead, ...bodyParagraphs]. If liveDescription is
- *  provided we use it as the subhead and treat all caption paragraphs as body. */
-function splitCaption(caption: string, hasExplicitSubhead: boolean): {
-  subhead: string | null;
-  paragraphs: string[];
-} {
-  const blocks = caption.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-  if (blocks.length === 0) return { subhead: null, paragraphs: [] };
-  if (hasExplicitSubhead) return { subhead: null, paragraphs: blocks };
-  // No explicit subhead → first block becomes subhead, rest become body
-  return { subhead: blocks[0] ?? null, paragraphs: blocks.slice(1) };
-}
+
+/**
+ * 2026-05-17 (CJ「headline 的 mockup 比較像 newspaper mockup 的感覺」):
+ * Redesigned from the cream-paper press-release letter into a newspaper
+ * FRONT PAGE — nameplate / masthead, heavy rules, big bold black serif
+ * headline, italic deck, justified greeked columns. The generated
+ * headline (which arrives in liveCaption for the 新聞稿標題 task — no
+ * separate liveTitle is passed) now renders as the giant front-page
+ * headline; body tasks still read first-block-as-headline + rest body.
+ */
+const SERIF = "'Times New Roman', 'Noto Serif TC', 'Songti TC', serif";
 
 export function PressRelease({ title, brandName, variantLabel, liveTitle, liveCaption, liveDescription }: MockupFields) {
-  const brand = brandName ?? "Your Brand";
-  const dateStr = (() => {
-    const d = new Date();
-    return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()}`;
-  })();
-  const headline = liveTitle ?? title;
-  const { subhead, paragraphs } = liveCaption
-    ? splitCaption(liveCaption, !!liveDescription)
-    : { subhead: null as string | null, paragraphs: [] as string[] };
-  const finalSubhead = liveDescription ?? subhead;
+  const brand = (brandName ?? "Your Brand").trim();
+  const today = new Date();
+  const dateStr = today.toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
+  const weekday = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][today.getDay()];
 
-  // Minimal contact derivation — uses brand slug for an obvious example.
-  // Real teams replace this block in the published draft.
-  const slug = brand.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const contactEmail = `press@${slug || "brand"}.com`;
+  // Headline resolution: explicit liveTitle wins; else the FIRST block of
+  // liveCaption (the 新聞稿標題 task emits a single line → that's the
+  // headline); else the run title. Remaining blocks become body.
+  const blocks = (liveCaption ?? "").split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  const headline = (liveTitle ?? blocks[0] ?? title ?? "").trim();
+  const deck = liveDescription ?? (blocks.length > 1 ? blocks[1]! : null);
+  const bodyParas = blocks.slice(liveTitle ? 0 : (deck && !liveDescription ? 2 : 1));
 
   return (
-    <div className="w-full max-w-[720px] mx-auto">
-      <MockupHeader icon={faNewspaper} label="新聞稿" variantLabel={variantLabel} />
+    <div className="w-full max-w-[760px] mx-auto">
+      <MockupHeader icon={faNewspaper} label="新聞稿 · 報紙版面" variantLabel={variantLabel} />
 
-      {/* Cream paper sheet with soft drop shadow */}
+      {/* Newsprint sheet */}
       <div
         className="rounded-sm overflow-hidden"
         style={{
-          background: "#EBE7D7",
-          boxShadow: "0 24px 48px -16px rgba(0,0,0,0.18), 0 8px 16px -8px rgba(0,0,0,0.10)",
-          fontFamily: "'Inter', 'Noto Sans TC', system-ui, sans-serif",
-          color: "#111",
+          background: "#f4f1ea",
+          boxShadow: "0 24px 48px -16px rgba(0,0,0,0.22), 0 8px 16px -8px rgba(0,0,0,0.12)",
+          fontFamily: SERIF,
+          color: "#1a1a1a",
         }}
       >
-        <div className="px-10 md:px-14 py-10 md:py-14">
-          {/* COMPANY NAME eyebrow */}
-          <p
-            className="text-[10px] font-bold uppercase tracking-[0.18em] mb-2"
-            style={{ color: "#111" }}
+        <div className="px-8 md:px-12 py-8 md:py-11">
+          {/* ── Nameplate / Masthead ── */}
+          <div className="flex items-center justify-between text-[10px] tracking-[0.18em] uppercase" style={{ color: "#333" }}>
+            <span>{dateStr} · {weekday}</span>
+            <span>創刊號 · 第 1 版</span>
+          </div>
+          <div className="border-t-2 border-black mt-2" />
+          <h1
+            className="text-center font-black my-1"
+            style={{ fontSize: "clamp(30px, 6vw, 56px)", letterSpacing: "0.02em", lineHeight: 1.05 }}
           >
             {brand.toUpperCase()}
-          </p>
-
-          {/* PRESS RELEASE — the fixed bold title bar */}
-          <h1
-            className="font-black leading-none mb-5"
-            style={{
-              fontSize: "clamp(28px, 5vw, 44px)",
-              letterSpacing: "0.01em",
-              color: "#111",
-            }}
-          >
-            PRESS RELEASE
           </h1>
+          <div className="flex items-center justify-center gap-3 text-[10px] tracking-[0.22em] uppercase pb-2" style={{ color: "#444" }}>
+            <span>NEWS</span><span>·</span><span>每日要聞</span><span>·</span><span>NT$ —</span>
+          </div>
+          <div className="border-t-[3px] border-double border-black mb-5" />
 
-          {/* Top rule */}
-          <div className="border-t border-black/80 mb-7" />
-
-          {/* Date stamp */}
-          <p className="text-[11px] tabular-nums mb-7" style={{ color: "#111" }}>
-            {dateStr}
-          </p>
-
-          {/* Headline */}
+          {/* ── Lead headline ── */}
           {headline ? (
             <h2
-              className="font-bold leading-snug mb-2"
-              style={{ fontSize: "clamp(17px, 2.2vw, 22px)", color: "#111" }}
+              className="text-center font-black mb-3"
+              style={{ fontSize: "clamp(22px, 3.6vw, 38px)", lineHeight: 1.18, letterSpacing: "0.005em" }}
             >
               {headline}
             </h2>
           ) : (
-            <Skeleton className="h-5 w-[80%] rounded mb-2" />
+            <div className="flex flex-col items-center gap-2 mb-3">
+              <Skeleton className="h-7 w-[85%] rounded" />
+              <Skeleton className="h-7 w-[60%] rounded" />
+            </div>
           )}
 
-          {/* Subheadline (lighter weight, slightly smaller) */}
-          {finalSubhead ? (
-            <p
-              className="leading-snug mb-7"
-              style={{ fontSize: "15px", color: "#111", fontWeight: 500 }}
-            >
-              {finalSubhead}
-            </p>
+          {/* Deck / subhead — italic, centered, between hairlines */}
+          {deck ? (
+            <>
+              <div className="border-t border-black/60 w-1/3 mx-auto mb-2" />
+              <p className="text-center italic mb-5" style={{ fontSize: "14px", color: "#333" }}>
+                {deck}
+              </p>
+            </>
           ) : (
-            <Skeleton className="h-4 w-[60%] rounded mb-7" />
+            <p className="text-center text-[11px] tracking-[0.18em] uppercase mb-5" style={{ color: "#777" }}>
+              ——  特訊  ——
+            </p>
           )}
 
-          {/* Body paragraphs */}
-          {paragraphs.length > 0 ? (
-            <div className="space-y-4">
-              {paragraphs.map((p, i) => (
-                <p
-                  key={i}
-                  className="leading-relaxed"
-                  style={{ fontSize: "12.5px", color: "#222" }}
-                >
-                  {p}
+          {/* Byline rule */}
+          <div className="flex items-center justify-between text-[10px] mb-3 pb-1 border-b border-black/40" style={{ color: "#555" }}>
+            <span>本報訊　{brand} 提供</span>
+            <span>{dateStr}</span>
+          </div>
+
+          {/* ── Body: two justified columns. Real body if present, else
+              tasteful greeked filler so the front page reads like a
+              printed mockup (the 標題 task has no body). ── */}
+          <div
+            className="md:[column-count:2] md:[column-gap:28px] md:[column-rule:1px_solid_rgba(0,0,0,0.25)]"
+            style={{ fontSize: "12px", lineHeight: 1.7, color: "#222", textAlign: "justify" }}
+          >
+            {bodyParas.length > 0 ? (
+              bodyParas.map((p, i) => (
+                <p key={i} className="mb-3" style={{ textIndent: "1.4em" }}>
+                  {i === 0 && (
+                    <span style={{ float: "left", fontSize: "2.6em", lineHeight: 0.82, fontWeight: 900, paddingRight: 8, paddingTop: 2 }}>
+                      {p.charAt(0)}
+                    </span>
+                  )}
+                  {i === 0 ? p.slice(1) : p}
                 </p>
-              ))}
-            </div>
-          ) : !liveCaption ? (
-            <div className="space-y-5">
-              {[1, 2, 3, 4].map((p) => (
-                <div key={p} className="space-y-1.5">
-                  <Skeleton className="h-2.5 w-full rounded" />
-                  <Skeleton className="h-2.5 w-[97%] rounded" />
-                  <Skeleton className="h-2.5 w-[88%] rounded" />
-                  {p === 1 && <Skeleton className="h-2.5 w-[72%] rounded" />}
-                </div>
-              ))}
-            </div>
-          ) : null}
+              ))
+            ) : (
+              <div aria-hidden style={{ color: "#9a958a" }}>
+                {[92, 100, 96, 88, 100, 94, 70, 100, 90, 100, 85, 60].map((w, i) => (
+                  <div key={i} className="mb-[7px] rounded-[1px]"
+                    style={{ height: 6, width: `${w}%`, background: "rgba(0,0,0,0.13)" }} />
+                ))}
+                <p className="mt-3 text-[10px] tracking-[0.16em] uppercase not-italic" style={{ color: "#8a857a" }}>
+                  — 內文於完整新聞稿中產出 —
+                </p>
+              </div>
+            )}
+          </div>
 
-          {/* Bottom rule */}
-          <div className="border-t border-black/80 mt-10 mb-6" />
-
-          {/* Two-column contacts (COMPANY · MEDIA CONTACT) */}
-          <div className="grid grid-cols-2 gap-8">
-            <div>
-              <p className="text-[11px] font-bold tracking-[0.12em] mb-2" style={{ color: "#111" }}>
-                COMPANY
-              </p>
-              <p className="text-[11px] leading-relaxed" style={{ color: "#333" }}>
-                {brand}<br />
-                {contactEmail}<br />
-                +886 2 0000 0000
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold tracking-[0.12em] mb-2" style={{ color: "#111" }}>
-                MEDIA CONTACT
-              </p>
-              <p className="text-[11px] leading-relaxed" style={{ color: "#333" }}>
-                公關聯絡人<br />
-                {contactEmail}<br />
-                +886 2 0000 0000
-              </p>
-            </div>
+          {/* Bottom plate */}
+          <div className="border-t-2 border-black mt-7 pt-3 flex items-center justify-between text-[10px]" style={{ color: "#555" }}>
+            <span>媒體聯絡 · {brand}</span>
+            <span>press@{(brand.toLowerCase().replace(/[^a-z0-9]+/g, "") || "brand")}.com</span>
           </div>
         </div>
       </div>
