@@ -347,6 +347,143 @@ export function QAMockup({ title, brandName, variantLabel, liveTitle, liveCaptio
   );
 }
 
+/* ─────────────── CEO Speech (致辭講稿) ───────────────
+ *
+ * 2026-05-17 (CJ「CEO QUOTE → CEO SPEECH，產出像致辭簡報，有主講人 /
+ * talking point / 時間地點，可編輯下載」). Slide-style "Message from
+ * CEO" layout: header, speaker block, talking-point bullets, occasion
+ * footer. Parses the metadata header (【主講人】…) + [重點…] sections.
+ */
+function parseSpeech(text: string): {
+  speaker: string; speakerTitle: string; occasion: string; topic: string;
+  points: { title: string; body: string }[];
+} {
+  const grab = (re: RegExp) => (text.match(re)?.[1] ?? "").trim();
+  const speaker      = grab(/【主講人】\s*(.+)/);
+  const speakerTitle = grab(/【職稱】\s*(.+)/);
+  const occasion     = grab(/【場合】\s*(.+)/);
+  const topic        = grab(/【講題】\s*(.+)/);
+  // Body after the --- separator (or whole text if absent)
+  const body = text.includes("---") ? text.split("---").slice(1).join("---") : text;
+  // Split on [開場]/[重點一]/[展望]/[結語] section markers.
+  const SECT = /\[([^\]]{1,12})\]/g;
+  const points: { title: string; body: string }[] = [];
+  let m: RegExpExecArray | null;
+  const marks: { tag: string; idx: number }[] = [];
+  while ((m = SECT.exec(body))) marks.push({ tag: m[1]!.trim(), idx: m.index });
+  if (marks.length) {
+    for (let i = 0; i < marks.length; i++) {
+      const start = marks[i]!.idx + marks[i]!.tag.length + 2;
+      const end = i + 1 < marks.length ? marks[i + 1]!.idx : body.length;
+      const seg = body.slice(start, end).trim().replace(/\s*\n\s*/g, " ");
+      if (seg) points.push({ title: marks[i]!.tag, body: seg });
+    }
+  } else {
+    // No markers — use paragraphs as points.
+    body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).slice(0, 8)
+      .forEach((p, i) => points.push({ title: `重點 ${i + 1}`, body: p }));
+  }
+  return { speaker, speakerTitle, occasion, topic, points };
+}
+
+export function SpeechMockup({ title, brandName, variantLabel, liveTitle, liveCaption }: MockupFields) {
+  const brand = (brandName ?? "Your Brand").trim();
+  const raw = (liveCaption ?? "").trim();
+  const s = parseSpeech(raw);
+  const speaker = s.speaker || "主講人";
+  const heading = s.topic || liveTitle || title || "致辭講稿";
+  const NAVY = "#1f2a4d", ACCENT = "#c0392b";
+
+  return (
+    <div className="w-full max-w-[760px] mx-auto">
+      <MockupHeader icon={faNewspaper} label="CEO 致辭講稿" variantLabel={variantLabel} />
+
+      <div className="rounded-lg overflow-hidden"
+        style={{ background: "#fff", border: "1px solid #e6e6ea",
+          boxShadow: "0 20px 44px -18px rgba(20,30,70,0.20)",
+          fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif", color: "#222" }}>
+        {/* Title bar */}
+        <div className="px-8 pt-7 pb-4 border-b" style={{ borderColor: "#eee" }}>
+          <h2 className="font-extrabold leading-snug" style={{ fontSize: "clamp(18px,2.6vw,24px)", color: NAVY }}>
+            {heading}
+          </h2>
+          <p className="text-[12px] mt-1" style={{ color: "#7a7f93" }}>
+            {brand} · CEO 致辭{s.occasion ? ` · ${s.occasion}` : ""}
+          </p>
+        </div>
+
+        <div className="px-8 py-7 grid md:grid-cols-[200px_1fr] gap-7">
+          {/* Speaker block */}
+          <div>
+            <div className="relative">
+              <div style={{
+                width: "100%", aspectRatio: "1/1", background: "#e9ecf3",
+                clipPath: "polygon(12% 0,100% 0,100% 88%,88% 100%,0 100%,0 12%)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ fontSize: 40, fontWeight: 800, color: "#aab0c4" }}>
+                  {speaker.charAt(0)}
+                </span>
+              </div>
+              <div style={{ position: "absolute", left: -6, top: -6, width: 22, height: 22,
+                background: ACCENT, transform: "rotate(45deg)" }} />
+            </div>
+            <p className="mt-4 font-bold" style={{ fontSize: 16, color: ACCENT }}>{speaker}</p>
+            <div className="mt-1 px-3 py-2 rounded" style={{ background: NAVY, color: "#fff" }}>
+              <p className="text-[12px] font-semibold">{s.speakerTitle || "CEO"}</p>
+              <p className="text-[11px] opacity-80">{brand}</p>
+            </div>
+          </div>
+
+          {/* Talking points */}
+          <div>
+            <p className="text-[10px] font-bold tracking-[0.22em] uppercase mb-3" style={{ color: "#9aa0b4" }}>
+              Talking Points
+            </p>
+            <div className="space-y-3">
+              {s.points.length > 0 ? s.points.map((p, i) => (
+                <div key={i} className="flex gap-3">
+                  <span className="shrink-0 mt-0.5 flex items-center justify-center"
+                    style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${ACCENT}`, color: ACCENT, fontSize: 10, fontWeight: 800 }}>
+                    {i + 1}
+                  </span>
+                  <div>
+                    <p className="font-bold leading-snug" style={{ fontSize: 13, color: NAVY }}>{p.title}</p>
+                    <p className="leading-relaxed mt-0.5" style={{ fontSize: 12.5, color: "#3c4257",
+                      display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      {p.body}
+                    </p>
+                  </div>
+                </div>
+              )) : raw ? (
+                <p className="whitespace-pre-wrap leading-relaxed" style={{ fontSize: 12.5, color: "#3c4257" }}>{raw}</p>
+              ) : (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((k) => (
+                    <div key={k} className="flex gap-3">
+                      <Skeleton className="w-5 h-5 rounded shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-3 w-[40%] rounded" />
+                        <Skeleton className="h-2.5 w-full rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-8 py-3 border-t flex items-center justify-between text-[10px]"
+          style={{ borderColor: "#eee", color: "#9aa0b4" }}>
+          <span>{s.occasion || "企業致辭"}</span>
+          <span>可編輯 · 下載講稿全文於右側工具列</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────── Presentation / Deck ─────────────── */
 
 export function DeckMockup({ title, brandName, variantLabel, liveTitle, liveCaption, liveDescription, liveImageDesc }: MockupFields) {

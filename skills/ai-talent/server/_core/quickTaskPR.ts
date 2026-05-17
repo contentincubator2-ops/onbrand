@@ -104,18 +104,49 @@ ${PR_TONE}`,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
   {
+    // 2026-05-17 (CJ「CEO QUOTE 改成 CEO SPEECH，要知道主講者，產出完整
+    // 講稿 ~2700 字，mockup 像致辭簡報、可編輯下載」). id kept stable
+    // for routing/data; behaviour fully reworked.
     id: "pr-30-ceo-quote",
     tier: "30s", postType: "press-release",
-    label: "CEO / 高管 quote",
-    description: "可直接引用的引言",
+    label: "CEO 致辭講稿（CEO Speech）",
+    description: "可直接上台念的完整致辭稿 + 主講人/場合",
     agent_id: 60036, skill_slug: "press",
-    primary_question: "誰要說？關於什麼？想傳達什麼觀點？",
-    primary_input: { key: "context", placeholder: "發言人角色 + 核心觀點", type: "textarea" },
-    inputs: [{ key: "context", label: "發言人 + 主題", type: "textarea", required: true }],
-    systemPrompt: `產出 CEO / 高管引言。每變體 1 種角度（願景式 / 客戶價值式 / 市場觀察式）。
-規則：60-120 字、第一人稱、要記者願意直接引用（specific、有觀點）。
-不要"我們很高興..."這種範本。${PR_TONE}`,
-    preferredModel: "qwen", maxTokens: 350,
+    primary_question: "致辭主題與想傳達的核心觀點？",
+    primary_input: { key: "context", placeholder: "致辭主題 + 想傳達的觀點 + 任何想提到的事實/數字", type: "textarea" },
+    inputs: [
+      { key: "context",      label: "致辭主題與觀點", type: "textarea", required: true },
+      { key: "speaker",      label: "主講人姓名",     type: "text",     required: true },
+      { key: "speakerTitle", label: "主講人職稱",     type: "text",     required: false },
+      { key: "occasion",     label: "場合 / 時間 / 地點", type: "text", required: false },
+    ],
+    systemPrompt: `你在撰寫一篇「可以直接上台念出來」的 CEO 致辭講稿（口語、有節奏、約 2400–2800 字）。
+
+輸入會以 [key] value 形式提供：[context] 主題與觀點、[speaker] 主講人姓名、[speakerTitle] 職稱、[occasion] 場合/時間/地點。務必把主講人與場合自然寫進稿中（開場致意、結尾署名）。缺的具體資訊用「[待補：例如 具體數字]」標出，不要杜撰、不要反問使用者。
+
+輸出格式（嚴格遵守，第一行開始就是 metadata，方便排版解析）：
+【主講人】<speaker>
+【職稱】<speakerTitle，無則留空>
+【場合】<occasion，無則寫「企業致辭」>
+【講題】<一句話講題>
+---
+[開場] 一段問候與破題（點出今天為何站在這裡、與聽眾的連結）
+[重點一] 小標 + 一段論述（含具體事實/數字/例子）
+[重點二] 小標 + 一段論述
+[重點三] 小標 + 一段論述
+[展望] 一段對未來的承諾與呼籲
+[結語] 收束＋感謝＋署名（主講人姓名）
+
+寫作準則：
+- 第一人稱、口語可朗讀（短句、停頓感、可以唸出口），不是書面新聞稿。
+- 每個重點都要有「可被記者單獨擷取引用」的一兩句金句。
+- 真誠具體，禁止「我們很高興 / 致力於 / 業界領先」這類空話與 buzzword。
+- 每個變體用 variantLabel 的角度貫穿全篇：願景式（描繪未來圖像、使命感）／客戶價值式（一切回到對客戶與社會的價值）／市場觀察式（從產業趨勢與洞察切入、展現格局）。
+${PR_TONE}`,
+    // document mode → systemPrompt is 最高指令, structure preserved
+    // verbatim (not rewritten into a social caption).
+    outputMode: "document",
+    preferredModel: "qwen", maxTokens: 2200,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
   {
@@ -236,7 +267,7 @@ export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "pr-30-headline":           { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實式", "數據式", "突破式", "影響式", "引述式", "時機式", "對比式", "懸念式"], captionMinChars: 12, captionMaxChars: 42 },
   "pr-30-subhead":            { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["影響面", "規模延伸", "時程感"], captionMinChars: 30, captionMaxChars: 80 },
   "pr-30-lead-paragraph":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實密度型", "影響面型", "故事感型"], captionMinChars: 70, captionMaxChars: 180 },
-  "pr-30-ceo-quote":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["願景式", "客戶價值", "市場觀察"], captionMinChars: 60, captionMaxChars: 150 },
+  "pr-30-ceo-quote":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["願景式", "客戶價值", "市場觀察"], captionMinChars: 1800, captionMaxChars: 3200 },
   "pr-30-boilerplate":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品導向", "規模導向", "里程碑導向"], captionMinChars: 150, captionMaxChars: 300 },
   "pr-30-fact-sheet":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品優先", "公司優先", "市場優先"], captionMinChars: 200, captionMaxChars: 600 },
   "pr-30-media-pitch":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["共同議題切入", "獨家數據切入", "採訪邀請切入"], captionMinChars: 100, captionMaxChars: 250 },
