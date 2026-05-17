@@ -1,0 +1,45 @@
+name: Ops — Re-run + verify brand 2859 positioning
+on: { workflow_dispatch: {} }
+jobs:
+  v:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 8
+    steps:
+      - name: rerun pipeline + dump positioning keys
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          node --import tsx -e "
+            (async () => {
+              const { default: pool } = await import('./server/localDb.ts');
+              const { startPositioningJob } = await import('./server/_core/positioningJobRunner.ts');
+              const steps = await import('./server/_core/positioningSteps.ts');
+              const build = steps.buildBrandPositioningSteps;
+              const ID = 2859, UID = 199;
+              const [[b]] = await pool.query('SELECT id, name FROM brands WHERE id=? AND userId=? LIMIT 1',[ID,UID]);
+              if (!b) { console.error('brand not found'); process.exit(1); }
+              const built = build({ lang: 'zh-TW' });
+              console.log('step count:', built.length, 'ids:', built.map(s=>s.id).join(','));
+              startPositioningJob({ userId: UID, entityKind:'brand', entityId: ID, brandName: b.name, steps: built });
+              // poll positioning_jobs until done/failed (process stays alive → bg job runs)
+              const t0 = Date.now();
+              while (Date.now()-t0 < 6.5*60*1000) {
+                await new Promise(r=>setTimeout(r,6000));
+                const [[j]] = await pool.query(\"SELECT status,currentStep,totalSteps,LEFT(COALESCE(lastError,''),120) le FROM positioning_jobs WHERE entityKind='brand' AND entityId=? ORDER BY id DESC LIMIT 1\",[ID]);
+                console.log('job', j && JSON.stringify(j));
+                if (j && (j.status==='done' || j.status==='failed')) break;
+              }
+              const [[r]] = await pool.query('SELECT positioning FROM brands WHERE id=?',[ID]);
+              let p = r && r.positioning; if (typeof p==='string') p = JSON.parse(p);
+              const keys = Object.keys(p||{});
+              console.log('positioning keys:', keys.join(','));
+              const want = ['goldenCircle','tagline','taglineScore','origin','values','audience','competition','differentiation','trends','voice'];
+              for (const k of want) {
+                const v = p && p[k];
+                const filled = v && Object.values(v).some(x => x && (typeof x==='string'? x.trim(): (Array.isArray(x)? x.length: true)));
+                console.log('  ', k, filled ? 'FILLED' : 'EMPTY', '::', JSON.stringify(v).slice(0,120));
+              }
+              console.log('  _assets preserved:', !!(p && p._assets));
+            })().catch(e => { console.error(e); process.exit(1); });
+          "
