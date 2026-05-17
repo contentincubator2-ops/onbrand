@@ -39,6 +39,41 @@ export interface BrandSummary {
  *
  * 2026-05-11 (CJ「選了 product / event 也要 narrow LLM context」).
  */
+/**
+ * 2026-05-17 (CJ「所有任務的產出，有遵守品牌大腦的規範嗎？」→ 硬檢查
+ * + 自動修正): structured brand-rule assets for the orchestra's
+ * post-generation enforcement layer. Soft prompt injection alone never
+ * guaranteed adherence; this returns the deterministically-checkable
+ * rules from positioning._assets so the orchestra can auto-apply
+ * substitutions and detect banned words after generation.
+ */
+export async function getBrandRuleAssets(
+  brandId: number | undefined | null,
+): Promise<{ banned: string[]; subs: Array<{ from: string; to: string }>; preferred: string[] }> {
+  const empty = { banned: [] as string[], subs: [] as Array<{ from: string; to: string }>, preferred: [] as string[] };
+  if (!brandId) return empty;
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning FROM brands WHERE id = ? LIMIT 1`,
+      [brandId],
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row?.positioning) return empty;
+    const p = typeof row.positioning === "string" ? safeParse(row.positioning) : row.positioning;
+    const a = p?._assets ?? {};
+    const strArr = (x: any): string[] =>
+      Array.isArray(x?.items) ? x.items.map((s: any) => String(s ?? "").trim()).filter(Boolean)
+      : Array.isArray(x) ? x.map((s: any) => String(s ?? "").trim()).filter(Boolean) : [];
+    const pairs = Array.isArray(a?.term_substitutions?.pairs)
+      ? a.term_substitutions.pairs
+          .map((pr: any) => ({ from: String(pr?.from ?? "").trim(), to: String(pr?.to ?? "").trim() }))
+          .filter((pr: any) => pr.from && pr.to)
+      : [];
+    return { banned: strArr(a?.banned_words), subs: pairs, preferred: strArr(a?.preferred_terms) };
+  } catch { return empty; }
+}
+
 export async function buildBrandPrefix(
   brandId: number | undefined | null,
   productId?: number | null,
