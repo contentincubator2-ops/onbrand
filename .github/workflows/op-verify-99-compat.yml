@@ -1,0 +1,31 @@
+name: Ops — Verify 99s compat shim on legacy data
+on: { workflow_dispatch: {} }
+jobs:
+  v:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: legacy *-100-* run still resolves
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          node --import tsx -e "
+            (async () => {
+              const { default: pool } = await import('./server/localDb.ts');
+              const { normalizeTaskId, legacyTaskId } = await import('./server/_core/tierCompat.ts');
+              // unit-ish: shim correctness
+              for (const t of ['fb-100-launch-toolkit','em-100-launch-sequence','kl-100-campaign-toolkit','fb-99-x','fb-30-caption-short']) {
+                console.log('SHIM', t, '->', normalizeTaskId(t), '| legacy:', legacyTaskId(t));
+              }
+              // find a legacy mission still carrying [task:*-100-*]
+              const [rows] = await pool.query(
+                \"SELECT m.id mid, m.description, mo.id oid FROM missions m JOIN mission_outputs mo ON mo.missionId=m.id WHERE m.description LIKE '%[task:%-100-%]%' ORDER BY mo.id DESC LIMIT 3\");
+              if (!rows.length) { console.log('NO legacy *-100-* missions in DB (nothing to break).'); return; }
+              for (const r of rows) {
+                const m = String(r.description||'').match(/\\[task:([^\\]]+)\\]/);
+                const raw = m && m[1];
+                console.log('LEGACY oid=', r.oid, 'rawTask=', raw, '-> normalized=', raw && normalizeTaskId(raw));
+              }
+            })().catch(e => { console.error(e); process.exit(1); });
+          "
