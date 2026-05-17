@@ -10,8 +10,8 @@
  *      points + competitor positioning gaps (5-8 sec).
  *   2. Single Haiku call to synthesize "wants X / lacks Y / fills Z"
  *      structure plus a tagline / USP / 3 differentiators (~2-3 sec).
- *   3. Persist to brands.soworkAnalysis (or products/events.positioning)
- *      under `_interim: true` so 30s/60s/100s/Theater can read it.
+ *   3. Persist to <entity>.positioning under `_interim` (namespaced, never
+ *      top-level) so 30s/60s/100s/Theater can read it as a fallback.
  *
  * Wall budget: ≤ 12s. If scout fails → still synthesize from prompt only.
  * Stays as fallback even after full pipeline completes (UI may prefer
@@ -33,7 +33,8 @@ export async function loadInterimPositioningBlock(
   entityId: number,
 ): Promise<string> {
   const table = entityKind === "brand" ? "brands" : entityKind === "product" ? "products" : "events";
-  const col = entityKind === "brand" ? "soworkAnalysis" : "positioning";
+  // 2026-05-17: brand reads the canonical `positioning` column too.
+  const col = "positioning";
   try {
     const [rows]: any = await localPool.execute(
       `SELECT \`${col}\` AS payload, name FROM \`${table}\` WHERE id = ? LIMIT 1`,
@@ -46,14 +47,14 @@ export async function loadInterimPositioningBlock(
     cur = cur ?? {};
     const interim = cur._interim ?? null;
 
-    // Prefer top-level full pipeline output, fall back to interim
+    // Prefer canonical positioning.<segment> shape, fall back to interim
     const wants  = interim?.consumerWants;
     const lacks  = interim?.competitorLacks;
     const fills  = interim?.brandFills;
-    const usp    = cur.usp ?? interim?.usp;
-    const audience = cur.targetAudience ?? interim?.targetAudience;
-    const positioning = cur.positioning ?? interim?.positioning;
-    const tagline = cur.tagline ?? interim?.tagline;
+    const usp    = cur.differentiation?.summary ?? cur.differentiation?.functional ?? interim?.usp;
+    const audience = cur.audience?.primary ?? interim?.targetAudience;
+    const positioning = cur.differentiation?.summary ?? cur.goldenCircle?.why ?? interim?.positioning;
+    const tagline = cur.tagline?.zhTagline ?? cur.tagline?.enTagline ?? interim?.tagline;
 
     const lines: string[] = [];
     if (wants || lacks || fills) {
@@ -216,7 +217,8 @@ ${scoutBlock}
 
 async function persistInterim(kind: "brand"|"product"|"event", id: number, userId: number, pulse: InterimPulse): Promise<void> {
   const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
-  const col   = kind === "brand" ? "soworkAnalysis" : "positioning";
+  // 2026-05-17: brand writes the canonical `positioning` column too.
+  const col   = "positioning";
   try {
     const [rows]: any = await localPool.execute(
       `SELECT \`${col}\` AS payload FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
@@ -227,16 +229,13 @@ async function persistInterim(kind: "brand"|"product"|"event", id: number, userI
     let cur: any = row.payload;
     if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
     cur = cur ?? {};
-    // Top-level: only fill values that are missing (never clobber full pipeline output).
+    // 2026-05-17: interim is namespaced STRICTLY under `_interim`. We must
+    // NOT write top-level string keys (tagline/positioning/usp/...) — in
+    // the canonical `positioning` column those top-level keys are reserved
+    // for segment OBJECTS (positioningSchema.ts). Writing a string there
+    // would corrupt the 品牌大腦 cards. Readers fall back to `_interim`.
     const next: any = { ...cur };
     next._interim = pulse;
-    if (!next.tagline)         next.tagline = pulse.tagline;
-    if (!next.positioning)     next.positioning = pulse.positioning;
-    if (!next.usp)             next.usp = pulse.usp;
-    if (!next.targetAudience)  next.targetAudience = pulse.targetAudience;
-    if (!next.brandVoice)      next.brandVoice = pulse.brandVoice;
-    if (!next.differentiators?.length)  next.differentiators = pulse.differentiators;
-    if (!next.messagingPillars?.length) next.messagingPillars = pulse.messagingPillars;
     await localPool.execute(
       `UPDATE \`${table}\` SET \`${col}\` = ? WHERE id = ? AND userId = ?`,
       [JSON.stringify(next), id, userId],

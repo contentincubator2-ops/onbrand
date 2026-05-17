@@ -6,8 +6,8 @@
  *    後，也就是該 brandId 有的所有資料。"
  *
  * Flow this assembles in priority order (most authoritative first):
- *   1. Full pipeline positioning (top-level keys in soworkAnalysis)
- *   2. Interim quick-pulse (soworkAnalysis._interim)
+ *   1. Full pipeline positioning (positioning.<segment>, positioningSchema.ts)
+ *   2. Interim quick-pulse (positioning._interim)
  *   3. _assets — 文字 tab content (voice / principles / banned / preferred /
  *      CTA / hook libraries, etc.)
  *   4. Visual assets (logo / colors / fonts) summary
@@ -57,8 +57,9 @@ export type EntityKind = "brand" | "product" | "event";
 /**
  * CJ 2026-05-07: "應用在品牌的規則和設計，也同樣應用在產品和活動"
  * Same context-scan logic applies to product / event scopes — they
- * have their own positioning JSON column. Brand uses soworkAnalysis;
- * product/event use positioning.
+ * have their own positioning JSON column.
+ * 2026-05-17: brand now also reads the canonical `positioning` column
+ * (segment-keyed, positioningSchema.ts shape) — no more soworkAnalysis.
  */
 export async function loadFullContext(
   entityKind: EntityKind,
@@ -67,7 +68,7 @@ export async function loadFullContext(
 ): Promise<FullBrandContext> {
   if (!entityId) return EMPTY;
   const table = entityKind === "brand" ? "brands" : entityKind === "product" ? "products" : "events";
-  const col   = entityKind === "brand" ? "soworkAnalysis" : "positioning";
+  const col   = "positioning";
   try {
     // Brand has many extra columns; product/event have fewer. Select common
     // columns explicitly to avoid Drizzle/MySQL column-mismatch errors.
@@ -100,48 +101,51 @@ export async function loadFullContext(
     if (row.emotionalDiff)   lines.push(`情感差異化：${row.emotionalDiff}`);
     if (row.functionalDiff)  lines.push(`功能差異化：${row.functionalDiff}`);
 
-    // ── 2. Full pipeline positioning sections ───────────────────────
+    // ── 2. Full positioning sections ────────────────────────────────
+    // 2026-05-17: canonical positioning.<segment> shape (positioningSchema.ts
+    // BRAND_SEGMENTS). Brand & product/event all read this column now.
     const seg: Record<string, any> = pos;
     const hasFullPositioning =
-      !!(seg.differentiation || seg.brandValues || seg.messagingStrategy || seg.executiveSummary);
+      !!(seg.goldenCircle || seg.differentiation || seg.tagline || seg.voice
+        || seg.values || seg.audience || seg.competition);
 
     if (hasFullPositioning) {
-      lines.push("\n【完整定位（14-step pipeline 產出）】");
-      if (seg.differentiation) {
-        const d = seg.differentiation;
-        if (d.uniqueSellingProposition) lines.push(`USP：${d.uniqueSellingProposition}`);
-        if (d.positioningStatement)     lines.push(`定位聲明：${d.positioningStatement}`);
-        const kd = fmtItems("差異化點", d.keyDifferentiators); if (kd) lines.push(kd);
-      }
-      if (seg.brandValues) {
-        const bv = seg.brandValues;
-        const cv = fmtItems("核心價值", bv.coreValues); if (cv) lines.push(cv);
-        if (bv.brandMission) lines.push(`使命：${bv.brandMission}`);
-        if (bv.brandVision)  lines.push(`願景：${bv.brandVision}`);
-        if (bv.goldenCircle) {
-          const gc = bv.goldenCircle;
-          if (gc.why || gc.how || gc.what) lines.push(`Why/How/What：${gc.why ?? ""} / ${gc.how ?? ""} / ${gc.what ?? ""}`);
+      lines.push("\n【完整定位（品牌定位 pipeline 產出）】");
+      if (seg.goldenCircle) {
+        const gc = seg.goldenCircle;
+        if (gc.why || gc.how || gc.what) {
+          lines.push(`Why/How/What：${gc.why ?? ""} / ${gc.how ?? ""} / ${gc.what ?? ""}`);
         }
       }
-      if (seg.brandPersonality) {
-        const bp = seg.brandPersonality;
-        const ar = fmtItems("品牌原型", bp.archetypes); if (ar) lines.push(ar);
-        if (bp.tone)  lines.push(`語調：${bp.tone}`);
-        if (bp.voice) lines.push(`聲音：${bp.voice}`);
+      if (seg.tagline) {
+        const t = seg.tagline;
+        if (t.zhTagline) lines.push(`標語（中）：${t.zhTagline}`);
+        if (t.enTagline) lines.push(`標語（EN）：${t.enTagline}`);
+        if (t.story)     lines.push(`標語故事：${t.story}`);
       }
-      if (seg.messagingStrategy) {
-        const ms = seg.messagingStrategy;
-        if (ms.tagline) lines.push(`正式標語：${ms.tagline}`);
-        if (ms.elevatorPitch) lines.push(`電梯簡報：${ms.elevatorPitch}`);
-        const mp = fmtItems("訊息支柱", ms.messagingPillars); if (mp) lines.push(mp);
+      if (seg.differentiation) {
+        const d = seg.differentiation;
+        if (d.emotional)  lines.push(`情感差異化：${d.emotional}`);
+        if (d.functional) lines.push(`功能差異化：${d.functional}`);
+        if (d.summary)    lines.push(`定位總結：${d.summary}`);
       }
-      if (seg.targetAudience) {
-        const ta = seg.targetAudience;
-        if (ta.primarySegment) lines.push(`主要客群：${ta.primarySegment}`);
-        if (ta.demographics)   lines.push(`人口統計：${ta.demographics}`);
-        if (ta.psychographics) lines.push(`心理特徵：${ta.psychographics}`);
+      if (seg.values && Array.isArray(seg.values.items)) {
+        const cv = seg.values.items
+          .map((it: any) => it?.label).filter((x: any) => typeof x === "string" && x.trim());
+        if (cv.length) lines.push(`核心價值：${cv.join(" / ")}`);
       }
-      if (seg.executiveSummary) lines.push(`執行摘要：${seg.executiveSummary}`);
+      if (seg.voice) {
+        const v = seg.voice;
+        const ar = fmtItems("品牌原型", v.archetypes); if (ar) lines.push(ar);
+        const tn = fmtItems("語調", v.tone);           if (tn) lines.push(tn);
+        const fb = fmtItems("溝通禁區", v.forbidden);   if (fb) lines.push(fb);
+      }
+      if (seg.audience) {
+        const ta = seg.audience;
+        if (ta.primary)   lines.push(`主要受眾：${String(ta.primary).slice(0, 400)}`);
+        if (ta.secondary) lines.push(`次要受眾：${String(ta.secondary).slice(0, 300)}`);
+      }
+      if (seg.origin?.story) lines.push(`品牌故事：${String(seg.origin.story).slice(0, 400)}`);
     }
 
     // ── 3. Interim positioning (wants / lacks / fills) ───────────────

@@ -113,18 +113,21 @@ async function gatherSessionContext(args: {
   // Brand info
   if (args.brandId) {
     try {
+      // 2026-05-17: brand positioning summary now derives from the
+      // canonical positioning.differentiation.summary (or goldenCircle.why).
       const [rows]: any = await localPool.execute(
         `SELECT name, industry, description,
-                JSON_EXTRACT(soworkAnalysis, '$.executiveSummary') AS exec
+                JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.differentiation.summary')) AS diffSummary,
+                JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.goldenCircle.why'))         AS gcWhy
            FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
         [args.brandId, args.userId],
       );
       const b = (rows as any[])[0];
       if (b) {
         ctx.push(`品牌：${b.name}${b.industry ? `（${b.industry}）` : ""}`);
-        if (b.exec) {
-          const summary = typeof b.exec === "string" ? b.exec : JSON.stringify(b.exec);
-          ctx.push(`品牌定位摘要：${String(summary).replace(/^"|"$/g, "").slice(0, 240)}`);
+        const summary = b.diffSummary || b.gcWhy;
+        if (summary && summary !== "null") {
+          ctx.push(`品牌定位摘要：${String(summary).slice(0, 240)}`);
         }
       }
     } catch { /* non-fatal */ }

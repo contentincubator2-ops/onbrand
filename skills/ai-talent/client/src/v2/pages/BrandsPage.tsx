@@ -3476,7 +3476,8 @@ function PositioningTopRow({
     startMut?.mutate?.({ entityKind, entityId: brandId, lang: "zh-TW" });
   };
 
-  const totalSteps = entityKind === "brand" ? 14 : entityKind === "product" ? 6 : 4;
+  // 2026-05-17: brand pipeline = 10 steps (one per BRAND_SEGMENTS id).
+  const totalSteps = entityKind === "brand" ? 10 : entityKind === "product" ? 6 : 4;
   // 2026-05-11 (reviewer:「重新自動定位 可以更名... 強調套用SoWork 品牌定位框架」)
   // — frame the button as applying a named methodology, not as a generic
   // "AI fills it in" action. Methodology becomes the competitive moat.

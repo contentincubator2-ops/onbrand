@@ -16,20 +16,23 @@
  *       5. On final success → status=done, finishedAt=now.
  *       6. On final fail (5 retries x all 5 backoffs exhausted on a
  *          non-recoverable error) → status=failed, lastError=msg.
- *   - Steps write directly to brands.positioning JSON via the same
- *     scope.savePositioning path used by manual edits.
+ *   - Steps write directly to <entity>.positioning JSON (single source of
+ *     truth — same column the 品牌大腦 cards + manual edits use). Brand
+ *     steps emit { [segmentId]: <segment obj> } in positioningSchema.ts
+ *     shape; merge is a plain top-level spread.
  *
  * Retry schedule (per step, per attempt index):
  *   1: 5s    2: 15s    3: 45s    4: 2min    5: 5min
  *   max wall budget per step ≈ 7-8 minutes
  *
  * Step parallelism:
- *   Brand pipeline (14 steps) — partitioned into waves:
- *     wave 1 (parallel): 1 market-insight, 2 audience, 3 competition
- *     wave 2 (parallel, depends on wave 1): 4 differentiation, 5 USP, 6 positioning
- *     wave 3 (sequential): 7 messaging, 8 voice (depend on wave 2 output)
- *     wave 4 (parallel): 9 SMP, 10 trends
- *     wave 5 (parallel): 11 origin, 12 values, 13 golden circle, 14 tagline
+ *   Brand pipeline (10 steps, = BRAND_SEGMENTS) — partitioned into waves:
+ *     wave 1 (parallel): audience, competition, trends, origin
+ *     wave 2 (parallel): values, differentiation
+ *     wave 3: goldenCircle
+ *     wave 4: tagline
+ *     wave 5: taglineScore
+ *     wave 6: voice
  *
  * Product pipeline (6 steps) — short version, mostly parallel.
  * Event   pipeline (4 steps) — even shorter, all parallel after step 1.
@@ -133,11 +136,20 @@ async function recordUsageRow(args: {
 
 /** Read current entity row's positioning JSON, merge `patch` into it,
  *  and write back. Used by step runners to persist their output.
- *  Brand uses `soworkAnalysis` (read by positioningBridge / Theater);
- *  Product/Event use `positioning` (added by entity migration). */
+ *
+ *  2026-05-17 ROOT-CAUSE FIX: ALL scopes (brand/product/event) now write
+ *  the `positioning` column — the single source of truth that the 品牌大腦
+ *  cards read (brands.positioning.<segmentId>). Brand previously wrote
+ *  `soworkAnalysis` keyed by step ids; that column + key shape never
+ *  matched the card schema so cards were always empty. The brand steps
+ *  now emit { [segmentId]: <segment obj> } (positioningSchema.ts shape),
+ *  so a plain spread-merge into `positioning` is correct.
+ *
+ *  Spread-merge preserves wizard-written sibling keys: _assets,
+ *  _aiPrompts, _interim, and any manually-edited segments not in this run. */
 async function mergePositioning(kind: EntityKind, id: number, userId: number, patch: Record<string, any>): Promise<void> {
   const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
-  const col = kind === "brand" ? "soworkAnalysis" : "positioning";
+  const col = "positioning";
   const [rows]: any = await localPool.execute(
     `SELECT \`${col}\` AS payload FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
     [id, userId],
@@ -147,6 +159,7 @@ async function mergePositioning(kind: EntityKind, id: number, userId: number, pa
   let cur: any = row.payload;
   if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
   cur = cur ?? {};
+  // Top-level spread: { ...prior segments + _assets/_aiPrompts/_interim, ...new segments }
   const next = { ...cur, ...patch };
   await localPool.execute(
     `UPDATE \`${table}\` SET \`${col}\` = ? WHERE id = ? AND userId = ?`,
@@ -373,27 +386,33 @@ async function runPipelineDetached(args: {
     }
   }
 
-  // 2026-05-15 (CJ「自動定位流程要跑完，資料要填完」):
-  // Project the soworkAnalysis JSON into the 7 estimate columns that the
-  // rest of the app actually reads (tagline / valueProposition /
-  // targetMarket / audienceA / audienceB / emotionalDiff / functionalDiff),
-  // mark positioningStatus='completed', onboardingStep=11, isEstimate=0.
-  // Without this projection, the pipeline finishes but every downstream
-  // "is this brand ready?" check still reports unlocked.
+  // 2026-05-17: brands.positioning.<segment> is now the single source of
+  // truth (cards read it directly — no projection needed for the UI). But
+  // several downstream readiness checks + verifyAndFinalize still gate on
+  // the legacy flat columns + positioningStatus. Keep a MINIMAL finalize
+  // that DERIVES those columns from the new positioning.<segment> shape
+  // (NOT from soworkAnalysis). Goal: one canonical shape, flat columns are
+  // a derived convenience only.
   if (args.entityKind === "brand") {
     try {
       await finalizeBrandAfterPipeline(args.userId, args.entityId);
     } catch (e) {
       console.error("[positioningJobRunner] finalize step failed:", e);
-      // Pipeline data still in soworkAnalysis — user can re-run finalize
-      // via positioningJobs.verifyAndFinalize. Don't mark whole job failed.
+      // positioning.<segment> data is already persisted (the cards work);
+      // only the derived flat columns may be stale. User can re-run
+      // finalize via positioningJobs.verifyAndFinalize. Don't fail the job.
     }
   }
   await setJobStatus(jobId, "done", { currentStep: args.steps.length, finishedAt: true });
 }
 
 /* ─────────────────────────────────────────────────────────────────────
- *  Brand finalization: soworkAnalysis JSON → 7 estimate columns + flags
+ *  Brand finalization: DERIVE legacy flat columns from the canonical
+ *  brands.positioning.<segment> structure (positioningSchema.ts shape).
+ *  The 品牌大腦 cards read positioning.<segment> directly and do NOT
+ *  depend on this — these columns are a derived convenience for legacy
+ *  readiness checks (positioningStatus / onboardingStep / isEstimate)
+ *  and the few consumers still on flat columns.
  * ───────────────────────────────────────────────────────────────────── */
 
 /** Extract the first non-empty string from a list of candidate paths.
@@ -410,7 +429,8 @@ function pickStr(obj: any, ...paths: string[]): string | null {
       const first = cur[0];
       if (typeof first === "string" && first.trim()) return first.trim();
       if (first && typeof first === "object") {
-        const s = (first.text ?? first.title ?? first.headline ?? first.name ?? "")
+        const s = (first.text ?? first.title ?? first.headline ?? first.name
+          ?? first.label ?? first.body ?? "")
           .toString().trim();
         if (s) return s;
       }
@@ -419,60 +439,46 @@ function pickStr(obj: any, ...paths: string[]): string | null {
   return null;
 }
 
-/** Read brands.soworkAnalysis, project to 7 estimate columns, mark complete. */
+/** Read brands.positioning, derive legacy flat columns, mark complete. */
 export async function finalizeBrandAfterPipeline(userId: number, brandId: number): Promise<{
   updated: number;
   filled: Record<string, boolean>;
 }> {
   const [rows]: any = await localPool.execute(
-    `SELECT soworkAnalysis FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+    `SELECT positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
     [brandId, userId],
   );
   const row = (rows as any[])[0];
   if (!row) throw new Error(`brand ${brandId} not found for user ${userId}`);
-  let a: any = row.soworkAnalysis;
+  let a: any = row.positioning;
   if (typeof a === "string") { try { a = JSON.parse(a); } catch { a = {}; } }
   a = a ?? {};
 
+  // Derive from positioning.<segment> using the canonical field keys
+  // (positioningSchema.ts BRAND_SEGMENTS).
   const tagline = pickStr(a,
-    "messagingStrategy.tagline",
-    "taglineCandidates",
-    "taglineCreative.tagline",
-    "taglineCreative.candidates",
-    "messagingStrategy.headlineConcept",
+    "tagline.zhTagline",
+    "tagline.enTagline",
   );
   const valueProposition = pickStr(a,
-    "valueProposition.headline",
-    "valueProposition.statement",
-    "valueProposition.summary",
-    "differentiation.positioningStatement",
+    "differentiation.summary",
+    "goldenCircle.why",
+    "differentiation.functional",
   );
   const targetMarket = pickStr(a,
-    "targetAudience.primarySegment",
-    "targetAudience.segment",
-    "targetAudience.summary",
-    "marketInsight.targetMarket",
+    "audience.primary",
   );
   const audienceA = pickStr(a,
-    "targetAudience.primary",
-    "targetAudience.personaA",
-    "targetAudience.primarySegment",
-    "targetAudience.segments",
+    "audience.primary",
   );
   const audienceB = pickStr(a,
-    "targetAudience.secondary",
-    "targetAudience.personaB",
-    "targetAudience.secondarySegment",
+    "audience.secondary",
   );
   const emotionalDiff = pickStr(a,
     "differentiation.emotional",
-    "brandPersonality.emotionalDriver",
-    "brandValues.emotional",
   );
   const functionalDiff = pickStr(a,
     "differentiation.functional",
-    "valueProposition.functionalBenefit",
-    "differentiation.summary",
   );
 
   // Build COALESCE-style UPDATE: only overwrite columns where we extracted

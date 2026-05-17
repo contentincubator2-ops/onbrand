@@ -114,48 +114,63 @@ export async function getBrandPositioning(input: PositioningInput): Promise<Posi
 }
 
 /**
- * 從 DB 讀取指定 brandId 的定位上下文（供 taskExecutor 使用）
+ * 從 DB 讀取指定 brandId 的定位上下文（供 taskExecutor / Theater 使用）
+ *
+ * 2026-05-17 ROOT-CAUSE FIX: reads the canonical brands.positioning
+ * column (segment-keyed, positioningSchema.ts BRAND_SEGMENTS shape) — NOT
+ * the old soworkAnalysis detour. Maps segment objects → the flat
+ * PositioningResult shape Theater / taskExecutor expect. Falls back to
+ * `_interim` (interimQuickPulse) then brand row columns then empty.
  */
 export async function getBrandPositioningById(
   brandId: number,
   userId: number
 ): Promise<PositioningResult | null> {
-  const db = await getDb();
-  if (!db) return null;
-
   try {
-    const rows = await db
-      .select()
-      .from(brands)
-      .where(and(eq(brands.id, brandId), eq(brands.userId, userId)))
-      .limit(1);
-
-    const brand = rows[0];
+    const { default: localPool } = await import("./localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT id, name, industry, tagline, targetAudience, brandVoice, positioning
+         FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+      [brandId, userId],
+    );
+    const brand = (rows as any[])[0];
     if (!brand) return null;
 
-    const analysis = (brand.soworkAnalysis ?? {}) as Record<string, unknown>;
-    // Fallback chain: full pipeline output → interim quick-pulse → brand row → empty.
-    // Interim is stored under analysis._interim by interimQuickPulse.
-    const interim = (analysis._interim ?? {}) as Record<string, any>;
-    const fb = <T>(...vals: T[]): T | undefined => vals.find((v) => v != null && v !== "" && !(Array.isArray(v) && v.length === 0));
+    let p: any = brand.positioning;
+    if (typeof p === "string") { try { p = JSON.parse(p); } catch { p = {}; } }
+    p = p ?? {};
+    const interim = (p._interim ?? {}) as Record<string, any>;
+    const fb = <T>(...vals: T[]): T | undefined =>
+      vals.find((v) => v != null && v !== "" && !(Array.isArray(v) && v.length === 0));
+
+    // Map canonical segments → flat PositioningResult.
+    const tl   = p.tagline ?? {};
+    const gc   = p.goldenCircle ?? {};
+    const diff = p.differentiation ?? {};
+    const aud  = p.audience ?? {};
+    const voice = p.voice ?? {};
+    // differentiators: emotional + functional axes, else interim list.
+    const diffs: string[] = [diff.emotional, diff.functional]
+      .filter((x) => typeof x === "string" && x.trim());
 
     return {
-      tagline: fb<string>(analysis.tagline as string, brand.tagline ?? "", interim.tagline) ?? brand.name,
-      targetAudience: fb<string>(brand.targetAudience ?? "", analysis.targetAudience as string, interim.targetAudience) ?? "",
-      usp: fb<string>(analysis.usp as string, ((analysis.differentiators as string[])?.[0] ?? ""), interim.usp) ?? "",
-      positioningSummary: fb<string>(analysis.positioning as string, brand.tagline ?? "", interim.positioning) ?? brand.name,
-      goldenCircle: (analysis.goldenCircle as PositioningResult["goldenCircle"]) ?? {
-        why: (analysis.valueProposition as string) ?? interim.brandFills ?? "",
-        how: brand.brandVoice ?? "",
-        what: brand.name,
-      },
-      valueProposition: fb<string>(analysis.valueProposition as string, interim.brandFills) ?? "",
-      brandVoice: fb<string>(brand.brandVoice ?? "", interim.brandVoice) ?? "",
-      differentiators: ((analysis.differentiators as string[]) ?? interim.differentiators ?? []) as string[],
-      messagingPillars: ((analysis.messagingPillars as string[]) ?? interim.messagingPillars ?? []) as string[],
+      tagline: fb<string>(tl.zhTagline, tl.enTagline, brand.tagline ?? "", interim.tagline) ?? brand.name,
+      targetAudience: fb<string>(aud.primary, brand.targetAudience ?? "", interim.targetAudience) ?? "",
+      usp: fb<string>(diff.summary, diff.functional, interim.usp) ?? "",
+      positioningSummary: fb<string>(diff.summary, gc.why, brand.tagline ?? "", interim.positioning) ?? brand.name,
+      goldenCircle: (gc.why || gc.how || gc.what)
+        ? { why: gc.why ?? "", how: gc.how ?? "", what: gc.what ?? brand.name }
+        : { why: interim.brandFills ?? "", how: brand.brandVoice ?? "", what: brand.name },
+      valueProposition: fb<string>(diff.summary, gc.why, interim.brandFills) ?? "",
+      brandVoice: fb<string>(
+        Array.isArray(voice.tone) && voice.tone.length ? voice.tone.join("、") : undefined,
+        brand.brandVoice ?? "", interim.brandVoice,
+      ) ?? "",
+      differentiators: (diffs.length ? diffs : (interim.differentiators ?? [])) as string[],
+      messagingPillars: (interim.messagingPillars ?? []) as string[],
       // Industry is read from brands.industry column (used by Theater scout
       // to bound 'this industry's viral patterns' queries).
-      industry: (brand as any).industry ?? (analysis.industry as string) ?? undefined,
+      industry: brand.industry ?? undefined,
       source: "db",
       brandId: brand.id,
     };

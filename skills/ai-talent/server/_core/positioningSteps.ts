@@ -1,14 +1,30 @@
 /**
  * positioningSteps.ts — PositioningStep[] factories for brand / product / event.
  *
- * Wraps existing 10-step prompts (from positioning/tenStepPositioning.ts) into
- * the runner's step shape with explicit dep graph for parallel waves.
+ * 2026-05-17 ROOT-CAUSE REFACTOR (品牌大腦 14-step cards always empty):
+ *   The brand pipeline previously emitted ad-hoc step-keyed JSON into the
+ *   wrong column (brands.soworkAnalysis). The「品牌大腦」cards read
+ *   brands.positioning.<segmentId> where segmentId ∈ BRAND_SEGMENTS
+ *   (client/src/v2/lib/positioningSchema.ts). Step ids ≠ segment ids and
+ *   column was wrong → cards never populated.
  *
- * Brand (14 steps total):
- *   wave 1 (parallel, no deps): market_insight, target_audience, competitor_analysis, brand_origin
- *   wave 2 (deps wave1): brand_values, differentiation, value_proposition
- *   wave 3 (deps wave2): brand_personality, messaging_strategy, tagline_creative
- *   wave 4 (deps wave3): channel_strategy, brand_activation, golden_circle_refine, executive_summary
+ *   Now: ONE step per BRAND_SEGMENTS id; each step's id IS the segment id
+ *   and its LLM prompt emits JSON in EXACTLY that segment's field schema.
+ *   No post-transform — the LLM produces the final card shape. The runner
+ *   merges { [segmentId]: <segment object> } straight into the
+ *   brands.positioning column (single source of truth, no detour).
+ *
+ *   Brand segment ids (= step ids), dependency-wave ordered:
+ *     wave 1 (no deps):   audience, competition, trends, origin
+ *     wave 2 (deps w1):   values, differentiation
+ *     wave 3 (deps w2):   goldenCircle
+ *     wave 4 (deps w3):   tagline
+ *     wave 5 (deps w4):   taglineScore
+ *     wave 6 (deps all):  voice
+ *   Deleted (no card segment): value_proposition, channel_strategy,
+ *     brand_activation, executive_summary (+ old step-keyed market_insight,
+ *     messaging_strategy, tagline_creative, golden_circle_refine,
+ *     brand_personality — folded into the segment steps above).
  *
  * Product (6 steps): market_fit, target_user, value_prop, differentiation, messaging, gtm_summary
  * Event   (4 steps): audience_brief, value_hook, messaging, callouts
@@ -71,179 +87,191 @@ function brandCtx(c: StepContext): string {
   return `品牌名稱：${c.brandName}\n產業：${c.industry || "未指定"}\n描述：${c.description || ""}`;
 }
 
-// ─── Brand 14-step pipeline ──────────────────────────────────────────────
+// ─── Brand pipeline — one step per BRAND_SEGMENTS id ─────────────────────
+//
+// Each step's `id` IS the segment id. Each `run` returns
+// { [segmentId]: <segment object matching positioningSchema.ts fields> }.
+// positioningJobRunner.mergePositioning() spreads these straight into
+// brands.positioning — NO post-transform, NO soworkAnalysis detour.
 
 export function buildBrandPositioningSteps(opts: { lang?: string } = {}): PositioningStep[] {
   const lang = opts.lang === "en" ? "English" : "繁體中文";
   const sys = SYS(lang);
 
   return [
-    // ── Wave 1 (no deps) ──
+    // ── Wave 1 (no deps) — grounding research ──
     {
-      id: "marketInsight",
-      label: "市場洞察分析",
+      id: "audience",
+      label: "目標受眾",
       deps: [],
       run: async (c) => ({
-        marketInsight: await callJSON(c, "marketInsight", sys,
-          `${brandCtx(c)}\n\n分析此品牌的市場洞察，輸出 JSON：
-{"industryTrends":["趨勢1","趨勢2","趨勢3"],"customerPainPoints":["痛點1","痛點2","痛點3"],"marketOpportunities":["機會1","機會2","機會3"],"marketSize":"市場規模描述"}`,
-          { industryTrends: [], customerPainPoints: [], marketOpportunities: [], marketSize: "" }),
+        audience: await callJSON(c, "audience", sys,
+          `${brandCtx(c)}\n\n定義此品牌的目標受眾。輸出 JSON，鍵名固定如下：
+{"primary":"主受眾完整敘事（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道，150-300字）","secondary":"次受眾敘事（80-150字）","matrix":[{"dim":"情感需求維度","primary":主受眾分數1-10,"fan":粉絲分數1-10,"weight":"★★★★★"}]}
+matrix 至少 5 個維度。`,
+          { primary: "", secondary: "", matrix: [] }, 1500),
       }),
     },
     {
-      id: "targetAudience",
-      label: "目標客群定義",
-      deps: [],
-      run: async (c) => ({
-        targetAudience: await callJSON(c, "targetAudience", sys,
-          `${brandCtx(c)}\n\n定義目標客群，輸出 JSON：
-{"primarySegment":"主要客群描述","demographics":"人口統計特徵","psychographics":"心理特徵","buyingBehavior":"購買行為","keyPersonas":[{"name":"角色名","description":"描述"}]}`,
-          { primarySegment: "", demographics: "", psychographics: "", buyingBehavior: "", keyPersonas: [] }),
-      }),
-    },
-    {
-      id: "competitorAnalysis",
+      id: "competition",
       label: "競爭格局分析",
       deps: [],
       run: async (c) => ({
-        competitorAnalysis: await callJSON(c, "competitorAnalysis", sys,
-          `${brandCtx(c)}\n\n分析競爭格局，輸出 JSON：
-{"mainCompetitors":[{"name":"競品1","positioning":"其定位","weakness":"其弱點"}],"marketGaps":["市場空缺1","市場空缺2"],"competitiveAdvantages":["優勢1","優勢2","優勢3"]}`,
-          { mainCompetitors: [], marketGaps: [], competitiveAdvantages: [] }),
+        competition: await callJSON(c, "competition", sys,
+          `${brandCtx(c)}\n\n分析此品牌的競爭格局。輸出 JSON，鍵名固定如下：
+{"intensity":"競爭強度評估（一段）","direct":[{"name":"競品名","position":"市場地位","tone":"品牌調性","weakness":"弱點","ourEdge":"我方差異點"}],"indirect":[{"name":"間接競品","threat":"威脅程度","response":"應對策略"}],"map":"競爭定位地圖描述（一段）"}
+direct 至少 2 個，indirect 至少 1 個。`,
+          { intensity: "", direct: [], indirect: [], map: "" }, 1500),
       }),
     },
     {
-      id: "brandOrigin",
+      id: "trends",
+      label: "市場趨勢與機會",
+      deps: [],
+      run: async (c) => ({
+        trends: await callJSON(c, "trends", sys,
+          `${brandCtx(c)}\n\n分析此品牌所處的市場趨勢與機會。輸出 JSON，鍵名固定如下：
+{"favorable":[{"name":"有利趨勢標題","body":"60-120字說明"}],"risks":[{"name":"風險標題","body":"60-120字應對方向"}]}
+favorable 3-4 個，risks 2-3 個。`,
+          { favorable: [], risks: [] }, 1200),
+      }),
+    },
+    {
+      id: "origin",
       label: "品牌起源故事",
       deps: [],
       run: async (c) => ({
-        brandOrigin: await callJSON(c, "brandOrigin", sys,
-          `${brandCtx(c)}\n\n撰寫品牌起源故事，輸出 JSON：
-{"founderStory":"創辦背景","triggerMoment":"關鍵啟動瞬間","rootBelief":"核心信念"}`,
-          { founderStory: "", triggerMoment: "", rootBelief: "" }, 1000),
+        origin: await callJSON(c, "origin", sys,
+          `${brandCtx(c)}\n\n撰寫此品牌的起源故事與信念五層深挖。輸出 JSON，鍵名固定如下：
+{"story":"整段品牌起源敘事（150-300字）","belief5Layers":[{"layer":"1 表面動機","body":"內容"},{"layer":"2 問題意識","body":"內容"},{"layer":"3 方法選擇","body":"內容"},{"layer":"4 信念基礎","body":"內容"},{"layer":"5 核心情緒動機","body":"一句話最本質情緒動機"}]}`,
+          { story: "", belief5Layers: [] }, 1200),
       }),
     },
 
     // ── Wave 2 (deps wave1) ──
     {
-      id: "brandValues",
-      label: "品牌核心價值",
-      deps: ["marketInsight", "competitorAnalysis"],
-      run: async (c) => ({
-        brandValues: await callJSON(c, "brandValues", sys,
-          `${brandCtx(c)}\n\n建立品牌核心價值，輸出 JSON：
-{"coreValues":["價值1","價值2","價值3"],"brandMission":"品牌使命宣言","brandVision":"品牌願景","goldenCircle":{"why":"為什麼存在","how":"如何實現","what":"提供什麼"}}`,
-          { coreValues: [], brandMission: "", brandVision: "", goldenCircle: { why: "", how: "", what: "" } }),
-      }),
+      id: "values",
+      label: "品牌核心價值觀",
+      deps: ["origin"],
+      run: async (c) => {
+        const origin = c.prevOutputs.origin?.origin;
+        return {
+          values: await callJSON(c, "values", sys,
+            `${brandCtx(c)}\n\n從以下品牌起源信念蒸餾出 3-5 條最不可複製的核心價值觀：
+起源故事：${origin?.story || ""}
+信念深挖：${JSON.stringify(origin?.belief5Layers || [])}
+
+輸出 JSON，鍵名固定如下：
+{"items":[{"label":"2-4字核心標籤","body":"50-80字說明（品牌做事方式的本質宣言，非行銷話術）"}]}
+items 3-5 條，彼此互補不重複。`,
+            { items: [] }, 1200),
+        };
+      },
     },
     {
       id: "differentiation",
-      label: "差異化定位策略",
-      deps: ["competitorAnalysis", "targetAudience"],
-      run: async (c) => ({
-        differentiation: await callJSON(c, "differentiation", sys,
-          `${brandCtx(c)}\n\n制定差異化定位，輸出 JSON：
-{"uniqueSellingProposition":"獨特銷售主張（一句話）","keyDifferentiators":["差異化點1","差異化點2","差異化點3"],"positioningStatement":"完整定位聲明"}`,
-          { uniqueSellingProposition: "", keyDifferentiators: [], positioningStatement: "" }, 1200),
-      }),
-    },
-    {
-      id: "valueProposition",
-      label: "價值主張建構",
-      deps: ["targetAudience", "marketInsight"],
-      run: async (c) => ({
-        valueProposition: await callJSON(c, "valueProposition", sys,
-          `${brandCtx(c)}\n\n建構價值主張，輸出 JSON：
-{"headline":"主標題（10字以內）","subheadline":"副標題（20字以內）","keyBenefits":["核心效益1","核心效益2","核心效益3"],"proofPoints":["佐證1","佐證2","佐證3"]}`,
-          { headline: "", subheadline: "", keyBenefits: [], proofPoints: [] }, 1200),
-      }),
+      label: "品牌差異化戰略",
+      deps: ["competition", "audience"],
+      run: async (c) => {
+        const comp = c.prevOutputs.competition?.competition;
+        const aud  = c.prevOutputs.audience?.audience;
+        return {
+          differentiation: await callJSON(c, "differentiation", sys,
+            `${brandCtx(c)}\n\n基於競爭格局與目標受眾，制定品牌差異化戰略：
+競爭格局：${JSON.stringify(comp || {}).slice(0, 1500)}
+主受眾：${(aud?.primary || "").slice(0, 600)}
+
+輸出 JSON，鍵名固定如下：
+{"emotional":"情感差異化（為什麼愛我，100-200字）","functional":"功能差異化（為什麼選我，100-200字）","summary":"差異化總結句（一句話品牌定位）"}`,
+            { emotional: "", functional: "", summary: "" }, 1200),
+        };
+      },
     },
 
     // ── Wave 3 (deps wave2) ──
     {
-      id: "brandPersonality",
-      label: "品牌個性與聲音",
-      deps: ["brandValues"],
-      run: async (c) => ({
-        brandPersonality: await callJSON(c, "brandPersonality", sys,
-          `${brandCtx(c)}\n\n定義品牌個性，輸出 JSON：
-{"archetypes":["原型1","原型2"],"tone":"品牌語調描述","voice":"品牌聲音特色","communicationStyle":"溝通風格指南"}`,
-          { archetypes: [], tone: "", voice: "", communicationStyle: "" }, 1000),
-      }),
-    },
-    {
-      id: "messagingStrategy",
-      label: "訊息策略制定",
-      deps: ["valueProposition", "differentiation"],
-      run: async (c) => ({
-        messagingStrategy: await callJSON(c, "messagingStrategy", sys,
-          `${brandCtx(c)}\n\n制定訊息策略，輸出 JSON：
-{"tagline":"品牌標語（8字以內）","elevatorPitch":"30秒電梯簡報","messagingPillars":["訊息支柱1","訊息支柱2","訊息支柱3"],"keyMessages":{"awareness":"知名度階段訊息","consideration":"考慮階段訊息","conversion":"轉換階段訊息"}}`,
-          { tagline: "", elevatorPitch: "", messagingPillars: [], keyMessages: {} }, 1200),
-      }),
-    },
-    {
-      id: "taglineCreative",
-      label: "Tagline 候選擴展",
-      deps: ["differentiation", "brandValues"],
-      run: async (c) => ({
-        taglineCandidates: await callJSON(c, "taglineCreative", sys,
-          `${brandCtx(c)}\n\n基於品牌差異化點生成 5 個候選 tagline，輸出 JSON：
-{"candidates":["tagline1","tagline2","tagline3","tagline4","tagline5"],"recommended":"最推薦的一句"}`,
-          { candidates: [], recommended: "" }, 800),
-      }),
+      id: "goldenCircle",
+      label: "品牌黃金圈",
+      deps: ["origin", "differentiation", "values"],
+      run: async (c) => {
+        const origin = c.prevOutputs.origin?.origin;
+        const diff   = c.prevOutputs.differentiation?.differentiation;
+        return {
+          goldenCircle: await callJSON(c, "goldenCircle", sys,
+            `${brandCtx(c)}\n\n從品牌起源與差異化蒸餾出黃金圈：
+核心情緒動機：${JSON.stringify(origin?.belief5Layers?.slice(-1) || [])}
+差異化總結：${diff?.summary || ""}
+
+輸出 JSON，鍵名固定如下：
+{"why":"WHY 品牌願景 — 相信什麼 / 為什麼存在（50-100字）","how":"HOW 品牌使命 — 怎麼做 / 方法（50-100字）","what":"WHAT 品牌產品或服務 — 提供什麼具體東西（50-100字）"}`,
+            { why: "", how: "", what: "" }, 1000),
+        };
+      },
     },
 
     // ── Wave 4 (deps wave3) ──
     {
-      id: "channelStrategy",
-      label: "通路策略規劃",
-      deps: ["targetAudience", "brandPersonality"],
-      run: async (c) => ({
-        channelStrategy: await callJSON(c, "channelStrategy", sys,
-          `${brandCtx(c)}\n\n規劃通路策略，輸出 JSON：
-{"primaryChannels":["通路1","通路2","通路3"],"contentStrategy":{"Instagram":"內容策略","Facebook":"內容策略","LinkedIn":"內容策略"},"touchpointMap":["接觸點1","接觸點2","接觸點3","接觸點4"]}`,
-          { primaryChannels: [], contentStrategy: {}, touchpointMap: [] }, 1200),
-      }),
-    },
-    {
-      id: "brandActivation",
-      label: "品牌活化計畫",
-      deps: ["messagingStrategy", "channelStrategy"],
-      run: async (c) => ({
-        brandActivation: await callJSON(c, "brandActivation", sys,
-          `${brandCtx(c)}\n\n制定品牌活化計畫，輸出 JSON：
-{"quickWins":["快速勝利1","快速勝利2","快速勝利3"],"quarterlyMilestones":["Q1","Q2","Q3","Q4"],"kpis":["KPI1","KPI2","KPI3","KPI4"],"budgetAllocation":{"內容製作":"20%","付費廣告":"40%","社群經營":"20%","公關活動":"20%"}}`,
-          { quickWins: [], quarterlyMilestones: [], kpis: [], budgetAllocation: {} }, 1200),
-      }),
-    },
-    {
-      id: "goldenCircleRefine",
-      label: "Golden Circle 精煉",
-      deps: ["brandValues", "brandOrigin"],
-      run: async (c) => ({
-        goldenCircleRefined: await callJSON(c, "goldenCircleRefine", sys,
-          `${brandCtx(c)}\n\n基於起源與核心價值，精煉 Why/How/What，輸出 JSON：
-{"why":"精煉的 why（1-2句）","how":"精煉的 how（1-2句）","what":"精煉的 what（1-2句）"}`,
-          { why: "", how: "", what: "" }, 800),
-      }),
-    },
-    {
-      id: "executiveSummary",
-      label: "執行摘要",
-      deps: ["differentiation", "brandValues", "messagingStrategy"],
+      id: "tagline",
+      label: "品牌核心標語",
+      deps: ["goldenCircle", "differentiation"],
       run: async (c) => {
+        const gc   = c.prevOutputs.goldenCircle?.goldenCircle;
         const diff = c.prevOutputs.differentiation?.differentiation;
-        const bv   = c.prevOutputs.brandValues?.brandValues;
-        const ms   = c.prevOutputs.messagingStrategy?.messagingStrategy;
-        const text = await callText(c, "executiveSummary", `你是品牌定位專家，請用${lang}撰寫執行摘要。`,
-          `${brandCtx(c)}\n\n基於以下分析結果，撰寫 200 字以內的執行摘要：
-定位聲明：${diff?.positioningStatement || ""}
-品牌使命：${bv?.brandMission || ""}
-USP：${diff?.uniqueSellingProposition || ""}
-標語：${ms?.tagline || ""}\n\n請直接輸出純文字摘要，不需要 JSON 格式。`,
-          800);
-        return { executiveSummary: text, brandPositioningScore: 75 + Math.floor(Math.random() * 15) };
+        return {
+          tagline: await callJSON(c, "tagline", sys,
+            `${brandCtx(c)}\n\n基於黃金圈與差異化生成品牌核心標語：
+WHY：${gc?.why || ""}
+差異化總結：${diff?.summary || ""}
+
+輸出 JSON，鍵名固定如下：
+{"zhTagline":"中文主標語","enTagline":"英文主標語","type":"標語類型（如：四字單句、直擊核心）","scenes":["應用場景1","應用場景2","應用場景3"],"competitorDiff":"與競品標語的差異（一段）","story":"標語背後的品牌故事（150-300字）"}`,
+            { zhTagline: "", enTagline: "", type: "", scenes: [], competitorDiff: "", story: "" }, 1200),
+        };
+      },
+    },
+
+    // ── Wave 5 (deps wave4) ──
+    {
+      id: "taglineScore",
+      label: "標語評分摘要",
+      deps: ["tagline"],
+      run: async (c) => {
+        const tl = c.prevOutputs.tagline?.tagline;
+        return {
+          taglineScore: await callJSON(c, "taglineScore", sys,
+            `${brandCtx(c)}\n\n對以下主標語進行 6 維度評分（每維度 1-100 分）：
+中文標語：${tl?.zhTagline || ""}
+英文標語：${tl?.enTagline || ""}
+
+6 維度：記憶(Memorability) / 差異(Uniqueness) / 情感(Emotional) / 簡潔(Clarity) / 國際化(Global) / 可延展(Extensible)
+
+輸出 JSON，鍵名固定如下：
+{"rows":[{"dim":"記憶","code":"Memorability","score":分數,"comment":"30-60字評析"}],"total":總分0-100}
+rows 必須含全部 6 維度，total = 6 維度平均。`,
+            { rows: [], total: 0 }, 1200),
+        };
+      },
+    },
+
+    // ── Wave 6 (deps all) — voice last ──
+    {
+      id: "voice",
+      label: "品牌個性與溝通風格",
+      deps: ["goldenCircle", "differentiation", "values"],
+      run: async (c) => {
+        const gc   = c.prevOutputs.goldenCircle?.goldenCircle;
+        const vals = c.prevOutputs.values?.values;
+        return {
+          voice: await callJSON(c, "voice", sys,
+            `${brandCtx(c)}\n\n基於黃金圈與核心價值觀，定義品牌個性與溝通風格：
+WHY：${gc?.why || ""}
+核心價值觀：${JSON.stringify(vals?.items || [])}
+
+輸出 JSON，鍵名固定如下：
+{"archetypes":["主原型（從英雄/智者/創造者/照顧者/探險家/反叛者/魔法師/一般人/戀人/弄臣/統治者/純真者選）","次原型"],"tone":["語調關鍵詞1","語調關鍵詞2","語調關鍵詞3","語調關鍵詞4"],"forbidden":["溝通禁區1","溝通禁區2","溝通禁區3"],"samples":[{"generic":"一般說法","ours":"我們的說法"}]}
+samples 3-4 組。`,
+            { archetypes: [], tone: [], forbidden: [], samples: [] }, 1200),
+        };
       },
     },
   ];

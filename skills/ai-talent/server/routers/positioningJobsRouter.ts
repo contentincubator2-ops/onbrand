@@ -131,7 +131,8 @@ export const positioningJobsRouter = router({
       const userId = ctx.user!.id;
       const table = input.entityKind === "brand" ? "brands"
                   : input.entityKind === "product" ? "products" : "events";
-      const col = input.entityKind === "brand" ? "soworkAnalysis" : "positioning";
+      // 2026-05-17: brand now uses the canonical `positioning` column too.
+      const col = "positioning";
       try {
         const [rows]: any = await localPool.execute(
           `SELECT \`${col}\` AS payload FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
@@ -143,16 +144,19 @@ export const positioningJobsRouter = router({
         if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
         if (!cur) return null;
         const interim = cur._interim ?? null;
-        const isFull = !!(cur.executiveSummary || cur.brandActivation || cur.messagingStrategy);
-        // Prefer full data; fallback to interim shape
+        // Read the canonical positioning.<segment> shape (positioningSchema.ts).
+        const isFull = !!(cur.goldenCircle || cur.differentiation || cur.tagline || cur.voice);
+        const diffs = Array.isArray(cur.differentiation)
+          ? cur.differentiation
+          : [cur.differentiation?.emotional, cur.differentiation?.functional].filter(Boolean);
         return {
           source: isFull ? "full" : (interim ? "interim" : "empty"),
-          tagline: cur.tagline ?? interim?.tagline ?? "",
-          positioning: cur.positioning ?? cur.differentiation?.positioningStatement ?? interim?.positioning ?? "",
-          usp: cur.usp ?? cur.differentiation?.uniqueSellingProposition ?? interim?.usp ?? "",
-          targetAudience: cur.targetAudience ?? interim?.targetAudience ?? "",
-          differentiators: cur.differentiators ?? cur.differentiation?.keyDifferentiators ?? interim?.differentiators ?? [],
-          messagingPillars: cur.messagingPillars ?? cur.messagingStrategy?.messagingPillars ?? interim?.messagingPillars ?? [],
+          tagline: cur.tagline?.zhTagline ?? cur.tagline?.enTagline ?? interim?.tagline ?? "",
+          positioning: cur.differentiation?.summary ?? cur.goldenCircle?.why ?? interim?.positioning ?? "",
+          usp: cur.differentiation?.summary ?? cur.differentiation?.functional ?? interim?.usp ?? "",
+          targetAudience: cur.audience?.primary ?? interim?.targetAudience ?? "",
+          differentiators: diffs.length ? diffs : (interim?.differentiators ?? []),
+          messagingPillars: interim?.messagingPillars ?? [],
           consumerWants: interim?.consumerWants ?? "",
           competitorLacks: interim?.competitorLacks ?? "",
           brandFills: interim?.brandFills ?? "",
@@ -327,7 +331,7 @@ ${fullCtx.block}${real.context}${knowledgeBlock}`;
         `SELECT id, name, brandName, positioningStatus, onboardingStep, isEstimate,
                 tagline, valueProposition, targetMarket, audienceA, audienceB,
                 emotionalDiff, functionalDiff,
-                soworkAnalysis
+                positioning
            FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
         [input.brandId, userId],
       );
@@ -387,7 +391,7 @@ ${fullCtx.block}${real.context}${knowledgeBlock}`;
         job: job ? {
           status: job.status,
           currentStep: Number(job.currentStep ?? 0),
-          totalSteps: Number(job.totalSteps ?? 14),
+          totalSteps: Number(job.totalSteps ?? 10),
           lastError: job.lastError ?? null,
           startedAt: job.startedAt,
           finishedAt: job.finishedAt,
