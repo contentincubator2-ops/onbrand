@@ -53,6 +53,17 @@ interface VariantData {
   extras?: any;
 }
 
+/* 2026-05-18 (CJ「還有 \n\n 的符號」): models sometimes emit the literal
+ * two-char sequence backslash-n instead of a real newline (double-escaped
+ * JSON). Normalize to real line breaks + collapse runs so every mockup
+ * renders clean paragraphs. */
+function sanitizeCaption(s: unknown): string {
+  let t = typeof s === "string" ? s : (s == null ? "" : String(s));
+  t = t.replace(/\\r\\n|\\n|\\r/g, "\n").replace(/\\t/g, " ");
+  t = t.replace(/\n{3,}/g, "\n\n").trim();
+  return t;
+}
+
 /* 2026-05-17 (CJ「把得獎工藝依據展示在前台」): per-task craft reference.
  * Mirrors the 【得獎工藝參考】 baked into each PR task's systemPrompt.
  * Wording is deliberately "工藝原則參考，非案例背書" — we apply the
@@ -519,7 +530,7 @@ export default function RunPage() {
         const img = v.image ?? {};
         return {
           label: v.label,
-          caption: v.caption,
+          caption: sanitizeCaption(v.caption),
           hashtags: v.hashtags ?? [],
           imageUrl: v.imageUrl ?? img.url ?? null,
           imageStatus: v.imageStatus ?? img.status ?? undefined,
@@ -529,7 +540,7 @@ export default function RunPage() {
         } as VariantData;
       });
     } catch { /* ignore */ }
-    return [{ label: lang === "en" ? "Main version" : "主版本", caption: data.content || "" }];
+    return [{ label: lang === "en" ? "Main version" : "主版本", caption: sanitizeCaption(data.content || "") }];
   }, [data]);
 
   // Apply local overrides so mockup reflects unsaved edits in real time

@@ -413,7 +413,7 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
           />
         </div>
         <div className="px-4 py-3">
-          <p className="text-base font-semibold leading-snug">{adText}</p>
+          <p className="text-small font-medium leading-relaxed whitespace-pre-wrap">{adText}</p>
           <p className="text-tiny text-default-500 mt-1">{lang === "en" ? "Shop now — 10% off, limited time →" : "立即購買，限時 9 折優惠 →"}</p>
         </div>
         {showImage && (

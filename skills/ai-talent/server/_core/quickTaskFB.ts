@@ -279,11 +279,20 @@ caption 欄位就放這「一個」headline 本身，不要解釋、不要前綴
     inputs: [
       { key: "topic", label: "主題 / 產品 / 受眾", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 5 個 FB 廣告 primary text（80-150 字 / 個）。
-5 種版本：① 故事式 ② 數據式 ③ 反差式 ④ 見證式（用第三人稱描述用戶體驗）⑤ 簡短直球式
-每個版本獨立完整、各有自己的 hook + body + CTA。caption 欄位放這 5 個（每個之間用 "---" 分隔）。${FB_TONE_SUFFIX}`,
+    // 2026-05-18 (CJ「寫 5 種只給一種、還有 \\n\\n」): was variants:1
+    // cramming 5 into one caption. Now 1 primary text PER variant.
+    systemPrompt: `產出「一個」FB 廣告 primary text（這次只寫這一個變體，80–150 字）。
+依本變體切角（variantLabel），五種版本各自精神：
+- 故事式：用一個具體場景/小故事開場帶出產品。
+- 數據式：用一個具體數字/反差當主軸。
+- 反差式：用前後對照凸顯改變。
+- 見證式：用第三人稱描述某位用戶的真實體驗。
+- 簡短直球式：最短、最直接，直接講利益＋CTA。
+要有自己的 hook → body → CTA。
+**換行用真正的換行（直接按 Enter 斷行/分段），絕對不要輸出「\\n」這種字面符號。**
+caption 欄位就放這「一個」primary text 本身，不要編號、不要用 --- 分隔、不要解釋。${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
-    maxTokens: 1200,
+    maxTokens: 400,
     outputDefaults: { platform: "facebook", post_type: "ad" },
   },
   {
@@ -612,16 +621,16 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     captionMaxChars: 30,
   },
   "fb-30-ad-primary": {
-    variants: 1,
+    variants: 5,
     images: 0,
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
     fluxSize: null,
     imageQualitySteps: 0,
-    variantLabels: ["5 種 primary text"],
-    captionMinChars: 200,
-    captionMaxChars: 1200,
+    variantLabels: ["故事式", "數據式", "反差式", "見證式", "簡短直球"],
+    captionMinChars: 60,
+    captionMaxChars: 220,
   },
   "fb-30-ad-cta": {
     variants: 1,
