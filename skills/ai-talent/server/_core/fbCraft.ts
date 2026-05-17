@@ -3,7 +3,7 @@
  * Architecture mirrors igCraft.ts / edmCraft.ts: brand-AGNOSTIC craft
  * discipline (the HOW); brand voice/essence still from the brand digest;
  * hard rules from the post-gen enforcement layer. Static constant — no DB,
- * no per-brand state. Injected only for FB-family body tasks.
+ * no per-brand state. Injected for ALL FB-family body tasks (30s/60s/99s).
  *
  * Facebook is a community-first medium: organic reach is earned by
  * triggering saves/shares/comments. Ads live or die by the first 3 words.
@@ -12,7 +12,7 @@
 
 import type { FBTaskTemplate } from "./quickTaskFB";
 
-/** Is this a Facebook-family task? */
+/** Is this a Facebook-family task? (30s / 60s / 99s) */
 export function isFacebookTask(template: FBTaskTemplate): boolean {
   const id = String(template.id ?? "");
   if (id.startsWith("fb-")) return true;
@@ -41,28 +41,38 @@ Facebook 是社群優先媒介——觸及靠分享/留言/儲存賺來，廣告
 - 可掃讀：短句換行、段落間空行、重點 emoji 當視覺錨（不濫用）。
 - 連結貼文：caption 先給脈絡再給連結——「為什麼你要點」比「這裡有什麼」重要。
 - 置頂/個人形象貼：2 句話定位品牌 + 一個明確 CTA（追蹤/了解更多/連結）。
+【60s 系列 / 套組 craft】
+- 連載 (serial)：3 集 = 1 情緒弧；第 1 集介紹＋鉤子，第 2 集深化，第 3 集解決＋重新開放；每集獨立可看懂但讓人想看下集。
+- 倒數套組 (countdown)：每天是獨立 hook 不只是數字——先給線索或問題，讓等待本身有價值；社群一起等。
+- 廣告包 (ad pack)：3 支廣告 = 漏斗覆蓋（認知/考慮/轉換）；每支獨立訊息，但共用一條 campaign 主軸。
+- 病毒改寫 (viral-rewrite)：分析原作為何引起分享 → 萃取可遷移的機制 → 用品牌素材重建。
+- 見證改寫 (testimonial-rewrite)：客戶是解決真實挑戰的主角；品牌是工具，不是主詞；量化結果嵌入故事。
 【廣告 craft】
 - 標題（Headline）：≤ 8 個字，包含核心價值主張或反差；不要疑問句。
 - 主文（Primary text）：前 3 個字決定是否繼續讀——用數字/問題/具體結果開場；痛點 → 解方 → 證明 結構。
 - 描述（Description）：補充標題沒說到的具體細節（節省多少時間 / 適合誰 / 價格錨點）。
 - CTA 按鈕：用結果型動詞（「開始使用」「取得報告」）而非點擊型（「了解更多」太泛）。
-- 廣告文案長度：主文 ≤ 125 字最佳展示；如需要長文先放最重要的 insight，展開才有後續。
-【zh-TW 在地化｜最高優先】台灣節點（春節/端午/中秋/雙十一/母親節/228/光棍節）、繁體中文、台灣口語（「超～」「真的假的」「嗯嗯嗯」等視語氣選用）。不要套用美式節慶或陸式用語。
+【99s 活動 craft】
+- 30 天月曆：1 個可擁有的主題錨 + 多格式混搭（影片/圖文/故事/直播）+ UGC 鼓勵貫穿。
+- 危機 playbook：承認→調查→修正→重建 4 個階段各有內容策略；語氣隨時間從危機管理→正常溫度。
+- 發表工具包：每個觸點（前期預告/發表日/後期）獨立訊息但共用一個中心創意概念。
+【zh-TW 在地化｜最高優先】台灣節點（春節/端午/中秋/雙十一/母親節/228）、繁體中文、台灣口語（「超～」「真的假的」「嗯嗯嗯」視語氣選用）。不要套用美式節慶或陸式用語。
 `.trim();
 
 /**
- * Per-task award reference — keyed by exact taskId.
+ * Per-task award reference — keyed by exact taskId (30s + 60s + 99s).
  * Each entry cites the most relevant internationally-awarded campaign for
- * this specific task type + the transferable craft pattern it demonstrates.
+ * this specific task type + the transferable craft pattern.
  * Principle only — NOT copying the campaign's creative.
  */
 const FB_TASK_REF: Record<string, string> = {
+  // ── 30s ───────────────────────────────────────────────────────────────
   "fb-30-caption-short":
     "Wendy's「National Roast Day」Facebook (Shorty Award Best Brand Presence 2019)：每則短貼文是獨立的文化時刻；品牌機智 > 產品功能；不需要 setup，直接就是 punchline。",
   "fb-30-pure-text-hook":
-    "Ryan Reynolds / Mint Mobile「Maximum Effort」Facebook 純文字貼文 (Shorty Award Humor 2020)：讀起來像真人寫的、不像行銷——反共識前置、沒有任何官腔修飾詞。",
+    "Ryan Reynolds / Mint Mobile「Maximum Effort」Facebook 純文字系列 (Shorty Award Humor 2020)：讀起來像真人寫的、不像行銷——反共識前置、沒有任何官腔修飾詞。",
   "fb-30-link-caption":
-    "BuzzFeed Tasty Facebook 連結貼文 (Webby Award People's Voice 2017)：caption 讓點擊感覺像「完成一個被打斷的念頭」，而不是廣告；先給脈絡再給連結。",
+    "BuzzFeed Tasty Facebook 連結貼文 (Webby Award People's Voice 2017)：caption 讓點擊感覺像「完成一個被打斷的念頭」；先給脈絡再給連結。",
   "fb-30-ad-headline":
     "Dollar Shave Club Facebook 廣告 (Effie Platinum New Brand 2013)：標題 = 價值主張 + 個性，一句話；「Our blades are f***ing great」的清晰度——不繞彎、不疑問。",
   "fb-30-ad-primary":
@@ -70,7 +80,7 @@ const FB_TASK_REF: Record<string, string> = {
   "fb-30-ad-cta":
     "Peloton 獲客漏斗 Facebook 廣告 (Shorty Award Health & Fitness 2022)：CTA 錨定在轉化結果（「開始你的旅程」）而非點擊行為——讓按鈕像承諾而非指令。",
   "fb-30-ad-description":
-    "Squarespace「Make Your Next Move」Facebook 廣告 (Shorty Award 2018)：description 從不同角度強化標題、補上標題省略的具體細節；不重複、只補充。",
+    "Squarespace「Make Your Next Move」Facebook 廣告 (Shorty Award 2018)：description 從不同角度強化標題、補上省略的具體細節；不重複、只補充。",
   "fb-30-pinned-short":
     "National Geographic Facebook 主頁 (Shorty Award Best Brand Presence Travel)：置頂 = 品牌永久第一印象；2 句話說清楚「我們是誰 + 為什麼你要追蹤」。",
   "fb-30-story-text":
@@ -78,7 +88,47 @@ const FB_TASK_REF: Record<string, string> = {
   "fb-30-live-title":
     "Red Bull Facebook Live 活動系列 (Shorty Award Sports 2020)：直播標題 = 現在時態的緊迫感；「正在發生什麼 + 為何不能錯過」兩件事都說清楚。",
   "fb-30-countdown-1day":
-    "HBO《Game of Thrones》Facebook 倒數系列 (Shorty Award Entertainment 2019)：每天倒數本身是獨立 hook——不只是「還有 X 天」，而是「今天先給你這個線索」。",
+    "HBO《Game of Thrones》Facebook 倒數系列 (Shorty Award Entertainment 2019)：每天倒數是獨立 hook——不只「還有 X 天」，而是「今天先給你這個線索」。",
+
+  // ── 60s ───────────────────────────────────────────────────────────────
+  "fb-60-single-full":
+    "Dove「Real Beauty」Facebook 完整貼文 (Cannes Lions Grand Prix Titanium 2013)：單貼文 = 完整情緒弧；品牌價值觀嵌入真實故事，不是標語；結尾邀請讀者成為一部分。",
+  "fb-60-link-full":
+    "BuzzFeed Tasty Facebook 原生影片連結 (Webby Award People's Voice 2017)：連結貼文 = 先用 caption 完成 70% 的說服，點擊是延伸；影片本身在 Facebook 原生播放效果最佳。",
+  "fb-60-album-4":
+    "National Geographic「Photo of the Day」Facebook 相簿 (Shorty Award Best Photography Brand)：相簿 = 策展敘事；每張圖賺到下一張點擊；caption 序列建立整體弧線。",
+  "fb-60-carousel-5":
+    "Airbnb「Experiences」Facebook 輪播 (Cannes Lions Titanium Grand Prix)：5 張輪播 = 1 個完整故事弧；封面承諾 payoff；每張賺到滑動；末張是預訂 CTA。",
+  "fb-60-countdown-5day":
+    "HBO《Game of Thrones》最終季 5 日倒數 (Shorty Award Entertainment 2019)：每天獨立 hook + 揭示一個新線索；社群一起等待本身成為事件；momentum 累積到發布日。",
+  "fb-60-launch-kit":
+    "Nike「Dream Crazy」30 週年發表套組 (Cannes Lions Grand Prix Outdoor 2018 → 社群延伸)：發表套組 = 1 個中心創意概念適配每個觸點；每件內容單獨看是完整的，合起來更強。",
+  "fb-60-live-suite":
+    "Red Bull「Stratos」Facebook Live 套組 (Shorty Award Sports 2013)：Live 套組 = 預告→直播錨→事後回顧的生命週期；每個階段有不同的觀眾再參與理由。",
+  "fb-60-pinned-suite":
+    "National Geographic Facebook 置頂套組 (Shorty Award Best Brand Presence Travel)：置頂套組 = 品牌建構的永久架構；組合起來回答「我是誰、我做什麼、你為何應該在乎」。",
+  "fb-60-serial-3":
+    "Dove「Real Beauty」Facebook 連載系列 (Cannes Lions Grand Prix 2013)：3 集 = 1 情緒弧；第 1 集設問/介紹，第 2 集深化/轉折，第 3 集解決 + 重新開放循環。",
+  "fb-60-viral-rewrite":
+    "Ryan Reynolds / Aviation Gin 病毒改寫策略 (Shorty Award Best Humor 2020)：病毒改寫 = 分析原作為何分享 → 萃取機制 → 以品牌素材重建；搭文化便車不是抄作品。",
+  "fb-60-trend-rewrite":
+    "Wendy's 趨勢內容改編系列 (Shorty Award Best Food & Beverage Social 2023)：改 1 個元素讓它變品牌的；時機 > 製作精緻度；讓 trend 替自己發聲。",
+  "fb-60-testimonial-rewrite":
+    "P&G「Thank You Mom」Facebook 見證系列 (Cannes Lions Grand Prix Creative Effectiveness 2012)：見證改寫：客戶 = 主角解決真實挑戰；品牌 = 使能工具，不是主詞；量化結果嵌入感性故事。",
+  "fb-60-ad-pack-3":
+    "Dollar Shave Club 3 支廣告包 (Effie Platinum New Brand 2013)：廣告包 = 認知/考慮/轉換 3 層漏斗各有獨立訊息；共用 1 條 campaign 主軸；每支單獨看也完整。",
+
+  // ── 99s ───────────────────────────────────────────────────────────────
+  "fb-99-30day-calendar":
+    "Coca-Cola「Share a Coke」30 天 Facebook 月曆 (Cannes Lions Grand Prix Creative Effectiveness)：1 個可擁有主題錨 30 天；多格式混搭（影片/圖文/故事）；UGC 鼓勵貫穿全月；品牌成為社群的一部分。",
+  "fb-99-14day-countdown":
+    "HBO《Game of Thrones》14 日最終季倒數 (Shorty Award Entertainment 2019)：14 天升級揭示——每天獨立 hook + 累積 momentum；社群期待本身成為節目；每貼文讓等待有回報。",
+  "fb-99-launch-toolkit":
+    "Nike「Dream Crazy」全平台發表工具包 (Cannes Lions Grand Prix 2018)：工具包 = 1 個中心創意概念跨所有觸點適配；從預告到發表日到長尾；每件內容強化同一個文化主張。",
+  "fb-99-livestream-9seg":
+    "Red Bull「Stratos」Facebook Live 9 段直播製作 (Shorty Award Sports 2013)：9 段 = 前期/中期/後期完整生命週期；每段有獨立的觀眾再參與鉤子；直播事件 = 媒體財產，不只是一次播出。",
+  "fb-99-crisis-playbook":
+    "Johnson & Johnson Tylenol 危機溝通 playbook (PR Week Award Best Crisis Management — 教科書級案例)：危機 playbook = 承認→調查→修正→重建 4 階段各有內容策略；語氣從危機管理逐漸回到品牌正常溫度。",
 };
 
 /** Per-use-case playbook — per taskId pattern + award reference appended. */
@@ -89,6 +139,7 @@ export function fbPlaybookFor(taskId: string): string {
     `# 本任務 playbook（FB 得獎模式）\n${s}` +
     (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
 
+  // ── 廣告系列 ──────────────────────────────────────────────────────────
   if (/ad-headline/.test(id))
     return P("廣告標題：≤ 8 字、核心價值主張 + 品牌個性；數字/反差/具體結果開場；不要疑問句；每字都要 earn its place。");
   if (/ad-primary/.test(id))
@@ -97,11 +148,47 @@ export function fbPlaybookFor(taskId: string): string {
     return P("廣告 CTA：結果型動詞（「取得報告」「開始使用」）而非點擊型；CTA 要像一個承諾，不是命令。");
   if (/ad-description/.test(id))
     return P("廣告描述：補充標題的具體細節（時間/錢/誰適合）；不重複主文；每個字都給轉換理由。");
+  if (/ad-pack/.test(id))
+    return P("廣告包：3 支覆蓋認知/考慮/轉換漏斗；每支獨立訊息但共用 campaign 主軸；格式差異化（影片/圖片/輪播）。");
   if (/ad-/.test(id))
-    return P("廣告文案：標題抓注意→主文建立信任→CTA 收割；每層都有獨立工作，不要疊床架屋。");
+    return P("廣告文案：標題抓注意→主文建立信任→CTA 收割；每層獨立工作，不要疊床架屋。");
+
+  // ── 60s 系列任務 ──────────────────────────────────────────────────────
+  if (/serial/.test(id))
+    return P("連載 3 集：1 情緒弧；集 1 設問/介紹+鉤子，集 2 深化/轉折，集 3 解決+重開循環；每集獨立可看懂但讓人想看下集。");
+  if (/viral-rewrite/.test(id))
+    return P("病毒改寫：分析原作為何分享 → 萃取分享機制 → 以品牌素材重建；搭文化便車，不是抄創意；品牌角度給舊事件新理由。");
+  if (/trend-rewrite/.test(id))
+    return P("趨勢改寫：改 1 個元素讓它變品牌的；不重建從頭、只劫持；時機 > 製作精緻度；說明改了哪個元素 + 為何 timing 對。");
+  if (/testimonial-rewrite/.test(id))
+    return P("見證改寫：客戶是主角解決真實挑戰；品牌是工具不是主詞；量化結果嵌入感性故事；去掉「我很感謝 X 品牌」這種句子。");
+  if (/launch-kit/.test(id))
+    return P("發表套組：1 個中心創意概念跨所有觸點（預告/發表日/後期）；每件內容單獨完整、合起來更強；格式多元化。");
+  if (/live-suite/.test(id))
+    return P("直播套組：預告→直播錨→事後回顧 3 個生命週期；每個階段有不同的觀眾再參與鉤子；累積跨越直播時間點的觸及。");
+  if (/album/.test(id))
+    return P("相簿：每張圖賺到下一張點擊；caption 序列建立整體弧線；最後一張 = 故事收束 + CTA。");
+  if (/carousel/.test(id))
+    return P("輪播：封面承諾 payoff；每張一重點且視覺連貫；末張 CTA + 儲存誘因；5 張 = 完整故事弧。");
+  if (/pinned-suite/.test(id))
+    return P("置頂套組：品牌永久建構架構；組合回答「我是誰/做什麼/你為何在乎」；視覺一致性讓帳號看起來有策略。");
+
+  // ── 99s 活動任務 ──────────────────────────────────────────────────────
+  if (/30day-calendar/.test(id))
+    return P("30 天月曆：1 個可擁有的主題錨全月；多格式混搭（影片/圖文/故事/直播）；UGC 鼓勵貫穿；每週有一個高峰內容。");
+  if (/14day-countdown|countdown-5day/.test(id))
+    return P("倒數系列：每天獨立 hook + 累積 momentum；給線索/預告/問題讓等待有回報；社群期待本身成為事件。");
+  if (/launch-toolkit/.test(id))
+    return P("發表工具包：中心創意概念跨所有觸點；前期鋪陳→發表日高峰→長尾延伸；每件內容強化同一個文化主張。");
+  if (/livestream/.test(id))
+    return P("直播 9 段：前期/中期/後期完整生命週期；每段有獨立觀眾再參與鉤子；直播事件 = 媒體財產，不只是一次播出。");
+  if (/crisis/.test(id))
+    return P("危機 playbook：承認→調查→修正→重建 4 階段各有內容策略；語氣從危機管理逐漸回品牌正常溫度；每階段訊息清晰、不模糊。");
+
+  // ── 通用 ──────────────────────────────────────────────────────────────
   if (/pure-text-hook/.test(id))
     return P("純文字貼文：不依賴圖片；反共識主張或強烈情緒前置；讀起來像真人說話；觸發「我要分享這個」。");
-  if (/link-caption/.test(id))
+  if (/link/.test(id))
     return P("連結貼文：先給為什麼點的脈絡；讓點擊感覺像延伸自己的想法；不要只說「快來看看」。");
   if (/story/.test(id))
     return P("Story：3 格微型旅程（吊胃口→揭示→行動）；每格獨立可看懂；互動貼紙（投票/問題）創造參與。");
@@ -111,6 +198,5 @@ export function fbPlaybookFor(taskId: string): string {
     return P("置頂貼文：品牌永久第一印象；2 句定位 + 1 個 CTA；讓陌生訪客 3 秒內知道為何追蹤。");
   if (/countdown/.test(id))
     return P("倒數貼文：每天是獨立 hook（不只 '-X 天'）；給小線索/預告/問題——讓等待本身有價值。");
-  // caption-short / default
   return P("FB 貼文：前 2 行就是命運；觸發分享的理由嵌入內容；結尾開放問題引留言；可掃讀短句。");
 }
