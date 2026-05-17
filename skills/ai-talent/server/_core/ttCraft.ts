@@ -72,7 +72,7 @@ const TT_TASK_REF: Record<string, string> = {
   "tt-30-trend-remix":
     "Wendy's TikTok 趨勢即時改編 (Shorty Award Best Brand Use of TikTok 2022；Ad Age 評選最佳快餐社群策略)：改 1 個元素讓它變品牌的；不重建 trend，只劫持它；時機正確的粗糙版 > 遲到的精緻版。",
   "tt-30-live-opening":
-    "Florida Lottery「Scratch Factor Live」(IAC Gold Award Social Media Campaign 2023；真人即時刮彩券直播 + 觀眾投票機制)：開場 10 秒：正在發生什麼 + 為何不能重播 + 觀眾能控制什麼；即時互動機制在前 30 秒就啟動。",
+    "WWE TikTok Live 開場設計 (TikTok 官方創作者案例；WWE 是非音樂類 TikTok Live 最高同時在線的體育娛樂品牌)：開場 30 秒說清楚「今晚的衝突是什麼 + 為何不能重播 + 你現在能影響什麼（投票/喊話）」；即時互動機制在開場就啟動——觀眾感覺自己是劇情的一部分，不只是觀眾。",
 
   // ── 60s ───────────────────────────────────────────────────────────────
   "tt-60-foryou-full":

@@ -72,7 +72,7 @@ const FB_TASK_REF: Record<string, string> = {
   "fb-30-pure-text-hook":
     "Ryan Reynolds / Aviation Gin「Maximum Effort」Facebook 純文字系列 (Shorty Award Best Humor Brand 2020，Cannes Lions Silver 2021)：讀起來像真人寫的、不像行銷——反共識前置、沒有任何官腔修飾詞。",
   "fb-30-link-caption":
-    "BuzzFeed Tasty Facebook 原生影片 (Webby Award People's Voice Best Food & Drink 2017)：caption 讓點擊感覺像「完成一個被打斷的念頭」；Facebook 原生影片先鋒；先給脈絡再給連結。",
+    "Tim Ferriss Facebook 連結貼文策略 (Shorty Award Best Author Social Media；《4-Hour Workweek》全球暢銷作家)：連結 caption = 先給讀者一個完整的思考框架（「我花了 6 個月試了 50 種方法，這是我學到的」），再給連結；讓點擊感覺像延伸自己的思考，而非進入廣告；脈絡 > 連結本身。",
   "fb-30-ad-headline":
     "Old Spice「The Man Your Man Could Smell Like」Facebook 廣告 (Cannes Lions Grand Prix Titanium 2010，Effie Gold 2011)：廣告標題 = 價值主張 + 個性，一句話說完；每個字有存在理由；結語即記憶點。",
   "fb-30-ad-primary":
