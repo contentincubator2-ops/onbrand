@@ -14,7 +14,7 @@ import {
   faChalkboard, faChevronLeft, faChevronRight, faImages,
   faCircle, faExpand,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText, titleEchoesCaption } from "./shared";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -53,13 +53,44 @@ export function PressRelease({ title, brandName, variantLabel, liveTitle, liveCa
   const dateStr = today.toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
   const weekday = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][today.getDay()];
 
-  // Headline resolution: explicit liveTitle wins; else the FIRST block of
-  // liveCaption (the 新聞稿標題 task emits a single line → that's the
-  // headline); else the run title. Remaining blocks become body.
+  // 2026-05-17 (CJ「副標過長，分不出主標/副標/描述」): clear 3-tier
+  // hierarchy that works for EVERY press task, not just 標題:
+  //   主標 (headline)  = a SHORT title — liveTitle → run title →
+  //                      (first caption block only if it's short).
+  //                      The 副標/引言 task's long paragraph must NOT
+  //                      land in the giant headline slot.
+  //   副標．引言 (deck) = first caption block (the generated subhead/
+  //                      lead) — medium italic, clamped, NOT huge.
+  //   內文 (body)       = remaining blocks (or greeked filler).
   const blocks = (liveCaption ?? "").split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-  const headline = (liveTitle ?? blocks[0] ?? title ?? "").trim();
-  const deck = liveDescription ?? (blocks.length > 1 ? blocks[1]! : null);
-  const bodyParas = blocks.slice(liveTitle ? 0 : (deck && !liveDescription ? 2 : 1));
+  const firstCap = blocks[0] ?? "";
+  const runTitle = (title ?? "").trim();
+  const SHORT = 28; // 中文字 — anything longer isn't a headline
+  const headline = (
+    (liveTitle && liveTitle.trim()) ||
+    runTitle ||
+    (firstCap.length <= SHORT ? firstCap : "")
+  ).trim();
+  // The caption is the deck UNLESS it just echoes the headline (the
+  // 標題 task: title ≈ caption → don't print it twice).
+  const capIsHeadline = titleEchoesCaption(headline, firstCap) || firstCap === headline;
+  const deck = liveDescription
+    ?? (!capIsHeadline && firstCap ? firstCap : null);
+  // Body = blocks after whichever block became the deck.
+  const usedAsDeck = !liveDescription && deck === firstCap;
+  const bodyParas = blocks.slice(usedAsDeck ? 1 : 0)
+    .filter((b) => b !== headline && b !== deck);
+  // Length-aware headline sizing so a longer title still fits ~2 lines
+  // instead of ballooning to 8 lines like the 副標 bug.
+  const hlLen = headline.length;
+  const hlSize = hlLen <= 14 ? "clamp(26px,4.4vw,42px)"
+               : hlLen <= 26 ? "clamp(22px,3.4vw,32px)"
+               :               "clamp(18px,2.6vw,25px)";
+
+  const Kicker = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-center text-[9px] tracking-[0.34em] uppercase mb-1.5 not-italic"
+       style={{ color: "#a39c8c" }}>{children}</p>
+  );
 
   return (
     <div className="w-full max-w-[760px] mx-auto">
@@ -93,31 +124,43 @@ export function PressRelease({ title, brandName, variantLabel, liveTitle, liveCa
           </div>
           <div className="border-t-[3px] border-double border-black mb-5" />
 
-          {/* ── Lead headline ── */}
+          {/* ── 主標 headline ── */}
+          <Kicker>主標 · Headline</Kicker>
           {headline ? (
             <h2
-              className="text-center font-black mb-3"
-              style={{ fontSize: "clamp(22px, 3.6vw, 38px)", lineHeight: 1.18, letterSpacing: "0.005em" }}
+              className="text-center font-black mb-4"
+              style={{
+                fontSize: hlSize, lineHeight: 1.2, letterSpacing: "0.005em",
+                display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
             >
               {headline}
             </h2>
           ) : (
-            <div className="flex flex-col items-center gap-2 mb-3">
-              <Skeleton className="h-7 w-[85%] rounded" />
-              <Skeleton className="h-7 w-[60%] rounded" />
+            <div className="flex flex-col items-center gap-2 mb-4">
+              <Skeleton className="h-7 w-[70%] rounded" />
             </div>
           )}
 
-          {/* Deck / subhead — italic, centered, between hairlines */}
+          {/* ── 副標 / 引言 deck — readable medium, clamped, NOT huge ── */}
           {deck ? (
-            <>
-              <div className="border-t border-black/60 w-1/3 mx-auto mb-2" />
-              <p className="text-center italic mb-5" style={{ fontSize: "14px", color: "#333" }}>
+            <div className="mb-5">
+              <div className="border-t border-black/50 w-1/4 mx-auto mb-2.5" />
+              <Kicker>副標 · 引言</Kicker>
+              <p
+                className="text-center italic mx-auto"
+                style={{
+                  fontSize: "15px", lineHeight: 1.55, color: "#3a3a3a", maxWidth: "44ch",
+                  display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
                 {deck}
               </p>
-            </>
+            </div>
           ) : (
-            <p className="text-center text-[11px] tracking-[0.18em] uppercase mb-5" style={{ color: "#777" }}>
+            <p className="text-center text-[11px] tracking-[0.18em] uppercase mb-5" style={{ color: "#9a958a" }}>
               ——  特訊  ——
             </p>
           )}
@@ -128,9 +171,10 @@ export function PressRelease({ title, brandName, variantLabel, liveTitle, liveCa
             <span>{dateStr}</span>
           </div>
 
-          {/* ── Body: two justified columns. Real body if present, else
-              tasteful greeked filler so the front page reads like a
-              printed mockup (the 標題 task has no body). ── */}
+          {/* ── 內文 body: two justified columns. Real body if present,
+              else greeked filler so the page reads like a printed
+              mockup (標題 / 副標 tasks have no body of their own). ── */}
+          <Kicker>內文 · Body</Kicker>
           <div
             className="md:[column-count:2] md:[column-gap:28px] md:[column-rule:1px_solid_rgba(0,0,0,0.25)]"
             style={{ fontSize: "12px", lineHeight: 1.7, color: "#222", textAlign: "justify" }}
