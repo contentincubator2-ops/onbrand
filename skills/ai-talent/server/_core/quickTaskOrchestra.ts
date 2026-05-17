@@ -20,6 +20,7 @@ import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSumma
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText } from "./brandContext";
+import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
 import { getBrandRealContent } from "./brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
@@ -398,6 +399,14 @@ async function callOneVariant(args: {
   // the structured-document systemPrompt. Lean prompt: template
   // instruction is dominant; input is explicitly raw material to be
   // distilled into the document, NOT rewritten into a post.
+  // 2026-05-17 (CJ「學習 IAC 得獎 email」): email-family tasks get the
+  // award-grade craft rubric + per-use-case playbook appended after the
+  // task instruction. Brand-agnostic craft (HOW); brand essence still
+  // from the digest, hard rules from the post-gen enforcement layer.
+  const edmBlock = isEmailTask(template)
+    ? `\n\n${EDM_CRAFT_RUBRIC}\n\n${edmPlaybookFor(template.id)}\n`
+    : "";
+
   const docMode = template.outputMode === "document";
   const system = docMode
     ? // 2026-05-16 (CJ「人設應該 follow agent，不要到處都是人設指令」):
@@ -408,6 +417,7 @@ async function callOneVariant(args: {
       captionPersona +
       `\n# 任務說明（最高指令 — 必須完全遵循其章節結構與順序）\n` +
       filledSystemPrompt +
+      edmBlock +
       strategistSection +
       `\n\n【本次只產 1 個變體】**${label}**：在不更動章節結構的前提下，` +
       `用此變體的風格詮釋（完整正式版＝最詳盡；精簡重點版＝每節更精煉；活動主題版＝圍繞本次活動主軸）。\n` +
@@ -427,6 +437,7 @@ async function callOneVariant(args: {
     captionPersona +
     `\n# 任務說明（特定任務規範 — 蓋過上方平台通則）\n` +
     filledSystemPrompt +
+    edmBlock +
     strategistSection +
     `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
     `${lengthHint}\n\n` +
@@ -1197,6 +1208,43 @@ export async function runOrchestra(args: {
         }
       } catch (e) {
         console.warn("[orchestra] brand-rule enforcement skipped:", (e as Error)?.message);
+      }
+    }
+
+    // ── EDM craft self-check: 7 維度產出後守門 (2026-05-17) ──
+    // Email body tasks only. Cheap deterministic gate (spam-trigger
+    // words / CTA proliferation); only when it fails do ONE LLM tighten
+    // pass against the rubric — ~zero cost when output is already good
+    // (same proven pattern as brand-rule enforcement).
+    if (Array.isArray(captions) && captions.length && isEmailBodyTask(args.template)) {
+      const SPAM = ["免費", "中獎", "保證", "瘋搶", "限時搶購", "100%", "點這裡", "立即購買！！",
+        "free!!!", "guarantee", "act now", "click here", "winner", "$$$"];
+      const ctaCount = (t: string) =>
+        (t.match(/立即|馬上|點此|點擊|了解更多|現在就|搶先|報名|購買|訂閱|前往|查看|按此|here|now|shop|buy|join|register/gi) || []).length;
+      for (const v of captions) {
+        if (!v?.caption) continue;
+        const t = v.caption;
+        const spamHit = SPAM.some((w) => t.toLowerCase().includes(w.toLowerCase()));
+        const ctaBloat = ctaCount(t) > 4;
+        if (!spamHit && !ctaBloat) continue; // already clean → no LLM cost
+        try {
+          const { invokeLLM } = await import("./llm");
+          const r: any = await invokeLLM({
+            provider: "anthropic",
+            messages: [{ role: "user", content:
+              `依 EDM 工藝準則收緊這封 email：移除垃圾觸發詞（${SPAM.slice(0, 8).join("、")} 等濫用語）、` +
+              `收斂成「單一主要 CTA」（最多重複 2 次）、行動裝置可掃讀、利益導向。` +
+              `保持原意、品牌語氣、長度與換行，只輸出收緊後文字本身，不要前言：\n\n${t}` }],
+            maxTokens: 1200,
+          });
+          const tightened = String(r?.content ?? r?.text ?? "").trim();
+          if (tightened) {
+            // re-apply brand hard rules (rewrite must not reintroduce)
+            v.caption = args.brandId
+              ? await enforceBrandRulesOnText(args.brandId, tightened).catch(() => tightened)
+              : tightened;
+          }
+        } catch { /* fail-safe: keep caption */ }
       }
     }
 
