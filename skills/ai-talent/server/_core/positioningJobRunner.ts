@@ -492,7 +492,7 @@ export async function finalizeBrandAfterPipeline(userId: number, brandId: number
   // (status never flipped to completed). These columns are legacy
   // fallbacks (agentContextLoader); a trimmed value is sufficient.
   const maybeSet = (col: string, val: string | null) => {
-    const v = val ? String(val).slice(0, 480) : val;
+    const v = val ? String(val).slice(0, 180) : val;
     filled[col] = !!v;
     if (v) { sets.push(`${col} = COALESCE(NULLIF(${col}, ''), ?)`); params.push(v); }
   };
