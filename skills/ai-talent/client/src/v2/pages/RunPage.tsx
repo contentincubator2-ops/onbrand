@@ -841,7 +841,7 @@ export default function RunPage() {
           {/* 2026-05-17 (CJ「可以讓用戶編輯後直接下載」): speech script
               download. Uses the current (edited) caption + the same
               <a download> blob pattern as the .ics export. */}
-          {effectiveVariant?.format === "speech" && slide?.caption && (
+          {(effectiveVariant?.format as string) === "speech" && slide?.caption && (
             <button
               onClick={() => {
                 const md = slide.caption;
