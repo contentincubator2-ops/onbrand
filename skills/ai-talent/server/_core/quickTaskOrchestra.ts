@@ -1511,7 +1511,11 @@ export async function runOrchestra(args: {
     // attempts, the variant ships with empty caption + the per-slide
     // warning UI tells the user to retry. We never hide the failure with
     // a clone of another variant.
-    const isHookTask = args.template.id === "fb-30-pure-text-hook";
+    // 2026-05-18 (CJ「整理原文、讓原文跟標題相符」): fb-30-pure-text-hook
+    // no longer appends the body verbatim — the LLM now returns the full
+    // post (hook + a re-structured, hook-consistent body). So this is
+    // disabled (no other task ever set it true).
+    const isHookTask = false;
     const articleBody =
       isHookTask
         ? (args.inputs["article_body"] ?? args.inputs["topic"] ?? "").trim()

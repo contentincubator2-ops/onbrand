@@ -171,12 +171,22 @@ ${FB_TONE_SUFFIX}
     inputs: [
       { key: "article_body", label: "原本的貼文內容", type: "textarea", required: true },
     ],
-    systemPrompt: `任務：用戶提供了一段「原本要發的貼文內文」（在 article_body 輸入裡）。
-你只要寫 hook（開場句），**不要重複貼用戶的原文** — orchestra 會在後端自動把原文接到你寫的 hook 後面。
+    // 2026-05-18 (CJ「呈現時一併整理原文格式與邏輯，讓原文跟標題相符」):
+    // was hook-only + verbatim body append (body 跟 hook 常不搭、又一大坨).
+    // Now output a COMPLETE post: hook + a re-structured body in the same
+    // angle/tone. All facts preserved, nothing invented.
+    systemPrompt: `任務：用戶在 article_body 提供「原本要發的貼文內文（可能很亂、是一大段）」。
+請輸出「一篇可以直接發的完整 FB 貼文」= 開場 hook ＋ 整理過的內文。
 
-每個 variant.caption = 那個口吻的 hook（30-60 字，1-2 句即可）。
-不要寫成 "[hook]\\n\\n[原文]"，只寫 hook。
+每個 variant.caption = 完整貼文（不是只有 hook）：
+1. 開場 hook（1–2 句，該變體的口吻）。
+2. 緊接「重新整理過的內文」：
+   - 保留 article_body 的**所有事實、數字、名稱、論點**——不可新增、不可刪改事實、不可杜撰。
+   - 但**應該**重排順序、分段、刪冗詞，讓邏輯通順。
+   - 內文切角與語氣要**呼應這個 hook**（hook 問什麼內文就回答什麼；hook 講反差內文就把反差講清楚）——讓「標題與原文相符」。
+   - 排版易讀：短段落、必要時條列；不要一整坨。
 口吻分別：反問式 / 數字式 / 反差式（依 Plan B 強制規則的順序）。
+caption 就是最終要發的貼文本身，不要寫「hook：」「內文：」標籤、不要解釋。
 ${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
     maxTokens: 600,
@@ -556,8 +566,9 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     fluxSize: "landscape_4_3",
     imageQualitySteps: 4,
     variantLabels: ["反問式", "數字式", "反差式"],
-    captionMinChars: 30,
-    captionMaxChars: 60,
+    // 2026-05-18: now a full post (hook + cleaned body), not a 60-char hook.
+    captionMinChars: 150,
+    captionMaxChars: 1200,
   },
   "fb-30-link-caption": {
     variants: 3,
