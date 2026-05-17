@@ -9,7 +9,7 @@
 import React from "react";
 import { Button, Chip, Divider, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faImages, faArrowRight, faAt, faInbox } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faArrowRight, faAt, faInbox } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, handleOf, MarkdownText } from "./shared";
 
 /* ─────────────── EDM / Full Email ─────────────── */
@@ -96,21 +96,9 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
           </div>
         </div>
 
-        <Divider />
-
-        {/* Two-column feature blocks */}
-        <div className="px-8 py-6 grid grid-cols-2 gap-6">
-          {[0, 1].map((i) => (
-            <div key={i} className="space-y-2">
-              <div className="aspect-[4/3] bg-default-100 rounded-lg flex items-center justify-center">
-                <FontAwesomeIcon icon={faImages} className="text-default-300 text-2xl" />
-              </div>
-              <Skeleton className="h-3 w-[80%] rounded" />
-              <Skeleton className="h-2.5 w-full rounded opacity-60" />
-              <Skeleton className="h-2.5 w-[85%] rounded opacity-60" />
-            </div>
-          ))}
-        </div>
+        {/* 2026-05-17 (CJ): removed the two decorative feature-image
+            blocks — they had no data source and rendered as permanent
+            empty skeletons, cluttering every EDM preview. */}
 
         <Divider />
 
