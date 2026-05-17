@@ -996,18 +996,24 @@ async function genOneImage(prompt: string, config: OrchestraConfig): Promise<Orc
       aspectRatio: aspect,
       quality: "high" as const,
     };
-    const tryModel = async (modelId: string, label: string) =>
+    const tryModel = async (modelId: string, label: string, capMs: number) =>
       Promise.race([
         dispatchGenerate(modelId, opts),
-        timeoutPromise<never>(PER_IMAGE_MS, label),
+        timeoutPromise<never>(capMs, label),
       ]);
+    // 2026-05-18 (CJ「現在沒有產出圖了」regression): the imagen primary +
+    // flux fallback were each capped at PER_IMAGE_MS (45s) → worst case
+    // 90s, blowing the ~30-60s background budget so the card never
+    // resolved. Cap the imagen attempt tight (25s); if it fails/slow,
+    // the proven Flux Schnell fallback still finishes inside budget.
+    const IMAGEN_CAP_MS = 25_000;
     let r;
     try {
-      r = await tryModel("google/imagen-4-default", "imagen-4");
+      r = await tryModel("google/imagen-4-default", "imagen-4", IMAGEN_CAP_MS);
       if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? "imagen-4 no url");
     } catch {
-      // fall back to the fast, content-permissive Flux tier
-      r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell");
+      // fall back to the fast, content-permissive, proven Flux tier
+      r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
     }
     if (r.status === "ready" && r.url) {
       return { style: prompt, url: r.url, status: "ready" };
