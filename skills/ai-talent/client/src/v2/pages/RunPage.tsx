@@ -1087,12 +1087,10 @@ export default function RunPage() {
                       : "會自動帶入品牌的色彩 / 風格 / 調性脈絡。寫越具體圖越貼近你要的"}
                     autoFocus
                   />
-                  {slide?.imageUrl && (
-                    <div className="rounded-lg overflow-hidden border border-default-200 mt-2">
-                      <p className="text-[10px] text-default-500 px-2 py-1 bg-default-50">{lang === "en" ? "Current image:" : "目前這篇的圖："}</p>
-                      <img src={slide.imageUrl} alt="current" className="w-full h-auto" />
-                    </div>
-                  )}
+                  {/* 2026-05-17 (CJ「右側欄不需要展示出圖片了」): the
+                      generated image now renders in the mockup's own
+                      image slot (left), so the duplicate "目前這篇的圖"
+                      preview here is removed to avoid showing it twice. */}
                   {/* 2026-05-12 Phase 1 (CJ「prompt library 整合」):
                       Nano-Banana 175 商業攝影 prompt 範本。先選類別 → 列表
                       → 點 card 套用到 prompt textarea。 */}

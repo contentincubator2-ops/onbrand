@@ -14,9 +14,10 @@ import { type MockupFields, MockupHeader, handleOf, MarkdownText } from "./share
 
 /* ─────────────── EDM / Full Email ─────────────── */
 
-export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTitle, liveDescription, liveCta }: MockupFields) {
+export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTitle, liveCta, liveImageUrl, liveImageStatus }: MockupFields) {
   const brand = brandName ?? "Your Brand";
   const handle = handleOf(brandName);
+  const hasHeroImg = !!liveImageUrl && liveImageStatus !== "failed";
 
   return (
     <div className="w-full max-w-[600px] mx-auto">
@@ -55,14 +56,17 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
           </div>
         </div>
 
-        {/* Hero image */}
-        <div className="aspect-[600/280] bg-gradient-to-br from-default-200 to-default-100 flex items-center justify-center relative">
-          <Skeleton className="absolute inset-0 rounded-none" />
-          <div className="relative z-10 text-center text-default-400 p-4">
-            <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-            <p className="text-tiny">{liveDescription ? liveDescription.slice(0, 80) : "Hero 圖 · 等待 AI 圖像"}</p>
+        {/* Hero image — 2026-05-17 (CJ「圖片產出後放進 mockup 對應
+            欄位；不需要圖片的任務不要顯示圖片欄」): email tasks never
+            auto-generate a hero (runImageGen=false); it only exists if
+            the user generated one via 改配圖. So render the hero ONLY
+            when an actual image exists — no misleading「等待 AI 圖像」
+            placeholder for text-only email tasks. */}
+        {hasHeroImg && (
+          <div className="aspect-[600/280] relative overflow-hidden">
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
           </div>
-        </div>
+        )}
 
         {/* Body section — text left, image right */}
         <div className="px-8 py-8">
