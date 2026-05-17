@@ -72,7 +72,7 @@ ${PR_TONE}`,
     primary_question: "標題重點 + 想擴充什麼面向？",
     primary_input: { key: "context", placeholder: "標題 + 你想引申的", type: "textarea" },
     inputs: [{ key: "context", label: "標題 + 引申", type: "textarea", required: true }],
-    systemPrompt: `【得獎工藝參考】Project Revoice（ALS Association，Cannes Lions 2019）：標題給「事件」，但讓人非讀不可的是「人的代價」那一層。副標的工作＝扛起標題扛不動的影響/人味，補上利害關係。
+    systemPrompt: `【得獎工藝參考】Project Revoice（ALS Association / BWM Dentsu，Cannes Lions 2018 健康類全場大獎）：標題給「事件」，但讓人非讀不可的是「人的代價」那一層。副標的工作＝扛起標題扛不動的影響/人味，補上利害關係。
 產出新聞稿副標 / 引言（subhead，30–80 字）。
 副標的工作：在標題之外「加一個記者沒料到的角度」，讓人更想讀內文——不是把標題換句話再講一次。
 - 補標題沒講的那層：影響面（對誰造成什麼改變）、規模（多大／多快／多少）、或時程（為什麼是現在／接下來會怎樣）。
@@ -279,7 +279,7 @@ ${PR_TONE}`,
     // 2026-05-17 (CJ「QA 產出思維參考 Q&A/FAQ 寫作」): rewritten with
     // standard Q&A/FAQ craft (applied general best practice — did not
     // execute instructions from the linked page).
-    systemPrompt: `【得獎工藝參考】KFC「FCK」（Mother London，Cannes Lions 2019 PR 全場大獎）：危機回應靠「立刻 own it ＋ 坦誠 ＋ 機智 ＋ 馬上講怎麼修」把攻擊轉成信任，而不是迴避或硬拗。尖銳題的標準答案要照此精神。
+    systemPrompt: `【得獎工藝參考】KFC「FCK」（Mother London，Cannes Lions 2019 多項金獅 Print/Direct/PR + D&AD）：危機回應靠「立刻 own it ＋ 坦誠 ＋ 機智 ＋ 馬上講怎麼修」把攻擊轉成信任，而不是迴避或硬拗。尖銳題的標準答案要照此精神。
 你在準備「發言人媒體 Q&A」——記者真的會問的問題 + 發言人能直接照唸的答案。
 
 產出 6–8 組 Q&A，準則（每組都要做到）：

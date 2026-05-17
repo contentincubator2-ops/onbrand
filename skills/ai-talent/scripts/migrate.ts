@@ -2193,13 +2193,13 @@ async function main() {
       const SRC = "業界公認之 Cannes Lions PR / 里程碑 earned-media 案例；依可轉移工藝對應，非案例背書";
       const rows: [string, string, string, string][] = [
         ["pr-30-headline", "The Tampon Book", "Cannes Lions 2019 PR 全場大獎", "用「重新框架」把舊事實變成不可忽視的新聞——標題＝reframe＋具體數字。"],
-        ["pr-30-subhead", "Project Revoice", "Cannes Lions 2019", "副標扛起標題扛不動的「人的代價/影響」，補上利害關係，不是重述標題。"],
+        ["pr-30-subhead", "Project Revoice", "Cannes Lions 2018 健康類全場大獎", "副標扛起標題扛不動的「人的代價/影響」，補上利害關係，不是重述標題。"],
         ["pr-30-lead-paragraph", "The Lost Class", "Cannes Lions 2022", "第一句就是一個讓人重新理解全局的事實揭露，不鋪陳。"],
         ["pr-30-ceo-quote", "Patagonia「Earth is now our only shareholder」", "2022 全球 earned-media 典範", "高層發言＝行動＋價值，每句可被記者原句引用，不是場面話。"],
         ["pr-30-boilerplate", "PR Awards 評審準則 + Dove 長青一致性", "業界評審共通準則", "用可驗證事實＋第三方背書建立可信度，能長期沿用不過期。"],
         ["pr-30-fact-sheet", "Spotify Wrapped", "全球 earned / 多獎", "把資料變成「10 秒看懂、想分享」的數字，掃描性 > 完整性。"],
         ["pr-30-media-pitch", "Whopper Detour", "Cannes Lions 2019", "賣「記者的讀者會在乎的角度」與不可抗拒的鉤，不是賣品牌。"],
-        ["pr-30-spokesperson-qa", "KFC「FCK」", "Cannes Lions 2019 PR 全場大獎", "危機回應：立刻 own it＋坦誠＋機智＋馬上講怎麼修，化攻擊為信任。"],
+        ["pr-30-spokesperson-qa", "KFC「FCK」", "Cannes Lions 2019 多項金獅 + D&AD", "危機回應：立刻 own it＋坦誠＋機智＋馬上講怎麼修，化攻擊為信任。"],
         ["pr-30-launch-social", "Spotify Wrapped 社群擴散", "全球 earned", "被分享的是「有觀點、有梗、與我有關」，不是公告。"],
         ["pr-100-launch-toolkit", "Whopper Detour（整合 earned）", "Cannes Lions 2019", "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。"],
         ["pr-99-launch-toolkit", "Whopper Detour（整合 earned）", "Cannes Lions 2019", "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。"],
