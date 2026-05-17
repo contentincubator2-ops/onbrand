@@ -130,17 +130,19 @@ ${PR_TONE}`,
     description: "可直接上台念的完整致辭稿 + 主講人/場合",
     agent_id: 60036, skill_slug: "press",
     primary_question: "致辭主題與想傳達的核心觀點？",
-    primary_input: { key: "context", placeholder: "致辭主題 + 想傳達的觀點 + 任何想提到的事實/數字", type: "textarea" },
+    // 2026-05-17 (CJ bug「Missing required input: speaker」): the 30s
+    // quick-task form only ever submits the ONE primary input — extra
+    // inputs[] were never collected, so a required `speaker` could
+    // never be satisfied. Collapse to a single guided textarea; the
+    // prompt extracts 主講人/職稱/場合 from it.
+    primary_input: { key: "context", placeholder: "主講人姓名＋職稱｜場合/時間/地點｜致辭主題與想傳達的觀點＋想提到的事實或數字", type: "textarea" },
     inputs: [
-      { key: "context",      label: "致辭主題與觀點", type: "textarea", required: true },
-      { key: "speaker",      label: "主講人姓名",     type: "text",     required: true },
-      { key: "speakerTitle", label: "主講人職稱",     type: "text",     required: false },
-      { key: "occasion",     label: "場合 / 時間 / 地點", type: "text", required: false },
+      { key: "context", label: "主講人 + 場合 + 致辭主題與觀點", type: "textarea", required: true },
     ],
     systemPrompt: `【得獎工藝參考】Patagonia「Earth is now our only shareholder」（Yvon Chouinard 2022 公開信，全球 earned-media 典範）：高層發言之所以變成新聞，是因為它本身就是「行動＋價值觀」，每一句都可被記者原句引用。致辭要有可被擷取的金句，不是場面話。
 你在撰寫一篇「可以直接上台念出來」的 CEO 致辭講稿（口語、有節奏、約 2400–2800 字）。
 
-輸入會以 [key] value 形式提供：[context] 主題與觀點、[speaker] 主講人姓名、[speakerTitle] 職稱、[occasion] 場合/時間/地點。務必把主講人與場合自然寫進稿中（開場致意、結尾署名）。缺的具體資訊用「[待補：例如 具體數字]」標出，不要杜撰、不要反問使用者。
+輸入是一段 [context] 自由文字，裡面可能同時包含：主講人姓名與職稱、場合/時間/地點、致辭主題與想傳達的觀點、想提到的事實或數字。請自行從中辨識出「主講人 / 職稱 / 場合 / 講題」並填入下方 metadata；其餘內容作為致辭素材。務必把主講人與場合自然寫進稿中（開場致意、結尾署名）。沒有提供的欄位寫「[待補：主講人]」之類標記，不要杜撰、不要反問使用者。
 
 輸出格式（嚴格遵守，第一行開始就是 metadata，方便排版解析）：
 【主講人】<speaker>
