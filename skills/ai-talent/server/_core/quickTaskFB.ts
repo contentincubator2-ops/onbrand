@@ -251,16 +251,19 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
     inputs: [
       { key: "product_focus", label: "產品 / 賣點 / 受眾", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 5 個 FB 廣告 headline。每個 25 字以內、有 hook、口語感、不要官腔。
-5 種切角分別：
-- 痛點挑戰式（戳中受眾煩惱）
-- 數據驚奇式（具體數字 / 反差）
-- 反問引發式（讓人停下滑動）
-- 情境共鳴式（描述用戶生活場景）
-- 結果承諾式（明確利益）
-caption 欄位放這 5 個 headline（編號 1-5，每個一行）。${FB_TONE_SUFFIX}`,
+    // 2026-05-18 (CJ「寫 5 種但只看到一種」): was variants:1 cramming
+    // 5 headlines into one caption. Now 1 headline PER variant → 5
+    // pills you can compare/switch.
+    systemPrompt: `產出「一個」FB 廣告 headline（這次只寫這一個變體）。25 字以內、有 hook、口語感、不要官腔、不要編號。
+依本變體的切角（variantLabel）下手，五種切角各自的精神：
+- 痛點挑戰式：戳中受眾最煩的那件事。
+- 數據驚奇式：用一個具體數字 / 反差當主角。
+- 反問引發式：一個讓人停下滑動的問句。
+- 情境共鳴式：描述用戶真實生活場景的一句。
+- 結果承諾式：明確、可信的利益承諾。
+caption 欄位就放這「一個」headline 本身，不要解釋、不要前綴。${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
-    maxTokens: 400,
+    maxTokens: 120,
     outputDefaults: { platform: "facebook", post_type: "ad" },
   },
   {
@@ -597,16 +600,16 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // Ad asset configs — single LLM call per task returns N options inline in caption.
   // (1 variant because the LLM emits all 5 options at once; we don't fan out.)
   "fb-30-ad-headline": {
-    variants: 1,
+    variants: 5,
     images: 0,
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
     fluxSize: null,
     imageQualitySteps: 0,
-    variantLabels: ["5 種 headline"],
-    captionMinChars: 30,
-    captionMaxChars: 400,
+    variantLabels: ["痛點挑戰", "數據驚奇", "反問引發", "情境共鳴", "結果承諾"],
+    captionMinChars: 6,
+    captionMaxChars: 30,
   },
   "fb-30-ad-primary": {
     variants: 1,
