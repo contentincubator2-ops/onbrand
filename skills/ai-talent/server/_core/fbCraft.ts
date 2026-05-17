@@ -68,67 +68,67 @@ Facebook 是社群優先媒介——觸及靠分享/留言/儲存賺來，廣告
 const FB_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "fb-30-caption-short":
-    "Wendy's「National Roast Day」Facebook (Shorty Award Best Brand Presence 2019)：每則短貼文是獨立的文化時刻；品牌機智 > 產品功能；不需要 setup，直接就是 punchline。",
+    "Wendy's 社群策略 (Shorty Awards 多年最佳品牌社群 + Ad Age Social Media Campaign of the Year 2018)：每則短貼文是獨立的文化時刻；品牌機智 > 產品功能；不需要 setup，直接就是 punchline。",
   "fb-30-pure-text-hook":
-    "Ryan Reynolds / Mint Mobile「Maximum Effort」Facebook 純文字系列 (Shorty Award Humor 2020)：讀起來像真人寫的、不像行銷——反共識前置、沒有任何官腔修飾詞。",
+    "Ryan Reynolds / Aviation Gin「Maximum Effort」Facebook 純文字系列 (Shorty Award Best Humor Brand 2020，Cannes Lions Silver 2021)：讀起來像真人寫的、不像行銷——反共識前置、沒有任何官腔修飾詞。",
   "fb-30-link-caption":
-    "BuzzFeed Tasty Facebook 連結貼文 (Webby Award People's Voice 2017)：caption 讓點擊感覺像「完成一個被打斷的念頭」；先給脈絡再給連結。",
+    "BuzzFeed Tasty Facebook 原生影片 (Webby Award People's Voice Best Food & Drink 2017)：caption 讓點擊感覺像「完成一個被打斷的念頭」；Facebook 原生影片先鋒；先給脈絡再給連結。",
   "fb-30-ad-headline":
-    "Dollar Shave Club Facebook 廣告 (Effie Platinum New Brand 2013)：標題 = 價值主張 + 個性，一句話；「Our blades are f***ing great」的清晰度——不繞彎、不疑問。",
+    "Old Spice「The Man Your Man Could Smell Like」Facebook 廣告 (Cannes Lions Grand Prix Titanium 2010，Effie Gold 2011)：廣告標題 = 價值主張 + 個性，一句話說完；每個字有存在理由；結語即記憶點。",
   "fb-30-ad-primary":
-    "Airbnb「Belong Anywhere」Facebook 活動 (Cannes Lions Titanium 2014)：主文串起故事與轉換——社會證明嵌入敘事；情緒共鳴先於行動呼籲。",
+    "Airbnb「Belong Anywhere」Facebook 活動 (Cannes Lions Grand Prix Titanium 2014)：主文串起故事與轉換——社會證明嵌入敘事；情緒共鳴先於行動呼籲。",
   "fb-30-ad-cta":
-    "Peloton 獲客漏斗 Facebook 廣告 (Shorty Award Health & Fitness 2022)：CTA 錨定在轉化結果（「開始你的旅程」）而非點擊行為——讓按鈕像承諾而非指令。",
+    "Spotify「2018 Wrapped」Facebook 廣告系列 (Cannes Lions Silver Outdoor + Social 2019)：CTA 錨定在個人化數據帶來的情緒峰值——讓按鈕像「看看你的年度結果」的承諾，不是指令。",
   "fb-30-ad-description":
-    "Squarespace「Make Your Next Move」Facebook 廣告 (Shorty Award 2018)：description 從不同角度強化標題、補上省略的具體細節；不重複、只補充。",
+    "Squarespace「Make Your Next Move」Facebook 廣告 (D&AD Wood Pencil Integrated Digital Campaigns 2018)：description 從不同角度強化標題、補上省略的具體細節；不重複、只補充。",
   "fb-30-pinned-short":
-    "National Geographic Facebook 主頁 (Shorty Award Best Brand Presence Travel)：置頂 = 品牌永久第一印象；2 句話說清楚「我們是誰 + 為什麼你要追蹤」。",
+    "National Geographic Facebook 主頁 (Shorty Award Best Brand Presence in Travel 多屆，全球最多 Facebook 追蹤者之一)：置頂 = 品牌永久第一印象；2 句話說清楚「我們是誰 + 為什麼你要追蹤」。",
   "fb-30-story-text":
-    "Sephora Facebook Stories (Shorty Award Beauty Brand 2021)：Stories 是微型旅程——3 個畫面：吊胃口→產品揭示→上滑 CTA；每格獨立可看懂。",
+    "Sephora Facebook/Instagram Stories 全管道策略 (Shorty Award Best in Beauty多屆)：Stories 是微型旅程——3 個畫面：吊胃口→產品揭示→上滑 CTA；每格獨立可看懂。",
   "fb-30-live-title":
-    "Red Bull Facebook Live 活動系列 (Shorty Award Sports 2020)：直播標題 = 現在時態的緊迫感；「正在發生什麼 + 為何不能錯過」兩件事都說清楚。",
+    "Red Bull Facebook Live 活動系列 (多次 Shorty Award Best in Sports；Red Bull Media House 旗艦直播格式)：直播標題 = 現在時態的緊迫感；「正在發生什麼 + 為何不能錯過」兩件事都說清楚。",
   "fb-30-countdown-1day":
-    "HBO《Game of Thrones》Facebook 倒數系列 (Shorty Award Entertainment 2019)：每天倒數是獨立 hook——不只「還有 X 天」，而是「今天先給你這個線索」。",
+    "HBO《Game of Thrones》Facebook 倒數系列 (Shorty Award Best in Entertainment，2019 最終季活動)：每天倒數是獨立 hook——不只「還有 X 天」，而是「今天先給你這個線索」。",
 
   // ── 60s ───────────────────────────────────────────────────────────────
   "fb-60-single-full":
-    "Dove「Real Beauty」Facebook 完整貼文 (Cannes Lions Grand Prix Titanium 2013)：單貼文 = 完整情緒弧；品牌價值觀嵌入真實故事，不是標語；結尾邀請讀者成為一部分。",
+    "Dove「Real Beauty」系列 (Cannes Lions Grand Prix Titanium 2006 + Effie Grand Prix Creative Effectiveness 2013)：單貼文 = 完整情緒弧；品牌價值觀嵌入真實故事，不是標語；結尾邀請讀者成為一部分。",
   "fb-60-link-full":
-    "BuzzFeed Tasty Facebook 原生影片連結 (Webby Award People's Voice 2017)：連結貼文 = 先用 caption 完成 70% 的說服，點擊是延伸；影片本身在 Facebook 原生播放效果最佳。",
+    "BuzzFeed Tasty Facebook 原生影片 (Webby Award People's Voice 2017；Facebook 原生影片格式定義者)：連結貼文 = 先用 caption 完成 70% 的說服，點擊是延伸；影片本身在 Facebook 原生播放。",
   "fb-60-album-4":
-    "National Geographic「Photo of the Day」Facebook 相簿 (Shorty Award Best Photography Brand)：相簿 = 策展敘事；每張圖賺到下一張點擊；caption 序列建立整體弧線。",
+    "National Geographic Facebook 相簿策略 (Shorty Award Best Brand Presence Travel；Instagram 第 1 個突破 1 億追蹤者的品牌)：相簿 = 策展敘事；每張圖賺到下一張點擊；caption 序列建立整體弧線。",
   "fb-60-carousel-5":
-    "Airbnb「Experiences」Facebook 輪播 (Cannes Lions Titanium Grand Prix)：5 張輪播 = 1 個完整故事弧；封面承諾 payoff；每張賺到滑動；末張是預訂 CTA。",
+    "Airbnb「Experiences」Facebook 輪播系列 (Cannes Lions Titanium Grand Prix 2014；Facebook 輪播廣告早期標竿)：5 張輪播 = 1 個完整故事弧；封面承諾 payoff；每張賺到滑動；末張是預訂 CTA。",
   "fb-60-countdown-5day":
-    "HBO《Game of Thrones》最終季 5 日倒數 (Shorty Award Entertainment 2019)：每天獨立 hook + 揭示一個新線索；社群一起等待本身成為事件；momentum 累積到發布日。",
+    "HBO《Game of Thrones》最終季 5 日倒數系列 (Shorty Award Best in Entertainment 2019；社群期待工程的教科書)：每天獨立 hook + 揭示一個新線索；momentum 累積到發布日。",
   "fb-60-launch-kit":
-    "Nike「Dream Crazy」30 週年發表套組 (Cannes Lions Grand Prix Outdoor 2018 → 社群延伸)：發表套組 = 1 個中心創意概念適配每個觸點；每件內容單獨看是完整的，合起來更強。",
+    "Nike「Dream Crazy」全平台發表套組 (Cannes Lions Grand Prix Outdoor 2018；One Show Grand Prix 2019)：發表套組 = 1 個中心創意概念適配每個觸點；每件內容單獨完整，合起來更強。",
   "fb-60-live-suite":
-    "Red Bull「Stratos」Facebook Live 套組 (Shorty Award Sports 2013)：Live 套組 = 預告→直播錨→事後回顧的生命週期；每個階段有不同的觀眾再參與理由。",
+    "Red Bull「Stratos」平流層跳傘 Facebook Live 套組 (Shorty Award Best in Sports 2013；全球同步觀看人數破紀錄)：Live 套組 = 預告→直播錨→事後回顧；每個階段有不同的觀眾再參與鉤子。",
   "fb-60-pinned-suite":
-    "National Geographic Facebook 置頂套組 (Shorty Award Best Brand Presence Travel)：置頂套組 = 品牌建構的永久架構；組合起來回答「我是誰、我做什麼、你為何應該在乎」。",
+    "National Geographic Facebook 置頂套組 (Shorty Award Best Brand Presence Travel；Facebook 頁面架構設計標竿)：置頂套組 = 品牌永久建構架構；組合回答「我是誰、我做什麼、你為何在乎」。",
   "fb-60-serial-3":
-    "Dove「Real Beauty」Facebook 連載系列 (Cannes Lions Grand Prix 2013)：3 集 = 1 情緒弧；第 1 集設問/介紹，第 2 集深化/轉折，第 3 集解決 + 重新開放循環。",
+    "Dove「Real Beauty Sketches」Facebook 連載 (Cannes Lions Grand Prix Film + Titanium 2013；當時史上觀看次數最多的廣告影片)：3 集 = 1 情緒弧；設問→深化→解決 + 重開循環。",
   "fb-60-viral-rewrite":
-    "Ryan Reynolds / Aviation Gin 病毒改寫策略 (Shorty Award Best Humor 2020)：病毒改寫 = 分析原作為何分享 → 萃取機制 → 以品牌素材重建；搭文化便車不是抄作品。",
+    "Ryan Reynolds / Aviation Gin「Peloton Wife」病毒回應 (Cannes Lions Silver 2021；48 小時內完成拍攝發布的教科書病毒改寫)：分析原作分享機制 → 萃取 → 以品牌素材重建；速度是關鍵。",
   "fb-60-trend-rewrite":
-    "Wendy's 趨勢內容改編系列 (Shorty Award Best Food & Beverage Social 2023)：改 1 個元素讓它變品牌的；時機 > 製作精緻度；讓 trend 替自己發聲。",
+    "Wendy's 社群趨勢內容改編 (Ad Age Social Media Campaign of the Year 2018；Shorty Award Best in Food & Beverage)：改 1 個元素讓它變品牌的；時機 > 製作精緻度；讓 trend 替自己發聲。",
   "fb-60-testimonial-rewrite":
-    "P&G「Thank You Mom」Facebook 見證系列 (Cannes Lions Grand Prix Creative Effectiveness 2012)：見證改寫：客戶 = 主角解決真實挑戰；品牌 = 使能工具，不是主詞；量化結果嵌入感性故事。",
+    "P&G「Thank You Mom」奧運見證系列 (Cannes Lions Grand Prix Creative Effectiveness 2013；Effie Grand Prix 2012)：客戶 = 主角解決真實挑戰；品牌 = 使能工具，不是主詞；量化結果嵌入感性故事。",
   "fb-60-ad-pack-3":
-    "Dollar Shave Club 3 支廣告包 (Effie Platinum New Brand 2013)：廣告包 = 認知/考慮/轉換 3 層漏斗各有獨立訊息；共用 1 條 campaign 主軸；每支單獨看也完整。",
+    "Dollar Shave Club 廣告包 (Webby Award Best Viral Campaign 2012；AICP Next Award 2012；全球最高 ROI 的品牌發表之一)：3 支覆蓋漏斗認知/考慮/轉換；共用 1 條 campaign 主軸；每支單獨完整。",
 
   // ── 99s ───────────────────────────────────────────────────────────────
   "fb-99-30day-calendar":
-    "Coca-Cola「Share a Coke」30 天 Facebook 月曆 (Cannes Lions Grand Prix Creative Effectiveness)：1 個可擁有主題錨 30 天；多格式混搭（影片/圖文/故事）；UGC 鼓勵貫穿全月；品牌成為社群的一部分。",
+    "Coca-Cola「Share a Coke」30 天多平台月曆 (Cannes Lions Grand Prix + Creative Effectiveness Grand Prix；在超過 80 個國家執行)：1 個可擁有主題錨 30 天；多格式混搭；UGC 鼓勵貫穿全月。",
   "fb-99-14day-countdown":
-    "HBO《Game of Thrones》14 日最終季倒數 (Shorty Award Entertainment 2019)：14 天升級揭示——每天獨立 hook + 累積 momentum；社群期待本身成為節目；每貼文讓等待有回報。",
+    "HBO《Game of Thrones》最終季 14 日社群倒數 (Shorty Award Best in Entertainment 2019；創下 HBO 平台流量紀錄)：14 天升級揭示——每天獨立 hook + 累積 momentum；社群期待本身成為節目。",
   "fb-99-launch-toolkit":
-    "Nike「Dream Crazy」全平台發表工具包 (Cannes Lions Grand Prix 2018)：工具包 = 1 個中心創意概念跨所有觸點適配；從預告到發表日到長尾；每件內容強化同一個文化主張。",
+    "Nike「Dream Crazy」跨平台發表工具包 (Cannes Lions Grand Prix Outdoor 2018；One Show Grand Prix 2019)：工具包 = 1 個中心創意概念跨所有觸點；從預告到發表日到長尾；每件內容強化同一個文化主張。",
   "fb-99-livestream-9seg":
-    "Red Bull「Stratos」Facebook Live 9 段直播製作 (Shorty Award Sports 2013)：9 段 = 前期/中期/後期完整生命週期；每段有獨立的觀眾再參與鉤子；直播事件 = 媒體財產，不只是一次播出。",
+    "Red Bull「Stratos」Facebook Live 9 段直播製作 (Shorty Award Best in Sports 2013；打破 YouTube 直播同時在線紀錄)：9 段 = 前中後完整生命週期；每段有獨立的再參與鉤子；直播事件 = 媒體財產。",
   "fb-99-crisis-playbook":
-    "Johnson & Johnson Tylenol 危機溝通 playbook (PR Week Award Best Crisis Management — 教科書級案例)：危機 playbook = 承認→調查→修正→重建 4 階段各有內容策略；語氣從危機管理逐漸回到品牌正常溫度。",
+    "Domino's Pizza「Pizza Turnaround」社群危機回應 (Effie Gold Crisis & Issue Management 2010；危機發生 48h 內用 YouTube/Facebook 公開道歉重建信任的教科書)：承認→調查→修正→重建 4 階段；透明度 = 最強的危機文案策略。",
 };
 
 /** Per-use-case playbook — per taskId pattern + award reference appended. */

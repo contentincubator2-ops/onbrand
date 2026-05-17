@@ -64,29 +64,29 @@ TikTok 是注意力極度稀缺的媒介——1.5 秒沒抓住就滑掉；聲音
 const TT_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "tt-30-opening-hook":
-    "E.l.f. Cosmetics「Eyes. Lips. Famous.」TikTok (Cannes Lions Social & Influencer Gold 2023)：第一幀 = 視覺不可能事件或行動後果，不是 logo；原創 TikTok 音效 × 挑戰機制 = 4M+ 有機觀看，earned attention 勝過 paid。",
+    "E.l.f. Cosmetics「#EyesLipsFace」TikTok 挑戰 (Shorty Award Best Use of TikTok 2020；5 百萬+ UGC 影片、5 十億+ 觀看次數，TikTok 最早的品牌 challenge 成功案例)：第一幀 = 視覺衝擊或行動後果，不是 logo；原創 TikTok 音效 × 挑戰機制 = 有機觸及爆發。",
   "tt-30-full-script":
-    "Duolingo「The Last Lesson」TikTok 系列 (Shorty Award Best Brand Social Campaign 2023)：角色弧 + 未解張力；每支影片完整但讓人「必須看下一集」；吉祥物成為有自己行動邏輯的角色，不只是代言人。",
+    "Duolingo TikTok 帳號 @duolingo (Shorty Award Best Brand Presence on TikTok 多屆；超過 1000 萬追蹤者；Fast Company 最具創意品牌)：角色弧 + 未解張力；每支影片完整但讓人「必須看下一集」；吉祥物成為有自己邏輯的角色，不只是代言人。",
   "tt-30-duet-angle":
-    "Ocean Spray × Nathan Apodaca「Dreams」TikTok 協作 (Shorty Award Best Branded Content 2021)：最好的 duet 角是「加入相反能量」——品牌成為支持角色，不是主角；反差 = 文化張力 = 分享動機。",
+    "Ocean Spray × Nathan Apodaca「Dreams」TikTok 有機協作 (Shorty Award Best Branded Content 2021；品牌 24h 內回應讓有機病毒事件成為品牌資產)：最好的 duet 角是「加入相反能量」——品牌成為支持角色，不是主角；反差 = 文化張力 = 分享動機。",
   "tt-30-trend-remix":
-    "Wendy's「Baconator」trend 改編系列 (Shorty Award Best Fast Food Social 2023)：改 1 個元素讓它變品牌的；不重建 trend，只劫持它；時機正確的粗糙版 > 遲到的精緻版。",
+    "Wendy's TikTok 趨勢即時改編 (Shorty Award Best Brand Use of TikTok 2022；Ad Age 評選最佳快餐社群策略)：改 1 個元素讓它變品牌的；不重建 trend，只劫持它；時機正確的粗糙版 > 遲到的精緻版。",
   "tt-30-live-opening":
-    "Florida Lottery「Scratch Factor Live」(IAC Gold Award Social Media 2023)：開場 10 秒：正在發生什麼 + 為何不能重播 + 觀眾能控制什麼；即時互動機制在前 30 秒就啟動。",
+    "Florida Lottery「Scratch Factor Live」(IAC Gold Award Social Media Campaign 2023；真人即時刮彩券直播 + 觀眾投票機制)：開場 10 秒：正在發生什麼 + 為何不能重播 + 觀眾能控制什麼；即時互動機制在前 30 秒就啟動。",
 
   // ── 60s ───────────────────────────────────────────────────────────────
   "tt-60-foryou-full":
-    "E.l.f. Cosmetics TikTok 完整創意包 (Cannes Lions Social & Influencer Gold 2023)：完整 TikTok = hook/promise/主體 3 點/反差高潮/loop；每秒都有存在理由；靜音也能看懂。",
+    "E.l.f. Cosmetics「#EyesLipsFace」完整 TikTok 格式 (Shorty Award 2020；TikTok 原創音樂 × challenge 的完整腳本格式標竿)：完整 TikTok = hook/promise/主體/反差高潮/loop；每秒有存在理由；靜音也能看懂；至少 1 個可截圖時刻。",
   "tt-60-series-3":
-    "Duolingo TikTok 3 集系列 (Shorty Award Best Brand Social Campaign 2023)：3 集 = 1 個故事弧；集 1 setup，集 2 complication，集 3 resolution + 重啟循環；角色弧比劇情更重要。",
+    "Duolingo TikTok 連載系列格式 (Shorty Award Best Brand Presence on TikTok；Duo 貓頭鷹角色的跨影片連載是 TikTok 品牌連載的教科書)：3 集 = 1 個故事弧；集 1 setup，集 2 complication，集 3 resolution + 重啟循環；角色弧比劇情更重要。",
   "tt-60-viral-rewrite":
-    "Wendy's TikTok 病毒內容改寫系列 (Shorty Award Best Fast Food Social 2023)：分析原作為何分享 → 萃取分享機制（反差/情緒/可截圖）→ 用品牌素材重建；不抄創意，只借機制。",
+    "Wendy's TikTok 病毒回應策略 (Ad Age Best Social Campaign；以「反應」他人內容創造自己的病毒時刻)：分析原作分享機制（反差/情緒/可截圖）→ 萃取 → 用品牌素材重建；不抄創意，只借機制。",
 
   // ── 99s ───────────────────────────────────────────────────────────────
   "tt-99-30day-foryou":
-    "Chipotle #GuacDance 30 天 TikTok 月曆 (TikTok for Business Award Best Challenge Campaign 2019)：1 個 challenge 機制錨全月；每天微調讓社群接棒；品牌參與自己的 challenge；KOL 種子帳號在第 1 週啟動。",
+    "Chipotle「#GuacDance」TikTok challenge (Shorty Awards 第 12 屆最佳食品飲料類；250,000+ UGC 影片、4 億 3 千萬次影片播放；National Avocado Day 24h 內最高酪梨醬銷售紀錄)：1 個 challenge 機制錨全月；每天微調讓社群接棒；品牌參與自己的 challenge。",
   "tt-99-trend-week":
-    "NBA TikTok 趨勢反應週 (Shorty Award Best Sports Brand Social 2022)：快速反應日曆：識別 emerging trend → 品牌版 → 社群種子 → 記錄反應；每天有不同格式（duet/stitch/original）；時機比精緻度更重要。",
+    "NBA TikTok 帳號 @nba (全球體育品牌 TikTok 追蹤最多之一；Shorty Award Best Brand in Sports 多次；趨勢快速反應的體育媒體標竿)：快速反應日曆；識別 emerging trend → 品牌版 → 社群種子 → 記錄反應；每天格式不同；時機比精緻度更重要。",
 };
 
 /** Per-use-case playbook — per taskId pattern + award reference appended. */

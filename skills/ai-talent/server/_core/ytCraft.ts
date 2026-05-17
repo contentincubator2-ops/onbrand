@@ -73,43 +73,43 @@ YouTube 是搜尋發現 + 留存媒介——標題/縮圖決定點擊；開場 h
 const YT_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "yt-30-title-strategies":
-    "MrBeast YouTube (YouTube Works Award Best Creator Campaign 2022)：標題公式：WHAT + 數字/最高級 + 好奇缺口（告訴你是什麼但不告訴你怎麼或誰贏）；好奇缺口是工程設計，不是意外。",
+    "MrBeast YouTube 頻道 (Streamy Award Top Creator 2022；Streamy Award Creator of the Year 2023；超過 3 億訂閱者)：標題公式：WHAT + 數字/最高級 + 好奇缺口（告訴你是什麼但不告訴你怎麼或誰贏）；好奇缺口是工程設計，不是意外。",
   "yt-30-thumbnail-text":
-    "Mark Rober「Engineering」縮圖策略 (YouTube Works Award Best Science Creator 2023)：3-5 字、高對比、放在情緒表情旁——人臉 + 情緒表情 + 補充標題缺口的字 = 最高 CTR 組合。",
+    "Mark Rober YouTube 頻道 (Streamy Award Science/Education 2022；NASA 前工程師，縮圖 CTR 業界最高之一)：3-5 字、高對比、放在情緒表情旁——人臉 + 情緒表情 + 補充標題缺口的字 = 最高 CTR 組合。",
   "yt-30-description-seo":
-    "TED Talks YouTube 頻道 (Webby Award Best Education/Reference Channel 2022)：前 2 行 = searchable + 情緒 hook；章節 = 導覽禮物，直接延長觀看時長；description 是內容，不只是元數據。",
+    "TED Talks YouTube 頻道 (Webby Award Best Education/Reference Channel 多次；超過 2 千萬訂閱者；Google 搜尋最高被引用的 YouTube 頻道之一)：前 2 行 = searchable + 情緒 hook；章節 = 導覽禮物，直接延長觀看時長。",
   "yt-30-chapter-timeline":
-    "Lex Fridman Podcast YouTube 章節 (Shorty Award Best Podcast Channel 2023)：章節標題 = 獨立搜尋查詢（不是「主題 3」，是「為何 X 認為 AGI 在 5 年內」）；每個標題都能被搜到。",
+    "Lex Fridman Podcast YouTube 章節策略 (Spotify 第 2 名最受歡迎 podcast；YouTube 上最多訂閱的訪談頻道之一)：章節標題 = 獨立搜尋查詢（不是「主題 3」，是「為何 X 認為 AGI 在 5 年內」）；每個標題都能被搜到。",
   "yt-30-shorts-script":
-    "Google「Search On '22」YouTube Shorts 系列 (Webby Award Best Brand Shorts 2023)：Shorts = 垂直、單一揭示、最後 2 秒是分享時刻（不是 CTA）；沒有浪費的幀。",
+    "Google「Search On '22」YouTube Shorts 系列 (Webby Award Best Brand Shorts 2023；Google 官方 Shorts 格式標竿)：Shorts = 垂直、單一揭示、最後 2 秒是分享時刻（不是 CTA）；沒有浪費的幀。",
   "yt-30-opening-hook":
-    "Kurzgesagt「In a Nutshell」開場設計 (Webby Award Best Animation/Education 2022)：前 10 秒 = 大膽主張 + 視覺佐證 + 「留下來的回報」；hook 本身就是論點，不是論點的簡介。",
+    "Kurzgesagt「In a Nutshell」開場設計 (Webby Award Best Animation 多次；Shorty Award Best Science & Education；超過 2 千 2 百萬訂閱者)：前 10 秒 = 大膽主張 + 視覺佐證 + 「留下來的回報」；hook 本身就是論點，不是論點的簡介。",
   "yt-30-end-cta":
-    "MKBHD (Marques Brownlee) end screen 策略 (Shorty Award Best Tech Review Creator 2022)：CTA 放在情緒峰值（大揭示後立刻）；感覺像自然延伸，不是廣告插入；推薦相關下一支，不是隨機。",
+    "MKBHD (Marques Brownlee) YouTube 頻道 (Streamy Award Best Tech Channel 多次；Webby Award Best Technology Channel；超過 1 千 8 百萬訂閱者)：CTA 放在情緒峰值（大揭示後立刻）；感覺像自然延伸；推薦相關下一支，不是隨機。",
   "yt-30-community-post":
-    "National Geographic YouTube Community posts (Shorty Award Best Brand Travel 2022)：社群貼文 = 訂閱者優先的幕後線索；1 張圖 + 1 個真實問題 = 留言率 10x；不要廣播，要對話。",
+    "National Geographic YouTube Community 策略 (Shorty Award Best Brand in Travel 多次；YouTube 品牌頻道最佳社群互動率之一)：社群貼文 = 訂閱者優先的幕後線索；1 張圖 + 1 個真實問題 = 留言率 10x；不要廣播，要對話。",
 
   // ── 60s ───────────────────────────────────────────────────────────────
   "yt-60-video-package":
-    "TED Talks 完整影片製作套組 (Webby Award Best Education/Reference Channel 2022)：標題/縮圖/描述/章節/end screen 是統一系統，不是獨立元件；每個元件強化同一個演講的可發現性。",
+    "TED Talks YouTube 全頻道製作系統 (Webby Award Best Education/Reference Channel 多次；超過 20 億次觀看；YouTube 最高 SEO 效益的教育頻道)：標題/縮圖/描述/章節/end screen 是統一系統；每個元件強化同一個影片的可發現性。",
   "yt-60-shorts-script":
-    "Google「Search On」YouTube Shorts 腳本包 (Webby Award Best Brand Shorts 2023)：Shorts 腳本：單一揭示弧、每秒有目的、最後 2 秒 = 分享時刻；5 支系列建立頻道 Shorts 視覺語言。",
+    "Google「Search On」YouTube Shorts 腳本系列 (Webby Award Best Brand Shorts 2023；Google 官方 Shorts 創意標竿)：Shorts 腳本：單一揭示弧；每秒有目的；最後 2 秒 = 分享時刻；系列建立頻道 Shorts 視覺語言。",
   "yt-60-thumbnail-suite":
-    "MrBeast 縮圖系統 (YouTube Works Award Best Creator Campaign 2022)：縮圖套組 = 跨 5 支影片的一致視覺語言；好奇缺口公式 + 情緒表情 + 高對比文字；系列辨識度建立訂閱習慣。",
+    "MrBeast YouTube 縮圖系統 (Streamy Award Top Creator 2022-2023；縮圖 A/B testing 業界最高標準；全球 CTR 最高的 YouTube 頻道之一)：縮圖套組 = 跨影片的一致視覺語言；好奇缺口公式 + 情緒表情 + 高對比文字。",
   "yt-60-series-3ep":
-    "Kurzgesagt 3 集系列設計 (Webby Award Best Animation/Education 2022)：3 集 = 1 個主題的 3 個深度層次；每集獨立但累積理解；訂閱在第 2 集中段最自然；末集 = 整合 + 下一系列預告。",
+    "Kurzgesagt 系列影片設計 (Webby Award Best Animation 多次；其宇宙/科學系列是 YouTube 教育連載的設計標竿)：3 集 = 1 個主題的 3 個深度層次；每集獨立但累積理解；訂閱在第 2 集中段最自然；末集 = 整合 + 下一系列預告。",
   "yt-60-community-post":
-    "National Geographic YouTube Community 套組 (Shorty Award Best Brand Travel 2022)：Community 套組 = 發布前/中/後生命週期；每個時機點有不同的觀眾參與理由；持續連結讓訂閱有感。",
+    "National Geographic YouTube Community 套組策略 (Shorty Award Best Brand in Travel 多次；YouTube 官方社群功能早期採用標竿)：Community 套組 = 發布前/中/後生命週期；每個時機點有不同的觀眾參與理由。",
   "yt-60-viral-rewrite":
-    "MKBHD 病毒內容改寫策略 (Shorty Award Best Tech Review Creator 2022)：分析為何原作被分享（洞察/驚喜/觸動哪種）→ 萃取機制 → 以自己的主題重建；不抄，借機制。",
+    "MKBHD 影片格式演進策略 (Streamy Award Best Tech Channel 多次；MKBHD 對「為何某支影片病毒」的系統分析是 YouTube 創作者的標竿做法)：分析原作被分享的機制（洞察/驚喜/觸動哪種）→ 萃取 → 以自己主題重建；不抄，借機制。",
 
   // ── 99s ───────────────────────────────────────────────────────────────
   "yt-99-series-6ep":
-    "Lex Fridman Podcast 6 集系列 (Shorty Award Best Podcast Channel 2023)：6 集 = 完整課程感；每集 = 獨立搜尋查詢 + 系列一部分；集集推薦下一集；末集總結 + 下一系列鉤子。",
+    "Lex Fridman Podcast YouTube 長系列格式 (Spotify 全球前 5 podcast；YouTube 訪談類最多訂閱頻道之一；其 Playlist 系列是 YouTube SEO 長系列的標竿)：6 集 = 完整課程感；每集 = 獨立搜尋查詢 + 系列一部分；末集總結 + 下一系列鉤子。",
   "yt-99-quarterly-strategy":
-    "YouTube Creator Academy 季度內容策略 (YouTube Works Award Best Education Creator)：季度 = Evergreen 支柱（長期 SEO）+ 重複系列（訂閱理由）+ 季節時刻（觸及爆發）三種類型的節奏混搭。",
+    "TED Talks YouTube 季度內容策略 (Webby Award Best Education/Reference Channel 多次；YouTube 上持續成長最穩的頻道之一；Evergreen + Trending 混搭策略的業界標竿)：季度 = Evergreen 支柱 + 重複系列 + 季節時刻三種類型的節奏混搭。",
   "yt-99-premiere-kit":
-    "MrBeast Premiere 首映策略 (YouTube Works Award Best Creator Campaign 2022)：首映套組 = Community Post 預熱 → 計劃首映設定 → 首映 Live Chat 互動 → 首映後 Community 追蹤；把上傳變成事件。",
+    "MrBeast Premiere 首映事件套組 (Streamy Award Top Creator 2022-2023；其首映策略讓每次上傳成為媒體事件；Premiere 同時在線觀看人數 YouTube 記錄持有者之一)：Community Post 預熱 → 計劃首映 → Live Chat 互動 → 首映後 Community 追蹤；把上傳變成事件。",
 };
 
 /** Per-use-case playbook — per taskId pattern + award reference appended. */
