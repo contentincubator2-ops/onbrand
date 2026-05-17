@@ -387,8 +387,16 @@ function RailIcon({ icon, count }: { icon: any; count?: string }) {
 
 /* ─────────────── FB Ad (feed + Sponsored + CTA) ─────────────── */
 
-export function FBAd({ title, brandName, variantLabel }: MockupFields) {
+export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus }: MockupFields) {
   const { lang } = useLang();
+  // 2026-05-18 (CJ): FBAd ignored the generated headline — showed the
+  // run title (same for every pill). Use the variant's caption (the
+  // actual ad headline) as the primary ad text.
+  const adText = (liveCaption ?? "").trim() || title;
+  // 2026-05-18 (CJ「選 A：隱藏空圖框」): only render the image block when
+  // an image actually exists or was attempted. Headline-only ad tasks
+  // (images:0 → no url, no status) → no fake forever-skeleton box.
+  const showImage = !!liveImageUrl || !!liveImageStatus;
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -404,17 +412,30 @@ export function FBAd({ title, brandName, variantLabel }: MockupFields) {
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
           />
         </div>
-        <div className="px-4 py-2">
-          <p className="text-small">{title}</p>
+        <div className="px-4 py-3">
+          <p className="text-base font-semibold leading-snug">{adText}</p>
           <p className="text-tiny text-default-500 mt-1">{lang === "en" ? "Shop now — 10% off, limited time →" : "立即購買，限時 9 折優惠 →"}</p>
         </div>
-        <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
-          <Skeleton className="absolute inset-0" />
-          <div className="text-center relative z-10">
-            <FontAwesomeIcon icon={faImages} className="text-4xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "Ad image · waiting for craft agent" : "廣告主圖 · 等待 AI 生成"}</p>
-          </div>
-        </div>
+        {showImage && (
+          liveImageUrl ? (
+            <div className="bg-default-100 overflow-hidden flex items-center justify-center">
+              <img src={liveImageUrl} alt={lang === "en" ? "Ad image" : "廣告主圖"}
+                className="w-full h-auto object-contain" style={{ maxHeight: 420 }} />
+            </div>
+          ) : (
+            <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
+              {liveImageStatus === "ready" ? <Skeleton className="absolute inset-0" /> : null}
+              <div className="text-center relative z-10">
+                <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
+                <p className="text-tiny">
+                  {liveImageStatus === "failed" || liveImageStatus === "timeout"
+                    ? (lang === "en" ? "Image generation failed" : "圖片生成失敗")
+                    : (lang === "en" ? "Ad image · generating…" : "廣告主圖 · 生成中…")}
+                </p>
+              </div>
+            </div>
+          )
+        )}
         {/* CTA bar (FB ad signature) */}
         <div className="px-4 py-2.5 bg-default-100 border-y border-divider flex items-center justify-between">
           <div className="min-w-0">
