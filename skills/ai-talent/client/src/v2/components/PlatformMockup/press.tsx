@@ -631,6 +631,72 @@ export function FactSheetMockup({ title, brandName, variantLabel, liveTitle, liv
   );
 }
 
+/* ─────────────── Company Boilerplate · 官網「關於我們」 ───────────────
+ *
+ * 2026-05-17 (CJ「公司簡介任務版型改成官方網站板型，文字好複製」):
+ * boilerplate ≠ newspaper. Render as a clean official-website About
+ * page (top nav bar + hero「關於 <brand>」+ readable prose column +
+ * contact strip + footer). Copy is handled by the RunPage copy button.
+ */
+export function WebAboutMockup({ title, brandName, variantLabel, liveTitle, liveCaption }: MockupFields) {
+  const brand = (brandName ?? "Your Brand").trim();
+  const raw = (liveCaption ?? "").trim();
+  const paras = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const heading = liveTitle || title || `關於 ${brand}`;
+
+  return (
+    <div className="w-full max-w-[820px] mx-auto">
+      <MockupHeader icon={faNewspaper} label="公司簡介 · 官網「關於我們」" variantLabel={variantLabel} />
+      <div className="rounded-lg overflow-hidden"
+        style={{ background: "#fff", border: "1px solid #e6e6ea",
+          boxShadow: "0 20px 44px -18px rgba(0,0,0,0.14)",
+          fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif", color: "#1f2430" }}>
+        {/* Site nav bar */}
+        <div className="flex items-center justify-between px-7 h-12 border-b" style={{ borderColor: "#eef0f4" }}>
+          <span className="font-extrabold tracking-tight" style={{ fontSize: 15 }}>{brand}</span>
+          <div className="flex gap-5 text-[11px]" style={{ color: "#7a8194" }}>
+            <span>首頁</span><span>服務</span>
+            <span style={{ color: "#1f2430", fontWeight: 700, borderBottom: "2px solid #1f2430", paddingBottom: 2 }}>關於我們</span>
+            <span>聯絡</span>
+          </div>
+        </div>
+
+        {/* Hero */}
+        <div className="px-9 pt-12 pb-7 text-center" style={{ background: "linear-gradient(180deg,#fafbfc,#fff)" }}>
+          <p className="text-[11px] font-semibold tracking-[0.28em] uppercase mb-3" style={{ color: "#9aa0b4" }}>About Us</p>
+          <h2 className="font-extrabold leading-tight" style={{ fontSize: "clamp(22px,3.2vw,30px)" }}>{heading}</h2>
+        </div>
+
+        {/* Body — readable single column, generous line-height (copy-friendly) */}
+        <div className="px-9 md:px-16 pb-10" style={{ maxWidth: 720, margin: "0 auto" }}>
+          {paras.length > 0 ? (
+            paras.map((p, i) => (
+              <p key={i} className="mb-4" style={{ fontSize: 14.5, lineHeight: 1.85, color: "#33384a" }}>{p}</p>
+            ))
+          ) : raw ? (
+            <p style={{ fontSize: 14.5, lineHeight: 1.85, color: "#33384a", whiteSpace: "pre-wrap" }}>{raw}</p>
+          ) : (
+            <div className="space-y-3">
+              {[100, 97, 93, 88].map((w, i) => (
+                <div key={i} className="h-3 rounded" style={{ width: `${w}%`, background: "rgba(0,0,0,0.07)" }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Contact strip */}
+        <div className="px-9 md:px-16 py-5 border-t flex flex-wrap items-center justify-between gap-3"
+          style={{ borderColor: "#eef0f4", background: "#fafbfc" }}>
+          <div className="text-[12px]" style={{ color: "#5a6072" }}>
+            <span className="font-semibold" style={{ color: "#1f2430" }}>{brand}</span>　·　媒體聯絡：press@{(brand.toLowerCase().replace(/[^a-z0-9]+/g, "") || "brand")}.com
+          </div>
+          <span className="text-[11px]" style={{ color: "#9aa0b4" }}>© {new Date().getFullYear()} {brand}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────── Presentation / Deck ─────────────── */
 
 export function DeckMockup({ title, brandName, variantLabel, liveTitle, liveCaption, liveDescription, liveImageDesc }: MockupFields) {

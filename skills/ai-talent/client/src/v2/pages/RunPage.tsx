@@ -657,6 +657,9 @@ export default function RunPage() {
       if (id.includes("ceo-quote") || id.includes("speech")) return "speech";
       // 2026-05-17 (CJ「factsheet 要像 factsheet」): scannable one-pager.
       if (id.includes("fact-sheet") || id.includes("factsheet")) return "factsheet";
+      // 2026-05-17 (CJ「公司簡介改成官網版型，好複製」): boilerplate →
+      // official-website "About" page mockup, not the newspaper sheet.
+      if (id.includes("boilerplate") || id.includes("about")) return "about";
       if (id.startsWith("pr-")) return "press-release";
       if (id.startsWith("em-")) return "edm";
       // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"
@@ -925,17 +928,31 @@ export default function RunPage() {
           {/* 2026-05-17 (CJ「可以讓用戶編輯後直接下載」): speech script
               download. Uses the current (edited) caption + the same
               <a download> blob pattern as the .ics export. */}
-          {(["speech", "factsheet"].includes(effectiveVariant?.format as string)) && slide?.caption && (
+          {(["speech", "factsheet", "about"].includes(effectiveVariant?.format as string)) && slide?.caption && (
             <div className="flex flex-wrap gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(slide.caption);
+                    showToastGlobal(lang === "en" ? "Copied" : "已複製全文");
+                  } catch {
+                    showToastGlobal(lang === "en" ? "Copy failed — select & copy manually" : "複製失敗，請手動選取");
+                  }
+                }}
+                className="px-4 py-2 rounded-lg text-tiny font-semibold text-white"
+                style={{ background: "#1f2a4d" }}
+              >
+                {lang === "en" ? "Copy full text" : "複製全文"}
+              </button>
               <button
                 onClick={exportSlidePng}
                 disabled={exporting}
-                className="px-4 py-2 rounded-lg text-tiny font-semibold text-white disabled:opacity-60"
-                style={{ background: "#1f2a4d" }}
+                className="px-4 py-2 rounded-lg text-tiny font-semibold border disabled:opacity-60"
+                style={{ borderColor: "#1f2a4d", color: "#1f2a4d" }}
               >
                 {exporting
                   ? (lang === "en" ? "Rendering…" : "產生圖片中…")
-                  : (lang === "en" ? "Download as image (PNG)" : "下載成圖片（PNG）")}
+                  : (lang === "en" ? "Image (PNG)" : "圖片（PNG）")}
               </button>
               <button
                 onClick={() => {
