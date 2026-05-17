@@ -484,6 +484,153 @@ export function SpeechMockup({ title, brandName, variantLabel, liveTitle, liveCa
   );
 }
 
+/* ─────────────── Fact Sheet (一頁式事實彙整) ───────────────
+ *
+ * 2026-05-17 (CJ「factsheet 產出跟 factsheet 不符」): a scannable
+ * one-pager — header, big stat tiles, labelled bullet sections,
+ * milestone timeline, contact footer. Parses the strict
+ * 【標題】/【副題】 + ##section（｜-delimited）format from the prompt.
+ */
+function parseFactSheet(text: string) {
+  const grab = (re: RegExp) => (text.match(re)?.[1] ?? "").trim();
+  const title = grab(/【標題】\s*(.+)/);
+  const subtitle = grab(/【副題】\s*(.+)/);
+  const body = text.includes("---") ? text.split("---").slice(1).join("---") : text;
+  const sections: Record<string, string[]> = {};
+  let cur = "";
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = line.match(/^#{1,3}\s*(.+)/);
+    if (h) { cur = h[1]!.trim(); sections[cur] = []; continue; }
+    if (cur) (sections[cur] ||= []).push(line.replace(/^[-•]\s*/, "").trim());
+  }
+  const pick = (...names: string[]) => {
+    for (const n of names) {
+      const k = Object.keys(sections).find((s) => s.includes(n));
+      if (k) return sections[k]!;
+    }
+    return [];
+  };
+  return {
+    title, subtitle,
+    stats: pick("數據", "數字", "Stats").map((l) => {
+      const [a, b, c] = l.split(/｜|\|/).map((x) => x.trim());
+      return { label: a ?? "", value: b ?? "", note: c ?? "" };
+    }).filter((s) => s.value || s.label),
+    facts: pick("重點事實", "事實", "Facts", "Key"),
+    milestones: pick("里程碑", "時程", "Milestones").map((l) => {
+      const [y, ...rest] = l.split(/｜|\|/);
+      return { year: (y ?? "").trim(), event: rest.join(" ").trim() };
+    }).filter((m) => m.year || m.event),
+    products: pick("產品", "服務", "核心業務", "Product"),
+    contact: pick("聯絡", "Contact").join("　·　"),
+  };
+}
+
+export function FactSheetMockup({ title, brandName, variantLabel, liveTitle, liveCaption }: MockupFields) {
+  const brand = (brandName ?? "Your Brand").trim();
+  const raw = (liveCaption ?? "").trim();
+  const f = parseFactSheet(raw);
+  const heading = f.title || liveTitle || title || `${brand} Fact Sheet`;
+  const dateStr = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long", day: "numeric" });
+  const INK = "#14213d", ACCENT = "#0a8a92";
+  const empty = !f.stats.length && !f.facts.length && !f.milestones.length && !f.products.length;
+
+  return (
+    <div className="w-full max-w-[760px] mx-auto">
+      <MockupHeader icon={faNewspaper} label="Fact Sheet · 一頁式" variantLabel={variantLabel} />
+      <div className="rounded-lg overflow-hidden"
+        style={{ background: "#fff", border: "1px solid #e6e6ea",
+          boxShadow: "0 20px 44px -18px rgba(20,33,61,0.18)",
+          fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif", color: "#222" }}>
+        {/* Header band */}
+        <div className="px-8 py-6" style={{ background: INK, color: "#fff" }}>
+          <div className="flex items-center justify-between text-[10px] tracking-[0.22em] uppercase opacity-70">
+            <span>{brand}</span><span>FACT SHEET · {dateStr}</span>
+          </div>
+          <h2 className="font-extrabold mt-2 leading-snug" style={{ fontSize: "clamp(19px,2.8vw,26px)" }}>
+            {heading}
+          </h2>
+          {f.subtitle && <p className="text-[13px] mt-1 opacity-85">{f.subtitle}</p>}
+        </div>
+
+        {empty && raw ? (
+          <div className="px-8 py-6 whitespace-pre-wrap leading-relaxed" style={{ fontSize: 13, color: "#3c4257" }}>{raw}</div>
+        ) : empty ? (
+          <div className="px-8 py-8 grid grid-cols-3 gap-3">
+            {[1,2,3,4,5,6].map((k) => <Skeleton key={k} className="h-16 rounded-lg" />)}
+          </div>
+        ) : (
+          <div className="px-8 py-6 space-y-6">
+            {/* Stat tiles */}
+            {f.stats.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {f.stats.map((s, i) => (
+                  <div key={i} className="rounded-lg p-3 text-center" style={{ background: "#f4f8f8", border: "1px solid #e3efef" }}>
+                    <p className="font-extrabold leading-none" style={{ fontSize: "clamp(18px,2.6vw,24px)", color: ACCENT }}>{s.value}</p>
+                    <p className="text-[11px] mt-1 font-semibold" style={{ color: INK }}>{s.label}</p>
+                    {s.note && <p className="text-[10px] mt-0.5" style={{ color: "#8a8f9e" }}>{s.note}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Key facts */}
+              {f.facts.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold tracking-[0.2em] uppercase mb-2" style={{ color: "#9aa0b4" }}>重點事實</p>
+                  <ul className="space-y-1.5">
+                    {f.facts.map((x, i) => (
+                      <li key={i} className="flex gap-2 leading-snug" style={{ fontSize: 12.5, color: "#33384a" }}>
+                        <span style={{ color: ACCENT, fontWeight: 800 }}>·</span><span>{x}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {/* Milestones */}
+              {f.milestones.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold tracking-[0.2em] uppercase mb-2" style={{ color: "#9aa0b4" }}>里程碑</p>
+                  <div className="space-y-1.5">
+                    {f.milestones.map((m, i) => (
+                      <div key={i} className="flex gap-3 leading-snug" style={{ fontSize: 12.5 }}>
+                        <span className="font-bold tabular-nums shrink-0" style={{ color: INK, minWidth: 44 }}>{m.year}</span>
+                        <span style={{ color: "#33384a" }}>{m.event}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Products / services */}
+            {f.products.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold tracking-[0.2em] uppercase mb-2" style={{ color: "#9aa0b4" }}>產品 / 服務</p>
+                <div className="grid md:grid-cols-2 gap-2">
+                  {f.products.map((p, i) => (
+                    <div key={i} className="rounded-md px-3 py-2" style={{ background: "#f7f8fa", fontSize: 12, color: "#33384a" }}>{p}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Contact footer */}
+        <div className="px-8 py-3 border-t flex items-center justify-between text-[10px]"
+          style={{ borderColor: "#eee", color: "#9aa0b4" }}>
+          <span>{f.contact || `媒體聯絡 · ${brand}`}</span>
+          <span>可編輯 · 下方可下載一頁圖（PNG）／全文</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────── Presentation / Deck ─────────────── */
 
 export function DeckMockup({ title, brandName, variantLabel, liveTitle, liveCaption, liveDescription, liveImageDesc }: MockupFields) {

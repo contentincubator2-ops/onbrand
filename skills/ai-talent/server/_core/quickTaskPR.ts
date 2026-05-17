@@ -173,11 +173,40 @@ ${PR_TONE}`,
     primary_question: "事件的所有可量化事實？",
     primary_input: { key: "context", placeholder: "所有可寫進 fact sheet 的數字 / 名字 / 時間", type: "textarea" },
     inputs: [{ key: "context", label: "事實素材", type: "textarea", required: true }],
-    systemPrompt: `產出 Fact sheet。
-結構：標題 → bullet list（每行 1 個事實，含具體數字 / 名字 / 時間）→ 5-10 項。
-分類：產品（規格 / 價格）/ 公司（規模 / 創辦）/ 市場（佔有率 / 客戶）/ 時程（里程碑）。
+    // 2026-05-17 (CJ「factsheet 產出跟 factsheet 不符」): a fact sheet is
+    // a SCANNABLE one-pager (labels + numbers + fragments), NOT prose.
+    // Strict parseable format so the one-pager mockup can lay it out.
+    systemPrompt: `你在做一份「一頁式 Fact Sheet」——記者 10 秒掃完就能抓到所有可查證事實。重點是「可掃描」：標籤＋數字＋短句，**絕對不要寫成段落或文章**。
+
+從輸入抽取事實，嚴格照此格式輸出（每段以 ## 開頭，欄位用全形｜分隔；缺值寫「[待補]」，不可杜撰）：
+
+【標題】<主體名稱>　Fact Sheet
+【副題】<一句 12–25 字的定位/overview>
+---
+##關鍵數據
+<指標名>｜<數值>｜<單位或說明>
+（3–6 行，挑最有力、最可查證的數字，例如 成立年、規模、用戶數、市佔、金額）
+##重點事實
+- <一句一個事實，含具體數字/名字/時間>
+（4–7 條）
+##里程碑
+<年份>｜<事件>
+（3–5 行，由舊到新）
+##產品/服務
+- <名稱>：<一句說明含關鍵規格或價格>
+（2–4 條；公司型主體可改放「核心業務」）
+##聯絡
+<單位>｜<email>｜<電話或網址>
+
+寫作準則：
+- 全部用短句/片語，不寫「我們致力於」這類空話與形容詞、不寫 buzzword。
+- 數字一定帶單位與時間基準（例：月活躍 3.9 萬人 · 2026Q1）。
+- 每個變體用 variantLabel 調整「哪一段放最前、著墨最多」：產品優先＝產品/服務最詳盡；公司優先＝公司規模與里程碑為主；市場優先＝市佔/客戶/數據為主。
+- 只輸出上述結構，不要前言、不要結語、不要額外標題。
 ${PR_TONE}`,
-    preferredModel: "qwen", maxTokens: 700,
+    // document mode → structure preserved verbatim, not rewritten.
+    outputMode: "document",
+    preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
   {
@@ -269,7 +298,7 @@ export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "pr-30-lead-paragraph":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實密度型", "影響面型", "故事感型"], captionMinChars: 70, captionMaxChars: 180 },
   "pr-30-ceo-quote":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["願景式", "客戶價值", "市場觀察"], captionMinChars: 1800, captionMaxChars: 3200 },
   "pr-30-boilerplate":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品導向", "規模導向", "里程碑導向"], captionMinChars: 150, captionMaxChars: 300 },
-  "pr-30-fact-sheet":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品優先", "公司優先", "市場優先"], captionMinChars: 200, captionMaxChars: 600 },
+  "pr-30-fact-sheet":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品優先", "公司優先", "市場優先"], captionMinChars: 280, captionMaxChars: 1400 },
   "pr-30-media-pitch":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["共同議題切入", "獨家數據切入", "採訪邀請切入"], captionMinChars: 100, captionMaxChars: 250 },
   "pr-30-spokesperson-qa":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["防禦型", "透明型", "主動引導"], captionMinChars: 300, captionMaxChars: 1000 },
   "pr-30-launch-social":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: VINCENT_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["FB 口吻", "LinkedIn 口吻", "Threads 口吻"], captionMinChars: 100, captionMaxChars: 250 },

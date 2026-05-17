@@ -601,6 +601,8 @@ export default function RunPage() {
       // 2026-05-17 (CJ「CEO QUOTE → CEO SPEECH，致辭簡報版型」):
       // ceo-quote / ceo-speech / any -speech → slide-style speech mockup.
       if (id.includes("ceo-quote") || id.includes("speech")) return "speech";
+      // 2026-05-17 (CJ「factsheet 要像 factsheet」): scannable one-pager.
+      if (id.includes("fact-sheet") || id.includes("factsheet")) return "factsheet";
       if (id.startsWith("pr-")) return "press-release";
       if (id.startsWith("em-")) return "edm";
       // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"
@@ -868,7 +870,7 @@ export default function RunPage() {
           {/* 2026-05-17 (CJ「可以讓用戶編輯後直接下載」): speech script
               download. Uses the current (edited) caption + the same
               <a download> blob pattern as the .ics export. */}
-          {(effectiveVariant?.format as string) === "speech" && slide?.caption && (
+          {(["speech", "factsheet"].includes(effectiveVariant?.format as string)) && slide?.caption && (
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={exportSlidePng}
@@ -877,8 +879,8 @@ export default function RunPage() {
                 style={{ background: "#1f2a4d" }}
               >
                 {exporting
-                  ? (lang === "en" ? "Rendering…" : "產生簡報圖中…")
-                  : (lang === "en" ? "Download slide (PNG)" : "下載簡報圖（PNG）")}
+                  ? (lang === "en" ? "Rendering…" : "產生圖片中…")
+                  : (lang === "en" ? "Download as image (PNG)" : "下載成圖片（PNG）")}
               </button>
               <button
                 onClick={() => {
@@ -886,15 +888,15 @@ export default function RunPage() {
                   const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
                   const a = document.createElement("a");
                   a.href = URL.createObjectURL(blob);
-                  const safe = (data.title ?? "ceo-speech").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
-                  a.download = `${safe || "ceo-speech"}.md`;
+                  const safe = (data.title ?? "press-output").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
+                  a.download = `${safe || "press-output"}.md`;
                   a.click();
                   URL.revokeObjectURL(a.href);
                 }}
                 className="px-4 py-2 rounded-lg text-tiny font-semibold border"
                 style={{ borderColor: "#1f2a4d", color: "#1f2a4d" }}
               >
-                {lang === "en" ? "Speech text (.md)" : "講稿全文（.md）"}
+                {lang === "en" ? "Full text (.md)" : "全文（.md）"}
               </button>
             </div>
           )}

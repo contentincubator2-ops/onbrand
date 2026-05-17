@@ -48,7 +48,7 @@ import { GoogleSearchAd, GoogleDisplayAd, GooglePMax } from "./google";
 import { XTweet, XThread } from "./twitter";
 import { LINEBroadcast, LINECard, LINERichMenu } from "./line";
 import { WebLanding, WebBlog, WebProduct } from "./web";
-import { PressRelease, DeckMockup, QAMockup, SpeechMockup } from "./press";
+import { PressRelease, DeckMockup, QAMockup, SpeechMockup, FactSheetMockup } from "./press";
 import { GenericMockup } from "./generic";
 import { ProposalCover, ProposalSpec, ResearchDoc, PersonaCard } from "./proposal";
 import { XHSNote, XHSVideo, XHSSearch } from "./xiaohongshu";
@@ -151,6 +151,9 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
 
     // ── CEO Speech 致辭講稿 (2026-05-17) ──────────────────────────────
     case "press:speech": return <SpeechMockup {...f} />;
+
+    // ── Fact Sheet 一頁式 (2026-05-17) ────────────────────────────────
+    case "press:factsheet": return <FactSheetMockup {...f} />;
 
     // ── Deck / Presentation (1) ───────────────────────────────────────
     case "deck:slide": return <DeckMockup {...f} />;
