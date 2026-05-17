@@ -175,6 +175,13 @@ A：<答案>
 
 （每組之間空一行，不要編號前綴、不要額外標題或結語。）
 ${PR_TONE}`,
+    // 2026-05-17 (CJ「沒有列出 QA 板型」root cause): without
+    // outputMode:"document" the orchestra wraps this in the 社群貼文
+    // scaffold + 台灣社群 master persona, which rewrites the Q&A into a
+    // flowing narrative caption — so the Q：/A： structure (and the
+    // mockup's parser) never sees pairs. document mode makes this
+    // systemPrompt the 最高指令 and preserves its structure verbatim.
+    outputMode: "document",
     preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
