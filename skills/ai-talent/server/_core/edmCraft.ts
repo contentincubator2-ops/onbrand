@@ -14,12 +14,18 @@
 
 import type { FBTaskTemplate } from "./quickTaskFB";
 
-/** Is this an email-family task (em-*, email:dm/edm/newsletter, PR media-pitch)? */
+/**
+ * Is this a 電子報 (email-newsletter) task?
+ * 2026-05-17 (CJ「email 家族任務，只要鎖定在電子報」): scope strictly
+ * to the 電子報 family — the em-* templates (quickTaskEmail.ts, all
+ * skill_slug:"newsletter") + any task whose output channel is email.
+ * Deliberately EXCLUDES KOL 1:1 DM (kl-*) and PR media-pitch: the IAC
+ * craft rubric is for marketing email/newsletter campaigns, not 1:1
+ * outreach or press pitches — forcing it there would be wrong.
+ */
 export function isEmailTask(template: FBTaskTemplate): boolean {
   const id = String(template.id ?? "");
   if (id.startsWith("em-")) return true;
-  if (id === "kl-30-invite-opener" || id === "kl-30-followup") return true; // 1:1 outreach email
-  if (id.includes("media-pitch")) return true;
   return template.outputDefaults?.platform === "email";
 }
 
