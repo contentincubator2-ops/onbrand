@@ -63,6 +63,14 @@ const CARD_PALETTES = [
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
+// 2026-05-18 (CJ「沒生成前應停留在讀秒 modal，不要跑來 mockup 等待」):
+// tasks whose deliverable is a complete post (copy + image). For these
+// we keep the running countdown modal open until the FULL post (incl.
+// image) is ready, THEN navigate to /run — instead of navigating at the
+// caption_ready checkpoint and making the user watch a spinner there.
+// Mirrors OrchestraConfig.holdForImages (server) + RunPage HOLD_FOR_IMAGES.
+const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full"]);
+
 /** Tier accent color (Canva-style — vibrant, distinct per tier).
  *  30s = teal (quick / fast), 60s = purple (production / depth),
  *  100s = amber (premium / research-validated). Used for mockup frame
@@ -364,6 +372,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   // 會 navigate 過來帶 ?rerun=<outputId>。我們撈該 run 的 metadata.inputs
   // + mission.taskId，自動開對應 task modal 並 prefill 主問題輸入。
   const [searchParams, setSearchParams] = useSearchParams();
+  const holdUtils = (trpc as any).useUtils?.() ?? null;
   const rerunId = Number(searchParams.get("rerun") ?? "0");
   const rerunQuery = (trpc as any).output?.getById?.useQuery
     ? (trpc as any).output.getById.useQuery(
@@ -651,8 +660,25 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         // No setOutput fallback, no in-modal mockup. If outputId is
         // missing, that's a recordTaskRun bug — surface it loudly.
         if ((r as any).outputId) {
+          const oid = (r as any).outputId;
+          // 2026-05-18 (CJ「沒生成前應停留在讀秒 modal」): hold-for-images
+          // tasks promise a complete post. The orchestra returns at the
+          // caption_ready checkpoint (text done, image pending); instead
+          // of navigating now and showing a spinner on /run, keep the
+          // running countdown modal open and poll until the full post
+          // (image) is done/failed, THEN navigate. 95s safety cap.
+          if (HOLD_FOR_IMAGES.has(activeTask.id) && holdUtils?.output?.getById?.fetch) {
+            const deadline = Date.now() + 95_000;
+            while (Date.now() < deadline) {
+              await new Promise((res) => setTimeout(res, 3000));
+              try {
+                const o: any = await holdUtils.output.getById.fetch({ id: oid });
+                if (o?.progress && o.progress !== "caption_ready") break;
+              } catch { /* transient — keep polling */ }
+            }
+          }
           closeTask();
-          navigate(`/run/${(r as any).outputId}`);
+          navigate(`/run/${oid}`);
           return;
         }
         // 2026-05-14 (CJ Bug#2 follow-up): more specific error UX. Three cases:
@@ -703,7 +729,11 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   }, [output]);
 
   // 倒數仍對用戶承諾 30s（CJ direction 2026-05-05 — 20s 是後端的內部安全上限）
-  const expectedSec = tier === "30s" ? 30 : tier === "60s" ? 60 : 100;
+  // hold-for-images tasks wait for copy + image before leaving the modal,
+  // so the countdown target is longer (else it reads "85s / 60s").
+  const expectedSec =
+    activeTask && HOLD_FOR_IMAGES.has(activeTask.id) ? 90 :
+    tier === "30s" ? 30 : tier === "60s" ? 60 : 100;
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 
   // Tier-distinct hero metadata — user feels the difference immediately
