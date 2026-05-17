@@ -18,8 +18,22 @@
  * No external deps — uses Node fetch + simple regex HTML cleanup.
  */
 
-const URL_RE = /https?:\/\/[^\s一-龥（），。！？「」『』、；：]+/i;
-const FETCH_TIMEOUT_MS = 6000;
+// 2026-05-18 (CJ「用戶有提供連結就要讀，剛剛沒讀」): the old regex
+// REQUIRED http(s):// — users very often paste a link WITHOUT the
+// scheme (www.x.com / x.com/page), so it was never detected → never
+// fetched. Now also catch scheme-less URLs and normalize.
+const BOUNDARY = "\\s一-龥（），。！？「」『』、；：\\\"<>";
+const URL_SCHEME_RE = new RegExp(`https?:\\/\\/[^${BOUNDARY}]+`, "i");
+// 2026-05-18: the old `www\.[a-z0-9-]+` alternative truncated
+// "www.sowork.ai/pricing" → "www.sowork" (matched only the first label,
+// then the optional path failed because the next char was ".ai"). The
+// TLD-anchored form below already handles a leading "www." correctly, so
+// we use a single "(label.)+TLD(/path)?" shape — no separate www branch.
+const URL_BARE_RE = new RegExp(
+  `(?:[a-z0-9-]+\\.)+(?:com|org|net|io|ai|co|tw|app|dev|me|info|biz|tv|news|xyz|page|site|shop|store|link|gov|edu)(?:\\.tw)?(?:\\/[^${BOUNDARY}]*)?`,
+  "i",
+);
+const FETCH_TIMEOUT_MS = 9000;
 const MAX_BODY_CHARS = 3000;
 
 export interface UrlSummary {
@@ -41,10 +55,26 @@ export interface UrlSummary {
   };
 }
 
-/** Extract the first URL from a free-form string. */
+const TRAIL_RE = /[).,，。、；：!?！？'"]+$/;
+
+/** Extract the first URL from a free-form string. Handles scheme-less
+ *  links (www.x.com / x.com/page) and strips trailing punctuation. */
 export function findFirstUrl(input: string): string | null {
-  const m = input.match(URL_RE);
-  return m ? m[0] : null;
+  const s = input ?? "";
+  const scheme = s.match(URL_SCHEME_RE);
+  if (scheme) return scheme[0].replace(TRAIL_RE, "");
+  const bare = s.match(URL_BARE_RE);
+  if (bare) {
+    const idx = bare.index ?? 0;
+    // crude e-mail guard: skip "name@domain.com"
+    if (idx > 0 && s[idx - 1] === "@") {
+      const rest = s.slice(idx + bare[0].length);
+      const next = findFirstUrl(rest);
+      return next;
+    }
+    return "https://" + bare[0].replace(TRAIL_RE, "");
+  }
+  return null;
 }
 
 /** Strip common HTML noise; return clean text. */
