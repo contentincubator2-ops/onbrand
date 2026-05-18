@@ -485,6 +485,31 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const runOrchestra60Mut = (trpc as any).quickTask?.runOrchestra60?.useMutation();
   const runOrchestra99Mut = (trpc as any).quickTask?.runOrchestra99?.useMutation();
   const runSquadAutoMut = (trpc as any).quickTask?.runSquadAuto?.useMutation();
+  // 2026-05-18 (CJ): optional AI polish of the user's brief — rewrites
+  // the input textarea in place (no diff modal). Works for 30s/60s/99s.
+  const polishInputMut = (trpc as any).quickTask?.polishInput?.useMutation();
+  const [polishing, setPolishing] = useState(false);
+  const [polishErr, setPolishErr] = useState<string | null>(null);
+  const handlePolish = async () => {
+    if (!activeTask || !primaryAnswer.trim() || !polishInputMut?.mutateAsync) return;
+    setPolishErr(null);
+    setPolishing(true);
+    try {
+      const r = await polishInputMut.mutateAsync({
+        taskId: activeTask.id,
+        text: primaryAnswer,
+        taskLabel: typeof activeTask.label === "string" ? activeTask.label : undefined,
+        primaryQuestion: activeTask.primary_question ?? undefined,
+        brandId: brandId ?? undefined,
+      });
+      if (r?.ok && r.polished) setPrimaryAnswer(r.polished);
+      else setPolishErr(lang === "en" ? "Polish failed — try again." : "潤稿失敗，請再試一次");
+    } catch (e: any) {
+      setPolishErr(lang === "en" ? "Polish failed — try again." : "潤稿失敗，請再試一次");
+    } finally {
+      setPolishing(false);
+    }
+  };
   const [orchestraStages, setOrchestraStages] = useState<any[] | null>(null);
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
 
@@ -1294,6 +1319,34 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                             onChange={(e) => setPrimaryAnswer(e.target.value)}
                             autoFocus
                           />
+                        )}
+                        {/* 2026-05-18 (CJ): optional AI polish — rewrites
+                            the brief in place so the executing agent gets
+                            a clearer input. Never fabricates facts. */}
+                        {polishInputMut && !running && (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              color="secondary"
+                              isLoading={polishing}
+                              isDisabled={polishing || !primaryAnswer.trim()}
+                              onPress={handlePolish}
+                              startContent={!polishing && <FontAwesomeIcon icon={faWandMagicSparkles} />}
+                            >
+                              {polishing
+                                ? (lang === "en" ? "Polishing…" : "潤稿中…")
+                                : (lang === "en" ? "AI polish my brief" : "✨ AI 潤稿")}
+                            </Button>
+                            <span className="text-tiny text-default-400">
+                              {lang === "en"
+                                ? "Tidies your input — facts kept, never invented. You can still edit."
+                                : "幫你整理輸入（保留事實、不會捏造），潤完仍可自行修改"}
+                            </span>
+                          </div>
+                        )}
+                        {polishErr && (
+                          <p className="text-tiny text-danger-500">{polishErr}</p>
                         )}
                       </div>
                     )}

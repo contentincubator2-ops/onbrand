@@ -1290,6 +1290,63 @@ export const quickTaskRouter = router({
       }
     }),
 
+  // 2026-05-18 (CJ「建立任務時加 AI 潤稿，潤完直接改寫輸入框」): a
+  // conservative, task-aware polish of the user's brief BEFORE it goes
+  // to the executing agent. Rewrites in place (client replaces textarea).
+  // Hard rule: never fabricate facts — only restructure/clarify what the
+  // user wrote and bracket any missing specifics as 「[請補充 …]」.
+  polishInput: protectedProcedure
+    .input(z.object({
+      taskId: z.string().min(1).max(64),
+      text: z.string().min(1).max(8000),
+      taskLabel: z.string().max(200).optional(),
+      primaryQuestion: z.string().max(400).optional(),
+      brandId: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      // light cost guard — this is a tiny call but still bills tokens
+      try {
+        const { preflightCostCheck } = await import("../llmWithBilling");
+        const g = await preflightCostCheck(userId);
+        if (!g.ok) throw new TRPCError({ code: "FORBIDDEN", message: g.reason });
+      } catch (e) { if (e instanceof TRPCError) throw e; /* guard optional */ }
+
+      const { callModel } = await import("../_core/multiModelRouter");
+      const { buildBrandPrefix } = await import("../_core/brandContext");
+      const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
+
+      const taskHint = input.taskLabel || input.taskId;
+      const qHint = input.primaryQuestion ? `（這個任務問用戶的問題是：「${input.primaryQuestion}」）` : "";
+      const system =
+        `你是資深行銷企劃，負責把用戶填寫的任務素材「潤飾整理」成一份清楚、可直接交給執行 agent 的 brief。\n` +
+        `這份素材會被用在任務：「${taskHint}」${qHint}。\n` +
+        `嚴格規則：\n` +
+        `1. 只整理與澄清用戶寫的內容，**絕對不可以新增、捏造任何事實**（數字、日期、獎項、客戶名、成效都不可自己生）。\n` +
+        `2. 用戶提供的具體事實（數字/名稱/時間/連結）**逐字保留**，不要改寫。\n` +
+        `3. 把內容整理成有結構、重點清楚、執行 agent 一看就懂的敘述；可分段、可條列。\n` +
+        `4. 若缺少這個任務明顯需要的關鍵資訊，用「[請補充：XXX]」標出來，不要自己填。\n` +
+        `5. 保持用戶原本的語言（繁體中文）與意圖，不要過度擴寫、不要換掉語氣。\n` +
+        `6. 只輸出整理後的素材本身，不要前言、不要解釋、不要 markdown 圍欄。\n` +
+        brandPrefix;
+
+      try {
+        const r = await callModel(
+          [
+            { role: "system", content: system },
+            { role: "user", content: input.text },
+          ],
+          undefined,
+          "anthropic",
+        );
+        const polished = (r.content ?? "").trim();
+        if (!polished) return { polished: "", ok: false, error: "empty" };
+        return { polished, ok: true };
+      } catch (e: any) {
+        return { polished: "", ok: false, error: e?.message ?? String(e) };
+      }
+    }),
+
   // 100s squad auto-run — sequentially executes all steps of a real squad
   // inline (no /picker redirect, no DB mission). Returns OrchestraResult-shaped
   // variants[] where each variant = one step's output, so the existing
