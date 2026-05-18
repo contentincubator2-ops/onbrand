@@ -627,6 +627,11 @@ async function callOneVariant(args: {
         const first = parsed[0];
         if (typeof first === "string" && first.trim().length > 0) return { caption: first.trim() };
         if (typeof first?.caption === "string") return { caption: first.caption.trim() };
+        // 2026-05-18 (CJ「行事曆產出空白」): a top-level array of objects
+        // (e.g. the calendar's [{day,pillar,hook,…}, …]) has no .caption
+        // and L3's length cap would drop it → empty. Preserve the whole
+        // array as a JSON-string caption so calendarMerge can parse it.
+        if (typeof first === "object") return { caption: JSON.stringify(parsed) };
       }
     }
     // L3: raw text fallback. Strip code fences + JSON-y noise. If at least
