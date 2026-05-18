@@ -803,13 +803,24 @@ export default function RunPage() {
     const lbl = String(slide?.label ?? "");
     const v = (platform: string, format: string): MockupVariant =>
       ({ platform: platform as any, format: format as any, label: `${platform}:${format}` });
+    // 2026-05-18 (CJ「釘選主文要 PIN / FAQ 要問答 / about us 要關於我們」):
+    // fb-60-pinned-suite fans out 4 DIFFERENT post types — render each
+    // piece with its own chrome. Gated to this task so the generic
+    // keywords (FAQ/about/案例) don't mis-route other tasks' variants.
+    if ((data?.mission?.taskId ?? "") === "fb-60-pinned-suite") {
+      if (/釘選|pin|主文/i.test(lbl)) return v("facebook", "pinned");
+      if (/FAQ|Q&A|問答|常見問題/i.test(lbl)) return v("facebook", "qa");
+      if (/about|關於/i.test(lbl)) return v("facebook", "about");
+      // 代表案例 = a representative customer case-study post → normal feed
+      return v("facebook", "feed");
+    }
     if (/threads/i.test(lbl)) return v("threads", "post");
     if (/linkedin|領英/i.test(lbl)) return v("linkedin", "feed");
     if (/facebook|臉書|\bFB\b/i.test(lbl)) return v("facebook", "feed");
     if (/instagram|\bIG\b/i.test(lbl)) return v("instagram", "feed");
     if (/\bLINE\b/i.test(lbl)) return v("line", "broadcast");
     return mockupVariant;
-  }, [mockupVariant, slide?.label]);
+  }, [mockupVariant, slide?.label, data?.mission?.taskId]);
 
   if (!id || isNaN(id)) {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;

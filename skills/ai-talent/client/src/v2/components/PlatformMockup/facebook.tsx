@@ -15,14 +15,14 @@ import {
   faImages, faThumbsUp, faComment, faShare, faGlobe, faPaperPlane,
   faMusic, faVolumeHigh, faXmark, faChevronLeft, faVideo, faHeart,
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
-  faChevronRight, faArrowRight,
+  faChevronRight, faArrowRight, faThumbtack,
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── FB Feed ─────────────── */
 
-export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard }: MockupFields) {
+export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard, pinned }: MockupFields) {
   const { lang } = useLang();
   // 2026-05-05: liveImageStyle takes priority over liveImageDesc — it's the
   // "style direction" the quick-task agent produced, kept inside the image
@@ -35,6 +35,14 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        {/* 2026-05-18 (CJ「釘選主文應該有個 PIN」): FB pinned-post chrome
+            — the small "📌 已釘選貼文" row FB shows above a pinned post. */}
+        {pinned && (
+          <div className="px-4 pt-3 pb-1 flex items-center gap-1.5 text-tiny text-default-500 font-medium border-b border-divider/60">
+            <FontAwesomeIcon icon={faThumbtack} className="text-[11px] -rotate-45" />
+            {lang === "en" ? "Pinned post" : "已釘選貼文"}
+          </div>
+        )}
         <div className="px-4 py-3 flex items-center gap-3">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}

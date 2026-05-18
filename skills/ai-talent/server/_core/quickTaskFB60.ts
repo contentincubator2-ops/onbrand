@@ -208,7 +208,7 @@ ${FB60_TONE}`,
       { key: "brand_focus", label: "品牌 focus", type: "textarea", required: true },
     ],
     systemPrompt: `產出 FB 釘選 + 配套貼文其中 1 篇。
-本次你寫的是「{label}」（釘選主文 / FAQ / about us / 代表案例）。
+本次你寫的是「{label}」（釘選主文 / 常見問答 FAQ / 關於我們 About / 代表案例＝挑一個最有代表性的客戶成功故事當門面）。
 釘選主文 300-500 字；配套各 200-300 字。
 釘選會留很久，不要寫時效性內容（"最新"、"本月" 都不要）。
 ${FB60_TONE}`,
@@ -494,10 +494,10 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 8,
-    variantLabels: ["釘選主文", "FAQ", "about us", "代表案例"],
+    variantLabels: ["釘選主文", "常見問答 FAQ", "關於我們 About", "代表案例（客戶成功故事）"],
     captionMinChars: 200,
     captionMaxChars: 500,
-    postLabels: ["釘選主文", "FAQ", "about us", "代表案例"],
+    postLabels: ["釘選主文", "常見問答 FAQ", "關於我們 About", "代表案例（客戶成功故事）"],
     extras: {
       postsCount: 4,
       replyTemplates: 5, postingTime: true, followupPost: true,

@@ -87,6 +87,11 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "facebook:live":           return <FBLive           {...f} />;
     case "facebook:cover":          return <FBCover          {...f} />;
     case "facebook:poll":           return <FBPoll           {...f} />;
+    // 2026-05-18 (CJ「釘選主文要 PIN / FAQ 要問答 / about us 要關於我們」):
+    // pinned-suite pieces each get the right chrome (reuse Q&A + About).
+    case "facebook:pinned":         return <FBFeed           {...f} pinned />;
+    case "facebook:qa":             return <QAMockup         {...f} />;
+    case "facebook:about":          return <WebAboutMockup   {...f} />;
     case "facebook:comment":        return <FBComment        {...f} />;
     case "facebook:group":          return <FBGroup          {...f} />;
     case "facebook:recommendation": return <FBRecommendation {...f} />;

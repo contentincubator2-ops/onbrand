@@ -156,6 +156,8 @@ export interface MockupFields {
   /** Live content fields — legacy path (still works when slotMap is absent) */
   liveCaption?: string;
   liveHashtags?: string[];
+  /** 2026-05-18 (CJ「釘選主文應該有個 PIN」): render FB pinned-post chrome */
+  pinned?: boolean;
   /** 2026-05-18 (CJ): carousel / album — N cards, each with its own image */
   liveCards?: Array<{
     headline: string;
