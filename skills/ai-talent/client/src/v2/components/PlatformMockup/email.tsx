@@ -26,20 +26,22 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
     const m = _cap.match(new RegExp(`^[\\s#*>\\-]*${kw}\\s*[：:]\\s*(.+?)\\**\\s*$`, "m"));
     return m?.[1]?.trim() || "";
   };
-  const subject = (liveTitle || _grab("主旨") || _grab("Subject") || title || "").trim();
+  // 2026-05-19 (CJ 驗收 v#2 Week-2 bug): _grab returns capture group after
+  // "主旨：" so it should NOT include the prefix — but if the model emits the
+  // header line in an unexpected format (e.g. no newline before it, or the
+  // regex fails to match), liveTitle may fall through as-is. Add a safety
+  // strip so "主旨：<text>" → "<text>" regardless of where it came from.
+  const _stripMetaPrefix = (s: string) =>
+    s.replace(/^[\s#*>\-]*(?:主旨|Subject)\s*[：:]\s*/i, "").trim();
+  const subject = _stripMetaPrefix((liveTitle || _grab("主旨") || _grab("Subject") || title || "").trim());
   const previewText = _grab("預覽(?:文字)?") || _grab("Preview");
-  // 2026-05-19: _grab uses the FIRST match; if model puts "CTA：" both in the
-  // header line AND again inside body, _grab catches the first (header) one
-  // but the body occurrence stays.  Use a broader pattern: also match CTA
-  // mid-sentence (e.g. "（CTA：立即鎖定）") so it's caught in both places.
-  const _grabCta = (): string => {
-    // Try strict line-start first (clean model output)
-    const strict = _grab("CTA") || _grab("行動呼籲");
-    if (strict) return strict;
-    // Fallback: CTA anywhere in the text (parenthesised or mid-sentence)
-    const loose = _cap.match(/(?:CTA|行動呼籲)\s*[：:]\s*(.{1,20}?)(?=[）\n\r！。？，,]|$)/m);
-    return loose?.[1]?.trim() || "";
-  };
+  // 2026-05-19 v#2: loose fallback was picking up CTA occurrences INSIDE the
+  // body text (e.g. embedded reminder "（CTA：設定我的品牌腳色）"), producing a
+  // double CTA button when the strict header-line match also succeeded.
+  // Fix: remove the loose fallback entirely — if the model didn't emit a
+  // proper "CTA：" header line, fall through to liveCta (passed from parent)
+  // rather than guessing from body text.
+  const _grabCta = (): string => _grab("CTA") || _grab("行動呼籲");
   const parsedCta = _grabCta() || liveCta || "";
   // 2026-05-19 (CJ 驗收 P1「Guardrail 殘缺」): prompt-only guardrails keep
   // leaking 驚嘆號 + 煽動詞 on the heaviest letters (上線封 / 提醒2). Add a
@@ -67,12 +69,15 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
       .replace(/[ \t]{2,}/g, " ");
   const bodyText = _sanitize(
     _cap
-      // Strip metadata header lines (add `g` flag — model sometimes repeats them)
+      // Strip metadata header lines (g flag — model sometimes repeats them)
       .replace(/^[\s#*>\-]*主旨\s*[：:].*$/mg, "")
+      .replace(/^[\s#*>\-]*Subject\s*[：:].*$/img, "")
       .replace(/^[\s#*>\-]*預覽(?:文字)?\s*[：:].*$/mg, "")
+      .replace(/^[\s#*>\-]*Preview\s*[：:].*$/img, "")
       .replace(/^[\s#*>\-]*(?:CTA|行動呼籲)\s*[：:].*$/mg, "")
-      // Also strip any inline "CTA：..." that slipped into body paragraphs
-      .replace(/(?:CTA|行動呼籲)\s*[：:]\s*.{1,20}?(?=[）\n\r！。？，, ]|$)/gm, ""),
+      // Strip inline parenthesised CTA hints that slipped into body paragraphs
+      // e.g. "（CTA：設定我的品牌腳色）" — greedy up to closing bracket or EOL
+      .replace(/[（(](?:CTA|行動呼籲)\s*[：:]\s*[^）)]{1,30}[）)]?/gm, ""),
   )
     .replace(/\n{3,}/g, "\n\n")
     .replace(/^\s+/, "")

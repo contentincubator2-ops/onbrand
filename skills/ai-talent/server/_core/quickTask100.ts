@@ -489,12 +489,26 @@ CTA：<本週 CTA 按鈕文字，依下方週次規則，≤8 字>
 （空一行後）<信件本文 200-400 字>
 
 【主旨差異化硬規則 — 違反即不合格】
-每週主旨必須各異，且與該週核心主題直接掛鉤：
-- 第 1 週主旨 → 聚焦「為什麼品牌一致性是你的痛點 / 你遇到的問題」（情境化，不要品牌宣傳腔）
-- 第 2 週主旨 → 聚焦「品牌腳色設定 / 讓 AI 真的讀懂你的品牌」（功能引導）
-- 第 3 週主旨 → 聚焦「你的第一篇 AI 產出 / 看到成果那一刻」（行動引導）
-- 第 4 週主旨 → 聚焦「解鎖更多 / 升級 / 品牌一致性的下一階段」（升級勾引）
+每週主旨必須各異，且與該週核心主題直接掛鉤。每週的 hook 角度如下，不得互換：
+
+- 第 1 週主旨（Why / 痛點）→ 以「為什麼」或「你是否…」開頭，聚焦受眾真實痛點
+  ✔ 正例：「為什麼你的 AI 文案，讀起來總像是別人寫的」
+  ✗ 禁止：第 2/3/4 週使用這個 hook 角度
+
+- 第 2 週主旨（What / 功能介紹）→ 聚焦「品牌腳色設定 / 讓 AI 真的讀懂你的品牌風格」（功能引導，不是問句）
+  ✔ 正例：「品牌腳色設定：讓 AI 學會你說話的方式」
+  ✗ 禁止：以「為什麼」開頭（那是第 1 週的 hook）；不得與第 1 週主旨相同或近似
+
+- 第 3 週主旨（How / 第一次行動）→ 聚焦「你的第一篇 AI 產出 / 看到成果那一刻」（行動引導，動詞開頭）
+  ✔ 正例：「產出你的第一篇品牌文案，只要三步驟」
+  ✗ 禁止：以「為什麼」或「品牌腳色」開頭
+
+- 第 4 週主旨（Deepen / 升級）→ 聚焦「解鎖更多 / 升級 / 品牌一致性的下一階段」（升級勾引）
+  ✔ 正例：「你已產出第一篇——現在解鎖進階分析」
+  ✗ 禁止：重複前三週任何主旨或 hook 角度
+
 **同一句主旨（或同一個 hook 角度）出現在超過一封 = 不合格，必須重寫**
+**特別檢查：你的第 2 週主旨不可以是「為什麼…」句型，也不可以和第 1 週主旨相同**
 
 【CTA 週次差異化｜必守，寫進 CTA：行】
 - 第 1 週：低摩擦認識 → 「了解 OnBrand」
@@ -518,7 +532,12 @@ SoWork 語氣＝「精準守護者、有憑據的科技感」，不是散文、�
 - 行銷業配煽動：「快來體驗」「心動不如行動」「別再猶豫」「趕快加入」
 - hashtag（EDM 不是社群，不得出現任何 #標籤）
 - 效率詞：快／高效／省時（空洞，改用具體動作或數據）
-【寄出前自我檢查｜必做】自己掃一遍：出現上述任何違禁 → 就地改寫再輸出
+【寄出前自我檢查｜必做】送出前依序確認：
+1. 前三行是「主旨：」「預覽：」「CTA：」，純文字，無粗體 ** 無 # 無行首符號
+2. 若本封是第 2 週：主旨【不以「為什麼」開頭】且【不與第 1 週主旨相同或近似】
+3. 品牌聲音違禁詞（emoji、驚嘆號、快來體驗、別再猶豫等）全部已改
+4. 功能名稱逐字忠實（溯源注解、品牌腳色設定…）
+如發現任何一條不符 → 立刻就地改寫，不要交出違規版本
 
 【功能名稱忠實規則】
 輸入怎麼寫就怎麼用，逐字沿用，不得自行改字：
@@ -1206,10 +1225,16 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "em-99-4week-nurture": {
-    // 2026-05-19 (Yi-Wen 驗收): images:4+runImageGen was same pattern that
+    // 2026-05-19 (Yi-Wen 驗收 v#1): images:4+runImageGen was same pattern that
     // caused em-99-launch-sequence to drop last variants. strategist/scout/
     // narrativeArc add overhead without benefiting per-email nurture content.
     // Prompt fully rewritten with format + per-week subject/CTA rules.
+    // 2026-05-19 (Yi-Wen 驗收 v#2): Week 2 triple failure — same subject as
+    // Week 1, "主旨：" prefix leaking into h1/body, double CTA button.
+    // Fix: (1) prompt hardened with per-week hook-angle prohibition + explicit
+    // example subjects + Week-2 self-check; (2) email.tsx _grabCta() loose
+    // fallback removed; (3) bodyText strip also covers parenthesised inline
+    // CTA hints; (4) _stripMetaPrefix() safety ensures "主旨：" never leaks.
     variants: 4, images: 0, runImageGen: false, imageDirectorId: null as any,
     aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
