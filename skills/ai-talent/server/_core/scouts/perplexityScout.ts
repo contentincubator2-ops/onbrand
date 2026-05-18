@@ -51,8 +51,26 @@ function buildPrompts(ctx: ScoutContext) {
   return { system, userMsg };
 }
 
+/** Extract the outermost JSON object or array, ignoring trailing non-JSON text. */
+function extractJsonStr(raw: string): string {
+  const s = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  const first = s.search(/[{\[]/);
+  if (first === -1) return s;
+  const open = s[first] as string;
+  const close = open === "{" ? "}" : "]";
+  let depth = 0;
+  for (let i = first; i < s.length; i++) {
+    if (s[i] === open) depth++;
+    else if (s[i] === close) {
+      depth--;
+      if (depth === 0) return s.slice(first, i + 1);
+    }
+  }
+  return s.slice(first); // unclosed — best effort
+}
+
 function parseItems(raw: string, limit: number, scoutId: string): IntelItem[] {
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  const cleaned = extractJsonStr(raw);
   const parsed = JSON.parse(cleaned);
   const items = Array.isArray(parsed) ? parsed : (parsed?.items ?? []);
 
@@ -145,10 +163,12 @@ async function fetchViaTavily(ctx: ScoutContext): Promise<IntelItem[]> {
 
 // ─── Provider 3: Azure Foundry (LLM knowledge fallback) ─────────────────────
 
+const AZURE_SCOUT_TIMEOUT_MS = 8_000; // fail fast — scout is best-effort
+
 async function fetchViaAzure(ctx: ScoutContext): Promise<IntelItem[]> {
   const { system, userMsg } = buildPrompts(ctx);
 
-  const result = await invokeLLM({
+  const llmPromise = invokeLLM({
     provider: "azure-foundry",
     messages: [
       { role: "system", content: system },
@@ -157,6 +177,12 @@ async function fetchViaAzure(ctx: ScoutContext): Promise<IntelItem[]> {
     maxTokens: 2400,
     responseFormat: { type: "json_object" },
   } as any);
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Azure scout timeout after ${AZURE_SCOUT_TIMEOUT_MS}ms`)), AZURE_SCOUT_TIMEOUT_MS),
+  );
+
+  const result = await Promise.race([llmPromise, timeoutPromise]);
 
   const rawContent = (result as any)?.choices?.[0]?.message?.content;
   const raw = typeof rawContent === "string"
