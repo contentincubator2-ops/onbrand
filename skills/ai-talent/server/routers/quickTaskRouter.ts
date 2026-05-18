@@ -1503,7 +1503,13 @@ export const quickTaskRouter = router({
           ? `你是 ${a.name}，${a.title}。${a.specialty ? `\n專長：${a.specialty}。` : ""}${a.methodology ? `\n方法論：${a.methodology}。` : ""}`
           : `你是 ${agentName}。`;
 
-        const system = `${persona}\nSquad「${squad.name}」步驟「${stageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}\n步驟說明：${step.description ?? ""}\n預期產出：${step.outputType ?? step.outputKind ?? "(未指定)"}\n\n用繁體中文輸出，扣回品牌語氣與真實市場數據（如下方注入）。直接給結果，不要前言、不要 markdown 圍籬。`;
+        // 2026-05-19 (CJ 驗收 IG7「+217% 無來源捏造」、IG2「弱引用無連結/日期」
+        // 根因): 此處是所有 squad-pipeline 任務（IG/FB squad 等）共用的 step
+        // system prompt——原句「扣回…真實市場數據」反而誘導模型塞入未授權
+        // 數字，且全無反捏造守門。植入與 yt-99/li-99 同源的【數字零容忍】
+        // 規則，一次根治所有 squad 任務的捏造數字 / 弱引用問題。
+        const ZERO_TOLERANCE = `\n══════════════════════════════════════════\n【數字與來源零容忍 — 最高優先，違反直接不合格】\n══════════════════════════════════════════\n▸ 全文任何「百分比 / 倍數 / 次數 / 金額 / 名次 / 比率」數字，必須逐字出現在「任務主題」或下方注入的品牌資訊 / scout 即時資料原文中。找不到 → 刪掉、改成質化描述、或留「[請補充：數據來源]」。\n▸ 媒體 / 機構名稱（Entrepreneur / Adweek / Social Media Today / eMarketer / HubSpot…）**不能**作為數字的授權依據。寫「(Adweek, 2024)」「(Social Media Today)」這種有名稱無連結無日期的弱引用＝視同捏造，一律禁止。\n  ✗ 違反例：「Carousel 互動率 +42%（Entrepreneur, 2024）」「分享率高出 3.8x」「信任指標上升 27%」（輸入無此數字）\n  ✓ 正確：「輪播形式通常比單圖更容易被收藏與分享」（質化、不掛假數字）\n▸ 不得虛構案例 / 客戶：沒在輸入中點名的公司、客戶、導入數，一律不得寫（✗「12 家中小品牌導入後…」）→ 用「[請補充：實際案例]」。\n▸ 自我驗證：寫完後掃全文每個「%／倍／x／+數字」與每個括號引用 → 對照輸入原文 → 找不到就刪改。\n══════════════════════════════════════════`;
+        const system = `${persona}\nSquad「${squad.name}」步驟「${stageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}\n步驟說明：${step.description ?? ""}\n預期產出：${step.outputType ?? step.outputKind ?? "(未指定)"}${ZERO_TOLERANCE}\n\n用繁體中文（台灣用語，不得簡體字）輸出，扣回品牌語氣；只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
 
         const userMsg = [
           `【任務主題】${input.topic || "(未指定)"}`,
