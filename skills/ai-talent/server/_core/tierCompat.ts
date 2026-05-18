@@ -35,6 +35,7 @@ export function normalizeTaskId(id: string): string {
   // multi-image deliverable). Map the legacy id forward so old links /
   // stored runs / re-runs resolve to the new 99s task.
   if (id === "fb-60-carousel-5") return "fb-99-carousel-5";
+  if (id === "fb-60-serial-3") return "fb-99-serial-3";
   return id.replace(/^([a-z]+)-100-/, "$1-99-");
 }
 

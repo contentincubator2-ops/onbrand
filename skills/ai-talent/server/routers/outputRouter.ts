@@ -390,20 +390,29 @@ export const outputRouter = router({
         const updated = (row as any).updatedAt instanceof Date
           ? (row as any).updatedAt.getTime()
           : Date.parse(String((row as any).updatedAt));
-        if (Number.isFinite(updated) && Date.now() - updated > 5 * 60_000) {
+        // 2026-05-18 (CJ「FB 3 篇連載超時很久」): the 5-min cap was too
+        // short for heavy multi-post packs (strategist + N episodes + N
+        // images + per-episode extras). Make it tier-aware so a
+        // legitimately-long 99s/60s pack run isn't killed prematurely.
+        const tierRaw = String((row as any).extracted_tier ?? "");
+        const staleMs =
+          tierRaw.includes("99") || tierRaw.includes("100") ? 12 * 60_000 :
+          tierRaw.includes("60") ? 8 * 60_000 :
+          5 * 60_000;
+        if (Number.isFinite(updated) && Date.now() - updated > staleMs) {
           {
             try {
               const { default: localPool } = await import("../localDb");
               await localPool.execute(
                 `UPDATE mission_outputs
                    SET progress = 'failed',
-                       progressDetail = '背景任務超過 5 分鐘未完成（process restart 或內部錯誤）',
+                       progressDetail = '背景任務逾時未完成（process restart 或內部錯誤），請重跑一次',
                        updatedAt = NOW()
                  WHERE id = ? AND progress = 'caption_ready'`,
                 [input.id],
               );
               (row as any).progress = "failed";
-              (row as any).progressDetail = "背景任務超過 5 分鐘未完成（process restart 或內部錯誤）";
+              (row as any).progressDetail = "背景任務逾時未完成（process restart 或內部錯誤），請重跑一次";
             } catch (e) {
               console.warn("[output.getById] stale-guard UPDATE failed:", (e as Error).message);
             }

@@ -953,7 +953,8 @@ export const quickTaskRouter = router({
     // via the orchestra (multi-card carousel), not a squad — let it
     // through so it appears in the 99s tab; other fb-/ig- stay squad-driven.
     const tasks99Orchestra = ALL_99S_TASKS.filter((t) =>
-      t.id === "fb-99-carousel-5" || (!t.id.startsWith("fb-") && !t.id.startsWith("ig-"))
+      t.id === "fb-99-carousel-5" || t.id === "fb-99-serial-3" ||
+      (!t.id.startsWith("fb-") && !t.id.startsWith("ig-"))
     ).map((t) => {
       const id = t.id;
       const platform =

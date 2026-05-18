@@ -217,31 +217,9 @@ ${FB60_TONE}`,
     outputDefaults: { platform: "facebook", post_type: "pinned" },
   },
 
-  // 9. 3 篇連載 — Strategist: Nelson Chen, Writer: Reed Lee
-  {
-    id: "fb-60-serial-3",
-    tier: "60s",
-    postType: "feed",
-    label: "FB 3 篇連載敘事",
-    description: "Nelson Chen 設計 3 集弧 + Reed Lee 寫 3 篇有勾連",
-    agent_id: 220752, // Reed Lee
-    skill_slug: "social-copy",
-    primary_question: "想連載講什麼故事？",
-    primary_input: { key: "story_topic", placeholder: "例：客戶轉型 / 團隊成長 / 產品研發歷程", type: "textarea" },
-    inputs: [
-      { key: "story_topic", label: "連載主題", type: "textarea", required: true },
-    ],
-    systemPrompt: `產出 FB 3 篇連載其中 1 篇（200-350 字）。
-本次你寫的是「{label}」集（第 1 集 / 第 2 集 / 第 3 集）。
-- 第 1 集：埋懸念 + 預告下集
-- 第 2 集：轉折 + 加深
-- 第 3 集：揭曉 / 收束 + 整體 CTA
-篇與篇要有勾連（每篇結尾留 1 句鉤子帶到下一篇）。
-${FB60_TONE}`,
-    preferredModel: "qwen",
-    maxTokens: 900,
-    outputDefaults: { platform: "facebook", post_type: "feed" },
-  },
+  // 9. 3 篇連載 — 2026-05-18 (CJ): moved to 99s as fb-99-serial-3
+  //    (strategist + 3 episodes + 3 images + extras too heavy for 60s,
+  //    hit the 5-min stale guard). normalizeTaskId maps the old id fwd.
 
   // 10. 爆款改寫 — Strategist: Kevin Liu, Writer: Siyu Li, Specialty: Cheng-Tse Liao
   {
@@ -504,25 +482,8 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     },
   },
 
-  // 9. 3 篇連載 — multi-post 3; strategist: Nelson Chen
-  "fb-60-serial-3": {
-    variants: 3,
-    images: 3,
-    runImageGen: true,
-    imageDirectorId: FB60_DIR_FRED,
-    aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
-    variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
-    captionMinChars: 200,
-    captionMaxChars: 350,
-    strategistAgentId: 220863, // Nelson Chen — Narrative Editor
-    postLabels: ["第 1 集", "第 2 集", "第 3 集"],
-    extras: {
-      postsCount: 3, narrativeArc: true,
-      replyTemplates: 5, postingTime: true, followupPost: true,
-    },
-  },
+  // 9. 3 篇連載 — 2026-05-18 (CJ): moved to 99s as fb-99-serial-3.
+  //    Config now in FB_99S_ORCHESTRA.
 
   // 10. 爆款改寫 — strategist: Kevin Liu, specialty: Cheng-Tse Liao (compare)
   "fb-60-viral-rewrite": {

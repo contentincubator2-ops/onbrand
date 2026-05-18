@@ -68,6 +68,30 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     outputDefaults: { platform: "facebook", post_type: "carousel" },
   },
   {
+    // 2026-05-18 (CJ「FB 3 篇連載超時很久，要移到 99s」): moved from
+    // fb-60-serial-3 — strategist + 3 episodes + 3 images + per-episode
+    // extras is too heavy for the 60s budget (hit the 5-min stale guard).
+    id: "fb-99-serial-3",
+    tier: "99s", postType: "feed",
+    label: "FB 3 篇連載敘事",
+    description: "Nelson Chen 設計 3 集弧 + Reed Lee 寫 3 篇有勾連（每集配圖＋產製配套）",
+    agent_id: 220752, // Reed Lee
+    skill_slug: "social-copy",
+    primary_question: "想連載講什麼故事？",
+    primary_input: { key: "story_topic", placeholder: "例：客戶轉型 / 團隊成長 / 產品研發歷程", type: "textarea" },
+    inputs: [
+      { key: "story_topic", label: "連載主題", type: "textarea", required: true },
+    ],
+    systemPrompt: `產出 FB 3 篇連載其中 1 篇（200-350 字）。
+本次你寫的是「{label}」集（第 1 集 / 第 2 集 / 第 3 集）。
+- 第 1 集：埋懸念 + 預告下集
+- 第 2 集：轉折 + 加深
+- 第 3 集：揭曉 / 收束 + 整體 CTA
+篇與篇要有勾連（每篇結尾留 1 句鉤子帶到下一篇）。${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 900,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+  {
     id: "fb-99-14day-countdown",
     tier: "99s", postType: "feed",
     label: "FB 14 天倒數活動",
@@ -629,6 +653,16 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     cardsPerVariant: 5,
     holdForImages: true,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
+  },
+  "fb-99-serial-3": {
+    ...fb100Common, variants: 3, images: 3,
+    aspectRatio: "1:1", fluxSize: "square_hd",
+    variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
+    captionMinChars: 200, captionMaxChars: 350,
+    strategistAgentId: 220863, // Nelson Chen — Narrative Editor
+    postLabels: ["第 1 集", "第 2 集", "第 3 集"],
+    holdForImages: true,
+    extras: { ...fb100Common.extras, postsCount: 3 },
   },
   "fb-99-14day-countdown": {
     ...fb100Common, variants: 7, images: 7,
