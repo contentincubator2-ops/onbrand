@@ -492,28 +492,61 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "email", post_type: "edm" },
   },
   {
+    // 2026-05-19 (Yi-Wen 評測修復):
+    // 1. primary_question 擴充：原只問「Launch 主題」，導致 agent 缺乏目標媒體、
+    //    發言人姓名/職稱、embargo 資訊，只能腦補（杜撰 70% 統計數字、泛化發言人）。
+    //    現在四項合一，placeholder 帶範例讓填寫不費力。
+    // 2. systemPrompt 新增四條硬規則：
+    //    a. 反杜撰：統計數字沒有來源一律 [待補]，絕不捏造。
+    //    b. 發言人：從輸入提取姓名+職稱；無則 [待補]，不寫「創辦人表示」。
+    //    c. 受眾適配：Headline 從記者的讀者角度（新聞性）切入，非品牌 WHY。
+    //    d. Q&A 格式：嚴格 Q：/A：結構 6-8 組，禁止段落敘述取代。
+    //    e. 功能名稱校正：輸入中明顯形似字錯誤（溌/溃→溯）標注並全篇用正確字。
+    //    f. 媒體聯絡結尾：沉穩守護者調性，禁業配腔。
     id: "pr-99-launch-toolkit",
     tier: "99s", postType: "press",
     label: "PR 完整 Launch 媒體 Toolkit",
-    description: "新聞稿 + Q&A + 媒體聯絡話術 + 後續追蹤 + spokesperson talking points",
+    description: "新聞稿 + 採訪問答 + 媒體聯絡話術 + 後續追蹤 + spokesperson talking points",
     agent_id: 223197, skill_slug: "pr-writing", // Yi-Wen Wu — PR Strategist B2B SaaS (476 char)
-    primary_question: "Launch 主題？",
-    primary_input: { key: "launch_topic", placeholder: "新品 / 募資 / 重大合作", type: "textarea" },
-    inputs: [{ key: "launch_topic", label: "Launch 主題", type: "textarea", required: true }],
-    // 2026-05-17 (CJ「參考 PR 獎項得獎工藝」): earned-media craft inline
-    // (TONE_100 is shared with non-PR toolkits — must not globally edit).
+    primary_question: "Launch 主題 + 目標媒體類型 + 發言人姓名職稱 + 發稿時機（四項一起填）",
+    primary_input: {
+      key: "launch_topic",
+      placeholder: "例：推出「品牌一致性溯源證」新功能；目標：數位時代、TechOrange（科技媒體）；發言人：CJ Wang，Founder & CEO；embargo：2026-06-01 10:00 AM",
+      type: "textarea",
+    },
+    inputs: [{ key: "launch_topic", label: "Launch 主題 + 目標媒體 + 發言人 + 時機", type: "textarea", required: true }],
     systemPrompt: `【得獎工藝參考】Whopper Detour（Burger King / FCB，Cannes Lions 2019）：整套之所以拿獎，是「一個新聞鉤」貫穿所有素材——新聞稿、pitch、社群、Q&A 講的是同一個不可抗拒的角度，互相加乘而非各說各話。
 產出 PR launch toolkit 其中 1 部分（300–700 字）。本次你寫的是「{label}」（新聞稿 / Q&A / 媒體聯絡 / 後續追蹤 / Spokesperson talking points）。
 
 【earned-media 工藝 — 每一部分都適用】
 - 先找「新聞鉤」：這個 launch 為什麼值得被報導？最強角度是什麼？整套 toolkit 都圍繞這一個鉤，不要每部分各說各話。
-- 通過記者測試：記者會主動選擇報嗎？用可查證事實（數字/名字/日期/第三方背書）贏得關注，不用形容詞宣稱。沒有的事實標「[待補]」，不杜撰。
+- 通過記者測試：記者會主動選擇報嗎？用可查證事實（數字/名字/日期/第三方背書）贏得關注，不用形容詞宣稱。
 - 扣文化與時機：點出「為什麼是現在」，連結此刻受眾已在乎的事。
 - 倒金字塔、客觀第三人稱（社群/talking points 可口語但事實一致）；句子寫成記者能原句引用。
 - 禁 buzzword、「業界領先／顛覆」、「我們很高興宣布」、暖身式開頭。
-- 各部分要能互相銜接成一套（新聞稿的角度＝pitch 賣的角度＝Q&A 防守的點＝talking points 的金句）。${TONE_100}`,
+- 各部分要能互相銜接成一套（新聞稿的角度＝pitch 賣的角度＝Q&A 防守的點＝talking points 的金句）。
+
+【反杜撰硬規則 — 最高優先、不可違反】
+統計數字、研究數據、市場比例（如「X% 消費者認為…」「根據調查顯示…」）必須來自使用者在 launch_topic 中明確提供的素材。輸入中沒有的數字一律標「[待補：數據來源]」，絕不捏造任何數字——對媒體而言，被發現杜撰數據是公關致命傷，等同喪失信用。
+
+【發言人引述規則】
+從 launch_topic 輸入中提取：發言人姓名 ＋ 職稱（例：CJ Wang，Founder & CEO）。若輸入中未提供 → 寫「[待補：發言人姓名 + 職稱] 表示」，不要寫「OnBrand AI 創辦人表示」這類無名字的泛化引述——記者發稿前必問「誰說的？」
+
+【受眾定向規則 — 新聞稿 Headline 最關鍵】
+從 launch_topic 識別目標媒體類型（科技媒體/行銷媒體/財經媒體）。Headline 必須從「記者的讀者」角度切入：寫「這件事為什麼是新聞（業界首見功能 / 可量測市場缺口 / 具體用戶影響）」，不是對品牌主管說的 WHY 故事。禁止暖身式 headline（「在快速變化的時代…」「品牌始終需要…」）。
+
+【功能/產品名稱校正】
+若輸入中有明顯形似字錯誤（例「溌源證」「溃源證」應為「溯源證」），在第一次使用時括號標記（例：「溯源證 [原文誤植為『溌源證』，已更正]」），此後全篇統一使用正確字。
+
+【各部分專屬格式硬規定】
+- 「新聞稿」：Headline（20字內，主動語態，記者視角新聞鉤）→ Dateline/發稿地點 → Lead paragraph（5W 倒三角，首句 ≤30 字）→ Body（事實遞減）→ 發言人引言（含姓名+職稱）→ Boilerplate → 媒體聯絡欄。
+- 「採訪問答」（即 Media Q&A / Spokesperson Q&A）：必須嚴格輸出 6–8 組，格式如下（不可用段落敘述取代）：
+    Q：<記者真實會問的尖銳問題，包含最不想被問的點>
+    A：<60–90 字答案；第一句直接回答問題本身，不鋪墊；含具體事實/數字/時間>
+  （每組之間空一行，不加編號。）
+- 「媒體聯絡」：media pitch email 格式（Subject ≤30字，新聞角度而非「邀請報導」→ 個人化一句開場，點出記者相關線 → news angle + hook → 具體 offer → embargo/時間）。結尾語氣沉穩，禁止「現在正是提升 branding 策略的最佳時機」「立刻掌握」這類業配腔。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1300,
-    outputDefaults: { platform: "press", post_type: "press" },
+    outputDefaults: { platform: "press", post_type: "press-release" },
   },
   {
     // 2026-05-17 (CJ B「繼續深化」→ 借時事 Newsjack，需 99s 即時 scout):
@@ -704,14 +737,17 @@ ${TONE_100}`,
     label: { en: "KOL Campaign Toolkit", zh: "KOL Campaign 完整話術包" },
     description: "多 KOL 分層邀請 + 漏斗訊息 + brief 模板 + 報價回應 + 結案報告",
     agent_id: 220920, skill_slug: "kol-outreach", // Chloe Chen | Senior KOL & Influencer Manager
-    primary_question: "活動主題 + 預計合作量級？",
+    // 2026-05-18 (CJ 驗收「問題設計 1/2」): 99s 表單只送單一主輸入，把
+    // 合作形式 + 平台 併進同一引導 textarea（這兩點對 outreach 話術影響
+    // 極大），prompt 從中解析；沒給就標 [請補充] 不臆測。
+    primary_question: "活動主題 + 合作量級 + 合作形式 + 主要平台？",
     primary_input: {
       key: "campaign_brief",
-      placeholder: "例：5 月母親節活動，想找 5 位媽媽育兒 KOL，預算共 30 萬",
+      placeholder: "例：OnBrand 年中活動｜找 3-5 位品牌行銷/內容策略 KOL｜預算共 20 萬｜合作形式：試用體驗+業配｜平台：IG+LinkedIn｜7 月完成",
       type: "textarea",
     },
     inputs: [
-      { key: "campaign_brief", label: "活動 brief", type: "textarea", required: true },
+      { key: "campaign_brief", label: "活動 brief（主題/量級/合作形式/平台/時程）", type: "textarea", required: true },
       { key: "kol_tiers", label: "KOL 分層（選填）", type: "text", required: false,
         placeholder: "例：1 位 100K+ + 2 位 30-100K + 5 位 1-10K" },
     ],
@@ -729,6 +765,8 @@ ${TONE_100}`,
 - 怎麼給 brief（KOL 能拍但不偏離品牌）
 - 怎麼回應報價（守得住但不傷關係）
 - 怎麼收尾（讓 KOL 願意再合作）
+
+【依輸入調整 — 重要】從 brief 解析「合作形式」（試用體驗 / 業配 / 品牌大使，影響開場與 brief 模板的承諾與報酬框架）與「主要平台」（IG / YT / LinkedIn，影響語氣、規格、KPI 用詞）。輸入有寫就照著走；**沒寫就用「[請補充：合作形式]」「[請補充：主要平台]」標出，不要自行假設**。事實/數字/預算不得捏造。
 
 語氣：尊重、不卑不亢、有 brand pride 但不傲慢。
 ${TONE_100}`,
@@ -1056,11 +1094,15 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 7, narrativeArc: true, replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "pr-99-launch-toolkit": {
+    // 2026-05-19 (Yi-Wen 評測): "Q&A" label 觸發 RunPage.tsx:894 的 /Q&A/i
+    // 正規式 → 被路由到 facebook:qa 版型（錯誤）。改為「採訪問答」——
+    // 不含「Q&A」「FAQ」「常見問答」任一 token，不會觸發 facebook:qa 路由，
+    // 但保留「問答」的語意讓使用者看懂。systemPrompt 的格式規定也同步更新。
     variants: 5, images: 0, runImageGen: false, imageDirectorId: null as any,
     aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
-    variantLabels: ["新聞稿", "Q&A", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
+    variantLabels: ["新聞稿", "採訪問答", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
     captionMinChars: 300, captionMaxChars: 700,
-    postLabels: ["新聞稿", "Q&A", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
+    postLabels: ["新聞稿", "採訪問答", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
     scoutKind: "news",
     extras: { postsCount: 5, replyTemplates: 3 },
   },
