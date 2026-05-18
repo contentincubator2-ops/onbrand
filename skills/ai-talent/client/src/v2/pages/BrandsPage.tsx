@@ -148,9 +148,18 @@ export default function BrandsPage() {
   const unlockTabMut = (trpc as any).theater?.unlockTab?.useMutation();
   // Load brand's full positioning JSON so cards can show preview content
   // without re-fetching per-tile (single round trip via scope.active).
+  // 2026-05-18 (CJ「選了 onbrand.ai 產品，品牌大腦還是顯示 sowork.ai」):
+  // was hardcoded productId/eventId: null → always queried + showed the
+  // BRAND's positioning even when a product/event scope was selected.
+  // Pass the active scope ids so we can show the product/event's own
+  // positioning.
   const scopeActiveQuery = (trpc as any).scope?.active?.useQuery
     ? (trpc as any).scope.active.useQuery(
-        { brandId: activeBrandIdForLocks ?? 0, productId: null, eventId: null },
+        {
+          brandId: activeBrandIdForLocks ?? 0,
+          productId: scope?.productId ?? null,
+          eventId: scope?.eventId ?? null,
+        },
         { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false, staleTime: 30_000 }
       )
     : { data: null };
@@ -162,7 +171,14 @@ export default function BrandsPage() {
   // Translate at read time so existing data renders without a server
   // migration. Renderers only require the keys they care about; extra
   // fields are ignored.
-  const rawPositioning = (scopeActiveQuery.data as any)?.brand?.positioning ?? {};
+  // Source positioning from the ACTIVE scope entity: product → product's
+  // own positioning, event → event's, otherwise the brand's. (Speed-card
+  // / 指令庫 are brand-level knowledge and still inherit from the brand.)
+  const _sa = scopeActiveQuery.data as any;
+  const rawPositioning =
+    (scope?.productId ? _sa?.product?.positioning
+      : scope?.eventId ? _sa?.event?.positioning
+      : _sa?.brand?.positioning) ?? {};
   const fullPositioning: Record<string, any> = (() => {
     // 2026-05-13 (post-deploy bug — "網站空白"): defensive wrapper.
     // If any step of the shape translation throws (malformed JSON, unexpected

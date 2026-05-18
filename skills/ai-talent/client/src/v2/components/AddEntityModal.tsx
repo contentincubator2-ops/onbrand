@@ -80,6 +80,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   // Product
   const [prodBrandId, setProdBrandId] = useState<number | null>(defaultBrandId ?? null);
   const [prodName, setProdName] = useState("");
+  const [prodWebsite, setProdWebsite] = useState("");
   const [prodPositioning, setProdPositioning] = useState("");
   // Event
   const [evBrandId, setEvBrandId] = useState<number | null>(defaultBrandId ?? null);
@@ -134,11 +135,20 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     if (!prodName.trim() || !upsertProductMut) return;
     setBusy(true); setErrorMsg(null);
     try {
+      // 2026-05-18 (CJ「新增產品也加網址欄位，後續讀取更準確」): persist
+      // the URL in positioning.website AND fold it into summary text so
+      // every downstream reader (positioning pipeline context + the
+      // orchestra's findFirstUrl) actually sees & can fetch the page.
+      const w = prodWebsite.trim();
+      const s = prodPositioning.trim();
+      const summary = [s, w ? `官方網址：${w}` : ""].filter(Boolean).join("\n");
+      const positioning =
+        (s || w) ? { summary: summary || undefined, website: w || undefined } : undefined;
       const r = await upsertProductMut.mutateAsync({
         brandId: prodBrandId,
         slug: autoSlug(prodName),
         name: prodName.trim(),
-        positioning: prodPositioning.trim() ? { summary: prodPositioning.trim() } : undefined,
+        positioning,
       });
       const newId = Number(r?.id ?? 0);
       await refreshLists();
@@ -259,6 +269,11 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
               <div>
                 <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Product name" : "產品名稱"}<span className="text-danger ml-0.5">*</span></label>
                 <Input value={prodName} onValueChange={setProdName} placeholder={lang === "en" ? "e.g. Healthy Meal 5g Protein microwave line" : "例：健力餐 5g 蛋白質微波系列"} autoFocus isRequired />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Product URL (optional)" : "產品網址（可選）"}</label>
+                <Input value={prodWebsite} onValueChange={setProdWebsite} placeholder="https://onbrand.sowork.ai" />
+                <p className="text-tiny text-default-400 mt-1">{lang === "en" ? "The AI reads this page so the positioning is accurate." : "AI 會讀取這個頁面，讓定位分析更準確"}</p>
               </div>
               <div>
                 <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Positioning / USP (optional)" : "產品定位 / USP（可選）"}</label>
