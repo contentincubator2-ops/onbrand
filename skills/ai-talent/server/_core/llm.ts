@@ -635,38 +635,26 @@ function getFallbackChain(): string[] {
   //
   // Set LLM_PRIMARY=anthropic in .env to revert to anthropic-first.
   if (process.env.LLM_PRIMARY === "anthropic") {
-    return ["anthropic", "azure-foundry", "qwen", "deepseek", "openai", "gemini", "ollama"];
+    // 2026-05-18: azure-foundry removed — DeploymentNotFound on every call
+    // (model deployment deleted/expired on Azure). Re-add when re-deployed.
+    return ["anthropic", "openai", "qwen", "deepseek", "gemini", "ollama"];
   }
-  // 2026-05-15 (60S test post-mortem — Bug B): azure-foundry returns
-  // 401 "Access denied due to invalid subscription" on EVERY call —
-  // the Azure subscription is dead. It was in slot 2, so every caption
-  // fanout wasted an RTT (× N variants × 100 users) on a known-401
-  // vendor. Demoted to just-before-ollama. Also confirmed dead:
-  // anthropic ($0 credits), ollama (not running on VM). Working tier:
-  // qwen / zhipu / deepseek / openai / gemini. zhipu added explicitly
-  // (glm-4-flash agents map here and it works). Restores automatically
-  // when the Azure subscription is renewed (or set LLM_FALLBACK_CHAIN).
-  // 2026-05-15 (CJ「台灣不能用中國模型」): zh-TW market. Order non-Chinese
-  // first — openai (billed, strong Traditional output), gemini (needs
-  // GOOGLE_AI_KEY — currently MISSING, will be skipped until set),
-  // anthropic ($0 credits — skipped until topped up but harmless to list).
-  // qwen / zhipu kept ONLY as last-resort so a total OpenAI outage
-  // degrades to working-but-Simplified rather than total failure.
-  // azure-foundry near-last (dead 401 subscription). ollama last (not
-  // running on the VM).
+  // 2026-05-18 (CJ「很容易出現 502」): azure-foundry is returning
+  // 404 DeploymentNotFound on EVERY call — the Azure model deployment
+  // has been deleted or expired. The circuit breaker reopens every 30s
+  // and wastes an RTT each time, causing latency to pile up under load →
+  // nginx timeout → 502. Removed from cascade entirely until re-deployed.
   //
-  // 2026-05-15 final — all key rotations applied + probed:
-  //   · anthropic    — credit topped up, claude-sonnet-4-6 ✓ (best zh-TW)
-  //   · azure-claude  — Sweden Claude, key updated ✓ (real Claude, +cap)
-  //   · azure-foundry — stale-key 401 fixed ✓ (gpt-5.4-mini; OK zh-TW)
-  //   · openai        — funded ✓ (strong zh-TW)
-  //   · qwen          — enable_thinking=false fix shipped (clean output
-  //                     but still Simplified-leaning — last-resort only)
-  // Four non-Chinese providers now lead so 100-user load spreads across
-  // Claude×2 + gpt + openai before EVER touching a Chinese model. gemini
-  // stays listed (skipped until GOOGLE_AI_KEY set). zhipu/qwen are the
-  // final safety net so a multi-provider outage degrades, not dies.
-  return ["anthropic", "openai", "azure-claude", "azure-foundry", "gemini", "qwen", "zhipu", "ollama"];
+  // 2026-05-15 (CJ「台灣不能用中國模型」): zh-TW market order.
+  // Working providers as of 2026-05-18:
+  //   · anthropic    — claude-sonnet-4-6 ✓ (best zh-TW quality)
+  //   · openai       — funded ✓ (strong Traditional output)
+  //   · azure-claude — Sweden Claude ✓ (real Claude, extra cap)
+  //   · gemini       — needs GOOGLE_AI_KEY (skipped until set)
+  //   · qwen / zhipu — last-resort only (Simplified-leaning output)
+  // azure-foundry: REMOVED (DeploymentNotFound — re-add when fixed)
+  // ollama: not running on VM
+  return ["anthropic", "openai", "azure-claude", "gemini", "qwen", "zhipu", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {
