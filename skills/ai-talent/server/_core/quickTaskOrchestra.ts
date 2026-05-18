@@ -1359,7 +1359,11 @@ export async function runOrchestra(args: {
       ]).then(([prefix, knowledge, real]) => prefix + (knowledge || "") + (real || "")),
       // Scout stage — only fires for 100s tier. scoutKind drives WHAT we fetch:
       // viral (default) / festivals (calendar tasks) / trending (時事改寫) / news.
-      isResearchTier
+      // 2026-05-18 (CJ 驗收: em-99 序列只產 5 封 + 502): scout fires for
+      // ALL 99s by default (gated on isResearchTier only), so removing
+      // scoutKind never disabled it. config.disableScout fully skips it
+      // for sequence-style tasks whose logic lives in the prompt.
+      (isResearchTier && !args.config.disableScout)
         ? (async () => {
             try {
               // 2026-05-18 (CJ「FB 30天行事曆又 502」): scout is a LIVE web

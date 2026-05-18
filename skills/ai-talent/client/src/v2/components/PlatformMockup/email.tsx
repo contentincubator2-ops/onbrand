@@ -22,13 +22,21 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
   // now emits "主旨：…\n預覽：…\n\n<body>". Parse it so the EDM mockup
   // shows the real subject + preview text and a clean body.
   const _cap = liveCaption ?? "";
-  const _subjM = _cap.match(/^\s*主旨[：:]\s*(.+)$/m);
-  const _prevM = _cap.match(/^\s*預覽(?:文字)?[：:]\s*(.+)$/m);
-  const subject = (liveTitle ?? _subjM?.[1]?.trim() ?? title ?? "").trim();
-  const previewText = _prevM?.[1]?.trim() ?? "";
+  const _grab = (kw: string) => {
+    const m = _cap.match(new RegExp(`^[\\s#*>\\-]*${kw}\\s*[：:]\\s*(.+?)\\**\\s*$`, "m"));
+    return m?.[1]?.trim() || "";
+  };
+  const subject = (liveTitle || _grab("主旨") || _grab("Subject") || title || "").trim();
+  const previewText = _grab("預覽(?:文字)?") || _grab("Preview");
+  const parsedCta = _grab("CTA") || _grab("行動呼籲") || liveCta || "";
   const bodyText = _cap
-    .replace(/^\s*主旨[：:].*$/m, "")
-    .replace(/^\s*預覽(?:文字)?[：:].*$/m, "")
+    .replace(/^[\s#*>\-]*主旨\s*[：:].*$/m, "")
+    .replace(/^[\s#*>\-]*預覽(?:文字)?\s*[：:].*$/m, "")
+    .replace(/^[\s#*>\-]*(?:CTA|行動呼籲)\s*[：:].*$/m, "")
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, "")
+    .replace(/(^|\s)#[^\s#]+/g, "")
+    .replace(/[!！]+(?=\s*$)/gm, "。")
+    .replace(/\n{3,}/g, "\n\n")
     .replace(/^\s+/, "")
     .trim();
 
@@ -107,7 +115,7 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
               className="bg-foreground text-background font-semibold px-8"
               endContent={<FontAwesomeIcon icon={faArrowRight} />}
             >
-              {liveCta ?? "立即了解"}
+              {parsedCta || "立即了解"}
             </Button>
           </div>
         </div>

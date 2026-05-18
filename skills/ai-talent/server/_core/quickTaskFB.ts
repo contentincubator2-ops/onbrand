@@ -570,6 +570,10 @@ export interface OrchestraConfig {
    * - news: thought-leadership / quarterly — scout 抓產業最新
    */
   scoutKind?: "viral" | "festivals" | "trending" | "news";
+  /** 2026-05-18 (CJ): fully skip the 99s scout stage (its logic lives in
+   *  the prompt). scout otherwise fires for EVERY 99s task and adds
+   *  latency / 502 risk that silently drops the last fanout variants. */
+  disableScout?: boolean;
   /**
    * 2026-05-18 (CJ「承諾是完整貼文 → 圖完成才展示 mockup」): when true,
    * the deliverable is a complete post (copy + image) and the UI must NOT
