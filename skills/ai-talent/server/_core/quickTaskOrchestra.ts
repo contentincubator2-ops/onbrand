@@ -1640,13 +1640,15 @@ export async function runOrchestra(args: {
       }
     }
 
-    // ── TikTok 品牌聲音守門 (2026-05-19, CJ 驗收 7/14「Day 1-3 帶貨腔崩壞」) ──
+    // ── TikTok / YouTube 品牌聲音守門 (2026-05-19, CJ 驗收) ──
     // 追熱點框架天生帶高能量 FYP 預設；prompt-only guardrail 在 per-variant
-    // fanout + 模型隨機（anthropic/openai）下無法保證每個 Day 都守住——
-    // 實測 Day 1-3 反覆崩、Day 4-5 才好。改用「確定性 regex 一律清洗 +
-    // 必要時 LLM 收緊」的雙層守門（同 EDM/IG self-check 證實有效的模式），
-    // 對 7 天每一篇都生效，不依賴模型自律。
-    if (Array.isArray(captions) && captions.length && isTikTokBodyTask(args.template)) {
+    // fanout + 模型隨機（anthropic/openai）下無法保證每個變體都守住——
+    // 實測 TikTok Day 1-3 反覆崩、Day 4-5 才好；YT Premiere 的 Community
+    // 倒數 ×5 子分支同樣漏驚嘆號 + 業配腔（「響亮無比！」）。改用「確定性
+    // regex 一律清洗 + 必要時 LLM 收緊」的雙層守門（同 EDM/IG self-check
+    // 證實有效的模式），對每一個變體都生效，不依賴模型自律。
+    if (Array.isArray(captions) && captions.length &&
+        (isTikTokBodyTask(args.template) || isYouTubeBodyTask(args.template))) {
       // L1 deterministic: 高信心、零成本、一律套用。
       const ttDet = (s: string): string =>
         s
@@ -1662,6 +1664,9 @@ export async function runOrchestra(args: {
           .replace(/(?:讓品牌)?大放異彩/g, "")
           .replace(/宇宙無敵/g, "")
           .replace(/超神奇/g, "")
+          .replace(/(?:讓你的品牌語音)?(?:在數位世界裡)?響亮無比/g, "讓品牌的聲音被聽見")
+          .replace(/響亮無比/g, "")
+          .replace(/在快速(?:進化|變化)的數位世界裡/g, "")
           .replace(/業界(?:的)?佼佼者/g, "")
           .replace(/不再擔心/g, "不必再擔心")
           .replace(/行銷新篇章/g, "行銷的下一步")
@@ -1686,20 +1691,20 @@ export async function runOrchestra(args: {
         // 仍需 LLM 收緊的觸發：開場是呼籲句 / 偵測到簡體 / 殘留帶貨詞
         const imperativeOpen = /^(注意|快|趕快|別再|馬上|立刻|全台|各位|嗨|哈囉|大家好)/.test(firstLine);
         const simplifiedHit = /[这个们时应该说话语]/.test(t) && /[这们应]/.test(t);
-        const salesyHit = /(亮起來|大放異彩|宇宙無敵|快來|佼佼者|趕快|別再猶豫|一起來討論)/.test(t);
+        const salesyHit = /(亮起來|大放異彩|宇宙無敵|響亮無比|快來|佼佼者|趕快|別再猶豫|一起來討論|數位世界裡)/.test(t);
         if (!imperativeOpen && !simplifiedHit && !salesyHit) continue; // 已乾淨 → 零成本
         try {
           const { invokeLLM } = await import("./llm");
           const r: any = await invokeLLM({
             provider: "anthropic",
             messages: [{ role: "user", content:
-              `這是一支 TikTok 追熱點短影音腳本。請用「沉穩觀察者／守護者」語氣收緊，嚴格遵守：\n` +
-              `1. 全文不得有句尾或句中驚嘆號；不得出現「快來」「注意」「亮起來」「大放異彩」「宇宙無敵」「佼佼者」等帶貨/浮誇詞。\n` +
-              `2. 第一行必須是「觀察句或反問句」，不得以呼籲句起頭。\n` +
+              `這是一段短影音／YouTube 首播預熱的文案（可能是腳本、Community 倒數貼文或直播配套）。請用「沉穩觀察者／守護者」語氣收緊，嚴格遵守：\n` +
+              `1. 全文不得有句尾或句中驚嘆號；不得出現「快來」「注意」「亮起來」「大放異彩」「宇宙無敵」「響亮無比」「佼佼者」「在快速進化的數位世界裡」等帶貨/浮誇/PR 腔詞。\n` +
+              `2. 開場第一行必須是「觀察句或反問句」，不得以呼籲句或 PR 腔起頭。\n` +
               `   正向範例語感：「你的 AI 生出來的文案，真的是你嗎？」「大家都在說 AI 工具很強，但很少有人問它有沒有在用你的品牌邏輯說話。」\n` +
               `3. 受眾是品牌行銷主管 / 經營者（B2B），措辭對齊專業決策者，不要寫成對一般消費者喊話。\n` +
               `4. 全文繁體中文（台灣用語），不得有簡體字。\n` +
-              `保持原本的熱點題材、腳本分段與長度，只輸出收緊後的腳本本身，不要前言：\n\n${t}` }],
+              `保持原本的主題、結構分段與長度，只輸出收緊後的文案本身，不要前言：\n\n${t}` }],
             maxTokens: 1200,
           });
           let tightened = String(r?.content ?? r?.text ?? "").trim();
