@@ -982,6 +982,21 @@ export const YT_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
 //   pr-99-crisis-toolkit → fb-crisis-comms shape adapted to PR
 //   rs-99-competitor-mapping → fb-account-reposition + competitor-audit shape
 export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  // 2026-05-18 (CJ 驗收 P0「Unknown task id: kl-99-campaign-toolkit」):
+  // the task template existed in MULTI_99S_TASKS but had NO matching
+  // orchestra config → get99OrchestraConfig returned null → the resolver
+  // discarded the found template and fell through to "Unknown task id".
+  // KOL 話術包 is a text deliverable (8 parts, no images).
+  "kl-99-campaign-toolkit": {
+    variants: 8, images: 0, runImageGen: false,
+    imageDirectorId: null as any,
+    aspectRatio: null as any, fluxSize: null as any,
+    imageQualitySteps: 4,
+    variantLabels: ["邀請開場", "brand brief 模板", "報價回應", "brief 確認", "拍攝期追蹤", "上稿確認", "結案感謝", "結案數據要求"],
+    captionMinChars: 400, captionMaxChars: 900,
+    postLabels: ["邀請開場", "brand brief 模板", "報價回應", "brief 確認", "拍攝期追蹤", "上稿確認", "結案感謝", "結案數據要求"],
+    extras: { postsCount: 8 },
+  },
   "tt-99-30day-foryou": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: ANNA,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,

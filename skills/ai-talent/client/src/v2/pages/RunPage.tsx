@@ -787,6 +787,11 @@ export default function RunPage() {
     if (taskId === "kl-30-influencer-brief" || taskId === "kl-30-brief-oneliner") {
       return { platform: "generic" as any, format: "proposal-spec" as any, label: "generic:proposal-spec" };
     }
+    // 2026-05-18 (CJ): KOL Campaign 完整話術包 = a multi-part outreach
+    // playbook document, not a social post → research-doc.
+    if (taskId === "kl-99-campaign-toolkit") {
+      return { platform: "generic" as any, format: "research-doc" as any, label: "generic:research-doc" };
+    }
 
     // ── Layer 1: taskId prefix → platform/format (richest mapping) ──
     const idPrefixMap: Record<string, string> = {
