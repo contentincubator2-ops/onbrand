@@ -112,3 +112,22 @@ export function reset(provider?: string): void {
   if (provider) stats.delete(provider);
   else stats.clear();
 }
+
+/**
+ * Permanent failure — open circuit for 1 hour (vs. the normal 30s cooloff).
+ * Use for errors that are NOT transient: DeploymentNotFound, invalid endpoint,
+ * wrong model name, etc. The cascade will skip this provider for 60 minutes
+ * instead of retrying every 30s and burning RTTs on a known-bad config.
+ */
+const PERMANENT_COOLOFF_MS = 60 * 60 * 1_000; // 1 hour
+export function permanentFail(provider: string): void {
+  const s = getStats(provider);
+  s.state = "OPEN";
+  s.openedAt = Date.now() - (COOLOFF_MS) + PERMANENT_COOLOFF_MS; // openedAt = now - 30s + 60min
+  // Effectively: cooloff won't expire until (openedAt + COOLOFF_MS) = now + ~60min
+  // Simpler: just set openedAt far in the future offset
+  s.openedAt = Date.now() + PERMANENT_COOLOFF_MS - COOLOFF_MS;
+  s.consecutiveFailures = 99;
+  s.recentResults = Array(WINDOW_SIZE).fill(false);
+  console.warn(`[llmCircuitBreaker] provider=${provider} → OPEN (permanent, 1h cooloff)`);
+}

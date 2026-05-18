@@ -176,7 +176,11 @@ const PROVIDER_CONFIG: Record<
     baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
       ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
       : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/onbrand/openai/v1",
-    defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-5.4-mini",
+    // 2026-05-18: was "gpt-5.4-mini" — that deployment does NOT exist in the
+    // Azure portal (all 42 deployments are healthy; none named gpt-5.4-mini).
+    // Corrected to gpt-4o-mini which is confirmed present. Override via
+    // AZURE_FOUNDRY_MODEL env var if a different deployment name is needed.
+    defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-4o-mini",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
 
@@ -635,26 +639,16 @@ function getFallbackChain(): string[] {
   //
   // Set LLM_PRIMARY=anthropic in .env to revert to anthropic-first.
   if (process.env.LLM_PRIMARY === "anthropic") {
-    // 2026-05-18: azure-foundry removed — DeploymentNotFound on every call
-    // (model deployment deleted/expired on Azure). Re-add when re-deployed.
-    return ["anthropic", "openai", "qwen", "deepseek", "gemini", "ollama"];
+    return ["anthropic", "azure-foundry", "openai", "qwen", "deepseek", "gemini", "ollama"];
   }
-  // 2026-05-18 (CJ「很容易出現 502」): azure-foundry is returning
-  // 404 DeploymentNotFound on EVERY call — the Azure model deployment
-  // has been deleted or expired. The circuit breaker reopens every 30s
-  // and wastes an RTT each time, causing latency to pile up under load →
-  // nginx timeout → 502. Removed from cascade entirely until re-deployed.
-  //
-  // 2026-05-15 (CJ「台灣不能用中國模型」): zh-TW market order.
-  // Working providers as of 2026-05-18:
-  //   · anthropic    — claude-sonnet-4-6 ✓ (best zh-TW quality)
-  //   · openai       — funded ✓ (strong Traditional output)
-  //   · azure-claude — Sweden Claude ✓ (real Claude, extra cap)
-  //   · gemini       — needs GOOGLE_AI_KEY (skipped until set)
-  //   · qwen / zhipu — last-resort only (Simplified-leaning output)
-  // azure-foundry: REMOVED (DeploymentNotFound — re-add when fixed)
-  // ollama: not running on VM
-  return ["anthropic", "openai", "azure-claude", "gemini", "qwen", "zhipu", "ollama"];
+  // 2026-05-18: azure-foundry root cause fixed — the model name was
+  // hardcoded as "gpt-5.4-mini" which does NOT exist as an Azure deployment
+  // (portal shows gpt-4o-mini, gpt-4.1-mini etc. — none named gpt-5.4-mini).
+  // Corrected to gpt-4o-mini. azure-foundry re-added to cascade.
+  // Non-retryable "DeploymentNotFound" errors now permanently open the
+  // circuit breaker (see catch block in invokeLLM) so a mis-configured
+  // deployment never wastes RTTs even if a key typo slips in again.
+  return ["anthropic", "openai", "azure-claude", "azure-foundry", "gemini", "qwen", "zhipu", "ollama"];
 }
 
 function isRetryableLLMError(msg: string): boolean {
@@ -733,11 +727,19 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     } catch (e: any) {
       const msg = String(e?.message ?? e);
       errors.push(`${provider}: ${msg.slice(0, 120)}`);
-      recordOutcome(provider, false);
+      // Permanent failures (DeploymentNotFound, invalid endpoint) are NOT
+      // transient — retrying in 30s is pointless and burns RTTs under load.
+      // Open the circuit for 1 hour so the cascade skips this provider
+      // entirely until a human fixes the configuration.
+      const isPermanent = /DeploymentNotFound|deployment.*not.*found|ResourceNotFound/i.test(msg);
+      if (isPermanent) {
+        const { permanentFail } = await import("./llmCircuitBreaker");
+        permanentFail(provider);
+        console.error(`[invokeLLM] ${provider} permanent failure (circuit open 1h): ${msg.slice(0, 200)}`);
+      } else {
+        recordOutcome(provider, false);
+      }
       if (!isRetryableLLMError(msg)) {
-        // Non-retryable (config / auth typo / payload error) — but still
-        // try the next provider since site-wide fallback is more important
-        // than surfacing the original error.
         console.warn(`[invokeLLM] ${provider} hard error, continuing chain: ${msg.slice(0, 200)}`);
       } else {
         console.warn(`[invokeLLM] ${provider} retryable error, continuing: ${msg.slice(0, 200)}`);
