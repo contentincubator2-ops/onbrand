@@ -803,17 +803,16 @@ export default function RunPage() {
     const lbl = String(slide?.label ?? "");
     const v = (platform: string, format: string): MockupVariant =>
       ({ platform: platform as any, format: format as any, label: `${platform}:${format}` });
-    // 2026-05-18 (CJ「釘選主文要 PIN / FAQ 要問答 / about us 要關於我們」):
-    // fb-60-pinned-suite fans out 4 DIFFERENT post types — render each
-    // piece with its own chrome. Gated to this task so the generic
-    // keywords (FAQ/about/案例) don't mis-route other tasks' variants.
-    if ((data?.mission?.taskId ?? "") === "fb-60-pinned-suite") {
-      if (/釘選|pin|主文/i.test(lbl)) return v("facebook", "pinned");
-      if (/FAQ|Q&A|問答|常見問題/i.test(lbl)) return v("facebook", "qa");
-      if (/about|關於/i.test(lbl)) return v("facebook", "about");
-      // 代表案例 = a representative customer case-study post → normal feed
-      return v("facebook", "feed");
-    }
+    // 2026-05-18 (CJ「釘選主文要 PIN / FAQ 要問答 / about us 要關於我們」;
+    // follow-up「沒看到調整」): the taskId gate was unreliable (taskId
+    // isn't always persisted → no-task → gate failed → fell to feed).
+    // Drive the pinned-suite per-piece mockup off the DISTINCTIVE piece
+    // labels themselves — these zh phrases are specific enough not to
+    // collide with other tasks' tone labels (情感版 / 理性版 …).
+    if (/已釘選|釘選主文|^釘選/i.test(lbl)) return v("facebook", "pinned");
+    if (/常見問答|常見問題|FAQ|Q&A|問答集/i.test(lbl)) return v("facebook", "qa");
+    if (/關於我們|about us/i.test(lbl)) return v("facebook", "about");
+    if (/代表案例|客戶成功|case study/i.test(lbl)) return v("facebook", "feed");
     if (/threads/i.test(lbl)) return v("threads", "post");
     if (/linkedin|領英/i.test(lbl)) return v("linkedin", "feed");
     if (/facebook|臉書|\bFB\b/i.test(lbl)) return v("facebook", "feed");
