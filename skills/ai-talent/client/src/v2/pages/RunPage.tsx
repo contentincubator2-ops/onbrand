@@ -747,7 +747,7 @@ export default function RunPage() {
     // 2026-05-18 (CJ「改成用 word 形式，不要 ppt」): these FB squads are
     // strategy plans / reports / playbooks, NOT postable social content
     // → render as a written document (Word-style), not a slide deck.
-    if (/quarterly-strategy|monthly-analytics|account-reposition|mass-control/.test(taskId)) {
+    if (/quarterly-strategy|monthly-analytics|account-reposition|mass-control|offer-first|hormozi|magnetic|kennedy/.test(taskId)) {
       return { platform: "generic" as any, format: "research-doc" as any, label: "generic:research-doc" };
     }
 
