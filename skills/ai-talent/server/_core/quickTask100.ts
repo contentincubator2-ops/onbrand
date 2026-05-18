@@ -547,8 +547,16 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
       type: "textarea",
     },
     inputs: [{ key: "launch_topic", label: "Launch 主題 + 目標媒體 + 發言人 + 時機", type: "textarea", required: true }],
-    systemPrompt: `【得獎工藝參考】Whopper Detour（Burger King / FCB，Cannes Lions 2019）：整套之所以拿獎，是「一個新聞鉤」貫穿所有素材——新聞稿、pitch、社群、Q&A 講的是同一個不可抗拒的角度，互相加乘而非各說各話。
-產出 PR launch toolkit 其中 1 部分（300–700 字）。本次你寫的是「{label}」（新聞稿 / Q&A / 媒體聯絡 / 後續追蹤 / Spokesperson talking points）。
+    systemPrompt: `【得獎工藝參考】Whopper Detour（Burger King / FCB，Cannes Lions 2019）：整套之所以拿獎，是「一個新聞鉤」貫穿所有素材——新聞稿、pitch、社群、採訪問答 講的是同一個不可抗拒的角度，互相加乘而非各說各話。
+產出 PR launch toolkit 其中 1 部分。本次你寫的是「{label}」（新聞稿 / 採訪問答 / 媒體聯絡 / 後續追蹤 / Spokesperson talking points）。
+
+【字數硬規定 — 最高優先，先看這條再開始寫】
+- 「新聞稿」：完整新聞稿總字數 ≥ 700 中文字。Body 段落 ≥ 3 段，每段 ≥ 80 字；Headline 必須是完整語句，**絕不以省略號（…/...）結尾**。
+- 「採訪問答」：6–8 組問答，每個 A ≥ 60 字。
+- 「媒體聯絡」：≥ 250 字，Subject + 開場 + angle + offer + 結尾全部完整。
+- 「後續追蹤」：≥ 300 字，3 波段追蹤策略完整呈現。
+- 「Spokesperson talking」：≥ 400 字，至少 5 個 talking point 各附支撐說法。
+**任何部分到字數硬規定前都不可截斷，即使已達 500 字也必須繼續寫到結構完整。**
 
 【earned-media 工藝 — 每一部分都適用】
 - 先找「新聞鉤」：這個 launch 為什麼值得被報導？最強角度是什麼？整套 toolkit 都圍繞這一個鉤，不要每部分各說各話。
@@ -556,9 +564,9 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
 - 扣文化與時機：點出「為什麼是現在」，連結此刻受眾已在乎的事。
 - 倒金字塔、客觀第三人稱（社群/talking points 可口語但事實一致）；句子寫成記者能原句引用。
 - 禁 buzzword、「業界領先／顛覆」、「我們很高興宣布」、暖身式開頭。
-- 各部分要能互相銜接成一套（新聞稿的角度＝pitch 賣的角度＝Q&A 防守的點＝talking points 的金句）。
+- 各部分要能互相銜接成一套（新聞稿的角度＝pitch 賣的角度＝採訪問答 防守的點＝talking points 的金句）。
 
-【反杜撰硬規則 — 最高優先、不可違反、適用每一個部分（含採訪問答 Q&A）】
+【反杜撰硬規則 — 最高優先、不可違反、適用每一個部分（含採訪問答）】
 任何統計數字、百分比、倍數、研究/調查、市場比例、媒體聲量（例：「審核時間縮短 65%」「偏離率從 18% 降到 3%」「討論量成長 3 倍」「動腦雜誌調查指出…」「根據我們內部測試…」）**必須來自使用者在 launch_topic 中明確提供的素材**。輸入沒有的，一律就地標「[待補：數據來源]」，**絕不自行生成或估算任何數字、不得假托「內部測試」「最新調查」**。
 - 採訪問答的答案**特別容易踩**：A 可以講機制、立場、做法，但凡要放數字／成效／外部調查而輸入沒給 → 改寫成質化敘述或標 [待補：數據來源]，不可為了答得漂亮就編。
 - 被媒體發現杜撰數據是公關致命傷，等同喪失信用。違反即不合格。
@@ -573,7 +581,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
 若輸入中有明顯形似字錯誤（例「溌源證」「溃源證」應為「溯源證」），在第一次使用時括號標記（例：「溯源證 [原文誤植為『溌源證』，已更正]」），此後全篇統一使用正確字。
 
 【各部分專屬格式硬規定】
-- 「新聞稿」：Headline（20字內，主動語態，記者視角新聞鉤）→ Dateline/發稿地點 → Lead paragraph（5W 倒三角，首句 ≤30 字）→ Body（事實遞減）→ 發言人引言（含姓名+職稱）→ Boilerplate → 媒體聯絡欄。
+- 「新聞稿」：Headline（≤25字，主動語態，記者視角新聞鉤，**完整語句不加省略號**）→ Dateline（格式：【城市，YYYY年MM月DD日】）→ Lead paragraph（5W 倒三角，首句 ≤35 字）→ Body（3段以上，每段 ≥80字，事實遞減）→ 發言人引言（含姓名+職稱，引號引用，60字以上）→ 關於 OnBrand AI（Boilerplate 80字以上）→ 媒體聯絡欄（聯絡人/電話/email）。
 - 「採訪問答」（即 Media Q&A / Spokesperson Q&A）：必須嚴格輸出 6–8 組，格式如下（不可用段落敘述取代）：
     Q：<記者真實會問的尖銳問題，包含最不想被問的點>
     A：<60–90 字答案；第一句直接回答問題本身，不鋪墊；用機制/做法/立場回答，**任何數字或外部調查若輸入未提供一律標 [待補：數據來源]，禁止自編**>
@@ -584,7 +592,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
   - 禁公關套話：「我們很高興地宣布」「這將是…一大創新」「業界領先/顛覆」「現在正是…最佳時機」「立刻掌握」。
   - 禁業配式結尾：「謝謝！」「希望能在媒體會議中見到您的身影！」「期待您的報導」這類；結尾用沉穩的具體下一步（可提供 embargo 素材/專訪窗口/聯絡方式），不撒嬌不催促、不用驚嘆號。
   整體語氣＝沉穩守護者，像資深公關寫給認識的記者，不是行銷文案。${TONE_100}`,
-    preferredModel: "qwen", maxTokens: 1300,
+    preferredModel: "qwen", maxTokens: 2500,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
   {
@@ -1151,7 +1159,10 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5, images: 0, runImageGen: false, imageDirectorId: null as any,
     aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
     variantLabels: ["新聞稿", "採訪問答", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
-    captionMinChars: 300, captionMaxChars: 700,
+    // 2026-05-19: raised from 300/700 — press releases need full structure
+    // (headline + dateline + 3-para body + quote + boilerplate + contacts ≈ 1500-2500 chars).
+    // Old 700-char cap was truncating output mid-sentence → "助力..." incomplete headline.
+    captionMinChars: 600, captionMaxChars: 3000,
     postLabels: ["新聞稿", "採訪問答", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
     scoutKind: "news",
     extras: { postsCount: 5, replyTemplates: 3 },
