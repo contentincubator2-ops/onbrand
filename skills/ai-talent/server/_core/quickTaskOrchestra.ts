@@ -978,6 +978,28 @@ async function callLegalAssistant(args: { caption: string; testimonialSource: st
   } catch { return ""; }
 }
 
+// 2026-05-18 (CJ「fb-60-carousel-5 mockup 沒套用」根因): recordTaskRun
+// never received an outputType, so it defaulted to "post" → RunPage
+// Layer-2 resolved every task to facebook:feed whenever taskId metadata
+// was absent (legacy / edge rows). Map the task's post_type to a SAFE
+// outputType that RunPage's outputTypeToFormat resolves correctly
+// (notably carousel → "slide" → carousel mockup). Belt-and-braces with
+// the taskId Layer-1 path so the right mockup shows regardless.
+function safeOutputTypeForPostType(
+  postType: string | undefined | null,
+): "post" | "story" | "reel" | "ad_copy" | "slide" {
+  switch (String(postType ?? "post")) {
+    case "carousel": return "slide";       // RunPage: slide → carousel
+    case "story":    return "story";
+    case "reel":     return "reel";
+    case "ad":       return "ad_copy";     // RunPage: ad_copy → ad
+    case "pinned":
+    case "feed":
+    case "post":
+    default:         return "post";        // RunPage: post → feed
+  }
+}
+
 // ── Single image gen with per-image timeout ─────────────────────────────
 
 async function genOneImage(prompt: string, config: OrchestraConfig): Promise<OrchestraVariant["image"]> {
@@ -1477,6 +1499,7 @@ export async function runOrchestra(args: {
             taskId: args.template.id,
             taskLabel: flatLabel,
             tier: tierStr,
+            outputType: safeOutputTypeForPostType(args.template.outputDefaults?.post_type),
             title: titleFromCaption(partialVariants[0]?.caption, flatLabel),
             content: JSON.stringify(partialVariants, null, 2),
             metadata: {
@@ -1846,6 +1869,7 @@ export async function runOrchestra(args: {
             taskId: args.template.id,
             taskLabel: flatLabel,
             tier: tierStr,
+            outputType: safeOutputTypeForPostType(args.template.outputDefaults?.post_type),
             title: titleFor,
             content: JSON.stringify(result.variants, null, 2),
             metadata: fullMetadata,
