@@ -46,14 +46,9 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   // produced a strategy essay, not a usable calendar. Replaced by the
   // structured orchestra task fb-99-30day-calendar (fixed content mix +
   // Calendar mockup), so this squad card is removed from the 99s tab.
-  {
-    id: "fb-99-monthly-calendar-promo",
-    squad_slug: "fb-monthly-calendar-product-promo",
-    platform: "facebook", postType: "feed",
-    label: "FB 30 天促銷月曆（多商品）",
-    description: "多商品輪轉的促銷節奏，每天主推一支重點商品，搭配檔期",
-    methodology: "促銷型內容支柱變體",
-  },
+  // 2026-05-18 (CJ「促銷月曆也超時」): replaced by the fast structured
+  // orchestra task fb-99-monthly-calendar-promo (parallel-by-pillar +
+  // Calendar mockup), so this heavy squad card is removed.
   {
     id: "fb-99-event-launch",
     squad_slug: "fb-garyvee-jab-hook",
