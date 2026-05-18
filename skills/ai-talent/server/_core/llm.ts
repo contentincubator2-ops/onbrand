@@ -599,16 +599,22 @@ function detectLanguage(messages: Message[]): "zh" | "ja" | "ko" | "en" {
 // NOTE 2026-05-03: gpt-5-nano deployment removed from Foundry project.
 // Using Kimi-K2.5 as default — confirmed deployed, strong Chinese support.
 // Override per-language via AZURE_FOUNDRY_MODEL_ZH / _JA / _KO / _EN env vars.
+// 2026-05-19: Kimi-K2.5 is a marketplace model — it cannot be accessed via
+// the Azure OpenAI deployment path (/openai/deployments/{name}/...) and causes
+// DeploymentNotFound on every call. Default all languages to gpt-4.1 which is
+// confirmed working (HTTP 200 from probe). Override via AZURE_FOUNDRY_MODEL_ZH
+// etc. env vars if a different per-language model is needed (must be an Azure
+// OpenAI-compatible deployment, not a marketplace/serverless endpoint).
 const AZURE_MODEL_BY_LANG: Record<string, string> = {
-  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "Kimi-K2.5",
-  ja: process.env.AZURE_FOUNDRY_MODEL_JA || "Kimi-K2.5",
-  ko: process.env.AZURE_FOUNDRY_MODEL_KO || "Kimi-K2.5",
-  en: process.env.AZURE_FOUNDRY_MODEL_EN || "gpt-4o",
+  zh: process.env.AZURE_FOUNDRY_MODEL_ZH || "gpt-4.1",
+  ja: process.env.AZURE_FOUNDRY_MODEL_JA || "gpt-4.1",
+  ko: process.env.AZURE_FOUNDRY_MODEL_KO || "gpt-4.1",
+  en: process.env.AZURE_FOUNDRY_MODEL_EN || "gpt-4.1",
 };
 
 function pickAzureModelForMessages(messages: Message[]): string {
   const lang = detectLanguage(messages);
-  return AZURE_MODEL_BY_LANG[lang] ?? "gpt-4o";
+  return AZURE_MODEL_BY_LANG[lang] ?? "gpt-4.1";
 }
 
 // Reasoning-model param translation.
