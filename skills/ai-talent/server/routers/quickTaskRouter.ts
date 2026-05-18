@@ -1316,8 +1316,31 @@ export const quickTaskRouter = router({
       const { buildBrandPrefix } = await import("../_core/brandContext");
       const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
 
+      // 2026-05-18 (CJ「只填網址時，AI 潤稿也要讀取該網址」): if the user
+      // pasted (mostly) a URL, polishing the bare link is useless. Detect
+      // + fetch the page and feed its content in, so the polish produces
+      // a real brief grounded in the actual page — still no fabrication
+      // beyond what the page / user wrote.
+      let urlBlock = "";
+      let fetchedUrl: string | null = null;
+      try {
+        const { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } =
+          await import("../_core/urlContext");
+        const url = findFirstUrl(input.text);
+        if (url) {
+          const summary = await fetchUrlSummary(url);
+          if (summary) {
+            fetchedUrl = url;
+            urlBlock = "\n\n" + formatUrlSummaryForPrompt(summary);
+          }
+        }
+      } catch { /* fetch is best-effort — fall back to text only */ }
+
       const taskHint = input.taskLabel || input.taskId;
       const qHint = input.primaryQuestion ? `（這個任務問用戶的問題是：「${input.primaryQuestion}」）` : "";
+      const urlRule = fetchedUrl
+        ? `7. 用戶主要只給了一個連結；系統已抓取該頁內容（見下方【已抓取參考連結】）。請以「該頁實際內容」為素材主體整理出 brief，並保留原始連結；不要寫成通用模板，要呼應這篇的具體訊息。仍然只能用頁面上或用戶寫的事實，不可自行新增。\n`
+        : "";
       const system =
         `你是資深行銷企劃，負責把用戶填寫的任務素材「潤飾整理」成一份清楚、可直接交給執行 agent 的 brief。\n` +
         `這份素材會被用在任務：「${taskHint}」${qHint}。\n` +
@@ -1328,13 +1351,14 @@ export const quickTaskRouter = router({
         `4. 若缺少這個任務明顯需要的關鍵資訊，用「[請補充：XXX]」標出來，不要自己填。\n` +
         `5. 保持用戶原本的語言（繁體中文）與意圖，不要過度擴寫、不要換掉語氣。\n` +
         `6. 只輸出整理後的素材本身，不要前言、不要解釋、不要 markdown 圍欄。\n` +
+        urlRule +
         brandPrefix;
 
       try {
         const r = await callModel(
           [
             { role: "system", content: system },
-            { role: "user", content: input.text },
+            { role: "user", content: input.text + urlBlock },
           ],
           undefined,
           "anthropic",
