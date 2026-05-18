@@ -56,20 +56,9 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   // Calendar mockup), so this heavy squad card is removed.
   // 2026-05-18 (CJ): fb-99-event-launch (GaryVee Jab-Jab-Right-Hook
   // squad) removed from the catalog per request.
-  {
-    id: "fb-99-countdown-series",
-    squad_slug: "fb-countdown-series",
-    platform: "facebook", postType: "feed",
-    label: "FB 倒數活動系列 7-14 天",
-    description: "Cialdini Scarcity 緊迫倒數法 + 每天獨立 hook 結構",
-    methodology: "Cialdini Scarcity",
-    primary_question: "在倒數什麼活動？幾天開始、截止日期、主要優惠或亮點是什麼？",
-    primary_input: {
-      key: "topic",
-      placeholder: "例：母親節限時 7 折，5/5 開始 5/12 結束，主打手工皂禮盒",
-      type: "textarea",
-    },
-  },
+  // 2026-05-18 (CJ 驗收報告「每天當成一個 FB mockup」): replaced by the
+  // structured orchestra task fb-99-14day-countdown (per-day variant
+  // pills + D-4 CTA rule + 截止日/天數 intake). Squad card removed.
   {
     id: "fb-99-account-reposition",
     squad_slug: "fb-account-reposition",

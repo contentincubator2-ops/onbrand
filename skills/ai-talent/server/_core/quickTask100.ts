@@ -215,24 +215,32 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
   {
+    // 2026-05-18 (CJ 驗收報告): consolidated countdown — each day is its
+    // OWN FB post variant (per-variant pills = 每天一個 FB mockup). Adds
+    // the two report fixes: (a) ask 倒數天數 + 截止日 in intake so the
+    // agent doesn't have to infer; (b) D-4 起每篇必含可執行 CTA.
     id: "fb-99-14day-countdown",
     tier: "99s", postType: "feed",
-    label: "FB 14 天倒數活動",
-    description: "14 天倒數 + 每天獨立 hook + 中段轉折 + 高潮收束 + scout 抓節慶/時事",
+    label: "FB 倒數活動系列（7 / 14 天）",
+    description: "每天一篇獨立倒數貼文 + 三幕節奏 + D-4 起含可執行 CTA + scout 抓節慶/時事",
     agent_id: 224116, // Hoàng Thị Mai — Email & CRM Strategist eCommerce VN (1251 char)
     skill_slug: "fb-countdown-series",
-    primary_question: "活動名稱 + 主要 hook？",
-    primary_input: { key: "event_name", placeholder: "例：母親節限時優惠 / 新品上市", type: "text" },
+    primary_question: "活動名稱 + 主要 hook/優惠 + 倒數天數(7或14) + 活動截止日？",
+    primary_input: {
+      key: "event_name",
+      placeholder: "例：OnBrand 年中升級活動｜主 hook：品牌 DNA 固化｜倒數 7 天｜截止日 7/1",
+      type: "textarea",
+    },
     inputs: [
-      { key: "event_name", label: "活動名稱", type: "text", required: true },
-      { key: "key_offer", label: "主要 hook / 優惠", type: "textarea", required: true },
+      { key: "event_name", label: "活動名稱 + hook/優惠 + 倒數天數 + 截止日", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 FB 14 天倒數系列其中 1 篇（80-130 字）。
-本次你寫的是「{label}」這天。注意三幕結構：
-- Day 14-10: 預熱、埋懸念
-- Day 9-5: 揭曉細節、加溫
-- Day 4-1: 緊迫感、最後機會
-${TONE_100}`,
+    systemPrompt: `你負責倒數系列的「{label}」這一篇 FB 貼文（80-130 字），這是一篇可直接發佈的 FB 貼文（不是文件）。
+依用戶輸入的「倒數天數（7 或 14）」與「截止日」對位三幕節奏：
+- 前段（倒數第 7~5 天 / 14~10）：喚醒痛點、埋懸念、教育型，**不硬銷**。
+- 中段（第 4~3 天 / 9~5）：示範解法、加溫、情境型。
+- 後段（第 2~1 天 / 4~1）：質變展現、緊迫、最後機會。
+【CTA 規則（驗收要求，必守）】倒數第 4 天起（含）每篇結尾**必須有一個具體可執行的 CTA**：可點連結指引 / 「留言『關鍵字』取得連結」/ 明確下一步（如「按下升級」）。倒數第 7~5 天可只鋪痛點不放 CTA。
+每篇結尾保留記憶錨點「（活動主題，倒數 X 天）」。事實/數字/截止日不得捏造，用戶沒給的用「[請補充：…]」標出。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 700,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
@@ -838,10 +846,10 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "fb-99-14day-countdown": {
     ...fb100Common, variants: 7, images: 7,
     aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["Day 14", "Day 12", "Day 10", "Day 7", "Day 5", "Day 3", "Day 1"],
+    variantLabels: ["倒數第 7 天", "倒數第 6 天", "倒數第 5 天", "倒數第 4 天", "倒數第 3 天", "倒數第 2 天", "最後 1 天"],
     captionMinChars: 80, captionMaxChars: 130,
     strategistAgentId: 60013, // Kevin Kan — SEO Content Strategist
-    postLabels: ["Day 14", "Day 12", "Day 10", "Day 7", "Day 5", "Day 3", "Day 1"],
+    postLabels: ["倒數第 7 天", "倒數第 6 天", "倒數第 5 天", "倒數第 4 天", "倒數第 3 天", "倒數第 2 天", "最後 1 天"],
     scoutKind: "festivals", // 倒數活動 → 抓相關節慶 / 行銷檔期
     extras: { ...fb100Common.extras, postsCount: 7 },
   },

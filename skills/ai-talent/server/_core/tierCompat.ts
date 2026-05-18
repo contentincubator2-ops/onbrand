@@ -39,6 +39,7 @@ export function normalizeTaskId(id: string): string {
   if (id === "fb-60-trend-rewrite") return "fb-99-trend-rewrite";
   if (id === "fb-60-viral-rewrite") return "fb-99-viral-rewrite";
   if (id === "fb-60-testimonial-rewrite") return "fb-99-testimonial-rewrite";
+  if (id === "fb-countdown-series") return "fb-99-14day-countdown";
   // calendar squads → fast structured orchestra tasks
   if (id === "fb-monthly-calendar-pulizzi") return "fb-99-30day-calendar";
   if (id === "fb-monthly-calendar-product-promo") return "fb-99-monthly-calendar-promo";

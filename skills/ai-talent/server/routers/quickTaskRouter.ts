@@ -958,7 +958,7 @@ export const quickTaskRouter = router({
       t.id === "fb-99-carousel-5" || t.id === "fb-99-serial-3" ||
       t.id === "fb-99-trend-rewrite" || t.id === "fb-99-viral-rewrite" ||
       t.id === "fb-99-testimonial-rewrite" || t.id === "fb-99-30day-calendar" ||
-      t.id === "fb-99-monthly-calendar-promo" ||
+      t.id === "fb-99-monthly-calendar-promo" || t.id === "fb-99-14day-countdown" ||
       (!t.id.startsWith("fb-") && !t.id.startsWith("ig-"))
     ).map((t) => {
       const id = t.id;
