@@ -1640,6 +1640,79 @@ export async function runOrchestra(args: {
       }
     }
 
+    // ── TikTok 品牌聲音守門 (2026-05-19, CJ 驗收 7/14「Day 1-3 帶貨腔崩壞」) ──
+    // 追熱點框架天生帶高能量 FYP 預設；prompt-only guardrail 在 per-variant
+    // fanout + 模型隨機（anthropic/openai）下無法保證每個 Day 都守住——
+    // 實測 Day 1-3 反覆崩、Day 4-5 才好。改用「確定性 regex 一律清洗 +
+    // 必要時 LLM 收緊」的雙層守門（同 EDM/IG self-check 證實有效的模式），
+    // 對 7 天每一篇都生效，不依賴模型自律。
+    if (Array.isArray(captions) && captions.length && isTikTokBodyTask(args.template)) {
+      // L1 deterministic: 高信心、零成本、一律套用。
+      const ttDet = (s: string): string =>
+        s
+          // 帶貨/浮誇/效率詞 → 沉穩守護者語感（軟改寫，不硬刪以免斷句）
+          .replace(/全台(?:品牌)?行銷人注意/g, "給品牌行銷人的觀察")
+          .replace(/注意[！!]/g, "")
+          .replace(/快來試試(?:看)?/g, "可以試試")
+          .replace(/趕快試試看/g, "可以試試")
+          .replace(/快來檢查一下/g, "值得檢查一下")
+          .replace(/快來一起看看/g, "一起看看")
+          .replace(/快來/g, "")
+          .replace(/讓你的品牌亮起來/g, "讓品牌好好說話")
+          .replace(/(?:讓品牌)?大放異彩/g, "")
+          .replace(/宇宙無敵/g, "")
+          .replace(/超神奇/g, "")
+          .replace(/業界(?:的)?佼佼者/g, "")
+          .replace(/不再擔心/g, "不必再擔心")
+          .replace(/行銷新篇章/g, "行銷的下一步")
+          .replace(/讓我們一起期待/g, "值得期待")
+          .replace(/一起來討論吧/g, "歡迎一起想想")
+          // 常見簡體漏字 → 繁體
+          .replace(/精准/g, "精準")
+          .replace(/内容/g, "內容")
+          .replace(/数据/g, "數據")
+          // 句尾與句中驚嘆號（! 與 ！）一律 → 句號
+          .replace(/[!！]+/g, "。")
+          // 清理改寫後的殘留
+          .replace(/。{2,}/g, "。")
+          .replace(/(^|\n)\s*。\s*/g, "$1")
+          .replace(/[ \t]{2,}/g, " ")
+          .replace(/\n{3,}/g, "\n\n");
+      for (const v of captions) {
+        if (!v?.caption) continue;
+        v.caption = ttDet(v.caption);
+        const t = v.caption;
+        const firstLine = (t.split(/\r?\n/).find((l) => l.trim().length > 0) ?? "").trim();
+        // 仍需 LLM 收緊的觸發：開場是呼籲句 / 偵測到簡體 / 殘留帶貨詞
+        const imperativeOpen = /^(注意|快|趕快|別再|馬上|立刻|全台|各位|嗨|哈囉|大家好)/.test(firstLine);
+        const simplifiedHit = /[这个们时应该说话语]/.test(t) && /[这们应]/.test(t);
+        const salesyHit = /(亮起來|大放異彩|宇宙無敵|快來|佼佼者|趕快|別再猶豫|一起來討論)/.test(t);
+        if (!imperativeOpen && !simplifiedHit && !salesyHit) continue; // 已乾淨 → 零成本
+        try {
+          const { invokeLLM } = await import("./llm");
+          const r: any = await invokeLLM({
+            provider: "anthropic",
+            messages: [{ role: "user", content:
+              `這是一支 TikTok 追熱點短影音腳本。請用「沉穩觀察者／守護者」語氣收緊，嚴格遵守：\n` +
+              `1. 全文不得有句尾或句中驚嘆號；不得出現「快來」「注意」「亮起來」「大放異彩」「宇宙無敵」「佼佼者」等帶貨/浮誇詞。\n` +
+              `2. 第一行必須是「觀察句或反問句」，不得以呼籲句起頭。\n` +
+              `   正向範例語感：「你的 AI 生出來的文案，真的是你嗎？」「大家都在說 AI 工具很強，但很少有人問它有沒有在用你的品牌邏輯說話。」\n` +
+              `3. 受眾是品牌行銷主管 / 經營者（B2B），措辭對齊專業決策者，不要寫成對一般消費者喊話。\n` +
+              `4. 全文繁體中文（台灣用語），不得有簡體字。\n` +
+              `保持原本的熱點題材、腳本分段與長度，只輸出收緊後的腳本本身，不要前言：\n\n${t}` }],
+            maxTokens: 1200,
+          });
+          let tightened = String(r?.content ?? r?.text ?? "").trim();
+          if (tightened) {
+            tightened = ttDet(tightened); // 收緊後再過一次確定性清洗
+            v.caption = args.brandId
+              ? await enforceBrandRulesOnText(args.brandId, tightened).catch(() => tightened)
+              : tightened;
+          }
+        } catch { /* fail-safe: keep deterministically-cleaned caption */ }
+      }
+    }
+
     // ── Checkpoint (2026-05-14 「先回 caption + brief、image 跟 QA 變 async polling」) ─
     // Captions + briefs are ready. If the caller passed `onCheckpoint`,
     // (a) persist a PARTIAL mission_outputs row now with progress='caption_ready',
