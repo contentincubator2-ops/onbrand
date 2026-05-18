@@ -15,6 +15,7 @@ import {
   faImages, faThumbsUp, faComment, faShare, faGlobe, faPaperPlane,
   faMusic, faVolumeHigh, faXmark, faChevronLeft, faVideo, faHeart,
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
+  faChevronRight, faArrowRight,
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption } from "./shared";
 import { useLang } from "../../../lib/i18n";
@@ -496,45 +497,128 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
 
 /* ─────────────── FB Carousel Ad (multi-card horizontal scroll) ─────────────── */
 
-export function FBCarousel({ title, brandName, variantLabel }: MockupFields) {
+// 2026-05-18 (CJ「FB Carousel 尺寸/版型不對，要照 FB 規格 + Figma 參考」):
+// the old FBCarousel was a hardcoded e-commerce product grid (tiny 170px
+// tiles, "商品 N / NT$1,234"). Rebuilt to the real FB carousel-AD spec:
+//   - 1:1 (1080×1080) card image per FB business help guidance
+//   - one card prominent + next card peeking (feed swipe UX) + chevrons
+//   - each card chrome: headline (bold) + description + CTA pill
+//   - post primary text = generated caption; first card uses live image
+// Card copy is derived from the generated caption (numbered/line split).
+function parseCarouselCards(caption: string): { headline: string; desc: string }[] {
+  const raw = (caption ?? "").trim();
+  if (!raw) return [];
+  // Prefer explicit per-card lines ("卡1：…" / "1. …" / "Card 1 -")
+  let segs = raw
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => l.replace(/^(卡片?|Card|第)?\s*\d+\s*[\.\):、\-－—]?\s*/i, "").trim())
+    .filter(Boolean);
+  // Fall back to sentence split if it wasn't a multi-line list
+  if (segs.length < 2) {
+    segs = raw.split(/(?<=[。！？!?])\s*/).map((s) => s.trim()).filter((s) => s.length >= 4);
+  }
+  return segs.slice(0, 5).map((s) => {
+    const cut = s.search(/[。！？!?：:，,\-－—]/);
+    const headline = (cut > 2 && cut < 24 ? s.slice(0, cut) : s.slice(0, 18)).trim();
+    const desc = s.slice(headline.length).replace(/^[。！？!?：:，,\s\-－—]+/, "").trim();
+    return { headline: headline || s.slice(0, 14), desc };
+  });
+}
+
+export function FBCarousel({
+  title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, liveImageStyle,
+}: MockupFields) {
   const { lang } = useLang();
+  const handle = brandName ?? (lang === "en" ? "Your Brand" : "您的品牌");
+  const postText = (liveCaption ?? "").trim();
+  const cards = parseCarouselCards(postText);
+  // FB carousel needs ≥2 cards; pad with style-direction placeholders
+  const cardSlots = cards.length >= 2 ? cards : [
+    ...cards,
+    ...Array.from({ length: Math.max(0, 3 - cards.length) }, (_, i) => ({
+      headline: lang === "en" ? `Card ${cards.length + i + 1}` : `第 ${cards.length + i + 1} 張`,
+      desc: "",
+    })),
+  ];
+  const hasImg = !!liveImageUrl && liveImageStatus === "ready";
+
   return (
-    <div className="w-full max-w-[520px] mx-auto">
+    <div className="w-full max-w-[500px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="px-4 py-3 flex items-center gap-3">
+        <div className="px-4 pt-3 pb-2 flex items-center gap-3">
           <User
-            name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">{lang === "en" ? "Sponsored · Carousel ad" : "贊助 · 輪播廣告"}</span>}
+            name={<span className="text-small font-semibold">{handle}</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? "Sponsored · Carousel" : "贊助 · 輪播廣告"} · <FontAwesomeIcon icon={faGlobe} className="text-[10px]" /></span>}
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
           />
         </div>
-        <div className="px-4 py-2">
-          <p className="text-small">{title}</p>
+        {/* Post primary text (the generated carousel narrative) */}
+        <div className="px-4 pb-3 text-small text-default-800 whitespace-pre-wrap leading-relaxed">
+          {postText
+            ? <MarkdownText content={postText} />
+            : <span className="text-default-400">{title}</span>}
         </div>
-        {/* Carousel: 3 cards visible side-by-side, 4th peeking */}
-        <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="shrink-0 w-[170px] border border-divider rounded-medium overflow-hidden bg-content1">
-              <div className="aspect-square bg-default-100 relative flex items-center justify-center">
-                <Skeleton className="absolute inset-0" />
-                <FontAwesomeIcon icon={faImages} className="relative z-10 text-default-400 text-2xl" />
+        {/* Carousel viewport: card 1 prominent + next peeking + chevrons */}
+        <div className="relative bg-default-50">
+          <div className="flex gap-2 px-4 py-3 overflow-hidden">
+            {cardSlots.map((c, i) => (
+              <div
+                key={i}
+                className={`shrink-0 ${i === 0 ? "w-[78%]" : "w-[78%]"} border border-divider rounded-lg overflow-hidden bg-content1 shadow-sm`}
+                style={i === 0 ? undefined : { marginRight: i === cardSlots.length - 1 ? 0 : undefined }}
+              >
+                {/* 1:1 image — FB recommends 1080×1080 */}
+                <div className="aspect-square bg-default-100 relative flex items-center justify-center">
+                  {i === 0 && hasImg ? (
+                    <img src={liveImageUrl} alt={liveImageStyle ?? "card"} className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <Skeleton className="absolute inset-0 opacity-40" />
+                      <div className="relative z-10 text-center text-default-400 px-3">
+                        <FontAwesomeIcon icon={faImages} className="text-2xl mb-1" />
+                        <p className="text-[10px] line-clamp-3">
+                          {i === 0 && liveImageStyle ? liveImageStyle : (lang === "en" ? "Carousel image 1:1" : "輪播圖 1:1（1080×1080）")}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {/* Card chrome: headline + desc + CTA (FB carousel ad card) */}
+                <div className="px-3 py-2 flex items-center gap-2 border-t border-divider">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-small font-semibold leading-tight line-clamp-1">{c.headline}</p>
+                    {c.desc && <p className="text-tiny text-default-500 leading-tight line-clamp-1">{c.desc}</p>}
+                  </div>
+                  <Button size="sm" radius="sm" className="shrink-0 h-7 px-3 text-tiny font-semibold bg-default-200 text-default-800">
+                    {lang === "en" ? "Learn more" : "了解更多"}
+                  </Button>
+                </div>
               </div>
-              <div className="p-2 space-y-1">
-                <p className="text-tiny font-semibold leading-tight line-clamp-2">{lang === "en" ? `Item ${i + 1}` : `商品 ${i + 1}`}</p>
-                <p className="text-tiny text-default-500">{lang === "en" ? "$39" : "NT$ 1,234"}</p>
-                <Button size="sm" radius="sm" color="default" className="w-full text-tiny h-6 bg-default-200 font-semibold">
-                  {lang === "en" ? "Shop" : "選購"}
-                </Button>
-              </div>
-            </div>
+            ))}
+          </div>
+          {/* Swipe chevrons */}
+          <button className="absolute left-2 top-[38%] -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center text-default-500">
+            <FontAwesomeIcon icon={faChevronLeft} className="text-tiny" />
+          </button>
+          <button className="absolute right-2 top-[38%] -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center text-default-600">
+            <FontAwesomeIcon icon={faChevronRight} className="text-tiny" />
+          </button>
+        </div>
+        {/* Dots */}
+        <div className="flex items-center justify-center gap-1 py-2">
+          {cardSlots.map((_, i) => (
+            <span key={i} className={`rounded-full ${i === 0 ? "w-2 h-2 bg-primary" : "w-1.5 h-1.5 bg-default-300"}`} />
           ))}
         </div>
-        {/* Carousel dots */}
-        <div className="flex items-center justify-center gap-1 pb-2">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={`rounded-full w-1.5 h-1.5 ${i === 0 ? "bg-primary" : "bg-default-300"}`} />
-          ))}
+        {/* CTA row (FB shows a footer link bar on carousel ads) */}
+        <div className="px-4 py-2 bg-default-50 border-t border-divider flex items-center justify-between">
+          <span className="text-tiny text-default-500 truncate">{(handle + "").toLowerCase().replace(/\s+/g, "")}.com</span>
+          <span className="text-tiny font-semibold text-primary flex items-center gap-1">
+            {lang === "en" ? "Learn more" : "了解更多"} <FontAwesomeIcon icon={faArrowRight} className="text-[10px]" />
+          </span>
         </div>
         <div className="px-4 py-1 border-t border-divider flex items-center justify-around text-default-700 text-small">
           <button className="flex-1 py-1.5 hover:bg-default-100 rounded-medium flex items-center justify-center gap-2">
