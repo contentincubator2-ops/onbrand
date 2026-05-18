@@ -1323,6 +1323,7 @@ const ig100Common = {
 //   ig-99-30day-calendar     ← (no exact IG squad; reuses fb-monthly-calendar shape)
 //   ig-99-reel-series-6      ← (new — adapted from fb-reels-script squad)
 //   ig-99-account-reposition ← fb-account-reposition squad shape
+//   ig-99-save-worthy        ← Hormozi Save-Worthy squad (3 merged variants)
 export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "ig-99-30day-calendar": {
     ...ig100Common, variants: 4, images: 4,
@@ -1353,6 +1354,24 @@ export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     postLabels: ["新 Bio", "Highlight 套組", "Launch Post 1-3", "Launch Post 4-6", "Launch Post 7-9"],
     scoutKind: "viral",
     extras: { ...ig100Common.extras, postsCount: 5 },
+  },
+  // 2026-05-19 (CJ): Hormozi Save-Worthy squad is a mixed deliverable —
+  // Tab 1 (主題研究) and Tab 3 (指標追蹤) are research docs; Tab 2
+  // (IG 高收藏文案 + 視覺策略) is the actual IG post + visual brief.
+  // RunPage.tsx effectiveVariant overrides handle per-tab mockup switching:
+  //   "Save-Worthy 主題研究" → generic:research-doc
+  //   "IG 高收藏文案 + 視覺策略" → instagram:feed (via /IG/ regex)
+  //   "Save/Share 指標追蹤" → generic:research-doc
+  // User originally had 4 tabs; tabs 2+3 (高密度文案 + 視覺優化) merged
+  // into one combined IG tab to reduce switching friction.
+  "ig-99-save-worthy": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null as any,
+    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 0,
+    variantLabels: ["Save-Worthy 主題研究", "IG 高收藏文案 + 視覺策略", "Save/Share 指標追蹤"],
+    captionMinChars: 300, captionMaxChars: 900,
+    postLabels: ["Save-Worthy 主題研究", "IG 高收藏文案 + 視覺策略", "Save/Share 指標追蹤"],
+    scoutKind: "viral",
+    extras: { postsCount: 3, replyTemplates: 3, postingTime: true },
   },
 };
 

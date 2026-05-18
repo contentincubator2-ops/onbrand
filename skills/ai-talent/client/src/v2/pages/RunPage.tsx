@@ -926,6 +926,11 @@ export default function RunPage() {
     if (/內容支柱|content pillar/i.test(lbl)) return v("generic", "research-doc");
     if (/competitor|競品分析|即時趨勢/i.test(lbl)) return v("generic", "research-doc");
     if (/community\s*月曆|社群月曆/i.test(lbl)) return v("youtube", "community");
+    // 2026-05-19 (CJ): ig-99-save-worthy is a mixed-mockup task.
+    // Tab 1 (主題研究) and Tab 3 (指標追蹤) are research docs;
+    // Tab 2 (IG 高收藏文案 + 視覺策略) falls through to the /IG/ match below → instagram:feed.
+    if (/Save.Worthy.*主題研究|主題研究.*Save.Worthy/i.test(lbl)) return v("generic", "research-doc");
+    if (/Save.*Share.*指標|指標追蹤/i.test(lbl)) return v("generic", "research-doc");
     if (/threads/i.test(lbl)) return v("threads", "post");
     if (/linkedin|領英/i.test(lbl)) return v("linkedin", "feed");
     if (/facebook|臉書|\bFB\b/i.test(lbl)) return v("facebook", "feed");
