@@ -600,6 +600,11 @@ export interface OrchestraConfig {
    * mockup renders). ~5× faster than one sequential mega-call → no 502.
    */
   calendarMerge?: boolean;
+  /** 2026-05-18 (CJ): use a MINIMAL clean prompt (persona + task prompt
+   *  + brand context only) — no social-caption scaffolding/craft. For
+   *  strict structured deliverables (e.g. newsjack 4-field format) whose
+   *  format/guardrails the social scaffolding otherwise overrides. */
+  cleanPrompt?: boolean;
 }
 
 const MANDY_ID = 220887;     // Claire Chen — Brand Visual Designer (977 char persona, was Mandy 199)

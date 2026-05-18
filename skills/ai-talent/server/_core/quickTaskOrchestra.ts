@@ -539,7 +539,12 @@ async function callOneVariant(args: {
   // {caption} object wrapper) actively fights that → prose/garbage.
   // Give calendar a MINIMAL clean prompt: persona + the strict task
   // prompt + brand context only.
-  const calMode = !!config.calendarMerge;
+  // 2026-05-18 (CJ 驗收 newsjack): calendar AND any cleanPrompt task
+  // bypass the social-caption scaffolding (craft rubric + 「只寫1變體
+  // caption」+「hashtag 放文末」+「不要結構化卡片」) which sabotages
+  // strict structured formats / guardrails (the newsjack 4-field format
+  // + no-hashtag rule kept being overridden).
+  const calMode = !!config.calendarMerge || !!config.cleanPrompt;
   const docMode = template.outputMode === "document";
   const system = calMode
     ? `# 角色（寫作口吻參考）\n${captionPersona}\n\n` +
