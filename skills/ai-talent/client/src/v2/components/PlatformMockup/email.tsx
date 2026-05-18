@@ -18,6 +18,19 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
   const brand = brandName ?? "Your Brand";
   const handle = handleOf(brandName);
   const hasHeroImg = !!liveImageUrl && liveImageStatus !== "failed";
+  // 2026-05-18 (CJ 驗收 P0「主旨行全空白」): the launch-sequence prompt
+  // now emits "主旨：…\n預覽：…\n\n<body>". Parse it so the EDM mockup
+  // shows the real subject + preview text and a clean body.
+  const _cap = liveCaption ?? "";
+  const _subjM = _cap.match(/^\s*主旨[：:]\s*(.+)$/m);
+  const _prevM = _cap.match(/^\s*預覽(?:文字)?[：:]\s*(.+)$/m);
+  const subject = (liveTitle ?? _subjM?.[1]?.trim() ?? title ?? "").trim();
+  const previewText = _prevM?.[1]?.trim() ?? "";
+  const bodyText = _cap
+    .replace(/^\s*主旨[：:].*$/m, "")
+    .replace(/^\s*預覽(?:文字)?[：:].*$/m, "")
+    .replace(/^\s+/, "")
+    .trim();
 
   return (
     <div className="w-full max-w-[600px] mx-auto">
@@ -32,7 +45,7 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
         </div>
         <div className="flex-1 bg-content1 rounded-md px-3 py-1 text-tiny text-default-400 flex items-center gap-2">
           <FontAwesomeIcon icon={faInbox} className="text-tiny" />
-          {liveTitle ? liveTitle.slice(0, 60) : "主旨行 · 等待 AI 撰寫 填入"}
+          {subject ? subject.slice(0, 60) : "主旨行 · 等待 AI 撰寫 填入"}
         </div>
       </div>
 
@@ -70,11 +83,14 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
 
         {/* Body section — text left, image right */}
         <div className="px-8 py-8">
-          <h1 className="text-[22px] font-bold leading-snug tracking-tight text-foreground mb-3">
-            {liveTitle ?? title ?? <Skeleton className="h-6 w-[70%] rounded" />}
+          <h1 className="text-[22px] font-bold leading-snug tracking-tight text-foreground mb-1">
+            {subject || <Skeleton className="h-6 w-[70%] rounded" />}
           </h1>
-          {liveCaption ? (
-            <MarkdownText content={liveCaption} className="text-small text-default-600 leading-relaxed" />
+          {previewText && (
+            <p className="text-tiny text-default-400 mb-3 italic">{previewText}</p>
+          )}
+          {bodyText ? (
+            <MarkdownText content={bodyText} className="text-small text-default-600 leading-relaxed" />
           ) : (
             <div className="space-y-2 mt-2">
               <Skeleton className="h-3 w-full rounded" />

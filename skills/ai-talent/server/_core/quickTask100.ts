@@ -483,11 +483,35 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     label: "Email 產品上線完整自動化 Sequence",
     description: "預告 ×2 / 上線 / 提醒 ×2 / 最後機會 / 後續 follow-up = 7 封",
     agent_id: 60061, skill_slug: "email-marketing", // Yahan Tsai — Retail E-commerce Newsletter Copywriter
-    primary_question: "產品名稱 + 賣點？",
-    primary_input: { key: "product", placeholder: "產品名 + 主要賣點", type: "textarea" },
-    inputs: [{ key: "product", label: "產品", type: "textarea", required: true }],
-    systemPrompt: `產出 Email launch 序列其中 1 封（200-400 字）。
-本次你寫的是「{label}」。${TONE_100}`,
+    // 2026-05-18 (CJ 驗收 P0): 原本只問「產品名+賣點」→ 主旨空白、CTA
+    // 不分階段、最後機會/follow-up 無從設計。四項合一引導 textarea。
+    primary_question: "產品名+賣點 + 目標受眾 + 上線日期 + 早鳥/限時機制 + 發送間隔？",
+    primary_input: {
+      key: "product",
+      placeholder: "例：品牌一致性溯源證｜每次 AI 產出自動附品牌字典對照｜受眾：品牌行銷主管/內容策略師｜上線 7/1｜早鳥前 100 名免費｜每 2 天發一封",
+      type: "textarea",
+    },
+    inputs: [{ key: "product", label: "產品+賣點+受眾+上線日+早鳥+發送間隔", type: "textarea", required: true }],
+    systemPrompt: `你負責這封 Email launch 序列信「{label}」（預告 1 / 預告 2 / 上線 / 提醒 1 / 提醒 2 / 最後機會 / 後續）。這是一封可直接寄出的 EDM。
+
+【輸出格式｜必守】嚴格依此格式，前兩行一定要有：
+主旨：<8-22 字、能決定開信率的主旨行，不用驚嘆號>
+預覽：<30-50 字 preview text，補主旨沒講完的鉤子>
+
+<信件本文 200-400 字>
+
+【主旨/預覽絕對不可省略或留空】沒有它整封信無法使用。
+
+【依輸入解析】從輸入抓「目標受眾」「上線日期」「早鳥/限時機制」「發送間隔」；信中該點名受眾情境（不要泛化成「所有品牌」）。**輸入沒給的用「[請補充：上線日期]」這類標出，不要自行假設或捏造日期/數字/優惠**。產品/功能名稱**逐字沿用輸入**，不得改字（例：「溯源證」不可寫成「溃源證」）。
+
+【每封 CTA 依階段差異化｜必守】
+- 預告 1/2：低摩擦 —「搶先看」「加入候補名單」，不催購
+- 上線：「立即體驗」+ 連結
+- 提醒 1/2：強化價值 +「立即試用」
+- 最後機會：明確緊迫（依輸入的早鳥/截止；沒給則「名額有限」不編數字）
+- 後續：re-engagement —「還沒試？這是我們留的位子」不責備
+
+【品牌調性 guardrail｜全序列每一封都適用，含提醒/最後機會】維持 SoWork 守護者、創造者語氣。**禁止**：促銷煽動句（「快來體驗」「立即搶購」）、驚嘆號收尾、emoji、純效率詞（快/高效/省時）。每封不要與其他封句式雷同（尤其別重複上線封的核心句）。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1000,
     outputDefaults: { platform: "email", post_type: "edm" },
   },
@@ -1084,14 +1108,16 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "em-99-launch-sequence": {
+    // 2026-05-18 (CJ 驗收 P0「只產 5 封，少了最後機會/follow-up」):
+    // strategist + scout + narrativeArc 讓 7 封 fanout 過重，後段信
+    // 失敗→靜默少產。砍掉非必要的 strategist/scout/narrativeArc，讓
+    // 7 封都穩定產出（序列邏輯已由 systemPrompt 的階段規則承載）。
     variants: 7, images: 7, runImageGen: true, imageDirectorId: EM100_IMG2,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
     captionMinChars: 200, captionMaxChars: 400,
-    strategistAgentId: 60080, // Ethan Yeh — Cross-border Marketing Strategy
     postLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
-    scoutKind: "viral",
-    extras: { postsCount: 7, narrativeArc: true, replyTemplates: 3, postingTime: true, followupPost: true },
+    extras: { postsCount: 7, replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "pr-99-launch-toolkit": {
     // 2026-05-19 (Yi-Wen 評測): "Q&A" label 觸發 RunPage.tsx:894 的 /Q&A/i
