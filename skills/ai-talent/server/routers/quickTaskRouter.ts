@@ -967,6 +967,8 @@ export const quickTaskRouter = router({
         : id.startsWith("pr-") ? "pr"
         : id.startsWith("br-") ? "brand"
         : id.startsWith("rs-") ? "audience"
+        // 2026-05-18 (CJ): kl-* (e.g. kl-99-campaign-toolkit) → KOL category
+        : id.startsWith("kl-") ? "kol"
         : "facebook";
       return { ...t, kind: "fast" as const, platform };
     });
@@ -980,6 +982,9 @@ export const quickTaskRouter = router({
         : id.startsWith("pr-") ? "pr"
         : id.startsWith("br-") ? "brand"
         : id.startsWith("rs-") ? "audience"
+        // 2026-05-18 (CJ「KOL 完整邀約話術包應在 KOL 類別」): kl-* was
+        // missing → fell through to "facebook". Tag it as the KOL category.
+        : id.startsWith("kl-") ? "kol"
         : "facebook";
       return { ...t, kind: "fast" as const, platform };
     });
