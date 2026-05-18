@@ -544,13 +544,38 @@ async function callOneVariant(args: {
   // caption」+「hashtag 放文末」+「不要結構化卡片」) which sabotages
   // strict structured formats / guardrails (the newsjack 4-field format
   // + no-hashtag rule kept being overridden).
-  const calMode = !!config.calendarMerge || !!config.cleanPrompt;
+  // 2026-05-19 (CJ 驗收 newsjack #3「JSON 裸輸出，每個 tab 顯示相同 blob」):
+  // calendarMerge 與 cleanPrompt 之前被合併成同一個 calMode，都被要求
+  // 「只輸出 JSON 陣列」。calendar 是「一次呼叫產全部 → 下游 split」所以
+  // 要陣列；但 cleanPrompt 任務（newsjack）走 per-variant fanout，每個
+  // {label} 是獨立 LLM call，被要求輸出陣列 → 每個 call 都吐出全部 5
+  // 變體的 JSON array → 每個 tab 顯示相同 blob、渲染器拆不開。
+  //   calendarMode：保留陣列輸出（merge/split 在下游）
+  //   cleanMode   ：minimal 乾淨 prompt（保留 guardrail 不被社群 scaffold
+  //                 蓋掉）+ 單變體 + 標準單一 JSON 物件輸出，讓既有
+  //                 per-variant fanout + L1 extractCaption 正常分流。
+  const calendarMode = !!config.calendarMerge;
+  const cleanMode = !!config.cleanPrompt && !config.calendarMerge;
   const docMode = template.outputMode === "document";
-  const system = calMode
+  const system = calendarMode
     ? `# 角色（寫作口吻參考）\n${captionPersona}\n\n` +
       `# 任務（最高指令，必須完全遵循；只輸出 JSON 陣列，不要任何其他文字）\n` +
       filledSystemPrompt +
       `\n\n# 品牌脈絡（素材，扣回用，不要照抄）\n${brandPrefix}` +
+      (hasUrl ? `\n\n# 參考素材（URL 抓到的內容）\n${urlContext}` : "")
+    : cleanMode
+    ? `# 角色（寫作口吻參考，不要把自我介紹寫進輸出）\n${captionPersona}\n\n` +
+      `# 任務（最高指令，必須完全逐條遵循其格式與【絕對規則】）\n` +
+      filledSystemPrompt +
+      `\n\n【本次只產 1 個變體】**${label}**：只接「這一個」時事/角度，` +
+      `完全照任務指定的四欄純文字格式輸出這 1 個變體的內容。\n` +
+      `**嚴禁**輸出 JSON 陣列、**嚴禁**一次列出多個變體、**嚴禁**把其他 ` +
+      `tab 的內容也寫進來——每個變體是獨立一次產出，只有一份。\n\n` +
+      `【輸出格式】輸出嚴格 JSON 物件（不是陣列）：\n` +
+      `{"caption":"<這 1 個變體的四欄純文字內容，保留【角度】【為什麼會被報】` +
+      `【一句 pitch】【建議下一步】四個方括號標題與換行>","hashtags":[]}\n` +
+      `第一個字元就是 {。不要 code fence、不要前言、caption 外不要多寫字。\n` +
+      `\n# 品牌脈絡（素材，扣回用，不要照抄）\n${brandPrefix}` +
       (hasUrl ? `\n\n# 參考素材（URL 抓到的內容）\n${urlContext}` : "")
     : docMode
     ? // 2026-05-16 (CJ「人設應該 follow agent，不要到處都是人設指令」):
@@ -698,7 +723,21 @@ async function callOneVariant(args: {
         // (e.g. the calendar's [{day,pillar,hook,…}, …]) has no .caption
         // and L3's length cap would drop it → empty. Preserve the whole
         // array as a JSON-string caption so calendarMerge can parse it.
-        if (typeof first === "object") return { caption: JSON.stringify(parsed) };
+        // 2026-05-19 (CJ 驗收 newsjack #3): ONLY do this for calendar. For
+        // cleanMode (newsjack) the prompt now forces a single object per
+        // fanout call; if the model still regresses to an array, dumping
+        // the whole JSON into every tab is exactly the reported P0. Format
+        // the FIRST element's fields into the readable four-欄 text so the
+        // tab shows usable copy instead of a raw JSON blob.
+        if (typeof first === "object") {
+          if (calendarMode) return { caption: JSON.stringify(parsed) };
+          const fields = ["角度", "為什麼會被報", "一句 pitch", "建議下一步"];
+          const lines = fields
+            .filter((k) => typeof first[k] === "string" && first[k].trim())
+            .map((k) => `【${k}】${String(first[k]).trim()}`);
+          if (lines.length > 0) return { caption: lines.join("\n\n") };
+          return { caption: JSON.stringify(first) };
+        }
       }
     }
     // L3: raw text fallback. Strip code fences + JSON-y noise. If at least
