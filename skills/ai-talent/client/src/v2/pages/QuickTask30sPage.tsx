@@ -1361,7 +1361,16 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                         orchestraStages && orchestraStages.length > 0
                           ? orchestraStages
                           : synthesizeStages(tickMs, tier, lang);
-                      const elapsedText = `${(tickMs / 1000).toFixed(1)}s / ${expectedSec}s`;
+                      // 2026-05-18 (CJ「60s 任務 modal 顯示 90s 看起來錯亂」):
+                      // 60s tasks now wait for copy + image before leaving
+                      // the modal, so a hard "/90s" contradicts the 60s
+                      // tier label and looks broken. For 60s show elapsed
+                      // + a phase note (no misleading denominator); other
+                      // tiers keep the "x / Ns" form.
+                      const elapsedText =
+                        tier === "60s"
+                          ? `${(tickMs / 1000).toFixed(0)}s · ${lang === "en" ? "writing copy + rendering image" : "文案＋出圖中"}`
+                          : `${(tickMs / 1000).toFixed(1)}s / ${expectedSec}s`;
                       const accent = tierAccent(tier);
 
                       // Build agent roster: caption_writer first, then
