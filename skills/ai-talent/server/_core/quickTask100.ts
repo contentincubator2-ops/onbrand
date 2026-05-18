@@ -47,6 +47,27 @@ export const FB_99S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
   {
+    // 2026-05-18 (CJ「carousel 一個貼文還是只出現一張圖 → 搬到 99s，
+    // 真的出 5 張卡圖」): moved from fb-60-carousel-5. A carousel is ONE
+    // post made of 5 cards, each with its own image — needs the 99s
+    // budget to render 5 card images + copy.
+    id: "fb-99-carousel-5",
+    tier: "99s", postType: "carousel",
+    label: "FB Carousel 5 卡輪播",
+    description: "Hook→Build→Turn→Payoff→CTA 敘事弧 + 5 張卡（每卡獨立文案＋專屬圖）",
+    agent_id: 180148, // David Chen | Social Media Manager
+    skill_slug: "social-copy",
+    primary_question: "輪播主題是什麼？",
+    primary_input: { key: "topic", placeholder: "輪播 5 卡要傳達的主題", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "輪播主題", type: "textarea", required: true },
+    ],
+    systemPrompt: `產出 FB Carousel 5 卡（敘事弧：Hook → Build → Turn → Payoff → CTA）。
+caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 1400,
+    outputDefaults: { platform: "facebook", post_type: "carousel" },
+  },
+  {
     id: "fb-99-14day-countdown",
     tier: "99s", postType: "feed",
     label: "FB 14 天倒數活動",
@@ -596,6 +617,18 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     scoutKind: "festivals", // 月曆 → 抓即時節慶
     extras: { ...fb100Common.extras, postsCount: 4 },
+  },
+  "fb-99-carousel-5": {
+    ...fb100Common,
+    // single version (one carousel), 5 cards each with its own image
+    variants: 1, images: 1,
+    aspectRatio: "1:1", fluxSize: "square_hd",
+    variantLabels: ["輪播版本"],
+    captionMinChars: 150, captionMaxChars: 250,
+    strategistAgentId: 180030, // Kevin Lin — Content Strategy
+    cardsPerVariant: 5,
+    holdForImages: true,
+    extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "fb-99-14day-countdown": {
     ...fb100Common, variants: 7, images: 7,

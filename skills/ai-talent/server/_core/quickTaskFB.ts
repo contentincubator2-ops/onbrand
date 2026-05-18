@@ -579,6 +579,14 @@ export interface OrchestraConfig {
    * continues); this flag is surfaced to the client so it holds rendering.
    */
   holdForImages?: boolean;
+  /**
+   * 2026-05-18 (CJ「carousel 要真的出 N 張卡圖」): for carousel / album
+   * tasks the deliverable is ONE post made of N cards, each with its own
+   * image. When set, the orchestra writes N card briefs + renders N card
+   * images and attaches them to the single variant as `cards[]` (instead
+   * of 1 image per alternative version). The carousel mockup renders them.
+   */
+  cardsPerVariant?: number;
 }
 
 const MANDY_ID = 220887;     // Claire Chen — Brand Visual Designer (977 char persona, was Mandy 199)

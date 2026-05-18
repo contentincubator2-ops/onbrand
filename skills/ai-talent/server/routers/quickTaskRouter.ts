@@ -949,7 +949,12 @@ export const quickTaskRouter = router({
     });
     // Orchestra-based 100s tasks for channels without squads yet (filtered to
     // exclude FB + IG since those now have proper squads above)
-    const tasks99Orchestra = ALL_99S_TASKS.filter((t) => !t.id.startsWith("fb-") && !t.id.startsWith("ig-")).map((t) => {
+    // 2026-05-18 (CJ): fb-99-carousel-5 is the one FB 99s task that runs
+    // via the orchestra (multi-card carousel), not a squad — let it
+    // through so it appears in the 99s tab; other fb-/ig- stay squad-driven.
+    const tasks99Orchestra = ALL_99S_TASKS.filter((t) =>
+      t.id === "fb-99-carousel-5" || (!t.id.startsWith("fb-") && !t.id.startsWith("ig-"))
+    ).map((t) => {
       const id = t.id;
       const platform =
         id.startsWith("yt-") ? "youtube"

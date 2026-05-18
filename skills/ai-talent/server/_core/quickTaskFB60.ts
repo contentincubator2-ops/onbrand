@@ -107,27 +107,9 @@ ${FB60_TONE}`,
     outputDefaults: { platform: "facebook", post_type: "album" },
   },
 
-  // 4. Carousel 5 卡 — Strategist: Kevin Lin, Writer: Tyler Brooks
-  {
-    id: "fb-60-carousel-5",
-    tier: "60s",
-    postType: "carousel",
-    label: "FB Carousel 5 卡輪播",
-    description: "Hook-Build-Turn-Payoff-CTA + Strategist 結構 + 5 卡敘事",
-    agent_id: 180148, // David Chen | Social Media Manager
-    skill_slug: "social-copy",
-    primary_question: "輪播主題是什麼？",
-    primary_input: { key: "topic", placeholder: "輪播 5 卡要傳達的主題", type: "textarea" },
-    inputs: [
-      { key: "topic", label: "輪播主題", type: "textarea", required: true },
-    ],
-    systemPrompt: `產出 FB Carousel 5 卡（敘事弧：Hook → Build → Turn → Payoff → CTA）。
-caption 是輪播主貼文文（150-250 字 tease 整組要看完）。
-${FB60_TONE}`,
-    preferredModel: "qwen",
-    maxTokens: 1400,
-    outputDefaults: { platform: "facebook", post_type: "carousel" },
-  },
+  // 4. Carousel 5 卡 — 2026-05-18 (CJ): moved to the 99s tier as
+  //    fb-99-carousel-5 (real 5-card multi-image deliverable needs the
+  //    99s budget). normalizeTaskId maps the old id forward.
 
   // 5. 5 天倒數系列 — Strategist: Ryan Yu, Writer: Claire Hsu  (multi-post)
   {
@@ -440,24 +422,8 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     },
   },
 
-  // 4. Carousel 5 卡 — strategist: Kevin Lin (180030)
-  "fb-60-carousel-5": {
-    variants: 5,
-    images: 5,
-    runImageGen: true,
-    imageDirectorId: FB60_DIR_BLAKE,
-    aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
-    variantLabels: ["教學式", "清單式", "故事式", "數據式", "對比式"],
-    captionMinChars: 150,
-    captionMaxChars: 250,
-    strategistAgentId: 180030, // Kevin Lin — Content Strategy
-    extras: {
-      replyTemplates: 5, postingTime: true, followupPost: true,
-      narrativeArc: true,
-    },
-  },
+  // 4. Carousel 5 卡 — 2026-05-18 (CJ): moved to 99s as fb-99-carousel-5
+  //    (real 5-card multi-image deliverable). Config now in FB_99S_ORCHESTRA.
 
   // 5. 5 天倒數系列 — multi-post 5; strategist: Ryan Yu
   "fb-60-countdown-5day": {

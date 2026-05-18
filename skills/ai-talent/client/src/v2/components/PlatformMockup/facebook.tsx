@@ -528,21 +528,43 @@ function parseCarouselCards(caption: string): { headline: string; desc: string }
 }
 
 export function FBCarousel({
-  title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, liveImageStyle,
+  title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, liveImageStyle, liveCards,
 }: MockupFields) {
   const { lang } = useLang();
   const handle = brandName ?? (lang === "en" ? "Your Brand" : "您的品牌");
   const postText = (liveCaption ?? "").trim();
-  const cards = parseCarouselCards(postText);
-  // FB carousel needs ≥2 cards; pad with style-direction placeholders
-  const cardSlots = cards.length >= 2 ? cards : [
-    ...cards,
-    ...Array.from({ length: Math.max(0, 3 - cards.length) }, (_, i) => ({
-      headline: lang === "en" ? `Card ${cards.length + i + 1}` : `第 ${cards.length + i + 1} 張`,
-      desc: "",
-    })),
-  ];
-  const hasImg = !!liveImageUrl && liveImageStatus === "ready";
+  // 2026-05-18 (CJ「carousel 一個貼文還是只出現一張圖」): when the
+  // orchestra produced real per-card images (liveCards), render EACH card
+  // with its own image. Fall back to caption-split (legacy, no per-card
+  // image) only when liveCards is absent.
+  type Slot = { headline: string; desc: string; imageUrl: string | null; imageStatus: string | null; imageStyle: string | null };
+  let cardSlots: Slot[];
+  if (Array.isArray(liveCards) && liveCards.length > 0) {
+    cardSlots = liveCards.map((c) => ({
+      headline: c.headline,
+      desc: c.body,
+      imageUrl: c.image?.url ?? null,
+      imageStatus: c.image?.status ?? null,
+      imageStyle: c.image?.style ?? null,
+    }));
+  } else {
+    const parsed = parseCarouselCards(postText);
+    const padded = parsed.length >= 2 ? parsed : [
+      ...parsed,
+      ...Array.from({ length: Math.max(0, 3 - parsed.length) }, (_, i) => ({
+        headline: lang === "en" ? `Card ${parsed.length + i + 1}` : `第 ${parsed.length + i + 1} 張`,
+        desc: "",
+      })),
+    ];
+    cardSlots = padded.map((c, i) => ({
+      headline: c.headline,
+      desc: c.desc,
+      // legacy single-image path: only card 0 can show the one live image
+      imageUrl: i === 0 ? (liveImageUrl ?? null) : null,
+      imageStatus: i === 0 ? (liveImageStatus ?? null) : null,
+      imageStyle: i === 0 ? (liveImageStyle ?? null) : null,
+    }));
+  }
 
   return (
     <div className="w-full max-w-[500px] mx-auto">
@@ -572,15 +594,19 @@ export function FBCarousel({
               >
                 {/* 1:1 image — FB recommends 1080×1080 */}
                 <div className="aspect-square bg-default-100 relative flex items-center justify-center">
-                  {i === 0 && hasImg ? (
-                    <img src={liveImageUrl} alt={liveImageStyle ?? "card"} className="absolute inset-0 w-full h-full object-cover" />
+                  {c.imageUrl && c.imageStatus === "ready" ? (
+                    <img src={c.imageUrl} alt={c.imageStyle ?? "card"} className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
                     <>
                       <Skeleton className="absolute inset-0 opacity-40" />
                       <div className="relative z-10 text-center text-default-400 px-3">
                         <FontAwesomeIcon icon={faImages} className="text-2xl mb-1" />
                         <p className="text-[10px] line-clamp-3">
-                          {i === 0 && liveImageStyle ? liveImageStyle : (lang === "en" ? "Carousel image 1:1" : "輪播圖 1:1（1080×1080）")}
+                          {c.imageStatus === "failed" || c.imageStatus === "timeout"
+                            ? (lang === "en" ? "Card image failed" : "此卡圖生成失敗")
+                            : c.imageStyle
+                              ? c.imageStyle
+                              : (lang === "en" ? "Carousel image 1:1" : "輪播圖 1:1（1080×1080）")}
                         </p>
                       </div>
                     </>

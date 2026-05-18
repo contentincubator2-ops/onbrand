@@ -156,6 +156,12 @@ export interface MockupFields {
   /** Live content fields — legacy path (still works when slotMap is absent) */
   liveCaption?: string;
   liveHashtags?: string[];
+  /** 2026-05-18 (CJ): carousel / album — N cards, each with its own image */
+  liveCards?: Array<{
+    headline: string;
+    body: string;
+    image: { style: string | null; url: string | null; status: string; errorMsg?: string };
+  }>;
   liveTitle?: string;
   liveDescription?: string;
   liveImageDesc?: string;

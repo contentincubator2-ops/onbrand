@@ -31,6 +31,10 @@
  */
 export function normalizeTaskId(id: string): string {
   if (!id) return id;
+  // 2026-05-18 (CJ): fb-60-carousel-5 moved to the 99s tier (real 5-card
+  // multi-image deliverable). Map the legacy id forward so old links /
+  // stored runs / re-runs resolve to the new 99s task.
+  if (id === "fb-60-carousel-5") return "fb-99-carousel-5";
   return id.replace(/^([a-z]+)-100-/, "$1-99-");
 }
 

@@ -85,6 +85,23 @@ export interface OrchestraVariant {
     errorMsg?: string;
   };
   /**
+   * 2026-05-18 (CJ「carousel 一個貼文還是只出現一張圖」): a carousel /
+   * album is ONE post made of N cards, each with its own image. Single
+   * version, multi-image. When config.cardsPerVariant is set the orchestra
+   * fills this with one entry per card (headline + body + its own image).
+   * The carousel mockup renders these as the swipeable cards.
+   */
+  cards?: Array<{
+    headline: string;
+    body: string;
+    image: {
+      style: string | null;
+      url: string | null;
+      status: "ready" | "failed" | "skipped" | "timeout" | "pending";
+      errorMsg?: string;
+    };
+  }>;
+  /**
    * 60s tier production-package extras. Always optional — 30s tier leaves
    * everything undefined; 60s+ populates per OrchestraConfig.extras flags.
    */
@@ -792,6 +809,63 @@ async function callImageDirector(args: {
   return settled.map((s, i) =>
     s.status === "fulfilled" ? s.value : `（${labels[i] ?? `brief ${i + 1}`} brief 生成失敗 — 請點「用此風格生圖」自己描述）`,
   );
+}
+
+// ── Carousel / album cards: split ONE post into N cards ─────────────────
+//
+// 2026-05-18 (CJ「carousel 一個貼文還是只出現一張圖」): a carousel is one
+// post made of N cards, each with its own headline + body + image. Given
+// the generated post caption, split it into N cards (headline ≤14 / body
+// ≤40) and a per-card visual brief. Conservative — only restructures the
+// caption, no fabricated facts.
+async function callCarouselCards(args: {
+  caption: string;
+  topic: string;
+  n: number;
+  brandPrefix: string;
+  imagePersona: string;
+  aspectRatio: string;
+}): Promise<Array<{ headline: string; body: string; imageBrief: string }>> {
+  const { caption, topic, n, brandPrefix, imagePersona, aspectRatio } = args;
+  const system =
+    imagePersona +
+    `你是輪播內容設計師。把下面這篇 FB 輪播貼文，拆成正好 ${n} 張卡，敘事弧：Hook → Build → Turn → Payoff → CTA。\n` +
+    `每張卡需要：\n` +
+    `- headline：≤ 14 字、強鉤、可單獨成立\n` +
+    `- body：≤ 40 字、承接 headline、口語\n` +
+    `- image：該卡的視覺方向描述（30-60 字繁中，涵蓋主體/構圖/光線/色彩/氛圍，比例 ${aspectRatio}，不疊文字、不放 logo），每張卡視覺要明顯不同\n` +
+    `嚴格規則：只根據貼文內容拆解與重組，**不可新增或捏造事實**。\n` +
+    `輸出嚴格 JSON 陣列，長度正好 ${n}：[{"headline":"...","body":"...","image":"..."}, ...]\n` +
+    `第一個字元就是 [。不要 markdown code fence、不要前言。\n` +
+    brandPrefix;
+  const userMsg = `主題：${topic}\n\n輪播貼文：\n${caption}`;
+  let attempt = 0;
+  let lastErr: any = null;
+  while (attempt < 2) {
+    attempt++;
+    try {
+      const r = await Promise.race([
+        callModel(
+          [{ role: "system", content: system }, { role: "user", content: userMsg }],
+          undefined,
+          "qwen",
+        ),
+        timeoutPromise<never>(LLM_BUDGET_MS, "carousel-cards"),
+      ]);
+      const parsed = tryParseJson(r.content);
+      const arr = Array.isArray(parsed) ? parsed : (parsed?.cards ?? parsed?.variants ?? []);
+      if (Array.isArray(arr) && arr.length > 0) {
+        return arr.slice(0, n).map((c: any, i: number) => ({
+          headline: String(c?.headline ?? c?.title ?? `卡 ${i + 1}`).trim().slice(0, 28),
+          body: String(c?.body ?? c?.desc ?? c?.text ?? "").trim().slice(0, 90),
+          imageBrief: String(c?.image ?? c?.imageBrief ?? c?.visual ?? "").trim().slice(0, 280),
+        }));
+      }
+      lastErr = new Error("empty cards");
+    } catch (e) { lastErr = e; }
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 200));
+  }
+  throw lastErr ?? new Error("carousel cards exhausted retries");
 }
 
 // ── 60s tier extras: reply templates / posting time / followup post ─────
@@ -1612,6 +1686,37 @@ export async function runOrchestra(args: {
         hashtags: cap?.hashtags ?? [],
         image: images[i] ?? { style: briefs[i] ?? null, url: null, status: args.config.images > 0 ? "failed" : "skipped" },
       });
+    }
+
+    // ── Stage 3.6: carousel / album cards (single post, N card images) ──
+    // 2026-05-18 (CJ「carousel 一個貼文還是只出現一張圖」): when the task
+    // is a multi-card deliverable, split the post into N cards and render
+    // one image per card, attached to the (single) variant as cards[].
+    const cardsN = args.config.cardsPerVariant ?? 0;
+    if (cardsN > 1 && variants[0]?.caption) {
+      try {
+        const topic = (args.inputs["topic"] ?? args.inputs["context"] ?? "").trim();
+        const cardSpecs = await callCarouselCards({
+          caption: variants[0].caption,
+          topic,
+          n: cardsN,
+          brandPrefix,
+          imagePersona: imageLoad.persona,
+          aspectRatio: args.config.aspectRatio ?? "1:1",
+        });
+        const cardImages = await Promise.all(
+          cardSpecs.map((c) => genOneImage(c.imageBrief, args.config)),
+        );
+        variants[0].cards = cardSpecs.map((c, idx) => ({
+          headline: c.headline,
+          body: c.body,
+          image: cardImages[idx] ?? { style: c.imageBrief, url: null, status: "failed" as const },
+        }));
+        const okCards = (variants[0].cards ?? []).filter((c) => c.image.status === "ready").length;
+        if (okCards === 0) errors.push("carousel: 卡片圖全部生成失敗");
+      } catch (e: any) {
+        errors.push(`carousel cards: ${String(e?.message ?? e).slice(0, 160)}`);
+      }
     }
 
     // ── Stage 3.5: 60s/100s production extras (replies / time / followup) ─

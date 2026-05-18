@@ -69,7 +69,7 @@ const dicebear = (seed: string) =>
 // image) is ready, THEN navigate to /run — instead of navigating at the
 // caption_ready checkpoint and making the user watch a spinner there.
 // Mirrors OrchestraConfig.holdForImages (server) + RunPage HOLD_FOR_IMAGES.
-const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full"]);
+const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
 
 /** Tier accent color (Canva-style — vibrant, distinct per tier).
  *  30s = teal (quick / fast), 60s = purple (production / depth),

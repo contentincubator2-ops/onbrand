@@ -51,6 +51,12 @@ interface VariantData {
   imageStatus?: string;
   qa?: any;
   extras?: any;
+  // 2026-05-18 (CJ): carousel / album — N cards, each its own image
+  cards?: Array<{
+    headline: string;
+    body: string;
+    image: { style: string | null; url: string | null; status: string; errorMsg?: string };
+  }>;
 }
 
 /* 2026-05-18 (CJ「還有 \n\n 的符號」): models sometimes emit the literal
@@ -89,7 +95,7 @@ const PR_CRAFT_REF: Record<string, { case: string; award: string; principle: str
 // orchestra is still on the caption_ready checkpoint (image pending) we
 // hold the mockup and show a "generating" state, then reveal the full
 // post once images finish. Mirrors OrchestraConfig.holdForImages server-side.
-const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full"]);
+const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
 
 function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
   const [open, setOpen] = React.useState(false);
@@ -544,6 +550,7 @@ export default function RunPage() {
           imageStyle: v.imageStyle ?? img.style ?? undefined,
           qa: v.qa,
           extras: v.extras,
+          cards: Array.isArray(v.cards) ? v.cards : undefined,
         } as VariantData;
       });
     } catch { /* ignore */ }
@@ -970,6 +977,7 @@ export default function RunPage() {
                 liveImageStyle={slide.imageStyle}
                 liveImageUrl={slide.imageUrl ?? undefined}
                 liveImageStatus={slide.imageStatus as any}
+                liveCards={slide.cards as any}
               />
               ) : null;
             })()}
