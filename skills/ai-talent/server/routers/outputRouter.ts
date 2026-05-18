@@ -6,6 +6,21 @@ import { missionOutputs } from "../../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { normalizeTaskId, normalizeTier } from "../_core/tierCompat";
 
+/**
+ * 2026-05-18 (CJ「整個系統還有哪些地方會遇到 taskId 沒被持久化」):
+ * taskId resolution used to rely solely on metadata.taskId, so any
+ * legacy row / path that didn't persist it showed "no-task" → wrong
+ * mockup format, missing CraftChip, broken hold logic, blank history.
+ * ensureMission ALWAYS writes "[task:<id>]" into the mission description
+ * (missions has no taskId column), so that tag is the reliable
+ * system-wide fallback. Use it everywhere taskId is read.
+ */
+function taskIdFromDescription(desc: string | null | undefined): string | null {
+  if (!desc) return null;
+  const m = /\[task:([^\]]+)\]/.exec(desc);
+  return m?.[1]?.trim() ?? null;
+}
+
 const PLATFORM_PREVIEW_TEMPLATES: Record<string, (content: string, title?: string) => string> = {
   facebook: (content, title) => `<div style="font-family:Helvetica,Arial,sans-serif;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><div style="padding:12px 16px;display:flex;align-items:center;gap:10px"><div style="width:40px;height:40px;border-radius:50%;background:#1877F2;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:16px">B</div><div><div style="font-weight:600;font-size:14px">品牌頁面</div><div style="font-size:12px;color:#65676b">剛剛 · 🌐</div></div></div><div style="padding:0 16px 12px;font-size:15px;line-height:1.6;color:#1c1e21;white-space:pre-wrap">${content}</div></div>`,
   instagram: (content) => `<div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:400px;border:1px solid #dbdbdb;border-radius:4px;background:#fff"><div style="padding:14px 16px;display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)"></div><div style="font-weight:600;font-size:14px">brand_account</div></div><div style="background:#f0f0f0;aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px">圖片區域</div><div style="padding:12px 16px"><div style="font-size:14px;line-height:1.6;white-space:pre-wrap"><span style="font-weight:600">brand_account</span> ${content}</div></div></div>`,
@@ -301,6 +316,7 @@ export const outputRouter = router({
            JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) AS tier,
            JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS taskId,
            m.title AS missionTitle,
+           m.description AS missionDescription,
            m.workspace AS workspace,
            m.brandId AS brandId
          FROM mission_outputs o
@@ -321,7 +337,10 @@ export const outputRouter = router({
         status: r.status,
         createdAt: r.createdAt,
         tier: r.tier ? normalizeTier(r.tier) : r.tier,
-        taskId: r.taskId ? normalizeTaskId(r.taskId) : r.taskId,
+        taskId: (() => {
+          const raw = r.taskId ?? taskIdFromDescription(r.missionDescription);
+          return raw ? normalizeTaskId(raw) : raw ?? null;
+        })(),
         missionTitle: r.missionTitle,
         workspace: r.workspace,
         brandId: r.brandId,
@@ -396,7 +415,8 @@ export const outputRouter = router({
       // 2026-05-17 100s→99s compat: legacy rows persisted "fb-100-…" /
       // "100s". Normalize on read so RunPage mockup inference + the shell
       // history sidebar resolve legacy runs to the renamed logic.
-      const rawTaskId: string | null = row.extracted_task_id ?? md.taskId ?? null;
+      const rawTaskId: string | null =
+        row.extracted_task_id ?? md.taskId ?? taskIdFromDescription(row.mission_description) ?? null;
       const rawTier: string | null = row.extracted_tier ?? md.tier ?? null;
       const taskId: string | null = rawTaskId ? normalizeTaskId(rawTaskId) : null;
       const tier: string | null = rawTier ? normalizeTier(rawTier) : null;
