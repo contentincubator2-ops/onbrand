@@ -612,11 +612,16 @@ export default function RunPage() {
       //   { imageUrl, imageStatus, imageStyle }.
       // Without this normalize, even a successfully-generated image showed
       // as "等待 AI 生成" because imageUrl was always undefined.
+      // 2026-05-18 (CJ「格式更亂了」根因): calendar captions are a JSON
+      // array; sanitizeCaption turns the JSON's \n escapes into real
+      // newlines → invalid JSON → mockup dumps raw text. Keep calendar
+      // captions RAW so the Calendar mockup can JSON.parse them.
+      const isCalendarTask = (data?.mission?.taskId ?? "").includes("calendar");
       return raw.map((v: any) => {
         const img = v.image ?? {};
         return {
           label: v.label,
-          caption: sanitizeCaption(v.caption),
+          caption: isCalendarTask ? String(v.caption ?? "") : sanitizeCaption(v.caption),
           hashtags: v.hashtags ?? [],
           imageUrl: v.imageUrl ?? img.url ?? null,
           imageStatus: v.imageStatus ?? img.status ?? undefined,

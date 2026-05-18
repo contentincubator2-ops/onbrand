@@ -713,59 +713,66 @@ function parseCalendar(raw: string): CalPost[] {
   } catch { return []; }
 }
 
-export function FBCalendar({ title, brandName, variantLabel, liveCaption }: MockupFields) {
+// 2026-05-18 (CJ「格式更亂了，乾脆用往下滑瀑布式的 FB mockup」):
+// render the 14 calendar posts as a SCROLLABLE waterfall of real
+// FB-post cards (brand header + Day/pillar tag + the post itself +
+// FB action row). Robust: even if some posts are missing fields it
+// still renders; falls back to raw text only if nothing parses.
+export function FBCalendar({ title, brandName, variantLabel, liveCaption, brandLogoUrl }: MockupFields) {
   const { lang } = useLang();
   const posts = parseCalendar(liveCaption ?? "");
-  const pillars = Array.from(new Set(posts.map((p) => p.pillar))).filter(Boolean);
+  const handle = brandName ?? (lang === "en" ? "Your Brand" : "您的品牌");
 
   return (
-    <div className="w-full max-w-[680px] mx-auto">
-      <MockupHeader icon={faCalendarDays} label={lang === "en" ? "30-Day Content Calendar" : "30 天內容行事曆"} variantLabel={variantLabel} />
-      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="px-5 py-4 border-b border-divider">
-          <p className="text-small font-semibold text-default-800">{brandName ?? "Brand"} · {lang === "en" ? "30-Day FB Plan" : "30 天 FB 內容規劃"}</p>
-          {title && <p className="text-tiny text-default-500 mt-0.5 line-clamp-1">{title}</p>}
-          {/* Pillar legend */}
-          <div className="flex flex-wrap gap-2 mt-3">
-            {pillars.map((p) => {
-              const st = PILLAR_STYLE[p] ?? PILLAR_FALLBACK;
-              return (
-                <span key={p} className={`inline-flex items-center gap-1.5 text-tiny px-2 py-0.5 rounded-full ${st.bg} ${st.text}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{p}
-                </span>
-              );
-            })}
-          </div>
+    <div className="w-full max-w-[520px] mx-auto">
+      <MockupHeader icon={faCalendarDays} label={lang === "en" ? "30-Day Content Plan" : "30 天內容行事曆"} variantLabel={variantLabel} />
+      <div className="bg-default-50 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 py-2.5 bg-content1 border-b border-divider flex items-center justify-between">
+          <p className="text-small font-semibold text-default-800">{handle} · {lang === "en" ? "30-Day FB Plan" : "30 天 FB 內容規劃"}</p>
+          <span className="text-tiny text-default-500">{posts.length} {lang === "en" ? "posts" : "篇貼文"}</span>
         </div>
 
         {posts.length === 0 ? (
-          <div className="px-5 py-8 text-tiny text-default-400 whitespace-pre-wrap">
-            {(liveCaption ?? "").slice(0, 1200) || (lang === "en" ? "Calendar is generating…" : "行事曆生成中…")}
+          <div className="px-5 py-8 text-tiny text-default-400 whitespace-pre-wrap max-h-[560px] overflow-y-auto">
+            {(liveCaption ?? "").slice(0, 1500) || (lang === "en" ? "Calendar is generating…" : "行事曆生成中…")}
           </div>
         ) : (
-          <div className="divide-y divide-divider max-h-[640px] overflow-y-auto">
+          <div className="max-h-[680px] overflow-y-auto px-3 py-3 space-y-3 bg-default-100/40">
             {posts.map((p, i) => {
               const st = PILLAR_STYLE[p.pillar] ?? PILLAR_FALLBACK;
               const meta = [p.audience, p.usp, p.product].filter(Boolean).join(" · ");
+              const body = [p.hook, p.message].filter(Boolean).join("\n\n");
               return (
-                <div key={i} className="flex gap-3 px-5 py-3">
-                  {/* Day badge */}
-                  <div className="shrink-0 w-12 text-center">
-                    <div className="text-[10px] uppercase tracking-wide text-default-400">{lang === "en" ? "Day" : "第"}</div>
-                    <div className="text-lg font-bold leading-tight text-default-800">{p.day || i + 1}</div>
-                    <div className="text-[10px] text-default-400">{lang === "en" ? "" : "天"}</div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full ${st.bg} ${st.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{p.pillar || "—"}
-                      </span>
-                      {p.format && <span className="text-[11px] text-default-500">· {p.format}</span>}
+                <div key={i} className="bg-content1 border border-divider rounded-xl shadow-sm overflow-hidden">
+                  {/* Post header: brand + Day + pillar */}
+                  <div className="px-4 pt-3 pb-2 flex items-center gap-2.5">
+                    <Avatar src={brandLogoUrl || dicebear(brandName ?? "brand")} size="sm" isBordered={!!brandLogoUrl} color={brandLogoUrl ? "default" : "primary"} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-small font-semibold leading-tight">{handle}</p>
+                      <p className="text-tiny text-default-500 flex items-center gap-1.5">
+                        {lang === "en" ? `Day ${p.day || i + 1}` : `第 ${p.day || i + 1} 天`}
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${st.bg} ${st.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{p.pillar || "—"}
+                        </span>
+                        {p.format && <span className="text-[10px] text-default-400">· {p.format}</span>}
+                      </p>
                     </div>
-                    {p.hook && <p className="text-small font-semibold text-default-800 mt-1 leading-snug">{p.hook}</p>}
-                    {p.message && <p className="text-tiny text-default-600 mt-0.5 leading-relaxed line-clamp-3">{p.message}</p>}
-                    {meta && <p className="text-[11px] text-default-400 mt-1">🎯 {meta}</p>}
-                    {p.cta && <p className="text-[11px] text-primary-600 mt-1 font-medium">→ {p.cta}</p>}
+                  </div>
+                  {/* Post body — like a real FB post */}
+                  <div className="px-4 pb-2 text-small text-default-800 whitespace-pre-wrap leading-relaxed">
+                    {body || <span className="text-default-400">{lang === "en" ? "(empty)" : "（無內容）"}</span>}
+                  </div>
+                  {meta && <p className="px-4 pb-1 text-[11px] text-default-400">🎯 {meta}</p>}
+                  {p.cta && (
+                    <div className="px-4 pb-3">
+                      <span className="inline-block text-tiny font-semibold text-primary-600 bg-primary-50 rounded-md px-2 py-1">→ {p.cta}</span>
+                    </div>
+                  )}
+                  {/* FB action row */}
+                  <div className="px-4 py-1 border-t border-divider flex items-center justify-around text-default-500 text-tiny">
+                    <span className="flex items-center gap-1.5 py-1"><FontAwesomeIcon icon={faThumbsUp} /> {lang === "en" ? "Like" : "讚"}</span>
+                    <span className="flex items-center gap-1.5 py-1"><FontAwesomeIcon icon={faComment} /> {lang === "en" ? "Comment" : "留言"}</span>
+                    <span className="flex items-center gap-1.5 py-1"><FontAwesomeIcon icon={faShare} /> {lang === "en" ? "Share" : "分享"}</span>
                   </div>
                 </div>
               );
@@ -773,6 +780,7 @@ export function FBCalendar({ title, brandName, variantLabel, liveCaption }: Mock
           </div>
         )}
       </div>
+      {title && <p className="text-tiny text-default-400 mt-2 text-center line-clamp-1">{title}</p>}
     </div>
   );
 }
