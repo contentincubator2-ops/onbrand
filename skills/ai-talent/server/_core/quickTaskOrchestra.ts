@@ -326,6 +326,25 @@ export async function loadAgent(id: number | null | undefined): Promise<{ meta: 
   } catch { return { meta: null, persona: "", aiModel: null }; }
 }
 
+// 2026-05-18 (CJ「行事曆」): merge N pillar-group JSON arrays into ONE
+// day-sorted calendar JSON string. Tolerant of fences / surrounding text.
+function mergeCalendarPosts(captionStrings: string[]): string {
+  const all: any[] = [];
+  for (const c of captionStrings) {
+    let s = String(c ?? "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const a = s.indexOf("["), b = s.lastIndexOf("]");
+    if (a >= 0 && b > a) s = s.slice(a, b + 1);
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr)) all.push(...arr.filter((p) => p && typeof p === "object"));
+    } catch { /* skip a malformed pillar slice */ }
+  }
+  all.sort((x, y) => (Number(x?.day) || 0) - (Number(y?.day) || 0));
+  const n = all.length || 1;
+  all.forEach((p, i) => { p.day = Math.min(30, Math.max(1, Math.round(((i + 1) * 30) / n))); });
+  return JSON.stringify(all);
+}
+
 function tryParseJson(text: string): any {
   let t = (text ?? "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
   const start = t.search(/[{\[]/);
@@ -484,8 +503,21 @@ async function callOneVariant(args: {
     ? `\n\n${CW_CRAFT_RUBRIC}\n\n${cwPlaybookFor(template.id)}\n`
     : "";
 
+  // 2026-05-18 (CJ「行事曆其他支柱格式是亂的」): calendar pillar agents
+  // must emit a STRICT JSON array. The social-caption scaffolding below
+  // (craft rubric + 「只寫 1 個變體 caption」+「不要排成結構化卡片」+
+  // {caption} object wrapper) actively fights that → prose/garbage.
+  // Give calendar a MINIMAL clean prompt: persona + the strict task
+  // prompt + brand context only.
+  const calMode = !!config.calendarMerge;
   const docMode = template.outputMode === "document";
-  const system = docMode
+  const system = calMode
+    ? `# 角色（寫作口吻參考）\n${captionPersona}\n\n` +
+      `# 任務（最高指令，必須完全遵循；只輸出 JSON 陣列，不要任何其他文字）\n` +
+      filledSystemPrompt +
+      `\n\n# 品牌脈絡（素材，扣回用，不要照抄）\n${brandPrefix}` +
+      (hasUrl ? `\n\n# 參考素材（URL 抓到的內容）\n${urlContext}` : "")
+    : docMode
     ? // 2026-05-16 (CJ「人設應該 follow agent，不要到處都是人設指令」):
       // doc tasks use the ASSIGNED agent's persona as the voice/role —
       // no hardcoded "文件撰寫者", no social master. captionPersona is
@@ -1542,15 +1574,26 @@ export async function runOrchestra(args: {
     if (args.onCheckpoint && args.userId) {
       try {
         console.log(`[orchestra:trace] task=${args.template.id} tier=${tier} userId=${args.userId} brandId=${args.brandId} → checkpoint gate entered`);
-        const partialVariants: OrchestraVariant[] = Array.from({ length: args.config.variants }, (_, i) => {
-          const cap = captions[i];
-          return {
-            label: cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`,
-            caption: (cap?.caption ?? "").trim(),
-            hashtags: cap?.hashtags ?? [],
-            image: { style: briefs[i] ?? null, url: null, status: "pending" as any },
-          };
-        });
+        // 2026-05-18 (CJ「行事曆其他支柱格式是亂的」): for calendar tasks
+        // collapse the per-pillar captions into ONE merged calendar at the
+        // checkpoint too, so caption_ready already shows a single clean
+        // calendar instead of 5 raw pillar tabs.
+        const partialVariants: OrchestraVariant[] = args.config.calendarMerge
+          ? [{
+              label: "30 天行事曆",
+              caption: mergeCalendarPosts(captions.map((c) => c?.caption ?? "")),
+              hashtags: [],
+              image: { style: null, url: null, status: "skipped" as any },
+            }]
+          : Array.from({ length: args.config.variants }, (_, i) => {
+              const cap = captions[i];
+              return {
+                label: cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`,
+                caption: (cap?.caption ?? "").trim(),
+                hashtags: cap?.hashtags ?? [],
+                image: { style: briefs[i] ?? null, url: null, status: "pending" as any },
+              };
+            });
         const partial: OrchestraResult = {
           taskId: args.template.id,
           totalLatencyMs: Date.now() - startedAt,
@@ -1717,22 +1760,8 @@ export async function runOrchestra(args: {
     // Merge all pillar JSON arrays into ONE day-sorted 30-day calendar
     // and collapse to a single variant the Calendar mockup renders.
     if (args.config.calendarMerge) {
-      const allPosts: any[] = [];
-      for (const v of variants) {
-        let s = String(v.caption ?? "").trim()
-          .replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-        const a = s.indexOf("["), b = s.lastIndexOf("]");
-        if (a >= 0 && b > a) s = s.slice(a, b + 1);
-        try {
-          const arr = JSON.parse(s);
-          if (Array.isArray(arr)) allPosts.push(...arr);
-        } catch { /* skip a malformed pillar slice */ }
-      }
-      // Re-spread days evenly across 30 and sort.
-      allPosts.sort((x, y) => (Number(x?.day) || 0) - (Number(y?.day) || 0));
-      const n = allPosts.length || 1;
-      allPosts.forEach((p, i) => { p.day = Math.min(30, Math.max(1, Math.round(((i + 1) * 30) / n))); });
-      const mergedCaption = JSON.stringify(allPosts);
+      const mergedCaption = mergeCalendarPosts(variants.map((v) => v.caption ?? ""));
+      const count = (() => { try { return JSON.parse(mergedCaption).length; } catch { return 0; } })();
       variants.length = 0;
       variants.push({
         label: "30 天行事曆",
@@ -1740,7 +1769,7 @@ export async function runOrchestra(args: {
         hashtags: [],
         image: { style: null, url: null, status: "skipped" },
       });
-      if (allPosts.length === 0) errors.push("calendar: 所有支柱都解析失敗");
+      if (count === 0) errors.push("calendar: 所有支柱都解析失敗");
     }
 
     // ── Stage 3.6: carousel / album cards (single post, N card images) ──
