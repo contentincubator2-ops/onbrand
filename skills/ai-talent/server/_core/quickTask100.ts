@@ -464,17 +464,70 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "linkedin", post_type: "newsletter" },
   },
   {
+    // 2026-05-19 (Yi-Wen 驗收 v#1 — 9/14 分, 4維度剛好過門檻):
+    // 原 2-行 prompt 無格式規定 → 三封相同主旨、無 CTA 差異、品牌聲音漂移。
+    // 問題設計 placeholder 過於抽象 → agent 無週次主題資訊，無法分工主旨。
+    // 完整重寫 prompt（對照 em-99-launch-sequence 工法）+問題+orchestra 修復。
     id: "em-99-4week-nurture",
     tier: "99s", postType: "edm",
     label: "Email 4 週 Onboarding Nurture",
-    description: "4 週 8-12 封 emails + 行為觸發分支 + scout 抓即時節慶",
-    agent_id: 224161, skill_slug: "email-marketing", // Xenia Anggraini — Email & CRM Strategist Beauty ID (1229 char)
-    primary_question: "新訂閱者最該知道什麼？",
-    primary_input: { key: "value_prop", placeholder: "核心價值 + onboarding 目標", type: "textarea" },
-    inputs: [{ key: "value_prop", label: "核心價值", type: "textarea", required: true }],
-    systemPrompt: `產出 Email 4 週 nurture 其中 1 封（200-400 字）。
-本次你寫的是「{label}」。每封要扣回核心價值，逐步深入。${TONE_100}`,
-    preferredModel: "qwen", maxTokens: 1000,
+    description: "4 週 onboarding：第1週 Why / 第2週 What / 第3週 How / 第4週 Deepen",
+    agent_id: 224161, skill_slug: "email-marketing", // Xenia Anggraini — Email & CRM Strategist Beauty ID
+    primary_question: "品牌/產品名稱 + 目標受眾職稱 + 4 週各週主題 + 核心功能名稱（四項一起填）",
+    primary_input: {
+      key: "value_prop",
+      placeholder: "例：OnBrand AI — 讓品牌聲音不因速度失真｜受眾：品牌行銷主管 / 內容策略師｜第1週 為什麼品牌一致性對你很重要 / 第2週 品牌腳色設定讓 AI 真的懂你 / 第3週 用溯源注解功能產出第一篇內容 / 第4週 解鎖進階分析 升級 Pro｜功能名稱：溯源注解、品牌字典對照、品牌腳色設定",
+      type: "textarea",
+    },
+    inputs: [{ key: "value_prop", label: "品牌名 + 受眾 + 4週主題 + 功能名稱", type: "textarea", required: true }],
+    systemPrompt: `你負責這封 4 週 Onboarding Nurture email「{label}」（第 1 週 / 第 2 週 / 第 3 週 / 第 4 週）。這是一封可直接寄出的 EDM。
+
+【輸出格式｜必守】**前三行**一定是這三行，純文字（不要 markdown 粗體 **、不要 # 標題、行首不要符號）：
+主旨：<8-22 字，本週專屬主旨，必須反映本週主題，不得與其他週重複>
+預覽：<30-50 字 preview text，不含 stage label（不要寫「第 X 週」「第一封」等內部標記）>
+CTA：<本週 CTA 按鈕文字，依下方週次規則，≤8 字>
+（空一行後）<信件本文 200-400 字>
+
+【主旨差異化硬規則 — 違反即不合格】
+每週主旨必須各異，且與該週核心主題直接掛鉤：
+- 第 1 週主旨 → 聚焦「為什麼品牌一致性是你的痛點 / 你遇到的問題」（情境化，不要品牌宣傳腔）
+- 第 2 週主旨 → 聚焦「品牌腳色設定 / 讓 AI 真的讀懂你的品牌」（功能引導）
+- 第 3 週主旨 → 聚焦「你的第一篇 AI 產出 / 看到成果那一刻」（行動引導）
+- 第 4 週主旨 → 聚焦「解鎖更多 / 升級 / 品牌一致性的下一階段」（升級勾引）
+**同一句主旨（或同一個 hook 角度）出現在超過一封 = 不合格，必須重寫**
+
+【CTA 週次差異化｜必守，寫進 CTA：行】
+- 第 1 週：低摩擦認識 → 「了解 OnBrand」
+- 第 2 週：功能設定 → 「設定我的品牌腳色」
+- 第 3 週：產出行動 → 「產出第一篇內容」
+- 第 4 週：升級 → 「升級解鎖更多」
+
+【週次內容骨架｜本週寫什麼】
+- 第 1 週（Why / 信任建立）：點出受眾真實痛點（具體情境，不是業配語）→ 說明為什麼品牌一致性是解方 → CTA 引導了解平台，不推功能清單
+- 第 2 週（What / 核心功能）：介紹品牌腳色設定 / 品牌字典功能的具體機制 → 一個功能說清楚，不堆功能清單 → CTA 引導設定動作
+- 第 3 週（How / 第一次行動）：鼓勵產出第一篇內容 → 說明用溯源注解功能確認品牌一致性的流程 → CTA 推動動手
+- 第 4 週（Deepen / 升級）：展示進階用法或數據回顧 → 升級邀請或專屬優惠（有才寫，沒有輸入就標 [請補充：優惠內容]）→ CTA 升級
+
+【品牌聲音 guardrail — 四封跨週一致，違反即不合格】
+SoWork 語氣＝「精準守護者、有憑據的科技感」，不是散文、不是煽情。
+逐條禁止（v#1 踩過的錯誤，原詞禁止）：
+- 文學/煽情腔：「如歌般悠揚」「熙來攘往」「走出…桎梏」「在…的世界裡」「讓每一句話…」
+- 語法不通組合：「既速且具一致性」「讓XXX兼具…」此類中西混用
+- emoji（任何，含 💡 ✨ 🚀）
+- 驚嘆號結尾（含「！」「!」）— 全部換成句號
+- 行銷業配煽動：「快來體驗」「心動不如行動」「別再猶豫」「趕快加入」
+- hashtag（EDM 不是社群，不得出現任何 #標籤）
+- 效率詞：快／高效／省時（空洞，改用具體動作或數據）
+【寄出前自我檢查｜必做】自己掃一遍：出現上述任何違禁 → 就地改寫再輸出
+
+【功能名稱忠實規則】
+輸入怎麼寫就怎麼用，逐字沿用，不得自行改字：
+- 「溯源注解」不可寫成「溯源**註**解」
+- 「品牌一致性溯源證」不可縮寫成「溯源憑證」
+- 輸入沒有的日期、數字、優惠一律標「[請補充：…]」，不捏造
+
+【依輸入解析】從輸入抓「目標受眾職稱」「4 週主題」「功能名稱」；信中點名受眾真實情境（不泛化成「所有人」）。${TONE_100}`,
+    preferredModel: "anthropic", maxTokens: 1000,
     outputDefaults: { platform: "email", post_type: "edm" },
   },
   {
@@ -1153,14 +1206,17 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 4, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "em-99-4week-nurture": {
-    variants: 4, images: 4, runImageGen: true, imageDirectorId: NATHAN,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
+    // 2026-05-19 (Yi-Wen 驗收): images:4+runImageGen was same pattern that
+    // caused em-99-launch-sequence to drop last variants. strategist/scout/
+    // narrativeArc add overhead without benefiting per-email nurture content.
+    // Prompt fully rewritten with format + per-week subject/CTA rules.
+    variants: 4, images: 0, runImageGen: false, imageDirectorId: null as any,
+    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
     variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
-    captionMinChars: 200, captionMaxChars: 400,
-    strategistAgentId: 180141, // Rachel Chen — Social Media Strategy Director
+    captionMinChars: 200, captionMaxChars: 500,
     postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
-    scoutKind: "viral",
-    extras: { postsCount: 4, narrativeArc: true, replyTemplates: 3, postingTime: true, followupPost: true },
+    disableScout: true,
+    extras: { postsCount: 4, replyTemplates: 2, postingTime: true },
   },
   "em-99-launch-sequence": {
     // 2026-05-18 (CJ 驗收 P0「只產 5 封，少了最後機會/follow-up」):
