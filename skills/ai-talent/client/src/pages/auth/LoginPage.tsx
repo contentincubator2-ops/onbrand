@@ -125,6 +125,31 @@ export default function LoginPage() {
 
       {/* Right login panel */}
       <div className="flex flex-col justify-center items-center w-full lg:w-1/2 px-8">
+        {/* Mobile-only brand strip (hidden on desktop where left panel shows) */}
+        <div className="lg:hidden w-full max-w-md mb-6 pt-8">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-base font-bold text-gray-900">OnBrand</span>
+            <button
+              onClick={() => setLang(lang === "en" ? "zh-TW" : "en")}
+              className="text-xs text-gray-400 hover:text-gray-600 underline transition"
+            >
+              {lang === "en" ? "繁體中文" : "English"}
+            </button>
+          </div>
+          <p className="text-sm text-gray-500 mb-3">
+            {lang === "en"
+              ? "168 award-craft tasks · All channels · Always on-brand"
+              : "168 個得獎工藝任務 · 全管道 · 永遠 on-brand"}
+          </p>
+          <Link
+            to="/auth/register"
+            className="inline-block text-xs font-semibold px-3 py-1.5 rounded-full text-white"
+            style={{ background: "linear-gradient(90deg, #6C5CE7, #a29bfe)" }}
+          >
+            {lang === "en" ? "Start free trial →" : "開始免費試用 →"}
+          </Link>
+        </div>
+
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 w-full max-w-md">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">{t("auth_login_title")}</h1>
