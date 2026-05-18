@@ -763,7 +763,11 @@ export default function RunPage() {
     // 2026-05-18 (CJ「改成用 word 形式，不要 ppt」): these FB squads are
     // strategy plans / reports / playbooks, NOT postable social content
     // → render as a written document (Word-style), not a slide deck.
-    if (/quarterly-strategy|monthly-analytics|account-reposition|mass-control|offer-first|hormozi|magnetic|kennedy/.test(taskId)) {
+    // 2026-05-19 (CJ): ig-hormozi-save-worthy is a CONTENT squad (actual IG
+    // posts), not a strategy doc — exclude from the research-doc blanket.
+    // "save-worthy" tasks produce social posts → should show instagram:feed.
+    if (/quarterly-strategy|monthly-analytics|account-reposition|mass-control|offer-first|magnetic|kennedy/.test(taskId) ||
+        (/hormozi/.test(taskId) && !/save-worthy/.test(taskId))) {
       return { platform: "generic" as any, format: "research-doc" as any, label: "generic:research-doc" };
     }
     // 2026-05-18 (CJ): carousel-cvo squad is a 10-card carousel narrative
@@ -914,6 +918,14 @@ export default function RunPage() {
     // a one-page campaign plan → render as a doc; the 8 post variants
     // stay FB feed.
     if (/活動總覽|總覽|campaign overview/i.test(lbl)) return v("generic", "research-doc");
+    // 2026-05-19 (CJ「這四個tab分別適合不同的mockup」): yt-99-quarterly-strategy
+    // has 5 tabs: 內容支柱 / 12 影片 title / Community 月曆 / Competitor 分析 /
+    // 即時趨勢報告. Default mockupVariant is youtube:video-card (correct for the
+    // 12 影片 tab). The strategy/research tabs → generic doc; Community → YT
+    // community post.
+    if (/內容支柱|content pillar/i.test(lbl)) return v("generic", "research-doc");
+    if (/competitor|競品分析|即時趨勢/i.test(lbl)) return v("generic", "research-doc");
+    if (/community\s*月曆|社群月曆/i.test(lbl)) return v("youtube", "community");
     if (/threads/i.test(lbl)) return v("threads", "post");
     if (/linkedin|領英/i.test(lbl)) return v("linkedin", "feed");
     if (/facebook|臉書|\bFB\b/i.test(lbl)) return v("facebook", "feed");

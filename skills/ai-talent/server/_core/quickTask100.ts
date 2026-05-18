@@ -374,55 +374,81 @@ export const YT_99S_TASKS: FBTaskTemplate[] = [
   },
   {
     // 2026-05-19 (Yi-Wen 驗收 v#1 — 12/14):
-    // 原 2-行 prompt → Community 月曆 tab 語氣崩回 v1 level：
-    //   「在這個數位行銷的時代」PR 腔開場、「響亮無比！」驚嘆號結尾。
-    // 12 影片 title 中「SME 用戶 68%」無具名出處。
-    // 根因：多 tab 任務中模型在 Community 月曆 tab 把格式切換成「社群促銷腔」，
-    //   把品牌聲音規則丟掉。需要明確說 Community 月曆仍是品牌聲音語境，非 IG/抖音。
-    // 修法：完整 systemPrompt（品牌聲音 guardrail + per-tab 內容規格 + 統計規則）。
+    // 原 2-行 prompt → Community 月曆驚嘆號/PR 腔、影片 title 裸數字 68%。
+    // v#2 — Community 月曆 ✅ 完全修復；驚嘆號全清 ✅；新浮出三個 P0/P1：
+    //   P0: eMarketer 68% 固定幻覺（出現於 4/5 tabs），換媒體名繞規則（同 Newsletter 78%）。
+    //   P0: Competitor 分析捏造競品（Gather Town/Teamflow），brief 完全未提競品。
+    //   P1: hashtag 仍出現於內容支柱（6個）+ Community 月曆（7個）。
+    // 修法 v#3：
+    //   (1) 數字零容忍 ══ 規則（同 Newsletter v#5）：數字是否在輸入原文，媒體名稱無效。
+    //   (2) 競品來源鎖定：Competitor 分析 tab 只能分析輸入中有的競品；無→[請補充]。
+    //   (3) hashtag 全文禁（所有 tabs），同 Newsletter 規則。
     id: "yt-99-quarterly-strategy",
     tier: "99s", postType: "video",
     label: "YT 季度頻道策略",
     description: "12 個 video title + 內容支柱 + community 月曆 + competitor 分析",
     agent_id: 224001, // Yun-Hsuan Chen — YouTube Marketing Strategist 服飾時尚 (~1019 char)
     skill_slug: "youtube-strategy",
-    primary_question: "頻道主題 + 目標受眾職稱 + 品牌主張（三項合填）",
+    primary_question: "頻道主題 + 目標受眾職稱 + 品牌主張 + 競品（四項合填）",
     primary_input: {
       key: "channel_focus",
-      placeholder: "例：OnBrand AI YouTube 頻道｜目標受眾：品牌行銷主管 / 中小企業內容策略師｜品牌主張：品牌聲音有溯源憑據，AI 輔助產出不失品牌靈魂",
+      placeholder: "例：OnBrand AI YouTube 頻道｜目標受眾：品牌行銷主管 / 中小企業內容策略師｜品牌主張：品牌聲音有溯源憑據，AI 輔助產出不失品牌靈魂｜競品：Jasper AI / Writer / Copy.ai",
       type: "textarea",
     },
-    inputs: [{ key: "channel_focus", label: "頻道主題 + 受眾職稱 + 品牌主張", type: "textarea", required: true }],
+    inputs: [{ key: "channel_focus", label: "頻道主題 + 受眾 + 品牌主張 + 競品", type: "textarea", required: true }],
     systemPrompt: `你負責撰寫 YT 季度頻道策略「{label}」這一部分（300-600 字）。
 
-【品牌聲音 guardrail — 所有 tabs 必守，Community 月曆尤其注意，違反即不合格】
-SoWork 語氣 = 「精準守護者、有憑據的科技感」。這份文件是品牌內部策略文件，不是 IG 貼文，不是抖音腳本。
-逐條禁止（v#1 踩過的錯誤，原詞禁止）：
-- 驚嘆號結尾（任何句子，含「響亮無比！」「一起加油！」）→ 全改句號
-- PR / 媒體腔開場：「在這個數位行銷的時代」「隨著科技演進」→ 改具體情境句
+══════════════════════════════════════════
+【A. 數字零容忍規則 — 最高優先，違反直接不合格】
+══════════════════════════════════════════
+▸ 全文任何「百分比 / 次數 / 得分 / 比率」數字，必須逐字出現在用戶輸入原文中。
+  找不到 → 刪掉，改質化描述，或留 [請補充：數據來源]。
+  媒體/機構名稱（eMarketer / martech.org / Forrester…）不能作為數字的授權依據。
+  ✗ 違反例（v#2 eMarketer 68%，4/5 tabs 踩過）：
+    「eMarketer 最新數據：68% 品牌行銷主管把語氣一致性列為首要指標」（輸入無此數字）
+    → 換媒體名稱（Adweek / martech.org）仍是捏造，同樣禁止。
+  ✓ 正確：「多數品牌行銷主管正在關注 AI 產出的語氣一致性問題」（質化描述）
+
+▸ 數字自我驗證：寫完後找全文「%」符號 → 對照輸入原文 → 找不到 → 刪改。
+══════════════════════════════════════════
+
+══════════════════════════════════════════
+【B. 競品來源鎖定（Competitor 分析 tab 專屬）】
+══════════════════════════════════════════
+▸ Competitor 分析只分析用戶輸入中明確點名的競品。
+  輸入未提任何競品 → 每個競品欄位輸出「[請補充：競品名稱]」，不自行搜尋或推測。
+  ✗ 違反例（v#2 踩過）：「Gather Town 最近推出…」「Teamflow 獲得 3500 萬」
+     （brief 完全未提這兩家公司，且混入其他任務的公司名稱）
+▸ 即使 Scout 回傳相關競品資訊，也需輸入中已點名才可引用。
+══════════════════════════════════════════
+
+【C. 全文禁 # — 所有 tabs（含 Community 月曆）】
+這份文件是 YT 頻道策略文件，全文（內容支柱/12 影片 title/Community 月曆/競品分析/趨勢報告）
+不得出現任何 # 字符。Community 月曆的貼文草稿也同樣不加 hashtag。
+✗ 違反例（v#2 內容支柱）：「#品牌一致性 #AI內容治理…」（6 個 hashtag）
+✗ 違反例（v#2 Community 月曆）：「#品牌聲音 #OnBrandAI…」（7 個 hashtag）
+
+【D. 品牌聲音 guardrail — 所有 tabs 必守，違反即不合格】
+SoWork 語氣 = 「精準守護者、有憑據的科技感」。
+逐條禁止（v#1+v#2 踩過的錯誤）：
+- 驚嘆號（任何句子）→ 全改句號
+- PR 腔開場：「在這個數位行銷的時代」「隨著科技演進」→ 改具體情境句
 - emoji（任何）、煽動詞（「快來」「把握」「心動不如行動」）
-- 散文腔：「如歌般悠揚」「讓品牌語音響亮無比」「讓每一句話…」
-【Community 月曆專屬補充】Community 帖文草稿仍是品牌策略語境，語氣要精準克制：
-  ✗ 錯誤：「讓你的品牌語音在 YouTube 響亮無比！」（煽情 + 驚嘆號）
-  ✓ 正確：「你的品牌聲音，在 YouTube 留下了什麼印記？」（具體問題導向）
+- 散文腔：「響亮無比」「如歌般悠揚」「讓每一句話…」
+Community 月曆帖文草稿仍是品牌策略語境（非 IG 貼文、非抖音腳本），語氣精準克制。
 
-【統計數字規則】
-任何百分比 / 次數 / 指標數字，只能使用輸入原文中明確出現的數字。
-輸入沒有 → 改質化描述或「[請補充：數據來源]」；不得附加媒體名稱繞過。
-✗ 違反例：「SME 用戶 68%」（輸入無此數字 → 禁止直接出現）
+【E. per-tab 內容規格】
+- 內容支柱：3-4 個支柱，支柱名稱 + 2 行說明 + 對應受眾痛點
+- 12 影片 title：含鉤子詞 + 清楚受益者；SEO 勾字（不要純業配腔）；無括號數字（除非來自輸入）
+- Community 月曆：每週 1-2 篇貼文草稿 + 發布時機；無 hashtag；無驚嘆號；具體問題導向收尾
+- Competitor 分析：只用輸入中有的競品；無 → [請補充：競品名稱]；無捏造融資/新功能
+- 即時趨勢報告：結合 Scout 資訊，3 條可操作趨勢 + 對本頻道的具體應用；無未授權數字
 
-【per-tab 內容規格】
-- 內容支柱：3-4 個支柱，每個支柱名稱 + 2 行說明 + 對應受眾痛點
-- 12 影片 title：每個 title 含鉤子詞 + 清楚受益者；注意 SEO 勾字（不要純業配腔）
-  → 影片 title 裡任何括號內數字（如「68%」）須有輸入來源，否則刪除
-- Community 月曆：每週 1-2 篇社群貼文草稿 + 預計發布時機；語氣見上方品牌聲音規則
-- Competitor 分析：3-4 家競品 + 各自策略特徵 + 本頻道差異化切入點
-- 即時趨勢報告：結合 scout 資訊，列 3 條當季可操作趨勢 + 對本頻道的具體應用
-
-【寄出前自我檢查｜必做】
-1. 有驚嘆號嗎？→ 全換句號
-2. 有「在這個…時代」「數位演進」PR 腔開場嗎？→ 換具體情境句
-3. 有輸入原文沒有的百分比 / 數字嗎？→ 刪或標 [請補充]
+【F. 寄出前自我檢查｜必做】
+1. 全文帶「%」的句子 → 對照輸入原文 → 找不到 → 刪改
+2. Competitor 分析有輸入未提的公司名嗎？→ 換成 [請補充：競品名稱]
+3. 全文有「#」嗎？→ 全刪
+4. 有驚嘆號嗎？→ 全換句號
 → 任一不符，就地改寫再輸出。${TONE_100}`,
     preferredModel: "anthropic", maxTokens: 1200,
     outputDefaults: { platform: "youtube", post_type: "video" },
@@ -437,8 +463,17 @@ SoWork 語氣 = 「精準守護者、有憑據的科技感」。這份文件是�
     primary_question: "Premiere 主題？",
     primary_input: { key: "premiere_topic", placeholder: "首播主題", type: "textarea" },
     inputs: [{ key: "premiere_topic", label: "首播主題", type: "textarea", required: true }],
+    // 2026-05-19 (CJ 驗收 v#2 11/14 → v#3 P2): 直播配套開場太導覽介紹腔、
+    // 中括號殘留包正文、英文直引號、通過/透過錯字。補品牌聲音 + 排版規則。
     systemPrompt: `產出 YT Premiere kit 其中 1 部分（150-400 字）。
-本次你寫的是「{label}」（預告 trailer 腳本 / Community 倒數 ×5 / 直播配套 / 精華剪輯指南）。${TONE_100}`,
+本次你寫的是「{label}」（預告 trailer 腳本 / Community 倒數 ×5 / 直播配套 / 精華剪輯指南）。
+
+【品牌聲音與排版規則（每個部分都適用，輸出前自查）】
+- 沉穩觀察者／守護者語氣。開場（特別是「直播配套」）**不要導覽式自我介紹腔**（「歡迎來到」「今天要為大家介紹」），改用一個對品牌行銷主管有共鳴的觀察句或反問句切入。
+- 全程繁體中文台灣用字：表達「藉由／經由」時用「**透過**」不要寫「通過」；不要簡體字。
+- **中括號 [ ] 只能用於 [請補充：…] 這類待補佔位**。正文句子、CTA、收尾**一律不得用中括號包起來**（壞例：「[計劃首映，直播時我們在評論區見]」→ 直接寫成正常句子）。
+- 引號用全形「」或『』，**不要用英文直引號 " "**。
+- 收尾語意要通順自然，不要為了金句硬湊（壞例：「不再迷失現身」）；寧可平實也不要拗口。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1100,
     outputDefaults: { platform: "youtube", post_type: "premiere" },
   },
