@@ -92,6 +92,28 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
   {
+    // 2026-05-18 (CJ「FB 時事改寫文 502」): moved from fb-60-trend-rewrite.
+    // strategist (Mark Davis) + specialty (Trend Researcher) + scout +
+    // captions ran synchronously past nginx's 60s upstream timeout → 502.
+    id: "fb-99-trend-rewrite",
+    tier: "99s", postType: "feed",
+    label: "FB 時事改寫文",
+    description: "Mark Davis 評估時事關聯 + Dale Yu 寫品牌切入點 + 時效性檢核（scout 抓即時時事）",
+    agent_id: 220755, // Dale Yu
+    skill_slug: "social-copy",
+    primary_question: "想搭哪個時事？",
+    primary_input: { key: "trend_topic", placeholder: "例：奧運 / AI 新聞 / 季節節日", type: "textarea" },
+    inputs: [
+      { key: "trend_topic", label: "時事主題", type: "textarea", required: true },
+      { key: "brand_angle", label: "品牌切入角度（可選）", type: "textarea", required: false },
+    ],
+    systemPrompt: `產出 FB 時事改寫文（150-300 字）。
+**核心原則**：時事是 hook，品牌是 punchline。前 1/3 講時事，後 2/3 拉回品牌。
+**禁忌**：不要假裝你是事件當事人；不要在敏感事件（災難、政治、人命）上消費；不要寫成蹭熱度。${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 900,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+  {
     id: "fb-99-14day-countdown",
     tier: "99s", postType: "feed",
     label: "FB 14 天倒數活動",
@@ -653,6 +675,17 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     cardsPerVariant: 5,
     holdForImages: true,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
+  },
+  "fb-99-trend-rewrite": {
+    ...fb100Common, variants: 5, images: 5,
+    aspectRatio: "1:1", fluxSize: "square_hd",
+    variantLabels: ["評論式", "幽默式", "資訊式", "立場式", "中立式"],
+    captionMinChars: 150, captionMaxChars: 300,
+    strategistAgentId: 90011, // Mark Davis — Public Affairs
+    specialtyAgentId: 220959, // Trend Researcher — Timing Advisor
+    scoutKind: "trending",
+    holdForImages: true,
+    extras: { ...fb100Common.extras, timingAdvisor: true },
   },
   "fb-99-serial-3": {
     ...fb100Common, variants: 3, images: 3,

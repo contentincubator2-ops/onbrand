@@ -245,29 +245,10 @@ ${FB60_TONE}`,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
 
-  // 11. 時事改寫文 — Strategist: Mark Davis, Writer: Dale Yu, Specialty: Trend Researcher
-  {
-    id: "fb-60-trend-rewrite",
-    tier: "60s",
-    postType: "feed",
-    label: "FB 時事改寫文",
-    description: "Mark Davis 評估時事關聯 + Dale Yu 寫品牌切入點 + 時效性檢核",
-    agent_id: 220755, // Dale Yu
-    skill_slug: "social-copy",
-    primary_question: "想搭哪個時事？",
-    primary_input: { key: "trend_topic", placeholder: "例：奧運 / AI 新聞 / 季節節日", type: "textarea" },
-    inputs: [
-      { key: "trend_topic", label: "時事主題", type: "textarea", required: true },
-      { key: "brand_angle", label: "品牌切入角度（可選）", type: "textarea", required: false },
-    ],
-    systemPrompt: `產出 FB 時事改寫文（150-300 字）。
-**核心原則**：時事是 hook，品牌是 punchline。前 1/3 講時事，後 2/3 拉回品牌。
-**禁忌**：不要假裝你是事件當事人；不要在敏感事件（災難、政治、人命）上消費；不要寫成蹭熱度。
-${FB60_TONE}`,
-    preferredModel: "qwen",
-    maxTokens: 900,
-    outputDefaults: { platform: "facebook", post_type: "feed" },
-  },
+  // 11. 時事改寫文 — 2026-05-18 (CJ「502」): moved to 99s as
+  //     fb-99-trend-rewrite (strategist + specialty + scout too heavy
+  //     for 60s — synchronous part hit nginx 60s → 502). normalizeTaskId
+  //     maps the old id forward.
 
   // 12. 客戶見證改寫文 — Strategist: Kurt Chen, Writer: Yawen Ma, Specialty: Jason Evans
   {
@@ -505,25 +486,8 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     },
   },
 
-  // 11. 時事改寫文 — strategist: Mark Davis, specialty: Trend Researcher
-  "fb-60-trend-rewrite": {
-    variants: 5,
-    images: 5,
-    runImageGen: true,
-    imageDirectorId: FB60_DIR_WENDY,
-    aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
-    variantLabels: ["評論式", "幽默式", "資訊式", "立場式", "中立式"],
-    captionMinChars: 150,
-    captionMaxChars: 300,
-    strategistAgentId: 90011, // Mark Davis — Public Affairs
-    specialtyAgentId: 220959, // Trend Researcher — Timing Advisor
-    extras: {
-      timingAdvisor: true,
-      replyTemplates: 5, postingTime: true, followupPost: true,
-    },
-  },
+  // 11. 時事改寫文 — 2026-05-18 (CJ): moved to 99s as fb-99-trend-rewrite.
+  //     Config now in FB_99S_ORCHESTRA.
 
   // 12. 客戶見證改寫文 — strategist: Kurt Chen, specialty: Jason Evans (legal)
   "fb-60-testimonial-rewrite": {

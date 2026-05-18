@@ -36,6 +36,7 @@ export function normalizeTaskId(id: string): string {
   // stored runs / re-runs resolve to the new 99s task.
   if (id === "fb-60-carousel-5") return "fb-99-carousel-5";
   if (id === "fb-60-serial-3") return "fb-99-serial-3";
+  if (id === "fb-60-trend-rewrite") return "fb-99-trend-rewrite";
   return id.replace(/^([a-z]+)-100-/, "$1-99-");
 }
 
