@@ -14,8 +14,8 @@
  *
  * Opens via the gear icon top-right of Brand workspace header.
  */
-import { useEffect, useState } from "react";
-import { Modal, ModalContent, Button, Input, Spinner } from "@heroui/react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Modal, ModalContent, Button, Input, Textarea, Spinner } from "@heroui/react";
 import {
   IdCard, Link2, Palette, Bot, Trash2, X, Share2, CheckCircle2, ExternalLink,
 } from "lucide-react";
@@ -181,9 +181,134 @@ export function InfoTab({ brandId, brandName }: { brandId: number | null; brandN
         </p>
       </div>
 
-      <div className="bg-default-50 rounded-xl p-5 mt-4 text-sm text-default-700 leading-relaxed">
-        <div className="text-default-400 italic">{en ? "Industry / description editor coming next (wired to brand.update)" : "產業 / 描述編輯介面接下來會接上（用 brand.update mutation）"}</div>
-        <div className="text-default-400 italic mt-1 font-mono text-tiny">brandId: {brandId}</div>
+      <BrandBasicEditor brandId={brandId} en={en} />
+    </div>
+  );
+}
+
+/**
+ * 2026-05-18 (CJ「他對 sowork.ai 認識不正確，又沒地方調整基本資料 + 讀錯
+ * 無法重新校對」): editable basic data + hard-correctable AI positioning
+ * summary + a 「重新分析」 button that re-reads the website/fanpage even
+ * when positioning is locked.
+ */
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mb-4">
+      <div className="text-xs font-semibold uppercase tracking-widest text-default-500 mb-1.5">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean }) {
+  const q = (trpc as any).brand?.get?.useQuery?.(
+    { id: brandId ?? 0 },
+    { enabled: !!brandId, refetchOnWindowFocus: false },
+  );
+  const updateM = (trpc as any).brand?.update?.useMutation?.({
+    onSuccess: () => q?.refetch?.(),
+  });
+  const recalM = (trpc as any).brand?.recalibrate?.useMutation?.({
+    onSuccess: () => q?.refetch?.(),
+  });
+
+  const [industry, setIndustry] = useState("");
+  const [description, setDescription] = useState("");
+  const [website, setWebsite] = useState("");
+  const [fanpage, setFanpage] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [positioning, setPositioning] = useState("");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [recalDone, setRecalDone] = useState(false);
+
+  useEffect(() => {
+    const b = q?.data;
+    if (!b) return;
+    setIndustry(b.industry ?? "");
+    setDescription(b.description ?? "");
+    setWebsite(b.website ?? "");
+    const sl = (typeof b.socialLinks === "string" ? safeJson(b.socialLinks) : b.socialLinks) ?? {};
+    setFanpage(sl.facebook ?? sl.fb ?? "");
+    setTagline(b.tagline ?? "");
+    setPositioning(b.positioningSummary ?? "");
+  }, [q?.data]);
+
+  function safeJson(s: string): any { try { return JSON.parse(s); } catch { return {}; } }
+
+  async function handleSave() {
+    if (!brandId) return;
+    const b = q?.data;
+    const sl = (typeof b?.socialLinks === "string" ? safeJson(b.socialLinks) : b?.socialLinks) ?? {};
+    await updateM?.mutateAsync?.({
+      brandId,
+      industry,
+      description,
+      website,
+      socialLinks: { ...sl, facebook: fanpage.trim() },
+      tagline,
+      positioningSummary: positioning,
+    });
+    setSavedAt(Date.now());
+  }
+
+  async function handleRecalibrate() {
+    if (!brandId) return;
+    // save edits first so the pipeline re-reads the corrected URLs
+    await handleSave();
+    await recalM?.mutateAsync?.({ brandId });
+    setRecalDone(true);
+  }
+
+  if (q?.isLoading) {
+    return <div className="mt-4 flex justify-center"><Spinner size="sm" /></div>;
+  }
+
+  return (
+    <div className="bg-default-50 rounded-xl border border-default-200 p-5 mt-4">
+      <Field label={en ? "Industry" : "產業"}>
+        <Input size="sm" value={industry} onChange={(e) => setIndustry(e.target.value)}
+          placeholder={en ? "e.g. SaaS / F&B / retail" : "例：SaaS / 餐飲 / 零售"} />
+      </Field>
+      <Field label={en ? "What the brand does (used by the AI)" : "品牌在做什麼（AI 會用這段認識你）"}>
+        <Textarea minRows={3} value={description} onChange={(e) => setDescription(e.target.value)}
+          placeholder={en ? "One paragraph the AI should treat as ground truth about this brand." : "用一段話描述這個品牌——AI 會把這段當成關於你的事實依據。"} />
+      </Field>
+      <Field label={en ? "Official website" : "官方網站"}>
+        <Input size="sm" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://sowork.ai" />
+      </Field>
+      <Field label={en ? "Facebook page URL" : "Facebook 粉絲團網址"}>
+        <Input size="sm" value={fanpage} onChange={(e) => setFanpage(e.target.value)} placeholder="https://www.facebook.com/..." />
+      </Field>
+      <Field label={en ? "Tagline" : "品牌標語 Tagline"}>
+        <Input size="sm" value={tagline} onChange={(e) => setTagline(e.target.value)} />
+      </Field>
+      <Field label={en ? "AI positioning summary — edit to hard-correct" : "AI 推導的定位摘要 — 可直接手改校正"}>
+        <Textarea minRows={5} value={positioning} onChange={(e) => setPositioning(e.target.value)}
+          placeholder={en ? "If the AI misunderstood the brand, correct it here. This text is injected into every task." : "如果 AI 對品牌的理解有誤，直接在這裡改正。這段會被注入到每一個任務。"} />
+        <p className="text-tiny text-default-400 mt-1">
+          {en ? "Injected into all 30s/60s/99s tasks as ground truth." : "會作為事實依據注入所有 30s/60s/99s 任務。"}
+        </p>
+      </Field>
+
+      <div className="flex flex-wrap items-center gap-3 mt-2">
+        <Button size="sm" color="primary" isLoading={updateM?.isPending}
+          isDisabled={!brandId || updateM?.isPending} onPress={handleSave}>
+          {en ? "Save" : "儲存"}
+        </Button>
+        <Button size="sm" variant="flat" color="secondary" isLoading={recalM?.isPending}
+          isDisabled={!brandId || recalM?.isPending} onPress={handleRecalibrate}
+          title={en ? "Re-reads the website / fanpage and rebuilds the AI's understanding" : "重新讀取官網／粉專，重建 AI 對品牌的理解"}>
+          {en ? "Re-analyze (re-read site/fanpage)" : "重新分析（重讀官網/粉專）"}
+        </Button>
+        {savedAt && !updateM?.isPending && (
+          <span className="text-tiny text-success-600">{en ? "Saved ✓" : "已儲存 ✓"}</span>
+        )}
+        {recalDone && !recalM?.isPending && (
+          <span className="text-tiny text-secondary-600">
+            {en ? "Re-analysis started — it updates in the background." : "已開始重新分析 — 會在背景更新品牌大腦"}
+          </span>
+        )}
       </div>
     </div>
   );

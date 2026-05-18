@@ -574,6 +574,82 @@ export const brandRouter = router({
       return { ok: true as const };
     }),
 
+  /**
+   * 2026-05-18 (CJ「他對 sowork.ai 認識不正確，又沒地方調整基本資料」):
+   * edit the brand's basic data + hard-correct the AI-derived positioning
+   * summary. Previously there was NO brand.update — the 基本資料 editor was
+   * a placeholder, so a mis-read brand could never be corrected.
+   */
+  update: protectedProcedure
+    .input(z.object({
+      brandId:            z.number().int().positive(),
+      name:               z.string().min(1).max(255).optional(),
+      industry:           z.string().max(64).optional().nullable(),
+      description:        z.string().max(4000).optional().nullable(),
+      website:            z.string().max(2048).optional().nullable(),
+      socialLinks:        z.record(z.string(), z.string()).optional().nullable(),
+      tagline:            z.string().max(1000).optional().nullable(),
+      targetAudience:     z.string().max(2000).optional().nullable(),
+      brandVoice:         z.string().max(2000).optional().nullable(),
+      positioningSummary: z.string().max(8000).optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { brands } = await import("../../drizzle/schema");
+      const rows = await db.select().from(brands)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
+        .limit(1);
+      if (!rows[0]) return null;
+      const patch: Record<string, any> = {};
+      if (input.name               !== undefined) patch.name               = input.name.trim();
+      if (input.industry           !== undefined) patch.industry           = input.industry?.trim() || null;
+      if (input.description        !== undefined) patch.description        = input.description?.trim() || null;
+      if (input.website            !== undefined) patch.website            = input.website?.trim() || null;
+      if (input.socialLinks        !== undefined) patch.socialLinks        = input.socialLinks ?? null;
+      if (input.tagline            !== undefined) patch.tagline            = input.tagline?.trim() || null;
+      if (input.targetAudience     !== undefined) patch.targetAudience     = input.targetAudience?.trim() || null;
+      if (input.brandVoice         !== undefined) patch.brandVoice         = input.brandVoice?.trim() || null;
+      if (input.positioningSummary !== undefined) patch.positioningSummary = input.positioningSummary?.trim() || null;
+      if (Object.keys(patch).length === 0) return { ok: true as const };
+      await db.update(brands).set(patch as any)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
+      return { ok: true as const };
+    }),
+
+  /**
+   * 2026-05-18 (CJ「讀取錯誤時還是無法重新校對」): re-run the positioning
+   * analysis from the (now corrected) website / fanpage — works even when
+   * positioning is "completed" (locked), by resetting status first.
+   */
+  recalibrate: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { brands } = await import("../../drizzle/schema");
+      const rows = await db.select().from(brands)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)))
+        .limit(1);
+      const brand = rows[0];
+      if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "brand not found" });
+      // unlock so the pipeline can overwrite the (wrong) understanding
+      await db.update(brands).set({ positioningStatus: "in_progress" } as any)
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
+      const { startPositioningJob } = await import("../_core/positioningJobRunner");
+      const { buildBrandPositioningSteps } = await import("../_core/positioningSteps");
+      startPositioningJob({
+        userId: ctx.user.id,
+        entityKind: "brand",
+        entityId: input.brandId,
+        brandName: (brand as any).name,
+        industry: (brand as any).industry ?? undefined,
+        description: (brand as any).description ?? undefined,
+        steps: buildBrandPositioningSteps({ lang: "zh-TW" }),
+      });
+      return { ok: true as const };
+    }),
+
   /** Read connections (website + socialLinks) for the connector tile UI. */
   getConnections: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
