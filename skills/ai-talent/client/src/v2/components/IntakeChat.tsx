@@ -91,11 +91,13 @@ function UserBubble({ content }: { content: string }) {
 // ── OAuth inline card ────────────────────────────────────────────────────────
 
 function AuthCard({
-  platform, onAuth, onSkip, authorized, authorizedName,
+  platform, onAuth, onSkip, onPrefetch, preparing, authorized, authorizedName,
 }: {
   platform: string;
   onAuth: () => void;
   onSkip: () => void;
+  onPrefetch: () => void;
+  preparing: boolean;
   authorized: boolean;
   authorizedName: string;
 }) {
@@ -125,8 +127,10 @@ function AuthCard({
       <div className="flex gap-2">
         <Button size="sm" variant="bordered" color="primary" className="flex-1 text-tiny"
           startContent={<FontAwesomeIcon icon={faLock} className="text-tiny" />}
+          onMouseEnter={onPrefetch}
+          onFocus={onPrefetch}
           onPress={onAuth}>
-          授權 {label}
+          {preparing ? `準備中…請再點一次` : `授權 ${label}`}
         </Button>
         <Button size="sm" variant="light" className="text-tiny text-default-400" onPress={onSkip}>
           略過
@@ -184,29 +188,88 @@ export function IntakeChat({
   // Platform OAuth
   const [platformAuthorized, setPlatformAuthorized] = useState(false);
   const [platformName, setPlatformName] = useState("");
+  const [authPreparing, setAuthPreparing] = useState(false);
   const getConnectToken = trpc.platformConnect.getConnectToken.useMutation();
 
-  async function handlePlatformAuth(platform: string) {
+  // 2026-05-18 (CJ「Connect account popup blocked」): the Pipedream SDK
+  // opens its OAuth popup inside connectAccount(). Browsers block that
+  // popup if it runs AFTER an await (the user-gesture/transient
+  // activation is gone) — and the old code did `await getConnectToken`
+  // + `await import(sdk)` BEFORE connectAccount. Fix: PREFETCH the token
+  // and the SDK module (on hover/focus/mount) so the click handler can
+  // call connectAccount with NO awaits in front of it → no popup block.
+  const pdSdkRef = useRef<any>(null);
+  const pdTokenRef = useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string }>>({});
+  const pdPrefetchingRef = useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    import("@pipedream/sdk/browser")
+      .then((m) => { pdSdkRef.current = (m as any).PipedreamClient; })
+      .catch(() => { /* retried lazily in prefetch */ });
+  }, []);
+
+  const prefetchPlatformAuth = React.useCallback(async (platform: string) => {
+    if (pdPrefetchingRef.current[platform]) return;
+    const cached = pdTokenRef.current[platform];
+    if (cached && cached.expiresAt - Date.now() > 60_000 && pdSdkRef.current) return;
+    pdPrefetchingRef.current[platform] = true;
     try {
-      const { token, appSlug, expiresAt, env } = await getConnectToken.mutateAsync({ platform: platform as any });
-      const { PipedreamClient } = await import("@pipedream/sdk/browser");
-      const pd = new PipedreamClient({
-        projectEnvironment: env as "production" | "development",
+      if (!pdSdkRef.current) {
+        const m = await import("@pipedream/sdk/browser");
+        pdSdkRef.current = (m as any).PipedreamClient;
+      }
+      const tk = await getConnectToken.mutateAsync({ platform: platform as any });
+      if (tk?.token) {
+        pdTokenRef.current[platform] = {
+          token: tk.token,
+          expiresAt: new Date(tk.expiresAt || Date.now() + 300_000).getTime(),
+          appSlug: tk.appSlug,
+          env: tk.env ?? "production",
+        };
+      }
+    } catch {
+      // Silent — user can skip
+    } finally {
+      pdPrefetchingRef.current[platform] = false;
+    }
+  }, [getConnectToken]);
+
+  // Synchronous: NO awaits before pd.connectAccount() so the popup keeps
+  // the click's user activation. If not warmed yet, warm it and ask the
+  // user to tap again (never attempt a popup that will be blocked).
+  function handlePlatformAuth(platform: string) {
+    const tk = pdTokenRef.current[platform];
+    const Ctor = pdSdkRef.current;
+    if (!Ctor || !tk || tk.expiresAt - Date.now() < 30_000) {
+      setAuthPreparing(true);
+      void prefetchPlatformAuth(platform).finally(() => setAuthPreparing(false));
+      return;
+    }
+    try {
+      const pd = new Ctor({
+        projectEnvironment: tk.env as "production" | "development",
         externalUserId: "sowork-user",
-        tokenCallback: async () => ({ token, expiresAt: new Date(expiresAt || Date.now() + 300_000), connectLinkUrl: "" }),
+        tokenCallback: async () => ({ token: tk.token, expiresAt: new Date(tk.expiresAt), connectLinkUrl: "" }),
       });
-      const accountId = await new Promise<string>((resolve, reject) => {
-        pd.connectAccount({
-          app: appSlug,
-          onSuccess: (res) => resolve(res.id),
-          onError: (err) => reject(new Error(String(err))),
-          onClose: ({ successful }) => {
-            if (!successful) reject(new Error("視窗已關閉"));
-          },
-        });
+      pd.connectAccount({
+        app: tk.appSlug,
+        onSuccess: (res: any) => {
+          setPlatformName(PLATFORM_LABEL[platform] ?? res?.id ?? platform);
+          setPlatformAuthorized(true);
+          delete pdTokenRef.current[platform];
+        },
+        onError: () => {
+          // Silent — user can skip
+          delete pdTokenRef.current[platform];
+          void prefetchPlatformAuth(platform);
+        },
+        onClose: ({ successful }: any) => {
+          if (!successful) {
+            delete pdTokenRef.current[platform];
+            void prefetchPlatformAuth(platform);
+          }
+        },
       });
-      setPlatformName(PLATFORM_LABEL[platform] ?? accountId);
-      setPlatformAuthorized(true);
     } catch {
       // Silent — user can skip
     }
@@ -305,6 +368,8 @@ export function IntakeChat({
                 authorized={platformAuthorized}
                 authorizedName={platformName}
                 onAuth={() => handlePlatformAuth(msg.authPlatform!)}
+                onPrefetch={() => prefetchPlatformAuth(msg.authPlatform!)}
+                preparing={authPreparing}
                 onSkip={() => {}}
               />
             );
