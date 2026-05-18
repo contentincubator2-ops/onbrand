@@ -53,8 +53,15 @@ jobs:
           # @vitejs/plugin-react) missing → "Cannot find package" build
           # failure. Force-include dev deps for the build, and pin
           # NODE_ENV=development for the install step only.
+          # 2026-05-19 (CJ 驗收 deploy 連續 ENOTEMPTY → @heroui/system-rsc
+          # resolve fail): `npm ci` rmdir's the existing node_modules; a
+          # concurrent/locked partial tree → ENOTEMPTY → fallback npm
+          # install drifts & drops the transitive peer → vite build fail.
+          # Wipe node_modules FIRST so npm ci installs the exact locked
+          # tree from clean (slower by ~30s but deterministic; no drift).
+          rm -rf node_modules
           (NODE_ENV=development npm ci --include=dev 2>&1 | tail -5) \
-            || (echo "npm ci failed → fallback npm install" && NODE_ENV=development npm install --legacy-peer-deps --include=dev 2>&1 | tail -5)
+            || (echo "npm ci failed → fallback npm install" && rm -rf node_modules && NODE_ENV=development npm install --legacy-peer-deps --include=dev 2>&1 | tail -5)
           # 2026-05-14 (white-screen post-mortem): purge public/assets/ before
           # build. Vite writes new hashed chunks but doesn't delete old ones —
           # so over multiple builds, public/assets/ accumulates stale .js/.css.
