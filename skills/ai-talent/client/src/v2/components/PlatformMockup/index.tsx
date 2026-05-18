@@ -69,6 +69,11 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     // ── Instagram (7) ─────────────────────────────────────────────────
     case "instagram:feed":      return <IGFeed     {...f} />;
     case "instagram:carousel":  return <IGCarousel {...f} />;
+    // 2026-05-19 (CJ 驗收 IG5 10/14「instagram:document 無 mockup →
+    // 主內容『製作中』無法評估」): an IG "document" post IS a swipe
+    // carousel of text slides — render via IGCarousel (handles
+    // caption-only content) instead of falling to the unsupported stub.
+    case "instagram:document":  return <IGCarousel {...f} />;
     case "instagram:reel":      return <IGReels    {...f} />;
     case "instagram:story":     return <IGStories  {...f} />;
     case "instagram:profile":   return <IGProfile  {...f} />;

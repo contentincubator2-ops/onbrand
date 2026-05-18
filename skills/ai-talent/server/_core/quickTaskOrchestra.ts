@@ -1724,6 +1724,26 @@ export async function runOrchestra(args: {
       }
     }
 
+    // ── IG 簡→繁 確定性守門 (2026-05-19, CJ 驗收 IG2「怎么 簡體漏出」) ──
+    // IG body 任務的品牌聲音已穩（驗收多為 2 分），不需 LLM 改寫——只需
+    // 把零星漏出的簡體字確定性轉繁。逐字 1:1 對應的簡體字形在 zh-TW
+    // 產出中本就不該出現，無語境誤傷風險，零成本一律套用。
+    if (Array.isArray(captions) && captions.length && isInstagramBodyTask(args.template)) {
+      const S2T: Record<string, string> = {
+        "么": "麼", "这": "這", "个": "個", "们": "們", "时": "時",
+        "应": "應", "说": "說", "让": "讓", "优": "優", "体": "體",
+        "关": "關", "实": "實", "现": "現", "发": "發", "内": "內",
+        "数": "數", "据": "據", "网": "網", "资": "資", "讯": "訊",
+        "构": "構", "习": "習", "众": "眾", "签": "籤", "动": "動",
+        "钩": "鉤", "击": "擊", "门": "門", "问": "問", "题": "題",
+      };
+      for (const v of captions) {
+        if (!v?.caption) continue;
+        v.caption = v.caption.replace(/[么这个们时应说让优体关实现发内数据网资讯构习众签动钩击门问题]/g,
+          (c: string) => S2T[c] ?? c);
+      }
+    }
+
     // ── Checkpoint (2026-05-14 「先回 caption + brief、image 跟 QA 變 async polling」) ─
     // Captions + briefs are ready. If the caller passed `onCheckpoint`,
     // (a) persist a PARTIAL mission_outputs row now with progress='caption_ready',
