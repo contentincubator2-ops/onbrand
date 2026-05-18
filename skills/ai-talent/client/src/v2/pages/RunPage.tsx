@@ -612,16 +612,11 @@ export default function RunPage() {
       //   { imageUrl, imageStatus, imageStyle }.
       // Without this normalize, even a successfully-generated image showed
       // as "等待 AI 生成" because imageUrl was always undefined.
-      // 2026-05-18 (CJ「格式更亂了」根因): calendar captions are a JSON
-      // array; sanitizeCaption turns the JSON's \n escapes into real
-      // newlines → invalid JSON → mockup dumps raw text. Keep calendar
-      // captions RAW so the Calendar mockup can JSON.parse them.
-      const isCalendarTask = (data?.mission?.taskId ?? "").includes("calendar");
       return raw.map((v: any) => {
         const img = v.image ?? {};
         return {
           label: v.label,
-          caption: isCalendarTask ? String(v.caption ?? "") : sanitizeCaption(v.caption),
+          caption: sanitizeCaption(v.caption),
           hashtags: v.hashtags ?? [],
           imageUrl: v.imageUrl ?? img.url ?? null,
           imageStatus: v.imageStatus ?? img.status ?? undefined,
@@ -776,7 +771,10 @@ export default function RunPage() {
       if (id.includes("pinned")) return "pinned";
       if (id.includes("story")) return "story";
       if (id.includes("reel")) return "reel";
-      if (id.includes("calendar")) return "calendar";
+      // 2026-05-18 (CJ「每篇一個可編輯 mockup」): calendar posts are now
+      // one VARIANT per post → render each as a normal FB feed post so
+      // the per-variant edit / 改圖 / 排程 UI works per post.
+      if (id.includes("calendar")) return "feed";
       if (id.includes("carousel")) return "carousel";
       if (id.includes("bio") || id.includes("profile")) return "profile";
       if (id.includes("live")) return "live";
@@ -1877,6 +1875,60 @@ export default function RunPage() {
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
                 onPress={() => setScheduleDialogOpen(true)}
               >{t("run_schedule_btn")}</Button>
+              {/* 2026-05-18 (CJ「批量下載到行事曆」): calendar tasks export
+                  ALL posts as one .ics (one all-day VEVENT per post on
+                  its date, parsed from the variant label prefix). */}
+              {(data?.mission?.taskId ?? "").includes("calendar") && variants.length > 1 && (
+                <Button
+                  variant="flat" fullWidth color="secondary"
+                  startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
+                  onPress={() => {
+                    const esc = (s: string) => String(s ?? "")
+                      .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
+                      .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+                    const ev: string[] = [];
+                    let eventCount = 0;
+                    variants.forEach((v: any, i: number) => {
+                      const m = /(\d{4})\/(\d{2})\/(\d{2})/.exec(String(v.label ?? ""));
+                      if (!m) return;
+                      eventCount++;
+                      const ymd = `${m[1]}${m[2]}${m[3]}`;
+                      const next = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
+                      const ymdEnd = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(next.getDate()).padStart(2, "0")}`;
+                      const summary = String(v.label ?? "").replace(/^\d{4}\/\d{2}\/\d{2}\s*·\s*/, "");
+                      ev.push(
+                        "BEGIN:VEVENT",
+                        `UID:${id}-${i}@onbrand.sowork.ai`,
+                        `DTSTART;VALUE=DATE:${ymd}`,
+                        `DTEND;VALUE=DATE:${ymdEnd}`,
+                        `SUMMARY:${esc((data?.brand?.name ? data.brand.name + " · " : "") + summary)}`,
+                        `DESCRIPTION:${esc(v.caption ?? "")}`,
+                        "END:VEVENT",
+                      );
+                    });
+                    if (ev.length === 0) {
+                      showToastGlobal(lang === "en" ? "No dated posts to export" : "沒有可匯出的日期貼文");
+                      return;
+                    }
+                    const ics = [
+                      "BEGIN:VCALENDAR", "VERSION:2.0",
+                      "PRODID:-//OnBrand//Content Calendar//ZH",
+                      "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
+                    ].join("\r\n");
+                    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `content-calendar-${id}.ics`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    showToastGlobal(
+                      lang === "en"
+                        ? `Exported ${eventCount} posts — drop the .ics into your calendar`
+                        : `已匯出 ${eventCount} 篇 — 拖進日曆 App 即可`
+                    );
+                  }}
+                >{lang === "en" ? "Download all to calendar (.ics)" : "批量下載到行事曆（全部 .ics）"}</Button>
+              )}
               {/* 2026-05-12 (CJ「移除寄給團隊」+「先移除 agency 邀請團隊的設計」):
                   寄給團隊 button removed. Email dialog code kept in file but
                   unreachable — can resurrect later if team review re-enabled. */}

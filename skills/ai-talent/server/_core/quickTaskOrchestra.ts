@@ -345,6 +345,36 @@ function mergeCalendarPosts(captionStrings: string[]): string {
   return JSON.stringify(all);
 }
 
+// 2026-05-18 (CJ「每篇一個可編輯 mockup + 日期 + 批量 .ics」): expand the
+// merged calendar posts into ONE VARIANT PER POST so the existing
+// per-variant UI (pills nav / 跟 agent 改文案 / 改圖 / 排程發布) works
+// per post. Label carries the real date + pillar (RunPage parses it for
+// the batch .ics); caption is the clean publishable post text.
+function expandCalendarVariants(captionStrings: string[]): OrchestraVariant[] {
+  const merged = mergeCalendarPosts(captionStrings);
+  let posts: any[] = [];
+  try { posts = JSON.parse(merged); } catch { posts = []; }
+  if (!Array.isArray(posts) || posts.length === 0) return [];
+  const today = new Date();
+  return posts.map((p, i) => {
+    const dayN = Math.max(1, Math.min(60, Number(p?.day) || i + 1));
+    const d = new Date(today.getTime() + (dayN - 1) * 86400000);
+    const dateStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+    const pillar = String(p?.pillar ?? "").trim() || "貼文";
+    const hook = String(p?.hook ?? "").trim();
+    const message = String(p?.message ?? "").trim();
+    const cta = String(p?.cta ?? "").trim();
+    const caption = [hook, message, cta ? `→ ${cta}` : ""].filter(Boolean).join("\n\n");
+    return {
+      // label is parseable: "<YYYY/MM/DD> · 第N天 · <pillar>"
+      label: `${dateStr} · 第 ${dayN} 天 · ${pillar}`,
+      caption,
+      hashtags: [],
+      image: { style: null, url: null, status: "skipped" as const },
+    };
+  });
+}
+
 function tryParseJson(text: string): any {
   let t = (text ?? "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
   const start = t.search(/[{\[]/);
@@ -1578,13 +1608,16 @@ export async function runOrchestra(args: {
         // collapse the per-pillar captions into ONE merged calendar at the
         // checkpoint too, so caption_ready already shows a single clean
         // calendar instead of 5 raw pillar tabs.
+        const expandedCal = args.config.calendarMerge
+          ? expandCalendarVariants(captions.map((c) => c?.caption ?? ""))
+          : [];
         const partialVariants: OrchestraVariant[] = args.config.calendarMerge
-          ? [{
+          ? (expandedCal.length > 0 ? expandedCal : [{
               label: "30 天行事曆",
               caption: mergeCalendarPosts(captions.map((c) => c?.caption ?? "")),
               hashtags: [],
               image: { style: null, url: null, status: "skipped" as any },
-            }]
+            }])
           : Array.from({ length: args.config.variants }, (_, i) => {
               const cap = captions[i];
               return {
@@ -1760,16 +1793,19 @@ export async function runOrchestra(args: {
     // Merge all pillar JSON arrays into ONE day-sorted 30-day calendar
     // and collapse to a single variant the Calendar mockup renders.
     if (args.config.calendarMerge) {
-      const mergedCaption = mergeCalendarPosts(variants.map((v) => v.caption ?? ""));
-      const count = (() => { try { return JSON.parse(mergedCaption).length; } catch { return 0; } })();
+      const expanded = expandCalendarVariants(variants.map((v) => v.caption ?? ""));
       variants.length = 0;
-      variants.push({
-        label: "30 天行事曆",
-        caption: mergedCaption,
-        hashtags: [],
-        image: { style: null, url: null, status: "skipped" },
-      });
-      if (count === 0) errors.push("calendar: 所有支柱都解析失敗");
+      if (expanded.length > 0) {
+        variants.push(...expanded);
+      } else {
+        variants.push({
+          label: "30 天行事曆",
+          caption: mergeCalendarPosts([]),
+          hashtags: [],
+          image: { style: null, url: null, status: "skipped" },
+        });
+        errors.push("calendar: 所有支柱都解析失敗");
+      }
     }
 
     // ── Stage 3.6: carousel / album cards (single post, N card images) ──
