@@ -680,6 +680,17 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 
+  // 2026-05-19: for email tasks (EDM), extract the per-slide email subject
+  // so the title row can show "主旨：<current email subject>" rather than
+  // the static mission title which always shows slide-0's subject.
+  const currentEmailSubject = useMemo(() => {
+    const taskId = data?.mission?.taskId ?? "";
+    if (!taskId.startsWith("em-")) return null;
+    const cap = slide?.caption ?? "";
+    const m = cap.match(/^[\s#*>\-]*主旨\s*[：:]\s*(.+?)[\s*]*$/m);
+    return m?.[1]?.trim() || null;
+  }, [data?.mission?.taskId, slide?.caption]);
+
   // P4: pre-fill image / video prompt when entering that mode or switching
   // variant. 2026-05-12 (CJ「按下改圖/改影片，應該要有預設的提示詞」).
   // imagePrompt state is reused for video — different seed format per mode.
@@ -1024,10 +1035,13 @@ export default function RunPage() {
       <div className="flex items-center gap-2 mb-3 px-1">
         <p
           className="text-tiny text-default-500 truncate flex-1 min-w-0"
-          title={data.title || data.mission?.taskLabel || ""}
+          title={currentEmailSubject ? `主旨：${currentEmailSubject}` : (data.title || data.mission?.taskLabel || "")}
         >
           {(() => {
-            const raw = data.title || data.mission?.taskLabel || (lang === "en" ? "(Untitled)" : "(無標題)");
+            // For email tasks: show current slide's email subject (updates on tab switch)
+            const raw = currentEmailSubject
+              ? `主旨：${currentEmailSubject}`
+              : data.title || data.mission?.taskLabel || (lang === "en" ? "(Untitled)" : "(無標題)");
             const cps = Array.from(raw);
             return cps.length > 40 ? cps.slice(0, 38).join("") + "…" : raw;
           })()}

@@ -28,11 +28,26 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
   };
   const subject = (liveTitle || _grab("主旨") || _grab("Subject") || title || "").trim();
   const previewText = _grab("預覽(?:文字)?") || _grab("Preview");
-  const parsedCta = _grab("CTA") || _grab("行動呼籲") || liveCta || "";
+  // 2026-05-19: _grab uses the FIRST match; if model puts "CTA：" both in the
+  // header line AND again inside body, _grab catches the first (header) one
+  // but the body occurrence stays.  Use a broader pattern: also match CTA
+  // mid-sentence (e.g. "（CTA：立即鎖定）") so it's caught in both places.
+  const _grabCta = (): string => {
+    // Try strict line-start first (clean model output)
+    const strict = _grab("CTA") || _grab("行動呼籲");
+    if (strict) return strict;
+    // Fallback: CTA anywhere in the text (parenthesised or mid-sentence)
+    const loose = _cap.match(/(?:CTA|行動呼籲)\s*[：:]\s*(.{1,20}?)(?=[）\n\r！。？，,]|$)/m);
+    return loose?.[1]?.trim() || "";
+  };
+  const parsedCta = _grabCta() || liveCta || "";
   const bodyText = _cap
-    .replace(/^[\s#*>\-]*主旨\s*[：:].*$/m, "")
-    .replace(/^[\s#*>\-]*預覽(?:文字)?\s*[：:].*$/m, "")
-    .replace(/^[\s#*>\-]*(?:CTA|行動呼籲)\s*[：:].*$/m, "")
+    // Strip metadata header lines (add `g` flag — model sometimes repeats them)
+    .replace(/^[\s#*>\-]*主旨\s*[：:].*$/mg, "")
+    .replace(/^[\s#*>\-]*預覽(?:文字)?\s*[：:].*$/mg, "")
+    .replace(/^[\s#*>\-]*(?:CTA|行動呼籲)\s*[：:].*$/mg, "")
+    // Also strip any inline "CTA：..." that slipped into body paragraphs
+    .replace(/(?:CTA|行動呼籲)\s*[：:]\s*.{1,20}?(?=[）\n\r！。？，, ]|$)/gm, "")
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, "")
     .replace(/(^|\s)#[^\s#]+/g, "")
     .replace(/[!！]+(?=\s*$)/gm, "。")

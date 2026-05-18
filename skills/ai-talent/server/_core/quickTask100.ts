@@ -514,13 +514,14 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
 【品牌調性 guardrail｜每一封都適用（含上線/提醒/最後機會），違反即不合格】
 維持 SoWork 守護者、創造者語氣。**逐條禁止**：
 - emoji（任何，含 💡 ✨ 🚀）
-- 任何句子以驚嘆號收尾（含「！」「!」）
-- 促銷煽動句：「快來體驗」「快來搶先體驗」「趕快來加入」「不要錯過了」「立即搶購」
+- 任何句子以驚嘆號收尾（含「！」「!」）— 含「心動不如行動！」「別再猶豫！」「搶先看！」等，全部換成句號
+- 促銷煽動句（以下原詞均禁止）：「快來體驗」「快來搶先體驗」「趕快來加入」「不要錯過了」「立即搶購」「心動不如行動」「別再猶豫」「快來加入」
 - 純效率詞：快／高效／省時
 - hashtag：EDM 不是社群，**全文不得出現任何 #標籤**
 - 與其他封句式雷同（尤其別重複上線封的核心句）
-【寄出前自我檢查｜必做】送出前自己掃一遍本文：若出現 emoji／句尾驚嘆號／上述促銷句／#標籤／效率詞 → **就地改寫掉再輸出**，不要交出違規版本。${TONE_100}`,
-    preferredModel: "qwen", maxTokens: 1000,
+- 預覽文字（第 2 行）不得夾帶 stage label（如「提醒 1｜」「最後機會｜」「預告｜」等內部分類詞），預覽文字只給訂閱者看，不需要知道這是第幾封
+【寄出前自我檢查｜必做】送出前掃一遍：出現 emoji／句尾驚嘆號／上述促銷句 / #標籤 / 效率詞 / 預覽夾 stage label → **就地改寫再輸出**，不要交出違規版本。${TONE_100}`,
+    preferredModel: "anthropic", maxTokens: 1000,
     outputDefaults: { platform: "email", post_type: "edm" },
   },
   {
@@ -1160,12 +1161,16 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     // strategist + scout + narrativeArc 讓 7 封 fanout 過重，後段信
     // 失敗→靜默少產。砍掉非必要的 strategist/scout/narrativeArc，讓
     // 7 封都穩定產出（序列邏輯已由 systemPrompt 的階段規則承載）。
-    variants: 7, images: 7, runImageGen: true, imageDirectorId: EM100_IMG2,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
+    // 2026-05-19: images:7 + runImageGen caused 7 parallel image-gen requests
+    // → overwhelmed pipeline → last 2 caption calls dropped silently (only 5/7 produced).
+    // Email sequences don't need AI hero images per-email; hero image can be added
+    // via 改配圖 after the fact. Disabling image gen makes all 7 captions reliable.
+    variants: 7, images: 0, runImageGen: false, imageDirectorId: null as any,
+    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
     variantLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
-    captionMinChars: 200, captionMaxChars: 400,
+    captionMinChars: 200, captionMaxChars: 500,
     postLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
-    disableScout: true, // scout fires for ALL 99s by default → 502/last-2-drop
+    disableScout: true,
     extras: { postsCount: 7, replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "pr-99-launch-toolkit": {
