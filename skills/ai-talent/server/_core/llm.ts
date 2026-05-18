@@ -173,14 +173,14 @@ const PROVIDER_CONFIG: Record<
   //           text-embedding-3-large/small, Cohere-embed-v3-multilingual, Cohere-rerank-v4.0-pro
   //   Key: AZURE_FOUNDRY_API_KEY  Endpoint: AZURE_FOUNDRY_PROJECT_ENDPOINT
   "azure-foundry": {
+    // 2026-05-19: Azure AI Foundry requires the deployment name in the URL path
+    // (.../openai/deployments/{name}/chat/completions), NOT in the request body
+    // like standard OpenAI. baseUrl must be the bare project endpoint (no /openai/v1).
+    // The deployment path is appended in invokeLLMOnce / invokeLLMStream.
     baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
-      ? `${((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")}/openai/v1`
-      : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/onbrand/openai/v1",
-    // 2026-05-18: was "gpt-5.4-mini" — that deployment does NOT exist in the
-    // Azure portal (all 42 deployments are healthy; none named gpt-5.4-mini).
-    // Corrected to gpt-4o-mini which is confirmed present. Override via
-    // AZURE_FOUNDRY_MODEL env var if a different deployment name is needed.
-    defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-4o-mini",
+      ? ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")
+      : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law",
+    defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-4.1",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
 
@@ -837,8 +837,13 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
   // Azure Northcentral (DeepSeek): per-deployment path + api-version query.
   // Probe 2026-05-08 confirmed this pattern works (DeepSeek-V3.2 200 OK 1.5s).
   // The /openai/v1/chat/completions pattern times out for this resource.
+  //
+  // Azure AI Foundry also requires deployment name in URL path (not just body):
+  // /openai/deployments/{deployment}/chat/completions?api-version=...
   const apiUrl = providerKey === "azure-northcentral"
     ? `${(((ENV as any).AZURE_NORTHCENTRAL_ENDPOINT as string) ?? "https://cjwan-mnykipqt-northcentralus.cognitiveservices.azure.com").replace(/\/$/, "")}/openai/deployments/${encodeURIComponent(model)}/chat/completions?api-version=2024-10-21`
+    : providerKey === "azure-foundry"
+    ? `${config.baseUrl}/openai/deployments/${encodeURIComponent(model)}/chat/completions?api-version=2024-12-01-preview`
     : `${config.baseUrl}/chat/completions`;
 
   const {
@@ -1044,7 +1049,12 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
   if (providerKey === "azure-foundry" && !params.model) {
     model = pickAzureModelForMessages(params.messages);
   }
-  const apiUrl = `${config.baseUrl}/chat/completions`;
+  // Azure AI Foundry requires the deployment name in the URL path:
+  // /openai/deployments/{deployment}/chat/completions?api-version=...
+  // All other providers use the OpenAI-style /chat/completions with model in body.
+  const apiUrl = providerKey === "azure-foundry"
+    ? `${config.baseUrl}/openai/deployments/${encodeURIComponent(model)}/chat/completions?api-version=2024-12-01-preview`
+    : `${config.baseUrl}/chat/completions`;
 
   const { messages, tools, toolChoice, tool_choice } = params;
   const payload: Record<string, unknown> = {
@@ -1095,7 +1105,8 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
         // (non-reasoning, deterministic clean output).
         const fbModel = (ENV as any).AZURE_FOUNDRY_FALLBACK_MODEL ?? "gpt-4.1";
         console.warn(`[invokeLLMStream] Anthropic failed → falling back to Azure Foundry ${fbModel}`);
-        const fbUrl = `${foundryEndpoint}/openai/v1/chat/completions`;
+        // Azure AI Foundry: deployment name must be in URL path, not just body
+        const fbUrl = `${foundryEndpoint}/openai/deployments/${encodeURIComponent(fbModel)}/chat/completions?api-version=2024-12-01-preview`;
         const fbPayload = {
           model: fbModel,
           messages: messages.map(normalizeMessage),
