@@ -55,6 +55,12 @@ const HARD_BUDGET_99S= 150_000; // 100s tier
 // caps the overall job. Variants run in parallel so wall time stays low.
 const PER_IMAGE_MS    = 45_000;
 const LLM_BUDGET_MS   = 40_000;
+// 2026-05-18 (CJ「想辦法加速」): the strategist anchor runs SEQUENTIALLY
+// before captions (captions depend on it), so its budget is dead time on
+// the critical path until the user sees output. It's non-fatal (callers
+// fall back to brand context if it's empty) → cap it tight. Cuts up to
+// ~18s off every strategist task's time-to-first-output / 502 risk.
+const STRATEGIST_BUDGET_MS = 22_000;
 const QA_BUDGET_MS    = 12_000;
 
 export type OrchestraTier = "30s" | "60s" | "99s";
@@ -980,7 +986,7 @@ async function callStrategist(args: {
         undefined,
         "qwen",
       ),
-      timeoutPromise<never>(LLM_BUDGET_MS, "strategist"),
+      timeoutPromise<never>(STRATEGIST_BUDGET_MS, "strategist"),
     ]);
     return r.content.trim().slice(0, 1500);
   } catch { return ""; }
@@ -1102,7 +1108,11 @@ async function genOneImage(prompt: string, config: OrchestraConfig): Promise<Orc
     // 90s, blowing the ~30-60s background budget so the card never
     // resolved. Cap the imagen attempt tight (25s); if it fails/slow,
     // the proven Flux Schnell fallback still finishes inside budget.
-    const IMAGEN_CAP_MS = 25_000;
+    // 2026-05-18 (CJ「想辦法加速」): Imagen 4 normally returns < 18s;
+    // capping the primary attempt tighter means a slow Imagen falls back
+    // to the proven (faster) Flux sooner. Saves up to ~7s/image on the
+    // slow path — directly shortens the hold-for-images wait.
+    const IMAGEN_CAP_MS = 18_000;
     let r;
     try {
       r = await tryModel("google/imagen-4-default", "imagen-4", IMAGEN_CAP_MS);

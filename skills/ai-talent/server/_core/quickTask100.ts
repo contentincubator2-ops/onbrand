@@ -92,6 +92,50 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
   {
+    // 2026-05-18 (CJ「也要移動 viral/testimonial」): strategist + specialty
+    // (Compare Editor) too heavy for 60s — same 502 risk as trend-rewrite.
+    id: "fb-99-viral-rewrite",
+    tier: "99s", postType: "feed",
+    label: "FB 爆款改寫",
+    description: "Kevin Liu 找原爆款結構 + Siyu Li 改寫品牌版 + 對照表（scout 抓同類爆款）",
+    agent_id: 60048, // Siyu Li
+    skill_slug: "fb-copywriting",
+    primary_question: "貼上爆款原文（或連結），我們會分析結構並改寫成你的版本",
+    primary_input: { key: "viral_source", placeholder: "貼上原爆款貼文 / 連結 / 主題", type: "textarea" },
+    inputs: [
+      { key: "viral_source", label: "爆款原文 / 連結 / 主題", type: "textarea", required: true },
+      { key: "brand_angle", label: "我方品牌角度（可選）", type: "textarea", required: false },
+    ],
+    systemPrompt: `產出 FB 爆款改寫文（200-400 字）。
+**核心原則**：保留原爆款的「敘事結構 / hook 機制 / 情緒節奏」，但內容換成品牌自己的事。不是抄文字，是學結構。
+不要直接複製原文用詞。注意法規 / 抄襲分寸。${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 1100,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+  {
+    id: "fb-99-testimonial-rewrite",
+    tier: "99s", postType: "feed",
+    label: "FB 客戶見證改寫文",
+    description: "Kurt Chen 找見證結構 + Yawen Ma 改寫敘事 + Jason Evans 法務檢核",
+    agent_id: 60026, // Kevin Chiang
+    skill_slug: "fb-copywriting",
+    primary_question: "貼上原始客戶見證 / 訪談 / 評價",
+    primary_input: { key: "testimonial_source", placeholder: "客戶原話、訪談逐字、評論截圖文字", type: "textarea" },
+    inputs: [
+      { key: "testimonial_source", label: "客戶見證原文", type: "textarea", required: true },
+      { key: "consent_status", label: "已取得發布同意？", type: "text", required: false, placeholder: "yes / 匿名化 / 待確認" },
+    ],
+    systemPrompt: `產出 FB 客戶見證改寫文（200-350 字）。
+**核心原則**：保留客戶情感真實感，重組敘事讓重點凸顯。
+**法務 / 倫理**：
+- 預設匿名化（除非明確標 "yes"），姓名只留首字
+- 不要編造客戶沒說過的話
+- 數字 / 成效宣稱必須有原文支持
+- 結尾不要寫成廣告口吻${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 1100,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+  {
     // 2026-05-18 (CJ「FB 時事改寫文 502」): moved from fb-60-trend-rewrite.
     // strategist (Mark Davis) + specialty (Trend Researcher) + scout +
     // captions ran synchronously past nginx's 60s upstream timeout → 502.
@@ -675,6 +719,27 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     cardsPerVariant: 5,
     holdForImages: true,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
+  },
+  "fb-99-viral-rewrite": {
+    ...fb100Common, variants: 5, images: 5,
+    aspectRatio: "1:1", fluxSize: "square_hd",
+    variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
+    captionMinChars: 200, captionMaxChars: 400,
+    strategistAgentId: 180142, // Kevin Liu — Social Listening
+    specialtyAgentId: 220504,  // Cheng-Tse Liao — Compare Editor
+    scoutKind: "viral",
+    holdForImages: true,
+    extras: { ...fb100Common.extras, compareTable: true },
+  },
+  "fb-99-testimonial-rewrite": {
+    ...fb100Common, variants: 5, images: 5,
+    aspectRatio: "1:1", fluxSize: "square_hd",
+    variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
+    captionMinChars: 200, captionMaxChars: 350,
+    strategistAgentId: 220754, // Kurt Chen — Insights Storyteller
+    specialtyAgentId: 180855,  // Jason Evans — Risk & Compliance
+    holdForImages: true,
+    extras: { ...fb100Common.extras, legalAssistant: true },
   },
   "fb-99-trend-rewrite": {
     ...fb100Common, variants: 5, images: 5,

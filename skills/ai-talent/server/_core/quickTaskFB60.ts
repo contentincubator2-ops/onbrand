@@ -221,62 +221,18 @@ ${FB60_TONE}`,
   //    (strategist + 3 episodes + 3 images + extras too heavy for 60s,
   //    hit the 5-min stale guard). normalizeTaskId maps the old id fwd.
 
-  // 10. 爆款改寫 — Strategist: Kevin Liu, Writer: Siyu Li, Specialty: Cheng-Tse Liao
-  {
-    id: "fb-60-viral-rewrite",
-    tier: "60s",
-    postType: "feed",
-    label: "FB 爆款改寫",
-    description: "Kevin Liu 找原爆款結構 + Siyu Li 改寫品牌版 + 對照表",
-    agent_id: 60048, // Siyu Li
-    skill_slug: "fb-copywriting",
-    primary_question: "貼上爆款原文（或連結），我們會分析結構並改寫成你的版本",
-    primary_input: { key: "viral_source", placeholder: "貼上原爆款貼文 / 連結 / 主題", type: "textarea" },
-    inputs: [
-      { key: "viral_source", label: "爆款原文 / 連結 / 主題", type: "textarea", required: true },
-      { key: "brand_angle", label: "我方品牌角度（可選）", type: "textarea", required: false },
-    ],
-    systemPrompt: `產出 FB 爆款改寫文（200-400 字）。
-**核心原則**：保留原爆款的「敘事結構 / hook 機制 / 情緒節奏」，但內容換成品牌自己的事。不是抄文字，是學結構。
-不要直接複製原文用詞。注意法規 / 抄襲分寸。
-${FB60_TONE}`,
-    preferredModel: "qwen",
-    maxTokens: 1100,
-    outputDefaults: { platform: "facebook", post_type: "feed" },
-  },
+  // 10. 爆款改寫 — 2026-05-18 (CJ): moved to 99s as fb-99-viral-rewrite
+  //     (strategist + specialty too heavy for 60s, 502 risk).
+  //     normalizeTaskId maps the old id forward.
 
   // 11. 時事改寫文 — 2026-05-18 (CJ「502」): moved to 99s as
   //     fb-99-trend-rewrite (strategist + specialty + scout too heavy
   //     for 60s — synchronous part hit nginx 60s → 502). normalizeTaskId
   //     maps the old id forward.
 
-  // 12. 客戶見證改寫文 — Strategist: Kurt Chen, Writer: Yawen Ma, Specialty: Jason Evans
-  {
-    id: "fb-60-testimonial-rewrite",
-    tier: "60s",
-    postType: "feed",
-    label: "FB 客戶見證改寫文",
-    description: "Kurt Chen 找見證結構 + Yawen Ma 改寫敘事 + Jason Evans 法務檢核",
-    agent_id: 60026, // Kevin Chiang | Financial Brand Social Copywriter
-    skill_slug: "fb-copywriting",
-    primary_question: "貼上原始客戶見證 / 訪談 / 評價",
-    primary_input: { key: "testimonial_source", placeholder: "客戶原話、訪談逐字、評論截圖文字", type: "textarea" },
-    inputs: [
-      { key: "testimonial_source", label: "客戶見證原文", type: "textarea", required: true },
-      { key: "consent_status", label: "已取得發布同意？", type: "text", required: false, placeholder: "yes / 匿名化 / 待確認" },
-    ],
-    systemPrompt: `產出 FB 客戶見證改寫文（200-350 字）。
-**核心原則**：保留客戶情感真實感，重組敘事讓重點凸顯。
-**法務 / 倫理**：
-- 預設匿名化（除非明確標 "yes"），姓名只留首字
-- 不要編造客戶沒說過的話
-- 數字 / 成效宣稱必須有原文支持
-- 結尾不要寫成廣告口吻
-${FB60_TONE}`,
-    preferredModel: "qwen",
-    maxTokens: 1100,
-    outputDefaults: { platform: "facebook", post_type: "feed" },
-  },
+  // 12. 客戶見證改寫文 — 2026-05-18 (CJ): moved to 99s as
+  //     fb-99-testimonial-rewrite (strategist + legal specialty too
+  //     heavy for 60s). normalizeTaskId maps the old id forward.
 
   // 13. FB 廣告完整包 A/B/C — 3 個獨立廣告，每個含 caption + 3 張視覺
   // 替代危機回覆任務，per CJ direction 2026-05-06
@@ -466,48 +422,13 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 9. 3 篇連載 — 2026-05-18 (CJ): moved to 99s as fb-99-serial-3.
   //    Config now in FB_99S_ORCHESTRA.
 
-  // 10. 爆款改寫 — strategist: Kevin Liu, specialty: Cheng-Tse Liao (compare)
-  "fb-60-viral-rewrite": {
-    variants: 5,
-    images: 5,
-    runImageGen: true,
-    imageDirectorId: FB60_DIR_CHLOE_Y,
-    aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
-    variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
-    captionMinChars: 200,
-    captionMaxChars: 400,
-    strategistAgentId: 180142, // Kevin Liu — Social Listening
-    specialtyAgentId: 220504,  // Cheng-Tse Liao — Compare Editor
-    extras: {
-      compareTable: true,
-      replyTemplates: 5, postingTime: true, followupPost: true,
-    },
-  },
+  // 10. 爆款改寫 — 2026-05-18 (CJ): moved to 99s as fb-99-viral-rewrite.
 
   // 11. 時事改寫文 — 2026-05-18 (CJ): moved to 99s as fb-99-trend-rewrite.
   //     Config now in FB_99S_ORCHESTRA.
 
-  // 12. 客戶見證改寫文 — strategist: Kurt Chen, specialty: Jason Evans (legal)
-  "fb-60-testimonial-rewrite": {
-    variants: 5,
-    images: 5,
-    runImageGen: true,
-    imageDirectorId: FB60_DIR_LYDIA,
-    aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
-    variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
-    captionMinChars: 200,
-    captionMaxChars: 350,
-    strategistAgentId: 220754, // Kurt Chen — Insights Storyteller
-    specialtyAgentId: 180855,  // Jason Evans — Risk & Compliance
-    extras: {
-      legalAssistant: true,
-      replyTemplates: 5, postingTime: true, followupPost: true,
-    },
-  },
+  // 12. 客戶見證改寫文 — 2026-05-18 (CJ): moved to 99s as
+  //     fb-99-testimonial-rewrite.
 
   // 13. FB 廣告完整包 A/B/C — multi-post fanout for 3 ad angles
   "fb-60-ad-pack-3": {
