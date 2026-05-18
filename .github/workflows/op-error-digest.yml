@@ -59,14 +59,26 @@ jobs:
           tail -50 /home/azureuser/.pm2/logs/onbrand-error.log 2>&1
 
           echo ""
-          echo "════ azure-foundry errors in last 15 min (post-fix check) ════"
-          grep "azure-foundry" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null \
-            | tail -20 \
-            | grep -v "^$" || echo "(none — azure-foundry clean)"
+          echo "════ LLM env vars (azure-foundry config check) ════"
+          echo "AZURE_FOUNDRY_MODEL     = ${AZURE_FOUNDRY_MODEL:-(not set → code default: gpt-4o-mini)}"
+          echo "AZURE_FOUNDRY_PROJECT_ENDPOINT = ${AZURE_FOUNDRY_PROJECT_ENDPOINT:-(not set → hardcoded URL)}"
+          echo "LLM_FALLBACK_CHAIN      = ${LLM_FALLBACK_CHAIN:-(not set → code cascade)}"
+          echo "LLM_PRIMARY             = ${LLM_PRIMARY:-(not set)}"
 
           echo ""
-          echo "════ DeploymentNotFound in last 15 min ════"
-          awk -v cutoff="$(date -d '15 minutes ago' '+%Y-%m-%dT%H:%M')" \
-            '$0 >= cutoff' /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null \
-            | grep -i "DeploymentNotFound" | wc -l \
-            | xargs -I{} echo "{} DeploymentNotFound errors in last 15 min"
+          echo "════ pm2 log format (first line check) ════"
+          head -1 /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null | cut -c1-60
+
+          echo ""
+          echo "════ Last 5 azure-foundry log lines (with line numbers) ════"
+          grep -n "azure-foundry\|DeploymentNotFound\|gpt-5\|gpt-4o-mini" \
+            /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null | tail -10
+
+          echo ""
+          echo "════ DeploymentNotFound count since last pm2 restart ════"
+          # Find restart marker, count errors after it
+          RESTART_LINE=$(grep -n "pm2\|restart\|\[NestApplication\]\|Server listening\|started" \
+            /home/azureuser/.pm2/logs/onbrand-out.log 2>/dev/null | tail -1 | cut -d: -f1)
+          echo "pm2 last start at out.log line: ${RESTART_LINE:-(unknown)}"
+          grep "DeploymentNotFound" /home/azureuser/.pm2/logs/onbrand-error.log \
+            2>/dev/null | wc -l | xargs echo "Total DeploymentNotFound in error log:"
