@@ -54,14 +54,8 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   // 2026-05-18 (CJ「促銷月曆也超時」): replaced by the fast structured
   // orchestra task fb-99-monthly-calendar-promo (parallel-by-pillar +
   // Calendar mockup), so this heavy squad card is removed.
-  {
-    id: "fb-99-event-launch",
-    squad_slug: "fb-garyvee-jab-hook",
-    platform: "facebook", postType: "event",
-    label: "FB 活動上線完整劇本",
-    description: "預告期養粉絲 → 當日大力推 → 事後追蹤的完整節奏（先給價值、最後才出手）",
-    methodology: "GaryVee Jab-Jab-Right-Hook",
-  },
+  // 2026-05-18 (CJ): fb-99-event-launch (GaryVee Jab-Jab-Right-Hook
+  // squad) removed from the catalog per request.
   {
     id: "fb-99-countdown-series",
     squad_slug: "fb-countdown-series",
