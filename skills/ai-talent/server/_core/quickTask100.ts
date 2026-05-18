@@ -250,9 +250,9 @@ ${TONE_100}`,
       { key: "event_when", label: "日期 / 時間", type: "text", required: true },
       { key: "event_why", label: "為什麼參加 / 重點", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 FB launch toolkit 其中 1 篇（150-300 字）。
-本次你寫的是「{label}」（預告 1 / 預告 2 / 預告 3 / 當日 / 即時 1 / 即時 2 / 事後 / IG 跨平台改寫）。
-每篇要扣回整個 launch arc，前一篇結尾鉤子帶到下一篇。${TONE_100}`,
+    systemPrompt: `本次你負責「{label}」。
+- 若「{label}」=「活動總覽」：產出一頁式**活動總覽文件**（Markdown 分段）：① 活動目標與受眾 ② 整體時程與節奏（哪幾天發哪一篇）③ 8 篇貼文各自的主題與角色一覽 ④ KPI 與成效追蹤建議 ⑤ 風險/備案。這是計畫文件，不是貼文，不受字數限制；事實不得捏造，缺的用「[請補充：…]」標出。
+- 否則（預告 1/2/3、當日、即時 1/2、事後、IG 跨平台改寫）：產出該篇 FB 貼文（150-300 字），扣回整個 launch arc，前一篇結尾鉤子帶到下一篇。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1100,
     outputDefaults: { platform: "facebook", post_type: "event" },
   },
@@ -846,14 +846,16 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { ...fb100Common.extras, postsCount: 7 },
   },
   "fb-99-launch-toolkit": {
-    ...fb100Common, variants: 8, images: 8,
+    // 2026-05-18 (CJ「launch-toolkit 加總覽」): first variant = 活動總覽
+    // (one-page campaign plan doc), then the 8 posts.
+    ...fb100Common, variants: 9, images: 9,
     aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
+    variantLabels: ["活動總覽", "預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
     captionMinChars: 150, captionMaxChars: 300,
     strategistAgentId: 60002, // Ethan Chiang — DTC E-commerce Brand Strategist
-    postLabels: ["預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
+    postLabels: ["活動總覽", "預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
     scoutKind: "viral", // 看同類 launch 通常用什麼 hook
-    extras: { ...fb100Common.extras, postsCount: 8 },
+    extras: { ...fb100Common.extras, postsCount: 9 },
   },
   "fb-99-livestream-9seg": {
     ...fb100Common, variants: 9, images: 9,

@@ -750,6 +750,11 @@ export default function RunPage() {
     if (/quarterly-strategy|monthly-analytics|account-reposition|mass-control|offer-first|hormozi|magnetic|kennedy/.test(taskId)) {
       return { platform: "generic" as any, format: "research-doc" as any, label: "generic:research-doc" };
     }
+    // 2026-05-18 (CJ): carousel-cvo squad is a 10-card carousel narrative
+    // → render as a carousel, not a feed post.
+    if (/deiss-cvo|carousel-cvo/.test(taskId)) {
+      return { platform: "facebook" as any, format: "carousel" as any, label: "facebook:carousel" };
+    }
 
     // ── Layer 1: Brand + Research (proposal-style mockups) ──
     if (taskId.startsWith("br-") || taskId.startsWith("rs-")) {
@@ -884,6 +889,10 @@ export default function RunPage() {
     if (/常見問答|常見問題|FAQ|Q&A|問答集/i.test(lbl)) return v("facebook", "qa");
     if (/關於我們|about us/i.test(lbl)) return v("facebook", "about");
     if (/代表案例|客戶成功|case study/i.test(lbl)) return v("facebook", "feed");
+    // 2026-05-18 (CJ「launch-toolkit 加總覽」): the 「活動總覽」 variant is
+    // a one-page campaign plan → render as a doc; the 8 post variants
+    // stay FB feed.
+    if (/活動總覽|總覽|campaign overview/i.test(lbl)) return v("generic", "research-doc");
     if (/threads/i.test(lbl)) return v("threads", "post");
     if (/linkedin|領英/i.test(lbl)) return v("linkedin", "feed");
     if (/facebook|臉書|\bFB\b/i.test(lbl)) return v("facebook", "feed");
