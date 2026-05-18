@@ -19,6 +19,7 @@ import { ACHIEVEMENTS, type AchievementRoute } from "./achievements";
 
 export type Reward =
   | { type: "quota_bonus"; field: "image_gen" | "video_gen" | "brands"; amount: number; label: string }
+  | { type: "points_add"; amount: number; label: string }
   | { type: "trial_extend"; days: number; label: string }
   | { type: "feature_flag"; flag: string; label: string }
   | { type: "promo_code"; kind: "first_month_pct" | "annual_pct"; discountPct: number; expiresInDays: number; label: string }
@@ -30,10 +31,12 @@ export const ROUTE_REWARDS: Record<AchievementRoute, Reward[]> = {
     { type: "quota_bonus", field: "brands", amount: 1, label: "額外 1 個品牌位（試用期間）" },
   ],
   explore: [
-    { type: "quota_bonus", field: "image_gen", amount: 30, label: "額外 30 張 AI 圖（試用期間）" },
+    // 2026-05-18: was quota_bonus:image_gen (legacy — no longer gated); converted to points_add
+    { type: "points_add", amount: 300, label: "額外 300 試用點數" },
   ],
   visual: [
-    { type: "quota_bonus", field: "video_gen", amount: 2, label: "額外 2 支 AI 影片（試用期間）" },
+    // 2026-05-18: was quota_bonus:video_gen (video disabled + legacy quota); converted to points_add
+    { type: "points_add", amount: 300, label: "額外 300 試用點數" },
   ],
   planning: [
     { type: "feature_flag", flag: "schedule_reminder_beta", label: "解鎖「自動排程提醒」beta" },
@@ -88,6 +91,12 @@ async function applyReward(userId: number, reward: Reward): Promise<{ applied: b
         [JSON.stringify(existing), userId],
       );
       return { applied: true, meta: { newQuotaBonus: existing } };
+    }
+    case "points_add": {
+      // Add points directly to the user's pointsBalance (points system, 2026-05-18)
+      const { addPoints } = await import("./pointsService");
+      await addPoints(userId, reward.amount, "grant", reward.label);
+      return { applied: true, meta: { pointsAdded: reward.amount } };
     }
     case "trial_extend": {
       // Add days to planEndsAt (only meaningful when on trial)

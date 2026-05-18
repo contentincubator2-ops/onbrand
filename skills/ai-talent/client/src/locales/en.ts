@@ -237,7 +237,7 @@ export const en = {
 
   // ── Auth: Register ───────────────────────────────────────────────────────
   auth_register_title:     "Create your account",
-  auth_register_subtitle:  "7 days free. No credit card.",
+  auth_register_subtitle:  "7 days or 1000 pts free. No credit card.",
   auth_name_label:         "Name",
   auth_name_placeholder:   "Sarah Chen",
   auth_company_label:      "Company (optional)",
@@ -478,7 +478,7 @@ export const en = {
   // ── Pricing / billing ────────────────────────────────────────────────────
   pricing_title:           "Simple pricing",
   pricing_subtitle:        "Start free. Pay when it works for you.",
-  pricing_trial_cta:       "Start 7-day trial",
+  pricing_trial_cta:       "Start free trial",
   pricing_upgrade_cta:     "Upgrade",
   pricing_per_month:       "/ month",
   pricing_per_year:        "/ year",

@@ -231,7 +231,7 @@ export const zh = {
 
   // ── Auth: Register ───────────────────────────────────────────────────────
   auth_register_title:     "開始做點東西",
-  auth_register_subtitle:  "7 天免費，不用先綁卡",
+  auth_register_subtitle:  "7 天或 1000 點免費，不用先綁卡",
   auth_name_label:         "你的名字",
   auth_name_placeholder:   "例:陳雅婷",
   auth_company_label:      "公司（選填）",
@@ -472,7 +472,7 @@ export const zh = {
   // ── Pricing / billing ────────────────────────────────────────────────────
   pricing_title:           "簡單透明的定價",
   pricing_subtitle:        "先免費試用，覺得有用再付。",
-  pricing_trial_cta:       "開始 7 天免費試用",
+  pricing_trial_cta:       "開始免費試用",
   pricing_upgrade_cta:     "升級 Pro",
   pricing_per_month:       "/ 月",
   pricing_per_year:        "/ 年",

@@ -18,8 +18,8 @@ import {
 /** Mini reward catalog — must mirror server/_core/achievementRewards.ts */
 const ROUTE_REWARDS_DISPLAY_ZH: Record<string, string[]> = {
   onboarding:  ["額外 1 個品牌位（試用期間）"],
-  explore:     ["額外 30 張 AI 圖（試用期間）"],
-  visual:      ["額外 2 支 AI 影片（試用期間）"],
+  explore:     ["額外 300 試用點數"],
+  visual:      ["額外 300 試用點數"],
   planning:    ["解鎖「自動排程提醒」beta"],
   integration: ["解鎖「品牌風格匯出 PDF」"],
   publish:     ["試用期延長 3 天"],
@@ -27,8 +27,8 @@ const ROUTE_REWARDS_DISPLAY_ZH: Record<string, string[]> = {
 };
 const ROUTE_REWARDS_DISPLAY_EN: Record<string, string[]> = {
   onboarding:  ["+1 brand slot (trial)"],
-  explore:     ["+30 AI images (trial)"],
-  visual:      ["+2 AI videos (trial)"],
+  explore:     ["+300 trial points"],
+  visual:      ["+300 trial points"],
   planning:    ["Unlock auto-schedule reminders (beta)"],
   integration: ["Unlock brand-style PDF export"],
   publish:     ["+3 trial days"],

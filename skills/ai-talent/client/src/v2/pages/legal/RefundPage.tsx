@@ -29,8 +29,8 @@ export default function RefundPage() {
           </h2>
           <p>
             {isEn
-              ? "New users get a 7-day free trial. No credit card needed. There are no charges during the trial — and nothing to refund."
-              : "新用戶享有 7 天免費試用，無須綁定信用卡。試用期內無任何費用，亦不需退費程序。"}
+              ? "New users get a free trial limited to 7 days or 1,000 trial points — whichever runs out first. No credit card needed. There are no charges during the trial — and nothing to refund."
+              : "新用戶享有免費試用，上限為 7 天或 1,000 試用點數（先到先停），無須綁定信用卡。試用期內無任何費用，亦不需退費程序。"}
           </p>
 
           <h2 className="text-lg font-semibold">
