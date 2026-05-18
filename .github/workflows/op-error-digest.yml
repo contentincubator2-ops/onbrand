@@ -17,7 +17,7 @@ jobs:
 
           echo "════ Last 1h error_log counts by source ════"
           $MYSQL -t -e "
-            SELECT source, COUNT(*) AS n, MAX(ts) AS latest
+            SELECT source, COUNT(*) AS n, MAX(createdAt) AS latest
               FROM error_log
              WHERE createdAt > NOW() - INTERVAL 1 HOUR
              GROUP BY source
@@ -27,7 +27,7 @@ jobs:
           echo ""
           echo "════ Top 10 error messages in last 1h (by fingerprint) ════"
           $MYSQL -t -e "
-            SELECT COUNT(*) AS n, source, LEFT(message, 100) AS message_head, MAX(ts) AS latest
+            SELECT COUNT(*) AS n, source, LEFT(message, 100) AS message_head, MAX(createdAt) AS latest
               FROM error_log
              WHERE createdAt > NOW() - INTERVAL 1 HOUR
              GROUP BY fingerprint, source, message_head
@@ -57,3 +57,16 @@ jobs:
           echo ""
           echo "════ pm2 onbrand last 50 error lines ════"
           tail -50 /home/azureuser/.pm2/logs/onbrand-error.log 2>&1
+
+          echo ""
+          echo "════ azure-foundry errors in last 15 min (post-fix check) ════"
+          grep "azure-foundry" /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null \
+            | tail -20 \
+            | grep -v "^$" || echo "(none — azure-foundry clean)"
+
+          echo ""
+          echo "════ DeploymentNotFound in last 15 min ════"
+          awk -v cutoff="$(date -d '15 minutes ago' '+%Y-%m-%dT%H:%M')" \
+            '$0 >= cutoff' /home/azureuser/.pm2/logs/onbrand-error.log 2>/dev/null \
+            | grep -i "DeploymentNotFound" | wc -l \
+            | xargs -I{} echo "{} DeploymentNotFound errors in last 15 min"
