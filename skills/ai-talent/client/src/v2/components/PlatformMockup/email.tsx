@@ -41,18 +41,46 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
     return loose?.[1]?.trim() || "";
   };
   const parsedCta = _grabCta() || liveCta || "";
-  const bodyText = _cap
-    // Strip metadata header lines (add `g` flag — model sometimes repeats them)
-    .replace(/^[\s#*>\-]*主旨\s*[：:].*$/mg, "")
-    .replace(/^[\s#*>\-]*預覽(?:文字)?\s*[：:].*$/mg, "")
-    .replace(/^[\s#*>\-]*(?:CTA|行動呼籲)\s*[：:].*$/mg, "")
-    // Also strip any inline "CTA：..." that slipped into body paragraphs
-    .replace(/(?:CTA|行動呼籲)\s*[：:]\s*.{1,20}?(?=[）\n\r！。？，, ]|$)/gm, "")
-    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, "")
-    .replace(/(^|\s)#[^\s#]+/g, "")
-    .replace(/[!！]+(?=\s*$)/gm, "。")
+  // 2026-05-19 (CJ 驗收 P1「Guardrail 殘缺」): prompt-only guardrails keep
+  // leaking 驚嘆號 + 煽動詞 on the heaviest letters (上線封 / 提醒2). Add a
+  // deterministic mockup-side sanitizer as backstop — applied to BOTH body
+  // and preview text. Replaces ALL ！/! (not just line-end), strips emoji /
+  // hashtags, and soft-rewrites the top forbidden 煽動 phrases.
+  const _sanitize = (s: string): string =>
+    s
+      .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, "")
+      .replace(/(^|\s)#[^\s#]+/g, "")
+      // forbidden 煽動 / 效率 phrases → calmer SoWork tone
+      .replace(/快來體驗/g, "歡迎了解")
+      .replace(/快(?:點|來)?把握(?:這個)?機會/g, "把握這次機會")
+      .replace(/快把握/g, "把握")
+      .replace(/別再猶豫/g, "")
+      .replace(/終於來了/g, "正式登場")
+      .replace(/(^|[，。、\s])而且(?=[！!])/g, "$1")
+      .replace(/立刻了解更多/g, "了解更多")
+      .replace(/立即(?=了解|報名|註冊|體驗)/g, "")
+      // collapse exclamation (mid-sentence too) → period
+      .replace(/[!！]+/g, "。")
+      // tidy up artefacts from the replacements above
+      .replace(/。{2,}/g, "。")
+      .replace(/(^|\n)\s*。\s*/g, "$1")
+      .replace(/[ \t]{2,}/g, " ");
+  const bodyText = _sanitize(
+    _cap
+      // Strip metadata header lines (add `g` flag — model sometimes repeats them)
+      .replace(/^[\s#*>\-]*主旨\s*[：:].*$/mg, "")
+      .replace(/^[\s#*>\-]*預覽(?:文字)?\s*[：:].*$/mg, "")
+      .replace(/^[\s#*>\-]*(?:CTA|行動呼籲)\s*[：:].*$/mg, "")
+      // Also strip any inline "CTA：..." that slipped into body paragraphs
+      .replace(/(?:CTA|行動呼籲)\s*[：:]\s*.{1,20}?(?=[）\n\r！。？，, ]|$)/gm, ""),
+  )
     .replace(/\n{3,}/g, "\n\n")
     .replace(/^\s+/, "")
+    .trim();
+  // preview text: same forbidden-phrase + emoji cleanup, plus drop any
+  // CTA-leak that slipped into the preview line ("…立刻了解更多").
+  const previewClean = _sanitize(previewText)
+    .replace(/(?:CTA|行動呼籲)\s*[：:]\s*.{1,20}/g, "")
     .trim();
 
   return (
@@ -109,8 +137,8 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
           <h1 className="text-[22px] font-bold leading-snug tracking-tight text-foreground mb-1">
             {subject || <Skeleton className="h-6 w-[70%] rounded" />}
           </h1>
-          {previewText && (
-            <p className="text-tiny text-default-400 mb-3 italic">{previewText}</p>
+          {previewClean && (
+            <p className="text-tiny text-default-400 mb-3 italic">{previewClean}</p>
           )}
           {bodyText ? (
             <MarkdownText content={bodyText} className="text-small text-default-600 leading-relaxed" />

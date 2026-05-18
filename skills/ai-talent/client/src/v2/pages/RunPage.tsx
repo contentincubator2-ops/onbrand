@@ -683,13 +683,18 @@ export default function RunPage() {
   // 2026-05-19: for email tasks (EDM), extract the per-slide email subject
   // so the title row can show "主旨：<current email subject>" rather than
   // the static mission title which always shows slide-0's subject.
+  // 2026-05-19 (CJ 驗收 P0-4「主旨面板始終停留在第一封」): the old code
+  // gated on data.mission.taskId.startsWith("em-"), but the client often
+  // has no resolved taskId (it's derived from the description tag and is
+  // frequently empty) → useMemo returned null → the panel fell back to the
+  // static data.title which is identical on every tab. Detect the subject
+  // straight from the current slide's caption instead — no taskId gate,
+  // mirroring EDMMockup's own header parsing (which IS correct per tab).
   const currentEmailSubject = useMemo(() => {
-    const taskId = data?.mission?.taskId ?? "";
-    if (!taskId.startsWith("em-")) return null;
     const cap = slide?.caption ?? "";
-    const m = cap.match(/^[\s#*>\-]*主旨\s*[：:]\s*(.+?)[\s*]*$/m);
+    const m = cap.match(/^[\s#*>\-]*主旨\s*[：:]\s*(.+?)\**\s*$/m);
     return m?.[1]?.trim() || null;
-  }, [data?.mission?.taskId, slide?.caption]);
+  }, [slide?.caption]);
 
   // P4: pre-fill image / video prompt when entering that mode or switching
   // variant. 2026-05-12 (CJ「按下改圖/改影片，應該要有預設的提示詞」).
