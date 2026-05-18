@@ -1648,10 +1648,25 @@ export async function runOrchestra(args: {
     // regex 一律清洗 + 必要時 LLM 收緊」的雙層守門（同 EDM/IG self-check
     // 證實有效的模式），對每一個變體都生效，不依賴模型自律。
     if (Array.isArray(captions) && captions.length &&
-        (isTikTokBodyTask(args.template) || isYouTubeBodyTask(args.template))) {
+        (isTikTokBodyTask(args.template) || isYouTubeBodyTask(args.template) ||
+         isKOLBodyTask(args.template))) {
       // L1 deterministic: 高信心、零成本、一律套用。
       const ttDet = (s: string): string =>
         s
+          // emoji 一律移除（含 😉 俏皮符號 — CJ 驗收 KOL 報價回應）
+          .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{2122}\u{2139}\u{203C}\u{2049}]/gu, "")
+          // 大陸用詞 → 台灣用語
+          .replace(/渠道/g, "管道")
+          // KOL 業配套語 / 空洞感性句 → 收斂（CJ 驗收 kl-60-pitch-pack）
+          .replace(/(?:特別是)?在這個數位時代[，,]?/g, "")
+          .replace(/讓我們的品牌故事更加精彩/g, "把品牌故事說得更清楚")
+          .replace(/更加精彩/g, "更完整")
+          .replace(/期待你的回音/g, "想聽聽你的想法")
+          .replace(/(?:讓我們一起)?打造出引人注目的內容(?:吧)?/g, "一起把內容做好")
+          .replace(/引人注目/g, "")
+          .replace(/感受到突破品牌行銷的興奮/g, "")
+          .replace(/非常契合/g, "很契合")
+          .replace(/管理品牌形象/g, "守住品牌的一致")
           // 帶貨/浮誇/效率詞 → 沉穩守護者語感（軟改寫，不硬刪以免斷句）
           .replace(/全台(?:品牌)?行銷人注意/g, "給品牌行銷人的觀察")
           .replace(/注意[！!]/g, "")
@@ -1704,12 +1719,12 @@ export async function runOrchestra(args: {
           const r: any = await invokeLLM({
             provider: "anthropic",
             messages: [{ role: "user", content:
-              `這是一段短影音／YouTube 首播預熱的文案（可能是腳本、Community 倒數貼文或直播配套）。請用「沉穩觀察者／守護者」語氣收緊，嚴格遵守：\n` +
-              `1. 全文不得有句尾或句中驚嘆號；不得出現「快來」「注意」「亮起來」「大放異彩」「宇宙無敵」「響亮無比」「佼佼者」「在快速進化的數位世界裡」等帶貨/浮誇/PR 腔詞。\n` +
-              `2. 開場第一行必須是「觀察句或反問句」，不得以呼籲句或 PR 腔起頭。\n` +
+              `這是一段品牌文案（可能是短影音腳本、首播預熱貼文、或 KOL 邀約話術）。請用「沉穩觀察者／守護者」語氣收緊，嚴格遵守：\n` +
+              `1. 全文不得有句尾或句中驚嘆號、不得有 emoji；不得出現「快來」「注意」「亮起來」「大放異彩」「宇宙無敵」「響亮無比」「佼佼者」「在這個/快速進化的數位世界裡」「更加精彩」「期待你的回音」「引人注目」「非常契合」等帶貨/浮誇/PR 腔詞。\n` +
+              `2. 開場第一行必須是「觀察句或反問句」，不得以呼籲句、寒暄或 PR 腔起頭。\n` +
               `   正向範例語感：「你的 AI 生出來的文案，真的是你嗎？」「大家都在說 AI 工具很強，但很少有人問它有沒有在用你的品牌邏輯說話。」\n` +
-              `3. 受眾是品牌行銷主管 / 經營者（B2B），措辭對齊專業決策者，不要寫成對一般消費者喊話。\n` +
-              `4. 全文繁體中文（台灣用語），不得有簡體字。\n` +
+              `3. 受眾是品牌行銷主管 / 經營者 / 合作創作者（專業對象），措辭對齊專業決策者，不要寫成對一般消費者喊話。\n` +
+              `4. 全文繁體中文（台灣用語，用「管道」不用「渠道」），不得有簡體字。收尾用一個對方會想回的具體問句，不要 PR 套語。\n` +
               `保持原本的主題、結構分段與長度，只輸出收緊後的文案本身，不要前言：\n\n${t}` }],
             maxTokens: 1200,
           });
