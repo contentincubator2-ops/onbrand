@@ -1,0 +1,36 @@
+name: Ops — Clean client node_modules (one-shot)
+# 2026-05-19: Run when npm ci fails with ENOTEMPTY due to corrupted node_modules.
+# Removes and reinstalls client node_modules, then rebuilds + restarts pm2.
+on: { workflow_dispatch: {} }
+jobs:
+  clean-rebuild:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+      - name: Clean client node_modules
+        run: |
+          set -e
+          CLIENT=/opt/onbrand/app/skills/ai-talent/client
+          echo "[clean] removing $CLIENT/node_modules"
+          rm -rf "$CLIENT/node_modules"
+          echo "[clean] done"
+
+      - name: npm install client
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent/client
+          NODE_ENV=development npm install --legacy-peer-deps 2>&1 | tail -10
+          echo "[npm] install done"
+
+      - name: Vite build
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent/client
+          npm run build 2>&1 | tail -20
+          echo "[build] done"
+
+      - name: Restart pm2
+        run: |
+          pm2 restart onbrand || pm2 start /opt/onbrand/app/skills/ai-talent/ecosystem.config.js
+          sleep 4
+          pm2 status
