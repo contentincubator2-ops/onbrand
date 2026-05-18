@@ -744,12 +744,11 @@ export default function RunPage() {
     // still resolve to the renamed mockup/prefix logic. Inline + idempotent.
     const taskId = (data?.mission?.taskId ?? "").replace(/^([a-z]+)-100-/, "$1-99-");
 
-    // 2026-05-18 (CJ「FB 季度策略小組 mockup 應該是 ppt / general doc」):
-    // these FB squads are strategy plans / reports / playbooks, NOT
-    // postable social content → render as a slide-deck (PPT) mockup,
-    // not a facebook:feed post.
+    // 2026-05-18 (CJ「改成用 word 形式，不要 ppt」): these FB squads are
+    // strategy plans / reports / playbooks, NOT postable social content
+    // → render as a written document (Word-style), not a slide deck.
     if (/quarterly-strategy|monthly-analytics|account-reposition|mass-control/.test(taskId)) {
-      return { platform: "deck" as any, format: "slide" as any, label: "deck:slide" };
+      return { platform: "generic" as any, format: "research-doc" as any, label: "generic:research-doc" };
     }
 
     // ── Layer 1: Brand + Research (proposal-style mockups) ──
