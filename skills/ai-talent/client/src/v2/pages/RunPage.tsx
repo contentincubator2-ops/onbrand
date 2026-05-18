@@ -744,6 +744,14 @@ export default function RunPage() {
     // still resolve to the renamed mockup/prefix logic. Inline + idempotent.
     const taskId = (data?.mission?.taskId ?? "").replace(/^([a-z]+)-100-/, "$1-99-");
 
+    // 2026-05-18 (CJ「FB 季度策略小組 mockup 應該是 ppt / general doc」):
+    // these FB squads are strategy plans / reports / playbooks, NOT
+    // postable social content → render as a slide-deck (PPT) mockup,
+    // not a facebook:feed post.
+    if (/quarterly-strategy|monthly-analytics|account-reposition|mass-control/.test(taskId)) {
+      return { platform: "deck" as any, format: "slide" as any, label: "deck:slide" };
+    }
+
     // ── Layer 1: Brand + Research (proposal-style mockups) ──
     if (taskId.startsWith("br-") || taskId.startsWith("rs-")) {
       const coverIds = ["br-30-tagline", "br-30-positioning", "br-30-elevator-pitch", "br-30-manifesto"];
