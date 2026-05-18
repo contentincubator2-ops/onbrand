@@ -442,6 +442,26 @@ export default function RunPage() {
     }
   };
 
+  // 2026-05-18 (CJ「toast 叫我點下方連接 Facebook 按鈕，但根本沒有那顆」):
+  // for Facebook there was ONLY the 直接發 button — no connect button —
+  // so the not-connected toast pointed at a button that didn't exist.
+  // Query FB status; when not connected the FB button BECOMES the
+  // connect action (clicking it IS a user gesture → popup allowed).
+  const fbBrandId = (data?.mission?.brandId ?? data?.brand?.id ?? 0) as number;
+  const fbStatusQuery = (trpc as any).publish?.getBrandFacebookStatus?.useQuery
+    ? (trpc as any).publish.getBrandFacebookStatus.useQuery(
+        { brandId: fbBrandId },
+        { enabled: fbBrandId > 0, refetchOnWindowFocus: false, staleTime: 15_000 },
+      )
+    : { data: null };
+  const fbConnected = !!(fbStatusQuery?.data as any)?.connected;
+
+  React.useEffect(() => {
+    // warm the FB connect token so the first click opens the popup
+    // synchronously (no gesture loss). Harmless when already connected.
+    if (fbBrandId > 0 && !fbConnected) prefetchConnect("facebook");
+  }, [fbBrandId, fbConnected, prefetchConnect]);
+
   const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
     ? (trpc as any).publish.toFacebook.useMutation({
         onSuccess: (r: any) => {
@@ -455,15 +475,17 @@ export default function RunPage() {
         onError: (e: any) => {
           const msg = String(e?.message ?? "");
           if (msg.includes("尚未連接") || msg.includes("缺 FB Page ID")) {
-            // 2026-05-18 (CJ「popup blocked」): a mutation onError is NOT a
-            // user gesture — auto-opening the OAuth popup here is always
-            // blocked. Instead warm the token and tell the user to tap
-            // the 連接 Facebook button (a real gesture → popup allowed).
+            // 2026-05-18 (CJ「toast 叫我點下方連接按鈕但沒有那顆」):
+            // refresh FB status so the publish button flips into the
+            // 「連接 Facebook 後發布」 connect button (same spot), and
+            // point the user at it. The button click is a real gesture
+            // → the OAuth popup opens without being blocked.
             prefetchConnect("facebook");
+            fbStatusQuery?.refetch?.();
             showToastGlobal(
               lang === "en"
-                ? "Facebook isn't connected — tap the 「Connect Facebook」 button below to authorize."
-                : "尚未授權 Facebook — 請點下方「連接 Facebook」按鈕完成授權"
+                ? "Facebook isn't connected — the publish button has switched to 「Connect Facebook」. Tap it to authorize."
+                : "尚未授權 Facebook — 上方發布按鈕已切換成「連接 Facebook 後發布」，點它即可完成授權"
             );
           } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
             showToastGlobal(
@@ -1768,6 +1790,25 @@ export default function RunPage() {
               {(() => {
                 const platform = (mockupVariant?.platform ?? "facebook") as string;
                 if (platform === "facebook") {
+                  // Not connected → THIS button is the connect action
+                  // (a real click → synchronous popup, no block).
+                  if (!fbConnected) {
+                    return (
+                      <Button
+                        color="primary" fullWidth
+                        startContent={<FontAwesomeIcon icon={faRocket} />}
+                        isLoading={pipedreamBusy}
+                        isDisabled={pipedreamBusy}
+                        onMouseEnter={() => prefetchConnect("facebook")}
+                        onFocus={() => prefetchConnect("facebook")}
+                        onPress={() => openPipedreamConnect("facebook")}
+                      >
+                        {pipedreamBusy
+                          ? (lang === "en" ? "Authorizing…" : "授權中…")
+                          : (lang === "en" ? "Connect Facebook to publish" : "連接 Facebook 後發布")}
+                      </Button>
+                    );
+                  }
                   return (
                     <Button
                       color="primary" fullWidth
