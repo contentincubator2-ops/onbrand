@@ -1295,12 +1295,20 @@ export async function runOrchestra(args: {
       isResearchTier
         ? (async () => {
             try {
-              return await fetchViralPatterns({
-                channel: taskChannel,
-                topic: taskTopic,
-                brandId: args.brandId,
-                kind: args.config.scoutKind ?? "viral",
-              });
+              // 2026-05-18 (CJ「FB 30天行事曆又 502」): scout is a LIVE web
+              // fetch (festivals/trending/news) with no timeout — if it
+              // hangs it blocks Stage 1 → strategist/captions/checkpoint
+              // never reached within nginx's 60s → 502. Cap it; null is
+              // non-fatal (task just ships without real-data validation).
+              return await Promise.race([
+                fetchViralPatterns({
+                  channel: taskChannel,
+                  topic: taskTopic,
+                  brandId: args.brandId,
+                  kind: args.config.scoutKind ?? "viral",
+                }),
+                timeoutPromise<null>(18_000, "scout"),
+              ]);
             } catch { return null; }
           })()
         : Promise.resolve(null),

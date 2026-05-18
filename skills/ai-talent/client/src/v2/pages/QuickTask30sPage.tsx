@@ -1367,9 +1367,13 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       // tier label and looks broken. For 60s show elapsed
                       // + a phase note (no misleading denominator); other
                       // tiers keep the "x / Ns" form.
+                      // 2026-05-18 (CJ「99S modal 讀秒 100 秒」): 60s/99s
+                      // are multi-stage (策略→文案→出圖→配套) and run
+                      // longer than the tier name — a hard "x / 100s"
+                      // looks broken. Show elapsed + a phase note instead.
                       const elapsedText =
-                        tier === "60s"
-                          ? `${(tickMs / 1000).toFixed(0)}s · ${lang === "en" ? "writing copy + rendering image" : "文案＋出圖中"}`
+                        (tier === "60s" || tier === "99s")
+                          ? `${(tickMs / 1000).toFixed(0)}s · ${lang === "en" ? "researching → writing → rendering" : "策略 → 文案 → 出圖中"}`
                           : `${(tickMs / 1000).toFixed(1)}s / ${expectedSec}s`;
                       const accent = tierAccent(tier);
 
