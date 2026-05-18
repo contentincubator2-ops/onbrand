@@ -7,6 +7,15 @@ name: Admin — Deploy to VM (self-hosted runner)
 on:
   workflow_dispatch:
 
+# 2026-05-19 (CJ 驗收 deploy 連續失敗根因): the self-hosted runner shares
+# ONE /opt tree. Concurrent deploy runs (multiple sessions dispatching)
+# stomp each other's node_modules mid-install → ENOTEMPTY / missing
+# typescript lib / @heroui/system-rsc resolve fail. Serialize: only one
+# deploy at a time; queue the rest (never cancel a half-done install).
+concurrency:
+  group: deploy-vm
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: [self-hosted, linux, vm-marketing-os]
