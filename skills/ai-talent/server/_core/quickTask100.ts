@@ -27,23 +27,36 @@ const TONE_100 = `
 // ─── FB 100s (5 tasks) ────────────────────────────────────────────────
 export const FB_99S_TASKS: FBTaskTemplate[] = [
   {
+    // 2026-05-18 (CJ「30天行事曆結果很不理想，要結構化行事曆+指定配比」):
+    // single structured 30-day calendar (NOT a strategy essay / weekly
+    // chunk). Fixed content mix per CJ + coursera FB-marketing structure.
     id: "fb-99-30day-calendar",
     tier: "99s", postType: "feed",
-    label: "FB 30 天內容月曆",
-    description: "30 天每日貼文大綱 + 內容支柱配比 + 真實爆款參考 + scout 抓即時節慶",
+    label: "FB 30 天內容行事曆",
+    description: "結構化 30 天行事曆：4 理念WHY / 4 產品 / 2 節慶 / 2 UGC見證 / 2 國際權威",
     agent_id: 224089, // Kevin Tan — Social Media Strategist eCommerce MY (1147 char)
     skill_slug: "content-calendar",
-    primary_question: "本月主推 / 主題？",
-    primary_input: { key: "monthly_focus", placeholder: "例：母親節檔 / 新品上市 / 品牌週年", type: "textarea" },
+    primary_question: "本月主推 / 主題？（可寫多個產品與目標族群）",
+    primary_input: { key: "monthly_focus", placeholder: "例：母親節檔｜主推 A 產品(忙碌媽媽) + B 產品(小資女)｜品牌理念：讓每個人都能輕鬆做出好內容", type: "textarea" },
     inputs: [
-      { key: "monthly_focus", label: "本月主題", type: "textarea", required: true },
-      { key: "pillar_mix", label: "內容支柱配比（可選）", type: "text", required: false, placeholder: "例：60% 教學 / 20% 故事 / 20% 促銷" },
+      { key: "monthly_focus", label: "本月主題 + 產品 + 目標族群", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 FB 30 天內容月曆其中 1 週（7 篇貼文，每篇 80-150 字大綱）。
-本次你寫的是「{label}」這週。
-每篇格式：[第 N 天] [Pillar 標籤] hook + 1 句要點 + 配圖風格。
-扣回月主題敘事弧。${TONE_100}`,
-    preferredModel: "qwen", maxTokens: 1800,
+    systemPrompt: `你是 FB 內容行事曆策略師。產出一份「30 天 FB 內容行事曆」，**只輸出嚴格 JSON 陣列**，正好 14 則貼文，依下列配比（參考 Joe Pulizzi 內容支柱法 + Facebook marketing 最佳實務）：
+
+- 4 則「理念WHY」：用黃金圈 Why 講品牌理念/創業初衷，不談產品功能
+- 4 則「產品」：每則只針對「一個目標族群」溝通「一個 USP」並帶到「一個產品」
+- 2 則「節慶」：搭配本月實際接近的節慶/檔期（若輸入或情境有提供）
+- 2 則「UGC見證」：使用者見證，每則見證「一個產品」、溝通「一個 USP」
+- 2 則「權威觀點」：引用國際權威/研究/名人觀點，印證品牌的創業理念（理念，不是產品）
+
+每則物件欄位：
+{"day": <1-30 的整數，14 則平均分散在 30 天>, "pillar": "理念WHY|產品|節慶|UGC見證|權威觀點", "audience": "<這則對誰說，理念/權威可寫『全體受眾』>", "usp": "<這則溝通的單一賣點，理念/權威留空字串>", "product": "<這則帶到的產品，理念/權威留空字串>", "hook": "<前 2 行鉤子，≤30字>", "message": "<貼文核心訊息，60-110字>", "format": "圖文|短影音|輪播|直播|純文字", "cta": "<行動呼籲，≤15字>"}
+
+規則：
+- 第一個字元就是 [，最後一個字元就是 ]。不要 markdown 圍欄、不要任何說明文字。
+- 嚴格 14 則、嚴格照上面配比數量。day 由小到大排序、平均分散。
+- 內容扣回用戶輸入的主題/產品/族群；事實不得捏造（沒有的用通則描述，不要編數字）。${TONE_100}`,
+    preferredModel: "qwen", maxTokens: 3200,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
   {
@@ -699,14 +712,17 @@ const fb100Common = {
 //   fb-99-crisis-playbook    ← fb-crisis-comms squad
 export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "fb-99-30day-calendar": {
-    ...fb100Common, variants: 4, images: 4,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
-    captionMinChars: 600, captionMaxChars: 1200,
-    strategistAgentId: 224094, // Jing Yi Lim — Social Media Strategist B2B SaaS MY (1143 char)
-    postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
-    scoutKind: "festivals", // 月曆 → 抓即時節慶
-    extras: { ...fb100Common.extras, postsCount: 4 },
+    // single structured 30-day calendar (one JSON deliverable). No
+    // per-post image gen (it's a PLAN — rendered as a calendar grid),
+    // no strategist (structure is prescriptive) → much faster, no 502.
+    ...fb100Common,
+    variants: 1, images: 0, runImageGen: false,
+    imageDirectorId: null as any,
+    aspectRatio: null as any, fluxSize: null as any,
+    variantLabels: ["30 天行事曆"],
+    captionMinChars: 400, captionMaxChars: 6000,
+    scoutKind: "festivals", // 抓即時節慶供「節慶」貼文使用（已有 18s 上限）
+    extras: {},
   },
   "fb-99-carousel-5": {
     ...fb100Common,

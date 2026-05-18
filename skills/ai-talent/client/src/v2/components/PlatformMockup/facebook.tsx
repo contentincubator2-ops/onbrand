@@ -669,3 +669,110 @@ export function FBCarousel({
     </div>
   );
 }
+
+/* ─────────────── FB 30-day Content Calendar ─────────────── */
+// 2026-05-18 (CJ「30天行事曆結果很不理想，要結構化行事曆」): the task
+// now emits a strict JSON array of 14 posts (4 理念WHY / 4 產品 / 2 節慶
+// / 2 UGC見證 / 2 權威觀點). Render it as an actual calendar/agenda —
+// dated, pillar-colour-coded cards + legend — not a feed text dump.
+type CalPost = {
+  day: number; pillar: string; audience?: string; usp?: string;
+  product?: string; hook?: string; message?: string; format?: string; cta?: string;
+};
+const PILLAR_STYLE: Record<string, { bg: string; text: string; dot: string }> = {
+  "理念WHY":   { bg: "bg-violet-50",  text: "text-violet-700",  dot: "bg-violet-500" },
+  "產品":      { bg: "bg-sky-50",     text: "text-sky-700",     dot: "bg-sky-500" },
+  "節慶":      { bg: "bg-amber-50",   text: "text-amber-700",   dot: "bg-amber-500" },
+  "UGC見證":   { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  "權威觀點":  { bg: "bg-rose-50",    text: "text-rose-700",    dot: "bg-rose-500" },
+};
+const PILLAR_FALLBACK = { bg: "bg-default-100", text: "text-default-600", dot: "bg-default-400" };
+
+function parseCalendar(raw: string): CalPost[] {
+  if (!raw) return [];
+  let s = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/,"").trim();
+  const a = s.indexOf("["), b = s.lastIndexOf("]");
+  if (a >= 0 && b > a) s = s.slice(a, b + 1);
+  try {
+    const arr = JSON.parse(s);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((p: any) => ({
+        day: Number(p?.day) || 0,
+        pillar: String(p?.pillar ?? "").trim(),
+        audience: p?.audience ? String(p.audience) : "",
+        usp: p?.usp ? String(p.usp) : "",
+        product: p?.product ? String(p.product) : "",
+        hook: p?.hook ? String(p.hook) : "",
+        message: p?.message ? String(p.message) : "",
+        format: p?.format ? String(p.format) : "",
+        cta: p?.cta ? String(p.cta) : "",
+      }))
+      .filter((p: CalPost) => p.hook || p.message)
+      .sort((x: CalPost, y: CalPost) => x.day - y.day);
+  } catch { return []; }
+}
+
+export function FBCalendar({ title, brandName, variantLabel, liveCaption }: MockupFields) {
+  const { lang } = useLang();
+  const posts = parseCalendar(liveCaption ?? "");
+  const pillars = Array.from(new Set(posts.map((p) => p.pillar))).filter(Boolean);
+
+  return (
+    <div className="w-full max-w-[680px] mx-auto">
+      <MockupHeader icon={faCalendarDays} label={lang === "en" ? "30-Day Content Calendar" : "30 天內容行事曆"} variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-5 py-4 border-b border-divider">
+          <p className="text-small font-semibold text-default-800">{brandName ?? "Brand"} · {lang === "en" ? "30-Day FB Plan" : "30 天 FB 內容規劃"}</p>
+          {title && <p className="text-tiny text-default-500 mt-0.5 line-clamp-1">{title}</p>}
+          {/* Pillar legend */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            {pillars.map((p) => {
+              const st = PILLAR_STYLE[p] ?? PILLAR_FALLBACK;
+              return (
+                <span key={p} className={`inline-flex items-center gap-1.5 text-tiny px-2 py-0.5 rounded-full ${st.bg} ${st.text}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{p}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        {posts.length === 0 ? (
+          <div className="px-5 py-8 text-tiny text-default-400 whitespace-pre-wrap">
+            {(liveCaption ?? "").slice(0, 1200) || (lang === "en" ? "Calendar is generating…" : "行事曆生成中…")}
+          </div>
+        ) : (
+          <div className="divide-y divide-divider max-h-[640px] overflow-y-auto">
+            {posts.map((p, i) => {
+              const st = PILLAR_STYLE[p.pillar] ?? PILLAR_FALLBACK;
+              const meta = [p.audience, p.usp, p.product].filter(Boolean).join(" · ");
+              return (
+                <div key={i} className="flex gap-3 px-5 py-3">
+                  {/* Day badge */}
+                  <div className="shrink-0 w-12 text-center">
+                    <div className="text-[10px] uppercase tracking-wide text-default-400">{lang === "en" ? "Day" : "第"}</div>
+                    <div className="text-lg font-bold leading-tight text-default-800">{p.day || i + 1}</div>
+                    <div className="text-[10px] text-default-400">{lang === "en" ? "" : "天"}</div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full ${st.bg} ${st.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{p.pillar || "—"}
+                      </span>
+                      {p.format && <span className="text-[11px] text-default-500">· {p.format}</span>}
+                    </div>
+                    {p.hook && <p className="text-small font-semibold text-default-800 mt-1 leading-snug">{p.hook}</p>}
+                    {p.message && <p className="text-tiny text-default-600 mt-0.5 leading-relaxed line-clamp-3">{p.message}</p>}
+                    {meta && <p className="text-[11px] text-default-400 mt-1">🎯 {meta}</p>}
+                    {p.cta && <p className="text-[11px] text-primary-600 mt-1 font-medium">→ {p.cta}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -771,6 +771,7 @@ export default function RunPage() {
       if (id.includes("pinned")) return "pinned";
       if (id.includes("story")) return "story";
       if (id.includes("reel")) return "reel";
+      if (id.includes("calendar")) return "calendar";
       if (id.includes("carousel")) return "carousel";
       if (id.includes("bio") || id.includes("profile")) return "profile";
       if (id.includes("live")) return "live";

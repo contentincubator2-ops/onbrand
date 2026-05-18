@@ -28,7 +28,7 @@ import {
   IGFeed, IGCarousel, IGReels, IGStories, IGProfile, IGLive, IGAd,
 } from "./instagram";
 import {
-  FBFeed, FBReel, FBStory, FBMarketplace, FBEvent, FBAd, FBCarousel,
+  FBFeed, FBReel, FBStory, FBMarketplace, FBEvent, FBAd, FBCarousel, FBCalendar,
 } from "./facebook";
 // 2026-05-05 quick-task pivot: 8 new FB variants
 import {
@@ -92,6 +92,7 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "facebook:pinned":         return <FBFeed           {...f} pinned />;
     case "facebook:qa":             return <QAMockup         {...f} />;
     case "facebook:about":          return <WebAboutMockup   {...f} />;
+    case "facebook:calendar":       return <FBCalendar       {...f} />;
     case "facebook:comment":        return <FBComment        {...f} />;
     case "facebook:group":          return <FBGroup          {...f} />;
     case "facebook:recommendation": return <FBRecommendation {...f} />;

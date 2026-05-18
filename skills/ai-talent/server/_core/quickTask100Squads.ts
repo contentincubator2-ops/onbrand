@@ -42,14 +42,10 @@ export interface SquadIndexEntry {
 // Each squad has been assigned a DISTINCT lead via admin-squad-leads-100s.yml
 // so the cards show 11 different real faces.
 export const FB_99S_SQUADS: SquadIndexEntry[] = [
-  {
-    id: "fb-99-monthly-calendar",
-    squad_slug: "fb-monthly-calendar-pulizzi",
-    platform: "facebook", postType: "feed",
-    label: "FB 30 天內容行事曆",
-    description: "真實行事曆：抓本月節慶 + 安排每日主題 + 產品 + 視覺方向（教學/故事/促銷配比）",
-    methodology: "Joe Pulizzi 內容支柱法",
-  },
+  // 2026-05-18 (CJ「30天行事曆結果很不理想」): the deep-research squad
+  // produced a strategy essay, not a usable calendar. Replaced by the
+  // structured orchestra task fb-99-30day-calendar (fixed content mix +
+  // Calendar mockup), so this squad card is removed from the 99s tab.
   {
     id: "fb-99-monthly-calendar-promo",
     squad_slug: "fb-monthly-calendar-product-promo",
