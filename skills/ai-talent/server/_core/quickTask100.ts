@@ -61,7 +61,8 @@ export const FB_99S_TASKS: FBTaskTemplate[] = [
 - 第一個字元就是 [，最後一個字元就是 ]。不要 markdown 圍欄、不要說明文字。
 - 只產「{label}」這組、嚴格照上面對應則數；pillar 欄位一律填「{label}」。
 - day 給 1-30 的合理值（系統會把所有支柱合併後重新分散排序）。
-- 內容扣回用戶輸入的主題/產品/族群；事實不得捏造。${TONE_100}`,
+- 內容扣回用戶輸入的主題/產品/族群；事實不得捏造。
+- 每一則都必守：鎖定「一個族群在一個具體情境」說話（用品牌脈絡的主受眾/痛點，audience 要具體不是「全體」除非理念/權威）、整則只打「一個」最強賣點（usp 單一、不要功能清單）、message 要鋪陳到一個可被認出的「Moment of Truth 決定性瞬間」（讀者那一刻確認「這就是我要的」）。遮掉品牌名仍適用競品＝太通用，重寫。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1600,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
@@ -92,7 +93,8 @@ export const FB_99S_TASKS: FBTaskTemplate[] = [
 每則物件欄位：
 {"day": <1-30 整數>, "pillar": "{label}", "audience": "<對誰說>", "usp": "<單一賣點/offer；理念留空>", "product": "<帶到的商品；理念留空>", "hook": "<前 2 行鉤子 ≤30字>", "message": "<核心訊息 60-110字>", "format": "圖文|短影音|輪播|直播|純文字", "cta": "<行動呼籲 ≤15字>"}
 
-規則：第一個字元就是 [、最後一個就是 ]，不要圍欄/說明；只產「{label}」這組、照對應則數；pillar 一律「{label}」；事實不得捏造。${TONE_100}`,
+規則：第一個字元就是 [、最後一個就是 ]，不要圍欄/說明；只產「{label}」這組、照對應則數；pillar 一律「{label}」；事實不得捏造。
+每一則都必守：鎖定「一個族群在一個具體情境」說話（audience 具體、用品牌主受眾/痛點）、整則只打「一個」最強賣點/offer（usp 單一、非清單）、message 鋪陳到一個可被認出的「Moment of Truth 決定性瞬間」（讀者那刻確認「這就是我要的」）。遮掉品牌名仍適用競品＝太通用，重寫。${TONE_100}`,
     preferredModel: "qwen", maxTokens: 1800,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
