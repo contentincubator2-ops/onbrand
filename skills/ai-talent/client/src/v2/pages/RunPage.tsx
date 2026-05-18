@@ -456,11 +456,49 @@ export default function RunPage() {
     : { data: null };
   const fbConnected = !!(fbStatusQuery?.data as any)?.connected;
 
-  React.useEffect(() => {
-    // warm the FB connect token so the first click opens the popup
-    // synchronously (no gesture loss). Harmless when already connected.
-    if (fbBrandId > 0 && !fbConnected) prefetchConnect("facebook");
-  }, [fbBrandId, fbConnected, prefetchConnect]);
+  // 2026-05-18 (CJ「Connect account popup blocked」again): the @pipedream
+  // SDK opens its OWN window AFTER an async tokenCallback → still blocked.
+  // Use the plain Pipedream Connect-Link URL instead: open OUR popup
+  // SYNCHRONOUSLY on click (keeps user activation), then navigate it to
+  // the URL once the token mints. Same proven pattern as BrandSettingsSheet.
+  const fbConnectUrlMut = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
+  const connectFacebookViaUrl = () => {
+    const win = window.open("about:blank", "_blank", "popup,width=600,height=720");
+    if (!win) {
+      showToastGlobal(
+        lang === "en"
+          ? "The connect window was blocked — allow pop-ups for this site and tap again."
+          : "授權視窗被瀏覽器封鎖 — 請允許本站彈出視窗後再點一次"
+      );
+      return;
+    }
+    try {
+      win.document.write(
+        `<p style="font:14px sans-serif;padding:24px;color:#555">${lang === "en" ? "Opening Facebook authorization…" : "正在開啟 Facebook 授權…"}</p>`
+      );
+    } catch { /* cross-origin not yet — fine */ }
+    (async () => {
+      try {
+        const r = await fbConnectUrlMut?.mutateAsync?.({});
+        if (r?.connectUrl) {
+          win.location.href = r.connectUrl;
+          showToastGlobal(
+            lang === "en"
+              ? "Authorize Facebook in the popup, then come back and publish."
+              : "在彈出視窗完成 Facebook 授權後，回來再按發布即可"
+          );
+        } else {
+          win.close();
+          showToastGlobal(lang === "en" ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結 — 請聯絡 sowork@sowork.ai");
+        }
+      } catch (e: any) {
+        win.close();
+        showToastGlobal(
+          lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`
+        );
+      }
+    })();
+  };
 
   const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
     ? (trpc as any).publish.toFacebook.useMutation({
@@ -1801,14 +1839,12 @@ export default function RunPage() {
                       <Button
                         color="primary" fullWidth
                         startContent={<FontAwesomeIcon icon={faRocket} />}
-                        isLoading={pipedreamBusy}
-                        isDisabled={pipedreamBusy}
-                        onMouseEnter={() => prefetchConnect("facebook")}
-                        onFocus={() => prefetchConnect("facebook")}
-                        onPress={() => openPipedreamConnect("facebook")}
+                        isLoading={fbConnectUrlMut?.isPending}
+                        isDisabled={fbConnectUrlMut?.isPending}
+                        onPress={connectFacebookViaUrl}
                       >
-                        {pipedreamBusy
-                          ? (lang === "en" ? "Authorizing…" : "授權中…")
+                        {fbConnectUrlMut?.isPending
+                          ? (lang === "en" ? "Opening…" : "開啟中…")
                           : (lang === "en" ? "Connect Facebook to publish" : "連接 Facebook 後發布")}
                       </Button>
                     );
