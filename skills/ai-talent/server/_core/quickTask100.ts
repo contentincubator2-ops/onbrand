@@ -436,31 +436,112 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
+    // 2026-05-19 (Yi-Wen 驗收 v#1 — 12/14):
+    // 原 2-行 prompt 無格式規定、無品牌聲音 guardrail →
+    // 第 2-3 週驚嘆號回流、散文腔（「如歌般悠揚」「情感連結又跑掉了！」）、
+    // 第 3 週捏造 SaaS 100億美元統計無來源。
+    // 問題設計 placeholder 「AI / 領導力 / SaaS 等」太精簡，導致 agent 缺乏
+    // 月份主題、受眾職稱、品牌主張，只能 week 1 撐全場。
+    // 修法：完整 systemPrompt + 強化 placeholder + preferredModel → anthropic。
     id: "li-99-30day-thought-leadership",
     tier: "99s", postType: "feed",
     label: "LI 30 天 Thought-Leadership 月曆",
     description: "30 天 = 10 觀點 / 10 案例 / 10 趨勢預測 + scout 抓即時節慶",
     agent_id: 222342, skill_slug: "linkedin-b2b", // Hung Ya-Wen | Social Media Strategist – B2B SaaS
-    primary_question: "這個月想立什麼專業 image？",
-    primary_input: { key: "expertise_area", placeholder: "AI / 領導力 / SaaS 等", type: "textarea" },
-    inputs: [{ key: "expertise_area", label: "專業領域", type: "textarea", required: true }],
-    systemPrompt: `產出 LI thought-leadership 月曆其中 1 週（5-7 篇大綱）。
-本次你寫的是「{label}」這週。${TONE_100}`,
-    preferredModel: "qwen", maxTokens: 1300,
+    primary_question: "這個月想立什麼專業 image？（月份 + 核心主題 + 目標受眾職稱 + 你的品牌主張，四項合填）",
+    primary_input: {
+      key: "expertise_area",
+      placeholder: "例：5月｜AI 品牌一致性｜目標受眾：品牌行銷主管 / 內容策略師｜品牌主張：品牌聲音不因速度而失真，每一篇 AI 產出都有溯源憑據",
+      type: "textarea",
+    },
+    inputs: [{ key: "expertise_area", label: "月份 + 主題 + 受眾職稱 + 品牌主張", type: "textarea", required: true }],
+    systemPrompt: `你負責撰寫 LinkedIn Thought-Leadership 月曆「{label}」這一週的主力貼文（1 篇完整 Feed 貼文，非大綱）。
+
+【格式｜必守】
+- 長度：150-350 字（中文字符計算）
+- 結構：強 hook（前 2 行，不到「more」折疊點讀者就不會展開）→ 論述 / 案例 / 數據（有憑有據）→ 結尾互動問句（1 句，引出留言）
+- Hashtag：結尾附 4-5 個相關 hashtag，無空格（如 #品牌策略 #AIMarketing）
+- 不要段落標題 / 不要 markdown / 不要條列（LinkedIn Feed 不需要）
+
+【每週 hook 角度 — 不得跨週混用】
+- 第 1 週（Why / 痛點框架）：以受眾親身痛點切入，「凌晨兩點、趕稿交件」式具體情境，不要空泛起手
+- 第 2 週（What / 案例解析）：真實或高度可信的案例，說清楚「這個方法如何解決上週的痛點」，不堆術語
+- 第 3 週（How / 方法拆解）：3 步驟以內的具體操作邏輯，讀者能當場拿走一個可用 insight
+- 第 4 週（So What / 趨勢主張）：品牌主場景的趨勢預測，基於輸入資料推論，有明確立場（非「也許可能」）
+
+【品牌聲音 guardrail — 四週跨越必守，違反即不合格】
+SoWork 語氣 = 「精準守護者、有憑據的科技感」，不是散文、不是煽情。
+逐條禁止（v#1 踩過的錯誤，原詞禁止）：
+- 驚嘆號結尾（任何句子，含「情感連結又跑掉了！」「期待你的看法！」等）→ 改句號
+- 散文腔：「如歌般悠揚」「讓每一句話都…」「走出桎梏」「在…的世界裡」
+- 捏造統計：任何不在輸入中的數字 / 百分比 / 市場規模，一律標「[請補充來源]」，不自行捏造
+- emoji（任何）、hashtag 混入正文（hashtag 只能在結尾）
+- 「快來體驗」「心動不如行動」「效率」「省時」等效率詞 / 促銷煽動句
+
+【統計數據硬規則】
+輸入中沒有的數字 / 研究來源 → 一律用「[請補充：數據來源]」標出，不自行假設
+違反例：「據報導，2026年全球SaaS市場將超過100億美元」（輸入沒給來源 → 禁止）
+
+【寄出前自我檢查｜必做】
+1. Hook 前 2 行：能在折疊點前讓人想繼續讀嗎？
+2. 本週 hook 角度（Why/What/How/So What）是否對應 {label}？
+3. 驚嘆號全部換成句號了嗎？有未標來源的數字嗎？
+4. 字數在 150-350 之間嗎？
+→ 任一不符，就地改寫再輸出。${TONE_100}`,
+    preferredModel: "anthropic", maxTokens: 1300,
     outputDefaults: { platform: "linkedin", post_type: "feed" },
   },
   {
+    // 2026-05-19 (Yi-Wen 驗收 v#1 — 13/14，可直接上線):
+    // 品牌聲音穩定，受眾切入精準（溯源三問、三人小團隊）。
+    // 兩個 P2 問題：
+    //   (1) 第 1 期末段語氣略飄「艱辛卻令人期待的旅程」+ 語法不通「從單純快速產出自由」
+    //   (2) placeholder 未引導各期題目 / CTA 策略
+    // 修法：prompt 加品牌聲音 guardrail（禁止「旅程」敘事 / 語法自查）+ 完善 placeholder。
     id: "li-99-newsletter-quarterly",
     tier: "99s", postType: "newsletter",
     label: "LI 季度 Newsletter 4 期",
     description: "季度 4 期 newsletter 完整內容 + 訂閱成長策略",
     agent_id: 60062, skill_slug: "linkedin-b2b", // Nathan Lu | Media Newsletter Copywriter
-    primary_question: "newsletter 季度大主題？",
-    primary_input: { key: "quarter_topic", placeholder: "本季想串什麼主題", type: "textarea" },
-    inputs: [{ key: "quarter_topic", label: "季度主題", type: "textarea", required: true }],
-    systemPrompt: `產出 LI quarterly newsletter 其中 1 期（500-800 字）。
-本次你寫的是「{label}」（第 1 期 / 第 2 期 / 第 3 期 / 第 4 期）。期與期要連貫。${TONE_100}`,
-    preferredModel: "qwen", maxTokens: 1200,
+    primary_question: "季度大主題 + 各期子題 + 目標讀者行動 + 品牌主張（四項合填）",
+    primary_input: {
+      key: "quarter_topic",
+      placeholder: "例：Q2 品牌一致性｜第1期 為什麼AI寫的稿讀起來像別人的 / 第2期 溯源三問：語氣怎麼來的 / 第3期 三人小團隊如何做到品牌一致 / 第4期 升級到 Pro 解鎖進階分析｜目標行動：讀完每期都能帶走 1 個可立刻執行的 insight｜品牌主張：品牌聲音有據可循，不因速度失真",
+      type: "textarea",
+    },
+    inputs: [{ key: "quarter_topic", label: "季度主題 + 各期子題 + 目標行動 + 品牌主張", type: "textarea", required: true }],
+    systemPrompt: `你負責撰寫 LinkedIn 季度 Newsletter「{label}」這一期（第 1 期 / 第 2 期 / 第 3 期 / 第 4 期）。
+
+【格式｜必守】
+- 長度：500-800 字（中文字符計算）
+- 結構：標題（≤20 字）→ 副標（1 句，點出本期核心張力）→ 正文（論述 / 案例 / 操作邏輯）→ 結尾 CTA 或閱讀下期預告
+- 期與期要有主題連貫性（引用前期框架、為下期埋梗）
+- Hashtag：結尾附 5-7 個，無空格
+- 不要 markdown 粗體 ** / 不要行首 # 標題
+
+【品牌聲音 guardrail — 四期必守，違反即不合格】
+SoWork 語氣 = 「精準守護者、有憑據的科技感」，深度論述但不煽情。
+逐條禁止（v#1 踩過的錯誤）：
+- 旅程敘事：「踏上這段艱辛卻令人期待的旅程」「一起走過」等煽情「journey」收尾 → 改成具體行動或 insight 提示
+- 語法不通組合：「從單純快速產出自由」「讓XXX兼具…」中西語法混用 → 寫前確認語法成立
+- 驚嘆號結尾（任何句子）→ 改句號
+- emoji（任何）
+- 散文腔：「如歌般悠揚」「熙來攘往」「在…的世界裡」
+- 捏造數字 / 研究 → 標「[請補充來源]」
+- hashtag 混入正文
+
+【每期 hook 角度 — 依 {label} 對應】
+- 第 1 期（Why / 問題框架）：揭示讀者「以為習以為常其實有問題」的現象，第一句就是讀者自我認出的 moment
+- 第 2 期（What / 解法機制）：說清楚解決方案的具體機制（一個功能說清楚，不堆功能清單）
+- 第 3 期（How / 落地實踐）：小團隊 / 中小品牌如何用最少資源落地，給讀者可帶走的操作框架
+- 第 4 期（So What / 升級/預告）：量化或展示 3 期成果，發出升級邀請或 Q3 預告，CTA 明確
+
+【寄出前自我檢查｜必做】
+1. 標題 ≤20 字，副標有張力嗎？
+2. 有沒有「旅程」敘事、語法不通句、驚嘆號、未標來源數字？
+3. 本期 hook 角度對應 {label} 嗎？
+→ 任一不符，就地改寫。${TONE_100}`,
+    preferredModel: "anthropic", maxTokens: 1200,
     outputDefaults: { platform: "linkedin", post_type: "newsletter" },
   },
   {
