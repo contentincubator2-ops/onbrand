@@ -173,13 +173,23 @@ const PROVIDER_CONFIG: Record<
   //           text-embedding-3-large/small, Cohere-embed-v3-multilingual, Cohere-rerank-v4.0-pro
   //   Key: AZURE_FOUNDRY_API_KEY  Endpoint: AZURE_FOUNDRY_PROJECT_ENDPOINT
   "azure-foundry": {
-    // 2026-05-19: Azure AI Foundry requires the deployment name in the URL path
-    // (.../openai/deployments/{name}/chat/completions), NOT in the request body
-    // like standard OpenAI. baseUrl must be the bare project endpoint (no /openai/v1).
-    // The deployment path is appended in invokeLLMOnce / invokeLLMStream.
-    baseUrl:      (ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT
-      ? ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string).replace(/\/$/, "")
-      : "https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law",
+    // 2026-05-19: Azure AI Foundry inference URL format:
+    //   https://{resource}.services.ai.azure.com/openai/deployments/{deployment}/chat/completions?api-version=...
+    //
+    // AZURE_FOUNDRY_PROJECT_ENDPOINT is the *project management* URL which includes
+    // "/api/projects/{project-name}" — that suffix must be stripped for inference calls.
+    // Example:
+    //   env:       https://sowork-foundry-claw-api-router.services.ai.azure.com/api/projects/proj-mkt-agent-law
+    //   inference: https://sowork-foundry-claw-api-router.services.ai.azure.com
+    //
+    // The deployment path (/openai/deployments/{model}/chat/completions?api-version=...)
+    // is appended in invokeLLMOnce / invokeLLMStream per-call.
+    baseUrl: (() => {
+      const raw = ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT as string | undefined) ?? "";
+      if (!raw) return "https://sowork-foundry-claw-api-router.services.ai.azure.com";
+      // Strip /api/projects/... suffix to get bare resource root
+      return raw.replace(/\/api\/projects\/[^/]+\/?$/, "").replace(/\/$/, "");
+    })(),
     defaultModel: (ENV as any).AZURE_FOUNDRY_MODEL || "gpt-4.1",
     getKey:       () => (ENV as any).AZURE_FOUNDRY_API_KEY ?? "",
   },
@@ -1098,7 +1108,9 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
     // Primary = other      → fallback to Anthropic (claude-sonnet-4-6)
     if (providerKey === "anthropic") {
       const foundryKey = (ENV as any).AZURE_FOUNDRY_API_KEY ?? (ENV as any).AZURE_AI_API_KEY ?? "";
-      const foundryEndpoint = ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT ?? "").replace(/\/$/, "");
+      // Strip /api/projects/... from the project management URL to get bare resource root
+      const foundryEndpoint = ((ENV as any).AZURE_FOUNDRY_PROJECT_ENDPOINT ?? "")
+        .replace(/\/api\/projects\/[^/]+\/?$/, "").replace(/\/$/, "");
       if (foundryKey && foundryEndpoint) {
         // 2026-05-12: was hard-coded to Kimi-K2.5 (reasoning model that returns
         // empty content for streaming) — broke /theater. Now defaults to gpt-4.1
