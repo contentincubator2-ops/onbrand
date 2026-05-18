@@ -109,14 +109,14 @@ export default function PricingPage() {
   ];
 
   const faq: [string, string][] = isEn ? [
-    ["What happens when my trial ends?", "We'll email you 1 day before it ends. If you don't upgrade, your account flips to read-only — you can still sign in and view your history, but can't make new content."],
+    ["What happens when my trial ends?", "Trial stops when EITHER the 7 days OR your 1000 trial points run out — whichever comes first. We'll email you 1 day before the time limit. When it ends, your account flips to read-only — you can still sign in and view history, but can't produce new content."],
     ["Can I cancel anytime?", "Yes. Hit Cancel in Account settings whenever you want. You'll keep access until the period ends, then no more charges."],
     ["Do unused credits roll over?", "Nope. Monthly plans reset on the 1st. Annual plans also reset monthly on the 1st."],
     ["Is 10 videos a month enough?", "Yes — 10 short clips (5-10s) covers ~1 IG Reel / TikTok / YT Short per week. Need more? Try Enterprise."],
     ["Who owns the output?", "You do. We claim zero rights. Use it commercially, remix it, resell it — it's all yours."],
     ["Can I get a company invoice?", "Yes. Add your tax ID + company name in Account settings → Invoice info, and the next charge will auto-issue a B2B e-invoice."],
   ] : [
-    ["試用期過了會怎樣？", "試用結束前 1 天會 email 通知。到期後若沒升級，帳號會自動切到唯讀模式（仍能登入查看歷史紀錄，但無法產出新內容）。"],
+    ["試用期過了會怎樣？", "試用在「7 天到期」或「1000 試用點數用完」時停止，先到先停。時間到的前 1 天會 email 通知。到期後若沒升級，帳號會自動切到唯讀模式（仍能登入查看歷史紀錄，但無法產出新內容）。"],
     ["可以中途取消嗎？", "可以，隨時於「帳號設定」按取消，當期到期前仍能正常使用，到期後不再扣款。"],
     ["額度沒用完會累積嗎？", "不會。月費方案每月 1 號重置，年費方案每月 1 號也會重置。"],
     ["影片生成 10 支夠嗎？", "5-10 秒短片 10 支 / 月足夠 IG Reels、TikTok、YT Shorts 一週一支的節奏。需要更多請洽企業版。"],

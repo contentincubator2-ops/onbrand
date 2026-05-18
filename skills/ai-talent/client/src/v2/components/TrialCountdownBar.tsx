@@ -1,8 +1,10 @@
 /**
  * TrialCountdownBar — top-of-app banner showing remaining trial days
- * + upgrade CTA. Hides when user is on active paid plan.
+ * AND remaining points + upgrade CTA. Hides on active paid plan.
  *
  * 2026-05-10. Trial = 7 days from register. After expiry shows "已到期" red bar.
+ * 2026-05-18 (CJ dual-limit): also shows points balance. Trial stops when
+ * EITHER the 7 days OR the 1000 points run out (whichever comes first).
  */
 import React from "react";
 import { Link } from "react-router-dom";
@@ -24,11 +26,15 @@ export default function TrialCountdownBar() {
   if (!status) return null;
   if (status.planStatus === "active" && !status.expired) return null;
 
-  // Trial active — show day countdown + achievements progress
+  // Trial active — show day countdown + points balance + achievements progress
   if (status.planStatus === "trial" && !status.expired) {
     const days = status.daysLeft ?? 0;
-    const urgency = days <= 1 ? "high" : days <= 3 ? "medium" : "low";
-    return <TrialBarWithProgress days={days} urgency={urgency} />;
+    const pointsLeft = status.points?.balance ?? 0;
+    const pointsTotal = status.points?.perCycle ?? 1000;
+    const urgency =
+      days <= 1 || pointsLeft <= 100 ? "high" :
+      days <= 3 || pointsLeft <= 300 ? "medium" : "low";
+    return <TrialBarWithProgress days={days} pointsLeft={pointsLeft} pointsTotal={pointsTotal} urgency={urgency} />;
   }
 
   // Expired — red bar, blocks usage with paywall
@@ -62,9 +68,13 @@ export default function TrialCountdownBar() {
  */
 function TrialBarWithProgress({
   days,
+  pointsLeft,
+  pointsTotal,
   urgency,
 }: {
   days: number;
+  pointsLeft: number;
+  pointsTotal: number;
   urgency: "high" | "medium" | "low";
 }) {
   const { lang } = useLang();
@@ -76,30 +86,41 @@ function TrialBarWithProgress({
     : { data: null };
   const ach = achQuery?.data;
 
+  const pointsPct = pointsTotal > 0 ? Math.max(0, Math.round((pointsLeft / pointsTotal) * 100)) : 0;
+
   return (
     <div className={`px-4 py-2 text-xs flex items-center justify-center gap-4 border-b flex-wrap ${
       urgency === "high" ? "bg-amber-50 border-amber-200 text-amber-900" :
       urgency === "medium" ? "bg-blue-50 border-blue-200 text-blue-900" :
       "bg-neutral-50 border-neutral-200 text-neutral-700"
     }`}>
+      {/* Days remaining */}
       <span>
         {days > 0
           ? lang === "en"
-            ? <><strong>{days} {days === 1 ? "day" : "days"} left</strong> in trial{urgency === "high" && " — keep your content rolling"}</>
-            : <>免費試用剩 <strong>{days} 天</strong>{urgency === "high" && " — 別讓你的內容企劃中斷"}</>
+            ? <><strong>{days} {days === 1 ? "day" : "days"} left</strong> in trial</>
+            : <>試用剩 <strong>{days} 天</strong></>
           : lang === "en" ? <>Trial ends today</> : <>試用今天到期</>
         }
+      </span>
+      {/* Points remaining with mini bar */}
+      <span className="flex items-center gap-1.5">
+        <span className="w-16 h-1.5 bg-neutral-300/50 rounded-full overflow-hidden">
+          <span
+            className={`block h-full rounded-full ${urgency === "high" ? "bg-amber-500" : urgency === "medium" ? "bg-blue-500" : "bg-neutral-500"}`}
+            style={{ width: `${pointsPct}%` }}
+          />
+        </span>
+        <span>
+          {lang === "en"
+            ? <><strong>{pointsLeft}</strong> pts left</>
+            : <><strong>{pointsLeft}</strong> 點剩餘</>}
+        </span>
       </span>
       {ach && (
         <Link to="/achievements" className="flex items-center gap-2 hover:underline">
           <span>
             {lang === "en" ? "Achievements" : "成就"} <strong>{ach.unlockedCount} / {ach.totalCount}</strong>
-          </span>
-          <span className="w-20 h-1.5 bg-neutral-300/50 rounded-full overflow-hidden">
-            <span
-              className="block h-full bg-neutral-900"
-              style={{ width: `${(ach.unlockedCount / ach.totalCount) * 100}%` }}
-            />
           </span>
         </Link>
       )}

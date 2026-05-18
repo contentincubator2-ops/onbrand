@@ -154,10 +154,12 @@ export interface Plan {
 }
 
 export const PLANS: Record<PlanCode, Plan> = {
-  /** New users get 7 days of full-feature access without a credit card.
-   *  2026-05-12: trial quotas reduced + video stripped (matches the new
-   *  OnBrand 個人 plan minus 1/3 — generous enough to evaluate, tight
-   *  enough that they upgrade.) */
+  /** New users get 7 days OR 1000 points (whichever runs out first).
+   *  2026-05-18: dual-limit trial — time cap prevents indefinite squatting;
+   *  points cap prevents account-farm abuse (new account = same 1000 pts,
+   *  no bonus from re-registering). pointsCycleDays=365 means points do NOT
+   *  refill within the 7-day trial window — use them up and you must upgrade.
+   *  1000 pts ≈ 16× 60s tasks, or 10× 99s tasks, or ~10 Flux images. */
   trial: {
     code: "trial",
     name: "7 天免費試用",
@@ -176,14 +178,14 @@ export const PLANS: Record<PlanCode, Plan> = {
       fb_publish: -1,
       team_members: 1,
       multi_client: false,
-      // Trial = 300 points (= ~3× 99s tasks or 10× 30s tasks)
-      pointsPerCycle: 300,
-      pointsCycleDays: 7,
+      // 2026-05-18: 1000 pts one-time (cycleDays=365 → no refill in trial window)
+      pointsPerCycle: 1000,
+      pointsCycleDays: 365,
     },
     features: [
-      "30s / 60s / 99s 任務模板（額度有限）",
-      "30 張 AI 圖預覽試用",
-      "7 天完整內容企劃台",
+      "1000 點試用額度（不重置，用完即停）",
+      "30s / 60s / 99s 任務模板（≈10–16 篇文案或 10 張圖）",
+      "7 天時間上限（先到先停）",
       "Email / LINE 客服",
       "免綁信用卡",
     ],
