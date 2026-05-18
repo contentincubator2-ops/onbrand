@@ -335,62 +335,110 @@ export default function RunPage() {
   const getConnectTokenMut = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
   const [pipedreamBusy, setPipedreamBusy] = useState(false);
 
-  const openPipedreamConnect = async (platform: "facebook" | "instagram" | "linkedin" | "youtube") => {
+  // 2026-05-18 (CJ「Connect account popup blocked」): the Pipedream SDK
+  // opens its OAuth popup inside connectAccount(). Browsers block that
+  // popup if it runs AFTER an await (the user-gesture/transient
+  // activation is gone) — and the old code did `await getConnectToken`
+  // + `await import(sdk)` BEFORE connectAccount. Fix: PREFETCH the token
+  // and the SDK module (on hover/focus/mount) so the click handler can
+  // call connectAccount with NO awaits in front of it → no popup block.
+  const pdSdkRef = React.useRef<any>(null);
+  const pdTokenRef = React.useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string }>>({});
+  const pdPrefetchingRef = React.useRef<Record<string, boolean>>({});
+  const PLATFORM_LABEL: Record<string, string> = {
+    facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube",
+  };
+
+  React.useEffect(() => {
+    import("@pipedream/sdk/browser")
+      .then((m) => { pdSdkRef.current = (m as any).PipedreamClient; })
+      .catch(() => { /* retried lazily in prefetch */ });
+  }, []);
+
+  const prefetchConnect = React.useCallback(async (platform: "facebook" | "instagram" | "linkedin" | "youtube") => {
+    if (pdPrefetchingRef.current[platform]) return;
+    const cached = pdTokenRef.current[platform];
+    const sdkReady = !!pdSdkRef.current;
+    if (cached && cached.expiresAt - Date.now() > 60_000 && sdkReady) return;
+    pdPrefetchingRef.current[platform] = true;
+    try {
+      if (!pdSdkRef.current) {
+        const m = await import("@pipedream/sdk/browser");
+        pdSdkRef.current = (m as any).PipedreamClient;
+      }
+      const tk = await getConnectTokenMut?.mutateAsync?.({ platform });
+      if (tk?.token) {
+        pdTokenRef.current[platform] = {
+          token: tk.token,
+          expiresAt: new Date(tk.expiresAt || Date.now() + 300_000).getTime(),
+          appSlug: tk.appSlug,
+          env: tk.env ?? "production",
+        };
+      }
+    } catch { /* surfaced on click if still cold */ } finally {
+      pdPrefetchingRef.current[platform] = false;
+    }
+  }, [getConnectTokenMut]);
+
+  // Synchronous: NO awaits before pd.connectAccount() so the popup keeps
+  // the click's user activation. If not warmed yet, warm it and ask the
+  // user to tap again (never attempt a popup that will be blocked).
+  const openPipedreamConnect = (platform: "facebook" | "instagram" | "linkedin" | "youtube") => {
     if (pipedreamBusy) return;
+    const tk = pdTokenRef.current[platform];
+    const Ctor = pdSdkRef.current;
+    if (!Ctor || !tk || tk.expiresAt - Date.now() < 30_000) {
+      prefetchConnect(platform);
+      showToastGlobal(
+        lang === "en"
+          ? "Preparing authorization — please tap again in a moment."
+          : "正在準備授權，請稍候 1-2 秒再點一次"
+      );
+      return;
+    }
     setPipedreamBusy(true);
     try {
-      const tk = await getConnectTokenMut?.mutateAsync?.({ platform });
-      if (!tk?.token) {
-        showToastGlobal(
-          lang === "en"
-            ? "Couldn't fetch auth token — contact sowork@sowork.ai"
-            : "無法取得授權 token — 請聯絡 sowork@sowork.ai"
-        );
-        return;
-      }
-      const { PipedreamClient } = await import("@pipedream/sdk/browser");
-      const pd = new PipedreamClient({
-        projectEnvironment: (tk.env ?? "production") as "production" | "development",
+      const pd = new Ctor({
+        projectEnvironment: tk.env as "production" | "development",
         externalUserId: `sowork-user`,
         tokenCallback: async () => ({
           token: tk.token,
-          expiresAt: new Date(tk.expiresAt || Date.now() + 300_000),
+          expiresAt: new Date(tk.expiresAt),
           connectLinkUrl: "",
         }),
       });
-      const PLATFORM_LABEL: Record<string, string> = {
-        facebook: "Facebook",
-        instagram: "Instagram",
-        linkedin: "LinkedIn",
-        youtube: "YouTube",
-      };
-      await new Promise<void>((resolve, reject) => {
-        pd.connectAccount({
-          app: tk.appSlug,
-          onSuccess: () => {
-            showToastGlobal(
-              lang === "en"
-                ? `${PLATFORM_LABEL[platform]} connected ✓ Ready to publish`
-                : `已授權 ${PLATFORM_LABEL[platform]} ✓ 現在可以發布`
-            );
-            resolve();
-          },
-          onError: (err: any) => reject(new Error(String(err))),
-          onClose: ({ successful }: any) => {
-            if (!successful) reject(new Error(lang === "en" ? "Auth window closed" : "授權視窗已關閉"));
-            else resolve();
-          },
-        });
+      pd.connectAccount({
+        app: tk.appSlug,
+        onSuccess: () => {
+          showToastGlobal(
+            lang === "en"
+              ? `${PLATFORM_LABEL[platform]} connected ✓ Ready to publish`
+              : `已授權 ${PLATFORM_LABEL[platform]} ✓ 現在可以發布`
+          );
+          setPipedreamBusy(false);
+          // token consumed — refresh for a possible next connect
+          delete pdTokenRef.current[platform];
+          prefetchConnect(platform);
+        },
+        onError: (err: any) => {
+          setPipedreamBusy(false);
+          showToastGlobal(
+            lang === "en" ? `Authorization failed: ${String(err).slice(0, 120)}` : `授權失敗：${String(err).slice(0, 120)}`
+          );
+        },
+        onClose: ({ successful }: any) => {
+          setPipedreamBusy(false);
+          if (!successful) {
+            delete pdTokenRef.current[platform];
+            prefetchConnect(platform);
+          }
+        },
       });
     } catch (e: any) {
-      const m = String(e?.message ?? "");
-      if (!/視窗已關閉|closed/i.test(m)) {
-        showToastGlobal(
-          lang === "en" ? `Authorization failed: ${m.slice(0, 120)}` : `授權失敗：${m.slice(0, 120)}`
-        );
-      }
-    } finally {
       setPipedreamBusy(false);
+      showToastGlobal(
+        lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`
+      );
     }
   };
 
@@ -407,13 +455,16 @@ export default function RunPage() {
         onError: (e: any) => {
           const msg = String(e?.message ?? "");
           if (msg.includes("尚未連接") || msg.includes("缺 FB Page ID")) {
-            // Auto-open Pipedream connect popup — no manual navigate to brand settings
+            // 2026-05-18 (CJ「popup blocked」): a mutation onError is NOT a
+            // user gesture — auto-opening the OAuth popup here is always
+            // blocked. Instead warm the token and tell the user to tap
+            // the 連接 Facebook button (a real gesture → popup allowed).
+            prefetchConnect("facebook");
             showToastGlobal(
               lang === "en"
-                ? "Facebook not connected — opening authorization…"
-                : "尚未授權 Facebook — 正在開啟授權視窗…"
+                ? "Facebook isn't connected — tap the 「Connect Facebook」 button below to authorize."
+                : "尚未授權 Facebook — 請點下方「連接 Facebook」按鈕完成授權"
             );
-            openPipedreamConnect("facebook");
           } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
             showToastGlobal(
               lang === "en"
@@ -1750,6 +1801,8 @@ export default function RunPage() {
                     startContent={<FontAwesomeIcon icon={faRocket} />}
                     isLoading={pipedreamBusy}
                     isDisabled={pipedreamBusy}
+                    onMouseEnter={() => prefetchConnect(cfg.key)}
+                    onFocus={() => prefetchConnect(cfg.key)}
                     onPress={() => openPipedreamConnect(cfg.key)}
                   >
                     {pipedreamBusy

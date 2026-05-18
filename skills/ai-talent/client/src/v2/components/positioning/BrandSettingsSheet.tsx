@@ -418,13 +418,31 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   const isLoading = !!statusQ?.isLoading;
 
   async function handleConnect() {
+    // 2026-05-18 (CJ「Connect account popup blocked」): browsers block
+    // window.open that runs AFTER an await (the user-gesture context is
+    // gone). Open the popup synchronously NOW, inside the click, then
+    // redirect it once the connect URL resolves.
+    const win = window.open("about:blank", "_blank", "width=600,height=700");
+    if (!win) {
+      alert(en
+        ? "The connect window was blocked by your browser. Please allow pop-ups for this site and try again."
+        : "瀏覽器封鎖了授權視窗。請允許本站的彈出視窗後再試一次。");
+      return;
+    }
     try {
+      win.document.write(
+        `<p style="font:14px sans-serif;padding:24px;color:#555">${en ? "Opening Pipedream Connect…" : "正在開啟 Pipedream 授權…"}</p>`,
+      );
       const r = await connectM?.mutateAsync?.({});
       if (r?.connectUrl) {
-        window.open(r.connectUrl, "_blank", "noopener,noreferrer,width=600,height=700");
+        win.location.href = r.connectUrl;
         setConnectStarted(true);
+      } else {
+        win.close();
+        alert(en ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結 — 請聯絡 sowork@sowork.ai");
       }
     } catch (e: any) {
+      win.close();
       alert(en ? `Couldn't open Pipedream Connect: ${e?.message ?? "Unknown error"}` : `無法開啟 Pipedream Connect：${e?.message ?? "未知錯誤"}`);
     }
   }
