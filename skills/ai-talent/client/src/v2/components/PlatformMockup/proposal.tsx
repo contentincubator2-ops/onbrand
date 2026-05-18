@@ -105,6 +105,30 @@ function MarkdownDoc({ content }: { content: string }) {
   );
 }
 
+// ─── parseSections — split markdown on ## headings ───────────────────────────
+/**
+ * Splits markdown text on ## / ### headings into {label, content} pairs.
+ * Used by ResearchDoc to produce the Figma two-column label/body layout.
+ * Labels have markdown stripped (**, #, `) for the ALL-CAPS sidebar display.
+ */
+function parseSections(text: string): { label: string; content: string }[] {
+  const lines = text.split("\n");
+  const sections: { label: string; content: string }[] = [];
+  let cur: { label: string; lines: string[] } | null = null;
+  for (const raw of lines) {
+    const h = raw.match(/^#{1,3}\s+(.+)/);
+    if (h) {
+      if (cur) sections.push({ label: cur.label, content: cur.lines.join("\n").trim() });
+      const label = h[1]!.trim().replace(/\*\*/g, "").replace(/[`#]/g, "").trim();
+      cur = { label, lines: [] };
+    } else if (cur) {
+      cur.lines.push(raw);
+    }
+  }
+  if (cur) sections.push({ label: cur.label, content: cur.lines.join("\n").trim() });
+  return sections.filter((s) => s.label);
+}
+
 // ─── Sidebar — shared left panel ─────────────────────────────────────────────
 interface SidebarProps {
   brandName?: string | null;
@@ -379,80 +403,175 @@ export function ProposalSpec({ title, brandName, variantLabel, liveCaption }: Mo
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RESEARCH — research doc + 99s strategy tabs (most-used variant)
+//
+// 2026-05-19 (CJ Figma ref figma.com/design/XG9yVwbMGqkBVAJ2FuyaE9):
+// Redesigned to match the Figma "Project Proposal Template (Community)"
+// two-column document layout — frame 2 "Project Brief" pattern:
+//   LEFT col  (140px) : ALL-CAPS section labels, muted gray, tight tracking
+//   RIGHT col (1fr)   : section body (markdown rendered)
+// Markdown ## headings become label/body pairs via parseSections().
+// Falls back to single-column prose when no headings are present.
+// Dark sidebar removed for research/strategy docs — those need reading
+// space, not metadata chrome.
 // ─────────────────────────────────────────────────────────────────────────────
-export function ResearchDoc({ title, brandName, variantLabel, liveCaption }: MockupFields) {
-  // Derive a short doc-type label from variantLabel for the chip
+export function ResearchDoc({ title, brandName, variantLabel, liveCaption, liveTitle, slotMap }: MockupFields) {
+  // Prefer slotMap.caption (live streaming) > liveCaption (completed run)
+  const slotCap = (slotMap as any)?.caption;
+  const captionLoading = slotCap?.status === "loading";
+  const caption = (typeof slotCap?.value === "string" ? slotCap.value : undefined) ?? liveCaption ?? "";
+  const hasContent = caption.trim().length > 0;
+
+  // Section heading → document title (favour liveTitle if present)
+  const heading = liveTitle || title || variantLabel || "Strategy Document";
+
+  // Parse ## / ### sections into label + body pairs
+  const sections = parseSections(caption);
+
+  // Short chip label derived from variantLabel
   const chipLabel = (() => {
     const v = (variantLabel ?? "").toLowerCase();
-    if (v.includes("策略") || v.includes("strategy")) return "Strategy";
-    if (v.includes("研究") || v.includes("research")) return "Research";
-    if (v.includes("分析") || v.includes("analysis")) return "Analysis";
-    if (v.includes("月曆") || v.includes("calendar")) return "Calendar";
-    if (v.includes("指標") || v.includes("metric")) return "Metrics";
-    if (v.includes("報告") || v.includes("report")) return "Report";
-    if (v.includes("支柱") || v.includes("pillar")) return "Pillars";
-    return "Doc";
+    if (v.includes("競品") || v.includes("competitor")) return "Competitor";
+    if (v.includes("趨勢") || v.includes("trend"))       return "Trends";
+    if (v.includes("支柱") || v.includes("pillar"))      return "Pillars";
+    if (v.includes("策略") || v.includes("strategy"))    return "Strategy";
+    if (v.includes("分析") || v.includes("analysis"))    return "Analysis";
+    if (v.includes("報告") || v.includes("report"))      return "Report";
+    if (v.includes("研究") || v.includes("research"))    return "Research";
+    if (v.includes("月曆") || v.includes("calendar"))    return "Calendar";
+    return "Document";
   })();
+
+  const today = new Date().toLocaleDateString("zh-TW", { year: "numeric", month: "long" });
+  const FONT = "'Inter','Noto Sans TC',system-ui,sans-serif";
 
   return (
     <div style={{
       width: "100%", maxWidth: 800, margin: "0 auto",
-      background: "#fff",
-      boxShadow: "0 8px 40px rgba(15,23,42,0.14)",
+      fontFamily: FONT,
+      background: "#FFFFFF",
+      boxShadow: "0 8px 40px rgba(15,23,42,0.14), 0 2px 8px rgba(15,23,42,0.06)",
       borderRadius: 12,
       overflow: "hidden",
       border: "1px solid #E2E8F0",
     }}>
-      {/* Top accent bar */}
+      {/* ── 4px gradient accent strip (proposal brand signature) ── */}
       <div style={{ height: 4, background: `linear-gradient(90deg, ${ACCENT}, #6366F1 60%, #EC4899)` }} />
 
-      <div style={{ display: "flex", minHeight: 520 }}>
-        {/* Left sidebar */}
-        <ProposalSidebar
-          brandName={brandName}
-          variantLabel={variantLabel ?? title ?? "Research Document"}
-          docType="Research"
-          chipLabel={chipLabel}
-        />
-
-        {/* Right — document content */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-          {/* Content header */}
+      {/* ── Document header ── */}
+      <div style={{
+        padding: "18px 32px 14px",
+        borderBottom: "1px solid #E2E8F0",
+        display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Chip */}
           <div style={{
-            padding: "22px 32px 16px",
-            borderBottom: "1px solid #E2E8F0",
+            display: "inline-flex", alignItems: "center",
+            background: "rgba(56,189,248,0.12)", borderRadius: 99, padding: "2px 9px",
+            fontSize: 9, fontWeight: 700, color: ACCENT,
+            textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 7,
           }}>
-            <p style={{ fontSize: 10, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 5 }}>
-              OnBrand AI · {chipLabel}
-            </p>
-            <h1 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0F172A", lineHeight: 1.3 }}>
-              {title || variantLabel || "Research Document"}
-            </h1>
+            {chipLabel}
           </div>
-
-          {/* Body */}
-          <div style={{
-            flex: 1,
-            padding: "20px 32px 16px",
-            overflowY: "auto",
-            maxHeight: 480,
+          <h2 style={{
+            margin: 0, fontSize: "clamp(15px,2vw,19px)", fontWeight: 700,
+            color: "#0F172A", lineHeight: 1.35, overflowWrap: "anywhere",
           }}>
-            <MarkdownDoc content={liveCaption || "（agent 撰寫研究文件中…）"} />
+            {heading}
+          </h2>
+          {brandName && (
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#94A3B8" }}>{brandName}</p>
+          )}
+        </div>
+        <div style={{ flexShrink: 0, paddingTop: 2, textAlign: "right" }}>
+          <p style={{ fontSize: 9.5, fontWeight: 600, color: "#CBD5E1", letterSpacing: "0.14em", textTransform: "uppercase", margin: 0 }}>
+            {today}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Content ── */}
+      {hasContent ? (
+        sections.length > 1 ? (
+          // ── Two-column labeled layout (Figma "Project Brief" page 2) ──
+          // LEFT : ALL-CAPS label (140px fixed)
+          // RIGHT: body content (MarkdownDoc)
+          // Rows separated by a whisper-thin rule (#F1F5F9)
+          <div>
+            {sections.map((s, i) => (
+              <div key={i} style={{
+                display: "grid",
+                gridTemplateColumns: "140px 1fr",
+                gap: "0 28px",
+                padding: "16px 32px",
+                borderBottom: i < sections.length - 1 ? "1px solid #F1F5F9" : "none",
+              }}>
+                {/* LEFT — section label */}
+                <div style={{ paddingTop: 3 }}>
+                  <span style={{
+                    display: "block",
+                    fontSize: 9.5, fontWeight: 700,
+                    letterSpacing: "0.16em", textTransform: "uppercase",
+                    color: "#94A3B8", lineHeight: 1.5,
+                  }}>
+                    {s.label}
+                  </span>
+                </div>
+                {/* RIGHT — section body */}
+                <div>
+                  {s.content
+                    ? <MarkdownDoc content={s.content} />
+                    : <span style={{ color: "#CBD5E1", fontSize: 12 }}>—</span>
+                  }
+                </div>
+              </div>
+            ))}
           </div>
-
-          {/* Footer */}
-          <div style={{
-            padding: "10px 32px",
-            borderTop: "1px solid #E2E8F0",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            background: "#FAFAFA",
-          }}>
-            <span style={{ fontSize: 10, color: "#94A3B8" }}>SoWork OnBrand · Internal</span>
-            <span style={{ fontSize: 10, color: "#94A3B8" }}>Confidential · 1 / 1</span>
+        ) : (
+          // ── Single-column prose fallback (no ## headings detected) ──
+          <div style={{ padding: "20px 32px" }}>
+            <MarkdownDoc content={caption} />
+          </div>
+        )
+      ) : captionLoading ? (
+        // ── Loading skeleton ──
+        <div style={{ padding: "24px 32px" }}>
+          {[3, 2, 4].map((lines, gi) => (
+            <div key={gi} style={{
+              display: "grid", gridTemplateColumns: "140px 1fr", gap: "0 28px",
+              padding: "14px 0",
+              borderBottom: gi < 2 ? "1px solid #F1F5F9" : "none",
+            }}>
+              <div style={{ height: 8, borderRadius: 4, background: "#F1F5F9", width: "55%", marginTop: 3 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {Array.from({ length: lines }, (_, i) => (
+                  <div key={i} style={{ height: 8, borderRadius: 4, background: "#F8FAFC", width: `${98 - i * 7}%` }} />
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 12 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: ACCENT, display: "inline-block", opacity: 0.75 }} />
+            <span style={{ fontSize: 10, color: ACCENT, opacity: 0.8 }}>Agent 生成中…</span>
           </div>
         </div>
+      ) : (
+        // ── Empty fallback ──
+        <div style={{ padding: "44px 32px", textAlign: "center", color: "#CBD5E1", fontSize: 13 }}>
+          尚無內容
+        </div>
+      )}
+
+      {/* ── Footer ── */}
+      <div style={{
+        padding: "9px 32px",
+        borderTop: "1px solid #E2E8F0",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        fontSize: 10, color: "#94A3B8",
+        background: "#FAFAFA",
+      }}>
+        <span>SoWork OnBrand · {chipLabel}</span>
+        <span>Confidential · Internal Use Only</span>
       </div>
     </div>
   );
