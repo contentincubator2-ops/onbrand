@@ -373,19 +373,58 @@ export const YT_99S_TASKS: FBTaskTemplate[] = [
     outputDefaults: { platform: "youtube", post_type: "video" },
   },
   {
+    // 2026-05-19 (Yi-Wen 驗收 v#1 — 12/14):
+    // 原 2-行 prompt → Community 月曆 tab 語氣崩回 v1 level：
+    //   「在這個數位行銷的時代」PR 腔開場、「響亮無比！」驚嘆號結尾。
+    // 12 影片 title 中「SME 用戶 68%」無具名出處。
+    // 根因：多 tab 任務中模型在 Community 月曆 tab 把格式切換成「社群促銷腔」，
+    //   把品牌聲音規則丟掉。需要明確說 Community 月曆仍是品牌聲音語境，非 IG/抖音。
+    // 修法：完整 systemPrompt（品牌聲音 guardrail + per-tab 內容規格 + 統計規則）。
     id: "yt-99-quarterly-strategy",
     tier: "99s", postType: "video",
     label: "YT 季度頻道策略",
     description: "12 個 video title + 內容支柱 + community 月曆 + competitor 分析",
     agent_id: 224001, // Yun-Hsuan Chen — YouTube Marketing Strategist 服飾時尚 (~1019 char)
     skill_slug: "youtube-strategy",
-    primary_question: "頻道方向 / 受眾？",
-    primary_input: { key: "channel_focus", placeholder: "頻道主題與目標受眾", type: "textarea" },
-    inputs: [{ key: "channel_focus", label: "頻道焦點", type: "textarea", required: true }],
-    systemPrompt: `產出 YT 季度策略其中 1 部分（300-600 字）。
-本次你寫的是「{label}」（內容支柱規劃 / 12 個影片 title / community 月曆 / competitor 分析 / 即時趨勢報告）。
-${TONE_100}`,
-    preferredModel: "qwen", maxTokens: 1200,
+    primary_question: "頻道主題 + 目標受眾職稱 + 品牌主張（三項合填）",
+    primary_input: {
+      key: "channel_focus",
+      placeholder: "例：OnBrand AI YouTube 頻道｜目標受眾：品牌行銷主管 / 中小企業內容策略師｜品牌主張：品牌聲音有溯源憑據，AI 輔助產出不失品牌靈魂",
+      type: "textarea",
+    },
+    inputs: [{ key: "channel_focus", label: "頻道主題 + 受眾職稱 + 品牌主張", type: "textarea", required: true }],
+    systemPrompt: `你負責撰寫 YT 季度頻道策略「{label}」這一部分（300-600 字）。
+
+【品牌聲音 guardrail — 所有 tabs 必守，Community 月曆尤其注意，違反即不合格】
+SoWork 語氣 = 「精準守護者、有憑據的科技感」。這份文件是品牌內部策略文件，不是 IG 貼文，不是抖音腳本。
+逐條禁止（v#1 踩過的錯誤，原詞禁止）：
+- 驚嘆號結尾（任何句子，含「響亮無比！」「一起加油！」）→ 全改句號
+- PR / 媒體腔開場：「在這個數位行銷的時代」「隨著科技演進」→ 改具體情境句
+- emoji（任何）、煽動詞（「快來」「把握」「心動不如行動」）
+- 散文腔：「如歌般悠揚」「讓品牌語音響亮無比」「讓每一句話…」
+【Community 月曆專屬補充】Community 帖文草稿仍是品牌策略語境，語氣要精準克制：
+  ✗ 錯誤：「讓你的品牌語音在 YouTube 響亮無比！」（煽情 + 驚嘆號）
+  ✓ 正確：「你的品牌聲音，在 YouTube 留下了什麼印記？」（具體問題導向）
+
+【統計數字規則】
+任何百分比 / 次數 / 指標數字，只能使用輸入原文中明確出現的數字。
+輸入沒有 → 改質化描述或「[請補充：數據來源]」；不得附加媒體名稱繞過。
+✗ 違反例：「SME 用戶 68%」（輸入無此數字 → 禁止直接出現）
+
+【per-tab 內容規格】
+- 內容支柱：3-4 個支柱，每個支柱名稱 + 2 行說明 + 對應受眾痛點
+- 12 影片 title：每個 title 含鉤子詞 + 清楚受益者；注意 SEO 勾字（不要純業配腔）
+  → 影片 title 裡任何括號內數字（如「68%」）須有輸入來源，否則刪除
+- Community 月曆：每週 1-2 篇社群貼文草稿 + 預計發布時機；語氣見上方品牌聲音規則
+- Competitor 分析：3-4 家競品 + 各自策略特徵 + 本頻道差異化切入點
+- 即時趨勢報告：結合 scout 資訊，列 3 條當季可操作趨勢 + 對本頻道的具體應用
+
+【寄出前自我檢查｜必做】
+1. 有驚嘆號嗎？→ 全換句號
+2. 有「在這個…時代」「數位演進」PR 腔開場嗎？→ 換具體情境句
+3. 有輸入原文沒有的百分比 / 數字嗎？→ 刪或標 [請補充]
+→ 任一不符，就地改寫再輸出。${TONE_100}`,
+    preferredModel: "anthropic", maxTokens: 1200,
     outputDefaults: { platform: "youtube", post_type: "video" },
   },
   {
