@@ -63,6 +63,10 @@ import AdminUserDetailPage from "../pages/AdminUserDetailPage";
 import LandingPage from "../pages/LandingPage";
 // 2026-05-11 (CJ「P0-1 內容日曆」): vs Buffer
 import CalendarPage from "../pages/CalendarPage";
+// 2026-05-18 (CJ): media-to-copy feature pages
+import PhotoCopyPage from "../pages/media/PhotoCopyPage";
+import VideoCopyPage from "../pages/media/VideoCopyPage";
+import DocRewritePage from "../pages/media/DocRewritePage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -272,6 +276,10 @@ export default function AppV2() {
           {/* 2026-05-13 — Layer 3 (admin support inbox) + Layer 5 (public changelog) */}
           <Route path="/admin/support" element={<AdminSupportPage />} />
           <Route path="/changelog" element={<ChangelogPage />} />
+          {/* 2026-05-18 (CJ): media-to-copy routes */}
+          <Route path="/media/photo/:channel" element={<PhotoCopyPage />} />
+          <Route path="/media/video/:channel" element={<VideoCopyPage />} />
+          <Route path="/media/doc" element={<DocRewritePage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

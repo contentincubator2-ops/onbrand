@@ -39,6 +39,8 @@ import { festivalRouter } from "./festivalRouter";
 import { promptTemplateRouter } from "./promptTemplateRouter";
 // 2026-05-12 (CJ「策略顧問 — 5 scenario cards + McKinsey reports + Q&A + 比稿」)
 import { strategyConsultantRouter } from "./strategyConsultantRouter";
+// 2026-05-18 (CJ「media to copy」): photo/video/doc → brand-aligned platform copy.
+import { mediaCopyRouter } from "./mediaCopyRouter";
 
 // 2026-05-14: removed 28 dead routers — none of them had any v2 callers
 // after the v1 frontend deletion. See git history (commit before this)
@@ -87,6 +89,7 @@ export const appRouter = router({
   festival:        festivalRouter,
   promptTemplate:      promptTemplateRouter,
   strategyConsultant:  strategyConsultantRouter,
+  mediaCopy:           mediaCopyRouter,
 });
 
 export type AppRouter = typeof appRouter;

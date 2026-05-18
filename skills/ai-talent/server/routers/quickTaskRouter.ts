@@ -691,6 +691,8 @@ import { KOL_30S_TASKS, KOL_30S_ORCHESTRA } from "../_core/quickTaskKOL";
 function getKOLOrchestraConfig(taskId: string) { return KOL_30S_ORCHESTRA[taskId] ?? null; }
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
+// 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
+import { MEDIA_PHOTO_TASKS, MEDIA_VIDEO_TASKS, MEDIA_DOC_TASKS } from "../_core/quickTaskMedia";
 
 function tryParseJson(s: string): any | null {
   if (!s) return null;
@@ -956,6 +958,7 @@ export const quickTaskRouter = router({
       t.id === "fb-99-carousel-5" || t.id === "fb-99-serial-3" ||
       t.id === "fb-99-trend-rewrite" || t.id === "fb-99-viral-rewrite" ||
       t.id === "fb-99-testimonial-rewrite" || t.id === "fb-99-30day-calendar" ||
+      t.id === "fb-99-monthly-calendar-promo" ||
       (!t.id.startsWith("fb-") && !t.id.startsWith("ig-"))
     ).map((t) => {
       const id = t.id;
@@ -988,10 +991,26 @@ export const quickTaskRouter = router({
         : "facebook";
       return { ...t, kind: "fast" as const, platform };
     });
+    // 2026-05-18 (CJ「media to copy」): photo/video/doc tasks — isMediaTask:true
+    // tells the frontend to route directly to the upload page (ctaPath) instead
+    // of opening the standard orchestra modal.
+    const mediaTasks = [
+      ...MEDIA_PHOTO_TASKS,
+      ...MEDIA_VIDEO_TASKS,
+      ...MEDIA_DOC_TASKS,
+    ].map((t) => ({
+      ...t,
+      kind: "fast" as const,
+      isMediaTask: true as const,
+      agent_id: null,
+      squadName: null,
+    }));
+
     const tasks: any[] = [
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
       ...tasks100,
       ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks, ...kolTasks,
+      ...mediaTasks,
     ];
     // 60s production-package universal team agent IDs (used by orchestra)
     // Emma Zhang / Helen Sung / David Wang / Sophie Ho / Jordan Hayes / Mandy / Nancy / Nina / Anna / Zeyu / Nathan

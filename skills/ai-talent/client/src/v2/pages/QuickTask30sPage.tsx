@@ -514,6 +514,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
 
   const openTask = (t: FBTaskCard) => {
+    // Media tasks (photo/video/doc) navigate directly to their dedicated page
+    // instead of opening the orchestra modal.
+    if ((t as any).isMediaTask && (t as any).ctaPath) {
+      navigate((t as any).ctaPath);
+      return;
+    }
     // Per CJ direction: 100s squad tasks now auto-run inline (same modal UX
     // as 30s/60s) instead of redirecting to /picker workspace. The squad
     // pipeline runs all steps sequentially via runSquadAuto and returns the
