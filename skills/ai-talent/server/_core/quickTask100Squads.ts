@@ -36,6 +36,11 @@ export interface SquadIndexEntry {
   description: string;
   /** Methodology / framework note (subtle text on card) */
   methodology?: string;
+  /** Override the generic intake question shown in the modal.
+   *  If omitted, quickTaskRouter falls back to the generic "本次想交付什麼？" prompt. */
+  primary_question?: string;
+  /** Override the generic intake input config. */
+  primary_input?: { key: string; placeholder: string; type: "textarea" | "text" };
 }
 
 // ─── FB 100s squads (11 — slugs verified to exist in DB 2026-05-06) ────
@@ -72,6 +77,12 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     label: "FB 帳號重新定位",
     description: "Trout & Ries Positioning + Pulizzi Tilt + 完整轉型 launch posts",
     methodology: "Trout & Ries Positioning",
+    primary_question: "為什麼想重新定位？想往哪個方向走、或有想參考的品牌？",
+    primary_input: {
+      key: "topic",
+      placeholder: "例：原本太嚴肅想轉輕鬆 / 想對標 XXX 的定位風格 / 客群從 B2B 轉 B2C",
+      type: "textarea",
+    },
   },
   {
     id: "fb-99-quarterly-strategy",
