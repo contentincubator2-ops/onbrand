@@ -1,6 +1,7 @@
 /**
- * Pricing page — single-tier OnBrand 個人.
- * 2026-05-10. CJ direction「one price, AI 小白 friendly」.
+ * Pricing page — 3 tiers: Starter / Solo / Studio + Agency contact card.
+ * 2026-05-19. CJ direction: add Starter at US$25 early / US$75 std.
+ * Task counting = per execution run (all variants + images in one run = 1 use).
  */
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -20,7 +21,6 @@ export default function PricingPage() {
 
   const isEn = lang === "en";
 
-  // 2026-05-14 (CJ「我們使用 Stripe」): wire CTA to Stripe Checkout.
   const checkoutMut = (trpc as any).stripe?.createCheckout?.useMutation
     ? (trpc as any).stripe.createCheckout.useMutation({
         onSuccess: (data: any) => {
@@ -31,105 +31,139 @@ export default function PricingPage() {
       })
     : null;
 
-  // 2026-05-14 (CJ「TWD + USD 雙幣」): derive currency + amounts from status.
-  // Falls back to TWD with default sticker so /pricing works for logged-out
-  // visitors too.
   const currency: "TWD" | "USD" = (status as any)?.currency ?? "TWD";
   const sym = currency === "USD" ? "US$" : "NT$";
-  // 2026-05-14 (CJ「美金為準，每天匯率動」): USD truth, TWD derives at live rate.
   const usdToTwd = (status as any)?.usdToTwd ?? 32;
   const r = (usd: number) => Math.round(usd * usdToTwd);
-  // 2026-05-14 (CJ Solo + Studio pricing pivot):
-  //   Solo  US$100 early / US$300 std · 1 brand · unlimited text+image
-  //   Studio US$250 early / US$750 std · 3 brands · unlimited each
-  //   Agency = roadmap, replaced with "聯繫業務" CTA below the grid
-  const defaults = currency === "USD"
-    ? { soloEarly: 100, soloStd: 300, soloAnnual: 1000, studioEarly: 250, studioStd: 750, studioAnnual: 2500 }
-    : { soloEarly: r(100), soloStd: r(300), soloAnnual: r(1000), studioEarly: r(250), studioStd: r(750), studioAnnual: r(2500) };
 
-  // 2-tier pricing: Solo (1 brand) + Studio (3 brands). Agency moved out
-  // of the grid into a "聯繫業務" footer card.
+  // ─── Pricing truth (USD) ───────────────────────────────────────────────────
+  // Starter  US$25 early / US$75 std  · annual US$250
+  // Solo     US$100 early / US$300 std · annual US$1,000
+  // Studio   US$250 early / US$750 std · annual US$2,500
+  const defaults = currency === "USD"
+    ? {
+        starterEarly: 25,   starterStd: 75,   starterAnnual: 250,
+        soloEarly:    100,  soloStd:    300,  soloAnnual:    1000,
+        studioEarly:  250,  studioStd:  750,  studioAnnual:  2500,
+      }
+    : {
+        starterEarly: r(25),   starterStd: r(75),   starterAnnual: r(250),
+        soloEarly:    r(100),  soloStd:    r(300),  soloAnnual:    r(1000),
+        studioEarly:  r(250),  studioStd:  r(750),  studioAnnual:  r(2500),
+      };
+
   const TIERS = [
     {
+      code: "drop_starter",
+      name: "OnBrand Starter",
+      sub: isEn ? "50 runs / mo · 1 brand · text + images" : "每月 50 次執行 · 1 個品牌 · 文案 + 圖",
+      monthly:         defaults.starterEarly,
+      annual:          defaults.starterAnnual,
+      standardMonthly: defaults.starterStd,
+      isEarlyBird: true,
+      members: isEn ? "1 brand · 1 user" : "1 個品牌 · 1 位用戶",
+      features: isEn ? [
+        "50 runs / month (each run = all variants + images)",
+        "30s & 60s task templates",
+        "AI images (Flux / GPT Image-1 / Imagen / Ideogram)",
+        "Brand brain positioning (USP · voice · audience)",
+        "Publish + schedule to FB / IG",
+        "E-invoices (personal / B2B)",
+        "99s deep-research: upgrade to Solo",
+      ] : [
+        "每月 50 次執行（每次含所有文案變體 + 圖）",
+        "30s 及 60s 全任務模板",
+        "AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
+        "品牌大腦定位（USP · 語氣 · 受眾）",
+        "FB / IG 直接發布 + 排程",
+        "電子發票（個人 / B2B）",
+        "99s 深度研究任務：升級 Solo 解鎖",
+      ],
+      cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
+      highlight: false,
+      highlightLabel: isEn ? "EARLY BIRD · LOCKED FOREVER" : "早鳥優惠 · 永久保價",
+    },
+    {
       code: "drop_pro",
-      name: isEn ? "OnBrand Solo" : "OnBrand Solo",
-      sub: isEn ? "One brand · unlimited captions + images" : "一個品牌 · 無限文案 + 圖",
-      // 2026-05-15 (CJ「nt$900 已確定無效，全改」): grandfather lock 已 wipe，
-      // 所有用戶都吃 US$100 早鳥。Pricing page 永遠顯示 marketing offer。
-      monthly: defaults.soloEarly,
-      annual:  defaults.soloAnnual,
+      name: "OnBrand Solo",
+      sub: isEn ? "Unlimited runs · 1 brand · text + images" : "無限次執行 · 1 個品牌 · 文案 + 圖",
+      monthly:         defaults.soloEarly,
+      annual:          defaults.soloAnnual,
       standardMonthly: defaults.soloStd,
       isEarlyBird: true,
       members: isEn ? "1 brand · 1 user" : "1 個品牌 · 1 位用戶",
       features: isEn ? [
-        "Unlimited captions (30s / 60s / 99s templates)",
+        "Unlimited runs (30s / 60s / 99s — all templates)",
         "Unlimited AI images (Flux / GPT Image-1 / Imagen / Ideogram)",
+        "99s deep-research pipeline",
         "Publish + schedule to FB / IG (unlimited)",
         "E-invoices (personal / B2B)",
-        "Video: roadmap add-on",
+        "Video generation: roadmap add-on",
         "Rename / swap brand: contact support",
       ] : [
-        "無限文案（30s / 60s / 99s 全任務模板）",
+        "無限次執行（30s / 60s / 99s 全任務模板）",
         "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
+        "99s 深度研究 pipeline",
         "FB / IG 直接發布 + 排程（無限）",
         "電子發票（個人 / B2B）",
-        "影片：roadmap 加購包",
+        "影片生成：roadmap 加購包",
         "改名 / 換品牌：聯繫客服",
       ],
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: true,
-      highlightLabel: isEn ? "EARLY BIRD · LOCKED FOREVER" : "早鳥優惠 · 永久保價",
+      highlightLabel: isEn ? "MOST POPULAR · EARLY BIRD" : "最多人選 · 早鳥優惠",
     },
     {
       code: "drop_team",
       name: "OnBrand Studio",
-      sub: isEn ? "Up to 3 brands, self-serve switching" : "最多 3 個品牌、自助切換",
-      monthly: defaults.studioEarly,
-      annual: defaults.studioAnnual,
+      sub: isEn ? "Unlimited runs · up to 3 brands" : "無限次執行 · 最多 3 個品牌",
+      monthly:         defaults.studioEarly,
+      annual:          defaults.studioAnnual,
       standardMonthly: defaults.studioStd,
-      isEarlyBird: status?.isEarlyBird ?? true,
+      isEarlyBird: (status as any)?.isEarlyBird ?? true,
       members: isEn ? "3 brands · 1 user" : "3 個品牌 · 1 位用戶",
       features: isEn ? [
         "Up to 3 brands (self-serve switching)",
-        "Each brand at Solo spec (unlimited text + image)",
+        "Each brand at Solo spec (unlimited runs + images)",
         "Cross-brand analytics + comparison",
         "Publish + schedule to FB / IG (unlimited)",
         "E-invoices (B2B)",
         "1 user · more seats on roadmap",
       ] : [
         "最多 3 個品牌（自助切換、不用聯繫客服）",
-        "每個品牌都是 Solo 規格（無限文案 + 圖）",
+        "每個品牌都是 Solo 規格（無限次執行 + 圖）",
         "跨品牌數據比較",
         "FB / IG 直接發布 + 排程（無限）",
         "電子發票（B2B）",
         "1 位用戶 · 多 user seats 是 roadmap",
       ],
       cta: isEn ? "Go Studio" : "升級到 Studio",
+      highlight: false,
+      highlightLabel: undefined as string | undefined,
     },
   ];
 
   const faq: [string, string][] = isEn ? [
-    ["What happens when my trial ends?", "Trial stops when EITHER the 7 days OR your 1000 trial points run out — whichever comes first. We'll email you 1 day before the time limit. When it ends, your account flips to read-only — you can still sign in and view history, but can't produce new content."],
-    ["Can I cancel anytime?", "Yes. Hit Cancel in Account settings whenever you want. You'll keep access until the period ends, then no more charges."],
-    ["Do unused credits roll over?", "Nope. Monthly plans reset on the 1st. Annual plans also reset monthly on the 1st."],
-    ["Is 10 videos a month enough?", "Yes — 10 short clips (5-10s) covers ~1 IG Reel / TikTok / YT Short per week. Need more? Try Enterprise."],
+    ["What counts as a 'run' in Starter?", "One run = one task execution, no matter how many variants or images are generated. If a 60s task produces 5 caption variants + 5 images, that still counts as 1 run. System failures are automatically refunded — unsatisfied with the output and re-running counts as a new run."],
+    ["What happens when my trial ends?", "Trial stops when EITHER the 7 days OR your 1,000 trial points run out — whichever comes first. We'll email you 1 day before expiry. After that, your account becomes read-only — you can still sign in and view history, but can't produce new content."],
+    ["Can I cancel anytime?", "Yes. Hit Cancel in Account settings whenever you want. You'll keep access until the current period ends, then no more charges."],
+    ["Do Starter's 50 runs roll over?", "No. The 50 runs reset on the 1st of each month. Annual plans also reset monthly on the 1st."],
+    ["Can I upgrade from Starter to Solo later?", "Yes — upgrade any time in Account settings. Your early-bird Starter price is locked for as long as you stay on Starter, but when you upgrade to Solo you lock in Solo's early-bird price instead."],
     ["Who owns the output?", "You do. We claim zero rights. Use it commercially, remix it, resell it — it's all yours."],
     ["Can I get a company invoice?", "Yes. Add your tax ID + company name in Account settings → Invoice info, and the next charge will auto-issue a B2B e-invoice."],
+    ["What's the difference between 30s, 60s, and 99s tasks?", "30s = single fast output (1 variant). 60s = 5 variants + 5 images in parallel (~60 seconds). 99s = deep-research pipeline with live web data, competitive analysis, and full content strategy (Solo+ only)."],
   ] : [
-    ["試用期過了會怎樣？", "試用在「7 天到期」或「1000 試用點數用完」時停止，先到先停。時間到的前 1 天會 email 通知。到期後若沒升級，帳號會自動切到唯讀模式（仍能登入查看歷史紀錄，但無法產出新內容）。"],
-    ["可以中途取消嗎？", "可以，隨時於「帳號設定」按取消，當期到期前仍能正常使用，到期後不再扣款。"],
-    ["額度沒用完會累積嗎？", "不會。月費方案每月 1 號重置，年費方案每月 1 號也會重置。"],
-    ["影片生成 10 支夠嗎？", "5-10 秒短片 10 支 / 月足夠 IG Reels、TikTok、YT Shorts 一週一支的節奏。需要更多請洽企業版。"],
-    ["產出的內容版權歸誰？", "全部歸您。我們不主張任何權利，您可商用、二次創作、轉售產出的素材。"],
-    ["能開公司發票嗎？", "可以。在「帳號設定 → 發票資訊」填統編 + 公司名，下次扣款會自動開立 B2B 三聯式電子發票。"],
+    ["Starter 的「50 次執行」是什麼意思？", "一次執行 = 跑一次任務，不管產出幾個變體或圖片都算 1 次。例如 60s 任務產出 5 份文案 + 5 張圖，仍算 1 次。系統錯誤自動退回；對輸出不滿意而主動重跑，算新的 1 次。"],
+    ["試用期過了會怎樣？", "試用在「7 天到期」或「1,000 試用點數用完」時停止，先到先停。到期前 1 天會 email 通知。若沒升級，帳號切到唯讀模式（仍能登入查歷史，但無法產出新內容）。"],
+    ["可以中途取消嗎？", "可以，隨時於「帳號設定」取消。當期到期前仍能正常使用，到期後不再扣款。"],
+    ["Starter 的 50 次用不完會累積嗎？", "不會，每月 1 號重置。年費方案每月 1 號也重置（不累積）。"],
+    ["之後可以從 Starter 升級到 Solo 嗎？", "可以，隨時在帳號設定升級。Starter 早鳥價只要繼續訂閱就永久保價；升級到 Solo 時，會鎖定當時 Solo 的早鳥價。"],
+    ["產出的內容版權歸誰？", "全部歸您。我們不主張任何權利，可商用、二次創作、轉售。"],
+    ["能開公司發票嗎？", "可以。在「帳號設定 → 發票資訊」填統編 + 公司名，下次扣款自動開立 B2B 三聯式電子發票。"],
+    ["30s / 60s / 99s 任務有什麼差別？", "30s = 單一快速輸出（1 個變體）。60s = 5 個文案變體 + 5 張圖並行（約 60 秒）。99s = 附帶即時網路研究、競品分析、完整內容策略的深度 pipeline（Solo 以上才有）。"],
   ];
 
-  // 2026-05-12 (CJ「我要有訂價方案的建議，1500 定價，早鳥 900」):
-  // Show the early-bird offer prominently when applicable. Unauthenticated
-  // visitors see this by default (status is null → isEarlyBird falls to true)
-  // so /pricing functions as a conversion page.
-  const showEarlyBirdBanner =
-    (status?.isEarlyBird ?? true) && (TIERS[0] as any).standardMonthly > TIERS[0].monthly;
+  const showEarlyBirdBanner = status?.isEarlyBird ?? true;
 
   return (
     <div className="min-h-screen bg-white">
@@ -138,8 +172,8 @@ export default function PricingPage() {
           style={{ background: "linear-gradient(90deg, #059669 0%, #10b981 60%, #34d399 100%)" }}
         >
           {isEn
-            ? <>⭐ <strong>Early-bird:</strong> {sym} <strong>{defaults.soloEarly}</strong>/mo (standard {sym} {defaults.soloStd.toLocaleString()}) — <strong>locked forever</strong> for accounts opened today.</>
-            : <>⭐ <strong>限時早鳥</strong>：{sym} <strong>{defaults.soloEarly}</strong>/月（標準價 {sym} {defaults.soloStd.toLocaleString()}）— <strong>現在開通永久保價</strong>，老用戶終身不漲</>
+            ? <>⭐ <strong>Early-bird:</strong> Starter {sym}<strong>{defaults.starterEarly}</strong> · Solo {sym}<strong>{defaults.soloEarly}</strong> · Studio {sym}<strong>{defaults.studioEarly}</strong> /mo — <strong>locked forever</strong> for accounts opened today.</>
+            : <>⭐ <strong>限時早鳥</strong>：Starter {sym}<strong>{defaults.starterEarly}</strong> · Solo {sym}<strong>{defaults.soloEarly}</strong> · Studio {sym}<strong>{defaults.studioEarly}</strong> /月 — <strong>現在開通永久保價</strong></>
           }
         </div>
       )}
@@ -147,7 +181,7 @@ export default function PricingPage() {
         {/* Header */}
         <div className="text-center mb-10">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
-            {isEn ? "PRICING · CHOOSE YOUR SCALE" : "PRICING · CHOOSE YOUR SCALE"}
+            PRICING · CHOOSE YOUR SCALE
           </p>
           <h1
             className="font-semibold tracking-tight leading-tight mb-3"
@@ -159,7 +193,7 @@ export default function PricingPage() {
               backgroundClip: "text",
             }}
           >
-            {isEn ? "From solo to full agency — one toolkit" : "從 1 個人到整個 Agency 都用得了"}
+            {isEn ? "From solo creator to full agency — one toolkit" : "從個人創作者到整個 Agency — 一套工具"}
           </h1>
           <p
             className="mx-auto text-default-700"
@@ -194,8 +228,8 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* 2-tier grid + Agency contact card */}
-        <div className="grid gap-5 md:grid-cols-2 mb-6 max-w-3xl mx-auto">
+        {/* 3-tier grid */}
+        <div className="grid gap-5 md:grid-cols-3 mb-6 max-w-5xl mx-auto">
           {TIERS.map((tier) => (
             <div
               key={tier.code}
@@ -206,17 +240,17 @@ export default function PricingPage() {
                 position: "relative",
               }}
             >
-              {tier.highlight && (
+              {tier.highlightLabel && (
                 <span
                   className="absolute -top-3 left-6 text-[10px] font-bold uppercase tracking-[0.18em] px-2 py-0.5 rounded-md"
                   style={{
-                    background: (tier as any).highlightLabel?.includes("早鳥") || (tier as any).highlightLabel?.includes("EARLY")
-                      ? "linear-gradient(90deg, #059669 0%, #10b981 100%)"
-                      : "#171717",
+                    background: tier.highlight
+                      ? "#171717"
+                      : "linear-gradient(90deg, #059669 0%, #10b981 100%)",
                     color: "white",
                   }}
                 >
-                  {(tier as any).highlightLabel ?? (isEn ? "BEST FOR AGENCIES" : "最適合 Agency")}
+                  {tier.highlightLabel}
                 </span>
               )}
               <div className="mb-1">
@@ -225,14 +259,14 @@ export default function PricingPage() {
                 </p>
                 <p className="text-xs text-neutral-700 mt-0.5">{tier.sub}</p>
               </div>
-              {/* 2026-05-12: strikethrough standard price ABOVE the big price
-                  so early-bird saving (NT$ 1500 → NT$ 900) is the first
-                  visual signal. Only renders for solo plan on monthly view. */}
-              {(tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && !annual && (
+
+              {/* Strikethrough standard price */}
+              {(tier as any).standardMonthly > tier.monthly && !annual && (
                 <div className="mt-3 text-sm text-neutral-400 line-through tabular-nums">
                   {sym} {(tier as any).standardMonthly.toLocaleString()} / {isEn ? "month" : "月"}
                 </div>
               )}
+
               <div className="flex items-baseline gap-1.5 mt-1">
                 <span className="text-3xl font-bold text-neutral-900 tabular-nums">
                   {annual
@@ -241,7 +275,9 @@ export default function PricingPage() {
                         : (tier.annual / 1000).toLocaleString() + "K")
                     : tier.monthly.toLocaleString()}
                 </span>
-                <span className="text-sm text-neutral-700">{sym} {annual ? (isEn ? "/ year" : "/ 年") : (isEn ? "/ month" : "/ 月")}</span>
+                <span className="text-sm text-neutral-700">
+                  {sym} {annual ? (isEn ? "/ year" : "/ 年") : (isEn ? "/ month" : "/ 月")}
+                </span>
               </div>
               <p className="text-xs text-neutral-700 mt-1">
                 {annual
@@ -250,7 +286,6 @@ export default function PricingPage() {
                       : `每月平均 ${sym} ${Math.round(tier.annual / 12).toLocaleString()}`)
                   : (isEn ? "Cancel anytime" : "隨時取消")}
               </p>
-              {/* 2026-05-14 (CJ「美金為準，每天匯率動」): hint that TWD floats. */}
               {currency === "TWD" && (
                 <p className="text-[11px] text-neutral-500 mt-1">
                   {isEn
@@ -258,19 +293,26 @@ export default function PricingPage() {
                     : `依當日匯率計算（1 USD ≈ ${usdToTwd.toFixed(2)} NTD），每天浮動`}
                 </p>
               )}
-              {(tier as any).isEarlyBird && (tier as any).standardMonthly && (tier as any).standardMonthly > tier.monthly && (
+              {(tier as any).isEarlyBird && (tier as any).standardMonthly > tier.monthly && (
                 <p className="text-xs text-emerald-700 mt-1 font-medium">
                   {isEn ? "⭐ Early-bird price · locked in forever" : "⭐ 早鳥優惠 · 永久保價"}
                 </p>
               )}
+
               <p className="text-xs text-neutral-900 font-medium mt-3 pb-3 border-b border-neutral-200">
                 {tier.members}
               </p>
               <ul className="space-y-2 text-sm text-neutral-800 mt-4 mb-6 flex-1">
                 {tier.features.map((f) => (
                   <li key={f} className="flex items-start gap-2">
-                    <Check size={14} className="text-neutral-900 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
-                    <span>{f}</span>
+                    <Check
+                      size={14}
+                      className={`mt-0.5 flex-shrink-0 ${f.includes("roadmap") || f.includes("upgrade") || f.includes("升級") ? "text-neutral-400" : "text-neutral-900"}`}
+                      strokeWidth={2.5}
+                    />
+                    <span className={f.includes("roadmap") || f.includes("upgrade") || f.includes("升級") ? "text-neutral-400" : ""}>
+                      {f}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -280,8 +322,8 @@ export default function PricingPage() {
                     navigate("/auth/register");
                     return;
                   }
-                  if (tier.code === "enterprise" || !checkoutMut) {
-                    window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand Enterprise";
+                  if (!checkoutMut) {
+                    window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand Upgrade";
                     return;
                   }
                   const wsId = (status as any)?.workspaceId ?? (status as any)?.defaultWorkspaceId;
@@ -311,8 +353,8 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Agency / Enterprise — placeholder for future tier */}
-        <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3 max-w-3xl mx-auto">
+        {/* Agency / Enterprise */}
+        <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3 max-w-5xl mx-auto">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">
               AGENCY · CUSTOM
@@ -332,13 +374,20 @@ export default function PricingPage() {
           </a>
         </div>
 
+        {/* Pricing comparison note */}
+        <p className="text-center text-xs text-neutral-500 mt-4 max-w-5xl mx-auto">
+          {isEn
+            ? "All plans include 7-day free trial · No credit card required to start · Cancel anytime"
+            : "所有方案均含 7 天免費試用 · 開始不需信用卡 · 隨時取消"}
+        </p>
+
         {/* FAQ */}
         <div className="mt-16 text-left max-w-2xl mx-auto space-y-6">
           <h2 className="text-2xl font-bold text-neutral-900 text-center mb-8">{isEn ? "FAQ" : "常見問題"}</h2>
           {faq.map(([q, a]) => (
             <details key={q} className="border border-neutral-200 rounded-lg p-4">
               <summary className="cursor-pointer font-medium text-neutral-900">{q}</summary>
-              <p className="mt-2 text-sm text-neutral-600">{a}</p>
+              <p className="mt-2 text-sm text-neutral-600 leading-relaxed">{a}</p>
             </details>
           ))}
         </div>
