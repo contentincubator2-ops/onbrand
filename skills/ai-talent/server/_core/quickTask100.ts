@@ -1354,7 +1354,7 @@ const ig100Common = {
 //   ig-99-30day-calendar     ← (no exact IG squad; reuses fb-monthly-calendar shape)
 //   ig-99-reel-series-6      ← (new — adapted from fb-reels-script squad)
 //   ig-99-account-reposition ← fb-account-reposition squad shape
-//   ig-99-save-worthy        ← Hormozi Save-Worthy squad (3 merged variants)
+//   ig-99-save-worthy        ← Hormozi Save-Worthy squad (5 slides + 2 research tabs)
 export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "ig-99-30day-calendar": {
     ...ig100Common, variants: 4, images: 4,
@@ -1386,23 +1386,24 @@ export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     scoutKind: "viral",
     extras: { ...ig100Common.extras, postsCount: 5 },
   },
-  // 2026-05-19 (CJ): Hormozi Save-Worthy squad is a mixed deliverable —
-  // Tab 1 (主題研究) and Tab 3 (指標追蹤) are research docs; Tab 2
-  // (IG 高收藏文案 + 視覺策略) is the actual IG post + visual brief.
-  // RunPage.tsx effectiveVariant overrides handle per-tab mockup switching:
-  //   "Save-Worthy 主題研究" → generic:research-doc
-  //   "IG 高收藏文案 + 視覺策略" → instagram:feed (via /IG/ regex)
-  //   "Save/Share 指標追蹤" → generic:research-doc
-  // User originally had 4 tabs; tabs 2+3 (高密度文案 + 視覺優化) merged
-  // into one combined IG tab to reduce switching friction.
+  // 2026-05-19 v2 (CJ): one copy + one image = one tab, per slide.
+  // Slides come FIRST (positions 0-4) so images:5 maps cleanly — the
+  // orchestra assigns image[n] to variant[n], so all 5 Slide tabs get
+  // AI-generated 1:1 carousel images. The two research tabs at the end
+  // (positions 5-6) don't get images (research-doc mockup ignores imageUrl).
+  // RunPage.tsx effectiveVariant routes:
+  //   /^Slide\s+\d+/i → instagram:carousel
+  //   /主題研究/       → generic:research-doc
+  //   /指標追蹤/       → generic:research-doc (existing rule)
   "ig-99-save-worthy": {
-    variants: 3, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 0,
-    variantLabels: ["Save-Worthy 主題研究", "IG 高收藏文案 + 視覺策略", "Save/Share 指標追蹤"],
-    captionMinChars: 300, captionMaxChars: 900,
-    postLabels: ["Save-Worthy 主題研究", "IG 高收藏文案 + 視覺策略", "Save/Share 指標追蹤"],
+    ...ig100Common,
+    variants: 7, images: 5,
+    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
+    variantLabels: ["Slide 1", "Slide 2", "Slide 3", "Slide 4", "Slide 5", "主題研究", "指標追蹤"],
+    captionMinChars: 60, captionMaxChars: 320,
+    postLabels: ["Slide 1", "Slide 2", "Slide 3", "Slide 4", "Slide 5", "主題研究", "指標追蹤"],
     scoutKind: "viral",
-    extras: { postsCount: 3, replyTemplates: 3, postingTime: true },
+    extras: { postsCount: 5, replyTemplates: 3, postingTime: true },
   },
 };
 
