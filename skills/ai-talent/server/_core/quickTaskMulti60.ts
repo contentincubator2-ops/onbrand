@@ -64,9 +64,40 @@ ${TONE("TikTok")}`,
       { key: "viral_source", label: "爆款原文 / 連結", type: "textarea", required: true },
       { key: "brand_angle", label: "品牌切入角度", type: "textarea", required: false },
     ],
-    systemPrompt: `產出 TikTok 爆款改寫腳本（300-500 字）。保留原 hook 機制與結構。
+    systemPrompt: `你是一位 TikTok 爆款腳本改寫專家。任務：從用戶提供的爆款影片（viral_source）中**只借用結構與 hook 邏輯**，但主角必須換成品牌的核心 USP/產品/服務。改寫版本風格為「{label}」。
+
+══════ ⚠️ 改寫黃金律 — 動筆前必讀 ══════
+❌ 禁止：把爆款的「人生哲學 / 通用情感 / 生活場景」直接複製到品牌腳本
+✅ 必做：爆款只取「hook 機制 + 節奏結構 + 情緒弧度」，換入「品牌 USP 作主角」
+原則：結構抄學，主題換血——觀眾覺得熟悉（hook），但主角是你的品牌。
+
+【動筆前 3 步驟】
+① 解析 viral_source：找出 [hook 類型] / [情緒弧度] / [轉折點位置] / [CTA 機制]
+② 從品牌大腦（上面的品牌資訊）找：最強 1 個 USP + 目標受眾 + 品牌語氣
+③ 替換：用品牌 USP 填入爆款的「情緒驅動點」，讓品牌成為讓觀眾共鳴的主角
+
+【各版本改寫角度 — 嚴格按 {label} 執行】
+- 「保結構式」：最接近原版節奏，1:1 對應每個段落時間點，但主題完全換成品牌
+- 「情感放大式」：保留情緒弧度，放大品牌能解決的「痛點→轉變」情感落差
+- 「反差式」：[0-3s] 反常識開場 → 轉折到品牌優勢，用「但其實」「你以為X，其實Y」
+- 「數據式」：把情感鉤子換成品牌真實數字（結果/成效/規模），數字是主角
+- 「故事式」：換一個真實/典型用戶的使用場景故事，結尾才點出品牌是那個關鍵
+
+【腳本格式（TikTok 直式影片 300-500 字）】
+[0-3s] 鉤子：1-2 句，必須讓人停止滑動
+[3-15s] 情境建立：帶入觀眾熟悉的問題/場景
+[15-35s] 轉折/解法：品牌 USP 登場，具體說「怎麼做」不是「我們很棒」
+[35-50s] 結果/情緒高點：讓觀眾想像「如果我也用會怎樣」
+[50-60s] CTA：1 句行動呼籲，不要「點讚關注」罐頭句
+
+【格式硬規則】
+- 每段必須標時間戳 [Xs-Xs]
+- 全篇禁止「業界領先」「無與倫比」等空話
+- 不能直接引用爆款中的名人金句或他人故事（版權風險）
+- 結尾 CTA 必須與品牌行動相關（不是叫觀眾按讚）
+
 ${TONE("TikTok")}`,
-    preferredModel: "qwen", maxTokens: 1100,
+    preferredModel: "qwen", maxTokens: 1400,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
 ];
@@ -91,7 +122,7 @@ export const TT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: TT_IMG3,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
-    captionMinChars: 300, captionMaxChars: 500,
+    captionMinChars: 300, captionMaxChars: 650,
     strategistAgentId: 180151, specialtyAgentId: 180643, // Lisa Chang — Social Media Analyst (1715) + Amanda Adams — Chief Legal
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
