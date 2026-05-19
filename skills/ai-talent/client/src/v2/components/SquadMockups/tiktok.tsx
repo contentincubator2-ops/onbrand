@@ -78,7 +78,7 @@ export function TTForYouMockup({ data, isActive = false }: ForYouProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="🎵" eyebrow="SQUAD · TT FORYOU" title={`TikTok 短影音（${data.durationSec ?? 60}秒）`} />
-          {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">● agent 思考中…</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">● AI 專家思考中…</Chip>}
         </div>
         <TTForYou {...fields} />
       </NotionCard>
@@ -87,9 +87,9 @@ export function TTForYouMockup({ data, isActive = false }: ForYouProps) {
         <SectionHeader eyebrow="SCRIPT" title="腳本三段式結構" />
         <div className="flex flex-col gap-2">
           {[
-            { label: "🪝 Hook（0–3s）", text: data.hook, color: "border-l-secondary" },
-            { label: "⏱ Hold（主體內容）", text: data.hold, color: "border-l-warning" },
-            { label: "🔁 Payoff / Loop / CTA", text: data.payoff, color: "border-l-success" },
+            { label: "🪝 開場鉤（0–3s）", text: data.hook, color: "border-l-secondary" },
+            { label: "⏱ 主體段落（主體內容）", text: data.hold, color: "border-l-warning" },
+            { label: "🔁 結尾回報 / 循環 / CTA", text: data.payoff, color: "border-l-success" },
           ].map((row, i) => (
             <div key={i} className={`p-3 rounded-md border border-divider border-l-4 ${row.color} bg-default-50`}>
               <p className="text-tiny text-default-500 font-medium mb-0.5">{row.label}</p>
@@ -145,7 +145,7 @@ export function TTCarouselMockup({ data, isActive = false }: CarouselProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="🖼️" eyebrow="ATOMIC · TT CAROUSEL" title={`TikTok 輪播圖文（${data.slides?.length ?? 0} 張）`} />
-          {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">● agent 思考中…</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">● AI 專家思考中…</Chip>}
         </div>
         <TTCarousel {...fields} />
       </NotionCard>

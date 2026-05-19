@@ -76,7 +76,7 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
             <Chip size="sm" variant="flat" className="h-5 text-tiny">{data.duration ?? 30}s</Chip>
             {isActive && (
               <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
-                ● agent 思考中…
+                ● AI 專家思考中…
               </Chip>
             )}
           </div>

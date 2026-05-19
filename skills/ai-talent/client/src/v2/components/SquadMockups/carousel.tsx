@@ -73,7 +73,7 @@ export function FBCarouselMockup({ data, isActive = false }: Props) {
           <SectionHeader icon="🖼" eyebrow="ATOMIC · FB CAROUSEL" title={data.topic || "FB 輪播圖文"} />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● agent 思考中…
+              ● AI 專家思考中…
             </Chip>
           )}
         </div>

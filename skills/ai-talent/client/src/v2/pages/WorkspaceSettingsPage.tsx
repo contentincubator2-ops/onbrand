@@ -75,10 +75,10 @@ export default function WorkspaceSettingsPage() {
           <ChevronLeft size={16} /> {lang === "en" ? "Back" : "返回"}
         </button>
 
-        <h1 className="text-2xl font-bold text-neutral-900 mb-1">{lang === "en" ? "Workspace settings" : "Workspace 設定"}</h1>
+        <h1 className="text-2xl font-bold text-neutral-900 mb-1">{lang === "en" ? "Workspace settings" : "工作空間設定"}</h1>
         <p className="text-sm text-neutral-500 mb-6">{lang === "en"
           ? "Manage team members, client access, and white-label"
-          : "管理團隊成員、客戶分權、white-label 設定"}</p>
+          : "管理團隊成員、客戶分權、白牌設定"}</p>
 
         <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
           {/* Sidebar: workspace list */}
@@ -86,7 +86,7 @@ export default function WorkspaceSettingsPage() {
             {listQ?.isLoading ? (
               <p className="text-sm text-neutral-400">{lang === "en" ? "One sec…" : "載入中…"}</p>
             ) : workspaces.length === 0 ? (
-              <p className="text-sm text-neutral-400">{lang === "en" ? "No workspaces yet" : "尚無 workspace"}</p>
+              <p className="text-sm text-neutral-400">{lang === "en" ? "No workspaces yet" : "尚無工作空間"}</p>
             ) : (
               workspaces.map((w) => (
                 <button
@@ -123,7 +123,7 @@ export default function WorkspaceSettingsPage() {
               />
             ) : (
               <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center text-neutral-400 text-sm">
-                {lang === "en" ? "Pick a workspace on the left" : "選擇左側一個 workspace"}
+                {lang === "en" ? "Pick a workspace on the left" : "選擇左側一個工作空間"}
               </div>
             )}
           </main>
@@ -295,7 +295,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                 <p className="text-xs text-neutral-500 mb-2">
                   {lang === "en"
                     ? "Limit access to these brands (none = sees every brand in workspace)"
-                    : "限制只看以下品牌（不選 = 可看 workspace 所有品牌）"}
+                    : "限制只看以下品牌（不選 = 可看工作空間所有品牌）"}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {brands.map((b) => (

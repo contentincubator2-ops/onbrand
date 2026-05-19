@@ -194,7 +194,7 @@ export function CalendarGridMockup({ data, readOnly = false, isActive = false }:
         {/* Pillar legend */}
         {data.pillars && data.pillars.length > 0 && (
           <div className="flex flex-wrap gap-2 items-center mt-4 pt-3 border-t border-divider">
-            <span className="text-tiny text-default-500 mr-1">Pillar：</span>
+            <span className="text-tiny text-default-500 mr-1">支柱：</span>
             {data.pillars.map((p, i) => (
               <Chip
                 key={i}

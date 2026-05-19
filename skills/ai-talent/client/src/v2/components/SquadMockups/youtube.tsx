@@ -102,7 +102,7 @@ export function YTVideoMockup({ data, isActive = false }: VideoProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="▶️" eyebrow="SQUAD · YT VIDEO" title={lang === "en" ? `YouTube video (${data.durationMin ?? "?"} min)` : `YouTube 影片（${data.durationMin ?? "?"}分鐘）`} />
-          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <YTVideoCard {...fields} />
       </NotionCard>
@@ -167,7 +167,7 @@ export function YTShortsMockup({ data, isActive = false }: ShortsProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="🎬" eyebrow="ATOMIC · YT SHORTS" title={lang === "en" ? `YouTube Shorts (${data.durationSec ?? "60"}s)` : `YouTube Shorts（${data.durationSec ?? "60"}秒）`} />
-          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <YTShorts {...fields} />
       </NotionCard>
@@ -175,9 +175,9 @@ export function YTShortsMockup({ data, isActive = false }: ShortsProps) {
         <SectionHeader eyebrow="SCRIPT" title={lang === "en" ? "Three-part script structure" : "腳本三段式結構"} />
         <div className="flex flex-col gap-2">
           {[
-            { label: lang === "en" ? "🪝 Hook (0–3s)" : "🪝 Hook（0–3s）", text: data.hook, color: "border-danger" },
-            { label: lang === "en" ? "⏱ Hold (4–45s)" : "⏱ Hold（4–45s）", text: data.hold, color: "border-warning" },
-            { label: "🎯 Payoff / CTA", text: data.payoff, color: "border-success" },
+            { label: lang === "en" ? "🪝 Hook (0–3s)" : "🪝 開場鉤（0–3s）", text: data.hook, color: "border-danger" },
+            { label: lang === "en" ? "⏱ Hold (4–45s)" : "⏱ 主體段落（4–45s）", text: data.hold, color: "border-warning" },
+            { label: lang === "en" ? "🎯 Payoff / CTA" : "🎯 結尾回報 / CTA", text: data.payoff, color: "border-success" },
           ].map((row, i) => (
             <div key={i} className={`p-3 rounded-md border-l-4 border border-divider ${row.color} bg-default-50`}>
               <p className="text-tiny text-default-500 font-medium mb-0.5">{row.label}</p>
@@ -219,7 +219,7 @@ export function YTCommunityMockup({ data, isActive = false }: CommunityProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="💬" eyebrow="ATOMIC · YT COMMUNITY" title={lang === "en" ? "YouTube community post" : "YouTube 社群貼文"} />
-          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <YTCommunity {...fields} />
       </NotionCard>
@@ -258,7 +258,7 @@ export function YTPremiereMockup({ data, isActive = false }: PremiereProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="🎞️" eyebrow="SQUAD · YT PREMIERE" title={lang === "en" ? "YouTube Premiere plan" : "YouTube 首播企劃"} />
-          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="danger" className="self-start">{lang === "en" ? "● agent thinking…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <YTPremiere {...fields} />
       </NotionCard>

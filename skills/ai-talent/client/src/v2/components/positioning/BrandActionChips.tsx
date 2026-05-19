@@ -47,7 +47,7 @@ export function BrandActionChipsRow({
     if (!brandId) return;
     if (!confirm(lang === "en"
       ? "Lock Positioning / Copy / Visual tabs?\nAfter locking:\n· Editors become read-only\n· This becomes the single source of truth everywhere\nYou can unlock anytime."
-      : "確定要鎖定 定位 / 文字 / 視覺 三個 tab？\n鎖定後：\n· 編輯欄變成唯讀\n· 全平台都會用這份做為單一真相\n隨時可以解鎖。")) return;
+      : "確定要鎖定 定位 / 文字 / 視覺 三個頁籤？\n鎖定後：\n· 編輯欄變成唯讀\n· 全平台都會用這份做為單一真相\n隨時可以解鎖。")) return;
     try {
       if ((trpc as any).theater?.lockTabs) {
         await lockTabsMut?.mutateAsync?.({ brandId, tabs: ["positioning", "copy", "visual"] });
