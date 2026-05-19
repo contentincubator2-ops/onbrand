@@ -48,7 +48,7 @@ function getPlans(lang: "zh-TW" | "en") {
         "E-invoices · cancel anytime",
         "99s deep-research: Solo only",
       ] : [
-        "每月 50 次執行（1 次含所有變體 + 圖）",
+        "每月 50 次執行（1 次含所有版本 + 圖）",
         "30s / 60s 模板 · 品牌大腦",
         "FB / IG 發布 + 排程",
         "電子發票 · 隨時取消",
@@ -177,7 +177,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
             <p className="text-xs text-amber-800 leading-relaxed">
               {lang === "en"
                 ? "💡 One run = one task execution, including all variants + images. System failures are automatically refunded."
-                : "💡 一次執行 = 跑一次任務，包含所有變體 + 圖片，系統錯誤自動退回不計次數。"}
+                : "💡 一次執行 = 跑一次任務，包含所有版本 + 圖片，系統錯誤自動退回不計次數。"}
             </p>
           </div>
 

@@ -600,7 +600,7 @@ authRouter.post("/resend-verification", async (req: Request, res: Response) => {
       }
     }
     markResend(email);
-    res.json({ success: true, message: "如果此 email 還沒驗證，新的驗證信已寄出" });
+    res.json({ success: true, message: "如果此電子郵件還沒驗證，新的驗證信已寄出" });
   } catch (err) {
     console.error("[auth] resend-verification error:", err);
     res.status(500).json({ error: "伺服器錯誤" });
@@ -723,7 +723,7 @@ authRouter.post("/change-password", async (req: Request, res: Response) => {
     }
     const payload = await verifySessionToken(token).catch(() => null);
     if (!payload?.userId) {
-      res.status(401).json({ error: "session 無效" });
+      res.status(401).json({ error: "登入狀態無效" });
       return;
     }
 

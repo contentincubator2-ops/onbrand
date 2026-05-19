@@ -25,7 +25,7 @@ const DURATION_MS = 1400;
 // composition feels like a real squad. Notionists style avatars match
 // the rest of the product (RunningAgentCarousel etc.).
 const AGENT_SEEDS: Array<{ name: string; role: string }> = [
-  { name: "Aiden Hsu",      role: "Caption Writer" },
+  { name: "Aiden Hsu",      role: "文案寫手" },
   { name: "Mandy Cheng",    role: "Image Director" },
   { name: "Jordan Hayes",   role: "QA Reviewer" },
   { name: "Tina Ji",         role: "Brand Strategist" },
@@ -41,7 +41,7 @@ const AGENT_SEEDS: Array<{ name: string; role: string }> = [
   { name: "Reed Lee",        role: "Insights Storyteller" },
   { name: "Grace Wu",        role: "Brand Storyteller" },
   { name: "Tyler Brooks",    role: "Short-Form" },
-  { name: "Emma Zhang",      role: "Hashtag Strategist" },
+  { name: "Emma Zhang",      role: "主題標籤策略師" },
   { name: "Helen Sung",      role: "Reply Writer" },
   { name: "David Wang",      role: "Scheduler" },
   { name: "Sophie Ho",       role: "Followup Writer" },
@@ -120,7 +120,7 @@ export default function ScopeSwitchOverlay({ scopeKey, scopeName }: Props) {
             讀取 {scopeName ?? "品牌"} 定位書中…
           </h2>
           <p className="text-tiny text-default-500 mb-4">
-            20 位 agent 正在載入定位 / 文字 / 視覺 / 知識
+            20 位 AI 專家正在載入定位 / 文字 / 視覺 / 知識
           </p>
 
           {/* 20 agent avatars in a 10×2 grid */}
