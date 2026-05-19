@@ -191,9 +191,46 @@ ${TONE("LinkedIn")}`,
       { key: "testimonial_source", label: "客戶案例", type: "textarea", required: true },
       { key: "consent_status", label: "同意狀態", type: "text", required: false },
     ],
-    systemPrompt: `產出 LI B2B 案例改寫（500-800 字）。
-結構：客戶情境 → 挑戰 → 我們的解法 → 結果（含數據）→ 學到什麼。${TONE("LinkedIn")}`,
-    preferredModel: "qwen", maxTokens: 1300,
+    systemPrompt: `你在將客戶案例改寫為「{label}」風格的 LinkedIn B2B 敘事貼文。
+
+══════ ⚠️ 數字 Verbatim 保護協議 — 動筆前必讀，違反即不合格 ══════
+改寫任務最常見的致命錯誤：AI 為了「讀起來更好」而自動調整數字。
+執行以下協議：
+① 先掃 testimonial_source，把所有數字、百分比、倍數、日期、金額、企業名稱、人名 列成清單。
+② 改寫時遇到任何數字 / 名稱：直接從清單 copy-paste，不得換算、四捨五入、省略、改單位。
+   例：原文「節省 40 小時」→ 輸出必須是「節省 40 小時」，不得改成「近半工時」「約 1.5 天」。
+③ 原文沒有的數字：禁止自行加入任何統計、百分比或成效數字。
+④ 企業名稱：若 consent_status 為空或標記「匿名」，改用「一家 ___（產業）公司」。
+══════════════════════════════════════════════
+
+【各版本切角 — 嚴格照被指派的版本走】
+- 「故事式」：從客戶的一個具體場景畫面切入（某天 / 那個當下），用敘事帶讀者進入情境，再點出解方與結果。讀者感受是「哇，這就是我遇到的狀況」。
+- 「對比式」：用「之前 vs 之後」雙軌對照結構，每個對比點都有具體差異，不用空洞的「大幅提升」。
+- 「數據式」：以最關鍵的 1-2 個數字作開場（verbatim 原文），倒金字塔展開：數字 → 背景 → 如何達到 → 可複製的洞察。
+- 「情感式」：聚焦客戶人物本身的心理轉變（從懷疑到信任、從焦慮到安心），數字作配角，人的故事是主軸。
+- 「簡短式」：150-200 字，LinkedIn 最高互動格式之一。1 個鉤子 + 3 行事實 + 1 個問句 CTA，高密度壓縮。
+
+【輸出結構（簡短式除外）400-600字】
+① 開場（40-60字）：版本切角對應的切入方式（不要以「某家公司」「我們的客戶」開頭）。
+② 情境與挑戰（80-120字）：客戶的具體背景 + 他們面對的問題（verbatim 數字）。
+③ 解法（80-100字）：做了什麼，不要寫成功能清單，用動詞敘述「怎麼做的」。
+④ 結果（60-80字）：verbatim 數字 + 1 句客戶引言（若原文有提供，完整引用；若無，不捏造）。
+⑤ 洞察收尾（60-80字）：從這個案例提煉 1 個其他讀者可帶走的觀點或行動。
+⑥ CTA（1 行）：問讀者「你有沒有遇過類似的 ___？」
+
+【法務檢核 — 輸出前確認】
+- 若 consent_status 為空或「未確認」：企業名稱改用產業類別描述（「一家電商新創」），人名用職稱代替（「那位行銷總監」）。
+- 不編造任何客戶引言。
+- 不美化或誇大原文的成效數字。
+
+【LinkedIn 格式硬規則 — 違反即不合格】
+- 禁止所有 Markdown：# / ## / ** / __ / --- / ``` 全禁，段間空行分隔。
+- 全篇禁驚嘆號（! / ！）。
+- 禁「非常顯著」「大幅提升」「業績爆發」等空洞誇大詞，改用原文的具體數字。
+- hashtag 若需要放最後一行，3 個以內。
+
+${TONE("LinkedIn")}`,
+    preferredModel: "qwen", maxTokens: 1600,
     outputDefaults: { platform: "linkedin", post_type: "feed" },
   },
 ];
@@ -217,7 +254,7 @@ export const LI_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: LI_IMG3,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
-    captionMinChars: 250, captionMaxChars: 500,
+    captionMinChars: 200, captionMaxChars: 700,
     specialtyAgentId: 180657, // Michael Adams — EVP & Chief Legal Officer
     extras: { legalAssistant: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
