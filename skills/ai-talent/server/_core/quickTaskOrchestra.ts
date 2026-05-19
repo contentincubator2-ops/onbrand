@@ -489,7 +489,12 @@ async function callOneVariant(args: {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor } = args;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
-  const filledSystemPrompt = template.systemPrompt.replace(/\{label\}/g, label);
+  // {today} → YYYY年M月D日（台北時區）so PR datelines / calendar dates are never stale.
+  const _now = new Date();
+  const todayStr = `${_now.getFullYear()}年${_now.getMonth() + 1}月${_now.getDate()}日`;
+  const filledSystemPrompt = template.systemPrompt
+    .replace(/\{label\}/g, label)
+    .replace(/\{today\}/g, todayStr);
 
   // 2026-05-16 (CJ「一句話 brand brief 變成長文改寫 — 指令太短還是
   // agent 不準？」root cause): a single soft "字數 X-Y 字" line gets
