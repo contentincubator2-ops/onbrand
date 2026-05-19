@@ -77,7 +77,7 @@ export const stripeRouter = router({
   /** Subscription checkout — monthly or annual. */
   createCheckout: protectedProcedure
     .input(z.object({
-      planCode: z.enum(["drop_starter", "drop_pro", "drop_team", "drop_agency"]),
+      planCode: z.enum(["drop_starter", "drop_pro", "drop_agency"]),
       workspaceId: z.number().int().positive(),
       annual: z.boolean().default(false),
     }))

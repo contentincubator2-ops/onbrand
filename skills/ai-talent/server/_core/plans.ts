@@ -36,9 +36,15 @@ export interface PlanQuota {
   multi_client: boolean;
   /** 2026-05-14 — monthly point allocation (refilled on the 1st).
    *  1 point = 1 second of task compute. Trial gets a one-time grant
-   *  (pointsPerCycle and pointsCycleDays=7); paid plans refresh monthly. */
+   *  (pointsPerCycle and pointsCycleDays=7); paid plans refresh monthly.
+   *  -1 = unlimited (bypass point gating). */
   pointsPerCycle: number;
   pointsCycleDays: number;   // 7 for trial, 30 for monthly subs
+  /** 2026-05-19 (CJ Starter plan) — monthly run limit regardless of task type.
+   *  1 run = 1 task execution (all variants + images count as 1 run).
+   *  -1 = unlimited. Enforced in executeTask.ts / quickTaskOrchestra.ts.
+   *  Starter = 50. All other paid plans = -1. */
+  runsPerCycle: number;
 }
 
 /** 2026-05-14: top-up packs (加購點數). Volume discount — bigger pack
@@ -166,28 +172,29 @@ export const PLANS: Record<PlanCode, Plan> = {
     code: "drop_starter",
     name: "OnBrand Starter",
     priceTwdMonthly:         2250,   // NT$2,250 ≈ US$75 standard
-    priceTwdAnnually:        7500,   // NT$7,500 ≈ US$250 annual (early bird)
+    priceTwdAnnually:        9000,   // NT$9,000 ≈ US$300 annual (= $25×12, no extra discount)
     earlyBirdPriceTwdMonthly: 750,   // NT$750 ≈ US$25 early bird
     standardPriceTwdMonthly: 2250,
     priceUsdMonthly:          75,    // standard US$75
-    priceUsdAnnually:        750,    // standard annual (10×)
+    priceUsdAnnually:        300,    // annual = $25×12 (no discount — same early-bird rate locked for 12 mo)
     earlyBirdPriceUsdMonthly: 25,    // early-bird US$25
     standardPriceUsdMonthly:  75,
     trialDays: 0,
     quota: {
-      task_30s:   -1,  // point-gated, no per-task cap
+      task_30s:   -1,  // run-gated via runsPerCycle; no per-type cap
       task_60s:   -1,
-      task_99s:    0,  // 99s locked on Starter
-      image_gen:  -1,
+      task_99s:    0,  // 99s locked on Starter (upgrade to Solo to unlock)
+      image_gen:  -1,  // images included in the run count
       video_gen:   0,
       brands:      1,
       fb_publish: -1,
       team_members: 1,
       multi_client: false,
-      // 5,000 pts/month ≈ 50 × 60s runs (text-only) or ~23 full 60s runs with 5 images
-      // Resets on the 1st of every month.
-      pointsPerCycle: 5000,
+      // Starter uses run-count gating (runsPerCycle), not points.
+      // pointsPerCycle = -1 bypasses point check; runsPerCycle enforces the 50-run limit.
+      pointsPerCycle: -1,
       pointsCycleDays: 30,
+      runsPerCycle: 50,  // 50 executions/month; 1 run = all variants + images
     },
     features: [
       "1 個品牌 · 1 位用戶",
@@ -228,6 +235,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       // 2026-05-18: 1000 pts one-time (cycleDays=365 → no refill in trial window)
       pointsPerCycle: 1000,
       pointsCycleDays: 365,
+      runsPerCycle: -1,   // trial: no run cap, gated by points instead
     },
     features: [
       "1000 點試用額度（不重置，用完即停）",
@@ -275,6 +283,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       // → $5/day) is the real fair-use guard for abuse cases.
       pointsPerCycle: -1,
       pointsCycleDays: 30,
+      runsPerCycle: -1,   // Solo: unlimited runs
     },
     features: [
       "1 個品牌 · 1 位用戶",
@@ -317,6 +326,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       multi_client: true,
       pointsPerCycle: -1,          // 無限文案 + 無限圖（fair-use daily $15 cap）
       pointsCycleDays: 30,
+      runsPerCycle: -1,            // Studio: unlimited runs
     },
     features: [
       "最多 3 個品牌（自助切換）",
@@ -349,6 +359,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       // Agency plan = 50,000 pts/month (~17× solo, 3× team)
       pointsPerCycle: 50000,
       pointsCycleDays: 30,
+      runsPerCycle: -1,
     },
     features: [
       "無限用戶 · 無限品牌",
@@ -375,6 +386,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       // Enterprise = unlimited points (-1 == bypass check)
       pointsPerCycle: -1,
       pointsCycleDays: 30,
+      runsPerCycle: -1,
     },
     features: [
       "無限額度",

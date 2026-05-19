@@ -37,19 +37,16 @@ export default function PricingPage() {
   const r = (usd: number) => Math.round(usd * usdToTwd);
 
   // ─── Pricing truth (USD) ───────────────────────────────────────────────────
-  // Starter  US$25 early / US$75 std  · annual US$250
-  // Solo     US$100 early / US$300 std · annual US$1,000
-  // Studio   US$250 early / US$750 std · annual US$2,500
+  // Starter  US$25 early / US$75 std  · annual US$300 (= $25×12, no discount)
+  // Solo     US$100 early / US$300 std · annual US$1,000 (= $100×10, save 17%)
   const defaults = currency === "USD"
     ? {
-        starterEarly: 25,   starterStd: 75,   starterAnnual: 250,
-        soloEarly:    100,  soloStd:    300,  soloAnnual:    1000,
-        studioEarly:  250,  studioStd:  750,  studioAnnual:  2500,
+        starterEarly: 25,  starterStd: 75,  starterAnnual: 300,   // $25×12
+        soloEarly:   100,  soloStd:   300,  soloAnnual:   1000,   // $100×10
       }
     : {
-        starterEarly: r(25),   starterStd: r(75),   starterAnnual: r(250),
-        soloEarly:    r(100),  soloStd:    r(300),  soloAnnual:    r(1000),
-        studioEarly:  r(250),  studioStd:  r(750),  studioAnnual:  r(2500),
+        starterEarly: r(25),  starterStd: r(75),  starterAnnual: r(300),
+        soloEarly:   r(100),  soloStd:   r(300),  soloAnnual:   r(1000),
       };
 
   const TIERS = [
@@ -82,6 +79,9 @@ export default function PricingPage() {
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: false,
       highlightLabel: isEn ? "EARLY BIRD · LOCKED FOREVER" : "早鳥優惠 · 永久保價",
+      // Starter annual = $25×12 = $300, no extra discount
+      annualNote: isEn ? "Annual: same $25/mo rate, 12-month commitment" : "年約：同樣 $25/月，鎖定 12 個月",
+      annualSavePct: 0,  // no saving vs monthly
     },
     {
       code: "drop_pro",
@@ -112,34 +112,8 @@ export default function PricingPage() {
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: true,
       highlightLabel: isEn ? "MOST POPULAR · EARLY BIRD" : "最多人選 · 早鳥優惠",
-    },
-    {
-      code: "drop_team",
-      name: "OnBrand Studio",
-      sub: isEn ? "Unlimited runs · up to 3 brands" : "無限次執行 · 最多 3 個品牌",
-      monthly:         defaults.studioEarly,
-      annual:          defaults.studioAnnual,
-      standardMonthly: defaults.studioStd,
-      isEarlyBird: (status as any)?.isEarlyBird ?? true,
-      members: isEn ? "3 brands · 1 user" : "3 個品牌 · 1 位用戶",
-      features: isEn ? [
-        "Up to 3 brands (self-serve switching)",
-        "Each brand at Solo spec (unlimited runs + images)",
-        "Cross-brand analytics + comparison",
-        "Publish + schedule to FB / IG (unlimited)",
-        "E-invoices (B2B)",
-        "1 user · more seats on roadmap",
-      ] : [
-        "最多 3 個品牌（自助切換、不用聯繫客服）",
-        "每個品牌都是 Solo 規格（無限次執行 + 圖）",
-        "跨品牌數據比較",
-        "FB / IG 直接發布 + 排程（無限）",
-        "電子發票（B2B）",
-        "1 位用戶 · 多 user seats 是 roadmap",
-      ],
-      cta: isEn ? "Go Studio" : "升級到 Studio",
-      highlight: false,
-      highlightLabel: undefined as string | undefined,
+      annualNote: isEn ? "~US$83/mo billed annually" : "年繳，每月平均 US$83",
+      annualSavePct: 17,
     },
   ];
 
@@ -172,8 +146,8 @@ export default function PricingPage() {
           style={{ background: "linear-gradient(90deg, #059669 0%, #10b981 60%, #34d399 100%)" }}
         >
           {isEn
-            ? <>⭐ <strong>Early-bird:</strong> Starter {sym}<strong>{defaults.starterEarly}</strong> · Solo {sym}<strong>{defaults.soloEarly}</strong> · Studio {sym}<strong>{defaults.studioEarly}</strong> /mo — <strong>locked forever</strong> for accounts opened today.</>
-            : <>⭐ <strong>限時早鳥</strong>：Starter {sym}<strong>{defaults.starterEarly}</strong> · Solo {sym}<strong>{defaults.soloEarly}</strong> · Studio {sym}<strong>{defaults.studioEarly}</strong> /月 — <strong>現在開通永久保價</strong></>
+            ? <>⭐ <strong>Early-bird:</strong> Starter {sym}<strong>{defaults.starterEarly}</strong>/mo · Solo {sym}<strong>{defaults.soloEarly}</strong>/mo — <strong>locked forever</strong> for accounts opened today.</>
+            : <>⭐ <strong>限時早鳥</strong>：Starter {sym}<strong>{defaults.starterEarly}</strong>/月 · Solo {sym}<strong>{defaults.soloEarly}</strong>/月 — <strong>現在開通永久保價</strong></>
           }
         </div>
       )}
@@ -223,13 +197,13 @@ export default function PricingPage() {
                 annual ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600"
               }`}
             >
-              {isEn ? "Yearly" : "年繳"} <span className="text-xs text-emerald-600 ml-1">{isEn ? "Save 17%" : "省 17%"}</span>
+              {isEn ? "Yearly" : "年繳"} <span className="text-xs text-emerald-600 ml-1">{isEn ? "Solo saves 17%" : "Solo 省 17%"}</span>
             </button>
           </div>
         </div>
 
-        {/* 3-tier grid */}
-        <div className="grid gap-5 md:grid-cols-3 mb-6 max-w-5xl mx-auto">
+        {/* 2-tier grid */}
+        <div className="grid gap-5 md:grid-cols-2 mb-6 max-w-3xl mx-auto">
           {TIERS.map((tier) => (
             <div
               key={tier.code}
@@ -281,9 +255,11 @@ export default function PricingPage() {
               </div>
               <p className="text-xs text-neutral-700 mt-1">
                 {annual
-                  ? (isEn
-                      ? `~${sym} ${Math.round(tier.annual / 12).toLocaleString()} / month`
-                      : `每月平均 ${sym} ${Math.round(tier.annual / 12).toLocaleString()}`)
+                  ? ((tier as any).annualNote
+                      ? (tier as any).annualNote
+                      : (isEn
+                          ? `~${sym} ${Math.round(tier.annual / 12).toLocaleString()} / month`
+                          : `每月平均 ${sym} ${Math.round(tier.annual / 12).toLocaleString()}`))
                   : (isEn ? "Cancel anytime" : "隨時取消")}
               </p>
               {currency === "TWD" && (
@@ -354,7 +330,7 @@ export default function PricingPage() {
         </div>
 
         {/* Agency / Enterprise */}
-        <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3 max-w-5xl mx-auto">
+        <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3 max-w-3xl mx-auto">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">
               AGENCY · CUSTOM
@@ -375,7 +351,7 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing comparison note */}
-        <p className="text-center text-xs text-neutral-500 mt-4 max-w-5xl mx-auto">
+        <p className="text-center text-xs text-neutral-500 mt-4 max-w-3xl mx-auto">
           {isEn
             ? "All plans include 7-day free trial · No credit card required to start · Cancel anytime"
             : "所有方案均含 7 天免費試用 · 開始不需信用卡 · 隨時取消"}

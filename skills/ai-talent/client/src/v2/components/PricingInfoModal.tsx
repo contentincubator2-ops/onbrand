@@ -40,7 +40,7 @@ function getPlans(lang: "zh-TW" | "en") {
       name: "OnBrand Starter",
       price: en ? "US$25 / mo" : "US$25 / 月",
       badge: en ? "Early bird" : "早鳥",
-      detail: en ? "50 runs / mo · 1 brand" : "每月 50 次執行 · 1 品牌",
+      detail: en ? "50 runs / mo · 1 brand · annual US$300 ($25×12)" : "每月 50 次執行 · 1 品牌 · 年約 US$300（$25×12）",
       features: en ? [
         "50 runs / mo (1 run = all variants + images)",
         "30s & 60s templates · brand brain",
@@ -74,27 +74,6 @@ function getPlans(lang: "zh-TW" | "en") {
         "99s 深度研究 pipeline",
         "FB / IG 發布 + 排程",
         "電子發票 · 隨時取消",
-      ],
-      cta: en ? "See pricing" : "查看定價",
-      highlight: false,
-    },
-    {
-      name: "OnBrand Studio",
-      price: en ? "US$250 / mo" : "US$250 / 月",
-      badge: undefined as string | undefined,
-      detail: en ? "Unlimited runs · 3 brands" : "無限次執行 · 最多 3 品牌",
-      features: en ? [
-        "Up to 3 brands (self-serve switch)",
-        "Each brand at Solo spec",
-        "Cross-brand analytics",
-        "FB / IG publish (unlimited)",
-        "B2B e-invoices",
-      ] : [
-        "最多 3 個品牌（自助切換）",
-        "每品牌都是 Solo 規格",
-        "跨品牌數據比較",
-        "FB / IG 發布（無限）",
-        "B2B 電子發票",
       ],
       cta: en ? "See pricing" : "查看定價",
       highlight: false,
@@ -144,7 +123,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
           </div>
 
           {/* Plans grid */}
-          <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 p-5 sm:grid-cols-3">
             {PLANS.map((p) => (
               <div
                 key={p.name}
