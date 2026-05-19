@@ -423,6 +423,288 @@ const TASK_DESC_EN_CLIENT: Record<string, string> = {
   "pr-99-newsjack":        "Connect your brand to breaking news — produce a reportable angle",
 };
 
+// ── Modal primary question (EN) ──────────────────────────────────────────────
+const TASK_PRIMARY_Q_EN: Record<string, string> = {
+  // Facebook 30s
+  "fb-30-caption-short":    "What's this post about? Paste a URL (auto-read), your text, or describe the topic",
+  "fb-30-pure-text-hook":   "Paste your post / article — I'll write 5 different opening hooks to prepend",
+  "fb-30-link-caption":     "Paste the URL you're sharing",
+  "fb-30-comment-reply":    "Paste the original comment or the post URL where it appears",
+  "fb-30-ad-headline":      "What is this ad promoting? Product / selling point / audience",
+  "fb-30-ad-primary":       "Ad topic / product / target audience?",
+  "fb-30-ad-cta":           "Product/service + what action do you want users to take?",
+  "fb-30-ad-description":   "Where does the link go? Product page / event page / article / app?",
+  "fb-30-pinned-short":     "What do you want first-time visitors to know in 3 seconds?",
+  "fb-30-story-text":       "What does today's Story say?",
+  "fb-30-live-title":       "Live topic + scheduled time?",
+  "fb-30-hashtag-set":      "What's the post topic or industry?",
+  "fb-30-countdown-1day":   "Event name + how many days left? (write both)",
+  // Facebook 60s
+  "fb-60-single-full":      "What is this post about?",
+  "fb-60-link-full":        "Paste the URL you're sharing",
+  "fb-60-album-4":          "What occasion / theme?",
+  "fb-60-countdown-5day":   "Event name?",
+  "fb-60-launch-kit":       "Event name + date?",
+  "fb-60-live-suite":       "Live stream topic?",
+  "fb-60-pinned-suite":     "What do you want new visitors to know in 3 seconds?",
+  "fb-60-ad-pack-3":        "Main product / audience / selling point for this ad?",
+  // Instagram 30s
+  "ig-30-caption-short":         "What's today's IG post about?",
+  "ig-30-pure-text-hook":        "Paste your post / article — I'll write IG opening hooks to prepend",
+  "ig-30-reel-hook":             "What's this Reel's theme / selling point?",
+  "ig-30-reel-script-full":      "What value does this Reel deliver?",
+  "ig-30-story-text":            "What does today's Story say?",
+  "ig-30-carousel-structure":    "What carousel theme? (tutorial / list / contrast / story)",
+  "ig-30-bio-rewrite":           "Who is your IG account, what do you do, who do you want to attract?",
+  "ig-30-hashtag-set":           "Post topic / your niche?",
+  "ig-30-comment-reply":         "Paste the original comment (or context)",
+  "ig-30-dm-script":             "What type of DM are you handling? Paste a common example",
+  "ig-30-live-opening":          "Tonight's live topic / what to talk about?",
+  "ig-30-story-repost-strategy": "What was the original story about?",
+  "ig-30-threads-cross-post":    "Paste the IG caption you want rewritten for Threads",
+  // Instagram 60s
+  "ig-60-feed-full":              "What's today's IG post about?",
+  "ig-60-reel-full":              "This Reel's theme / selling point?",
+  "ig-60-carousel-7":             "Carousel theme?",
+  "ig-60-story-3frame":           "What does this Story communicate?",
+  "ig-60-countdown-5day":         "Counting down to what event?",
+  "ig-60-highlight-suite":        "What highlights do you want to feature?",
+  "ig-60-live-suite":             "Live stream topic?",
+  "ig-60-serial-3":               "What story do you want to serialize?",
+  "ig-60-viral-rewrite":          "Paste the viral post / link / theme",
+  "ig-60-testimonial-rewrite":    "Paste the customer testimonial / interview / review",
+  // YouTube 30s
+  "yt-30-title-strategies":  "Paste the video URL (auto-read) or describe the topic",
+  "yt-30-thumbnail-text":    "Paste the video URL or describe the topic",
+  "yt-30-description-seo":   "Paste the video URL (auto-read) or describe the topic",
+  "yt-30-chapter-timeline":  "Paste the YouTube video URL (system auto-reads subtitles)",
+  "yt-30-shorts-script":     "What does this Short cover? Paste URL or describe the topic",
+  "yt-30-opening-hook":      "Video URL or topic",
+  "yt-30-end-cta":           "Video topic / what action do you want viewers to take?",
+  "yt-30-comment-reply":     "Paste the original comment + the tone you want to convey",
+  "yt-30-pinned-comment":    "Video URL or topic (system writes a hook comment based on content)",
+  "yt-30-community-post":    "What do you want to share in the Community tab today?",
+  // YouTube 60s
+  "yt-60-video-package":   "Video topic / selling point?",
+  "yt-60-shorts-script":   "Shorts topic?",
+  "yt-60-thumbnail-suite": "Video topic / what should the thumbnail communicate?",
+  "yt-60-series-3ep":      "What topic do you want to serialize?",
+  "yt-60-community-post":  "What does the Community post communicate?",
+  "yt-60-viral-rewrite":   "Paste the viral video title / link / topic",
+  // TikTok 30s
+  "tt-30-opening-hook":       "What's this TikTok about?",
+  "tt-30-full-script":        "What topic do you want this TikTok to cover?",
+  "tt-30-caption-rhythm":     "Paste your voiceover script (or TikTok topic)",
+  "tt-30-bio-rewrite":        "Who are you, what do you do, who do you want to attract?",
+  "tt-30-hashtag-set":        "TikTok topic or niche",
+  "tt-30-caption-description":"What's the video about? What action do you want to drive?",
+  "tt-30-duet-angle":         "Paste the video URL you want to duet, or describe its content",
+  "tt-30-trend-remix":        "What trend / sound do you want to ride?",
+  "tt-30-comment-reply":      "Paste the comment you want to reply to",
+  "tt-30-live-opening":       "Tonight's live topic",
+  // TikTok 60s
+  "tt-60-foryou-full":   "This TikTok's topic?",
+  "tt-60-series-3":      "What do you want a 3-episode series about?",
+  "tt-60-viral-rewrite": "Paste the viral video link / topic",
+  // LinkedIn 30s
+  "li-30-insight-post":   "What professional insight do you want to share today?",
+  "li-30-hook-3":         "Post topic?",
+  "li-30-article-opener": "What does this Article discuss?",
+  "li-30-poll":           "What do you want to ask your industry?",
+  "li-30-event-invite":   "Event topic / time / target audience?",
+  "li-30-dm-intro":       "Who are you connecting with? Purpose?",
+  "li-30-comment":        "Paste the original post / describe its content",
+  "li-30-headline":       "What do you do? Who do you want to attract?",
+  "li-30-newsletter":     "What's this issue's topic?",
+  "li-30-document":       "What do you want to teach / explain in the Document post?",
+  // LinkedIn 60s
+  "li-60-thought-leader": "What B2B insight do you want to share?",
+  "li-60-newsletter":     "This issue's topic?",
+  "li-60-case-study":     "Paste the client case study / interview",
+  // Email 30s
+  "em-30-subject-line":   "What do you want people to do when they open this email?",
+  "em-30-preview-text":   "What's the subject line?",
+  "em-30-welcome":        "What's your brand? What do subscribers get?",
+  "em-30-promo":          "What's the promotion / offer?",
+  "em-30-drip":           "Which email in the drip sequence is this? What did the last one say?",
+  "em-30-abandoned-cart": "What did the user leave in their cart?",
+  "em-30-re-engagement":  "Who are these dormant users? When did they last engage?",
+  "em-30-event-invite":   "Event topic / time / audience / registration link?",
+  "em-30-cold-email":     "Who is this person? What do you want?",
+  "em-30-transactional":  "What transaction event? Order number / items / amount?",
+  // Email 60s
+  "em-60-newsletter-full": "This issue's newsletter topic?",
+  "em-60-promo-sequence":  "What's the promotion?",
+  "em-60-onboarding-3":    "What value do new subscribers get from your service / product?",
+  // PR 30s
+  "pr-30-headline":       "What's the core event of this news?",
+  "pr-30-subhead":        "Key headline point + what angle do you want to expand on?",
+  "pr-30-lead-paragraph": "The 5W1H of the event?",
+  "pr-30-ceo-quote":      "Speech topic and core message to convey?",
+  "pr-30-boilerplate":    "Company core business / scale / major milestones?",
+  "pr-30-fact-sheet":     "All quantifiable facts about the event?",
+  "pr-30-media-pitch":    "News topic + why would this journalist care?",
+  "pr-30-spokesperson-qa":"News topic + what points might be challenged?",
+  "pr-30-launch-social":  "News topic + what do you want the social audience to do?",
+  "pr-30-news-hook":      "What does the company want to say? (Be as specific as possible)",
+  // PR 60s
+  "pr-60-news-release-full": "News topic?",
+  // Brand 60s
+  "br-60-tagline-suite":   "Brand spirit / core differentiation?",
+  "br-60-value-prop":      "What does your brand / product do?",
+  "br-60-brand-voice":     "What brand tone do you want to build?",
+  // Research 60s
+  "rs-60-interview-guide": "What do you want to learn about users?",
+  "rs-60-persona-suite":   "Your product / service?",
+  "rs-60-jtbd-suite":      "In what context would users turn to you?",
+  // Cross-platform 60s
+  "cw-60-crosspost-4platform": "What do you want to share today?",
+  "cw-60-ab-variants":         "What topic are you testing?",
+  // KOL 60s
+  "kl-60-pitch-pack": "What type of KOL are you looking for? Collaboration topic?",
+};
+
+// ── Modal primary input placeholder (EN) ─────────────────────────────────────
+const TASK_PRIMARY_PH_EN: Record<string, string> = {
+  // Facebook 30s
+  "fb-30-caption-short":    "e.g. https://your-blog.com  /  Spring new arrivals  /  Mother's Day campaign",
+  "fb-30-pure-text-hook":   "Paste the full post body (hook goes before it)",
+  "fb-30-link-caption":     "https://...",
+  "fb-30-comment-reply":    "What did the user say? Paste the full comment",
+  "fb-30-ad-headline":      "e.g. Mother's Day high-protein meal kit, targeting working moms",
+  "fb-30-ad-primary":       "e.g. Mother's Day meal kit, working moms 35-50",
+  "fb-30-ad-cta":           "e.g. SoWork AI consultation system, goal: 'book a demo'",
+  "fb-30-ad-description":   "e.g. Goes to the 14-pack meal kit product page",
+  "fb-30-pinned-short":     "Who we are, what we do, why follow us",
+  "fb-30-story-text":       "e.g. Behind the scenes / limited offer / question sticker",
+  "fb-30-live-title":       "e.g. Unboxing & review | Tonight 8PM (time optional)",
+  "fb-30-hashtag-set":      "e.g. Pour-over coffee / B2B SaaS / Mother & baby",
+  "fb-30-countdown-1day":   "e.g. Anniversary sale — 3 days left / New launch countdown 7 days",
+  // Facebook 60s
+  "fb-60-single-full":      "e.g. Spring new arrivals / Customer appreciation / Product lifestyle",
+  "fb-60-link-full":        "https://...",
+  "fb-60-album-4":          "e.g. Company event, product lifestyle, behind the scenes",
+  "fb-60-countdown-5day":   "e.g. Anniversary sale / New product launch / Limited offer",
+  "fb-60-launch-kit":       "e.g. Online launch event May 20",
+  "fb-60-live-suite":       "e.g. Product trial / New launch / Q&A",
+  "fb-60-pinned-suite":     "Who we are, what we do, why follow us",
+  "fb-60-ad-pack-3":        "e.g. Mother's Day high-protein meal kit, working moms 35-50",
+  // Instagram 30s
+  "ig-30-caption-short":         "e.g. New product launch / Customer story / Behind the scenes",
+  "ig-30-pure-text-hook":        "Paste the full post body (hook goes before it)",
+  "ig-30-reel-hook":             "e.g. 30s tutorial / Unboxing / Before-after reveal",
+  "ig-30-reel-script-full":      "e.g. 3 IG algorithm myths / How I went from 0 to 10K in 90 days",
+  "ig-30-story-text":            "e.g. Behind the scenes / limited offer / question / poll",
+  "ig-30-carousel-structure":    "e.g. 5 underrated IG algorithm tips / 3 design mistakes I made",
+  "ig-30-bio-rewrite":           "e.g. 'I'm ___, I help ___ solve ___, previously ___'",
+  "ig-30-hashtag-set":           "e.g. Pour-over coffee / North America interior design / B2B SaaS",
+  "ig-30-comment-reply":         "What did the user say? Paste the full comment",
+  "ig-30-dm-script":             "e.g. 'Is this still in stock?' / 'Not happy with product' / 'Want to collab'",
+  "ig-30-live-opening":          "e.g. New product try-on / Q&A / Unboxing / Tutorial",
+  "ig-30-story-repost-strategy": "Paste the story text / topic",
+  "ig-30-threads-cross-post":    "Paste the full IG caption",
+  // Instagram 60s
+  "ig-60-feed-full":              "e.g. New product launch, customer story, behind the scenes",
+  "ig-60-reel-full":              "e.g. 30s tutorial / Unboxing / Before-after reveal",
+  "ig-60-carousel-7":             "Tutorial / list / story / contrast etc.",
+  "ig-60-story-3frame":           "e.g. New product teaser, limited offer, question",
+  "ig-60-countdown-5day":         "e.g. New product / Anniversary / Live stream",
+  "ig-60-highlight-suite":        "e.g. Product intro / Founder story / Customer testimonials",
+  "ig-60-live-suite":             "Q&A / New product trial / Founder story",
+  "ig-60-serial-3":               "Customer transformation / Team growth / Product journey",
+  "ig-60-viral-rewrite":          "Original viral post / link / theme",
+  "ig-60-testimonial-rewrite":    "Customer's original words, interview transcript, review text",
+  // YouTube 30s
+  "yt-30-title-strategies":  "https://youtu.be/...  or  video topic description",
+  "yt-30-thumbnail-text":    "https://youtu.be/...  or  video topic",
+  "yt-30-description-seo":   "https://youtu.be/...  or  video topic",
+  "yt-30-chapter-timeline":  "https://youtu.be/...",
+  "yt-30-shorts-script":     "https://youtu.be/...  or  Shorts topic",
+  "yt-30-opening-hook":      "https://youtu.be/...  or  video topic",
+  "yt-30-end-cta":           "e.g. Lead to next episode / subscribe / comment / click product link",
+  "yt-30-comment-reply":     "Paste the full comment",
+  "yt-30-pinned-comment":    "https://youtu.be/...  or  video topic",
+  "yt-30-community-post":    "e.g. Next episode preview / Ask fans what they want / Behind the scenes",
+  // YouTube 60s
+  "yt-60-video-package":   "e.g. Tutorial / Unboxing / Review",
+  "yt-60-shorts-script":   "Tutorial / contrast / reveal",
+  "yt-60-thumbnail-suite": "Video topic or key visual",
+  "yt-60-series-3ep":      "Tutorial series / story series / review series",
+  "yt-60-community-post":  "New video preview / Q&A / Behind the scenes",
+  "yt-60-viral-rewrite":   "Original viral title / URL / topic",
+  // TikTok 30s
+  "tt-30-opening-hook":       "e.g. 3 underrated Notion AI tips / My biggest design mistake",
+  "tt-30-full-script":        "e.g. Debunking a common myth",
+  "tt-30-caption-rhythm":     "Paste the full voiceover",
+  "tt-30-bio-rewrite":        "Your background + who you want to reach",
+  "tt-30-hashtag-set":        "e.g. Office productivity tips / Beauty reviews",
+  "tt-30-caption-description":"Video content + CTA goal",
+  "tt-30-duet-angle":         "TikTok URL or video description",
+  "tt-30-trend-remix":        "e.g. 'oh no oh no oh no no no' / lip-sync trend",
+  "tt-30-comment-reply":      "User comment",
+  "tt-30-live-opening":       "e.g. Unboxing new product / Q&A / Color try-on",
+  // TikTok 60s
+  "tt-60-foryou-full":   "Tutorial / contrast / reveal / unboxing",
+  "tt-60-series-3":      "Tutorial series / story series",
+  "tt-60-viral-rewrite": "Original viral TikTok / topic",
+  // LinkedIn 30s
+  "li-30-insight-post":   "e.g. 3 takeaways after 6 months of AI tools",
+  "li-30-hook-3":         "e.g. B2B SaaS marketing cost optimization",
+  "li-30-article-opener": "e.g. Why 70% of digital transformations fail",
+  "li-30-poll":           "e.g. B2B marketing KPIs / remote work productivity",
+  "li-30-event-invite":   "e.g. 'B2B SaaS Growth' online session, Jun 15 19:00",
+  "li-30-dm-intro":       "Their role + what you want (collaborate / learn / introduce yourself)",
+  "li-30-comment":        "Other person's post content",
+  "li-30-headline":       "Your role + who you want to reach (clients / collaborators / peers)",
+  "li-30-newsletter":     "This issue's theme",
+  "li-30-document":       "e.g. 5 common B2B funnel mistakes",
+  // LinkedIn 60s
+  "li-60-thought-leader": "e.g. 3 takeaways after 6 months of AI tools",
+  "li-60-newsletter":     "What do you want to tell subscribers this issue",
+  "li-60-case-study":     "Original case / interview content",
+  // Email 30s
+  "em-30-subject-line":   "e.g. Announce new product / remind of incomplete order / event invite",
+  "em-30-preview-text":   "Paste your subject line",
+  "em-30-welcome":        "Brand intro + subscription value",
+  "em-30-promo":          "e.g. Anniversary 20% off / New member 10% off / Limited product",
+  "em-30-drip":           "Drip sequence context + what this email should convey",
+  "em-30-abandoned-cart": "Product name + price + key features",
+  "em-30-re-engagement":  "User background + how long inactive",
+  "em-30-event-invite":   "All event information",
+  "em-30-cold-email":     "Their role / company + what you want to discuss",
+  "em-30-transactional":  "Event + details",
+  // Email 60s
+  "em-60-newsletter-full": "What do you want to tell subscribers",
+  "em-60-promo-sequence":  "Event name + offer details",
+  "em-60-onboarding-3":    "What new subscribers most need to know",
+  // PR 30s
+  "pr-30-headline":       "Who + did what + when / where",
+  "pr-30-subhead":        "Headline + what you want to extend",
+  "pr-30-lead-paragraph": "Who / did what / when / where / why / how",
+  "pr-30-ceo-quote":      "Speaker name + title | occasion/time/location | topic + key points + facts",
+  "pr-30-boilerplate":    "Business + scale + founding date + main products",
+  "pr-30-fact-sheet":     "All numbers / names / dates for the fact sheet",
+  "pr-30-media-pitch":    "News topic + journalist's past coverage + why it's relevant",
+  "pr-30-spokesperson-qa":"Topic + tough questions you expect",
+  "pr-30-launch-social":  "News core + CTA",
+  "pr-30-news-hook":      "What you want to announce + facts, numbers, people, dates you have",
+  // PR 60s
+  "pr-60-news-release-full": "New product launch / funding success / major partnership",
+  // Brand 60s
+  "br-60-tagline-suite":   "Brand spirit, beliefs, what you do",
+  "br-60-value-prop":      "Product / service description",
+  "br-60-brand-voice":     "e.g. Professional but warm, youthful but not flashy",
+  // Research 60s
+  "rs-60-interview-guide": "Research goal / hypothesis to validate",
+  "rs-60-persona-suite":   "Product / service description",
+  "rs-60-jtbd-suite":      "User context description",
+  // Cross-platform 60s
+  "cw-60-crosspost-4platform": "Topic / message / original URL",
+  "cw-60-ab-variants":         "Topic / original post / URL",
+  // KOL 60s
+  "kl-60-pitch-pack": "e.g. Parenting KOL with 10K-50K followers for Mother's Day campaign",
+};
+
 const CARD_PALETTES = [
   { from: "#fde68a", to: "#fbbf24", text: "#92400e" },
   { from: "#a5f3fc", to: "#22d3ee", text: "#164e63" },
@@ -1680,10 +1962,16 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                     {/* Primary question */}
                     {activeTask.primary_input && (
                       <div className="space-y-2">
-                        <p className="text-small font-medium">{activeTask.primary_question}</p>
+                        <p className="text-small font-medium">
+                          {lang === "en"
+                            ? (TASK_PRIMARY_Q_EN[activeTask.id] ?? activeTask.primary_question)
+                            : activeTask.primary_question}
+                        </p>
                         {activeTask.primary_input.type === "textarea" ? (
                           <Textarea
-                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            placeholder={lang === "en"
+                              ? (TASK_PRIMARY_PH_EN[activeTask.id] ?? activeTask.primary_input.placeholder ?? "")
+                              : (activeTask.primary_input.placeholder ?? "")}
                             value={primaryAnswer}
                             onChange={(e) => setPrimaryAnswer(e.target.value)}
                             minRows={3}
@@ -1691,7 +1979,9 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                           />
                         ) : (
                           <Input
-                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            placeholder={lang === "en"
+                              ? (TASK_PRIMARY_PH_EN[activeTask.id] ?? activeTask.primary_input.placeholder ?? "")
+                              : (activeTask.primary_input.placeholder ?? "")}
                             value={primaryAnswer}
                             onChange={(e) => setPrimaryAnswer(e.target.value)}
                             autoFocus
