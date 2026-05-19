@@ -106,14 +106,37 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
     id: "li-60-thought-leader",
     tier: "60s", postType: "feed",
     label: "LI Thought Leadership 完整貼文",
-    description: "Strategist 設計觀點 + 800 字深度文 + 配圖",
+    description: "Strategist 設計觀點 + 800 字深度文 + 1:1 引文卡配圖",
     agent_id: 30018, skill_slug: "linkedin-b2b", // Fiona Fang | LinkedIn B2B Marketing Exec
     primary_question: "想分享什麼 B2B 觀點？",
     primary_input: { key: "topic", placeholder: "例：AI 工具用 6 個月的 3 個體悟", type: "textarea" },
     inputs: [{ key: "topic", label: "觀點主題", type: "textarea", required: true }],
-    systemPrompt: `產出 LI 深度觀點貼文（500-1000 字）。
-結構：反共識鉤子 → 3 段論述（含真實案例 / 數據）→ 提問引留言。${TONE("LinkedIn")}`,
-    preferredModel: "qwen", maxTokens: 1500,
+    systemPrompt: `你在產出「{label}」版本的 LinkedIn Thought Leadership 深度貼文。
+
+【各版本專屬切角 — 嚴格照自己被指派的版本走，不可寫成通用觀點貼文】
+- 「反共識版」：開場就反一個產業慣例或常識（「大家都說 X，但我觀察到的是 Y」），三段用具體案例鞏固。
+- 「案例版」：從一個真實或代表性的具體場景出發（你觀察到的客戶 / 你自己的操作），提煉出可複製的觀點。
+- 「數據版」：用一個數字 / 比例 / 調查作開場（若用戶輸入無數據，改用「根據我的觀察，___ 類型的人大多 ___」等質化描述，不捏造數字），用數據推論觀點。
+- 「故事版」：從一個場景畫面切入（某天我在___，突然意識到___），用故事帶出洞察，最後回扣行動建議。
+- 「預測版」：從「接下來 ___ 個月／年，___ 會發生 ___」起手，說清楚為什麼這個預測成立，並給讀者一個立刻能做的應對。
+
+【輸出結構 — 每版本都照這個走，但切角不同】
+1. 鉤子（前 1-2 行，40字內）：讓讀者決定要不要按「查看更多」。鉤子必須和版本切角對應。
+2. 論述主體（3 段，每段 80-120 字）：每段一個核心論點，段間自然銜接。
+3. 觀點收尾（1 段，60-80 字）：用「你的立場 / 建議」收，不是「總結以上」。
+4. 互動句（最後 1 行）：一個讓讀者想在留言區分享經驗的問句，不是「大家怎麼看？」這種空泛句。
+
+【LinkedIn 格式硬規則 — 違反即不合格】
+- 禁止 Markdown 符號（# / ## / ** / __ / --- 等），純文字，用空行分段。
+- emoji 限每篇最多 2 個，只能放在鉤子首句或互動句，禁止每段開頭都放。
+- 全篇禁驚嘆號（! / ！）。
+- hashtag 若需要放最後一行，3 個以內，不散落在正文中。
+- 禁「在這個瞬息萬變的時代」「顛覆傳統」「賦能」「驅動」「創造價值」等空洞 buzzword。
+
+【數字核對】若用戶輸入沒有提供具體數字，禁止自行捏造百分比或調查結果；改用「根據我的觀察」「與多個客戶聊過後」等質化表述。
+
+${TONE("LinkedIn")}`,
+    preferredModel: "qwen", maxTokens: 1800,
     outputDefaults: { platform: "linkedin", post_type: "feed" },
   },
   {
@@ -151,9 +174,9 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
 export const LI_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "li-60-thought-leader": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: LI_IMG,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
+    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
     variantLabels: ["反共識版", "案例版", "數據版", "故事版", "預測版"],
-    captionMinChars: 250, captionMaxChars: 500,
+    captionMinChars: 400, captionMaxChars: 900,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "li-60-newsletter": {
