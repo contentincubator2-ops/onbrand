@@ -122,7 +122,7 @@ function AuthCard({
         <Chip size="sm" color="warning" variant="flat" className="ml-auto text-tiny">建議</Chip>
       </div>
       <p className="text-tiny text-default-400 leading-relaxed">
-        Agent 讀取你的 {label} 數據後，能產出更精準的內容。可選跳過。
+        AI 專家讀取你的 {label} 數據後，能產出更精準的內容。可選跳過。
       </p>
       <div className="flex gap-2">
         <Button size="sm" variant="bordered" color="primary" className="flex-1 text-tiny"
@@ -294,7 +294,7 @@ export function IntakeChat({
   // Kick off agent opener when context loads
   useEffect(() => {
     if (ctxLoaded && messages.length === 0) {
-      send(`請開始 intake。品牌：${brandName ?? "（未提供）"}。`);
+      send(`請開始建立資料。品牌：${brandName ?? "（未提供）"}。`);
     }
   }, [ctxLoaded]);
 

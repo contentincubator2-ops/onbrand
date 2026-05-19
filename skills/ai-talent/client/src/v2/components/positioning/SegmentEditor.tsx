@@ -15,6 +15,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRobot, faPlus, faXmark, faWandSparkles } from "@fortawesome/free-solid-svg-icons";
 import type { SegmentSpec, FieldSpec } from "../../lib/positioningSchema";
 import SourceViewer from "./SourceViewer";
+import { useLang } from "../../lib/i18n";
 
 export interface SegmentEditorProps {
   spec: SegmentSpec;
@@ -31,6 +32,8 @@ export interface SegmentEditorProps {
 export default function SegmentEditor({
   spec, value, onChange, onRunAgent, research, wizardMeta,
 }: SegmentEditorProps) {
+  const { lang } = useLang();
+  const en = lang === "en";
   const v = value ?? {};
   const setField = (key: string, next: any) => onChange({ ...v, [key]: next });
   const wizardWrote = !!wizardMeta?.wroteAt;
@@ -45,7 +48,7 @@ export default function SegmentEditor({
           <h3 className="text-medium font-semibold truncate">{spec.title}</h3>
           {wizardWrote && (
             <Tooltip
-              content={`由 ${wizardMeta?.agent ?? "wizard"} 於 ${
+              content={`由 ${wizardMeta?.agent ?? "AI 專家"} 於 ${
                 wizardMeta?.wroteAt
                   ? new Date(wizardMeta.wroteAt).toLocaleString("zh-TW")
                   : "—"
@@ -59,14 +62,14 @@ export default function SegmentEditor({
                 startContent={<FontAwesomeIcon icon={faWandSparkles} className="text-tiny ml-1" />}
                 className="shrink-0"
               >
-                Wizard 自動產出
+                {en ? "Auto-filled by AI" : "AI 自動產出"}
               </Chip>
             </Tooltip>
           )}
         </div>
         <div className="flex items-center gap-2">
           <SourceViewer research={research} segmentTitle={`${spec.num} ${spec.title}`} />
-          <Tooltip content={`由 ${spec.agent} 幫我填寫`} placement="top">
+          <Tooltip content={en ? `Fill with AI` : `由 AI 專家幫我填寫`} placement="top">
             <Button
               size="sm"
               variant="bordered"

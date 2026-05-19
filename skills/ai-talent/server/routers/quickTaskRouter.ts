@@ -799,7 +799,7 @@ export const quickTaskRouter = router({
       const brandPrefix = await buildBrandContext(input.brandId);
       const priorContext = buildPriorContext(input.prior ?? []);
       const filledUser = fillTemplate(agent.userTemplate, input.inputs ?? {});
-      const userMsg = priorContext + (priorContext ? "\n\n[原始 brief]\n" : "") + filledUser;
+      const userMsg = priorContext + (priorContext ? "\n\n[原始企劃摘要]\n" : "") + filledUser;
 
       const messages = [
         { role: "system" as const, content: agent.system + brandPrefix },
@@ -1097,7 +1097,7 @@ export const quickTaskRouter = router({
           squad_slug: t.squad_slug,
           methodology: t.methodology ?? null,
           inputs: [{ key: "topic", label: "本次活動 / 主題 / 重點", type: "textarea", required: true }],
-          primary_question: t.primary_question ?? "本次想交付什麼？簡單說明主題、活動、目標即可（agents 會自己找節慶、趨勢資料）",
+          primary_question: t.primary_question ?? "本次想交付什麼？簡單說明主題、活動、目標即可（AI 專家會自動搜尋節慶、趨勢資料）",
           primary_input: t.primary_input ?? { key: "topic", placeholder: "例：5 月母親節限時優惠 / 新品上市 / 客戶見證輯", type: "textarea" as const },
           agent: leadId ? (agentMap[leadId] ?? null) : null,
           team: team.length > 0 ? team : undefined,
@@ -1453,7 +1453,7 @@ export const quickTaskRouter = router({
 
 【品牌聲音規則】
 - 台灣繁體中文，口語自然但具專業感
-- 驚嘆號→句號；無 emoji；無 hashtag
+- 驚嘆號→句號；無 emoji；無主題標籤
 - 所有數字必須有來源邏輯（不捏造統計數字）
 - 總字數：800–1400 字`;
 

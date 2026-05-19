@@ -722,8 +722,8 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         setErrorMsg(
           hasErrors && !hasAnyCaption
             ? (lang === "en"
-                ? `This agent failed to write any content (likely LLM provider down). Try a different task. Detail: ${errorPreview}`
-                : `這個 agent 寫不出文案（可能 LLM provider 暫時離線）。請改試其他任務或回報客服。詳情：${errorPreview}`)
+                ? `The AI specialist failed to write any content (the service may be temporarily unavailable). Try a different task. Detail: ${errorPreview}`
+                : `這位 AI 專家目前無法產出文案（服務可能暫時離線）。請改試其他任務或回報客服。詳情：${errorPreview}`)
             : hasErrors
             ? (lang === "en"
                 ? "AI is a bit busy — hit Make it again (usually rush-hour traffic)."
@@ -1024,7 +1024,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               <p className="text-tiny text-default-400">
                 {tier === "60s" && (lang === "en" ? "60-second tasks (with full visual brief) launch next wave." : "60 秒任務（含完整視覺指示）將於下一波上線")}
                 {tier === "99s" && (lang === "en" ? "99s: real-data validation + video generation (Phase 3 rolling out)" : "99 秒：含真實數據驗證 + 影片生成（Phase 3 啟用中）")}
-                {tier === "30s" && (lang === "en" ? "Hang tight — agents are warming up." : "請稍候，Agent 正在準備中")}
+                {tier === "30s" && (lang === "en" ? "Hang tight — your AI specialists are warming up." : "請稍候，AI 專家準備中")}
               </p>
             </CardBody>
           </Card>

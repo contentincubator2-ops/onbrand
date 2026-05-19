@@ -99,8 +99,8 @@ export default function ChangelogPage() {
         {error && (
           <div style={{ padding: 24, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>
             {isEn
-              ? `Couldn't load changelog: ${error}`
-              : `讀不到 changelog：${error}`}
+              ? `Could not load release notes: ${error}`
+              : `無法載入更新日誌：${error}`}
           </div>
         )}
 

@@ -358,7 +358,7 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
                     handleSend();
                   }
                 }}
-                placeholder={isEn ? "Tell Mia what's up…" : "卡在哪裡？跟 Mia 說…"}
+                placeholder={isEn ? "Describe your issue and we'll get back to you…" : "卡在哪裡？跟 Mia 說…"}
                 rows={1}
                 style={{
                   flex: 1, resize: "none",
@@ -400,7 +400,7 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
                   const title = window.prompt(isEn ? "Bug title (short)" : "Bug 標題（簡短）");
                   if (!title || title.trim().length < 3) return;
                   const body = window.prompt(isEn
-                    ? "What happened? Steps + what you expected"
+                    ? "Describe what happened, the steps you took, and what you expected to see."
                     : "發生了什麼？操作步驟 + 你預期的結果");
                   if (!body || body.trim().length < 5) return;
                   try {

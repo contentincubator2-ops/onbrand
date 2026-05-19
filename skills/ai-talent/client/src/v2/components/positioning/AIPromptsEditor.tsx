@@ -122,7 +122,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
           </div>
           <p className="text-sm text-default-500">
             {en
-              ? "Set brand-specific text + image prompts for each platform. 30s / 60s / 99s / Theater auto-apply these when running on that platform."
+              ? "Set brand-specific text and image instructions for each platform. 30s, 60s, 99s, and Theater tasks automatically apply these when generating content for that platform."
               : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。30s / 60s / 99s / 企劃台 在該平台跑任務時會自動套用。"}
           </p>
         </div>
@@ -198,8 +198,8 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
                 minRows={10}
                 maxRows={20}
                 placeholder={en
-                  ? `Voice, structure, length, tone to follow when writing for ${active.label}…\ne.g. Short ${active.label} post, 120–180 chars, hook in line 1, no clichés, 1–2 hashtags at the end…`
-                  : `為 ${active.label} 寫貼文時要遵守的口吻、結構、長度、tone…\n例：寫 ${active.label} 短貼文，120-180 字，第一句 hook、不要套話、最後 1-2 個 hashtag…`}
+                  ? `Voice, structure, length, tone to follow when writing for ${active.label}…\ne.g. Short ${active.label} post, 120–180 chars, opening hook in line 1, no clichés, 1–2 hashtags at the end…`
+                  : `為 ${active.label} 寫貼文時要遵守的口吻、結構、長度、tone…\n例：寫 ${active.label} 短貼文，120-180 字，第一句為開場鉤、不要套話、最後 1-2 個主題標籤…`}
                 value={cur.text ?? ""}
                 onValueChange={(s) => updatePrompt(active.id, "text", s)}
               />
@@ -228,8 +228,8 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
       <div className="mt-4 text-xs text-default-500 bg-default-50 rounded-lg p-3 leading-relaxed">
         <div className="font-medium text-default-700 mb-1">{en ? "💡 How it works" : "💡 使用說明"}</div>
         {en
-          ? "Every time a task runs for this platform (e.g. 30s FB short post), the system injects the Text prompt + Image prompt above into the matching agent's prompt. Empty platforms fall back to the general brand voice."
-          : "每次跑該平台的任務（如 30s FB 短貼文）時，系統會自動把這裡的「文字指令」+「圖片指令」injection 進對應 agent 的 prompt。空白的平台會 fallback 到通用品牌口吻。"}
+          ? "Every time a task runs for this platform (e.g. a 30s Facebook post), the system applies the Text and Image instructions above to the content AI for that platform. Platforms left blank fall back to the general brand voice."
+          : "每次跑該平台的任務（如 30s FB 短貼文）時，系統會自動把這裡的「文字指令」+「圖片指令」套用到對應的 AI 專家。未填寫的平台會自動套用通用品牌口吻。"}
       </div>
     </div>
   );

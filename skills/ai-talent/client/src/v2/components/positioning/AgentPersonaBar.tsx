@@ -41,7 +41,7 @@ function getPersonas(lang: Lang): Record<PersonaId, PersonaMeta> {
       defaultLine: en
         ? "I'll walk you through SoWork's 14-step brand positioning to lock down who you are and who you exist for — once locked, every piece of content builds from this."
         : "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」— 鎖定後，所有內容都會以此為基礎產出。",
-      domain: en ? "Brand Positioning" : "Brand Positioning",
+      domain: en ? "Brand Positioning" : "品牌定位",
     },
     copywriter: {
       label: en ? "Copy Director" : "文字總監",
@@ -90,6 +90,7 @@ export default function AgentPersonaBar({
   persona, message, meta, trailing, mode = "idle", brandName, compact = false,
 }: AgentPersonaBarProps) {
   const { lang } = useLang();
+  const en = lang === "en";
   const p = getPersonas(lang)[persona];
   const avatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(p.seed + "-" + (brandName ?? ""))}`;
   const portraitSize = compact ? 72 : 88;
@@ -152,19 +153,19 @@ export default function AgentPersonaBar({
               {mode === "idle" && (
                 <span className="inline-flex items-center gap-1 text-neutral-700">
                   <span className="w-1.5 h-1.5 rounded-full bg-neutral-300" />
-                  Ready
+                  {en ? "Ready" : "就緒"}
                 </span>
               )}
               {mode === "busy" && (
                 <span className="inline-flex items-center gap-1 text-neutral-800">
                   <span className="w-1.5 h-1.5 rounded-full bg-neutral-900 animate-pulse" />
-                  Live
+                  {en ? "Live" : "執行中"}
                 </span>
               )}
               {mode === "done" && (
                 <span className="inline-flex items-center gap-1 text-emerald-700">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                  Done
+                  {en ? "Done" : "完成"}
                 </span>
               )}
             </div>

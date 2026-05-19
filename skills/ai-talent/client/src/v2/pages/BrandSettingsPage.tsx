@@ -41,7 +41,7 @@ export default function BrandSettingsPage() {
     { id: "connector", label: lang === "en" ? "Connect"   : "連結",      Icon: Link2,   hint: lang === "en" ? "FB / IG / LinkedIn / YouTube"          : "FB / IG / LinkedIn / YouTube" },
     { id: "publish",   label: lang === "en" ? "Publish"   : "發布",      Icon: Share2,  hint: lang === "en" ? "Pick the FB page to publish to"        : "選擇要發布的 FB 粉專" },
     { id: "visual",    label: lang === "en" ? "Visual"    : "視覺",      Icon: Palette, hint: lang === "en" ? "Logo / colors / fonts"                 : "Logo / 色票 / 字型" },
-    { id: "ai",        label: lang === "en" ? "AI prompts": "AI 指令",   Icon: Bot,     hint: lang === "en" ? "Per-platform custom prompts"           : "per-platform 自訂 prompt" },
+    { id: "ai",        label: lang === "en" ? "AI prompts": "AI 指令",   Icon: Bot,     hint: lang === "en" ? "Custom AI instructions per platform"   : "各平台自訂 AI 指令" },
     { id: "danger",    label: lang === "en" ? "Danger"    : "危險區",    Icon: Trash2,  hint: lang === "en" ? "Delete this brand"                     : "刪除品牌" },
   ];
 

@@ -335,7 +335,7 @@ export default function AdminDashboardPage() {
                 busy={confirmM?.isPending} />
               <BugBtn label="✗ 非 bug" onClick={() => confirmM?.mutate?.({ bugId: b.id, isBug: false })}
                 busy={confirmM?.isPending} />
-              <BugBtn label="🤖 派給修復 agent" onClick={() => dispatchM?.mutate?.({ bugId: b.id })}
+              <BugBtn label="🤖 派給修復專員" onClick={() => dispatchM?.mutate?.({ bugId: b.id })}
                 busy={dispatchM?.isPending} />
               <BugBtn label="🎉 標記已解決＋通知" onClick={() => {
                 const note = window.prompt("給用戶的備註（可空白）：") ?? undefined;

@@ -36,10 +36,10 @@ const OAUTH_PLATFORMS = new Set(["facebook", "instagram", "linkedin", "youtube",
 function buildIntakeSystemPrompt(squadCtx: string, brandCtx: string): string {
   const guide = buildLeadIntakeGuide();
   return [
-    "你是這個 squad 的 Lead Agent，負責在任務派出前收集必要資訊。",
+    "你是這個小組的主要 AI 專家，負責在任務派出前收集必要資訊。",
     "語言：繁體中文（硬性規定）。",
     "",
-    "【Squad 資訊】",
+    "【小組資訊】",
     squadCtx,
     "",
     "【品牌資訊】",
@@ -52,7 +52,7 @@ function buildIntakeSystemPrompt(squadCtx: string, brandCtx: string): string {
     "  {{AUTH_REQUIRED:<platform>}}",
     "  其中 <platform> 可以是 facebook / instagram / linkedin / youtube / tiktok / line",
     "  範例：{{AUTH_REQUIRED:facebook}}",
-    "  條件：只有當 squad 的 workspace 對應到該平台，且對話中尚未授權時，才輸出此標記。",
+    "  條件：只有當小組的工作空間對應到該平台，且對話中尚未授權時，才輸出此標記。",
     "",
     "若所有問題已完成且可以開始執行，在回覆的最後一行輸出：",
     "  {{INTAKE_READY}}",
@@ -98,10 +98,10 @@ async function generatePreview(
         {
           role: "system",
           content: [
-            "根據以下 squad 資訊和用戶的最新回覆，用 1-2 句話（繁體中文）預告這個 squad 將產出什麼具體成果。",
+            "根據以下小組資訊和用戶的最新回覆，用 1-2 句話（繁體中文）預告這個小組將產出什麼具體成果。",
             "只描述成果本身，不問問題，不重複問題，不超過 60 字。",
             "",
-            "【Squad】",
+            "【小組】",
             squadCtx.slice(0, 800),
           ].join("\n"),
         },
