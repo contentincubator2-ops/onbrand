@@ -1163,31 +1163,12 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                     className="min-w-0 flex-1 group cursor-default"
                     title={activeTask.agent ? `${activeTask.label_zh ?? activeTask.label} · ${activeTask.agent.name}（${activeTask.agent.title}）` : (activeTask.label_zh ?? activeTask.label)}
                   >
-                    {lang === "en" ? (
-                      <>
-                        <p className="text-[12px] text-default-800 truncate font-medium">
-                          {activeTask.label_en ?? activeTask.label}
-                          {activeTask.agent && <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>}
-                        </p>
-                        {activeTask.label_zh && (
-                          <p className="text-[9px] text-default-400 truncate leading-tight">
-                            {activeTask.label_zh}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        {activeTask.label_en && (
-                          <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-default-500 truncate leading-tight">
-                            {activeTask.label_en}
-                          </p>
-                        )}
-                        <p className="text-[12px] text-default-800 truncate font-medium">
-                          {activeTask.label_zh ?? activeTask.label}
-                          {activeTask.agent && <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>}
-                        </p>
-                      </>
-                    )}
+                    <p className="text-[12px] text-default-800 truncate font-medium">
+                      {lang === "en"
+                        ? (activeTask.label_en ?? activeTask.label)
+                        : (activeTask.label_zh ?? activeTask.label)}
+                      {activeTask.agent && <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>}
+                    </p>
                   </div>
                   <span
                     className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"

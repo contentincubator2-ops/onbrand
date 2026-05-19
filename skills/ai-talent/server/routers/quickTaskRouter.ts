@@ -757,6 +757,102 @@ const TASK_LABEL_EN: Record<string, string> = {
   "pr-30-media-pitch":    "Media pitch email",
   "pr-30-news-hook":      "News story idea generator",
   "pr-30-launch-social":  "Launch PR social post",
+  // Facebook 60s
+  "fb-60-single-full":      "FB Full post",
+  "fb-60-link-full":        "FB Link post (full)",
+  "fb-60-album-4":          "FB Photo album × 4",
+  "fb-60-countdown-5day":   "FB 5-day countdown series",
+  "fb-60-launch-kit":       "FB Event launch kit (4 posts)",
+  "fb-60-live-suite":       "FB Live suite (6 pieces)",
+  "fb-60-pinned-suite":     "FB Pinned + 3 companion posts",
+  "fb-60-ad-pack-3":        "FB Ad pack A/B/C",
+  // Instagram 60s
+  "ig-60-feed-full":              "IG Full feed post",
+  "ig-60-reel-full":              "IG Reel full script",
+  "ig-60-carousel-7":             "IG Carousel 7-slide",
+  "ig-60-story-3frame":           "IG Story 3-frame set",
+  "ig-60-countdown-5day":         "IG 5-day countdown series",
+  "ig-60-highlight-suite":        "IG Highlight × 5 (cover + content)",
+  "ig-60-live-suite":             "IG Live suite (5 pieces)",
+  "ig-60-serial-3":               "IG 3-part narrative series",
+  "ig-60-viral-rewrite":          "IG Viral rewrite",
+  "ig-60-testimonial-rewrite":    "IG Testimonial rewrite",
+  // YouTube 60s
+  "yt-60-video-package":   "YT Full video caption package",
+  "yt-60-shorts-script":   "YT Shorts full script",
+  "yt-60-thumbnail-suite": "YT Thumbnail × 5 styles",
+  "yt-60-series-3ep":      "YT 3-episode series",
+  "yt-60-community-post":  "YT Community post",
+  "yt-60-viral-rewrite":   "YT Viral video rewrite",
+  // TikTok 60s
+  "tt-60-foryou-full":    "TikTok ForYou full package",
+  "tt-60-series-3":       "TikTok 3-episode series",
+  "tt-60-viral-rewrite":  "TikTok Viral rewrite",
+  // LinkedIn 60s
+  "li-60-thought-leader": "LI Thought leadership post (full)",
+  "li-60-newsletter":     "LI Newsletter (one issue)",
+  "li-60-case-study":     "LI Client case study rewrite",
+  // Email 60s
+  "em-60-newsletter-full":  "Email Newsletter (full issue)",
+  "em-60-promo-sequence":   "Email promo sequence (3 emails)",
+  "em-60-onboarding-3":     "Email onboarding sequence (3 emails)",
+  // PR 60s
+  "pr-60-news-release-full": "Full press release",
+  // Brand / Research 60s
+  "br-60-tagline-suite":   "Brand tagline × 5 variants",
+  "br-60-value-prop":      "Value proposition rewrite",
+  "br-60-brand-voice":     "Brand Voice Guideline",
+  "rs-60-interview-guide": "User interview guide (full)",
+  "rs-60-persona-suite":   "User persona × 5",
+  "rs-60-jtbd-suite":      "Jobs-to-be-Done × 5",
+  // Facebook 99s
+  "fb-99-30day-calendar":         "FB 30-day content calendar",
+  "fb-99-monthly-calendar-promo": "FB 30-day promo calendar (multi-product)",
+  "fb-99-carousel-5":             "FB Carousel 5-card",
+  "fb-99-serial-3":               "FB 3-part narrative series",
+  "fb-99-viral-rewrite":          "FB Viral rewrite",
+  "fb-99-testimonial-rewrite":    "FB Testimonial rewrite",
+  "fb-99-trend-rewrite":          "FB Trending news rewrite",
+  "fb-99-14day-countdown":        "FB Countdown series (7 / 14 days)",
+  "fb-99-launch-toolkit":         "FB Full launch toolkit (8 posts)",
+  "fb-99-livestream-9seg":        "FB Live 9-segment suite",
+  "fb-99-crisis-playbook":        "FB Full crisis PR playbook",
+  // FB 99s squads
+  "fb-99-account-reposition": "FB Account repositioning",
+  "fb-99-quarterly-strategy": "FB Quarterly content strategy",
+  "fb-99-monthly-analytics":  "FB Monthly performance report",
+  "fb-99-carousel-cvo":       "FB Carousel: awareness-to-purchase story",
+  "fb-99-offer-first":        "FB Offer-led post",
+  "fb-99-magnetic-marketing": "FB Magnetic marketing post",
+  "fb-99-mass-control":       "FB Grand launch playbook",
+  // Instagram 99s
+  "ig-99-30day-calendar":    "IG 30-day content calendar",
+  "ig-99-reel-series-6":     "IG Reel 6-episode series",
+  "ig-99-account-reposition":"IG Account repositioning full kit",
+  // IG 99s squads
+  "ig-99-monthly-calendar":       "IG 30-day content calendar",
+  "ig-99-youtility":              "IG Utility-first content strategy",
+  "ig-99-visual-story":           "IG Visual-consistency brand posts",
+  "ig-99-live-first":             "IG Live-first content strategy",
+  "ig-99-document":               "IG Documentary-style content",
+  "ig-99-radical-transparency":   "IG Radical transparency brand posts",
+  "ig-99-save-worthy":            "IG Save-worthy utility posts",
+  // YouTube 99s
+  "yt-99-series-6ep":         "YT 6-episode full production pack",
+  "yt-99-quarterly-strategy": "YT Quarterly channel strategy",
+  "yt-99-premiere-kit":       "YT Premiere full kit",
+  // TikTok 99s
+  "tt-99-30day-foryou":  "TikTok 30-day ForYou formula",
+  "tt-99-trend-week":    "TikTok 1-week trending full kit",
+  // LinkedIn 99s
+  "li-99-30day-thought-leadership": "LI 30-day Thought Leadership calendar",
+  "li-99-newsletter-quarterly":     "LI Quarterly newsletter (4 issues)",
+  // Email 99s
+  "em-99-4week-nurture":    "Email 4-week onboarding nurture",
+  "em-99-launch-sequence":  "Email product launch automation sequence",
+  // PR 99s
+  "pr-99-launch-toolkit": "PR Full launch media toolkit",
+  "pr-99-newsjack":        "Newsjacking (trending news hook)",
 };
 // 2026-05-05 quick-task pivot
 import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../_core/quickTaskOutput";
@@ -1182,8 +1278,11 @@ export const quickTaskRouter = router({
         const leadId = t.agent_id ?? null;
         const memberIds: number[] = Array.isArray(t.squad_member_ids) ? t.squad_member_ids : [];
         const team = memberIds.map((id: number) => agentMap[id]).filter(Boolean);
+        const squadLabelEn = typeof t.label === "object" && t.label?.en ? t.label.en : (TASK_LABEL_EN[t.id] ?? null);
         return {
           ...base,
+          label_en: squadLabelEn,
+          label_zh: typeof t.label === "object" && t.label?.zh ? t.label.zh : null,
           squad_slug: t.squad_slug,
           methodology: t.methodology ?? null,
           inputs: [{ key: "topic", label: "本次活動 / 主題 / 重點", type: "textarea", required: true }],
