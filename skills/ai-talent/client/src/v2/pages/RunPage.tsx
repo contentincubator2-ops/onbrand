@@ -209,6 +209,10 @@ export default function RunPage() {
   const [videoModel, setVideoModel] = useState<string>("auto");
   /** 2026-05-12 Phase 1 — picked template category for the 改圖 picker. */
   const [templateCategory, setTemplateCategory] = useState<string>("");
+  /** 2026-05-19 (CJ「某個影片 title 產出腳本」): inline script generation modal. */
+  const [scriptModalTitle, setScriptModalTitle] = useState<string | null>(null);
+  const [generatedScript, setGeneratedScript] = useState<string | null>(null);
+  const [scriptCopied, setScriptCopied] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -248,6 +252,16 @@ export default function RunPage() {
   });
   const refineMut = (trpc as any).quickTask?.refineCaption?.useMutation
     ? (trpc as any).quickTask.refineCaption.useMutation()
+    : null;
+  // 2026-05-19: inline script generation for YT 12-title tab
+  const scriptMut = (trpc as any).quickTask?.generateVideoScript?.useMutation
+    ? (trpc as any).quickTask.generateVideoScript.useMutation({
+        onSuccess: (r: any) => {
+          if (r.ok) setGeneratedScript(r.script);
+          else showToastGlobal(lang === "en" ? `Script failed: ${r.error}` : `腳本生成失敗：${r.error}`);
+        },
+        onError: (e: any) => showToastGlobal(lang === "en" ? `Script error: ${e.message}` : `腳本錯誤：${e.message}`),
+      })
     : null;
   const emailMut = trpc.output.emailToTeam.useMutation({
     onSuccess: (r) => {
@@ -1251,6 +1265,145 @@ export default function RunPage() {
                 {lang === "en" ? "Full text (.md)" : "全文（.md）"}
               </button>
             </div>
+          )}
+
+          {/* 2026-05-19 (CJ「某個影片 title 產出腳本」): 12-title script panel.
+              Only visible when the active tab is "12 影片 title". Parses
+              ①–⑫ titles from the caption and renders a compact list;
+              each row has a "📝 腳本" button that opens the script modal. */}
+          {/12\s*影片\s*title/i.test(slide?.label ?? "") && (() => {
+            const raw = slide?.caption ?? "";
+            const rows = [...raw.matchAll(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫])\s*(.+)$/gmu)].map(m => ({
+              num: m[1], title: m[2].trim(),
+            }));
+            if (rows.length === 0) return null;
+            return (
+              <div className="rounded-xl border border-default-200 bg-white overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-default-100 flex items-center justify-between">
+                  <span className="text-small font-semibold text-default-700">
+                    {lang === "en" ? "12 Video Titles — click to generate script" : "12 支影片 title — 點選產出腳本"}
+                  </span>
+                  <span className="text-tiny text-default-400">{rows.length} 支</span>
+                </div>
+                <div className="divide-y divide-default-100">
+                  {rows.map((row, i) => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-default-50 transition group">
+                      <span className="text-default-400 text-tiny font-mono w-5 shrink-0">{row.num}</span>
+                      <span className="flex-1 text-small text-default-800 leading-snug">{row.title}</span>
+                      <button
+                        onClick={() => {
+                          setScriptModalTitle(row.title);
+                          setGeneratedScript(null);
+                          setScriptCopied(false);
+                        }}
+                        className="shrink-0 px-2.5 py-1 rounded-lg text-tiny font-semibold border border-secondary/40 text-secondary opacity-0 group-hover:opacity-100 transition hover:bg-secondary/5"
+                      >
+                        {lang === "en" ? "📝 Script" : "📝 腳本"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Script generation modal */}
+          {scriptModalTitle !== null && (
+            <Modal
+              isOpen
+              onClose={() => { setScriptModalTitle(null); setGeneratedScript(null); }}
+              size="3xl"
+              scrollBehavior="inside"
+            >
+              <ModalContent>
+                <ModalHeader className="flex flex-col gap-1">
+                  <span className="text-small font-normal text-default-500">
+                    {lang === "en" ? "Script for" : "腳本 ·"}
+                  </span>
+                  <span className="text-medium font-bold leading-snug">{scriptModalTitle}</span>
+                </ModalHeader>
+                <ModalBody>
+                  {!generatedScript && !scriptMut?.isPending && (
+                    <div className="flex flex-col items-center gap-4 py-8 text-center">
+                      <p className="text-small text-default-600 max-w-sm">
+                        {lang === "en"
+                          ? "Generate a full shooting script for this video title. The script will include hook, main body (3–5 points), and closing CTA."
+                          : "為這支影片 title 產出完整拍攝腳本，包含開場 Hook、主體論點（3–5個）、收尾 CTA。"}
+                      </p>
+                      <Button
+                        color="secondary"
+                        onPress={() => {
+                          if (!scriptMut) return;
+                          scriptMut.mutate({
+                            videoTitle: scriptModalTitle,
+                            titleContext: slide?.caption ?? undefined,
+                            brandId: data?.brand?.id ?? undefined,
+                          });
+                        }}
+                      >
+                        {lang === "en" ? "Generate script" : "產出腳本"}
+                      </Button>
+                    </div>
+                  )}
+                  {scriptMut?.isPending && (
+                    <div className="flex flex-col items-center gap-3 py-12">
+                      <span className="w-8 h-8 border-[3px] border-secondary/20 border-t-secondary rounded-full animate-spin inline-block" />
+                      <span className="text-small text-default-500">
+                        {lang === "en" ? "Generating script…" : "腳本生成中（約 20–40 秒）…"}
+                      </span>
+                    </div>
+                  )}
+                  {generatedScript && (
+                    <div className="prose prose-sm max-w-none text-default-800 text-small leading-relaxed whitespace-pre-wrap font-[inherit]">
+                      {generatedScript}
+                    </div>
+                  )}
+                </ModalBody>
+                <ModalFooter className="gap-2">
+                  {generatedScript && (
+                    <>
+                      <Button
+                        variant="flat"
+                        size="sm"
+                        onPress={async () => {
+                          try {
+                            await navigator.clipboard.writeText(generatedScript);
+                            setScriptCopied(true);
+                            setTimeout(() => setScriptCopied(false), 2000);
+                          } catch { showToastGlobal(lang === "en" ? "Copy failed" : "複製失敗"); }
+                        }}
+                      >
+                        {scriptCopied ? (lang === "en" ? "✓ Copied" : "✓ 已複製") : (lang === "en" ? "Copy script" : "複製腳本")}
+                      </Button>
+                      <Button
+                        variant="flat"
+                        size="sm"
+                        onPress={() => {
+                          setGeneratedScript(null);
+                          setScriptCopied(false);
+                          if (scriptMut) {
+                            scriptMut.mutate({
+                              videoTitle: scriptModalTitle!,
+                              titleContext: slide?.caption ?? undefined,
+                              brandId: data?.brand?.id ?? undefined,
+                            });
+                          }
+                        }}
+                      >
+                        {lang === "en" ? "Regenerate" : "重新產出"}
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant="light"
+                    size="sm"
+                    onPress={() => { setScriptModalTitle(null); setGeneratedScript(null); }}
+                  >
+                    {lang === "en" ? "Close" : "關閉"}
+                  </Button>
+                </ModalFooter>
+              </ModalContent>
+            </Modal>
           )}
         </section>
 

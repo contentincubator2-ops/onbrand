@@ -1403,6 +1403,79 @@ export const quickTaskRouter = router({
       }
     }),
 
+  // 2026-05-19 (CJ「想對某個影片 title 產出腳本或分鏡」): inline script
+  // generation for a specific YT video title. User picks a title from the
+  // yt-99-quarterly-strategy "12 影片 title" tab → modal calls this to
+  // get a full shooting script without leaving the RunPage.
+  generateVideoScript: protectedProcedure
+    .input(z.object({
+      /** The chosen video title (e.g. "AI 品牌聲音的 3 大指標") */
+      videoTitle: z.string().min(1).max(300),
+      /** Full text of the "12 影片 title" tab — provides channel context. */
+      titleContext: z.string().max(4000).optional(),
+      brandId: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      try {
+        const { preflightCostCheck } = await import("../llmWithBilling");
+        const g = await preflightCostCheck(userId);
+        if (!g.ok) throw new TRPCError({ code: "FORBIDDEN", message: g.reason });
+      } catch (e) { if (e instanceof TRPCError) throw e; }
+
+      const { callModel } = await import("../_core/multiModelRouter");
+
+      const contextBlock = input.titleContext
+        ? `\n\n【頻道本季其他影片方向（供參考，勿直接複製）】\n${input.titleContext}`
+        : "";
+
+      const system = `你是資深 YouTube 內容策略師兼腳本撰稿人。
+請為以下影片標題撰寫一份完整的拍攝腳本。
+
+【腳本格式】
+## 開場 Hook（0–15 秒）
+[直接切入，用一句觀察句或反問句抓住注意力；禁止「大家好，歡迎來到…」類介紹腔]
+
+## 主體內容
+### 論點 1：[小標題]
+[120–200 字完整腳本文字，可直接照念]
+
+### 論點 2：[小標題]
+[120–200 字]
+
+### 論點 3：[小標題]
+[120–200 字]
+
+（視題目需要可增至 4–5 個論點）
+
+## 收尾（最後 30–45 秒）
+[有記憶點的結尾觀點 + 自然的訂閱/留言 CTA，不要爆料腔「快來訂閱」]
+
+【品牌聲音規則】
+- 台灣繁體中文，口語自然但具專業感
+- 驚嘆號→句號；無 emoji；無 hashtag
+- 所有數字必須有來源邏輯（不捏造統計數字）
+- 總字數：800–1400 字`;
+
+      const userMsg = `影片標題：${input.videoTitle}${contextBlock}\n\n請產出這支影片的完整拍攝腳本。`;
+
+      try {
+        const r = await callModel(
+          [
+            { role: "system", content: system },
+            { role: "user", content: userMsg },
+          ],
+          undefined,
+          "anthropic",
+        );
+        const script = (r.content ?? "").trim();
+        if (!script) return { script: "", ok: false, error: "empty response" };
+        return { script, ok: true };
+      } catch (e: any) {
+        return { script: "", ok: false, error: e?.message ?? String(e) };
+      }
+    }),
+
   // 100s squad auto-run — sequentially executes all steps of a real squad
   // inline (no /picker redirect, no DB mission). Returns OrchestraResult-shaped
   // variants[] where each variant = one step's output, so the existing
