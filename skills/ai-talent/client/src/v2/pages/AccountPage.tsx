@@ -139,7 +139,7 @@ export default function AccountPage() {
         );
       }
     } catch (e: any) {
-      showToastGlobal((lang === "en" ? "Network hiccup: " : "網路錯誤：") + (e?.message ?? e));
+      showToastGlobal((lang === "en" ? "Network error: " : "網路錯誤：") + (e?.message ?? e));
     } finally {
       setPwdLoading(false);
     }
@@ -342,7 +342,7 @@ export default function AccountPage() {
         <section className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-neutral-900 mb-4">{t("account_invoices")}</h2>
           {invoices.length === 0 ? (
-            <p className="text-sm text-neutral-500">{lang === "en" ? "No invoices yet (no invoices during trial)" : "尚無發票（試用期間不開立發票）"}</p>
+            <p className="text-sm text-neutral-500">{lang === "en" ? "No invoices yet — invoices appear once you subscribe." : "尚無發票（試用期間不開立發票）"}</p>
           ) : (
             <table className="w-full text-sm">
               <thead className="text-xs text-neutral-500 border-b border-neutral-200">
@@ -408,7 +408,7 @@ export default function AccountPage() {
           <h2 className="text-lg font-semibold text-neutral-900 mb-2">{t("account_export_data")}</h2>
           <p className="text-sm text-neutral-500 mb-4">
             {lang === "en"
-              ? "Download all your brands, tasks, and outputs (JSON) — your data, your right."
+              ? "Download all your brands, tasks, and outputs as JSON. You own your data."
               : "下載您所有的品牌、任務、產出內容（JSON 格式）— 個資法權利之一。"}
           </p>
           <button
@@ -512,7 +512,7 @@ export default function AccountPage() {
                 {((topupPacksQuery as any)?.data?.currency === "TWD") && (
                   <span className="block mt-1">
                     {lang === "en"
-                      ? `Billed in TWD · today's rate 1 USD ≈ ${Number((topupPacksQuery as any)?.data?.usdToTwd ?? 32).toFixed(2)} NTD`
+                      ? `Billed in TWD · today's rate: 1 USD ≈ ${Number((topupPacksQuery as any)?.data?.usdToTwd ?? 32).toFixed(2)} TWD`
                       : `依當日匯率計算 · 1 USD ≈ ${Number((topupPacksQuery as any)?.data?.usdToTwd ?? 32).toFixed(2)} NTD`}
                   </span>
                 )}

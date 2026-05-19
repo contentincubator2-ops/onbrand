@@ -97,7 +97,7 @@ export default function LoginPage() {
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
               {lang === "en"
-                ? "168 tasks, each backed by a named award or market-proven case"
+                ? "168 tasks, each backed by an award-winning or market-proven case"
                 : "168 個任務，每個內建獨立得獎工藝案例"}
             </li>
             <li className="flex items-center gap-3">
@@ -109,7 +109,7 @@ export default function LoginPage() {
             <li className="flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">✦</span>
               {lang === "en"
-                ? "Brand positioning locked — A2A strategy to execution, always on-brand"
+                ? "Brand positioning set once — A2A strategy to execution, always on-brand"
                 : "品牌定位一鍵鎖定，A2A 策略到執行永遠 on-brand"}
             </li>
           </ul>

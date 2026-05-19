@@ -84,7 +84,7 @@ export default function WorkspaceSettingsPage() {
           {/* Sidebar: workspace list */}
           <aside className="space-y-1">
             {listQ?.isLoading ? (
-              <p className="text-sm text-neutral-400">{lang === "en" ? "One sec…" : "載入中…"}</p>
+              <p className="text-sm text-neutral-400">{lang === "en" ? "Loading…" : "載入中…"}</p>
             ) : workspaces.length === 0 ? (
               <p className="text-sm text-neutral-400">{lang === "en" ? "No workspaces yet" : "尚無工作空間"}</p>
             ) : (
@@ -325,7 +325,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
             )}
             <p className="mt-2 text-xs text-neutral-400">
               {lang === "en"
-                ? "They'll need to sign up at drop.sowork.ai first. Team plan caps at 5; Agency is unlimited."
+                ? "They'll need a SoWork account first. Team plan: up to 5 members; Agency: unlimited."
                 : "對方需先在 drop.sowork.ai 註冊。Team 方案上限 5 位，Agency 方案無限。"}
             </p>
           </div>

@@ -153,7 +153,7 @@ function ContextReadingBanner({
         )}
 
         {phase === "error" && (
-          <p className="text-[11px] text-danger-700">{lang === "en" ? "Couldn't load — check brand / product / event setup and try again." : "無法讀取資料，請確認品牌 / 產品 / 活動已正確建立後重試。"}</p>
+          <p className="text-[11px] text-danger-700">{lang === "en" ? "Failed to load — verify your brand, product, and event details are complete, then try again." : "無法讀取資料，請確認品牌 / 產品 / 活動已正確建立後重試。"}</p>
         )}
       </div>
     </div>
@@ -336,7 +336,7 @@ export function IntakeFormMockup({
         <SectionHeader
           icon="🌐"
           eyebrow={lang === "en" ? "Market signals" : "市場觀察"}
-          title={lang === "en" ? "Live signals from the web (intake pre-ran this)" : "網路上目前的訊號（intake 已先預跑）"}
+          title={lang === "en" ? "Live signals from the web (auto-fetched at session start)" : "網路上目前的訊號（intake 已先預跑）"}
         />
         <div className="flex flex-col gap-1.5 text-tiny text-default-700 leading-relaxed">
           <div><span className="text-default-500">{lang === "en" ? "Audience pains preview: " : "受眾痛點預覽："}</span>{web.audiencePainsPreview ?? <EmptyHint>{lang === "en" ? "Run intake first" : "跑 intake 才會有"}</EmptyHint>}</div>
@@ -350,7 +350,7 @@ export function IntakeFormMockup({
         <SectionHeader
           icon="👤"
           eyebrow={lang === "en" ? "Strategy picks" : "策略選擇"}
-          title={lang === "en" ? "You decide these — AI shouldn't guess" : "這幾項由你決定（AI 不該替你猜）"}
+          title={lang === "en" ? "You decide these — too important to automate" : "這幾項由你決定（AI 不該替你猜）"}
           color="primary"
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -416,7 +416,7 @@ export function IntakeFormMockup({
         </div>
         <Textarea
           size="sm" radius="md" variant="bordered"
-          label={lang === "en" ? "Tilt confirm / edit (derived from positioning)" : "定位角確認 / 編輯（AI 專家已從品牌定位推導）"}
+          label={lang === "en" ? "Positioning angle — confirm or adjust" : "定位角確認 / 編輯（AI 專家已從品牌定位推導）"}
           labelPlacement="outside"
           minRows={3}
           placeholder={lang === "en" ? "One line describing the semantic space you want to own" : "一句話描述你想壟斷的語意空間"}

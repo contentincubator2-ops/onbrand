@@ -784,7 +784,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         emoji: "🎼",
         kicker: "PRODUCTION PACKAGE",
         headline: lang === "en" ? "A full production pack in 60 seconds" : "60 秒交付一個完整套組",
-        sub: lang === "en" ? "Multi-agent · 5 variants + real images + reply templates + posting time + QA" : "多 AI 專家協作 · 5 版本 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
+        sub: lang === "en" ? "Multi-agent · 5 variants + real images + reply templates + optimal post timing + QA" : "多 AI 專家協作 · 5 版本 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
         bullets: lang === "en" ? ["5 variants", "7-9 agents", "Real Flux images", "Jordan QA"] : ["5 版本", "7-9 位 AI 專家協作", "Flux 真生圖", "Jordan QA 審核"],
         accent: "#7c3aed",
         gradientFrom: "rgba(124,58,237,0.10)",
@@ -1035,7 +1035,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
               <p>
                 {!["facebook","instagram","youtube","tiktok","linkedin","email","pr","brand","audience","all"].includes(channel)
                   ? (lang === "en"
-                      ? `${(CHANNEL_EN_LABEL[channel] ?? CHANNEL_TILES.find((c) => c.id === channel)?.label)} ${tierLabel} tasks are in the works…`
+                      ? `No ${(CHANNEL_EN_LABEL[channel] ?? CHANNEL_TILES.find((c) => c.id === channel)?.label)} ${tierLabel} tasks yet — more coming soon.`
                       : `${CHANNEL_TILES.find((c) => c.id === channel)?.label} 通路的 ${tierLabel} 任務製作中…`)
                   : (lang === "en"
                       ? `No tasks match "${searchQuery}"`
@@ -1206,7 +1206,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                               >
                                 Brand → Words
                               </a>
-                              {" "}and hit Auto-fill to set tone and banned words. Results will sound much more on-brand (it'll still run without, but generic).
+                              {" "}and click Auto-fill to set tone and vocabulary. Output will be far more on-brand. (It'll still run without, but results will be generic.)
                             </>
                           ) : (
                             <>
@@ -1265,7 +1265,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                             }}
                           >
                             {lang === "en"
-                              ? `Context · I'll use these from ${brandName ?? "your brand"} to run this`
+                              ? `Context · pulling these from ${brandName ?? "your brand"} for this task`
                               : `Context · 我會用 ${brandName ?? "你的品牌"} 的這些資料來跑這個任務`}
                           </p>
                           <div className="flex flex-wrap gap-1.5">

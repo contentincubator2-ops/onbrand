@@ -109,7 +109,7 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
         style={{ borderColor: "#e5d9b6", background: "#fbf6e7", color: "#8a6d1d" }}
         title={en ? "Craft reference" : "工藝依據"}
       >
-        ✨ {en ? "Craft basis" : "工藝依據"}：{ref.case}
+        ✨ {en ? "Craft reference" : "工藝依據"}：{ref.case}
       </button>
       {open && (
         <div
@@ -286,7 +286,7 @@ export default function RunPage() {
       a.click();
       URL.revokeObjectURL(a.href);
       showToastGlobal(
-        lang === "en" ? ".ics ready — drag into your calendar app" : "已產生 .ics — 拖進日曆 App 即可"
+        lang === "en" ? ".ics downloaded — open it to add to your calendar" : "已產生 .ics — 拖進日曆 App 即可"
       );
       utils.output.getById.invalidate({ id });
     },
@@ -1616,7 +1616,7 @@ export default function RunPage() {
                       底下圖片變成「目前的圖」獨立區塊，不混在 prompt 裡 */}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
                     {lang === "en"
-                      ? "Step 1: Tell us what kind of image you want (or tweak the current prompt)"
+                      ? "Step 1: Describe the image you want (or tweak the current prompt)"
                       : "Step 1：先告訴我你想要什麼樣的圖（或調整現有 prompt）"}
                   </div>
                   <Textarea
