@@ -1085,7 +1085,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       </div>
                       {/* Card info */}
                       <div className="p-3 flex flex-col gap-1 flex-1">
-                        <p className="text-small font-semibold leading-tight line-clamp-2">{t.label}</p>
+                        <p className="text-small font-semibold leading-tight line-clamp-2">{lang === "en" ? (t.label_en ?? t.label) : t.label}</p>
                         <p className="text-tiny text-default-500 line-clamp-2">{t.description}</p>
                         {(t as any).methodology && (
                           <span className="text-[10px] text-default-400 italic">📚 {(t as any).methodology}</span>
@@ -1163,15 +1163,31 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                     className="min-w-0 flex-1 group cursor-default"
                     title={activeTask.agent ? `${activeTask.label_zh ?? activeTask.label} · ${activeTask.agent.name}（${activeTask.agent.title}）` : (activeTask.label_zh ?? activeTask.label)}
                   >
-                    {activeTask.label_en && (
-                      <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-default-500 truncate leading-tight">
-                        {activeTask.label_en}
-                      </p>
+                    {lang === "en" ? (
+                      <>
+                        <p className="text-[12px] text-default-800 truncate font-medium">
+                          {activeTask.label_en ?? activeTask.label}
+                          {activeTask.agent && <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>}
+                        </p>
+                        {activeTask.label_zh && (
+                          <p className="text-[9px] text-default-400 truncate leading-tight">
+                            {activeTask.label_zh}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {activeTask.label_en && (
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-default-500 truncate leading-tight">
+                            {activeTask.label_en}
+                          </p>
+                        )}
+                        <p className="text-[12px] text-default-800 truncate font-medium">
+                          {activeTask.label_zh ?? activeTask.label}
+                          {activeTask.agent && <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>}
+                        </p>
+                      </>
                     )}
-                    <p className="text-[12px] text-default-800 truncate font-medium">
-                      {activeTask.label_zh ?? activeTask.label}
-                      {activeTask.agent && <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>}
-                    </p>
                   </div>
                   <span
                     className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"

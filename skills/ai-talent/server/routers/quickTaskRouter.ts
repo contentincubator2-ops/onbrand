@@ -668,6 +668,96 @@ function fillTemplate(tpl: string, inputs: Record<string, string | number | unde
 // Brand context now lives in _core/brandContext.ts so every router
 // uses the same source of truth + same 1-min cache.
 import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
+
+// ── English labels for all 30s/60s tasks ────────────────────────────────────
+// Primary display locale is zh-TW; this map supplies the EN equivalent used
+// when the UI language is switched to English. KOL tasks already use the
+// { en, zh } object format so they're handled separately in listFB below.
+const TASK_LABEL_EN: Record<string, string> = {
+  // Facebook 30s
+  "fb-30-caption-short":    "FB Short caption",
+  "fb-30-pure-text-hook":   "FB Text-only hooks × 3",
+  "fb-30-link-caption":     "FB Link post caption",
+  "fb-30-comment-reply":    "FB Comment reply",
+  "fb-30-ad-headline":      "FB Ad headlines × 5",
+  "fb-30-ad-primary":       "FB Ad primary text × 5",
+  "fb-30-ad-cta":           "FB Ad CTAs × 5",
+  "fb-30-ad-description":   "FB Link ad descriptions × 5",
+  "fb-30-story-text":       "FB Story copy",
+  "fb-30-hashtag-set":      "FB Hashtag set",
+  "fb-30-countdown-1day":   "FB 1-day countdown hype",
+  "fb-30-live-title":       "FB Live title + teaser",
+  "fb-30-pinned-short":     "FB Pinned post copy",
+  // Instagram 30s
+  "ig-30-caption-short":         "IG Short caption",
+  "ig-30-pure-text-hook":        "IG Text hooks × 3",
+  "ig-30-story-text":            "IG Story copy + sticker ideas",
+  "ig-30-reel-hook":             "IG Reel opening hook (first 3s)",
+  "ig-30-reel-script-full":      "IG Reel full script (15-30s)",
+  "ig-30-carousel-structure":    "IG Carousel 10-slide structure",
+  "ig-30-hashtag-set":           "IG Hashtag set × 30",
+  "ig-30-bio-rewrite":           "IG Bio rewrite",
+  "ig-30-comment-reply":         "IG Comment reply",
+  "ig-30-dm-script":             "IG DM auto-reply script",
+  "ig-30-live-opening":          "IG Live opening (30s)",
+  "ig-30-story-repost-strategy": "IG Story 24h repost strategy",
+  "ig-30-threads-cross-post":    "IG → Threads cross-post",
+  // YouTube 30s
+  "yt-30-title-strategies":  "YT Video title (3 strategies)",
+  "yt-30-description-seo":   "YT SEO description (full)",
+  "yt-30-thumbnail-text":    "YT Thumbnail copy + visual brief",
+  "yt-30-opening-hook":      "YT Opening hook (first 15s)",
+  "yt-30-chapter-timeline":  "YT Chapter timestamps ⭐",
+  "yt-30-end-cta":           "YT End-screen CTA",
+  "yt-30-pinned-comment":    "YT Pinned comment hook",
+  "yt-30-comment-reply":     "YT Comment reply",
+  "yt-30-shorts-script":     "YT Shorts script (30-60s)",
+  "yt-30-community-post":    "YT Community tab post",
+  // TikTok 30s
+  "tt-30-opening-hook":      "TikTok Opening hook (first 3s)",
+  "tt-30-full-script":       "TikTok Full script (30-60s)",
+  "tt-30-caption-description":"TikTok Caption (description)",
+  "tt-30-caption-rhythm":    "TikTok Caption rhythm (timestamps)",
+  "tt-30-hashtag-set":       "TikTok Hashtag set",
+  "tt-30-trend-remix":       "TikTok Trend remix",
+  "tt-30-duet-angle":        "TikTok Duet angle ideas",
+  "tt-30-bio-rewrite":       "TikTok Bio rewrite",
+  "tt-30-comment-reply":     "TikTok Comment reply",
+  "tt-30-live-opening":      "TikTok Live opening (30s)",
+  // LinkedIn 30s
+  "li-30-insight-post":  "LI Insight post",
+  "li-30-hook-3":        "LI Hooks × 3 (scroll-stopper)",
+  "li-30-article-opener":"LI Article opener (first 200 words)",
+  "li-30-newsletter":    "LI Newsletter title + intro",
+  "li-30-poll":          "LI Poll (question + 4 options)",
+  "li-30-document":      "LI Document (8-slide PDF carousel)",
+  "li-30-comment":       "LI Comment reply",
+  "li-30-dm-intro":      "LI Cold DM intro",
+  "li-30-event-invite":  "LI Event invite post",
+  "li-30-headline":      "LI Profile headline",
+  // Email 30s
+  "em-30-subject-line":   "Email subject line",
+  "em-30-preview-text":   "Email preview text",
+  "em-30-welcome":        "Welcome email",
+  "em-30-cold-email":     "Cold email",
+  "em-30-drip":           "Drip series (nth email)",
+  "em-30-promo":          "Promotional email (limited offer)",
+  "em-30-event-invite":   "Event invite email",
+  "em-30-abandoned-cart": "Abandoned cart recovery",
+  "em-30-re-engagement":  "Re-engagement email",
+  "em-30-transactional":  "Transactional notification",
+  // PR 30s
+  "pr-30-headline":       "Press release headline",
+  "pr-30-subhead":        "PR subheadline + lead",
+  "pr-30-lead-paragraph": "Inverted pyramid lead paragraph",
+  "pr-30-boilerplate":    "Company boilerplate",
+  "pr-30-ceo-quote":      "CEO statement (speech)",
+  "pr-30-fact-sheet":     "Fact sheet (one-pager)",
+  "pr-30-spokesperson-qa":"Spokesperson Q&A (media prep)",
+  "pr-30-media-pitch":    "Media pitch email",
+  "pr-30-news-hook":      "News story idea generator",
+  "pr-30-launch-social":  "Launch PR social post",
+};
 // 2026-05-05 quick-task pivot
 import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../_core/quickTaskOutput";
 import { FB_30S_TASKS, FB_90S_TASK_INDEX, listAllFBTasks } from "../_core/quickTaskFB";
@@ -1119,7 +1209,8 @@ export const quickTaskRouter = router({
         primary_input: t.primary_input ?? null,
         // 2026-05-11 — surface bilingual label parts + context wiring so the
         // intake modal can render "EN · 中文" + the "我會用 X 來跑" strip.
-        label_en: typeof t.label === "object" && t.label?.en ? t.label.en : null,
+        // 2026-05-19 — also look up TASK_LABEL_EN for tasks with plain-string labels.
+        label_en: typeof t.label === "object" && t.label?.en ? t.label.en : (TASK_LABEL_EN[t.id] ?? null),
         label_zh: typeof t.label === "object" && t.label?.zh ? t.label.zh : null,
         contextSources: t.contextSources ?? null,
         agent: t.agent_id ? (agentMap[t.agent_id] ?? null) : null,
