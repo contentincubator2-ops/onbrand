@@ -9,22 +9,28 @@
  *   - User-initiated chat / tasks: FREE (included in monthly plan, logged only)
  *   - User adopts AI proactive proposal: CHARGED (deducted from credits)
  *
- * Pricing revision (2026-03-01):
- *   - BASE_CREDITS multiplied by 8× to reflect true infrastructure cost + margin
- *   - New user trial: 500 points (enough for ~8–12 short content adoptions)
- *   - Plans: starter 1,500 / professional 15,000 / enterprise 150,000 pts/month
+ * NOTE (2026-05-19): Active billing now uses plans.ts pointsPerCycle + deductCredits.ts wallet system.
+ * PLAN_CREDITS here is a legacy lookup used ONLY for wallet initialisation in deductCredits.ts ensureWallet().
+ * Plan codes: trial / drop_starter / drop_pro / drop_team / drop_agency / enterprise.
+ * Trial = 1,000 pts one-time (aligned with plans.ts quota.pointsPerCycle).
+ * Starter uses run-count gating (runsPerCycle=50), not points — pointsPerCycle=-1 bypasses check.
  */
 
 // ─── Plan tiers & monthly credits ────────────────────────────────────────────
 
 export const PLAN_CREDITS: Record<string, number> = {
-  trial: 500,          // New user gift — enough to experience the product
-  starter: 1_500,      // NT$900/mo (discounted) / NT$1,500 (original)
-  professional: 15_000, // NT$9,000/mo (discounted) / NT$15,000 (original)
-  enterprise: 150_000, // NT$90,000/mo (discounted) / NT$150,000 (original)
-  // Legacy aliases (kept for backward compat)
-  community: 1_500,
-  integration: 15_000,
+  trial: 1_000,         // 7-day one-time grant (aligned with plans.ts trial.quota.pointsPerCycle)
+  // Paid plans: pointsPerCycle=-1 (unlimited) — these values are fallback only
+  drop_starter: -1,     // Starter uses run-count gating, not points
+  drop_pro: -1,         // Solo: unlimited
+  drop_team: -1,        // Studio: unlimited
+  drop_agency: -1,      // Agency: unlimited
+  enterprise: -1,       // Enterprise: unlimited
+  // Legacy aliases (kept for backward compat with old wallets in DB)
+  starter: 1_000,
+  professional: -1,
+  community: 1_000,
+  integration: -1,
 };
 
 // ─── Base credits per action type (8× cost multiplier applied) ───────────────

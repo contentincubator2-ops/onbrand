@@ -311,13 +311,16 @@ export const billingRouter = router({
     }),
 
   /**
-   * Manual subscribe stub. After 金流 lands tomorrow this gets replaced
-   * with a綠界 redirect URL. For now: marks user as drop_pro for 30 days
-   * (testing only — won't ship to public).
+   * Manual subscribe stub — dev/staging ONLY. Stripe is the real path.
+   * Guard: requires NODE_ENV !== 'production' AND literal confirm string.
+   * This endpoint must never be callable in production.
    */
   manualSubscribe: protectedProcedure
     .input(z.object({ confirm: z.literal("yes-test-mode-only") }))
     .mutation(async ({ ctx }) => {
+      if (process.env.NODE_ENV === "production") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Not available in production" });
+      }
       const { default: localPool } = await import("../localDb");
       const ends = new Date(Date.now() + 30 * 24 * 3600_000);
       await localPool.execute(

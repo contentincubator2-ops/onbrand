@@ -14,7 +14,7 @@
  *   image:     ~$0.04 USD
  *   video:     ~$1.00 USD per 5s clip
  *
- * Heavy-use cost @ 80% caps: ~$13 USD ≈ NTD 400, vs NTD 990 revenue → 60% margin.
+ * Heavy-use cost @ 80% caps: ~$13 USD, vs US$25 early-bird → ~48% margin (Solo US$100 → ~87%).
  */
 
 // 2026-05-11 — multi-tier for $1M ARR strategy. Solo / Team / Agency
@@ -437,9 +437,9 @@ export function getEffectivePrice(
   if (typeof locked === "number" && locked > 0) {
     if (currency === "USD") {
       const usd = Math.round((locked / rate) * 100) / 100;
-      return { monthly: usd, annually: Math.round(usd * 10 * 100) / 100, isEarlyBird: false, isLocked: true, currency, usdToTwd: rate };
+      return { monthly: usd, annually: Math.round(usd * 11 * 100) / 100, isEarlyBird: false, isLocked: true, currency, usdToTwd: rate };
     }
-    return { monthly: locked, annually: locked * 10, isEarlyBird: false, isLocked: true, currency, usdToTwd: rate };
+    return { monthly: locked, annually: locked * 11, isEarlyBird: false, isLocked: true, currency, usdToTwd: rate };
   }
 
   // 2. Pick the right USD anchor (early-bird vs standard)

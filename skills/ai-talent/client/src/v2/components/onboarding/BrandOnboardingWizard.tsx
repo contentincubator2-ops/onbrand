@@ -565,17 +565,19 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     >
                       {lang === "en" ? "Just 1 → Solo $100/mo" : "就 1 個 → Solo $100/月"}
                     </button>
-                    <button
-                      onClick={() => navigate("/pricing?recommend=studio")}
+                    <a
+                      href="mailto:sowork@sowork.ai?subject=多品牌方案洽詢"
                       style={{
                         padding: "8px 14px", fontSize: 12, fontWeight: 600,
                         borderRadius: 6, cursor: "pointer",
                         border: "1px solid #D4D4D4",
                         background: "#FFFFFF", color: "#171717",
+                        textDecoration: "none",
+                        display: "inline-flex", alignItems: "center",
                       }}
                     >
-                      {lang === "en" ? "2–3 → Studio $250/mo" : "2–3 個 → Studio $250/月"}
-                    </button>
+                      {lang === "en" ? "2–3 brands → Contact us" : "2–3 個品牌 → 聯繫我們"}
+                    </a>
                     <a
                       href="mailto:sowork@sowork.ai?subject=Agency 方案洽詢"
                       style={{
