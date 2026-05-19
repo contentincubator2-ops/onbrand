@@ -784,8 +784,8 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         emoji: "🎼",
         kicker: "PRODUCTION PACKAGE",
         headline: lang === "en" ? "A full production pack in 60 seconds" : "60 秒交付一個完整套組",
-        sub: lang === "en" ? "Multi-agent · 5 variants + real images + reply templates + posting time + QA" : "多 AI 助手協作 · 5 版本 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
-        bullets: lang === "en" ? ["5 variants", "7-9 agents", "Real Flux images", "Jordan QA"] : ["5 版本", "7-9 位 AI 助手協作", "Flux 真生圖", "Jordan QA 審核"],
+        sub: lang === "en" ? "Multi-agent · 5 variants + real images + reply templates + posting time + QA" : "多 AI 專家協作 · 5 版本 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
+        bullets: lang === "en" ? ["5 variants", "7-9 agents", "Real Flux images", "Jordan QA"] : ["5 版本", "7-9 位 AI 專家協作", "Flux 真生圖", "Jordan QA 審核"],
         accent: "#7c3aed",
         gradientFrom: "rgba(124,58,237,0.10)",
       }

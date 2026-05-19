@@ -1989,7 +1989,7 @@ export default function RunPage() {
                   <p className="text-[11px] text-default-500 leading-relaxed">
                     {lang === "en"
                       ? <>Have the same agent write this version again — &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
-                      : <>讓同一位 AI 助手重新寫一次當前版本「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
+                      : <>讓同一位 AI 專家重新寫一次當前版本「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
                   </p>
                   <Button
                     color="secondary"

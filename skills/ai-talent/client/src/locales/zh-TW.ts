@@ -79,7 +79,7 @@ export const zh = {
   // ── Drawer — resources ────────────────────────────────────────────────────
   section_resources:  "你的團隊",
   matching:           "正在組隊…",
-  footer_agents:      "AI 助手",
+  footer_agents:      "AI 專家",
   footer_skills:      "技能",
   footer_models:      "AI 模型",
   footer_credits:     "點數",
@@ -425,7 +425,7 @@ export const zh = {
   theater_scope_brand:       "套用到本品牌所有未來企劃",
   theater_scope_brand_hint:  "存進品牌規則庫，下次按開始企劃會自動帶。",
   theater_btn_apply_redo:    "套用 + 重新生成",
-  theater_cast_footer:       "演職員表（20 位 AI 助手 · 全員不重複）",
+  theater_cast_footer:       "演職員表（20 位 AI 專家 · 全員不重複）",
 
   // ── Run page (mission output viewer) ─────────────────────────────────────
   run_title:               "你的產出",

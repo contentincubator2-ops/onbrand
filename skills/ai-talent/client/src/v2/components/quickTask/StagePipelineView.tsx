@@ -272,7 +272,7 @@ export function StagePipelineView({
     <div className="border border-default-200 rounded-medium bg-default-50 overflow-hidden">
       <div className="px-3 py-2 border-b border-default-200 flex items-center justify-between">
         <p className="text-tiny font-semibold text-default-700">
-          {lang === "en" ? `🎼 Multi-agent collab · ${tier}` : `🎼 多 AI 助手協作 · ${tier}`}
+          {lang === "en" ? `🎼 Multi-agent collab · ${tier}` : `🎼 多 AI 專家協作 · ${tier}`}
         </p>
         <p className="text-[10px] text-default-500 tabular-nums">
           {completedCount} / {visibleSlots.length} {lang === "en" ? "done" : "完成"}
