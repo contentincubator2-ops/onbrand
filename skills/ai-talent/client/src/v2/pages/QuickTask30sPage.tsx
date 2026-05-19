@@ -49,6 +49,191 @@ import {
   RotateCcw, X as LucideX,
 } from "lucide-react";
 
+// ── Client-side EN label lookup ──────────────────────────────────────────────
+// Mirrors the server-side TASK_LABEL_EN map so the card title renders
+// in English even when the backend label_en field is null/undefined
+// (e.g. stale tRPC cache, old bundle, or deploy timing gap).
+// Keyed by task id; values are the canonical English display name.
+const TASK_LABEL_EN_CLIENT: Record<string, string> = {
+  // Facebook 30s
+  "fb-30-caption-short":    "FB Short caption",
+  "fb-30-pure-text-hook":   "FB Text-only hooks × 3",
+  "fb-30-link-caption":     "FB Link post caption",
+  "fb-30-comment-reply":    "FB Comment reply",
+  "fb-30-ad-headline":      "FB Ad headlines × 5",
+  "fb-30-ad-primary":       "FB Ad primary text × 5",
+  "fb-30-ad-cta":           "FB Ad CTAs × 5",
+  "fb-30-ad-description":   "FB Link ad descriptions × 5",
+  "fb-30-story-text":       "FB Story copy",
+  "fb-30-hashtag-set":      "FB Hashtag set",
+  "fb-30-countdown-1day":   "FB 1-day countdown hype",
+  "fb-30-live-title":       "FB Live title + teaser",
+  "fb-30-pinned-short":     "FB Pinned post copy",
+  // Instagram 30s
+  "ig-30-caption-short":         "IG Short caption",
+  "ig-30-pure-text-hook":        "IG Text hooks × 3",
+  "ig-30-story-text":            "IG Story copy + sticker ideas",
+  "ig-30-reel-hook":             "IG Reel opening hook (first 3s)",
+  "ig-30-reel-script-full":      "IG Reel full script (15-30s)",
+  "ig-30-carousel-structure":    "IG Carousel 10-slide structure",
+  "ig-30-hashtag-set":           "IG Hashtag set × 30",
+  "ig-30-bio-rewrite":           "IG Bio rewrite",
+  "ig-30-comment-reply":         "IG Comment reply",
+  "ig-30-dm-script":             "IG DM auto-reply script",
+  "ig-30-live-opening":          "IG Live opening (30s)",
+  "ig-30-story-repost-strategy": "IG Story 24h repost strategy",
+  "ig-30-threads-cross-post":    "IG → Threads cross-post",
+  // YouTube 30s
+  "yt-30-title-strategies":  "YT Video title (3 strategies)",
+  "yt-30-description-seo":   "YT SEO description (full)",
+  "yt-30-thumbnail-text":    "YT Thumbnail copy + visual brief",
+  "yt-30-opening-hook":      "YT Opening hook (first 15s)",
+  "yt-30-chapter-timeline":  "YT Chapter timestamps",
+  "yt-30-end-cta":           "YT End-screen CTA",
+  "yt-30-pinned-comment":    "YT Pinned comment hook",
+  "yt-30-comment-reply":     "YT Comment reply",
+  "yt-30-shorts-script":     "YT Shorts script (30-60s)",
+  "yt-30-community-post":    "YT Community tab post",
+  // TikTok 30s
+  "tt-30-opening-hook":       "TikTok Opening hook (first 3s)",
+  "tt-30-full-script":        "TikTok Full script (30-60s)",
+  "tt-30-caption-description":"TikTok Caption (description)",
+  "tt-30-caption-rhythm":     "TikTok Caption rhythm (timestamps)",
+  "tt-30-hashtag-set":        "TikTok Hashtag set",
+  "tt-30-trend-remix":        "TikTok Trend remix",
+  "tt-30-duet-angle":         "TikTok Duet angle ideas",
+  "tt-30-bio-rewrite":        "TikTok Bio rewrite",
+  "tt-30-comment-reply":      "TikTok Comment reply",
+  "tt-30-live-opening":       "TikTok Live opening (30s)",
+  // LinkedIn 30s
+  "li-30-insight-post":  "LI Insight post",
+  "li-30-hook-3":        "LI Hooks × 3 (scroll-stopper)",
+  "li-30-article-opener":"LI Article opener (first 200 words)",
+  "li-30-newsletter":    "LI Newsletter title + intro",
+  "li-30-poll":          "LI Poll (question + 4 options)",
+  "li-30-document":      "LI Document (8-slide PDF carousel)",
+  "li-30-comment":       "LI Comment reply",
+  "li-30-dm-intro":      "LI Cold DM intro",
+  "li-30-event-invite":  "LI Event invite post",
+  "li-30-headline":      "LI Profile headline",
+  // Email 30s
+  "em-30-subject-line":   "Email subject line",
+  "em-30-preview-text":   "Email preview text",
+  "em-30-welcome":        "Welcome email",
+  "em-30-cold-email":     "Cold email",
+  "em-30-drip":           "Drip series (nth email)",
+  "em-30-promo":          "Promotional email (limited offer)",
+  "em-30-event-invite":   "Event invite email",
+  "em-30-abandoned-cart": "Abandoned cart recovery",
+  "em-30-re-engagement":  "Re-engagement email",
+  "em-30-transactional":  "Transactional notification",
+  // PR 30s
+  "pr-30-headline":       "Press release headline",
+  "pr-30-subhead":        "PR subheadline + lead",
+  "pr-30-lead-paragraph": "Inverted pyramid lead paragraph",
+  "pr-30-boilerplate":    "Company boilerplate",
+  "pr-30-ceo-quote":      "CEO statement (speech)",
+  "pr-30-fact-sheet":     "Fact sheet (one-pager)",
+  "pr-30-spokesperson-qa":"Spokesperson Q&A (media prep)",
+  "pr-30-media-pitch":    "Media pitch email",
+  "pr-30-news-hook":      "News story idea generator",
+  "pr-30-launch-social":  "Launch PR social post",
+  // Facebook 60s
+  "fb-60-single-full":      "FB Full post",
+  "fb-60-link-full":        "FB Link post (full)",
+  "fb-60-album-4":          "FB Photo album × 4",
+  "fb-60-countdown-5day":   "FB 5-day countdown series",
+  "fb-60-launch-kit":       "FB Event launch kit (4 posts)",
+  "fb-60-live-suite":       "FB Live suite (6 pieces)",
+  "fb-60-pinned-suite":     "FB Pinned + 3 companion posts",
+  "fb-60-ad-pack-3":        "FB Ad pack A/B/C",
+  // Instagram 60s
+  "ig-60-feed-full":              "IG Full feed post",
+  "ig-60-reel-full":              "IG Reel full script",
+  "ig-60-carousel-7":             "IG Carousel 7-slide",
+  "ig-60-story-3frame":           "IG Story 3-frame set",
+  "ig-60-countdown-5day":         "IG 5-day countdown series",
+  "ig-60-highlight-suite":        "IG Highlight × 5 (cover + content)",
+  "ig-60-live-suite":             "IG Live suite (5 pieces)",
+  "ig-60-serial-3":               "IG 3-part narrative series",
+  "ig-60-viral-rewrite":          "IG Viral rewrite",
+  "ig-60-testimonial-rewrite":    "IG Testimonial rewrite",
+  // YouTube 60s
+  "yt-60-video-package":   "YT Full video caption package",
+  "yt-60-shorts-script":   "YT Shorts full script",
+  "yt-60-thumbnail-suite": "YT Thumbnail × 5 styles",
+  "yt-60-series-3ep":      "YT 3-episode series",
+  "yt-60-community-post":  "YT Community post",
+  "yt-60-viral-rewrite":   "YT Viral video rewrite",
+  // TikTok 60s
+  "tt-60-foryou-full":   "TikTok ForYou full package",
+  "tt-60-series-3":      "TikTok 3-episode series",
+  "tt-60-viral-rewrite": "TikTok Viral rewrite",
+  // LinkedIn 60s
+  "li-60-thought-leader": "LI Thought leadership post (full)",
+  "li-60-newsletter":     "LI Newsletter (one issue)",
+  "li-60-case-study":     "LI Client case study rewrite",
+  // Email 60s
+  "em-60-newsletter-full": "Email Newsletter (full issue)",
+  "em-60-promo-sequence":  "Email promo sequence (3 emails)",
+  "em-60-onboarding-3":    "Email onboarding sequence (3 emails)",
+  // PR 60s
+  "pr-60-news-release-full": "Full press release",
+  // Brand / Research 60s
+  "br-60-tagline-suite":   "Brand tagline × 5 variants",
+  "br-60-value-prop":      "Value proposition rewrite",
+  "br-60-brand-voice":     "Brand Voice Guideline",
+  "rs-60-interview-guide": "User interview guide (full)",
+  "rs-60-persona-suite":   "User persona × 5",
+  "rs-60-jtbd-suite":      "Jobs-to-be-Done × 5",
+  // Facebook 99s
+  "fb-99-30day-calendar":         "FB 30-day content calendar",
+  "fb-99-monthly-calendar-promo": "FB 30-day promo calendar (multi-product)",
+  "fb-99-carousel-5":             "FB Carousel 5-card",
+  "fb-99-serial-3":               "FB 3-part narrative series",
+  "fb-99-viral-rewrite":          "FB Viral rewrite",
+  "fb-99-testimonial-rewrite":    "FB Testimonial rewrite",
+  "fb-99-trend-rewrite":          "FB Trending news rewrite",
+  "fb-99-14day-countdown":        "FB Countdown series (7 / 14 days)",
+  "fb-99-launch-toolkit":         "FB Full launch toolkit (8 posts)",
+  "fb-99-livestream-9seg":        "FB Live 9-segment suite",
+  "fb-99-crisis-playbook":        "FB Full crisis PR playbook",
+  "fb-99-account-reposition":     "FB Account repositioning",
+  "fb-99-quarterly-strategy":     "FB Quarterly content strategy",
+  "fb-99-monthly-analytics":      "FB Monthly performance report",
+  "fb-99-carousel-cvo":           "FB Carousel: awareness-to-purchase story",
+  "fb-99-offer-first":            "FB Offer-led post",
+  "fb-99-magnetic-marketing":     "FB Magnetic marketing post",
+  "fb-99-mass-control":           "FB Grand launch playbook",
+  // Instagram 99s
+  "ig-99-30day-calendar":      "IG 30-day content calendar",
+  "ig-99-reel-series-6":       "IG Reel 6-episode series",
+  "ig-99-account-reposition":  "IG Account repositioning full kit",
+  "ig-99-monthly-calendar":    "IG 30-day content calendar",
+  "ig-99-youtility":           "IG Utility-first content strategy",
+  "ig-99-visual-story":        "IG Visual-consistency brand posts",
+  "ig-99-live-first":          "IG Live-first content strategy",
+  "ig-99-document":            "IG Documentary-style content",
+  "ig-99-radical-transparency":"IG Radical transparency brand posts",
+  "ig-99-save-worthy":         "IG Save-worthy utility posts",
+  // YouTube 99s
+  "yt-99-series-6ep":         "YT 6-episode full production pack",
+  "yt-99-quarterly-strategy": "YT Quarterly channel strategy",
+  "yt-99-premiere-kit":       "YT Premiere full kit",
+  // TikTok 99s
+  "tt-99-30day-foryou": "TikTok 30-day ForYou formula",
+  "tt-99-trend-week":   "TikTok 1-week trending full kit",
+  // LinkedIn 99s
+  "li-99-30day-thought-leadership": "LI 30-day Thought Leadership calendar",
+  "li-99-newsletter-quarterly":     "LI Quarterly newsletter (4 issues)",
+  // Email 99s
+  "em-99-4week-nurture":   "Email 4-week onboarding nurture",
+  "em-99-launch-sequence": "Email product launch automation sequence",
+  // PR 99s
+  "pr-99-launch-toolkit": "PR Full launch media toolkit",
+  "pr-99-newsjack":        "Newsjacking (trending news hook)",
+};
+
 const CARD_PALETTES = [
   { from: "#fde68a", to: "#fbbf24", text: "#92400e" },
   { from: "#a5f3fc", to: "#22d3ee", text: "#164e63" },
@@ -1085,7 +1270,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       </div>
                       {/* Card info */}
                       <div className="p-3 flex flex-col gap-1 flex-1">
-                        <p className="text-small font-semibold leading-tight line-clamp-2">{lang === "en" ? (t.label_en ?? t.label) : t.label}</p>
+                        <p className="text-small font-semibold leading-tight line-clamp-2">{lang === "en" ? (t.label_en ?? TASK_LABEL_EN_CLIENT[t.id] ?? t.label) : t.label}</p>
                         <p className="text-tiny text-default-500 line-clamp-2">{t.description}</p>
                         {(t as any).methodology && (
                           <span className="text-[10px] text-default-400 italic">📚 {(t as any).methodology}</span>
@@ -1165,7 +1350,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                   >
                     <p className="text-[12px] text-default-800 truncate font-medium">
                       {lang === "en"
-                        ? (activeTask.label_en ?? activeTask.label)
+                        ? (activeTask.label_en ?? TASK_LABEL_EN_CLIENT[activeTask.id] ?? activeTask.label)
                         : (activeTask.label_zh ?? activeTask.label)}
                       {activeTask.agent && <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>}
                     </p>
