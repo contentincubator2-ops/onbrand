@@ -2187,6 +2187,15 @@ export default function RunPage() {
               {/* 2026-05-11 (CJ feedback「存 Mission 沒有成功反饋」):
                   - 成功後 button 變綠色 + 顯示「✓ 已存到 /projects」
                   - 加 link 到 /projects 讓用戶能立刻去看 */}
+              {/* 2026-05-19 (CJ「任務完成不用按存也要出現在專案」):
+                  任務完成時 recordTaskRun 已自動寫入 mission_outputs，
+                  此按鈕只是將 status 從 draft → approved（核准標記）。
+                  改名為「核准此版本」避免誤導用戶以為要手動存才會記錄。 */}
+              <div className="text-[10px] text-default-400 text-center px-1 leading-relaxed">
+                {lang === "en"
+                  ? "✓ Auto-saved to Projects — no action needed"
+                  : "✓ 任務完成即自動記錄到專案，無需手動儲存"}
+              </div>
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={data.status === "approved" ? faClipboardCheck : faFolderPlus} />}
@@ -2196,15 +2205,13 @@ export default function RunPage() {
                 onPress={() => statusMut.mutate({ id, status: "approved" })}
               >
                 {data.status === "approved"
-                  ? (lang === "en" ? "✓ Saved to Projects (open 'Projects' to find)" : "✓ 已存到 Mission（點開「專案」找）")
-                  : t("run_save_to_mission")}
+                  ? (lang === "en" ? "✓ Approved" : "✓ 已核准")
+                  : (lang === "en" ? "Approve this version" : "核准此版本")}
               </Button>
-              {data.status === "approved" && (
-                <button
-                  onClick={() => navigate("/projects")}
-                  className="text-[11px] text-secondary hover:underline text-center"
-                >{lang === "en" ? "→ Open the Projects page" : "→ 直接去專案頁看"}</button>
-              )}
+              <button
+                onClick={() => navigate("/projects")}
+                className="text-[11px] text-secondary hover:underline text-center"
+              >{lang === "en" ? "→ Open Projects" : "→ 去專案頁"}</button>
               {/* 2026-05-09 (CJ): removed 複製文字 here — duplicates the
                   toolbar 📋 複製文案 button. Keep only 複製此頁網址 (different
                   function: shares the run URL, not the caption). */}

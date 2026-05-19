@@ -1911,7 +1911,9 @@ function OutputCarousel({
                 showToastGlobal(t("toast_copied"), "success");
               }
             }} />
-          <ToolBtn lucide={Save} label={lang === "en" ? "Save / add to project" : "儲存 / 加到專案"} active={activeTool === "save"}
+          {/* 2026-05-19 (CJ): 按鈕實際功能是「編輯文案」panel，
+              改名避免用戶誤以為要按才會存（任務完成時已自動記錄）。 */}
+          <ToolBtn lucide={Save} label={lang === "en" ? "Edit caption" : "編輯文案"} active={activeTool === "save"}
             onPress={() => toggleTool("save")} />
 
           {/* GROUP E (2026-05-08): 重做 + 關閉 — relocated from ModalFooter
@@ -2050,7 +2052,7 @@ function OutputCarousel({
                 {activeTool === "prompt" && (lang === "en" ? "🪄 Visual brief / hashtags" : "🪄 視覺方向 / hashtag")}
                 {activeTool === "details" && (lang === "en" ? "📊 Details" : "📊 細節資訊")}
                 {activeTool === "chat" && (lang === "en" ? `Chat with ${agentMeta?.name ?? "AI"}` : `跟 ${agentMeta?.name ?? "AI"} 改文案`)}
-                {activeTool === "save" && (lang === "en" ? "💾 Save / add to project" : "💾 儲存 / 加到專案")}
+                {activeTool === "save" && (lang === "en" ? "✏️ Edit caption" : "✏️ 編輯文案（任務完成即自動記錄到專案）")}
               </span>
               <button onClick={() => setActiveTool(null)} className="text-default-400 hover:text-default-700">
                 <FontAwesomeIcon icon={faXmark} className="text-tiny" />

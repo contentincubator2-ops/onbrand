@@ -85,13 +85,16 @@ export default function ProjectsPage() {
   const shellProductId = (ctx as any)?.scope?.productId ?? null;
   const shellEventId = (ctx as any)?.scope?.eventId ?? null;
 
+  // 2026-05-19 (CJ「任務完成沒有按儲存也要出現在專案」):
+  // refetchOnWindowFocus: true → 從 /run 切回 /projects 立刻拿最新清單。
+  // interval 縮到 8s (was 15s) 讓背景任務更快出現。
   const allQuery = (trpc as any).mission?.listAllForUser?.useQuery?.(
     undefined,
-    { refetchOnWindowFocus: false, refetchInterval: 15_000 },
+    { refetchOnWindowFocus: true, refetchInterval: 8_000 },
   );
   const fallbackQuery = trpc.mission.listByBrand.useQuery(
     { brandId: shellBrands?.[0]?.id ?? 0 },
-    { enabled: !allQuery && !!shellBrands?.[0]?.id, refetchOnWindowFocus: false },
+    { enabled: !allQuery && !!shellBrands?.[0]?.id, refetchOnWindowFocus: true },
   );
 
   const rows: MissionRow[] = useMemo(() => {
