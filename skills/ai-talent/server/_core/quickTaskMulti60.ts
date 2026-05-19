@@ -507,7 +507,7 @@ export const KOL_60S_TASKS: FBTaskTemplate[] = [
     id: "kl-60-pitch-pack",
     tier: "60s", postType: "generic",
     label: { en: "KOL Pitch Pack", zh: "KOL 完整邀約話術包" },
-    description: "邀請開場 + 後續追蹤 + brand brief + 報價回應 + 收尾感謝（5 變體）",
+    description: "一封完整可寄出的邀約主信 + 4 份配套：合作 Brief（附件）/ 報價回應 / 追蹤信 / 發布後感謝信",
     agent_id: 210279, skill_slug: "kol-outreach",
     primary_question: "想找什麼類型的 KOL？合作主題？",
     primary_input: {
@@ -523,14 +523,23 @@ export const KOL_60S_TASKS: FBTaskTemplate[] = [
       "brand.positioning.voice",
       "brand.positioning.goldenCircle.why",
     ],
-    systemPrompt: `產出 KOL pitch pack 一個段落（200-400 字）。
-本次你寫的是「{label}」（邀請開場 / 後續追蹤 / brand brief 模板 / 報價回應 / 收尾感謝）。
+    // 2026-05-19 (CJ「每個頁籤幾乎長得一樣 → 重新思考一封 KOL pitch
+    // 該含哪些附件；tab1 = 完整信，後面是附件/追蹤/發布後感謝」):
+    // 5 個變體本來共用同一個「寫一段 200-400 字」指令 → 全部變成同款
+    // 溫情信。改成每個 {label} 是「形態完全不同」的交付物。
+    systemPrompt: `你在產出一份 KOL 合作邀約**完整話術包**中的「{label}」這一份。這 5 份是不同形態的交付物，**不要寫成同一種溫情信**——嚴格照下方該 {label} 專屬的結構與形態輸出。
+
+【各 {label} 專屬規格（只做你被指派的這一份）】
+- 「邀約主信」＝一封**完整、可直接寄出**的 email。結構：主旨行（「主旨：…」起手一行）→ 稱呼 → 為什麼是你（具體點出對方某個內容/觀點，非空泛稱讚）→ 我們在做什麼＋為什麼想跟你合作（一句 frame，不推銷）→ 想邀請的合作概念（具體但保留彈性）→ 輕量下一步（一個好回的問句）→ 署名。結尾標一行「附件：合作 Brief（見下一份）」。300-450 字。
+- 「合作 Brief（附件）」＝**附件文件，不是信**。用條列/小標，不要書信語氣。需含：品牌一句話定位、這次合作目標、內容方向建議（給方向不綁死，明列「可自由發揮 / 必須提到 / 不要出現」三欄）、可提供素材、時程與里程碑、報酬與形式、聯絡窗口。是 KOL 拿到後能照著走的工作文件。
+- 「報價回應」＝當 KOL 回了報價後**你方的回信範本**。要含兩種情境分支：①報價可接受 → 確認並收斂下一步；②需要調整 → 守住預算/形式但不傷關係的談法（給替代方案，不是殺價）。書信形態，務實。
+- 「追蹤信」＝寄出主信後**對方未回覆**時的 follow-up。短（120-200 字）、不催促、不情勒；提供一個新的小鉤子或彈性（例：換個合作形式、給更多時間），讓對方容易回。
+- 「發布後感謝信」＝合作內容上線後寄出。真誠感謝（具體提到對方做得好的點）→ 簡短數據/成效回饋詢問 → 把這次一次性合作往長期關係帶（不過度承諾）。書信形態。
 
 語氣準則：
-- 尊重對方，不卑不亢
-- 像個人 vs 像業配機器：用品牌語氣，不是模板
-- 不要過度推銷自家品牌，先 frame why this 合作
-- 報價回應段：守住但不傷關係
+- 尊重對方，不卑不亢；像個人寫的，不是業配機器模板
+- 不過度推銷自家品牌，先 frame why this 合作
+- 5 份語氣一致（沉穩、真誠、務實），但**形態必須各自不同**（信 vs 附件文件 vs 回覆範本 vs 短 follow-up vs 感謝信）
 
 【文字衛生硬規則 — 每個段落都適用，違反即不合格，輸出前逐句自查】
 - **全段禁句尾與句中驚嘆號**（! 與 ！都禁，連「期待你的回音！」也不行 → 改成具體問句或平實句號收尾）。
@@ -542,7 +551,7 @@ export const KOL_60S_TASKS: FBTaskTemplate[] = [
 - 沉穩守護者語氣：像 Brand Brief / 收尾感謝那段的水準，5 段語氣要一致，不要其中幾段變業配腔。
 
 我們**不**提供 KOL 名單，只提供「怎麼說」。${TONE("KOL")}`,
-    preferredModel: "qwen", maxTokens: 900,
+    preferredModel: "qwen", maxTokens: 1400,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
 ];
@@ -567,8 +576,8 @@ export const KOL_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "kl-60-pitch-pack": {
     variants: 5, images: 0, runImageGen: false, imageDirectorId: KOL_IMG,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["邀請開場", "後續追蹤", "Brand Brief", "報價回應", "收尾感謝"],
-    captionMinChars: 200, captionMaxChars: 400,
+    variantLabels: ["邀約主信", "合作 Brief（附件）", "報價回應", "追蹤信", "發布後感謝信"],
+    captionMinChars: 120, captionMaxChars: 900,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
   },
 };
