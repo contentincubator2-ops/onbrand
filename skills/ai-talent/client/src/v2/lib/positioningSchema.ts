@@ -33,6 +33,8 @@ export interface SegmentSpec {
   /** Section number in the printed doc, e.g., "1.1". */
   num: string;
   title: string;
+  /** English title — displayed when UI language is "en". */
+  titleEn?: string;
   /** Recommended agent slug — used by the "🤖 由 X 幫我填寫" button. */
   agent: string;
   fields: FieldSpec[];
@@ -43,6 +45,8 @@ export interface SegmentSpec {
    * 「目前定位頁的段落像問卷，不像方法論」.
    */
   rationale?: string;
+  /** English rationale — displayed when UI language is "en". */
+  rationaleEn?: string;
 }
 
 // ── Brand (8 segments) ───────────────────────────────────────────────────
@@ -51,8 +55,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "goldenCircle",
     num: "1.1",
     title: "品牌黃金圈",
+    titleEn: "Brand Golden Circle",
     agent: "brand-archetype-positioning",
     rationale: "先有 WHY，才有 HOW 跟 WHAT — Sinek 的黃金圈是定位的起點，沒鎖定信念，後面標語、價值觀、差異化都會飄。",
+    rationaleEn: "WHY before HOW and WHAT — Sinek's golden circle is where positioning starts. Without a locked belief, taglines, values, and differentiation all drift.",
     fields: [
       { key: "why",  label: "WHY — 品牌願景",        type: "textarea" },
       { key: "how",  label: "HOW — 品牌使命",        type: "textarea" },
@@ -63,8 +69,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "tagline",
     num: "1.2",
     title: "品牌核心標語",
+    titleEn: "Core Brand Tagline",
     agent: "brand-tagline-writer",
     rationale: "標語把 WHY 濃縮成一句記得住的話 — 它是黃金圈的對外口號，所有貼文 / 廣告的 CTA 都會以此為錨。",
+    rationaleEn: "The tagline distils the WHY into one memorable line — it's the golden circle's public face. Every post and ad CTA anchors to it.",
     fields: [
       { key: "zhTagline",      label: "中文標語",      type: "text" },
       { key: "enTagline",      label: "英文標語",      type: "text" },
@@ -78,8 +86,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "taglineScore",
     num: "1.3",
     title: "標語評分摘要",
+    titleEn: "Tagline Score Summary",
     agent: "brand-tagline-scorer",
     rationale: "好標語不只憑感覺 — 6 維度（記憶 / 差異 / 情感 / 簡潔 / 國際化 / 可延展）量化打分，低於 75 分要重寫。",
+    rationaleEn: "Good taglines aren't just a feeling — scored across 6 dimensions (memorability / differentiation / emotion / simplicity / international / extensibility). Below 75 means rewrite.",
     fields: [
       { key: "rows", label: "評分", type: "tableRows", columns: [
         { key: "dim",     label: "維度",   type: "text" },
@@ -94,8 +104,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "origin",
     num: "2.1",
     title: "品牌起源故事",
+    titleEn: "Brand Origin Story",
     agent: "brand-storyteller",
     rationale: "起源故事是用戶相信你的 receipt — 「為什麼是你做這件事？」沒有故事的品牌只是另一個 logo。",
+    rationaleEn: "The origin story is the receipt that earns user trust — 'Why are you the one doing this?' A brand without a story is just another logo.",
     fields: [
       { key: "story",         label: "起源故事",       type: "textarea" },
       { key: "belief5Layers", label: "信念五層深挖",   type: "tableRows", columns: [
@@ -108,8 +120,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "values",
     num: "2.2",
     title: "品牌核心價值觀",
+    titleEn: "Core Brand Values",
     agent: "brand-values-coach",
     rationale: "價值觀是品牌的內建決策框 — 遇到取捨時依此判斷。3-5 條最有力，多了就變裝飾品。",
+    rationaleEn: "Values are the brand's built-in decision framework — use them when trade-offs arise. 3-5 is most powerful; any more becomes decoration.",
     fields: [
       { key: "items", label: "核心價值觀", type: "tableRows", columns: [
         { key: "label", label: "核心",   type: "text" },
@@ -121,8 +135,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "audience",
     num: "3",
     title: "目標受眾",
+    titleEn: "Target Audience",
     agent: "persona-architect",
     rationale: "AI 寫不像你的品牌，多半是受眾沒鎖定 — 主受眾的痛點、情感需求一旦定義清楚，每篇文章的「對誰說」就有了。",
+    rationaleEn: "When AI doesn't sound like your brand, the audience is usually undefined. Once the primary audience's pain points and emotional needs are clear, every piece has a 'who it's for'.",
     fields: [
       { key: "primary",   label: "主受眾（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道）", type: "textarea" },
       { key: "secondary", label: "次受眾",                                                  type: "textarea" },
@@ -138,8 +154,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "competition",
     num: "4",
     title: "競爭格局分析",
+    titleEn: "Competitive Landscape",
     agent: "competitive-intel",
     rationale: "不認識競品，差異化只是自己騙自己 — 直接 / 間接 / 潛在三層分清楚，才知道空白在哪裡。",
+    rationaleEn: "Without knowing competitors, differentiation is self-deception — map direct / indirect / latent tiers to find the white space.",
     fields: [
       { key: "intensity",  label: "競爭強度評估",  type: "textarea" },
       { key: "direct",     label: "直接競爭對手",  type: "tableRows", columns: [
@@ -161,8 +179,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "differentiation",
     num: "5",
     title: "品牌差異化戰略",
+    titleEn: "Brand Differentiation Strategy",
     agent: "differentiation-strategist",
     rationale: "差異化要同時拿下情感（為什麼愛我）與功能（為什麼選我） — 只有其中之一，會被便宜或熱情壓過去。",
+    rationaleEn: "Differentiation must win on both emotional (why they love you) and functional (why they choose you). Just one gets outcompeted on price or passion.",
     fields: [
       { key: "emotional",  label: "情感差異化",  type: "textarea" },
       { key: "functional", label: "功能差異化",  type: "textarea" },
@@ -173,8 +193,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "trends",
     num: "7",
     title: "市場趨勢與機會",
+    titleEn: "Market Trends & Opportunities",
     agent: "trend-radar",
     rationale: "趨勢決定切入時機 — 對的策略放錯時機等於 0，識別有利趨勢 + 風險，是內容議題日曆的母本。",
+    rationaleEn: "Trends determine timing — the right strategy at the wrong moment equals zero. Identifying favorable trends and risks is the master template for the content calendar.",
     fields: [
       { key: "favorable", label: "有利趨勢", type: "tableRows", columns: [
         { key: "name", label: "趨勢", type: "text" },
@@ -190,8 +212,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     id: "voice",
     num: "8",
     title: "品牌個性與溝通風格",
+    titleEn: "Brand Personality & Voice",
     agent: "brand-voice-coach",
     rationale: "Voice 是 AI 寫貼文的最後一道濾鏡 — 人格原型 + 語調詞 + 禁區字三件套，把品牌「說話的方式」變成可複製的規則。",
+    rationaleEn: "Voice is the final filter for AI-generated posts — persona archetype + tone keywords + forbidden zones turn 'how the brand speaks' into replicable rules.",
     fields: [
       { key: "archetypes", label: "人格原型（主 / 次）",   type: "array" },
       { key: "tone",       label: "核心語調關鍵詞",         type: "array" },
@@ -210,6 +234,7 @@ export const PRODUCT_SEGMENTS: SegmentSpec[] = [
     id: "core",
     num: "1.1",
     title: "產品核心定位",
+    titleEn: "Product Core Positioning",
     agent: "product-strategist",
     fields: [
       { key: "name",          label: "產品名稱",       type: "text" },
@@ -223,6 +248,7 @@ export const PRODUCT_SEGMENTS: SegmentSpec[] = [
     id: "audience",
     num: "1.2",
     title: "目標族群",
+    titleEn: "Target Group",
     agent: "persona-architect",
     fields: [
       { key: "primary",   label: "主目標族群",  type: "textarea" },
@@ -239,6 +265,7 @@ export const PRODUCT_SEGMENTS: SegmentSpec[] = [
     id: "value",
     num: "2",
     title: "產品價值主張",
+    titleEn: "Product Value Proposition",
     agent: "product-value-mapper",
     fields: [
       { key: "coreFunctions", label: "核心功能",   type: "array" },
@@ -253,6 +280,7 @@ export const PRODUCT_SEGMENTS: SegmentSpec[] = [
     id: "competition",
     num: "3",
     title: "競爭定位",
+    titleEn: "Competitive Positioning",
     agent: "competitive-intel",
     fields: [
       { key: "competitors", label: "競品", type: "tableRows", columns: [
@@ -268,6 +296,7 @@ export const PRODUCT_SEGMENTS: SegmentSpec[] = [
     id: "strategy",
     num: "4",
     title: "產品策略",
+    titleEn: "Product Strategy",
     agent: "gtm-architect",
     fields: [
       { key: "positioning",         label: "產品定位策略", type: "textarea" },
@@ -286,6 +315,7 @@ export const PRODUCT_SEGMENTS: SegmentSpec[] = [
     id: "marketing",
     num: "5",
     title: "行銷指引",
+    titleEn: "Marketing Guidelines",
     agent: "brand-voice-coach",
     fields: [
       { key: "tone",          label: "品牌語氣",      type: "textarea" },

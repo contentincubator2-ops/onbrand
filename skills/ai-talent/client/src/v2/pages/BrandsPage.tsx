@@ -1218,9 +1218,9 @@ export default function BrandsPage() {
 
             {/* 品牌定位 sub-items */}
             {category === "positioning" && [
-              { id: "card",    label: "速查卡"    },
-              { id: "prompts", label: "AI 指令庫" },
-              ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${s.title}` })),
+              { id: "card",    label: lang === "en" ? "Cheat sheet" : "速查卡"    },
+              { id: "prompts", label: lang === "en" ? "AI prompts"  : "AI 指令庫" },
+              ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${lang === "en" ? (s.titleEn ?? s.title) : s.title}` })),
             ].map(item => {
               const active = section === item.id;
               return (
@@ -2027,13 +2027,13 @@ function PositioningGrid({
               return (
                 <AssetCard
                   key={s.id}
-                  label={`${s.num} ${s.title}`}
+                  label={`${s.num} ${lang === "en" ? (s.titleEn ?? s.title) : s.title}`}
                   icon={ICONS[s.id] ?? faBookOpen}
                   bg={BG_CYCLE[(gi * 4 + si) % BG_CYCLE.length]!}
                   onClick={() => onSelect(`seg:${s.id}`)}
                   preview={preview}
                   hasContent={hasContent}
-                  rationale={(s as any).rationale}
+                  rationale={lang === "en" ? (s.rationaleEn ?? s.rationale) : s.rationale}
                 />
               );
             })}
@@ -2990,7 +2990,7 @@ function PositioningEditor({
         <CardBody className="px-5 py-4 gap-1 flex-row items-center justify-between flex-wrap">
           <div>
             <p className="text-tiny text-default-700 uppercase tracking-wider">
-              {scopeMode.toUpperCase()} · {activeSegment.num} {activeSegment.title}
+              {scopeMode.toUpperCase()} · {activeSegment.num} {lang === "en" ? (activeSegment.titleEn ?? activeSegment.title) : activeSegment.title}
             </p>
             <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
           </div>
