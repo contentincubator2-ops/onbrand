@@ -9,6 +9,7 @@
  * Layout chosen via the `variant` prop. Same data, different look.
  */
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import { Card, CardBody, Chip, Skeleton, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUsers, faCubes, faRobot } from "@fortawesome/free-solid-svg-icons";
@@ -19,6 +20,8 @@ interface Props {
 }
 
 export function EntityStats({ variant = "inline", className }: Props) {
+  const { lang } = useLang();
+  const en = lang === "en";
   const q = (trpc as any).entity?.stats?.useQuery
     ? (trpc as any).entity.stats.useQuery(undefined, {
         refetchOnWindowFocus: false,
@@ -40,7 +43,7 @@ export function EntityStats({ variant = "inline", className }: Props) {
         <b className="text-foreground">{data.squad.curated}</b> 精選方法論
         （共 {data.squad.total}）
         ・<b className="text-foreground">{data.skill.total}</b> 技能
-        ・<b className="text-foreground">{data.agent.available}</b> Agents
+        ・<b className="text-foreground">{data.agent.available}</b> {en ? "Agents" : "AI 專家"}
       </span>
     );
   }
@@ -50,7 +53,7 @@ export function EntityStats({ variant = "inline", className }: Props) {
       <div className={`grid grid-cols-3 gap-3 ${className ?? ""}`}>
         <StatCell icon={faUsers} label="方法論小組" main={data.squad.curated} sub={`精選 / 全部 ${data.squad.total}`} />
         <StatCell icon={faCubes}  label="技能"        main={data.skill.total} sub={originBreakdown(data.skill.byOrigin)} />
-        <StatCell icon={faRobot}  label="Agents"      main={data.agent.available} sub={`可用 / 全部 ${data.agent.total}`} />
+        <StatCell icon={faRobot}  label={en ? "Agents" : "AI 專家"}      main={data.agent.available} sub={`可用 / 全部 ${data.agent.total}`} />
       </div>
     );
   }

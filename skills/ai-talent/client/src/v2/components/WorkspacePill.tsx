@@ -12,6 +12,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { useLang } from "../../lib/i18n";
 import { Building2, ChevronDown, Settings } from "lucide-react";
 
 const LS_KEY = "drop.activeWorkspaceId";
@@ -35,6 +36,7 @@ export function getActiveWorkspaceId(): number | null {
 
 export default function WorkspacePill() {
   const navigate = useNavigate();
+  const { lang } = useLang();
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(getActiveWorkspaceId());
   const ref = useRef<HTMLDivElement>(null);
@@ -123,7 +125,7 @@ export default function WorkspacePill() {
               onClick={() => { setOpen(false); navigate("/settings/workspace"); }}
               className="text-[11px] text-neutral-500 hover:text-neutral-800 transition"
             >
-              管理 workspace →
+              {lang === "en" ? "Manage workspace →" : "管理工作空間 →"}
             </button>
           </div>
         </div>

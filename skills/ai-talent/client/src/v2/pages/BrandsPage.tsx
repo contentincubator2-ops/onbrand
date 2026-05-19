@@ -1504,7 +1504,7 @@ export default function BrandsPage() {
                 {failedStepIds.length > 0 && (
                   <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
                     {lang === "en" ? "⚠ These steps came back empty — re-run them from each segment:" : "⚠ 以下步驟沒寫入內容，建議到對應頁籤重跑："}{" "}
-                    {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`; }).join(lang === "en" ? ", " : "、")}
+                    {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return lang === "en" ? (s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`) : (s ? `步驟 ${id} · ${s.segmentId}` : `步驟 ${id}`); }).join(lang === "en" ? ", " : "、")}
                     <button className="ml-2 underline" onClick={() => setFailedStepIds([])}>{t("close")}</button>
                   </div>
                 )}
@@ -1887,7 +1887,7 @@ function PositioningBrainBar({ thinking }: {
           />
           <div className="text-tiny text-neutral-700 mb-0.5 flex items-center gap-2">
             <span className="font-semibold text-neutral-800">
-              Step {thinking.stepNum} / {thinking.stepTotal}
+              {lang === "en" ? `Step ${thinking.stepNum} / ${thinking.stepTotal}` : `步驟 ${thinking.stepNum} / ${thinking.stepTotal}`}
             </span>
             <span>·</span>
             <span>{thinking.stepTitle}</span>
@@ -2629,7 +2629,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
             fontSize: 9, fontWeight: 600, color: "#171717",
             letterSpacing: "0.18em", textTransform: "uppercase",
           }}>
-            Filled
+            {lang === "en" ? "Filled" : "已填寫"}
           </span>
         )}
       </div>

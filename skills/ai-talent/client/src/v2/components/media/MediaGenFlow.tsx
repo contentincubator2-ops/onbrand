@@ -248,7 +248,7 @@ export default function MediaGenFlow({
         startContent={<FontAwesomeIcon icon={kind === "video" ? faVideo : faImage} className="text-tiny ml-1" />}>
         {kind === "video" ? (lang === "en" ? "Video gen" : "影片生成") : (lang === "en" ? "Image gen" : "圖像生成")}
       </Chip>
-      <h2 className="text-medium font-semibold">{lang === "en" ? "3-step visual gen flow" : "3-step 視覺產出流程"}</h2>
+      <h2 className="text-medium font-semibold">{lang === "en" ? "3-step visual gen flow" : "三步視覺產出流程"}</h2>
       <PhaseStepper phase={phase} />
     </>
   );
@@ -281,7 +281,7 @@ export default function MediaGenFlow({
 function PhaseStepper({ phase }: { phase: Phase }) {
   const { lang } = useLang();
   const steps: Array<{ id: Phase; label: string }> = [
-    { id: "input",      label: "Brief" },
+    { id: "input",      label: lang === "en" ? "Brief" : "視覺指引" },
     { id: "directions", label: lang === "en" ? "Direction" : "設計方向" },
     { id: "prompt",     label: "AI Prompt" },
     { id: "model",      label: lang === "en" ? "Pick model" : "選擇模型" },
