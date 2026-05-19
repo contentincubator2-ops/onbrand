@@ -66,7 +66,7 @@ export default function PricingPage() {
         "Brand brain positioning (USP · voice · audience)",
         "Publish + schedule to FB / IG",
         "E-invoices (personal / B2B)",
-        "99s deep-research: upgrade to Solo",
+        "99s deep research — available on Solo and above",
       ] : [
         "每月 50 次執行（每次含所有文案變體 + 圖）",
         "30s 及 60s 全任務模板",
@@ -80,7 +80,7 @@ export default function PricingPage() {
       highlight: false,
       highlightLabel: isEn ? "EARLY BIRD · LOCKED FOREVER" : "早鳥優惠 · 永久保價",
       // Starter annual = $25×12 = $300, no extra discount
-      annualNote: isEn ? "Annual: same $25/mo rate, 12-month commitment" : "年約：同樣 $25/月，鎖定 12 個月",
+      annualNote: isEn ? "Billed annually at the same $25/mo rate — 12-month commitment" : "年約：同樣 $25/月，鎖定 12 個月",
       annualSavePct: 0,  // no saving vs monthly
     },
     {
@@ -98,8 +98,8 @@ export default function PricingPage() {
         "99s deep-research pipeline",
         "Publish + schedule to FB / IG (unlimited)",
         "E-invoices (personal / B2B)",
-        "Video generation: roadmap add-on",
-        "Rename / swap brand: contact support",
+        "Video generation — coming soon",
+        "Brand rename or swap — contact support",
       ] : [
         "無限次執行（30s / 60s / 99s 全任務模板）",
         "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
@@ -112,7 +112,7 @@ export default function PricingPage() {
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: true,
       highlightLabel: isEn ? "MOST POPULAR · EARLY BIRD" : "最多人選 · 早鳥優惠",
-      annualNote: isEn ? "~US$92/mo billed annually (1 month free)" : "年繳，每月平均約 US$92（送 1 個月）",
+      annualNote: isEn ? "Billed annually — ~US$92/mo (one month free)" : "年繳，每月平均約 US$92（送 1 個月）",
       annualSavePct: 8,
     },
   ];

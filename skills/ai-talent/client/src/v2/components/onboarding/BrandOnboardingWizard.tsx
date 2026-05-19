@@ -298,7 +298,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 </button>
                 <p style={{ fontSize: 11, color: "#525252", marginTop: 10 }}>
                   {lang === "en"
-                    ? "About 2 minutes · AI's ready to write for you once done"
+                    ? "About 2 minutes · once finished, AI is ready to write for your brand"
                     : "預計 2 分鐘 · 完成後 AI 已備好可以為你寫內容"}
                 </p>
               </div>
@@ -317,7 +317,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   <div>
                     <h2 className="text-lg font-semibold">{lang === "en" ? "Add your first brand" : "建立第一個品牌"}</h2>
                     <p className="text-xs text-default-500">{lang === "en"
-                      ? "Website + FB matter — AI pulls real content to ground itself"
+                      ? "Website + FB help a lot — AI reads real content to write more accurately about your brand"
                       : "官網 + FB 連結很重要 — AI 會抓真實內容做 ground"}</p>
                   </div>
                 </div>
@@ -403,7 +403,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     maxWidth: 520,
                   }}>
                     {lang === "en"
-                      ? "14 steps from Golden Circle to differentiation and Voice — each one gets written into your Brand DNA. Runs in the background, skip ahead and watch live in the workspace."
+                      ? "14 steps from Golden Circle to differentiation and Voice — each one gets written into your Brand DNA. It runs in the background; feel free to skip ahead and watch the progress live."
                       : "14 步從黃金圈推導到差異化、Voice — 每一步都會持續寫入品牌大腦。背景執行，可以略過先到工作區看實時進度。"}
                   </p>
                 </div>

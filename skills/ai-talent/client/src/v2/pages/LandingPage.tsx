@@ -167,11 +167,11 @@ export default function LandingPage() {
       <section className="bg-neutral-50 border-t border-neutral-200">
         <div className="max-w-5xl mx-auto px-6 py-16">
           <p className="text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-neutral-500 mb-3">
-            {en ? "Built on award craft" : "內建 168 個得獎工藝案例"}
+            {en ? "Built on award-winning craft" : "內建 168 個得獎工藝案例"}
           </p>
           <h2 className="text-center text-2xl font-bold mb-3">
             {en
-              ? "168 tasks. 168 unique named award or market-proven cases."
+              ? "168 tasks. Each one built on a named, award-winning or market-proven case."
               : "168 個任務，每個對應一個命名得獎或市場成功案例"}
           </h2>
           <p className="text-center text-neutral-600 text-sm mb-10 max-w-2xl mx-auto">

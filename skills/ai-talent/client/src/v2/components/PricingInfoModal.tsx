@@ -106,7 +106,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
               </span>
             </div>
             <h1 className="text-2xl font-semibold">
-              {lang === "en" ? "Pick the plan that fits" : "選擇適合你的方案"}
+              {lang === "en" ? "Find the right plan" : "選擇適合你的方案"}
             </h1>
             {balance && (
               <p className="text-sm opacity-90 mt-1">
@@ -185,7 +185,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
           <div className="px-5 py-4 bg-default-50 border-t border-default-100 flex items-center justify-between flex-wrap gap-2">
             <p className="text-xs text-default-500 leading-relaxed">
               {lang === "en"
-                ? "Trial has a $5 USD daily LLM cap (to protect you from accidental spend). Paid plans: $50 USD / day."
+                ? "Trial plans include a $5/day AI usage limit to prevent accidental overages. Paid plans: $50/day."
                 : "試用期每日 LLM 成本上限 $5 USD（防止誤超支）。付費方案：每日 $50 USD。"}
             </p>
             <div className="flex gap-2">

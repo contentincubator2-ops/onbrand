@@ -480,9 +480,9 @@ export default function BrandsPage() {
     [scopeBrands, scope?.brandId, brandId]
   );
   const scopeName =
-    scopeMode === "product" ? ((productQuery.data as any)?.name ?? (lang === "en" ? "(Pick a product up top)" : "（請於右上選擇產品）"))
-    : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? (lang === "en" ? "(Pick an event up top)" : "（請於右上選擇活動）"))
-    : (currentBrand?.name ?? (lang === "en" ? "(Pick a brand up top)" : "（請於右上選擇品牌）"));
+    scopeMode === "product" ? ((productQuery.data as any)?.name ?? (lang === "en" ? "(Select a product above)" : "（請於右上選擇產品）"))
+    : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? (lang === "en" ? "(Select an event above)" : "（請於右上選擇活動）"))
+    : (currentBrand?.name ?? (lang === "en" ? "(Select a brand above)" : "（請於右上選擇品牌）"));
   const scopeIcon =
     scopeMode === "product" ? faBox
     : scopeMode === "event" ? faCalendarDay
@@ -1485,8 +1485,8 @@ export default function BrandsPage() {
                     <div className="flex items-start gap-3">
                       <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-small font-semibold text-primary-800">{lang === "en" ? "🛑 SMP Checkpoint — confirm the single-minded proposition" : "🛑 SMP Checkpoint — 請確認單一核心命題"}</p>
-                        <p className="text-tiny text-default-600 mt-1">{lang === "en" ? "SMP is the top creative principle for this campaign — the next 5 steps revolve around it. Confirm before continuing." : "SMP 是這次活動的最高創意準則，後面 5 個 step 都會圍繞它展開。先確認再繼續。"}</p>
+                        <p className="text-small font-semibold text-primary-800">{lang === "en" ? "🛑 SMP Checkpoint — confirm your single-minded proposition" : "🛑 SMP Checkpoint — 請確認單一核心命題"}</p>
+                        <p className="text-tiny text-default-600 mt-1">{lang === "en" ? "SMP is the core creative principle for this campaign — the next 5 steps are built around it. Review it before moving on." : "SMP 是這次活動的最高創意準則，後面 5 個 step 都會圍繞它展開。先確認再繼續。"}</p>
                         {smpData?.singleMindedProposition && (
                           <div className="mt-2 p-2 rounded bg-white border border-divider">
                             <p className="text-small font-medium text-foreground">「{smpData.singleMindedProposition}」</p>
@@ -2877,7 +2877,7 @@ function PositioningPanel({
           display: "flex", alignItems: "center", gap: 8,
         }}>
           <span>🔒</span>
-          <span>{lang === "en" ? "Positioning is locked — this segment is read-only. Head back to /brands to unlock and edit." : "定位已鎖定 — 此 segment 為唯讀。回 /brands 解鎖才能編輯。"}</span>
+          <span>{lang === "en" ? "Positioning is locked — this section is read-only. Go to Brand settings to unlock and edit." : "定位已鎖定 — 此 segment 為唯讀。回 /brands 解鎖才能編輯。"}</span>
         </div>
       )}
       <div style={locked ? { opacity: 0.65, pointerEvents: "none" } : undefined}>

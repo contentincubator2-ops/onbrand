@@ -97,7 +97,7 @@ function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
       tooltip: en ? "99s · full slate — 30-day calendar, 6-episode series, launch toolkit" : "99 秒企劃一個檔期 — 30 天月曆、6 集系列、上市工具包" },
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
-      tooltip: en ? "Calendar view — scheduled + published at a glance, your edge over Buffer" : "月曆視圖 — 已排程 + 已發布內容一目了然" },
+      tooltip: en ? "Calendar view — all scheduled and published posts at a glance" : "月曆視圖 — 已排程 + 已發布內容一目了然" },
     { to: "/theater",   label: en ? "Theater" : "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
     // 2026-05-14 (CJ「品牌大腦」概念導入): icon faUserGroup → faBrain。
     // 概念校正：positioning 鎖定 + 累積的知識/偏好/規則 = 「品牌大腦」、
@@ -972,7 +972,7 @@ function BrainSummaryPanel({
       </div>
 
       {/* 1. 鎖定憲法 */}
-      <Section title={isEn ? "01 · Locked Constitution" : "01 · 鎖定憲法"}>
+      <Section title={isEn ? "01 · Locked Positioning" : "01 · 鎖定憲法"}>
         <Row
           label={isEn ? "Positioning" : "品牌定位"}
           value={
@@ -984,7 +984,7 @@ function BrainSummaryPanel({
         {!s?.positioning?.isLocked && (
           <p style={{ fontSize: 10, color: "#9ca3af", marginTop: 4, lineHeight: 1.5 }}>
             {isEn
-              ? "Not locked yet — finish onboarding to lock the brand identity."
+              ? "Not locked yet — complete the positioning flow to lock your brand identity."
               : `尚未鎖定 · 完成 ${s?.positioning?.totalSections ?? 10} 步定位後會自動鎖定`}
           </p>
         )}
