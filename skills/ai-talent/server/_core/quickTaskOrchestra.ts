@@ -345,6 +345,69 @@ function mergeCalendarPosts(captionStrings: string[]): string {
   return JSON.stringify(all);
 }
 
+// 2026-05-19 (CJ 驗收 kl-60-pitch-pack v#2「守門未生效」): hoisted to
+// module scope so it can run BOTH in the post-caption gate AND again as
+// a final pass right before variants are persisted — a guaranteed
+// backstop independent of which upstream path populated the caption.
+// Deterministic, zero-cost, idempotent (safe to run twice).
+export function voiceSanitizeZhTW(s: string): string {
+  return s
+    // emoji 一律移除（含 😉 俏皮符號）
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{2122}\u{2139}\u{203C}\u{2049}]/gu, "")
+    // 大陸用詞 → 台灣用語
+    .replace(/渠道/g, "管道")
+    // KOL 業配套語 / 空洞感性句 → 收斂
+    .replace(/(?:特別是)?在這個數位時代[，,]?/g, "")
+    .replace(/讓我們的品牌故事更加精彩/g, "把品牌故事說得更清楚")
+    .replace(/更加精彩/g, "更完整")
+    .replace(/期待你的回音/g, "想聽聽你的想法")
+    .replace(/期待你的回應/g, "想聽聽你的想法")
+    .replace(/(?:讓我們一起)?打造出引人注目的內容(?:吧)?/g, "一起把內容做好")
+    .replace(/引人注目/g, "")
+    .replace(/感受到突破品牌行銷的興奮/g, "")
+    .replace(/非常契合/g, "很契合")
+    .replace(/管理品牌形象/g, "守住品牌的一致")
+    .replace(/突破性的功能/g, "這個功能")
+    .replace(/不得不點贊/g, "")
+    // 帶貨/浮誇/效率詞 → 沉穩守護者語感（軟改寫，不硬刪以免斷句）
+    .replace(/全台(?:品牌)?行銷人注意/g, "給品牌行銷人的觀察")
+    .replace(/注意[！!]/g, "")
+    .replace(/快來試試(?:看)?/g, "可以試試")
+    .replace(/趕快試試看/g, "可以試試")
+    .replace(/快來檢查一下/g, "值得檢查一下")
+    .replace(/快來一起看看/g, "一起看看")
+    .replace(/快來/g, "")
+    .replace(/讓你的品牌亮起來/g, "讓品牌好好說話")
+    .replace(/(?:讓品牌)?大放異彩/g, "")
+    .replace(/宇宙無敵/g, "")
+    .replace(/超神奇/g, "")
+    .replace(/(?:讓你的品牌語音)?(?:在數位世界裡)?響亮無比/g, "讓品牌的聲音被聽見")
+    .replace(/響亮無比/g, "")
+    .replace(/在快速(?:進化|變化)的數位世界裡/g, "")
+    .replace(/業界(?:的)?佼佼者/g, "")
+    .replace(/不再擔心/g, "不必再擔心")
+    .replace(/行銷新篇章/g, "行銷的下一步")
+    .replace(/讓我們一起期待/g, "值得期待")
+    .replace(/一起來討論吧/g, "歡迎一起想想")
+    // 常見簡體漏字 → 繁體
+    .replace(/精准/g, "精準")
+    .replace(/内容/g, "內容")
+    .replace(/数据/g, "數據")
+    // 「通過」誤用 → 「透過」（表 via/經由 的語境；保守鎖定後接詞）
+    .replace(/通過(?=直播|首映|預告|頻道|這場|本次|這次|社群|留言|評論)/g, "透過")
+    // 英文直引號包中文 → 全形「」
+    .replace(/"([^"\n]{1,40})"/g, "「$1」")
+    // 正文被中括號整句包起來（非 [請補充/待補/請填入] 佔位）→ 拆掉括號
+    .replace(/(^|\n)\s*[\[【]\s*((?!請補充|待補|請填入)[^\[\]【】\n]{6,})\s*[\]】]\s*(?=\n|$)/g, "$1$2")
+    // 句尾與句中驚嘆號（! 與 ！）一律 → 句號
+    .replace(/[!！]+/g, "。")
+    // 清理改寫後的殘留
+    .replace(/。{2,}/g, "。")
+    .replace(/(^|\n)\s*。\s*/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 // 2026-05-18 (CJ「每篇一個可編輯 mockup + 日期 + 批量 .ics」): expand the
 // merged calendar posts into ONE VARIANT PER POST so the existing
 // per-variant UI (pills nav / 跟 agent 改文案 / 改圖 / 排程發布) works
@@ -1650,60 +1713,8 @@ export async function runOrchestra(args: {
     if (Array.isArray(captions) && captions.length &&
         (isTikTokBodyTask(args.template) || isYouTubeBodyTask(args.template) ||
          isKOLBodyTask(args.template))) {
-      // L1 deterministic: 高信心、零成本、一律套用。
-      const ttDet = (s: string): string =>
-        s
-          // emoji 一律移除（含 😉 俏皮符號 — CJ 驗收 KOL 報價回應）
-          .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{2122}\u{2139}\u{203C}\u{2049}]/gu, "")
-          // 大陸用詞 → 台灣用語
-          .replace(/渠道/g, "管道")
-          // KOL 業配套語 / 空洞感性句 → 收斂（CJ 驗收 kl-60-pitch-pack）
-          .replace(/(?:特別是)?在這個數位時代[，,]?/g, "")
-          .replace(/讓我們的品牌故事更加精彩/g, "把品牌故事說得更清楚")
-          .replace(/更加精彩/g, "更完整")
-          .replace(/期待你的回音/g, "想聽聽你的想法")
-          .replace(/(?:讓我們一起)?打造出引人注目的內容(?:吧)?/g, "一起把內容做好")
-          .replace(/引人注目/g, "")
-          .replace(/感受到突破品牌行銷的興奮/g, "")
-          .replace(/非常契合/g, "很契合")
-          .replace(/管理品牌形象/g, "守住品牌的一致")
-          // 帶貨/浮誇/效率詞 → 沉穩守護者語感（軟改寫，不硬刪以免斷句）
-          .replace(/全台(?:品牌)?行銷人注意/g, "給品牌行銷人的觀察")
-          .replace(/注意[！!]/g, "")
-          .replace(/快來試試(?:看)?/g, "可以試試")
-          .replace(/趕快試試看/g, "可以試試")
-          .replace(/快來檢查一下/g, "值得檢查一下")
-          .replace(/快來一起看看/g, "一起看看")
-          .replace(/快來/g, "")
-          .replace(/讓你的品牌亮起來/g, "讓品牌好好說話")
-          .replace(/(?:讓品牌)?大放異彩/g, "")
-          .replace(/宇宙無敵/g, "")
-          .replace(/超神奇/g, "")
-          .replace(/(?:讓你的品牌語音)?(?:在數位世界裡)?響亮無比/g, "讓品牌的聲音被聽見")
-          .replace(/響亮無比/g, "")
-          .replace(/在快速(?:進化|變化)的數位世界裡/g, "")
-          .replace(/業界(?:的)?佼佼者/g, "")
-          .replace(/不再擔心/g, "不必再擔心")
-          .replace(/行銷新篇章/g, "行銷的下一步")
-          .replace(/讓我們一起期待/g, "值得期待")
-          .replace(/一起來討論吧/g, "歡迎一起想想")
-          // 常見簡體漏字 → 繁體
-          .replace(/精准/g, "精準")
-          .replace(/内容/g, "內容")
-          .replace(/数据/g, "數據")
-          // 「通過」誤用 → 「透過」（表 via/經由 的語境；保守鎖定後接詞）
-          .replace(/通過(?=直播|首映|預告|頻道|這場|本次|這次|社群|留言|評論)/g, "透過")
-          // 英文直引號包中文 → 全形「」
-          .replace(/"([^"\n]{1,40})"/g, "「$1」")
-          // 正文被中括號整句包起來（非 [請補充/待補/請填入] 佔位）→ 拆掉括號
-          .replace(/(^|\n)\s*[\[【]\s*((?!請補充|待補|請填入)[^\[\]【】\n]{6,})\s*[\]】]\s*(?=\n|$)/g, "$1$2")
-          // 句尾與句中驚嘆號（! 與 ！）一律 → 句號
-          .replace(/[!！]+/g, "。")
-          // 清理改寫後的殘留
-          .replace(/。{2,}/g, "。")
-          .replace(/(^|\n)\s*。\s*/g, "$1")
-          .replace(/[ \t]{2,}/g, " ")
-          .replace(/\n{3,}/g, "\n\n");
+      // L1 deterministic: 高信心、零成本、一律套用（hoisted 共用函式）。
+      const ttDet = voiceSanitizeZhTW;
       for (const v of captions) {
         if (!v?.caption) continue;
         v.caption = ttDet(v.caption);
@@ -1922,6 +1933,12 @@ export async function runOrchestra(args: {
 
     const variants: OrchestraVariant[] = [];
     const N = args.config.variants;
+    // 2026-05-19 (CJ 驗收 kl-60-pitch-pack v#2「守門未生效」): guaranteed
+    // final backstop — even if the post-caption gate's mutation was lost
+    // (stale process / repopulated captions / different path), clean the
+    // caption ONE more time here, the last point before persistence.
+    const _voiceGated = isTikTokBodyTask(args.template) ||
+      isYouTubeBodyTask(args.template) || isKOLBodyTask(args.template);
     for (let i = 0; i < N; i++) {
       const cap = captions[i];
       const label = cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`;
@@ -1943,6 +1960,7 @@ export async function runOrchestra(args: {
       // writer LLM duplicating its own hook + hashtag groups within a
       // single output.
       if (caption) caption = deduplicateInternalCaption(caption);
+      if (caption && _voiceGated) caption = voiceSanitizeZhTW(caption);
       if (!caption) {
         errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
       }
