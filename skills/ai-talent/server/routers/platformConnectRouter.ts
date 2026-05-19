@@ -44,15 +44,17 @@ async function getPipedreamToken(externalUserId: string): Promise<{ token: strin
     });
   }
 
-  // Get OAuth2 bearer token from Pipedream
+  // Get OAuth2 bearer token from Pipedream.
+  // Pipedream follows RFC 6749 — token endpoint requires Basic Auth header
+  // (base64 of clientId:clientSecret) + form-urlencoded body, NOT JSON.
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const tokenRes = await fetch("https://api.pipedream.com/v1/oauth/token", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      grant_type:    "client_credentials",
-      client_id:     clientId,
-      client_secret: clientSecret,
-    }),
+    headers: {
+      "Content-Type":  "application/x-www-form-urlencoded",
+      "Authorization": `Basic ${basicAuth}`,
+    },
+    body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
   });
 
   if (!tokenRes.ok) {
