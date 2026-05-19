@@ -44,7 +44,7 @@ export default function PromptLibrary({ scopeMode, scopeName, data }: PromptLibr
           </p>
           <h2 className="text-xl font-semibold tracking-tight">{scopeName}</h2>
           <p className="text-small text-default-500">
-            開箱即用的 prompt 模板，{templates.length} 個範本。變數已從定位書自動填入；未填的會保留 {"{變數}"} 佔位待你補。
+            開箱即用的指令模板，{templates.length} 個範本。變數已從定位書自動填入；未填的會保留 {"{變數}"} 佔位待你補。
           </p>
         </CardBody>
       </Card>

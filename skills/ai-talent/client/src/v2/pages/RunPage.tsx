@@ -1808,7 +1808,7 @@ export default function RunPage() {
                         showToastGlobal(
                           lang === "en"
                             ? "Fill in the video brief, or pick a variant that has a caption"
-                            : "請先填影片指令，或這個 variant 要有文案"
+                            : "請先填影片指令，或這個版本要有文案"
                         );
                         return;
                       }
@@ -1956,14 +1956,14 @@ export default function RunPage() {
                     <div className="bg-default-50 rounded-lg p-2.5 text-[11px] leading-relaxed space-y-1.5 max-h-56 overflow-y-auto">
                       {focusedAgent === "image" ? (
                         <>
-                          <p className="font-semibold">{lang === "en" ? "Image brief for this version:" : "本變體配圖 brief："}</p>
+                          <p className="font-semibold">{lang === "en" ? "Image brief for this version:" : "本版本配圖指引："}</p>
                           <p className="whitespace-pre-wrap text-default-800">
-                            {slide?.imageStyle || (lang === "en" ? "(This task has no image brief)" : "（這個任務沒有配圖 brief）")}
+                            {slide?.imageStyle || (lang === "en" ? "(This task has no image brief)" : "（這個任務沒有配圖指引）")}
                           </p>
                         </>
                       ) : (
                         <>
-                          <p className="font-semibold">{lang === "en" ? "Caption for this version:" : "本變體文案："}</p>
+                          <p className="font-semibold">{lang === "en" ? "Caption for this version:" : "本版本文案："}</p>
                           <p className="whitespace-pre-wrap text-default-800">
                             {(slide?.caption ?? "").slice(0, 400)}{(slide?.caption?.length ?? 0) > 400 ? "…" : ""}
                           </p>
@@ -1989,7 +1989,7 @@ export default function RunPage() {
                   <p className="text-[11px] text-default-500 leading-relaxed">
                     {lang === "en"
                       ? <>Have the same agent write this version again — &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
-                      : <>讓同一位 agent 重新寫一次當前 variant「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
+                      : <>讓同一位 AI 助手重新寫一次當前版本「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
                   </p>
                   <Button
                     color="secondary"
@@ -2002,12 +2002,12 @@ export default function RunPage() {
                   >
                     {regenMut.isPending
                       ? (lang === "en" ? "Rewriting…" : "重生中…")
-                      : (lang === "en" ? "Rewrite this version" : "立即重生這個變體")}
+                      : (lang === "en" ? "Rewrite this version" : "立即重生這個版本")}
                   </Button>
                   <p className="text-[10px] text-default-400">
                     {lang === "en"
                       ? <>Will call {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "the caption agent"} to regenerate variant {activeIdx + 1}.</>
-                      : <>將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫者"} 重新產出第 {activeIdx + 1} 個變體。</>}
+                      : <>將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫者"} 重新產出第 {activeIdx + 1} 個版本。</>}
                   </p>
                   {Array.isArray(data.metadata?.archivedVariants) && data.metadata.archivedVariants.length > 0 && (
                     <p className="text-[10px] text-default-500">
@@ -2075,7 +2075,7 @@ export default function RunPage() {
                         if (!confirm(
                           lang === "en"
                             ? "Publish this version to Facebook? It'll appear on your FB page right away."
-                            : "確定要把這個 variant 發到 Facebook？發布後會直接出現在你的 FB 粉專。"
+                            : "確定要把這個版本發到 Facebook？發布後會直接出現在你的 FB 粉專。"
                         )) return;
                         fbPublishMut.mutate({ outputId: id, variantIndex: activeIdx });
                       }}

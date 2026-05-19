@@ -88,7 +88,7 @@ export const en = {
   footer_agents:      "Agents",
   footer_skills:      "Skills",
   footer_models:      "Models",
-  footer_credits:     "credits",
+  footer_credits:     "Credits",
 
   // ── MissionHomePage ────────────────────────────────────────────────────────
   mission_start:        "Get started",
@@ -309,7 +309,7 @@ export const en = {
   qt_30s_title:            "30s post",
   qt_30s_subtitle:         "One post, one channel — ready in 30 seconds",
   qt_60s_title:            "60s package",
-  qt_60s_subtitle:         "Caption + image + variants — ready in 60 seconds",
+  qt_60s_subtitle:         "Copy + images + variants — ready in 60 seconds",
   qt_99s_title:            "99s campaign",
   qt_99s_subtitle:         "Full multi-channel campaign — ready in 99 seconds",
   qt_pick_channel:         "Choose a channel",
@@ -440,7 +440,7 @@ export const en = {
   run_mode_chat:           "Chat",
   run_mode_image:          "Redo image",
   run_mode_video:          "Storyboard",
-  run_mode_agent:          "Agent",
+  run_mode_agent:          "Chat",
   run_mode_regen:          "Rewrite",
   run_save_btn:            "Save changes",
   run_revert:              "Revert",

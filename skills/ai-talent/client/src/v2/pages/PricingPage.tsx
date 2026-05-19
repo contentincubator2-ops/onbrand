@@ -103,7 +103,7 @@ export default function PricingPage() {
       ] : [
         "無限次執行（30s / 60s / 99s 全任務模板）",
         "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-        "99s 深度研究 pipeline",
+        "99s 深度研究流程",
         "FB / IG 直接發布 + 排程（無限）",
         "電子發票（個人 / B2B）",
         "影片生成：roadmap 加購包",
@@ -134,7 +134,7 @@ export default function PricingPage() {
     ["之後可以從 Starter 升級到 Solo 嗎？", "可以，隨時在帳號設定升級。Starter 早鳥價只要繼續訂閱就永久保價；升級到 Solo 時，會鎖定當時 Solo 的早鳥價。"],
     ["產出的內容版權歸誰？", "全部歸您。我們不主張任何權利，可商用、二次創作、轉售。"],
     ["能開公司發票嗎？", "可以。在「帳號設定 → 發票資訊」填統編 + 公司名，下次扣款自動開立 B2B 三聯式電子發票。"],
-    ["30s / 60s / 99s 任務有什麼差別？", "30s = 單一快速輸出（1 個變體）。60s = 5 個文案變體 + 5 張圖並行（約 60 秒）。99s = 附帶即時網路研究、競品分析、完整內容策略的深度 pipeline（Solo 以上才有）。"],
+    ["30s / 60s / 99s 任務有什麼差別？", "30s = 單一快速輸出（1 個變體）。60s = 5 個文案變體 + 5 張圖並行（約 60 秒）。99s = 附帶即時網路研究、競品分析、完整內容策略的深度研究流程（Solo 以上才有）。"],
   ];
 
   const showEarlyBirdBanner = status?.isEarlyBird ?? true;

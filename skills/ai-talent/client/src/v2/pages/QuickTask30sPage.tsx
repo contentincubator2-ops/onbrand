@@ -1874,7 +1874,7 @@ function OutputCarousel({
                                   : `撰寫了 ${slides.length} 個變體的文案。當前版本「${slide?.label}」：\n${slide?.caption?.slice(0, 200) ?? ""}…`)
                               : (a.role === "視覺方向" || a.role === "Visual direction") ? (lang === "en"
                                   ? `Wrote the visual brief:\n${slide?.imageStyle?.slice(0, 200) ?? "(no brief)"}`
-                                  : `產出視覺風格 brief：\n${slide?.imageStyle?.slice(0, 200) ?? "（沒有 brief）"}`)
+                                  : `產出視覺風格指引：\n${slide?.imageStyle?.slice(0, 200) ?? "（無視覺指引）"}`)
                               : (lang === "en" ? "(no separate output recorded)" : "（無單獨輸出記錄）")}
                           </p>
                         </div>
@@ -2095,7 +2095,7 @@ function OutputCarousel({
                     {lang === "en" ? "Visual style suggestion" : "中文視覺風格建議"}
                   </p>
                   <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line">
-                    {slide?.imageStyle ?? (lang === "en" ? "(no visual brief)" : "（無視覺方向 brief）")}
+                    {slide?.imageStyle ?? (lang === "en" ? "(no visual brief)" : "（無視覺方向）")}
                   </p>
                 </div>
 
@@ -2222,7 +2222,7 @@ function OutputCarousel({
                     {lang === "en" ? "Video style suggestion" : "影片風格建議"}
                   </p>
                   <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line">
-                    {(output as any)?.video_style_direction?.summary ?? slide?.imageStyle ?? (lang === "en" ? "(no video brief — using the image brief as the base)" : "（沒有 video brief，會用 image brief 當基礎）")}
+                    {(output as any)?.video_style_direction?.summary ?? slide?.imageStyle ?? (lang === "en" ? "(no video brief — using the image brief as the base)" : "（沒有影片視覺指引，會用圖片指引當基礎）")}
                   </p>
                 </div>
                 {videoStep === "brief" && (
@@ -2434,7 +2434,7 @@ function OutputCarousel({
               <div className="rounded-xl border border-default-200 bg-default-50 p-3 space-y-2">
                 <p className="text-[10px] text-default-500 mb-1">{lang === "en" ? "Visual brief (goes into AI image gen)" : "視覺方向（會送進 AI 生圖）"}</p>
                 <p className="text-tiny text-default-800 leading-relaxed whitespace-pre-line border-l-2 border-default-300 pl-2">
-                  {slide?.imageStyle ?? (lang === "en" ? "(no visual brief for this task)" : "（這個任務沒有 visual brief）")}
+                  {slide?.imageStyle ?? (lang === "en" ? "(no visual brief for this task)" : "（這個任務沒有視覺指引）")}
                 </p>
                 {slide?.hashtags && slide.hashtags.length > 0 && (
                   <>

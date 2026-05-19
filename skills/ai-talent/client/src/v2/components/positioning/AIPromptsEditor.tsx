@@ -207,7 +207,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
             <div>
               <label className="text-xs font-semibold text-default-700 mb-1.5 block flex items-center gap-1.5">
                 <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px]">{en ? "Image prompt" : "圖片指令"}</span>
-                {en ? "Image / Flux style brief" : "配圖 / Flux 風格 brief"}
+                {en ? "Image / Flux style brief" : "配圖 / Flux 風格指引"}
               </label>
               <Textarea
                 size="sm"

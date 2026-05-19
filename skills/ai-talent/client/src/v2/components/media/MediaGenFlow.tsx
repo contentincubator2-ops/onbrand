@@ -101,7 +101,7 @@ export default function MediaGenFlow({
   const generateMutation= (trpc as any).media?.generate?.useMutation?.()           ?? null;
 
   const onProposeDirections = async () => {
-    if (!brief.trim()) { setErr(lang === "en" ? "Enter a brief first" : "請先輸入 brief"); return; }
+    if (!brief.trim()) { setErr(lang === "en" ? "Enter a brief first" : "請先輸入需求說明"); return; }
     if (!proposeMutation) { setErr(lang === "en" ? "media.proposeDirection not deployed yet" : "media.proposeDirection 尚未部署"); return; }
     setBusy(true); setErr(null);
     try {

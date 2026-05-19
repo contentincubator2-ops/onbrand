@@ -71,7 +71,7 @@ function getPlans(lang: "zh-TW" | "en") {
       ] : [
         "無限次執行 — 30s / 60s / 99s 全開",
         "無限 AI 圖",
-        "99s 深度研究 pipeline",
+        "99s 深度研究流程",
         "FB / IG 發布 + 排程",
         "電子發票 · 隨時取消",
       ],
