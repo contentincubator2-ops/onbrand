@@ -234,6 +234,195 @@ const TASK_LABEL_EN_CLIENT: Record<string, string> = {
   "pr-99-newsjack":        "Newsjacking (trending news hook)",
 };
 
+// ── Client-side EN description lookup ────────────────────────────────────────
+// English descriptions for all tasks — used in place of t.description when
+// lang === "en". Keyed by task id.
+const TASK_DESC_EN_CLIENT: Record<string, string> = {
+  // Facebook 30s
+  "fb-30-caption-short":    "100-200 word single-image caption with 1 hook + 1 CTA",
+  "fb-30-pure-text-hook":   "3 opening hooks in different tones, auto-connects to your post",
+  "fb-30-link-caption":     "Lead-in text when sharing a URL (with OG preview teaser)",
+  "fb-30-comment-reply":    "Brand replies to positive / neutral comments",
+  "fb-30-ad-headline":      "5 ad headline angles (under 25 words), copy-paste into Ads Manager",
+  "fb-30-ad-primary":       "5 ad body texts in different tones (80-150 words), matched to audience psychology",
+  "fb-30-ad-cta":           "5 CTA button texts + situational guidance for each",
+  "fb-30-ad-description":   "Link ad description (under 30 words), 5 different angles",
+  "fb-30-pinned-short":     "Page-pinned post — who we are and why to follow",
+  "fb-30-story-text":       "9:16 ephemeral copy + overlay headline",
+  "fb-30-live-title":       "Teaser caption 1-2 hours before going live",
+  "fb-30-hashtag-set":      "10-15 tiered hashtags (core / mid-range / long-tail)",
+  "fb-30-countdown-1day":   "Single countdown post in a series (day N)",
+  // Facebook 60s
+  "fb-60-single-full":      "5 variants + 5 AI images + comment templates + posting schedule + 24h follow-up",
+  "fb-60-link-full":        "OG copy + thumbnail style + lead-in + comment templates + posting schedule",
+  "fb-60-album-4":          "Strategist plans narrative arc + 4 cohesive images + unified caption story",
+  "fb-60-countdown-5day":   "Strategist designs countdown arc + 5 days × 5 parallel posts + images",
+  "fb-60-launch-kit":       "Launch arc: teaser×2 / launch day / post-event — 4 posts in parallel",
+  "fb-60-live-suite":       "Teaser / opening / 3 highlights / recap — 6 pieces in parallel",
+  "fb-60-pinned-suite":     "Pinned post + 3 companion pieces (FAQ / about / case study)",
+  "fb-60-ad-pack-3":        "3 standalone ads (emotional / rational / contrast), each with caption + 3 image styles",
+  // Instagram 30s
+  "ig-30-caption-short":         "80-150 word IG feed caption + 5-10 hashtags",
+  "ig-30-pure-text-hook":        "3 opening hooks in different tones, auto-connects to your content",
+  "ig-30-reel-hook":             "First-3s voiceover + subtitle rhythm + opening visual brief",
+  "ig-30-reel-script-full":      "Structured storyboard: hook → promise → 3 content beats → CTA",
+  "ig-30-story-text":            "9:16 headline + body copy + recommended sticker",
+  "ig-30-carousel-structure":    "1 title card + 8 content cards + 1 CTA card, text for each",
+  "ig-30-bio-rewrite":           "150-char bio with emoji + line breaks + CTA",
+  "ig-30-hashtag-set":           "3-tier mix: core 5 / mid-range 15 / long-tail 10",
+  "ig-30-comment-reply":         "5 tone variants (fans / friendly / peers / KOL / general inquiry)",
+  "ig-30-dm-script":             "3 scenarios: price inquiry / after-sale / collaboration invite",
+  "ig-30-live-opening":          "Opening speech + warm-up engagement + CTA to drive comments",
+  "ig-30-story-repost-strategy": "What to do after story expires (highlight / repurpose as feed / new story)",
+  "ig-30-threads-cross-post":    "Rewrite your IG post in Threads style",
+  // Instagram 60s
+  "ig-60-feed-full":              "5 variants + 5 AI images + hashtags + comment templates + posting schedule",
+  "ig-60-reel-full":              "Strategist plans Hook-Hold-Payoff + full script + 9:16 visuals",
+  "ig-60-carousel-7":             "Strategist plans narrative arc + 7 cards + unified visual tone",
+  "ig-60-story-3frame":           "3-frame cohesive story: context / highlight / CTA + sticker ideas",
+  "ig-60-countdown-5day":         "Strategist designs countdown arc + 5 days × 5 parallel posts + images",
+  "ig-60-highlight-suite":        "5 highlight covers (about / products / FAQ / reviews / cases) + visual consistency",
+  "ig-60-live-suite":             "Teaser / opening / peak / closing / recap — 5 pieces in parallel",
+  "ig-60-serial-3":               "Strategist designs 3-part arc + 3 interlocking serial posts",
+  "ig-60-viral-rewrite":          "Strategist finds viral structure + rewrites as brand version + comparison",
+  "ig-60-testimonial-rewrite":    "Strategist finds testimonial structure + rewrites narrative + legal check",
+  // YouTube 30s
+  "yt-30-title-strategies":  "SEO-friendly / contrast-number / suspense — 1 of each",
+  "yt-30-thumbnail-text":    "Thumbnail headline (5-8 words) + overall visual direction",
+  "yt-30-description-seo":   "With timestamps / links / hashtags / tags",
+  "yt-30-chapter-timeline":  "Paste video URL → auto-generates chapter timestamps from transcript",
+  "yt-30-shorts-script":     "Hook → 3 content beats → CTA structure",
+  "yt-30-opening-hook":      "Voiceover + subtitles + camera direction",
+  "yt-30-end-cta":           "Subscribe / bell / next video / comment prompt",
+  "yt-30-comment-reply":     "5 tones: fan / complaint / peer / skeptic / silent viewer",
+  "yt-30-pinned-comment":    "First pinned comment after publish — sparks discussion",
+  "yt-30-community-post":    "3 types: text / poll / teaser",
+  // YouTube 60s
+  "yt-60-video-package":   "Title + description + chapters + 5 alt titles + thumbnail style",
+  "yt-60-shorts-script":   "Strategist plans structure + 60s script + thumbnail brief",
+  "yt-60-thumbnail-suite": "5 thumbnail visual directions + matching title variants",
+  "yt-60-series-3ep":      "Strategist designs 3-episode arc + 3 full video captions + cohesive narrative",
+  "yt-60-community-post":  "5 community posts (poll / image / text / Q&A / teaser)",
+  "yt-60-viral-rewrite":   "Strategist finds viral structure + rewrites as brand version + comparison",
+  // TikTok 30s
+  "tt-30-opening-hook":       "Voiceover + overlay text + camera direction",
+  "tt-30-full-script":        "Hook → reveal → 3 content beats → CTA",
+  "tt-30-caption-rhythm":     "Subtitle rhythm synced to voiceover",
+  "tt-30-bio-rewrite":        "80-char bio + emoji + link",
+  "tt-30-hashtag-set":        "5-15 tiered hashtags",
+  "tt-30-caption-description":"Under 100-word description + CTA",
+  "tt-30-duet-angle":         "React to / supplement / counter another video",
+  "tt-30-trend-remix":        "Remix a trending format in your brand's version",
+  "tt-30-comment-reply":      "5 tone variants",
+  "tt-30-live-opening":       "Opening speech + warm-up + CTA",
+  // TikTok 60s
+  "tt-60-foryou-full":    "Hook + hold + payoff complete 60s script + 5 variants",
+  "tt-60-series-3":       "Strategist designs 3-episode arc + 3 cohesive scripts",
+  "tt-60-viral-rewrite":  "Strategist finds viral structure + rewrites as brand version + comparison",
+  // LinkedIn 30s
+  "li-30-insight-post":   "150-300 word professional opinion post",
+  "li-30-hook-3":         "First 1-2 lines that decide if they read on",
+  "li-30-article-opener": "LI Article opening 200 words — hook that keeps readers going",
+  "li-30-poll":           "LI poll question + 4 options",
+  "li-30-event-invite":   "Invite to webinar / meetup / workshop",
+  "li-30-dm-intro":       "First DM after connecting",
+  "li-30-comment":        "High-value comment on someone else's LI post",
+  "li-30-headline":       "Your LinkedIn profile headline (under 120 chars)",
+  "li-30-newsletter":     "LI Newsletter title + first paragraph (entices subscription)",
+  "li-30-document":       "8-page LI document post structure + copy for each page",
+  // LinkedIn 60s
+  "li-60-thought-leader": "Strategist designs angle + 800-word deep post + pull-quote card",
+  "li-60-newsletter":     "Strategist designs TOC + full newsletter (headline + intro + 3 sections + CTA)",
+  "li-60-case-study":     "Strategist finds testimonial structure + rewrites narrative + legal check",
+  // Email 30s
+  "em-30-subject-line":   "The 30-word line that decides whether they open",
+  "em-30-preview-text":   "Preview text next to the subject — reinforces open rate",
+  "em-30-welcome":        "First email to new subscribers",
+  "em-30-promo":          "Event / discount / limited-time promo email",
+  "em-30-drip":           "One email in an automated drip campaign",
+  "em-30-abandoned-cart": "Remind users to complete their purchase",
+  "em-30-re-engagement":  "Win back subscribers who haven't opened in 30/60/90 days",
+  "em-30-event-invite":   "Webinar / offline event / opening night invitation",
+  "em-30-cold-email":     "First B2B cold outreach email",
+  "em-30-transactional":  "Order confirmation / shipping notice / invoice",
+  // Email 60s
+  "em-60-newsletter-full":  "Strategist designs structure + subject + intro + 3 sections + CTA + preview",
+  "em-60-promo-sequence":   "Strategist designs promo arc + 3 emails (teaser / launch / last call)",
+  "em-60-onboarding-3":     "First 3 welcome emails for new subscribers (Day 0 / Day 3 / Day 7)",
+  // PR 30s
+  "pr-30-headline":       "The first line that decides if journalists open it",
+  "pr-30-subhead":        "1-2 extension sentences below the headline",
+  "pr-30-lead-paragraph": "5W1H first paragraph — the most important facts",
+  "pr-30-ceo-quote":      "Ready-to-deliver full speech + speaker / occasion",
+  "pr-30-boilerplate":    "The fixed 'About [Company]' section at the bottom",
+  "pr-30-fact-sheet":     "Quick-reference bullet list for journalists",
+  "pr-30-media-pitch":    "The 'why you should cover us' email to journalists",
+  "pr-30-spokesperson-qa":"Anticipated media questions + standard answers",
+  "pr-30-launch-social":  "Social post to run alongside the press release",
+  "pr-30-news-hook":      "Turn 'what we want to say' into 'what journalists will write'",
+  // PR 60s
+  "pr-60-news-release-full": "Headline + subhead + 5W1H lead + 3 body sections + boilerplate + media contact",
+  // Brand 60s
+  "br-60-tagline-suite":   "Strategist defines archetype + 5 tagline candidates + usage contexts",
+  "br-60-value-prop":      "Strategist finds competitive difference + 5 value prop versions",
+  "br-60-brand-voice":     "5 brand voice samples + Do / Don't comparison",
+  // Research 60s
+  "rs-60-interview-guide": "Strategist designs research questions + open-ended Qs + probing prompts",
+  "rs-60-persona-suite":   "5 key persona cards (demographics + psychology + pain points + channels)",
+  "rs-60-jtbd-suite":      "5 JTBD statements + trigger context + competitors",
+  // Cross-platform 60s
+  "cw-60-crosspost-4platform": "Same topic → adapted for 4 platforms (tone / length / hashtags all differ)",
+  "cw-60-ab-variants":         "2 versions from different angles + 'which will win' analysis + test setup",
+  // KOL 60s
+  "kl-60-pitch-pack": "Complete ready-to-send invitation + 4 attachments: brief / pricing response / follow-up / thank-you",
+  // Facebook 99s
+  "fb-99-30day-calendar":         "Structured 30-day calendar: 4 WHY posts / 4 product / 2 seasonal / 2 UGC / 2 authority",
+  "fb-99-monthly-calendar-promo": "Structured promo calendar: 6 product / 3 urgency / 2 seasonal / 2 UGC / 1 brand story",
+  "fb-99-carousel-5":             "Hook→Build→Turn→Payoff→CTA arc + 5 cards (each with copy + image)",
+  "fb-99-serial-3":               "3-part narrative arc + 3 interlocking posts (each with image + full package)",
+  "fb-99-viral-rewrite":          "Finds viral structure → rewrites as brand version + comparison (scout pulls viral benchmarks)",
+  "fb-99-testimonial-rewrite":    "Finds testimonial structure + rewrites narrative + legal check",
+  "fb-99-trend-rewrite":          "Evaluates news relevance + writes brand angle + timeliness check (scout pulls breaking news)",
+  "fb-99-14day-countdown":        "Daily countdown post + 3-act pacing + D-4 onwards with CTA + scout for events",
+  "fb-99-launch-toolkit":         "Teaser×3 / launch / live×2 / recap / IG cross-post + scout for events",
+  "fb-99-livestream-9seg":        "Teaser + opening + 5 peak moments + closing + recap + reel editing guide",
+  "fb-99-crisis-playbook":        "Detection + first statement + mid-updates×3 + follow-up + internal talking points",
+  "fb-99-account-reposition":     "Trout & Ries positioning + Pulizzi Tilt + complete repositioning launch posts",
+  "fb-99-quarterly-strategy":     "3-month rhythm: monthly themes + 12 key post ideas + content pillar mix",
+  "fb-99-monthly-analytics":      "Engagement / reach / saves full analysis + next-month recommendations",
+  "fb-99-carousel-cvo":           "10-card story: stranger → customer (awareness→interest→evaluation→purchase)",
+  "fb-99-offer-first":            "Write an offer people can't refuse: value stacking + risk reversal + urgency",
+  "fb-99-magnetic-marketing":     "Attract the right people proactively: precise positioning, strong appeal, clear CTA",
+  "fb-99-mass-control":           "High-momentum launch: 3-phase teaser → climax → wind-down (major annual events)",
+  // Instagram 99s
+  "ig-99-30day-calendar":      "30-day feed/reel/story mix + per-post hook + hashtag strategy + real viral references",
+  "ig-99-reel-series-6":       "6-episode arc + full script for each (hook + hold + payoff) + thumbnail brief",
+  "ig-99-account-reposition":  "New bio + 9 highlight themes + 9 launch posts + visual direction",
+  "ig-99-monthly-calendar":    "Daily feed / reel / story plan + seasonal hooks + themes + visual consistency",
+  "ig-99-youtility":           "30 days of genuinely useful content (zero selling, pure value) — people save and share",
+  "ig-99-visual-story":        "Full visual identity + color palette + composition style + 30-day feed consistency",
+  "ig-99-live-first":          "Live-centric strategy: teaser + live package + post-live reel clips",
+  "ig-99-document":            "Real behind-the-scenes work, unpolished — build genuine brand authenticity",
+  "ig-99-radical-transparency":"Share brand backstage / failures / growth publicly — build deep trust",
+  "ig-99-save-worthy":         "Carousel tutorials / lists / comparison tables — content people save and share",
+  // YouTube 99s
+  "yt-99-series-6ep":         "6-episode titles + 800-1200 word descriptions + 3 thumbnail briefs each + community package",
+  "yt-99-quarterly-strategy": "Trending topic report + content pillars + 12 video titles + community calendar",
+  "yt-99-premiere-kit":       "Teaser video + countdown community posts + live package + clip editing guide",
+  // TikTok 99s
+  "tt-99-30day-foryou": "30-day daily scripts + trend alignment + sound suggestions + scout for events",
+  "tt-99-trend-week":   "7-day trending hooks + brand angle + 3 hook variants each + sound suggestions",
+  // LinkedIn 99s
+  "li-99-30day-thought-leadership": "30 days: 10 insights / 10 case studies / 10 trend predictions + scout for events",
+  "li-99-newsletter-quarterly":     "4-issue quarterly newsletter full content + subscriber growth strategy",
+  // Email 99s
+  "em-99-4week-nurture":   "4-week onboarding: Week 1 Why / Week 2 What / Week 3 How / Week 4 Deepen",
+  "em-99-launch-sequence": "Teaser×2 / launch / reminder×2 / last call / follow-up = 7 emails",
+  // PR 99s
+  "pr-99-launch-toolkit": "Press release + media Q&A + contact script + follow-up + spokesperson talking points",
+  "pr-99-newsjack":        "Connect your brand to breaking news — produce a reportable angle",
+};
+
 const CARD_PALETTES = [
   { from: "#fde68a", to: "#fbbf24", text: "#92400e" },
   { from: "#a5f3fc", to: "#22d3ee", text: "#164e63" },
@@ -1271,7 +1460,7 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
                       {/* Card info */}
                       <div className="p-3 flex flex-col gap-1 flex-1">
                         <p className="text-small font-semibold leading-tight line-clamp-2">{lang === "en" ? (t.label_en ?? TASK_LABEL_EN_CLIENT[t.id] ?? t.label) : t.label}</p>
-                        <p className="text-tiny text-default-500 line-clamp-2">{t.description}</p>
+                        <p className="text-tiny text-default-500 line-clamp-2">{lang === "en" ? (TASK_DESC_EN_CLIENT[t.id] ?? t.description) : t.description}</p>
                         {(t as any).methodology && (
                           <span className="text-[10px] text-default-400 italic">📚 {(t as any).methodology}</span>
                         )}
