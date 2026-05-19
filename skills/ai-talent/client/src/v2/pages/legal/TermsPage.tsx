@@ -1,5 +1,5 @@
 /**
- * 服務條款 — OnBrand Pro Terms of Service.
+ * 服務條款 — OnBrand Terms of Service.
  * 2026-05-10. 由 SoWork 法律顧問 review 後正式版替換 (TODO).
  */
 import React from "react";
@@ -62,8 +62,8 @@ export default function TermsPage() {
             </li>
             <li>
               {isEn
-                ? <>Paid plans (Starter / Solo / Studio): see current prices at <a href="/pricing" className="text-blue-600 underline">/pricing</a>. Early-bird subscribers lock in their price permanently. Annual plans save approximately 17%.</>
-                : <>付費方案（Starter / Solo / Studio）：現行定價請見 <a href="/pricing" className="text-blue-600 underline">/pricing</a>。早鳥方案用戶永久保價；年繳方案約折抵 17%。</>}
+                ? <>Paid plans (Starter / Solo): see current prices at <a href="/pricing" className="text-blue-600 underline">/pricing</a>. Early-bird subscribers lock in their price permanently. Solo annual = 11 months (1 month free, ~8%); Starter annual = 12 months at the same monthly rate (no discount).</>
+                : <>付費方案（Starter / Solo）：現行定價請見 <a href="/pricing" className="text-blue-600 underline">/pricing</a>。早鳥方案用戶永久保價。Solo 年繳 = 11 個月（送 1 個月，約 8%）；Starter 年繳 = 12 個月同月費（無額外折扣）。</>}
             </li>
             <li>
               {isEn

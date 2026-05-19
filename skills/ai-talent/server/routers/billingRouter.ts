@@ -85,7 +85,7 @@ export async function assertWithinPlan(
   if (u.planStatus === "trial" && u.planEndsAt && u.planEndsAt < now) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: "免費試用已到期 — 請升級 OnBrand Pro 繼續使用",
+      message: "免費試用已到期 — 請升級至付費方案繼續使用",
     });
   }
   if (u.planStatus === "expired" || u.planStatus === "canceled") {

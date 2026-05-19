@@ -181,8 +181,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     code: "subscribed",
     route: "upgrade", order: 2, points: 50,
-    title: "OnBrand Pro 用戶",
-    description: "升級為 OnBrand Pro，無限 30 秒任務一路跑",
+    title: "OnBrand 付費用戶",
+    description: "升級至付費方案，無限 30 秒任務一路跑",
     icon: "Crown",
     ctaPath: "/pricing", ctaText: "查看方案",
   },
@@ -207,7 +207,7 @@ export const ROUTE_META: Record<AchievementRoute, { label: string; subtitle: str
   planning:    { label: "規劃",   subtitle: "整週的內容一次企劃完", dayHint: "Day 4" },
   integration: { label: "整合",   subtitle: "跨平台 + 品牌規則", dayHint: "Day 5" },
   publish:     { label: "發布",   subtitle: "真的把內容送出去", dayHint: "Day 6" },
-  upgrade:     { label: "升級",   subtitle: "成為 OnBrand Pro", dayHint: "Day 7" },
+  upgrade:     { label: "升級",   subtitle: "升級至付費方案", dayHint: "Day 7" },
 };
 
 // ─── Evaluators ──────────────────────────────────────────────────────

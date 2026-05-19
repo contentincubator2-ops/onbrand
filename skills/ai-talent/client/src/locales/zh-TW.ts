@@ -473,7 +473,7 @@ export const zh = {
   pricing_title:           "簡單透明的定價",
   pricing_subtitle:        "先免費試用，覺得有用再付。",
   pricing_trial_cta:       "開始免費試用",
-  pricing_upgrade_cta:     "升級 Pro",
+  pricing_upgrade_cta:     "查看方案",
   pricing_per_month:       "/ 月",
   pricing_per_year:        "/ 年",
   pricing_billed_annually: "年繳",
