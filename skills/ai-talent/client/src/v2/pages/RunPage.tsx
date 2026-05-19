@@ -925,12 +925,11 @@ export default function RunPage() {
     // stay FB feed.
     if (/活動總覽|總覽|campaign overview/i.test(lbl)) return v("generic", "research-doc");
     // 2026-05-19 (CJ「這四個tab分別適合不同的mockup」): yt-99-quarterly-strategy
-    // has 5 tabs: 內容支柱 / 12 影片 title / Community 月曆 / Competitor 分析 /
-    // 即時趨勢報告. Default mockupVariant is youtube:video-card (correct for the
-    // 12 影片 tab). The strategy/research tabs → generic doc; Community → YT
-    // community post.
-    if (/內容支柱|content pillar/i.test(lbl)) return v("generic", "research-doc");
-    if (/competitor|競品分析|即時趨勢/i.test(lbl)) return v("generic", "research-doc");
+    // 4 tabs (即時趨勢報告 / 內容支柱 / 12 影片 title / Community 月曆).
+    // Default mockupVariant is youtube:video-card (correct for 12 影片 tab).
+    // Strategy/research tabs → generic doc; Community → YT community post.
+    // 2026-05-19 v2: Competitor 分析 removed (5→4 tabs); chip order updated.
+    if (/內容支柱|content pillar|即時趨勢/i.test(lbl)) return v("generic", "research-doc");
     if (/community\s*月曆|社群月曆/i.test(lbl)) return v("youtube", "community");
     // 2026-05-19 v2 (CJ): ig-99-save-worthy per-slide tabs.
     // Each "Slide N" tab → instagram:carousel (1:1 square with copy + AI image).

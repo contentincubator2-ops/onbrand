@@ -394,7 +394,7 @@ export const YT_99S_TASKS: FBTaskTemplate[] = [
     id: "yt-99-quarterly-strategy",
     tier: "99s", postType: "video",
     label: "YT 季度頻道策略",
-    description: "12 個 video title + 內容支柱 + community 月曆 + competitor 分析",
+    description: "即時趨勢報告 + 內容支柱 + 12 個 video title + community 月曆",
     agent_id: 224001, // Yun-Hsuan Chen — YouTube Marketing Strategist 服飾時尚 (~1019 char)
     skill_slug: "youtube-strategy",
     primary_question: "頻道主題 + 目標受眾職稱 + 品牌主張 + 競品（四項合填）",
@@ -427,7 +427,6 @@ Community 月曆模擬投票數字（「56% / 32% / 12% / 567 票 / 1.2K」）�
 即使你認為 Grammarly、Writer AI 是業界公認競品，只要輸入未提，一律不得出現。
 這是合規要求，不是風格建議，「常識」不能授權你引用未點名競品。
 → 改泛稱：「同類 AI 寫作工具」「市面品牌語音工具」
-Competitor 分析 tab：輸入無競品 → 每個競品欄位輸出「[請補充：競品名稱]」
 Scout 回傳資訊提到某競品 → 仍需輸入中已點名才可引用
 ══════════════════════════════════════════
 
@@ -459,20 +458,14 @@ title 內的數字必須來自輸入。競品名稱必須來自輸入。
 ▌Community 月曆（label 含「Community」）
 每篇貼文嚴格按以下三段格式，格式以外不得添加任何元素：
 
-第 N 週 · 貼文 M｜發布時機：[星期幾 時段]
+YYYY年M月D日（週N）｜發布時機：[星期幾 時段]
 [正文，純文字，100-180 字，無 emoji，無 hashtag，無驚嘆號，無數字統計，無投票選項]
 問題：[一個開放式問題句，不含選項、不含百分比、不含票數]
 
-（重複 8-12 篇；絕對不輸出「A. XX%  B. XX%  票數：XXX」類的投票 UI）
-
-▌Competitor 分析（label 含「Competitor」）
-若輸入有競品：
-## [競品名稱（輸入中有的）]
-市場定位：[...]
-優勢：[...]
-對本頻道的策略含義：[...]
-若輸入無競品：
-## [請補充：競品名稱]（×3，無其他內容）
+日期格式說明：用真實的 2026 年月日（例：2026年6月1日（週一））。
+從當前月份起算，共輸出 8-12 篇，每篇間隔 5-7 天。
+絕對不輸出「A. XX%  B. XX%  票數：XXX」類的投票 UI。
+絕對不用「第 N 週 · 貼文 M」這類抽象佔位符。
 
 ▌即時趨勢報告（label 含「趨勢」）
 ## 趨勢 N：[名稱]
@@ -1436,14 +1429,15 @@ export const YT_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { ...yt100Common.extras, postsCount: 6 },
   },
   "yt-99-quarterly-strategy": {
-    ...yt100Common, variants: 5, images: 5,
+    ...yt100Common, variants: 4, images: 4,
     aspectRatio: "16:9", fluxSize: "landscape_16_9",
-    variantLabels: ["內容支柱", "12 影片 title", "Community 月曆", "Competitor 分析", "即時趨勢報告"],
+    // 2026-05-19 (CJ): reorder tabs + remove Competitor 分析 (5→4 tabs)
+    variantLabels: ["即時趨勢報告", "內容支柱", "12 影片 title", "Community 月曆"],
     captionMinChars: 300, captionMaxChars: 600,
     strategistAgentId: 30001, // Alex Chen — AI Growth Hacker CMO (1831 char)
-    postLabels: ["內容支柱", "12 影片 title", "Community 月曆", "Competitor 分析", "即時趨勢報告"],
+    postLabels: ["即時趨勢報告", "內容支柱", "12 影片 title", "Community 月曆"],
     scoutKind: "news", // 季度策略 → 抓產業最新
-    extras: { ...yt100Common.extras, postsCount: 5 },
+    extras: { ...yt100Common.extras, postsCount: 4 },
   },
   "yt-99-premiere-kit": {
     ...yt100Common, variants: 4, images: 4,
