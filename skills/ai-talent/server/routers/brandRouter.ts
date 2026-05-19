@@ -694,7 +694,7 @@ export const brandRouter = router({
       try {
         await assertBrandOwner(input.brandId, ctx.user.id);
       } catch {
-        throw new TRPCError({ code: "FORBIDDEN", message: "你沒有這個 brand 的編輯權限" });
+        throw new TRPCError({ code: "FORBIDDEN", message: "你沒有這個品牌的編輯權限" });
       }
 
       // Extract handle from URL if a URL was given

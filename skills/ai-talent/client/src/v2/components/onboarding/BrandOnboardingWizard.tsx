@@ -414,13 +414,13 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     { name: "Mandy Cheng", title: "Brand Strategist", role: "Differentiation analysis" },
                     { name: "Jordan Hayes", title: "QA Reviewer", role: "Final review" },
                   ] : [
-                    { name: "Aiden Hsu", title: "Caption Writer", role: "撰寫定位草稿" },
-                    { name: "Mandy Cheng", title: "Brand Strategist", role: "差異化分析" },
-                    { name: "Jordan Hayes", title: "QA Reviewer", role: "整合審稿" },
+                    { name: "Aiden Hsu", title: "文案撰寫師", role: "撰寫定位草稿" },
+                    { name: "Mandy Cheng", title: "品牌策略師", role: "差異化分析" },
+                    { name: "Jordan Hayes", title: "QA 審核師", role: "整合審稿" },
                   ]}
                   stages={
                     jobData
-                      ? [{ key: "running", label: `Step ${jobData.currentStep ?? 0} / ${jobData.totalSteps ?? 14}`, status: "running" }]
+                      ? [{ key: "running", label: lang === "en" ? `Step ${jobData.currentStep ?? 0} / ${jobData.totalSteps ?? 14}` : `步驟 ${jobData.currentStep ?? 0} / ${jobData.totalSteps ?? 14}`, status: "running" }]
                       : null
                   }
                   accentColor="#7C3AED"

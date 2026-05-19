@@ -122,7 +122,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
           <span style={{ fontSize: 10.5, color: "#525252", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-            Capacity · {charPct}%
+            {en ? `Capacity · ${charPct}%` : `容量使用率 · ${charPct}%`}
           </span>
           <span style={{ fontSize: 10, color: "#525252" }}>{en ? "Cap: 50 entries × 8,000 chars each" : "上限：50 條 × 每條 8,000 字"}</span>
         </div>
@@ -300,13 +300,13 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                   letterSpacing: "0.12em", textTransform: "uppercase",
                   borderTop: "1px solid #D4D4D4", paddingTop: 8,
                 }}>
-                  <span>{(it.body ?? "").length.toLocaleString()} chars</span>
+                  <span>{(it.body ?? "").length.toLocaleString()} {en ? "chars" : "字"}</span>
                   {it.sourceUrl && (
                     <a
                       href={it.sourceUrl} target="_blank" rel="noreferrer"
                       style={{ display: "flex", alignItems: "center", gap: 3, color: "#525252", textDecoration: "none" }}
                     >
-                      <ExternalLink size={10} /> Source
+                      <ExternalLink size={10} /> {en ? "Source" : "來源"}
                     </a>
                   )}
                 </div>

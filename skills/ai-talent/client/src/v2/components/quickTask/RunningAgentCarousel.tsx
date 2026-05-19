@@ -39,13 +39,15 @@ interface Props {
   progressPct?: number;
   /** Latency display "12.3s / 20s" */
   elapsedText?: string;
+  /** Language: "en" or "zh-TW" (default zh-TW) */
+  lang?: string;
 }
 
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
 export default function RunningAgentCarousel({
-  agents, stages, accentColor, progressPct, elapsedText,
+  agents, stages, accentColor, progressPct, elapsedText, lang = "zh-TW",
 }: Props) {
   // Rotate through agents every 2.4s. If only 1 agent, stay on it.
   const [activeIdx, setActiveIdx] = useState(0);
@@ -178,7 +180,7 @@ export default function RunningAgentCarousel({
           {activeAgent.name}
         </div>
         <div className="text-tiny text-default-500 mt-0.5">
-          {activeAgent.role ?? activeAgent.title ?? "Agent"}
+          {activeAgent.role ?? activeAgent.title ?? (lang === "en" ? "Agent" : "AI 專家")}
         </div>
       </div>
 

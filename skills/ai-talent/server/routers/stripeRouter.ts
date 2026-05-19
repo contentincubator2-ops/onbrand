@@ -98,11 +98,11 @@ export const stripeRouter = router({
         console.warn("[stripe.createCheckout] workspace lookup failed:", (e as Error).message);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Workspace 資料未就緒，請稍後再試或聯絡 SoWork",
+          message: "工作空間資料未就緒，請稍後再試或聯絡 SoWork",
         });
       }
       if (!wRows[0]) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "只有 workspace owner 可以訂閱" });
+        throw new TRPCError({ code: "FORBIDDEN", message: "只有工作空間擁有者可以訂閱" });
       }
 
       // 2026-05-14 (CJ「美金為準，每天匯率動」): USD is the truth, TWD derives

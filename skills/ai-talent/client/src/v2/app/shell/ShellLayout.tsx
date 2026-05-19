@@ -90,9 +90,9 @@ function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
     // countdown sequences, ad packs); 99s = full slate (42 tasks like
     // 30-day calendars, 6-ep series, launch toolkits).
     { to: "/30s",       label: en ? "Single" : "單品",   tierBadge: "30s", icon: null,
-      tooltip: en ? "30s · single piece — one headline / caption / DM / hashtag set" : "30 秒寫完一件素材 — 一組標題 / 文案 / 私訊 / hashtag" },
+      tooltip: en ? "30s · single piece — one headline / caption / DM / hashtag set" : "30 秒寫完一件素材 — 一組標題 / 文案 / 私訊 / 主題標籤" },
     { to: "/60s",       label: en ? "Pack" : "套組", tierBadge: "60s", icon: null,
-      tooltip: en ? "60s · a related set of pieces — 5-day countdown, 7-slide carousel, 3-variant ad pack" : "60 秒寫完一套相關素材 — 5 天倒數、7 張輪播、3 種廣告變體" },
+      tooltip: en ? "60s · a related set of pieces — 5-day countdown, 7-slide carousel, 3-variant ad pack" : "60 秒寫完一套相關素材 — 5 天倒數、7 張輪播、3 種廣告版本" },
     { to: "/99s",       label: en ? "Slate" : "檔期", tierBadge: "99s", icon: null, matchPrefix: "/99s",
       tooltip: en ? "99s · full slate — 30-day calendar, 6-episode series, launch toolkit" : "99 秒企劃一個檔期 — 30 天月曆、6 集系列、上市工具包" },
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
@@ -758,7 +758,7 @@ function BrandHierarchyPill({
             <>
               <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
               <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "4px 10px", textTransform: "uppercase" }}>
-                {isEn ? "Product" : "產品 / Product"}
+                {isEn ? "Product" : "產品"}
               </p>
               {scope.productId && (
                 <button
@@ -805,7 +805,7 @@ function BrandHierarchyPill({
             <>
               <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
               <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "4px 10px", textTransform: "uppercase" }}>
-                {isEn ? "Event" : "活動 / Event"}
+                {isEn ? "Event" : "活動"}
               </p>
               {scope.eventId && (
                 <button
