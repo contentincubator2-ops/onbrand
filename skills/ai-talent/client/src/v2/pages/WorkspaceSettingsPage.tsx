@@ -31,11 +31,13 @@ const ROLE_LABEL_EN: Record<Role, string> = {
 };
 
 const PLAN_LABEL: Record<string, string> = {
-  solo: "Solo",
-  drop_pro: "OnBrand Pro",
-  drop_team: "OnBrand Team",
-  drop_agency: "OnBrand Agency",
-  enterprise: "Enterprise",
+  trial:        "Trial",
+  solo:         "Solo",
+  drop_starter: "OnBrand Starter",
+  drop_pro:     "OnBrand Solo",
+  drop_team:    "OnBrand Studio",
+  drop_agency:  "OnBrand Agency",
+  enterprise:   "Enterprise",
 };
 
 export default function WorkspaceSettingsPage() {

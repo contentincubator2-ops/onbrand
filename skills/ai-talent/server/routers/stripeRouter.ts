@@ -55,9 +55,10 @@ function getStripe(): Stripe {
 }
 
 const PLAN_LABEL: Record<string, string> = {
-  drop_pro:    "OnBrand · 一人公司方案",
-  drop_team:   "OnBrand · 小團隊方案",
-  drop_agency: "OnBrand · 代理商方案",
+  drop_starter: "OnBrand Starter",
+  drop_pro:     "OnBrand Solo",
+  drop_team:    "OnBrand Studio",
+  drop_agency:  "OnBrand Agency",
 };
 
 /** Look up the user's billing currency (defaults TWD). */
@@ -76,7 +77,7 @@ export const stripeRouter = router({
   /** Subscription checkout — monthly or annual. */
   createCheckout: protectedProcedure
     .input(z.object({
-      planCode: z.enum(["drop_pro", "drop_team", "drop_agency"]),
+      planCode: z.enum(["drop_starter", "drop_pro", "drop_team", "drop_agency"]),
       workspaceId: z.number().int().positive(),
       annual: z.boolean().default(false),
     }))

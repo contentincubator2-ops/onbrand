@@ -19,7 +19,7 @@
 
 // 2026-05-11 — multi-tier for $1M ARR strategy. Solo / Team / Agency
 // split (CJ「Team / Agency 方案是 $1M 真正的槓桿」).
-export type PlanCode = "trial" | "drop_pro" | "drop_team" | "drop_agency" | "enterprise";
+export type PlanCode = "trial" | "drop_starter" | "drop_pro" | "drop_team" | "drop_agency" | "enterprise";
 
 export interface PlanQuota {
   /** -1 means unlimited */
@@ -154,6 +154,53 @@ export interface Plan {
 }
 
 export const PLANS: Record<PlanCode, Plan> = {
+  /** OnBrand Starter — entry-level personal plan.
+   *  2026-05-19 (CJ direction「加 Starter 給個人購買者」):
+   *    - 早鳥 US$25/月（永久保價）
+   *    - 標準 US$75/月
+   *    - 1 個品牌 · 50 次執行 / 月（points cap 5,000 ≈ 50 × 60s tasks）
+   *    - 30s + 60s 任務；99s 鎖定（需升級 Solo）
+   *    - 每日 LLM cost cap = $2（fair-use guard）
+   */
+  drop_starter: {
+    code: "drop_starter",
+    name: "OnBrand Starter",
+    priceTwdMonthly:         2250,   // NT$2,250 ≈ US$75 standard
+    priceTwdAnnually:        7500,   // NT$7,500 ≈ US$250 annual (early bird)
+    earlyBirdPriceTwdMonthly: 750,   // NT$750 ≈ US$25 early bird
+    standardPriceTwdMonthly: 2250,
+    priceUsdMonthly:          75,    // standard US$75
+    priceUsdAnnually:        750,    // standard annual (10×)
+    earlyBirdPriceUsdMonthly: 25,    // early-bird US$25
+    standardPriceUsdMonthly:  75,
+    trialDays: 0,
+    quota: {
+      task_30s:   -1,  // point-gated, no per-task cap
+      task_60s:   -1,
+      task_99s:    0,  // 99s locked on Starter
+      image_gen:  -1,
+      video_gen:   0,
+      brands:      1,
+      fb_publish: -1,
+      team_members: 1,
+      multi_client: false,
+      // 5,000 pts/month ≈ 50 × 60s runs (text-only) or ~23 full 60s runs with 5 images
+      // Resets on the 1st of every month.
+      pointsPerCycle: 5000,
+      pointsCycleDays: 30,
+    },
+    features: [
+      "1 個品牌 · 1 位用戶",
+      "每月 50 次執行（30s + 60s 任務，每次含所有變體 + 圖）",
+      "AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
+      "品牌大腦定位（USP · 語氣 · 受眾）",
+      "FB / IG 直接發布 + 排程",
+      "電子發票（個人 / B2B）",
+      "99s 深度研究任務：升級 Solo 解鎖",
+    ],
+    highlight: "早鳥 US$25／標準 US$75",
+  },
+
   /** New users get 7 days OR 1000 points (whichever runs out first).
    *  2026-05-18: dual-limit trial — time cap prevents indefinite squatting;
    *  points cap prevents account-farm abuse (new account = same 1000 pts,

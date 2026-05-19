@@ -20,7 +20,7 @@ export default function TermsPage() {
           {isEn ? "Terms of Service" : "服務條款"}
         </h1>
         <p className="text-sm text-neutral-500 mb-8">
-          {isEn ? "Last updated: 2026-05-10" : "最後更新：2026-05-10"}
+          {isEn ? "Last updated: 2026-05-19" : "最後更新：2026-05-19"}
         </p>
 
         <section className="prose prose-sm max-w-none space-y-6 text-neutral-800 leading-relaxed">
@@ -62,8 +62,8 @@ export default function TermsPage() {
             </li>
             <li>
               {isEn
-                ? "Paid plan: OnBrand Pro is NT$ 990 / month, or NT$ 9,900 / year (about 17% off)."
-                : "付費方案：OnBrand Pro 月費 NT$ 990 / 月，或年繳 NT$ 9,900（折抵約 17%）。"}
+                ? <>Paid plans (Starter / Solo / Studio): see current prices at <a href="/pricing" className="text-blue-600 underline">/pricing</a>. Early-bird subscribers lock in their price permanently. Annual plans save approximately 17%.</>
+                : <>付費方案（Starter / Solo / Studio）：現行定價請見 <a href="/pricing" className="text-blue-600 underline">/pricing</a>。早鳥方案用戶永久保價；年繳方案約折抵 17%。</>}
             </li>
             <li>
               {isEn

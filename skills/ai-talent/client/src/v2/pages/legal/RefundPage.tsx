@@ -20,7 +20,7 @@ export default function RefundPage() {
           {isEn ? "Refund Policy" : "退費條款"}
         </h1>
         <p className="text-sm text-neutral-500 mb-8">
-          {isEn ? "Last updated: 2026-05-10" : "最後更新：2026-05-10"}
+          {isEn ? "Last updated: 2026-05-19" : "最後更新：2026-05-19"}
         </p>
 
         <section className="prose prose-sm max-w-none space-y-6 text-neutral-800 leading-relaxed">
@@ -84,18 +84,18 @@ export default function RefundPage() {
             <li>
               {isEn ? (
                 <>
-                  <strong>After 14 days</strong>, we deduct used months at NT$ 990 / month and refund the balance.
+                  <strong>After 14 days</strong>, we deduct used months at the monthly equivalent of your plan and refund the remaining balance.
                 </>
               ) : (
                 <>
-                  付款後 <strong>超過 14 日</strong>，按已使用月份扣除（NT$ 990 / 月）後退還餘額。
+                  付款後 <strong>超過 14 日</strong>，按已使用月份數扣除（以您方案的月費均攤計算）後退還餘額。
                 </>
               )}
             </li>
             <li>
               {isEn
-                ? "Example: paid NT$ 9,900 / year, used 3 months — refund = 9,900 − (990 × 3) = NT$ 6,930."
-                : "例：年繳 9,900 元，使用 3 個月後申請，退還 9,900 - (990×3) = 6,930 元。"}
+                ? "Example: paid US$ 250 / year (Solo annual), used 3 months — monthly equivalent = US$250÷12 ≈ US$20.8; refund = 250 − (20.8 × 3) ≈ US$ 187.5."
+                : "例：年繳 Solo 方案（US$250），使用 3 個月後申請，每月均攤 US$250÷12 ≈ US$20.8，退還 250 - (20.8×3) ≈ US$187.5（依當日匯率換算 TWD）。"}
             </li>
           </ul>
 
