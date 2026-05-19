@@ -122,7 +122,7 @@ function synthesizeStages(elapsedMs: number, tier: "30s" | "60s" | "99s", lang: 
   if (isProd) {
     stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   }
-  stages.push(mk("caption", L("Caption Writer 寫變體", "Caption writer drafts variants"), capStart, capEnd));
+  stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
   stages.push(mk("brief", L("視覺指導寫風格指示", "Image director writes the visual brief"), capStart, capEnd));
   stages.push(mk("gen", L("Flux 生圖", "Flux paints the image"), capEnd, genEnd));
   if (isProd) {
@@ -784,8 +784,8 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
         emoji: "🎼",
         kicker: "PRODUCTION PACKAGE",
         headline: lang === "en" ? "A full production pack in 60 seconds" : "60 秒交付一個完整套組",
-        sub: lang === "en" ? "Multi-agent · 5 variants + real images + reply templates + posting time + QA" : "多 Agent 協作 · 5 變體 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
-        bullets: lang === "en" ? ["5 variants", "7-9 agents", "Real Flux images", "Jordan QA"] : ["5 變體", "7-9 位 agent 協作", "Flux 真生圖", "Jordan QA 審核"],
+        sub: lang === "en" ? "Multi-agent · 5 variants + real images + reply templates + posting time + QA" : "多 AI 助手協作 · 5 版本 + 真生圖 + 留言模板 + 發文時段 + QA 審核",
+        bullets: lang === "en" ? ["5 variants", "7-9 agents", "Real Flux images", "Jordan QA"] : ["5 版本", "7-9 位 AI 助手協作", "Flux 真生圖", "Jordan QA 審核"],
         accent: "#7c3aed",
         gradientFrom: "rgba(124,58,237,0.10)",
       }

@@ -93,7 +93,7 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
             <Chip size="sm" variant="flat" className="h-5 text-tiny">{AUDIO_LABEL[data.audioKind] ?? "🎵"}</Chip>
             {isActive && (
               <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
-                ● agent 思考中…
+                ● AI 助手思考中…
               </Chip>
             )}
           </div>
@@ -114,7 +114,7 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
           </p>
           {data.hookHypothesis && (
             <p className="text-tiny text-default-500 leading-relaxed px-1">
-              <span className="font-semibold">Hook 假設：</span>{data.hookHypothesis}
+              <span className="font-semibold">開場鉤假設：</span>{data.hookHypothesis}
             </p>
           )}
         </div>

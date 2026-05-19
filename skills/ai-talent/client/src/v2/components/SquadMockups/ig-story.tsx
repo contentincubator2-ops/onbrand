@@ -92,7 +92,7 @@ export function IGStoryMockup({ data, isActive = false }: Props) {
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● agent 思考中…
+              ● AI 助手思考中…
             </Chip>
           )}
         </div>
