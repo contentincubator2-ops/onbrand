@@ -263,7 +263,7 @@ export const PLANS: Record<PlanCode, Plan> = {
     standardPriceTwdMonthly: 9000,
     // 2026-05-14 (CJ Solo pivot): USD is the canonical price.
     priceUsdMonthly: 300,                  // standard US$300
-    priceUsdAnnually: 3000,                // 10× monthly
+    priceUsdAnnually: 3300,                // 11× standard monthly ($300×11)
     earlyBirdPriceUsdMonthly: 100,         // early-bird US$100 (永久保價 for 早鳥)
     standardPriceUsdMonthly: 300,
     trialDays: 0,
@@ -447,10 +447,13 @@ export function getEffectivePrice(
   const usdMonthly = isEarlyBird && plan.earlyBirdPriceUsdMonthly && plan.earlyBirdPriceUsdMonthly > 0
     ? plan.earlyBirdPriceUsdMonthly
     : (plan.priceUsdMonthly ?? 0);
-  // Annual = 10× monthly (saves 17%; matches existing UI copy)
+  // Annual = 11× monthly (1 month free / ~8% saving).
+  // Starter is an exception: its annual is exactly 12× ($25×12=$300, no saving).
+  const isStarter = plan.code === "drop_starter";
+  const annualMultiplier = isStarter ? 12 : 11;
   const usdAnnually = isEarlyBird && plan.earlyBirdPriceUsdMonthly && plan.earlyBirdPriceUsdMonthly > 0
-    ? plan.earlyBirdPriceUsdMonthly * 10
-    : (plan.priceUsdAnnually ?? usdMonthly * 10);
+    ? plan.earlyBirdPriceUsdMonthly * annualMultiplier
+    : (plan.priceUsdAnnually ?? usdMonthly * annualMultiplier);
 
   // 3. Return in requested currency
   if (currency === "USD") {

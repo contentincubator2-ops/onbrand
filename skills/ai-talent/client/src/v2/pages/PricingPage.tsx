@@ -37,16 +37,16 @@ export default function PricingPage() {
   const r = (usd: number) => Math.round(usd * usdToTwd);
 
   // ─── Pricing truth (USD) ───────────────────────────────────────────────────
-  // Starter  US$25 early / US$75 std  · annual US$300 (= $25×12, no discount)
-  // Solo     US$100 early / US$300 std · annual US$1,000 (= $100×10, save 17%)
+  // Starter  US$25 early / US$75 std  · annual US$300 (= $25×12, no saving)
+  // Solo     US$100 early / US$300 std · annual US$1,100 (= $100×11, 1 month free ~8%)
   const defaults = currency === "USD"
     ? {
         starterEarly: 25,  starterStd: 75,  starterAnnual: 300,   // $25×12
-        soloEarly:   100,  soloStd:   300,  soloAnnual:   1000,   // $100×10
+        soloEarly:   100,  soloStd:   300,  soloAnnual:   1100,   // $100×11
       }
     : {
         starterEarly: r(25),  starterStd: r(75),  starterAnnual: r(300),
-        soloEarly:   r(100),  soloStd:   r(300),  soloAnnual:   r(1000),
+        soloEarly:   r(100),  soloStd:   r(300),  soloAnnual:   r(1100),
       };
 
   const TIERS = [
@@ -112,8 +112,8 @@ export default function PricingPage() {
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: true,
       highlightLabel: isEn ? "MOST POPULAR · EARLY BIRD" : "最多人選 · 早鳥優惠",
-      annualNote: isEn ? "~US$83/mo billed annually" : "年繳，每月平均 US$83",
-      annualSavePct: 17,
+      annualNote: isEn ? "~US$92/mo billed annually (1 month free)" : "年繳，每月平均約 US$92（送 1 個月）",
+      annualSavePct: 8,
     },
   ];
 
@@ -197,7 +197,7 @@ export default function PricingPage() {
                 annual ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600"
               }`}
             >
-              {isEn ? "Yearly" : "年繳"} <span className="text-xs text-emerald-600 ml-1">{isEn ? "Solo saves 17%" : "Solo 省 17%"}</span>
+              {isEn ? "Yearly" : "年繳"} <span className="text-xs text-emerald-600 ml-1">{isEn ? "Solo: 1 month free" : "Solo 送 1 個月"}</span>
             </button>
           </div>
         </div>
