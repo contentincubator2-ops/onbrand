@@ -15,7 +15,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRobot, faPlus, faXmark, faWandSparkles } from "@fortawesome/free-solid-svg-icons";
 import type { SegmentSpec, FieldSpec } from "../../lib/positioningSchema";
 import SourceViewer from "./SourceViewer";
-import { useLang } from "../../lib/i18n";
+import { useLang } from "../../../lib/i18n";
 
 export interface SegmentEditorProps {
   spec: SegmentSpec;
