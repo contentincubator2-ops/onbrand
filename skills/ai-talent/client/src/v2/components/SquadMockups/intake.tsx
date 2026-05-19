@@ -416,7 +416,7 @@ export function IntakeFormMockup({
         </div>
         <Textarea
           size="sm" radius="md" variant="bordered"
-          label={lang === "en" ? "Tilt confirm / edit (derived from positioning)" : "Tilt 確認 / 編輯（intake agent 已從品牌定位推導）"}
+          label={lang === "en" ? "Tilt confirm / edit (derived from positioning)" : "定位角確認 / 編輯（AI 助手已從品牌定位推導）"}
           labelPlacement="outside"
           minRows={3}
           placeholder={lang === "en" ? "One line describing the semantic space you want to own" : "一句話描述你想壟斷的語意空間"}
@@ -479,7 +479,7 @@ export function IntakeFormMockup({
             isDisabled={!requiredFilled}
             onPress={onSubmit}
           >
-            {lang === "en" ? "Confirm & run squad" : "確認 & 開始跑 Squad"}
+            {lang === "en" ? "Confirm & run squad" : "確認 & 開始執行"}
           </Button>
         </div>
       )}

@@ -1494,7 +1494,7 @@ export default function BrandsPage() {
                           </div>
                         )}
                         <div className="mt-3 flex items-center gap-2 flex-wrap">
-                          <button className="px-3 py-1 rounded-md bg-primary text-white text-tiny font-medium hover:opacity-90" onClick={resumeAfterSmp}>{lang === "en" ? "▶ Continue (steps 7-11)" : "▶ 繼續（跑 step 7-11）"}</button>
+                          <button className="px-3 py-1 rounded-md bg-primary text-white text-tiny font-medium hover:opacity-90" onClick={resumeAfterSmp}>{lang === "en" ? "▶ Continue (steps 7-11)" : "▶ 繼續（跑步驟 7-11）"}</button>
                           <button className="px-3 py-1 rounded-md border border-divider text-tiny hover:bg-default-50" onClick={() => setSection("seg:smp")}>{lang === "en" ? "Edit SMP" : "編輯 SMP"}</button>
                         </div>
                       </div>
@@ -1503,7 +1503,7 @@ export default function BrandsPage() {
                 )}
                 {failedStepIds.length > 0 && (
                   <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
-                    {lang === "en" ? "⚠ These steps came back empty — re-run them from each segment:" : "⚠ 以下 step 沒寫入內容，建議到對應頁籤重跑："}{" "}
+                    {lang === "en" ? "⚠ These steps came back empty — re-run them from each segment:" : "⚠ 以下步驟沒寫入內容，建議到對應頁籤重跑："}{" "}
                     {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`; }).join(lang === "en" ? ", " : "、")}
                     <button className="ml-2 underline" onClick={() => setFailedStepIds([])}>{t("close")}</button>
                   </div>
@@ -3525,10 +3525,10 @@ function PositioningTopRow({
             locked
               ? (lang === "en" ? "Locked — unlock to re-run" : "已鎖定 — 解鎖後才能重跑")
               : isRunning
-                ? (lang === "en" ? `Running in the background (step ${cur}/${total})` : `背景產生中 (step ${cur}/${total})`)
+                ? (lang === "en" ? `Running in the background (step ${cur}/${total})` : `背景產生中（步驟 ${cur}/${total}）`)
                 : (lang === "en"
                     ? `Auto-fill every positioning field via a ${totalSteps}-step pipeline (background run, retry × 5)`
-                    : `用 ${totalSteps}-step pipeline 自動填寫所有定位欄位（背景執行，retry × 5）`)
+                    : `自動填寫所有定位欄位（共 ${totalSteps} 步，背景執行，最多重試 5 次）`)
           }
         >
           <Sparkles size={14} className={isRunning ? "animate-pulse" : ""} />

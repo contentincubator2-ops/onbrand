@@ -48,7 +48,7 @@ export function FBPostBriefMockup({ data, readOnly = false, isActive = false, on
           <SectionHeader
             icon="✍"
             eyebrow="STEP 5 · POST BRIEFS"
-            title={`${briefs.length} 篇 brief`}
+            title={`${briefs.length} 篇企劃摘要`}
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
@@ -57,10 +57,10 @@ export function FBPostBriefMockup({ data, readOnly = false, isActive = false, on
           )}
         </div>
         {briefs.length === 0 ? (
-          <EmptyHint>Step 5 跑完才會有 brief</EmptyHint>
+          <EmptyHint>步驟 5 跑完才會有企劃摘要</EmptyHint>
         ) : (
           <p className="text-tiny text-default-500">
-            每張卡 = calendar 的一個 slot。下游 squad（fb-post-writer-from-brief）會把每張卡轉成可發布的最終貼文。
+            每張卡 = 行事曆的一個時段。下游小組（fb-post-writer-from-brief）會把每張卡轉成可發布的最終貼文。
           </p>
         )}
       </NotionCard>
@@ -113,7 +113,7 @@ function BriefCard({
         {/* Hook */}
         <Input
           size="md" radius="md" variant="bordered"
-          label="Hook（開場一句吸引眼球）" labelPlacement="outside"
+          label="開場鉤（開場一句吸引眼球）" labelPlacement="outside"
           value={brief.hook}
           onValueChange={(v) => onChange({ hook: v })}
           isReadOnly={readOnly}

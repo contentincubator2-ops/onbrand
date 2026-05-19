@@ -148,7 +148,7 @@ export function LIFeedMockup({ data, isActive = false }: FeedProps) {
       )}
       {data.firstComment && (
         <NotionCard>
-          <SectionHeader eyebrow="FIRST COMMENT" title={lang === "en" ? "First comment (hashtag bundle)" : "首則留言（hashtag bundle）"} />
+          <SectionHeader eyebrow="FIRST COMMENT" title={lang === "en" ? "First comment (hashtag bundle)" : "首則留言（主題標籤組合）"} />
           <p className="text-small text-default-700 leading-relaxed">{data.firstComment}</p>
         </NotionCard>
       )}

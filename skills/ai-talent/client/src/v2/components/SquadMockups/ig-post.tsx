@@ -59,7 +59,7 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
     return (
       <NotionCard>
         <SectionHeader icon="📷" eyebrow="ATOMIC · IG POST" title="IG 單篇貼文 / 輪播" />
-        <EmptyHint>{!data ? "尚未產出 — 點擊執行此任務" : "資料不完整 — 缺 briefs"}</EmptyHint>
+        <EmptyHint>{!data ? "尚未產出 — 點擊執行此任務" : "資料不完整 — 缺企劃摘要"}</EmptyHint>
       </NotionCard>
     );
   }

@@ -34,8 +34,8 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
   if (!data || (!data.thinking && !data.conclusion && (!data.sources || data.sources.length === 0))) {
     return (
       <NotionCard>
-        <SectionHeader icon="🔬" eyebrow="STEP 2 · RESEARCH" title="Pillar 受眾 × 競品 gap 深度研究" />
-        <EmptyHint>{isActive ? "Stacy Lin 研究中…" : "Step 2 跑完才會有研究內容"}</EmptyHint>
+        <SectionHeader icon="🔬" eyebrow="STEP 2 · RESEARCH" title="支柱受眾 × 競品缺口深度研究" />
+        <EmptyHint>{isActive ? "Stacy Lin 研究中…" : "步驟 2 跑完才會有研究內容"}</EmptyHint>
       </NotionCard>
     );
   }

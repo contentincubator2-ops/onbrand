@@ -159,7 +159,7 @@ function PillarRowCard({
 
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label="🎨 視覺方向（這 pillar 的 image_brief 一致參考）"
+        label="🎨 視覺方向（此支柱的視覺指引一致參考）"
         labelPlacement="outside"
         minRows={2}
         placeholder="例：使用扁平向量、藍金色系、玩家小卡感"
