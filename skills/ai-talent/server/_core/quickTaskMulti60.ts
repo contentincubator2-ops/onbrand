@@ -148,8 +148,35 @@ ${TONE("LinkedIn")}`,
     primary_question: "本期主題？",
     primary_input: { key: "topic", placeholder: "本期 newsletter 想講什麼", type: "textarea" },
     inputs: [{ key: "topic", label: "Newsletter 主題", type: "textarea", required: true }],
-    systemPrompt: `產出 LI Newsletter 一期（800-1500 字）。${TONE("LinkedIn")}`,
-    preferredModel: "qwen", maxTokens: 1800,
+    systemPrompt: `你在產出「{label}」版本的 LinkedIn Newsletter 一期完整內容。
+
+【各版本切角 — 嚴格照自己被指派的版本走】
+- 「教學版」：以「怎麼做」為主軸，用 3 個具體步驟 / 框架帶讀者完成一件事，適合有操作需求的受眾。
+- 「觀點版」：以「我的立場」為主軸，反一個產業慣例或提出一個有爭議但有依據的觀點，3 個段落逐步鞏固論點。
+- 「趨勢版」：以「正在發生的事」為主軸，描述一個市場現象 → 分析背後原因 → 給出訂閱者的行動建議。
+
+【輸出結構 — 7 個區塊，全部完整輸出，不可省略或合併】
+① 期刊名與期號（1 行）：格式「[品牌] 週報 第 N 期 ｜ YYYY年M月D日」，日期用 {today}。
+② 本期目錄（3 行）：列出本期 3 個段落各自的標題，格式「→ 標題」每行一條，不加序號。
+③ 標題（≤20字）：吸引點閱的主標，要讓訂閱者知道「這期在講什麼 + 為什麼值得讀」。
+④ 引言（80-120字）：從一個具體場景或問題切入，拋出本期要回答的核心問題。不要以「在這個時代」「隨著科技發展」開頭。
+⑤ 段落一（100-150字）：主題句 + 2-3 個支撐論點（含具體案例 / 觀察，若無數字則用質化描述，不捏造）。
+⑥ 段落二（100-150字）：承接段落一，推進一層（原因 / 反例 / 延伸），段間自然銜接。
+⑦ 段落三（100-150字）：收斂，給出「讀者可以立刻採取的 1 個行動 / 視角轉換」。
+⑧ CTA（60-80字）：邀讀者回覆或分享觀點（具體問句，不是「喜歡請分享」），加一句「下期預告」。
+
+【LinkedIn Newsletter 格式硬規則 — 違反即不合格】
+- 禁止所有 Markdown 符號：# / ## / ** / __ / --- / ``` 全禁。
+- 段落之間用空行（一個換行）分隔，不用任何符號作分隔線。
+- 標題不加冒號結尾、不加引號包覆。
+- 全篇禁驚嘆號（! / ！）。
+- 禁「在這個瞬息萬變的時代」「數位浪潮」「賦能」「驅動價值」等空洞詞。
+- hashtag 若需要，放在 CTA 之後獨立一行，3 個以內。
+
+【數字核對】用戶輸入若無提供具體數字，禁止捏造百分比或調查結果，改用「根據我的觀察」「多個案例顯示」等質化表述。
+
+${TONE("LinkedIn")}`,
+    preferredModel: "qwen", maxTokens: 2200,
     outputDefaults: { platform: "linkedin", post_type: "newsletter" },
   },
   {
@@ -183,7 +210,7 @@ export const LI_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: LI_IMG2,
     aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
     variantLabels: ["教學版", "觀點版", "趨勢版"],
-    captionMinChars: 400, captionMaxChars: 700,
+    captionMinChars: 600, captionMaxChars: 1300,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "li-60-case-study": {
