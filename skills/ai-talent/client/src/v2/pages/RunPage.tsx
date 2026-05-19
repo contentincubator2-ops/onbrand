@@ -910,6 +910,12 @@ export default function RunPage() {
     // Drive the pinned-suite per-piece mockup off the DISTINCTIVE piece
     // labels themselves — these zh phrases are specific enough not to
     // collide with other tasks' tone labels (情感版 / 理性版 …).
+    // 2026-05-19 (CJ 驗收 kl-60-pitch-pack「generic:feed 純白框，KOL 邀約
+    // 應有訊息/信件 UI」): per-variant mockup for the KOL pitch pack —
+    // 信件類 → email:dm（寄件人/收件人/主旨 letter UI）；Brief 附件 →
+    // proposal-spec 文件。labels 同時涵蓋 squad step 名與新 orchestra 標籤。
+    if (/合作\s*Brief|Brief（附件）|資料包|brand\s*brief/i.test(lbl)) return v("generic", "proposal-spec");
+    if (/邀約主信|邀請開場|主信|報價回應|議價|追蹤信|後續追蹤|follow-?up|收尾感謝|發布後感謝|結案感謝/i.test(lbl)) return v("email", "dm");
     if (/已釘選|釘選主文|^釘選/i.test(lbl)) return v("facebook", "pinned");
     if (/常見問答|常見問題|FAQ|Q&A|問答集/i.test(lbl)) return v("facebook", "qa");
     if (/關於我們|about us/i.test(lbl)) return v("facebook", "about");
