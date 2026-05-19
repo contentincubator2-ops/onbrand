@@ -30,13 +30,15 @@ const GRAD = "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)";
 export default function LandingPage() {
   const { lang, setLang } = useLang();
   const en = lang === "en";
+  const [authed, setAuthed] = React.useState(false);
 
-  // Authed users shouldn't see marketing — bounce to the app.
   React.useEffect(() => {
     let dead = false;
+    // Check auth status to swap nav CTA — but don't auto-redirect so
+    // logged-in users can still view and share the marketing page.
     fetch("/api/auth/me", { method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" }, body: "{}" })
-      .then((r) => { if (!dead && r.ok) window.location.replace("/30s"); })
+      .then((r) => { if (!dead && r.ok) setAuthed(true); })
       .catch(() => {});
     // Headline === site description (single consistent message).
     document.title = en ? `OnBrand · ${TAGLINE_EN}` : `OnBrand · ${TAGLINE_ZH}`;
@@ -44,6 +46,7 @@ export default function LandingPage() {
       ?? (() => { const e = document.createElement("meta"); e.setAttribute("name", "description"); document.head.appendChild(e); return e; })();
     m.setAttribute("content", en ? `${TAGLINE_EN}. ${SUBLINE_EN}` : `${TAGLINE_ZH}。${SUBLINE_ZH}`);
     return () => { dead = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [en]);
 
   const moat = en ? [
@@ -69,14 +72,24 @@ export default function LandingPage() {
           <Link to="/pricing" className="text-neutral-600 hover:text-neutral-900 px-2">
             {en ? "Pricing" : "方案"}
           </Link>
-          <Link to="/auth/login" className="text-neutral-600 hover:text-neutral-900 px-2">
-            {en ? "Sign in" : "登入"}
-          </Link>
-          <Link to="/auth/register"
-            className="px-4 py-2 rounded-lg text-white font-semibold"
-            style={{ background: GRAD }}>
-            {en ? "Start free" : "免費試用"}
-          </Link>
+          {authed ? (
+            <Link to="/30s"
+              className="px-4 py-2 rounded-lg text-white font-semibold"
+              style={{ background: GRAD }}>
+              {en ? "Go to app" : "進入應用程式"}
+            </Link>
+          ) : (
+            <>
+              <Link to="/auth/login" className="text-neutral-600 hover:text-neutral-900 px-2">
+                {en ? "Sign in" : "登入"}
+              </Link>
+              <Link to="/auth/register"
+                className="px-4 py-2 rounded-lg text-white font-semibold"
+                style={{ background: GRAD }}>
+                {en ? "Start free" : "免費試用"}
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
