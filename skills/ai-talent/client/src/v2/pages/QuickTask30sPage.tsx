@@ -792,13 +792,13 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
     : {
         emoji: "🎯",
         kicker: "REAL SQUAD · CAMPAIGN PIPELINE",
-        headline: lang === "en" ? "99s = a real multi-step squad workflow" : "99 秒任務 = 真實 Squad 多步驟工作流",
+        headline: lang === "en" ? "99s = a real multi-step AI workflow" : "99 秒任務 = 真實多步驟 AI 工作流",
         sub: lang === "en"
-          ? "Click a task to enter the Squad workspace — agents hand off step by step to deliver a full calendar / launch toolkit / crisis playbook."
-          : "點擊任務後進入 Squad 工作區（/picker）— 多位 agent 接力、按方法論交付完整月曆 / launch toolkit / 危機劇本",
+          ? "Click a task to enter the workspace — AI specialists hand off step by step to deliver a full calendar, launch toolkit, or crisis playbook."
+          : "點擊任務後進入工作區（/picker）— 多位 AI 專家接力、按方法論交付完整月曆 / 上市工具包 / 危機劇本",
         bullets: lang === "en"
-          ? ["Real squad pipeline", "Full methodology (Pulizzi / Cialdini / Lagadec)", "Calendar / toolkit output", "FB 11 + IG 7 squads ready"]
-          : ["真實 Squad pipeline", "完整方法論（Pulizzi / Cialdini / Lagadec）", "calendar / toolkit shape 輸出", "FB 11 + IG 7 squad 已就位"],
+          ? ["Real multi-agent workflow", "Full methodology (Pulizzi / Cialdini / Lagadec)", "Calendar or toolkit output", "FB 11 + IG 7 plans ready"]
+          : ["真實多 AI 協作流程", "完整方法論（Pulizzi / Cialdini / Lagadec）", "行事曆 / 工具包輸出", "FB 11 + IG 7 小組已就位"],
         accent: "#f59e0b",
         gradientFrom: "rgba(245,158,11,0.10)",
       };
@@ -1885,7 +1885,7 @@ function OutputCarousel({
                 {overflowCount > 0 && (
                   <button
                     onClick={() => toggleTool("details")}
-                    title={lang === "en" ? `${overflowCount} more agents — see the full collab flow` : `還有 ${overflowCount} 位 agent，點開看完整協作流程`}
+                    title={lang === "en" ? `${overflowCount} more AI specialists — see the full collab flow` : `還有 ${overflowCount} 位 AI 專家，點開看完整協作流程`}
                     className="w-7 h-7 rounded-full bg-default-100 text-default-600 text-[10px] font-bold hover:bg-default-200 transition flex items-center justify-center"
                   >
                     +{overflowCount}
@@ -1897,7 +1897,7 @@ function OutputCarousel({
 
           <span className="w-px h-5 bg-default-200 mx-1" />
           {/* GROUP C: 看細節 */}
-          <ToolBtn lucide={Wand2} label={lang === "en" ? "Visual brief / hashtags" : "視覺方向 / hashtag"} active={activeTool === "prompt"}
+          <ToolBtn lucide={Wand2} label={lang === "en" ? "Visual brief / hashtags" : "視覺方向 / 主題標籤"} active={activeTool === "prompt"}
             disabled={!slide?.imageStyle} onPress={() => toggleTool("prompt")} />
           <ToolBtn lucide={LucideSliders} label={lang === "en" ? "QA / production pack / links" : "QA / Production package / 連結"} active={activeTool === "details"}
             disabled={!hasDetails} onPress={() => toggleTool("details")} />
@@ -2049,7 +2049,7 @@ function OutputCarousel({
                 {activeTool === "edit" && (lang === "en" ? "✏️ Direct edit" : "✏️ 直接編輯")}
                 {activeTool === "style" && (lang === "en" ? "AI image" : "AI 生圖")}
                 {activeTool === "video" && (lang === "en" ? "🎬 AI video" : "🎬 AI 影片生成")}
-                {activeTool === "prompt" && (lang === "en" ? "🪄 Visual brief / hashtags" : "🪄 視覺方向 / hashtag")}
+                {activeTool === "prompt" && (lang === "en" ? "🪄 Visual brief / hashtags" : "🪄 視覺方向 / 主題標籤")}
                 {activeTool === "details" && (lang === "en" ? "📊 Details" : "📊 細節資訊")}
                 {activeTool === "chat" && (lang === "en" ? `Chat with ${agentMeta?.name ?? "AI"}` : `跟 ${agentMeta?.name ?? "AI"} 改文案`)}
                 {activeTool === "save" && (lang === "en" ? "✏️ Edit caption" : "✏️ 編輯文案（任務完成即自動記錄到專案）")}
@@ -2438,7 +2438,7 @@ function OutputCarousel({
                 </p>
                 {slide?.hashtags && slide.hashtags.length > 0 && (
                   <>
-                    <p className="text-[10px] text-default-500 mt-3 mb-1">{lang === "en" ? "Suggested hashtags" : "推薦 hashtag"}</p>
+                    <p className="text-[10px] text-default-500 mt-3 mb-1">{lang === "en" ? "Suggested hashtags" : "推薦主題標籤"}</p>
                     <p className="text-tiny text-primary-700">
                       {slide.hashtags.map((h: string) => `#${h}`).join(" ")}
                     </p>
@@ -2516,7 +2516,7 @@ function OutputCarousel({
                 )}
                 {orchestraStages && orchestraStages.length > 0 && (
                   <div className="rounded-xl border border-default-200 bg-white p-3">
-                    <p className="text-tiny font-semibold mb-2">{lang === "en" ? `🎼 Agent collab (${doneStages}/${stageCount})` : `🎼 Agent 協作 (${doneStages}/${stageCount})`}</p>
+                    <p className="text-tiny font-semibold mb-2">{lang === "en" ? `🎼 AI collab (${doneStages}/${stageCount})` : `🎼 AI 專家協作 (${doneStages}/${stageCount})`}</p>
                     <StagePipelineView
                       stages={orchestraStages}
                       captionAgent={agentMeta}

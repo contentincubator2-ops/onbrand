@@ -753,7 +753,7 @@ export default function RunPage() {
     // Video: 3-beat storyboard seed (hook → main shot → text overlay/CTA)
     if (mode === "video") {
       const seed = subject
-        ? `開頭 3 秒（hook）：${subject} —— 鏡頭抓住一個吸睛瞬間。\n` +
+        ? `開頭 3 秒（開場鉤）：${subject} —— 鏡頭抓住一個吸睛瞬間。\n` +
           `中段（10-20 秒）：產品 / 場景特寫 + 一個具體動作（手部、表情、物件接觸）。\n` +
           `結尾（3-5 秒）：字卡呼應文案核心，3-8 字。可配「定格 + 留白」收尾。\n` +
           `風格：自然光、節奏穩、不刻意配音、字卡簡潔。`
@@ -1327,8 +1327,8 @@ export default function RunPage() {
                     <div className="flex flex-col items-center gap-4 py-8 text-center">
                       <p className="text-small text-default-600 max-w-sm">
                         {lang === "en"
-                          ? "Generate a full shooting script for this video title. The script will include hook, main body (3–5 points), and closing CTA."
-                          : "為這支影片 title 產出完整拍攝腳本，包含開場 Hook、主體論點（3–5個）、收尾 CTA。"}
+                          ? "Generate a full shooting script. Includes an opening hook, 3–5 main points, and a closing call to action."
+                          : "為這支影片 title 產出完整拍攝腳本，包含開場鉤、主體論點（3–5個）、收尾行動呼籲。"}
                       </p>
                       <Button
                         color="secondary"
@@ -1416,7 +1416,7 @@ export default function RunPage() {
           <div className="bg-white rounded-xl border border-default-200 shadow-sm">
             <div className="flex items-center gap-0.5 px-2 py-1.5 flex-wrap">
               <ToolbarBtn icon={Pencil}        label={lang === "en" ? "Edit text" : "直接編輯"}      active={mode==="edit"}  onClick={() => setMode("edit")} />
-              <ToolbarBtn icon={MessageCircle} label={lang === "en" ? "Chat with agent" : "跟 agent 對話"} active={mode==="chat"}  onClick={() => setMode("chat")} />
+              <ToolbarBtn icon={MessageCircle} label={lang === "en" ? "Chat with AI" : "跟 AI 專家對話"} active={mode==="chat"}  onClick={() => setMode("chat")} />
               <ToolbarBtn icon={LucideImage}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
               {/* 2026-05-12 (CJ「影片功能我想要先拿掉，現在看起來不穩」):
                   hide 改影片 entry. The /trpc/video.* router still exists
@@ -1438,7 +1438,7 @@ export default function RunPage() {
                   })()}
                 </button>
               </Tooltip>
-              <Tooltip content={lang === "en" ? "Visual agent — see thinking" : "視覺 agent — 看思考過程"}>
+              <Tooltip content={lang === "en" ? "Visual AI — see thinking" : "視覺 AI 專家 — 看思考過程"}>
                 <button
                   onClick={() => { setMode("agent"); setFocusedAgent("image"); }}
                   className={`w-7 h-7 rounded-full overflow-hidden ring-1 transition ${mode==="agent" && focusedAgent==="image" ? "ring-secondary ring-2" : "ring-default-200 hover:ring-secondary"}`}
@@ -1493,11 +1493,11 @@ export default function RunPage() {
             <CardBody className="space-y-3">
               {mode === "chat" && (
                 <>
-                  <p className="text-tiny font-semibold">{lang === "en" ? "Tell the agent what to tweak" : "跟 agent 改文案"}</p>
+                  <p className="text-tiny font-semibold">{lang === "en" ? "Tell the AI specialist what to change" : "跟 AI 專家改文案"}</p>
                   <p className="text-[11px] text-default-500 leading-relaxed">
                     {lang === "en"
                       ? "Tell the agent how to adjust it — e.g. \"end with a limited-time offer\" or \"too wordy, cut the second paragraph\"."
-                      : "告訴 agent 你想怎麼調整：例如「結尾改成限時優惠」、「太囉嗦砍第二段」。"}
+                      : "告訴 AI 專家你想怎麼調整：例如「結尾改成限時優惠」、「太囉嗦砍第二段」。"}
                   </p>
                   {chatHistory.length > 0 && (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto bg-default-50 rounded-lg p-2">
@@ -1616,7 +1616,7 @@ export default function RunPage() {
                       底下圖片變成「目前的圖」獨立區塊，不混在 prompt 裡 */}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
                     {lang === "en"
-                      ? "Step 1: Describe the image you want (or tweak the current prompt)"
+                      ? "Step 1: Describe the image you want (or adjust the current prompt)"
                       : "Step 1：先告訴我你想要什麼樣的圖（或調整現有 prompt）"}
                   </div>
                   <Textarea
@@ -1758,7 +1758,7 @@ export default function RunPage() {
                       用戶可拿這份 brief 自己拍 / 給拍攝團隊。 */}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
                     {lang === "en"
-                      ? "Step 1: Describe what the video should show (we'll pull in this caption too)"
+                      ? "Step 1: Describe what the video should show (we'll also use this caption as context)"
                       : "第 1 步：寫影片想呈現什麼（會自動帶入這篇的文案當補充）"}
                   </div>
                   <Textarea
@@ -1777,7 +1777,7 @@ export default function RunPage() {
                   />
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
                     {lang === "en"
-                      ? "Step 2: Pick video length (determines scene count)"
+                      ? "Step 2: Pick video length"
                       : "Step 2：選影片長度（決定分鏡數量）"}
                   </div>
                   <div className="flex gap-1.5">
@@ -1903,7 +1903,7 @@ export default function RunPage() {
                 const imageAg = typeof md.imageAgent === "object" ? md.imageAgent : (md.imageAgent ? { name: md.imageAgent } : null);
                 const focusedAg = focusedAgent === "image" ? imageAg : captionAg;
                 const focusedAgName = focusedAg?.name ?? (focusedAgent === "image"
-                  ? (lang === "en" ? "Visual agent" : "視覺 agent")
+                  ? (lang === "en" ? "Visual AI" : "視覺 AI 專家")
                   : (lang === "en" ? "Caption agent" : "撰寫者"));
                 const focusedAgTitle = focusedAg?.title ?? "";
                 const stages: Array<{key: string; label: string; status: string; startedAt?: number; completedAt?: number}> = Array.isArray(md.stages) ? md.stages : [];
@@ -2006,7 +2006,7 @@ export default function RunPage() {
                   </Button>
                   <p className="text-[10px] text-default-400">
                     {lang === "en"
-                      ? <>Will call {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "the caption agent"} to regenerate variant {activeIdx + 1}.</>
+                      ? <>Will ask {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "the copywriter"} to rewrite version {activeIdx + 1}.</>
                       : <>將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫者"} 重新產出第 {activeIdx + 1} 個版本。</>}
                   </p>
                   {Array.isArray(data.metadata?.archivedVariants) && data.metadata.archivedVariants.length > 0 && (
@@ -2245,7 +2245,7 @@ export default function RunPage() {
               label={lang === "en" ? "Note (optional)" : "附加訊息（可選）"}
               placeholder={lang === "en"
                 ? "Please check whether this version's hook lands with the target audience"
-                : "請幫我看一下這版本的 hook 是否打到目標族群"}
+                : "請幫我看一下這版本的開場鉤是否打到目標族群"}
               value={emailNote}
               onChange={(e) => setEmailNote(e.target.value)}
               minRows={3}

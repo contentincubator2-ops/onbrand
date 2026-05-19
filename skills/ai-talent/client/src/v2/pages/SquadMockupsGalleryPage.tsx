@@ -64,7 +64,7 @@ function CrewHeader() {
                     {m.isLead && <Chip size="sm" variant="flat" color="primary" className="h-4 text-tiny">Lead</Chip>}
                   </p>
                   <p className="text-tiny text-default-500 truncate">
-                    {m.role} · step {m.step}
+                    {m.role} · 步驟 {m.step}
                   </p>
                 </div>
               </div>
@@ -85,7 +85,7 @@ export default function SquadMockupsGalleryPage() {
         <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
           <div>
             <p className="text-tiny text-default-500 uppercase tracking-wider">DESIGN SYSTEM · GALLERY</p>
-            <h1 className="text-2xl font-semibold tracking-tight">FB 月行事曆 Squad — 6 Mockup</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">FB 月行事曆小組 — 6 個預覽</h1>
             <p className="text-small text-default-500 mt-1">
               測試案例：Pokemon GO 台灣社群 · 2026/5/4 → 5/31（Deino Community Day Classic 5/17）
             </p>
@@ -125,7 +125,7 @@ export default function SquadMockupsGalleryPage() {
             <p className="text-small text-default-700 leading-relaxed">
               這 5 個 mockup 是 squad <code className="text-tiny">fb-monthly-calendar-pulizzi</code>（id=725）每個 step 上線後會渲染的 UI。
               squad <code>is_approved=0</code>（draft），等你 review 通過才會在前台 picker 出現。
-              demo 用 Pokemon GO Deino CD 擬真資料 — 真實跑時各 step 的 agent 把 conclusion 寫進對應 storage，這些 mockup 從 storage 讀渲染。打開「執行中」開關可預覽各 step 跑步階段的 agent 進度 chip。
+              demo 用 Pokemon GO Deino CD 擬真資料 — 真實跑時各步驟的 AI 專家把結論寫進對應儲存欄，這些預覽畫面從儲存欄讀取渲染。打開「執行中」開關可預覽各步驟執行中的 AI 專家進度狀態。
             </p>
           </CardBody>
         </Card>

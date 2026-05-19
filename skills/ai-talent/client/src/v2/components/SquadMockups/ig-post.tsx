@@ -79,7 +79,7 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● agent 思考中…
+              ● AI 專家思考中…
             </Chip>
           )}
         </div>
@@ -111,7 +111,7 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
 
       {/* Full caption + hashtags + first-comment (squad-mockup additions) */}
       <NotionCard>
-        <SectionHeader eyebrow="CAPTION" title="完整貼文文字" />
+        <SectionHeader eyebrow="貼文文案" title="完整貼文文字" />
         <pre className="text-small leading-relaxed whitespace-pre-wrap font-sans bg-default-50 border border-divider rounded-md p-3">
           {data.caption || "（caption 未產出）"}
         </pre>

@@ -46,8 +46,8 @@ export function PillarTableMockup({ data, readOnly = false, isActive = false, on
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
             icon="🏛"
-            eyebrow="STEP 3 · CONTENT PILLARS"
-            title={data?.tilt ? `Tilt: ${data.tilt}` : "Pillars 定義"}
+            eyebrow="步驟 3 · 內容支柱"
+            title={data?.tilt ? `傾斜主題：${data.tilt}` : "內容支柱定義"}
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
@@ -57,7 +57,7 @@ export function PillarTableMockup({ data, readOnly = false, isActive = false, on
         </div>
 
         {pillars.length === 0 ? (
-          <EmptyHint>尚未產出 pillar — Step 3 跑完才會填</EmptyHint>
+          <EmptyHint>尚未產出內容支柱 — 步驟 3 跑完才會填</EmptyHint>
         ) : (
           <>
             <div className="flex flex-col gap-3">
@@ -114,7 +114,7 @@ function PillarRowCard({
         <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-[1fr_120px_140px] gap-2">
           <Input
             size="sm" radius="md" variant="bordered"
-            label="Pillar 名稱" labelPlacement="outside"
+            label="支柱名稱" labelPlacement="outside"
             value={pillar.name}
             onValueChange={(v) => onChange({ name: v })}
             isReadOnly={readOnly}
@@ -129,7 +129,7 @@ function PillarRowCard({
           />
           <Input
             size="sm" radius="md" variant="bordered"
-            label="Target KPI" labelPlacement="outside"
+            label="目標 KPI" labelPlacement="outside"
             value={pillar.target_kpi}
             onValueChange={(v) => onChange({ target_kpi: v })}
             isReadOnly={readOnly}
@@ -139,7 +139,7 @@ function PillarRowCard({
 
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label="假設（為什麼這 pillar 在這個 tilt 是合理切入點）"
+        label="假設（為什麼這個支柱在這個定位角是合理切入點）"
         labelPlacement="outside"
         minRows={2}
         value={pillar.hypothesis}

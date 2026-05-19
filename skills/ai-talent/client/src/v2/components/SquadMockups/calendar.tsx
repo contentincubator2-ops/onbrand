@@ -116,8 +116,8 @@ export function CalendarGridMockup({ data, readOnly = false, isActive = false }:
   if (!data || !data.targetDateStart || !data.targetDateEnd || !Array.isArray(data.entries)) {
     return (
       <NotionCard>
-        <SectionHeader icon="📅" eyebrow="STEP 4 · CALENDAR" title="月度排程" />
-        <EmptyHint>{!data ? "Step 4 跑完才有 calendar" : "資料不完整 — 缺 targetDateStart / targetDateEnd / entries"}</EmptyHint>
+        <SectionHeader icon="📅" eyebrow="步驟 4 · 行事曆" title="月度排程" />
+        <EmptyHint>{!data ? "步驟 4 跑完才有行事曆" : "資料不完整 — 缺 targetDateStart / targetDateEnd / entries"}</EmptyHint>
       </NotionCard>
     );
   }
@@ -155,7 +155,7 @@ export function CalendarGridMockup({ data, readOnly = false, isActive = false }:
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
             icon="📅"
-            eyebrow="STEP 4 · EDITORIAL CALENDAR"
+            eyebrow="步驟 4 · 編輯行事曆"
             title={`${rangeLabel} · ${totalPosts} 篇`}
           />
           {isActive && (

@@ -130,7 +130,7 @@ export function LIFeedMockup({ data, isActive = false }: FeedProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="💼" eyebrow="SQUAD · LI FEED" title={lang === "en" ? "LinkedIn post" : "LinkedIn 貼文"} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● AI working…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <LIFeed {...fields} />
       </NotionCard>
@@ -174,7 +174,7 @@ export function LIArticleMockup({ data, isActive = false }: ArticleProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="📝" eyebrow="SQUAD · LI ARTICLE" title={lang === "en" ? "LinkedIn article" : "LinkedIn 長文章"} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● AI working…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <LIArticle {...fields} />
       </NotionCard>
@@ -219,7 +219,7 @@ export function LINewsletterMockup({ data, isActive = false }: NewsletterProps) 
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="📨" eyebrow="SQUAD · LI NEWSLETTER" title={lang === "en" ? "LinkedIn Newsletter" : "LinkedIn Newsletter 期刊"} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● AI working…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <LINewsletter {...fields} />
       </NotionCard>
@@ -253,7 +253,7 @@ export function LIPollMockup({ data, isActive = false }: PollProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="📊" eyebrow="ATOMIC · LI POLL" title={lang === "en" ? "LinkedIn poll" : "LinkedIn 互動民調"} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● AI working…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <LIPoll {...fields} />
       </NotionCard>
@@ -292,7 +292,7 @@ export function LIDocumentMockup({ data, isActive = false }: DocumentProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="📄" eyebrow="SQUAD · LI DOCUMENT" title={lang === "en" ? `LinkedIn Document (${data.slides?.length ?? 0} pages)` : `LinkedIn Document (${data.slides?.length ?? 0} 頁)`} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● AI working…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <LIDocument {...fields} />
       </NotionCard>
@@ -336,7 +336,7 @@ export function LINativeVideoMockup({ data, isActive = false }: NativeVideoProps
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="🎬" eyebrow="SQUAD · LI NATIVE VIDEO" title={lang === "en" ? "LinkedIn native video script" : "LinkedIn 原生影片腳本"} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● AI working…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <LINativeVideo {...fields} />
       </NotionCard>
@@ -344,7 +344,7 @@ export function LINativeVideoMockup({ data, isActive = false }: NativeVideoProps
         <SectionHeader eyebrow="SCRIPT" title={lang === "en" ? "Video script structure" : "影片腳本結構"} />
         <div className="flex flex-col gap-2">
           {[
-            { label: lang === "en" ? "🪝 Hook (first 3s)" : "🪝 Hook（前 3 秒）", text: data.hook },
+            { label: lang === "en" ? "🪝 Opening hook (first 3s)" : "🪝 開場鉤（前 3 秒）", text: data.hook },
             { label: lang === "en" ? "📖 Main body" : "📖 主體內容", text: data.body },
             { label: "🎯 CTA", text: data.cta },
           ].map((row, i) => (
@@ -383,7 +383,7 @@ export function LIAdMockup({ data, isActive = false }: AdProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="🎯" eyebrow="SQUAD · LI AD" title={lang === "en" ? "LinkedIn ad copy" : "LinkedIn 廣告文案"} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● AI working…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <LIAd {...fields} />
       </NotionCard>
@@ -432,7 +432,7 @@ export function LIEventMockup({ data, isActive = false }: EventProps) {
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader icon="📅" eyebrow="ATOMIC · LI EVENT" title={lang === "en" ? "LinkedIn event promo" : "LinkedIn 活動宣傳"} />
-          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● agent thinking…" : "● agent 思考中…"}</Chip>}
+          {isActive && <Chip size="sm" variant="flat" color="primary" className="self-start">{lang === "en" ? "● AI working…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <LIEvent {...fields} />
       </NotionCard>

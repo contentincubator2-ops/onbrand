@@ -340,7 +340,7 @@ export function IntakeFormMockup({
         />
         <div className="flex flex-col gap-1.5 text-tiny text-default-700 leading-relaxed">
           <div><span className="text-default-500">{lang === "en" ? "Audience pains preview: " : "受眾痛點預覽："}</span>{web.audiencePainsPreview ?? <EmptyHint>{lang === "en" ? "Run intake first" : "跑 intake 才會有"}</EmptyHint>}</div>
-          <div><span className="text-default-500">{lang === "en" ? "Competitor pillars preview: " : "競品 Pillar 預覽："}</span>{web.competitorPillarsPreview ?? <EmptyHint>{lang === "en" ? "Run intake first" : "跑 intake 才會有"}</EmptyHint>}</div>
+          <div><span className="text-default-500">{lang === "en" ? "Competitor pillars preview: " : "競品支柱預覽："}</span>{web.competitorPillarsPreview ?? <EmptyHint>{lang === "en" ? "Run intake first" : "跑 intake 才會有"}</EmptyHint>}</div>
           <div><span className="text-default-500">{lang === "en" ? "FB Prime Time: " : "FB Prime Time："}</span>{web.primeTime ?? <EmptyHint>{lang === "en" ? "Run intake first" : "跑 intake 才會有"}</EmptyHint>}</div>
         </div>
       </NotionCard>
@@ -372,7 +372,7 @@ export function IntakeFormMockup({
           />
           <Select
             size="sm" radius="md" variant="bordered"
-            label={lang === "en" ? "Pillar count (3-5)" : "Pillar 數量（3-5）"} labelPlacement="outside"
+            label={lang === "en" ? "Pillar count (3-5)" : "支柱數量（3-5）"} labelPlacement="outside"
             placeholder={lang === "en" ? "Pick 3 / 4 / 5" : "選 3 / 4 / 5"}
             selectedKeys={ui.pillar_count ? new Set([ui.pillar_count]) : new Set()}
             onSelectionChange={(keys) => {
@@ -383,7 +383,7 @@ export function IntakeFormMockup({
             isDisabled={readOnly}
           >
             {["3", "4", "5"].map((n) => (
-              <SelectItem key={n}>{lang === "en" ? `${n} pillars` : `${n} 個 pillar`}</SelectItem>
+              <SelectItem key={n}>{lang === "en" ? `${n} pillars` : `${n} 個支柱`}</SelectItem>
             ))}
           </Select>
           <Input

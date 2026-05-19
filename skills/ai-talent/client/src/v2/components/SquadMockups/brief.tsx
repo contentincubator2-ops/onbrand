@@ -47,7 +47,7 @@ export function FBPostBriefMockup({ data, readOnly = false, isActive = false, on
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
             icon="✍"
-            eyebrow="STEP 5 · POST BRIEFS"
+            eyebrow="步驟 5 · 每篇企劃摘要"
             title={`${briefs.length} 篇企劃摘要`}
           />
           {isActive && (

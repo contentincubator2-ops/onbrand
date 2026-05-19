@@ -67,7 +67,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
   if (!data || !data.verdict) {
     return (
       <NotionCard>
-        <SectionHeader icon="🛡" eyebrow="STEP 6 · QA REPORT" title="Squad Lead QA" />
+        <SectionHeader icon="🛡" eyebrow="步驟 6 · 品質審核" title="小組組長終審" />
         <EmptyHint>{!data ? "Step 6 跑完才會有 QA 報告" : "資料不完整 — 缺 verdict"}</EmptyHint>
       </NotionCard>
     );
@@ -84,7 +84,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
       {/* Section 1: Overall verdict */}
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🛡" eyebrow="STEP 6 · QA REPORT" title="Squad Lead 終審" />
+          <SectionHeader icon="🛡" eyebrow="步驟 6 · 品質審核" title="Squad Lead 終審" />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
               ● Claire Hsu 審核中…
@@ -108,7 +108,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
 
       {/* Section 2: Per-pillar */}
       <NotionCard>
-        <SectionHeader eyebrow="PILLAR CHECKS" title="比例與內容多樣性" />
+        <SectionHeader eyebrow="支柱比例審核" title="比例與內容多樣性" />
         <div className="flex flex-col gap-3">
           {pillarChecks.map((p, i) => {
             const ratioOk = p.actualRatio === p.expectedRatio;
@@ -180,7 +180,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
               {!readOnly && (
                 <div className="flex gap-1 shrink-0">
                   <Button size="sm" variant="flat" color="success" onPress={() => onAccept?.(item.id)}>
-                    Accept
+                    接受
                   </Button>
                   <Button size="sm" variant="flat" color="warning" onPress={() => onReject?.(item.id)}>
                     退回
