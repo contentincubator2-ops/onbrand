@@ -1,0 +1,70 @@
+name: Admin — Set user permissions (admin + unlimited credits)
+
+# Grants role='admin' + hasUnlimitedCredits=1 to:
+#   - liudice@gmail.com
+#   - all users whose email ends with @sowork.tw
+#
+# Run via: GitHub → Actions → this workflow → Run workflow
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vm
+  cancel-in-progress: false
+
+jobs:
+  set-permissions:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Show current state
+        run: |
+          set -e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
+          DB_USER="${LOCAL_DB_USER:-mos_user}"
+          DB_PASS="${LOCAL_DB_PASSWORD:-mos_secure_2026}"
+          DB_NAME="${LOCAL_DB_NAME:-mos_db}"
+          echo "=== Before update ==="
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
+            "SELECT id, email, role, isActive, hasUnlimitedCredits, orgRole
+             FROM users
+             WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw'
+             ORDER BY email;"
+
+      - name: Grant admin + unlimited credits
+        run: |
+          set -e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
+          DB_USER="${LOCAL_DB_USER:-mos_user}"
+          DB_PASS="${LOCAL_DB_PASSWORD:-mos_secure_2026}"
+          DB_NAME="${LOCAL_DB_NAME:-mos_db}"
+
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
+            "UPDATE users
+             SET role = 'admin',
+                 hasUnlimitedCredits = 1,
+                 isActive = 1
+             WHERE email = 'liudice@gmail.com'
+                OR email LIKE '%@sowork.tw';"
+
+          echo "Rows affected: $(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -se \
+            "SELECT ROW_COUNT();")"
+
+      - name: Verify result
+        run: |
+          set -e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
+          DB_USER="${LOCAL_DB_USER:-mos_user}"
+          DB_PASS="${LOCAL_DB_PASSWORD:-mos_secure_2026}"
+          DB_NAME="${LOCAL_DB_NAME:-mos_db}"
+          echo "=== After update ==="
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
+            "SELECT id, email, role, isActive, hasUnlimitedCredits
+             FROM users
+             WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw'
+             ORDER BY email;"
+          echo "✓ Done"
