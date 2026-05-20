@@ -1,0 +1,50 @@
+name: Ops — Diagnose brand owner + permissions
+
+# Shows who owns a brand (by brand id) and their current permissions.
+# Also shows all brands owned by liudice@gmail.com.
+# Run via: GitHub → Actions → this workflow → Run workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Brand b=2862 owner + permissions
+        run: |
+          set -e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
+          DB_USER="${LOCAL_DB_USER:-mos_user}"
+          DB_PASS="${LOCAL_DB_PASSWORD:-mos_secure_2026}"
+          DB_NAME="${LOCAL_DB_NAME:-mos_db}"
+
+          echo "=== Brand id=2862 — owner lookup ==="
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
+            "SELECT b.id AS brand_id, b.name AS brand_name, b.userId,
+                    u.email, u.role, u.hasUnlimitedCredits, u.isActive, u.planCode
+             FROM brands b
+             JOIN users u ON u.id = b.userId
+             WHERE b.id = 2862;"
+
+          echo ""
+          echo "=== All brands owned by liudice@gmail.com ==="
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
+            "SELECT b.id, b.name, b.userId, u.email, u.role, u.hasUnlimitedCredits
+             FROM brands b
+             JOIN users u ON u.id = b.userId
+             WHERE u.email = 'liudice@gmail.com'
+             ORDER BY b.id;"
+
+          echo ""
+          echo "=== All @sowork.tw users + their brand counts ==="
+          mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
+            "SELECT u.id, u.email, u.role, u.hasUnlimitedCredits, u.planCode,
+                    COUNT(b.id) AS brand_count
+             FROM users u
+             LEFT JOIN brands b ON b.userId = u.id
+             WHERE u.email = 'liudice@gmail.com' OR u.email LIKE '%@sowork.tw'
+             GROUP BY u.id
+             ORDER BY u.email;"
