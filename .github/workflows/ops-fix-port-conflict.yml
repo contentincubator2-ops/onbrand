@@ -1,0 +1,70 @@
+name: Ops — Fix port 3101 conflict (retire ai-marketer, start onbrand)
+
+# ai-marketer (pm2 id=2) is the OLD process squatting port 3101.
+# onbrand (pm2 id=1310) is the NEW process but crashes because port is taken.
+# This workflow:
+#   1. Shows what is currently on port 3101
+#   2. Stops ai-marketer so port 3101 is freed
+#   3. Restarts onbrand so the new code takes over
+#   4. Verifies onbrand is online and serving
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix-port:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+      - name: Diagnose port 3101 current occupant
+        run: |
+          echo "=== What is on port 3101 ==="
+          ss -tlnp | grep 3101 || echo "(nothing found via ss)"
+          lsof -i :3101 2>/dev/null || echo "(lsof: nothing on 3101)"
+
+          echo ""
+          echo "=== pm2 process list ==="
+          pm2 list
+
+      - name: Stop ai-marketer (old process occupying port 3101)
+        run: |
+          echo "=== Stopping ai-marketer ==="
+          pm2 stop ai-marketer 2>/dev/null && echo "ai-marketer stopped" || echo "ai-marketer was not running"
+
+          # Give the OS a moment to release the port
+          sleep 3
+
+          echo ""
+          echo "=== Port 3101 after stopping ai-marketer ==="
+          ss -tlnp | grep 3101 || echo "(port 3101 is now free)"
+
+      - name: Start onbrand on freed port 3101
+        run: |
+          echo "=== Restarting onbrand ==="
+          pm2 restart onbrand
+
+          # Wait for it to stabilise
+          sleep 5
+
+          echo ""
+          echo "=== pm2 list after restart ==="
+          pm2 list
+
+          echo ""
+          echo "=== Port 3101 now occupied by ==="
+          ss -tlnp | grep 3101 || echo "(port 3101 not bound — check logs)"
+
+      - name: Verify onbrand is serving
+        run: |
+          echo "=== Health check: curl localhost:3101/api/health ==="
+          curl -sf http://localhost:3101/api/health 2>/dev/null && echo "" || \
+          curl -sf http://localhost:3101/ 2>/dev/null | head -5 || \
+          echo "(health endpoint not responding — check onbrand error log)"
+
+          echo ""
+          echo "=== onbrand recent log (last 20 lines) ==="
+          pm2 logs onbrand --lines 20 --nostream 2>/dev/null || true
+
+          echo ""
+          echo "=== onbrand uptime + restart count ==="
+          pm2 show onbrand 2>/dev/null | grep -E "status|uptime|restart time|unstable" || true
