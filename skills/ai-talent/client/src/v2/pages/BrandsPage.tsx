@@ -243,6 +243,10 @@ export default function BrandsPage() {
     if (merged.goldenCircleRefined && !merged.goldenCircle) {
       merged.goldenCircle = merged.goldenCircleRefined;
     }
+    // 2026-05-20: old auto pipeline wrote "goldenCircleRefine" (no trailing 'd')
+    if (merged.goldenCircleRefine && !merged.goldenCircle) {
+      merged.goldenCircle = merged.goldenCircleRefine;
+    }
     // ...fallback: derive from brandValues.goldenCircle if outer not present
     if (!merged.goldenCircle && bv?.goldenCircle) {
       merged.goldenCircle = bv.goldenCircle;
@@ -264,10 +268,67 @@ export default function BrandsPage() {
         competitorDiff: "",
       });
     }
+    // 2026-05-20: old auto pipeline wrote "taglineCreative" — map to tagline shape
+    const tce = merged.taglineCreative;
+    if (tce && typeof tce === "object") {
+      setIfEmpty("tagline", {
+        zhTagline: tce.zhTagline ?? tce.tagline ?? tce.mainTagline ?? "",
+        enTagline: tce.enTagline ?? "",
+        type: tce.type ?? "",
+        scenes: Array.isArray(tce.scenes) ? tce.scenes : [],
+        competitorDiff: tce.competitorDiff ?? "",
+        story: tce.story ?? tce.rationale ?? "",
+      });
+    }
 
     // (6) taglineScore: server brandPositioningScore — pass through best-effort
     if (merged.brandPositioningScore && !merged.taglineScore) {
       merged.taglineScore = merged.brandPositioningScore;
+    }
+
+    // 2026-05-20: old auto pipeline segment ID normalizations (pre-May-17 data)
+    // competitorAnalysis{mainCompetitors[{name,positioning,weakness}], marketGaps, competitiveAdvantages}
+    //   → competition{direct[{name}], intensity}
+    const compA = merged.competitorAnalysis;
+    if (compA && typeof compA === "object") {
+      const direct = Array.isArray(compA.mainCompetitors)
+        ? compA.mainCompetitors.map((c: any) => ({ name: c.name ?? c, positioning: c.positioning ?? "" }))
+        : [];
+      const intensity = Array.isArray(compA.competitiveAdvantages)
+        ? compA.competitiveAdvantages.slice(0, 2).join("；")
+        : (compA.marketGaps ? String(compA.marketGaps).slice(0, 100) : "");
+      setIfEmpty("competition", { direct, intensity });
+    }
+    // brandPersonality{archetypes[], tone (string), voice, communicationStyle}
+    //   → voice{archetypes[], tone[], forbidden[]}
+    const bp = merged.brandPersonality;
+    if (bp && typeof bp === "object") {
+      setIfEmpty("voice", {
+        archetypes: Array.isArray(bp.archetypes) ? bp.archetypes : [],
+        tone: Array.isArray(bp.tone) ? bp.tone : (bp.tone ? [bp.tone] : []),
+        forbidden: [],
+      });
+    }
+    // valueProposition{headline, subheadline, keyBenefits[], proofPoints[]}
+    //   → differentiation{summary, emotional, functional}
+    const vp = merged.valueProposition;
+    if (vp && typeof vp === "object") {
+      setIfEmpty("differentiation", {
+        summary: vp.uniqueSellingProposition ?? vp.positioningStatement ?? vp.headline ?? "",
+        emotional: vp.subheadline ?? "",
+        functional: Array.isArray(vp.keyBenefits) ? vp.keyBenefits : (Array.isArray(vp.keyDifferentiators) ? vp.keyDifferentiators : []),
+      });
+    }
+    // marketInsight{...} → trends{favorable[], risks[]} (best-effort shape coercion)
+    const mi = merged.marketInsight;
+    if (mi && typeof mi === "object") {
+      const favorable = Array.isArray(mi.favorable) ? mi.favorable
+        : Array.isArray(mi.opportunities) ? mi.opportunities.map((o: any) => ({ name: o.title ?? o, body: o.description ?? "" }))
+        : [];
+      const risks = Array.isArray(mi.risks) ? mi.risks
+        : Array.isArray(mi.threats) ? mi.threats.map((t: any) => ({ name: t.title ?? t, body: t.description ?? "" }))
+        : [];
+      if (favorable.length > 0 || risks.length > 0) setIfEmpty("trends", { favorable, risks });
     }
 
     return merged;
