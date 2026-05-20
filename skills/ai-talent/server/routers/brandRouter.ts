@@ -219,29 +219,36 @@ export const brandRouter = router({
       // Refusing at create-time is the right boundary (not delete-time)
       // so the user gets a clear upgrade CTA instead of accidentally
       // creating a brand they can't use.
+      //
+      // 2026-05-21 (CJ): admin users and users with hasUnlimitedCredits=1 bypass the cap entirely.
       try {
         const { default: localPool } = await import("../localDb");
         const [pRows]: any = await localPool.execute(
-          `SELECT planCode FROM users WHERE id = ? LIMIT 1`,
+          `SELECT planCode, hasUnlimitedCredits, role FROM users WHERE id = ? LIMIT 1`,
           [ctx.user.id],
         );
-        const planCode = (pRows as any[])[0]?.planCode ?? "trial";
-        const { getPlan } = await import("../_core/plans");
-        const plan = getPlan(planCode);
-        const cap = plan.quota.brands;
-        if (typeof cap === "number" && cap > 0) {
-          const [cRows]: any = await localPool.execute(
-            `SELECT COUNT(*) AS n FROM brands WHERE userId = ?`,
-            [ctx.user.id],
-          );
-          const used = Number((cRows as any[])[0]?.n ?? 0);
-          if (used >= cap) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: cap === 1
-                ? `您的方案（${plan.name}）只支援 1 個品牌。需要管理多個品牌請升級到 Studio（3 個品牌），或聯繫業務洽詢 Agency 方案。`
-                : `您的方案（${plan.name}）最多 ${cap} 個品牌。升級到 Agency 方案以支援更多品牌，或聯繫業務洽詢。`,
-            });
+        const row = (pRows as any[])[0];
+        // Admins and unlimited-credit users have no brand cap
+        const isUnlimited = row?.hasUnlimitedCredits === 1 || row?.role === "admin";
+        if (!isUnlimited) {
+          const planCode = row?.planCode ?? "trial";
+          const { getPlan } = await import("../_core/plans");
+          const plan = getPlan(planCode);
+          const cap = plan.quota.brands;
+          if (typeof cap === "number" && cap > 0) {
+            const [cRows]: any = await localPool.execute(
+              `SELECT COUNT(*) AS n FROM brands WHERE userId = ?`,
+              [ctx.user.id],
+            );
+            const used = Number((cRows as any[])[0]?.n ?? 0);
+            if (used >= cap) {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message: cap === 1
+                  ? `您的方案（${plan.name}）只支援 1 個品牌。需要管理多個品牌請升級到 Studio（3 個品牌），或聯繫業務洽詢 Agency 方案。`
+                  : `您的方案（${plan.name}）最多 ${cap} 個品牌。升級到 Agency 方案以支援更多品牌，或聯繫業務洽詢。`,
+              });
+            }
           }
         }
       } catch (e) {
