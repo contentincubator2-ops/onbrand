@@ -1,6 +1,6 @@
 name: Admin — Set user permissions (admin + unlimited credits)
 
-# Grants role='admin' + hasUnlimitedCredits=1 to:
+# Grants role='admin' + hasUnlimitedCredits=1 + planCode='enterprise' to:
 #   - liudice@gmail.com
 #   - all users whose email ends with @sowork.tw
 #
@@ -28,12 +28,12 @@ jobs:
           DB_NAME="${LOCAL_DB_NAME:-mos_db}"
           echo "=== Before update ==="
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
-            "SELECT id, email, role, isActive, hasUnlimitedCredits, orgRole
+            "SELECT id, email, role, isActive, hasUnlimitedCredits, planCode, orgRole
              FROM users
              WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw'
              ORDER BY email;"
 
-      - name: Grant admin + unlimited credits
+      - name: Grant admin + unlimited credits + enterprise plan
         run: |
           set -e
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
@@ -46,6 +46,7 @@ jobs:
             "UPDATE users
              SET role = 'admin',
                  hasUnlimitedCredits = 1,
+                 planCode = 'enterprise',
                  isActive = 1
              WHERE email = 'liudice@gmail.com'
                 OR email LIKE '%@sowork.tw';"
@@ -63,7 +64,7 @@ jobs:
           DB_NAME="${LOCAL_DB_NAME:-mos_db}"
           echo "=== After update ==="
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
-            "SELECT id, email, role, isActive, hasUnlimitedCredits
+            "SELECT id, email, role, isActive, hasUnlimitedCredits, planCode
              FROM users
              WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw'
              ORDER BY email;"
