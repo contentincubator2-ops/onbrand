@@ -1,31 +1,26 @@
 /**
  * LandingPage — public marketing page at "/".
  *
- * 2026-05-16 (CJ「我還應該調整 landing page 嗎」→「主打品牌定位鎖定，
- * 主標 = 網站描述，同一句訊息一致」).
+ * 2026-05-19 (CJ): Rebuilt around 3 core differentiators:
+ *   1. 168 award-backed task templates (traceable, not a black box)
+ *   2. Specialized AI agents per content type (not one generic model)
+ *   3. Verifiable methodology (6 dimensions, auditable outputs)
  *
- * Cold traffic used to be bounced straight to /auth/login (no landing
- * at all). This is the top-of-funnel surface: one message, one moat,
- * one CTA. The moat is the LOCKED brand positioning brain — the thing
- * ChatGPT / Jasper / Copy.ai structurally cannot do (they restart from
- * zero every prompt and drift off-brand).
- *
- * Authed visitors self-redirect to /30s so this never blocks the app.
- * Headline === meta description (single consistent message, per CJ).
+ * Auth-check swaps nav CTA (Sign in → Go to app) without redirecting,
+ * so logged-in users can still view and share the marketing page.
+ * Login / Register buttons always navigate to their own dedicated pages.
  */
 import React from "react";
 import { Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
 
-// One sentence, used for BOTH the H1 and <meta name="description">.
 const TAGLINE_ZH = "鎖定品牌定位，AI 永遠 on-brand 不跑題";
 const TAGLINE_EN = "Lock your brand positioning — AI that never drifts off-brand";
-const SUBLINE_ZH =
-  "台灣中小品牌的 AI 行銷工作室。先用 SoWork 方法鎖定品牌定位，之後每篇文案、每張圖都自動 on-brand —— 不像 ChatGPT 每次都從零開始、越寫越歪。";
-const SUBLINE_EN =
-  "An AI marketing studio for SMB brands. Lock your positioning once with the SoWork method — then every caption and image stays on-brand automatically. Unlike ChatGPT, it never restarts from zero.";
+const SUBLINE_ZH = "台灣中小品牌的 AI 行銷工作室。先用 SoWork 方法鎖定品牌定位，之後每篇文案、每張圖都自動 on-brand —— 不像 ChatGPT 每次都從零開始、越寫越歪。";
+const SUBLINE_EN = "An AI marketing studio for SMB brands. Lock your positioning once with the SoWork method — then every caption and image stays on-brand automatically. Unlike ChatGPT, it never restarts from zero.";
 
 const GRAD = "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)";
+const BLK  = "#0F0F0E";
 
 export default function LandingPage() {
   const { lang, setLang } = useLang();
@@ -34,13 +29,10 @@ export default function LandingPage() {
 
   React.useEffect(() => {
     let dead = false;
-    // Check auth status to swap nav CTA — but don't auto-redirect so
-    // logged-in users can still view and share the marketing page.
     fetch("/api/auth/me", { method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" }, body: "{}" })
       .then((r) => { if (!dead && r.ok) setAuthed(true); })
       .catch(() => {});
-    // Headline === site description (single consistent message).
     document.title = en ? `OnBrand · ${TAGLINE_EN}` : `OnBrand · ${TAGLINE_ZH}`;
     const m = document.querySelector('meta[name="description"]')
       ?? (() => { const e = document.createElement("meta"); e.setAttribute("name", "description"); document.head.appendChild(e); return e; })();
@@ -49,21 +41,72 @@ export default function LandingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [en]);
 
-  const moat = en ? [
-    ["Locked positioning", "Set your brand DNA once with the SoWork method. It's locked — the AI can't drift, and competitors can't copy a positioning they can't see."],
-    ["Always on-brand", "Every caption, post and image is generated against the locked brain. No more \"that doesn't sound like us\" rewrites."],
-    ["One setup → every platform", "FB / IG / LinkedIn / YouTube / Email / PR — produced in parallel from the same brand truth, in 30–99 seconds."],
+  // ── Data ────────────────────────────────────────────────────────────────
+
+  const differentiators = en ? [
+    {
+      n: "01",
+      title: "168 Award-Backed Task Templates",
+      body: "Every content task is mapped to a real, named, documented award-winning campaign — Duolingo × Shorty Award, Liquid Death × Clio Grand Prix, Dropbox × IAC Award. The craft logic is extracted from each case and encoded into the task. Traceable methodology, not a black box.",
+    },
+    {
+      n: "02",
+      title: "Specialized AI Agents — Not One Generic Model",
+      body: "Each content type runs through a purpose-built AI agent with its own methodology, role, and output spec. A PR Strategist agent thinks in news angles and journalist psychology. A TikTok agent thinks in character arcs and unresolved tension. Specialization is what makes the output sound like an expert wrote it.",
+    },
+    {
+      n: "03",
+      title: "Verifiable Methodology",
+      body: "Brand positioning is scored across 6 measurable dimensions. Every output has a defined structure you can audit. The award cases behind each task have public records you can look up. Built to be inspectable — because if you can't verify the logic, you can't trust it at scale.",
+    },
   ] : [
-    ["鎖定的品牌定位", "用 SoWork 方法一次鎖定品牌 DNA。鎖定後 AI 不會跑題，對手也抄不走一個他們看不見的定位。"],
-    ["永遠 on-brand", "每篇文案、貼文、圖都對著鎖定的品牌大腦產出。不用再一直「這不像我們」重寫。"],
-    ["設定一次 → 多平台齊發", "FB / IG / LinkedIn / YouTube / 電子報 / 新聞稿，同一份品牌定位並行產出，30–99 秒完成。"],
+    {
+      n: "01",
+      title: "168 個得獎案例對應的任務模板",
+      body: "每一個內容任務，都對應到一個真實、有名字、有完整公開紀錄的得獎案例——Duolingo × Shorty Award、Liquid Death × Clio Grand Prix、Dropbox × IAC Award。我們萃取每個案例的工藝邏輯並編進任務中。方法論可追溯，不是黑盒子。",
+    },
+    {
+      n: "02",
+      title: "專屬 AI 專家分工——不是一個通用模型包辦",
+      body: "每種內容類型都由有自己方法論、角色定位和輸出規格的專屬 AI 專家處理。PR 策略師用新聞角度和記者心理思考；TikTok 專家用角色弧和未解張力思考。正是這種分工，讓產出聽起來像是真正的專家寫的。",
+    },
+    {
+      n: "03",
+      title: "可驗證的方法論",
+      body: "品牌定位跨 6 個可量化維度評分。每種輸出有明確結構讓你審計。每個任務背後的得獎案例有公開紀錄可自行查證。整個系統設計前提就是「可審查」——因為如果你無法驗證邏輯，就不可能放心地大規模使用它。",
+    },
   ];
+
+  const steps = en ? [
+    ["1", "Lock positioning", "Answer the SoWork positioning flow once — Golden Circle, tagline, audience, voice. It becomes your locked brand brain."],
+    ["2", "Pick a task", "FB post, IG carousel, LinkedIn newsletter, TikTok script, press release — 168 tasks across every major platform."],
+    ["3", "Ship on-brand", "Multi-platform copy + images in 30–99 seconds, generated against your locked brain. Every time."],
+  ] : [
+    ["1", "鎖定定位", "完成一次 SoWork 定位流程——黃金圈、標語、受眾、品牌聲音。它成為你鎖定的品牌大腦。"],
+    ["2", "選任務", "FB 貼文、IG 輪播、LinkedIn 電子報、TikTok 腳本、新聞稿——168 個跨平台任務。"],
+    ["3", "直接發布", "30–99 秒產出多平台文案＋圖，全部對著你的品牌大腦產出。每次都是。"],
+  ];
+
+  const awardCases = en ? [
+    ["TikTok Script", "Duolingo · Shorty Award — Best Brand on TikTok", "Character arc + unresolved tension: every clip is complete but makes you need the next one."],
+    ["Welcome Email", "Dropbox Onboarding · IAC Award Winner", "Anchor on progress milestones, not discounts — the user feels they're completing their own task."],
+    ["PR News Hook", "Liquid Death · Clio Award Grand Prix", "A counter-intuitive claim makes journalists write the story themselves — 20× earned media vs. ad spend."],
+  ] : [
+    ["TikTok 腳本", "Duolingo · Shorty Award 多屆最佳品牌", "角色弧 + 未解張力：每支完整但讓人必須看下一集。"],
+    ["歡迎信", "Dropbox 歡迎序列 · IAC Award 最佳 Onboarding", "進度里程碑定錨，不是促銷——讓用戶覺得在完成自己的任務。"],
+    ["PR 新聞鉤", "Liquid Death · Clio Award Grand Prix", "反常識主張讓媒體自動報導，PR 曝光超過廣告投入 20 倍。"],
+  ];
+
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-white text-neutral-900">
-      {/* Nav */}
+
+      {/* ── Nav ── */}
       <header className="flex items-center justify-between px-6 md:px-10 py-5 max-w-6xl mx-auto">
-        <div className="text-xl font-bold">OnBrand<span className="text-neutral-400"> · 對版</span></div>
+        <div className="text-xl font-bold">
+          OnBrand<span className="text-neutral-400"> · 對版</span>
+        </div>
         <div className="flex items-center gap-3 text-sm">
           <button onClick={() => setLang(en ? "zh-TW" : "en")}
             className="text-neutral-500 hover:text-neutral-900 transition">
@@ -80,7 +123,8 @@ export default function LandingPage() {
             </Link>
           ) : (
             <>
-              <Link to="/auth/login" className="text-neutral-600 hover:text-neutral-900 px-2">
+              <Link to="/auth/login"
+                className="text-neutral-600 hover:text-neutral-900 px-3 py-2 rounded-lg border border-neutral-200 hover:border-neutral-400 transition">
                 {en ? "Sign in" : "登入"}
               </Link>
               <Link to="/auth/register"
@@ -93,10 +137,10 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero */}
+      {/* ── Hero ── */}
       <section className="max-w-4xl mx-auto px-6 pt-16 pb-20 text-center">
         <div className="inline-block text-[11px] font-semibold tracking-widest uppercase text-neutral-500 mb-5">
-          {en ? "AI marketing for SMB brands" : "中小品牌的 AI 行銷工作室"}
+          {en ? "AI marketing studio" : "中小品牌的 AI 行銷工作室"}
         </div>
         <h1 className="font-bold tracking-tight leading-tight mb-6"
           style={{ fontSize: "clamp(2rem, 5vw, 3.4rem)" }}>
@@ -115,9 +159,9 @@ export default function LandingPage() {
             style={{ background: GRAD }}>
             {en ? "Start 7-day free trial" : "免費試用 7 天"}
           </Link>
-          <Link to="/pricing"
+          <Link to="/auth/login"
             className="px-7 py-3 rounded-xl font-semibold text-base border border-neutral-300 hover:border-neutral-900 transition">
-            {en ? "See pricing" : "看方案"}
+            {en ? "Sign in" : "登入帳號"}
           </Link>
         </div>
         <p className="text-xs text-neutral-500 mt-4">
@@ -127,44 +171,38 @@ export default function LandingPage() {
         </p>
       </section>
 
-      {/* The moat */}
-      <section className="bg-neutral-50 border-y border-neutral-200">
+      {/* ── 3 Differentiators ── */}
+      <section style={{ background: BLK }}>
         <div className="max-w-5xl mx-auto px-6 py-16">
-          <h2 className="text-center text-2xl font-bold mb-3">
-            {en ? "Why it stays on-brand when ChatGPT doesn't" : "為什麼它不跑題，ChatGPT 會"}
-          </h2>
-          <p className="text-center text-neutral-600 text-sm mb-12 max-w-2xl mx-auto">
-            {en
-              ? "Generic AI tools restart from a blank prompt every time. OnBrand generates against a positioning brain you lock once."
-              : "通用 AI 工具每次都從空白 prompt 重來。OnBrand 對著你「鎖定一次」的品牌大腦產出，所以不會越寫越歪。"}
+          <p className="text-center text-[11px] font-semibold tracking-[0.25em] uppercase mb-3"
+            style={{ color: "#6B6B68" }}>
+            {en ? "What makes it different" : "三件事讓它跟所有 AI 工具都不一樣"}
           </p>
+          <h2 className="text-center text-2xl font-bold mb-12 text-white">
+            {en
+              ? "Not a prompt wrapper. A methodology system."
+              : "不是 prompt 包裝工具，是一套方法論系統"}
+          </h2>
           <div className="grid gap-6 md:grid-cols-3">
-            {moat.map(([t, d]) => (
-              <div key={t} className="bg-white rounded-2xl border border-neutral-200 p-6">
-                <div className="w-9 h-9 rounded-lg mb-4 flex items-center justify-center text-white font-bold"
-                  style={{ background: GRAD }}>✦</div>
-                <div className="font-bold mb-2">{t}</div>
-                <p className="text-sm text-neutral-600 leading-relaxed">{d}</p>
+            {differentiators.map((d) => (
+              <div key={d.n} className="rounded-2xl border p-6"
+                style={{ background: "#1A1A18", borderColor: "#2A2A28" }}>
+                <div className="text-3xl font-bold mb-4" style={{ color: "#3A3A38" }}>{d.n}</div>
+                <div className="font-bold mb-3 text-white text-[15px]">{d.title}</div>
+                <p className="text-sm leading-relaxed" style={{ color: "#9C9C98" }}>{d.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How it works */}
+      {/* ── How it works ── */}
       <section className="max-w-4xl mx-auto px-6 py-16">
         <h2 className="text-center text-2xl font-bold mb-12">
           {en ? "Three steps" : "三步驟"}
         </h2>
         <div className="grid gap-6 md:grid-cols-3 text-center">
-          {(en
-            ? [["1", "Lock positioning", "Answer the SoWork positioning flow once. It becomes your locked brand brain."],
-               ["2", "Pick a task", "FB post, IG carousel, LinkedIn, newsletter — pick a 30/60/99-second task."],
-               ["3", "Ship on-brand", "Get multi-platform copy + images, already on-brand. Edit, schedule, publish."]]
-            : [["1", "鎖定定位", "完成一次 SoWork 定位流程，它成為你鎖定的品牌大腦。"],
-               ["2", "選任務", "FB 貼文、IG 輪播、LinkedIn、電子報 —— 選一個 30/60/99 秒任務。"],
-               ["3", "直接發布", "拿到多平台文案＋圖，已經 on-brand。微調、排程、發布。"]]
-          ).map(([n, t, d]) => (
+          {steps.map(([n, t, d]) => (
             <div key={n}>
               <div className="text-3xl font-bold mb-2"
                 style={{ background: GRAD, WebkitBackgroundClip: "text",
@@ -176,32 +214,24 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Award-craft (option B — marketing surface) */}
-      <section className="bg-neutral-50 border-t border-neutral-200">
+      {/* ── Award case examples ── */}
+      <section className="bg-neutral-50 border-y border-neutral-200">
         <div className="max-w-5xl mx-auto px-6 py-16">
           <p className="text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-neutral-500 mb-3">
-            {en ? "Built on award-winning craft" : "內建 168 個得獎工藝案例"}
+            {en ? "Proven craft, built in" : "內建 168 個得獎工藝案例"}
           </p>
           <h2 className="text-center text-2xl font-bold mb-3">
             {en
-              ? "168 tasks. Each one built on a named, award-winning or market-proven case."
+              ? "168 tasks. Each one grounded in a real, named, award-winning case."
               : "168 個任務，每個對應一個命名得獎或市場成功案例"}
           </h2>
           <p className="text-center text-neutral-600 text-sm mb-10 max-w-2xl mx-auto">
             {en
-              ? "Across Facebook, Instagram, TikTok, YouTube, Email, PR, LinkedIn, Brand Strategy, KOL, and Research — every task type encodes the transferable craft of a real documented award or industry-proven campaign, so your output reads like an expert wrote it, not a generic AI."
-              : "涵蓋 Facebook、Instagram、TikTok、YouTube、Email、PR、LinkedIn、品牌策略、KOL、研究調查——每一種任務類型，都內建一個有公開記錄的得獎或市場驗證案例的「可轉移工藝」，讓產出像專家執行的，不是通用 AI 套版。"}
+              ? "Across Facebook, Instagram, TikTok, YouTube, Email, PR, LinkedIn, Brand Strategy, KOL, and Research — every task encodes the transferable craft of a documented award or industry-proven campaign, so your output reads like an expert wrote it."
+              : "涵蓋 Facebook、Instagram、TikTok、YouTube、Email、PR、LinkedIn、品牌策略、KOL、研究調查——每個任務都內建有公開紀錄的得獎或市場驗證案例的「可轉移工藝」，讓產出像專家執行的。"}
           </p>
           <div className="grid gap-4 md:grid-cols-3 max-w-4xl mx-auto">
-            {(en ? [
-              ["TikTok Hook", "Duolingo @duolingo · Shorty Award Best Brand on TikTok", "Character arc + unresolved tension: every clip is complete but makes you need the next one."],
-              ["Welcome Email", "Dropbox Onboarding · IAC Award Winner", "Anchor on progress milestones, not discounts — the user feels they're completing their own task."],
-              ["PR News Hook", "Liquid Death · Clio Award Grand Prix", "A slightly counter-intuitive claim makes journalists write the story themselves — 20× earned media vs. ad spend."],
-            ] : [
-              ["TikTok 腳本", "Duolingo @duolingo · Shorty Award 多屆最佳品牌", "角色弧 + 未解張力：每支完整但讓人必須看下一集。"],
-              ["歡迎信", "Dropbox 歡迎序列 · IAC Award 最佳 Onboarding", "進度里程碑定錨，不是促銷——讓用戶覺得在完成自己的任務。"],
-              ["PR 新聞鉤", "Liquid Death · Clio Award Grand Prix", "反常識主張讓媒體自動報導，PR 曝光超過廣告投入 20 倍。"],
-            ]).map(([t, c, d]) => (
+            {awardCases.map(([t, c, d]) => (
               <div key={t} className="bg-white rounded-2xl border border-neutral-200 p-6">
                 <div className="font-bold mb-1">{t}</div>
                 <div className="text-[11px] text-neutral-500 mb-3">{c}</div>
@@ -217,33 +247,52 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* ── Closing quote ── */}
+      <section className="max-w-3xl mx-auto px-6 py-16 text-center">
+        <blockquote className="text-xl font-medium leading-relaxed text-neutral-700 italic mb-2">
+          {en
+            ? "\"We didn't build another prompt wrapper. We built a methodology system that happens to run on AI.\""
+            : "「我們沒有做另一個 prompt 包裝工具。我們建立的是一套方法論系統，而它剛好是跑在 AI 上面的。」"}
+        </blockquote>
+        <p className="text-sm text-neutral-400">— SoWork</p>
+      </section>
+
+      {/* ── Final CTA ── */}
       <section className="border-t border-neutral-200">
         <div className="max-w-3xl mx-auto px-6 py-20 text-center">
           <h2 className="text-3xl font-bold mb-4">
             {en ? "Stop sounding like everyone else." : "別再讓你的品牌聽起來跟別人一樣。"}
           </h2>
           <p className="text-neutral-600 mb-8">
-            {en ? "Lock your positioning today. Early-bird pricing won't last."
-                : "今天就鎖定你的品牌定位。早鳥價不會永遠都在。"}
+            {en
+              ? "Lock your positioning today. Early-bird pricing won't last."
+              : "今天就鎖定你的品牌定位。早鳥價不會永遠都在。"}
           </p>
-          <Link to="/auth/register"
-            className="inline-block px-8 py-3.5 rounded-xl text-white font-semibold text-base shadow-lg"
-            style={{ background: GRAD }}>
-            {en ? "Start 7-day free trial" : "免費試用 7 天"}
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link to="/auth/register"
+              className="inline-block px-8 py-3.5 rounded-xl text-white font-semibold text-base shadow-lg"
+              style={{ background: GRAD }}>
+              {en ? "Start 7-day free trial" : "免費試用 7 天"}
+            </Link>
+            <Link to="/auth/login"
+              className="inline-block px-8 py-3.5 rounded-xl font-semibold text-base border border-neutral-300 hover:border-neutral-900 transition">
+              {en ? "Sign in" : "登入帳號"}
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <footer className="border-t border-neutral-200 py-8 text-center text-xs text-neutral-500 space-x-4">
-        <Link to="/pricing" className="hover:text-neutral-900">{en ? "Pricing" : "方案"}</Link>
-        <Link to="/terms" className="hover:text-neutral-900">{en ? "Terms" : "服務條款"}</Link>
-        <Link to="/privacy" className="hover:text-neutral-900">{en ? "Privacy" : "隱私權"}</Link>
-        <Link to="/refund" className="hover:text-neutral-900">{en ? "Refund" : "退款"}</Link>
+        <Link to="/pricing"   className="hover:text-neutral-900">{en ? "Pricing"  : "方案"}</Link>
+        <Link to="/changelog" className="hover:text-neutral-900">{en ? "Updates"  : "更新日誌"}</Link>
+        <Link to="/terms"     className="hover:text-neutral-900">{en ? "Terms"    : "服務條款"}</Link>
+        <Link to="/privacy"   className="hover:text-neutral-900">{en ? "Privacy"  : "隱私權"}</Link>
+        <Link to="/refund"    className="hover:text-neutral-900">{en ? "Refund"   : "退款"}</Link>
         <a href="mailto:sowork@sowork.ai" className="hover:text-neutral-900">sowork@sowork.ai</a>
         <div className="mt-3 text-neutral-400">© {new Date().getFullYear()} SoWork · OnBrand</div>
       </footer>
+
     </div>
   );
 }
