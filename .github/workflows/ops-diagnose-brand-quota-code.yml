@@ -1,0 +1,30 @@
+name: Ops — Diagnose brand quota code on VM
+
+# Reads the actual deployed brandRouter.ts from the VM and shows
+# the quota-check block so we can verify the code is up to date.
+# Also shows pm2 process info.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Show deployed brand quota code + pm2 state
+        run: |
+          echo "=== Git log (last 5 commits on VM) ==="
+          cd /opt/onbrand/app && git log --oneline -5
+
+          echo ""
+          echo "=== brandRouter.ts quota block (lines 215-260) ==="
+          sed -n '215,260p' /opt/onbrand/app/skills/ai-talent/server/routers/brandRouter.ts
+
+          echo ""
+          echo "=== pm2 process list ==="
+          pm2 list
+
+          echo ""
+          echo "=== pm2 startup script / exec command ==="
+          pm2 show onbrand 2>/dev/null | grep -E "exec path|script|interpreter|status|pm_uptime|version" || true
