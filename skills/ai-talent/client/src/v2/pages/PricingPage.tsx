@@ -36,17 +36,19 @@ export default function PricingPage() {
   const usdToTwd = (status as any)?.usdToTwd ?? 32;
   const r = (usd: number) => Math.round(usd * usdToTwd);
 
-  // ─── Pricing truth (USD) ───────────────────────────────────────────────────
-  // Starter  US$25 early / US$75 std  · annual US$300 (= $25×12, no saving)
-  // Solo     US$100 early / US$300 std · annual US$1,100 (= $100×11, 1 month free ~8%)
+  // ─── Pricing truth ─────────────────────────────────────────────────────────
+  // USD:  Starter US$25 early / US$75 std  · annual US$300 (×12, no saving)
+  //       Solo    US$100 early / US$300 std · annual US$1,100 (×11, 1 month free)
+  // TWD:  Starter NT$750 early / NT$2,250 std · annual NT$7,500  (×10, 2 months free)
+  //       Solo    NT$3,000 early / NT$9,000 std · annual NT$30,000 (×10, 2 months free)
   const defaults = currency === "USD"
     ? {
-        starterEarly: 25,  starterStd: 75,  starterAnnual: 300,   // $25×12
-        soloEarly:   100,  soloStd:   300,  soloAnnual:   1100,   // $100×11
+        starterEarly: 25,   starterStd: 75,   starterAnnual: 300,
+        soloEarly:   100,   soloStd:   300,   soloAnnual:   1100,
       }
     : {
-        starterEarly: r(25),  starterStd: r(75),  starterAnnual: r(300),
-        soloEarly:   r(100),  soloStd:   r(300),  soloAnnual:   r(1100),
+        starterEarly: 750,  starterStd: 2250, starterAnnual: 7500,
+        soloEarly:   3000,  soloStd:   9000,  soloAnnual:   30000,
       };
 
   const TIERS = [
@@ -80,8 +82,12 @@ export default function PricingPage() {
       highlight: false,
       highlightLabel: isEn ? "EARLY BIRD · LOCKED FOREVER" : "早鳥優惠 · 永久保價",
       // Starter annual = $25×12 = $300, no extra discount
-      annualNote: isEn ? "Billed annually at the same $25/mo rate — 12-month commitment" : "年約：同樣 $25/月，鎖定 12 個月",
-      annualSavePct: 0,  // no saving vs monthly
+      annualNote: isEn
+        ? "Billed annually — US$300/yr (same $25/mo rate, 12-month commitment)"
+        : currency === "TWD"
+          ? "年繳 NT$7,500（每月平均 NT$625，省 NT$1,500）"
+          : "年繳 US$300（同樣 $25/月，鎖定 12 個月）",
+      annualSavePct: currency === "TWD" ? 17 : 0,
     },
     {
       code: "drop_pro",
@@ -112,8 +118,12 @@ export default function PricingPage() {
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: true,
       highlightLabel: isEn ? "MOST POPULAR · EARLY BIRD" : "最多人選 · 早鳥優惠",
-      annualNote: isEn ? "Billed annually — ~US$92/mo (one month free)" : "年繳，每月平均約 US$92（送 1 個月）",
-      annualSavePct: 8,
+      annualNote: isEn
+        ? "Billed annually — US$1,100/yr (~US$92/mo, one month free)"
+        : currency === "TWD"
+          ? "年繳 NT$30,000（每月平均 NT$2,500，省 NT$6,000）"
+          : "年繳 US$1,100（每月平均約 US$92，送 1 個月）",
+      annualSavePct: currency === "TWD" ? 17 : 8,
     },
   ];
 
@@ -197,7 +207,7 @@ export default function PricingPage() {
                 annual ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600"
               }`}
             >
-              {isEn ? "Yearly" : "年繳"} <span className="text-xs text-emerald-600 ml-1">{isEn ? "Solo: 1 month free" : "Solo 送 1 個月"}</span>
+              {isEn ? "Yearly" : "年繳"} <span className="text-xs text-emerald-600 ml-1">{isEn ? "2 months free" : "送 2 個月"}</span>
             </button>
           </div>
         </div>
@@ -265,8 +275,8 @@ export default function PricingPage() {
               {currency === "TWD" && (
                 <p className="text-[11px] text-neutral-500 mt-1">
                   {isEn
-                    ? `Billed in TWD at today's USD rate (1 USD ≈ ${usdToTwd.toFixed(2)} NTD)`
-                    : `依當日匯率計算（1 USD ≈ ${usdToTwd.toFixed(2)} NTD），每天浮動`}
+                    ? "Fixed NTD pricing — no exchange rate fluctuation"
+                    : "固定台幣定價，不受匯率影響"}
                 </p>
               )}
               {(tier as any).isEarlyBird && (tier as any).standardMonthly > tier.monthly && (
