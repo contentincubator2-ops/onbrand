@@ -1,0 +1,44 @@
+name: Ops — Diagnose onbrand crash loop
+
+# Shows the last 100 lines of pm2 error log for the onbrand process,
+# restart count, and recent pm2 logs to identify crash root cause.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: pm2 crash summary + recent error log
+        run: |
+          echo "=== onbrand pm2 detail ==="
+          pm2 show onbrand 2>/dev/null | grep -E "restart time|unstable restarts|status|uptime|pid|exec path|script args|error log|out log" || true
+
+          echo ""
+          echo "=== Last 80 lines of onbrand stderr (pm2 error log) ==="
+          ERROR_LOG=$(pm2 show onbrand 2>/dev/null | grep "error log" | awk -F'│' '{print $3}' | tr -d ' ')
+          if [ -n "$ERROR_LOG" ] && [ -f "$ERROR_LOG" ]; then
+            tail -80 "$ERROR_LOG"
+          else
+            # fallback: try common pm2 log paths
+            tail -80 ~/.pm2/logs/onbrand-error.log 2>/dev/null || \
+            tail -80 /root/.pm2/logs/onbrand-error.log 2>/dev/null || \
+            echo "(error log not found at expected paths)"
+          fi
+
+          echo ""
+          echo "=== Last 40 lines of onbrand stdout ==="
+          OUT_LOG=$(pm2 show onbrand 2>/dev/null | grep "out log" | awk -F'│' '{print $3}' | tr -d ' ')
+          if [ -n "$OUT_LOG" ] && [ -f "$OUT_LOG" ]; then
+            tail -40 "$OUT_LOG"
+          else
+            tail -40 ~/.pm2/logs/onbrand-out.log 2>/dev/null || \
+            tail -40 /root/.pm2/logs/onbrand-out.log 2>/dev/null || \
+            echo "(out log not found)"
+          fi
+
+          echo ""
+          echo "=== pm2 logs (last 60 lines, combined) ==="
+          pm2 logs onbrand --lines 60 --nostream 2>/dev/null || true
