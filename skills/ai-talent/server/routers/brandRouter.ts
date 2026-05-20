@@ -228,8 +228,10 @@ export const brandRouter = router({
           [ctx.user.id],
         );
         const row = (pRows as any[])[0];
-        // Admins and unlimited-credit users have no brand cap
-        const isUnlimited = row?.hasUnlimitedCredits === 1 || row?.role === "admin";
+        // Admins and unlimited-credit users have no brand cap.
+        // Use Number() cast because mysql2 may return TINYINT(1) as boolean true
+        // rather than the integer 1, making strict === 1 fail.
+        const isUnlimited = Number(row?.hasUnlimitedCredits) === 1 || row?.role === "admin";
         if (!isUnlimited) {
           const planCode = row?.planCode ?? "trial";
           const { getPlan } = await import("../_core/plans");
