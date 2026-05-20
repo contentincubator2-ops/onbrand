@@ -2218,6 +2218,19 @@ async function main() {
     }
     console.log("[migrate] pr_craft_refs: OK (seeded)");
 
+    // ── 2026-05-20: users.preferredLang — persist UI language choice to DB ──
+    // Survives localStorage clears; syncs across devices on login.
+    const [prefLangCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'preferredLang'
+    `) as any;
+    if ((prefLangCol as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE users ADD COLUMN preferredLang VARCHAR(8) NOT NULL DEFAULT 'zh-TW'`);
+      console.log("[migrate] users.preferredLang: added");
+    } else {
+      console.log("[migrate] users.preferredLang: already exists, skipped");
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

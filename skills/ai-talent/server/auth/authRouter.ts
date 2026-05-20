@@ -29,6 +29,7 @@ import {
   setPasswordResetToken,
   updateUserPassword,
   updateLastLoginIp,
+  updatePreferredLang,
   verifyEmailPassword,
   upsertGoogleUser,
   deleteUserById,
@@ -299,6 +300,7 @@ authRouter.post("/me", async (req: Request, res: Response) => {
         isActive: users.isActive,
         credits: users.credits,
         hasUnlimitedCredits: users.hasUnlimitedCredits,
+        preferredLang: users.preferredLang,
       })
       .from(users)
       .where(eq(users.id, session.userId))
@@ -313,6 +315,31 @@ authRouter.post("/me", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[auth] me error:", err);
     res.status(500).json({ error: "伺服器錯誤" });
+  }
+});
+
+/**
+ * PATCH /api/auth/me/lang - Persist the user's preferred UI language to DB.
+ * Called whenever the user explicitly toggles the language in the UI.
+ * Survives localStorage clears; syncs across devices on next login.
+ */
+authRouter.patch("/me/lang", async (req: Request, res: Response) => {
+  try {
+    const sessionToken = req.cookies[SESSION_COOKIE_NAME];
+    if (!sessionToken) { res.status(401).json({ error: "Not authenticated" }); return; }
+    const session = await verifySessionToken(sessionToken);
+    if (!session) { res.status(401).json({ error: "Invalid session" }); return; }
+
+    const schema = z.object({ lang: z.enum(["zh-TW", "en"]) });
+    const result = schema.safeParse(req.body);
+    if (!result.success) { res.status(400).json({ error: "lang must be zh-TW or en" }); return; }
+
+    const db = await getDb();
+    await updatePreferredLang(db, session.userId, result.data.lang);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[auth] me/lang error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 

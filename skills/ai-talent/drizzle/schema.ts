@@ -45,6 +45,9 @@ export const users = mysqlTable("users", {
   companyId: int("companyId"),
   departmentId: int("departmentId"),
   orgRole: mysqlEnum("orgRole", ["owner", "admin", "member"]).default("member"),
+  // 2026-05-20: UI language preference — persisted to DB so it survives
+  // localStorage clears and syncs across devices. "zh-TW" | "en".
+  preferredLang: varchar("preferredLang", { length: 8 }).default("zh-TW"),
   // 2026-05-12 (CJ「老用戶永遠保 900，新用戶才漲 1500」): grandfathered
   // launch-promo flag. Set on register based on ONBRAND_PROMO_ACTIVE env.
   // When 1: this user keeps the early-bird price forever even after the

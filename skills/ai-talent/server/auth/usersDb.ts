@@ -237,6 +237,21 @@ export async function updateUserPassword(
 }
 
 /**
+ * Update user's preferred UI language — persisted so it survives localStorage
+ * clears and syncs across devices. Called when user explicitly toggles lang.
+ */
+export async function updatePreferredLang(
+  db: DB,
+  userId: number,
+  lang: "zh-TW" | "en",
+): Promise<void> {
+  await db
+    .update(users)
+    .set({ preferredLang: lang })
+    .where(eq(users.id, userId));
+}
+
+/**
  * Update last login IP
  */
 export async function updateLastLoginIp(
