@@ -1460,7 +1460,16 @@ async function main() {
 
     // 2026-05-11 — ECPay extensions to invoices.
     await ensureCol("invoices", "workspaceId",     "INT NULL");
-    await ensureCol("invoices", "merchantTradeNo", "VARCHAR(32) NULL");
+    await ensureCol("invoices", "merchantTradeNo", "VARCHAR(255) NULL");
+    // 2026-05-21: VARCHAR(32) is too small for Stripe session IDs (~80 chars)
+    // and for pending_${timestamp}_${userId} temp values. Widen to 255.
+    try {
+      await conn.execute(
+        `ALTER TABLE invoices MODIFY COLUMN merchantTradeNo VARCHAR(255) NULL`,
+      );
+    } catch (e) {
+      /* already wide enough or column absent — ok */
+    }
     await ensureCol("invoices", "planCode",        "VARCHAR(24) NULL");
     await ensureCol("invoices", "billingCycle",    "VARCHAR(12) NULL");
     await ensureCol("invoices", "amount",          "INT NULL");
