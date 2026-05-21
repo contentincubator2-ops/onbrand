@@ -1,0 +1,61 @@
+name: Ops — Kill rogue process on port 3101 and restart onbrand
+
+# 2026-05-21: A standalone node process (not managed by pm2) is holding
+# port 3101, causing the pm2 onbrand process to crash-loop.
+# This workflow kills whatever is on port 3101 then restarts onbrand cleanly.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Show what is on port 3101
+        run: |
+          echo "=== ss ==="
+          ss -tlnp | grep 3101 || echo "(nothing)"
+          echo "=== lsof ==="
+          lsof -i :3101 2>/dev/null || echo "(nothing via lsof)"
+          echo "=== pm2 list ==="
+          pm2 list
+
+      - name: Kill everything on port 3101
+        run: |
+          set +e
+          # Kill by port (fuser -k: kills all pids holding the port)
+          fuser -k 3101/tcp 2>/dev/null && echo "fuser killed port 3101" || echo "fuser: nothing to kill"
+          # Belt-and-suspenders: also kill by lsof pid list
+          PIDS=$(lsof -t -i:3101 2>/dev/null)
+          if [ -n "$PIDS" ]; then
+            echo "Killing pids from lsof: $PIDS"
+            kill -9 $PIDS
+          else
+            echo "lsof: no extra pids found"
+          fi
+          sleep 3
+          echo "=== port 3101 after kill ==="
+          ss -tlnp | grep 3101 || echo "(port is now free)"
+
+      - name: Restart onbrand on freed port
+        run: |
+          set -e
+          pm2 restart onbrand
+          sleep 5
+          echo "=== pm2 list ==="
+          pm2 list
+          echo "=== port 3101 now ==="
+          ss -tlnp | grep 3101 || echo "(not bound — check logs)"
+
+      - name: Health check
+        run: |
+          set +e
+          sleep 3
+          curl -sf http://localhost:3101/health && echo "" || \
+          curl -sf http://localhost:3101/api/health && echo "" || \
+          echo "(health endpoint not responding)"
+          echo "=== last 15 out lines ==="
+          pm2 logs onbrand --lines 15 --nostream 2>/dev/null || true
+          echo "=== onbrand status ==="
+          pm2 show onbrand 2>/dev/null | grep -E "status|uptime|restart time|unstable|pid" || true
