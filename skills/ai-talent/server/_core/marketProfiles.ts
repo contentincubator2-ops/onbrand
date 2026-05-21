@@ -54,7 +54,7 @@ const PROFILES: Record<string, MarketProfile> = {
     countryCode: "CN", countryName: "China", defaultLanguage: "zh-CN",
     platforms: ["WeChat", "Weibo", "Douyin (TikTok CN)", "Xiaohongshu (RED)", "Bilibili", "Kuaishou"],
     culturalContext: "使用简体中文；内容需通过平台审核（避免政治话题）；消费者重视国货品牌、品质背书与KOL推荐。直播电商是重要渠道。节日营销关键节点：618、双11、春节。小红书适合种草，微信适合私域流量，抖音适合短视频引流。",
-    regulations: "广告法严格：禁用"最"、"第一"、"国家级"等绝对化语言；医疗健康产品需相应资质；需遵守互联网信息服务管理规定。",
+    regulations: "广告法严格：禁用「最」「第一」「国家级」等绝对化语言；医疗健康产品需相应资质；需遵守互联网信息服务管理规定。",
     visualStyle: "红色、金色为吉祥色；国潮（新中式）风格流行；直播截图式视觉效果好；产品细节展示为主。",
   },
   HK: {
