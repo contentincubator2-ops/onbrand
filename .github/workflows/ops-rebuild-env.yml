@@ -1,0 +1,188 @@
+name: Ops — Rebuild .env from backup or secrets (emergency)
+
+# .env at /opt/onbrand/app/skills/ai-talent/.env is missing.
+# This workflow:
+#   1. Looks for the most recent .env.bak.* backup (created by op-set-all-keys.yml)
+#   2. If found  → restores it
+#   3. If not    → creates a fresh .env with JWT_SECRET + Stripe + Resend + static vars
+#   4. Ensures /opt/marketing-os symlink path still resolves (bootstrap-env fallback)
+#   5. Fixes perms + restarts onbrand
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rebuild:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+
+      - name: Check for .env backups
+        id: check_backup
+        run: |
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          DIR=$(dirname "$ENV")
+          mkdir -p "$DIR"
+
+          echo "=== Existing .env state ==="
+          ls -la "$ENV" 2>/dev/null || echo "(missing)"
+
+          echo ""
+          echo "=== Looking for backups ==="
+          LATEST_BAK=$(ls -t "${ENV}.bak."* 2>/dev/null | head -1 || true)
+          if [ -n "$LATEST_BAK" ] && [ -s "$LATEST_BAK" ]; then
+            echo "✓ Found backup: $LATEST_BAK ($(wc -l < "$LATEST_BAK") lines)"
+            echo "backup_path=$LATEST_BAK" >> "$GITHUB_OUTPUT"
+            echo "has_backup=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "  No backup found — will create from secrets"
+            echo "has_backup=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Also check marketing-os path (bootstrap-env fallback)
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+          echo ""
+          echo "=== marketing-os .env state ==="
+          ls -la "$MOS" 2>/dev/null || echo "(missing)"
+
+      - name: Restore from backup
+        if: steps.check_backup.outputs.has_backup == 'true'
+        run: |
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          LATEST_BAK="${{ steps.check_backup.outputs.backup_path }}"
+          cp "$LATEST_BAK" "$ENV"
+          echo "✓ Restored from $LATEST_BAK"
+          echo "  Lines: $(wc -l < "$ENV")"
+          head -5 "$ENV" | sed 's/=.*/=***/'
+
+      - name: Create fresh .env from secrets
+        if: steps.check_backup.outputs.has_backup == 'false'
+        env:
+          SK:  ${{ secrets.STRIPE_SECRET_KEY }}
+          WS:  ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          RK:  ${{ secrets.RESEND_API_KEY }}
+          ANT: ${{ secrets.ANTHROPIC_API_KEY }}
+          OAI: ${{ secrets.OPENAI_API_KEY }}
+          GEM: ${{ secrets.GEMINI_API_KEY }}
+          GPT1: ${{ secrets.OPENAI_API_KEY_1 }}
+          GPT2: ${{ secrets.OPENAI_API_KEY_2 }}
+          DSK: ${{ secrets.DEEPSEEK_API_KEY_7 }}
+          PPX: ${{ secrets.PERPLEXITY_API_KEY_5 }}
+          FAL: ${{ secrets.FAL_AI_API_KEY_1 }}
+          AZU: ${{ secrets.AZURE_CLAUDE_SWEDEN_API_KEY }}
+          AZF: ${{ secrets.AZURE_FOUNDRY_API_KEY }}
+          CLAUDE1: ${{ secrets.CLAUDE_API_KEY_DEFAULT }}
+          CLAUDE2: ${{ secrets.CLAUDE_API_KEY_1 }}
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          mkdir -p "$(dirname "$ENV")"
+
+          # Generate a fresh JWT_SECRET
+          NEW_JWT=$(openssl rand -base64 64 | tr -d '\n=' | head -c 86)
+          echo "::add-mask::$NEW_JWT"
+
+          cat > "$ENV" << ENVEOF
+# Rebuilt by ops-rebuild-env @ $(date -Iseconds)
+# NOTE: JWT_SECRET is newly generated — all users will need to re-login
+
+NODE_ENV=production
+PORT=3101
+APP_URL=https://onbrand.sowork.ai
+CORS_ORIGIN=https://onbrand.sowork.ai,https://marketing-os.sowork.ai
+EMAIL_FROM=noreply@sowork.ai
+
+JWT_SECRET=${NEW_JWT}
+
+# Stripe
+STRIPE_SECRET_KEY=${SK}
+STRIPE_WEBHOOK_SECRET=${WS}
+
+# Email
+RESEND_API_KEY=${RK}
+
+# LLM — Anthropic
+ANTHROPIC_API_KEY=${ANT:-$CLAUDE1}
+CLAUDE_API_KEY_DEFAULT=${CLAUDE1}
+ANTHROPIC_API_KEY_BACKUP_1=${CLAUDE2}
+
+# LLM — OpenAI
+OPENAI_API_KEY=${OAI:-$GPT1}
+OPENAI_API_KEY_BACKUP_1=${GPT2}
+
+# LLM — Google
+GEMINI_API_KEY=${GEM}
+GOOGLE_API_KEY=${GEM}
+
+# LLM — DeepSeek
+DEEPSEEK_API_KEY=${DSK}
+
+# LLM — Perplexity
+PERPLEXITY_API_KEY=${PPX}
+
+# Image
+FAL_API_KEY=${FAL}
+FAL_AI_API_KEY=${FAL}
+
+# Azure
+AZURE_CLAUDE_SWEDEN_API_KEY=${AZU}
+AZURE_CLAUDE_SWEDEN_ENDPOINT=https://proj-claude-sweden-resource.services.ai.azure.com/
+AZURE_FOUNDRY_API_KEY=${AZF}
+ENVEOF
+
+          echo "✓ Created fresh .env ($(wc -l < "$ENV") lines)"
+          echo ""
+          echo "=== Keys present (values masked) ==="
+          grep -E '^[A-Z]' "$ENV" | sed 's/=.*/=***/' | head -30
+
+      - name: Ensure marketing-os path resolves
+        run: |
+          # bootstrap-env.ts looks up /opt/marketing-os/app/skills/ai-talent/.env
+          # Make sure it resolves to the onbrand file
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          MOS_ENV=/opt/marketing-os/app/skills/ai-talent/.env
+          MOS_DIR=$(dirname "$MOS_ENV")
+
+          if [ ! -f "$MOS_ENV" ] && [ ! -L "$MOS_ENV" ]; then
+            mkdir -p "$MOS_DIR"
+            ln -s "$ENV" "$MOS_ENV"
+            echo "✓ Created symlink: $MOS_ENV → $ENV"
+          elif [ -L "$MOS_ENV" ]; then
+            REAL=$(readlink -f "$MOS_ENV" 2>/dev/null || true)
+            echo "  Existing symlink: $MOS_ENV → $REAL"
+          else
+            echo "  $MOS_ENV is already a real file"
+          fi
+
+      - name: Fix permissions
+        run: |
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          chown azureuser:azureuser "$ENV"
+          chmod 640 "$ENV"
+          echo "✓ Permissions: 640 azureuser:azureuser"
+
+      - name: Restart onbrand
+        run: |
+          set -e
+          pm2 restart onbrand --update-env 2>&1 | tail -5
+          sleep 8
+
+      - name: Verify
+        run: |
+          set +e
+          echo "=== onbrand status ==="
+          pm2 show onbrand 2>/dev/null | grep -E "status|uptime|unstable|pid" || true
+
+          echo ""
+          echo "=== port 3101 ==="
+          ss -tlnp | grep 3101 || echo "(not bound yet)"
+
+          echo ""
+          echo "=== last 6 log lines ==="
+          pm2 logs onbrand --lines 6 --nostream 2>/dev/null | grep -E "bootstrap|CORS|listening|JWT|FATAL|ERROR" || true
+
+          echo ""
+          echo "=== health check ==="
+          curl -sf http://localhost:3101/health && echo "✓ healthy" \
+            || curl -sf http://localhost:3101/ -o /dev/null -w "HTTP %{http_code}\n" \
+            || echo "(no response)"
