@@ -1,0 +1,154 @@
+name: Ops — Stabilize onbrand (retire ai-marketer, persist pm2, fix .env)
+
+# Run this once to achieve a stable, reboot-safe "onbrand" process.
+#
+# What it does:
+#   1. Permanently deletes the old "ai-marketer" process from pm2
+#      (was squatting port 3101 and causing crash loops)
+#   2. Verifies / repairs the canonical .env at /opt/onbrand/app/skills/ai-talent/.env
+#      — converts any symlink chain into a real file so it survives reboots
+#   3. Restarts onbrand cleanly with --update-env
+#   4. Runs `pm2 startup` + `pm2 save` so onbrand auto-starts on VM reboot
+#   5. Verifies the server is healthy on port 3101
+
+on:
+  workflow_dispatch:
+
+jobs:
+  stabilize:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+
+      # ── Step 1: Retire ai-marketer for good ───────────────────────────────
+      - name: Delete ai-marketer from pm2 (permanent)
+        run: |
+          echo "=== pm2 list before ==="
+          pm2 list
+
+          echo ""
+          echo "=== Stopping and deleting ai-marketer ==="
+          if pm2 list | grep -q "ai-marketer"; then
+            pm2 stop ai-marketer 2>/dev/null || true
+            pm2 delete ai-marketer 2>/dev/null && echo "✓ ai-marketer deleted" || echo "(already gone)"
+          else
+            echo "ai-marketer not in pm2 list — nothing to delete"
+          fi
+
+          echo ""
+          echo "=== Port 3101 after ==="
+          sleep 2
+          ss -tlnp | grep 3101 || echo "(port 3101 is now free)"
+
+      # ── Step 2: Ensure .env is a REAL FILE (not a symlink chain) ─────────
+      - name: Ensure onbrand .env is a real file
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+
+          echo "=== Current .env state ==="
+          ls -la "$ENV" 2>/dev/null || echo "onbrand .env: not found"
+          ls -la "$MOS" 2>/dev/null || echo "marketing-os .env: not found"
+
+          # If onbrand .env is a symlink, resolve and copy the real content
+          if [ -L "$ENV" ]; then
+            REAL=$(readlink -f "$ENV" 2>/dev/null || true)
+            echo "  onbrand .env is a symlink → $REAL"
+            if [ -f "$REAL" ] && [ -s "$REAL" ]; then
+              cp "$REAL" "${ENV}.tmp"
+              rm "$ENV"
+              mv "${ENV}.tmp" "$ENV"
+              echo "✓ Converted symlink to real file ($REAL → $ENV)"
+            else
+              echo "❌ Symlink target is missing or empty — cannot convert"
+              exit 1
+            fi
+          elif [ -f "$ENV" ] && [ -s "$ENV" ]; then
+            echo "✓ onbrand .env is already a real file ($(wc -l < "$ENV") lines)"
+          else
+            # Last resort: copy from marketing-os if it exists
+            if [ -f "$MOS" ] && [ -s "$MOS" ]; then
+              cp "$MOS" "$ENV"
+              echo "✓ Copied .env from marketing-os as fallback"
+            else
+              echo "❌ No .env found at either path — run ops-restore-env-from-pm2 first"
+              exit 1
+            fi
+          fi
+
+          chown azureuser:azureuser "$ENV"
+          chmod 640 "$ENV"
+
+          echo ""
+          echo "=== .env sanity check (key count + first 5 keys masked) ==="
+          grep -c '=' "$ENV" && head -5 "$ENV" | sed 's/=.*/=***/'
+
+      # ── Step 3: Restart onbrand cleanly ───────────────────────────────────
+      - name: Restart onbrand with updated env
+        run: |
+          set -e
+          echo "=== Restarting onbrand ==="
+          pm2 restart onbrand --update-env 2>&1 | tail -5
+          sleep 8
+
+          echo ""
+          echo "=== Port 3101 after restart ==="
+          ss -tlnp | grep 3101 || echo "(nothing on 3101 yet — may still be booting)"
+
+      # ── Step 4: Persist pm2 so onbrand survives VM reboots ────────────────
+      - name: Save pm2 process list + configure startup
+        run: |
+          set -e
+          echo "=== pm2 save ==="
+          pm2 save --force
+          echo "✓ pm2 dump saved"
+
+          echo ""
+          echo "=== pm2 startup (generates/updates systemd unit) ==="
+          # This may output a command to run as root — capture it
+          STARTUP_CMD=$(pm2 startup 2>&1 | grep "sudo" | tail -1 || true)
+          if [ -n "$STARTUP_CMD" ]; then
+            echo "Running: $STARTUP_CMD"
+            eval "$STARTUP_CMD" 2>&1 || true
+            pm2 save --force
+            echo "✓ systemd startup configured"
+          else
+            echo "  pm2 startup reports already configured (or running as root)"
+          fi
+
+          echo ""
+          echo "=== Verifying pm2 systemd service ==="
+          systemctl is-enabled pm2-$(whoami) 2>/dev/null || \
+          systemctl is-enabled pm2-root 2>/dev/null || \
+          systemctl is-enabled pm2 2>/dev/null || \
+          echo "  (systemd unit name may differ — check with: systemctl list-units | grep pm2)"
+
+      # ── Step 5: Verify everything is healthy ──────────────────────────────
+      - name: Verify onbrand is healthy
+        run: |
+          set +e
+          echo "=== pm2 list (final) ==="
+          pm2 list
+
+          echo ""
+          echo "=== onbrand detail ==="
+          pm2 show onbrand 2>/dev/null | grep -E "status|uptime|restart time|unstable restarts|pid|exec path" || true
+
+          echo ""
+          echo "=== Last 8 log lines ==="
+          pm2 logs onbrand --lines 8 --nostream 2>/dev/null | grep -E "bootstrap|CORS|listening|JWT|FATAL|ERROR" || true
+
+          echo ""
+          echo "=== Port 3101 ==="
+          ss -tlnp | grep 3101 || echo "(nothing on 3101 — check logs!)"
+
+          echo ""
+          echo "=== Health check ==="
+          curl -sf http://localhost:3101/health && echo "✓ healthy" \
+            || curl -sf http://localhost:3101/ -o /dev/null -w "  / → HTTP %{http_code}\n" \
+            || echo "(no response — check pm2 logs)"
+
+          echo ""
+          echo "=== ai-marketer should be gone ==="
+          pm2 list | grep "ai-marketer" && echo "⚠️  ai-marketer still present!" || echo "✓ ai-marketer absent"
