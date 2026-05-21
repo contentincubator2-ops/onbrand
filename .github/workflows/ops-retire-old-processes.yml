@@ -1,0 +1,68 @@
+name: Ops — Retire old pm2 processes (keep only onbrand)
+
+# Permanently removes ai-marketer, roster, ai-proxy from pm2.
+# Kills any orphaned node processes on port 3101.
+# Only onbrand remains.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  retire:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+
+      - name: Kill orphan on port 3101
+        run: |
+          echo "=== Killing anything on port 3101 ==="
+          fuser -k 3101/tcp 2>/dev/null && echo "✓ killed" || echo "(nothing)"
+          sleep 2
+          ss -tlnp | grep 3101 || echo "✓ port 3101 free"
+
+      - name: Stop and delete old processes
+        run: |
+          for NAME in ai-marketer roster ai-proxy; do
+            if pm2 list | grep -q "$NAME"; then
+              pm2 stop "$NAME" 2>/dev/null || true
+              pm2 delete "$NAME" 2>/dev/null && echo "✓ deleted $NAME" || echo "(could not delete $NAME)"
+            else
+              echo "  $NAME not in pm2 — skipping"
+            fi
+          done
+
+      - name: Restart onbrand cleanly
+        run: |
+          set -e
+          pm2 restart onbrand --update-env 2>&1 | tail -5
+          sleep 6
+
+      - name: Save pm2 list + configure startup
+        run: |
+          pm2 save --force
+          echo "✓ pm2 saved"
+          STARTUP=$(pm2 startup 2>&1 | grep "sudo" | tail -1 || true)
+          if [ -n "$STARTUP" ]; then
+            eval "$STARTUP" 2>&1 || true
+            pm2 save --force
+            echo "✓ systemd startup configured"
+          else
+            echo "  startup already configured"
+          fi
+
+      - name: Verify
+        run: |
+          set +e
+          echo "=== pm2 list (should only show onbrand) ==="
+          pm2 list
+
+          echo ""
+          echo "=== port 3101 ==="
+          ss -tlnp | grep 3101 || echo "(not bound yet)"
+
+          echo ""
+          sleep 3
+          echo "=== health check ==="
+          curl -sf http://localhost:3101/health && echo "✓ healthy" \
+            || curl -sf http://localhost:3101/ -o /dev/null -w "HTTP %{http_code}\n" \
+            || echo "(no response)"
