@@ -1,0 +1,85 @@
+name: Ops — Link onbrand .env to marketing-os .env (one-time)
+
+# 2026-05-21: The server runs from /opt/onbrand/app but bootstrap-env.ts
+# falls through to /opt/marketing-os/app/.env because /opt/onbrand/app/.env
+# doesn't exist (or has only Stripe keys). This symlinks the onbrand .env
+# to the canonical marketing-os .env so both paths resolve correctly.
+# Also copies Stripe keys back into the canonical .env so they survive.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  link:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Check current state
+        run: |
+          ONBRAND=/opt/onbrand/app/skills/ai-talent/.env
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+          echo "=== /opt/onbrand .env ==="
+          ls -la "$ONBRAND" 2>/dev/null || echo "(not found)"
+          echo ""
+          echo "=== /opt/marketing-os .env key count ==="
+          grep -c '=' "$MOS" 2>/dev/null || echo "(not found)"
+          echo ""
+          echo "=== Stripe keys in marketing-os .env ==="
+          grep -E '^STRIPE_' "$MOS" 2>/dev/null | sed 's/=.*/=***/' || echo "(none)"
+
+      - name: Merge Stripe keys into marketing-os .env then symlink
+        env:
+          SK: ${{ secrets.STRIPE_SECRET_KEY }}
+          WS: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: |
+          set -e
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+          ONBRAND=/opt/onbrand/app/skills/ai-talent/.env
+
+          # 1. Upsert Stripe keys into the CANONICAL marketing-os .env
+          if [ -n "$SK" ] && [ -n "$WS" ]; then
+            TMP=$(mktemp)
+            grep -v -E '^(STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET)=' "$MOS" > "$TMP" || true
+            {
+              echo ""
+              echo "# Stripe — written by ops-link-onbrand-env @ $(date -Iseconds)"
+              echo "STRIPE_SECRET_KEY=$SK"
+              echo "STRIPE_WEBHOOK_SECRET=$WS"
+            } >> "$TMP"
+            mv "$TMP" "$MOS"
+            chmod 600 "$MOS"
+            echo "✓ Stripe keys merged into $MOS"
+          else
+            echo "  STRIPE secrets not provided — skipping Stripe key merge"
+          fi
+
+          # 2. Remove any incomplete /opt/onbrand .env and symlink to canonical
+          if [ -L "$ONBRAND" ]; then
+            echo "  symlink already exists — relinking"
+            rm "$ONBRAND"
+          elif [ -f "$ONBRAND" ]; then
+            echo "  regular file exists at onbrand path — removing (incomplete, only had Stripe keys)"
+            rm "$ONBRAND"
+          fi
+          mkdir -p "$(dirname "$ONBRAND")"
+          ln -s "$MOS" "$ONBRAND"
+          echo "✓ Symlinked: $ONBRAND → $MOS"
+          ls -la "$ONBRAND"
+
+      - name: Restart onbrand with correct env
+        run: |
+          set -e
+          pm2 restart onbrand --update-env
+          sleep 5
+          echo "=== pm2 onbrand status ==="
+          pm2 show onbrand 2>/dev/null | grep -E "status|uptime|restart|pid" || true
+
+      - name: Verify server loaded correct .env
+        run: |
+          set +e
+          sleep 3
+          echo "=== last 10 out lines ==="
+          pm2 logs onbrand --lines 10 --nostream 2>/dev/null | grep -E "bootstrap|CORS|listening|JWT" || true
+          echo ""
+          echo "=== health check ==="
+          curl -sf http://localhost:3101/health && echo "" || echo "(no response)"
