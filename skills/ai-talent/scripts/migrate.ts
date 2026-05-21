@@ -1807,18 +1807,25 @@ async function main() {
     try { await conn.execute(`ALTER TABLE workspaces ADD INDEX idx_ws_owner (ownerUserId)`); }
     catch { /* index exists */ }
 
-    // 2026-05-21: prod workspaces may have a legacy `organizationId INT NOT NULL`
-    // column (from an old schema pre-dating this migration). When it exists with
-    // no DEFAULT the backfill INSERT fails silently. Make it nullable so we can
-    // insert without specifying it.
-    if (wsColSet.has("organizationId")) {
-      try {
-        await conn.execute(
-          `ALTER TABLE workspaces MODIFY COLUMN organizationId INT NULL DEFAULT NULL`,
-        );
-        console.log("[migrate] workspaces: organizationId made nullable (legacy col)");
-      } catch (e) {
-        console.warn("[migrate] workspaces organizationId MODIFY:", (e as Error).message);
+    // 2026-05-21: prod workspaces may have legacy NOT-NULL-without-DEFAULT
+    // columns from an older schema (organizationId, workspaceKey, status …).
+    // Any such column blocks the backfill INSERT. Make them nullable so we
+    // can insert without specifying them.
+    const legacyNullableCols: Array<[string, string]> = [
+      ["organizationId", "INT NULL DEFAULT NULL"],
+      ["workspaceKey",   "VARCHAR(128) NULL DEFAULT NULL"],
+      ["status",         "VARCHAR(32)  NULL DEFAULT NULL"],
+    ];
+    for (const [col, ddl] of legacyNullableCols) {
+      if (wsColSet.has(col)) {
+        try {
+          await conn.execute(
+            `ALTER TABLE workspaces MODIFY COLUMN \`${col}\` ${ddl}`,
+          );
+          console.log(`[migrate] workspaces: ${col} made nullable (legacy col)`);
+        } catch (e) {
+          console.warn(`[migrate] workspaces ${col} MODIFY:`, (e as Error).message);
+        }
       }
     }
 
