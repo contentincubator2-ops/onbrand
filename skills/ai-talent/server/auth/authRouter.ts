@@ -162,6 +162,28 @@ authRouter.post("/register", async (req: Request, res: Response) => {
         // Pre-existing bug from da4787b that's been failing CI ever since.
         [trialEnds, billingCountry, user.id],
       );
+
+      // 2026-05-21 (CJ「找不到 workspace」): provision default workspace for
+      // every new user at registration so PricingPage checkout never fails.
+      try {
+        const slug = `ws-${user.id}-${Math.random().toString(36).slice(2, 8)}`;
+        const wsName = name || `Workspace #${user.id}`;
+        const [wsIns]: any = await localPool.execute(
+          `INSERT INTO workspaces (slug, name, ownerUserId, planCode, planStatus, billingMode)
+           VALUES (?, ?, ?, 'trial', 'trial', 'solo')`,
+          [slug, wsName, user.id],
+        );
+        const wsId = (wsIns as any)?.insertId;
+        if (wsId) {
+          await localPool.execute(
+            `INSERT IGNORE INTO workspace_members (workspaceId, userId, role, joinedAt)
+             VALUES (?, ?, 'owner', NOW(3))`,
+            [wsId, user.id],
+          );
+        }
+      } catch (e) {
+        console.warn("[auth] workspace provision failed (non-blocking):", e);
+      }
     } catch (e) {
       console.warn("[auth] planEndsAt set failed (non-blocking):", e);
     }

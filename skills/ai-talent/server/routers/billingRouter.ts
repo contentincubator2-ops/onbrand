@@ -226,6 +226,28 @@ export const billingRouter = router({
           [ctx.user!.id],
         );
         workspaceId = (wsRows as any[])[0]?.id ?? null;
+
+        // 2026-05-21 (CJ「找不到 workspace」): auto-provision workspace for
+        // users who registered after the backfill migration ran.
+        if (!workspaceId) {
+          const uid  = ctx.user!.id;
+          const slug = `ws-${uid}-${Math.random().toString(36).slice(2, 8)}`;
+          const name = (ctx.user as any)?.name ?? `Workspace #${uid}`;
+          const [ins]: any = await localPool.execute(
+            `INSERT INTO workspaces (slug, name, ownerUserId, planCode, planStatus, billingMode)
+             VALUES (?, ?, ?, ?, ?, 'solo')`,
+            [slug, name, uid, u.planCode ?? "trial", u.planStatus ?? "trial"],
+          );
+          workspaceId = (ins as any)?.insertId ?? null;
+          if (workspaceId) {
+            await localPool.execute(
+              `INSERT IGNORE INTO workspace_members (workspaceId, userId, role, joinedAt)
+               VALUES (?, ?, 'owner', NOW(3))`,
+              [workspaceId, uid],
+            );
+            console.log(`[billing.getStatus] auto-created workspace ${workspaceId} for user ${uid}`);
+          }
+        }
       } catch (e) {
         console.warn("[billing.getStatus] workspace lookup skipped:", (e as Error).message);
       }
