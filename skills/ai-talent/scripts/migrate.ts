@@ -1806,6 +1806,22 @@ async function main() {
     // Ensure the idx_ws_owner index exists (for ownerUserId queries).
     try { await conn.execute(`ALTER TABLE workspaces ADD INDEX idx_ws_owner (ownerUserId)`); }
     catch { /* index exists */ }
+
+    // 2026-05-21: prod workspaces may have a legacy `organizationId INT NOT NULL`
+    // column (from an old schema pre-dating this migration). When it exists with
+    // no DEFAULT the backfill INSERT fails silently. Make it nullable so we can
+    // insert without specifying it.
+    if (wsColSet.has("organizationId")) {
+      try {
+        await conn.execute(
+          `ALTER TABLE workspaces MODIFY COLUMN organizationId INT NULL DEFAULT NULL`,
+        );
+        console.log("[migrate] workspaces: organizationId made nullable (legacy col)");
+      } catch (e) {
+        console.warn("[migrate] workspaces organizationId MODIFY:", (e as Error).message);
+      }
+    }
+
     console.log("[migrate] workspaces: OK");
 
     await conn.execute(`

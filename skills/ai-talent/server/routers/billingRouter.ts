@@ -233,12 +233,25 @@ export const billingRouter = router({
           const uid  = ctx.user!.id;
           const slug = `ws-${uid}-${Math.random().toString(36).slice(2, 8)}`;
           const name = (ctx.user as any)?.name ?? `Workspace #${uid}`;
-          const [ins]: any = await localPool.execute(
-            `INSERT INTO workspaces (slug, name, ownerUserId, planCode, planStatus, billingMode)
-             VALUES (?, ?, ?, ?, ?, 'solo')`,
-            [slug, name, uid, u.planCode ?? "trial", u.planStatus ?? "trial"],
+          // 2026-05-21: prod workspaces may have a legacy `organizationId INT NOT NULL`
+          // column. Until the migrate makes it nullable we skip that column entirely —
+          // the INSERT IGNORE + minimal column list avoids the "Field has no default" error.
+          // We re-select after INSERT so we also pick up any row the backfill already created.
+          try {
+            await localPool.execute(
+              `INSERT IGNORE INTO workspaces (slug, name, ownerUserId, planCode, planStatus, billingMode)
+               VALUES (?, ?, ?, ?, ?, 'solo')`,
+              [slug, name, uid, u.planCode ?? "trial", u.planStatus ?? "trial"],
+            );
+          } catch (insertErr) {
+            console.warn(`[billing.getStatus] workspace INSERT failed for user ${uid}:`, (insertErr as Error).message);
+          }
+          // Re-select regardless of INSERT outcome — the backfill may have beaten us.
+          const [wsRows2]: any = await localPool.execute(
+            `SELECT id FROM workspaces WHERE ownerUserId = ? ORDER BY id ASC LIMIT 1`,
+            [uid],
           );
-          workspaceId = (ins as any)?.insertId ?? null;
+          workspaceId = (wsRows2 as any[])[0]?.id ?? null;
           if (workspaceId) {
             await localPool.execute(
               `INSERT IGNORE INTO workspace_members (workspaceId, userId, role, joinedAt)
@@ -246,6 +259,8 @@ export const billingRouter = router({
               [workspaceId, uid],
             );
             console.log(`[billing.getStatus] auto-created workspace ${workspaceId} for user ${uid}`);
+          } else {
+            console.warn(`[billing.getStatus] workspace still null after INSERT attempt for user ${uid}`);
           }
         }
       } catch (e) {
