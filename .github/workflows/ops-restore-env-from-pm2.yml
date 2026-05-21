@@ -1,0 +1,146 @@
+name: Ops — Restore .env from pm2 dump (emergency recovery)
+
+# 2026-05-21 EMERGENCY: Both /opt/marketing-os and /opt/onbrand .env files
+# became circular symlinks. This workflow:
+#   1. Deletes both broken symlinks
+#   2. Extracts the saved env vars from the pm2 process dump (~/.pm2/dump.pm2)
+#   3. Writes a fresh .env at the canonical marketing-os path
+#   4. Creates a clean symlink: onbrand/.env → marketing-os/.env
+#   5. Restarts the server and verifies it starts correctly
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restore:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 10
+    steps:
+      - name: Delete broken symlinks
+        run: |
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+          ONBRAND=/opt/onbrand/app/skills/ai-talent/.env
+          echo "=== Current state ==="
+          ls -la "$MOS" 2>/dev/null || echo "MOS: not found"
+          ls -la "$ONBRAND" 2>/dev/null || echo "ONBRAND: not found"
+          # Remove circular symlinks
+          rm -f "$MOS" "$ONBRAND"
+          echo "Removed both symlinks"
+
+      - name: Restore .env from pm2 dump
+        env:
+          SK: ${{ secrets.STRIPE_SECRET_KEY }}
+          WS: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: |
+          set -e
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+          PM2_DUMP=~/.pm2/dump.pm2
+
+          echo "=== Extracting env from pm2 dump ==="
+          if [ ! -f "$PM2_DUMP" ]; then
+            echo "❌ pm2 dump not found at $PM2_DUMP"; exit 1
+          fi
+
+          # Extract the env block for 'onbrand' process from pm2 dump JSON
+          # pm2 dump is a JSON array of process configs; each has a .pm2_env.env block
+          # We use python to parse it since jq may not be available
+          python3 - "$PM2_DUMP" "$MOS" << 'PYEOF'
+import json, sys, os
+
+dump_path = sys.argv[1]
+out_path  = sys.argv[2]
+
+with open(dump_path) as f:
+    data = json.load(f)
+
+# Find the onbrand process
+proc = None
+for p in data:
+    name = p.get("name", "") or p.get("pm2_env", {}).get("name", "")
+    if name == "onbrand":
+        proc = p
+        break
+
+if not proc:
+    print("❌ 'onbrand' process not found in dump. Available:", [p.get("name") for p in data])
+    sys.exit(1)
+
+env = proc.get("pm2_env", {}).get("env", {})
+print(f"Found {len(env)} env vars in pm2 dump for 'onbrand'")
+
+# Skip pm2 internal variables
+SKIP = {"NODE_APP_INSTANCE", "PM2_HOME", "PM2_JSON_PROCESSING", "restart_delay",
+        "pm_exec_path", "pm_cwd", "exec_mode", "instances", "pmx", "automation",
+        "status", "pm_uptime", "created_at", "unstable_restarts", "restart_time",
+        "pm_id", "versioning", "node_version"}
+
+lines = []
+for k, v in env.items():
+    if k in SKIP or k.startswith("pm_") or k.startswith("_"):
+        continue
+    lines.append(f"{k}={v}")
+
+os.makedirs(os.path.dirname(out_path), exist_ok=True)
+with open(out_path, "w") as f:
+    f.write("\n".join(lines) + "\n")
+
+print(f"✓ Wrote {len(lines)} vars to {out_path}")
+PYEOF
+
+          echo ""
+          echo "=== .env written — first 5 keys (values masked) ==="
+          head -5 "$MOS" | sed 's/=.*/=***/'
+
+          # Upsert Stripe keys (may be absent or stale in pm2 dump)
+          if [ -n "$SK" ] && [ -n "$WS" ]; then
+            TMP=$(mktemp)
+            grep -v -E '^(STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET)=' "$MOS" > "$TMP" || true
+            {
+              echo ""
+              echo "# Stripe — restored by ops-restore-env-from-pm2 @ $(date -Iseconds)"
+              echo "STRIPE_SECRET_KEY=$SK"
+              echo "STRIPE_WEBHOOK_SECRET=$WS"
+            } >> "$TMP"
+            mv "$TMP" "$MOS"
+            echo "✓ Stripe keys upserted"
+          fi
+
+          chown azureuser:azureuser "$MOS"
+          chmod 640 "$MOS"
+          echo "✓ Permissions set: 640 azureuser:azureuser"
+
+      - name: Create clean symlink onbrand → marketing-os
+        run: |
+          set -e
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+          ONBRAND=/opt/onbrand/app/skills/ai-talent/.env
+          rm -f "$ONBRAND"
+          ln -s "$MOS" "$ONBRAND"
+          echo "✓ Symlink: $ONBRAND → $MOS"
+          ls -la "$ONBRAND"
+
+      - name: Restart onbrand
+        run: |
+          set -e
+          pm2 restart onbrand --update-env 2>&1 | tail -5
+          sleep 8
+
+      - name: Verify server is up
+        run: |
+          set +e
+          echo "=== pm2 onbrand ==="
+          pm2 show onbrand 2>/dev/null | grep -E "status|uptime|restart|pid" || true
+
+          echo ""
+          echo "=== last 6 out lines ==="
+          pm2 logs onbrand --lines 6 --nostream 2>/dev/null | grep -E "bootstrap|CORS|listening|JWT|FATAL" || true
+
+          echo ""
+          echo "=== port 3101 ==="
+          ss -tlnp | grep 3101 || echo "(nothing on 3101 — check logs!)"
+
+          echo ""
+          echo "=== health check ==="
+          curl -sf http://localhost:3101/health && echo "✓ healthy" \
+            || curl -sf http://localhost:3101/ -o /dev/null -w "  / → HTTP %{http_code}\n" \
+            || echo "(no response)"
