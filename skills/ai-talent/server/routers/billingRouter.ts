@@ -250,7 +250,8 @@ export const billingRouter = router({
         // Legacy TWD-only fields (kept so old clients don't crash)
         priceTwdMonthly:  effTwd.monthly,
         priceTwdAnnually: effTwd.annually,
-        standardPriceTwdMonthly: Math.round((plan.standardPriceUsdMonthly ?? plan.priceUsdMonthly ?? 0) * usdToTwdRate),
+        // Use the plan's hardcoded standard TWD price (not exchange-rate derived).
+        standardPriceTwdMonthly: plan.standardPriceTwdMonthly ?? Math.round((plan.standardPriceUsdMonthly ?? plan.priceUsdMonthly ?? 0) * usdToTwdRate),
         isEarlyBird: eff.isEarlyBird,
         isLocked:    eff.isLocked,
         workspaceId,

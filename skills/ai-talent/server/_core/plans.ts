@@ -171,9 +171,9 @@ export const PLANS: Record<PlanCode, Plan> = {
   drop_starter: {
     code: "drop_starter",
     name: "OnBrand Starter",
-    priceTwdMonthly:         2250,   // NT$2,250 ≈ US$75 standard
-    priceTwdAnnually:        9000,   // NT$9,000 ≈ US$300 annual (= $25×12, no extra discount)
-    earlyBirdPriceTwdMonthly: 750,   // NT$750 ≈ US$25 early bird
+    priceTwdMonthly:         2250,   // NT$2,250 standard
+    priceTwdAnnually:        7500,   // NT$7,500 early-bird annual (NT$750×10, 2 months free)
+    earlyBirdPriceTwdMonthly: 750,   // NT$750 early-bird monthly (fixed, not exchange-rate derived)
     standardPriceTwdMonthly: 2250,
     priceUsdMonthly:          75,    // standard US$75
     priceUsdAnnually:        300,    // annual = $25×12 (no discount — same early-bird rate locked for 12 mo)
@@ -257,9 +257,9 @@ export const PLANS: Record<PlanCode, Plan> = {
   drop_pro: {
     code: "drop_pro",
     name: "OnBrand Solo",
-    priceTwdMonthly: 9000,                 // standard (derived via FX, kept for back-compat)
-    priceTwdAnnually: 90000,
-    earlyBirdPriceTwdMonthly: 3000,        // early-bird (NT$3000 ≈ US$100)
+    priceTwdMonthly: 9000,                 // NT$9,000 standard monthly
+    priceTwdAnnually: 30000,              // NT$30,000 early-bird annual (NT$3,000×10, 2 months free)
+    earlyBirdPriceTwdMonthly: 3000,        // NT$3,000 early-bird monthly (fixed, not exchange-rate derived)
     standardPriceTwdMonthly: 9000,
     // 2026-05-14 (CJ Solo pivot): USD is the canonical price.
     priceUsdMonthly: 300,                  // standard US$300
@@ -459,9 +459,20 @@ export function getEffectivePrice(
   if (currency === "USD") {
     return { monthly: usdMonthly, annually: usdAnnually, isEarlyBird, isLocked: false, currency, usdToTwd: rate };
   }
+
+  // TWD: use hardcoded plan prices — not exchange-rate derived — so the number
+  // never fluctuates day-to-day. Annual = monthly × 10 (2 months free) for both plans.
+  const twdMonthly = isEarlyBird && plan.earlyBirdPriceTwdMonthly && plan.earlyBirdPriceTwdMonthly > 0
+    ? plan.earlyBirdPriceTwdMonthly
+    : (plan.priceTwdMonthly ?? Math.round(usdMonthly * rate));
+  // Use the plan's priceTwdAnnually directly (already set to ×10 values).
+  // Fall back to twdMonthly×10 if the field is missing.
+  const twdAnnually = plan.priceTwdAnnually && plan.priceTwdAnnually > 0
+    ? plan.priceTwdAnnually
+    : twdMonthly * 10;
   return {
-    monthly:  Math.round(usdMonthly  * rate),
-    annually: Math.round(usdAnnually * rate),
+    monthly:  twdMonthly,
+    annually: twdAnnually,
     isEarlyBird,
     isLocked: false,
     currency,

@@ -563,7 +563,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                         background: "#FFFFFF", color: "#171717",
                       }}
                     >
-                      {lang === "en" ? "Just 1 → Solo $100/mo" : "就 1 個 → Solo $100/月"}
+                      {lang === "en" ? "Just 1 → Solo $100/mo" : "就 1 個 → Solo NT$3,000/月"}
                     </button>
                     <a
                       href="mailto:sowork@sowork.ai?subject=多品牌方案洽詢"

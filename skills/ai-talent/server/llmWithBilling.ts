@@ -66,7 +66,7 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
     if (expired) {
       if (p?.planStatus === "trial" || p?.planCode === "trial") {
         return { ok: false, reason:
-          "免費試用已到期。升級方案即可繼續使用 —— 前往「方案」頁面開通（早鳥 US$100/月）。" };
+          "免費試用已到期。升級方案即可繼續使用 —— 前往「方案」頁面開通（Starter NT$750/月 · Solo NT$3,000/月）。" };
       }
       if (p?.planStatus === "active") {
         return { ok: false, reason:

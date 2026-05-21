@@ -167,7 +167,7 @@ export default function LandingPage() {
         <p className="text-xs text-neutral-500 mt-4">
           {en
             ? "Early-bird US$100/mo (was US$300) · 7-day / 1000-pt trial · cancel anytime"
-            : "早鳥 US$100/月（標準 US$300）· 7 天或 1000 點雙限試用 · 隨時取消"}
+            : "早鳥 NT$750 / NT$3,000 起 · 7 天或 1000 點雙限試用 · 隨時取消"}
         </p>
       </section>
 

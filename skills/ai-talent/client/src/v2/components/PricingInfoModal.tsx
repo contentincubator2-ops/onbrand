@@ -38,9 +38,9 @@ function getPlans(lang: "zh-TW" | "en") {
     },
     {
       name: "OnBrand Starter",
-      price: en ? "US$25 / mo" : "US$25 / 月",
+      price: en ? "US$25 / mo" : "NT$750 / 月",
       badge: en ? "Early bird" : "早鳥",
-      detail: en ? "50 runs / mo · 1 brand · annual US$300 ($25×12)" : "每月 50 次執行 · 1 品牌 · 年約 US$300（$25×12）",
+      detail: en ? "50 runs / mo · 1 brand · annual US$300 ($25×12)" : "每月 50 次執行 · 1 品牌 · 年約 NT$7,500（×10，送 2 個月）",
       features: en ? [
         "50 runs / mo (1 run = all variants + images)",
         "30s & 60s templates · brand brain",
@@ -59,9 +59,9 @@ function getPlans(lang: "zh-TW" | "en") {
     },
     {
       name: "OnBrand Solo",
-      price: en ? "US$100 / mo" : "US$100 / 月",
+      price: en ? "US$100 / mo" : "NT$3,000 / 月",
       badge: en ? "Popular" : "熱門",
-      detail: en ? "Unlimited runs · 1 brand" : "無限次執行 · 1 品牌",
+      detail: en ? "Unlimited runs · 1 brand" : "無限次執行 · 1 品牌 · 年約 NT$30,000（×10，送 2 個月）",
       features: en ? [
         "Unlimited runs — 30s / 60s / 99s",
         "Unlimited AI images",
