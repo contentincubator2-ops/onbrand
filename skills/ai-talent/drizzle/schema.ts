@@ -180,7 +180,37 @@ export const brands = mysqlTable("brands", {
   accentColor: varchar("accentColor", { length: 16 }),
   fontFamily: varchar("fontFamily", { length: 64 }),
   visualGuidelines: text("visualGuidelines"),
+  // 2026-05-21 (CJ「全球每個國家都可在地化」): target market + output language.
+  // targetCountry — ISO 3166-1 alpha-2 code (e.g. "TW", "JP", "US").
+  //   Controls which market profile is injected into every LLM prompt so
+  //   copy respects local platforms, culture, regulations, and norms.
+  //   NULL = no explicit market (default: TW behavioural profile).
+  // outputLanguage — BCP 47 language tag (e.g. "zh-TW", "ja", "en-US").
+  //   Forces all generated copy to be written in this language.
+  //   NULL = infer from targetCountry default language.
+  // marketContextOverride — free-form override text (Tier C).
+  //   Replaces the auto-generated marketContext string entirely when set.
+  //   Allows power users to write a fully custom market brief.
+  targetCountry: varchar("targetCountry", { length: 2 }),
+  outputLanguage: varchar("outputLanguage", { length: 10 }),
+  marketContextOverride: text("marketContextOverride"),
 });
+
+// ─── Market Profiles Cache (全球市場設定快取) ──────────────────────────────────
+// Tier A (35 hand-crafted profiles in marketProfiles.ts) never hit this table.
+// Tier B: LLM-generated profiles for unlisted countries are cached here so we
+// only pay the LLM cost once per country and subsequent calls are instant.
+// Tier C: User override is stored on brands.marketContextOverride, not here.
+export const marketProfiles = mysqlTable("market_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  countryCode: varchar("countryCode", { length: 2 }).notNull(),   // ISO 3166-1 alpha-2
+  profileJson: text("profileJson").notNull(),                      // JSON MarketProfile
+  generatedBy: varchar("generatedBy", { length: 32 }).default("llm"), // 'llm' | 'hand'
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MarketProfile = typeof marketProfiles.$inferSelect;
+export type InsertMarketProfile = typeof marketProfiles.$inferInsert;
 
 export type Brand = typeof brands.$inferSelect;
 export type InsertBrand = typeof brands.$inferInsert;

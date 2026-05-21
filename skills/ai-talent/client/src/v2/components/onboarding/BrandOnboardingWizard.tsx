@@ -15,15 +15,16 @@
  *
  * Auto-shown when user has 0 brands (replaces the simple empty state).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { Modal, ModalContent, ModalBody, Button, Input, Select, SelectItem } from "@heroui/react";
+import { Modal, ModalContent, ModalBody, Button, Input, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrademark, faGlobe, faArrowRight, faCheck, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
+import { faTrademark, faGlobe, faArrowRight, faCheck, faWandMagicSparkles, faLanguage } from "@fortawesome/free-solid-svg-icons";
 import { faFacebook } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../quickTask/RunningAgentCarousel";
+import { COUNTRIES, getCountry } from "../../../lib/countries";
 
 const INDUSTRIES_ZH = [
   "AI / 科技軟體",
@@ -86,14 +87,24 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
   const [industry, setIndustry] = useState<string>("");
   const [website, setWebsite] = useState("");
   const [fbUrl, setFbUrl] = useState("");
+  const [targetCountry, setTargetCountry] = useState<string>("TW");
+  const [outputLanguage, setOutputLanguage] = useState<string>("zh-TW");
   const [err, setErr] = useState<string | null>(null);
+
+  // When country changes, auto-populate the default language for that country
+  const handleCountryChange = (code: string) => {
+    setTargetCountry(code);
+    const profile = getCountry(code);
+    if (profile) setOutputLanguage(profile.languageCode);
+  };
 
   // Reset on open
   useEffect(() => {
     if (isOpen) {
       setStep(1);
       setCreatedBrandId(null);
-      setName(""); setIndustry(""); setWebsite(""); setFbUrl(""); setErr(null);
+      setName(""); setIndustry(""); setWebsite(""); setFbUrl("");
+      setTargetCountry("TW"); setOutputLanguage("zh-TW"); setErr(null);
     }
   }, [isOpen]);
 
@@ -106,7 +117,11 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
     if (!name.trim()) { setErr(lang === "en" ? "Brand name is required" : "請輸入品牌名稱"); return; }
     setErr(null);
     try {
-      const r = await createBrandMut.mutateAsync({ name: name.trim() });
+      const r = await createBrandMut.mutateAsync({
+        name: name.trim(),
+        targetCountry: targetCountry || undefined,
+        outputLanguage: outputLanguage || undefined,
+      });
       const newId = Number(r?.id ?? r?.brandId ?? 0);
       if (!newId) { setErr(lang === "en" ? "Couldn't create — try again in a sec" : "建立失敗，請稍後再試"); return; }
       setCreatedBrandId(newId);
@@ -344,6 +359,71 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   >
                     {INDUSTRIES.map((i) => <SelectItem key={i}>{i}</SelectItem>)}
                   </Select>
+
+                  {/* ── Target market + output language (2026-05-21) ── */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Autocomplete
+                      label={lang === "en" ? "Target market" : "目標市場"}
+                      placeholder={lang === "en" ? "Search country…" : "搜尋國家…"}
+                      defaultSelectedKey={targetCountry}
+                      onSelectionChange={(key) => { if (key) handleCountryChange(String(key)); }}
+                      description={lang === "en"
+                        ? "AI adapts copy style and platforms"
+                        : "AI 依市場調整文案風格與平台"}
+                    >
+                      {COUNTRIES.map((c) => (
+                        <AutocompleteItem key={c.code} textValue={`${c.emoji} ${lang === "en" ? c.name : (c.nameZh ?? c.name)} (${c.code})`}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{c.emoji}</span>
+                            <span className="text-sm">{lang === "en" ? c.name : (c.nameZh ?? c.name)}</span>
+                            <span className="text-xs text-default-400 ml-auto">{c.code}</span>
+                          </div>
+                        </AutocompleteItem>
+                      ))}
+                    </Autocomplete>
+
+                    <Select
+                      label={lang === "en" ? "Output language" : "輸出語言"}
+                      selectedKeys={outputLanguage ? [outputLanguage] : ["zh-TW"]}
+                      onSelectionChange={(keys) => setOutputLanguage(Array.from(keys)[0] as string ?? "zh-TW")}
+                      description={lang === "en"
+                        ? "Language AI will write in"
+                        : "AI 產出文案的語言"}
+                      startContent={<FontAwesomeIcon icon={faLanguage} className="text-default-400 text-tiny" />}
+                    >
+                      {/* Common languages first, then auto-populated from selected country */}
+                      {[
+                        { code: "zh-TW", label: "繁體中文" },
+                        { code: "zh-CN", label: "简体中文" },
+                        { code: "en",    label: "English" },
+                        { code: "en-US", label: "English (US)" },
+                        { code: "en-GB", label: "English (UK)" },
+                        { code: "ja",    label: "日本語" },
+                        { code: "ko",    label: "한국어" },
+                        { code: "th",    label: "ภาษาไทย" },
+                        { code: "vi",    label: "Tiếng Việt" },
+                        { code: "id",    label: "Bahasa Indonesia" },
+                        { code: "ms",    label: "Bahasa Melayu" },
+                        { code: "de",    label: "Deutsch" },
+                        { code: "fr",    label: "Français" },
+                        { code: "es",    label: "Español" },
+                        { code: "pt",    label: "Português" },
+                        { code: "it",    label: "Italiano" },
+                        { code: "ru",    label: "Русский" },
+                        { code: "ar",    label: "العربية" },
+                        { code: "hi",    label: "हिन्दी" },
+                        // auto-add target country's native language if not already listed
+                        ...((() => {
+                          const c = getCountry(targetCountry);
+                          if (!c) return [];
+                          const existing = ["zh-TW","zh-CN","en","en-US","en-GB","ja","ko","th","vi","id","ms","de","fr","es","pt","it","ru","ar","hi"];
+                          if (existing.includes(c.languageCode)) return [];
+                          return [{ code: c.languageCode, label: c.languageName }];
+                        })()),
+                      ].map((l) => <SelectItem key={l.code}>{l.label}</SelectItem>)}
+                    </Select>
+                  </div>
+
                   <Input
                     label={lang === "en" ? "Website (optional)" : "官網（可選）"}
                     placeholder="https://example.com"

@@ -208,6 +208,10 @@ export const brandRouter = router({
       competitors: z.string().optional(),
       targetMarket: z.string().optional(),
       contentLanguage: z.string().optional(),
+      // 2026-05-21 global localisation
+      targetCountry: z.string().length(2).optional().nullable(),
+      outputLanguage: z.string().max(10).optional().nullable(),
+      marketContextOverride: z.string().max(2000).optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -278,6 +282,10 @@ export const brandRouter = router({
           targetMarket: input.targetMarket ?? 'Taiwan',
           contentLanguage: input.contentLanguage ?? 'zh-TW',
         },
+        // 2026-05-21 global localisation
+        targetCountry: input.targetCountry ?? null,
+        outputLanguage: input.outputLanguage ?? null,
+        marketContextOverride: input.marketContextOverride ?? null,
         dataSource: 'manual',
         isDefault: false,
       });
@@ -591,16 +599,20 @@ export const brandRouter = router({
    */
   update: protectedProcedure
     .input(z.object({
-      brandId:            z.number().int().positive(),
-      name:               z.string().min(1).max(255).optional(),
-      industry:           z.string().max(64).optional().nullable(),
-      description:        z.string().max(4000).optional().nullable(),
-      website:            z.string().max(2048).optional().nullable(),
-      socialLinks:        z.record(z.string(), z.string()).optional().nullable(),
-      tagline:            z.string().max(1000).optional().nullable(),
-      targetAudience:     z.string().max(2000).optional().nullable(),
-      brandVoice:         z.string().max(2000).optional().nullable(),
-      positioningSummary: z.string().max(8000).optional().nullable(),
+      brandId:               z.number().int().positive(),
+      name:                  z.string().min(1).max(255).optional(),
+      industry:              z.string().max(64).optional().nullable(),
+      description:           z.string().max(4000).optional().nullable(),
+      website:               z.string().max(2048).optional().nullable(),
+      socialLinks:           z.record(z.string(), z.string()).optional().nullable(),
+      tagline:               z.string().max(1000).optional().nullable(),
+      targetAudience:        z.string().max(2000).optional().nullable(),
+      brandVoice:            z.string().max(2000).optional().nullable(),
+      positioningSummary:    z.string().max(8000).optional().nullable(),
+      // 2026-05-21 global localisation
+      targetCountry:         z.string().length(2).optional().nullable(),
+      outputLanguage:        z.string().max(10).optional().nullable(),
+      marketContextOverride: z.string().max(2000).optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -620,6 +632,10 @@ export const brandRouter = router({
       if (input.targetAudience     !== undefined) patch.targetAudience     = input.targetAudience?.trim() || null;
       if (input.brandVoice         !== undefined) patch.brandVoice         = input.brandVoice?.trim() || null;
       if (input.positioningSummary !== undefined) patch.positioningSummary = input.positioningSummary?.trim() || null;
+      // 2026-05-21 global localisation
+      if (input.targetCountry         !== undefined) patch.targetCountry         = input.targetCountry ?? null;
+      if (input.outputLanguage        !== undefined) patch.outputLanguage        = input.outputLanguage ?? null;
+      if (input.marketContextOverride !== undefined) patch.marketContextOverride = input.marketContextOverride ?? null;
       if (Object.keys(patch).length === 0) return { ok: true as const };
       await db.update(brands).set(patch as any)
         .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));

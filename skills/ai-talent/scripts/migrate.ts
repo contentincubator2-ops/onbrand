@@ -2231,6 +2231,42 @@ async function main() {
       console.log("[migrate] users.preferredLang: already exists, skipped");
     }
 
+    // ── 2026-05-21 (CJ「全球每個國家都可在地化」): global market localisation ──
+    // brands.targetCountry  — ISO 3166-1 alpha-2 (e.g. 'TW','JP','US')
+    // brands.outputLanguage — BCP 47 output language tag (e.g. 'zh-TW','ja')
+    // brands.marketContextOverride — free-text Tier C override
+    for (const [col, def] of [
+      ["targetCountry",          "VARCHAR(2) NULL COMMENT 'ISO 3166-1 alpha-2 target market'"],
+      ["outputLanguage",         "VARCHAR(10) NULL COMMENT 'BCP 47 output language tag'"],
+      ["marketContextOverride",  "TEXT NULL COMMENT 'Tier C: fully custom market brief'"],
+    ] as const) {
+      const [rows] = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brands' AND COLUMN_NAME = ?
+      `, [col]) as any;
+      if ((rows as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE brands ADD COLUMN ${col} ${def}`);
+        console.log(`[migrate] brands.${col}: added`);
+      } else {
+        console.log(`[migrate] brands.${col}: already exists, skipped`);
+      }
+    }
+
+    // market_profiles — LLM-generated Tier B cache (one row per country code).
+    // Tier A profiles (35 hand-crafted) live in marketProfiles.ts, never DB.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS market_profiles (
+        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        countryCode  VARCHAR(2)   NOT NULL UNIQUE COMMENT 'ISO 3166-1 alpha-2',
+        profileJson  TEXT         NOT NULL COMMENT 'JSON MarketProfile from marketProfiles.ts',
+        generatedBy  VARCHAR(32)  NOT NULL DEFAULT 'llm' COMMENT 'llm | hand',
+        createdAt    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_mp_country (countryCode)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] market_profiles: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

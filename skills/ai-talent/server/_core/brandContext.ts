@@ -10,6 +10,7 @@
  */
 import { sql } from "drizzle-orm";
 import { getDb } from "../db";
+import { buildMarketContext } from "./marketProfiles";
 
 function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
@@ -183,7 +184,8 @@ export async function buildBrandPrefix(
     // but should not be relied on.
     const { default: localPool } = await import("../localDb");
     const [brandRowsRaw]: any = await localPool.execute(
-      `SELECT name, tagline, positioningSummary, positioningReport, positioningStatus, positioning
+      `SELECT name, tagline, positioningSummary, positioningReport, positioningStatus, positioning,
+              targetCountry, outputLanguage, marketContextOverride
        FROM brands WHERE id = ? LIMIT 1`,
       [brandId],
     );
@@ -375,6 +377,18 @@ export async function buildBrandPrefix(
       } catch {/* non-fatal */}
     }
 
+    // ── Market context (2026-05-21 global localisation) ──────────────────
+    // Injected FIRST so it's the outer constraint all other brand rules sit
+    // inside. Tier A = hand-crafted static. Tier B = LLM cached. Tier C = override.
+    let marketSection = "";
+    try {
+      marketSection = await buildMarketContext(
+        brandRow?.targetCountry,
+        brandRow?.outputLanguage,
+        brandRow?.marketContextOverride,
+      );
+    } catch { /* non-fatal: market context is best-effort */ }
+
     const hasAny =
       (rows && rows.length > 0) ||
       brandLocked.length > 0 ||
@@ -382,6 +396,7 @@ export async function buildBrandPrefix(
       assetsBlock.length > 0 ||
       contextBlock.length > 0 ||
       coreDigest ||
+      marketSection ||
       productSection ||
       eventSection;
     if (!hasAny) {
@@ -410,18 +425,21 @@ export async function buildBrandPrefix(
         rows.map((r: any) => `- 【${r.category}】${r.title}：${r.content}`).join("\n") + "\n"
       : "";
 
-    // 順序：鎖定屬性 → 聲音指南（含中英夾雜 samples）→ 寫手指引 →
+    // 順序：市場設定（最外層約束）→ 鎖定屬性 → 聲音指南 → 寫手指引 →
     // 脈絡 → 補充 → product/event narrow。
     // LLM 對「靠後出現」內容更易執行，product/event 放最後。
+    // marketSection 放最前：所有後續指令都要在此市場框架內執行。
     const fullPrefix =
-      "\n\n" + lockedSection + voiceSection + assetsSection + contextSection + brainSection + productSection + eventSection;
-    // mode="core" → distilled digest + product/event narrowing (short
-    // tasks). SAFETY: if coreDigest is empty (brand not re-run after the
+      "\n\n" + marketSection + lockedSection + voiceSection + assetsSection + contextSection + brainSection + productSection + eventSection;
+    // mode="core" → market context + distilled digest + product/event narrowing
+    // (short tasks). SAFETY: if coreDigest is empty (brand not re-run after the
     // single-source refactor → positioning has no segments yet), fall
     // back to the full block so un-migrated brands don't silently lose
     // ALL brand grounding on short tasks. mode="full" → rich block.
+    // Market context is ALWAYS prepended — even for core mode — because
+    // "write in Japanese for the JP market" must never be skipped.
     const prefix = (mode === "core" && coreDigest)
-      ? coreDigest + productSection + eventSection
+      ? marketSection + coreDigest + productSection + eventSection
       : fullPrefix;
 
     CACHE.set(ck, { prefix, expiresAt: Date.now() + TTL_MS });
