@@ -1,0 +1,82 @@
+name: Ops — Recover .env permissions (emergency)
+
+# 2026-05-21 EMERGENCY: ops-link-onbrand-env.yml ran `chmod 600` on
+# /opt/marketing-os/app/skills/ai-talent/.env without `chown azureuser`,
+# making the file unreadable by the pm2 process → server crash loop / 502.
+# This workflow restores ownership+permissions and restarts the server.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  recover:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Fix ownership and permissions on both .env files
+        run: |
+          set -e
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+          ONBRAND=/opt/onbrand/app/skills/ai-talent/.env
+
+          echo "=== Before fix ==="
+          ls -la "$MOS" 2>/dev/null || echo "MOS .env: not found"
+          ls -la "$ONBRAND" 2>/dev/null || echo "ONBRAND .env: not found / symlink broken"
+
+          # Fix marketing-os .env
+          if [ -f "$MOS" ]; then
+            chown azureuser:azureuser "$MOS"
+            chmod 640 "$MOS"
+            echo "✓ Fixed $MOS"
+          else
+            echo "❌ $MOS missing — cannot fix"
+          fi
+
+          # Fix onbrand symlink target or file
+          if [ -L "$ONBRAND" ]; then
+            echo "  $ONBRAND is a symlink — target perms already fixed above"
+          elif [ -f "$ONBRAND" ]; then
+            chown azureuser:azureuser "$ONBRAND"
+            chmod 640 "$ONBRAND"
+            echo "✓ Fixed $ONBRAND"
+          else
+            echo "  $ONBRAND missing"
+          fi
+
+          echo ""
+          echo "=== After fix ==="
+          ls -la "$MOS" 2>/dev/null || echo "MOS .env: still not found"
+          ls -la "$ONBRAND" 2>/dev/null || echo "ONBRAND .env: still not found"
+
+      - name: Verify .env is readable by azureuser
+        run: |
+          MOS=/opt/marketing-os/app/skills/ai-talent/.env
+          sudo -u azureuser bash -c "wc -l '$MOS' && grep -c '=' '$MOS'" 2>/dev/null \
+            || bash -c "wc -l '$MOS' && grep -c '=' '$MOS'"
+          echo "✓ .env is readable"
+
+      - name: Restart onbrand server
+        run: |
+          set -e
+          pm2 restart onbrand --update-env 2>&1 | tail -5
+          sleep 6
+
+      - name: Verify server started
+        run: |
+          set +e
+          echo "=== pm2 status ==="
+          pm2 show onbrand 2>/dev/null | grep -E "status|uptime|restart|pid" || true
+
+          echo ""
+          echo "=== last 8 out lines ==="
+          pm2 logs onbrand --lines 8 --nostream 2>/dev/null | grep -E "bootstrap|CORS|listening|JWT|FATAL" || true
+
+          echo ""
+          echo "=== port 3101 ==="
+          ss -tlnp | grep 3101 || echo "(nothing on 3101)"
+
+          echo ""
+          echo "=== health check ==="
+          curl -sf http://localhost:3101/health && echo "✓ healthy" \
+            || curl -sf http://localhost:3101/api/auth/me -o /dev/null -w "  /api/auth/me → HTTP %{http_code}\n" \
+            || echo "(no response)"
