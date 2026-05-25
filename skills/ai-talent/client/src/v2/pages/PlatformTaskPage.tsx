@@ -722,17 +722,16 @@ function PlatformTaskPageInner() {
                     className="flex flex-col rounded-2xl overflow-hidden text-left transition hover:scale-[1.02] hover:shadow-lg"
                     style={{ border: "1px solid rgba(0,0,0,0.07)", background: "white" }}
                   >
-                    {/* Card top — gradient + avatar */}
+                    {/* Card top — full-bleed portrait (方塊人像, 原始設計) */}
                     <div
-                      className="flex items-center justify-center relative"
-                      style={{ height: 120, background: `linear-gradient(135deg, ${pal.from} 0%, ${pal.to} 100%)` }}
+                      className="relative overflow-hidden"
+                      style={{ height: 130, background: `linear-gradient(135deg, ${pal.from} 0%, ${pal.to} 100%)` }}
                     >
-                      <Avatar
+                      <img
                         src={avatarSrc}
-                        size="lg"
-                        isBordered
-                        color="default"
-                        className="w-18 h-18 ring-2 ring-white/60"
+                        alt={agentName}
+                        className="w-full h-full object-cover object-top"
+                        onError={(e) => { e.currentTarget.style.opacity = "0"; }}
                       />
                       {/* Speed badge — top right */}
                       <span
