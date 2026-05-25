@@ -67,6 +67,8 @@ import CalendarPage from "../pages/CalendarPage";
 import PhotoCopyPage from "../pages/media/PhotoCopyPage";
 import VideoCopyPage from "../pages/media/VideoCopyPage";
 import DocRewritePage from "../pages/media/DocRewritePage";
+// 2026-05-26 (CJ「左欄改成平台優先」): platform-first task pages
+import PlatformTaskPage from "../pages/PlatformTaskPage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -229,21 +231,23 @@ export default function AppV2() {
           {/* 2026-05-16: public LandingPage now owns "/" and self-redirects
               authed users to /30s, so the old protected "/"→/30s Navigate
               was removed (two routes for "/" is ambiguous in v6). */}
-          <Route path="/30s" element={<QuickTask30sPage tier="30s" />} />
-          <Route path="/60s" element={<QuickTask30sPage tier="60s" />} />
-          {/* 2026-05-17: 100s → 99s rename is now fully internal (tier id,
-              task ids, tRPC procedure). /100s + /90s redirect here for
-              backward-compat; tierCompat shim resolves legacy stored ids. */}
-          <Route path="/99s" element={<QuickTask30sPage tier="99s" />} />
+          {/* 2026-05-26 (CJ「左欄改成平台優先」): platform-first routes.
+              /tasks/:platform renders PlatformTaskPage with tier tabs inside.
+              Old tier routes kept as redirects for backward-compat. */}
+          <Route path="/tasks" element={<Navigate to="/tasks/fb" replace />} />
+          <Route path="/tasks/:platform" element={<PlatformTaskPage />} />
+          {/* Keep old tier routes alive — redirect to FB platform page */}
+          <Route path="/30s" element={<Navigate to="/tasks/fb" replace />} />
+          <Route path="/60s" element={<Navigate to="/tasks/fb" replace />} />
+          <Route path="/99s" element={<Navigate to="/tasks/fb" replace />} />
+          <Route path="/100s" element={<Navigate to="/tasks/fb" replace />} />
+          <Route path="/90s"  element={<Navigate to="/tasks/fb" replace />} />
+          <Route path="/quicktask" element={<Navigate to="/tasks/fb" replace />} />
+          <Route path="/fb" element={<Navigate to="/tasks/fb" replace />} />
           {/* 2026-05-09 (CJ): Phase 2 route-based output workspace.
               Replaces modal-based viewing for 60s/100s tasks. URL is
               shareable, browser back works, can multi-tab compare. */}
           <Route path="/run/:outputId" element={<RunPage />} />
-          {/* Backwards-compat redirects */}
-          <Route path="/100s" element={<Navigate to="/99s" replace />} />
-          <Route path="/90s"  element={<Navigate to="/99s" replace />} />
-          <Route path="/quicktask" element={<Navigate to="/30s" replace />} />
-          <Route path="/fb" element={<Navigate to="/30s" replace />} />
           <Route path="/projects" element={<ProjectsPage />} />
           {/* 2026-05-11 (CJ): /brands is now the manager dashboard.
               Old single-brand editor moved to /brands/edit?b=:id */}

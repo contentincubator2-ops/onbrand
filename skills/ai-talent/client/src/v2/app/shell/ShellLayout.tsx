@@ -37,7 +37,11 @@ import {
   faShareNodes, faTrophy, faUsers, faLanguage,
   faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
+  faEnvelope, faBullhorn,
 } from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
+} from "@fortawesome/free-brands-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
 const PANEL_W = 210;  // slide panel width
@@ -77,36 +81,36 @@ interface NavItem {
   tooltip?: string;
 }
 
-// 2026-05-12 brand rename to 「OnBrand · 對版」(CJ direction):
-// Tier nav items show the seconds badge AS THE ICON (replacing sparkle),
-// with the plain-language subtitle on the second row. Distinct visual
-// rhythm: tier items = numeric badge + verb; everything else = icon + noun.
+// 2026-05-26 (CJ「左欄改成平台優先」): replace tier-first nav (30s/60s/99s)
+// with platform icons. Users pick the *platform* first; speed is shown as
+// a badge on each task card inside the platform page.
+// Brand Strategy + Research Analysis removed per CJ direction; Brand Brain kept.
 function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
   const en = lang === "en";
   return [
-    // 2026-05-12 (CJ「單品 / 套組 / 檔期」): final tier naming after auditing
-    // all 189 quickTask templates. 30s = single piece (98 micro-tasks like
-    // headlines / hashtags / DMs); 60s = related set (48 tasks like carousels,
-    // countdown sequences, ad packs); 99s = full slate (42 tasks like
-    // 30-day calendars, 6-ep series, launch toolkits).
-    { to: "/30s",       label: en ? "Single" : "單品",   tierBadge: "30s", icon: null,
-      tooltip: en ? "30s · single piece — one headline / caption / DM / hashtag set" : "30 秒寫完一件素材 — 一組標題 / 文案 / 私訊 / 主題標籤" },
-    { to: "/60s",       label: en ? "Pack" : "套組", tierBadge: "60s", icon: null,
-      tooltip: en ? "60s · a related set of pieces — 5-day countdown, 7-slide carousel, 3-variant ad pack" : "60 秒寫完一套相關素材 — 5 天倒數、7 張輪播、3 種廣告版本" },
-    { to: "/99s",       label: en ? "Slate" : "檔期", tierBadge: "99s", icon: null, matchPrefix: "/99s",
-      tooltip: en ? "99s · full slate — 30-day calendar, 6-episode series, launch toolkit" : "99 秒企劃一個檔期 — 30 天月曆、6 集系列、上市工具包" },
+    // ── Platform tier (primary content creation entry points) ──────────────
+    { to: "/tasks/fb",    label: "Facebook",  icon: <FontAwesomeIcon icon={faFacebookF} />,  matchPrefix: "/tasks/fb",
+      tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
+    { to: "/tasks/ig",    label: "Instagram", icon: <FontAwesomeIcon icon={faInstagram} />,  matchPrefix: "/tasks/ig",
+      tooltip: en ? "Instagram captions, Reels, carousel, Stories" : "IG 貼文 / Reels / 輪播 / 限時動態" },
+    { to: "/tasks/li",    label: "LinkedIn",  icon: <FontAwesomeIcon icon={faLinkedinIn} />, matchPrefix: "/tasks/li",
+      tooltip: en ? "LinkedIn posts, newsletters, thought leadership" : "LinkedIn 貼文 / 電子報 / 思想領袖文章" },
+    { to: "/tasks/yt",    label: "YouTube",   icon: <FontAwesomeIcon icon={faYoutube} />,    matchPrefix: "/tasks/yt",
+      tooltip: en ? "YouTube titles, descriptions, Shorts scripts" : "YouTube 標題 / SEO 說明 / Shorts 腳本" },
+    { to: "/tasks/tt",    label: "TikTok",    icon: <FontAwesomeIcon icon={faTiktok} />,     matchPrefix: "/tasks/tt",
+      tooltip: en ? "TikTok hooks, scripts, hashtags, bio" : "TikTok 開場鉤子 / 腳本 / 主題標籤" },
+    { to: "/tasks/email", label: en ? "Email" : "電子報", icon: <FontAwesomeIcon icon={faEnvelope} />, matchPrefix: "/tasks/email",
+      tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
+    { to: "/tasks/pr",    label: en ? "PR" : "新聞稿",   icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/tasks/pr",
+      tooltip: en ? "Press releases, media pitch, CEO quotes, fact sheets" : "新聞稿 / 媒體提案 / CEO 聲明 / 資料頁" },
+    // ── Workspace & tools ──────────────────────────────────────────────────
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
-      tooltip: en ? "Calendar view — all scheduled and published posts at a glance" : "月曆視圖 — 已排程 + 已發布內容一目了然" },
+      tooltip: en ? "Calendar view — all scheduled and published posts" : "月曆視圖 — 已排程 + 已發布內容" },
     { to: "/theater",   label: en ? "Theater" : "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
-    // 2026-05-14 (CJ「品牌大腦」概念導入): icon faUserGroup → faBrain。
-    // 概念校正：positioning 鎖定 + 累積的知識/偏好/規則 = 「品牌大腦」、
-    // sidebar label 跟 panel 命名一致。
-    { to: "/brands",    label: en ? "Brand Brain" : "品牌大腦",     icon: <FontAwesomeIcon icon={faBrain} /> },
+    // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav)
+    { to: "/brands",    label: en ? "Brand Brain" : "品牌大腦", icon: <FontAwesomeIcon icon={faBrain} /> },
     { to: "/brands/settings", label: en ? "Connect" : "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands/settings" },
-    // 2026-05-12 (CJ「請把策略顧問拿掉」): /consultant route still works
-    // for power users / direct URL access, but no sidebar entry. Solo
-    // users don't need McKinsey-grade strategy frameworks in their face.
   ];
 }
 
@@ -414,7 +418,7 @@ function IconBar({
             <OnBrandLogo
               glyphOnly
               size={32}
-              onClick={() => onNavigate("/30s")}
+              onClick={() => onNavigate("/tasks/fb")}
               style={{ padding: 4, borderRadius: 8 }}
             />
           </span>
