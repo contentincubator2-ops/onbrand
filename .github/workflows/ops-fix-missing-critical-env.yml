@@ -1,0 +1,92 @@
+name: Ops — Fix missing critical env vars (LOCAL_DB_PASSWORD + others)
+
+# One-shot recovery: writes LOCAL_DB_PASSWORD and other vars that were lost
+# when the .env was wiped during the 2026-05-26 ops incident.
+#
+# Secrets required in repo Settings → Secrets and variables → Actions:
+#   LOCAL_DB_PASSWORD       MySQL password for mos_user
+#   STRIPE_PUBLISHABLE_KEY  pk_live_... or pk_test_...
+#   GOOGLE_AI_KEY           Google AI Studio key (for Gemini fallback)
+#   PIAPI_KEY               PiAPI key for image generation
+#   RESEND_API_KEY          re_... (already has a dedicated workflow but added here too)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Mask secrets
+        run: |
+          echo "::add-mask::${{ secrets.LOCAL_DB_PASSWORD }}"
+          echo "::add-mask::${{ secrets.STRIPE_PUBLISHABLE_KEY }}"
+          echo "::add-mask::${{ secrets.GOOGLE_AI_KEY }}"
+          echo "::add-mask::${{ secrets.PIAPI_KEY }}"
+          echo "::add-mask::${{ secrets.RESEND_API_KEY }}"
+
+      - name: Write missing vars to .env
+        env:
+          LOCAL_DB_PASSWORD:      ${{ secrets.LOCAL_DB_PASSWORD }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          GOOGLE_AI_KEY:          ${{ secrets.GOOGLE_AI_KEY }}
+          PIAPI_KEY:              ${{ secrets.PIAPI_KEY }}
+          RESEND_API_KEY:         ${{ secrets.RESEND_API_KEY }}
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+
+          # Safety: ensure file exists
+          touch "$ENV"
+          cp "$ENV" "${ENV}.bak.$(date +%s)"
+
+          upsert() {
+            local KEY="$1"; local VAL="$2"
+            if [ -z "$VAL" ]; then
+              echo "  ⊘ $KEY (empty in secrets — skipped)"
+              return
+            fi
+            if grep -qE "^${KEY}=" "$ENV" 2>/dev/null; then
+              sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" "$ENV"
+              echo "  ↻ $KEY (updated, ${#VAL} chars)"
+            else
+              echo "${KEY}=${VAL}" >> "$ENV"
+              echo "  + $KEY (added, ${#VAL} chars)"
+            fi
+          }
+
+          echo "════════════════════════════════════════════════════════"
+          echo "  Writing missing critical env vars"
+          echo "════════════════════════════════════════════════════════"
+
+          upsert LOCAL_DB_PASSWORD      "$LOCAL_DB_PASSWORD"
+          upsert STRIPE_PUBLISHABLE_KEY "$STRIPE_PUBLISHABLE_KEY"
+          upsert GOOGLE_AI_KEY          "$GOOGLE_AI_KEY"
+          upsert PIAPI_KEY              "$PIAPI_KEY"
+          upsert RESEND_API_KEY         "$RESEND_API_KEY"
+
+          echo ""
+          echo "  Presence check (values masked):"
+          for KEY in LOCAL_DB_PASSWORD STRIPE_PUBLISHABLE_KEY GOOGLE_AI_KEY PIAPI_KEY RESEND_API_KEY; do
+            if grep -q "^${KEY}=" "$ENV"; then
+              echo "  ✓ $KEY present"
+            else
+              echo "  ❌ $KEY STILL MISSING — add to repo Secrets"
+            fi
+          done
+
+      - name: Restart pm2 and verify
+        run: |
+          echo ""
+          echo "  Restarting pm2 onbrand..."
+          pm2 restart onbrand --update-env 2>&1 | tail -3
+          sleep 4
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/health || echo "000")
+          echo "  /health → $HTTP"
+          if [ "$HTTP" = "200" ]; then
+            echo "✅ Server is up"
+          else
+            echo "❌ Server still down — check pm2 logs:"
+            tail -20 ~/.pm2/logs/onbrand-error.log 2>/dev/null || true
+          fi
