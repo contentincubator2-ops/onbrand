@@ -1,0 +1,74 @@
+name: Ops — Restart onbrand (source .env first)
+
+# Hard-restarts the onbrand pm2 process by sourcing the .env file into the
+# shell before calling pm2, so all variables (including LOCAL_DB_PASSWORD)
+# are actually present in the new process environment.
+#
+# Run this whenever pm2 restart/reload fails to pick up updated .env vars.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restart:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Source .env and hard-restart pm2
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          TSX=/opt/onbrand/app/skills/ai-talent/node_modules/.bin/tsx
+          AI=/opt/onbrand/app/skills/ai-talent
+
+          echo "════════════════════════════════════════════"
+          echo "  Sourcing .env and restarting onbrand"
+          echo "════════════════════════════════════════════"
+
+          # Verify .env has LOCAL_DB_PASSWORD before doing anything
+          if ! grep -q "^LOCAL_DB_PASSWORD=" "$ENV" 2>/dev/null; then
+            echo "❌ LOCAL_DB_PASSWORD not found in $ENV"
+            echo "   Run ops-recover-db-password.yml first."
+            exit 1
+          fi
+          echo "  ✓ LOCAL_DB_PASSWORD present in .env"
+
+          # Load .env into current shell so pm2 inherits all vars
+          set -a
+          source "$ENV"
+          set +a
+          echo "  ✓ .env sourced (LOCAL_DB_PASSWORD in shell: $([ -n "$LOCAL_DB_PASSWORD" ] && echo YES || echo NO))"
+
+          # Hard-restart: delete + start (ensures clean env, not just reload)
+          echo ""
+          echo "── Deleting old pm2 process ──"
+          pm2 delete onbrand 2>/dev/null || echo "  (no existing onbrand process)"
+
+          echo ""
+          echo "── Starting fresh onbrand process ──"
+          pm2 start "$TSX" \
+            --name onbrand \
+            --cwd "$AI" \
+            --update-env \
+            -- server/index.ts
+
+          pm2 save --force
+          echo "  ✓ pm2 save done"
+
+          echo ""
+          echo "── Waiting for startup ──"
+          sleep 6
+
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/health || echo "000")
+          echo "  /health → $HTTP"
+
+          if [ "$HTTP" = "200" ]; then
+            echo ""
+            echo "✅ Server is up!"
+            curl -s http://localhost:3101/health
+          else
+            echo ""
+            echo "❌ Still not healthy. Last 20 lines of error log:"
+            tail -20 ~/.pm2/logs/onbrand-error.log 2>/dev/null || echo "(no error log)"
+            exit 1
+          fi
