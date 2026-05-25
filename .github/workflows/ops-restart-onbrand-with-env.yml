@@ -1,10 +1,16 @@
 name: Ops — Restart onbrand (source .env first)
 
-# Hard-restarts the onbrand pm2 process by sourcing the .env file into the
-# shell before calling pm2, so all variables (including LOCAL_DB_PASSWORD)
-# are actually present in the new process environment.
+# Hard-restarts the onbrand pm2 process, ensuring LOCAL_DB_PASSWORD
+# (and all other .env vars) are actually present in the new process.
 #
-# Run this whenever pm2 restart/reload fails to pick up updated .env vars.
+# Root cause of restart failures: bootstrap-env.ts uses dotenv({ override: true })
+# and tries multiple .env paths. We write to ALL candidate paths so it always
+# finds a .env with the required vars regardless of which path wins.
+#
+# Candidate paths bootstrap-env.ts checks:
+#   1. process.cwd()/.env  → /opt/onbrand/app/skills/ai-talent/.env
+#   2. __dirname/../.env   → same as #1 (server/ → ../ = ai-talent/)
+#   3. /opt/marketing-os/app/skills/ai-talent/.env  (hardcoded fallback)
 
 on:
   workflow_dispatch:
@@ -12,37 +18,67 @@ on:
 jobs:
   restart:
     runs-on: [self-hosted, linux, vm-marketing-os]
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
-      - name: Source .env and hard-restart pm2
+      - name: Sync .env to all candidate paths and hard-restart pm2
         run: |
           set -e
-          ENV=/opt/onbrand/app/skills/ai-talent/.env
+
+          # ── Canonical .env location (where recovery wrote the password) ──
+          ENV_ONBRAND=/opt/onbrand/app/skills/ai-talent/.env
+          # ── Hardcoded fallback in bootstrap-env.ts ──
+          ENV_MOS=/opt/marketing-os/app/skills/ai-talent/.env
+
           TSX=/opt/onbrand/app/skills/ai-talent/node_modules/.bin/tsx
           AI=/opt/onbrand/app/skills/ai-talent
 
           echo "════════════════════════════════════════════"
-          echo "  Sourcing .env and restarting onbrand"
+          echo "  onbrand restart — dual .env sync"
           echo "════════════════════════════════════════════"
 
-          # Verify .env has LOCAL_DB_PASSWORD before doing anything
-          if ! grep -q "^LOCAL_DB_PASSWORD=" "$ENV" 2>/dev/null; then
-            echo "❌ LOCAL_DB_PASSWORD not found in $ENV"
+          # ── Step 1: confirm LOCAL_DB_PASSWORD exists in primary .env ──
+          if ! grep -q "^LOCAL_DB_PASSWORD=" "$ENV_ONBRAND" 2>/dev/null; then
+            echo "❌ LOCAL_DB_PASSWORD not found in $ENV_ONBRAND"
             echo "   Run ops-recover-db-password.yml first."
             exit 1
           fi
-          echo "  ✓ LOCAL_DB_PASSWORD present in .env"
+          echo "  ✓ LOCAL_DB_PASSWORD present in $ENV_ONBRAND"
 
-          # Load .env into current shell so pm2 inherits all vars
+          # ── Step 2: read the password from the primary .env ──
+          DB_PASS=$(grep "^LOCAL_DB_PASSWORD=" "$ENV_ONBRAND" | head -1 | sed 's/^LOCAL_DB_PASSWORD=//')
+          echo "  ✓ Password read (${#DB_PASS} chars)"
+          echo "::add-mask::${DB_PASS}"
+
+          # ── Step 3: ensure /opt/marketing-os .env also has it ──
+          # (bootstrap-env.ts uses this as the 3rd-priority fallback,
+          #  but if CWD doesn't resolve correctly it becomes the winner)
+          echo ""
+          echo "── Syncing to /opt/marketing-os .env ──"
+          if [ -f "$ENV_MOS" ]; then
+            if grep -qE "^LOCAL_DB_PASSWORD=" "$ENV_MOS" 2>/dev/null; then
+              sed -i "s|^LOCAL_DB_PASSWORD=.*|LOCAL_DB_PASSWORD=${DB_PASS}|" "$ENV_MOS"
+              echo "  ↻ LOCAL_DB_PASSWORD updated in $ENV_MOS"
+            else
+              echo "LOCAL_DB_PASSWORD=${DB_PASS}" >> "$ENV_MOS"
+              echo "  + LOCAL_DB_PASSWORD added to $ENV_MOS"
+            fi
+          else
+            echo "  ⊘ $ENV_MOS does not exist — skipping (bootstrap-env candidate 3 won't apply)"
+          fi
+
+          # ── Step 4: source the primary .env into current shell ──
+          echo ""
+          echo "── Sourcing .env into shell ──"
           set -a
-          source "$ENV"
+          source "$ENV_ONBRAND"
           set +a
-          echo "  ✓ .env sourced (LOCAL_DB_PASSWORD in shell: $([ -n "$LOCAL_DB_PASSWORD" ] && echo YES || echo NO))"
+          echo "  LOCAL_DB_PASSWORD in shell: $([ -n "$LOCAL_DB_PASSWORD" ] && echo YES || echo NO)"
+          echo "  JWT_SECRET in shell:        $([ -n "$JWT_SECRET" ] && echo YES || echo NO)"
 
-          # Hard-restart: delete + start (ensures clean env, not just reload)
+          # ── Step 5: hard-restart pm2 ──
           echo ""
           echo "── Deleting old pm2 process ──"
-          pm2 delete onbrand 2>/dev/null || echo "  (no existing onbrand process)"
+          pm2 delete onbrand 2>/dev/null || echo "  (no existing onbrand process to delete)"
 
           echo ""
           echo "── Starting fresh onbrand process ──"
@@ -53,12 +89,19 @@ jobs:
             -- server/index.ts
 
           pm2 save --force
-          echo "  ✓ pm2 save done"
+          echo "  ✓ pm2 saved"
+
+          # ── Step 6: wait and verify ──
+          echo ""
+          echo "── Waiting 15 s for startup ──"
+          sleep 15
 
           echo ""
-          echo "── Waiting for startup ──"
-          sleep 6
+          echo "── pm2 status ──"
+          pm2 list
 
+          echo ""
+          echo "── Health check ──"
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/health || echo "000")
           echo "  /health → $HTTP"
 
@@ -68,7 +111,11 @@ jobs:
             curl -s http://localhost:3101/health
           else
             echo ""
-            echo "❌ Still not healthy. Last 20 lines of error log:"
-            tail -20 ~/.pm2/logs/onbrand-error.log 2>/dev/null || echo "(no error log)"
+            echo "❌ Still not healthy (HTTP $HTTP). Recent error log:"
+            # Show only lines from the last 30 seconds to avoid showing stale entries
+            tail -30 ~/.pm2/logs/onbrand-error.log 2>/dev/null || echo "(no error log)"
+            echo ""
+            echo "── bootstrap-env log (from pm2 out log) ──"
+            grep -a "bootstrap-env\|LOCAL_DB\|JWT_SECRET" ~/.pm2/logs/onbrand-out.log 2>/dev/null | tail -10 || echo "(no out log)"
             exit 1
           fi
