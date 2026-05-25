@@ -1,0 +1,111 @@
+name: Ops — Recover RESEND_API_KEY from backups
+
+# Searches .env backups for RESEND_API_KEY and writes it to .env.
+# Also writes JWT_SECRET if found missing.
+# Does NOT restart pm2 — just updates the .env file so the next
+# restart picks it up. Run ops-restart-onbrand-with-env.yml after.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  recover:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Search backups and write RESEND_API_KEY to .env
+        run: |
+          set +e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+
+          echo "════════════════════════════════════════════════════"
+          echo "  Searching backups for RESEND_API_KEY"
+          echo "════════════════════════════════════════════════════"
+
+          FOUND_RESEND=""
+          FOUND_JWT=""
+
+          # Search all .env backup files
+          for bak in \
+            "${ENV}.bak."* \
+            /opt/onbrand/app/skills/ai-talent/.env.bak.* \
+            /opt/marketing-os/app/skills/ai-talent/.env.bak.*; do
+            [ -f "$bak" ] || continue
+
+            if [ -z "$FOUND_RESEND" ]; then
+              val=$(grep "^RESEND_API_KEY=" "$bak" 2>/dev/null | head -1 | sed 's/^RESEND_API_KEY=//')
+              if [ -n "$val" ]; then
+                echo "  ✓ RESEND_API_KEY found in: $bak (${#val} chars)"
+                FOUND_RESEND="$val"
+              fi
+            fi
+
+            if [ -z "$FOUND_JWT" ]; then
+              val=$(grep "^JWT_SECRET=" "$bak" 2>/dev/null | head -1 | sed 's/^JWT_SECRET=//')
+              if [ -n "$val" ]; then
+                echo "  ✓ JWT_SECRET found in: $bak (${#val} chars)"
+                FOUND_JWT="$val"
+              fi
+            fi
+
+            [ -n "$FOUND_RESEND" ] && [ -n "$FOUND_JWT" ] && break
+          done
+
+          echo ""
+          echo "── Results ──"
+          echo "  RESEND_API_KEY: $([ -n "$FOUND_RESEND" ] && echo "found (${#FOUND_RESEND} chars)" || echo "NOT FOUND")"
+          echo "  JWT_SECRET:     $([ -n "$FOUND_JWT" ] && echo "found (${#FOUND_JWT} chars)" || echo "NOT FOUND")"
+
+          # Mask values
+          [ -n "$FOUND_RESEND" ] && echo "::add-mask::${FOUND_RESEND}"
+          [ -n "$FOUND_JWT"    ] && echo "::add-mask::${FOUND_JWT}"
+
+          if [ -z "$FOUND_RESEND" ]; then
+            echo "❌ RESEND_API_KEY not found in any backup."
+            echo "   You need to add it manually to GitHub Secrets → RESEND_API_KEY"
+            echo "   Then run ops-fix-missing-critical-env.yml"
+          fi
+
+          echo ""
+          echo "── Writing to .env ──"
+          upsert() {
+            local KEY="$1"; local VAL="$2"
+            [ -z "$VAL" ] && return
+            if grep -qE "^${KEY}=" "$ENV" 2>/dev/null; then
+              sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" "$ENV"
+              echo "  ↻ $KEY updated"
+            else
+              echo "${KEY}=${VAL}" >> "$ENV"
+              echo "  + $KEY added"
+            fi
+          }
+
+          upsert RESEND_API_KEY "$FOUND_RESEND"
+          upsert JWT_SECRET     "$FOUND_JWT"
+
+          echo ""
+          echo "── Current criticalEnv status in .env ──"
+          for KEY in LOCAL_DB_PASSWORD RESEND_API_KEY JWT_SECRET; do
+            if grep -q "^${KEY}=" "$ENV"; then
+              echo "  ✓ $KEY present"
+            else
+              echo "  ❌ $KEY MISSING"
+            fi
+          done
+
+          echo ""
+          echo "── pm2 restart to pick up new .env ──"
+          set -a; source "$ENV"; set +a
+          TSX=/opt/onbrand/app/skills/ai-talent/node_modules/.bin/tsx
+          AI=/opt/onbrand/app/skills/ai-talent
+          pm2 restart onbrand --update-env 2>&1 | tail -3
+          sleep 8
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/health || echo "000")
+          echo "  /health → $HTTP"
+          if [ "$HTTP" = "200" ]; then
+            echo "✅ Health check passing!"
+            curl -s http://localhost:3101/health
+          else
+            echo "Partial health response:"
+            curl -s http://localhost:3101/health
+          fi
