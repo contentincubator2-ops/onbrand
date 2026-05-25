@@ -1,0 +1,121 @@
+name: Ops — Debug VM paths (one-shot)
+
+# Diagnoses the /opt/onbrand vs /opt/marketing-os path relationship
+# and the exact content of .env files that bootstrap-env.ts reads.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 2
+    steps:
+      - name: Path audit + write LOCAL_DB_PASSWORD to all candidate .env files
+        run: |
+          set +e  # don't abort on errors so we see everything
+
+          ENV_ONBRAND=/opt/onbrand/app/skills/ai-talent/.env
+          ENV_MOS=/opt/marketing-os/app/skills/ai-talent/.env
+
+          echo "════════════════════════════════════════════════════"
+          echo "  1. Directory structure"
+          echo "════════════════════════════════════════════════════"
+          ls -la /opt/ 2>&1
+          echo ""
+          echo "── /opt/onbrand → real path ──"
+          readlink -f /opt/onbrand 2>&1
+          echo ""
+          echo "── /opt/marketing-os → real path ──"
+          readlink -f /opt/marketing-os 2>&1
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  2. .env file info"
+          echo "════════════════════════════════════════════════════"
+          echo "── /opt/onbrand/.env ──"
+          ls -la "$ENV_ONBRAND" 2>&1
+          echo "   inode: $(stat -c %i "$ENV_ONBRAND" 2>&1)"
+          echo "   LOCAL_DB_PASSWORD line: $(grep "^LOCAL_DB_PASSWORD=" "$ENV_ONBRAND" | head -1 | sed 's/=.*/=<MASKED>/')"
+          echo ""
+          echo "── /opt/marketing-os/.env ──"
+          ls -la "$ENV_MOS" 2>&1
+          echo "   inode: $(stat -c %i "$ENV_MOS" 2>&1)"
+          echo "   LOCAL_DB_PASSWORD line: $(grep "^LOCAL_DB_PASSWORD=" "$ENV_MOS" | head -1 | sed 's/=.*/=<MASKED>/')"
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  3. Are they the same file? (same inode = symlink)"
+          echo "════════════════════════════════════════════════════"
+          INODE_A=$(stat -c %i "$ENV_ONBRAND" 2>/dev/null)
+          INODE_B=$(stat -c %i "$ENV_MOS" 2>/dev/null)
+          if [ -n "$INODE_A" ] && [ -n "$INODE_B" ] && [ "$INODE_A" = "$INODE_B" ]; then
+            echo "  ✓ SAME inode ($INODE_A) — they are the same file"
+          else
+            echo "  ✗ DIFFERENT inodes (onbrand=$INODE_A, marketing-os=$INODE_B) — different files!"
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  4. Write LOCAL_DB_PASSWORD to BOTH paths"
+          echo "════════════════════════════════════════════════════"
+          # Read from the onbrand .env (which recovery wrote to)
+          DB_PASS=$(grep "^LOCAL_DB_PASSWORD=" "$ENV_ONBRAND" | head -1 | sed 's/^LOCAL_DB_PASSWORD=//')
+          if [ -z "$DB_PASS" ]; then
+            echo "  ❌ LOCAL_DB_PASSWORD empty in $ENV_ONBRAND! Recovery must run first."
+            exit 1
+          fi
+          echo "::add-mask::${DB_PASS}"
+          echo "  ✓ Got LOCAL_DB_PASSWORD (${#DB_PASS} chars)"
+
+          for ENVFILE in "$ENV_ONBRAND" "$ENV_MOS"; do
+            echo ""
+            echo "── Writing to $ENVFILE ──"
+            # Try to create if doesn't exist
+            if [ ! -f "$ENVFILE" ]; then
+              mkdir -p "$(dirname "$ENVFILE")" 2>&1
+              touch "$ENVFILE" 2>&1
+            fi
+            if grep -qE "^LOCAL_DB_PASSWORD=" "$ENVFILE" 2>/dev/null; then
+              sed -i "s|^LOCAL_DB_PASSWORD=.*|LOCAL_DB_PASSWORD=${DB_PASS}|" "$ENVFILE"
+              echo "  ↻ Updated"
+            else
+              echo "LOCAL_DB_PASSWORD=${DB_PASS}" >> "$ENVFILE"
+              echo "  + Added"
+            fi
+            echo "  Verify: $(grep "^LOCAL_DB_PASSWORD=" "$ENVFILE" | head -1 | sed 's/=.*/=<MASKED>/')"
+          done
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  5. Restart pm2"
+          echo "════════════════════════════════════════════════════"
+          TSX=/opt/onbrand/app/skills/ai-talent/node_modules/.bin/tsx
+          AI=/opt/onbrand/app/skills/ai-talent
+
+          set -a
+          source "$ENV_ONBRAND"
+          set +a
+          echo "  LOCAL_DB_PASSWORD in shell: $([ -n "$LOCAL_DB_PASSWORD" ] && echo YES || echo NO)"
+
+          pm2 delete onbrand 2>/dev/null || true
+          pm2 start "$TSX" --name onbrand --cwd "$AI" --update-env -- server/index.ts
+          pm2 save --force
+
+          sleep 8
+          echo ""
+          pm2 list
+
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/health || echo "000")
+          echo "  /health → $HTTP"
+
+          echo ""
+          echo "── bootstrap-env log (last 5 entries) ──"
+          grep -a "bootstrap-env\|LOCAL_DB" ~/.pm2/logs/onbrand-out.log 2>/dev/null | tail -5 || echo "(no out log)"
+
+          if [ "$HTTP" = "200" ]; then
+            echo "✅ Server is up!"
+          else
+            echo "❌ Still down. Error log tail:"
+            tail -15 ~/.pm2/logs/onbrand-error.log 2>/dev/null || true
+          fi
