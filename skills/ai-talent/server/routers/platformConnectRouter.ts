@@ -44,14 +44,36 @@ async function getPipedreamToken(externalUserId: string): Promise<{ token: strin
     });
   }
 
-  // 2026-05-26: Pipedream Connect API uses Basic Auth (pub_:sec_) directly
-  // on /v1/connect/tokens — no intermediate /v1/oauth/token step needed.
+  // Step 1: exchange OAuth App credentials for a short-lived Bearer token.
+  // Pipedream Connect requires a two-step flow:
+  //   1. POST /v1/oauth/token with Basic Auth (CLIENT_ID:CLIENT_SECRET)
+  //   2. POST /v1/connect/tokens with Bearer access_token
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const tokenRes = await fetch("https://api.pipedream.com/v1/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/x-www-form-urlencoded",
+      "Authorization": `Basic ${basicAuth}`,
+    },
+    body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
+  });
+
+  if (!tokenRes.ok) {
+    const text = await tokenRes.text();
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Pipedream OAuth token error ${tokenRes.status}: ${text.slice(0, 200)}`,
+    });
+  }
+
+  const { access_token } = (await tokenRes.json()) as { access_token: string };
+
+  // Step 2: mint a Connect user token with the Bearer access_token.
   const connectRes = await fetch(`${PD_API}/tokens`, {
     method: "POST",
     headers: {
       "Content-Type":    "application/json",
-      "Authorization":   `Basic ${basicAuth}`,
+      "Authorization":   `Bearer ${access_token}`,
       "X-PD-Environment": env,
     },
     body: JSON.stringify({
