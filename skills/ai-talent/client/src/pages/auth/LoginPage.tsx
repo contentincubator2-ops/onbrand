@@ -69,7 +69,7 @@ export default function LoginPage() {
 
       // Wait for cookie to be set
       await new Promise(resolve => setTimeout(resolve, 500));
-      window.location.href = "/";
+      window.location.href = "/theater";
     } catch (err) {
       setError(t("auth_err_network"));
     } finally {

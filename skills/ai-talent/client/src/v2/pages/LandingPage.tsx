@@ -116,7 +116,7 @@ export default function LandingPage() {
             {en ? "Pricing" : "方案"}
           </Link>
           {authed ? (
-            <Link to="/30s"
+            <Link to="/theater"
               className="px-4 py-2 rounded-lg text-white font-semibold"
               style={{ background: GRAD }}>
               {en ? "Go to app" : "進入應用程式"}

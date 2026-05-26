@@ -2642,7 +2642,7 @@ class RouteErrorBoundary extends React.Component<
               </button>
               <button
                 style={{ padding: "6px 12px", background: "white", border: "1px solid #cbd5e1", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
-                onClick={() => window.location.assign("/30s")}
+                onClick={() => window.location.assign("/theater")}
               >
                 回到首頁
               </button>
