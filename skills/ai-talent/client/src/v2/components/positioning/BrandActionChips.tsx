@@ -37,9 +37,11 @@ export function BrandActionChipsRow({
 }: Props & { expanded: boolean; onToggle: () => void; status: "full"|"interim"|"empty"; isRunning: boolean }) {
   const { lang } = useLang();
   const utils = trpc.useUtils();
+  // 2026-05-27: use theater.lockTabs (bulk, now exists on server).
+  // Previous code tried to ?? fallback to theater.lockTab, but tRPC proxy is
+  // always truthy for any path, so the fallback never triggered and the call
+  // to the non-existent theater.lockTabs caused "No procedure found" errors.
   const lockTabsMut = (trpc as any).theater?.lockTabs?.useMutation?.({
-    onSuccess: () => utils.theater?.getTabLocks?.invalidate?.(),
-  }) ?? (trpc as any).theater?.lockTab?.useMutation?.({
     onSuccess: () => utils.theater?.getTabLocks?.invalidate?.(),
   });
 
@@ -49,13 +51,7 @@ export function BrandActionChipsRow({
       ? "Lock Positioning / Copy / Visual tabs?\nAfter locking:\n· Editors become read-only\n· This becomes the single source of truth everywhere\nYou can unlock anytime."
       : "確定要鎖定 定位 / 文字 / 視覺 三個頁籤？\n鎖定後：\n· 編輯欄變成唯讀\n· 全平台都會用這份做為單一真相\n隨時可以解鎖。")) return;
     try {
-      if ((trpc as any).theater?.lockTabs) {
-        await lockTabsMut?.mutateAsync?.({ brandId, tabs: ["positioning", "copy", "visual"] });
-      } else {
-        for (const tab of ["positioning", "copy", "visual"] as const) {
-          await lockTabsMut?.mutateAsync?.({ brandId, tab, locked: true });
-        }
-      }
+      await lockTabsMut?.mutateAsync?.({ brandId, tabs: ["positioning", "copy", "visual"] });
     } catch (e: any) {
       alert((lang === "en" ? "Lock failed: " : "鎖定失敗：") + String(e?.message ?? e));
     }

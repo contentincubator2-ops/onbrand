@@ -1082,6 +1082,35 @@ ${cleaned}
       return { ok: true as const, lock: cur[input.tab] };
     }),
 
+  // 2026-05-27 (CJ「定案失敗 lockTabs not found」): bulk-lock convenience.
+  // BrandActionChips was calling theater.lockTabs (plural) which didn't exist.
+  // Adds it as a single-round-trip mutation that sets all tabs at once.
+  lockTabs: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      tabs: z.array(z.enum(["positioning", "copy", "visual"])).min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [rows]: any = await localPool.execute(
+        `SELECT tabLocks FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new Error("brand not found");
+      let cur: any = row.tabLocks;
+      if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
+      cur = cur ?? {};
+      const now = new Date().toISOString();
+      for (const tab of input.tabs) {
+        cur[tab] = { at: now, by: ctx.user.id };
+      }
+      await localPool.execute(
+        `UPDATE brands SET tabLocks = ? WHERE id = ? AND userId = ?`,
+        [JSON.stringify(cur), input.brandId, ctx.user.id],
+      );
+      return { ok: true as const, locks: cur };
+    }),
+
   unlockTab: protectedProcedure
     .input(z.object({
       brandId: z.number().int().positive(),
