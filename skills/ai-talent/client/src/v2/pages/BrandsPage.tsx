@@ -331,6 +331,86 @@ export default function BrandsPage() {
       if (favorable.length > 0 || risks.length > 0) setIfEmpty("trends", { favorable, risks });
     }
 
+    // ── Product pipeline → UI segment key translation (2026-05-26) ──────────
+    // buildProductPositioningSteps writes: marketFit, targetUser, valueProp,
+    // productDifferentiation, productMessaging, gtmSummary.
+    // PRODUCT_SEGMENTS expects: core, audience, value, competition, strategy.
+    // Same setIfEmpty pattern as brand translations above — never overwrites
+    // manually-edited data.
+    const pMktFit = merged.marketFit;
+    const pTargetUser = merged.targetUser;
+    const pValProp = merged.valueProp;
+    const pDiff = merged.productDifferentiation;
+    const pMsg = merged.productMessaging;
+    const pGtm = merged.gtmSummary;
+
+    if (pMsg && typeof pMsg === "object") {
+      // core: name / zhTagline / coreStatement / oneLineValueProp
+      setIfEmpty("core", {
+        name: pMsg.oneLiner ?? "",
+        zhTagline: pMsg.tagline ?? "",
+        enTagline: "",
+        coreStatement: Array.isArray(pMsg.threePillars) ? pMsg.threePillars.join(" · ") : "",
+        oneLineValueProp: (pValProp as any)?.headline ?? pMsg.oneLiner ?? "",
+      });
+      // also fill tagline so 速查卡 can read seg.tagline?.zhTagline
+      setIfEmpty("tagline", {
+        zhTagline: pMsg.tagline ?? "",
+        enTagline: "",
+        type: "",
+        scenes: [],
+        competitorDiff: (pDiff as any)?.comparisonHook ?? "",
+        story: "",
+      });
+    }
+
+    if (pTargetUser && typeof pTargetUser === "object") {
+      setIfEmpty("audience", {
+        primary: (pTargetUser as any).primaryUser ?? "",
+        secondary: Array.isArray((pTargetUser as any).useCases)
+          ? (pTargetUser as any).useCases.slice(0, 2).join("\n") : "",
+        pains: Array.isArray((pTargetUser as any).userPainPoints) ? (pTargetUser as any).userPainPoints : [],
+        needs: Array.isArray((pTargetUser as any).useCases) ? (pTargetUser as any).useCases : [],
+        mots: [],
+      });
+    }
+
+    if (pValProp && typeof pValProp === "object") {
+      setIfEmpty("value", {
+        coreFunctions: Array.isArray((pValProp as any).keyBenefits) ? (pValProp as any).keyBenefits : [],
+        features: Array.isArray((pDiff as any)?.keyDifferentiators) ? (pDiff as any).keyDifferentiators : [],
+        advantages: [],
+        primaryEmotion: (pValProp as any).emotionalHook ?? "",
+        personality: "",
+        userFeeling: (pValProp as any).emotionalHook ?? "",
+      });
+      // also fill differentiation so 速查卡 can read seg.differentiation?.summary
+      setIfEmpty("differentiation", {
+        summary: (pValProp as any).headline ?? "",
+        emotional: (pValProp as any).emotionalHook ?? "",
+        functional: Array.isArray((pValProp as any).keyBenefits) ? (pValProp as any).keyBenefits : [],
+      });
+    }
+
+    if (pMktFit && typeof pMktFit === "object") {
+      setIfEmpty("competition", {
+        competitors: Array.isArray((pMktFit as any).competingProducts)
+          ? (pMktFit as any).competingProducts.map((n: any) => ({ name: String(n), position: "" }))
+          : [],
+        uniqueUsp: (pDiff as any)?.comparisonHook ?? "",
+        rareUsp: (pMktFit as any).whitespace ?? "",
+        commonUsp: "",
+      });
+    }
+
+    if (pGtm) {
+      setIfEmpty("strategy", {
+        positioning: typeof pGtm === "string" ? pGtm : "",
+        pricing: "",
+        channel: (pMktFit as any)?.marketNeed ?? "",
+      });
+    }
+
     return merged;
     } catch (e) {
       console.error("[BrandsPage] positioning normalizer crashed:", e);
