@@ -272,8 +272,15 @@ function PlatformTaskPageInner() {
       )
     : { data: null };
 
+  // 2026-05-26 fix: was hardcoded productId/eventId: null → always fetched
+  // brand-only positioning even when a product/event scope was active.
+  // Now passes the real scope ids so context chips show the correct entity.
   const scopeActiveQuery = (trpc as any).scope?.active?.useQuery?.(
-    { brandId: brandId ?? 0, productId: null, eventId: null },
+    {
+      brandId:   brandId ?? 0,
+      productId: ctx?.scope?.productId ?? null,
+      eventId:   ctx?.scope?.eventId   ?? null,
+    },
     { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 60_000 },
   );
 
@@ -323,14 +330,28 @@ function PlatformTaskPageInner() {
     return () => clearInterval(id);
   }, [countdownStart]);
 
-  // Brand context for modal chips
+  // Brand context for modal chips.
+  // When product/event scope is active, overlay their positioning on top of
+  // the brand's so context chips reflect the selected product/event, not
+  // the parent brand. Use product/event name as the display name.
   const brandCtx = useMemo(() => {
     const data: any = scopeActiveQuery?.data;
     if (!data?.brand) return null;
+    const basePositioning    = data.brand.positioning    ?? {};
+    const productPositioning = data.product?.positioning ?? {};
+    const eventPositioning   = data.event?.positioning   ?? {};
+    const overlayPositioning =
+      Object.keys(productPositioning).length > 0
+        ? { ...basePositioning, ...productPositioning }
+      : Object.keys(eventPositioning).length > 0
+        ? { ...basePositioning, ...eventPositioning }
+        : basePositioning;
+    const displayName =
+      data.product?.name ?? data.event?.name ?? data.brand?.name ?? null;
     return {
-      brand: { ...data.brand, positioning: data.brand.positioning ?? {} },
+      brand:   { ...data.brand, name: displayName, positioning: overlayPositioning },
       product: data.product ?? null,
-      event: data.event ?? null,
+      event:   data.event   ?? null,
     };
   }, [scopeActiveQuery?.data]);
 
