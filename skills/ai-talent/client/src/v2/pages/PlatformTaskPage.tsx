@@ -334,17 +334,30 @@ function PlatformTaskPageInner() {
   // When product/event scope is active, overlay their positioning on top of
   // the brand's so context chips reflect the selected product/event, not
   // the parent brand. Use product/event name as the display name.
+  //
+  // 2026-05-27 (CJ「勝選通 modal 還是顯示 SoWork 設定」): fix fallback.
+  // If a product/event scope is active but has NO positioning yet, we must NOT
+  // fall back to brand positioning — that causes the parent brand's chips
+  // (e.g. SoWork's archetypes/tone/WHY) to appear for the child product/event.
+  // Use an empty object instead, which renders chips as "尚未填寫".
   const brandCtx = useMemo(() => {
     const data: any = scopeActiveQuery?.data;
     if (!data?.brand) return null;
     const basePositioning    = data.brand.positioning    ?? {};
     const productPositioning = data.product?.positioning ?? {};
     const eventPositioning   = data.event?.positioning   ?? {};
+    const productScopeActive = !!(ctx?.scope?.productId);
+    const eventScopeActive   = !!(ctx?.scope?.eventId);
     const overlayPositioning =
       Object.keys(productPositioning).length > 0
         ? { ...basePositioning, ...productPositioning }
       : Object.keys(eventPositioning).length > 0
         ? { ...basePositioning, ...eventPositioning }
+      // Product/event scope active but no positioning data yet →
+      // use empty object so chips say "尚未填寫" instead of showing
+      // the parent brand's positioning (e.g. SoWork for 勝選通).
+      : (productScopeActive || eventScopeActive)
+        ? {}
         : basePositioning;
     const displayName =
       data.product?.name ?? data.event?.name ?? data.brand?.name ?? null;
@@ -353,7 +366,52 @@ function PlatformTaskPageInner() {
       product: data.product ?? null,
       event:   data.event   ?? null,
     };
-  }, [scopeActiveQuery?.data]);
+  }, [scopeActiveQuery?.data, ctx?.scope?.productId, ctx?.scope?.eventId]);
+
+  // Auto-trigger interim positioning for product/event scope with no positioning.
+  // Mirrors BrandsPage auto-trigger so users don't need to visit BrandsPage first.
+  // Phase: fires once per (kind, entityId) and is reset on scope change.
+  const _autoPosTaskRef = React.useRef<string | null>(null);
+  const autoRunInterimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
+  const autoStartJobMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
+  const trpcUtils = (trpc as any).useUtils?.() ?? null;
+  useEffect(() => {
+    const productId = ctx?.scope?.productId ?? null;
+    const eventId   = ctx?.scope?.eventId   ?? null;
+    if (!productId && !eventId) return; // Brand scope — BrandsPage handles it
+    const kind: "product" | "event" = productId ? "product" : "event";
+    const entityId = (productId ?? eventId) as number;
+    const key = `${kind}:${entityId}`;
+    if (_autoPosTaskRef.current === key) return; // Already fired
+    const data: any = scopeActiveQuery?.data;
+    if (!data) return; // Query not yet loaded
+    const entityPositioning = kind === "product"
+      ? (data.product?.positioning ?? {})
+      : (data.event?.positioning   ?? {});
+    // Check for real content (ignore _interim / _meta internal keys)
+    const hasContent = Object.keys(entityPositioning)
+      .filter(k => !k.startsWith("_"))
+      .some(k => {
+        const v = entityPositioning[k];
+        if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+        return Object.values(v).some(fv =>
+          (typeof fv === "string" && (fv as string).trim().length > 0) ||
+          (Array.isArray(fv)      && (fv as any[]).length > 0)
+        );
+      });
+    if (hasContent) return; // Already has positioning — nothing to do
+    if (!autoRunInterimMut?.mutate || !autoStartJobMut?.mutate) return;
+    _autoPosTaskRef.current = key;
+    (async () => {
+      // 1. Fire full pipeline fire-and-forget (background, takes minutes)
+      try { autoStartJobMut.mutate({ entityKind: kind, entityId }); } catch { /* non-fatal */ }
+      // 2. Run interim (≤12s) — writes _interim positioning used by content tasks
+      try { await autoRunInterimMut.mutateAsync?.({ entityKind: kind, entityId }); } catch { /* non-fatal */ }
+      // 3. Refresh scope.active so chips pick up the new interim data
+      trpcUtils?.scope?.active?.invalidate?.();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx?.scope?.productId, ctx?.scope?.eventId, scopeActiveQuery?.data]);
 
   // Polish input
   const polishInputMut = (trpc as any).quickTask?.polishInput?.useMutation();
