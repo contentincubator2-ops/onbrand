@@ -950,38 +950,74 @@ export default function BrandsPage() {
   // user must commit before steps 7-11 (messaging/creative/...) fire.
   const [smpCheckpointActive, setSmpCheckpointActive] = useState(false);
 
-  // ── Quick positioning intake state machine ───────────────────────────────
-  // "form"    → 3-question intake form (consumer wants / competitor gap / brand fills)
-  // "running" → runInterim is in-flight (≤12s spinner)
-  // "preview" → runInterim done, showing AI summary + background pipeline running
-  const [intakeAnswers, setIntakeAnswers] = useState({ consumerWants: "", competitorLacks: "", brandFills: "" });
-  const [intakePhase, setIntakePhase] = useState<"form" | "running" | "preview">("form");
-  const [intakeInterimResult, setIntakeInterimResult] = useState<{
-    consumerWants: string; competitorLacks: string; brandFills: string;
-    tagline?: string; usp?: string;
-  } | null>(null);
-  const [intakeDismissed, setIntakeDismissed] = useState(false);
+  // ── Auto background positioning (fires when entity has no positioning) ──────
+  // Phase: "idle" → "interim-running" → "interim-done" → "full-done"
+  // No user interaction required — triggers automatically on mount/scope change.
+  const [autoPosPhase, setAutoPosPhase] = useState<"idle"|"interim-running"|"interim-done"|"full-done">("idle");
   const runInterimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
   const startJobMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
-  const intakeJobStatus = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  // Poll job status once interim is done (every 15s until full pipeline finishes)
+  const autoPosJobStatus = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
     { entityKind: (scopeMode !== "none" ? scopeMode : "brand") as "brand"|"product"|"event", entityId: targetId ?? 0 },
     {
-      enabled: intakePhase === "preview" && !!targetId && scopeMode !== "none",
-      refetchInterval: intakePhase === "preview" ? 12_000 : false,
+      enabled: autoPosPhase === "interim-done" && !!targetId && scopeMode !== "none",
+      refetchInterval: autoPosPhase === "interim-done" ? 15_000 : false,
     }
   );
-  const intakeJobDone = intakeJobStatus?.data?.status === "done";
-  // Reset intake when user switches scope (different brand / product)
-  const _prevIntakeScopeKey = React.useRef<string | null>(null);
+  // Advance to "full-done" when job status flips to "done"
+  React.useEffect(() => {
+    if (autoPosPhase === "interim-done" && autoPosJobStatus?.data?.status === "done") {
+      setAutoPosPhase("full-done");
+      utils?.scope?.active?.invalidate?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPosJobStatus?.data?.status, autoPosPhase]);
+
+  // Auto-trigger: when scope becomes active and positioning is empty,
+  // run interim (≤12s) immediately then fire full pipeline in background.
+  const _autoPosFired = React.useRef<string | null>(null);
   React.useEffect(() => {
     const key = `${scopeMode}:${targetId ?? "null"}`;
-    if (_prevIntakeScopeKey.current === key) return;
-    _prevIntakeScopeKey.current = key;
-    setIntakePhase("form");
-    setIntakeAnswers({ consumerWants: "", competitorLacks: "", brandFills: "" });
-    setIntakeInterimResult(null);
-    setIntakeDismissed(false);
-  }, [scopeMode, targetId]);
+    // Reset phase whenever scope changes
+    if (_autoPosFired.current !== key) {
+      _autoPosFired.current = null;
+      setAutoPosPhase("idle");
+    }
+    // Guard: only fire once per (scopeMode, targetId), skip if already has content
+    if (
+      _autoPosFired.current === key ||
+      scopeMode === "none" ||
+      !targetId ||
+      hasAnyPositioningContent ||
+      pipeline.status !== "idle" ||
+      !runInterimMut || !startJobMut
+    ) return;
+    // Mark as fired BEFORE the async call so concurrent renders don't double-fire
+    _autoPosFired.current = key;
+    setAutoPosPhase("interim-running");
+
+    (async () => {
+      // 1. Fire full pipeline fire-and-forget (background, takes minutes)
+      try {
+        startJobMut.mutate?.({
+          entityKind: scopeMode as "brand"|"product"|"event",
+          entityId: targetId,
+        });
+      } catch { /* non-fatal */ }
+      // 2. Run interim synchronously (≤12s) — writes positioning._interim to DB
+      //    which loadInterimPositioningBlock() already reads for all content tasks
+      try {
+        await runInterimMut.mutateAsync?.({
+          entityKind: scopeMode as "brand"|"product"|"event",
+          entityId: targetId,
+        });
+      } catch { /* non-fatal */ }
+      setAutoPosPhase("interim-done");
+      // Invalidate so the strategist bar / speed card pick up the new _interim data
+      utils?.scope?.active?.invalidate?.();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeMode, targetId, hasAnyPositioningContent, pipeline.status]);
 
   const runSegmentAutoFill = (segmentId: string) => {
     if (scopeMode === "none" || pipelineSteps.length === 0) return;
@@ -1039,50 +1075,6 @@ export default function BrandsPage() {
     copy:   hasAnyAsset(COPY_KEYS_FOR_COMPLETION),
     visual: hasAnyAsset(VISUAL_KEYS_FOR_COMPLETION),
   };
-  // ── Quick intake submit ──────────────────────────────────────────────────
-  const handleIntakeSubmit = async () => {
-    if (!targetId || scopeMode === "none") return;
-    setIntakePhase("running");
-    // 1. Persist user's answers under positioning._intake so the AI has context
-    try {
-      const withIntake = { ...positioningSegmentData, _intake: { ...intakeAnswers, ts: Date.now() } };
-      await saveMutation?.mutateAsync({
-        kind: scopeMode as "brand" | "product" | "event",
-        id: targetId,
-        positioning: withIntake,
-      });
-    } catch { /* non-fatal — still proceed */ }
-    // 2. Fire background full positioning pipeline (fire-and-forget)
-    try {
-      startJobMut?.mutate?.({
-        entityKind: scopeMode as "brand" | "product" | "event",
-        entityId: targetId,
-      });
-    } catch { /* non-fatal */ }
-    // 3. Run interim (≤12s) → get AI-generated 3-part positioning immediately
-    try {
-      const res: any = await runInterimMut?.mutateAsync?.({
-        entityKind: scopeMode as "brand" | "product" | "event",
-        entityId: targetId,
-      });
-      if (res?.ok && res.pulse) {
-        setIntakeInterimResult({
-          consumerWants:  res.pulse.consumerWants  ?? intakeAnswers.consumerWants,
-          competitorLacks: res.pulse.competitorLacks ?? intakeAnswers.competitorLacks,
-          brandFills:     res.pulse.brandFills     ?? intakeAnswers.brandFills,
-          tagline:        res.pulse.tagline  ?? "",
-          usp:            res.pulse.usp      ?? "",
-        });
-      } else {
-        setIntakeInterimResult({ ...intakeAnswers });
-      }
-    } catch {
-      setIntakeInterimResult({ ...intakeAnswers });
-    }
-    setIntakePhase("preview");
-    utils?.scope?.active?.invalidate?.();
-  };
-
   // Action handler for the primary button — 文字/視覺 just navigate to
   // the first asset card; 定位 fires the real pipeline.
   const handleTabAction = (tab: "positioning" | "copy" | "visual") => {
@@ -1679,235 +1671,35 @@ export default function BrandsPage() {
                     />
                   )}
 
-                  {/* ── Quick intake wizard — show when positioning is empty ─── */}
-                  {pipeline.status === "idle" &&
-                   !hasAnyPositioningContent &&
-                   !intakeDismissed &&
-                   scopeMode !== "none" &&
-                   !!targetId && (
+                  {/* ── Auto-positioning status banner ───────────────────────────
+                      Shown while the background interim/full pipeline is running.
+                      No user action needed — just a subtle status indicator. */}
+                  {(autoPosPhase === "interim-running" || autoPosPhase === "interim-done" || autoPosPhase === "full-done") && (
                     <div style={{
-                      background: "#fff", borderRadius: 12,
-                      border: "1px solid #E5E5E5",
-                      padding: "28px 32px 24px",
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 16px", borderRadius: 8,
+                      background: autoPosPhase === "full-done" ? "#F0FDF4" : "#FAFAFA",
+                      border: autoPosPhase === "full-done" ? "1px solid #BBF7D0" : "1px solid #E5E5E5",
                     }}>
-                      {/* Header */}
-                      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#A8A29E", margin: "0 0 8px" }}>
-                        {lang === "en" ? "QUICK START · POSITIONING INTAKE" : "快速啟動 · 定位三問"}
-                      </p>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: "#171717", margin: "0 0 6px", lineHeight: 1.3 }}>
-                        {lang === "en"
-                          ? "Before the full analysis — tell us your instinct"
-                          : "分析前 — 先用三個問題鎖定方向"}
-                      </h2>
-                      <p style={{ fontSize: 13, color: "#78716C", margin: "0 0 24px", lineHeight: 1.6 }}>
-                        {lang === "en"
-                          ? "Answer these three questions and we'll run a quick AI positioning synthesis (≤12 s), then kick off the full background analysis. Come back in a few minutes to see the complete result."
-                          : "回答三個問題，我們會即時執行 AI 定位快速合成（≤12 秒），同時在背景啟動完整定位分析。幾分鐘後回來查看完整結果。"}
-                      </p>
-
-                      {intakePhase === "form" && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                          {/* Q1 */}
-                          <div>
-                            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#404040", marginBottom: 6, letterSpacing: "0.02em" }}>
-                              <span style={{ color: "#A8A29E", marginRight: 8, fontWeight: 700 }}>01</span>
-                              {lang === "en" ? "What does your target consumer most want to achieve?" : "你的目標消費者，最想達成什麼？"}
-                            </label>
-                            <textarea
-                              value={intakeAnswers.consumerWants}
-                              onChange={e => setIntakeAnswers(a => ({ ...a, consumerWants: e.target.value }))}
-                              placeholder={lang === "en" ? "e.g. Save time on social media without hiring extra staff" : "例如：不用多聘人力，也能讓社群每天準時發文、有質感"}
-                              rows={2}
-                              style={{
-                                width: "100%", boxSizing: "border-box",
-                                padding: "10px 12px", fontSize: 13, color: "#171717",
-                                background: "#F9F9F8", border: "1px solid #E5E5E5",
-                                borderRadius: 8, outline: "none", resize: "vertical",
-                                lineHeight: 1.6, fontFamily: "inherit",
-                              }}
-                            />
-                          </div>
-                          {/* Q2 */}
-                          <div>
-                            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#404040", marginBottom: 6, letterSpacing: "0.02em" }}>
-                              <span style={{ color: "#A8A29E", marginRight: 8, fontWeight: 700 }}>02</span>
-                              {lang === "en" ? "Where do competitors typically fall short for these consumers?" : "市面上的競品，通常在哪裡讓消費者失望？"}
-                            </label>
-                            <textarea
-                              value={intakeAnswers.competitorLacks}
-                              onChange={e => setIntakeAnswers(a => ({ ...a, competitorLacks: e.target.value }))}
-                              placeholder={lang === "en" ? "e.g. Too expensive, requires technical knowledge, or generic results" : "例如：要價太高、操作門檻高、產出文字太制式沒有品牌感"}
-                              rows={2}
-                              style={{
-                                width: "100%", boxSizing: "border-box",
-                                padding: "10px 12px", fontSize: 13, color: "#171717",
-                                background: "#F9F9F8", border: "1px solid #E5E5E5",
-                                borderRadius: 8, outline: "none", resize: "vertical",
-                                lineHeight: 1.6, fontFamily: "inherit",
-                              }}
-                            />
-                          </div>
-                          {/* Q3 */}
-                          <div>
-                            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#404040", marginBottom: 6, letterSpacing: "0.02em" }}>
-                              <span style={{ color: "#A8A29E", marginRight: 8, fontWeight: 700 }}>03</span>
-                              {lang === "en" ? "How can your brand/product uniquely fill that gap?" : "你的品牌 / 產品，可以如何填補這個缺口？"}
-                            </label>
-                            <textarea
-                              value={intakeAnswers.brandFills}
-                              onChange={e => setIntakeAnswers(a => ({ ...a, brandFills: e.target.value }))}
-                              placeholder={lang === "en" ? "e.g. One-click AI posts tuned to your brand voice, ready in 30 seconds" : "例如：30 秒一鍵產出、自動學習品牌語氣、不需要任何文案背景"}
-                              rows={2}
-                              style={{
-                                width: "100%", boxSizing: "border-box",
-                                padding: "10px 12px", fontSize: 13, color: "#171717",
-                                background: "#F9F9F8", border: "1px solid #E5E5E5",
-                                borderRadius: 8, outline: "none", resize: "vertical",
-                                lineHeight: 1.6, fontFamily: "inherit",
-                              }}
-                            />
-                          </div>
-                          {/* CTA row */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 4 }}>
-                            <button
-                              onClick={handleIntakeSubmit}
-                              disabled={!intakeAnswers.consumerWants.trim() && !intakeAnswers.competitorLacks.trim() && !intakeAnswers.brandFills.trim()}
-                              style={{
-                                display: "inline-flex", alignItems: "center", gap: 8,
-                                padding: "10px 20px", borderRadius: 8,
-                                background: "#171717", color: "#fff",
-                                border: "none", cursor: "pointer",
-                                fontSize: 13, fontWeight: 600,
-                                opacity: (!intakeAnswers.consumerWants.trim() && !intakeAnswers.competitorLacks.trim() && !intakeAnswers.brandFills.trim()) ? 0.45 : 1,
-                                transition: "opacity 0.15s",
-                              }}
-                            >
-                              {lang === "en" ? "Run quick positioning (≤12 s)" : "執行快速定位（≤12 秒）"}
-                              <Sparkles size={13} />
-                            </button>
-                            <button
-                              onClick={() => setIntakeDismissed(true)}
-                              style={{
-                                fontSize: 12, color: "#A8A29E", background: "none",
-                                border: "none", cursor: "pointer", padding: "10px 0",
-                              }}
-                            >
-                              {lang === "en" ? "Skip — fill in manually" : "跳過，手動填寫"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {intakePhase === "running" && (
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "32px 0" }}>
+                      {autoPosPhase === "full-done" ? (
+                        <span style={{ fontSize: 14 }}>✅</span>
+                      ) : (
+                        <>
                           <div style={{
-                            width: 40, height: 40,
-                            border: "3px solid #E5E5E5",
-                            borderTopColor: "#171717",
-                            borderRadius: "50%",
-                            animation: "spin 0.9s linear infinite",
+                            width: 12, height: 12, flexShrink: 0,
+                            border: "2px solid #D6D3D1", borderTopColor: "#525252",
+                            borderRadius: "50%", animation: "spin 0.9s linear infinite",
                           }} />
-                          <p style={{ fontSize: 14, color: "#525252", margin: 0, fontWeight: 500 }}>
-                            {lang === "en" ? "AI positioning synthesis running…" : "AI 定位快速合成中…"}
-                          </p>
-                          <p style={{ fontSize: 12, color: "#A8A29E", margin: 0 }}>
-                            {lang === "en" ? "Usually finishes in 10–12 seconds" : "通常 10–12 秒完成"}
-                          </p>
-                          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                        </div>
+                          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                        </>
                       )}
-
-                      {intakePhase === "preview" && intakeInterimResult && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                          {/* 3-part result */}
-                          {[
-                            { key: "consumerWants" as const,  num: "01", label: lang === "en" ? "Consumer wants" : "消費者要什麼", color: "#F0FDF4", border: "#BBF7D0", text: "#166534" },
-                            { key: "competitorLacks" as const, num: "02", label: lang === "en" ? "Competitor gaps" : "競品無法滿足", color: "#FFF7ED", border: "#FED7AA", text: "#92400E" },
-                            { key: "brandFills" as const,      num: "03", label: lang === "en" ? "What you provide" : "你能填補的",   color: "#F5F3FF", border: "#DDD6FE", text: "#4C1D95" },
-                          ].map(row => (
-                            <div key={row.key} style={{
-                              display: "flex", gap: 14, padding: "14px 16px",
-                              background: row.color, borderRadius: 10, border: `1px solid ${row.border}`,
-                            }}>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: row.text, letterSpacing: "0.1em", minWidth: 24 }}>
-                                {row.num}
-                              </span>
-                              <div>
-                                <p style={{ fontSize: 11, fontWeight: 600, color: row.text, margin: "0 0 3px", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                                  {row.label}
-                                </p>
-                                <p style={{ fontSize: 13, color: "#171717", margin: 0, lineHeight: 1.65 }}>
-                                  {intakeInterimResult[row.key]}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                          {/* Tagline if present */}
-                          {intakeInterimResult.tagline && (
-                            <div style={{ padding: "12px 16px", background: "#F9F9F8", borderRadius: 8, border: "1px solid #E5E5E5" }}>
-                              <p style={{ fontSize: 11, fontWeight: 700, color: "#A8A29E", margin: "0 0 4px", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                                {lang === "en" ? "TAGLINE CANDIDATE" : "候選 TAGLINE"}
-                              </p>
-                              <p style={{ fontSize: 15, fontWeight: 600, color: "#171717", margin: 0 }}>
-                                {intakeInterimResult.tagline}
-                              </p>
-                            </div>
-                          )}
-                          {/* Background pipeline status */}
-                          <div style={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "12px 16px", borderRadius: 8,
-                            background: intakeJobDone ? "#F0FDF4" : "#FAFAF9",
-                            border: intakeJobDone ? "1px solid #BBF7D0" : "1px solid #E5E5E5",
-                          }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              {intakeJobDone ? (
-                                <span style={{ fontSize: 16 }}>✅</span>
-                              ) : (
-                                <div style={{
-                                  width: 14, height: 14,
-                                  border: "2px solid #D6D3D1",
-                                  borderTopColor: "#78716C",
-                                  borderRadius: "50%",
-                                  animation: "spin 0.9s linear infinite",
-                                  flexShrink: 0,
-                                }} />
-                              )}
-                              <span style={{ fontSize: 13, color: intakeJobDone ? "#166534" : "#525252", fontWeight: 500 }}>
-                                {intakeJobDone
-                                  ? (lang === "en" ? "Full positioning complete!" : "完整定位分析已完成！")
-                                  : (lang === "en" ? "Full positioning running in background…" : "完整定位正在背景分析中…")}
-                              </span>
-                            </div>
-                            {intakeJobDone && (
-                              <button
-                                onClick={() => {
-                                  setIntakeDismissed(true);
-                                  utils?.scope?.active?.invalidate?.();
-                                }}
-                                style={{
-                                  fontSize: 12, fontWeight: 600, color: "#166534",
-                                  background: "none", border: "none", cursor: "pointer",
-                                  padding: "4px 0",
-                                }}
-                              >
-                                {lang === "en" ? "View results →" : "前往查看 →"}
-                              </button>
-                            )}
-                          </div>
-                          {/* Dismiss link */}
-                          {!intakeJobDone && (
-                            <div style={{ textAlign: "right" }}>
-                              <button
-                                onClick={() => setIntakeDismissed(true)}
-                                style={{ fontSize: 12, color: "#A8A29E", background: "none", border: "none", cursor: "pointer" }}
-                              >
-                                {lang === "en" ? "Dismiss" : "收起"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <span style={{ fontSize: 12, color: autoPosPhase === "full-done" ? "#166534" : "#525252" }}>
+                        {autoPosPhase === "interim-running"
+                          ? (lang === "en" ? "AI quick-positioning running… content tasks will use it automatically once ready" : "AI 定位分析中⋯完成後文章產出會自動套用")
+                          : autoPosPhase === "interim-done"
+                            ? (lang === "en" ? "Quick positioning ready — full analysis running in background" : "初步定位已就緒，文章已可套用 · 完整分析仍在背景執行中")
+                            : (lang === "en" ? "Full positioning complete — all content tasks now use the upgraded positioning" : "完整定位已完成 — 所有文章產出已升級為完整定位版本")}
+                      </span>
                     </div>
                   )}
 
