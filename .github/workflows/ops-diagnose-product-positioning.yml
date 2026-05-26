@@ -1,0 +1,129 @@
+name: Ops — Diagnose product positioning (and optionally re-trigger)
+
+on:
+  workflow_dispatch:
+    inputs:
+      product_id:
+        description: "Product ID to diagnose (default: 14 = 勝選通)"
+        required: false
+        default: "14"
+      retrigger:
+        description: "Type RETRIGGER to force-reset the job to pending and restart it via API"
+        required: false
+        default: ""
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 5
+    steps:
+      - name: Diagnose positioning job + optionally re-trigger
+        run: |
+          set +e
+          PID="${{ github.event.inputs.product_id }}"
+          RETRIGGER="${{ github.event.inputs.retrigger }}"
+          AI=/opt/onbrand/app/skills/ai-talent
+          ENV=$AI/.env
+          set -a; source "$ENV" 2>/dev/null; set +a
+
+          DB_HOST="${LOCAL_DB_HOST:-localhost}"
+          DB_PORT="${LOCAL_DB_PORT:-3306}"
+          DB_USER="${LOCAL_DB_USER:-root}"
+          DB_PASS="${LOCAL_DB_PASSWORD:-}"
+          DB_NAME="${LOCAL_DB_NAME:-marketing_os}"
+          echo "::add-mask::${DB_PASS}"
+
+          MYSQL="mysql -h$DB_HOST -P$DB_PORT -u$DB_USER -p$DB_PASS $DB_NAME --batch --silent"
+
+          echo "════════════════════════════════════════════════════"
+          echo "  1. Product row (id=$PID)"
+          echo "════════════════════════════════════════════════════"
+          $MYSQL -e "
+            SELECT id, userId, brandId, slug, name,
+                   LEFT(positioning, 300) AS positioning_preview,
+                   createdAt, updatedAt
+            FROM products WHERE id = $PID\G" 2>&1
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  2. positioning_jobs for this product"
+          echo "════════════════════════════════════════════════════"
+          $MYSQL -e "
+            SELECT id, userId, entityKind, entityId, status,
+                   currentStep, totalSteps, retryCount,
+                   startedAt, finishedAt,
+                   LEFT(lastError, 400) AS lastError
+            FROM positioning_jobs
+            WHERE entityKind='product' AND entityId=$PID
+            ORDER BY id DESC
+            LIMIT 5\G" 2>&1
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  3. Latest usage_log entries for this product"
+          echo "════════════════════════════════════════════════════"
+          $MYSQL -e "
+            SELECT id, kind, model, inputTokens, outputTokens, costUsd, createdAt
+            FROM usage_log
+            WHERE entityKind='product' AND entityId=$PID
+            ORDER BY id DESC LIMIT 10" 2>&1
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  4. pm2 error log (last 30 lines)"
+          echo "════════════════════════════════════════════════════"
+          tail -30 ~/.pm2/logs/onbrand-error.log 2>/dev/null || echo "(no error log)"
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  5. pm2 out log — positioning lines (last 20)"
+          echo "════════════════════════════════════════════════════"
+          grep -a "positioningJob\|positioning_job\|positioning\|product:$PID\|entityId.*$PID" \
+            ~/.pm2/logs/onbrand-out.log 2>/dev/null | tail -20 || echo "(no matching lines)"
+
+          if [ "$RETRIGGER" = "RETRIGGER" ]; then
+            echo ""
+            echo "════════════════════════════════════════════════════"
+            echo "  6. Force-reset job to pending + call /api/internal/retrigger-positioning"
+            echo "════════════════════════════════════════════════════"
+
+            # Get userId for this product
+            UID_VAL=$($MYSQL -e "SELECT userId FROM products WHERE id=$PID LIMIT 1" 2>/dev/null | tail -1)
+            echo "  userId = $UID_VAL"
+
+            # Reset positioning_jobs row to pending so the in-process guard doesn't block
+            $MYSQL -e "
+              UPDATE positioning_jobs
+              SET status='pending', currentStep=0, retryCount=0,
+                  lastError=NULL, startedAt=NOW(3), finishedAt=NULL
+              WHERE entityKind='product' AND entityId=$PID" 2>&1
+            echo "  positioning_jobs reset → pending"
+
+            # Hit the internal endpoint to re-trigger (server must be running)
+            # We use trpc mutation via curl with a temp JWT — just restart pm2 with
+            # STARTUP_RECOVERY instead, which will re-queue all pending jobs.
+            echo ""
+            echo "  Restarting pm2 so startup recovery re-queues this job..."
+            set -a; source "$ENV"; set +a
+            TSX=$AI/node_modules/.bin/tsx
+            pm2 restart onbrand --update-env 2>&1 | tail -3
+            sleep 10
+
+            echo ""
+            echo "  Health after restart:"
+            curl -s http://localhost:3101/health
+            echo ""
+
+            echo ""
+            echo "  positioning_jobs status after restart:"
+            $MYSQL -e "
+              SELECT id, status, currentStep, totalSteps, retryCount, startedAt, lastError
+              FROM positioning_jobs
+              WHERE entityKind='product' AND entityId=$PID
+              ORDER BY id DESC LIMIT 3\G" 2>&1
+
+            echo ""
+            echo "  pm2 out log (last 10 lines, watching for resume):"
+            sleep 5
+            tail -10 ~/.pm2/logs/onbrand-out.log 2>/dev/null
+          fi
