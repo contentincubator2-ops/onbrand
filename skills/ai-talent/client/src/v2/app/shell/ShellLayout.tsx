@@ -8,6 +8,7 @@
  * Content area paddingLeft = 70px always (collapsed) or 280px (expanded).
  */
 import React from "react";
+import { createPortal } from "react-dom";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import ScopeBar, { useScopeState, type ScopeState } from "./ScopeBar";
@@ -1213,69 +1214,101 @@ function BrandSwitcherButton({
 }
 
 function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
+  const [hovered, setHovered] = React.useState(false);
+  const [tooltipTop, setTooltipTop] = React.useState(0);
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+
   return (
-    <button
-      onClick={onClick}
-      aria-label={item.label}
-      title={item.tooltip ?? item.label}
-      style={{
-        width: 64, height: 44, margin: "1px auto 0",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
-        background: "none", border: "none", padding: 0, cursor: "pointer",
-        color: active ? "#F97316" : "#9ca3af",
-        transition: "color 0.1s",
-        position: "relative",
-      }}
-      onMouseEnter={e => {
-        if (!active) {
-          e.currentTarget.style.color = "#374151";
-          const pill = e.currentTarget.querySelector(".nav-pill") as HTMLElement | null;
-          if (pill) pill.style.background = "rgba(0,0,0,0.05)";
-        }
-      }}
-      onMouseLeave={e => {
-        if (!active) {
-          e.currentTarget.style.color = "#9ca3af";
-          const pill = e.currentTarget.querySelector(".nav-pill") as HTMLElement | null;
-          if (pill) pill.style.background = "transparent";
-        }
-      }}
-    >
-      {/* Active/hover pill */}
-      <span className="nav-pill" style={{
-        position: "absolute", inset: "4px 6px", borderRadius: 10, pointerEvents: "none",
-        background: active ? "rgba(249,115,22,0.10)" : "transparent",
-        transition: "background 0.1s",
-      }} />
-      {/* 2026-05-10: tier items render the seconds badge AS the icon.
-          2026-05-14 (CJ「收合後 30s/60s/99s 識別度低」): rendered as a
-          coloured rounded chip (not bare text) so it reads as a button
-          and the tier number stands out. */}
-      {item.tierBadge ? (
-        <span style={{
-          width: 30, height: 22, borderRadius: 6,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 11, fontWeight: 700, letterSpacing: "-0.02em",
+    <>
+      <button
+        ref={buttonRef}
+        onClick={onClick}
+        aria-label={item.label}
+        style={{
+          width: 64, height: 44, margin: "1px auto 0",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          background: "none", border: "none", padding: 0, cursor: "pointer",
+          color: active ? "#F97316" : "#9ca3af",
+          transition: "color 0.1s",
           position: "relative",
-          color: active ? "white" : "#7C3AED",
-          background: active ? "rgb(249,115,22)" : "rgba(124,58,237,0.10)",
-          border: active ? "none" : "1px solid rgba(124,58,237,0.20)",
-          transition: "background 0.12s, color 0.12s",
+        }}
+        onMouseEnter={e => {
+          if (buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setTooltipTop(rect.top + rect.height / 2);
+          }
+          setHovered(true);
+          if (!active) {
+            e.currentTarget.style.color = "#374151";
+            const pill = e.currentTarget.querySelector(".nav-pill") as HTMLElement | null;
+            if (pill) pill.style.background = "rgba(0,0,0,0.05)";
+          }
+        }}
+        onMouseLeave={e => {
+          setHovered(false);
+          if (!active) {
+            e.currentTarget.style.color = "#9ca3af";
+            const pill = e.currentTarget.querySelector(".nav-pill") as HTMLElement | null;
+            if (pill) pill.style.background = "transparent";
+          }
+        }}
+      >
+        {/* Active/hover pill */}
+        <span className="nav-pill" style={{
+          position: "absolute", inset: "4px 6px", borderRadius: 10, pointerEvents: "none",
+          background: active ? "rgba(249,115,22,0.10)" : "transparent",
+          transition: "background 0.1s",
+        }} />
+        {/* 2026-05-10: tier items render the seconds badge AS the icon.
+            2026-05-14 (CJ「收合後 30s/60s/99s 識別度低」): rendered as a
+            coloured rounded chip (not bare text) so it reads as a button
+            and the tier number stands out. */}
+        {item.tierBadge ? (
+          <span style={{
+            width: 30, height: 22, borderRadius: 6,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, fontWeight: 700, letterSpacing: "-0.02em",
+            position: "relative",
+            color: active ? "white" : "#7C3AED",
+            background: active ? "rgb(249,115,22)" : "rgba(124,58,237,0.10)",
+            border: active ? "none" : "1px solid rgba(124,58,237,0.20)",
+            transition: "background 0.12s, color 0.12s",
+          }}>
+            {item.tierBadge}
+          </span>
+        ) : (
+          <span style={{
+            width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18, position: "relative",
+          }}>
+            {item.icon}
+          </span>
+        )}
+      </button>
+      {/* Hover tooltip — rendered via portal so it escapes any overflow:hidden container */}
+      {hovered && createPortal(
+        <div style={{
+          position: "fixed",
+          left: ICON_W + 10,
+          top: tooltipTop,
+          transform: "translateY(-50%)",
+          background: "#1f2937",
+          color: "white",
+          fontSize: 12,
+          fontWeight: 500,
+          padding: "5px 12px",
+          borderRadius: 7,
+          pointerEvents: "none",
+          zIndex: 9999,
+          whiteSpace: "nowrap",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+          letterSpacing: "0.01em",
         }}>
-          {item.tierBadge}
-        </span>
-      ) : (
-        <span style={{
-          width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 18, position: "relative",
-        }}>
-          {item.icon}
-        </span>
+          {item.label}
+        </div>,
+        document.body
       )}
-      <span style={{ fontSize: 10, fontWeight: active ? 600 : 500, textAlign: "center", position: "relative", lineHeight: 1.1 }}>
-        {item.label}
-      </span>
-    </button>
+    </>
   );
 }
 
