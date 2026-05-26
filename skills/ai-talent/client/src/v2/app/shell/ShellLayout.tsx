@@ -433,7 +433,7 @@ function IconBar({
           as horizontal hierarchy bar (BrandHierarchyPill in main layout) */}
 
       {/* Nav icons */}
-      <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px" }}>
+      <nav style={{ flex: 1, overflowY: "hidden", overflowX: "hidden", padding: "0 3px" }}>
         {NAV_ITEMS.map((item) => {
           // 2026-05-12 (CJ「按了連結還是顯示為品牌區」): pick the MOST SPECIFIC
           // matching item. If another nav item has a longer matching prefix,
@@ -1219,7 +1219,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
       aria-label={item.label}
       title={item.tooltip ?? item.label}
       style={{
-        width: 64, height: 52, margin: "2px auto 0",
+        width: 64, height: 44, margin: "1px auto 0",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
         background: "none", border: "none", padding: 0, cursor: "pointer",
         color: active ? "#F97316" : "#9ca3af",
@@ -1272,7 +1272,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
           {item.icon}
         </span>
       )}
-      <span style={{ fontSize: 12, fontWeight: active ? 600 : 500, textAlign: "center", position: "relative" }}>
+      <span style={{ fontSize: 10, fontWeight: active ? 600 : 500, textAlign: "center", position: "relative", lineHeight: 1.1 }}>
         {item.label}
       </span>
     </button>
