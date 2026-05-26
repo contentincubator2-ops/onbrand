@@ -44,6 +44,7 @@ import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
+import { resumeInterruptedPositioningJobs } from "./_core/positioningJobRunner";
 import { computeMissionResources } from "./missionResourceComputer";
 
 const app = express();
@@ -583,6 +584,9 @@ const server = app.listen(PORT, async () => {
   if (recovered > 0) {
     console.log(`[server] recovered ${recovered} billing records from fallback log`);
   }
+  // STAB-4: Re-queue any positioning jobs that were in-flight when pm2
+  // was last restarted (status='pending'|'running' but no process running them).
+  resumeInterruptedPositioningJobs();
   // Backfill mission resources for existing missions (fire-and-forget)
   backfillMissionResources();
 });

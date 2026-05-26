@@ -194,6 +194,89 @@ export function startPositioningJob(args: {
   setImmediate(() => runPipelineDetached(args).finally(() => activeJobs.delete(k)));
 }
 
+/**
+ * Call once at server startup. Scans positioning_jobs for any rows with
+ * status='pending' or status='running' (i.e. the in-process setImmediate
+ * pipeline was killed by a pm2 restart). Re-queues each one so they
+ * resume automatically without the user needing to click "re-analyze".
+ *
+ * Skips rows whose finishedAt is already set (should not exist for those
+ * statuses, but guards against data corruption).
+ *
+ * Does NOT crash the server if the DB is unavailable — failures are
+ * logged and swallowed so startup completes.
+ */
+export async function resumeInterruptedPositioningJobs(): Promise<void> {
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT pj.userId, pj.entityKind, pj.entityId, pj.totalSteps,
+              COALESCE(b.brandName, p.name, e.name) AS entityName,
+              b.industry                             AS brandIndustry,
+              p.positioning                          AS productPositioning
+         FROM positioning_jobs pj
+         LEFT JOIN brands   b ON pj.entityKind = 'brand'   AND b.id = pj.entityId AND b.userId   = pj.userId
+         LEFT JOIN products p ON pj.entityKind = 'product' AND p.id = pj.entityId AND p.userId   = pj.userId
+         LEFT JOIN events   e ON pj.entityKind = 'event'   AND e.id = pj.entityId AND e.userId   = pj.userId
+        WHERE pj.status IN ('pending', 'running')
+          AND pj.finishedAt IS NULL`,
+    );
+
+    const interrupted = rows as any[];
+    if (interrupted.length === 0) {
+      console.log("[positioningJobRunner] startup: no interrupted jobs found");
+      return;
+    }
+
+    console.log(`[positioningJobRunner] startup: resuming ${interrupted.length} interrupted job(s)`);
+
+    // Import step builders lazily to avoid circular-import issues at module load.
+    const { buildBrandPositioningSteps, buildProductPositioningSteps, buildEventPositioningSteps } =
+      await import("./positioningSteps");
+
+    for (const row of interrupted) {
+      const kind = String(row.entityKind) as EntityKind;
+      const entityId = Number(row.entityId);
+      const userId   = Number(row.userId);
+      const name     = String(row.entityName ?? "");
+
+      if (!name || !entityId || !userId) {
+        console.warn(`[positioningJobRunner] startup: skip orphan job (no entity row) kind=${kind} entityId=${entityId}`);
+        continue;
+      }
+
+      // Extract description from product's positioning JSON if present
+      let description: string | undefined;
+      if (kind === "product" && row.productPositioning) {
+        try {
+          const pos = typeof row.productPositioning === "string"
+            ? JSON.parse(row.productPositioning)
+            : row.productPositioning;
+          description = pos?.summary ?? pos?.description ?? undefined;
+        } catch { /* ignore */ }
+      }
+
+      const steps =
+        kind === "brand"   ? buildBrandPositioningSteps({ lang: "zh-TW" }) :
+        kind === "product" ? buildProductPositioningSteps({ lang: "zh-TW" }) :
+                             buildEventPositioningSteps({ lang: "zh-TW" });
+
+      console.log(`[positioningJobRunner] startup: re-queuing ${kind}:${entityId} "${name}"`);
+      startPositioningJob({
+        userId,
+        entityKind: kind,
+        entityId,
+        brandName: name,
+        industry: row.brandIndustry ?? undefined,
+        description,
+        steps,
+      });
+    }
+  } catch (err) {
+    // Non-fatal: startup recovery failure must not block the server.
+    console.error("[positioningJobRunner] startup: recovery scan failed:", (err as Error).message);
+  }
+}
+
 export async function getPositioningJob(entityKind: EntityKind, entityId: number, userId: number): Promise<{
   status: JobStatus;
   currentStep: number;
