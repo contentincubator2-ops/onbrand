@@ -115,6 +115,34 @@ app.use(cors({
 }));
 console.log(`[server] CORS origin: ${Array.isArray(corsOrigin) ? corsOrigin.join(",") : corsOrigin}`);
 app.use(cookieParser());
+
+// ⚠️  STRIPE WEBHOOK — must be registered BEFORE express.json().
+// body-parser marks the stream as consumed on first read (req._body = true).
+// If express.json() runs first it parses req.body into a JS object and marks
+// the stream consumed; express.raw() then skips → req.body is an object, not
+// a Buffer → stripe.webhooks.constructEvent() receives wrong bytes →
+// signature verification always fails → 400.
+// Mounting the raw route here ensures express.raw() wins the first-read race.
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json", limit: "2mb" }),
+  async (req, res) => {
+    try {
+      const signature = req.header("stripe-signature") ?? "";
+      const { handleStripeWebhook } = await import("./routers/stripeRouter");
+      const result = await handleStripeWebhook(req.body as Buffer, signature);
+      if (result.ok) {
+        res.status(200).json({ received: true });
+      } else {
+        res.status(400).json({ error: result.message ?? "webhook failed" });
+      }
+    } catch (e: any) {
+      console.error("[stripe.webhook] handler error:", e);
+      res.status(500).json({ error: "server error" });
+    }
+  },
+);
+
 // SEC-B-08 (2026-05-04): cap JSON body size. Per-field check below is the
 // real DoS protection; body limit just caps overall request size.
 // 2026-05-12: bumped 1MB → 50MB. OpenAI gpt-image-1 returns base64 PNG.
@@ -369,28 +397,7 @@ app.get("/health", healthLimiter, async (_req, res) => {
   });
 });
 
-// 2026-05-14 (CJ「我們使用 Stripe」): webhook endpoint needs the RAW body
-// (Buffer) for signature verification. Mount express.raw BEFORE the
-// global JSON parser so req.body stays a Buffer here.
-app.post(
-  "/api/stripe/webhook",
-  express.raw({ type: "application/json", limit: "2mb" }),
-  async (req, res) => {
-    try {
-      const signature = req.header("stripe-signature") ?? "";
-      const { handleStripeWebhook } = await import("./routers/stripeRouter");
-      const result = await handleStripeWebhook(req.body as Buffer, signature);
-      if (result.ok) {
-        res.status(200).json({ received: true });
-      } else {
-        res.status(400).json({ error: result.message ?? "webhook failed" });
-      }
-    } catch (e: any) {
-      console.error("[stripe.webhook] handler error:", e);
-      res.status(500).json({ error: "server error" });
-    }
-  },
-);
+// (Stripe webhook route moved above express.json() — see comment above)
 
 // Mount tRPC router
 app.use("/trpc", (req, res, next) => {
