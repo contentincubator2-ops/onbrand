@@ -38,32 +38,7 @@ jobs:
           echo "  PIPEDREAM_PROJECT_ID : $PIPEDREAM_PROJECT_ID"
 
           echo ""
-          echo "════════════════════════════════════════════════════"
-          echo "  2. Step 1 — Exchange client_credentials for access_token"
-          echo "════════════════════════════════════════════════════"
-
-          BASIC=$(echo -n "${PIPEDREAM_CLIENT_ID}:${PIPEDREAM_CLIENT_SECRET}" | base64 -w0)
-          HTTP_CODE=$(curl -s -o /tmp/pd_token.json -w "%{http_code}" \
-            -X POST \
-            -H "Authorization: Basic $BASIC" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "grant_type=client_credentials" \
-            "https://api.pipedream.com/v1/oauth/token" \
-          )
-
-          echo "  OAuth token endpoint HTTP: $HTTP_CODE"
-          cat /tmp/pd_token.json | python3 -m json.tool 2>/dev/null || cat /tmp/pd_token.json
-          echo ""
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Failed to get access token (HTTP $HTTP_CODE)"
-            echo "   Check PIPEDREAM_CLIENT_ID and PIPEDREAM_CLIENT_SECRET."
-            exit 1
-          fi
-
-          ACCESS_TOKEN=$(python3 -c "import json,sys; d=json.load(open('/tmp/pd_token.json')); print(d.get('access_token',''))")
-          echo "  access_token: ${ACCESS_TOKEN:0:12}... ✅"
-
+          
           echo ""
           echo "════════════════════════════════════════════════════"
           echo "  3. Step 2 — Mint a Connect user token"
@@ -72,7 +47,7 @@ jobs:
           PD_ENV="${PIPEDREAM_PROJECT_ENV:-production}"
           HTTP_CODE=$(curl -s -o /tmp/pd_resp.json -w "%{http_code}" \
             -X POST \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Authorization: Bearer $PIPEDREAM_CLIENT_SECRET" \
             -H "Content-Type: application/json" \
             -H "X-PD-Environment: $PD_ENV" \
             -d "{\"external_user_id\":\"probe-test-001\",\"project_id\":\"${PIPEDREAM_PROJECT_ID}\"}" \
