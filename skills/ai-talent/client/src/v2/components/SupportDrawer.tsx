@@ -153,7 +153,8 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
     if (a.kind === "navigate") {
       url = a.url;
     } else if (a.kind === "open_task") {
-      const base = a.tier === "30s" ? "/30s" : a.tier === "60s" ? "/60s" : "/99s";
+      // 2026-05-27: old tier routes removed; all tasks are now platform-first
+      const base = "/tasks/fb";
       url = a.topic ? `${base}?topic=${encodeURIComponent(a.topic)}` : base;
     }
     // 2026-05-15 (CJ「客服連結按下去沒跑到該頁面」): navigate FIRST,

@@ -554,7 +554,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
                   <button
                     onClick={() => {
-                      if (createdBrandId) navigate(`/30s?b=${createdBrandId}`);
+                      navigate(createdBrandId ? `/tasks/fb?b=${createdBrandId}` : "/tasks/fb");
                       handleFinish();
                     }}
                     style={{
@@ -565,35 +565,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                       display: "inline-flex", alignItems: "center", gap: 6,
                     }}
                   >
-                    {lang === "en" ? "Start 30s Single" : "開始 30s 單品"} <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (createdBrandId) navigate(`/b/${createdBrandId}/60s`);
-                      handleFinish();
-                    }}
-                    style={{
-                      padding: "10px 16px", fontSize: 13, fontWeight: 600,
-                      letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
-                      border: "1px solid #171717",
-                      background: "#FFFFFF", color: "#171717",
-                    }}
-                  >
-                    {lang === "en" ? "60s Pack" : "60s 套組"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (createdBrandId) navigate(`/b/${createdBrandId}/99s`);
-                      handleFinish();
-                    }}
-                    style={{
-                      padding: "10px 16px", fontSize: 13, fontWeight: 600,
-                      letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
-                      border: "1px solid #171717",
-                      background: "#FFFFFF", color: "#171717",
-                    }}
-                  >
-                    {lang === "en" ? "99s Slate" : "99s 檔期"}
+                    {lang === "en" ? "Start creating" : "開始創作"} <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
                   </button>
                   <button
                     onClick={() => {

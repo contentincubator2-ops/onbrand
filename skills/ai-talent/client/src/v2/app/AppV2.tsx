@@ -36,7 +36,6 @@ import ShellLayout from "./shell/ShellLayout";
 import MissionRedirect from "./MissionRedirect";
 import ProjectsPage from "../pages/ProjectsPage";
 import BrandsPage from "../pages/BrandsPage";
-import QuickTask30sPage from "../pages/QuickTask30sPage";
 import RunPage from "../pages/RunPage";
 import StrategyConsultantPage from "../pages/StrategyConsultantPage";
 import TheaterPage from "../pages/TheaterPage";
@@ -194,7 +193,7 @@ export default function AppV2() {
 
         {/* 2026-05-16 (CJ「主打品牌定位鎖定」): public marketing landing
             at /. Cold traffic used to hit /auth/login directly (funnel
-            leak). LandingPage self-redirects authed users to /30s. */}
+            leak). LandingPage self-redirects authed users to /theater. */}
         <Route path="/" element={<LandingPage />} />
 
         {/* 2026-05-10: Public legal + pricing pages (no auth required so
@@ -222,28 +221,10 @@ export default function AppV2() {
             </RequireAuthV2>
           }
         >
-          {/* 2026-05-05 pivot: 快派 (QuickTask) is now the main entry.
-              Current MissionsHome moved to /squads; /quicktask kept as
-              alias so any existing links still work. */}
-          {/* 2026-05-05 pivot v2: tier = top-level route. 30S/60S/90S are
-              siblings, each rendering QuickTask30sPage with a different
-              tier prop. / redirects to /30s. */}
-          {/* 2026-05-16: public LandingPage now owns "/" and self-redirects
-              authed users to /30s, so the old protected "/"→/30s Navigate
-              was removed (two routes for "/" is ambiguous in v6). */}
           {/* 2026-05-26 (CJ「左欄改成平台優先」): platform-first routes.
-              /tasks/:platform renders PlatformTaskPage with tier tabs inside.
-              Old tier routes kept as redirects for backward-compat. */}
+              /tasks/:platform renders PlatformTaskPage with tier tabs inside. */}
           <Route path="/tasks" element={<Navigate to="/tasks/fb" replace />} />
           <Route path="/tasks/:platform" element={<PlatformTaskPage />} />
-          {/* Keep old tier routes alive — redirect to FB platform page */}
-          <Route path="/30s" element={<Navigate to="/tasks/fb" replace />} />
-          <Route path="/60s" element={<Navigate to="/tasks/fb" replace />} />
-          <Route path="/99s" element={<Navigate to="/tasks/fb" replace />} />
-          <Route path="/100s" element={<Navigate to="/tasks/fb" replace />} />
-          <Route path="/90s"  element={<Navigate to="/tasks/fb" replace />} />
-          <Route path="/quicktask" element={<Navigate to="/tasks/fb" replace />} />
-          <Route path="/fb" element={<Navigate to="/tasks/fb" replace />} />
           {/* 2026-05-09 (CJ): Phase 2 route-based output workspace.
               Replaces modal-based viewing for 60s/100s tasks. URL is
               shareable, browser back works, can multi-tab compare. */}
