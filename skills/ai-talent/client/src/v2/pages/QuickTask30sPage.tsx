@@ -948,9 +948,16 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   // we can prompt the user to fill them on first task run. Without
   // voice / banned_words / preferred_terms etc., the AI has no real
   // grounding for tone — first-time output ends up generic.
+  // 2026-05-26 (CJ「chips 顯示 SoWork 但生成用到勝選通」):
+  // handleRun 送 productId/eventId 給 server，但這裡寫死 null → chips 只讀
+  // 品牌層資料，跟實際 generation 不一致。改成跟 generation 一樣傳 scope。
   const scopeActiveQuery = (trpc as any).scope?.active?.useQuery?.(
-    { brandId: brandId ?? 0, productId: null, eventId: null },
-    { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 60_000 },
+    {
+      brandId: brandId ?? 0,
+      productId: ctx?.scope?.productId ?? null,
+      eventId:  ctx?.scope?.eventId  ?? null,
+    },
+    { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 15_000 },
   );
   const brandAssetsForCheck: Record<string, any> =
     ((scopeActiveQuery?.data as any)?.brand?.positioning?._assets ?? {}) as Record<string, any>;
@@ -992,12 +999,27 @@ function QuickTask30sPageInner({ tier = "30s" }: { tier?: Tier }) {
   const brandCtx = useMemo(() => {
     const data: any = scopeActiveQuery?.data;
     if (!data?.brand) return null;
+    // 2026-05-26: when product/event scope is active, overlay their
+    // positioning on the brand so chips reflect what the server actually uses.
+    const basePositioning = data.brand.positioning ?? {};
+    const productPositioning = data.product?.positioning ?? {};
+    const eventPositioning  = data.event?.positioning  ?? {};
+    const overlayPositioning = Object.keys(productPositioning).length > 0
+      ? { ...basePositioning, ...productPositioning }
+      : Object.keys(eventPositioning).length > 0
+        ? { ...basePositioning, ...eventPositioning }
+        : basePositioning;
+    // Also surface the product/event name as brand.name so the header
+    // says "勝選通" instead of "SoWork".
+    const displayName =
+      (data.product?.name ?? null) ||
+      (data.event?.name  ?? null)  ||
+      (data.brand?.name  ?? null);
     return {
       brand: {
         ...data.brand,
-        // Normalise common aliases — positioning JSON sometimes lives under
-        // .positioning, sometimes loose at top level; expose both.
-        positioning: data.brand.positioning ?? {},
+        name: displayName,
+        positioning: overlayPositioning,
       },
       product: data.product ?? null,
       event: data.event ?? null,
