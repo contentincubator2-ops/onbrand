@@ -45,6 +45,7 @@ import { appRouter } from "./routers";
 import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
 import { resumeInterruptedPositioningJobs } from "./_core/positioningJobRunner";
+import { runStartupCleanup } from "./_core/startupCleanup";
 import { computeMissionResources } from "./missionResourceComputer";
 
 const app = express();
@@ -587,6 +588,9 @@ const server = app.listen(PORT, async () => {
   // STAB-4: Re-queue any positioning jobs that were in-flight when pm2
   // was last restarted (status='pending'|'running' but no process running them).
   resumeInterruptedPositioningJobs();
+  // STAB-5: Mark stuck squad_sessions and project_sync_jobs rows as failed
+  // so users see an error + retry button instead of a frozen spinner.
+  runStartupCleanup();
   // Backfill mission resources for existing missions (fire-and-forget)
   backfillMissionResources();
 });
