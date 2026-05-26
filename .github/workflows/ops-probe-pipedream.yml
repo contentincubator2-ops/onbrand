@@ -1,7 +1,7 @@
 name: Ops — Probe Pipedream Connect API
 
-# Verify that PIPEDREAM_CLIENT_ID + PIPEDREAM_CLIENT_SECRET + PIPEDREAM_PROJECT_ID
-# on the VM can successfully call the Pipedream Connect /tokens endpoint.
+# Verify that the PIPEDREAM_CLIENT_ID + PIPEDREAM_CLIENT_SECRET on the VM
+# can successfully call the Pipedream Connect /tokens endpoint.
 # Run after admin-write-pipedream-env.yml to confirm everything is wired.
 
 on:
@@ -19,18 +19,18 @@ jobs:
           ENV=$AI/.env
           set -a; source "$ENV" 2>/dev/null; set +a
 
-          echo "════════════════════════════════════════════════════"
+          echo "========================================================"
           echo "  1. Env check"
-          echo "════════════════════════════════════════════════════"
+          echo "========================================================"
 
           if [ -z "$PIPEDREAM_CLIENT_ID" ]; then
-            echo "❌ PIPEDREAM_CLIENT_ID is empty in .env"; exit 1
+            echo "PIPEDREAM_CLIENT_ID is empty in .env"; exit 1
           fi
           if [ -z "$PIPEDREAM_CLIENT_SECRET" ]; then
-            echo "❌ PIPEDREAM_CLIENT_SECRET is empty in .env"; exit 1
+            echo "PIPEDREAM_CLIENT_SECRET is empty in .env"; exit 1
           fi
           if [ -z "$PIPEDREAM_PROJECT_ID" ]; then
-            echo "❌ PIPEDREAM_PROJECT_ID is empty in .env"; exit 1
+            echo "PIPEDREAM_PROJECT_ID is empty in .env"; exit 1
           fi
 
           echo "  PIPEDREAM_CLIENT_ID    : ${PIPEDREAM_CLIENT_ID:0:10}... (${#PIPEDREAM_CLIENT_ID} chars)"
@@ -38,36 +38,55 @@ jobs:
           echo "  PIPEDREAM_PROJECT_ID   : $PIPEDREAM_PROJECT_ID"
 
           echo ""
-          echo "════════════════════════════════════════════════════"
-          echo "  2. POST /v1/connect/tokens (Basic Auth: pub_:sec_)"
-          echo "════════════════════════════════════════════════════"
 
-          BASIC=$(echo -n "${PIPEDREAM_CLIENT_ID}:${PIPEDREAM_CLIENT_SECRET}" | base64 -w0)
-          PD_ENV="${PIPEDREAM_PROJECT_ENV:-production}"
+          echo "========================================================"
+          echo "  2. Step 1 - Exchange OAuth credentials for token"
+          echo "========================================================"
 
-          HTTP_CODE=$(curl -s -o /tmp/pd_resp.json -w "%{http_code}" \
+          OAUTH_RESP=$(curl -s -o /tmp/pd_oauth.json -w "%{http_code}" \
             -X POST \
-            -H "Authorization: Basic $BASIC" \
             -H "Content-Type: application/json" \
-            -H "X-PD-Environment: $PD_ENV" \
-            -d "{\"external_user_id\":\"probe-test-001\",\"project_id\":\"${PIPEDREAM_PROJECT_ID}\"}" \
-            "https://api.pipedream.com/v1/connect/tokens" \
+            -d "{\"grant_type\":\"client_credentials\",\"client_id\":\"$PIPEDREAM_CLIENT_ID\",\"client_secret\":\"$PIPEDREAM_CLIENT_SECRET\"}" \
+            "https://api.pipedream.com/v1/oauth/token" \
           )
 
-          echo "  HTTP status: $HTTP_CODE"
+          echo "  OAuth HTTP: $OAUTH_RESP"
+          cat /tmp/pd_oauth.json | python3 -m json.tool 2>/dev/null || cat /tmp/pd_oauth.json
+          echo ""
+
+          if [ "$OAUTH_RESP" != "200" ]; then
+            echo "OAuth token exchange failed HTTP $OAUTH_RESP"; exit 1
+          fi
+
+          ACCESS_TOKEN=$(python3 -c "import json; print(json.load(open('/tmp/pd_oauth.json'))['access_token'])")
+          echo "  Got access token: ${ACCESS_TOKEN:0:10}... (${#ACCESS_TOKEN} chars)"
+          echo ""
+
+          echo "========================================================"
+          echo "  3. Step 2 - Mint a Connect user token"
+          echo "========================================================"
+
+          PD_ENV="${PIPEDREAM_PROJECT_ENV:-production}"
+          HTTP_CODE=$(curl -s -o /tmp/pd_resp.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "X-PD-Environment: $PD_ENV" \
+            -d "{\"external_user_id\":\"probe-test-001\"}" \
+            "https://api.pipedream.com/v1/connect/$PIPEDREAM_PROJECT_ID/tokens" \
+          )
+
+          echo "  Connect /tokens HTTP: $HTTP_CODE"
           cat /tmp/pd_resp.json | python3 -m json.tool 2>/dev/null || cat /tmp/pd_resp.json
           echo ""
 
           if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
             echo "✅ Pipedream Connect API: fully operational"
-            echo "   Connect token minted — Facebook authorization flow should work."
+            echo "   Both OAuth token exchange and Connect token mint succeeded."
           elif [ "$HTTP_CODE" = "401" ]; then
-            echo "❌ 401 Unauthorized — PIPEDREAM_CLIENT_ID or CLIENT_SECRET is wrong."
-            exit 1
+            echo "401 on Connect /tokens - access_token rejected"; exit 1
           elif [ "$HTTP_CODE" = "404" ]; then
-            echo "❌ 404 — PIPEDREAM_PROJECT_ID ($PIPEDREAM_PROJECT_ID) not found."
-            exit 1
+            echo "404 - PIPEDREAM_PROJECT_ID not found"; exit 1
           else
-            echo "❌ Unexpected HTTP $HTTP_CODE"
-            exit 1
+            echo "Unexpected HTTP $HTTP_CODE on Connect /tokens"; exit 1
           fi
