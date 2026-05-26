@@ -154,24 +154,54 @@ export const publishRouter = router({
   getFacebookConnectUrl: protectedProcedure
     .input(z.object({}).optional())
     .mutation(async ({ ctx }) => {
-      const apiKey = (ENV as any).PIPEDREAM_API_KEY as string | undefined;
-      const projectId = (ENV as any).PIPEDREAM_PROJECT_ID as string | undefined;
-      if (!apiKey || !projectId) {
-        console.error("[publish.getFacebookConnectUrl] missing env: PIPEDREAM_API_KEY / PIPEDREAM_PROJECT_ID");
+      // 2026-05-26: migrated from PIPEDREAM_API_KEY (static, unsupported by
+      // Pipedream Connect) to OAuth client_credentials flow using
+      // PIPEDREAM_CLIENT_ID (pub_...) + PIPEDREAM_CLIENT_SECRET (sec_...).
+      // Same pattern as platformConnectRouter.getPipedreamToken().
+      const clientId     = process.env.PIPEDREAM_CLIENT_ID;
+      const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
+      const projectId    = process.env.PIPEDREAM_PROJECT_ID;
+      const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
+
+      if (!clientId || !clientSecret || !projectId) {
+        console.error("[publish.getFacebookConnectUrl] missing env: PIPEDREAM_CLIENT_ID / CLIENT_SECRET / PROJECT_ID");
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "Facebook 授權服務尚未啟用，請聯絡 sowork@sowork.ai。",
         });
       }
-      const resp = await fetch(`https://api.pipedream.com/v1/connect/${projectId}/tokens`, {
+
+      // Step 1: exchange client credentials for a short-lived access token
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      const tokenRes = await fetch("https://api.pipedream.com/v1/oauth/token", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
+          "Content-Type":  "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${basicAuth}`,
+        },
+        body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!tokenRes.ok) {
+        const t = await tokenRes.text();
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Pipedream OAuth error ${tokenRes.status}: ${t.slice(0, 200)}`,
+        });
+      }
+      const { access_token } = (await tokenRes.json()) as { access_token: string };
+
+      // Step 2: mint a Connect user token for the popup flow
+      const resp = await fetch(`https://api.pipedream.com/v1/connect/tokens`, {
+        method: "POST",
+        headers: {
+          "Authorization":   `Bearer ${access_token}`,
+          "Content-Type":    "application/json",
+          "X-PD-Environment": pdEnv,
         },
         body: JSON.stringify({
-          external_user_id: String(ctx.user.id),
-          allowed_origins: ["https://onbrand.sowork.ai", "https://marketing-os.sowork.ai"],
+          external_user_id: `sowork-${ctx.user.id}`,
+          project_id:       projectId,
         }),
         signal: AbortSignal.timeout(15_000),
       });
@@ -179,14 +209,15 @@ export const publishRouter = router({
         const t = await resp.text();
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Pipedream ${resp.status}: ${t.slice(0, 300)}`,
+          message: `Pipedream Connect ${resp.status}: ${t.slice(0, 300)}`,
         });
       }
       const data: any = await resp.json();
       // Frontend opens this URL → user OAuths Facebook → returns to our app.
       return {
         token: data.token,
-        connectUrl: data.connect_link_url ?? `https://pipedream.com/_static/connect.html?token=${data.token}&app=facebook_pages`,
+        connectUrl: data.connect_link_url
+          ?? `https://pipedream.com/_static/connect.html?token=${data.token}&app=facebook_pages`,
         expiresAt: data.expires_at ?? null,
       };
     }),
