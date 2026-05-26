@@ -171,32 +171,14 @@ export const publishRouter = router({
         });
       }
 
-      // Step 1: exchange client credentials for a short-lived access token
+      // 2026-05-26: Pipedream Connect API — Basic Auth (pub_:sec_) directly
+      // on /v1/connect/tokens. No intermediate /v1/oauth/token step.
       const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-      const tokenRes = await fetch("https://api.pipedream.com/v1/oauth/token", {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/x-www-form-urlencoded",
-          "Authorization": `Basic ${basicAuth}`,
-        },
-        body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!tokenRes.ok) {
-        const t = await tokenRes.text();
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `Pipedream OAuth error ${tokenRes.status}: ${t.slice(0, 200)}`,
-        });
-      }
-      const { access_token } = (await tokenRes.json()) as { access_token: string };
-
-      // Step 2: mint a Connect user token for the popup flow
       const resp = await fetch(`https://api.pipedream.com/v1/connect/tokens`, {
         method: "POST",
         headers: {
-          "Authorization":   `Bearer ${access_token}`,
-          "Content-Type":    "application/json",
+          "Authorization":    `Basic ${basicAuth}`,
+          "Content-Type":     "application/json",
           "X-PD-Environment": pdEnv,
         },
         body: JSON.stringify({

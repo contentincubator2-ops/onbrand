@@ -44,35 +44,14 @@ async function getPipedreamToken(externalUserId: string): Promise<{ token: strin
     });
   }
 
-  // Get OAuth2 bearer token from Pipedream.
-  // Pipedream follows RFC 6749 — token endpoint requires Basic Auth header
-  // (base64 of clientId:clientSecret) + form-urlencoded body, NOT JSON.
+  // 2026-05-26: Pipedream Connect API uses Basic Auth (pub_:sec_) directly
+  // on /v1/connect/tokens — no intermediate /v1/oauth/token step needed.
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-  const tokenRes = await fetch("https://api.pipedream.com/v1/oauth/token", {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/x-www-form-urlencoded",
-      "Authorization": `Basic ${basicAuth}`,
-    },
-    body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
-  });
-
-  if (!tokenRes.ok) {
-    const text = await tokenRes.text();
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `Pipedream OAuth token error ${tokenRes.status}: ${text.slice(0, 200)}`,
-    });
-  }
-
-  const { access_token } = (await tokenRes.json()) as { access_token: string };
-
-  // Issue a Connect user token
   const connectRes = await fetch(`${PD_API}/tokens`, {
     method: "POST",
     headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${access_token}`,
+      "Content-Type":    "application/json",
+      "Authorization":   `Basic ${basicAuth}`,
       "X-PD-Environment": env,
     },
     body: JSON.stringify({
