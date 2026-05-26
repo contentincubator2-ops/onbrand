@@ -1,0 +1,77 @@
+name: Ops — Probe Pipedream Connect API
+
+# Verify that the PIPEDREAM_API_KEY + PIPEDREAM_PROJECT_ID on the VM
+# can successfully call the Pipedream Connect /tokens endpoint.
+# Run after admin-write-pipedream-env.yml to confirm everything is wired.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-marketing-os]
+    timeout-minutes: 3
+    steps:
+      - name: Probe Pipedream Connect credentials
+        run: |
+          set -e
+          AI=/opt/onbrand/app/skills/ai-talent
+          ENV=$AI/.env
+          set -a; source "$ENV" 2>/dev/null; set +a
+
+          echo "════════════════════════════════════════════════════"
+          echo "  1. Env check"
+          echo "════════════════════════════════════════════════════"
+
+          if [ -z "$PIPEDREAM_API_KEY" ]; then
+            echo "❌ PIPEDREAM_API_KEY is empty in .env"; exit 1
+          fi
+          if [ -z "$PIPEDREAM_PROJECT_ID" ]; then
+            echo "❌ PIPEDREAM_PROJECT_ID is empty in .env"; exit 1
+          fi
+
+          KEY_LEN=${#PIPEDREAM_API_KEY}
+          echo "  PIPEDREAM_API_KEY   : ${PIPEDREAM_API_KEY:0:6}... (${KEY_LEN} chars)"
+          echo "  PIPEDREAM_PROJECT_ID: $PIPEDREAM_PROJECT_ID"
+
+          # Warn if key doesn't look like a Pipedream project key (pdk_...)
+          if [[ "$PIPEDREAM_API_KEY" != pdk_* ]]; then
+            echo ""
+            echo "⚠️  Warning: PIPEDREAM_API_KEY does not start with 'pdk_'"
+            echo "   Pipedream Connect project keys usually begin with 'pdk_'."
+            echo "   This may be a workspace API key or legacy format — continuing probe..."
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  2. Call POST /v1/connect/{projectId}/tokens"
+          echo "════════════════════════════════════════════════════"
+
+          HTTP_CODE=$(curl -s -o /tmp/pd_resp.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $PIPEDREAM_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"external_user_id":"probe-test-001","allowed_origins":["https://onbrand.sowork.ai"]}' \
+            "https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/tokens" \
+          )
+
+          echo "  HTTP status: $HTTP_CODE"
+          echo "  Response body:"
+          cat /tmp/pd_resp.json | python3 -m json.tool 2>/dev/null || cat /tmp/pd_resp.json
+          echo ""
+
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "✅ Pipedream Connect API: OK (HTTP $HTTP_CODE)"
+            echo "   Token issued — Facebook authorization flow should work."
+          elif [ "$HTTP_CODE" = "401" ]; then
+            echo "❌ 401 Unauthorized — PIPEDREAM_API_KEY is wrong or expired."
+            echo "   Go to pipedream.com → Settings → API Keys → create a key starting with 'pdk_'"
+            exit 1
+          elif [ "$HTTP_CODE" = "404" ]; then
+            echo "❌ 404 Not Found — PIPEDREAM_PROJECT_ID ($PIPEDREAM_PROJECT_ID) may be wrong."
+            echo "   Check the project URL in Pipedream dashboard."
+            exit 1
+          else
+            echo "❌ Unexpected HTTP $HTTP_CODE"
+            exit 1
+          fi
