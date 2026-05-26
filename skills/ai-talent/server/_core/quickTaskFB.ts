@@ -141,8 +141,8 @@ export const FB_30S_TASKS: FBTaskTemplate[] = [
     id: "fb-30-caption-short",
     tier: "30s",
     postType: "feed",
-    label: "FB 短貼文 caption",
-    description: "100-200 字單張圖文 caption，含 1 句 hook + 1 個 CTA",
+    label: "FB 短貼文",
+    description: "100-200 字圖文貼文，含開場吸引句 + 行動呼籲",
     agent_id: 30020,              // Iris Yi — Social Media Manager (2001 char persona)
     skill_slug: "fb-copywriting",
     primary_question: "今天這篇貼文要講什麼？可以貼網址（會自動讀取）、原文、或主題描述",
@@ -162,8 +162,8 @@ ${FB_TONE_SUFFIX}
     id: "fb-30-pure-text-hook",
     tier: "30s",
     postType: "feed",
-    label: "FB 純文字 hook 3 種",
-    description: "3 種不同口吻的開場 hook，自動接上你原本的貼文內容",
+    label: "FB 純文字開場句 3 種",
+    description: "3 種不同口吻的開場句，自動接上你原本的貼文內容",
     agent_id: 224079,             // Kavitha Nair — Social Media Strategist (1191 char)
     skill_slug: "hook-writing",
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會幫你寫 5 種不同口吻的開場接上去",
@@ -196,7 +196,7 @@ ${FB_TONE_SUFFIX}`,
     id: "fb-30-link-caption",
     tier: "30s",
     postType: "feed",
-    label: "FB 連結貼文 caption",
+    label: "FB 連結貼文",
     description: "分享網址時的引言文（含 OG 預覽期待）",
     agent_id: 60021,              // Tina Ji — Facebook/Instagram Social Copywriter
     skill_slug: "social-copy",
@@ -225,7 +225,7 @@ ${FB_TONE_SUFFIX}`,
     primary_input: { key: "user_comment", placeholder: "用戶說了什麼？整段留言貼進來", type: "textarea" },
     inputs: [
       { key: "user_comment", label: "用戶留言", type: "textarea", required: true },
-      { key: "tone", label: "回覆口吻（warm / professional / playful）", type: "text", required: false, placeholder: "warm" },
+      { key: "tone", label: "回覆口吻（溫暖 / 專業 / 活潑）", type: "text", required: false, placeholder: "warm" },
     ],
     systemPrompt: `產出 FB 商家對用戶留言的回覆（30-80 字）。
 規則：先呼應對方訊息 → 再給 1 個有溫度的小細節 → 結尾留「下次再聊」式邀請而非結束。

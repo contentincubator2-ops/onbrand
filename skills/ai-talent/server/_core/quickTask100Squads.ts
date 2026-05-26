@@ -134,7 +134,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "fb-kennedy-magnetic",
     platform: "facebook", postType: "feed",
     label: "FB 把自己變磁鐵：吸客貼文",
-    description: "讓對的人主動找上你：精準定位、強烈訴求、明確 CTA",
+    description: "讓對的人主動找上你：精準定位、強烈訴求、明確行動呼籲",
     methodology: "Kennedy Magnetic Marketing",
     primary_question: "你最想吸引的是哪種人？他們現在最大的痛點或渴望是什麼？",
     primary_input: {
