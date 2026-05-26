@@ -52,16 +52,60 @@ interface PlatformMeta {
   bg: string;
   heroZh: string;
   heroEn: string;
+  subZh: string;
+  subEn: string;
 }
 
 const PLATFORM_META: Record<string, PlatformMeta> = {
-  facebook:  { label: "Facebook",   labelZh: "Facebook",   icon: faFacebookF,  bg: "#1877F2", heroZh: "今天想在 Facebook 發什麼？",   heroEn: "What are we making for Facebook today?" },
-  instagram: { label: "Instagram",  labelZh: "Instagram",  icon: faInstagram,  bg: "#E4405F", heroZh: "今天想在 Instagram 發什麼？",  heroEn: "What are we making for Instagram today?" },
-  linkedin:  { label: "LinkedIn",   labelZh: "LinkedIn",   icon: faLinkedinIn, bg: "#0A66C2", heroZh: "今天想在 LinkedIn 發什麼？",   heroEn: "What are we making for LinkedIn today?" },
-  youtube:   { label: "YouTube",    labelZh: "YouTube",    icon: faYoutube,    bg: "#FF0000", heroZh: "今天想在 YouTube 發什麼？",    heroEn: "What are we making for YouTube today?" },
-  tiktok:    { label: "TikTok",     labelZh: "TikTok",     icon: faTiktok,     bg: "#010101", heroZh: "今天想在 TikTok 發什麼？",     heroEn: "What are we making for TikTok today?" },
-  email:     { label: "Newsletter", labelZh: "電子報",     icon: faEnvelope,   bg: "#7B5BC8", heroZh: "今天想寫什麼電子報？",         heroEn: "What email are we writing today?" },
-  pr:        { label: "PR",         labelZh: "新聞稿",     icon: faBullhorn,   bg: "#475569", heroZh: "今天想發什麼新聞稿？",         heroEn: "What press material are we making today?" },
+  facebook: {
+    label: "Facebook", labelZh: "Facebook", icon: faFacebookF, bg: "#1877F2",
+    heroZh: "讓每篇 Facebook 貼文，都有爆款的骨架",
+    heroEn: "Every post built on a viral framework — not blank-page guessing",
+    subZh: "Clio 獲獎敘事公式 × 品牌定位鎖定，自然引發互動",
+    subEn: "Award-winning narrative structures, locked to your brand voice",
+  },
+  instagram: {
+    label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#E4405F",
+    heroZh: "文案 × 視覺指令同步產出，不再是漂亮圖片配隨便文字",
+    heroEn: "Caption and visual brief generated together — not pasted separately",
+    subZh: "文案代理人 + 圖片指導代理人協作，輸出比競品深一層",
+    subEn: "Caption agent + image director agent working in sync",
+  },
+  linkedin: {
+    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedinIn, bg: "#0A66C2",
+    heroZh: "不只是發文，是在 LinkedIn 建立你的專業話語權",
+    heroEn: "Thought leadership that generates real business — not just impressions",
+    subZh: "PR Strategist 代理人以記者邏輯構建你的觀點",
+    subEn: "PR Strategist agent thinks in journalist psychology and B2B conversion",
+  },
+  youtube: {
+    label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#FF0000",
+    heroZh: "標題、章節、縮圖文案、結尾鉤子 — YouTube 影片完整佈局",
+    heroEn: "Title · chapters · thumbnail brief · end hook — all in one run",
+    subZh: "Strategist 規劃敘事弧，再由文案代理人完成每一段腳本",
+    subEn: "Strategist maps the narrative arc; writer handles every segment",
+  },
+  tiktok: {
+    label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#EE1D52",
+    heroZh: "前 3 秒留人，後 60 秒轉化 — TikTok 腳本不靠靈感",
+    heroEn: "Hook in 3 seconds, convert in 60 — scripts built for retention",
+    subZh: "TikTok 專屬代理人以角色弧度 × 未解懸念設計驅動完播率",
+    subEn: "TikTok-specialized agent that thinks in character arcs and unresolved tension",
+  },
+  email: {
+    label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#7B5BC8",
+    heroZh: "每封電子報都是品牌聲音的延伸，不是隨機發文",
+    heroEn: "Every newsletter sounds exactly like you — not like a template",
+    subZh: "品牌定位鎖定主旨行、開場鉤子與 CTA，完整結構一次產出",
+    subEn: "Brand voice locks the subject line, opener, and CTA — zero drift",
+  },
+  pr: {
+    label: "PR", labelZh: "新聞稿", icon: faBullhorn, bg: "#475569",
+    heroZh: "讓媒體真正想報導你 — 不是寫稿，是設計新聞角度",
+    heroEn: "Designed to be covered — not written to fill a checklist",
+    subZh: "PR Strategist 代理人以記者視角找到新聞價值，再產出完整稿件",
+    subEn: "PR Strategist agent finds the news angle before writing a single word",
+  },
 };
 
 // ── Shared utilities ─────────────────────────────────────────────────────────
@@ -572,31 +616,32 @@ function PlatformTaskPageInner() {
             </p>
           </div>
 
-          {/* Hero title */}
+          {/* Hero title — plain color (no gradient-text; gradient clip is unreliable cross-browser) */}
           <h1
-            className="font-semibold tracking-tight leading-tight mb-3"
+            className="font-bold tracking-tight leading-tight mb-2"
             style={{
-              fontSize: "clamp(1.5rem, 3vw, 2.1rem)",
-              background: `linear-gradient(135deg, ${meta.bg} 0%, #7c3aed 100%)`,
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
+              fontSize: "clamp(1.45rem, 2.8vw, 2rem)",
+              color: "#0f0f0e",
             }}
           >
             {lang === "en" ? meta.heroEn : meta.heroZh}
           </h1>
 
-          {/* Brand subtitle */}
-          {brandId && (
-            <p
-              className="mb-4 text-default-500"
-              style={{ fontStyle: "italic", fontSize: 13, lineHeight: 1.6, maxWidth: 560 }}
-            >
-              {lang === "en"
-                ? `Using ${brandName ?? "your brand"}'s positioning as the spine.`
-                : `以 ${brandName ?? "你的品牌"} 的定位為骨架`}
-            </p>
-          )}
+          {/* Platform sub-headline — differentiation copy */}
+          <p
+            className="mb-3 text-default-500"
+            style={{ fontSize: 14, lineHeight: 1.65, maxWidth: 580 }}
+          >
+            <span style={{ color: meta.bg, fontWeight: 600 }}>▸ </span>
+            {lang === "en" ? meta.subEn : meta.subZh}
+            {brandId && (
+              <span style={{ fontStyle: "italic", color: "#9ca3af" }}>
+                {lang === "en"
+                  ? ` · Using ${brandName ?? "your brand"}'s positioning`
+                  : ` · 以 ${brandName ?? "你的品牌"} 定位為骨架`}
+              </span>
+            )}
+          </p>
 
           {/* Search */}
           <div className="w-full mb-5" style={{ maxWidth: 740 }}>
