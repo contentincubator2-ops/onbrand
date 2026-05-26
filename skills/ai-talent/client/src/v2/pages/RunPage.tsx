@@ -1172,8 +1172,8 @@ export default function RunPage() {
                 variant={{ ...effectiveVariant, label: `${effectiveVariant.label} · ${slide.label}` }}
                 title={data.title ?? ""}
                 brief={""}
-                brandName={data.brand?.name ?? ""}
-                brandLogoUrl={data.brand?.logoUrl ?? null}
+                brandName={(data as any).product?.name ?? data.brand?.name ?? ""}
+                brandLogoUrl={(data as any).product?.logoUrl ?? data.brand?.logoUrl ?? null}
                 liveCaption={slide.caption}
                 liveHashtags={slide.hashtags}
                 liveImageStyle={slide.imageStyle}

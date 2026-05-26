@@ -429,6 +429,24 @@ export const outputRouter = router({
       const rawTier: string | null = row.extracted_tier ?? md.tier ?? null;
       const taskId: string | null = rawTaskId ? normalizeTaskId(rawTaskId) : null;
       const tier: string | null = rawTier ? normalizeTier(rawTier) : null;
+
+      // 2026-05-26 (CJ「mockup 顯示 SoWork 不是勝選通」):
+      // productId is already stored in metadata by the orchestra. Look it up
+      // now so RunPage can display the product name in the mockup instead of
+      // the top-level brand name.
+      let product: { id: number; name: string; logoUrl: string | null } | null = null;
+      const metaProductId = md.productId ? Number(md.productId) : null;
+      if (metaProductId) {
+        try {
+          const [pRows]: any = await localPool.execute(
+            `SELECT id, name, logoUrl FROM products WHERE id = ? LIMIT 1`,
+            [metaProductId],
+          );
+          const pr = Array.isArray(pRows) ? pRows[0] : null;
+          if (pr?.name) product = { id: pr.id, name: pr.name, logoUrl: pr.logoUrl ?? null };
+        } catch { /* non-fatal — fall back to brand name */ }
+      }
+
       return {
         id: row.id,
         missionId: row.missionId,
@@ -464,6 +482,10 @@ export const outputRouter = router({
           logoUrl: row.brand_logo,
           industry: row.brand_industry,
         } : null,
+        // product is non-null when the task was run with a product scope.
+        // RunPage uses product.name / product.logoUrl for the mockup avatar
+        // so it shows 勝選通 instead of the parent brand (SoWork).
+        product,
       };
     }),
 
