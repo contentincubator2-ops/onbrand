@@ -335,30 +335,62 @@ function PlatformTaskPageInner() {
   // the brand's so context chips reflect the selected product/event, not
   // the parent brand. Use product/event name as the display name.
   //
-  // 2026-05-27 (CJ「勝選通 modal 還是顯示 SoWork 設定」): fix fallback.
-  // If a product/event scope is active but has NO positioning yet, we must NOT
-  // fall back to brand positioning — that causes the parent brand's chips
-  // (e.g. SoWork's archetypes/tone/WHY) to appear for the child product/event.
-  // Use an empty object instead, which renders chips as "尚未填寫".
+  // 2026-05-27 v2 (CJ「根治勝選通 modal 仍出現 SoWork」): two-level fix:
+  //
+  // A) Real-content check: `Object.keys(pos).length > 0` is insufficient because
+  //    the auto-trigger writes `positioning._interim = {...}` which makes the check
+  //    true even though no real segment data exists yet. We now check for non-"_"
+  //    keys with actual string/array content (mirrors BrandsPage hasAnyPositioningContent).
+  //
+  // B) Interim overlay: if a product/event has only interim data (no real segments),
+  //    use the interim sub-object as the overlay source — NOT the whole positioning
+  //    object which would just merge brand+_interim and still expose brand chips.
+  //
+  // C) Hard isolation: if product/event scope is active but NOTHING exists yet,
+  //    use {} so chips render as "尚未填寫" — never fall back to brand positioning.
   const brandCtx = useMemo(() => {
     const data: any = scopeActiveQuery?.data;
     if (!data?.brand) return null;
     const basePositioning    = data.brand.positioning    ?? {};
-    const productPositioning = data.product?.positioning ?? {};
-    const eventPositioning   = data.event?.positioning   ?? {};
+    const productPositioning = (data.product?.positioning ?? {}) as Record<string, any>;
+    const eventPositioning   = (data.event?.positioning   ?? {}) as Record<string, any>;
     const productScopeActive = !!(ctx?.scope?.productId);
     const eventScopeActive   = !!(ctx?.scope?.eventId);
+
+    /** Does a positioning object have real (non-internal) segment data? */
+    const posHasReal = (pos: Record<string, any>): boolean =>
+      Object.keys(pos).filter(k => !k.startsWith("_")).some(k => {
+        const v = pos[k];
+        if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+        return Object.values(v).some(fv =>
+          (typeof fv === "string" && (fv as string).trim().length > 0) ||
+          (Array.isArray(fv) && (fv as any[]).length > 0)
+        );
+      });
+
+    const productHasReal    = posHasReal(productPositioning);
+    const productInterim    = productPositioning._interim as Record<string, any> | undefined ?? {};
+    const productHasInterim = Object.keys(productInterim).length > 0;
+    const eventHasReal      = posHasReal(eventPositioning);
+    const eventInterim      = eventPositioning._interim as Record<string, any> | undefined ?? {};
+    const eventHasInterim   = Object.keys(eventInterim).length > 0;
+
+    // Overlay priority:
+    //   1. Product real segments → merge on base (full override)
+    //   2. Product interim only  → merge interim sub-object on base
+    //   3. Event real segments   → merge on base
+    //   4. Event interim only    → merge interim sub-object on base
+    //   5. product/event scope active but truly empty → {} (no brand fallback)
+    //   6. Brand scope           → brand positioning as-is
     const overlayPositioning =
-      Object.keys(productPositioning).length > 0
-        ? { ...basePositioning, ...productPositioning }
-      : Object.keys(eventPositioning).length > 0
-        ? { ...basePositioning, ...eventPositioning }
-      // Product/event scope active but no positioning data yet →
-      // use empty object so chips say "尚未填寫" instead of showing
-      // the parent brand's positioning (e.g. SoWork for 勝選通).
+      productHasReal    ? { ...basePositioning, ...productPositioning }
+      : productHasInterim ? { ...basePositioning, ...productInterim }
+      : eventHasReal    ? { ...basePositioning, ...eventPositioning }
+      : eventHasInterim ? { ...basePositioning, ...eventInterim }
       : (productScopeActive || eventScopeActive)
         ? {}
         : basePositioning;
+
     const displayName =
       data.product?.name ?? data.event?.name ?? data.brand?.name ?? null;
     return {
@@ -999,9 +1031,14 @@ function PlatformTaskPageInner() {
                   return (
                     <div className="mb-3 rounded-lg px-3 py-2.5" style={{ background: "#FAFAF9", border: "1px solid #171717" }}>
                       <p style={{ fontSize: 9, fontWeight: 700, color: "#525252", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 6 }}>
-                        {lang === "en"
-                          ? `Context · pulling these from ${brandName ?? "your brand"} for this task`
-                          : `Context · 我會用 ${brandName ?? "你的品牌"} 的這些資料來跑這個任務`}
+                        {(() => {
+                          // Use product/event name when scope is active;
+                          // fall back to parent brand name for brand scope.
+                          const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
+                          return lang === "en"
+                            ? `Context · pulling these from ${entityName} for this task`
+                            : `Context · 我會用 ${entityName} 的這些資料來跑這個任務`;
+                        })()}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {chips.filter((c: any) => c.hasContent).map((c: any, i: number) => (
