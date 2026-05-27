@@ -1089,11 +1089,12 @@ export default function BrandsPage() {
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
       {/* Settings sheet — opened by the gear icon in the header */}
+      {/* BUG-4 fix: always pass brand name (not scopeName which changes with product/event scope) */}
       <BrandSettingsSheet
         isOpen={settingsOpen}
         onClose={() => { setSettingsOpen(false); setOnboardingHint(undefined); }}
         brandId={activeBrandIdForLocks}
-        brandName={scopeName}
+        brandName={currentBrand?.name ?? null}
         initialTab={settingsInitialTab}
         onboardingHint={onboardingHint}
       />
