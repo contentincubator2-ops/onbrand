@@ -7,15 +7,18 @@
  * Sync image providers return ready immediately. Async video providers
  * return submitted + taskId; client polls media.checkJob.
  *
- * Generated assets are persisted to /opt/marketing-os/covers/
+ * Generated assets are persisted to /opt/onbrand/covers/
  * media-<id>.png (same dir as squad covers / agent avatars) and a
  * relative URL like /static/covers/media-<id>.png is returned.
+ *
+ * NOTE: default changed from /opt/marketing-os/covers → /opt/onbrand/covers
+ * on 2026-05-28 to reflect infra rename. Set COVERS_DIR env var to override.
  */
 
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
-const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/marketing-os/covers";
+const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
 mkdirSync(COVERS_DIR, { recursive: true });
 

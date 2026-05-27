@@ -1,0 +1,92 @@
+name: "Admin — Fix covers dir (migrate /opt/marketing-os → /opt/onbrand)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type APPLY to run the migration"
+        required: true
+        default: ""
+
+jobs:
+  fix-covers-dir:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    if: ${{ github.event.inputs.confirm == 'APPLY' }}
+    steps:
+      - name: "1 — Create /opt/onbrand/covers if missing"
+        run: |
+          mkdir -p /opt/onbrand/covers
+          echo "[covers] /opt/onbrand/covers exists: $(ls -ld /opt/onbrand/covers)"
+
+      - name: "2 — Migrate existing images from old path (if any)"
+        run: |
+          OLD=/opt/marketing-os/covers
+          NEW=/opt/onbrand/covers
+          if [ -d "$OLD" ]; then
+            COUNT=$(find "$OLD" -maxdepth 1 -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.webp" -o -name "*.mp4" \) | wc -l)
+            echo "[covers] Found $COUNT file(s) in $OLD — copying to $NEW"
+            if [ "$COUNT" -gt 0 ]; then
+              cp -n "$OLD"/*.png "$NEW"/ 2>/dev/null || true
+              cp -n "$OLD"/*.jpg "$NEW"/ 2>/dev/null || true
+              cp -n "$OLD"/*.webp "$NEW"/ 2>/dev/null || true
+              cp -n "$OLD"/*.mp4 "$NEW"/ 2>/dev/null || true
+              echo "[covers] Migration done. Files in $NEW:"
+              ls "$NEW" | tail -20
+            else
+              echo "[covers] No image files to migrate."
+            fi
+          else
+            echo "[covers] $OLD does not exist — nothing to migrate."
+          fi
+
+      - name: "3 — Ensure COVERS_DIR is set in .env"
+        run: |
+          ENV_FILE=/opt/onbrand/app/skills/ai-talent/.env
+          if grep -q "^COVERS_DIR=" "$ENV_FILE"; then
+            # Replace existing line
+            sed -i 's|^COVERS_DIR=.*|COVERS_DIR=/opt/onbrand/covers|' "$ENV_FILE"
+            echo "[env] Updated existing COVERS_DIR"
+          else
+            # Append
+            echo "COVERS_DIR=/opt/onbrand/covers" >> "$ENV_FILE"
+            echo "[env] Appended COVERS_DIR=/opt/onbrand/covers"
+          fi
+          echo "[env] Current COVERS_DIR line:"
+          grep "COVERS_DIR" "$ENV_FILE"
+
+      - name: "4 — Check PIAPI_KEY presence"
+        run: |
+          ENV_FILE=/opt/onbrand/app/skills/ai-talent/.env
+          if grep -q "^PIAPI_KEY=" "$ENV_FILE" || grep -q "^PIAPI_API_KEY=" "$ENV_FILE"; then
+            echo "[piapi] PIAPI key IS present in .env"
+            grep -E "^PIAPI_KEY=|^PIAPI_API_KEY=" "$ENV_FILE" | sed 's/=.*/=***REDACTED***/'
+          else
+            echo "[piapi] WARNING: PIAPI_KEY is NOT in .env"
+            echo "[piapi] Theater images will fall back to openai/gpt-image-1 (needs OPENAI_API_KEY)."
+            if grep -q "^OPENAI_API_KEY=" "$ENV_FILE"; then
+              echo "[piapi] OPENAI_API_KEY IS present — fallback will work."
+            else
+              echo "[piapi] OPENAI_API_KEY also missing! Theater image generation will fail completely."
+            fi
+          fi
+
+      - name: "5 — Restart pm2 to pick up new COVERS_DIR"
+        run: |
+          pm2 restart onbrand
+          sleep 3
+          pm2 status onbrand
+
+      - name: "6 — Smoke-test: verify /static/covers serves correctly"
+        run: |
+          # Write a test file and check Express can serve it
+          echo "test-$(date +%s)" > /opt/onbrand/covers/healthcheck.txt
+          sleep 1
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/static/covers/healthcheck.txt)
+          echo "[smoke] GET /static/covers/healthcheck.txt → HTTP $STATUS"
+          if [ "$STATUS" = "200" ]; then
+            echo "[smoke] ✅ /static/covers is serving correctly"
+            rm -f /opt/onbrand/covers/healthcheck.txt
+          else
+            echo "[smoke] ❌ Expected 200, got $STATUS — check Express static config"
+            exit 1
+          fi

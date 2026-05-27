@@ -106,6 +106,9 @@ interface CellState {
   structured?: Record<string, any>;
   caption?: string;
   imageUrl?: string | null;
+  /** true when image generation was attempted but failed (distinct from
+   *  imageUrl===null due to platform not requiring an image). */
+  imageError?: boolean;
   startedAt?: number;
   doneAt?: number;
 }
@@ -341,6 +344,14 @@ function PlatformCell({
               <Avatar src={imageDirAvatar ?? undefined} size="sm" className="w-8 h-8" />
               <Spinner size="sm" />
               <p className="text-[10px] text-neutral-600">{t("theater_image_dir_busy")}</p>
+            </div>
+          )}
+          {/* Image generation failed — show retry hint instead of empty space */}
+          {isDone && state.imageError && !state.imageUrl && (
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+              <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                ⚠️ {t("theater_image_failed")}
+              </span>
             </div>
           )}
           {isWriting && !caption && (
@@ -1088,14 +1099,15 @@ export default function TheaterPage() {
           );
           if (stopRef.current) return;
           if (r.ok && r.imageUrl) {
-            updateCell(task.key, { status: "done", imageUrl: r.imageUrl, doneAt: Date.now() });
+            updateCell(task.key, { status: "done", imageUrl: r.imageUrl, imageError: false, doneAt: Date.now() });
           } else {
-            // image failed → keep caption, mark as done with no image rather than failing the whole cell
-            updateCell(task.key, { status: "done", imageUrl: null, doneAt: Date.now() });
+            // image failed → keep caption, mark as done with imageError so UI can show retry hint
+            console.error("[theater] image failed:", task.key, (r as any).error);
+            updateCell(task.key, { status: "done", imageUrl: null, imageError: true, doneAt: Date.now() });
           }
         } catch (e) {
           console.error("[theater] image failed:", task.key, e);
-          updateCell(task.key, { status: "done", imageUrl: null, doneAt: Date.now() });
+          updateCell(task.key, { status: "done", imageUrl: null, imageError: true, doneAt: Date.now() });
         }
       }
     };

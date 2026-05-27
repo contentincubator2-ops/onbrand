@@ -248,7 +248,10 @@ async function loadBrandRules(brandId: number, userId: number): Promise<string[]
       const t = String(r.rule || "").trim();
       if (t) out.push(t);
     }
-  } catch { /* non-fatal */ }
+  } catch (e) {
+    console.error("[loadBrandRules] brand_caption_rules query failed:", e);
+    /* non-fatal — continue with empty explicit rules */
+  }
 
   // 2. Derive rules from /brands 文字 tab assets
   try {
@@ -305,7 +308,10 @@ async function loadBrandRules(brandId: number, userId: number): Promise<string[]
       const tt = String(p?.to || "").trim();
       if (f && tt) out.push(`縮寫「${f}」第一次出現時，建議補上全稱「${tt}」。`);
     }
-  } catch { /* non-fatal — writer still gets explicit rules */ }
+  } catch (e) {
+    console.error("[loadBrandRules] positioning assets query failed:", e);
+    /* non-fatal — writer still gets explicit rules from brand_caption_rules */
+  }
 
   return out;
 }
@@ -955,14 +961,27 @@ ${cleaned}
         : input.platform === "instagram" ? "1:1"
         : input.platform === "blog" ? "16:9"
         : "1:1";
+      // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back
+      // to openai/gpt-image-1 when PIAPI_KEY is absent so Theater images
+      // still work when only OPENAI_API_KEY is configured.
+      const hasPiapiKey = !!(process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY);
+      const primaryModel = hasPiapiKey ? "piapi/flux-schnell" : "openai/gpt-image-1";
       try {
-        const r = await dispatchGenerate("piapi/flux-schnell", {
+        const r = await dispatchGenerate(primaryModel, {
           prompt: brief,
           aspectRatio: aspect as any,
           brandId: input.brandId,
         });
         if (r.status === "ready" && r.url) {
           return { ok: true as const, imageUrl: r.url, brief };
+        }
+        // Primary failed — try OpenAI as emergency fallback (only if not already tried)
+        if (primaryModel !== "openai/gpt-image-1" && (process.env.OPENAI_API_KEY ?? "")) {
+          console.warn(`[theater.generateImage] ${primaryModel} failed (${r.errorMsg}), falling back to openai/gpt-image-1`);
+          try {
+            const r2 = await dispatchGenerate("openai/gpt-image-1", { prompt: brief, aspectRatio: aspect as any, brandId: input.brandId });
+            if (r2.status === "ready" && r2.url) return { ok: true as const, imageUrl: r2.url, brief };
+          } catch { /* fallback also failed, fall through */ }
         }
         return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `image gen ${r.status}` };
       } catch (e: any) {

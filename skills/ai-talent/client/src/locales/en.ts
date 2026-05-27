@@ -354,6 +354,7 @@ export const en = {
   theater_role_qa:           "Editor",
   theater_writer_busy:       "Caption writer drafting…",
   theater_image_dir_busy:    "Visual director rendering…",
+  theater_image_failed:      "Image failed — rerun to retry",
   theater_qa_busy:           "Chun-Hao reviewing…",
   theater_chapters_label:    "Timeline",
   theater_thread_label:      "Thread ({n} posts)",

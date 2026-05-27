@@ -348,6 +348,7 @@ export const zh = {
   theater_role_qa:           "QA 總編",
   theater_writer_busy:       "文案師撰寫中…",
   theater_image_dir_busy:    "視覺指導生圖中…",
+  theater_image_failed:      "圖片生成失敗 — 點重跑可重試",
   theater_qa_busy:           "Chun-Hao 校對中",
   theater_chapters_label:    "章節時間軸",
   theater_thread_label:      "續發 ({n} 則)",
