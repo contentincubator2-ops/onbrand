@@ -9,7 +9,7 @@ on:
 
 jobs:
   diagnose:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 5
     steps:
       - name: Show deployed brand quota code + pm2 state

@@ -2,7 +2,7 @@ name: Ops — error_log sanity (does it have ANY rows)
 on: { workflow_dispatch: {} }
 jobs:
   s:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 1
     steps:
       - run: |

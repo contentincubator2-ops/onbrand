@@ -1,0 +1,180 @@
+name: Ops — Rename infrastructure to onbrand (Phase 1)
+
+# Phase 1 of the marketing-os → onbrand rename.
+# Run this BEFORE pushing the workflow label changes.
+#
+# What this does:
+#   1. Adds "vm-onbrand" label to this self-hosted runner via GitHub API
+#      (keeps "vm-onbrand" too, so old refs still work during transition)
+#   2. Renames nginx site config from "marketing-os" to "onbrand"
+#   3. Ensures /opt/marketing-os symlink still resolves (backward compat)
+#
+# After this succeeds, push the bulk vm-onbrand→vm-onbrand commit.
+# After that, rename the GitHub repo: Marketing-OS → onbrand.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rename:
+    runs-on: [self-hosted, linux, vm-marketing-os]  # intentionally old label — this workflow ADDS the new label
+    timeout-minutes: 10
+    steps:
+      - name: "Step 1 — Add vm-onbrand label to this runner via GitHub API"
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+
+          echo "════════════════════════════════════════════════════"
+          echo "  Finding runner ID..."
+          echo "════════════════════════════════════════════════════"
+
+          # Get list of runners and find the one running this job
+          RUNNERS=$(curl -s \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/contentincubator2-ops/Marketing-OS/actions/runners?per_page=50")
+
+          echo "$RUNNERS" | python3 -m json.tool 2>/dev/null | grep -E '"id"|"name"|"labels"' | head -40
+
+          # Find runner ID by hostname
+          HOSTNAME=$(hostname)
+          echo ""
+          echo "  This machine hostname: $HOSTNAME"
+
+          RUNNER_ID=$(echo "$RUNNERS" | python3 -c "
+          import json, sys, os
+          hostname = os.environ.get('HOSTNAME', '')
+          data = json.load(sys.stdin)
+          runners = data if isinstance(data, list) else data.get('runners', [])
+          for r in runners:
+              name = r.get('name','')
+              if hostname in name or name in hostname:
+                  print(r['id'])
+                  break
+          " HOSTNAME="$HOSTNAME" 2>/dev/null || true)
+
+          if [ -z "$RUNNER_ID" ]; then
+            echo "  Could not find runner by hostname, trying first online runner..."
+            RUNNER_ID=$(echo "$RUNNERS" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          runners = data if isinstance(data, list) else data.get('runners', [])
+          for r in runners:
+              if r.get('status') == 'online':
+                  print(r['id'])
+                  break
+            ")
+          fi
+
+          echo "  Runner ID: $RUNNER_ID"
+
+          if [ -z "$RUNNER_ID" ]; then
+            echo "❌ Could not determine runner ID — add vm-onbrand label manually in GitHub UI"
+            echo "   Settings → Actions → Runners → click the runner → Edit → add vm-onbrand"
+            exit 1
+          fi
+
+          echo ""
+          echo "  Adding vm-onbrand label to runner $RUNNER_ID..."
+          RESP=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/contentincubator2-ops/Marketing-OS/actions/runners/${RUNNER_ID}/labels" \
+            -d '{"labels":["vm-onbrand"]}')
+
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "  HTTP: $HTTP_CODE"
+          echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "$BODY"
+
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "  ✅ vm-onbrand label added to runner"
+          else
+            echo "  ⚠️  API call returned $HTTP_CODE — check response above"
+            echo "  If 403/404: add label manually in GitHub UI:"
+            echo "  Settings → Actions → Runners → click runner → Edit → add vm-onbrand"
+          fi
+
+      - name: "Step 2 — Rename nginx site config marketing-os → onbrand"
+        run: |
+          set -e
+          echo "════════════════════════════════════════════════════"
+          echo "  Nginx config rename"
+          echo "════════════════════════════════════════════════════"
+
+          OLD_SITE=/etc/nginx/sites-enabled/marketing-os
+          OLD_AVAIL=/etc/nginx/sites-available/marketing-os
+          NEW_SITE=/etc/nginx/sites-enabled/onbrand
+          NEW_AVAIL=/etc/nginx/sites-available/onbrand
+
+          # Check what exists
+          echo "  sites-enabled:"
+          ls -la /etc/nginx/sites-enabled/ 2>/dev/null || echo "  (cannot list)"
+          echo ""
+          echo "  sites-available:"
+          ls -la /etc/nginx/sites-available/ 2>/dev/null || echo "  (cannot list)"
+
+          # Rename sites-available if exists
+          if [ -f "$OLD_AVAIL" ] && [ ! -f "$NEW_AVAIL" ]; then
+            sudo cp "$OLD_AVAIL" "$NEW_AVAIL"
+            echo "  ✅ Copied sites-available/marketing-os → sites-available/onbrand"
+          elif [ -f "$NEW_AVAIL" ]; then
+            echo "  ℹ️  sites-available/onbrand already exists"
+          else
+            echo "  ⊘ sites-available/marketing-os not found (may already be renamed or at different path)"
+          fi
+
+          # Update symlink in sites-enabled
+          if [ -L "$OLD_SITE" ] || [ -f "$OLD_SITE" ]; then
+            TARGET=$(readlink -f "$OLD_SITE" 2>/dev/null || echo "$NEW_AVAIL")
+            if [ ! -e "$NEW_SITE" ]; then
+              sudo ln -s "$TARGET" "$NEW_SITE" 2>/dev/null \
+                || sudo cp "$OLD_SITE" "$NEW_SITE" 2>/dev/null \
+                || true
+              echo "  ✅ Created sites-enabled/onbrand → $TARGET"
+            fi
+            # Keep old link alive for 1 week to avoid outage if something references it
+            echo "  ℹ️  Keeping sites-enabled/marketing-os for backward compat"
+          else
+            echo "  ⊘ sites-enabled/marketing-os not found"
+          fi
+
+          # Test nginx config before reloading
+          if sudo nginx -t 2>&1; then
+            sudo nginx -s reload 2>/dev/null && echo "  ✅ nginx reloaded" || echo "  ⚠️  nginx reload failed"
+          else
+            echo "  ❌ nginx config test failed — not reloading"
+          fi
+
+      - name: "Step 3 — Verify /opt/marketing-os symlink (backward compat)"
+        run: |
+          echo "════════════════════════════════════════════════════"
+          echo "  VM path audit"
+          echo "════════════════════════════════════════════════════"
+
+          echo "  /opt/onbrand   : $(ls -la /opt/onbrand 2>/dev/null || echo 'NOT FOUND')"
+          echo "  /opt/marketing-os: $(ls -la /opt/marketing-os 2>/dev/null || echo 'NOT FOUND')"
+
+          if [ -d /opt/onbrand ] && [ ! -e /opt/marketing-os ]; then
+            sudo ln -s /opt/onbrand /opt/marketing-os 2>/dev/null \
+              && echo "  ✅ Created /opt/marketing-os → /opt/onbrand symlink (backward compat)"
+          elif [ -L /opt/marketing-os ]; then
+            TARGET=$(readlink /opt/marketing-os)
+            echo "  ✅ /opt/marketing-os already symlinks → $TARGET"
+          else
+            echo "  ℹ️  /opt/marketing-os is a real directory (not a symlink)"
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  ✅ Phase 1 complete."
+          echo "  Next steps:"
+          echo "  1. Confirm vm-onbrand label appears in:"
+          echo "     github.com/contentincubator2-ops/Marketing-OS → Settings → Actions → Runners"
+          echo "  2. Tell Claude — Phase 2 (bulk rename commit) can now be pushed"
+          echo "  3. After Phase 2 deploy: rename GitHub repo Marketing-OS → onbrand in Settings"
+          echo "  4. After repo rename: run ops-update-git-remote.yml"
+          echo "════════════════════════════════════════════════════"

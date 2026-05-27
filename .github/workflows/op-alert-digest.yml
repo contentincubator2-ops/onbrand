@@ -17,7 +17,7 @@ on:
 
 jobs:
   digest:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 5
     steps:
       - run: |

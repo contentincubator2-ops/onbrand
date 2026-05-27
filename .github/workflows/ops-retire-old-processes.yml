@@ -9,7 +9,7 @@ on:
 
 jobs:
   retire:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 10
     steps:
 

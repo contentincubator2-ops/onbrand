@@ -10,7 +10,7 @@ on:
 
 jobs:
   probe:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 3
     steps:
       - name: Probe Pipedream Connect two-step OAuth flow

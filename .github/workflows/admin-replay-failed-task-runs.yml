@@ -5,7 +5,7 @@ name: Admin — Replay failed task runs from DLQ
 on: { workflow_dispatch: {} }
 jobs:
   replay:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 5
     steps:
       - name: Inspect DLQ

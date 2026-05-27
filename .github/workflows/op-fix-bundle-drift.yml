@@ -2,7 +2,7 @@ name: Ops — Fix bundle drift (force rebuild + restart nginx cache)
 on: { workflow_dispatch: {} }
 jobs:
   fix:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 5
     steps:
       - name: Diagnose current state

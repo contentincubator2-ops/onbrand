@@ -2,7 +2,7 @@ name: Ops — List OAuth failures (Slack/FB/Google)
 on: { workflow_dispatch: {} }
 jobs:
   list:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 1
     steps:
       - run: |

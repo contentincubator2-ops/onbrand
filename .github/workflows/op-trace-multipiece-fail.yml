@@ -6,7 +6,7 @@ name: Ops — Trace multi-piece task DB failures
 on: { workflow_dispatch: {} }
 jobs:
   trace:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 2
     steps:
       - run: |

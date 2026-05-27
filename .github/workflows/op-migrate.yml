@@ -9,7 +9,7 @@ on:
 
 jobs:
   migrate:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 5
     steps:
       - name: Pull main

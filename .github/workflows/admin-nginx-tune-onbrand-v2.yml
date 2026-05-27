@@ -14,7 +14,7 @@ name: Admin — Tune nginx onbrand timeouts v2 (recover + targeted)
 on: { workflow_dispatch: {} }
 jobs:
   retune:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 3
     steps:
       - name: Restore most recent .bak so we start from a valid state

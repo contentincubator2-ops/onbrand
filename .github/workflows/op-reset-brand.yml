@@ -36,7 +36,7 @@ on:
 
 jobs:
   reset:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 3
     steps:
       - name: 0. Safety

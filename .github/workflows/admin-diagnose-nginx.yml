@@ -2,7 +2,7 @@ name: Admin — Diagnose nginx + restore if broken
 on: { workflow_dispatch: {} }
 jobs:
   diag:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 3
     steps:
       - name: Probes

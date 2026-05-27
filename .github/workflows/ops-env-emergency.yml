@@ -5,7 +5,7 @@ on:
 
 jobs:
   rebuild:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 10
     steps:
       - name: Check for backup and restore or create

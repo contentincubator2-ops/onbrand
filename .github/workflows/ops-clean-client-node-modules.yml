@@ -4,7 +4,7 @@ name: Ops — Clean client node_modules (one-shot)
 on: { workflow_dispatch: {} }
 jobs:
   clean-rebuild:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 10
     steps:
       - name: Clean client node_modules

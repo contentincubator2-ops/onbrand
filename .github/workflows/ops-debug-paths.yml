@@ -8,7 +8,7 @@ on:
 
 jobs:
   debug:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 2
     steps:
       - name: Path audit + write LOCAL_DB_PASSWORD to all candidate .env files

@@ -2,7 +2,7 @@ name: Ops — Anthropic 404 full detail
 on: { workflow_dispatch: {} }
 jobs:
   d:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 2
     steps:
       - name: Full 404 body from pm2 log

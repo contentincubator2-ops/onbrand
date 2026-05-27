@@ -1,0 +1,44 @@
+name: Ops — Update VM git remote after repo rename
+
+# Run AFTER renaming the GitHub repo from Marketing-OS → onbrand.
+# Updates the git remote URL on the VM so future CI deploys work.
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_repo_name:
+        description: "New repo name (default: onbrand)"
+        required: false
+        default: "onbrand"
+
+jobs:
+  update:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Update git remote URL on VM
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          set -e
+          NEW_REPO="${{ github.event.inputs.new_repo_name }}"
+          APP=/opt/onbrand/app
+          NEW_REMOTE="https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/${NEW_REPO}.git"
+
+          echo "════════════════════════════════════════════════════"
+          echo "  Updating git remote: contentincubator2-ops/${NEW_REPO}"
+          echo "════════════════════════════════════════════════════"
+
+          cd "$APP"
+          echo "  Current remote:"
+          git remote get-url origin 2>/dev/null || echo "  (none)"
+
+          git remote set-url origin "$NEW_REMOTE"
+          echo "  ✅ Remote updated to: contentincubator2-ops/${NEW_REPO}"
+
+          echo ""
+          echo "  Testing git fetch..."
+          git fetch origin --dry-run 2>&1 && echo "  ✅ Fetch OK" || echo "  ❌ Fetch failed — check token and repo name"
+
+          echo ""
+          echo "  ✅ Done. Future CI deploys will use the new repo URL."

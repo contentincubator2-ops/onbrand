@@ -2,7 +2,7 @@ name: Admin — Tail orchestra persistence warnings
 on: { workflow_dispatch: {} }
 jobs:
   tail:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 1
     steps:
       - run: |

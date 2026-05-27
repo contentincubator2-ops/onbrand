@@ -10,7 +10,7 @@ on:
 
 jobs:
   recover:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 5
     steps:
       - name: Fix ownership and permissions on both .env files

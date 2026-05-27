@@ -7,7 +7,7 @@ name: Ops — Probe error_log pipeline (end-to-end)
 on: { workflow_dispatch: {} }
 jobs:
   probe:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 2
     steps:
       - name: POST a synthetic error via the real endpoint

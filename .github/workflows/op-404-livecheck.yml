@@ -2,7 +2,7 @@ name: Ops — 404 live-or-stale + probe all 4 providers
 on: { workflow_dispatch: {} }
 jobs:
   c:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 3
     steps:
       - name: count anthropic-404 BEFORE

@@ -19,7 +19,7 @@ on:
 
 jobs:
   write:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 3
     steps:
       - name: Mask secrets in any echo

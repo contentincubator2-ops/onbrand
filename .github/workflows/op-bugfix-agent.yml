@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   bugfix:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 25
     steps:
       - name: Checkout main

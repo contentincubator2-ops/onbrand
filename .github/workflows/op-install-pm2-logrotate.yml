@@ -5,7 +5,7 @@ name: Ops — Install pm2-logrotate
 on: { workflow_dispatch: {} }
 jobs:
   install:
-    runs-on: [self-hosted, linux, vm-marketing-os]
+    runs-on: [self-hosted, linux, vm-onbrand]
     timeout-minutes: 3
     steps:
       - name: Install module + configure
