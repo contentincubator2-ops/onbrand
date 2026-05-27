@@ -622,12 +622,14 @@ export default function BrandsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode]);
 
-  // When scope switches to event/product, copy/knowledge/visual tiles
+  // When scope switches to event/product, knowledge/visual tiles
   // aren't shown — force category back to positioning so the content
   // area doesn't render a hidden tab's contents. CJ 2026-05-13.
+  // NOTE: "copy" is intentionally NOT reset — product has 行銷指引 (marketing)
+  // and event has 創意與內容規範 (guidelines) as their own 文字 content.
   React.useEffect(() => {
     if ((scopeMode === "event" || scopeMode === "product") &&
-        (category === "copy" || category === "knowledge" || category === "visual")) {
+        (category === "knowledge" || category === "visual")) {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.set("cat", "positioning");
       setSearchParams(nextParams, { replace: true });
@@ -1262,8 +1264,11 @@ export default function BrandsPage() {
                     : scopeMode === "product" ? (lang === "en" ? "Product positioning (6 steps)"   : "產品定位（6 步）")
                     : (lang === "en" ? "Brand core / slogan" : "品牌核心 / Slogan"),
                       Icon: LucideTarget,    scopes: ["brand", "product", "event"] as string[] },
-                  { v: "copy"        as const, label: lang === "en" ? "Copy"        : "文字",     desc: lang === "en" ? "Words / banned / style"   : "用詞 / 禁忌詞 / 風格",
-                      Icon: LucideType,      scopes: ["brand"] },
+                  { v: "copy"        as const, label: lang === "en" ? "Copy"        : "文字",
+                      desc: scopeMode === "product" ? (lang === "en" ? "Tone / style / keywords" : "語氣 / 溝通風格 / 關鍵詞")
+                          : scopeMode === "event"   ? (lang === "en" ? "Voice / must-have / don'ts" : "語氣 / 必用 / 禁用規範")
+                          : (lang === "en" ? "Words / banned / style"   : "用詞 / 禁忌詞 / 風格"),
+                      Icon: LucideType,      scopes: ["brand", "product", "event"] as string[] },
                   { v: "knowledge"   as const, label: lang === "en" ? "Knowledge"   : "知識",     desc: lang === "en" ? "FAQ / fact library"       : "FAQ / 常識資料庫",
                       Icon: LucideBook,      scopes: ["brand"] },
                   { v: "info"        as const, label: lang === "en" ? "Info"        : "基本資料",
@@ -1327,6 +1332,12 @@ export default function BrandsPage() {
             scopeName={scopeName}
             testOpen={testPanelOpen}
             onToggleTest={() => setTestPanelOpen((v) => !v)}
+            scopeMode={scopeMode}
+            scopeEntityId={
+              scopeMode === "product" ? (scope?.productId ?? null)
+              : scopeMode === "event"   ? (scope?.eventId   ?? null)
+              : null
+            }
           />
         </div>
       </div>
@@ -1933,22 +1944,15 @@ export default function BrandsPage() {
           )}
 
           {/* ── 文字 ──
-              2026-05-08: also visible for product/event scopes — copy
-              assets live at brand level, so product/event share the
-              parent brand's voice/words/templates. CopyTabInline
-              receives the resolved brandId regardless of active scope. */}
-          {derivedCategory === "copy" && activeBrandIdForLocks && (
+              Brand:   voice/tone/forbidden assets via CopyTabInline
+              Product: 行銷指引 (marketing segment) — tone/style/keywords
+              Event:   創意與內容規範 (guidelines segment) — toneOfVoice/mustHave/forbidden
+              2026-05-27 (CJ「為產品和活動設計與品牌相同的文字標籤頁」) */}
+          {derivedCategory === "copy" && activeBrandIdForLocks && scopeMode === "brand" && (
             <>
               <div style={{ padding: "16px 28px 0" }}>
                 <AgentPersonaBar persona="copywriter" brandName={scopeName} mode="idle" />
               </div>
-              {scopeMode !== "brand" && (
-                <div className="max-w-[1100px] mx-auto px-6 pt-2">
-                  <div className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 text-xs text-sky-900">
-                    {lang === "en" ? "💡 Copy assets are shared at brand level — edits here affect every product and campaign under this brand." : "💡 文字資產屬於品牌共用 — 在這裡編輯會影響此品牌下所有產品 / 活動。"}
-                  </div>
-                </div>
-              )}
               <CopyTabInline
                 key={`copy-${activeBrandIdForLocks}`}
                 brandId={activeBrandIdForLocks}
@@ -1957,6 +1961,57 @@ export default function BrandsPage() {
                 locked={!!tabLocks.copy}
                 onLockToggle={() => handleLockToggle("copy")}
               />
+            </>
+          )}
+          {/* 2026-05-27 (CJ「為產品和活動設計文字標籤頁」):
+              Product → 行銷指引 (marketing segment: tone/style/keywords)
+              Event   → 創意與內容規範 (guidelines segment: toneOfVoice/mustHave/forbidden) */}
+          {derivedCategory === "copy" && scopeMode === "product" && scope?.productId && (
+            <>
+              <div style={{ padding: "16px 28px 0" }}>
+                <AgentPersonaBar persona="copywriter" brandName={scopeName} mode="idle"
+                  message={lang === "en"
+                    ? "Marketing tone, style, and keywords for this product — derived from its positioning and target audience."
+                    : "此產品的行銷語氣、溝通風格、關鍵詞彙 — 從定位與目標族群推導而來。"}
+                />
+              </div>
+              <div style={{ padding: "16px 28px 32px" }}>
+                <PositioningPanel
+                  section="seg:marketing"
+                  scopeMode="product"
+                  scopeName={scopeName}
+                  scopeBrandId={scope?.brandId ?? null}
+                  scopeProductId={scope.productId}
+                  scopeEventId={null}
+                  pipelineThinking={null}
+                  onAutoFill={runSegmentAutoFill}
+                  locked={!!tabLocks.copy}
+                />
+              </div>
+            </>
+          )}
+          {derivedCategory === "copy" && scopeMode === "event" && scope?.eventId && (
+            <>
+              <div style={{ padding: "16px 28px 0" }}>
+                <AgentPersonaBar persona="copywriter" brandName={scopeName} mode="idle"
+                  message={lang === "en"
+                    ? "Creative & content guidelines for this campaign — tone of voice, must-haves, and forbidden elements."
+                    : "此活動的創意與內容規範 — 語氣基調、必須出現元素、禁用元素，從品牌聲音與活動概念推導而來。"}
+                />
+              </div>
+              <div style={{ padding: "16px 28px 32px" }}>
+                <PositioningPanel
+                  section="seg:guidelines"
+                  scopeMode="event"
+                  scopeName={scopeName}
+                  scopeBrandId={scope?.brandId ?? null}
+                  scopeProductId={scope?.productId ?? null}
+                  scopeEventId={scope.eventId}
+                  pipelineThinking={null}
+                  onAutoFill={runSegmentAutoFill}
+                  locked={!!tabLocks.copy}
+                />
+              </div>
             </>
           )}
 
@@ -3827,14 +3882,21 @@ function PositioningTopRow({
    BRAND WORKSPACE pill + brand name + 試寫 chip + 定案 chip.
    ───────────────────────────────────────────────────────────────────── */
 function KickerRow({
-  brandId, scopeName, testOpen, onToggleTest,
+  brandId, scopeName, testOpen, onToggleTest, scopeMode, scopeEntityId,
 }: {
   brandId: number | null;
   scopeName: string;
   testOpen: boolean;
   onToggleTest: () => void;
+  /** BUG-3 fix: pass the current scope so status reflects the right entity. */
+  scopeMode: "brand" | "product" | "event" | "none";
+  scopeEntityId: number | null;
 }) {
-  const { status, isRunning } = usePositioningStatus(brandId);
+  // When scopeMode is "none" (no brand selected) fall back to brand kind so
+  // the hook stays valid; the enabled guard (entityId=null) will skip the query.
+  const resolvedKind = (scopeMode === "none" ? "brand" : scopeMode) as "brand" | "product" | "event";
+  const resolvedId   = scopeMode === "brand" ? brandId : scopeEntityId;
+  const { status, isRunning } = usePositioningStatus(resolvedKind, resolvedId);
   return (
     <div className="mt-4 flex items-center gap-2 text-tiny text-default-600 flex-wrap justify-center">
       <span

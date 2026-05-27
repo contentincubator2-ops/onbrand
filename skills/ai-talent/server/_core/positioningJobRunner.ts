@@ -89,10 +89,12 @@ async function upsertJob(userId: number, kind: EntityKind, entityId: number, tot
            totalSteps = VALUES(totalSteps)`,
     [userId, kind, entityId, totalSteps],
   );
-  // ON DUP UPDATE returns insertId of original row; fetch via SELECT
+  // ON DUP UPDATE returns insertId of original row; fetch via SELECT.
+  // MUST include userId to avoid returning another user's job row when
+  // entity IDs collide across users (e.g., both have brand id=1).
   const [rows]: any = await localPool.execute(
-    `SELECT id FROM positioning_jobs WHERE entityKind = ? AND entityId = ? LIMIT 1`,
-    [kind, entityId],
+    `SELECT id FROM positioning_jobs WHERE userId = ? AND entityKind = ? AND entityId = ? ORDER BY id DESC LIMIT 1`,
+    [userId, kind, entityId],
   );
   return Number((rows as any[])[0]?.id ?? r?.insertId ?? 0);
 }

@@ -145,16 +145,56 @@ export const positioningJobsRouter = router({
         if (!cur) return null;
         const interim = cur._interim ?? null;
         // Read the canonical positioning.<segment> shape (positioningSchema.ts).
-        const isFull = !!(cur.goldenCircle || cur.differentiation || cur.tagline || cur.voice);
+        // Check any pipeline output key — brand uses goldenCircle/differentiation/tagline/voice,
+        // product uses marketFit/targetUser/valueProp/productMessaging/gtmSummary,
+        // event uses smp/eventBackground/targetAudience. A non-empty segment in any
+        // pipeline means the full pass has run.
+        // Segment IDs must match positioningSchema.ts exactly.
+        // BUG-5 fix (2026-05-28): old PRODUCT_KEYS / EVENT_KEYS used stale
+        // pipeline output names that never matched the DB shape, so products
+        // and events always returned source:"interim" even when fully positioned.
+        const BRAND_KEYS   = ["goldenCircle", "tagline", "taglineScore", "origin", "values", "audience", "competition", "differentiation", "trends", "voice"];
+        const PRODUCT_KEYS = ["core", "audience", "value", "competition", "strategy", "marketing"];
+        const EVENT_KEYS   = ["brief", "context", "audience", "objectives", "awards", "smp", "messaging", "creative", "guidelines", "channels", "journey"];
+        const ALL_SEGMENT_KEYS = [...BRAND_KEYS, ...PRODUCT_KEYS, ...EVENT_KEYS];
+        const isFull = ALL_SEGMENT_KEYS.some(k => {
+          const v = cur[k];
+          if (!v || typeof v !== "object") return false;
+          return Object.values(v).some(fv =>
+            (typeof fv === "string" && fv.trim().length > 0) ||
+            (Array.isArray(fv) && fv.length > 0),
+          );
+        });
         const diffs = Array.isArray(cur.differentiation)
           ? cur.differentiation
           : [cur.differentiation?.emotional, cur.differentiation?.functional].filter(Boolean);
         return {
           source: isFull ? "full" : (interim ? "interim" : "empty"),
-          tagline: cur.tagline?.zhTagline ?? cur.tagline?.enTagline ?? interim?.tagline ?? "",
-          positioning: cur.differentiation?.summary ?? cur.goldenCircle?.why ?? interim?.positioning ?? "",
-          usp: cur.differentiation?.summary ?? cur.differentiation?.functional ?? interim?.usp ?? "",
-          targetAudience: cur.audience?.primary ?? interim?.targetAudience ?? "",
+          // tagline:  brand → tagline.zhTagline/enTagline
+          //           product → core.zhTagline/enTagline
+          //           event → messaging.coreMessage / smp.singleMindedProposition
+          tagline: cur.tagline?.zhTagline ?? cur.tagline?.enTagline
+                ?? cur.core?.zhTagline ?? cur.core?.enTagline
+                ?? cur.messaging?.coreMessage ?? cur.smp?.singleMindedProposition
+                ?? interim?.tagline ?? "",
+          // positioning: brand → differentiation.summary / goldenCircle.why
+          //              product → core.coreStatement / strategy.positioning
+          //              event → smp.singleMindedProposition / context.coreProblem
+          positioning: cur.differentiation?.summary ?? cur.goldenCircle?.why
+                    ?? cur.core?.coreStatement ?? cur.strategy?.positioning
+                    ?? cur.smp?.singleMindedProposition ?? cur.context?.coreProblem
+                    ?? interim?.positioning ?? "",
+          // usp: brand → differentiation.summary / differentiation.functional
+          //      product → competition.uniqueUsp / core.oneLineValueProp
+          //      event → messaging.coreMessage / smp.singleMindedProposition
+          usp: cur.differentiation?.summary ?? cur.differentiation?.functional
+             ?? cur.competition?.uniqueUsp ?? cur.core?.oneLineValueProp
+             ?? cur.messaging?.coreMessage
+             ?? interim?.usp ?? "",
+          // targetAudience: brand/product → audience.primary
+          //                 event → audience.primaryAudience
+          targetAudience: cur.audience?.primary ?? cur.audience?.primaryAudience
+                       ?? interim?.targetAudience ?? "",
           differentiators: diffs.length ? diffs : (interim?.differentiators ?? []),
           messagingPillars: interim?.messagingPillars ?? [],
           consumerWants: interim?.consumerWants ?? "",

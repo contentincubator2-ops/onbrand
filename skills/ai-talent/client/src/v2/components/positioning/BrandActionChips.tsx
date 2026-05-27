@@ -199,17 +199,27 @@ export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | n
   );
 }
 
-/** Read positioning status for the chip row (small hook for parent). */
-export function usePositioningStatus(brandId: number | null): { status: "full"|"interim"|"empty"; isRunning: boolean } {
+/**
+ * Read positioning status for the chip row (small hook for parent).
+ *
+ * BUG-3 fix (2026-05-28): was hardcoded to entityKind:"brand" — products
+ * and events always showed "empty" status even when fully positioned.
+ * Now accepts entityKind + entityId so scope-aware callers can pass the
+ * correct entity.
+ */
+export function usePositioningStatus(
+  entityKind: "brand" | "product" | "event",
+  entityId: number | null,
+): { status: "full"|"interim"|"empty"; isRunning: boolean } {
   const cur = (trpc as any).positioningJobs?.getCurrent?.useQuery?.(
-    { entityKind: "brand", entityId: brandId ?? 0 },
-    { enabled: !!brandId, refetchInterval: 6_000 },
+    { entityKind, entityId: entityId ?? 0 },
+    { enabled: !!entityId, refetchInterval: 6_000 },
   );
   const data = (cur?.data as any) ?? null;
   const status = (data?.source as "full" | "interim" | "empty" | undefined) ?? "empty";
   const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
-    { entityKind: "brand", entityId: brandId ?? 0 },
-    { enabled: !!brandId, refetchInterval: 4_000 },
+    { entityKind, entityId: entityId ?? 0 },
+    { enabled: !!entityId, refetchInterval: 4_000 },
   );
   const isRunning = (job?.data as any)?.status === "running";
   return { status, isRunning };
