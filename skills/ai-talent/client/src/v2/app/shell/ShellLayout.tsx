@@ -202,7 +202,12 @@ export default function ShellLayout() {
           // cold mount is the blank flash. When a brand is already
           // active, jump straight to the editor and skip the bounce.
           if (to === "/brands" && scope.brandId) {
-            navigate(`/brands/edit?b=${scope.brandId}`);
+            // 2026-05-27 (CJ「品牌大腦跳回 SoWork」): preserve product/event
+            // scope params so the ScopeBar doesn't reset on navigation.
+            let url = `/brands/edit?b=${scope.brandId}`;
+            if (scope.productId) url += `&p=${scope.productId}`;
+            if (scope.eventId)   url += `&e=${scope.eventId}`;
+            navigate(url);
             return;
           }
           navigate(to);

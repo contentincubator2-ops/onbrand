@@ -104,6 +104,7 @@ export interface ContextChip {
 }
 
 const PATH_LABELS: Record<string, string> = {
+  // ── Brand scope paths ──
   "brand.name":                            "品牌",
   "brand.industry":                        "產業",
   "brand.positioning.goldenCircle":        "黃金圈",
@@ -116,7 +117,22 @@ const PATH_LABELS: Record<string, string> = {
   "brand.positioning.differentiation":     "差異化",
   "brand.positioning.differentiation.summary": "差異化",
   "brand.positioning.voice":               "Voice",
+  "brand.positioning.voice.archetypes":    "archetypes",
+  "brand.positioning.voice.tone":          "tone",
+  "brand.positioning.voice.forbidden":     "forbidden",
   "brand.positioning.trends":              "趨勢",
+  // ── Product scope paths (segment ids: core/audience/value/competition/strategy/marketing) ──
+  "brand.positioning.core.coreStatement":      "核心定位",
+  "brand.positioning.core.oneLineValueProp":   "核心主張",
+  "brand.positioning.value.userFeeling":       "使用者感受",
+  "brand.positioning.value.primaryEmotion":    "情緒價值",
+  "brand.positioning.competition.uniqueUsp":   "獨家賣點",
+  "brand.positioning.marketing.tone":          "tone",
+  "brand.positioning.marketing.style":         "溝通風格",
+  // ── Event scope paths ──
+  "brand.positioning.smp.statement":           "SMP",
+  "brand.positioning.messaging.coreMessage":   "核心訊息",
+  "brand.positioning.strategy.approach":       "活動策略",
 };
 
 export function buildContextChips(ctx: any, sources: string[] | undefined): ContextChip[] {

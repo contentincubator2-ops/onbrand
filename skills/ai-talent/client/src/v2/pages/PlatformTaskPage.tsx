@@ -1014,7 +1014,14 @@ function PlatformTaskPageInner() {
 
                 {/* Context chips */}
                 {(() => {
-                  const DEFAULT_SOURCES = [
+                  // 2026-05-27 (CJ「modal chip 仍抓 SoWork」): scope-aware DEFAULT_SOURCES.
+                  // Product uses segment ids: core / audience / value / competition / strategy / marketing.
+                  // Brand uses: goldenCircle / audience / voice / differentiation / values / tagline.
+                  // When product/event scope is active, use the correct paths so chips read
+                  // from the product's own positioning segments, not the brand's.
+                  const isProductScope = !!(brandCtx?.product);
+                  const isEventScope   = !!(brandCtx?.event);
+                  const BRAND_SOURCES = [
                     "brand.name",
                     "brand.positioning.audience.primary",
                     "brand.positioning.voice.archetypes",
@@ -1022,6 +1029,25 @@ function PlatformTaskPageInner() {
                     "brand.positioning.voice.forbidden",
                     "brand.positioning.goldenCircle.why",
                   ];
+                  const PRODUCT_SOURCES = [
+                    "brand.name",                                   // displayName = product name
+                    "brand.positioning.audience.primary",           // product.audience.primary
+                    "brand.positioning.core.coreStatement",         // product.core.coreStatement
+                    "brand.positioning.marketing.tone",             // product.marketing.tone
+                    "brand.positioning.competition.uniqueUsp",      // product.competition.uniqueUsp
+                    "brand.positioning.value.userFeeling",          // product.value.userFeeling
+                  ];
+                  const EVENT_SOURCES = [
+                    "brand.name",                                   // displayName = event name
+                    "brand.positioning.audience.primary",           // event.audience.primary
+                    "brand.positioning.smp.statement",              // event.smp.statement
+                    "brand.positioning.messaging.coreMessage",      // event.messaging.coreMessage
+                    "brand.positioning.strategy.approach",          // event.strategy.approach
+                  ];
+                  const DEFAULT_SOURCES =
+                    isProductScope ? PRODUCT_SOURCES :
+                    isEventScope   ? EVENT_SOURCES   :
+                    BRAND_SOURCES;
                   const sources = (activeTask.contextSources && activeTask.contextSources.length > 0)
                     ? activeTask.contextSources
                     : DEFAULT_SOURCES;
