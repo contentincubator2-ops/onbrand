@@ -534,33 +534,34 @@ export default function RunPage() {
       );
     } catch { /* cross-origin not yet — fine */ }
 
-    // Listen for Pipedream OAuth completion postMessage
-    const onMsg = (e: MessageEvent) => {
-      if (e.data?.type === "success") {
-        window.removeEventListener("message", onMsg);
-        try { win.close(); } catch { /* ignore */ }
-        // OAuth done — switch button to "發布到 Facebook"
-        setFbOauthDone(true);
-        showToastGlobal(lang === "en" ? "Facebook authorized ✓ Now click \"Publish to Facebook\"" : "Facebook 授權成功 ✓ 點「發布到 Facebook」即可發布");
-      } else if (e.data?.type === "close") {
-        window.removeEventListener("message", onMsg);
-      }
+    // Pipedream popup URL flow does NOT postMessage back to opener.
+    // Poll win.closed every 500ms — when popup closes, treat as OAuth done.
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    const cleanup = () => {
+      if (pollTimer !== null) { clearInterval(pollTimer); pollTimer = null; }
     };
-    window.addEventListener("message", onMsg);
 
     (async () => {
       try {
         const r = await fbConnectUrlMut?.mutateAsync?.({});
         if (r?.connectUrl) {
           win.location.href = r.connectUrl;
+          // Start polling after navigation
+          pollTimer = setInterval(() => {
+            if (win.closed) {
+              cleanup();
+              // Popup closed → OAuth completed (or user dismissed)
+              setFbOauthDone(true);
+              showToastGlobal(lang === "en" ? "Facebook authorized ✓ Now click \"Publish to Facebook\"" : "Facebook 授權成功 ✓ 點「發布到 Facebook」即可發布");
+            }
+          }, 500);
         } else {
-          window.removeEventListener("message", onMsg);
           win.close();
           showToastGlobal(lang === "en" ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結 — 請聯絡 sowork@sowork.ai");
         }
       } catch (e: any) {
-        window.removeEventListener("message", onMsg);
-        win.close();
+        cleanup();
+        try { win.close(); } catch { /* ignore */ }
         showToastGlobal(
           lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`
         );
