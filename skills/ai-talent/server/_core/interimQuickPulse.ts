@@ -113,6 +113,18 @@ export async function generateInterimPulse(args: {
   industry?: string;
   description?: string;
 }): Promise<InterimPulse> {
+  // Stage 0 — fetch real website content for brand entities (best effort)
+  let websiteBlock = "";
+  if (args.entityKind === "brand") {
+    try {
+      const { getBrandRealContent } = await import("./brandRealContent");
+      const content = await getBrandRealContent(args.entityId);
+      if (content.hasContent && content.context) {
+        websiteBlock = `\n【官網 / 社群真實內容】\n${content.context.slice(0, 1500)}`;
+      }
+    } catch { /* non-fatal */ }
+  }
+
   // Stage 1 — scout (best effort, may return null)
   const patterns = await fetchViralPatterns({
     channel: "facebook",
@@ -131,11 +143,12 @@ export async function generateInterimPulse(args: {
 核心結構：
   consumerWants：消費者真正想要什麼（具體痛點 / 渴望）
   competitorLacks：競品做不到什麼（缺口）
-  brandFills：本品牌可以補上什麼（差異化價值）`;
+  brandFills：本品牌可以補上什麼（差異化價值）
+重要：若有提供官網內容，請以官網資料為定位基礎，不可無中生有。`;
 
   const user = `品牌：${args.brandName}
 產業：${args.industry ?? "未指定"}
-描述：${args.description ?? ""}
+描述：${args.description ?? ""}${websiteBlock}
 
 【產業即時訊號】
 ${scoutBlock}

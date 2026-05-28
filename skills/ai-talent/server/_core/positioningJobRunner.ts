@@ -65,6 +65,10 @@ export interface StepContext {
   brandName: string;
   industry?: string;
   description?: string;
+  /** Scraped website + social content from getBrandRealContent (brand only).
+   *  Injected before wave-1 so ALL steps can ground their output in real
+   *  brand content rather than hallucinating from the name alone. */
+  realContent?: string;
   // outputs from already-completed steps in this run, keyed by step id
   prevOutputs: Record<string, any>;
   /** Helper to record cost — runner calls this after each LLM call. */
@@ -381,6 +385,25 @@ async function runPipelineDetached(args: {
   const jobId = await upsertJob(args.userId, args.entityKind, args.entityId, args.steps.length);
   await setJobStatus(jobId, "running");
 
+  // Fetch real website/social content BEFORE wave execution so every step
+  // can ground its output in actual brand content (not hallucinated from name).
+  // Only meaningful for brand entities (getBrandRealContent reads brands table).
+  let realContent: string | undefined;
+  if (args.entityKind === "brand") {
+    try {
+      const { getBrandRealContent } = await import("./brandRealContent");
+      const content = await getBrandRealContent(args.entityId);
+      if (content.hasContent && content.context) {
+        realContent = content.context;
+        console.log(`[positioningJobRunner] fetched real content for brand ${args.entityId}: ${realContent.slice(0, 80)}...`);
+      } else {
+        console.log(`[positioningJobRunner] no real content available for brand ${args.entityId} (website may be empty or bot-blocked)`);
+      }
+    } catch (e: any) {
+      console.warn(`[positioningJobRunner] getBrandRealContent failed for brand ${args.entityId}:`, e?.message ?? e);
+    }
+  }
+
   // Build adjacency: id → step
   const stepMap = new Map(args.steps.map((s) => [s.id, s]));
   const completed = new Set<string>();
@@ -419,6 +442,7 @@ async function runPipelineDetached(args: {
             brandName: args.brandName,
             industry: args.industry,
             description: args.description,
+            realContent,
             prevOutputs: outputs,
             recordUsage,
           };

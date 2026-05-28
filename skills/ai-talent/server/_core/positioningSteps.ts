@@ -94,7 +94,11 @@ async function callText(ctx: StepContext, stepId: string, system: string, user: 
 const SYS = (lang: string) => `你是品牌定位專家，請用${lang}回答，輸出純 JSON。`;
 
 function brandCtx(c: StepContext): string {
-  return `品牌名稱：${c.brandName}\n產業：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+  const base = `品牌名稱：${c.brandName}\n產業：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+  if (c.realContent) {
+    return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
+  }
+  return base;
 }
 
 // ─── Brand pipeline — one step per BRAND_SEGMENTS id ─────────────────────
