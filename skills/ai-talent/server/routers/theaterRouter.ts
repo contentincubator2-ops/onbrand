@@ -966,6 +966,18 @@ ${cleaned}
       // still work when only OPENAI_API_KEY is configured.
       const hasPiapiKey = !!(process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY);
       const primaryModel = hasPiapiKey ? "piapi/flux-schnell" : "openai/gpt-image-1";
+      // Helper: attempt OpenAI gpt-image-1 as fallback
+      const tryOpenAIFallback = async (): Promise<{ ok: true; imageUrl: string; brief: string } | null> => {
+        if (primaryModel === "openai/gpt-image-1" || !(process.env.OPENAI_API_KEY ?? "")) return null;
+        try {
+          console.warn(`[theater.generateImage] ${primaryModel} failed, falling back to openai/gpt-image-1`);
+          const r2 = await dispatchGenerate("openai/gpt-image-1", { prompt: brief, aspectRatio: aspect as any, brandId: input.brandId });
+          if (r2.status === "ready" && r2.url) return { ok: true as const, imageUrl: r2.url, brief };
+        } catch (e2) {
+          console.error(`[theater.generateImage] openai fallback also failed:`, e2);
+        }
+        return null;
+      };
       try {
         const r = await dispatchGenerate(primaryModel, {
           prompt: brief,
@@ -975,16 +987,15 @@ ${cleaned}
         if (r.status === "ready" && r.url) {
           return { ok: true as const, imageUrl: r.url, brief };
         }
-        // Primary failed — try OpenAI as emergency fallback (only if not already tried)
-        if (primaryModel !== "openai/gpt-image-1" && (process.env.OPENAI_API_KEY ?? "")) {
-          console.warn(`[theater.generateImage] ${primaryModel} failed (${r.errorMsg}), falling back to openai/gpt-image-1`);
-          try {
-            const r2 = await dispatchGenerate("openai/gpt-image-1", { prompt: brief, aspectRatio: aspect as any, brandId: input.brandId });
-            if (r2.status === "ready" && r2.url) return { ok: true as const, imageUrl: r2.url, brief };
-          } catch { /* fallback also failed, fall through */ }
-        }
+        // Primary returned non-ready — try OpenAI fallback
+        const fallback = await tryOpenAIFallback();
+        if (fallback) return fallback;
         return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `image gen ${r.status}` };
       } catch (e: any) {
+        // Primary THREW (e.g. PiAPI HTTP 500 insufficient credits) — still try OpenAI fallback
+        console.error(`[theater.generateImage] ${primaryModel} threw:`, e?.message ?? e);
+        const fallback = await tryOpenAIFallback();
+        if (fallback) return fallback;
         return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
       }
     })),
