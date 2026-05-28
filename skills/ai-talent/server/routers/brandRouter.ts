@@ -746,7 +746,8 @@ export const brandRouter = router({
         // Download + persist
         const { mkdirSync, writeFileSync } = await import("fs");
         const { join } = await import("path");
-        const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/marketing-os/covers";
+        // 2026-05-28: updated default to match infra rename /opt/marketing-os → /opt/onbrand
+        const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
         const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
         mkdirSync(COVERS_DIR, { recursive: true });
         const fileId = `brand-${input.brandId}-fb-${Date.now()}.jpg`;

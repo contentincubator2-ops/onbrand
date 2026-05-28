@@ -25,7 +25,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const candidatePaths = [
   join(process.cwd(), ".env"),                    // when ci.yml --cwd is correct
   join(here, "..", ".env"),                       // server/bootstrap-env.ts → ../.env
-  "/opt/marketing-os/app/skills/ai-talent/.env",  // prod absolute fallback
+  "/opt/onbrand/app/skills/ai-talent/.env",       // prod absolute fallback (infra renamed 2026-05-28)
+  "/opt/marketing-os/app/skills/ai-talent/.env",  // legacy fallback (symlink to /opt/onbrand)
 ];
 const envPath = candidatePaths.find((p) => existsSync(p));
 if (!envPath) {
