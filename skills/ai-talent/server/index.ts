@@ -98,7 +98,20 @@ app.use(helmet({
     preload: true,
   },
   crossOriginEmbedderPolicy: false,  // allow SPA iframe embeds if needed
+  // 2026-05-29 (security): explicit referrer policy — don't leak URL path in
+  // Referer header when navigating to external sites (GDPR data minimisation).
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
 }));
+
+// 2026-05-29 (security): Permissions-Policy — disable unused browser APIs that
+// could be abused by injected scripts (microphone, camera, geolocation, etc.)
+app.use((_req, res, next) => {
+  res.setHeader(
+    "Permissions-Policy",
+    "geolocation=(), microphone=(), camera=(), payment=(), usb=(), fullscreen=(self)",
+  );
+  next();
+});
 
 // SEC-S-07 (2026-05-04): production no longer falls back to localhost (a
 // misconfig that would have allowed cross-origin writes). If CORS_ORIGIN is
@@ -347,20 +360,15 @@ app.use("/api/missions", missionStepStreamRouter);
 //   · verify critical env vars are present (catches deploy-misconfig)
 //   · verify at least one LLM provider key is set (router has fallback chain)
 //   · include memory + uptime for capacity planning
-app.get("/health", healthLimiter, async (_req, res) => {
+app.get("/health", healthLimiter, async (req, res) => {
   const [dbOk, soworkDbOk] = await Promise.all([pingDb(), pingSoworkDb()]);
   const billingQueueLength = getBillingRetryQueueLength();
 
-  // Critical env vars — if any missing, server can't function. Don't leak
-  // the values; just confirm presence so health checks can fail loudly
-  // when a deploy accidentally drops a secret.
   const criticalEnvPresent =
     !!process.env.JWT_SECRET &&
     !!process.env.LOCAL_DB_PASSWORD &&
     !!process.env.RESEND_API_KEY;
 
-  // At least ONE LLM provider key must work. Router will fallback through
-  // all of them, but with zero keys nothing can run.
   const anyLLMKey =
     !!process.env.AZURE_FOUNDRY_API_KEY ||
     !!process.env.OPENAI_API_KEY ||
@@ -374,15 +382,32 @@ app.get("/health", healthLimiter, async (_req, res) => {
   const checks = {
     db: dbOk,
     soworkDb: soworkDbOk,
-    billingQueueOk: billingQueueLength < 100,  // 100+ stuck billing rows = bad
+    billingQueueOk: billingQueueLength < 100,
     criticalEnvPresent,
     anyLLMKey,
   };
   const allOk = Object.values(checks).every(Boolean);
+  const status = allOk ? "ok" : "degraded";
+
+  // 2026-05-29 (security): full details only for authenticated internal monitors.
+  // HEALTH_SECRET env var — set a random token in prod; monitoring tools send
+  // Authorization: Bearer <token>. Without it, only return a status flag.
+  const healthSecret = process.env.HEALTH_SECRET;
+  const authHeader = req.headers.authorization ?? "";
+  const isInternal =
+    !healthSecret || // no secret set = open (dev mode)
+    authHeader === `Bearer ${healthSecret}` ||
+    req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
+
+  if (!isInternal) {
+    // External probes: only the status code + minimal body
+    res.status(allOk ? 200 : 503).json({ status });
+    return;
+  }
 
   const mem = process.memoryUsage();
   res.status(allOk ? 200 : 503).json({
-    status:  allOk ? "ok" : "degraded",
+    status,
     service: "ai-talent",
     checks: {
       db:                checks.db ? "ok" : "fail",

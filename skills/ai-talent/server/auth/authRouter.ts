@@ -127,7 +127,11 @@ authRouter.post("/register", async (req: Request, res: Response) => {
     const schema = z.object({
       name: z.string().min(1, "姓名為必填"),
       email: z.string().email("請輸入有效的電子郵件"),
-      password: z.string().min(8, "密碼至少需要 8 個字元"),
+      password: z.string()
+        .min(8, "密碼至少需要 8 個字元")
+        .regex(/[A-Z]/, "密碼需包含至少一個大寫字母")
+        .regex(/[0-9]/, "密碼需包含至少一個數字")
+        .regex(/[^A-Za-z0-9]/, "密碼需包含至少一個特殊字元（如 !@#$）"),
     });
 
     const result = schema.safeParse(req.body);
@@ -242,6 +246,7 @@ authRouter.post("/register", async (req: Request, res: Response) => {
       console.error("[auth] verification email send failed (non-blocking):", emailError);
     }
 
+    void writeLoginAuditLog({ userId: user.id, email, event: "register", ip: getClientIp(req), userAgent: req.headers["user-agent"] ?? null });
     res.json({
       success: true,
       message: emailSent
@@ -274,8 +279,21 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     const { email, password } = result.data;
     const db = await getDb();
 
+    // 2026-05-29 (ISO 27001 A.9.4): check account lockout
+    const lockCheck = checkLoginLockout(email);
+    if (!lockCheck.ok) {
+      const retryMins = Math.ceil(lockCheck.retryInMs / 60_000);
+      void writeLoginAuditLog({ userId: null, email, event: "lockout", ip: getClientIp(req), userAgent: req.headers["user-agent"] ?? null });
+      res.status(429).json({
+        error: `帳號因多次登入失敗已暫時鎖定，請 ${retryMins} 分鐘後再試`,
+      });
+      return;
+    }
+
     const user = await verifyEmailPassword(db, email, password);
     if (!user) {
+      recordLoginFailure(email);
+      void writeLoginAuditLog({ userId: null, email, event: "login_failure", ip: getClientIp(req), userAgent: req.headers["user-agent"] ?? null });
       res.status(401).json({ error: "電子郵件或密碼錯誤" });
       return;
     }
@@ -294,6 +312,8 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     // Update last login IP
     const clientIp = getClientIp(req);
     await updateLastLoginIp(db, user.userId, clientIp);
+    recordLoginSuccess(email);
+    void writeLoginAuditLog({ userId: user.userId, email, event: "login_success", ip: clientIp, userAgent: req.headers["user-agent"] ?? null });
 
     // Create session token
     const sessionToken = await createSessionToken(user.userId, user.openId);
@@ -607,6 +627,80 @@ authRouter.post("/resetPassword", async (req: Request, res: Response) => {
 // 2026-05-08 (P0-B + P0-C): in-memory rate limiters
 // Per-email cooldowns. trial scale; revisit to Redis when scaling out.
 // ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+// 2026-05-29 (ISO 27001 A.9.4): per-account login lockout.
+// After 5 failed attempts within 15 min → lock for 15 min.
+// In-memory; resets on process restart (acceptable at trial scale).
+// ─────────────────────────────────────────────────────────────────────
+const LOGIN_FAIL_WINDOW_MS  = 15 * 60 * 1000; // 15 minutes
+const LOGIN_FAIL_MAX        = 5;              // max failures before lockout
+const LOGIN_LOCKOUT_MS      = 15 * 60 * 1000; // lockout duration
+const loginFailsByEmail = new Map<string, { times: number[]; lockedUntil: number }>();
+
+function checkLoginLockout(email: string): { ok: true } | { ok: false; retryInMs: number } {
+  const now = Date.now();
+  const entry = loginFailsByEmail.get(email);
+  if (!entry) return { ok: true };
+  if (entry.lockedUntil > now) {
+    return { ok: false, retryInMs: entry.lockedUntil - now };
+  }
+  return { ok: true };
+}
+
+function recordLoginFailure(email: string): void {
+  const now = Date.now();
+  const windowStart = now - LOGIN_FAIL_WINDOW_MS;
+  const entry = loginFailsByEmail.get(email) ?? { times: [], lockedUntil: 0 };
+  entry.times = entry.times.filter(t => t > windowStart);
+  entry.times.push(now);
+  if (entry.times.length >= LOGIN_FAIL_MAX) {
+    entry.lockedUntil = now + LOGIN_LOCKOUT_MS;
+    entry.times = []; // reset after lockout applied
+  }
+  loginFailsByEmail.set(email, entry);
+}
+
+function recordLoginSuccess(email: string): void {
+  loginFailsByEmail.delete(email); // clear failure count on success
+}
+
+/**
+ * Write an auth event to login_audit_log (ISO 27001 A.12.4 audit trail).
+ * Non-fatal — log failures don't block the auth flow.
+ * Table is auto-created on first write (lazy migration).
+ */
+async function writeLoginAuditLog(entry: {
+  userId: number | null;
+  email: string;
+  event: "login_success" | "login_failure" | "logout" | "register" | "lockout";
+  ip: string;
+  userAgent: string | null;
+}): Promise<void> {
+  try {
+    const { default: localPool } = await import("../localDb");
+    await localPool.execute(
+      `CREATE TABLE IF NOT EXISTS login_audit_log (
+         id         BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+         userId     INT          NULL,
+         email      VARCHAR(255) NOT NULL,
+         event      VARCHAR(40)  NOT NULL,
+         ip         VARCHAR(64)  NOT NULL,
+         userAgent  TEXT         NULL,
+         createdAt  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+         INDEX idx_email (email),
+         INDEX idx_userid (userId),
+         INDEX idx_event_time (event, createdAt)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    );
+    await localPool.execute(
+      `INSERT INTO login_audit_log (userId, email, event, ip, userAgent) VALUES (?, ?, ?, ?, ?)`,
+      [entry.userId ?? null, entry.email, entry.event, entry.ip, entry.userAgent ?? null],
+    );
+  } catch {
+    // Non-fatal — audit log failure must never block auth
+  }
+}
+
 const RESEND_COOLDOWN_MS = 5 * 60 * 1000;       // resend verification: 5 min
 const FORGOT_COOLDOWN_MS = 60 * 60 * 1000;      // forgot password: 1 hour window
 const FORGOT_MAX_PER_WINDOW = 3;
