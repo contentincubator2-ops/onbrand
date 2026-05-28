@@ -193,6 +193,9 @@ export const publishRouter = router({
       const { access_token } = (await tokenRes.json()) as { access_token: string };
 
       // Step 2: mint a Connect user token for the popup flow.
+      // 2026-05-28 fix: include app so connect_link_url embeds ?app=facebook_pages.
+      // Without this, Pipedream returns a connect_link_url without the app
+      // parameter and its iframe shows "Please include the app in the Connect URL".
       const resp = await fetch(`https://api.pipedream.com/v1/connect/tokens`, {
         method: "POST",
         headers: {
@@ -203,6 +206,7 @@ export const publishRouter = router({
         body: JSON.stringify({
           external_user_id: `sowork-${ctx.user.id}`,
           project_id:       projectId,
+          app:              "facebook_pages",
         }),
         signal: AbortSignal.timeout(15_000),
       });
@@ -214,11 +218,29 @@ export const publishRouter = router({
         });
       }
       const data: any = await resp.json();
-      // Frontend opens this URL → user OAuths Facebook → returns to our app.
+      // Build the Connect URL — always guarantee ?app=facebook_pages is present.
+      // Pipedream only embeds the app in connect_link_url when the token was
+      // created with `app` in the body (fixed above). But as a belt-and-suspenders
+      // guard, we parse whatever URL Pipedream returns and force-inject the app
+      // param if it's missing rather than trusting Pipedream's format blindly.
+      let connectUrl: string;
+      try {
+        const rawUrl = data.connect_link_url
+          ?? `https://pipedream.com/_static/connect.html?token=${data.token}`;
+        const u = new URL(rawUrl);
+        if (!u.searchParams.has("app")) {
+          u.searchParams.set("app", "facebook_pages");
+        }
+        if (!u.searchParams.has("token") && data.token) {
+          u.searchParams.set("token", data.token);
+        }
+        connectUrl = u.toString();
+      } catch {
+        connectUrl = `https://pipedream.com/_static/connect.html?token=${data.token}&app=facebook_pages`;
+      }
       return {
         token: data.token,
-        connectUrl: data.connect_link_url
-          ?? `https://pipedream.com/_static/connect.html?token=${data.token}&app=facebook_pages`,
+        connectUrl,
         expiresAt: data.expires_at ?? null,
       };
     }),
