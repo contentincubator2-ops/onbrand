@@ -47,7 +47,9 @@ export async function createContext({ req }: { req: Request }): Promise<TRPCCont
     const secret = new TextEncoder().encode(getJwtSecret());
     const { payload } = await jose.jwtVerify(token, secret);
 
-    console.log('[auth] Successfully verified token from', tokenSource, 'for userId:', Number(payload.sub ?? (payload as any).userId ?? 0));
+    // 2026-05-29 (GDPR data minimisation): removed per-request userId log.
+    // userId in every request log = extensive personal data processing.
+    // JWT verification failures are still logged (below) for security monitoring.
 
     return {
       user: {
@@ -144,9 +146,10 @@ export const protectedProcedure = t.procedure
     }
     return next({ ctx: { ...ctx, user: ctx.user } });
   })
-  .use(({ ctx, next, path }) => {
-    // Log all protected procedure calls
-    console.log(`[trpc] Protected procedure called: ${path} by userId:`, ctx.user?.id);
+  .use(({ ctx, next }) => {
+    // 2026-05-29 (GDPR data minimisation): removed per-call userId log.
+    // Logging userId on every tRPC call creates extensive personal data
+    // processing records. Errors are still captured via errorLoggerMiddleware.
     return next({ ctx });
   });
 
@@ -161,13 +164,13 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
     [ctx.user.id],
   );
   const u = (rows as any[])[0] ?? {};
-  // 2026-05-16 (CJ「後台監控」): accept role='admin' OR the SoWork staff
-  // allowlist (mirrors supportRouter.isAdminUser) so internal team gets
-  // in without a manual users.role flip. CJ = userId 199 / @sowork.tw.
+  // 2026-05-29 (security): removed hardcoded userId 199 check — that's a
+  // magic-number IDOR risk (anyone who learns user 199 exists can craft tokens
+  // if the secret ever leaks). Admin access is now strictly role- or
+  // email-domain based. Set users.role='admin' via DB migration for staff.
   const email = String(u.email ?? ctx.user.email ?? "");
   const isAdmin =
     u.role === "admin" ||
-    ctx.user.id === 199 ||
     /@sowork\.(tw|ai)$/i.test(email);
   if (!isAdmin) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });

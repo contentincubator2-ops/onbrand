@@ -6,6 +6,16 @@ import { missionOutputs } from "../../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { normalizeTaskId, normalizeTier } from "../_core/tierCompat";
 
+/** Escape HTML special characters to prevent stored XSS in previewHtml */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 /**
  * 2026-05-18 (CJ「整個系統還有哪些地方會遇到 taskId 沒被持久化」):
  * taskId resolution used to rely solely on metadata.taskId, so any
@@ -22,12 +32,12 @@ function taskIdFromDescription(desc: string | null | undefined): string | null {
 }
 
 const PLATFORM_PREVIEW_TEMPLATES: Record<string, (content: string, title?: string) => string> = {
-  facebook: (content, title) => `<div style="font-family:Helvetica,Arial,sans-serif;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><div style="padding:12px 16px;display:flex;align-items:center;gap:10px"><div style="width:40px;height:40px;border-radius:50%;background:#1877F2;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:16px">B</div><div><div style="font-weight:600;font-size:14px">品牌頁面</div><div style="font-size:12px;color:#65676b">剛剛 · 🌐</div></div></div><div style="padding:0 16px 12px;font-size:15px;line-height:1.6;color:#1c1e21;white-space:pre-wrap">${content}</div></div>`,
-  instagram: (content) => `<div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:400px;border:1px solid #dbdbdb;border-radius:4px;background:#fff"><div style="padding:14px 16px;display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)"></div><div style="font-weight:600;font-size:14px">brand_account</div></div><div style="background:#f0f0f0;aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px">圖片區域</div><div style="padding:12px 16px"><div style="font-size:14px;line-height:1.6;white-space:pre-wrap"><span style="font-weight:600">brand_account</span> ${content}</div></div></div>`,
-  linkedin: (content, title) => `<div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:550px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;padding:16px"><div style="display:flex;gap:10px;margin-bottom:12px"><div style="width:48px;height:48px;border-radius:50%;background:#0077B5;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold">B</div><div><div style="font-weight:600;font-size:14px">品牌名稱</div><div style="font-size:12px;color:#666">行銷 · 1分鐘前</div></div></div><div style="font-size:14px;line-height:1.7;color:#1c1c1c;white-space:pre-wrap">${content}</div></div>`,
-  youtube: (content, title) => `<div style="font-family:Roboto,Arial,sans-serif;max-width:560px;background:#fff"><div style="background:#f0f0f0;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#aaa;font-size:14px">▶ 影片縮圖</div><div style="padding:12px 0"><div style="font-size:16px;font-weight:600;line-height:1.4;margin-bottom:6px">${title || '影片標題'}</div><div style="font-size:13px;color:#606060;line-height:1.5;white-space:pre-wrap">${content}</div></div></div>`,
-  google_ads: (content, title) => `<div style="font-family:Arial,sans-serif;max-width:480px;border:1px solid #ddd;border-radius:4px;padding:12px;background:#fff"><div style="font-size:11px;color:#006621;margin-bottom:2px">廣告 · www.example.com</div><div style="font-size:18px;color:#1a0dab;margin-bottom:4px">${title || '廣告標題'}</div><div style="font-size:14px;color:#545454;line-height:1.5">${content}</div></div>`,
-  email: (content, title) => `<div style="font-family:Arial,sans-serif;max-width:600px;border:1px solid #ddd;background:#fff"><div style="background:#f5f5f5;padding:12px 16px;border-bottom:1px solid #ddd"><div style="font-size:13px;color:#666">主旨：${title || '（無主旨）'}</div></div><div style="padding:24px 16px;font-size:14px;line-height:1.8"><div style="white-space:pre-wrap">${content}</div></div></div>`,
+  facebook: (content, title) => `<div style="font-family:Helvetica,Arial,sans-serif;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><div style="padding:12px 16px;display:flex;align-items:center;gap:10px"><div style="width:40px;height:40px;border-radius:50%;background:#1877F2;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:16px">B</div><div><div style="font-weight:600;font-size:14px">品牌頁面</div><div style="font-size:12px;color:#65676b">剛剛 · 🌐</div></div></div><div style="padding:0 16px 12px;font-size:15px;line-height:1.6;color:#1c1e21;white-space:pre-wrap">${escapeHtml(content)}</div></div>`,
+  instagram: (content) => `<div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:400px;border:1px solid #dbdbdb;border-radius:4px;background:#fff"><div style="padding:14px 16px;display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)"></div><div style="font-weight:600;font-size:14px">brand_account</div></div><div style="background:#f0f0f0;aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px">圖片區域</div><div style="padding:12px 16px"><div style="font-size:14px;line-height:1.6;white-space:pre-wrap"><span style="font-weight:600">brand_account</span> ${escapeHtml(content)}</div></div></div>`,
+  linkedin: (content, title) => `<div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:550px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;padding:16px"><div style="display:flex;gap:10px;margin-bottom:12px"><div style="width:48px;height:48px;border-radius:50%;background:#0077B5;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold">B</div><div><div style="font-weight:600;font-size:14px">品牌名稱</div><div style="font-size:12px;color:#666">行銷 · 1分鐘前</div></div></div><div style="font-size:14px;line-height:1.7;color:#1c1c1c;white-space:pre-wrap">${escapeHtml(content)}</div></div>`,
+  youtube: (content, title) => `<div style="font-family:Roboto,Arial,sans-serif;max-width:560px;background:#fff"><div style="background:#f0f0f0;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#aaa;font-size:14px">▶ 影片縮圖</div><div style="padding:12px 0"><div style="font-size:16px;font-weight:600;line-height:1.4;margin-bottom:6px">${escapeHtml(title ?? '') || '影片標題'}</div><div style="font-size:13px;color:#606060;line-height:1.5;white-space:pre-wrap">${escapeHtml(content)}</div></div></div>`,
+  google_ads: (content, title) => `<div style="font-family:Arial,sans-serif;max-width:480px;border:1px solid #ddd;border-radius:4px;padding:12px;background:#fff"><div style="font-size:11px;color:#006621;margin-bottom:2px">廣告 · www.example.com</div><div style="font-size:18px;color:#1a0dab;margin-bottom:4px">${escapeHtml(title ?? '') || '廣告標題'}</div><div style="font-size:14px;color:#545454;line-height:1.5">${escapeHtml(content)}</div></div>`,
+  email: (content, title) => `<div style="font-family:Arial,sans-serif;max-width:600px;border:1px solid #ddd;background:#fff"><div style="background:#f5f5f5;padding:12px 16px;border-bottom:1px solid #ddd"><div style="font-size:13px;color:#666">主旨：${escapeHtml(title ?? '') || '（無主旨）'}</div></div><div style="padding:24px 16px;font-size:14px;line-height:1.8"><div style="white-space:pre-wrap">${escapeHtml(content)}</div></div></div>`,
 };
 
 export const outputRouter = router({
@@ -38,6 +48,12 @@ export const outputRouter = router({
       platform: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [mCheck]: any = await localPool.execute(
+        `SELECT id FROM missions WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.missionId, ctx.user.id]
+      );
+      if (!(mCheck as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Mission not found" });
       const db = await getDb();
       if (!db) return [];
       const conditions: any[] = [eq(missionOutputs.missionId, input.missionId)];
@@ -504,6 +520,12 @@ export const outputRouter = router({
       batchGroupId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [mCheck]: any = await localPool.execute(
+        `SELECT id FROM missions WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.missionId, ctx.user.id]
+      );
+      if (!(mCheck as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Mission not found" });
       const db = await getDb();
       if (!db) throw new Error("DB not available");
       const previewFn = PLATFORM_PREVIEW_TEMPLATES[input.platform];
@@ -534,6 +556,12 @@ export const outputRouter = router({
       scheduledAt: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [own]: any = await localPool.execute(
+        `SELECT mo.id FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId WHERE mo.id = ? AND m.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id]
+      );
+      if (!(own as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Output not found" });
       const db = await getDb();
       if (!db) throw new Error("DB not available");
       const updates: any = { status: input.status };
@@ -546,6 +574,12 @@ export const outputRouter = router({
   getVersions: protectedProcedure
     .input(z.object({ outputId: z.number() }))
     .query(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [own]: any = await localPool.execute(
+        `SELECT mo.id FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId WHERE mo.id = ? AND m.userId = ? LIMIT 1`,
+        [input.outputId, ctx.user.id]
+      );
+      if (!(own as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Output not found" });
       const db = await getDb();
       if (!db) return [];
       const chain: any[] = [];
@@ -566,6 +600,14 @@ export const outputRouter = router({
       status: z.enum(["draft","pending_review","approved","scheduled","published","archived"]),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (input.ids.length === 0) return { success: true, count: 0 };
+      const { default: localPool } = await import("../localDb");
+      const placeholders = input.ids.map(() => '?').join(',');
+      const [owned]: any = await localPool.execute(
+        `SELECT mo.id FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId WHERE mo.id IN (${placeholders}) AND m.userId = ?`,
+        [...input.ids, ctx.user.id]
+      );
+      if ((owned as any[]).length !== input.ids.length) throw new TRPCError({ code: "FORBIDDEN", message: "One or more outputs not found" });
       const db = await getDb();
       if (!db) throw new Error("DB not available");
       for (const id of input.ids) {
@@ -609,6 +651,12 @@ export const outputRouter = router({
       finalizedBy: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [own]: any = await localPool.execute(
+        `SELECT mo.id FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId WHERE mo.id = ? AND m.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id]
+      );
+      if (!(own as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Output not found" });
       const db = await getDb();
       if (!db) throw new Error("DB not available");
       const finalizedBy = input.finalizedBy ?? (ctx.user as any)?.id ?? 'unknown';
@@ -627,6 +675,12 @@ export const outputRouter = router({
       toolUrlExpiresAt: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [own]: any = await localPool.execute(
+        `SELECT mo.id FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId WHERE mo.id = ? AND m.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id]
+      );
+      if (!(own as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Output not found" });
       const db = await getDb();
       if (!db) throw new Error("DB not available");
       const parts: string[] = [];
@@ -652,6 +706,12 @@ export const outputRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [own]: any = await localPool.execute(
+        `SELECT mo.id FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId WHERE mo.id = ? AND m.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id]
+      );
+      if (!(own as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Output not found" });
       const db = await getDb();
       if (!db) throw new Error("DB not available");
       await db.update(missionOutputs).set({ status: "archived" as any })

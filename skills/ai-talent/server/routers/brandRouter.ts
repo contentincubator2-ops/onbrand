@@ -1268,7 +1268,7 @@ export const brandRouter = router({
 
       const [rows] = await db.execute(
         sql`SELECT name, description, industry, website, tagline FROM brands
-          WHERE id=${input.brandId} LIMIT 1`
+          WHERE id=${input.brandId} AND userId=${ctx.user.id} LIMIT 1`
       ) as any;
       const brand = rows?.[0];
       if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
@@ -1316,7 +1316,7 @@ export const brandRouter = router({
           emotionalDiff=${parsed.emotionalDiff ?? null},
           functionalDiff=${parsed.functionalDiff ?? null},
           isEstimate=1
-        WHERE id=${input.brandId}`
+        WHERE id=${input.brandId} AND userId=${ctx.user.id}`
       );
       return { success: true, data: parsed };
     }),

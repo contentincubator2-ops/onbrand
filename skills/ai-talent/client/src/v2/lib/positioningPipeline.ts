@@ -657,6 +657,40 @@ export const PRODUCT_FULL_PIPELINE: PipelineStepSpec[] = [
       },
     },
   },
+  {
+    id: 6,
+    title: "Step 6 — 行銷語氣指引（品牌聲音 × 產品個性 → 文字規範）",
+    segmentTarget: "seg:marketing",
+    segmentId: "marketing",
+    agent: "brand-voice-coach",
+    researchBudget: { minUrls: 0, minChars: 0 },
+    promptTemplate: `整合 Step 1-5 分析，為產品「{brand_name}」生成行銷文字指引。
+
+從已有的：
+- Step 1 產品核心（zhTagline / coreStatement）
+- Step 3 目標受眾（心理特徵 + 行為模式）
+- Step 4 功能 / 情緒價值（personality / primaryEmotion）
+- 品牌 voice 語氣規範（若有注入）
+
+生成：
+1. tone（品牌語氣）：100-150 字，描述與目標受眾溝通時的情緒溫度與說話方式
+2. style（溝通風格）：100-150 字，描述文字排版 / 句式 / 長短 / 開頭常用語氣詞
+3. keywords（關鍵詞彙）：8-12 個品牌專屬用詞（名詞 / 動詞 / 形容詞均可）
+4. visualStyle（視覺文字搭配）：50-80 字，文案搭配的視覺方向
+5. colorStrategy（色彩與情緒聯想）：50-80 字，文字說話時配合的色感
+6. imageStyle（圖像語言）：50-80 字，圖像與文字的整體風格定調
+
+依範例結構輸出 conclusion。`,
+    mockThinking: "整合產品定位 + 目標受眾 + 品牌 voice，生成文字指引…",
+    mockConclusion: {
+      tone: "（mock）直接、務實、有說服力。說話時像一位熟悉市場的朋友，不賣弄術語。",
+      style: "（mock）簡短有力，每段不超過 2 句。開頭用動詞。避免被動語態。",
+      keywords: ["（mock）精準", "（mock）主動", "（mock）前瞻", "（mock）掌握", "（mock）策略"],
+      visualStyle: "（mock）文字置中，搭配數字圖表，強調數據驅動感。",
+      colorStrategy: "（mock）深藍 + 白，傳遞專業穩健感。CTA 用橙色增加行動感。",
+      imageStyle: "（mock）都市專業人士的工作場景，有溫度但不過度。",
+    },
+  },
 ];
 
 // ── Event pipeline (11 steps — CJ direction 2026-04-29) ─────────────────

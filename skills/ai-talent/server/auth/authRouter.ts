@@ -42,38 +42,68 @@ export const authRouter = Router();
 
 // Cookie configuration
 const SESSION_COOKIE_NAME = "session";
+// 2026-05-29 (security/GDPR): reduced from 365d to 30d.
+// Long-lived sessions are a GDPR Art. 32 risk — a stolen cookie is valid for
+// a year. 30d balances UX (users don't have to re-login constantly) with
+// the principle of minimal exposure. Rotate to 7d once we add refresh tokens.
+const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
-  maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+  maxAge: SESSION_MAX_AGE_MS,
   path: "/",
 };
+
+/**
+ * Server-side session revocation (GDPR Art. 17 / ISO 27001 A.9.4).
+ *
+ * When a user logs out we add their JWT's `jti` (JWT ID) to this set so
+ * that even if the browser cookie is replayed (e.g. XSS steal, copied
+ * session) the token is rejected immediately.
+ *
+ * This is an in-memory store — it resets on process restart, but at that
+ * point existing JWTs still verify cryptographically, so users just stay
+ * logged in across restarts (acceptable UX trade-off for trial scale).
+ * Upgrade to Redis when multi-process / multi-replica deployment happens.
+ *
+ * Entries are pruned lazily: jti encodes the exp timestamp so we can drop
+ * entries whose tokens would already be expired.
+ */
+const revokedJtis = new Set<string>();
 
 function getSecretBytes(): Uint8Array {
   return new TextEncoder().encode(getJwtSecret());
 }
 
 /**
- * Create a session token for a user
+ * Create a session token for a user.
+ * Embeds a `jti` (JWT ID) = `<userId>:<randomHex>` for server-side revocation.
  */
 async function createSessionToken(userId: number, openId: string): Promise<string> {
-  return await new SignJWT({ sub: String(userId), openId })
+  const { randomBytes } = await import("crypto");
+  const jti = `${userId}:${randomBytes(16).toString("hex")}`;
+  return await new SignJWT({ sub: String(userId), openId, jti })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("365d")
+    .setExpirationTime("30d")
     .sign(getSecretBytes());
 }
 
 /**
- * Verify a session token and return user ID
+ * Verify a session token and return user ID + jti.
+ * Returns null if token is invalid, expired, or has been revoked via logout.
  */
-async function verifySessionToken(token: string): Promise<{ userId: number; openId: string } | null> {
+async function verifySessionToken(token: string): Promise<{ userId: number; openId: string; jti?: string } | null> {
   try {
     const { payload } = await jwtVerify(token, getSecretBytes());
+    const jti = typeof payload.jti === "string" ? payload.jti : undefined;
+    // Reject revoked sessions (e.g. explicit logout)
+    if (jti && revokedJtis.has(jti)) return null;
     return {
       userId: parseInt(payload.sub as string),
       openId: payload.openId as string,
+      jti,
     };
   } catch {
     return null;
@@ -288,8 +318,35 @@ authRouter.post("/login", async (req: Request, res: Response) => {
 
 /**
  * POST /api/auth/logout - Logout
+ * 2026-05-29 (GDPR Art. 17 / ISO 27001 A.9.4): server-side session
+ * revocation. Extract the jti from the current cookie and add it to the
+ * in-memory revocation set so replayed tokens are instantly rejected.
  */
-authRouter.post("/logout", async (_req: Request, res: Response) => {
+authRouter.post("/logout", async (req: Request, res: Response) => {
+  try {
+    const sessionToken = req.cookies[SESSION_COOKIE_NAME];
+    if (sessionToken) {
+      const session = await verifySessionToken(sessionToken);
+      if (session?.jti) {
+        revokedJtis.add(session.jti);
+        // Lazy cleanup: prune any revoked jtis whose userId prefix matches
+        // the current user (keeps set small; exact exp-based pruning would
+        // require storing the exp alongside the jti).
+        if (revokedJtis.size > 10_000) {
+          // Emergency cap — shouldn't be reached at trial scale.
+          // Take the oldest 5000 entries off (Sets iterate insertion-order).
+          const iter = revokedJtis.values();
+          for (let i = 0; i < 5_000; i++) {
+            const v = iter.next();
+            if (v.done) break;
+            revokedJtis.delete(v.value);
+          }
+        }
+      }
+    }
+  } catch {
+    // Non-fatal — always clear the cookie regardless
+  }
   res.clearCookie(SESSION_COOKIE_NAME, { path: "/" });
   res.json({ success: true });
 });

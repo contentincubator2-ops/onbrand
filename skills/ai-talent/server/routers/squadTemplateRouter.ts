@@ -760,10 +760,12 @@ ${schemaExample}
       // ── Pass 2: batch resolve agents ────────────────────────────────────────
       const agentMap: Record<number, any> = {};
       if (agentIdSet.size > 0) {
-        const ids = [...agentIdSet].join(",");
+        const ids = [...agentIdSet];
+        const placeholders = ids.map(() => "?").join(",");
         try {
           const [aRows] = await localPool.execute(
-            `SELECT id, name, title, primarySkill, aiModel FROM agents WHERE id IN (${ids})`
+            `SELECT id, name, title, primarySkill, aiModel FROM agents WHERE id IN (${placeholders})`,
+            ids,
           ) as any[];
           for (const a of aRows as any[]) agentMap[a.id] = a;
         } catch (e) {
@@ -1134,8 +1136,10 @@ ${schemaExample}
       const leadMap: Record<number, any> = {};
       if (leadIds.length) {
         try {
+          const leadPlaceholders = leadIds.map(() => "?").join(",");
           const [agentRows] = await localPool.execute(
-            `SELECT id, name, title FROM agents WHERE id IN (${leadIds.join(",")})`
+            `SELECT id, name, title FROM agents WHERE id IN (${leadPlaceholders})`,
+            leadIds,
           ) as any[];
           for (const a of agentRows as any[]) leadMap[a.id] = a;
         } catch (e) {
@@ -1338,9 +1342,11 @@ ${schemaExample}
       // Fetch real agent data
       let agentMap: Record<number, any> = {};
       if (agentIds.length) {
+        const agentPlaceholders = agentIds.map(() => "?").join(",");
         const [agentRows] = await localPool.execute(
           `SELECT id, name, title, specialty, primarySkill, aiModel, avatarUrl
-           FROM agents WHERE id IN (${agentIds.join(",")})`
+           FROM agents WHERE id IN (${agentPlaceholders})`,
+          agentIds,
         ) as any[];
         for (const a of agentRows as any[]) agentMap[(a as any).id] = a;
       }
@@ -1443,9 +1449,11 @@ ${schemaExample}
       if (!candidates.length) return [];
 
       const leadIds = candidates.map((c: any) => c.leadAgentId) as number[];
+      const altLeadPlaceholders = leadIds.map(() => "?").join(",");
       const [agentRows] = await localPool.execute(
         `SELECT id, name, title, primarySkill, aiModel
-         FROM agents WHERE id IN (${leadIds.join(",")}) ORDER BY rating DESC`
+         FROM agents WHERE id IN (${altLeadPlaceholders}) ORDER BY rating DESC`,
+        leadIds,
       ) as any[];
 
       const agentMap: Record<number, any> = {};
@@ -1577,9 +1585,11 @@ ${schemaExample}
             const agentIds = membersJson.map((m: any) => m.agent_id).filter(Boolean) as number[];
 
             if (agentIds.length) {
+              const assemblePlaceholders = agentIds.map(() => "?").join(",");
               const [agentRows] = await localPool.execute(
                 `SELECT id, name, title, primarySkill, aiModel
-                 FROM agents WHERE id IN (${agentIds.join(",")})`
+                 FROM agents WHERE id IN (${assemblePlaceholders})`,
+                agentIds,
               ) as any[];
               const agentMap: Record<number, any> = {};
               for (const a of agentRows as any[]) agentMap[(a as any).id] = a;

@@ -7,6 +7,7 @@
  */
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { missions, missionTaskUnits } from "../../drizzle/schema";
 import { eq, and, desc, or, isNull, sql } from "drizzle-orm";
@@ -315,6 +316,13 @@ export const missionRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("DB not available");
+      // 2026-05-29 (security): verify caller owns the mission before adding units.
+      const { default: localPool } = await import("../localDb");
+      const [mCheck]: any = await localPool.execute(
+        `SELECT id FROM missions WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.missionId, ctx.user.id],
+      );
+      if (!(mCheck as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Mission not found" });
       // Get max sort order
       const existing = await db.select().from(missionTaskUnits)
         .where(eq(missionTaskUnits.missionId, input.missionId));
@@ -339,6 +347,15 @@ export const missionRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("DB not available");
+      // 2026-05-29 (security): verify caller owns the mission that owns this task unit.
+      const { default: localPool } = await import("../localDb");
+      const [uCheck]: any = await localPool.execute(
+        `SELECT tu.id FROM mission_task_units tu
+         JOIN missions m ON m.id = tu.missionId
+         WHERE tu.id = ? AND m.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      if (!(uCheck as any[])[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Task unit not found" });
       const { id, ...updates } = input;
       const cleanUpdates = Object.fromEntries(
         Object.entries(updates).filter(([_, v]) => v !== undefined)
