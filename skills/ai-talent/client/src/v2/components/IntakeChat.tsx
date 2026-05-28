@@ -199,7 +199,7 @@ export function IntakeChat({
   // and the SDK module (on hover/focus/mount) so the click handler can
   // call connectAccount with NO awaits in front of it → no popup block.
   const pdSdkRef = useRef<any>(null);
-  const pdTokenRef = useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string }>>({});
+  const pdTokenRef = useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string; connectLinkUrl: string }>>({});
   const pdPrefetchingRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -225,6 +225,7 @@ export function IntakeChat({
           expiresAt: new Date(tk.expiresAt || Date.now() + 300_000).getTime(),
           appSlug: tk.appSlug,
           env: tk.env ?? "production",
+          connectLinkUrl: tk.connectLinkUrl ?? "",
         };
       }
     } catch {
@@ -249,7 +250,7 @@ export function IntakeChat({
       const pd = new Ctor({
         projectEnvironment: tk.env as "production" | "development",
         externalUserId: "sowork-user",
-        tokenCallback: async () => ({ token: tk.token, expiresAt: new Date(tk.expiresAt), connectLinkUrl: "" }),
+        tokenCallback: async () => ({ token: tk.token, expiresAt: new Date(tk.expiresAt), connectLinkUrl: tk.connectLinkUrl }),
       });
       pd.connectAccount({
         app: tk.appSlug,

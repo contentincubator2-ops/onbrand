@@ -29,7 +29,10 @@ const PLATFORM_APP: Record<string, string> = {
   youtube:   "youtube",
 };
 
-async function getPipedreamToken(externalUserId: string): Promise<{ token: string; expires_at: string }> {
+async function getPipedreamToken(
+  externalUserId: string,
+  appSlug: string,
+): Promise<{ token: string; expires_at: string; connect_link_url?: string }> {
   const clientId     = process.env.PIPEDREAM_CLIENT_ID;
   const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
   const projectId    = process.env.PIPEDREAM_PROJECT_ID;
@@ -69,6 +72,10 @@ async function getPipedreamToken(externalUserId: string): Promise<{ token: strin
   const { access_token } = (await tokenRes.json()) as { access_token: string };
 
   // Step 2: mint a Connect user token with the Bearer access_token.
+  // 2026-05-28 fix: include `app` in the token body so Pipedream embeds
+  // the app slug in connect_link_url. Without it Pipedream returns a URL
+  // with no ?app= param and its iframe shows "Please include the app in
+  // the Connect URL".
   const connectRes = await fetch(`${PD_API}/tokens`, {
     method: "POST",
     headers: {
@@ -79,6 +86,7 @@ async function getPipedreamToken(externalUserId: string): Promise<{ token: strin
     body: JSON.stringify({
       external_user_id: externalUserId,
       project_id:       projectId,
+      app:              appSlug,
     }),
   });
 
@@ -90,7 +98,7 @@ async function getPipedreamToken(externalUserId: string): Promise<{ token: strin
     });
   }
 
-  const data = (await connectRes.json()) as { token: string; expires_at: string };
+  const data = (await connectRes.json()) as { token: string; expires_at: string; connect_link_url?: string };
   return data;
 }
 
@@ -120,7 +128,7 @@ export const platformConnectRouter = router({
       const projectId = process.env.PIPEDREAM_PROJECT_ID ?? "";
       const env = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
 
-      const { token, expires_at } = await getPipedreamToken(externalUserId);
+      const { token, expires_at, connect_link_url } = await getPipedreamToken(externalUserId, appSlug);
 
       return {
         token,
@@ -128,6 +136,7 @@ export const platformConnectRouter = router({
         appSlug,
         projectId,
         env: env as "production" | "development",
+        connectLinkUrl: connect_link_url ?? "",
       };
     }),
 });

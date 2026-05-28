@@ -357,7 +357,7 @@ export default function RunPage() {
   // and the SDK module (on hover/focus/mount) so the click handler can
   // call connectAccount with NO awaits in front of it → no popup block.
   const pdSdkRef = React.useRef<any>(null);
-  const pdTokenRef = React.useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string }>>({});
+  const pdTokenRef = React.useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string; connectLinkUrl: string }>>({});
   const pdPrefetchingRef = React.useRef<Record<string, boolean>>({});
   const PLATFORM_LABEL: Record<string, string> = {
     facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube",
@@ -387,6 +387,7 @@ export default function RunPage() {
           expiresAt: new Date(tk.expiresAt || Date.now() + 300_000).getTime(),
           appSlug: tk.appSlug,
           env: tk.env ?? "production",
+          connectLinkUrl: tk.connectLinkUrl ?? "",
         };
       }
     } catch { /* surfaced on click if still cold */ } finally {
@@ -418,7 +419,7 @@ export default function RunPage() {
         tokenCallback: async () => ({
           token: tk.token,
           expiresAt: new Date(tk.expiresAt),
-          connectLinkUrl: "",
+          connectLinkUrl: tk.connectLinkUrl,
         }),
       });
       pd.connectAccount({
