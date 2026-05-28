@@ -59,5 +59,38 @@ jobs:
           ls -lh "$DIR" | tail -8
           echo ""
           echo "✅ Backup done: $OUT"
-          echo "ℹ️ Off-site copy not yet configured — add an rsync / object-"
-          echo "   storage push here once a destination + creds are decided."
+
+          # ── Off-site backup (optional but strongly recommended) ────────────
+          # To enable: set BACKUP_RCLONE_REMOTE in the .env file.
+          # Example setup (Backblaze B2 — free up to 10GB/month):
+          #   1. Create account at backblaze.com
+          #   2. Create bucket: onbrand-backups
+          #   3. Generate Application Key (s3-compatible)
+          #   4. apt install rclone && rclone config  (add B2 or S3-compatible remote)
+          #   5. Add to .env:  BACKUP_RCLONE_REMOTE=b2:onbrand-backups
+          #
+          # Alternative (SSH rsync to secondary server):
+          #   BACKUP_RSYNC_TARGET=user@server2:/backups/onbrand
+          # ────────────────────────────────────────────────────────────────────
+          if [ -n "$BACKUP_RCLONE_REMOTE" ]; then
+            echo "── Uploading to off-site: $BACKUP_RCLONE_REMOTE ──"
+            if command -v rclone &>/dev/null; then
+              rclone copy "$OUT" "$BACKUP_RCLONE_REMOTE/" \
+                --transfers=1 --stats=30s 2>&1
+              echo "✅ Off-site upload complete"
+              # Prune remote backups older than 30 days
+              rclone delete "$BACKUP_RCLONE_REMOTE/" \
+                --min-age=30d --include='mos_db-*.sql.gz' 2>/dev/null || true
+            else
+              echo "⚠ rclone not installed — skipping off-site upload"
+              echo "  Install: sudo apt install rclone && rclone config"
+            fi
+          elif [ -n "$BACKUP_RSYNC_TARGET" ]; then
+            echo "── rsyncing to $BACKUP_RSYNC_TARGET ──"
+            rsync -az --remove-source-files "$OUT" "$BACKUP_RSYNC_TARGET/" 2>&1 \
+              && echo "✅ rsync complete" \
+              || echo "⚠ rsync failed (non-fatal — local backup still valid)"
+          else
+            echo "ℹ️ Off-site backup not configured."
+            echo "   Set BACKUP_RCLONE_REMOTE=b2:onbrand-backups in .env to enable."
+          fi

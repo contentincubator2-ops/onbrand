@@ -1,0 +1,105 @@
+name: Ops — Trial expiry notifications (daily)
+
+# 2026-05-29 (CJ solo-ops): Users get a 7-day trial. Without expiry
+# reminders they silently churn. This workflow sends:
+#   - Day 6 (1 day left): "你的試用明天到期，升級可繼續使用"
+#   - Day 7 (expires today): "試用今天到期"
+#   - Day 8 (expired yesterday): last-chance "轉換" email
+#
+# Runs daily at 10:00 Taipei. Uses Resend API (already on VM).
+# Non-blocking: DB errors only skip that user, don't fail the job.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"     # 10:00 Asia/Taipei (UTC+8)
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 10
+    steps:
+      - name: Send trial expiry notifications
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+
+          if [ -z "$RESEND_API_KEY" ]; then
+            echo "⚠ RESEND_API_KEY not set — skipping trial expiry emails"
+            exit 0
+          fi
+
+          Q() { mysql -h localhost -u mos_user mos_db -N -s -e "$1" 2>/dev/null; }
+          FROM="${EMAIL_FROM:-onboarding@resend.dev}"
+          APP="${APP_URL:-https://onbrand.sowork.ai}"
+
+          send_email() {
+            local TO="$1" SUBJECT="$2" HTML="$3"
+            curl -s -X POST https://api.resend.com/emails \
+              -H "Authorization: Bearer $RESEND_API_KEY" \
+              -H "Content-Type: application/json" \
+              --data "$(jq -n --arg from "$FROM" --arg to "$TO" \
+                 --arg subj "$SUBJECT" --arg html "$HTML" \
+                 '{from:$from,to:[$to],subject:$subj,html:$html}')" \
+              -o /dev/null || true
+          }
+
+          # ── Day 6 users (trial ends tomorrow) ────────────────────────────
+          echo "── Sending day-6 warnings ──"
+          Q "SELECT id,name,email FROM users
+             WHERE planStatus='trial'
+               AND planEndsAt BETWEEN NOW() AND NOW()+INTERVAL 26 HOUR
+               AND isActive=1
+             LIMIT 200" | while IFS=$'\t' read -r UID NAME EMAIL; do
+            [ -z "$EMAIL" ] && continue
+            send_email "$EMAIL" \
+              "【OnBrand】試用期明天結束，5分鐘完成升級繼續使用 🚀" \
+              "<div style='font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px'>
+                <h2 style='color:#1A1A18'>嗨 ${NAME}，你的免費試用明天到期</h2>
+                <p style='color:#444;line-height:1.7'>感謝你試用 OnBrand AI！你的 7 天試用將於<b>明天</b>結束。升級後可繼續使用所有功能，過去建立的品牌資料和作品都會保留。</p>
+                <a href='${APP}/settings/billing' style='display:inline-block;margin:16px 0;padding:12px 24px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;font-weight:600'>立即升級方案 →</a>
+                <p style='color:#888;font-size:13px'>有任何問題請回覆這封信，我們 24h 內回覆。</p>
+              </div>"
+            echo "  → day-6 email sent to $EMAIL (userId $UID)"
+          done
+
+          # ── Day 7 users (trial ends today) ───────────────────────────────
+          echo "── Sending expiry-day notices ──"
+          Q "SELECT id,name,email FROM users
+             WHERE planStatus='trial'
+               AND planEndsAt BETWEEN NOW()-INTERVAL 2 HOUR AND NOW()+INTERVAL 2 HOUR
+               AND isActive=1
+             LIMIT 200" | while IFS=$'\t' read -r UID NAME EMAIL; do
+            [ -z "$EMAIL" ] && continue
+            send_email "$EMAIL" \
+              "【OnBrand】試用今天到期 — 升級保留所有作品" \
+              "<div style='font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px'>
+                <h2 style='color:#dc2626'>你的 OnBrand 試用今天到期</h2>
+                <p style='color:#444;line-height:1.7'>嗨 ${NAME}，你的免費試用<b>今天到期</b>。升級後所有已建立的品牌定位、文案和歷史記錄都會完整保留。</p>
+                <a href='${APP}/settings/billing' style='display:inline-block;margin:16px 0;padding:12px 24px;background:#dc2626;color:#fff;border-radius:8px;text-decoration:none;font-weight:600'>馬上升級，不要讓努力白費 →</a>
+              </div>"
+            echo "  → expiry-day email sent to $EMAIL (userId $UID)"
+          done
+
+          # ── Day 8 users (expired yesterday = last chance) ─────────────────
+          echo "── Sending last-chance emails ──"
+          Q "SELECT id,name,email FROM users
+             WHERE planStatus='trial'
+               AND planEndsAt BETWEEN NOW()-INTERVAL 26 HOUR AND NOW()-INTERVAL 22 HOUR
+               AND isActive=1
+             LIMIT 200" | while IFS=$'\t' read -r UID NAME EMAIL; do
+            [ -z "$EMAIL" ] && continue
+            send_email "$EMAIL" \
+              "【OnBrand】你的 OnBrand 帳號已暫停 — 30天解凍方案" \
+              "<div style='font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px'>
+                <h2 style='color:#444'>帳號暫停通知</h2>
+                <p style='color:#444;line-height:1.7'>嗨 ${NAME}，你的試用期已結束，帳號功能已暫停。<br>好消息是：<b>你的所有品牌資料在 30 天內都還保留著</b>，升級就能立刻恢復。</p>
+                <a href='${APP}/settings/billing' style='display:inline-block;margin:16px 0;padding:12px 24px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;font-weight:600'>30 秒升級，立刻解凍 →</a>
+                <p style='color:#888;font-size:12px'>如果你不想繼續，不需要任何操作，帳號資料將在 30 天後自動清除。有問題請聯絡 sowork@sowork.ai</p>
+              </div>"
+            echo "  → last-chance email sent to $EMAIL (userId $UID)"
+          done
+
+          echo "✅ Trial expiry notification run complete"

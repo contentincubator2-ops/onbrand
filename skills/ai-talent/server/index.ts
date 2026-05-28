@@ -664,6 +664,10 @@ process.on("uncaughtException", (err) => {
 });
 process.on("unhandledRejection", (reason) => {
   console.error("[server] unhandledRejection:", reason);
+  // 2026-05-29 (solo-ops): unhandled promise rejection = unexpected state.
+  // Log then initiate graceful shutdown so pm2 can restart the process
+  // instead of leaving it in a potentially corrupt state.
+  shutdown("unhandledRejection").catch(() => process.exit(1));
 });
 
 export default app;

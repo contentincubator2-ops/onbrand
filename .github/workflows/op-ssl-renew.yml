@@ -1,0 +1,99 @@
+name: Ops — SSL certificate renewal (weekly check)
+
+# 2026-05-29 (CJ solo-ops): Let's Encrypt certs expire in 90 days.
+# This workflow checks remaining validity weekly and auto-renews when
+# < 30 days remain. Runs on the self-hosted VM runner (same box as nginx).
+#
+# REQUIRED: certbot must be installed on the VM:
+#   sudo apt install certbot python3-certbot-nginx
+#   sudo certbot --nginx -d onbrand.sowork.ai  (first-time setup)
+#
+# After first-time setup this workflow handles all future renewals.
+# On renewal, nginx is reloaded gracefully (no downtime).
+#
+# If renewal FAILS the job fails → GitHub sends a failure email to the
+# repo owner. Also sends a Resend email if RESEND_API_KEY is configured.
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"     # 10:00 Asia/Taipei every Monday
+  workflow_dispatch:
+
+jobs:
+  renew:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 15
+    steps:
+      - name: Check cert expiry and renew if needed
+        run: |
+          set -e
+          DOMAIN=onbrand.sowork.ai
+
+          # Load env for Resend alerting
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          [ -f "$ENV" ] && { set -a; source "$ENV"; set +a; }
+
+          send_alert() {
+            local SUBJECT="$1"
+            local BODY="$2"
+            if [ -n "$RESEND_API_KEY" ]; then
+              TO="${SUPPORT_NOTIFY_TO:-sowork@sowork.ai}"
+              FROM="${EMAIL_FROM:-onboarding@resend.dev}"
+              curl -s -X POST https://api.resend.com/emails \
+                -H "Authorization: Bearer $RESEND_API_KEY" \
+                -H "Content-Type: application/json" \
+                --data "$(jq -n --arg from "$FROM" --arg to "$TO" \
+                   --arg subj "$SUBJECT" --arg html "$BODY" \
+                   '{from:$from,to:[$to],subject:$subj,html:$html}')" || true
+            fi
+          }
+
+          # Check if certbot is installed
+          if ! command -v certbot &>/dev/null; then
+            echo "⚠ certbot not found — SSL auto-renewal requires:"
+            echo "  sudo apt install certbot python3-certbot-nginx"
+            echo "  sudo certbot --nginx -d $DOMAIN"
+            send_alert "[OnBrand] ⚠ SSL: certbot 尚未安裝" \
+              "<p>VM 上找不到 certbot，SSL 自動更新無法運作。</p><p>請登入 VM 執行：<br><code>sudo apt install certbot python3-certbot-nginx</code><br><code>sudo certbot --nginx -d $DOMAIN</code></p>"
+            exit 1
+          fi
+
+          # Check current cert expiry
+          CERT_FILE="/etc/letsencrypt/live/$DOMAIN/cert.pem"
+          if [ -f "$CERT_FILE" ]; then
+            EXPIRY=$(openssl x509 -enddate -noout -in "$CERT_FILE" | cut -d= -f2)
+            EXPIRY_TS=$(date -d "$EXPIRY" +%s)
+            NOW_TS=$(date +%s)
+            DAYS_LEFT=$(( (EXPIRY_TS - NOW_TS) / 86400 ))
+            echo "📜 Cert for $DOMAIN expires: $EXPIRY ($DAYS_LEFT days left)"
+
+            if [ "$DAYS_LEFT" -gt 30 ]; then
+              echo "✅ Cert valid for $DAYS_LEFT days — no renewal needed"
+              exit 0
+            fi
+            echo "⚠ Cert expires in $DAYS_LEFT days — renewing now..."
+          else
+            echo "⚠ No cert file found at $CERT_FILE — attempting first-time certbot run..."
+          fi
+
+          # Attempt renewal
+          sudo certbot renew --non-interactive --nginx 2>&1
+          RENEW_EXIT=$?
+
+          if [ $RENEW_EXIT -ne 0 ]; then
+            echo "❌ certbot renew failed (exit $RENEW_EXIT)"
+            send_alert "[OnBrand] 🔴 SSL 憑證更新失敗" \
+              "<p><b>SSL 憑證更新失敗</b> — 請立即登入 VM 手動執行：</p><pre>sudo certbot renew --nginx</pre><p>憑證到期後整個網站會顯示安全性警告，所有用戶都進不來。</p>"
+            exit 1
+          fi
+
+          # Reload nginx gracefully (zero-downtime)
+          sudo nginx -s reload 2>&1 && echo "✅ nginx reloaded" || sudo systemctl reload nginx
+
+          # Verify new expiry
+          if [ -f "$CERT_FILE" ]; then
+            NEW_EXPIRY=$(openssl x509 -enddate -noout -in "$CERT_FILE" | cut -d= -f2)
+            echo "✅ SSL cert renewed. New expiry: $NEW_EXPIRY"
+            send_alert "[OnBrand] ✅ SSL 憑證已更新" \
+              "<p>SSL 憑證已自動更新成功。</p><p>新到期日：<b>$NEW_EXPIRY</b></p>"
+          fi
