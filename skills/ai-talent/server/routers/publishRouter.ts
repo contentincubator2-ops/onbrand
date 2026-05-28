@@ -246,6 +246,91 @@ export const publishRouter = router({
     }),
 
   /**
+   * 2026-05-28 — After the user completes Facebook OAuth via Pipedream,
+   * fetch the list of FB Pages they manage so the frontend can show a
+   * picker instead of making the user manually hunt for a numeric Page ID.
+   *
+   * Flow:
+   *   1. Get Pipedream Bearer token (same client_credentials flow)
+   *   2. GET /v1/connect/{projectId}/users/{externalUserId}/accounts?app=facebook_pages
+   *      → find the connected Facebook account ID
+   *   3. GET /v1/connect/{projectId}/accounts/{accountId}?include_credentials=1
+   *      → extract the OAuth user access token
+   *   4. GET graph.facebook.com/v18.0/me/accounts → pages the user manages
+   */
+  getFacebookPages: protectedProcedure
+    .input(z.object({}).optional())
+    .mutation(async ({ ctx }) => {
+      const clientId     = process.env.PIPEDREAM_CLIENT_ID;
+      const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
+      const projectId    = process.env.PIPEDREAM_PROJECT_ID;
+      const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
+
+      if (!clientId || !clientSecret || !projectId) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Facebook 授權服務尚未啟用。" });
+      }
+
+      const externalUserId = `sowork-${ctx.user.id}`;
+      const PD = "https://api.pipedream.com/v1";
+
+      // Step 1: get Bearer token
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      const tokenRes = await fetch(`${PD}/oauth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Basic ${basicAuth}` },
+        body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!tokenRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 Pipedream token" });
+      const { access_token } = (await tokenRes.json()) as { access_token: string };
+      const headers = { "Authorization": `Bearer ${access_token}`, "X-PD-Environment": pdEnv };
+
+      // Step 2: list connected accounts for this user + facebook_pages app
+      const accountsRes = await fetch(
+        `${PD}/connect/${projectId}/users/${externalUserId}/accounts?app=facebook_pages&limit=10`,
+        { headers, signal: AbortSignal.timeout(15_000) },
+      );
+      if (!accountsRes.ok) {
+        const t = await accountsRes.text();
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得已連接的 FB 帳號：${t.slice(0, 200)}` });
+      }
+      const accountsData = (await accountsRes.json()) as { data?: Array<{ id: string; name?: string }> };
+      const accounts = accountsData.data ?? [];
+      if (accounts.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "尚未連接 Facebook，請先完成授權。" });
+      }
+      const accountId = accounts[0].id;
+
+      // Step 3: get OAuth credentials for the account
+      const credRes = await fetch(
+        `${PD}/connect/${projectId}/accounts/${accountId}?include_credentials=1`,
+        { headers, signal: AbortSignal.timeout(15_000) },
+      );
+      if (!credRes.ok) {
+        const t = await credRes.text();
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得 FB token：${t.slice(0, 200)}` });
+      }
+      const credData = (await credRes.json()) as { credentials?: { oauth_access_token?: string; access_token?: string } };
+      const fbToken = credData.credentials?.oauth_access_token ?? credData.credentials?.access_token;
+      if (!fbToken) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 FB 存取 token，請重新授權。" });
+      }
+
+      // Step 4: call FB Graph API to list managed pages
+      const pagesRes = await fetch(
+        `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,category&limit=30&access_token=${encodeURIComponent(fbToken)}`,
+        { signal: AbortSignal.timeout(15_000) },
+      );
+      if (!pagesRes.ok) {
+        const t = await pagesRes.text();
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `FB Graph API 失敗：${t.slice(0, 200)}` });
+      }
+      const pagesData = (await pagesRes.json()) as { data?: Array<{ id: string; name: string; category?: string }> };
+      const pages = (pagesData.data ?? []).map((p) => ({ id: p.id, name: p.name, category: p.category ?? "" }));
+      return { ok: true as const, pages };
+    }),
+
+  /**
    * 2026-05-11 — Bind a Facebook Page to a brand. After the user finishes
    * Pipedream Connect OAuth, the frontend asks them which Page ID to use
    * (or pick from a list later) and calls this to persist.

@@ -193,6 +193,10 @@ export default function RunPage() {
   const [copied, setCopied] = useState(false);
   // 2026-05-11 (CJ「Spotify 模式」): community-template publish modal state.
   const [shareModal, setShareModal] = useState(false);
+  // 2026-05-28: FB page picker — shown after OAuth success so user picks
+  // which page to post to without leaving the run page.
+  const [fbPagePickerOpen, setFbPagePickerOpen] = useState(false);
+  const [fbPages, setFbPages] = useState<Array<{ id: string; name: string; category: string }>>([]);
   /** Local override for variants — applied after save, mockup updates live. */
   const [overrides, setOverrides] = useState<Record<number, { caption: string }>>({});
   /** AI chat history per variant. */
@@ -477,6 +481,33 @@ export default function RunPage() {
   // SYNCHRONOUSLY on click (keeps user activation), then navigate it to
   // the URL once the token mints. Same proven pattern as BrandSettingsSheet.
   const fbConnectUrlMut = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
+  const fbPagesMut      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
+  const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();
+
+  // After OAuth succeeds → fetch the user's FB pages and show picker.
+  const fetchFbPagesAfterConnect = React.useCallback(async () => {
+    try {
+      const result = await fbPagesMut?.mutateAsync?.({});
+      const pages: Array<{ id: string; name: string; category: string }> = result?.pages ?? [];
+      if (pages.length === 0) {
+        showToastGlobal(lang === "en" ? "No Facebook pages found on this account." : "此帳號沒有可管理的 FB 粉專");
+        return;
+      }
+      if (pages.length === 1) {
+        // Only one page — auto-bind and refresh
+        await setBrandFbPageMut?.mutateAsync?.({ brandId: fbBrandId, fbPageId: pages[0].id, fbPageName: pages[0].name });
+        fbStatusQuery?.refetch?.();
+        showToastGlobal(lang === "en" ? `Connected ${pages[0].name} ✓ Now click "Publish to Facebook"` : `已連接「${pages[0].name}」✓ 現在可以按「直接發 Facebook」`);
+      } else {
+        // Multiple pages — show picker
+        setFbPages(pages);
+        setFbPagePickerOpen(true);
+      }
+    } catch (e: any) {
+      showToastGlobal(lang === "en" ? `Couldn't fetch pages: ${String(e?.message ?? e).slice(0, 100)}` : `無法取得粉專清單：${String(e?.message ?? e).slice(0, 100)}`);
+    }
+  }, [fbPagesMut, setBrandFbPageMut, fbBrandId, fbStatusQuery, lang]);
+
   const connectFacebookViaUrl = () => {
     const win = window.open("about:blank", "_blank", "popup,width=600,height=720");
     if (!win) {
@@ -492,21 +523,32 @@ export default function RunPage() {
         `<p style="font:14px sans-serif;padding:24px;color:#555">${lang === "en" ? "Opening Facebook authorization…" : "正在開啟 Facebook 授權…"}</p>`
       );
     } catch { /* cross-origin not yet — fine */ }
+
+    // Listen for Pipedream OAuth completion message
+    const onMsg = (e: MessageEvent) => {
+      if (e.data?.type === "success") {
+        window.removeEventListener("message", onMsg);
+        win.close();
+        // Fetch pages and show picker
+        void fetchFbPagesAfterConnect();
+      } else if (e.data?.type === "close") {
+        window.removeEventListener("message", onMsg);
+      }
+    };
+    window.addEventListener("message", onMsg);
+
     (async () => {
       try {
         const r = await fbConnectUrlMut?.mutateAsync?.({});
         if (r?.connectUrl) {
           win.location.href = r.connectUrl;
-          showToastGlobal(
-            lang === "en"
-              ? "Authorize Facebook in the popup, then come back and publish."
-              : "在彈出視窗完成 Facebook 授權後，回來再按發布即可"
-          );
         } else {
+          window.removeEventListener("message", onMsg);
           win.close();
           showToastGlobal(lang === "en" ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結 — 請聯絡 sowork@sowork.ai");
         }
       } catch (e: any) {
+        window.removeEventListener("message", onMsg);
         win.close();
         showToastGlobal(
           lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`
@@ -2035,6 +2077,39 @@ export default function RunPage() {
             </CardBody>
           </Card>
 
+          {/* 2026-05-28: FB page picker modal — appears after OAuth succeeds
+              when the user has multiple FB pages to choose from. */}
+          {fbPagePickerOpen && fbPages.length > 0 && (
+            <Card className="border-2 border-primary">
+              <CardBody className="space-y-2">
+                <p className="text-small font-semibold">{lang === "en" ? "Select Facebook Page to publish to:" : "選擇要發到哪個 Facebook 粉專："}</p>
+                <div className="space-y-1.5">
+                  {fbPages.map((p) => (
+                    <Button
+                      key={p.id} fullWidth variant="flat" color="primary" size="sm"
+                      isLoading={setBrandFbPageMut?.isPending}
+                      onPress={async () => {
+                        try {
+                          await setBrandFbPageMut?.mutateAsync?.({ brandId: fbBrandId, fbPageId: p.id, fbPageName: p.name });
+                          fbStatusQuery?.refetch?.();
+                          setFbPagePickerOpen(false);
+                          showToastGlobal(lang === "en" ? `Connected "${p.name}" ✓ Now publish!` : `已選擇「${p.name}」✓ 現在可以發布了！`);
+                        } catch (e: any) {
+                          showToastGlobal(`Error: ${String(e?.message ?? e).slice(0, 100)}`);
+                        }
+                      }}
+                    >
+                      <span className="text-left w-full">{p.name}{p.category ? ` · ${p.category}` : ""}</span>
+                    </Button>
+                  ))}
+                </div>
+                <Button size="sm" variant="light" fullWidth onPress={() => setFbPagePickerOpen(false)}>
+                  {lang === "en" ? "Cancel" : "取消"}
+                </Button>
+              </CardBody>
+            </Card>
+          )}
+
           <Card>
             <CardBody className="space-y-2">
               <p className="text-tiny font-semibold">{lang === "en" ? "Publish to" : "發布到"}</p>
@@ -2056,12 +2131,12 @@ export default function RunPage() {
                       <Button
                         color="primary" fullWidth
                         startContent={<FontAwesomeIcon icon={faRocket} />}
-                        isLoading={fbConnectUrlMut?.isPending}
-                        isDisabled={fbConnectUrlMut?.isPending}
+                        isLoading={fbConnectUrlMut?.isPending || fbPagesMut?.isPending}
+                        isDisabled={fbConnectUrlMut?.isPending || fbPagesMut?.isPending}
                         onPress={connectFacebookViaUrl}
                       >
-                        {fbConnectUrlMut?.isPending
-                          ? (lang === "en" ? "Opening…" : "開啟中…")
+                        {(fbConnectUrlMut?.isPending || fbPagesMut?.isPending)
+                          ? (lang === "en" ? "Connecting…" : "連接中…")
                           : (lang === "en" ? "Connect Facebook to publish" : "連接 Facebook 後發布")}
                       </Button>
                     );
