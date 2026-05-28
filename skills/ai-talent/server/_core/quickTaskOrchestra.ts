@@ -1983,7 +1983,14 @@ export async function runOrchestra(args: {
         label,
         caption,
         hashtags: cap?.hashtags ?? [],
-        image: images[i] ?? { style: briefs[i] ?? null, url: null, status: args.config.images > 0 ? "failed" : "skipped" },
+        // 2026-05-28 (CJ「我還沒按下生成圖片，不應該顯示生成失敗」):
+        // When images[i] is missing it means auto-gen never produced a result
+        // (threw before push, or was skipped in an error path). Use "skipped"
+        // rather than "failed" so the mockup shows a neutral "tap to generate"
+        // state instead of a red "generation failed" error the user didn't trigger.
+        // Actual failures (both Imagen + Flux returned errors) already push
+        // an explicit {status:"failed"} into images[i] above.
+        image: images[i] ?? { style: briefs[i] ?? null, url: null, status: "skipped" },
       });
     }
 

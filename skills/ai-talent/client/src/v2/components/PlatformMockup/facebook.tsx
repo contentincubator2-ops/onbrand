@@ -153,10 +153,13 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                     <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to retry" : "點此重試"}</p>
                   </>
                 ) : liveImageStatus === "failed" ? (
+                  // 2026-05-28: use neutral styling — auto-gen may have failed
+                  // without user action. Red "失敗" wording confused users who
+                  // hadn't clicked anything. Tap-to-generate is still offered.
                   <>
-                    <p className="text-tiny font-semibold text-danger-600 mb-1">{lang === "en" ? "Image generation failed" : "圖片生成失敗"}</p>
+                    <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Image not yet generated" : "圖片尚未生成"}</p>
                     {liveImageStyle && <p className="text-tiny line-clamp-3 text-default-600">{liveImageStyle}</p>}
-                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to retry" : "點此重新生成"}</p>
+                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to generate" : "點此生圖"}</p>
                   </>
                 ) : liveImageStatus === "skipped" ? (
                   <>
@@ -297,9 +300,11 @@ export function FBStory({ title, brandName, variantLabel, liveCaption, liveTitle
               <p className="text-tiny">
                 {liveImageStyle
                   ? liveImageStyle
-                  : liveImageStatus === "failed" || liveImageStatus === "timeout"
-                    ? (lang === "en" ? "Story image failed · tap to retry" : "限動圖生成失敗 · 點此重試")
-                    : (lang === "en" ? "Story image · tap to generate" : "限動背景圖 · 點此生成")}
+                  : liveImageStatus === "timeout"
+                    ? (lang === "en" ? "Story image timed out · tap to retry" : "限動圖超時 · 點此重試")
+                    : liveImageStatus === "failed"
+                      ? (lang === "en" ? "Story image · tap to generate" : "限動背景圖 · 點此生成")
+                      : (lang === "en" ? "Story image · tap to generate" : "限動背景圖 · 點此生成")}
               </p>
             </div>
           </div>
@@ -476,9 +481,9 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
               <div className="text-center relative z-10">
                 <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
                 <p className="text-tiny">
-                  {liveImageStatus === "failed" || liveImageStatus === "timeout"
-                    ? (lang === "en" ? "Image generation failed" : "圖片生成失敗")
-                    : (lang === "en" ? "Ad image · generating…" : "廣告主圖 · 生成中…")}
+                  {liveImageStatus === "timeout"
+                    ? (lang === "en" ? "Image timed out · tap to retry" : "圖片超時 · 點此重試")
+                    : (lang === "en" ? "Ad image · tap to generate" : "廣告主圖 · 點此生成")}
                 </p>
               </div>
             </div>
