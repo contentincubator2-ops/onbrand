@@ -1,0 +1,106 @@
+name: "Ops — Diagnose image generation"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: "1 — Check env vars"
+        run: |
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          echo "=== KEY PRESENCE CHECK ==="
+          for KEY in PIAPI_KEY PIAPI_API_KEY OPENAI_API_KEY COVERS_DIR COVERS_URL_PREFIX; do
+            if grep -q "^${KEY}=" "$ENV" 2>/dev/null; then
+              VAL=$(grep "^${KEY}=" "$ENV" | cut -d= -f2- | head -c 12)
+              echo "  $KEY = ${VAL}... ✅"
+            else
+              echo "  $KEY = MISSING ❌"
+            fi
+          done
+
+      - name: "2 — Check covers dir"
+        run: |
+          DIR="${COVERS_DIR:-/opt/onbrand/covers}"
+          echo "=== COVERS DIR: $DIR ==="
+          if [ -d "$DIR" ]; then
+            echo "  exists ✅"
+            echo "  file count: $(ls "$DIR" | wc -l)"
+            echo "  writable: $([ -w "$DIR" ] && echo YES || echo NO)"
+          else
+            echo "  MISSING ❌"
+          fi
+
+          # Also check what the running process sees
+          PID=$(pm2 pid onbrand 2>/dev/null || echo "")
+          if [ -n "$PID" ]; then
+            echo "  pm2 onbrand PID=$PID"
+            echo "  COVERS_DIR in process env: $(cat /proc/$PID/environ 2>/dev/null | tr '\0' '\n' | grep COVERS_DIR || echo '(not set in process env)')"
+          fi
+
+      - name: "3 — pm2 recent image errors"
+        run: |
+          echo "=== LAST 100 LINES OF PM2 LOG ==="
+          pm2 logs onbrand --lines 100 --nostream 2>&1 | grep -iE "image|piapi|openai.*image|COVERS|covers|flux|gpt-image|ENOENT|write|ERROR" | tail -40 || echo "(no matches)"
+
+      - name: "4 — Test OpenAI image API directly"
+        run: |
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          OPENAI_KEY=$(grep "^OPENAI_API_KEY=" "$ENV" | cut -d= -f2-)
+          if [ -z "$OPENAI_KEY" ]; then
+            echo "OPENAI_API_KEY missing — skipping direct test ❌"
+            exit 0
+          fi
+          echo "Testing OpenAI /v1/images/generations ..."
+          HTTP=$(curl -s -o /tmp/img_test_resp.json -w "%{http_code}" \
+            -X POST https://api.openai.com/v1/images/generations \
+            -H "Authorization: Bearer $OPENAI_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"gpt-image-1","prompt":"a red circle on white background","n":1,"size":"1024x1024","quality":"low"}')
+          echo "HTTP $HTTP"
+          cat /tmp/img_test_resp.json | python3 -c "
+          import sys,json
+          d=json.load(sys.stdin)
+          if 'error' in d:
+              print('ERROR:', d['error'].get('message','?'))
+          elif 'data' in d:
+              url=d['data'][0].get('url','') or '(b64, len='+str(len(d['data'][0].get('b64_json','')))+' chars)'
+              print('SUCCESS — got image:', url[:80])
+          else:
+              print('UNKNOWN RESPONSE:', str(d)[:200])
+          " 2>/dev/null || cat /tmp/img_test_resp.json | head -5
+
+      - name: "5 — Test PiAPI if key present"
+        run: |
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          PIAPI_KEY=$(grep "^PIAPI_KEY=" "$ENV" | cut -d= -f2- || grep "^PIAPI_API_KEY=" "$ENV" | cut -d= -f2- || echo "")
+          if [ -z "$PIAPI_KEY" ]; then
+            echo "PIAPI_KEY not configured — skipping (fallback to OpenAI is expected)"
+            exit 0
+          fi
+          echo "Testing PiAPI flux-schnell ..."
+          HTTP=$(curl -s -o /tmp/piapi_test.json -w "%{http_code}" \
+            -X POST https://api.piapi.ai/api/v1/task \
+            -H "x-api-key: $PIAPI_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"Qubico/flux1-schnell","task_type":"txt2img","input":{"prompt":"a blue circle","width":512,"height":512}}')
+          echo "HTTP $HTTP"
+          cat /tmp/piapi_test.json | head -5
+
+      - name: "6 — Write a test image file + verify static route"
+        run: |
+          DIR="${COVERS_DIR:-/opt/onbrand/covers}"
+          FNAME="diag-test-$(date +%s).txt"
+          echo "test" > "$DIR/$FNAME"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3101/static/covers/$FNAME")
+          echo "/static/covers/$FNAME → HTTP $STATUS"
+          [ "$STATUS" = "200" ] && echo "Static route ✅" || echo "Static route ❌ (got $STATUS)"
+          rm -f "$DIR/$FNAME"
+
+      - name: "7 — Check running app version"
+        run: |
+          # Confirm deployed code has the PIAPI fallback
+          grep -n "hasPiapiKey\|primaryModel\|openai/gpt-image-1" \
+            /opt/onbrand/app/skills/ai-talent/server/routers/theaterRouter.ts 2>/dev/null | head -10 \
+            || echo "theaterRouter.ts not found at expected path"
