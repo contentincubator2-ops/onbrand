@@ -283,25 +283,51 @@ export const publishRouter = router({
       });
       if (!tokenRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 Pipedream token" });
       const { access_token } = (await tokenRes.json()) as { access_token: string };
-      const headers = { "Authorization": `Bearer ${access_token}`, "X-PD-Environment": pdEnv };
+      // 2026-05-30 (CJ「Facebook 卡 2 天」fix-A): add x-pd-project-id header —
+      // required by Pipedream Connect accounts-list endpoint even when projectId
+      // is already embedded in the URL path.
+      const headers = {
+        "Authorization":    `Bearer ${access_token}`,
+        "X-PD-Environment": pdEnv,
+        "x-pd-project-id":  projectId,
+      };
 
-      // Step 2: list connected accounts for this user + facebook_pages app.
+      // Step 2: list ALL connected accounts for this user (no app-slug filter),
+      // then filter client-side.
+      //
+      // WHY: ?app=facebook_pages was too strict — Pipedream registers the account
+      // under the OAuth app's internal slug which may be "facebook_pages",
+      // "facebook", or "facebook_oauth2" depending on project setup. Filtering by
+      // a single hard-coded slug caused getFacebookPages to return 0 even after
+      // the user successfully completed the popup OAuth.
+      //
       // Retry up to 4× with increasing delay — Pipedream can take 2–4 seconds
       // to propagate the OAuth callback after the user completes the popup.
-      const accountsUrl = `${PD}/connect/${projectId}/users/${externalUserId}/accounts?app=facebook_pages&limit=10`;
-      let accounts: Array<{ id: string; name?: string }> = [];
+      const allAccountsUrl = `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`;
+      const FB_SLUGS = new Set(["facebook_pages", "facebook", "facebook_oauth2"]);
+      let accounts: Array<{ id: string; name?: string; app?: string }> = [];
       const RETRIES = [0, 2000, 3000, 4000]; // ms to wait before each attempt
       for (let attempt = 0; attempt < RETRIES.length; attempt++) {
         if (RETRIES[attempt]! > 0) {
           await new Promise((r) => setTimeout(r, RETRIES[attempt]));
         }
-        const accountsRes = await fetch(accountsUrl, { headers, signal: AbortSignal.timeout(15_000) });
+        const accountsRes = await fetch(allAccountsUrl, { headers, signal: AbortSignal.timeout(15_000) });
         if (!accountsRes.ok) {
           const t = await accountsRes.text();
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得已連接的 FB 帳號：${t.slice(0, 200)}` });
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得已連接的帳號：${t.slice(0, 200)}` });
         }
-        const accountsData = (await accountsRes.json()) as { data?: Array<{ id: string; name?: string }> };
-        accounts = accountsData.data ?? [];
+        const accountsData = (await accountsRes.json()) as { data?: Array<{ id: string; name?: string; app?: string }> };
+        const allAccounts = accountsData.data ?? [];
+        // Filter for known Facebook app slugs
+        accounts = allAccounts.filter(a => a.app && FB_SLUGS.has(a.app));
+        if (accounts.length === 0 && allAccounts.length > 0) {
+          // Log which apps ARE connected — helps diagnose slug mismatches
+          console.log(
+            `[publish.getFacebookPages] attempt=${attempt} user=${externalUserId}`,
+            `has ${allAccounts.length} account(s) but none matched FB slugs.`,
+            `Connected app slugs: ${allAccounts.map(a => a.app ?? "?").join(", ")}`,
+          );
+        }
         if (accounts.length > 0) break; // found — stop retrying
       }
       if (accounts.length === 0) {
@@ -397,7 +423,12 @@ export const publishRouter = router({
       });
       if (!tokenRes.ok) return { connected: {} as Record<string, { accountId: string; name?: string }> };
       const { access_token } = (await tokenRes.json()) as { access_token: string };
-      const pdHeaders = { "Authorization": `Bearer ${access_token}`, "X-PD-Environment": pdEnv };
+      // 2026-05-30 (CJ fix-A): x-pd-project-id required even when projectId is in URL path
+      const pdHeaders = {
+        "Authorization":    `Bearer ${access_token}`,
+        "X-PD-Environment": pdEnv,
+        "x-pd-project-id":  projectId,
+      };
 
       // Step 2: list all connected accounts for this external user
       const accsRes = await fetch(

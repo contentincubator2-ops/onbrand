@@ -49,6 +49,18 @@ jobs:
           $MYSQL -e "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='brands' AND COLUMN_NAME='tabLocks'"
 
           echo ""
+          echo "════ brands FB binding columns (fbPageId / fbPageName / fbConnectedAt) ════"
+          for col in fbPageId fbPageName fbConnectedAt; do
+            result=$($MYSQL -e "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='brands' AND COLUMN_NAME='$col'" 2>/dev/null || echo "")
+            if [ -n "$result" ]; then
+              echo "  ✅ brands.$col: exists"
+            else
+              echo "  ❌ brands.$col: MISSING — migration may not have run"
+            fi
+          done
+
+          echo ""
           echo "════ Counts ════"
           $MYSQL -e "SELECT COUNT(*) AS rules FROM brand_caption_rules"
           $MYSQL -e "SELECT COUNT(*) AS branded_with_locks FROM brands WHERE tabLocks IS NOT NULL"
+          $MYSQL -e "SELECT COUNT(*) AS fb_connected FROM brands WHERE fbPageId IS NOT NULL" 2>/dev/null || echo "  (fbConnected: column not yet present)"
