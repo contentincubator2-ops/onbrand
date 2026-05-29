@@ -591,7 +591,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         const r = await getConnectTkM?.mutateAsync?.({ platform: platform.key as "instagram" | "linkedin" | "youtube" });
         connectUrl = r?.connectLinkUrl ?? "";
         if (!connectUrl && r?.token && r?.projectId) {
-          connectUrl = `https://pipedream.com/_static/connect.html?token=${r.token}&app=${platform.appSlug}`;
+          connectUrl = `https://pipedream.com/_static/connect.html?token=${r.token}&app=${platform.key}`;
         }
       }
       if (!connectUrl) {

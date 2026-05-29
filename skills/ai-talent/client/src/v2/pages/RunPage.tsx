@@ -488,6 +488,41 @@ export default function RunPage() {
   const fbConnectUrlMut = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
   const fbPagesMut      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
   const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();
+  // Declared here (before handleFbPublishClick) to avoid TS2448 "used before declaration"
+  const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
+    ? (trpc as any).publish.toFacebook.useMutation({
+        onSuccess: (r: any) => {
+          showToastGlobal(
+            r.permalink
+              ? (lang === "en" ? `Published ✓ ${r.permalink}` : `已發布 ✓ ${r.permalink}`)
+              : (lang === "en" ? "Published to Facebook ✓" : "已發布到 Facebook ✓")
+          );
+          utils.output.getById.invalidate({ id });
+        },
+        onError: (e: any) => {
+          const msg = String(e?.message ?? "");
+          if (msg.includes("尚未連接") || msg.includes("缺 FB Page ID")) {
+            prefetchConnect("facebook");
+            fbStatusQuery?.refetch?.();
+            showToastGlobal(
+              lang === "en"
+                ? "Facebook isn't connected — the publish button has switched to 「Connect Facebook」. Tap it to authorize."
+                : "尚未授權 Facebook — 上方發布按鈕已切換成「連接 Facebook 後發布」，點它即可完成授權"
+            );
+          } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
+            showToastGlobal(
+              lang === "en"
+                ? "Facebook publishing not enabled — contact sowork@sowork.ai"
+                : "FB 發布服務尚未啟用 — 請聯絡 sowork@sowork.ai"
+            );
+          } else {
+            showToastGlobal(
+              lang === "en" ? `Facebook publish failed: ${e?.message ?? e}` : `FB 發布失敗：${e?.message ?? e}`
+            );
+          }
+        },
+      })
+    : { mutate: () => {}, isPending: false };
 
   // Called when user clicks "發布到 Facebook" after OAuth.
   // If pages are already cached → show picker immediately.
@@ -582,45 +617,6 @@ export default function RunPage() {
     }
   };
 
-  const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
-    ? (trpc as any).publish.toFacebook.useMutation({
-        onSuccess: (r: any) => {
-          showToastGlobal(
-            r.permalink
-              ? (lang === "en" ? `Published ✓ ${r.permalink}` : `已發布 ✓ ${r.permalink}`)
-              : (lang === "en" ? "Published to Facebook ✓" : "已發布到 Facebook ✓")
-          );
-          utils.output.getById.invalidate({ id });
-        },
-        onError: (e: any) => {
-          const msg = String(e?.message ?? "");
-          if (msg.includes("尚未連接") || msg.includes("缺 FB Page ID")) {
-            // 2026-05-18 (CJ「toast 叫我點下方連接按鈕但沒有那顆」):
-            // refresh FB status so the publish button flips into the
-            // 「連接 Facebook 後發布」 connect button (same spot), and
-            // point the user at it. The button click is a real gesture
-            // → the OAuth popup opens without being blocked.
-            prefetchConnect("facebook");
-            fbStatusQuery?.refetch?.();
-            showToastGlobal(
-              lang === "en"
-                ? "Facebook isn't connected — the publish button has switched to 「Connect Facebook」. Tap it to authorize."
-                : "尚未授權 Facebook — 上方發布按鈕已切換成「連接 Facebook 後發布」，點它即可完成授權"
-            );
-          } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
-            showToastGlobal(
-              lang === "en"
-                ? "Facebook publishing not enabled — contact sowork@sowork.ai"
-                : "FB 發布服務尚未啟用 — 請聯絡 sowork@sowork.ai"
-            );
-          } else {
-            showToastGlobal(
-              lang === "en" ? `Facebook publish failed: ${e?.message ?? e}` : `FB 發布失敗：${e?.message ?? e}`
-            );
-          }
-        },
-      })
-    : { mutate: () => {}, isPending: false };
   // Video gen — async pipeline. Spawn job, poll for status until ready.
   // 2026-05-12 (CJ「我要改成只給腳本 — C」): storyboard mode replaces full
   // video gen. Calls video.generateStoryboard which returns a script with

@@ -299,7 +299,7 @@ export const publishRouter = router({
       if (accounts.length === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "尚未連接 Facebook，請先完成授權。" });
       }
-      const accountId = accounts[0].id;
+      const accountId = accounts[0]!.id;
 
       // Step 3: get OAuth credentials for the account
       const credRes = await fetch(
