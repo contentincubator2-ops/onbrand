@@ -368,6 +368,9 @@ export default function RunPage() {
   const pdSdkRef = React.useRef<any>(null);
   const pdTokenRef = React.useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string; connectLinkUrl: string }>>({});
   const pdPrefetchingRef = React.useRef<Record<string, boolean>>({});
+  // 2026-05-30: popup + poll refs for FB Canva-style auto-detect
+  const fbRunPopupRef = useRef<Window | null>(null);
+  const fbRunPollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const PLATFORM_LABEL: Record<string, string> = {
     facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube",
   };
@@ -389,7 +392,8 @@ export default function RunPage() {
         const m = await import("@pipedream/sdk/browser");
         pdSdkRef.current = (m as any).PipedreamClient;
       }
-      const tk = await getConnectTokenMut?.mutateAsync?.({ platform });
+      const brandIdForToken = (data?.mission?.brandId ?? data?.brand?.id ?? 0) as number;
+      const tk = await getConnectTokenMut?.mutateAsync?.({ platform, brandId: brandIdForToken });
       if (tk?.token) {
         pdTokenRef.current[platform] = {
           token: tk.token,
@@ -424,7 +428,7 @@ export default function RunPage() {
     try {
       const pd = new Ctor({
         projectEnvironment: tk.env as "production" | "development",
-        externalUserId: `sowork-user`,
+        externalUserId: `sowork-brand-${(data?.mission?.brandId ?? data?.brand?.id ?? 0)}`,
         tokenCallback: async () => ({
           token: tk.token,
           expiresAt: new Date(tk.expiresAt),
@@ -480,6 +484,54 @@ export default function RunPage() {
     : { data: null };
   const fbConnected = !!(fbStatusQuery?.data as any)?.connected;
 
+  // 2026-05-30: brand-scoped platform connection status (for polling)
+  const platformsQRun = (trpc as any).publish?.getConnectedPlatforms?.useQuery?.(
+    { brandId: fbBrandId },
+    { enabled: fbBrandId > 0, refetchOnWindowFocus: false, staleTime: 20_000 },
+  );
+
+  // Use a ref for fbPagesMut so startFbPolling can call it without stale closure
+  const fbPagesMutRef = useRef<any>(null);
+
+  // 2026-05-30: start polling Pipedream every 4s while FB popup is open.
+  // When connection detected → fetch pages → show picker. Canva-style UX.
+  const startFbPolling = React.useCallback(() => {
+    if (fbRunPollRef.current) clearInterval(fbRunPollRef.current);
+    let elapsed = 0;
+    fbRunPollRef.current = setInterval(async () => {
+      elapsed += 4000;
+      const popupClosed = !fbRunPopupRef.current || fbRunPopupRef.current.closed;
+      if (elapsed >= 300_000 || popupClosed) {
+        clearInterval(fbRunPollRef.current!);
+        fbRunPollRef.current = null;
+        setFbOauthPending(false);
+        return;
+      }
+      try {
+        const result = await platformsQRun?.refetch?.();
+        const connected: Record<string, any> = (result?.data as any)?.connected ?? {};
+        if (connected["facebook"]) {
+          clearInterval(fbRunPollRef.current!);
+          fbRunPollRef.current = null;
+          setFbOauthPending(false);
+          setFbOauthDone(true);
+          try { fbRunPopupRef.current?.close(); } catch { /* cross-origin */ }
+          // Fetch pages for picker
+          try {
+            const r = await fbPagesMutRef.current?.mutateAsync?.({ brandId: fbBrandId });
+            const pages: Array<{ id: string; name: string; category: string }> = r?.pages ?? [];
+            if (pages.length > 0) {
+              setFbPages(pages);
+              setFbPagePickerOpen(true);
+            }
+          } catch { /* non-fatal */ }
+          fbStatusQuery?.refetch?.();
+        }
+      } catch { /* transient — keep polling */ }
+    }, 4000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fbBrandId, platformsQRun, fbStatusQuery]);
+
   // 2026-05-18 (CJ「Connect account popup blocked」again): the @pipedream
   // SDK opens its OWN window AFTER an async tokenCallback → still blocked.
   // Use the plain Pipedream Connect-Link URL instead: open OUR popup
@@ -487,6 +539,8 @@ export default function RunPage() {
   // the URL once the token mints. Same proven pattern as BrandSettingsSheet.
   const fbConnectUrlMut = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
   const fbPagesMut      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
+  // Keep ref in sync so startFbPolling (useCallback) can call the latest mutation
+  fbPagesMutRef.current = fbPagesMut;
   const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();
   // Declared here (before handleFbPublishClick) to avoid TS2448 "used before declaration"
   const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
@@ -542,7 +596,7 @@ export default function RunPage() {
       return;
     }
     try {
-      const result = await fbPagesMut?.mutateAsync?.({});
+      const result = await fbPagesMut?.mutateAsync?.({ brandId: fbBrandId });
       const pages: Array<{ id: string; name: string; category: string }> = result?.pages ?? [];
       if (pages.length === 0) {
         showToastGlobal(lang === "en" ? "No Facebook pages found — please check your account." : "此帳號沒有可管理的 FB 粉專");
@@ -553,7 +607,7 @@ export default function RunPage() {
     } catch (e: any) {
       showToastGlobal(lang === "en" ? `Couldn't load pages: ${String(e?.message ?? e).slice(0, 100)}` : `無法載入粉專清單：${String(e?.message ?? e).slice(0, 100)}`);
     }
-  }, [fbConnected, fbPages, fbPagesMut, fbPublishMut, id, activeIdx, lang]);
+  }, [fbConnected, fbPages, fbPagesMut, fbPublishMut, id, activeIdx, lang, fbBrandId]);
 
   const connectFacebookViaUrl = () => {
     const win = window.open("about:blank", "_blank", "popup,width=600,height=720");
@@ -573,12 +627,13 @@ export default function RunPage() {
 
     (async () => {
       try {
-        const r = await fbConnectUrlMut?.mutateAsync?.({});
+        const r = await fbConnectUrlMut?.mutateAsync?.({ brandId: fbBrandId });
         if (r?.connectUrl) {
           win.location.href = r.connectUrl;
-          // Pipedream popup URL flow does NOT postMessage or auto-close.
-          // Show a "✓ 已完成授權" button so user explicitly confirms.
+          fbRunPopupRef.current = win;
+          // Show "waiting" indicator and start polling for auto-detection
           setFbOauthPending(true);
+          startFbPolling();
         } else {
           win.close();
           showToastGlobal(lang === "en" ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結 — 請聯絡 sowork@sowork.ai");
@@ -592,30 +647,8 @@ export default function RunPage() {
     })();
   };
 
-  // Called when user clicks "✓ 已完成授權" after the Pipedream popup.
-  // Verifies by actually fetching pages from Graph API.
-  const handleFbConfirmAuth = async () => {
-    try {
-      const result = await fbPagesMut?.mutateAsync?.({});
-      const pages: Array<{ id: string; name: string; category: string }> = result?.pages ?? [];
-      setFbOauthPending(false);
-      if (pages.length === 0) {
-        showToastGlobal(lang === "en"
-          ? "Authorization verified but no FB pages found — ensure the account manages at least one page."
-          : "授權驗證成功，但此帳號沒有可管理的 FB 粉專");
-        setFbOauthDone(true);
-        return;
-      }
-      setFbPages(pages);
-      setFbOauthDone(true);
-      // Show picker immediately
-      setFbPagePickerOpen(true);
-    } catch (e: any) {
-      showToastGlobal(lang === "en"
-        ? `Couldn't verify authorization — please try again: ${String(e?.message ?? e).slice(0, 80)}`
-        : `驗證授權失敗，請重新嘗試：${String(e?.message ?? e).slice(0, 80)}`);
-    }
-  };
+  // handleFbConfirmAuth removed (2026-05-30): replaced by polling auto-detection.
+  // startFbPolling() detects when Pipedream OAuth completes, then fetches pages.
 
   // Video gen — async pipeline. Spawn job, poll for status until ready.
   // 2026-05-12 (CJ「我要改成只給腳本 — C」): storyboard mode replaces full
@@ -2147,17 +2180,13 @@ export default function RunPage() {
                   authorize any platform regardless of the current content type. */}
               {/* ── Facebook ── */}
               {fbOauthPending ? (
-                // Popup is open — user needs to click this after completing auth
+                // Popup is open — auto-polling for Pipedream auth (no confirm button needed)
                 <Button
-                  color="success" fullWidth variant="flat"
-                  startContent={<span>✓</span>}
-                  isLoading={fbPagesMut?.isPending}
-                  isDisabled={fbPagesMut?.isPending}
-                  onPress={handleFbConfirmAuth}
+                  color="default" fullWidth variant="flat"
+                  isDisabled
                 >
-                  {fbPagesMut?.isPending
-                    ? (lang === "en" ? "Verifying…" : "驗證中…")
-                    : (lang === "en" ? "I've authorized Facebook — Continue" : "✓ 我已完成 Facebook 授權，繼續")}
+                  <span className="animate-spin mr-1 text-primary">⟳</span>
+                  {lang === "en" ? "Waiting for Facebook authorization…" : "等待 Facebook 授權，請在彈出視窗完成…"}
                 </Button>
               ) : (!fbConnected && !fbOauthDone) ? (
                 <Button

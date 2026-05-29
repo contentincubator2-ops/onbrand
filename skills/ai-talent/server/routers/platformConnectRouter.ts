@@ -120,10 +120,10 @@ export const platformConnectRouter = router({
   getConnectToken: protectedProcedure
     .input(z.object({
       platform: z.enum(["facebook", "instagram", "linkedin", "youtube"]),
+      brandId:  z.number().int().positive(),
     }))
-    .mutation(async ({ input, ctx }) => {
-      const userId = String((ctx as any).user?.id ?? (ctx as any).session?.user?.id ?? "anonymous");
-      const externalUserId = `sowork-${userId}`;
+    .mutation(async ({ input, ctx: _ctx }) => {
+      const externalUserId = `sowork-brand-${input.brandId}`;
       const appSlug = PLATFORM_APP[input.platform]!;
       const projectId = process.env.PIPEDREAM_PROJECT_ID ?? "";
       const env = process.env.PIPEDREAM_PROJECT_ENV ?? "production";

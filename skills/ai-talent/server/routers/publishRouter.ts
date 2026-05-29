@@ -152,8 +152,8 @@ export const publishRouter = router({
    * Pipedream Connect API ref: https://pipedream.com/docs/connect/api
    */
   getFacebookConnectUrl: protectedProcedure
-    .input(z.object({}).optional())
-    .mutation(async ({ ctx }) => {
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
       // 2026-05-26: migrated from PIPEDREAM_API_KEY (static, unsupported by
       // Pipedream Connect) to OAuth client_credentials flow using
       // PIPEDREAM_CLIENT_ID (pub_...) + PIPEDREAM_CLIENT_SECRET (sec_...).
@@ -204,7 +204,7 @@ export const publishRouter = router({
           "X-PD-Environment": pdEnv,
         },
         body: JSON.stringify({
-          external_user_id: `sowork-${ctx.user.id}`,
+          external_user_id: `sowork-brand-${input.brandId}`,
           project_id:       projectId,
           app:              "facebook_pages",
         }),
@@ -259,8 +259,8 @@ export const publishRouter = router({
    *   4. GET graph.facebook.com/v18.0/me/accounts → pages the user manages
    */
   getFacebookPages: protectedProcedure
-    .input(z.object({}).optional())
-    .mutation(async ({ ctx }) => {
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .mutation(async ({ ctx: _ctx, input }) => {
       const clientId     = process.env.PIPEDREAM_CLIENT_ID;
       const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
       const projectId    = process.env.PIPEDREAM_PROJECT_ID;
@@ -270,7 +270,7 @@ export const publishRouter = router({
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Facebook 授權服務尚未啟用。" });
       }
 
-      const externalUserId = `sowork-${ctx.user.id}`;
+      const externalUserId = `sowork-brand-${input.brandId}`;
       const PD = "https://api.pipedream.com/v1";
 
       // Step 1: get Bearer token
@@ -401,16 +401,15 @@ export const publishRouter = router({
    * Returns: { connected: { facebook?: {accountId,name}, instagram?: ..., ... } }
    */
   getConnectedPlatforms: protectedProcedure
-    .input(z.object({}).optional())
-    .query(async ({ ctx }) => {
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx: _ctx, input }) => {
       const clientId     = process.env.PIPEDREAM_CLIENT_ID;
       const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
       const projectId    = process.env.PIPEDREAM_PROJECT_ID;
       const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
       if (!clientId || !clientSecret || !projectId) return { connected: {} as Record<string, { accountId: string; name?: string }> };
 
-      const userId = String(ctx.user.id);
-      const externalUserId = `sowork-${userId}`;
+      const externalUserId = `sowork-brand-${input.brandId}`;
       const PD = "https://api.pipedream.com/v1";
 
       // Step 1: bearer token
