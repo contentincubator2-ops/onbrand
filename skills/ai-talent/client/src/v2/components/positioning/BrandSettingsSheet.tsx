@@ -17,37 +17,38 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Modal, ModalContent, Button, Input, Textarea, Spinner } from "@heroui/react";
 import {
-  IdCard, Link2, Palette, Bot, Trash2, X, Share2, CheckCircle2, ExternalLink,
+  IdCard, Palette, Bot, Trash2, X, Share2, CheckCircle2, ExternalLink,
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebook, faInstagram, faLinkedin, faYoutube } from "@fortawesome/free-brands-svg-icons";
-import ConnectorEditor from "./ConnectorEditor";
+import { faFacebook, faInstagram, faLinkedin, faYoutube, faLine, faThreads, faTiktok } from "@fortawesome/free-brands-svg-icons";
+import { faGlobe } from "@fortawesome/free-solid-svg-icons";
 import AIPromptsEditor from "./AIPromptsEditor";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 
-type SettingsTab = "info" | "connector" | "publish" | "visual" | "ai" | "danger";
+type SettingsTab = "info" | "publish" | "visual" | "ai" | "danger";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   brandId: number | null;
   brandName: string | null;
-  /** Tab to land on when sheet opens. Defaults to "connector" (most common entry). */
+  /** Tab to land on when sheet opens. Defaults to "info". */
   initialTab?: SettingsTab;
   /** Optional onboarding banner shown above active tab content. */
   onboardingHint?: string;
 }
 
 function getTabs(en: boolean): Array<{ id: SettingsTab; label: string; Icon: any }> {
-  // 2026-05-13 (CJ「AI 指令不需要了，基本資料 + 視覺合併到主要工作區」):
-  // info / visual / ai 都從這個面板移除 — info + visual 變成主要工作區
-  // 的頁籤；AI 指令庫整個功能已下線。剩下連結（=發布）與危險區，但危險區
-  // 也在 基本資料 tab 內提供，這裡保留以利老用戶。
+  // 2026-05-30 (CJ「移除連結頁，合併到品牌編輯頁」):
+  // 連結 tab 整個移除 — 社群 URL 欄位合併進「基本資料」。
+  // 發布 tab 改名「平台授權」，專門放 OAuth 連接卡片。
   return [
-    { id: "connector", label: en ? "Links"       : "連結",      Icon: Link2   },
-    { id: "publish",   label: en ? "Publish"     : "發布",      Icon: Share2  },
-    { id: "danger",    label: en ? "Danger zone" : "危險區",    Icon: Trash2  },
+    { id: "info",    label: en ? "Basic info"       : "基本資料",   Icon: IdCard  },
+    { id: "publish", label: en ? "Platform auth"    : "平台授權",   Icon: Share2  },
+    { id: "visual",  label: en ? "Visual"           : "視覺",       Icon: Palette  },
+    { id: "ai",      label: en ? "AI prompts"       : "AI 指令",    Icon: Bot     },
+    { id: "danger",  label: en ? "Danger zone"      : "危險區",     Icon: Trash2  },
   ];
 }
 
@@ -55,7 +56,7 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
   const { lang } = useLang();
   const en = lang === "en";
   const TABS = getTabs(en);
-  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "connector");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "info");
   // When a fresh initialTab arrives (e.g., onboarding triggers connector), reflect it.
   useEffect(() => {
     if (isOpen && initialTab) setActiveTab(initialTab);
@@ -114,9 +115,6 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
               </div>
             )}
             {activeTab === "info" && <InfoTab brandId={brandId} brandName={brandName} />}
-            {activeTab === "connector" && (
-              <ConnectorEditor brandId={brandId} />
-            )}
             {activeTab === "publish" && <PublishTab brandId={brandId} />}
             {activeTab === "visual" && <VisualTab brandId={brandId} />}
             {activeTab === "ai" && (
@@ -187,6 +185,23 @@ export function InfoTab({ brandId, brandName }: { brandId: number | null; brandN
 }
 
 /**
+ * Social URL fields config — mirrors ConnectorEditor but used inline in
+ * the basic info tab so users don't need a separate "連結" screen.
+ * 2026-05-30 (CJ「移除連結頁，合併到品牌編輯頁」)
+ */
+function getSocialFields(en: boolean): Array<{ key: string; label: string; icon: any; tone: string; placeholder: string }> {
+  return [
+    { key: "facebook",  label: en ? "Facebook Page" : "Facebook 粉專",  icon: faFacebook,  tone: "#1877F2", placeholder: "https://www.facebook.com/yourpage" },
+    { key: "instagram", label: "Instagram",    icon: faInstagram, tone: "#E1306C", placeholder: "https://www.instagram.com/yourhandle" },
+    { key: "youtube",   label: "YouTube",       icon: faYoutube,   tone: "#FF0000", placeholder: "https://www.youtube.com/@yourchannel" },
+    { key: "threads",   label: "Threads",       icon: faThreads,   tone: "#111111", placeholder: "https://www.threads.net/@yourhandle" },
+    { key: "tiktok",    label: "TikTok",        icon: faTiktok,    tone: "#111111", placeholder: "https://www.tiktok.com/@yourhandle" },
+    { key: "linkedin",  label: "LinkedIn",      icon: faLinkedin,  tone: "#0A66C2", placeholder: "https://www.linkedin.com/company/yours" },
+    { key: "line",      label: en ? "LINE Official" : "LINE 官方帳號", icon: faLine, tone: "#06C755", placeholder: en ? "https://lin.ee/xxxxx or @yourLineId" : "https://lin.ee/xxxxx 或 @yourLineId" },
+  ];
+}
+
+/**
  * 2026-05-18 (CJ「他對 sowork.ai 認識不正確，又沒地方調整基本資料 + 讀錯
  * 無法重新校對」): editable basic data + hard-correctable AI positioning
  * summary + a 「重新分析」 button that re-reads the website/fanpage even
@@ -202,111 +217,165 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean }) {
+  const SOCIAL_FIELDS = getSocialFields(en);
+
+  // Brand data (industry / description / tagline / positioningSummary)
   const q = (trpc as any).brand?.get?.useQuery?.(
     { id: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false },
   );
+  // Connections data (website + all social links)
+  const connQ = (trpc as any).brand?.getConnections?.useQuery?.(
+    { brandId: brandId ?? 0 },
+    { enabled: !!brandId, refetchOnWindowFocus: false },
+  );
+
   const updateM = (trpc as any).brand?.update?.useMutation?.({
     onSuccess: () => q?.refetch?.(),
   });
+  const updateConnM = (trpc as any).brand?.updateConnections?.useMutation?.({
+    onSuccess: () => connQ?.refetch?.(),
+  });
   const recalM = (trpc as any).brand?.recalibrate?.useMutation?.({
-    onSuccess: () => q?.refetch?.(),
+    onSuccess: () => { q?.refetch?.(); connQ?.refetch?.(); },
   });
 
-  const [industry, setIndustry] = useState("");
+  // Basic fields
+  const [industry,    setIndustry]    = useState("");
   const [description, setDescription] = useState("");
-  const [website, setWebsite] = useState("");
-  const [fanpage, setFanpage] = useState("");
-  const [tagline, setTagline] = useState("");
+  const [tagline,     setTagline]     = useState("");
   const [positioning, setPositioning] = useState("");
-  const [savedAt, setSavedAt] = useState<number | null>(null);
+  // URL fields
+  const [website,     setWebsite]     = useState("");
+  const [socialLinks, setSocialLinks] = useState<Record<string, string>>({});
+
+  const [savedAt,   setSavedAt]   = useState<number | null>(null);
   const [recalDone, setRecalDone] = useState(false);
 
+  // Load brand basic data
   useEffect(() => {
     const b = q?.data;
     if (!b) return;
     setIndustry(b.industry ?? "");
     setDescription(b.description ?? "");
-    setWebsite(b.website ?? "");
-    const sl = (typeof b.socialLinks === "string" ? safeJson(b.socialLinks) : b.socialLinks) ?? {};
-    setFanpage(sl.facebook ?? sl.fb ?? "");
     setTagline(b.tagline ?? "");
     setPositioning(b.positioningSummary ?? "");
   }, [q?.data]);
 
-  function safeJson(s: string): any { try { return JSON.parse(s); } catch { return {}; } }
+  // Load connections (website + social links)
+  useEffect(() => {
+    const c = connQ?.data as { website?: string; socialLinks?: Record<string, string> } | null | undefined;
+    if (!c) return;
+    setWebsite(c.website ?? "");
+    setSocialLinks(c.socialLinks ?? {});
+  }, [connQ?.data]);
+
+  const updateLink = (key: string, val: string) =>
+    setSocialLinks((cur) => ({ ...cur, [key]: val }));
 
   async function handleSave() {
     if (!brandId) return;
-    const b = q?.data;
-    const sl = (typeof b?.socialLinks === "string" ? safeJson(b.socialLinks) : b?.socialLinks) ?? {};
-    await updateM?.mutateAsync?.({
-      brandId,
-      industry,
-      description,
-      website,
-      socialLinks: { ...sl, facebook: fanpage.trim() },
-      tagline,
-      positioningSummary: positioning,
-    });
+    // Save basic brand data
+    await updateM?.mutateAsync?.({ brandId, industry, description, tagline, positioningSummary: positioning });
+    // Save connections (website + all social URLs)
+    await updateConnM?.mutateAsync?.({ brandId, website: website.trim() || null, socialLinks });
     setSavedAt(Date.now());
   }
 
   async function handleRecalibrate() {
     if (!brandId) return;
-    // save edits first so the pipeline re-reads the corrected URLs
     await handleSave();
     await recalM?.mutateAsync?.({ brandId });
     setRecalDone(true);
   }
+
+  const isSaving = updateM?.isPending || updateConnM?.isPending;
 
   if (q?.isLoading) {
     return <div className="mt-4 flex justify-center"><Spinner size="sm" /></div>;
   }
 
   return (
-    <div className="bg-default-50 rounded-xl border border-default-200 p-5 mt-4">
-      <Field label={en ? "Industry" : "產業"}>
-        <Input size="sm" value={industry} onChange={(e) => setIndustry(e.target.value)}
-          placeholder={en ? "e.g. SaaS / F&B / retail" : "例：SaaS / 餐飲 / 零售"} />
-      </Field>
-      <Field label={en ? "What the brand does (used by the AI)" : "品牌在做什麼（AI 會用這段認識你）"}>
-        <Textarea minRows={3} value={description} onChange={(e) => setDescription(e.target.value)}
-          placeholder={en ? "One paragraph the AI should treat as ground truth about this brand." : "用一段話描述這個品牌——AI 會把這段當成關於你的事實依據。"} />
-      </Field>
-      <Field label={en ? "Official website" : "官方網站"}>
-        <Input size="sm" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://sowork.ai" />
-      </Field>
-      <Field label={en ? "Facebook page URL" : "Facebook 粉絲團網址"}>
-        <Input size="sm" value={fanpage} onChange={(e) => setFanpage(e.target.value)} placeholder="https://www.facebook.com/..." />
-      </Field>
-      <Field label={en ? "Tagline" : "品牌標語 Tagline"}>
-        <Input size="sm" value={tagline} onChange={(e) => setTagline(e.target.value)} />
-      </Field>
-      <Field label={en ? "AI positioning summary — edit to hard-correct" : "AI 推導的定位摘要 — 可直接手改校正"}>
-        <Textarea minRows={5} value={positioning} onChange={(e) => setPositioning(e.target.value)}
-          placeholder={en ? "If the AI misunderstood the brand, correct it here. This text is injected into every task." : "如果 AI 對品牌的理解有誤，直接在這裡改正。這段會被注入到每一個任務。"} />
-        <p className="text-tiny text-default-400 mt-1">
-          {en ? "Injected into all 30s/60s/99s tasks as ground truth." : "會作為事實依據注入所有 30s/60s/99s 任務。"}
-        </p>
-      </Field>
+    <div className="space-y-4 mt-4">
+      {/* ── Brand info ──────────────────────────────────────────────────── */}
+      <div className="bg-default-50 rounded-xl border border-default-200 p-5">
+        <Field label={en ? "Industry" : "產業"}>
+          <Input size="sm" value={industry} onChange={(e) => setIndustry(e.target.value)}
+            placeholder={en ? "e.g. SaaS / F&B / retail" : "例：SaaS / 餐飲 / 零售"} />
+        </Field>
+        <Field label={en ? "What the brand does (used by the AI)" : "品牌在做什麼（AI 會用這段認識你）"}>
+          <Textarea minRows={3} value={description} onChange={(e) => setDescription(e.target.value)}
+            placeholder={en ? "One paragraph the AI should treat as ground truth about this brand." : "用一段話描述這個品牌——AI 會把這段當成關於你的事實依據。"} />
+        </Field>
+        <Field label={en ? "Tagline" : "品牌標語 Tagline"}>
+          <Input size="sm" value={tagline} onChange={(e) => setTagline(e.target.value)} />
+        </Field>
+        <Field label={en ? "AI positioning summary — edit to hard-correct" : "AI 推導的定位摘要 — 可直接手改校正"}>
+          <Textarea minRows={5} value={positioning} onChange={(e) => setPositioning(e.target.value)}
+            placeholder={en ? "If the AI misunderstood the brand, correct it here. This text is injected into every task." : "如果 AI 對品牌的理解有誤，直接在這裡改正。這段會被注入到每一個任務。"} />
+          <p className="text-tiny text-default-400 mt-1">
+            {en ? "Injected into all 30s/60s/99s tasks as ground truth." : "會作為事實依據注入所有 30s/60s/99s 任務。"}
+          </p>
+        </Field>
+      </div>
 
-      <div className="flex flex-wrap items-center gap-3 mt-2">
-        <Button size="sm" color="primary" isLoading={updateM?.isPending}
-          isDisabled={!brandId || updateM?.isPending} onPress={handleSave}>
+      {/* ── External links ──────────────────────────────────────────────── */}
+      {/* 2026-05-30: merged from ConnectorEditor — website + 7 social URLs
+          in one compact inline form. AI reads these URLs before every task. */}
+      <div className="bg-default-50 rounded-xl border border-default-200 p-5">
+        <div className="text-xs font-semibold uppercase tracking-widest text-default-500 mb-3">
+          {en ? "External links — AI reads these before each task" : "外部連結 — AI 每次任務前都會讀取"}
+        </div>
+        {/* Website */}
+        <div className="flex items-center gap-3 mb-3">
+          <FontAwesomeIcon icon={faGlobe} style={{ color: "#64748B", fontSize: 16, width: 18 }} />
+          <Input
+            size="sm"
+            label={en ? "Official website" : "官方網站"}
+            placeholder="https://example.com"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+          />
+        </div>
+        {/* Social platforms — 2-column grid */}
+        <div className="grid gap-2 sm:grid-cols-2">
+          {SOCIAL_FIELDS.map((f) => (
+            <div key={f.key} className="flex items-center gap-2">
+              <FontAwesomeIcon icon={f.icon} style={{ color: f.tone, fontSize: 16, width: 18, flexShrink: 0 }} />
+              <Input
+                size="sm"
+                label={f.label}
+                placeholder={f.placeholder}
+                value={socialLinks[f.key] ?? ""}
+                onChange={(e) => updateLink(f.key, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+        <p className="text-tiny text-default-400 mt-3 leading-relaxed">
+          {en
+            ? "Auto-fill, test scenarios, and all 30s/99s tasks pull real content from these URLs so output matches your actual brand voice — not a guess."
+            : "AI 自動填寫、測試情境、所有 30s/99s 任務都會去抓這些連結的真實內容，讓產出貼合品牌語氣，而不是亂猜。"}
+        </p>
+      </div>
+
+      {/* ── Save bar ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="sm" color="primary" isLoading={isSaving}
+          isDisabled={!brandId || isSaving} onPress={handleSave}>
           {en ? "Save" : "儲存"}
         </Button>
         <Button size="sm" variant="flat" color="secondary" isLoading={recalM?.isPending}
           isDisabled={!brandId || recalM?.isPending} onPress={handleRecalibrate}
-          title={en ? "Re-reads the website / fanpage and rebuilds the AI's understanding" : "重新讀取官網／粉專，重建 AI 對品牌的理解"}>
-          {en ? "Re-analyze (re-read site/fanpage)" : "重新分析（重讀官網/粉專）"}
+          title={en ? "Re-reads the website / social pages and rebuilds the AI's understanding" : "重新讀取官網／社群頁，重建 AI 對品牌的理解"}>
+          {en ? "Re-analyze (re-read site)" : "重新分析（重讀官網/社群）"}
         </Button>
-        {savedAt && !updateM?.isPending && (
+        {savedAt && !isSaving && (
           <span className="text-tiny text-success-600">{en ? "Saved ✓" : "已儲存 ✓"}</span>
         )}
         {recalDone && !recalM?.isPending && (
           <span className="text-tiny text-secondary-600">
-            {en ? "Re-analysis started — it updates in the background." : "已開始重新分析 — 會在背景更新品牌大腦"}
+            {en ? "Re-analysis started — updates in background." : "已開始重新分析 — 會在背景更新品牌大腦"}
           </span>
         )}
       </div>

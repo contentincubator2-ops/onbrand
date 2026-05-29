@@ -1,16 +1,10 @@
 /**
- * /connections — dedicated sidebar entry for brand connections + settings.
+ * /connections — legacy route kept for bookmark compatibility.
  *
- * 2026-05-12 (CJ「加一個獨立的功能區叫做『連結』」).
- *
- * Behavior:
- *   - If the user has an active brand (from shell context OR ?b= URL),
- *     redirect to /brands/edit?b=<id>&tab=connector — the BrandSettingsSheet
- *     opens directly on the "連結" tab.
- *   - If no active brand: redirect to /brands (the manager list) so they
- *     can pick one first.
- *
- * This page renders nothing itself; it just routes.
+ * 2026-05-30 (CJ「移除連結頁」): "連結" sidebar item removed. Social URLs
+ * now live in 基本資料 tab (info). This component redirects any old
+ * /connections links to /brands/edit?tab=info so they still land somewhere
+ * sensible instead of 404-ing.
  */
 import { Navigate, useOutletContext, useSearchParams } from "react-router-dom";
 
@@ -34,7 +28,7 @@ export default function ConnectionsRedirect() {
     (ctx?.brands?.[0]?.id ?? null);
 
   if (activeBrandId) {
-    return <Navigate to={`/brands/settings?b=${activeBrandId}&tab=connector`} replace />;
+    return <Navigate to={`/brands/edit?b=${activeBrandId}&tab=info`} replace />;
   }
   return <Navigate to="/brands" replace />;
 }

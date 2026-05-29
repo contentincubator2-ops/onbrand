@@ -17,8 +17,10 @@ export default function BrandSettingsPage() {
   const ctx = useOutletContext<ShellCtx | null>();
 
   useEffect(() => {
-    const b   = search.get("b") ?? String(ctx?.brandId ?? ctx?.brands?.[0]?.id ?? "");
-    const tab = search.get("tab") ?? "connector";
+    const b = search.get("b") ?? String(ctx?.brandId ?? ctx?.brands?.[0]?.id ?? "");
+    // 2026-05-30: "connector" tab removed — redirect legacy ?tab=connector to info tab.
+    const rawTab = search.get("tab") ?? "info";
+    const tab = rawTab === "connector" ? "info" : rawTab;
     const url = b ? `/brands/edit?b=${b}&tab=${tab}` : `/brands/edit?tab=${tab}`;
     navigate(url, { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps

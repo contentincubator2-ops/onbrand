@@ -119,15 +119,20 @@ export default function BrandsPage() {
   // every refresh after dismissing.
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   // (effect to auto-open is declared further down once scopeBrands is defined)
-  const [settingsInitialTab, setSettingsInitialTab] = useState<"info"|"connector"|"publish"|"visual"|"ai"|"danger">("connector");
+  // 2026-05-30 (CJ「移除連結頁」): "connector" removed from tab union.
+  const [settingsInitialTab, setSettingsInitialTab] = useState<"info"|"publish"|"visual"|"ai"|"danger">("info");
   // 2026-05-11: support deep link /brands/edit?b=:id&tab=publish from
   // RunPage's "尚未連接 FB" toast.
   React.useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const t = sp.get("tab");
-      if (t === "publish" || t === "connector" || t === "info" || t === "visual" || t === "ai" || t === "danger") {
+      if (t === "publish" || t === "info" || t === "visual" || t === "ai" || t === "danger") {
         setSettingsInitialTab(t);
+        setSettingsOpen(true);
+      } else if (t === "connector") {
+        // legacy URL — redirect to info tab (social URLs are now there)
+        setSettingsInitialTab("info");
         setSettingsOpen(true);
       }
     } catch { /* no-op */ }
