@@ -111,7 +111,9 @@ function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
     { to: "/theater",   label: en ? "Theater" : "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
     // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav)
     { to: "/brands",    label: en ? "Brand Brain" : "品牌大腦", icon: <FontAwesomeIcon icon={faBrain} /> },
-    { to: "/brands/settings", label: en ? "Connect" : "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands/settings" },
+    // 2026-05-29 (CJ「合併到品牌頁」): settings merged into /brands/edit
+    // via the ?tab= param. The link is dynamically built in onNavigate below.
+    { to: "/brands/settings", label: en ? "Connect" : "連結", icon: <FontAwesomeIcon icon={faShareNodes} />, matchPrefix: "/brands" },
   ];
 }
 
@@ -207,6 +209,16 @@ export default function ShellLayout() {
             let url = `/brands/edit?b=${scope.brandId}`;
             if (scope.productId) url += `&p=${scope.productId}`;
             if (scope.eventId)   url += `&e=${scope.eventId}`;
+            navigate(url);
+            return;
+          }
+          // 2026-05-29 (CJ「合併到品牌頁」): /brands/settings merged into
+          // /brands/edit via ?tab=connector — open settings modal directly.
+          if (to === "/brands/settings") {
+            const bid = scope.brandId ?? brands[0]?.id;
+            const url = bid
+              ? `/brands/edit?b=${bid}&tab=connector`
+              : `/brands/edit?tab=connector`;
             navigate(url);
             return;
           }
