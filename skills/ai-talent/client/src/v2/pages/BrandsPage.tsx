@@ -35,7 +35,8 @@ import BrandAssetEditor, { type AssetKey } from "../components/positioning/Brand
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
-import BrandSettingsSheet, { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab } from "../components/positioning/BrandSettingsSheet";
+import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
+import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
@@ -46,7 +47,7 @@ import {
   Lock as LucideLock, Unlock as LucideUnlock, Play as LucidePlay,
   RotateCcw as LucideRotate, BookOpen as LucideBook,
   Sparkles, Link2 as LucideLink, Bot as LucideRobotIcon,
-  Settings as LucideSettings,
+  Share2 as LucideShare,
   Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon,
   Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage,
   Hash as LucideHash, MessageCircle as LucideMessage,
@@ -111,32 +112,20 @@ export default function BrandsPage() {
   const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
   // Inline test panel (試寫 expand below kicker row)
   const [testPanelOpen, setTestPanelOpen] = useState(false);
-  // Settings sheet (right-drawer with 連結 / 視覺 / AI 指令 / 危險區)
-  const [settingsOpen, setSettingsOpen] = useState(false);
   // 2026-05-08: onboarding wizard for first-time users (no brands yet).
-  // Auto-opens once when the user lands here with zero brands; flag
-  // is per-session in localStorage so they don't get re-prompted on
-  // every refresh after dismissing.
   const [onboardingOpen, setOnboardingOpen] = useState(false);
-  // (effect to auto-open is declared further down once scopeBrands is defined)
-  // 2026-05-30 (CJ「modal 只留設定類 tab」): 基本資料/視覺 moved to main workspace.
-  // Modal only has: publish / ai / danger.
-  const [settingsInitialTab, setSettingsInitialTab] = useState<"publish"|"ai"|"danger">("publish");
-  // 2026-05-11: support deep link /brands/edit?b=:id&tab=publish from
-  // RunPage's "尚未連接 FB" toast.
+  // 2026-05-30 (CJ「modal 移除」): ?tab= deep-links now navigate to the
+  // corresponding main-workspace category instead of opening a modal.
   React.useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const t = sp.get("tab");
-      if (t === "publish" || t === "ai" || t === "danger") {
-        setSettingsInitialTab(t);
-        setSettingsOpen(true);
-      } else if (t === "connector" || t === "info" || t === "visual") {
-        // legacy URLs — these are now in the main workspace tabs, not the modal.
-        // For publish deep-links (e.g. from RunPage FB toast), map to publish.
-        if (t === "connector") { setSettingsInitialTab("publish"); setSettingsOpen(true); }
-        // info/visual — don't open modal, main page already shows them as tabs.
+      if (t === "publish" || t === "ai") {
+        setCategory(t);
+      } else if (t === "connector") {
+        setCategory("publish"); // legacy alias
       }
+      // info/visual → those are already the default main tabs; no-op.
     } catch { /* no-op */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -588,14 +577,16 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "settings" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
     : urlCat === "info" ? "info"
+    : urlCat === "publish" ? "publish"
+    : urlCat === "ai" ? "ai"
     : urlCat === "settings" ? "settings"
     : "positioning";
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai") => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("cat", next);
     setSearchParams(nextParams, { replace: true });
@@ -616,7 +607,8 @@ export default function BrandsPage() {
       prevCatRef.current = category;
       if (category === "visual" || category === "copy") setSection("asset:all");
       else if (category === "settings") setSection("settings");
-      else if (category === "knowledge") setSection("settings"); // any default — content branch handles it
+      else if (category === "knowledge") setSection("settings");
+      else if (category === "publish" || category === "ai") setSection("pos:home");
       else                              setSection("pos:home");
     }
   }, [category]);
@@ -1095,16 +1087,9 @@ export default function BrandsPage() {
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
-      {/* Settings sheet — opened by the gear icon in the header */}
-      {/* BUG-4 fix: always pass brand name (not scopeName which changes with product/event scope) */}
-      <BrandSettingsSheet
-        isOpen={settingsOpen}
-        onClose={() => { setSettingsOpen(false); setOnboardingHint(undefined); }}
-        brandId={activeBrandIdForLocks}
-        brandName={currentBrand?.name ?? null}
-        initialTab={settingsInitialTab}
-        onboardingHint={onboardingHint}
-      />
+      {/* 2026-05-30 (CJ「modal 移除，功能全進主工作區」):
+          BrandSettingsSheet modal removed. 平台授權 and AI 指令 are now
+          full tabs in the main workspace. 危險區 remains inside 基本資料. */}
 
       {/* 2026-05-13 (CJ「建立好品牌後我點選左側品牌會是空白畫面」):
           when scope just changed to a brand that hasn't landed in
@@ -1197,17 +1182,7 @@ export default function BrandsPage() {
             ← {lang === "en" ? "All brands" : "所有品牌"}
           </a>
         </div>
-        {/* Gear icon top-right — opens Settings sheet (平台授權 / AI 指令 / 危險區) */}
-        {activeBrandIdForLocks && (
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="absolute top-5 right-5 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-default-200 hover:border-default-400 shadow-sm transition text-default-600 hover:text-default-900 z-10"
-            title={lang === "en" ? "Settings (platform auth / AI prompts / danger zone)" : "設定（平台授權 / AI 指令 / 危險區）"}
-          >
-            <LucideSettings size={14} strokeWidth={1.8} />
-            <span className="text-xs font-medium">{lang === "en" ? "Settings" : "設定"}</span>
-          </button>
-        )}
+        {/* 2026-05-30: gear icon removed — 平台授權 / AI 指令 are now main workspace tabs */}
         {/* 2026-05-10 (CJ「4A 代理商專業感, B&W」): hero redesigned.
             Removed gradient emblem + gradient title. Editorial
             typography: tiny eyebrow, large bold title, subtle stats. */}
@@ -1285,8 +1260,14 @@ export default function BrandsPage() {
                       : scopeMode === "product" ? (lang === "en" ? "Name / SKU / brand link"     : "名稱 / SKU / 所屬品牌")
                       : (lang === "en" ? "Name / industry / about" : "名稱 / 產業 / 描述"),
                       Icon: LucideIdCard,    scopes: ["brand", "product", "event"] },
-                  { v: "visual"      as const, label: lang === "en" ? "Visual"      : "視覺",     desc: lang === "en" ? "Logo / palette / font"    : "Logo / 色票 / 字型",
+                  { v: "visual"      as const, label: lang === "en" ? "Visual"      : "視覺",       desc: lang === "en" ? "Logo / palette / font"       : "Logo / 色票 / 字型",
                       Icon: LucidePalette,   scopes: ["brand"] },
+                  // 2026-05-30 (CJ「modal 移除，功能全進主工作區」):
+                  // 平台授權 + AI 指令 moved from settings modal to main tabs.
+                  { v: "publish"     as const, label: lang === "en" ? "Platform auth" : "平台授權",  desc: lang === "en" ? "Facebook / IG / LinkedIn / YT" : "Facebook / IG / LinkedIn / YT",
+                      Icon: LucideShare,     scopes: ["brand"] },
+                  { v: "ai"          as const, label: lang === "en" ? "AI prompts"    : "AI 指令",   desc: lang === "en" ? "Per-platform text + image"     : "各平台文字 + 圖片指令",
+                      Icon: LucideRobotIcon, scopes: ["brand"] },
                 ];
                 const visibleTiles = allTiles.filter((tile) =>
                   tile.scopes.includes(scopeMode === "none" ? "brand" : scopeMode),
@@ -2037,6 +2018,21 @@ export default function BrandsPage() {
                 brandId={(scope?.brandId ?? brandId) as number}
                 brandName={currentBrand?.name ?? null}
               />
+            </div>
+          )}
+
+          {/* ── 平台授權 (publish) — OAuth connections ── */}
+          {/* 2026-05-30 (CJ「modal 移除，功能全進主工作區」) */}
+          {derivedCategory === "publish" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <BrandPublishTab brandId={activeBrandIdForLocks} />
+            </div>
+          )}
+
+          {/* ── AI 指令 (ai) — per-platform prompt overrides ── */}
+          {derivedCategory === "ai" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <AIPromptsEditor brandId={activeBrandIdForLocks} />
             </div>
           )}
         </div>
