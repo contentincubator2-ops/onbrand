@@ -194,10 +194,12 @@ export default function RunPage() {
   // 2026-05-11 (CJ「Spotify 模式」): community-template publish modal state.
   const [shareModal, setShareModal] = useState(false);
   // 2026-05-28: FB flow state
-  // fbOauthDone  — OAuth popup completed this session (button switches to "發布")
+  // fbOauthDone    — OAuth popup completed this session (button switches to "發布")
+  // fbOauthPending — popup is open; show "✓ 已完成授權" confirm button instead
   // fbPagePickerOpen — page picker shown when user clicks publish
-  // fbPages      — pages fetched from Graph API (cached after OAuth)
+  // fbPages        — pages fetched from Graph API (cached after OAuth)
   const [fbOauthDone, setFbOauthDone] = useState(false);
+  const [fbOauthPending, setFbOauthPending] = useState(false);
   const [fbPagePickerOpen, setFbPagePickerOpen] = useState(false);
   const [fbPages, setFbPages] = useState<Array<{ id: string; name: string; category: string }>>([]);
   /** Local override for variants — applied after save, mockup updates live. */
@@ -534,39 +536,50 @@ export default function RunPage() {
       );
     } catch { /* cross-origin not yet — fine */ }
 
-    // Pipedream popup URL flow does NOT postMessage back to opener.
-    // Poll win.closed every 500ms — when popup closes, treat as OAuth done.
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
-    const cleanup = () => {
-      if (pollTimer !== null) { clearInterval(pollTimer); pollTimer = null; }
-    };
-
     (async () => {
       try {
         const r = await fbConnectUrlMut?.mutateAsync?.({});
         if (r?.connectUrl) {
           win.location.href = r.connectUrl;
-          // Start polling after navigation
-          pollTimer = setInterval(() => {
-            if (win.closed) {
-              cleanup();
-              // Popup closed → OAuth completed (or user dismissed)
-              setFbOauthDone(true);
-              showToastGlobal(lang === "en" ? "Facebook authorized ✓ Now click \"Publish to Facebook\"" : "Facebook 授權成功 ✓ 點「發布到 Facebook」即可發布");
-            }
-          }, 500);
+          // Pipedream popup URL flow does NOT postMessage or auto-close.
+          // Show a "✓ 已完成授權" button so user explicitly confirms.
+          setFbOauthPending(true);
         } else {
           win.close();
           showToastGlobal(lang === "en" ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結 — 請聯絡 sowork@sowork.ai");
         }
       } catch (e: any) {
-        cleanup();
         try { win.close(); } catch { /* ignore */ }
         showToastGlobal(
           lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`
         );
       }
     })();
+  };
+
+  // Called when user clicks "✓ 已完成授權" after the Pipedream popup.
+  // Verifies by actually fetching pages from Graph API.
+  const handleFbConfirmAuth = async () => {
+    try {
+      const result = await fbPagesMut?.mutateAsync?.({});
+      const pages: Array<{ id: string; name: string; category: string }> = result?.pages ?? [];
+      setFbOauthPending(false);
+      if (pages.length === 0) {
+        showToastGlobal(lang === "en"
+          ? "Authorization verified but no FB pages found — ensure the account manages at least one page."
+          : "授權驗證成功，但此帳號沒有可管理的 FB 粉專");
+        setFbOauthDone(true);
+        return;
+      }
+      setFbPages(pages);
+      setFbOauthDone(true);
+      // Show picker immediately
+      setFbPagePickerOpen(true);
+    } catch (e: any) {
+      showToastGlobal(lang === "en"
+        ? `Couldn't verify authorization — please try again: ${String(e?.message ?? e).slice(0, 80)}`
+        : `驗證授權失敗，請重新嘗試：${String(e?.message ?? e).slice(0, 80)}`);
+    }
   };
 
   const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
@@ -2132,84 +2145,85 @@ export default function RunPage() {
               <p className="text-tiny font-semibold">{lang === "en" ? "Publish to" : "發布到"}</p>
               {/* 2026-05-12 (CJ「若是產出為 instagram/linkedin/youtube，也要有
                   一鍵授權的按鈕」): platform-aware publish row.
-                  - Facebook: 直接發 (full publish via Pipedream webhook, auto-auth
-                    popup on '尚未連接')
-                  - Instagram / LinkedIn / YouTube: 一鍵授權 (publish backend not
-                    wired yet — button opens Pipedream auth popup; once authorized,
-                    the platform's connect token is stored against this user so a
-                    future publish.toX call can use it without re-auth) */}
-              {(() => {
-                const platform = (mockupVariant?.platform ?? "facebook") as string;
-                if (platform === "facebook") {
-                  // Not connected and OAuth not done this session → connect button
-                  if (!fbConnected && !fbOauthDone) {
-                    return (
-                      <Button
-                        color="primary" fullWidth
-                        startContent={<FontAwesomeIcon icon={faRocket} />}
-                        isLoading={fbConnectUrlMut?.isPending}
-                        isDisabled={fbConnectUrlMut?.isPending}
-                        onPress={connectFacebookViaUrl}
-                      >
-                        {fbConnectUrlMut?.isPending
-                          ? (lang === "en" ? "Opening…" : "開啟中…")
-                          : (lang === "en" ? "Connect Facebook to publish" : "連接 Facebook 後發布")}
-                      </Button>
-                    );
-                  }
-                  // OAuth done (this session OR previously saved) → publish button
-                  // Clicking it shows the page picker if no page bound yet,
-                  // or confirms + publishes directly if page is already bound.
-                  return (
-                    <Button
-                      color="primary" fullWidth
-                      startContent={<FontAwesomeIcon icon={faRocket} />}
-                      isLoading={fbPublishMut?.isPending || fbPagesMut?.isPending}
-                      isDisabled={fbPublishMut?.isPending || fbPagesMut?.isPending}
-                      onPress={handleFbPublishClick}
-                    >
-                      {(fbPublishMut?.isPending || fbPagesMut?.isPending)
-                        ? (lang === "en" ? "Publishing…" : "發布中…")
-                        : (lang === "en" ? "Publish to Facebook" : "發布到 Facebook")}
-                    </Button>
-                  );
-                }
-                const PLATFORM_AUTH: Record<string, { label: string; key: "instagram" | "linkedin" | "youtube" }> = {
-                  instagram: { label: "Instagram", key: "instagram" },
-                  linkedin:  { label: "LinkedIn",  key: "linkedin"  },
-                  youtube:   { label: "YouTube",   key: "youtube"   },
-                };
-                const cfg = PLATFORM_AUTH[platform];
-                if (!cfg) {
-                  // Threads / LINE / TikTok / Email / PR don't have Pipedream
-                  // connect support yet — show a neutral disabled state.
-                  return (
-                    <Button
-                      variant="flat" fullWidth isDisabled
-                      startContent={<FontAwesomeIcon icon={faRocket} />}
-                    >{lang === "en" ? "Publishing for this platform coming soon" : "此平台發布功能即將開放"}</Button>
-                  );
-                }
-                return (
-                  <Button
-                    color="primary" fullWidth
-                    startContent={<FontAwesomeIcon icon={faRocket} />}
-                    isLoading={pipedreamBusy}
-                    isDisabled={pipedreamBusy}
-                    onMouseEnter={() => prefetchConnect(cfg.key)}
-                    onFocus={() => prefetchConnect(cfg.key)}
-                    onPress={() => openPipedreamConnect(cfg.key)}
-                  >
-                    {pipedreamBusy
-                      ? (lang === "en" ? "Authorizing…" : "授權中…")
-                      : t(
-                          cfg.key === "instagram" ? "run_authorize_ig"
-                          : cfg.key === "linkedin" ? "run_authorize_li"
-                          : "run_authorize_yt"
-                        )}
-                  </Button>
-                );
-              })()}
+                  - Facebook: 直接發 (full publish via Pipedream webhook)
+                  - Instagram / LinkedIn / YouTube: 一鍵授權 (Pipedream SDK)
+                  All 4 platform buttons are always shown so the user can
+                  authorize any platform regardless of the current content type. */}
+              {/* ── Facebook ── */}
+              {fbOauthPending ? (
+                // Popup is open — user needs to click this after completing auth
+                <Button
+                  color="success" fullWidth variant="flat"
+                  startContent={<span>✓</span>}
+                  isLoading={fbPagesMut?.isPending}
+                  isDisabled={fbPagesMut?.isPending}
+                  onPress={handleFbConfirmAuth}
+                >
+                  {fbPagesMut?.isPending
+                    ? (lang === "en" ? "Verifying…" : "驗證中…")
+                    : (lang === "en" ? "I've authorized Facebook — Continue" : "✓ 我已完成 Facebook 授權，繼續")}
+                </Button>
+              ) : (!fbConnected && !fbOauthDone) ? (
+                <Button
+                  color="primary" fullWidth
+                  startContent={<FontAwesomeIcon icon={faRocket} />}
+                  isLoading={fbConnectUrlMut?.isPending}
+                  isDisabled={fbConnectUrlMut?.isPending}
+                  onPress={connectFacebookViaUrl}
+                >
+                  {fbConnectUrlMut?.isPending
+                    ? (lang === "en" ? "Opening…" : "開啟中…")
+                    : (lang === "en" ? "Connect Facebook to publish" : "連接 Facebook 後發布")}
+                </Button>
+              ) : (
+                <Button
+                  color="primary" fullWidth
+                  startContent={<FontAwesomeIcon icon={faRocket} />}
+                  isLoading={fbPublishMut?.isPending || fbPagesMut?.isPending}
+                  isDisabled={fbPublishMut?.isPending || fbPagesMut?.isPending}
+                  onPress={handleFbPublishClick}
+                >
+                  {(fbPublishMut?.isPending || fbPagesMut?.isPending)
+                    ? (lang === "en" ? "Publishing…" : "發布中…")
+                    : (lang === "en" ? "Publish to Facebook" : "發布到 Facebook")}
+                </Button>
+              )}
+              {/* ── Instagram ── */}
+              <Button
+                variant="flat" fullWidth
+                startContent={<FontAwesomeIcon icon={faRocket} />}
+                isLoading={pipedreamBusy}
+                isDisabled={pipedreamBusy}
+                onMouseEnter={() => prefetchConnect("instagram")}
+                onFocus={() => prefetchConnect("instagram")}
+                onPress={() => openPipedreamConnect("instagram")}
+              >
+                {pipedreamBusy ? (lang === "en" ? "Authorizing…" : "授權中…") : (lang === "en" ? "Authorize Instagram" : "授權 Instagram")}
+              </Button>
+              {/* ── LinkedIn ── */}
+              <Button
+                variant="flat" fullWidth
+                startContent={<FontAwesomeIcon icon={faRocket} />}
+                isLoading={pipedreamBusy}
+                isDisabled={pipedreamBusy}
+                onMouseEnter={() => prefetchConnect("linkedin")}
+                onFocus={() => prefetchConnect("linkedin")}
+                onPress={() => openPipedreamConnect("linkedin")}
+              >
+                {pipedreamBusy ? (lang === "en" ? "Authorizing…" : "授權中…") : (lang === "en" ? "Authorize LinkedIn" : "授權 LinkedIn")}
+              </Button>
+              {/* ── YouTube ── */}
+              <Button
+                variant="flat" fullWidth
+                startContent={<FontAwesomeIcon icon={faRocket} />}
+                isLoading={pipedreamBusy}
+                isDisabled={pipedreamBusy}
+                onMouseEnter={() => prefetchConnect("youtube")}
+                onFocus={() => prefetchConnect("youtube")}
+                onPress={() => openPipedreamConnect("youtube")}
+              >
+                {pipedreamBusy ? (lang === "en" ? "Authorizing…" : "授權中…") : (lang === "en" ? "Authorize YouTube" : "授權 YouTube")}
+              </Button>
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
