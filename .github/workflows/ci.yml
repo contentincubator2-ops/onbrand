@@ -62,7 +62,7 @@ jobs:
 
             echo "===== Pull latest code ====="
             cd "$APP"
-            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/Marketing-OS.git"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/contentincubator2-ops/onbrand.git"
             git fetch origin main && git reset --hard origin/main
             echo "Latest commit: $(git log --oneline -1)"
 
