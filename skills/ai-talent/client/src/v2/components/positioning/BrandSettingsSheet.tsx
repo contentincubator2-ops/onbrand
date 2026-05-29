@@ -556,43 +556,22 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     (platformsQ?.data as any)?.connected ?? {};
 
   // ── Platform config ────────────────────────────────────────────────────
-  const PLATFORMS = [
-    {
-      key: "facebook",
-      label: "Facebook",
-      color: "#1877F2",
-      icon: faFacebook,
-      appSlug: "facebook_pages" as const,
-      desc: en ? "Publish to your Facebook Page" : "發布到 Facebook 粉專",
-    },
-    {
-      key: "instagram",
-      label: "Instagram",
-      color: "#E1306C",
-      icon: faInstagram,
-      appSlug: "instagram" as const,
-      desc: en ? "Publish to your Instagram Business account" : "發布到 Instagram 商業帳號",
-    },
-    {
-      key: "linkedin",
-      label: "LinkedIn",
-      color: "#0A66C2",
-      icon: faLinkedin,
-      appSlug: "linkedin" as const,
-      desc: en ? "Publish to your LinkedIn profile or page" : "發布到 LinkedIn 帳號或企業頁面",
-    },
-    {
-      key: "youtube",
-      label: "YouTube",
-      color: "#FF0000",
-      icon: faYoutube,
-      appSlug: "youtube" as const,
-      desc: en ? "Upload videos to your YouTube channel" : "上傳影片到 YouTube 頻道",
-    },
-  ] as const;
+  type PlatformCfg = {
+    key: string;
+    label: string;
+    color: string;
+    icon: any;
+    desc: string;
+  };
+  const PLATFORMS: PlatformCfg[] = [
+    { key: "facebook",  label: "Facebook",  color: "#1877F2", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"               : "發布到 Facebook 粉專"        },
+    { key: "instagram", label: "Instagram", color: "#E1306C", icon: faInstagram, desc: en ? "Publish to your Instagram Business account"    : "發布到 Instagram 商業帳號"   },
+    { key: "linkedin",  label: "LinkedIn",  color: "#0A66C2", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"       : "發布到 LinkedIn 帳號或企業頁面" },
+    { key: "youtube",   label: "YouTube",   color: "#FF0000", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"          : "上傳影片到 YouTube 頻道"     },
+  ];
 
   // ── Open OAuth popup ────────────────────────────────────────────────────
-  async function openConnectPopup(platform: typeof PLATFORMS[number]) {
+  async function openConnectPopup(platform: PlatformCfg) {
     const win = window.open("about:blank", "_blank", "popup,width=620,height=720");
     if (!win) {
       alert(en
@@ -609,7 +588,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         const r = await fbConnectUrlM?.mutateAsync?.({});
         connectUrl = r?.connectUrl ?? "";
       } else {
-        const r = await getConnectTkM?.mutateAsync?.({ platform: platform.appSlug === "instagram" ? "instagram" : platform.appSlug === "linkedin" ? "linkedin" : "youtube" });
+        const r = await getConnectTkM?.mutateAsync?.({ platform: platform.key as "instagram" | "linkedin" | "youtube" });
         connectUrl = r?.connectLinkUrl ?? "";
         if (!connectUrl && r?.token && r?.projectId) {
           connectUrl = `https://pipedream.com/_static/connect.html?token=${r.token}&app=${platform.appSlug}`;
