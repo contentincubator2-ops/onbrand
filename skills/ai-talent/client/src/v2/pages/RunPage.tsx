@@ -29,6 +29,9 @@ import {
   faChevronLeft, faFolderOpen,
 } from "@fortawesome/free-solid-svg-icons";
 import {
+  faFacebook, faInstagram, faLinkedin, faYoutube,
+} from "@fortawesome/free-brands-svg-icons";
+import {
   Pencil, MessageCircle, Image as LucideImage, Video,
   Wand2, Sliders as LucideSliders, Save, Copy as LucideCopy,
   Share2 as LucideShare,
@@ -2171,84 +2174,94 @@ export default function RunPage() {
 
           <Card>
             <CardBody className="space-y-2">
-              <p className="text-tiny font-semibold">{lang === "en" ? "Publish to" : "發布到"}</p>
-              {/* 2026-05-12 (CJ「若是產出為 instagram/linkedin/youtube，也要有
-                  一鍵授權的按鈕」): platform-aware publish row.
-                  - Facebook: 直接發 (full publish via Pipedream webhook)
-                  - Instagram / LinkedIn / YouTube: 一鍵授權 (Pipedream SDK)
-                  All 4 platform buttons are always shown so the user can
-                  authorize any platform regardless of the current content type. */}
-              {/* ── Facebook ── */}
-              {fbOauthPending ? (
-                // Popup is open — auto-polling for Pipedream auth (no confirm button needed)
-                <Button
-                  color="default" fullWidth variant="flat"
-                  isDisabled
-                >
-                  <span className="animate-spin mr-1 text-primary">⟳</span>
-                  {lang === "en" ? "Waiting for Facebook authorization…" : "等待 Facebook 授權，請在彈出視窗完成…"}
-                </Button>
-              ) : (!fbConnected && !fbOauthDone) ? (
-                <Button
-                  color="primary" fullWidth
-                  startContent={<FontAwesomeIcon icon={faRocket} />}
-                  isLoading={fbConnectUrlMut?.isPending}
-                  isDisabled={fbConnectUrlMut?.isPending}
-                  onPress={connectFacebookViaUrl}
-                >
-                  {fbConnectUrlMut?.isPending
-                    ? (lang === "en" ? "Opening…" : "開啟中…")
-                    : (lang === "en" ? "Connect Facebook to publish" : "連接 Facebook 後發布")}
-                </Button>
-              ) : (
-                <Button
-                  color="primary" fullWidth
-                  startContent={<FontAwesomeIcon icon={faRocket} />}
-                  isLoading={fbPublishMut?.isPending || fbPagesMut?.isPending}
-                  isDisabled={fbPublishMut?.isPending || fbPagesMut?.isPending}
-                  onPress={handleFbPublishClick}
-                >
-                  {(fbPublishMut?.isPending || fbPagesMut?.isPending)
-                    ? (lang === "en" ? "Publishing…" : "發布中…")
-                    : (lang === "en" ? "Publish to Facebook" : "發布到 Facebook")}
-                </Button>
-              )}
-              {/* ── Instagram ── */}
-              <Button
-                variant="flat" fullWidth
-                startContent={<FontAwesomeIcon icon={faRocket} />}
-                isLoading={pipedreamBusy}
-                isDisabled={pipedreamBusy}
-                onMouseEnter={() => prefetchConnect("instagram")}
-                onFocus={() => prefetchConnect("instagram")}
-                onPress={() => openPipedreamConnect("instagram")}
-              >
-                {pipedreamBusy ? (lang === "en" ? "Authorizing…" : "授權中…") : (lang === "en" ? "Authorize Instagram" : "授權 Instagram")}
-              </Button>
-              {/* ── LinkedIn ── */}
-              <Button
-                variant="flat" fullWidth
-                startContent={<FontAwesomeIcon icon={faRocket} />}
-                isLoading={pipedreamBusy}
-                isDisabled={pipedreamBusy}
-                onMouseEnter={() => prefetchConnect("linkedin")}
-                onFocus={() => prefetchConnect("linkedin")}
-                onPress={() => openPipedreamConnect("linkedin")}
-              >
-                {pipedreamBusy ? (lang === "en" ? "Authorizing…" : "授權中…") : (lang === "en" ? "Authorize LinkedIn" : "授權 LinkedIn")}
-              </Button>
-              {/* ── YouTube ── */}
-              <Button
-                variant="flat" fullWidth
-                startContent={<FontAwesomeIcon icon={faRocket} />}
-                isLoading={pipedreamBusy}
-                isDisabled={pipedreamBusy}
-                onMouseEnter={() => prefetchConnect("youtube")}
-                onFocus={() => prefetchConnect("youtube")}
-                onPress={() => openPipedreamConnect("youtube")}
-              >
-                {pipedreamBusy ? (lang === "en" ? "Authorizing…" : "授權中…") : (lang === "en" ? "Authorize YouTube" : "授權 YouTube")}
-              </Button>
+              {/* ── Platform publish list (P0 redesign 2026-05-30) ── */}
+              <p className="text-tiny font-semibold text-default-500">{lang === "en" ? "Publish to" : "發布到"}</p>
+              {[
+                { key: "facebook",  label: "Facebook",  icon: faFacebook,  color: "#1877F2" },
+                { key: "instagram", label: "Instagram", icon: faInstagram, color: "#E1306C" },
+                { key: "linkedin",  label: "LinkedIn",  icon: faLinkedin,  color: "#0A66C2" },
+                { key: "youtube",   label: "YouTube",   icon: faYoutube,   color: "#FF0000" },
+              ].map((p, idx) => {
+                const isFb        = p.key === "facebook";
+                const pdConn      = (platformsQRun?.data as any)?.connected?.[p.key];
+                const isConnected = isFb ? (fbConnected || fbOauthDone) : !!pdConn;
+                const accountName = isFb
+                  ? ((fbStatusQuery?.data as any)?.fbPageName ?? null)
+                  : (pdConn?.name ?? null);
+
+                return (
+                  <div
+                    key={p.key}
+                    className={`flex items-center gap-2 py-1.5${idx < 3 ? " border-b border-default-100" : ""}`}
+                  >
+                    {/* Platform icon */}
+                    <div
+                      className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
+                      style={{ background: p.color + "18" }}
+                    >
+                      <FontAwesomeIcon icon={p.icon} style={{ color: p.color, fontSize: 13 }} />
+                    </div>
+
+                    {/* Name + account/status */}
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className="text-[12px] font-medium leading-tight text-default-900">{p.label}</p>
+                      <p className="text-[10px] leading-tight truncate" style={{ color: isConnected ? "#16a34a" : "#9ca3af" }}>
+                        {isConnected
+                          ? (accountName ?? (lang === "en" ? "Connected" : "已連接"))
+                          : (lang === "en" ? "Not connected" : "尚未連接")}
+                      </p>
+                    </div>
+
+                    {/* Status dot */}
+                    <div
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ background: isConnected ? "#4ade80" : "#e5e7eb" }}
+                    />
+
+                    {/* Action button */}
+                    {isFb ? (
+                      fbOauthPending ? (
+                        <Button size="sm" variant="flat" isDisabled className="min-w-[58px]">
+                          <span className="animate-spin text-[11px] text-primary">⟳</span>
+                        </Button>
+                      ) : isConnected ? (
+                        <Button
+                          size="sm" color="primary" className="min-w-[58px] text-[11px]"
+                          isLoading={fbPublishMut?.isPending || fbPagesMut?.isPending}
+                          isDisabled={fbPublishMut?.isPending || fbPagesMut?.isPending}
+                          onPress={handleFbPublishClick}
+                        >
+                          {lang === "en" ? "Publish" : "發布"}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm" color="primary" variant="flat" className="min-w-[58px] text-[11px]"
+                          isLoading={fbConnectUrlMut?.isPending}
+                          isDisabled={fbConnectUrlMut?.isPending}
+                          onPress={connectFacebookViaUrl}
+                        >
+                          {lang === "en" ? "Connect" : "連接"}
+                        </Button>
+                      )
+                    ) : isConnected ? (
+                      <Button size="sm" variant="flat" color="success" isDisabled className="min-w-[58px] text-[11px]">
+                        ✓ {lang === "en" ? "Auth'd" : "已授權"}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm" color="default" variant="flat" className="min-w-[58px] text-[11px]"
+                        isLoading={pipedreamBusy}
+                        isDisabled={pipedreamBusy}
+                        onMouseEnter={() => prefetchConnect(p.key as any)}
+                        onFocus={() => prefetchConnect(p.key as any)}
+                        onPress={() => openPipedreamConnect(p.key as any)}
+                      >
+                        {lang === "en" ? "Connect" : "連接"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}

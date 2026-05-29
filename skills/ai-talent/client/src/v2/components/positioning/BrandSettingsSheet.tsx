@@ -775,7 +775,12 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
           return (
             <div
               key={p.key}
-              className="border border-default-200 rounded-xl p-4 bg-white flex flex-col gap-3"
+              className={[
+                "rounded-xl p-4 flex flex-col gap-3 transition-colors",
+                fullyConnected
+                  ? "border-2 border-success-300 bg-white"
+                  : "border-2 border-dashed border-default-200 bg-default-50/40",
+              ].join(" ")}
             >
               {/* Card header */}
               <div className="flex items-center gap-3">
@@ -796,20 +801,36 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 )}
               </div>
 
-              {/* Connected state: show account/page name + disconnect */}
-              {fullyConnected && (
-                <div className="text-xs text-default-500 bg-default-50 rounded-lg px-3 py-2">
-                  {p.key === "facebook" && fbStatus?.fbPageName && (
-                    <span>{en ? "Page: " : "粉專："}<strong>{fbStatus.fbPageName}</strong></span>
-                  )}
-                  {p.key !== "facebook" && connectedAccount?.name && (
-                    <span>{en ? "Account: " : "帳號："}<strong>{connectedAccount.name}</strong></span>
-                  )}
-                  {!((p.key === "facebook" && fbStatus?.fbPageName) || (p.key !== "facebook" && connectedAccount?.name)) && (
-                    <span className="text-default-400">{en ? "Authorization active" : "授權生效中"}</span>
-                  )}
-                </div>
-              )}
+              {/* Connected state: account name + last connected indicator */}
+              {fullyConnected && (() => {
+                const connectedAtRaw = p.key === "facebook" ? (fbStatus as any)?.connectedAt : null;
+                const daysSince = connectedAtRaw
+                  ? Math.floor((Date.now() - new Date(connectedAtRaw).getTime()) / 86_400_000)
+                  : null;
+                const isStale = daysSince !== null && daysSince > 60;
+                return (
+                  <div className={`text-xs rounded-lg px-3 py-2 ${isStale ? "bg-warning-50 text-warning-700" : "text-default-500 bg-default-50"}`}>
+                    <div>
+                      {p.key === "facebook" && fbStatus?.fbPageName && (
+                        <span>{en ? "Page: " : "粉專："}<strong>{fbStatus.fbPageName}</strong></span>
+                      )}
+                      {p.key !== "facebook" && connectedAccount?.name && (
+                        <span>{en ? "Account: " : "帳號："}<strong>{connectedAccount.name}</strong></span>
+                      )}
+                      {!((p.key === "facebook" && fbStatus?.fbPageName) || (p.key !== "facebook" && connectedAccount?.name)) && (
+                        <span className={isStale ? "" : "text-default-400"}>{en ? "Authorization active" : "授權生效中"}</span>
+                      )}
+                    </div>
+                    {daysSince !== null && (
+                      <div className={`mt-0.5 text-[10px] ${isStale ? "text-warning-600 font-medium" : "text-default-400"}`}>
+                        {isStale
+                          ? (en ? `⚠ Connected ${daysSince}d ago — consider re-authorizing` : `⚠ 已連接 ${daysSince} 天，建議重新授權`)
+                          : (en ? `Connected ${daysSince}d ago` : `已連接 ${daysSince} 天`)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Waiting indicator — shown while popup is open (auto-polling) */}
               {isPending && (

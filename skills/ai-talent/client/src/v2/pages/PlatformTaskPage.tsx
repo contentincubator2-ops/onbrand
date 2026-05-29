@@ -33,6 +33,26 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 
+// ── Recently used tasks helpers ─────────────────────────────────────────────
+const LAST_USED_KEY = "onbrand_last_used_tasks_v1";
+function recordTaskUsed(taskId: string) {
+  try {
+    const raw = localStorage.getItem(LAST_USED_KEY);
+    const map: Record<string, number> = raw ? JSON.parse(raw) : {};
+    map[taskId] = Date.now();
+    localStorage.setItem(LAST_USED_KEY, JSON.stringify(map));
+  } catch { /* non-fatal */ }
+}
+function getLastUsedDays(taskId: string): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_USED_KEY);
+    if (!raw) return null;
+    const map: Record<string, number> = JSON.parse(raw);
+    if (!map[taskId]) return null;
+    return Math.floor((Date.now() - map[taskId]) / 86_400_000);
+  } catch { return null; }
+}
+
 // ── Platform route mapping ───────────────────────────────────────────────────
 // URL param → internal platform filter key (matches task.platform from listFB)
 const ROUTE_TO_PLATFORM: Record<string, string> = {
@@ -563,6 +583,7 @@ function PlatformTaskPageInner() {
       navigate((task as any).ctaPath);
       return;
     }
+    recordTaskUsed(task.id);
     setActiveTask(task);
     let prefill = "";
     const derive = (task as any).primary_input?.derive;
@@ -824,6 +845,45 @@ function PlatformTaskPageInner() {
           </div>
         </div>
       </div>
+
+      {/* ── Recently used tasks ── */}
+      {(() => {
+        const raw = (() => { try { return JSON.parse(localStorage.getItem(LAST_USED_KEY) ?? "{}") as Record<string, number>; } catch { return {} as Record<string, number>; } })();
+        const recentTasks = Object.entries(raw)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .map(([id]) => allTasks?.find((t: any) => t.id === id))
+          .filter(Boolean) as any[];
+        if (recentTasks.length === 0) return null;
+        return (
+          <div className="mb-6 px-4 md:px-6 max-w-[1200px] mx-auto">
+            <p className="text-xs font-semibold text-default-400 uppercase tracking-wide mb-3">
+              {lang === "en" ? "Recently used" : "最近使用"}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {recentTasks.map((task: any) => {
+                const days = getLastUsedDays(task.id);
+                return (
+                  <button
+                    key={task.id}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-default-200 bg-white hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
+                    onClick={() => openTask(task)}
+                  >
+                    <span className="text-[12px] font-medium text-default-900 max-w-[140px] truncate">
+                      {task.title ?? task.label ?? task.id}
+                    </span>
+                    {days !== null && (
+                      <span className="text-[10px] text-default-400 flex-shrink-0">
+                        {days === 0 ? (lang === "en" ? "today" : "今天") : `${days}d`}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ─── Task grid ─────────────────────────────────────────────────── */}
       <div className="max-w-[1200px] mx-auto px-6 pb-20">

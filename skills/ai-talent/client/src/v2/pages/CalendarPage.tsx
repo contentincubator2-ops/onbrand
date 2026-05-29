@@ -269,6 +269,24 @@ export default function CalendarPage() {
           </div>
         </div>
 
+        {/* Empty state */}
+        {items.length === 0 && !rangeQ?.isLoading && (
+          <div className="text-center py-10 text-default-400">
+            <p className="text-sm font-medium">{lang === "en" ? "No published posts this month" : "本月尚無發布記錄"}</p>
+            <p className="text-xs mt-1 text-default-300">
+              {lang === "en"
+                ? "Posts appear here after publishing via the Run page."
+                : "在 Run 頁面發布後，貼文會顯示在這裡。"}
+            </p>
+            <button
+              className="mt-3 text-xs text-primary hover:underline"
+              onClick={() => navigate("/tasks/fb")}
+            >
+              {lang === "en" ? "→ Create your first post" : "→ 建立第一篇貼文"}
+            </button>
+          </div>
+        )}
+
         {/* Footer hint */}
         <p className="mt-4 text-[11px] text-default-700 text-center">
           {lang === "en" ? (

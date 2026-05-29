@@ -598,6 +598,13 @@ export default function TheaterPage() {
     return out;
   }, [lang]);
 
+  // Platform connection status (for colored dots on platform selector)
+  const pdConnectQ = (trpc as any).publish?.getConnectedPlatforms?.useQuery?.(
+    { brandId: brandId ?? 0 },
+    { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 30_000 },
+  );
+  const connectedPlatforms: Record<string, any> = (pdConnectQ?.data as any)?.connected ?? {};
+
   // Preload cast avatars
   const castQuery = trpc.agent.byIds.useQuery({ ids: castIds() }, {
     staleTime: 60 * 60_000,
@@ -1450,6 +1457,14 @@ export default function TheaterPage() {
               >
                 <PlatformIcon platformKey={meta.iconKey} className={on ? "text-white" : "text-neutral-700"} />
                 <span>{meta.label}</span>
+                {/* Connection status dot */}
+                {connectedPlatforms[p] ? (
+                  <span
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    style={{ background: on ? "#4ade80" : "#16a34a" }}
+                    title={lang === "en" ? "Connected" : "已連接"}
+                  />
+                ) : null}
                 {on && <Check size={12} strokeWidth={2.5} />}
               </button>
             );
@@ -1560,6 +1575,14 @@ export default function TheaterPage() {
                       onEdit={(newCaption) => editCellCaption(key, newCaption)}
                       onMarkRule={() => openRuleModal(key)}
                         />
+                      {/* Platform connection status chip on done cells */}
+                      {state.status === "done" && connectedPlatforms[p] && (
+                        <div className="flex justify-end mt-0.5 px-1">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success-50 border border-success-200 text-success-700 font-medium">
+                            ✓ {lang === "en" ? "Connected" : "已連接"}
+                          </span>
+                        </div>
+                      )}
                       </div>
                     );
                   })}
