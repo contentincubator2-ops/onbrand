@@ -285,17 +285,25 @@ export const publishRouter = router({
       const { access_token } = (await tokenRes.json()) as { access_token: string };
       const headers = { "Authorization": `Bearer ${access_token}`, "X-PD-Environment": pdEnv };
 
-      // Step 2: list connected accounts for this user + facebook_pages app
-      const accountsRes = await fetch(
-        `${PD}/connect/${projectId}/users/${externalUserId}/accounts?app=facebook_pages&limit=10`,
-        { headers, signal: AbortSignal.timeout(15_000) },
-      );
-      if (!accountsRes.ok) {
-        const t = await accountsRes.text();
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得已連接的 FB 帳號：${t.slice(0, 200)}` });
+      // Step 2: list connected accounts for this user + facebook_pages app.
+      // Retry up to 4× with increasing delay — Pipedream can take 2–4 seconds
+      // to propagate the OAuth callback after the user completes the popup.
+      const accountsUrl = `${PD}/connect/${projectId}/users/${externalUserId}/accounts?app=facebook_pages&limit=10`;
+      let accounts: Array<{ id: string; name?: string }> = [];
+      const RETRIES = [0, 2000, 3000, 4000]; // ms to wait before each attempt
+      for (let attempt = 0; attempt < RETRIES.length; attempt++) {
+        if (RETRIES[attempt]! > 0) {
+          await new Promise((r) => setTimeout(r, RETRIES[attempt]));
+        }
+        const accountsRes = await fetch(accountsUrl, { headers, signal: AbortSignal.timeout(15_000) });
+        if (!accountsRes.ok) {
+          const t = await accountsRes.text();
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得已連接的 FB 帳號：${t.slice(0, 200)}` });
+        }
+        const accountsData = (await accountsRes.json()) as { data?: Array<{ id: string; name?: string }> };
+        accounts = accountsData.data ?? [];
+        if (accounts.length > 0) break; // found — stop retrying
       }
-      const accountsData = (await accountsRes.json()) as { data?: Array<{ id: string; name?: string }> };
-      const accounts = accountsData.data ?? [];
       if (accounts.length === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "尚未連接 Facebook，請先完成授權。" });
       }

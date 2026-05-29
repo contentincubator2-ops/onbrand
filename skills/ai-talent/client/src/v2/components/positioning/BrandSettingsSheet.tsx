@@ -774,13 +774,20 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 
               {/* Confirm button — shown while popup is open */}
               {isPending && (
-                <Button
-                  color="success" size="sm" variant="flat" fullWidth
-                  isLoading={fbPagesM?.isPending || platformsQ?.isFetching}
-                  onPress={() => confirmAuth(p.key)}
-                >
-                  {en ? `✓ I've authorized ${p.label} — Continue` : `✓ 我已完成 ${p.label} 授權，繼續`}
-                </Button>
+                <div className="flex flex-col gap-1">
+                  <Button
+                    color="success" size="sm" variant="flat" fullWidth
+                    isLoading={fbPagesM?.isPending || platformsQ?.isFetching}
+                    onPress={() => confirmAuth(p.key)}
+                  >
+                    {en ? `✓ I've authorized ${p.label} — Continue` : `✓ 我已完成 ${p.label} 授權，繼續`}
+                  </Button>
+                  {(fbPagesM?.isPending) && (
+                    <p className="text-[11px] text-default-400 text-center">
+                      {en ? "Verifying with Pipedream… this may take up to 10 seconds." : "正在向 Pipedream 驗證授權，最多需要 10 秒，請稍候…"}
+                    </p>
+                  )}
+                </div>
               )}
 
               {/* Connect / Re-authorize button */}
