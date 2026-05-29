@@ -68,6 +68,8 @@ import VideoCopyPage from "../pages/media/VideoCopyPage";
 import DocRewritePage from "../pages/media/DocRewritePage";
 // 2026-05-26 (CJ「左欄改成平台優先」): platform-first task pages
 import PlatformTaskPage from "../pages/PlatformTaskPage";
+import NotFoundPage from "../pages/NotFoundPage";
+import PlanExpiredPage from "../pages/PlanExpiredPage";
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -128,9 +130,13 @@ class AppErrorBoundary extends React.Component<
             <p style={{ fontSize: 12, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1 }}>RENDER ERROR</p>
             <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>應用程式載入失敗</h2>
             <p style={{ marginTop: 8, color: "#374151" }}>{this.state.error.message}</p>
-            <pre style={{ marginTop: 12, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap" }}>
-              {this.state.error.stack}
-            </pre>
+            {/* 2026-05-29 (security): hide raw stack trace in production — leaks file
+                paths and internal class names. Dev mode still shows it for debugging. */}
+            {import.meta.env.DEV && (
+              <pre style={{ marginTop: 12, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap" }}>
+                {this.state.error.stack}
+              </pre>
+            )}
             <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <button
                 style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
@@ -203,6 +209,10 @@ export default function AppV2() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/refund" element={<RefundPage />} />
 
+        {/* Plan expired — accessible without full auth gate so expired users
+            can see the upgrade page instead of being stuck in a redirect loop */}
+        <Route path="/plan-expired" element={<PlanExpiredPage />} />
+
         {/* Onboarding kept */}
         <Route
           path="/onboarding"
@@ -267,7 +277,7 @@ export default function AppV2() {
           <Route path="/media/doc" element={<DocRewritePage />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </LanguageProvider>
     </AppErrorBoundary>

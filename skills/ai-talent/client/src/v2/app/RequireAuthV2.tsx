@@ -43,6 +43,14 @@ export default function RequireAuthV2({ children }: { children: React.ReactNode 
         clearTimeout(timer);
         if (!r.ok) { setOk(false); setChecking(false); return; }
         const d = await r.json();
+        if (d.user?.planStatus === "expired") {
+          // 2026-05-29: auto-heal sets planStatus='expired' when trial ends.
+          // Redirect to upgrade page instead of letting the user hit
+          // confusing 403 errors on every tRPC call.
+          navigate("/plan-expired", { replace: true });
+          setChecking(false);
+          return;
+        }
         setOk(!!d.user);
         setChecking(false);
       } catch (err: any) {

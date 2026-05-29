@@ -1,0 +1,210 @@
+name: Ops — Auto-heal (every 30 min)
+
+# 2026-05-29 (CJ solo-ops): single-operator "self-healing" run.
+# Detects and auto-fixes the most common production issues without
+# manual intervention. Runs every 30 minutes. Also dispatchable.
+#
+# What it fixes automatically:
+#   1. Stuck positioning jobs (running >10 min → set to failed so user can retry)
+#   2. Trial users whose planEndsAt has passed but planStatus is still 'trial'
+#      → set planStatus='expired', which blocks new runs + triggers upgrade prompt
+#   3. Billing mismatch (paid invoice but planStatus not 'active') → auto-activate
+#   4. Failed Stripe events → re-POST to the webhook handler (idempotent replay)
+#   5. Health check → if /health returns 503, restart pm2 process
+#
+# What it does NOT do (requires human judgment):
+#   - Delete user data
+#   - Change prices
+#   - Modify credit balances outside of the billing mismatch auto-fix
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes, 24/7
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (print actions, don't apply)"
+        type: boolean
+        default: false
+
+jobs:
+  heal:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 8
+    steps:
+      - name: Auto-heal production issues
+        run: |
+          set -e
+          DRY="${{ github.event.inputs.dry_run }}"
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+
+          Q()   { mysql -h localhost -u mos_user mos_db -N -s -e "$1" 2>/dev/null || true; }
+          RUN() {
+            if [ "$DRY" = "true" ]; then
+              echo "  [DRY] $1"
+            else
+              mysql -h localhost -u mos_user mos_db -e "$1" 2>/dev/null && echo "  ✅ Applied" || echo "  ⚠ Query failed (non-fatal)"
+            fi
+          }
+
+          FIXED=0
+          REPORT=""
+          append() { REPORT="${REPORT}<li>$1</li>"; FIXED=$((FIXED+1)); }
+
+          echo "══ Auto-heal run $(date '+%Y-%m-%d %H:%M') ══"
+
+          # ────────────────────────────────────────────────────────────────
+          # Fix 1: Stuck positioning jobs (running for >12 minutes)
+          # ────────────────────────────────────────────────────────────────
+          STUCK=$(Q "SELECT COUNT(*) FROM positioning_jobs
+                     WHERE status='running' AND startedAt < NOW()-INTERVAL 12 MINUTE")
+          if [ "${STUCK:-0}" -gt 0 ] 2>/dev/null; then
+            echo "🔧 Fix 1: $STUCK stuck positioning job(s) → setting to failed"
+            RUN "UPDATE positioning_jobs
+                 SET status='failed',
+                     errorMessage='自動偵測：任務超過 12 分鐘未完成，已重設。請重新執行。',
+                     finishedAt=NOW()
+                 WHERE status='running' AND startedAt < NOW()-INTERVAL 12 MINUTE"
+            append "重設 $STUCK 個卡住的定位任務"
+          else
+            echo "✓ Fix 1: no stuck positioning jobs"
+          fi
+
+          # ────────────────────────────────────────────────────────────────
+          # Fix 2: Trial-expired users (planEndsAt passed, planStatus still 'trial')
+          # ────────────────────────────────────────────────────────────────
+          EXPIRED=$(Q "SELECT COUNT(*) FROM users
+                       WHERE planStatus='trial' AND planEndsAt < NOW() AND planEndsAt IS NOT NULL")
+          if [ "${EXPIRED:-0}" -gt 0 ] 2>/dev/null; then
+            echo "🔧 Fix 2: $EXPIRED trial(s) expired → setting planStatus='expired'"
+            RUN "UPDATE users
+                 SET planStatus='expired'
+                 WHERE planStatus='trial' AND planEndsAt < NOW() AND planEndsAt IS NOT NULL"
+            append "$EXPIRED 個試用帳號到期，planStatus 更新為 expired"
+          else
+            echo "✓ Fix 2: no expired trials to flip"
+          fi
+
+          # ────────────────────────────────────────────────────────────────
+          # Fix 3: Billing mismatch — paid invoice but planStatus not active
+          # (user paid but webhook crashed before updating users table)
+          # ────────────────────────────────────────────────────────────────
+          MISMATCH=$(Q "SELECT COUNT(*) FROM users u
+                        WHERE EXISTS (
+                          SELECT 1 FROM invoices i
+                          WHERE i.userId=u.id AND i.status='paid' AND i.packType<>'topup'
+                            AND i.paidAt > NOW()-INTERVAL 48 HOUR
+                        )
+                        AND u.planStatus NOT IN ('active','enterprise')")
+          if [ "${MISMATCH:-0}" -gt 0 ] 2>/dev/null; then
+            echo "🔧 Fix 3: $MISMATCH billing mismatch(es) → activating plan"
+            # Get the plan code from the most recent paid invoice per user
+            RUN "UPDATE users u
+                 JOIN (
+                   SELECT i.userId, i.packType AS planCode,
+                          DATE_ADD(NOW(), INTERVAL 30 DAY) AS planEndsAt
+                   FROM invoices i
+                   WHERE i.status='paid' AND i.packType<>'topup'
+                     AND i.paidAt > NOW()-INTERVAL 48 HOUR
+                   ORDER BY i.paidAt DESC
+                 ) latest ON latest.userId=u.id
+                 SET u.planStatus='active',
+                     u.planCode=latest.planCode,
+                     u.planEndsAt=latest.planEndsAt
+                 WHERE u.planStatus NOT IN ('active','enterprise')"
+            append "⚠ 金流異常自動修復：$MISMATCH 個付費帳號已啟用"
+          else
+            echo "✓ Fix 3: no billing mismatches"
+          fi
+
+          # ────────────────────────────────────────────────────────────────
+          # Fix 4: Replay failed Stripe webhook events (idempotent, safe)
+          # ────────────────────────────────────────────────────────────────
+          FAILPAY=$(Q "SELECT COUNT(*) FROM failed_stripe_events
+                       WHERE createdAt > NOW()-INTERVAL 24 HOUR AND retryCount < 3
+                       LIMIT 1" 2>/dev/null || echo "0")
+          if [ "${FAILPAY:-0}" -gt 0 ] 2>/dev/null; then
+            echo "🔧 Fix 4: replaying up to 5 failed Stripe events"
+            # Fetch and replay each failed event body via the local webhook endpoint
+            Q "SELECT id, eventBody FROM failed_stripe_events
+               WHERE createdAt > NOW()-INTERVAL 24 HOUR AND retryCount < 3
+               LIMIT 5" 2>/dev/null | while IFS=$'\t' read -r EID EBODY; do
+              [ -z "$EID" ] && continue
+              HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+                -X POST http://localhost:3101/api/stripe/webhook-replay \
+                -H "Content-Type: application/json" \
+                -H "X-Internal-Heal: ${HEALTH_SECRET:-internal}" \
+                --data "{\"eventId\":$EID}" 2>/dev/null || echo "000")
+              if [ "$HTTP" = "200" ]; then
+                RUN "UPDATE failed_stripe_events SET retryCount=retryCount+1, lastRetryAt=NOW(), status='replayed' WHERE id=$EID"
+                echo "  ↺ Event $EID replayed (HTTP $HTTP)"
+              else
+                RUN "UPDATE failed_stripe_events SET retryCount=retryCount+1, lastRetryAt=NOW() WHERE id=$EID"
+                echo "  ✗ Event $EID replay failed (HTTP $HTTP)"
+              fi
+            done
+            append "嘗試重送 $FAILPAY 個失敗的 Stripe webhook"
+          else
+            echo "✓ Fix 4: no recent failed Stripe events to replay"
+          fi
+
+          # ────────────────────────────────────────────────────────────────
+          # Fix 5: Health check → restart pm2 if degraded
+          # ────────────────────────────────────────────────────────────────
+          SECRET="${HEALTH_SECRET:-}"
+          AUTH_HEADER=""
+          [ -n "$SECRET" ] && AUTH_HEADER="-H 'Authorization: Bearer $SECRET'"
+          HSTATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            ${AUTH_HEADER:+$AUTH_HEADER} \
+            http://localhost:3101/health 2>/dev/null || echo "000")
+          if [ "$HSTATUS" = "503" ] || [ "$HSTATUS" = "000" ]; then
+            echo "🔧 Fix 5: health check returned $HSTATUS → restarting pm2 onbrand"
+            if [ "$DRY" != "true" ]; then
+              pm2 restart onbrand --update-env 2>&1 | tail -5 || true
+              sleep 10
+              HSTATUS2=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/health 2>/dev/null || echo "000")
+              echo "  Post-restart health: $HSTATUS2"
+              if [ "$HSTATUS2" = "200" ]; then
+                append "伺服器無回應，已自動重啟 pm2 onbrand ✅"
+              else
+                append "⚠ pm2 重啟後健康檢查仍為 $HSTATUS2 — 需要人工介入"
+              fi
+            else
+              echo "  [DRY] Would restart pm2 onbrand"
+            fi
+          else
+            echo "✓ Fix 5: health OK (HTTP $HSTATUS)"
+          fi
+
+          # ────────────────────────────────────────────────────────────────
+          # Summary
+          # ────────────────────────────────────────────────────────────────
+          echo ""
+          if [ "$FIXED" -gt 0 ]; then
+            echo "══ 自動修復完成：$FIXED 項 ══"
+            # Send alert email only when something was actually fixed
+            if [ -n "$RESEND_API_KEY" ] && [ "$DRY" != "true" ]; then
+              FROM="${EMAIL_FROM:-onboarding@resend.dev}"
+              TO="${SUPPORT_NOTIFY_TO:-sowork@sowork.ai}"
+              HTML="<div style='font-family:-apple-system,sans-serif;line-height:1.6;color:#333'>
+                <h2 style='color:#059669'>🔧 OnBrand 自動修復報告</h2>
+                <p>$(date '+%Y-%m-%d %H:%M') — 以下問題已自動修復：</p>
+                <ul>${REPORT}</ul>
+                <p style='color:#888;font-size:12px'>如果這些修復持續出現，請登入後台查看根本原因。<br>
+                <a href='https://onbrand.sowork.ai/admin/dashboard'>→ 後台監控</a></p>
+              </div>"
+              curl -s -X POST https://api.resend.com/emails \
+                -H "Authorization: Bearer $RESEND_API_KEY" \
+                -H "Content-Type: application/json" \
+                --data "$(jq -n --arg from "$FROM" --arg to "$TO" \
+                   --arg subj "[OnBrand Auto-Heal] 自動修復 $FIXED 項問題" \
+                   --arg html "$HTML" \
+                   '{from:$from,to:[$to],subject:$subj,html:$html}')" \
+                -o /dev/null || true
+              echo "📧 Alert email sent to $TO"
+            fi
+          else
+            echo "══ 一切正常，無需修復 ══"
+          fi

@@ -410,7 +410,24 @@ authRouter.post("/me", async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ user: user[0] });
+    // 2026-05-29: fetch planStatus + planEndsAt via raw query — these columns
+    // exist in the DB but are not in the Drizzle schema (managed by localPool
+    // migrations). Frontend uses planStatus to show trial-expired UX without
+    // a separate billing API call.
+    let planStatus: string | null = null;
+    let planEndsAt: string | null = null;
+    try {
+      const { default: localPool } = await import("../localDb");
+      const [planRows]: any = await localPool.execute(
+        `SELECT planStatus, planEndsAt FROM users WHERE id = ? LIMIT 1`,
+        [session.userId],
+      );
+      const planRow = Array.isArray(planRows) ? planRows[0] : null;
+      planStatus = planRow?.planStatus ?? null;
+      planEndsAt = planRow?.planEndsAt ? new Date(planRow.planEndsAt).toISOString() : null;
+    } catch { /* non-fatal — return user without plan info */ }
+
+    res.json({ user: { ...user[0], planStatus, planEndsAt } });
   } catch (err) {
     console.error("[auth] me error:", err);
     res.status(500).json({ error: "伺服器錯誤" });
