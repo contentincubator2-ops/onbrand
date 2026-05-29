@@ -18,10 +18,17 @@ export default function BrandSettingsPage() {
 
   useEffect(() => {
     const b = search.get("b") ?? String(ctx?.brandId ?? ctx?.brands?.[0]?.id ?? "");
-    // 2026-05-30: "connector" tab removed — redirect legacy ?tab=connector to info tab.
-    const rawTab = search.get("tab") ?? "info";
-    const tab = rawTab === "connector" ? "info" : rawTab;
-    const url = b ? `/brands/edit?b=${b}&tab=${tab}` : `/brands/edit?tab=${tab}`;
+    // 2026-05-30: modal only has publish/ai/danger.
+    // connector/info/visual → no longer modal tabs; drop the ?tab= so the
+    // main workspace page opens normally (基本資料/視覺 are main page tabs).
+    const rawTab = search.get("tab") ?? "";
+    const modalTabs = ["publish", "ai", "danger"];
+    const tab = modalTabs.includes(rawTab) ? rawTab
+               : rawTab === "connector" ? "publish"   // legacy connector → publish
+               : "";                                   // info/visual → no modal tab
+    const url = b
+      ? (tab ? `/brands/edit?b=${b}&tab=${tab}` : `/brands/edit?b=${b}`)
+      : (tab ? `/brands/edit?tab=${tab}` : `/brands/edit`);
     navigate(url, { replace: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

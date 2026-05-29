@@ -212,13 +212,13 @@ export default function ShellLayout() {
             navigate(url);
             return;
           }
-          // 2026-05-30 (CJ「移除連結頁」): legacy /brands/settings URLs still
-          // redirect to /brands/edit — now landing on info tab (not connector).
+          // 2026-05-30 (CJ「modal 精簡」): legacy /brands/settings opens
+          // settings modal on platform-auth tab (most useful entry point).
           if (to === "/brands/settings") {
             const bid = scope.brandId ?? brands[0]?.id;
             const url = bid
-              ? `/brands/edit?b=${bid}&tab=info`
-              : `/brands/edit?tab=info`;
+              ? `/brands/edit?b=${bid}&tab=publish`
+              : `/brands/edit?tab=publish`;
             navigate(url);
             return;
           }

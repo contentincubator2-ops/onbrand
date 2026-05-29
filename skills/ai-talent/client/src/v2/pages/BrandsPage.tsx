@@ -119,21 +119,23 @@ export default function BrandsPage() {
   // every refresh after dismissing.
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   // (effect to auto-open is declared further down once scopeBrands is defined)
-  // 2026-05-30 (CJ「移除連結頁」): "connector" removed from tab union.
-  const [settingsInitialTab, setSettingsInitialTab] = useState<"info"|"publish"|"visual"|"ai"|"danger">("info");
+  // 2026-05-30 (CJ「modal 只留設定類 tab」): 基本資料/視覺 moved to main workspace.
+  // Modal only has: publish / ai / danger.
+  const [settingsInitialTab, setSettingsInitialTab] = useState<"publish"|"ai"|"danger">("publish");
   // 2026-05-11: support deep link /brands/edit?b=:id&tab=publish from
   // RunPage's "尚未連接 FB" toast.
   React.useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const t = sp.get("tab");
-      if (t === "publish" || t === "info" || t === "visual" || t === "ai" || t === "danger") {
+      if (t === "publish" || t === "ai" || t === "danger") {
         setSettingsInitialTab(t);
         setSettingsOpen(true);
-      } else if (t === "connector") {
-        // legacy URL — redirect to info tab (social URLs are now there)
-        setSettingsInitialTab("info");
-        setSettingsOpen(true);
+      } else if (t === "connector" || t === "info" || t === "visual") {
+        // legacy URLs — these are now in the main workspace tabs, not the modal.
+        // For publish deep-links (e.g. from RunPage FB toast), map to publish.
+        if (t === "connector") { setSettingsInitialTab("publish"); setSettingsOpen(true); }
+        // info/visual — don't open modal, main page already shows them as tabs.
       }
     } catch { /* no-op */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1195,12 +1197,12 @@ export default function BrandsPage() {
             ← {lang === "en" ? "All brands" : "所有品牌"}
           </a>
         </div>
-        {/* Gear icon top-right — opens Settings sheet (連結 / 視覺 / AI 指令 / 危險區) */}
+        {/* Gear icon top-right — opens Settings sheet (平台授權 / AI 指令 / 危險區) */}
         {activeBrandIdForLocks && (
           <button
             onClick={() => setSettingsOpen(true)}
             className="absolute top-5 right-5 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-default-200 hover:border-default-400 shadow-sm transition text-default-600 hover:text-default-900 z-10"
-            title={lang === "en" ? "Settings (links / visual / AI / delete)" : "設定（連結 / 視覺 / AI 指令 / 刪除）"}
+            title={lang === "en" ? "Settings (platform auth / AI prompts / danger zone)" : "設定（平台授權 / AI 指令 / 危險區）"}
           >
             <LucideSettings size={14} strokeWidth={1.8} />
             <span className="text-xs font-medium">{lang === "en" ? "Settings" : "設定"}</span>
