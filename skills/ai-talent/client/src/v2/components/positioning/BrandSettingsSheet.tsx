@@ -20,7 +20,7 @@ import {
   IdCard, Link2, Palette, Bot, Trash2, X, Share2, CheckCircle2, ExternalLink,
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebook } from "@fortawesome/free-brands-svg-icons";
+import { faFacebook, faInstagram, faLinkedin, faYoutube } from "@fortawesome/free-brands-svg-icons";
 import ConnectorEditor from "./ConnectorEditor";
 import AIPromptsEditor from "./AIPromptsEditor";
 import { trpc } from "../../../lib/trpc";
@@ -502,216 +502,321 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
 }
 
 /**
- * 2026-05-11 — PublishTab: per-brand Facebook binding for multi-tenant SaaS.
+ * 2026-05-29 — PublishTab: Buffer-style platform connection grid.
  *
- * Flow:
- *   1. User clicks 「連接 Facebook」 → opens Pipedream Connect popup
- *      (OAuth scoped to this user's external_user_id = our userId).
- *   2. User authorises FB → Pipedream stores their access token in vault.
- *   3. User pastes the FB Page ID they want this brand to publish to
- *      → saved into brands.fbPageId.
- *   4. From now on, publish.toFacebook reads brand.fbPageId + sends
- *      connect_external_user_id so Pipedream uses THIS user's token.
+ * Shows all 4 platforms (Facebook, Instagram, LinkedIn, YouTube) as cards.
+ * Each card shows connection status and a Connect / Disconnect button.
+ *
+ * Auth flow (all platforms):
+ *   1. Click "Connect [Platform]" → popup opens synchronously (keeps user gesture)
+ *   2. Popup navigates to Pipedream Connect URL for that app
+ *   3. Main page shows green "✓ 我已完成授權" confirm button
+ *   4. User completes OAuth in popup, then clicks confirm on main page
+ *   5. getConnectedPlatforms refetch verifies → card shows "Connected ✓"
+ *
+ * Facebook additionally:
+ *   - Auto-fetches page list via getFacebookPages after confirm
+ *   - User picks page from dropdown → auto-saves (no manual Page ID input)
  */
 export function PublishTab({ brandId }: { brandId: number | null }) {
   const { lang } = useLang();
   const en = lang === "en";
-  const statusQ = (trpc as any).publish?.getBrandFacebookStatus?.useQuery?.(
+
+  // ── Queries ──────────────────────────────────────────────────────────
+  const fbStatusQ = (trpc as any).publish?.getBrandFacebookStatus?.useQuery?.(
     { brandId: brandId ?? 0 },
-    { enabled: !!brandId, refetchOnWindowFocus: false },
+    { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 15_000 },
   );
-  const setPageM = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
-    onSuccess: () => statusQ?.refetch?.(),
+  const platformsQ = (trpc as any).publish?.getConnectedPlatforms?.useQuery?.(
+    {},
+    { refetchOnWindowFocus: false, staleTime: 20_000 },
+  );
+
+  // ── Mutations ─────────────────────────────────────────────────────────
+  const fbConnectUrlM  = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
+  const fbPagesM       = (trpc as any).publish?.getFacebookPages?.useMutation?.();
+  const setFbPageM     = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
+    onSuccess: () => { fbStatusQ?.refetch?.(); platformsQ?.refetch?.(); },
   });
-  const unbindM = (trpc as any).publish?.unbindBrandFacebook?.useMutation?.({
-    onSuccess: () => statusQ?.refetch?.(),
+  const unbindFbM      = (trpc as any).publish?.unbindBrandFacebook?.useMutation?.({
+    onSuccess: () => { fbStatusQ?.refetch?.(); platformsQ?.refetch?.(); },
   });
-  const connectM = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
+  const getConnectTkM  = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
 
-  const [pageId, setPageId] = useState("");
-  const [pageName, setPageName] = useState("");
-  const [connectStarted, setConnectStarted] = useState(false);
+  // ── Local state ───────────────────────────────────────────────────────
+  // pendingPlatform — popup currently open for this platform
+  const [pendingPlatform, setPendingPlatform] = useState<string | null>(null);
+  // fbPages — list of pages fetched after FB auth confirmed
+  const [fbPages, setFbPages] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [fbPickerOpen, setFbPickerOpen] = useState(false);
 
-  useEffect(() => {
-    const d = statusQ?.data;
-    if (d?.fbPageId) setPageId(d.fbPageId);
-    if (d?.fbPageName) setPageName(d.fbPageName);
-  }, [statusQ?.data]);
+  const fbStatus = fbStatusQ?.data;
+  const fbConnected = !!fbStatus?.connected;
+  const connectedMap: Record<string, { accountId: string; name?: string }> =
+    (platformsQ?.data as any)?.connected ?? {};
 
-  const status = statusQ?.data;
-  const isConnected = !!status?.connected;
-  const isLoading = !!statusQ?.isLoading;
+  // ── Platform config ────────────────────────────────────────────────────
+  const PLATFORMS = [
+    {
+      key: "facebook",
+      label: "Facebook",
+      color: "#1877F2",
+      icon: faFacebook,
+      appSlug: "facebook_pages" as const,
+      desc: en ? "Publish to your Facebook Page" : "發布到 Facebook 粉專",
+    },
+    {
+      key: "instagram",
+      label: "Instagram",
+      color: "#E1306C",
+      icon: faInstagram,
+      appSlug: "instagram" as const,
+      desc: en ? "Publish to your Instagram Business account" : "發布到 Instagram 商業帳號",
+    },
+    {
+      key: "linkedin",
+      label: "LinkedIn",
+      color: "#0A66C2",
+      icon: faLinkedin,
+      appSlug: "linkedin" as const,
+      desc: en ? "Publish to your LinkedIn profile or page" : "發布到 LinkedIn 帳號或企業頁面",
+    },
+    {
+      key: "youtube",
+      label: "YouTube",
+      color: "#FF0000",
+      icon: faYoutube,
+      appSlug: "youtube" as const,
+      desc: en ? "Upload videos to your YouTube channel" : "上傳影片到 YouTube 頻道",
+    },
+  ] as const;
 
-  async function handleConnect() {
-    // 2026-05-18 (CJ「Connect account popup blocked」): browsers block
-    // window.open that runs AFTER an await (the user-gesture context is
-    // gone). Open the popup synchronously NOW, inside the click, then
-    // redirect it once the connect URL resolves.
-    const win = window.open("about:blank", "_blank", "width=600,height=700");
+  // ── Open OAuth popup ────────────────────────────────────────────────────
+  async function openConnectPopup(platform: typeof PLATFORMS[number]) {
+    const win = window.open("about:blank", "_blank", "popup,width=620,height=720");
     if (!win) {
       alert(en
-        ? "The connect window was blocked by your browser. Please allow pop-ups for this site and try again."
-        : "瀏覽器封鎖了授權視窗。請允許本站的彈出視窗後再試一次。");
+        ? "Pop-up was blocked — allow pop-ups for this site and try again."
+        : "授權視窗被封鎖 — 請允許本站的彈出視窗後再試一次。");
       return;
     }
     try {
       win.document.write(
-        `<p style="font:14px sans-serif;padding:24px;color:#555">${en ? "Opening Pipedream Connect…" : "正在開啟 Pipedream 授權…"}</p>`,
+        `<p style="font:14px sans-serif;padding:24px;color:#555">${en ? `Opening ${platform.label} authorization…` : `正在開啟 ${platform.label} 授權…`}</p>`,
       );
-      const r = await connectM?.mutateAsync?.({});
-      if (r?.connectUrl) {
-        win.location.href = r.connectUrl;
-        setConnectStarted(true);
+      let connectUrl: string;
+      if (platform.key === "facebook") {
+        const r = await fbConnectUrlM?.mutateAsync?.({});
+        connectUrl = r?.connectUrl ?? "";
       } else {
-        win.close();
-        alert(en ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結 — 請聯絡 sowork@sowork.ai");
+        const r = await getConnectTkM?.mutateAsync?.({ platform: platform.appSlug === "instagram" ? "instagram" : platform.appSlug === "linkedin" ? "linkedin" : "youtube" });
+        connectUrl = r?.connectLinkUrl ?? "";
+        if (!connectUrl && r?.token && r?.projectId) {
+          connectUrl = `https://pipedream.com/_static/connect.html?token=${r.token}&app=${platform.appSlug}`;
+        }
       }
+      if (!connectUrl) {
+        win.close();
+        alert(en ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結");
+        return;
+      }
+      win.location.href = connectUrl;
+      // Popup is open — show confirm button on main page
+      setPendingPlatform(platform.key);
     } catch (e: any) {
       win.close();
-      alert(en ? `Couldn't open Pipedream Connect: ${e?.message ?? "Unknown error"}` : `無法開啟 Pipedream Connect：${e?.message ?? "未知錯誤"}`);
+      alert(en ? `Failed: ${e?.message ?? "Unknown error"}` : `失敗：${e?.message ?? "未知錯誤"}`);
     }
   }
 
-  async function handleSave() {
-    if (!brandId || !pageId.trim()) return;
-    try {
-      await setPageM?.mutateAsync?.({
-        brandId,
-        fbPageId: pageId.trim(),
-        fbPageName: pageName.trim() || undefined,
-      });
-    } catch (e: any) {
-      alert(en ? `Save failed: ${e?.message ?? "Unknown error"}` : `儲存失敗：${e?.message ?? "未知錯誤"}`);
+  // ── Confirm auth (user clicks after completing OAuth in popup) ──────────
+  async function confirmAuth(platformKey: string) {
+    if (platformKey === "facebook") {
+      // Facebook: also fetch pages
+      try {
+        const result = await fbPagesM?.mutateAsync?.({});
+        const pages: Array<{ id: string; name: string; category: string }> = result?.pages ?? [];
+        setPendingPlatform(null);
+        platformsQ?.refetch?.();
+        fbStatusQ?.refetch?.();
+        if (pages.length === 0) {
+          alert(en ? "Authorized but no pages found — ensure your account manages at least one Facebook Page." : "授權成功，但此帳號沒有可管理的 FB 粉專");
+          return;
+        }
+        setFbPages(pages);
+        setFbPickerOpen(true);
+      } catch (e: any) {
+        alert(en ? `Couldn't verify auth: ${e?.message ?? "Unknown"}` : `驗證失敗：${e?.message ?? "未知錯誤"}`);
+      }
+    } else {
+      // Instagram / LinkedIn / YouTube: just verify via getConnectedPlatforms
+      setPendingPlatform(null);
+      platformsQ?.refetch?.();
     }
   }
 
-  async function handleUnbind() {
+  // ── Disconnect Facebook ─────────────────────────────────────────────────
+  async function disconnectFacebook() {
     if (!brandId) return;
     if (!confirm(en
-      ? "Disconnect Facebook from this brand? Posts already published won't be deleted."
-      : "確定要解除此品牌的 Facebook 綁定？已發出的貼文不會被刪除。")) return;
+      ? "Disconnect Facebook from this brand? Published posts won't be deleted."
+      : "確定要解除此品牌的 Facebook 綁定？已發出的貼文不受影響。")) return;
     try {
-      await unbindM?.mutateAsync?.({ brandId });
-      setPageId("");
-      setPageName("");
+      await unbindFbM?.mutateAsync?.({ brandId });
+      platformsQ?.refetch?.();
     } catch (e: any) {
-      alert(en ? `Disconnect failed: ${e?.message ?? "Unknown error"}` : `解除失敗：${e?.message ?? "未知錯誤"}`);
+      alert(en ? `Failed: ${e?.message ?? "Unknown"}` : `解除失敗：${e?.message ?? "未知錯誤"}`);
     }
   }
 
   return (
     <div className="max-w-[760px] mx-auto p-8">
-      <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Publish settings" : "發布設定"}</h2>
+      <h2 className="text-2xl font-semibold text-default-900 mb-1">{en ? "Platform connections" : "平台連接"}</h2>
       <p className="text-sm text-default-500 mb-6">
         {en
-          ? "Connect your own Facebook Page to this brand. \"Post to FB\" will use your authorization to publish to the page you pick."
-          : "為這個品牌連接你自己的 Facebook 粉專，「直接發 FB」會用你的授權發到你選定的粉專。"}
+          ? "Connect your accounts once. OnBrand uses your authorization to publish content directly."
+          : "一次授權，之後 OnBrand 用你的授權直接發布內容。"}
       </p>
 
-      {/* Facebook section */}
-      <div className="border border-default-200 rounded-xl p-5 bg-white">
-        <div className="flex items-center gap-3 mb-4">
-          <FontAwesomeIcon icon={faFacebook} style={{ color: "#1877F2", fontSize: 22 }} />
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-default-900">{en ? "Facebook Page" : "Facebook 粉專"}</div>
-            <div className="text-xs text-default-500">{en ? "Secure auth via Pipedream Connect · disconnect anytime" : "透過 Pipedream Connect 安全授權 · 隨時可解除"}</div>
-          </div>
-          {isConnected && (
-            <span className="flex items-center gap-1 text-xs text-success-700 bg-success-50 border border-success-200 px-2 py-1 rounded-full">
-              <CheckCircle2 size={12} /> {en ? "Connected" : "已連接"}
-            </span>
-          )}
-        </div>
+      {/* Platform card grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {PLATFORMS.map((p) => {
+          const pdConnected = !!connectedMap[p.key];
+          // For Facebook, "connected" also means brand has a page binding
+          const fullyConnected = p.key === "facebook" ? fbConnected : pdConnected;
+          const isPending = pendingPlatform === p.key;
+          const connectedAccount = connectedMap[p.key];
 
-        {isLoading ? (
-          <div className="py-6 flex justify-center"><Spinner size="sm" /></div>
-        ) : (
-          <>
-            {/* Step 1: OAuth */}
-            <div className="mb-5">
-              <div className="text-xs font-medium text-default-700 mb-2">
-                {en ? "1. Authorize Facebook" : "1. 授權 Facebook 帳號"}
-              </div>
-              <Button
-                size="sm"
-                variant={isConnected ? "bordered" : "solid"}
-                color={isConnected ? "default" : "primary"}
-                startContent={<ExternalLink size={13} />}
-                isLoading={connectM?.isPending}
-                onPress={handleConnect}
-              >
-                {isConnected
-                  ? (en ? "Re-authorize / switch account" : "重新授權 / 換帳號")
-                  : (en ? "Connect Facebook" : "連接 Facebook")}
-              </Button>
-              {connectStarted && !isConnected && (
-                <p className="text-xs text-default-500 mt-2">
-                  {en ? "Finish authorization in the new tab, then come back to fill in your Page ID." : "在新分頁完成授權後回來這裡填入粉專 ID。"}
-                </p>
-              )}
-            </div>
-
-            {/* Step 2: page ID */}
-            <div className="mb-4">
-              <div className="text-xs font-medium text-default-700 mb-2">
-                {en ? "2. Which Page?" : "2. 想用哪個粉專？"}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  size="sm"
-                  label={en ? "Page ID" : "粉專 ID"}
-                  placeholder={en ? "e.g. 123456789012345" : "例：123456789012345"}
-                  value={pageId}
-                  onValueChange={setPageId}
-                  description={en ? "Find it on your Page's About tab" : "可在粉專「關於」頁面找到"}
-                />
-                <Input
-                  size="sm"
-                  label={en ? "Page name (display)" : "粉專名稱（顯示用）"}
-                  placeholder={en ? "Optional, e.g. SoWork Marketing" : "選填，例：摘星行銷"}
-                  value={pageName}
-                  onValueChange={setPageName}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                color="primary"
-                isDisabled={!pageId.trim() || !brandId}
-                isLoading={setPageM?.isPending}
-                onPress={handleSave}
-              >
-                {en ? "Save binding" : "儲存綁定"}
-              </Button>
-              {isConnected && (
-                <Button
-                  size="sm"
-                  variant="light"
-                  color="danger"
-                  isLoading={unbindM?.isPending}
-                  onPress={handleUnbind}
+          return (
+            <div
+              key={p.key}
+              className="border border-default-200 rounded-xl p-4 bg-white flex flex-col gap-3"
+            >
+              {/* Card header */}
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: p.color + "18" }}
                 >
-                  {en ? "Disconnect" : "解除綁定"}
+                  <FontAwesomeIcon icon={p.icon} style={{ color: p.color, fontSize: 18 }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-default-900">{p.label}</div>
+                  <div className="text-xs text-default-400 truncate">{p.desc}</div>
+                </div>
+                {fullyConnected && (
+                  <span className="flex items-center gap-1 text-[11px] text-success-700 bg-success-50 border border-success-200 px-2 py-0.5 rounded-full flex-shrink-0">
+                    <CheckCircle2 size={11} /> {en ? "Connected" : "已連接"}
+                  </span>
+                )}
+              </div>
+
+              {/* Connected state: show account/page name + disconnect */}
+              {fullyConnected && (
+                <div className="text-xs text-default-500 bg-default-50 rounded-lg px-3 py-2">
+                  {p.key === "facebook" && fbStatus?.fbPageName && (
+                    <span>{en ? "Page: " : "粉專："}<strong>{fbStatus.fbPageName}</strong></span>
+                  )}
+                  {p.key !== "facebook" && connectedAccount?.name && (
+                    <span>{en ? "Account: " : "帳號："}<strong>{connectedAccount.name}</strong></span>
+                  )}
+                  {!((p.key === "facebook" && fbStatus?.fbPageName) || (p.key !== "facebook" && connectedAccount?.name)) && (
+                    <span className="text-default-400">{en ? "Authorization active" : "授權生效中"}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Confirm button — shown while popup is open */}
+              {isPending && (
+                <Button
+                  color="success" size="sm" variant="flat" fullWidth
+                  isLoading={fbPagesM?.isPending || platformsQ?.isFetching}
+                  onPress={() => confirmAuth(p.key)}
+                >
+                  {en ? `✓ I've authorized ${p.label} — Continue` : `✓ 我已完成 ${p.label} 授權，繼續`}
                 </Button>
               )}
+
+              {/* Connect / Re-authorize button */}
+              {!isPending && (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    color={fullyConnected ? "default" : "primary"}
+                    variant={fullyConnected ? "bordered" : "solid"}
+                    startContent={<ExternalLink size={12} />}
+                    isLoading={
+                      (p.key === "facebook" ? fbConnectUrlM?.isPending : getConnectTkM?.isPending)
+                    }
+                    onPress={() => openConnectPopup(p)}
+                    className="flex-1"
+                  >
+                    {fullyConnected
+                      ? (en ? "Re-authorize" : "重新授權")
+                      : (en ? `Connect ${p.label}` : `連接 ${p.label}`)}
+                  </Button>
+                  {/* Disconnect — only Facebook has DB binding to clear */}
+                  {p.key === "facebook" && fbConnected && (
+                    <Button
+                      size="sm" variant="light" color="danger"
+                      isLoading={unbindFbM?.isPending}
+                      onPress={disconnectFacebook}
+                    >
+                      {en ? "Disconnect" : "解除"}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
-
-            {status?.connectedAt && (
-              <p className="text-xs text-default-400 mt-3">
-                {en ? "Last connected: " : "上次連接："}{new Date(status.connectedAt).toLocaleString(en ? "en-US" : "zh-TW")}
-              </p>
-            )}
-          </>
-        )}
+          );
+        })}
       </div>
 
-      <div className="mt-4 text-xs text-default-400 leading-relaxed">
+      {/* Facebook page picker — shown after auth confirm when brand has no page yet */}
+      {fbPickerOpen && fbPages.length > 0 && (
+        <div className="mt-5 border border-primary-200 rounded-xl p-4 bg-primary-50">
+          <div className="text-sm font-semibold text-default-900 mb-3">
+            {en ? "Which Facebook Page should this brand publish to?" : "這個品牌要發到哪個粉絲團？"}
+          </div>
+          <div className="space-y-2">
+            {fbPages.map((page) => (
+              <Button
+                key={page.id} fullWidth variant="flat" color="primary" size="sm"
+                isLoading={setFbPageM?.isPending}
+                onPress={async () => {
+                  try {
+                    await setFbPageM?.mutateAsync?.({
+                      brandId: brandId!,
+                      fbPageId: page.id,
+                      fbPageName: page.name,
+                    });
+                    setFbPickerOpen(false);
+                    setFbPages([]);
+                  } catch (e: any) {
+                    alert(en ? `Failed: ${e?.message}` : `失敗：${e?.message}`);
+                  }
+                }}
+              >
+                <span className="text-left w-full truncate">
+                  {page.name}{page.category ? ` · ${page.category}` : ""}
+                </span>
+              </Button>
+            ))}
+          </div>
+          <Button
+            size="sm" variant="light" fullWidth className="mt-2"
+            onPress={() => { setFbPickerOpen(false); setFbPages([]); }}
+          >
+            {en ? "Cancel" : "取消"}
+          </Button>
+        </div>
+      )}
+
+      <p className="mt-5 text-xs text-default-400 leading-relaxed">
         {en
-          ? "Note: OnBrand never stores your Facebook password. OAuth tokens live with Pipedream, isolated per user. Disconnecting only clears the link on our side — to fully revoke, go to Facebook Settings → Linked apps and remove Pipedream."
-          : "說明：OnBrand 不會儲存你的 Facebook 密碼。OAuth token 由 Pipedream 代管，每位用戶獨立。解除綁定只會從 OnBrand 端清除指向關係，要徹底撤銷請至 Facebook 設定 → 已連結應用程式移除 Pipedream。"}
-      </div>
+          ? "OnBrand never stores your passwords. OAuth tokens are managed by Pipedream, isolated per user. To fully revoke access, go to each platform's app settings and remove Pipedream."
+          : "OnBrand 不會儲存你的密碼。OAuth token 由 Pipedream 代管，每位用戶獨立。要徹底撤銷，請至各平台設定頁面移除 Pipedream 的存取權限。"}
+      </p>
     </div>
   );
 }

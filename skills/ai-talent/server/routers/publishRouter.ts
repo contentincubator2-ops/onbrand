@@ -358,6 +358,63 @@ export const publishRouter = router({
       return { ok: true };
     }),
 
+  /**
+   * 2026-05-29 — Return which platforms are connected via Pipedream for the
+   * current user. Used by Settings PublishTab to show connection status on all
+   * platform cards (Buffer-style).
+   *
+   * Calls: GET /v1/connect/{projectId}/users/{externalUserId}/accounts?limit=50
+   * Returns: { connected: { facebook?: {accountId,name}, instagram?: ..., ... } }
+   */
+  getConnectedPlatforms: protectedProcedure
+    .input(z.object({}).optional())
+    .query(async ({ ctx }) => {
+      const clientId     = process.env.PIPEDREAM_CLIENT_ID;
+      const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
+      const projectId    = process.env.PIPEDREAM_PROJECT_ID;
+      const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
+      if (!clientId || !clientSecret || !projectId) return { connected: {} as Record<string, { accountId: string; name?: string }> };
+
+      const userId = String(ctx.user.id);
+      const externalUserId = `sowork-${userId}`;
+      const PD = "https://api.pipedream.com/v1";
+
+      // Step 1: bearer token
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      const tokenRes = await fetch(`${PD}/oauth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Basic ${basicAuth}` },
+        body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!tokenRes.ok) return { connected: {} as Record<string, { accountId: string; name?: string }> };
+      const { access_token } = (await tokenRes.json()) as { access_token: string };
+      const pdHeaders = { "Authorization": `Bearer ${access_token}`, "X-PD-Environment": pdEnv };
+
+      // Step 2: list all connected accounts for this external user
+      const accsRes = await fetch(
+        `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`,
+        { headers: pdHeaders, signal: AbortSignal.timeout(10_000) },
+      );
+      if (!accsRes.ok) return { connected: {} as Record<string, { accountId: string; name?: string }> };
+      const body = (await accsRes.json()) as { data?: Array<{ app?: string; id: string; name?: string }> };
+      const accounts = body.data ?? [];
+
+      const APP_KEY: Record<string, string> = {
+        facebook_pages:      "facebook",
+        instagram_business:  "instagram",
+        linkedin:            "linkedin",
+        youtube:             "youtube",
+      };
+      const connected: Record<string, { accountId: string; name?: string }> = {};
+      for (const acc of accounts) {
+        if (acc.app && APP_KEY[acc.app]) {
+          connected[APP_KEY[acc.app]!] = { accountId: acc.id, name: acc.name };
+        }
+      }
+      return { connected };
+    }),
+
   /** Disconnect FB binding from a brand (does NOT revoke Pipedream token). */
   unbindBrandFacebook: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
