@@ -151,6 +151,7 @@ export interface IntakeChatProps {
   busy: boolean;
   error: string | null;
   missionId: number | null;
+  brandId?: number | null;
   onLaunch: (intakeSummary: string) => void;
   onBack: () => void;
   onPreviewChunk: (text: string) => void;
@@ -160,6 +161,7 @@ export function IntakeChat({
   squad, lang, workspace,
   brandName, brandCtx,
   busy, error, missionId,
+  brandId,
   onLaunch, onBack, onPreviewChunk,
 }: IntakeChatProps) {
   const lk = resolveLayer(squad.strategyLayer);
@@ -218,7 +220,7 @@ export function IntakeChat({
         const m = await import("@pipedream/sdk/browser");
         pdSdkRef.current = (m as any).PipedreamClient;
       }
-      const tk = await getConnectToken.mutateAsync({ platform: platform as any });
+      const tk = await getConnectToken.mutateAsync({ platform: platform as any, brandId: brandId ?? 0 });
       if (tk?.token) {
         pdTokenRef.current[platform] = {
           token: tk.token,
