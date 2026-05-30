@@ -778,25 +778,33 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
               className={[
                 "rounded-xl p-4 flex flex-col gap-3 transition-colors",
                 fullyConnected
-                  ? "border-2 border-success-300 bg-white"
-                  : "border-2 border-dashed border-default-200 bg-default-50/40",
+                  ? "border-2 border-success-400 bg-success-50/20"
+                  : "border-2 border-dashed border-default-300 bg-default-100/60",
               ].join(" ")}
             >
               {/* Card header */}
               <div className="flex items-center gap-3">
                 <div
                   className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: p.color + "18" }}
+                  style={{
+                    background: fullyConnected ? p.color + "22" : "#e5e5e5",
+                    opacity: fullyConnected ? 1 : 0.75,
+                  }}
                 >
-                  <FontAwesomeIcon icon={p.icon} style={{ color: p.color, fontSize: 18 }} />
+                  <FontAwesomeIcon icon={p.icon} style={{ color: fullyConnected ? p.color : "#9ca3af", fontSize: 18 }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-default-900">{p.label}</div>
+                  <div className={`text-sm font-semibold ${fullyConnected ? "text-default-900" : "text-default-500"}`}>{p.label}</div>
                   <div className="text-xs text-default-400 truncate">{p.desc}</div>
                 </div>
-                {fullyConnected && (
-                  <span className="flex items-center gap-1 text-[11px] text-success-700 bg-success-50 border border-success-200 px-2 py-0.5 rounded-full flex-shrink-0">
+                {/* Connection status badge — always visible */}
+                {fullyConnected ? (
+                  <span className="flex items-center gap-1 text-[11px] text-success-700 bg-success-100 border border-success-300 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">
                     <CheckCircle2 size={11} /> {en ? "Connected" : "已連接"}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[11px] text-default-400 bg-white border border-default-200 px-2 py-0.5 rounded-full flex-shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-default-300 flex-shrink-0" /> {en ? "Not connected" : "尚未連接"}
                   </span>
                 )}
               </div>
