@@ -122,8 +122,8 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
           </div>
           <p className="text-sm text-default-500">
             {en
-              ? "Set brand-specific text and image instructions for each platform. 30s, 60s, 99s, and Theater tasks automatically apply these when generating content for that platform."
-              : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。30s / 60s / 99s / 企劃台 在該平台跑任務時會自動套用。"}
+              ? "Set brand-specific text and image instructions for each platform. 30s, 60s, 99s, and 7-Day Publisher tasks automatically apply these when generating content for that platform."
+              : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。30s / 60s / 99s / 七日發布台 在該平台跑任務時會自動套用。"}
           </p>
         </div>
       </div>

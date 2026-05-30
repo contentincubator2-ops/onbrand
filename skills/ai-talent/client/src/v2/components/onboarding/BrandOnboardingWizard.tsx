@@ -544,8 +544,8 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 }}>
                   {jobData?.status === "done"
                     ? (lang === "en"
-                      ? "All 10 sections are done — Golden Circle, target audience, differentiation, and Voice are written to your Brand DNA. From here on, every 30s / 60s / 99s / Theater post uses this as its backbone."
-                      : "10 個段落全部完成 — 黃金圈、目標受眾、差異化、Voice 已寫入品牌大腦。從現在起 30s / 60s / 99s / 企劃台 的每一篇內容都會以此為骨架產出。")
+                      ? "All 10 sections are done — Golden Circle, target audience, differentiation, and Voice are written to your Brand DNA. From here on, every 30s / 60s / 99s / 7-Day Publisher post uses this as its backbone."
+                      : "10 個段落全部完成 — 黃金圈、目標受眾、差異化、Voice 已寫入品牌大腦。從現在起 30s / 60s / 99s / 七日發布台 的每一篇內容都會以此為骨架產出。")
                     : (lang === "en"
                       ? "Full positioning still running in the background (we'll ping you bottom-left). You can head to the workspace to watch the 10 steps live, or jump in with the interim positioning and write your first post."
                       : "完整定位仍在背景跑（左下會通知）— 你可以先到工作區看 10 步即時推理，或直接用臨時定位開始試寫第一篇。")}

@@ -108,7 +108,7 @@ function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
       tooltip: en ? "Calendar view — all scheduled and published posts" : "月曆視圖 — 已排程 + 已發布內容" },
-    { to: "/theater",   label: en ? "Theater" : "企劃台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
+    { to: "/theater",   label: en ? "7-Day Publisher" : "七日發布台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
     // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav)
     { to: "/brands",    label: en ? "Brand Brain" : "品牌大腦", icon: <FontAwesomeIcon icon={faBrain} /> },
     // 2026-05-30 (CJ「移除連結頁」): "連結" sidebar item removed entirely.

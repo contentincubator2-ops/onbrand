@@ -196,8 +196,8 @@ export default function ProjectsPage() {
             }}
           >
             {lang === "en"
-              ? "Outputs from 30s / 60s / 99s / Theater land here automatically"
-              : "30s / 60s / 99s / 企劃台 的產出自動歸檔到這裡"}
+              ? "Outputs from 30s / 60s / 99s / 7-Day Publisher land here automatically"
+              : "30s / 60s / 99s / 七日發布台 的產出自動歸檔到這裡"}
           </p>
           <p
             className="mt-2 mb-5 mx-auto text-default-700"
@@ -561,9 +561,9 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
           </p>
           <p className="text-tiny text-default-500 mb-4">
             {lang === "en" ? (
-              <>Run a task in 30s / 60s / 99s / Theater and outputs land here.<br />Or start a new project:</>
+              <>Run a task in 30s / 60s / 99s / 7-Day Publisher and outputs land here.<br />Or start a new project:</>
             ) : (
-              <>到 30s / 60s / 99s / 企劃台 跑任務，產出會自動進來。<br />或直接建立新任務：</>
+              <>到 30s / 60s / 99s / 七日發布台 跑任務，產出會自動進來。<br />或直接建立新任務：</>
             )}
           </p>
           <button
