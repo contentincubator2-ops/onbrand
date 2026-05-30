@@ -445,11 +445,15 @@ export const publishRouter = router({
         youtube:             "youtube",
       };
       const connected: Record<string, { accountId: string; name?: string }> = {};
+      // 2026-05-30 diagnostic: log raw app slugs so we can verify APP_KEY mapping
+      const rawApps = accounts.map((a: any) => a.app ?? "(null)");
+      console.log(`[getConnectedPlatforms] brandId=${input.brandId} externalUserId=${externalUserId} accounts=${accounts.length} apps=[${rawApps.join(",")}]`);
       for (const acc of accounts) {
         if (acc.app && APP_KEY[acc.app]) {
           connected[APP_KEY[acc.app]!] = { accountId: acc.id, name: acc.name };
         }
       }
+      console.log(`[getConnectedPlatforms] mapped keys: [${Object.keys(connected).join(",")}]`);
       return { connected };
     }),
 

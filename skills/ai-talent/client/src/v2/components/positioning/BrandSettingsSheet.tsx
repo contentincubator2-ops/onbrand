@@ -636,19 +636,31 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   }, []);
 
   // ── Polling: auto-detect when OAuth completes ──────────────────────────
+  // CRITICAL FIX (2026-05-30): Pipedream closes the popup window after OAuth
+  // success. The old code checked popupClosed BEFORE the refetch and returned
+  // immediately, so the connection was never detected. Fix: track how many
+  // ticks have elapsed AFTER the popup closed and keep polling for 6 more
+  // ticks (24s) to handle Pipedream's API propagation delay.
   function startPolling(platformKey: string) {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     let elapsed = 0;
+    let afterCloseTicks = 0;
+    const MAX_AFTER_CLOSE = 6; // 6 × 4s = 24s grace period after popup closes
+
     pollTimerRef.current = setInterval(async () => {
       elapsed += 4000;
       const popupClosed = !popupWindowRef.current || popupWindowRef.current.closed;
-      // Stop after 5 minutes or when popup is closed by user
-      if (elapsed >= 300_000 || popupClosed) {
+      if (popupClosed) afterCloseTicks++;
+
+      // Hard stop: 5 min total, OR popup has been closed for more than MAX_AFTER_CLOSE ticks
+      if (elapsed >= 300_000 || (popupClosed && afterCloseTicks > MAX_AFTER_CLOSE)) {
         clearInterval(pollTimerRef.current!);
         pollTimerRef.current = null;
         setPendingPlatform(null);
         return;
       }
+
+      // Always refetch — even after popup closes (connection may propagate a few seconds late)
       try {
         const result = await platformsQ?.refetch?.();
         const connected: Record<string, any> = (result?.data as any)?.connected ?? {};
@@ -667,14 +679,20 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 setFbPickerOpen(true);
               } else {
                 alert(en
-                  ? "Authorized but no Facebook Pages found — ensure your account manages at least one Page."
-                  : "授權成功，但此帳號沒有可管理的 FB 粉專");
+                  ? "Authorized but no Facebook Pages found — make sure your account manages at least one Page."
+                  : "授權成功，但此帳號沒有可管理的 FB 粉專，請確認你的帳號有管理至少一個粉絲專頁。");
               }
-            } catch { /* page fetch failure is non-fatal; user can retry connect */ }
+            } catch (e: any) {
+              // Failure here means FB token was obtained but page-list fetch failed.
+              // Show a specific error so the user knows what went wrong.
+              alert(en
+                ? `Could not load Facebook Pages: ${e?.message ?? "unknown error"}. Try re-connecting.`
+                : `無法載入 FB 粉專列表：${e?.message ?? "未知錯誤"}。請重新授權一次。`);
+            }
           }
           fbStatusQ?.refetch?.();
         }
-      } catch { /* refetch errors are transient; keep polling */ }
+      } catch { /* transient refetch error — keep polling */ }
     }, 4000);
   }
 
