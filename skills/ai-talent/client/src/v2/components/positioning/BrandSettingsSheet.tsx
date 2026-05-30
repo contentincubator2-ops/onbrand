@@ -14,7 +14,7 @@
  *
  * Opens via the gear icon top-right of Brand workspace header.
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal, ModalContent, Button, Input, Textarea, Spinner } from "@heroui/react";
 import {
   Bot, Trash2, X, Share2, CheckCircle2, ExternalLink,
@@ -569,23 +569,14 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
 }
 
 /**
- * 2026-05-30 — PublishTab: Buffer-style platform connection grid.
+ * PublishTab — platform connection grid (Buffer-style).
  *
- * Shows all 4 platforms (Facebook, Instagram, LinkedIn, YouTube) as cards.
- * Each card shows connection status and a Connect / Disconnect button.
- *
- * Auth flow (all platforms) — Canva-style polling:
- *   1. Click "Connect [Platform]" → popup opens synchronously (keeps user gesture)
- *   2. Popup navigates to Pipedream Connect URL for that app
- *   3. Main page polls getConnectedPlatforms every 4s while popup is open
- *   4. When platform detected as connected → auto-complete (no confirm button needed)
- *
- * Brand-scoped: external_user_id = sowork-brand-{brandId}
- *   → All products under the same brand share one Pipedream account.
- *
- * Facebook additionally:
- *   - Auto-fetches page list via getFacebookPages when polling detects auth
- *   - User picks page from dropdown → auto-saves (no manual Page ID input)
+ * Auth flow — Pipedream SDK (simple):
+ *   1. On mount: prefetch Connect tokens for all 4 platforms (silent, background)
+ *   2. Click "Connect": pd.connectAccount() opens the Pipedream OAuth popup
+ *   3. User completes OAuth in popup
+ *   4. onSuccess callback fires — no polling needed
+ *   5. Facebook only: fetch page list → user picks → save to DB
  */
 export function PublishTab({ brandId }: { brandId: number | null }) {
   const { lang } = useLang();
@@ -602,160 +593,158 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   );
 
   // ── Mutations ─────────────────────────────────────────────────────────
-  const fbConnectUrlM  = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
-  const fbPagesM       = (trpc as any).publish?.getFacebookPages?.useMutation?.();
-  const setFbPageM     = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
+  const fbConnectUrlM = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
+  const fbPagesM      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
+  const setFbPageM    = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
     onSuccess: () => { fbStatusQ?.refetch?.(); platformsQ?.refetch?.(); },
   });
-  const unbindFbM      = (trpc as any).publish?.unbindBrandFacebook?.useMutation?.({
+  const unbindFbM     = (trpc as any).publish?.unbindBrandFacebook?.useMutation?.({
     onSuccess: () => { fbStatusQ?.refetch?.(); platformsQ?.refetch?.(); },
   });
-  const getConnectTkM  = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
+  const getConnectTkM = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
 
-  // ── Refs for popup + polling ───────────────────────────────────────────
-  const popupWindowRef = useRef<Window | null>(null);
-  const pollTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  // ── SDK + pre-fetched token cache ─────────────────────────────────────
+  // SDK is loaded once on mount. Tokens are pre-fetched so connectAccount()
+  // can be called synchronously from the click handler (avoids popup block).
+  const pdSdkRef    = useRef<any>(null);
+  type TokenCache = { token: string; connectLinkUrl: string; appSlug: string; env: string; expiresAt: number };
+  const pdTokensRef = useRef<Record<string, TokenCache>>({});
 
   // ── Local state ───────────────────────────────────────────────────────
-  // pendingPlatform — popup currently open for this platform key
   const [pendingPlatform, setPendingPlatform] = useState<string | null>(null);
-  // fbPages — list of pages fetched after FB auth detected
-  const [fbPages, setFbPages] = useState<Array<{ id: string; name: string; category: string }>>([]);
-  const [fbPickerOpen, setFbPickerOpen] = useState(false);
+  const [fbPages, setFbPages]                 = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [fbPickerOpen, setFbPickerOpen]       = useState(false);
 
-  const fbStatus = fbStatusQ?.data;
+  const fbStatus    = fbStatusQ?.data;
   const fbConnected = !!fbStatus?.connected;
   const connectedMap: Record<string, { accountId: string; name?: string }> =
     (platformsQ?.data as any)?.connected ?? {};
 
-  // ── Cleanup on unmount ─────────────────────────────────────────────────
+  // ── Load SDK once ──────────────────────────────────────────────────────
   useEffect(() => {
-    return () => {
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    };
+    import("@pipedream/sdk/browser")
+      .then((m) => { pdSdkRef.current = (m as any).PipedreamClient; })
+      .catch(() => {});
   }, []);
 
-  // ── Polling: auto-detect when OAuth completes ──────────────────────────
-  // CRITICAL FIX (2026-05-30): Pipedream closes the popup window after OAuth
-  // success. The old code checked popupClosed BEFORE the refetch and returned
-  // immediately, so the connection was never detected. Fix: track how many
-  // ticks have elapsed AFTER the popup closed and keep polling for 6 more
-  // ticks (24s) to handle Pipedream's API propagation delay.
-  function startPolling(platformKey: string) {
-    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    let elapsed = 0;
-    let afterCloseTicks = 0;
-    const MAX_AFTER_CLOSE = 6; // 6 × 4s = 24s grace period after popup closes
-
-    pollTimerRef.current = setInterval(async () => {
-      elapsed += 4000;
-      const popupClosed = !popupWindowRef.current || popupWindowRef.current.closed;
-      if (popupClosed) afterCloseTicks++;
-
-      // Hard stop: 5 min total, OR popup has been closed for more than MAX_AFTER_CLOSE ticks
-      if (elapsed >= 300_000 || (popupClosed && afterCloseTicks > MAX_AFTER_CLOSE)) {
-        clearInterval(pollTimerRef.current!);
-        pollTimerRef.current = null;
-        setPendingPlatform(null);
-        return;
+  // ── Pre-fetch tokens for all platforms ────────────────────────────────
+  const prefetchTokens = useCallback(async () => {
+    if (!brandId) return;
+    // Facebook
+    try {
+      const r = await fbConnectUrlM?.mutateAsync?.({ brandId });
+      if (r?.token) {
+        pdTokensRef.current["facebook"] = {
+          token: r.token,
+          connectLinkUrl: r.connectUrl ?? "",
+          appSlug: "facebook_pages",
+          env: "production",
+          expiresAt: r.expiresAt ? new Date(r.expiresAt).getTime() : Date.now() + 300_000,
+        };
       }
-
-      // Always refetch — even after popup closes (connection may propagate a few seconds late)
+    } catch { /* silent — token just won't be cached yet */ }
+    // Instagram / LinkedIn / YouTube
+    for (const key of ["instagram", "linkedin", "youtube"] as const) {
       try {
-        const result = await platformsQ?.refetch?.();
-        const connected: Record<string, any> = (result?.data as any)?.connected ?? {};
-        if (connected[platformKey]) {
-          // Platform detected — stop polling
-          clearInterval(pollTimerRef.current!);
-          pollTimerRef.current = null;
-          setPendingPlatform(null);
-          try { popupWindowRef.current?.close(); } catch { /* ignore cross-origin */ }
-          // Facebook: fetch page list so user can pick which page to bind
-          if (platformKey === "facebook" && brandId) {
-            try {
-              const pages = await fbPagesM?.mutateAsync?.({ brandId });
-              if ((pages?.pages?.length ?? 0) > 0) {
-                setFbPages(pages!.pages);
-                setFbPickerOpen(true);
-              } else {
-                alert(en
-                  ? "Authorized but no Facebook Pages found — make sure your account manages at least one Page."
-                  : "授權成功，但此帳號沒有可管理的 FB 粉專，請確認你的帳號有管理至少一個粉絲專頁。");
-              }
-            } catch (e: any) {
-              // Failure here means FB token was obtained but page-list fetch failed.
-              // Show a specific error so the user knows what went wrong.
-              alert(en
-                ? `Could not load Facebook Pages: ${e?.message ?? "unknown error"}. Try re-connecting.`
-                : `無法載入 FB 粉專列表：${e?.message ?? "未知錯誤"}。請重新授權一次。`);
-            }
-          }
-          fbStatusQ?.refetch?.();
+        const r = await getConnectTkM?.mutateAsync?.({ platform: key, brandId });
+        if (r?.token) {
+          pdTokensRef.current[key] = {
+            token: r.token,
+            connectLinkUrl: r.connectLinkUrl ?? `https://pipedream.com/_static/connect.html?token=${r.token}&app=${key}`,
+            appSlug: r.appSlug ?? key,
+            env: r.env ?? "production",
+            expiresAt: r.expiresAt ? new Date(r.expiresAt).getTime() : Date.now() + 300_000,
+          };
         }
-      } catch { /* transient refetch error — keep polling */ }
-    }, 4000);
-  }
+      } catch { /* silent */ }
+    }
+  }, [brandId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { prefetchTokens(); }, [prefetchTokens]);
 
   // ── Platform config ────────────────────────────────────────────────────
-  type PlatformCfg = {
-    key: string;
-    label: string;
-    color: string;
-    icon: any;
-    desc: string;
-  };
+  type PlatformCfg = { key: string; label: string; color: string; icon: any; desc: string };
   const PLATFORMS: PlatformCfg[] = [
-    { key: "facebook",  label: "Facebook",  color: "#1877F2", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"               : "發布到 Facebook 粉專"        },
-    { key: "instagram", label: "Instagram", color: "#E1306C", icon: faInstagram, desc: en ? "Publish to your Instagram Business account"    : "發布到 Instagram 商業帳號"   },
-    { key: "linkedin",  label: "LinkedIn",  color: "#0A66C2", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"       : "發布到 LinkedIn 帳號或企業頁面" },
-    { key: "youtube",   label: "YouTube",   color: "#FF0000", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"          : "上傳影片到 YouTube 頻道"     },
+    { key: "facebook",  label: "Facebook",  color: "#1877F2", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
+    { key: "instagram", label: "Instagram", color: "#E1306C", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
+    { key: "linkedin",  label: "LinkedIn",  color: "#0A66C2", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"    : "發布到 LinkedIn 帳號或企業頁面" },
+    { key: "youtube",   label: "YouTube",   color: "#FF0000", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
   ];
 
-  // ── Open OAuth popup ────────────────────────────────────────────────────
-  async function openConnectPopup(platform: PlatformCfg) {
-    if (!brandId) {
-      alert(en ? "Please save the brand first." : "請先儲存品牌。");
-      return;
-    }
-    const win = window.open("about:blank", "_blank", "popup,width=620,height=720");
-    if (!win) {
+  // ── Connect with SDK ───────────────────────────────────────────────────
+  // Called synchronously from the button click handler.
+  // Token is already cached from prefetchTokens() so no await is needed
+  // before connectAccount() — popup won't be blocked.
+  function connectWithSDK(platform: PlatformCfg) {
+    if (!brandId) { alert(en ? "Please save the brand first." : "請先儲存品牌。"); return; }
+
+    const Ctor = pdSdkRef.current;
+    const tk   = pdTokensRef.current[platform.key];
+
+    if (!Ctor || !tk || tk.expiresAt - Date.now() < 30_000) {
+      // Token not ready yet — kick off a fresh prefetch and ask user to retry
+      prefetchTokens();
       alert(en
-        ? "Pop-up was blocked — allow pop-ups for this site and try again."
-        : "授權視窗被封鎖 — 請允許本站的彈出視窗後再試一次。");
+        ? "Preparing authorization — please try again in 2 seconds."
+        : "準備授權連結中，請稍候 2 秒後再按一次。");
       return;
     }
-    popupWindowRef.current = win;
-    try {
-      win.document.write(
-        `<p style="font:14px sans-serif;padding:24px;color:#555">${en ? `Opening ${platform.label} authorization…` : `正在開啟 ${platform.label} 授權…`}</p>`,
-      );
-      let connectUrl: string;
-      if (platform.key === "facebook") {
-        const r = await fbConnectUrlM?.mutateAsync?.({ brandId });
-        connectUrl = r?.connectUrl ?? "";
-      } else {
-        const r = await getConnectTkM?.mutateAsync?.({
-          platform: platform.key as "instagram" | "linkedin" | "youtube",
-          brandId,
-        });
-        connectUrl = r?.connectLinkUrl ?? "";
-        if (!connectUrl && r?.token && r?.projectId) {
-          connectUrl = `https://pipedream.com/_static/connect.html?token=${r.token}&app=${platform.key}`;
+
+    setPendingPlatform(platform.key);
+
+    const pd = new Ctor({
+      projectEnvironment: tk.env as "production" | "development",
+      externalUserId: `sowork-brand-${brandId}`,
+      tokenCallback: async () => ({
+        token: tk.token,
+        expiresAt: new Date(tk.expiresAt),
+        connectLinkUrl: tk.connectLinkUrl,
+      }),
+    });
+
+    pd.connectAccount({
+      app: tk.appSlug,
+
+      onSuccess: async () => {
+        setPendingPlatform(null);
+        delete pdTokensRef.current[platform.key]; // consumed — will pre-warm below
+
+        if (platform.key === "facebook" && brandId) {
+          try {
+            const pages = await fbPagesM?.mutateAsync?.({ brandId });
+            if ((pages?.pages?.length ?? 0) > 0) {
+              setFbPages(pages!.pages);
+              setFbPickerOpen(true);
+            } else {
+              alert(en
+                ? "Authorized but no Facebook Pages found — make sure your account manages at least one Page."
+                : "授權成功，但此帳號沒有可管理的 FB 粉專，請確認帳號有管理至少一個粉絲專頁。");
+            }
+          } catch (e: any) {
+            alert(en
+              ? `Could not load Facebook Pages: ${e?.message ?? "unknown error"}. Please re-connect.`
+              : `無法載入 FB 粉專列表：${e?.message ?? "未知錯誤"}。請重新授權一次。`);
+          }
         }
-      }
-      if (!connectUrl) {
-        win.close();
-        alert(en ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結");
-        return;
-      }
-      win.location.href = connectUrl;
-      // Popup is open — show "Waiting for authorization…" indicator and start polling
-      setPendingPlatform(platform.key);
-      startPolling(platform.key);
-    } catch (e: any) {
-      win.close();
-      alert(en ? `Failed: ${e?.message ?? "Unknown error"}` : `失敗：${e?.message ?? "未知錯誤"}`);
-    }
+
+        platformsQ?.refetch?.();
+        fbStatusQ?.refetch?.();
+        prefetchTokens(); // pre-warm a fresh token for next time
+      },
+
+      onError: (err: any) => {
+        setPendingPlatform(null);
+        alert(en
+          ? `Authorization failed: ${String(err).slice(0, 120)}`
+          : `授權失敗：${String(err).slice(0, 120)}`);
+        prefetchTokens();
+      },
+
+      onClose: ({ successful }: { successful: boolean }) => {
+        // onSuccess fires before onClose on success — only clear pending if not successful
+        if (!successful) setPendingPlatform(null);
+      },
+    });
   }
 
   // ── Disconnect Facebook ─────────────────────────────────────────────────
@@ -858,46 +847,34 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 );
               })()}
 
-              {/* Waiting indicator — shown while popup is open (auto-polling) */}
-              {isPending && (
-                <div className="flex items-center gap-2 text-[12px] text-default-500 bg-default-50 rounded-lg px-3 py-2">
-                  <span className="animate-spin text-primary">⟳</span>
-                  {en
-                    ? `Waiting for ${p.label} authorization — complete it in the popup…`
-                    : `等待 ${p.label} 授權完成，請在彈出視窗中完成操作…`}
-                </div>
-              )}
-
-              {/* Connect / Re-authorize button */}
-              {!isPending && (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    color={fullyConnected ? "default" : "primary"}
-                    variant={fullyConnected ? "bordered" : "solid"}
-                    startContent={<ExternalLink size={12} />}
-                    isLoading={
-                      (p.key === "facebook" ? fbConnectUrlM?.isPending : getConnectTkM?.isPending)
-                    }
-                    onPress={() => openConnectPopup(p)}
-                    className="flex-1"
-                  >
-                    {fullyConnected
+              {/* Connect / Re-authorize button — SDK handles popup internally */}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  color={fullyConnected ? "default" : "primary"}
+                  variant={fullyConnected ? "bordered" : "solid"}
+                  startContent={isPending ? undefined : <ExternalLink size={12} />}
+                  isLoading={isPending}
+                  onPress={() => connectWithSDK(p)}
+                  className="flex-1"
+                >
+                  {isPending
+                    ? (en ? `Connecting ${p.label}…` : `連接 ${p.label} 中…`)
+                    : fullyConnected
                       ? (en ? "Re-authorize" : "重新授權")
                       : (en ? `Connect ${p.label}` : `連接 ${p.label}`)}
+                </Button>
+                {/* Disconnect — only Facebook has DB binding to clear */}
+                {p.key === "facebook" && fbConnected && (
+                  <Button
+                    size="sm" variant="light" color="danger"
+                    isLoading={unbindFbM?.isPending}
+                    onPress={disconnectFacebook}
+                  >
+                    {en ? "Disconnect" : "解除"}
                   </Button>
-                  {/* Disconnect — only Facebook has DB binding to clear */}
-                  {p.key === "facebook" && fbConnected && (
-                    <Button
-                      size="sm" variant="light" color="danger"
-                      isLoading={unbindFbM?.isPending}
-                      onPress={disconnectFacebook}
-                    >
-                      {en ? "Disconnect" : "解除"}
-                    </Button>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           );
         })}
