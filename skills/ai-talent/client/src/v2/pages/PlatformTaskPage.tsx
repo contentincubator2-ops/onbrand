@@ -846,36 +846,41 @@ function PlatformTaskPageInner() {
         </div>
       </div>
 
-      {/* ── Recently used tasks ── */}
-      {(() => {
-        const raw = (() => { try { return JSON.parse(localStorage.getItem(LAST_USED_KEY) ?? "{}") as Record<string, number>; } catch { return {} as Record<string, number>; } })();
-        const recentTasks = Object.entries(raw)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 4)
-          .map(([id]) => allTasks?.find((t: any) => t.id === id))
-          .filter(Boolean) as any[];
-        if (recentTasks.length === 0) return null;
+      {/* ── 推薦起點 — always-visible pinned starter row ── */}
+      {allTasks.length > 0 && (() => {
+        // Pick first 4 "30s" tasks for this platform; fall back to first 4 of any tier
+        const platformTasks = allTasks.filter((t: any) => inferPlatform(t) === platform);
+        const starters: any[] = [
+          ...platformTasks.filter((t: any) => t.tier === "30s"),
+          ...platformTasks.filter((t: any) => t.tier !== "30s"),
+        ].slice(0, 4);
+        if (starters.length === 0) return null;
         return (
           <div className="mb-6 px-4 md:px-6 max-w-[1200px] mx-auto">
-            <p className="text-xs font-semibold text-default-400 uppercase tracking-wide mb-3">
-              {lang === "en" ? "Recently used" : "最近使用"}
-            </p>
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">
+                {lang === "en" ? "Recommended starting points" : "推薦起點"}
+              </p>
+              <div className="flex-1 h-px bg-default-100" />
+            </div>
             <div className="flex gap-2 flex-wrap">
-              {recentTasks.map((task: any) => {
+              {starters.map((task: any) => {
                 const days = getLastUsedDays(task.id);
                 return (
                   <button
                     key={task.id}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-default-200 bg-white hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-default-200 bg-default-50 hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
                     onClick={() => openTask(task)}
                   >
-                    <span className="text-[12px] font-medium text-default-900 max-w-[140px] truncate">
-                      {task.title ?? task.label ?? task.id}
+                    <span className="text-[12px] font-medium text-default-900 max-w-[180px] truncate">
+                      {lang === "en" ? (task.label_en ?? task.label) : task.label}
                     </span>
-                    {days !== null && (
-                      <span className="text-[10px] text-default-400 flex-shrink-0">
-                        {days === 0 ? (lang === "en" ? "today" : "今天") : `${days}d`}
+                    {days !== null ? (
+                      <span className="text-[10px] bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium">
+                        {days === 0 ? (lang === "en" ? "今天" : "今天") : `${days}d ago`}
                       </span>
+                    ) : (
+                      <span className="text-[10px] text-default-300 flex-shrink-0">{task.tier ?? "30s"}</span>
                     )}
                   </button>
                 );
@@ -957,6 +962,19 @@ function PlatformTaskPageInner() {
                       >
                         {taskTier === "99s" ? "99s" : taskTier}
                       </span>
+                      {/* Last-used badge — bottom right, only when used before */}
+                      {(() => {
+                        const days = getLastUsedDays(task.id);
+                        if (days === null) return null;
+                        return (
+                          <span
+                            className="absolute bottom-2 right-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                            style={{ background: "rgba(0,0,0,0.55)", color: "#fff", letterSpacing: "0.03em" }}
+                          >
+                            {days === 0 ? (lang === "en" ? "today" : "今天用過") : `${days}d ago`}
+                          </span>
+                        );
+                      })()}
                       {/* Platform icon — top left */}
                       <div
                         className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center"

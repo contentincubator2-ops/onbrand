@@ -1457,14 +1457,20 @@ export default function TheaterPage() {
               >
                 <PlatformIcon platformKey={meta.iconKey} className={on ? "text-white" : "text-neutral-700"} />
                 <span>{meta.label}</span>
-                {/* Connection status dot */}
+                {/* Connection status dot — green = connected, hollow amber = not connected */}
                 {connectedPlatforms[p] ? (
                   <span
                     className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                     style={{ background: on ? "#4ade80" : "#16a34a" }}
-                    title={lang === "en" ? "Connected" : "已連接"}
+                    title={lang === "en" ? "Account connected" : "帳號已連接"}
                   />
-                ) : null}
+                ) : (
+                  <span
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0 border flex-shrink-0"
+                    style={{ borderColor: on ? "rgba(255,255,255,0.5)" : "#d97706", opacity: 0.7 }}
+                    title={lang === "en" ? "Account not connected" : "帳號尚未連接"}
+                  />
+                )}
                 {on && <Check size={12} strokeWidth={2.5} />}
               </button>
             );
@@ -1575,12 +1581,18 @@ export default function TheaterPage() {
                       onEdit={(newCaption) => editCellCaption(key, newCaption)}
                       onMarkRule={() => openRuleModal(key)}
                         />
-                      {/* Platform connection status chip on done cells */}
-                      {state.status === "done" && connectedPlatforms[p] && (
+                      {/* Platform connection status chip on done cells — always visible */}
+                      {state.status === "done" && (
                         <div className="flex justify-end mt-0.5 px-1">
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success-50 border border-success-200 text-success-700 font-medium">
-                            ✓ {lang === "en" ? "Connected" : "已連接"}
-                          </span>
+                          {connectedPlatforms[p] ? (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success-50 border border-success-200 text-success-700 font-medium">
+                              ✓ {lang === "en" ? "可排程發布" : "可排程發布"}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-warning-50 border border-warning-200 text-warning-700 font-medium">
+                              ⚠ {lang === "en" ? "Connect account first" : "需先連接帳號"}
+                            </span>
+                          )}
                         </div>
                       )}
                       </div>

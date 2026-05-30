@@ -191,6 +191,30 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* Empty-state banner — above grid so it's immediately visible without scrolling */}
+      {items.length === 0 && !rangeQ?.isLoading && (
+        <div className="max-w-[1100px] mx-auto px-6 mb-4">
+          <div className="flex items-center gap-4 px-5 py-4 rounded-xl border border-dashed border-default-300 bg-default-50">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-default-700 mb-0.5">
+                {lang === "en" ? "No posts scheduled this month" : "本月尚無排程或發布記錄"}
+              </p>
+              <p className="text-xs text-default-400">
+                {lang === "en"
+                  ? "Posts appear here after you run a task and schedule or publish the result."
+                  : "跑任務 → 在結果頁按「排程」或「發布」後，貼文會自動出現在這裡。"}
+              </p>
+            </div>
+            <button
+              className="shrink-0 px-4 py-2 rounded-lg text-xs font-semibold bg-default-900 text-white hover:bg-default-700 transition-colors"
+              onClick={() => navigate("/tasks/fb")}
+            >
+              {lang === "en" ? "→ Start a task" : "→ 去跑任務"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Calendar grid */}
       <div className="max-w-[1100px] mx-auto px-6 pb-12">
         <div className="bg-white border border-default-300 rounded-xl overflow-hidden">
@@ -259,9 +283,7 @@ export default function CalendarPage() {
                         </button>
                       );
                     })}
-                    {cellItems.length === 0 && d.inMonth && (
-                      <span className="text-[10px] text-default-500 italic">—</span>
-                    )}
+                    {/* empty in-month cells show nothing — the banner above explains */}
                   </div>
                 </div>
               );
