@@ -562,8 +562,8 @@ export default function RunPage() {
     onSuccess: (_r: any) => {
       showToastGlobal(
         lang === "en"
-          ? "Added to Calendar ✓ — go to Publishing Calendar to publish"
-          : "已加入行事曆 ✓ — 前往「七日發布台」發布"
+          ? "Added to Calendar ✓ — go to Calendar page to publish"
+          : "已加入日曆 ✓ — 前往「日曆」頁面發布"
       );
     },
     onError: (e: any) => {
@@ -580,8 +580,8 @@ export default function RunPage() {
   // Schedules the current output to calendar, then user publishes from CalendarPage.
   const handleScheduleToCalendar = React.useCallback(async (rowPlatform: string) => {
     if (!confirm(lang === "en"
-      ? `Add to Publishing Calendar as ${rowPlatform}? You can then publish from the Calendar page.`
-      : `加入七日發布台（${rowPlatform}）？可在行事曆頁面選擇時間並發布。`)) return;
+      ? `Add to Calendar as ${rowPlatform}? You can then publish from the Calendar page.`
+      : `加入日曆（${rowPlatform}）？可在日曆頁面選擇時間並發布。`)) return;
 
     await scheduleToCalMut?.mutateAsync?.({
       outputId: id,
@@ -2511,8 +2511,8 @@ export default function RunPage() {
                   : "產生 .ics 檔 — 拖進 Google Calendar / Outlook / Apple Calendar 即可。")
                 : schedMode === "calendar"
                 ? (lang === "en"
-                  ? "Adds this post to Publishing Calendar. You can track it and publish from the Calendar page."
-                  : "將此貼文加入七日發布台。確認後自動跳轉行事曆頁面，可在那裡追蹤並一鍵發布。")
+                  ? "Adds this post to Calendar. You can track it and publish from the Calendar page."
+                  : "將此貼文加入日曆。確認後自動跳轉日曆頁面，可在那裡追蹤並一鍵發布。")
                 : (lang === "en"
                   ? `Schedules this post to ${schedPlatform}. After confirming you'll be taken to the Calendar page to publish.`
                   : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡一鍵發布。`)}

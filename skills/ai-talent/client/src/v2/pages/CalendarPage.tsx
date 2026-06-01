@@ -1,5 +1,5 @@
 /**
- * CalendarPage — 七日發布台 v2
+ * CalendarPage — 日曆（排程 & 發布管理）
  *
  * 2026-06-01 (CJ「七日發布台的用戶體驗有問題，全部都修改好，不知道如何發布」)
  *
@@ -224,7 +224,7 @@ export default function CalendarPage() {
       <div className="pt-8 pb-4 px-6 text-center">
         <div className="flex flex-col items-center max-w-[1100px] mx-auto">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-2">
-            {lang === "en" ? "PUBLISHING · CONTENT CALENDAR" : "七日發布台 · 排程 & 發布管理"}
+            {lang === "en" ? "PUBLISHING · CONTENT CALENDAR" : "日曆 · 排程 & 發布管理"}
           </p>
           <h1
             className="font-semibold tracking-tight leading-tight"
@@ -236,7 +236,7 @@ export default function CalendarPage() {
               backgroundClip: "text",
             }}
           >
-            {lang === "en" ? "Your 7-day publishing view" : "七日發布台"}
+            {lang === "en" ? "Content Calendar" : "日曆"}
           </h1>
           <p className="mt-2 text-default-500" style={{ fontSize: 13 }}>
             {lang === "en"
