@@ -207,6 +207,70 @@ const TIER_TABS: TierTab[] = [
   { id: "99s",  labelZh: "完整活動 · 99s", labelEn: "Campaign · 99s", accent: "#f59e0b" },
 ];
 
+// ── Format category config (FB only) ────────────────────────────────────────
+type ActiveFormat =
+  | "all" | "貼文" | "連結貼文" | "廣告" | "輪播 Carousel"
+  | "多媒體" | "直播" | "釘選貼文" | "活動 / 系列" | "月曆 / 策略" | "互動 / 工具";
+
+const FORMAT_TABS: { id: ActiveFormat; label: string }[] = [
+  { id: "all",            label: "全部"           },
+  { id: "貼文",           label: "貼文"           },
+  { id: "連結貼文",       label: "連結貼文"       },
+  { id: "廣告",           label: "廣告"           },
+  { id: "輪播 Carousel",  label: "輪播 Carousel"  },
+  { id: "多媒體",         label: "多媒體"         },
+  { id: "直播",           label: "直播"           },
+  { id: "釘選貼文",       label: "釘選貼文"       },
+  { id: "活動 / 系列",    label: "活動 / 系列"    },
+  { id: "月曆 / 策略",    label: "月曆 / 策略"    },
+  { id: "互動 / 工具",    label: "互動 / 工具"    },
+];
+
+const TASK_FORMAT_MAP: Record<string, ActiveFormat> = {
+  // 貼文
+  "fb-30-caption-short":          "貼文",
+  "fb-30-pure-text-hook":         "貼文",
+  "fb-60-single-full":            "貼文",
+  // 連結貼文
+  "fb-30-link-caption":           "連結貼文",
+  "fb-60-link-full":              "連結貼文",
+  // 廣告
+  "fb-30-ad-headline":            "廣告",
+  "fb-30-ad-primary":             "廣告",
+  "fb-30-ad-cta":                 "廣告",
+  "fb-30-ad-description":         "廣告",
+  "fb-60-ad-pack-3":              "廣告",
+  // 輪播 Carousel
+  "fb-90-carousel-10frame":       "輪播 Carousel",
+  // 多媒體 (Album + Reels + Story 合併)
+  "fb-60-album-4":                "多媒體",
+  "fb-90-reels-full":             "多媒體",
+  "fb-30-story-text":             "多媒體",
+  // 直播
+  "fb-30-live-title":             "直播",
+  "fb-60-live-suite":             "直播",
+  "fb-90-livestream-suite":       "直播",
+  // 釘選貼文
+  "fb-30-pinned-short":           "釘選貼文",
+  "fb-60-pinned-suite":           "釘選貼文",
+  // 活動 / 系列
+  "fb-30-countdown-1day":         "活動 / 系列",
+  "fb-60-countdown-5day":         "活動 / 系列",
+  "fb-60-launch-kit":             "活動 / 系列",
+  "fb-90-event-launch":           "活動 / 系列",
+  "fb-90-countdown-series":       "活動 / 系列",
+  // 月曆 / 策略
+  "fb-90-monthly-calendar":       "月曆 / 策略",
+  "fb-90-monthly-calendar-promo": "月曆 / 策略",
+  "fb-90-account-reposition":     "月曆 / 策略",
+  "fb-90-quarterly-strategy":     "月曆 / 策略",
+  "fb-90-monthly-analytics":      "月曆 / 策略",
+  // 互動 / 工具
+  "fb-30-comment-reply":          "互動 / 工具",
+  "fb-30-hashtag-set":            "互動 / 工具",
+  "fb-90-crisis-full":            "互動 / 工具",
+};
+
 // ── FBTaskCard type (same as QuickTask30sPage) ───────────────────────────────
 interface FBTaskCard {
   id: string;
@@ -325,8 +389,10 @@ function PlatformTaskPageInner() {
     return v("voice") && v("voice_principles") && v("preferred_terms") && v("banned_words");
   }, [brandAssetsForCheck, brandQuery?.data]);
 
-  // Tier tab state
+  // Tier tab state (used for non-FB platforms)
   const [activeTier, setActiveTier] = useState<ActiveTier>("all");
+  // Format tab state (used for FB)
+  const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -555,8 +621,16 @@ function PlatformTaskPageInner() {
   // ── Filtered task list ────────────────────────────────────────────────────
   const visibleTasks = useMemo(() => {
     let list = allTasks.filter((task) => inferPlatform(task) === platform);
-    if (activeTier !== "all") {
-      list = list.filter((task) => task.tier === activeTier);
+    if (platform === "facebook") {
+      // Format-based filter for FB
+      if (activeFormat !== "all") {
+        list = list.filter((task) => TASK_FORMAT_MAP[task.id] === activeFormat);
+      }
+    } else {
+      // Tier-based filter for other platforms
+      if (activeTier !== "all") {
+        list = list.filter((task) => task.tier === activeTier);
+      }
     }
     if (searchQuery.trim()) {
       list = list.filter((task) =>
@@ -570,12 +644,24 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
     [allTasks, platform],
   );
+
+  // Count tasks per format category (FB only)
+  const formatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "facebook") return {};
+    const fbTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: fbTasks.length };
+    for (const task of fbTasks) {
+      const fmt = TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
 
   // ── Open / close task modal ───────────────────────────────────────────────
   const openTask = (task: FBTaskCard) => {
@@ -797,40 +883,69 @@ function PlatformTaskPageInner() {
             />
           </div>
 
-          {/* ── Tier tabs ─────────────────────────────────────────────── */}
-          <div className="flex items-center gap-2 flex-wrap justify-center">
-            {TIER_TABS.map((tab) => {
-              const active = activeTier === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTier(tab.id)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all"
-                  style={
-                    active
-                      ? {
-                          background: tab.accent,
-                          color: "white",
-                          boxShadow: `0 2px 12px ${tab.accent}55`,
-                        }
-                      : {
-                          background: "white",
-                          color: "#525252",
-                          border: "1px solid #E5E5E5",
-                        }
-                  }
-                >
-                  {tab.id !== "all" && (
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: active ? "rgba(255,255,255,0.7)" : tab.accent }}
-                    />
-                  )}
-                  {lang === "en" ? tab.labelEn : tab.labelZh}
-                </button>
-              );
-            })}
-          </div>
+          {/* ── Format tiles (FB) / Tier tabs (other platforms) ──────── */}
+          {platform === "facebook" ? (
+            <div className="w-full overflow-x-auto pb-1 scrollbar-hide" style={{ maxWidth: 740 }}>
+              <div className="flex items-center gap-2 flex-nowrap px-1">
+                {FORMAT_TABS.map((tab) => {
+                  const active = activeFormat === tab.id;
+                  const count = formatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap flex-shrink-0"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              {TIER_TABS.map((tab) => {
+                const active = activeTier === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTier(tab.id)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all"
+                    style={
+                      active
+                        ? { background: tab.accent, color: "white", boxShadow: `0 2px 12px ${tab.accent}55` }
+                        : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                    }
+                  >
+                    {tab.id !== "all" && (
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: active ? "rgba(255,255,255,0.7)" : tab.accent }}
+                      />
+                    )}
+                    {lang === "en" ? tab.labelEn : tab.labelZh}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Task count micro-label */}
           <div className="mt-3 text-tiny text-default-400">
