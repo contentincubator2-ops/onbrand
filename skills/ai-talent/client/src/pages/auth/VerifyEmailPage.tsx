@@ -43,7 +43,7 @@ export default function VerifyEmailPage() {
         setMessage(lang === "en" ? "Your email is verified!" : "您的電子郵件已成功驗證！");
 
         await new Promise(resolve => setTimeout(resolve, 500));
-        window.location.href = "/";
+        window.location.href = "/theater";
       } catch (err) {
         setStatus("error");
         setMessage(lang === "en" ? "Network error — try again in a sec." : "網路錯誤，請稍後再試");

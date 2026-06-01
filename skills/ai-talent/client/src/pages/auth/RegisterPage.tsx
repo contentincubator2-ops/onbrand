@@ -36,7 +36,7 @@ export default function RegisterPage() {
       .then((r) => {
         if (cancelled) return;
         if (r.ok) {
-          navigate("/", { replace: true });
+          navigate("/theater", { replace: true });
         } else {
           setAuthChecking(false);
         }
@@ -114,7 +114,7 @@ export default function RegisterPage() {
         const loginData = await loginRes.json();
         if (loginRes.ok && loginData.token) {
           try { localStorage.setItem("authToken", loginData.token); } catch {}
-          window.location.replace("/");
+          window.location.replace("/theater");
           return;
         }
       } catch (e) {

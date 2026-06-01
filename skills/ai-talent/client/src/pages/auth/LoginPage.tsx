@@ -37,7 +37,7 @@ export default function LoginPage() {
     })
       .then((r) => {
         if (cancelled) return;
-        if (r.ok) navigate("/", { replace: true });
+        if (r.ok) navigate("/theater", { replace: true });
         else setAuthChecking(false);
       })
       .catch(() => { if (!cancelled) setAuthChecking(false); });

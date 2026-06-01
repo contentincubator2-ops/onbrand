@@ -218,7 +218,7 @@ export default function AppV2() {
           path="/onboarding"
           element={
             <RequireAuthV2>
-              <OnboardingWizard onComplete={() => (window.location.href = "/")} />
+              <OnboardingWizard onComplete={() => (window.location.href = "/theater")} />
             </RequireAuthV2>
           }
         />

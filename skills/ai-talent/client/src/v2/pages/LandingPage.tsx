@@ -11,7 +11,7 @@
  * Login / Register buttons always navigate to their own dedicated pages.
  */
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
 
 const TAGLINE_ZH = "鎖定品牌定位，AI 永遠 on-brand 不跑題";
@@ -26,12 +26,19 @@ export default function LandingPage() {
   const { lang, setLang } = useLang();
   const en = lang === "en";
   const [authed, setAuthed] = React.useState(false);
+  const navigate = useNavigate();
 
   React.useEffect(() => {
     let dead = false;
     fetch("/api/auth/me", { method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" }, body: "{}" })
-      .then((r) => { if (!dead && r.ok) setAuthed(true); })
+      .then((r) => {
+        if (dead) return;
+        if (r.ok) {
+          setAuthed(true);
+          navigate("/theater", { replace: true });
+        }
+      })
       .catch(() => {});
     document.title = en ? `OnBrand · ${TAGLINE_EN}` : `OnBrand · ${TAGLINE_ZH}`;
     const m = document.querySelector('meta[name="description"]')
