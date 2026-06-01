@@ -680,7 +680,7 @@ export default function CalendarPage() {
                               style={{ borderLeft: `2px solid ${color}` }}
                             >
                               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dot }} />
-                              <span className="truncate">{it.preview || it.missionTitle || "—"}</span>
+                              <span className="truncate">{String(it.preview || it.missionTitle || "—")}</span>
                             </button>
                           );
                         })}
@@ -828,7 +828,7 @@ function PostPill({
             </span>
           </div>
           <p className="text-[11px] text-default-900 font-medium truncate leading-tight">
-            {item.preview || item.missionTitle || "—"}
+            {String(item.preview || item.missionTitle || "—")}
           </p>
           {publishedTime && (
             <p className="text-[9px] text-default-400 mt-0.5">{publishedTime}</p>
@@ -1082,7 +1082,7 @@ function FestivalNudgeBanner({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="text-[13px] font-semibold text-default-900">
-                      {lang === "en" ? (f.name_en ?? f.name_zh) : f.name_zh}
+                      {String(lang === "en" ? (f.name_en ?? f.name_zh ?? "") : (f.name_zh ?? ""))}
                     </span>
                     <span className="text-[11px] text-default-500 tabular-nums">
                       {new Date(f.date).toLocaleDateString(
@@ -1099,7 +1099,7 @@ function FestivalNudgeBanner({
                   </div>
                   {(() => {
                     const hint = lang === "en" ? getFestivalHintEn(f.slug) : f.contentHint;
-                    if (!hint) return null;
+                    if (!hint || typeof hint !== "string") return null;
                     return (
                       <p
                         className="text-[11px] mt-0.5 line-clamp-1 text-default-500 italic"

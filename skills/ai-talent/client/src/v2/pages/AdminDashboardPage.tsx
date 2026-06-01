@@ -240,8 +240,8 @@ export default function AdminDashboardPage() {
               const rateColor = rate >= 80 ? "#15803d" : rate >= 50 ? "#b45309" : "#b91c1c";
               return (
                 <tr key={f.taskId + f.workspace} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                  <td style={{ ...td, whiteSpace: "normal", maxWidth: 260 }}>{f.label}</td>
-                  <td style={td}>{f.workspace}</td>
+                  <td style={{ ...td, whiteSpace: "normal", maxWidth: 260 }}>{String(f.label ?? "—")}</td>
+                  <td style={td}>{String(f.workspace ?? "—")}</td>
                   <td style={{ ...td, fontWeight: 600 }}>{f.uses}</td>
                   <td style={td}>{f.users}</td>
                   <td style={{ ...td, color: "#15803d" }}>{f.done}</td>
@@ -281,7 +281,7 @@ export default function AdminDashboardPage() {
                 <td style={td}>{r.source}</td>
                 <td style={{ ...td, fontWeight: 700, color: r.errors > 5 ? "#b91c1c" : "#374151" }}>{r.errors}</td>
                 <td style={td}>{r.users}</td>
-                <td style={{ ...td, whiteSpace: "normal", maxWidth: 320, color: "#737373" }}>{r.sampleMessage}</td>
+                <td style={{ ...td, whiteSpace: "normal", maxWidth: 320, color: "#737373" }}>{typeof r.sampleMessage === "string" ? r.sampleMessage : String(r.sampleMessage ?? "—")}</td>
                 <td style={{ ...td, color: "#9ca3af" }}>
                   {r.lastSeen ? new Date(r.lastSeen).toLocaleString("zh-TW", { hour12: false }) : "—"}
                 </td>
@@ -321,9 +321,9 @@ export default function AdminDashboardPage() {
               </span>
             </div>
             <div style={{ fontSize: 12, color: "#525252", margin: "5px 0", whiteSpace: "pre-wrap" }}>
-              {b.body.slice(0, 280)}{b.body.length > 280 ? "…" : ""}
+              {String(b.body ?? "").slice(0, 280)}{(String(b.body ?? "").length > 280) ? "…" : ""}
             </div>
-            {b.triageReason && (
+            {b.triageReason && typeof b.triageReason === "string" && (
               <div style={{ fontSize: 11, color: "#737373", fontStyle: "italic", marginBottom: 6 }}>
                 triage：{b.triageReason}
               </div>

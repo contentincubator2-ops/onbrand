@@ -55,7 +55,7 @@ export default function FestivalGlobalNudge() {
         <Sparkles size={12} strokeWidth={2} style={{ color: urgent ? "#B91C1C" : "#7C3AED" }} />
         <span style={{ fontSize: 18 }}>{f.emoji ?? "🎉"}</span>
         <span className="font-medium text-default-900 truncate flex-1 min-w-0">
-          {lang === "en" ? (f.name_en ?? f.name_zh) : f.name_zh}
+          {String(lang === "en" ? (f.name_en ?? f.name_zh ?? "") : (f.name_zh ?? ""))}
           <span
             className="ml-2"
             style={{

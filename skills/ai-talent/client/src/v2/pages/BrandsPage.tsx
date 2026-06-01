@@ -1752,7 +1752,7 @@ export default function BrandsPage() {
                         {smpData?.singleMindedProposition && (
                           <div className="mt-2 p-2 rounded bg-white border border-divider">
                             <p className="text-small font-medium text-foreground">「{smpData.singleMindedProposition}」</p>
-                            {smpData.rationale && <p className="text-tiny text-default-700 mt-1 leading-relaxed">{smpData.rationale}</p>}
+                            {smpData.rationale && typeof smpData.rationale === "string" && <p className="text-tiny text-default-700 mt-1 leading-relaxed">{smpData.rationale}</p>}
                           </div>
                         )}
                         <div className="mt-3 flex items-center gap-2 flex-wrap">
