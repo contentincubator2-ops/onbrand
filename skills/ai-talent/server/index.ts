@@ -574,10 +574,10 @@ async function backfillMissionResources(): Promise<void> {
 //   for /trpc + /api paths ensures the client never sees HTML for those.
 //   Static / boardroom / covers paths still return HTML (intentional).
 app.use("/trpc", (_req, res) => {
-  res.status(404).json({ error: { code: "NOT_FOUND", message: "tRPC procedure not found" } });
+  res.status(404).json({ error: "tRPC procedure not found" });
 });
 app.use("/api", (_req, res) => {
-  res.status(404).json({ error: { code: "NOT_FOUND", message: "API endpoint not found" } });
+  res.status(404).json({ error: "API endpoint not found" });
 });
 // Global error handler — last middleware. Catches anything not handled by
 // tRPC's onError or route-level try/catch. Always returns JSON so the
@@ -595,10 +595,7 @@ app.use((err: any, req: any, res: any, _next: any) => {
   const isJsonPath = req.path?.startsWith("/trpc") || req.path?.startsWith("/api");
   if (isJsonPath) {
     res.status(500).json({
-      error: {
-        code: "INTERNAL_SERVER_ERROR",
-        message: err?.message ?? "unknown server error",
-      },
+      error: err?.message ?? "unknown server error",
     });
   } else {
     res.status(500).type("text/plain").send(`server error: ${err?.message ?? "unknown"}`);
