@@ -472,7 +472,8 @@ authRouter.post("/verifyEmail", async (req: Request, res: Response) => {
 
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: result.error.flatten().fieldErrors });
+      const firstMsg = Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "請檢查輸入欄位";
+      res.status(400).json({ error: firstMsg });
       return;
     }
 
@@ -790,7 +791,8 @@ authRouter.post("/resend-verification", async (req: Request, res: Response) => {
     const schema = z.object({ email: z.string().email("請輸入有效的電子郵件") });
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: result.error.flatten().fieldErrors });
+      const firstMsg = Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "請檢查輸入欄位";
+      res.status(400).json({ error: firstMsg });
       return;
     }
     const { email } = result.data;
@@ -954,7 +956,8 @@ authRouter.post("/change-password", async (req: Request, res: Response) => {
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+      const firstMsg = Object.values(parsed.error.flatten().fieldErrors).flat()[0] ?? "請檢查輸入欄位";
+      res.status(400).json({ error: firstMsg });
       return;
     }
 
