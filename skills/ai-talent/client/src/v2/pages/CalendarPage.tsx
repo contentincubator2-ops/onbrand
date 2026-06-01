@@ -162,12 +162,17 @@ export default function CalendarPage() {
     return m;
   }, [items]);
 
-  // Cancel + reschedule mutations
+  // Cancel + reschedule + publish mutations
   const cancelMut = (trpc as any).calendar?.cancel?.useMutation?.({
     onSuccess: () => rangeQ?.refetch?.(),
   });
   const rescheduleMut = (trpc as any).calendar?.reschedule?.useMutation?.({
     onSuccess: () => rangeQ?.refetch?.(),
+  });
+  const publishMut = (trpc as any).calendar?.publish?.useMutation?.({
+    onSuccess: (_r: any, vars: any) => {
+      rangeQ?.refetch?.();
+    },
   });
 
   // Platform picker modal state
@@ -532,6 +537,7 @@ export default function CalendarPage() {
                               setRescheduleId(id);
                               setRescheduleAt(formatLocalDatetimeInput(new Date(at)));
                             }}
+                            onPublish={(id) => publishMut?.mutateAsync?.({ id })}
                             rescheduling={rescheduleId === it.id}
                           />
                         ))}
@@ -761,17 +767,19 @@ export default function CalendarPage() {
 
 /* ── PostPill ─────────────────────────────────────────────────── */
 function PostPill({
-  item, lang, navigate, onCancel, onReschedule, rescheduling,
+  item, lang, navigate, onCancel, onReschedule, onPublish, rescheduling,
 }: {
   item: any;
   lang: "zh-TW" | "en";
   navigate: (to: string) => void;
   onCancel: (id: number) => void;
   onReschedule: (id: number, at: string) => void;
+  onPublish?: (id: number) => Promise<void>;
   rescheduling: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const color = getPlatformColor(item.platform);
   const isPublished = item.kind === "published";
@@ -843,6 +851,32 @@ function PostPill({
           </button>
           {isPending && (
             <>
+              {/* Publish to platform — calls calendar.publish → Pipedream webhook */}
+              {onPublish && (
+                <button
+                  onClick={async () => {
+                    const platformLabel = getPlatformLabel(item.platform);
+                    if (!confirm(lang === "en"
+                      ? `Publish to ${platformLabel} now? This will post immediately.`
+                      : `確定立即發布到 ${platformLabel}？發布後無法撤回。`)) return;
+                    setPublishing(true);
+                    try {
+                      await onPublish(item.id);
+                    } catch (e: any) {
+                      alert(e?.message ?? String(e));
+                    } finally {
+                      setPublishing(false);
+                    }
+                  }}
+                  disabled={publishing}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-white disabled:opacity-50"
+                  style={{ background: publishing ? "#525252" : "#171717" }}
+                >
+                  {publishing
+                    ? (lang === "en" ? "Publishing…" : "發布中…")
+                    : (lang === "en" ? "Publish now" : "立即發布")}
+                </button>
+              )}
               <button
                 onClick={() => onReschedule(item.id, item.at)}
                 className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-white border border-violet-200 hover:border-violet-500 text-violet-700"

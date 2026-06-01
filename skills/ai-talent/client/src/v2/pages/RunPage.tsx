@@ -555,72 +555,44 @@ export default function RunPage() {
   // Keep ref in sync so startFbPolling (useCallback) can call the latest mutation
   fbPagesMutRef.current = fbPagesMut;
   const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();
-  // Declared here (before handleFbPublishClick) to avoid TS2448 "used before declaration"
-  const fbPublishMut = (trpc as any).publish?.toFacebook?.useMutation
-    ? (trpc as any).publish.toFacebook.useMutation({
-        onSuccess: (r: any) => {
-          showToastGlobal(
-            r.permalink
-              ? (lang === "en" ? `Published ✓ ${r.permalink}` : `已發布 ✓ ${r.permalink}`)
-              : (lang === "en" ? "Published to Facebook ✓" : "已發布到 Facebook ✓")
-          );
-          utils.output.getById.invalidate({ id });
-        },
-        onError: (e: any) => {
-          const msg = String(e?.message ?? "");
-          if (msg.includes("尚未連接") || msg.includes("缺 FB Page ID")) {
-            prefetchConnect("facebook");
-            fbStatusQuery?.refetch?.();
-            showToastGlobal(
-              lang === "en"
-                ? "Facebook isn't connected — the publish button has switched to 「Connect Facebook」. Tap it to authorize."
-                : "尚未授權 Facebook — 上方發布按鈕已切換成「連接 Facebook 後發布」，點它即可完成授權"
-            );
-          } else if (msg.includes("FB 發布服務尚未啟用") || msg.includes("Facebook 授權服務")) {
-            showToastGlobal(
-              lang === "en"
-                ? "Facebook publishing not enabled — contact sowork@sowork.ai"
-                : "FB 發布服務尚未啟用 — 請聯絡 sowork@sowork.ai"
-            );
-          } else {
-            showToastGlobal(
-              lang === "en" ? `Facebook publish failed: ${e?.message ?? e}` : `FB 發布失敗：${e?.message ?? e}`
-            );
-          }
-        },
-      })
-    : { mutate: () => {}, isPending: false };
+  // 2026-06-01 (CJ): Route all publishing through Calendar instead of direct Pipedream call.
+  // scheduleToCalMut: schedules the output as a "pending" scheduled_post, then user
+  // goes to CalendarPage where they click "立即發布" to actually push via Pipedream.
+  const scheduleToCalMut = (trpc as any).calendar?.schedule?.useMutation?.({
+    onSuccess: (_r: any) => {
+      showToastGlobal(
+        lang === "en"
+          ? "Added to Calendar ✓ — go to Publishing Calendar to publish"
+          : "已加入行事曆 ✓ — 前往「七日發布台」發布"
+      );
+    },
+    onError: (e: any) => {
+      showToastGlobal(
+        lang === "en"
+          ? `Schedule failed: ${e?.message ?? e}`
+          : `排程失敗：${e?.message ?? e}`
+      );
+    },
+  }) ?? { mutateAsync: async () => {}, isPending: false };
 
-  // Called when user clicks "發布到 Facebook" after OAuth.
-  // If pages are already cached → show picker immediately.
-  // If not yet fetched → fetch first, then show picker (or auto-pick if 1 page).
-  const handleFbPublishClick = React.useCallback(async () => {
-    // Already has a saved page binding → straight to confirm + publish
-    if (fbConnected) {
-      if (!confirm(lang === "en"
-        ? "Publish this version to Facebook? It'll appear on your FB page right away."
-        : "確定要把這個版本發到 Facebook？發布後會直接出現在你的 FB 粉專。")) return;
-      fbPublishMut?.mutate?.({ outputId: id, variantIndex: activeIdx });
-      return;
-    }
-    // OAuth done this session but no fbPageId yet → fetch pages and show picker
-    if (fbPages.length > 0) {
-      setFbPagePickerOpen(true);
-      return;
-    }
-    try {
-      const result = await fbPagesMut?.mutateAsync?.({ brandId: fbBrandId });
-      const pages: Array<{ id: string; name: string; category: string }> = result?.pages ?? [];
-      if (pages.length === 0) {
-        showToastGlobal(lang === "en" ? "No Facebook pages found — please check your account." : "此帳號沒有可管理的 FB 粉專");
-        return;
-      }
-      setFbPages(pages);
-      setFbPagePickerOpen(true);
-    } catch (e: any) {
-      showToastGlobal(lang === "en" ? `Couldn't load pages: ${String(e?.message ?? e).slice(0, 100)}` : `無法載入粉專清單：${String(e?.message ?? e).slice(0, 100)}`);
-    }
-  }, [fbConnected, fbPages, fbPagesMut, fbPublishMut, id, activeIdx, lang, fbBrandId]);
+  // Called when user clicks "排程到行事曆" (Facebook connected path).
+  // Schedules the current output to calendar with scheduledAt = now,
+  // then user can publish from the Calendar page.
+  const handleScheduleToCalendar = React.useCallback(async () => {
+    if (!confirm(lang === "en"
+      ? "Add to Publishing Calendar? You can then publish from the Calendar page."
+      : "加入七日發布台？可在行事曆頁面選擇時間並發布。")) return;
+    const platform = mockupVariant?.platform && mockupVariant.platform !== "generic"
+      ? mockupVariant.platform
+      : "facebook";
+    await scheduleToCalMut?.mutateAsync?.({
+      outputId: id,
+      variantIndex: activeIdx,
+      platform,
+      scheduledAt: new Date().toISOString(),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang, mockupVariant?.platform, id, activeIdx]);
 
   const connectFacebookViaUrl = () => {
     const win = window.open("about:blank", "_blank", "popup,width=600,height=720");
@@ -2144,12 +2116,12 @@ export default function RunPage() {
             </CardBody>
           </Card>
 
-          {/* 2026-05-28: FB page picker — shown when user clicks "發布到 Facebook"
-              and hasn't saved a page binding yet. Appears inline below the button. */}
+          {/* 2026-06-01: FB page picker — shown after OAuth when brand has no saved page binding.
+              After binding, schedules to calendar (unified flow) instead of direct publish. */}
           {fbPagePickerOpen && fbPages.length > 0 && (
             <Card className="border border-primary/40">
               <CardBody className="space-y-2">
-                <p className="text-small font-semibold">{lang === "en" ? "Which page to publish to?" : "要發到哪個粉絲團？"}</p>
+                <p className="text-small font-semibold">{lang === "en" ? "Which Facebook page to bind?" : "要綁定哪個粉絲團？"}</p>
                 <div className="space-y-1.5">
                   {fbPages.map((p) => (
                     <Button
@@ -2160,12 +2132,8 @@ export default function RunPage() {
                           await setBrandFbPageMut?.mutateAsync?.({ brandId: fbBrandId, fbPageId: p.id, fbPageName: p.name });
                           fbStatusQuery?.refetch?.();
                           setFbPagePickerOpen(false);
-                          // Publish immediately after binding
-                          if (confirm(lang === "en"
-                            ? `Publish to "${p.name}"?`
-                            : `確定發布到「${p.name}」？`)) {
-                            fbPublishMut?.mutate?.({ outputId: id, variantIndex: activeIdx });
-                          }
+                          // After binding, schedule to calendar instead of direct publish
+                          await handleScheduleToCalendar();
                         } catch (e: any) {
                           showToastGlobal(`Error: ${String(e?.message ?? e).slice(0, 100)}`);
                         }
@@ -2236,12 +2204,12 @@ export default function RunPage() {
                         </Button>
                       ) : isConnected ? (
                         <Button
-                          size="sm" color="primary" className="min-w-[58px] text-[11px]"
-                          isLoading={fbPublishMut?.isPending || fbPagesMut?.isPending}
-                          isDisabled={fbPublishMut?.isPending || fbPagesMut?.isPending}
-                          onPress={handleFbPublishClick}
+                          size="sm" color="primary" className="min-w-[68px] text-[10px]"
+                          isLoading={scheduleToCalMut?.isPending}
+                          isDisabled={scheduleToCalMut?.isPending}
+                          onPress={handleScheduleToCalendar}
                         >
-                          {lang === "en" ? "Publish" : "發布"}
+                          {lang === "en" ? "→ Calendar" : "排程發布"}
                         </Button>
                       ) : (
                         <Button

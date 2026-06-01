@@ -265,6 +265,142 @@ export const calendarRouter = router({
       );
       return { ok: true };
     }),
+
+  /**
+   * Publish a scheduled post to its platform via Pipedream.
+   * Reads the scheduled_post, extracts caption from mission_outputs,
+   * calls Pipedream webhook, then marks both records as published.
+   *
+   * Currently supports: Facebook (via PIPEDREAM_FB_PUBLISH_WEBHOOK).
+   * Other platforms will return PRECONDITION_FAILED until their webhooks are configured.
+   */
+  publish: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const webhookUrl = (process.env as any).PIPEDREAM_FB_PUBLISH_WEBHOOK as string | undefined;
+      const secret = (process.env as any).PIPEDREAM_WEBHOOK_SECRET as string | undefined;
+      if (!webhookUrl) {
+        console.error("[calendar.publish] missing env: PIPEDREAM_FB_PUBLISH_WEBHOOK");
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "FB 發布服務尚未啟用，請聯絡 sowork@sowork.ai。",
+        });
+      }
+
+      const { default: localPool } = await import("../localDb");
+
+      // Load scheduled_post + verify ownership + mission_output + brand FB binding
+      const [rows]: any = await localPool.execute(
+        `SELECT sp.id, sp.outputId, sp.variantIndex, sp.platform, sp.status, sp.brandId,
+                o.content AS outputContent,
+                b.fbPageId AS brand_fb_page_id, b.fbPageName AS brand_fb_page_name
+         FROM scheduled_posts sp
+         LEFT JOIN mission_outputs o ON o.id = sp.outputId
+         LEFT JOIN brands b ON b.id = sp.brandId
+         WHERE sp.id = ? AND sp.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "排程不存在或無權限" });
+      if (row.status !== "pending") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文已發布或已取消，無法重複發布" });
+      }
+
+      // Extract caption from mission_output content (same logic as publishRouter.toFacebook)
+      let caption = "";
+      try {
+        const parsed = JSON.parse(row.outputContent);
+        const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
+        caption = variants[row.variantIndex ?? 0]?.caption ?? "";
+      } catch {
+        caption = String(row.outputContent ?? "");
+      }
+      if (!caption.trim()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文沒有文字內容可發布" });
+      }
+
+      // Require brand FB page binding
+      const pageId = row.brand_fb_page_id ?? null;
+      if (!pageId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "此品牌尚未連接 Facebook 粉專。請到 品牌設定 → 連接 Facebook 完成綁定。",
+        });
+      }
+
+      // Build Pipedream payload (same shape as publishRouter.toFacebook)
+      const pipedreamPayload = {
+        page_id: pageId,
+        message: caption,
+        connect_external_user_id: String(ctx.user.id),
+        _meta: {
+          secret: secret ?? null,
+          outputId: row.outputId,
+          variantIndex: row.variantIndex ?? 0,
+          brandId: row.brandId,
+          userId: ctx.user.id,
+          fbPageName: row.brand_fb_page_name ?? null,
+          scheduledPostId: input.id,
+          source: "calendar.publish",
+        },
+      };
+
+      const t0 = Date.now();
+      const resp = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pipedreamPayload),
+        signal: AbortSignal.timeout(30_000),
+      });
+      const text = await resp.text();
+      const latencyMs = Date.now() - t0;
+
+      if (!resp.ok) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Pipedream ${resp.status}: ${text.slice(0, 300)}`,
+        });
+      }
+
+      let pipedreamResult: any = text;
+      try { pipedreamResult = JSON.parse(text); } catch { /* keep as text */ }
+
+      const permalink = pipedreamResult?.permalink_url ?? pipedreamResult?.permalink ?? null;
+
+      // Mark scheduled_post as published
+      try {
+        await localPool.execute(
+          `UPDATE scheduled_posts
+           SET status = 'published', publishedAt = NOW(3), externalUrl = ?
+           WHERE id = ?`,
+          [permalink, input.id],
+        );
+      } catch (e) {
+        console.error("[calendar.publish] failed to update scheduled_posts:", e);
+      }
+
+      // Mark mission_output as published
+      if (row.outputId) {
+        try {
+          await localPool.execute(
+            `UPDATE mission_outputs
+             SET status = 'published', publishedAt = NOW(), updatedAt = NOW()
+             WHERE id = ?`,
+            [row.outputId],
+          );
+        } catch (e) {
+          console.error("[calendar.publish] failed to update mission_outputs:", e);
+        }
+      }
+
+      return {
+        ok: true,
+        latencyMs,
+        pipedreamResult,
+        postId: pipedreamResult?.post_id ?? pipedreamResult?.id ?? null,
+        permalink,
+      };
+    }),
 });
 
 function extractCaption(content: any, variantIndex: number): string {
