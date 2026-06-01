@@ -375,6 +375,51 @@ const LI_TASK_FORMAT_MAP: Record<string, LIActiveFormat> = {
   "li-30-headline":                "個人頁 / 觸達",
 };
 
+// ── Format category config (YT) ─────────────────────────────────────────────
+type YTActiveFormat =
+  | "all" | "影片 / 腳本" | "SEO / 元資料" | "Shorts"
+  | "縮圖" | "Community" | "互動 / 工具" | "系列 / 策略";
+
+const YT_FORMAT_TABS: { id: YTActiveFormat; label: string }[] = [
+  { id: "all",          label: "全部"         },
+  { id: "影片 / 腳本",  label: "影片 / 腳本"  },
+  { id: "SEO / 元資料", label: "SEO / 元資料" },
+  { id: "Shorts",       label: "Shorts"       },
+  { id: "縮圖",         label: "縮圖"         },
+  { id: "Community",    label: "Community"    },
+  { id: "互動 / 工具",  label: "互動 / 工具"  },
+  { id: "系列 / 策略",  label: "系列 / 策略"  },
+];
+
+const YT_TASK_FORMAT_MAP: Record<string, YTActiveFormat> = {
+  // 影片 / 腳本
+  "yt-30-opening-hook":      "影片 / 腳本",
+  "yt-30-end-cta":           "影片 / 腳本",
+  "yt-60-video-package":     "影片 / 腳本",
+  "yt-60-viral-rewrite":     "影片 / 腳本",
+  // SEO / 元資料
+  "yt-30-title-strategies":  "SEO / 元資料",
+  "yt-30-description-seo":   "SEO / 元資料",
+  "yt-30-chapter-timeline":  "SEO / 元資料",
+  // Shorts
+  "yt-30-shorts-script":     "Shorts",
+  "yt-60-shorts-script":     "Shorts",
+  // 縮圖
+  "yt-30-thumbnail-text":    "縮圖",
+  "yt-60-thumbnail-suite":   "縮圖",
+  // Community
+  "yt-30-community-post":    "Community",
+  "yt-60-community-post":    "Community",
+  // 互動 / 工具
+  "yt-30-comment-reply":     "互動 / 工具",
+  "yt-30-pinned-comment":    "互動 / 工具",
+  // 系列 / 策略
+  "yt-60-series-3ep":        "系列 / 策略",
+  "yt-99-series-6ep":        "系列 / 策略",
+  "yt-99-quarterly-strategy":"系列 / 策略",
+  "yt-99-premiere-kit":      "系列 / 策略",
+};
+
 // ── FBTaskCard type (same as QuickTask30sPage) ───────────────────────────────
 interface FBTaskCard {
   id: string;
@@ -501,6 +546,8 @@ function PlatformTaskPageInner() {
   const [activeIGFormat, setActiveIGFormat] = useState<IGActiveFormat>("all");
   // Format tab state (used for LI)
   const [activeLIFormat, setActiveLIFormat] = useState<LIActiveFormat>("all");
+  // Format tab state (used for YT)
+  const [activeYTFormat, setActiveYTFormat] = useState<YTActiveFormat>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -744,6 +791,11 @@ function PlatformTaskPageInner() {
       if (activeLIFormat !== "all") {
         list = list.filter((task) => LI_TASK_FORMAT_MAP[task.id] === activeLIFormat);
       }
+    } else if (platform === "youtube") {
+      // Format-based filter for YT
+      if (activeYTFormat !== "all") {
+        list = list.filter((task) => YT_TASK_FORMAT_MAP[task.id] === activeYTFormat);
+      }
     } else {
       // Tier-based filter for other platforms
       if (activeTier !== "all") {
@@ -762,7 +814,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -800,6 +852,18 @@ function PlatformTaskPageInner() {
     const counts: Record<string, number> = { all: liTasks.length };
     for (const task of liTasks) {
       const fmt = LI_TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
+
+  // Count tasks per format category (YT)
+  const ytFormatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "youtube") return {};
+    const ytTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: ytTasks.length };
+    for (const task of ytTasks) {
+      const fmt = YT_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
@@ -1107,6 +1171,41 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveLIFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "youtube" ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {YT_FORMAT_TABS.map((tab) => {
+                  const active = activeYTFormat === tab.id;
+                  const count = ytFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveYTFormat(tab.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active
