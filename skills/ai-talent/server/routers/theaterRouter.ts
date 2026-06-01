@@ -1222,7 +1222,7 @@ ${cleaned}
       const [mRes]: any = await localPool.execute(
         `INSERT INTO missions
            (userId, brandId, workspace, title, status, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, 'done', NOW(3), NOW(3))`,
+         VALUES (?, ?, ?, ?, 'completed', NOW(3), NOW(3))`,
         [ctx.user.id, input.brandId, input.platform, missionTitle],
       );
       const missionId = (mRes as any).insertId as number;
