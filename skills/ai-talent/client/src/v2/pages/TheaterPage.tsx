@@ -290,20 +290,50 @@ function PlatformCell({
 
   return (
     <div className="relative flex flex-col">
-      {/* status chip — floats top-right of mockup. 2026-05-10 (CJ B&W):
-          neutral palette by default; only state-failed uses red. */}
-      {(hasContent || state.status === "queued") && (
+      {/* Status chip — only shown for non-done states (queued / writing / qa / imaging / failed).
+          When done, the primary action buttons replace it. */}
+      {(hasContent || state.status === "queued") && !isDone && (
         <span
           className={`absolute top-2 right-2 z-10 px-2 py-0.5 text-[10px] font-medium rounded-full shadow-sm ${
             state.status === "failed"
               ? "bg-red-600 text-white"
-              : state.status === "done"
-              ? "bg-neutral-900 text-white"
               : "bg-white text-neutral-700 border border-neutral-300"
           }`}
         >
           {statusLabel}
         </span>
+      )}
+
+      {/* ── Primary CTAs — always visible top-right when cell is done ─── */}
+      {isDone && caption && (
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+          {onEdit && (
+            <button
+              onClick={() => onEdit()}
+              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur-sm border border-neutral-300 text-neutral-700 hover:bg-white hover:border-neutral-500 shadow-sm transition"
+            >
+              <Pencil size={10} strokeWidth={2.5} />
+              {lang === "en" ? "Edit" : "編輯"}
+            </button>
+          )}
+          {onScheduleClick && (
+            <button
+              onClick={onScheduleClick}
+              className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg shadow-sm transition ${
+                state.scheduledPostId
+                  ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  : "bg-neutral-900 hover:bg-neutral-700 text-white"
+              }`}
+            >
+              {state.scheduledPostId
+                ? <CheckCircle2 size={10} strokeWidth={2.5} />
+                : <CalendarIcon size={10} strokeWidth={2.5} />}
+              {state.scheduledPostId
+                ? (lang === "en" ? "Scheduled ✓" : "已排程 ✓")
+                : (lang === "en" ? "Schedule" : "送到行事曆")}
+            </button>
+          )}
+        </div>
       )}
 
       {/* Real platform mockup — full-width, no outer frame */}
@@ -399,91 +429,44 @@ function PlatformCell({
         />
       )}
 
-      {/* Action row (only on done) */}
+      {/* Secondary actions — icon-only, below the mockup */}
       {isDone && caption && (
-        <div className="mt-1 px-1 py-1.5 flex items-center gap-1.5 flex-wrap">
+        <div className="mt-1 px-1 py-0.5 flex items-center gap-0.5">
           {onCopy && (
             <button
               onClick={onCopy}
-              className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
+              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition"
               title={t("theater_copy_tip")}
             >
-              <Copy size={11} strokeWidth={2} />
-              {t("theater_btn_copy")}
-            </button>
-          )}
-          {onEdit && (
-            <button
-              onClick={() => onEdit()}
-              className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
-              title={t("theater_edit_tip")}
-            >
-              <Pencil size={11} strokeWidth={2} />
-              {t("theater_btn_edit")}
+              <Copy size={12} strokeWidth={2} />
             </button>
           )}
           {onMarkRule && (
             <button
               onClick={onMarkRule}
-              className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
+              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition"
               title={t("theater_btn_mark_rule_tip")}
             >
-              <Flag size={11} strokeWidth={2} />
-              {t("theater_btn_mark_rule")}
+              <Flag size={12} strokeWidth={2} />
             </button>
           )}
           {onRedo && (
             <button
               onClick={onRedo}
-              className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
+              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition"
               title={t("theater_btn_redo_tip")}
             >
-              <RefreshCw size={11} strokeWidth={2} />
-              {t("theater_btn_redo_cell")}
+              <RefreshCw size={12} strokeWidth={2} />
             </button>
           )}
-          {/* Schedule button — primary action, visually distinct */}
-          {onScheduleClick && !state.scheduledPostId && (
-            <button
-              onClick={onScheduleClick}
-              className="text-[10px] px-2.5 py-1 rounded-md flex items-center gap-1 transition font-semibold ml-auto"
-              style={{ background: "#171717", color: "white" }}
-              title={lang === "en" ? "Schedule to calendar" : "排程到行事曆"}
-            >
-              <CalendarIcon size={11} strokeWidth={2} />
-              {lang === "en" ? "Schedule" : "排程"}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Scheduled badge */}
-      {state.scheduledPostId && isDone && (
-        <div
-          className="mt-1 mx-1 mb-1 px-2.5 py-1.5 rounded-lg flex items-center gap-2"
-          style={{ background: "#f0fdf4", border: "1px solid #a7f3d0" }}
-        >
-          <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold text-emerald-800">
-              {lang === "en" ? "Scheduled ✓" : "已排程 ✓"}
-            </p>
-            {state.scheduledAt && (
-              <p className="text-[9px] text-emerald-600 truncate">
-                {new Date(state.scheduledAt).toLocaleString(
-                  lang === "en" ? "en-US" : "zh-TW",
-                  { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
-                )}
-              </p>
-            )}
-          </div>
-          {onScheduleClick && (
-            <button
-              onClick={onScheduleClick}
-              className="text-[9px] text-emerald-700 hover:underline shrink-0"
-            >
-              {lang === "en" ? "Edit" : "修改"}
-            </button>
+          {/* Scheduled time — shown inline when this cell has a scheduled time */}
+          {state.scheduledPostId && state.scheduledAt && (
+            <span className="ml-auto text-[9px] text-emerald-600 pr-1 truncate">
+              {new Date(state.scheduledAt).toLocaleString(
+                lang === "en" ? "en-US" : "zh-TW",
+                { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+              )}
+            </span>
           )}
         </div>
       )}
