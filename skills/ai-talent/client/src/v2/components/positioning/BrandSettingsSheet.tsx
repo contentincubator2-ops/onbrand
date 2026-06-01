@@ -942,7 +942,7 @@ export function DangerTab({ brandId, brandName, onClose }: { brandId: number | n
         onSuccess: () => {
           showToastGlobal(en ? `Brand "${brandName ?? brandId}" deleted` : `品牌「${brandName ?? brandId}」已刪除`, "success");
           onClose();
-          navigate("/brands");
+          navigate("/brands", { replace: true });
         },
         onError: (e: any) => {
           showToastGlobal((typeof e?.message === "string" ? e.message : null) ?? (en ? "Delete failed" : "刪除失敗"));
