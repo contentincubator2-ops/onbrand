@@ -136,7 +136,8 @@ authRouter.post("/register", async (req: Request, res: Response) => {
 
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: result.error.flatten().fieldErrors });
+      const firstMsg = Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "請檢查輸入欄位";
+      res.status(400).json({ error: firstMsg });
       return;
     }
 
@@ -272,7 +273,8 @@ authRouter.post("/login", async (req: Request, res: Response) => {
 
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: result.error.flatten().fieldErrors });
+      const firstMsg = Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "請檢查輸入欄位";
+      res.status(400).json({ error: firstMsg });
       return;
     }
 
@@ -523,7 +525,8 @@ authRouter.post("/forgotPassword", async (req: Request, res: Response) => {
 
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: result.error.flatten().fieldErrors });
+      const firstMsg = Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "請檢查輸入欄位";
+      res.status(400).json({ error: firstMsg });
       return;
     }
 
@@ -599,7 +602,8 @@ authRouter.post("/resetPassword", async (req: Request, res: Response) => {
 
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: result.error.flatten().fieldErrors });
+      const firstMsg = Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "請檢查輸入欄位";
+      res.status(400).json({ error: firstMsg });
       return;
     }
 
