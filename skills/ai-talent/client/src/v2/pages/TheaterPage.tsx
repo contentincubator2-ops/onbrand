@@ -76,6 +76,7 @@ import {
   type CastMember,
   type TheaterPlatform,
 } from "../config/theaterCast";
+import EditCellModal from "../components/theater/EditCellModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,8 @@ interface CellState {
   structured?: Record<string, any>;
   caption?: string;
   imageUrl?: string | null;
+  /** Last image brief/prompt used — shown in EditCellModal for user to review/edit. */
+  imagePrompt?: string;
   /** true when image generation was attempted but failed (distinct from
    *  imageUrl===null due to platform not requiring an image). */
   imageError?: boolean;
@@ -262,15 +265,11 @@ function PlatformCell({
   brandLogoUrl: string | null;
   onRedo?: () => void;
   onCopy?: () => void;
-  onEdit?: (newCaption: string) => void;
+  onEdit?: () => void;
   onMarkRule?: () => void;
   onScheduleClick?: () => void;
 }) {
   const { t, lang } = useLang();
-  // Phase 3a — inline edit state
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(caption);
-  useEffect(() => { if (!editing) setDraft(caption); }, [caption, editing]);
   const meta = PLATFORM_META[platform];
   const isIdle    = state.status === "idle" || state.status === "queued";
   const isWriting = state.status === "writing";
@@ -390,55 +389,18 @@ function PlatformCell({
         </div>
       )}
 
-      {/* Inline edit overlay (Phase 3a) — opens on dblclick of done cell */}
-      {editing && (
-        <div className="absolute inset-0 z-30 bg-white/95 backdrop-blur-sm rounded-lg p-3 flex flex-col gap-2 shadow-lg" style={{ border: "2px solid #6366f1" }}>
-          <p className="text-[10px] text-indigo-700 font-semibold flex items-center gap-1">
-            ✏️ {t("theater_edit_hint")}
-          </p>
-          <textarea
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") { setEditing(false); setDraft(caption); }
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                onEdit?.(draft);
-                setEditing(false);
-              }
-            }}
-            className="flex-1 w-full text-[12px] leading-relaxed px-2 py-1.5 border border-indigo-200 rounded resize-none focus:outline-none focus:border-indigo-500"
-            style={{ minHeight: 140 }}
-          />
-          <div className="flex items-center justify-end gap-1.5">
-            <button
-              onClick={() => { setEditing(false); setDraft(caption); }}
-              className="text-[10px] px-2 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
-            >
-              {t("cancel")}
-            </button>
-            <button
-              onClick={() => { onEdit?.(draft); setEditing(false); }}
-              className="text-[10px] px-2 py-1 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium"
-            >
-              {t("save")}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Double-click area on the mockup body opens inline edit */}
-      {isDone && caption && !editing && onEdit && (
+      {/* Double-click area on the mockup body opens edit modal */}
+      {isDone && caption && onEdit && (
         <div
           className="absolute inset-0 cursor-text"
           style={{ background: "transparent" }}
-          onDoubleClick={() => setEditing(true)}
+          onDoubleClick={() => onEdit()}
           title={t("theater_dblclick_to_edit")}
         />
       )}
 
       {/* Action row (only on done) */}
-      {isDone && caption && !editing && (
+      {isDone && caption && (
         <div className="mt-1 px-1 py-1.5 flex items-center gap-1.5 flex-wrap">
           {onCopy && (
             <button
@@ -452,7 +414,7 @@ function PlatformCell({
           )}
           {onEdit && (
             <button
-              onClick={() => setEditing(true)}
+              onClick={() => onEdit()}
               className="text-[10px] px-2 py-1 rounded-md bg-neutral-50 hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 flex items-center gap-1 transition"
               title={t("theater_edit_tip")}
             >
@@ -495,7 +457,7 @@ function PlatformCell({
         </div>
       )}
 
-      {/* Scheduled badge — shown when this cell has been scheduled */}
+      {/* Scheduled badge */}
       {state.scheduledPostId && isDone && (
         <div
           className="mt-1 mx-1 mb-1 px-2.5 py-1.5 rounded-lg flex items-center gap-2"
@@ -1156,7 +1118,7 @@ export default function TheaterPage() {
           );
           if (stopRef.current) return;
           if (r.ok && r.imageUrl) {
-            updateCell(task.key, { status: "done", imageUrl: r.imageUrl, imageError: false, doneAt: Date.now() });
+            updateCell(task.key, { status: "done", imageUrl: r.imageUrl, imagePrompt: (r as any).brief ?? undefined, imageError: false, doneAt: Date.now() });
           } else {
             // image failed → keep caption, mark as done with imageError so UI can show retry hint
             console.error("[theater] image failed:", task.key, (r as any).error);
@@ -1268,6 +1230,18 @@ export default function TheaterPage() {
   /** Run-scope rules: applied to all future cells in this run only.
    *  Persistent across cells in the run; cleared on stop / new run. */
   const [runRules, setRunRules] = useState<string[]>([]);
+
+  // ── Edit cell modal state ────────────────────────────────────────────────
+  const [editModal, setEditModal] = useState<{
+    key: CellKey;
+    platform: TheaterPlatform;
+    date: string;
+    dateLabel: string;
+  } | null>(null);
+
+  const openEditModal = (key: CellKey, platform: TheaterPlatform, date: string, dateLabel: string) => {
+    setEditModal({ key, platform, date, dateLabel });
+  };
 
   // ── Schedule modal state ─────────────────────────────────────────────────
   const scheduleCellMut = (trpc as any).theater?.scheduleCell?.useMutation?.();
@@ -1671,7 +1645,7 @@ export default function TheaterPage() {
                       brandLogoUrl={(ctx?.brands ?? []).find((b: any) => b.id === brandId)?.logoUrl ?? null}
                       onCopy={() => copyCaption(key)}
                       onRedo={() => redoCell(key, p)}
-                      onEdit={(newCaption) => editCellCaption(key, newCaption)}
+                      onEdit={() => openEditModal(key, p, d.date, d.label)}
                       onMarkRule={() => openRuleModal(key)}
                       onScheduleClick={() => openScheduleModal(key, p, d.date, state.caption ?? "", state.imageUrl)}
                         />
@@ -2024,6 +1998,33 @@ export default function TheaterPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── Edit cell modal ── */}
+        {editModal && brandId && (
+          <EditCellModal
+            platform={editModal.platform}
+            date={editModal.date}
+            dateLabel={editModal.dateLabel}
+            initialCaption={cells.get(editModal.key)?.caption ?? ""}
+            initialStructured={cells.get(editModal.key)?.structured ?? {}}
+            initialImageUrl={cells.get(editModal.key)?.imageUrl}
+            initialImagePrompt={cells.get(editModal.key)?.imagePrompt}
+            brandId={brandId}
+            brandTagline={cellMeta.get(editModal.key)?.brandTagline ?? null}
+            lang={lang}
+            isAlreadyScheduled={!!cells.get(editModal.key)?.scheduledPostId}
+            qaReviewMut={qaReviewMut}
+            generateImageMut={generateImageMut}
+            scheduleCellMut={scheduleCellMut}
+            onSave={({ caption, structured, imageUrl, imagePrompt }) => {
+              updateCell(editModal.key, { caption, structured, imageUrl, imagePrompt });
+            }}
+            onScheduleSuccess={(scheduledPostId, scheduledAt, caption, imageUrl) => {
+              updateCell(editModal.key, { scheduledPostId, scheduledAt, caption, imageUrl: imageUrl ?? undefined });
+            }}
+            onClose={() => setEditModal(null)}
+          />
         )}
 
         {/* Cast roster footer */}
