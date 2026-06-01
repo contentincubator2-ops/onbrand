@@ -72,7 +72,7 @@ brandBrainRouter.get("/:brandId", async (req: Request, res: Response) => {
     res.json({ brandId, entries });
   } catch (err: any) {
     console.error("[brandBrainRoute] GET error:", err?.message);
-    res.status(500).json({ error: err?.message });
+    res.status(500).json({ error: err?.message ?? "伺服器錯誤" });
   }
 });
 
@@ -117,7 +117,7 @@ brandBrainRouter.post("/:brandId", async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error("[brandBrainRoute] POST error:", err?.message);
-    res.status(500).json({ error: err?.message });
+    res.status(500).json({ error: err?.message ?? "伺服器錯誤" });
   }
 });
 
@@ -170,7 +170,7 @@ brandBrainRouter.put("/entry/:id", async (req: Request, res: Response) => {
     res.json({ ok: true, id });
   } catch (err: any) {
     console.error("[brandBrainRoute] PUT error:", err?.message);
-    res.status(500).json({ error: err?.message });
+    res.status(500).json({ error: err?.message ?? "伺服器錯誤" });
   }
 });
 
@@ -196,7 +196,7 @@ brandBrainRouter.delete("/entry/:id", async (req: Request, res: Response) => {
     res.json({ ok: true, id });
   } catch (err: any) {
     console.error("[brandBrainRoute] DELETE error:", err?.message);
-    res.status(500).json({ error: err?.message });
+    res.status(500).json({ error: err?.message ?? "伺服器錯誤" });
   }
 });
 

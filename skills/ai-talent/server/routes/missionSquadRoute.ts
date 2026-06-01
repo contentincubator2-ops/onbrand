@@ -172,6 +172,6 @@ missionSquadRouter.get("/:missionId/squad", async (req: Request, res: Response) 
     });
   } catch (err: any) {
     console.error("[missionSquadRoute] GET error:", err?.message);
-    res.status(500).json({ error: err?.message });
+    res.status(500).json({ error: err?.message ?? "伺服器錯誤" });
   }
 });

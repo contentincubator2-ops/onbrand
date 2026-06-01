@@ -270,7 +270,7 @@ export default function RunPage() {
     ? (trpc as any).quickTask.generateVideoScript.useMutation({
         onSuccess: (r: any) => {
           if (r.ok) setGeneratedScript(r.script);
-          else showToastGlobal(lang === "en" ? `Script failed: ${r.error}` : `腳本生成失敗：${r.error}`);
+          else showToastGlobal(lang === "en" ? `Script failed: ${typeof r.error === "string" ? r.error : "unknown error"}` : `腳本生成失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`);
         },
         onError: (e: any) => showToastGlobal(lang === "en" ? `Script error: ${e.message}` : `腳本錯誤：${e.message}`),
       })
@@ -1666,8 +1666,8 @@ export default function RunPage() {
                         } else {
                           showToastGlobal(
                             lang === "en"
-                              ? `AI rewrite failed: ${r.error ?? "unknown error"}`
-                              : `AI 改寫失敗：${r.error ?? "未知錯誤"}`
+                              ? `AI rewrite failed: ${typeof r.error === "string" ? r.error : "unknown error"}`
+                              : `AI 改寫失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`
                           );
                         }
                       } catch (e: any) {

@@ -87,7 +87,7 @@ exportsRouter.get("/", async (req: Request, res: Response) => {
     res.json({ exports });
   } catch (err: any) {
     console.error("[exportsRoute] GET error:", err?.message);
-    res.status(500).json({ error: err?.message });
+    res.status(500).json({ error: err?.message ?? "伺服器錯誤" });
   }
 });
 

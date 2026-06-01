@@ -208,7 +208,7 @@ exportRouter.post("/image", async (req: Request, res: Response) => {
     if (!data.pngUrl) throw new Error(data.error ?? "Recraft generation failed");
     res.json({ pngUrl: data.pngUrl, imageId: data.imageId });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message });
+    res.status(500).json({ error: err?.message ?? "伺服器錯誤" });
   }
 });
 
@@ -240,6 +240,6 @@ exportRouter.post("/video-start", async (req: Request, res: Response) => {
     // We'd create a job and return jobId for polling
     res.json({ status: "queued", message: "影片生成任務已排入佇列" });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message });
+    res.status(500).json({ error: err?.message ?? "伺服器錯誤" });
   }
 });
