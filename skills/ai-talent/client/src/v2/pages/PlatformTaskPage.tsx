@@ -500,6 +500,40 @@ const EM_TASK_FORMAT_MAP: Record<string, EMActiveFormat> = {
   "em-30-transactional":   "開發 / 交易",
 };
 
+// ── Format category config (PR) ─────────────────────────────────────────────
+type PRActiveFormat =
+  | "all" | "新聞稿" | "文件 / 素材" | "媒體關係" | "社群擴散" | "策略 / 發佈";
+
+const PR_FORMAT_TABS: { id: PRActiveFormat; label: string }[] = [
+  { id: "all",        label: "全部"       },
+  { id: "新聞稿",     label: "新聞稿"     },
+  { id: "文件 / 素材", label: "文件 / 素材" },
+  { id: "媒體關係",   label: "媒體關係"   },
+  { id: "社群擴散",   label: "社群擴散"   },
+  { id: "策略 / 發佈", label: "策略 / 發佈" },
+];
+
+const PR_TASK_FORMAT_MAP: Record<string, PRActiveFormat> = {
+  // 新聞稿
+  "pr-30-headline":          "新聞稿",
+  "pr-30-subhead":           "新聞稿",
+  "pr-30-lead-paragraph":    "新聞稿",
+  "pr-60-news-release-full": "新聞稿",
+  // 文件 / 素材
+  "pr-30-boilerplate":       "文件 / 素材",
+  "pr-30-fact-sheet":        "文件 / 素材",
+  "pr-30-ceo-quote":         "文件 / 素材",
+  // 媒體關係
+  "pr-30-media-pitch":       "媒體關係",
+  "pr-30-spokesperson-qa":   "媒體關係",
+  // 社群擴散
+  "pr-30-launch-social":     "社群擴散",
+  // 策略 / 發佈
+  "pr-30-news-hook":         "策略 / 發佈",
+  "pr-99-launch-toolkit":    "策略 / 發佈",
+  "pr-99-newsjack":          "策略 / 發佈",
+};
+
 // ── FBTaskCard type (same as QuickTask30sPage) ───────────────────────────────
 interface FBTaskCard {
   id: string;
@@ -632,6 +666,8 @@ function PlatformTaskPageInner() {
   const [activeTTFormat, setActiveTTFormat] = useState<TTActiveFormat>("all");
   // Format tab state (used for Email)
   const [activeEMFormat, setActiveEMFormat] = useState<EMActiveFormat>("all");
+  // Format tab state (used for PR)
+  const [activePRFormat, setActivePRFormat] = useState<PRActiveFormat>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -890,6 +926,11 @@ function PlatformTaskPageInner() {
       if (activeEMFormat !== "all") {
         list = list.filter((task) => EM_TASK_FORMAT_MAP[task.id] === activeEMFormat);
       }
+    } else if (platform === "pr") {
+      // Format-based filter for PR
+      if (activePRFormat !== "all") {
+        list = list.filter((task) => PR_TASK_FORMAT_MAP[task.id] === activePRFormat);
+      }
     } else {
       // Tier-based filter for other platforms
       if (activeTier !== "all") {
@@ -908,7 +949,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -982,6 +1023,18 @@ function PlatformTaskPageInner() {
     const counts: Record<string, number> = { all: emTasks.length };
     for (const task of emTasks) {
       const fmt = EM_TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
+
+  // Count tasks per format category (PR)
+  const prFormatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "pr") return {};
+    const prTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: prTasks.length };
+    for (const task of prTasks) {
+      const fmt = PR_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
@@ -1394,6 +1447,41 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveEMFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "pr" ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {PR_FORMAT_TABS.map((tab) => {
+                  const active = activePRFormat === tab.id;
+                  const count = prFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActivePRFormat(tab.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active
