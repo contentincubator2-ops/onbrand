@@ -818,7 +818,7 @@ function PlatformTaskPageInner() {
   return (
     <div>
       {/* ─── HERO ──────────────────────────────────────────────────────── */}
-      <div className="relative pt-24 pb-6 px-6 text-center">
+      <div className="relative pt-8 pb-4 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
 
           {/* Platform eyebrow */}
@@ -885,8 +885,8 @@ function PlatformTaskPageInner() {
 
           {/* ── Format tiles (FB) / Tier tabs (other platforms) ──────── */}
           {platform === "facebook" ? (
-            <div className="w-full overflow-x-auto pb-1 scrollbar-hide" style={{ maxWidth: 740 }}>
-              <div className="flex items-center gap-2 flex-nowrap px-1">
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
                 {FORMAT_TABS.map((tab) => {
                   const active = activeFormat === tab.id;
                   const count = formatCounts[tab.id] ?? 0;
@@ -895,7 +895,7 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap flex-shrink-0"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active
                           ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
@@ -961,52 +961,10 @@ function PlatformTaskPageInner() {
         </div>
       </div>
 
-      {/* ── 推薦起點 — always-visible pinned starter row ── */}
-      {allTasks.length > 0 && (() => {
-        // Pick first 4 "30s" tasks for this platform; fall back to first 4 of any tier
-        const platformTasks = allTasks.filter((t: any) => inferPlatform(t) === platform);
-        const starters: any[] = [
-          ...platformTasks.filter((t: any) => t.tier === "30s"),
-          ...platformTasks.filter((t: any) => t.tier !== "30s"),
-        ].slice(0, 4);
-        if (starters.length === 0) return null;
-        return (
-          <div className="mb-6 px-4 md:px-6 max-w-[1200px] mx-auto">
-            <div className="flex items-center gap-2 mb-3">
-              <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">
-                {lang === "en" ? "Recommended starting points" : "推薦起點"}
-              </p>
-              <div className="flex-1 h-px bg-default-100" />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {starters.map((task: any) => {
-                const days = getLastUsedDays(task.id);
-                return (
-                  <button
-                    key={task.id}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-default-200 bg-default-50 hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
-                    onClick={() => openTask(task)}
-                  >
-                    <span className="text-[12px] font-medium text-default-900 max-w-[180px] truncate">
-                      {lang === "en" ? (task.label_en ?? task.label) : task.label}
-                    </span>
-                    {days !== null ? (
-                      <span className="text-[10px] bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium">
-                        {days === 0 ? (lang === "en" ? "今天" : "今天") : `${days}d ago`}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-default-300 flex-shrink-0">{task.tier ?? "30s"}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
+      {/* 推薦起點 row removed — it duplicated the grid and pushed tiles below fold */}
 
       {/* ─── Task grid ─────────────────────────────────────────────────── */}
-      <div className="max-w-[1200px] mx-auto px-6 pb-20">
+      <div className="max-w-[1200px] mx-auto px-6 pb-20 mt-2">
         {totalForPlatform === 0 ? (
           <Card>
             <CardBody className="text-center text-default-500 py-12">
