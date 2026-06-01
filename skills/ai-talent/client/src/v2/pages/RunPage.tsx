@@ -2409,8 +2409,8 @@ export default function RunPage() {
             />
             <p className="text-tiny text-default-500">
               {lang === "en"
-                ? "Downloads a .ics file — drop it into Google Calendar / Outlook / Apple Calendar. This run is also marked as 'scheduled' in the system."
-                : "產生 .ics 檔下載 — 拖進 Google Calendar / Outlook / Apple Calendar 即可。這個 run 也會在系統內標記為「已排程」。"}
+                ? "Downloads a .ics file — drop it into Google Calendar / Outlook / Apple Calendar. This post also appears in Publishing Calendar so you can track and publish from there."
+                : "產生 .ics 檔下載 — 拖進日曆 App 即可。此貼文同時會出現在「七日發布台」，方便追蹤與一鍵發布。"}
             </p>
           </ModalBody>
           <ModalFooter>
@@ -2419,12 +2419,32 @@ export default function RunPage() {
               color="primary"
               isLoading={scheduleMut.isPending}
               onPress={() => {
+                // Infer platform from taskId prefix so CalendarPage can group by channel.
+                const _tid = (data as any)?.mission?.taskId ?? "";
+                const _pfxMap: Record<string, string> = {
+                  fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+                  li: "linkedin", em: "email", pr: "press",
+                };
+                const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
+                const _platform = (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
+                const _scheduledAt = new Date(scheduleAt).toISOString();
+
                 scheduleMut.mutate({
                   id, variantIndex: activeIdx,
-                  scheduledAt: new Date(scheduleAt).toISOString(),
+                  scheduledAt: _scheduledAt,
                   durationMinutes: 30,
                 }, {
-                  onSuccess: () => setScheduleDialogOpen(false),
+                  onSuccess: () => {
+                    setScheduleDialogOpen(false);
+                    // 2026-06-02: also write to scheduled_posts so the post
+                    // appears on CalendarPage (calendar.range reads that table).
+                    scheduleToCalMut?.mutateAsync?.({
+                      outputId: id,
+                      variantIndex: activeIdx,
+                      platform: _platform,
+                      scheduledAt: _scheduledAt,
+                    }).catch(() => {/* non-fatal — .ics already downloaded */});
+                  },
                 });
               }}
             >{lang === "en" ? "Download .ics" : "下載 .ics"}</Button>
