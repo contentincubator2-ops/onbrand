@@ -210,7 +210,8 @@ export default function EditCellModal({
         platform,
         date,
         caption,
-        imageUrl: imageUrl ?? null,
+        // Normalise: empty string → null so server doesn't trip on url validation
+        imageUrl: (imageUrl && imageUrl.trim() !== "") ? imageUrl : null,
         scheduledAt: new Date(scheduleAt).toISOString(),
       });
       if (r?.ok && r?.scheduledPostId) {

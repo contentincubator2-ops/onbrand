@@ -929,10 +929,15 @@ ${cleaned}
       platform: PlatformZ,
       caption: z.string().min(1).max(3000),
       brandTagline: z.string().nullable().optional(),
+      /** User-supplied prompt override — skips the LLM brief synthesis step. */
+      customPrompt: z.string().max(1000).optional(),
     }))
     .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
-      // 1) Caption → short visual brief
+      // 1) Caption → short visual brief (skip if user provided customPrompt)
       let brief = "";
+      if (input.customPrompt?.trim()) {
+        brief = input.customPrompt.trim();
+      } else
       try {
         const r = await invokeLLM({
           provider: "anthropic",
@@ -1192,7 +1197,7 @@ ${cleaned}
       platform: z.string().min(1).max(32),
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),       // YYYY-MM-DD
       caption: z.string().min(1).max(8000),
-      imageUrl: z.string().url().nullable().optional(),
+      imageUrl: z.string().max(4096).nullable().optional(),
       scheduledAt: z.string(),                               // ISO datetime
     }))
     .mutation(async ({ ctx, input }) => {
