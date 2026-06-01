@@ -26,7 +26,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faClipboard, faClipboardCheck, faRotateRight, faXmark,
   faShare, faCalendarPlus, faEnvelope, faRocket, faFolderPlus,
-  faChevronLeft, faFolderOpen,
+  faChevronLeft, faFolderOpen, faDownload, faChevronDown, faChevronUp,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faLinkedin, faYoutube,
@@ -633,6 +633,107 @@ export default function RunPage() {
   // handleFbConfirmAuth removed (2026-05-30): replaced by polling auto-detection.
   // startFbPolling() detects when Pipedream OAuth completes, then fetches pages.
 
+  // ── Unified schedule-dialog confirm handler ─────────────────────────────
+  // Called by the single Schedule modal for all three modes.
+  const handleScheduleConfirm = React.useCallback(async () => {
+    const _scheduledAt = new Date(scheduleAt).toISOString();
+
+    if (schedMode === "ics") {
+      // Mode A: download .ics only — no navigate
+      const _tid = (data as any)?.mission?.taskId ?? "";
+      const _pfxMap: Record<string, string> = {
+        fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+        li: "linkedin", em: "email", pr: "press",
+      };
+      const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
+      const _platform = (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
+      scheduleMut.mutate({
+        id, variantIndex: activeIdx,
+        scheduledAt: _scheduledAt,
+        durationMinutes: 30,
+      }, {
+        onSuccess: () => {
+          setScheduleDialogOpen(false);
+          // Also register in scheduled_posts (non-fatal) so CalendarPage can see it
+          scheduleToCalMut?.mutateAsync?.({
+            outputId: id, variantIndex: activeIdx,
+            platform: _platform, scheduledAt: _scheduledAt,
+          }).catch(() => {/* non-fatal */});
+        },
+      });
+    } else {
+      // Mode B ("calendar") or Mode C ("publish") — write to scheduled_posts + navigate
+      const _platform = schedMode === "publish"
+        ? schedPlatform
+        : (() => {
+            const _tid = (data as any)?.mission?.taskId ?? "";
+            const _pfxMap: Record<string, string> = {
+              fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+              li: "linkedin", em: "email", pr: "press",
+            };
+            const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
+            return (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
+          })();
+      try {
+        await scheduleToCalMut?.mutateAsync?.({
+          outputId: id, variantIndex: activeIdx,
+          platform: _platform, scheduledAt: _scheduledAt,
+        });
+        setScheduleDialogOpen(false);
+        navigate("/calendar");
+      } catch {
+        // error toast already shown by scheduleToCalMut.onError
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedMode, schedPlatform, scheduleAt, id, activeIdx, data, scheduleMut, scheduleToCalMut, navigate]);
+
+  // ── Bulk .ics export (calendar-type tasks only) ──────────────────────────
+  const handleBulkIcsExport = React.useCallback(() => {
+    const esc = (s: string) => String(s ?? "")
+      .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
+      .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+    const ev: string[] = [];
+    let eventCount = 0;
+    variants.forEach((v: any, i: number) => {
+      const m = /(\d{4})\/(\d{2})\/(\d{2})/.exec(String(v.label ?? ""));
+      if (!m) return;
+      eventCount++;
+      const ymd = `${m[1]}${m[2]}${m[3]}`;
+      const next = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
+      const ymdEnd = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(next.getDate()).padStart(2, "0")}`;
+      const summary = String(v.label ?? "").replace(/^\d{4}\/\d{2}\/\d{2}\s*·\s*/, "");
+      ev.push(
+        "BEGIN:VEVENT",
+        `UID:${id}-${i}@onbrand.sowork.ai`,
+        `DTSTART;VALUE=DATE:${ymd}`,
+        `DTEND;VALUE=DATE:${ymdEnd}`,
+        `SUMMARY:${esc(((data as any)?.brand?.name ? (data as any).brand.name + " · " : "") + summary)}`,
+        `DESCRIPTION:${esc(v.caption ?? "")}`,
+        "END:VEVENT",
+      );
+    });
+    if (ev.length === 0) {
+      showToastGlobal(lang === "en" ? "No dated posts to export" : "沒有可匯出的日期貼文");
+      return;
+    }
+    const ics = [
+      "BEGIN:VCALENDAR", "VERSION:2.0",
+      "PRODID:-//OnBrand//Content Calendar//ZH",
+      "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
+    ].join("\r\n");
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `content-calendar-${id}.ics`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToastGlobal(lang === "en"
+      ? `Exported ${eventCount} posts — drop the .ics into your calendar`
+      : `已匯出 ${eventCount} 篇 — 拖進日曆 App 即可`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variants, id, data, lang]);
+
   // Video gen — async pipeline. Spawn job, poll for status until ready.
   // 2026-05-12 (CJ「我要改成只給腳本 — C」): storyboard mode replaces full
   // video gen. Calls video.generateStoryboard which returns a script with
@@ -726,6 +827,14 @@ export default function RunPage() {
   const [emailRecipients, setEmailRecipients] = useState("");
   const [emailNote, setEmailNote] = useState("");
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  // schedMode: which action triggered the schedule dialog
+  //   "ics"      → download .ics only, no redirect
+  //   "calendar" → write to scheduled_posts + navigate /calendar
+  //   "publish"  → platform-specific write to scheduled_posts + navigate /calendar
+  const [schedMode, setSchedMode] = useState<"ics" | "calendar" | "publish">("ics");
+  const [schedPlatform, setSchedPlatform] = useState("facebook");
+  // publishExpanded: show/hide platform list under 直接發佈
+  const [publishExpanded, setPublishExpanded] = useState(false);
   const [scheduleAt, setScheduleAt] = useState(() => {
     const d = new Date();
     d.setHours(d.getHours() + 24);
@@ -2149,195 +2258,164 @@ export default function RunPage() {
             </Card>
           )}
 
+          {/* 2026-06-02 (CJ): Simplified publish panel — 4 clean actions.
+              直接發佈 / 送到行事曆 / 下載 .ics / 分享連結.
+              Platform list collapses under 直接發佈 to keep the panel compact. */}
           <Card>
-            <CardBody className="space-y-2">
-              {/* ── Platform publish list (P0 redesign 2026-05-30) ── */}
-              <p className="text-tiny font-semibold text-default-500">{lang === "en" ? "Publish to" : "發布到"}</p>
-              {[
-                { key: "facebook",  label: "Facebook",  icon: faFacebook,  color: "#1877F2" },
-                { key: "instagram", label: "Instagram", icon: faInstagram, color: "#E1306C" },
-                { key: "linkedin",  label: "LinkedIn",  icon: faLinkedin,  color: "#0A66C2" },
-                { key: "youtube",   label: "YouTube",   icon: faYoutube,   color: "#FF0000" },
-              ].map((p, idx) => {
-                const isFb        = p.key === "facebook";
-                const pdConn      = (platformsQRun?.data as any)?.connected?.[p.key];
-                const isConnected = isFb ? (fbConnected || fbOauthDone) : !!pdConn;
-                const accountName = isFb
-                  ? ((fbStatusQuery?.data as any)?.fbPageName ?? null)
-                  : (pdConn?.name ?? null);
+            <CardBody className="space-y-2 p-3">
 
-                return (
-                  <div
-                    key={p.key}
-                    className={`flex items-center gap-2 py-1.5${idx < 3 ? " border-b border-default-100" : ""}`}
-                  >
-                    {/* Platform icon */}
-                    <div
-                      className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
-                      style={{ background: p.color + "18" }}
-                    >
-                      <FontAwesomeIcon icon={p.icon} style={{ color: p.color, fontSize: 13 }} />
-                    </div>
+              {/* ── 1. 直接發佈 ──────────────────────────── */}
+              <Button
+                fullWidth color="primary"
+                startContent={<FontAwesomeIcon icon={faRocket} />}
+                endContent={
+                  <FontAwesomeIcon
+                    icon={publishExpanded ? faChevronUp : faChevronDown}
+                    style={{ fontSize: 10, marginLeft: "auto" }}
+                  />
+                }
+                className="justify-start"
+                onPress={() => setPublishExpanded((v) => !v)}
+              >
+                {lang === "en" ? "Direct Publish" : "直接發佈"}
+              </Button>
 
-                    {/* Name + account/status */}
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <p className="text-[12px] font-medium leading-tight text-default-900">{p.label}</p>
-                      <p className="text-[10px] leading-tight truncate" style={{ color: isConnected ? "#16a34a" : "#9ca3af" }}>
-                        {isConnected
-                          ? (accountName ?? (lang === "en" ? "Connected" : "已連接"))
-                          : (lang === "en" ? "Not connected" : "尚未連接")}
-                      </p>
-                    </div>
-
-                    {/* Status dot */}
-                    <div
-                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      style={{ background: isConnected ? "#4ade80" : "#e5e7eb" }}
-                    />
-
-                    {/* Action button */}
-                    {isFb ? (
-                      fbOauthPending ? (
-                        <Button size="sm" variant="flat" isDisabled className="min-w-[58px]">
-                          <span className="animate-spin text-[11px] text-primary">⟳</span>
-                        </Button>
-                      ) : isConnected ? (
-                        <Button
-                          size="sm" color="primary" className="min-w-[68px] text-[10px]"
-                          isLoading={scheduleToCalMut?.isPending}
-                          isDisabled={scheduleToCalMut?.isPending}
-                          onPress={() => handleScheduleToCalendar(p.key)}
-                        >
-                          {lang === "en" ? "→ Calendar" : "排程發布"}
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm" color="primary" variant="flat" className="min-w-[58px] text-[11px]"
-                          isLoading={fbConnectUrlMut?.isPending}
-                          isDisabled={fbConnectUrlMut?.isPending}
-                          onPress={connectFacebookViaUrl}
-                        >
-                          {lang === "en" ? "Connect" : "連接"}
-                        </Button>
-                      )
-                    ) : isConnected ? (
-                      // Non-FB platforms: connected → schedule to calendar, using this row's platform key
-                      <Button
-                        size="sm" color="primary" className="min-w-[68px] text-[10px]"
-                        isLoading={scheduleToCalMut?.isPending}
-                        isDisabled={scheduleToCalMut?.isPending}
-                        onPress={() => handleScheduleToCalendar(p.key)}
+              {/* Expandable platform list */}
+              {publishExpanded && (
+                <div
+                  className="rounded-xl overflow-hidden"
+                  style={{ border: "1px solid #E5E5E5" }}
+                >
+                  {[
+                    { key: "facebook",  label: "Facebook",  icon: faFacebook,  color: "#1877F2" },
+                    { key: "instagram", label: "Instagram", icon: faInstagram, color: "#E1306C" },
+                    { key: "linkedin",  label: "LinkedIn",  icon: faLinkedin,  color: "#0A66C2" },
+                    { key: "youtube",   label: "YouTube",   icon: faYoutube,   color: "#FF0000" },
+                  ].map((p, idx) => {
+                    const isFb        = p.key === "facebook";
+                    const pdConn      = (platformsQRun?.data as any)?.connected?.[p.key];
+                    const isConnected = isFb ? (fbConnected || fbOauthDone) : !!pdConn;
+                    const accountName = isFb
+                      ? ((fbStatusQuery?.data as any)?.fbPageName ?? null)
+                      : (pdConn?.name ?? null);
+                    return (
+                      <div
+                        key={p.key}
+                        className="flex items-center gap-2 px-3 py-2"
+                        style={idx < 3 ? { borderBottom: "1px solid #F5F5F5" } : undefined}
                       >
-                        {lang === "en" ? "→ Calendar" : "排程發布"}
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm" color="default" variant="flat" className="min-w-[58px] text-[11px]"
-                        isLoading={pipedreamBusy}
-                        isDisabled={pipedreamBusy}
-                        onMouseEnter={() => prefetchConnect(p.key as any)}
-                        onFocus={() => prefetchConnect(p.key as any)}
-                        onPress={() => openPipedreamConnect(p.key as any)}
-                      >
-                        {lang === "en" ? "Connect" : "連接"}
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
+                        <div
+                          className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+                          style={{ background: p.color + "18" }}
+                        >
+                          <FontAwesomeIcon icon={p.icon} style={{ color: p.color, fontSize: 11 }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium leading-tight text-default-900">{p.label}</p>
+                          <p className="text-[9px] leading-tight truncate" style={{ color: isConnected ? "#16a34a" : "#9ca3af" }}>
+                            {isConnected
+                              ? (accountName ?? (lang === "en" ? "Connected" : "已連接"))
+                              : (lang === "en" ? "Not connected" : "尚未連接")}
+                          </p>
+                        </div>
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: isConnected ? "#4ade80" : "#e5e7eb" }} />
+                        {isFb ? (
+                          fbOauthPending ? (
+                            <Button size="sm" variant="flat" isDisabled className="min-w-[52px] text-[10px]">
+                              <span className="animate-spin text-primary">⟳</span>
+                            </Button>
+                          ) : isConnected ? (
+                            <Button
+                              size="sm" color="primary" className="min-w-[52px] text-[10px]"
+                              isLoading={scheduleToCalMut?.isPending}
+                              isDisabled={scheduleToCalMut?.isPending}
+                              onPress={() => {
+                                setSchedPlatform("facebook");
+                                setSchedMode("publish");
+                                setScheduleDialogOpen(true);
+                              }}
+                            >
+                              {lang === "en" ? "Publish" : "發布"}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm" color="primary" variant="flat" className="min-w-[52px] text-[10px]"
+                              isLoading={fbConnectUrlMut?.isPending}
+                              isDisabled={fbConnectUrlMut?.isPending}
+                              onPress={connectFacebookViaUrl}
+                            >
+                              {lang === "en" ? "Connect" : "連接"}
+                            </Button>
+                          )
+                        ) : isConnected ? (
+                          <Button
+                            size="sm" color="primary" className="min-w-[52px] text-[10px]"
+                            isLoading={scheduleToCalMut?.isPending}
+                            isDisabled={scheduleToCalMut?.isPending}
+                            onPress={() => {
+                              setSchedPlatform(p.key);
+                              setSchedMode("publish");
+                              setScheduleDialogOpen(true);
+                            }}
+                          >
+                            {lang === "en" ? "Publish" : "發布"}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm" color="default" variant="flat" className="min-w-[52px] text-[10px]"
+                            isLoading={pipedreamBusy}
+                            isDisabled={pipedreamBusy}
+                            onMouseEnter={() => prefetchConnect(p.key as any)}
+                            onFocus={() => prefetchConnect(p.key as any)}
+                            onPress={() => openPipedreamConnect(p.key as any)}
+                          >
+                            {lang === "en" ? "Connect" : "連接"}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ height: 1, background: "#F5F5F5", margin: "2px 0" }} />
+
+              {/* ── 2. 送到行事曆 ─────────────────────────── */}
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
-                onPress={() => setScheduleDialogOpen(true)}
-              >{t("run_schedule_btn")}</Button>
-              {/* 2026-05-18 (CJ「批量下載到行事曆」): calendar tasks export
-                  ALL posts as one .ics (one all-day VEVENT per post on
-                  its date, parsed from the variant label prefix). */}
-              {(data?.mission?.taskId ?? "").includes("calendar") && variants.length > 1 && (
-                <Button
-                  variant="flat" fullWidth color="secondary"
-                  startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
-                  onPress={() => {
-                    const esc = (s: string) => String(s ?? "")
-                      .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
-                      .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-                    const ev: string[] = [];
-                    let eventCount = 0;
-                    variants.forEach((v: any, i: number) => {
-                      const m = /(\d{4})\/(\d{2})\/(\d{2})/.exec(String(v.label ?? ""));
-                      if (!m) return;
-                      eventCount++;
-                      const ymd = `${m[1]}${m[2]}${m[3]}`;
-                      const next = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
-                      const ymdEnd = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(next.getDate()).padStart(2, "0")}`;
-                      const summary = String(v.label ?? "").replace(/^\d{4}\/\d{2}\/\d{2}\s*·\s*/, "");
-                      ev.push(
-                        "BEGIN:VEVENT",
-                        `UID:${id}-${i}@onbrand.sowork.ai`,
-                        `DTSTART;VALUE=DATE:${ymd}`,
-                        `DTEND;VALUE=DATE:${ymdEnd}`,
-                        `SUMMARY:${esc((data?.brand?.name ? data.brand.name + " · " : "") + summary)}`,
-                        `DESCRIPTION:${esc(v.caption ?? "")}`,
-                        "END:VEVENT",
-                      );
-                    });
-                    if (ev.length === 0) {
-                      showToastGlobal(lang === "en" ? "No dated posts to export" : "沒有可匯出的日期貼文");
-                      return;
-                    }
-                    const ics = [
-                      "BEGIN:VCALENDAR", "VERSION:2.0",
-                      "PRODID:-//OnBrand//Content Calendar//ZH",
-                      "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
-                    ].join("\r\n");
-                    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-                    const a = document.createElement("a");
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `content-calendar-${id}.ics`;
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                    showToastGlobal(
-                      lang === "en"
-                        ? `Exported ${eventCount} posts — drop the .ics into your calendar`
-                        : `已匯出 ${eventCount} 篇 — 拖進日曆 App 即可`
-                    );
-                  }}
-                >{lang === "en" ? "Download all to calendar (.ics)" : "批量下載到行事曆（全部 .ics）"}</Button>
-              )}
-              {/* 2026-05-12 (CJ「移除寄給團隊」+「先移除 agency 邀請團隊的設計」):
-                  寄給團隊 button removed. Email dialog code kept in file but
-                  unreachable — can resurrect later if team review re-enabled. */}
-              {/* 2026-05-11 (CJ feedback「存 Mission 沒有成功反饋」):
-                  - 成功後 button 變綠色 + 顯示「✓ 已存到 /projects」
-                  - 加 link 到 /projects 讓用戶能立刻去看 */}
-              {/* 2026-05-19 (CJ「任務完成不用按存也要出現在專案」):
-                  任務完成時 recordTaskRun 已自動寫入 mission_outputs，
-                  此按鈕只是將 status 從 draft → approved（核准標記）。
-                  改名為「核准此版本」避免誤導用戶以為要手動存才會記錄。 */}
-              <div className="text-[10px] text-default-400 text-center px-1 leading-relaxed">
-                {lang === "en"
-                  ? "✓ Auto-saved to Projects — no action needed"
-                  : "✓ 任務完成即自動記錄到專案，無需手動儲存"}
-              </div>
+                onPress={() => {
+                  setSchedMode("calendar");
+                  setScheduleDialogOpen(true);
+                }}
+              >
+                {lang === "en" ? "Add to Calendar" : "送到行事曆"}
+              </Button>
+
+              {/* ── 3. 下載 .ics ──────────────────────────── */}
               <Button
                 variant="flat" fullWidth
-                startContent={<FontAwesomeIcon icon={data.status === "approved" ? faClipboardCheck : faFolderPlus} />}
-                color={data.status === "approved" ? "success" : "default"}
-                isDisabled={data.status === "approved" || statusMut.isPending}
-                isLoading={statusMut.isPending}
-                onPress={() => statusMut.mutate({ id, status: "approved" })}
+                startContent={<FontAwesomeIcon icon={faDownload} />}
+                onPress={() => {
+                  setSchedMode("ics");
+                  setScheduleDialogOpen(true);
+                }}
               >
-                {data.status === "approved"
-                  ? (lang === "en" ? "✓ Approved" : "✓ 已核准")
-                  : (lang === "en" ? "Approve this version" : "核准此版本")}
+                {lang === "en" ? "Download .ics" : "下載 .ics"}
               </Button>
-              <button
-                onClick={() => navigate("/projects")}
-                className="text-[11px] text-secondary hover:underline text-center"
-              >{lang === "en" ? "→ Open Projects" : "→ 去專案頁"}</button>
-              {/* 2026-05-09 (CJ): removed 複製文字 here — duplicates the
-                  toolbar 📋 複製文案 button. Keep only 複製此頁網址 (different
-                  function: shares the run URL, not the caption). */}
+
+              {/* Bulk export — calendar-type tasks only */}
+              {(data?.mission?.taskId ?? "").includes("calendar") && variants.length > 1 && (
+                <Button
+                  variant="flat" fullWidth size="sm" color="secondary"
+                  startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
+                  onPress={handleBulkIcsExport}
+                >
+                  {lang === "en" ? "Export all to calendar (.ics)" : "批量下載到行事曆（全部 .ics）"}
+                </Button>
+              )}
+
+              {/* ── 4. 分享連結 ───────────────────────────── */}
               <Button
                 variant="light" fullWidth size="sm"
                 startContent={<FontAwesomeIcon icon={faShare} />}
@@ -2346,8 +2424,16 @@ export default function RunPage() {
                   showToastGlobal(t("toast_link_copied"));
                 }}
               >
-                {t("run_copy_link")}
+                {lang === "en" ? "Share link" : "分享連結"}
               </Button>
+
+              {/* Auto-save note — always true, no action needed */}
+              <div className="text-[10px] text-default-400 text-center px-1 leading-relaxed">
+                {lang === "en"
+                  ? "✓ Auto-saved to Projects — no action needed"
+                  : "✓ 任務完成即自動記錄到專案，無需手動儲存"}
+              </div>
+
             </CardBody>
           </Card>
         </aside>
@@ -2396,10 +2482,21 @@ export default function RunPage() {
         </ModalContent>
       </Modal>
 
-      {/* ── SCHEDULE DIALOG ─────────────────────────────────────────── */}
+      {/* ── UNIFIED SCHEDULE DIALOG ────────────────────────────────────
+          Three modes controlled by schedMode state:
+          "ics"      → download .ics file only
+          "calendar" → write to scheduled_posts + navigate to /calendar
+          "publish"  → platform-specific write + navigate to /calendar
+          ─────────────────────────────────────────────────────────── */}
       <Modal isOpen={scheduleDialogOpen} onClose={() => setScheduleDialogOpen(false)} size="sm">
         <ModalContent>
-          <ModalHeader className="text-base">{lang === "en" ? "Schedule publish time" : "排程發布時間"}</ModalHeader>
+          <ModalHeader className="text-base">
+            {schedMode === "ics"
+              ? (lang === "en" ? "Download .ics" : "下載 .ics")
+              : schedMode === "calendar"
+              ? (lang === "en" ? "Add to Calendar" : "排程到行事曆")
+              : (lang === "en" ? `Publish — ${schedPlatform}` : `排程發布 — ${schedPlatform}`)}
+          </ModalHeader>
           <ModalBody className="space-y-3">
             <Input
               type="datetime-local"
@@ -2408,46 +2505,30 @@ export default function RunPage() {
               onChange={(e) => setScheduleAt(e.target.value)}
             />
             <p className="text-tiny text-default-500">
-              {lang === "en"
-                ? "Downloads a .ics file — drop it into Google Calendar / Outlook / Apple Calendar. This post also appears in Publishing Calendar so you can track and publish from there."
-                : "產生 .ics 檔下載 — 拖進日曆 App 即可。此貼文同時會出現在「七日發布台」，方便追蹤與一鍵發布。"}
+              {schedMode === "ics"
+                ? (lang === "en"
+                  ? "Downloads a .ics file — drag into Google Calendar / Outlook / Apple Calendar."
+                  : "產生 .ics 檔 — 拖進 Google Calendar / Outlook / Apple Calendar 即可。")
+                : schedMode === "calendar"
+                ? (lang === "en"
+                  ? "Adds this post to Publishing Calendar. You can track it and publish from the Calendar page."
+                  : "將此貼文加入七日發布台。確認後自動跳轉行事曆頁面，可在那裡追蹤並一鍵發布。")
+                : (lang === "en"
+                  ? `Schedules this post to ${schedPlatform}. After confirming you'll be taken to the Calendar page to publish.`
+                  : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡一鍵發布。`)}
             </p>
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={() => setScheduleDialogOpen(false)}>{t("cancel")}</Button>
             <Button
               color="primary"
-              isLoading={scheduleMut.isPending}
-              onPress={() => {
-                // Infer platform from taskId prefix so CalendarPage can group by channel.
-                const _tid = (data as any)?.mission?.taskId ?? "";
-                const _pfxMap: Record<string, string> = {
-                  fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
-                  li: "linkedin", em: "email", pr: "press",
-                };
-                const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
-                const _platform = (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
-                const _scheduledAt = new Date(scheduleAt).toISOString();
-
-                scheduleMut.mutate({
-                  id, variantIndex: activeIdx,
-                  scheduledAt: _scheduledAt,
-                  durationMinutes: 30,
-                }, {
-                  onSuccess: () => {
-                    setScheduleDialogOpen(false);
-                    // 2026-06-02: also write to scheduled_posts so the post
-                    // appears on CalendarPage (calendar.range reads that table).
-                    scheduleToCalMut?.mutateAsync?.({
-                      outputId: id,
-                      variantIndex: activeIdx,
-                      platform: _platform,
-                      scheduledAt: _scheduledAt,
-                    }).catch(() => {/* non-fatal — .ics already downloaded */});
-                  },
-                });
-              }}
-            >{lang === "en" ? "Download .ics" : "下載 .ics"}</Button>
+              isLoading={schedMode === "ics" ? scheduleMut.isPending : (scheduleToCalMut?.isPending ?? false)}
+              onPress={handleScheduleConfirm}
+            >
+              {schedMode === "ics"
+                ? (lang === "en" ? "Download" : "下載")
+                : (lang === "en" ? "Confirm" : "確認排程")}
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
