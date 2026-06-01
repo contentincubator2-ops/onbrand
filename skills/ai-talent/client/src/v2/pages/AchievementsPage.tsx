@@ -174,9 +174,9 @@ export default function AchievementsPage() {
                         onClick={() => s.ctaPath && navigate(s.ctaPath)}
                         className="text-left px-4 py-3 rounded-lg border border-neutral-200 hover:border-neutral-900 hover:bg-neutral-50 transition group"
                       >
-                        <p className="text-sm font-semibold text-neutral-900 mb-0.5">{s.title}</p>
+                        <p className="text-sm font-semibold text-neutral-900 mb-0.5">{typeof s.title === "string" ? s.title : String(s.title ?? "")}</p>
                         <p className="text-xs text-neutral-500 group-hover:text-neutral-700 flex items-center gap-1">
-                          {s.ctaText ?? (lang === "en" ? "Go" : "前往")} <ChevronRight size={11} />
+                          {(typeof s.ctaText === "string" ? s.ctaText : null) ?? (lang === "en" ? "Go" : "前往")} <ChevronRight size={11} />
                         </p>
                       </button>
                     ))}
@@ -287,10 +287,10 @@ export default function AchievementsPage() {
                         <p className={`text-sm font-semibold mb-0.5 ${
                           a.unlocked ? "text-neutral-900" : "text-neutral-500"
                         }`}>
-                          {a.title}
+                          {typeof a.title === "string" ? a.title : String(a.title ?? "")}
                         </p>
                         <p className="text-xs text-neutral-500 leading-relaxed mb-2">
-                          {a.description}
+                          {typeof a.description === "string" ? a.description : String(a.description ?? "")}
                         </p>
                         <div className="flex items-center justify-between">
                           <span className={`text-[10px] font-mono ${a.unlocked ? "text-neutral-700" : "text-neutral-400"}`}>
@@ -301,7 +301,7 @@ export default function AchievementsPage() {
                               to={a.ctaPath}
                               className="text-[11px] text-neutral-900 hover:underline font-medium"
                             >
-                              {a.ctaText ?? (lang === "en" ? "Go" : "前往")} →
+                              {(typeof a.ctaText === "string" ? a.ctaText : null) ?? (lang === "en" ? "Go" : "前往")} →
                             </Link>
                           )}
                           {a.unlocked && (

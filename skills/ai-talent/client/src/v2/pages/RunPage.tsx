@@ -1943,13 +1943,13 @@ export default function RunPage() {
                               )}
                               <div className="p-2 space-y-1">
                                 <p className="text-[10px] font-semibold text-secondary-700">
-                                  Scene {i + 1} · {scene.durationSec ?? "?"}s · {scene.cameraMove || "static"}
+                                  Scene {i + 1} · {typeof scene.durationSec === "number" ? scene.durationSec : (scene.durationSec ?? "?")}s · {typeof scene.cameraMove === "string" ? scene.cameraMove : "static"}
                                 </p>
                                 <p className="text-[11px] text-default-700 leading-snug">
-                                  <span className="text-default-500">{lang === "en" ? "Visual: " : "畫面："}</span>{scene.visualPrompt}
+                                  <span className="text-default-500">{lang === "en" ? "Visual: " : "畫面："}</span>{typeof scene.visualPrompt === "string" ? scene.visualPrompt : ""}
                                 </p>
                                 <p className="text-[11px] text-default-700 leading-snug">
-                                  <span className="text-default-500">{lang === "en" ? "Voiceover: " : "旁白："}</span>{scene.narration}
+                                  <span className="text-default-500">{lang === "en" ? "Voiceover: " : "旁白："}</span>{typeof scene.narration === "string" ? scene.narration : ""}
                                 </p>
                               </div>
                             </div>
