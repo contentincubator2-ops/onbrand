@@ -332,6 +332,49 @@ const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
   "ig-99-radical-transparency":  "策略 / 月曆",
 };
 
+// ── Format category config (LI) ─────────────────────────────────────────────
+type LIActiveFormat =
+  | "all" | "貼文" | "Article 長文" | "投票"
+  | "Newsletter" | "Document" | "Thought Leadership" | "客戶案例" | "個人頁 / 觸達";
+
+const LI_FORMAT_TABS: { id: LIActiveFormat; label: string }[] = [
+  { id: "all",                label: "全部"              },
+  { id: "貼文",               label: "貼文"              },
+  { id: "Article 長文",       label: "Article 長文"      },
+  { id: "投票",               label: "投票"              },
+  { id: "Newsletter",         label: "Newsletter"        },
+  { id: "Document",           label: "Document"          },
+  { id: "Thought Leadership", label: "Thought Leadership"},
+  { id: "客戶案例",           label: "客戶案例"          },
+  { id: "個人頁 / 觸達",      label: "個人頁 / 觸達"     },
+];
+
+const LI_TASK_FORMAT_MAP: Record<string, LIActiveFormat> = {
+  // 貼文
+  "li-30-insight-post":            "貼文",
+  "li-30-hook-3":                  "貼文",
+  "li-30-event-invite":            "貼文",
+  // Article 長文
+  "li-30-article-opener":          "Article 長文",
+  // 投票
+  "li-30-poll":                    "投票",
+  // Newsletter
+  "li-30-newsletter":              "Newsletter",
+  "li-60-newsletter":              "Newsletter",
+  "li-99-newsletter-quarterly":    "Newsletter",
+  // Document
+  "li-30-document":                "Document",
+  // Thought Leadership
+  "li-60-thought-leader":          "Thought Leadership",
+  "li-99-30day-thought-leadership":"Thought Leadership",
+  // 客戶案例
+  "li-60-case-study":              "客戶案例",
+  // 個人頁 / 觸達
+  "li-30-dm-intro":                "個人頁 / 觸達",
+  "li-30-comment":                 "個人頁 / 觸達",
+  "li-30-headline":                "個人頁 / 觸達",
+};
+
 // ── FBTaskCard type (same as QuickTask30sPage) ───────────────────────────────
 interface FBTaskCard {
   id: string;
@@ -456,6 +499,8 @@ function PlatformTaskPageInner() {
   const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
   // Format tab state (used for IG)
   const [activeIGFormat, setActiveIGFormat] = useState<IGActiveFormat>("all");
+  // Format tab state (used for LI)
+  const [activeLIFormat, setActiveLIFormat] = useState<LIActiveFormat>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -694,6 +739,11 @@ function PlatformTaskPageInner() {
       if (activeIGFormat !== "all") {
         list = list.filter((task) => IG_TASK_FORMAT_MAP[task.id] === activeIGFormat);
       }
+    } else if (platform === "linkedin") {
+      // Format-based filter for LI
+      if (activeLIFormat !== "all") {
+        list = list.filter((task) => LI_TASK_FORMAT_MAP[task.id] === activeLIFormat);
+      }
     } else {
       // Tier-based filter for other platforms
       if (activeTier !== "all") {
@@ -712,7 +762,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -738,6 +788,18 @@ function PlatformTaskPageInner() {
     const counts: Record<string, number> = { all: igTasks.length };
     for (const task of igTasks) {
       const fmt = IG_TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
+
+  // Count tasks per format category (LI)
+  const liFormatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "linkedin") return {};
+    const liTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: liTasks.length };
+    for (const task of liTasks) {
+      const fmt = LI_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
@@ -1010,6 +1072,41 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveIGFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "linkedin" ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {LI_FORMAT_TABS.map((tab) => {
+                  const active = activeLIFormat === tab.id;
+                  const count = liFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveLIFormat(tab.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active
