@@ -461,6 +461,45 @@ const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
   "tt-99-trend-week":       "系列 / 策略",
 };
 
+// ── Format category config (Email) ──────────────────────────────────────────
+type EMActiveFormat =
+  | "all" | "主旨 / 預覽" | "Newsletter / 培育"
+  | "促銷 / 發佈" | "歡迎 / Onboarding" | "挽回 / 再活化" | "開發 / 交易";
+
+const EM_FORMAT_TABS: { id: EMActiveFormat; label: string }[] = [
+  { id: "all",              label: "全部"             },
+  { id: "主旨 / 預覽",      label: "主旨 / 預覽"      },
+  { id: "Newsletter / 培育",label: "Newsletter / 培育" },
+  { id: "促銷 / 發佈",      label: "促銷 / 發佈"      },
+  { id: "歡迎 / Onboarding",label: "歡迎 / Onboarding" },
+  { id: "挽回 / 再活化",    label: "挽回 / 再活化"    },
+  { id: "開發 / 交易",      label: "開發 / 交易"      },
+];
+
+const EM_TASK_FORMAT_MAP: Record<string, EMActiveFormat> = {
+  // 主旨 / 預覽
+  "em-30-subject-line":    "主旨 / 預覽",
+  "em-30-preview-text":    "主旨 / 預覽",
+  // Newsletter / 培育
+  "em-60-newsletter-full": "Newsletter / 培育",
+  "em-30-drip":            "Newsletter / 培育",
+  "em-99-4week-nurture":   "Newsletter / 培育",
+  // 促銷 / 發佈
+  "em-30-promo":           "促銷 / 發佈",
+  "em-30-event-invite":    "促銷 / 發佈",
+  "em-60-promo-sequence":  "促銷 / 發佈",
+  "em-99-launch-sequence": "促銷 / 發佈",
+  // 歡迎 / Onboarding
+  "em-30-welcome":         "歡迎 / Onboarding",
+  "em-60-onboarding-3":    "歡迎 / Onboarding",
+  // 挽回 / 再活化
+  "em-30-abandoned-cart":  "挽回 / 再活化",
+  "em-30-re-engagement":   "挽回 / 再活化",
+  // 開發 / 交易
+  "em-30-cold-email":      "開發 / 交易",
+  "em-30-transactional":   "開發 / 交易",
+};
+
 // ── FBTaskCard type (same as QuickTask30sPage) ───────────────────────────────
 interface FBTaskCard {
   id: string;
@@ -591,6 +630,8 @@ function PlatformTaskPageInner() {
   const [activeYTFormat, setActiveYTFormat] = useState<YTActiveFormat>("all");
   // Format tab state (used for TikTok)
   const [activeTTFormat, setActiveTTFormat] = useState<TTActiveFormat>("all");
+  // Format tab state (used for Email)
+  const [activeEMFormat, setActiveEMFormat] = useState<EMActiveFormat>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -844,6 +885,11 @@ function PlatformTaskPageInner() {
       if (activeTTFormat !== "all") {
         list = list.filter((task) => TT_TASK_FORMAT_MAP[task.id] === activeTTFormat);
       }
+    } else if (platform === "email") {
+      // Format-based filter for Email
+      if (activeEMFormat !== "all") {
+        list = list.filter((task) => EM_TASK_FORMAT_MAP[task.id] === activeEMFormat);
+      }
     } else {
       // Tier-based filter for other platforms
       if (activeTier !== "all") {
@@ -862,7 +908,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -924,6 +970,18 @@ function PlatformTaskPageInner() {
     const counts: Record<string, number> = { all: ttTasks.length };
     for (const task of ttTasks) {
       const fmt = TT_TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
+
+  // Count tasks per format category (Email)
+  const emFormatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "email") return {};
+    const emTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: emTasks.length };
+    for (const task of emTasks) {
+      const fmt = EM_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
@@ -1301,6 +1359,41 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTTFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "email" ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {EM_FORMAT_TABS.map((tab) => {
+                  const active = activeEMFormat === tab.id;
+                  const count = emFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveEMFormat(tab.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active
