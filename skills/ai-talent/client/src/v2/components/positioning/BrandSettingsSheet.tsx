@@ -25,6 +25,8 @@ import { faGlobe } from "@fortawesome/free-solid-svg-icons";
 import AIPromptsEditor from "./AIPromptsEditor";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
+import { useNavigate } from "react-router-dom";
+import { showToastGlobal } from "../../components/ui/Toast";
 
 // 2026-05-30 (CJ「modal 只留設定類 tab，內容類交給主頁面」):
 // 基本資料 和 視覺 都已在主工作區有完整 tab，不在 modal 重複。
@@ -932,8 +934,31 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 export function DangerTab({ brandId, brandName, onClose }: { brandId: number | null; brandName: string | null; onClose: () => void }) {
   const { lang } = useLang();
   const en = lang === "en";
-  // onClose retained for API compatibility
-  void onClose;
+  const navigate = useNavigate();
+  const [confirmed, setConfirmed] = useState(false);
+
+  const deleteMut = (trpc as any).brand?.delete?.useMutation
+    ? (trpc as any).brand.delete.useMutation({
+        onSuccess: () => {
+          showToastGlobal(en ? `Brand "${brandName ?? brandId}" deleted` : `品牌「${brandName ?? brandId}」已刪除`, "success");
+          onClose();
+          navigate("/brands");
+        },
+        onError: (e: any) => {
+          showToastGlobal((typeof e?.message === "string" ? e.message : null) ?? (en ? "Delete failed" : "刪除失敗"));
+        },
+      })
+    : null;
+
+  const handleDelete = () => {
+    if (!brandId || !deleteMut) return;
+    if (!confirmed) {
+      setConfirmed(true);
+      return;
+    }
+    deleteMut.mutate({ id: brandId });
+  };
+
   return (
     <div className="max-w-[700px] mx-auto p-8">
       <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Danger zone" : "危險區"}</h2>
@@ -942,12 +967,30 @@ export function DangerTab({ brandId, brandName, onClose }: { brandId: number | n
         <h3 className="font-semibold text-danger-800 mb-1.5">{en ? "Delete brand" : "刪除品牌"}</h3>
         <p className="text-sm text-default-700 mb-4">
           {en
-            ? <>This permanently deletes "{brandName ?? brandId}" and all its positioning / copy / visual / knowledge data. Linked products and events will be orphaned. **This cannot be undone**.</>
-            : <>這會永久刪除「{brandName ?? brandId}」及其所有定位 / 文字 / 視覺 / 知識資料。對應的產品、活動會變成孤兒。**此動作不可復原**。</>}
+            ? <>This permanently deletes &ldquo;{brandName ?? brandId}&rdquo; and all its positioning / copy / visual / knowledge data. Linked products and events will be orphaned. <strong>This cannot be undone.</strong></>
+            : <>這會永久刪除「{brandName ?? brandId}」及其所有定位 / 文字 / 視覺 / 知識資料。對應的產品、活動會變成孤兒。<strong>此動作不可復原。</strong></>}
         </p>
-        <Button color="danger" variant="bordered" isDisabled>
-          {en ? "Delete (coming soon)" : "刪除（接下來會接上）"}
+        {confirmed && (
+          <p className="text-sm font-semibold text-danger-700 mb-3">
+            {en ? "⚠ Are you sure? Click again to confirm deletion." : "⚠ 確定嗎？再按一次確認刪除。"}
+          </p>
+        )}
+        <Button
+          color="danger"
+          variant={confirmed ? "solid" : "bordered"}
+          isDisabled={!brandId || !deleteMut || deleteMut?.isPending}
+          isLoading={deleteMut?.isPending}
+          onPress={handleDelete}
+        >
+          {confirmed
+            ? (en ? "Confirm delete" : "確認刪除")
+            : (en ? "Delete brand" : "刪除品牌")}
         </Button>
+        {confirmed && (
+          <Button variant="light" className="ml-2" onPress={() => setConfirmed(false)}>
+            {en ? "Cancel" : "取消"}
+          </Button>
+        )}
       </div>
     </div>
   );
