@@ -1,0 +1,26 @@
+name: Ops — Check exact Google CLIENT_ID in .env
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 30s
+          script: |
+            ENV=/opt/onbrand/app/skills/ai-talent/.env
+            echo "════ Full GOOGLE_CLIENT_ID in .env ════"
+            grep "^GOOGLE_CLIENT_ID=" "$ENV" || echo "NOT FOUND"
+            echo ""
+            echo "════ Full GOOGLE_CLIENT_SECRET length + first 10 chars ════"
+            val=$(grep "^GOOGLE_CLIENT_SECRET=" "$ENV" | cut -d= -f2-)
+            echo "  length=${#val}  prefix=${val:0:10}"
+            echo ""
+            echo "════ What server actually sends to Google ════"
+            curl -sv http://127.0.0.1:3101/api/auth/google 2>&1 | grep -i "location:" | head -1
