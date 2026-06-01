@@ -271,6 +271,67 @@ const TASK_FORMAT_MAP: Record<string, ActiveFormat> = {
   "fb-90-crisis-full":            "互動 / 工具",
 };
 
+// ── Format category config (IG) ─────────────────────────────────────────────
+type IGActiveFormat =
+  | "all" | "Feed 貼文" | "Reels" | "Carousel 輪播"
+  | "Story 限時" | "Live 直播" | "個人頁" | "互動 / 工具" | "策略 / 月曆";
+
+const IG_FORMAT_TABS: { id: IGActiveFormat; label: string }[] = [
+  { id: "all",            label: "全部"           },
+  { id: "Feed 貼文",      label: "Feed 貼文"      },
+  { id: "Reels",          label: "Reels"          },
+  { id: "Carousel 輪播",  label: "Carousel 輪播"  },
+  { id: "Story 限時",     label: "Story 限時"     },
+  { id: "Live 直播",      label: "Live 直播"      },
+  { id: "個人頁",         label: "個人頁"         },
+  { id: "互動 / 工具",    label: "互動 / 工具"    },
+  { id: "策略 / 月曆",    label: "策略 / 月曆"    },
+];
+
+const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
+  // Feed 貼文
+  "ig-30-caption-short":         "Feed 貼文",
+  "ig-30-pure-text-hook":        "Feed 貼文",
+  "ig-30-hashtag-set":           "Feed 貼文",
+  "ig-60-feed-full":             "Feed 貼文",
+  "ig-60-countdown-5day":        "Feed 貼文",
+  "ig-60-serial-3":              "Feed 貼文",
+  "ig-60-viral-rewrite":         "Feed 貼文",
+  "ig-60-testimonial-rewrite":   "Feed 貼文",
+  // Reels
+  "ig-30-reel-hook":             "Reels",
+  "ig-30-reel-script-full":      "Reels",
+  "ig-60-reel-full":             "Reels",
+  "ig-99-reel-series-6":         "Reels",
+  // Carousel 輪播
+  "ig-30-carousel-structure":    "Carousel 輪播",
+  "ig-60-carousel-7":            "Carousel 輪播",
+  "ig-99-save-worthy":           "Carousel 輪播",
+  // Story 限時
+  "ig-30-story-text":            "Story 限時",
+  "ig-30-story-repost-strategy": "Story 限時",
+  "ig-60-story-3frame":          "Story 限時",
+  // Live 直播
+  "ig-30-live-opening":          "Live 直播",
+  "ig-60-live-suite":            "Live 直播",
+  // 個人頁
+  "ig-30-bio-rewrite":           "個人頁",
+  "ig-60-highlight-suite":       "個人頁",
+  "ig-99-account-reposition":    "個人頁",
+  // 互動 / 工具
+  "ig-30-comment-reply":         "互動 / 工具",
+  "ig-30-dm-script":             "互動 / 工具",
+  "ig-30-threads-cross-post":    "互動 / 工具",
+  // 策略 / 月曆
+  "ig-99-monthly-calendar":      "策略 / 月曆",
+  "ig-99-30day-calendar":        "策略 / 月曆",
+  "ig-99-youtility":             "策略 / 月曆",
+  "ig-99-visual-story":          "策略 / 月曆",
+  "ig-99-live-first":            "策略 / 月曆",
+  "ig-99-document":              "策略 / 月曆",
+  "ig-99-radical-transparency":  "策略 / 月曆",
+};
+
 // ── FBTaskCard type (same as QuickTask30sPage) ───────────────────────────────
 interface FBTaskCard {
   id: string;
@@ -389,10 +450,12 @@ function PlatformTaskPageInner() {
     return v("voice") && v("voice_principles") && v("preferred_terms") && v("banned_words");
   }, [brandAssetsForCheck, brandQuery?.data]);
 
-  // Tier tab state (used for non-FB platforms)
+  // Tier tab state (used for non-FB/non-IG platforms)
   const [activeTier, setActiveTier] = useState<ActiveTier>("all");
   // Format tab state (used for FB)
   const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
+  // Format tab state (used for IG)
+  const [activeIGFormat, setActiveIGFormat] = useState<IGActiveFormat>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -626,6 +689,11 @@ function PlatformTaskPageInner() {
       if (activeFormat !== "all") {
         list = list.filter((task) => TASK_FORMAT_MAP[task.id] === activeFormat);
       }
+    } else if (platform === "instagram") {
+      // Format-based filter for IG
+      if (activeIGFormat !== "all") {
+        list = list.filter((task) => IG_TASK_FORMAT_MAP[task.id] === activeIGFormat);
+      }
     } else {
       // Tier-based filter for other platforms
       if (activeTier !== "all") {
@@ -644,20 +712,32 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
     [allTasks, platform],
   );
 
-  // Count tasks per format category (FB only)
+  // Count tasks per format category (FB)
   const formatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "facebook") return {};
     const fbTasks = allTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: fbTasks.length };
     for (const task of fbTasks) {
       const fmt = TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
+
+  // Count tasks per format category (IG)
+  const igFormatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "instagram") return {};
+    const igTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: igTasks.length };
+    for (const task of igTasks) {
+      const fmt = IG_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
@@ -883,7 +963,7 @@ function PlatformTaskPageInner() {
             />
           </div>
 
-          {/* ── Format tiles (FB) / Tier tabs (other platforms) ──────── */}
+          {/* ── Format tiles (FB) / Format tiles (IG) / Tier tabs (other) ── */}
           {platform === "facebook" ? (
             <div className="w-full" style={{ maxWidth: 860 }}>
               <div className="flex items-center gap-2 flex-wrap justify-center">
@@ -895,6 +975,41 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "instagram" ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {IG_FORMAT_TABS.map((tab) => {
+                  const active = activeIGFormat === tab.id;
+                  const count = igFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveIGFormat(tab.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active
