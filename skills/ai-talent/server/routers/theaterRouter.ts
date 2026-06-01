@@ -12,6 +12,7 @@
  * blocks the rest.
  */
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getBrandPositioningById } from "../positioningBridge";
 import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
@@ -1172,5 +1173,74 @@ ${cleaned}
     }))
     .mutation(async () => {
       return { ok: true as const };
+    }),
+
+  /**
+   * scheduleCell — saves Theater-generated content to the DB and creates a
+   * scheduled_post entry so it shows up on the Calendar page.
+   *
+   * Theater content lives only in localStorage; this mutation persists it:
+   *   1. INSERT INTO missions (synthetic "Theater" mission for this cell)
+   *   2. INSERT INTO mission_outputs (the caption + optional imageUrl)
+   *   3. INSERT INTO scheduled_posts (the pending future post)
+   *
+   * Returns { scheduledPostId, outputId } so the client can track state.
+   */
+  scheduleCell: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      platform: z.string().min(1).max(32),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),       // YYYY-MM-DD
+      caption: z.string().min(1).max(8000),
+      imageUrl: z.string().url().nullable().optional(),
+      scheduledAt: z.string(),                               // ISO datetime
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+
+      // Ownership check
+      const [bRows]: any = await localPool.execute(
+        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      if (!(bRows as any[])[0]) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Brand not found" });
+      }
+
+      const scheduledAt = new Date(input.scheduledAt);
+      if (isNaN(scheduledAt.getTime()) || scheduledAt.getTime() < Date.now() - 60_000) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "scheduledAt 必須是未來時間" });
+      }
+
+      // 1) Synthetic mission
+      const missionTitle = `Theater · ${input.platform} · ${input.date}`;
+      const [mRes]: any = await localPool.execute(
+        `INSERT INTO missions
+           (userId, brandId, workspace, title, status, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, 'done', NOW(3), NOW(3))`,
+        [ctx.user.id, input.brandId, input.platform, missionTitle],
+      );
+      const missionId = (mRes as any).insertId as number;
+
+      // 2) Mission output
+      const outputContent = JSON.stringify({ caption: input.caption, imageUrl: input.imageUrl ?? null });
+      const [oRes]: any = await localPool.execute(
+        `INSERT INTO mission_outputs
+           (missionId, content, status, createdAt, updatedAt)
+         VALUES (?, ?, 'draft', NOW(3), NOW(3))`,
+        [missionId, outputContent],
+      );
+      const outputId = (oRes as any).insertId as number;
+
+      // 3) Scheduled post
+      const [spRes]: any = await localPool.execute(
+        `INSERT INTO scheduled_posts
+           (userId, brandId, outputId, variantIndex, platform, scheduledAt, status)
+         VALUES (?, ?, ?, 0, ?, ?, 'pending')`,
+        [ctx.user.id, input.brandId, outputId, input.platform, scheduledAt],
+      );
+      const scheduledPostId = (spRes as any).insertId as number;
+
+      return { ok: true as const, scheduledPostId, outputId };
     }),
 });

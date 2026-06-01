@@ -35,6 +35,8 @@ import {
   Copy,
   Pencil,
   Flag,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -111,6 +113,9 @@ interface CellState {
   imageError?: boolean;
   startedAt?: number;
   doneAt?: number;
+  /** Set after user schedules this cell to the calendar. */
+  scheduledPostId?: number;
+  scheduledAt?: string; // ISO string
 }
 
 type CellKey = string; // `${platform}::${date}`
@@ -245,6 +250,7 @@ function PlatformCell({
   onCopy,
   onEdit,
   onMarkRule,
+  onScheduleClick,
 }: {
   platform: TheaterPlatform;
   state: CellState;
@@ -258,8 +264,9 @@ function PlatformCell({
   onCopy?: () => void;
   onEdit?: (newCaption: string) => void;
   onMarkRule?: () => void;
+  onScheduleClick?: () => void;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   // Phase 3a — inline edit state
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(caption);
@@ -440,9 +447,6 @@ function PlatformCell({
               {t("theater_btn_copy")}
             </button>
           )}
-          {/* 2026-05-10 (CJ feedback「Notion B&W」+「按鈕命名不清楚」):
-              移除 emoji、用 lucide icons、統一 neutral 色系。
-              標記要改 → 標記修改規則（明確指動作 + 套用範圍） */}
           {onEdit && (
             <button
               onClick={() => setEditing(true)}
@@ -471,6 +475,49 @@ function PlatformCell({
             >
               <RefreshCw size={11} strokeWidth={2} />
               {t("theater_btn_redo_cell")}
+            </button>
+          )}
+          {/* Schedule button — primary action, visually distinct */}
+          {onScheduleClick && !state.scheduledPostId && (
+            <button
+              onClick={onScheduleClick}
+              className="text-[10px] px-2.5 py-1 rounded-md flex items-center gap-1 transition font-semibold ml-auto"
+              style={{ background: "#171717", color: "white" }}
+              title={lang === "en" ? "Schedule to calendar" : "排程到行事曆"}
+            >
+              <CalendarIcon size={11} strokeWidth={2} />
+              {lang === "en" ? "Schedule" : "排程"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Scheduled badge — shown when this cell has been scheduled */}
+      {state.scheduledPostId && isDone && (
+        <div
+          className="mt-1 mx-1 mb-1 px-2.5 py-1.5 rounded-lg flex items-center gap-2"
+          style={{ background: "#f0fdf4", border: "1px solid #a7f3d0" }}
+        >
+          <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold text-emerald-800">
+              {lang === "en" ? "Scheduled ✓" : "已排程 ✓"}
+            </p>
+            {state.scheduledAt && (
+              <p className="text-[9px] text-emerald-600 truncate">
+                {new Date(state.scheduledAt).toLocaleString(
+                  lang === "en" ? "en-US" : "zh-TW",
+                  { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+                )}
+              </p>
+            )}
+          </div>
+          {onScheduleClick && (
+            <button
+              onClick={onScheduleClick}
+              className="text-[9px] text-emerald-700 hover:underline shrink-0"
+            >
+              {lang === "en" ? "Edit" : "修改"}
             </button>
           )}
         </div>
@@ -1219,6 +1266,49 @@ export default function TheaterPage() {
    *  Persistent across cells in the run; cleared on stop / new run. */
   const [runRules, setRunRules] = useState<string[]>([]);
 
+  // ── Schedule modal state ─────────────────────────────────────────────────
+  const scheduleCellMut = (trpc as any).theater?.scheduleCell?.useMutation?.();
+  const [scheduleModal, setScheduleModal] = useState<{
+    key: CellKey;
+    platform: TheaterPlatform;
+    date: string; // YYYY-MM-DD
+    caption: string;
+    imageUrl?: string | null;
+  } | null>(null);
+  // Prefill datetime: the cell's date at 09:00
+  const [scheduleAt, setScheduleAt] = useState<string>("");
+  const [scheduleDraft, setScheduleDraft] = useState<string>("");
+
+  const openScheduleModal = (key: CellKey, platform: TheaterPlatform, date: string, caption: string, imageUrl?: string | null) => {
+    // Default to 09:00 on the cell date
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setScheduleAt(`${date}T09:00`);
+    setScheduleDraft(caption);
+    setScheduleModal({ key, platform, date, caption, imageUrl });
+  };
+  const closeScheduleModal = () => setScheduleModal(null);
+
+  const submitSchedule = async () => {
+    if (!scheduleModal || !brandId) return;
+    const result = await scheduleCellMut?.mutateAsync?.({
+      brandId,
+      platform: scheduleModal.platform,
+      date: scheduleModal.date,
+      caption: scheduleDraft.trim() || scheduleModal.caption,
+      imageUrl: scheduleModal.imageUrl,
+      scheduledAt: new Date(scheduleAt).toISOString(),
+    });
+    if (result?.ok) {
+      updateCell(scheduleModal.key, {
+        scheduledPostId: result.scheduledPostId,
+        scheduledAt: new Date(scheduleAt).toISOString(),
+        // Persist the edited caption back to the cell
+        caption: scheduleDraft.trim() || scheduleModal.caption,
+      });
+      closeScheduleModal();
+    }
+  };
+
   /** Modal for marking a cell as needing a fix */
   const [ruleModal, setRuleModal] = useState<{ key: CellKey; platform: TheaterPlatform } | null>(null);
   const [ruleText, setRuleText] = useState("");
@@ -1580,6 +1670,7 @@ export default function TheaterPage() {
                       onRedo={() => redoCell(key, p)}
                       onEdit={(newCaption) => editCellCaption(key, newCaption)}
                       onMarkRule={() => openRuleModal(key)}
+                      onScheduleClick={() => openScheduleModal(key, p, d.date, state.caption ?? "", state.imageUrl)}
                         />
                       {/* Platform connection status chip on done cells — always visible */}
                       {state.status === "done" && (
@@ -1769,6 +1860,95 @@ export default function TheaterPage() {
                   className="text-sm px-4 py-1.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
                 >
                   {t("theater_btn_done_modal")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── 排程 modal ── */}
+        {scheduleModal && (
+          <div
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6"
+            onClick={closeScheduleModal}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="px-6 py-5 flex items-center justify-between" style={{ borderBottom: "1px solid #E5E5E5" }}>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-400 mb-0.5">
+                    {lang === "en" ? "SCHEDULE TO CALENDAR" : "排程到行事曆"}
+                  </p>
+                  <h2 className="text-[15px] font-semibold text-neutral-900">
+                    {scheduleModal.platform.toUpperCase()} · {scheduleModal.date}
+                  </h2>
+                </div>
+                <button
+                  onClick={closeScheduleModal}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-400 hover:bg-neutral-100"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5 space-y-4">
+                {/* Caption edit */}
+                <div>
+                  <label className="text-[11px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
+                    <Pencil size={11} />
+                    {lang === "en" ? "Caption (edit before scheduling)" : "文案（排程前可修改）"}
+                  </label>
+                  <textarea
+                    autoFocus
+                    value={scheduleDraft}
+                    onChange={(e) => setScheduleDraft(e.target.value)}
+                    rows={6}
+                    className="w-full text-[13px] leading-relaxed px-3 py-2.5 border border-neutral-200 rounded-xl resize-none focus:outline-none focus:border-neutral-900 transition"
+                    style={{ fontFamily: "inherit" }}
+                  />
+                  <p className="text-[10px] text-neutral-400 mt-1 text-right">
+                    {scheduleDraft.length} {lang === "en" ? "chars" : "字"}
+                  </p>
+                </div>
+
+                {/* Date + time picker */}
+                <div>
+                  <label className="text-[11px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
+                    <Clock size={11} />
+                    {lang === "en" ? "Publish date & time" : "發布日期與時間"}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={scheduleAt}
+                    onChange={(e) => setScheduleAt(e.target.value)}
+                    min={`${new Date().toISOString().slice(0, 10)}T00:00`}
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-[13px] focus:outline-none focus:border-neutral-900 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 pb-5 flex items-center gap-3">
+                <button
+                  onClick={closeScheduleModal}
+                  className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-[13px] text-neutral-700 hover:border-neutral-400 transition"
+                >
+                  {lang === "en" ? "Cancel" : "取消"}
+                </button>
+                <button
+                  onClick={submitSchedule}
+                  disabled={!scheduleAt || !scheduleDraft.trim() || scheduleCellMut?.isLoading}
+                  className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
+                  style={{ background: "#171717", color: "white" }}
+                >
+                  <CalendarIcon size={13} />
+                  {scheduleCellMut?.isLoading
+                    ? (lang === "en" ? "Scheduling…" : "排程中…")
+                    : (lang === "en" ? "Confirm schedule" : "確認排程")}
                 </button>
               </div>
             </div>
