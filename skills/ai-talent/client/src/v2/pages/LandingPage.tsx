@@ -155,7 +155,7 @@ export default function LandingPage() {
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           {authed ? (
-            <Link to="/"
+            <Link to="/theater"
               className="px-7 py-3 rounded-xl text-white font-semibold text-base shadow-lg"
               style={{ background: GRAD }}>
               {en ? "Go to app →" : "進入應用程式 →"}
@@ -280,7 +280,7 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             {authed ? (
-              <Link to="/"
+              <Link to="/theater"
                 className="inline-block px-8 py-3.5 rounded-xl text-white font-semibold text-base shadow-lg"
                 style={{ background: GRAD }}>
                 {en ? "Go to app →" : "進入應用程式 →"}

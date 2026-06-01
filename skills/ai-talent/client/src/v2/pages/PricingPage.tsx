@@ -16,7 +16,9 @@ export default function PricingPage() {
   const [annual, setAnnual] = React.useState(false);
   const statusQuery = (trpc as any).billing?.getStatus?.useQuery
     ? (trpc as any).billing.getStatus.useQuery()
-    : { data: null, isLoading: false };
+    // Treat a missing tRPC hook (e.g. deploy misconfiguration) as "still loading"
+    // so a logged-in user is never misrouted to /auth/register.
+    : { data: null, isLoading: true };
   const status = statusQuery?.data;
   // isLoading: don't redirect to /auth/register while the query is still in-flight;
   // a logged-in user whose billing status hasn't returned yet would otherwise get

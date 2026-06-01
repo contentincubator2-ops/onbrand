@@ -1,8 +1,12 @@
 /**
  * LoginPage.tsx — Email/password + Google OAuth login
+ *
+ * 2026-06-01 fix: if the user is already authenticated, redirect to "/" instead
+ * of showing the login form. Mirrors the same guard added to RegisterPage so
+ * Google-OAuth users who navigate here directly are sent straight to the app.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
 
@@ -19,7 +23,27 @@ export default function LoginPage() {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendMsg, setResendMsg] = useState("");
+  const [authChecking, setAuthChecking] = useState(true);
   const navigate = useNavigate();
+
+  // If already logged in, skip straight to the app.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    })
+      .then((r) => {
+        if (cancelled) return;
+        if (r.ok) navigate("/", { replace: true });
+        else setAuthChecking(false);
+      })
+      .catch(() => { if (!cancelled) setAuthChecking(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleResendVerification = async () => {
     if (!email) return;
@@ -81,6 +105,16 @@ export default function LoginPage() {
     setGoogleLoading(true);
     window.location.href = "/api/auth/google";
   };
+
+  // Show spinner while auth check is in-flight (avoids flashing the login
+  // form to users who are already authenticated).
+  if (authChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-7 h-7 rounded-full border-2 border-gray-200 border-t-violet-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
