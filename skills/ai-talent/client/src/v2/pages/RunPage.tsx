@@ -575,34 +575,22 @@ export default function RunPage() {
     },
   }) ?? { mutateAsync: async () => {}, isPending: false };
 
-  // Called when user clicks "排程發布" on any platform row.
-  // Schedules the current output to calendar (scheduledAt = now),
-  // then user publishes from CalendarPage → calendar.publish → Pipedream.
-  const handleScheduleToCalendar = React.useCallback(async () => {
+  // Called when user clicks "排程發布" on a specific platform row.
+  // `rowPlatform` = the p.key of the row the user clicked ("facebook","instagram",…).
+  // Schedules the current output to calendar, then user publishes from CalendarPage.
+  const handleScheduleToCalendar = React.useCallback(async (rowPlatform: string) => {
     if (!confirm(lang === "en"
-      ? "Add to Publishing Calendar? You can then publish from the Calendar page."
-      : "加入七日發布台？可在行事曆頁面選擇時間並發布。")) return;
-
-    // Prefer the mockup-inferred platform. If generic/unknown, fall back to
-    // the first connected platform in the publish list, or "facebook".
-    const mvPlatform = mockupVariant?.platform;
-    const platformMap: Record<string, string> = {
-      facebook: "facebook", instagram: "instagram",
-      linkedin: "linkedin",  youtube: "youtube",
-      tiktok: "tiktok",      email: "email",
-    };
-    const platform = (mvPlatform && mvPlatform !== "generic" && platformMap[mvPlatform])
-      ? platformMap[mvPlatform]
-      : (data as any)?.platform ?? "facebook";
+      ? `Add to Publishing Calendar as ${rowPlatform}? You can then publish from the Calendar page.`
+      : `加入七日發布台（${rowPlatform}）？可在行事曆頁面選擇時間並發布。`)) return;
 
     await scheduleToCalMut?.mutateAsync?.({
       outputId: id,
       variantIndex: activeIdx,
-      platform,
+      platform: rowPlatform,
       scheduledAt: new Date().toISOString(),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang, mockupVariant?.platform, (data as any)?.platform, id, activeIdx]);
+  }, [lang, id, activeIdx]);
 
   const connectFacebookViaUrl = () => {
     const win = window.open("about:blank", "_blank", "popup,width=600,height=720");
@@ -2144,7 +2132,7 @@ export default function RunPage() {
                           fbStatusQuery?.refetch?.();
                           setFbPagePickerOpen(false);
                           // After binding, schedule to calendar instead of direct publish
-                          await handleScheduleToCalendar();
+                          await handleScheduleToCalendar("facebook");
                         } catch (e: any) {
                           showToastGlobal(`Error: ${String(e?.message ?? e).slice(0, 100)}`);
                         }
@@ -2218,7 +2206,7 @@ export default function RunPage() {
                           size="sm" color="primary" className="min-w-[68px] text-[10px]"
                           isLoading={scheduleToCalMut?.isPending}
                           isDisabled={scheduleToCalMut?.isPending}
-                          onPress={handleScheduleToCalendar}
+                          onPress={() => handleScheduleToCalendar(p.key)}
                         >
                           {lang === "en" ? "→ Calendar" : "排程發布"}
                         </Button>
@@ -2233,12 +2221,12 @@ export default function RunPage() {
                         </Button>
                       )
                     ) : isConnected ? (
-                      // Non-FB platforms: connected → schedule to calendar (same unified flow)
+                      // Non-FB platforms: connected → schedule to calendar, using this row's platform key
                       <Button
                         size="sm" color="primary" className="min-w-[68px] text-[10px]"
                         isLoading={scheduleToCalMut?.isPending}
                         isDisabled={scheduleToCalMut?.isPending}
-                        onPress={handleScheduleToCalendar}
+                        onPress={() => handleScheduleToCalendar(p.key)}
                       >
                         {lang === "en" ? "→ Calendar" : "排程發布"}
                       </Button>
