@@ -1,0 +1,87 @@
+name: Ops — Fix Google OAuth env reload
+
+# 2026-06-01: GOOGLE_CLIENT_SECRET written to .env but pm2 process
+# may not have picked it up. This workflow:
+#   1. Lists pm2 processes to find actual name
+#   2. Shows what env the running process actually sees
+#   3. Force-restarts with --update-env using the correct name
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Diagnose and reload Google OAuth env
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            ENV=/opt/onbrand/app/skills/ai-talent/.env
+
+            echo "════ .env file values ════"
+            if grep -q "GOOGLE_CLIENT_SECRET" "$ENV"; then
+              val=$(grep "^GOOGLE_CLIENT_SECRET=" "$ENV" | cut -d= -f2-)
+              echo "  .env GOOGLE_CLIENT_SECRET length: ${#val}"
+            else
+              echo "  ❌ GOOGLE_CLIENT_SECRET not in .env"
+            fi
+
+            echo ""
+            echo "════ pm2 process list ════"
+            pm2 list 2>&1
+
+            echo ""
+            echo "════ process listening on 3101 ════"
+            ss -tlnp 2>/dev/null | grep 3101 || netstat -tlnp 2>/dev/null | grep 3101 || echo "  (no ss/netstat output)"
+
+            echo ""
+            echo "════ pm2 env check (try 'onbrand') ════"
+            pm2 env onbrand 2>&1 | grep -E "GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET|APP_URL" || echo "  (no match or process not named 'onbrand')"
+
+            echo ""
+            echo "════ Finding actual pm2 name for port 3101 ════"
+            # Get PID of process on 3101
+            pid=$(ss -tlnp 2>/dev/null | grep 3101 | grep -o 'pid=[0-9]*' | grep -o '[0-9]*' | head -1)
+            if [ -z "$pid" ]; then
+              pid=$(lsof -ti :3101 2>/dev/null | head -1)
+            fi
+            echo "  PID on 3101: ${pid:-not found}"
+
+            if [ -n "$pid" ]; then
+              # Match pm2 process by PID
+              pm2_name=$(pm2 jlist 2>/dev/null | python3 -c "
+            import json,sys
+            data=json.load(sys.stdin)
+            pid=$pid
+            for p in data:
+                if p.get('pid')==pid:
+                    print(p.get('name',''))
+                    break
+            " 2>/dev/null)
+              echo "  pm2 name: ${pm2_name:-not matched}"
+
+              if [ -n "\$pm2_name" ]; then
+                echo ""
+                echo "════ Restarting '\$pm2_name' with --update-env ════"
+                pm2 restart "\$pm2_name" --update-env 2>&1
+                sleep 3
+
+                echo ""
+                echo "════ Verify env after restart ════"
+                pm2 env "\$pm2_name" 2>&1 | grep -E "GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET|APP_URL"
+
+                echo ""
+                echo "════ Health check ════"
+                curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:3101/health || true
+                curl -s -o /dev/null -w "Google OAuth start: HTTP %{http_code}\n" http://127.0.0.1:3101/api/auth/google || true
+              fi
+            fi
+
+            echo ""
+            echo "════ Done ════"
