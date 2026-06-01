@@ -58,7 +58,7 @@ export default function ResetPasswordPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || (lang === "en" ? "Couldn't reset — try again." : "重設失敗，請稍後再試"));
+        setError((typeof data.error === "string" ? data.error : data.error?.message) || (lang === "en" ? "Couldn't reset — try again." : "重設失敗，請稍後再試"));
         return;
       }
 

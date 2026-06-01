@@ -60,7 +60,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || t("auth_err_wrong_creds"));
+        setError((typeof data.error === "string" ? data.error : data.error?.message) || t("auth_err_wrong_creds"));
         if (res.status === 403 && data.needsVerification) {
           setNeedsVerification(true);
         }

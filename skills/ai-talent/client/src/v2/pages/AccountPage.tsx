@@ -59,7 +59,7 @@ export default function AccountPage() {
   const deleteMut = (trpc as any).billing?.deleteAccount?.useMutation
     ? (trpc as any).billing.deleteAccount.useMutation({
         onSuccess: (r: any) => {
-          showToastGlobal(r.message, "success");
+          showToastGlobal(typeof r?.message === "string" ? r.message : String(r?.message ?? (lang === "en" ? "Account deleted" : "帳號已刪除")), "success");
           setTimeout(() => {
             try { localStorage.removeItem("authToken"); } catch {}
             window.location.replace("/auth/login");
@@ -135,7 +135,8 @@ export default function AccountPage() {
         setCurrentPwd(""); setNewPwd("");
       } else {
         showToastGlobal(
-          data.error ?? (lang === "en" ? `Update failed (${res.status})` : `更新失敗 (${res.status})`)
+          (typeof data.error === "string" ? data.error : (data.error?.message ?? null)) ??
+          (lang === "en" ? `Update failed (${res.status})` : `更新失敗 (${res.status})`)
         );
       }
     } catch (e: any) {

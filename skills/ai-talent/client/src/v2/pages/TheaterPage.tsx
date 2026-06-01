@@ -341,9 +341,12 @@ function PlatformCell({
           {(state.structured as any)?.thread?.length > 1 && (
             <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[10px] leading-relaxed">
               <p className="text-neutral-500 mb-0.5">{t("theater_thread_label", { n: (state.structured as any).thread.length })}</p>
-              {((state.structured as any).thread as string[]).slice(1, 4).map((t, i) => (
-                <p key={i} className="text-neutral-700">{`${i + 2}. ${t.slice(0, 80)}`}</p>
-              ))}
+              {((state.structured as any).thread as any[])
+                .filter((item: any) => typeof item === "string")
+                .slice(1, 4)
+                .map((t: string, i: number) => (
+                  <p key={i} className="text-neutral-700">{`${i + 2}. ${t.slice(0, 80)}`}</p>
+                ))}
             </div>
           )}
           {isImaging && !state.imageUrl && (

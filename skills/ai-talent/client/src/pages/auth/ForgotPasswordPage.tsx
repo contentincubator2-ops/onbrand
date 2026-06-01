@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || (lang === "en" ? "Couldn't send the link — try again." : "請求失敗，請稍後再試"));
+        setError((typeof data.error === "string" ? data.error : data.error?.message) || (lang === "en" ? "Couldn't send the link — try again." : "請求失敗，請稍後再試"));
         return;
       }
 

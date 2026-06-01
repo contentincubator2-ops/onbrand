@@ -1094,7 +1094,7 @@ export default function RunPage() {
               className="hover:text-default-900 transition truncate max-w-[160px]"
               title={(data as any).mission.brandName}
             >
-              {(data as any).mission.brandName}
+              {String((data as any).mission.brandName ?? "")}
             </button>
           </>
         )}
@@ -1104,9 +1104,9 @@ export default function RunPage() {
             <button
               onClick={() => navigate("/projects")}
               className="hover:text-default-900 transition truncate max-w-[260px]"
-              title={(data as any).mission.title}
+              title={String((data as any).mission.title ?? "")}
             >
-              {(data as any).mission.title}
+              {String((data as any).mission.title ?? "")}
             </button>
           </>
         )}
@@ -1139,7 +1139,8 @@ export default function RunPage() {
           );
         }
         if (p === "failed") {
-          const detail = (data as any)?.progressDetail;
+          const detailRaw = (data as any)?.progressDetail;
+          const detail = typeof detailRaw === "string" ? detailRaw : null;
           return (
             <div className="mb-3 mx-1 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-tiny text-danger-700">
               <p className="font-semibold">
@@ -1923,7 +1924,7 @@ export default function RunPage() {
                       </p>
                       {videoStatus?.status === "failed" && (
                         <p className="text-[11px] text-danger-700 leading-relaxed">
-                          {videoStatus?.errorMessage ?? (lang === "en" ? "Unknown error" : "未知錯誤")}
+                          {typeof videoStatus?.errorMessage === "string" ? videoStatus.errorMessage : (lang === "en" ? "Unknown error" : "未知錯誤")}
                         </p>
                       )}
                       {storyboardTitle && (

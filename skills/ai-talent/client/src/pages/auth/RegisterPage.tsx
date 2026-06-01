@@ -58,7 +58,7 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || (lang === "en" ? "Sign-up failed — please try again." : "註冊失敗，請稍後再試"));
+        setError((typeof data.error === "string" ? data.error : data.error?.message) || (lang === "en" ? "Sign-up failed — please try again." : "註冊失敗，請稍後再試"));
         return;
       }
 
