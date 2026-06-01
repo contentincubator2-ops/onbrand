@@ -1,8 +1,13 @@
 /**
  * RegisterPage.tsx — Email/password registration
+ *
+ * 2026-06-01 fix: if the user is already authenticated (e.g. came via Google
+ * OAuth), redirect to "/" immediately instead of showing the register form.
+ * This prevents the "此電子郵件已註冊" dead-end loop for Google-login users
+ * who click a landing-page "免費試用" CTA.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
 
@@ -16,7 +21,40 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const navigate = useNavigate();
+
+  // If already logged in, skip straight to the app.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    })
+      .then((r) => {
+        if (cancelled) return;
+        if (r.ok) {
+          navigate("/", { replace: true });
+        } else {
+          setAuthChecking(false);
+        }
+      })
+      .catch(() => { if (!cancelled) setAuthChecking(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Show a minimal spinner while the auth check is in flight (avoids
+  // briefly flashing the register form to already-logged-in users).
+  if (authChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-7 h-7 rounded-full border-2 border-gray-200 border-t-violet-500 animate-spin" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -259,8 +297,28 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                <span>⚠</span> {error}
+              <div className="text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 space-y-1.5">
+                <div className="flex items-center gap-2 text-red-600">
+                  <span>⚠</span> {error}
+                </div>
+                {/* Email already registered: offer direct login instead of dead-end */}
+                {(error.includes("已註冊") || error.includes("already") || error.includes("already registered")) && (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <Link
+                      to="/auth/login"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      {lang === "en" ? "Sign in to your existing account →" : "直接登入現有帳號 →"}
+                    </Link>
+                    <span className="text-gray-300">·</span>
+                    <a
+                      href="/api/auth/google"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      {lang === "en" ? "Sign in with Google →" : "用 Google 登入 →"}
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 

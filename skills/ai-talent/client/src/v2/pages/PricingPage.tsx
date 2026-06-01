@@ -16,8 +16,12 @@ export default function PricingPage() {
   const [annual, setAnnual] = React.useState(false);
   const statusQuery = (trpc as any).billing?.getStatus?.useQuery
     ? (trpc as any).billing.getStatus.useQuery()
-    : { data: null };
+    : { data: null, isLoading: false };
   const status = statusQuery?.data;
+  // isLoading: don't redirect to /auth/register while the query is still in-flight;
+  // a logged-in user whose billing status hasn't returned yet would otherwise get
+  // bounced to the register page incorrectly.
+  const statusLoading = statusQuery?.isLoading ?? false;
 
   const isEn = lang === "en";
 
@@ -304,10 +308,14 @@ export default function PricingPage() {
               </ul>
               <button
                 onClick={() => {
-                  if (!status) {
+                  // Wait for billing status to load before deciding route.
+                  // "statusLoading" covers the brief window between mount and
+                  // first response — don't misroute a logged-in user to register.
+                  if (!status && !statusLoading) {
                     navigate("/auth/register");
                     return;
                   }
+                  if (!status) return; // still loading — do nothing
                   if (!checkoutMut) {
                     window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand Upgrade";
                     return;

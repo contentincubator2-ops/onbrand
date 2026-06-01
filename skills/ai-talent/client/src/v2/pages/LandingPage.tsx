@@ -154,15 +154,25 @@ export default function LandingPage() {
           {en ? SUBLINE_EN : SUBLINE_ZH}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link to="/auth/register"
-            className="px-7 py-3 rounded-xl text-white font-semibold text-base shadow-lg"
-            style={{ background: GRAD }}>
-            {en ? "Start 7-day free trial" : "免費試用 7 天"}
-          </Link>
-          <Link to="/auth/login"
-            className="px-7 py-3 rounded-xl font-semibold text-base border border-neutral-300 hover:border-neutral-900 transition">
-            {en ? "Sign in" : "登入帳號"}
-          </Link>
+          {authed ? (
+            <Link to="/"
+              className="px-7 py-3 rounded-xl text-white font-semibold text-base shadow-lg"
+              style={{ background: GRAD }}>
+              {en ? "Go to app →" : "進入應用程式 →"}
+            </Link>
+          ) : (
+            <>
+              <Link to="/auth/register"
+                className="px-7 py-3 rounded-xl text-white font-semibold text-base shadow-lg"
+                style={{ background: GRAD }}>
+                {en ? "Start 7-day free trial" : "免費試用 7 天"}
+              </Link>
+              <Link to="/auth/login"
+                className="px-7 py-3 rounded-xl font-semibold text-base border border-neutral-300 hover:border-neutral-900 transition">
+                {en ? "Sign in" : "登入帳號"}
+              </Link>
+            </>
+          )}
         </div>
         <p className="text-xs text-neutral-500 mt-4">
           {en
@@ -269,15 +279,25 @@ export default function LandingPage() {
               : "今天就鎖定你的品牌定位。早鳥價不會永遠都在。"}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link to="/auth/register"
-              className="inline-block px-8 py-3.5 rounded-xl text-white font-semibold text-base shadow-lg"
-              style={{ background: GRAD }}>
-              {en ? "Start 7-day free trial" : "免費試用 7 天"}
-            </Link>
-            <Link to="/auth/login"
-              className="inline-block px-8 py-3.5 rounded-xl font-semibold text-base border border-neutral-300 hover:border-neutral-900 transition">
-              {en ? "Sign in" : "登入帳號"}
-            </Link>
+            {authed ? (
+              <Link to="/"
+                className="inline-block px-8 py-3.5 rounded-xl text-white font-semibold text-base shadow-lg"
+                style={{ background: GRAD }}>
+                {en ? "Go to app →" : "進入應用程式 →"}
+              </Link>
+            ) : (
+              <>
+                <Link to="/auth/register"
+                  className="inline-block px-8 py-3.5 rounded-xl text-white font-semibold text-base shadow-lg"
+                  style={{ background: GRAD }}>
+                  {en ? "Start 7-day free trial" : "免費試用 7 天"}
+                </Link>
+                <Link to="/auth/login"
+                  className="inline-block px-8 py-3.5 rounded-xl font-semibold text-base border border-neutral-300 hover:border-neutral-900 transition">
+                  {en ? "Sign in" : "登入帳號"}
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
