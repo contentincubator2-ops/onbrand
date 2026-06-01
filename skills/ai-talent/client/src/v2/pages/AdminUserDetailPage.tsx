@@ -105,7 +105,7 @@ export default function AdminUserDetailPage() {
               <div style={h2}>點數紀錄（最近 20）</div>
               {d.pointHistory.map((p: any, i: number) => (
                 <div key={i} style={{ ...kv, display: "flex", justifyContent: "space-between" }}>
-                  <span>{p.kind} · {p.reason}</span>
+                  <span>{String(p.kind ?? "—")} · {String(p.reason ?? "—")}</span>
                   <span style={{ color: p.delta >= 0 ? "#15803d" : "#b91c1c" }}>
                     {p.delta >= 0 ? "+" : ""}{p.delta} → {p.balanceAfter}
                   </span>
@@ -137,7 +137,7 @@ export default function AdminUserDetailPage() {
               <div style={h2}>近期錯誤（{d.recentErrors.length}）</div>
               {d.recentErrors.map((e: any) => (
                 <div key={e.id} style={{ ...kv, color: "#b91c1c" }}>
-                  [{e.source}] {e.message} · {iso(e.createdAt)}
+                  [{String(e.source ?? "?")}] {String(e.message ?? "unknown error")} · {iso(e.createdAt)}
                 </div>
               ))}
               {d.recentErrors.length === 0 && <div style={{ ...kv, color: "#9ca3af" }}>無</div>}

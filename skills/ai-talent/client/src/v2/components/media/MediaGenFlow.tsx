@@ -495,7 +495,7 @@ function ModelPhase({
           <CardBody className="p-3">
             <p className="text-small font-medium">
               {genResult.ok ? <FontAwesomeIcon icon={faCheck} className="text-success mr-2" /> : null}
-              {genResult.message}
+              {typeof genResult.message === "string" ? genResult.message : ""}
             </p>
             {genResult.url && (
               <a href={genResult.url} target="_blank" rel="noopener noreferrer" className="text-tiny text-primary truncate">

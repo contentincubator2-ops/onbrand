@@ -293,7 +293,7 @@ function TicketDetail({ ticketId, onUpdated }: { ticketId: number; onUpdated: ()
                 border: isAdmin ? "1px solid #FCA5A5" : isUser ? "none" : "1px solid #e5e7eb",
                 fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word",
               }}>
-                {m.content}
+                {typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "")}
               </div>
             </div>
           );
