@@ -575,16 +575,26 @@ export default function RunPage() {
     },
   }) ?? { mutateAsync: async () => {}, isPending: false };
 
-  // Called when user clicks "排程到行事曆" (Facebook connected path).
-  // Schedules the current output to calendar with scheduledAt = now,
-  // then user can publish from the Calendar page.
+  // Called when user clicks "排程發布" on any platform row.
+  // Schedules the current output to calendar (scheduledAt = now),
+  // then user publishes from CalendarPage → calendar.publish → Pipedream.
   const handleScheduleToCalendar = React.useCallback(async () => {
     if (!confirm(lang === "en"
       ? "Add to Publishing Calendar? You can then publish from the Calendar page."
       : "加入七日發布台？可在行事曆頁面選擇時間並發布。")) return;
-    const platform = mockupVariant?.platform && mockupVariant.platform !== "generic"
-      ? mockupVariant.platform
-      : "facebook";
+
+    // Prefer the mockup-inferred platform. If generic/unknown, fall back to
+    // the first connected platform in the publish list, or "facebook".
+    const mvPlatform = mockupVariant?.platform;
+    const platformMap: Record<string, string> = {
+      facebook: "facebook", instagram: "instagram",
+      linkedin: "linkedin",  youtube: "youtube",
+      tiktok: "tiktok",      email: "email",
+    };
+    const platform = (mvPlatform && mvPlatform !== "generic" && platformMap[mvPlatform])
+      ? platformMap[mvPlatform]
+      : (data as any)?.platform ?? "facebook";
+
     await scheduleToCalMut?.mutateAsync?.({
       outputId: id,
       variantIndex: activeIdx,
@@ -592,7 +602,7 @@ export default function RunPage() {
       scheduledAt: new Date().toISOString(),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang, mockupVariant?.platform, id, activeIdx]);
+  }, [lang, mockupVariant?.platform, (data as any)?.platform, id, activeIdx]);
 
   const connectFacebookViaUrl = () => {
     const win = window.open("about:blank", "_blank", "popup,width=600,height=720");
@@ -2223,8 +2233,14 @@ export default function RunPage() {
                         </Button>
                       )
                     ) : isConnected ? (
-                      <Button size="sm" variant="flat" color="success" isDisabled className="min-w-[58px] text-[11px]">
-                        ✓ {lang === "en" ? "Auth'd" : "已授權"}
+                      // Non-FB platforms: connected → schedule to calendar (same unified flow)
+                      <Button
+                        size="sm" color="primary" className="min-w-[68px] text-[10px]"
+                        isLoading={scheduleToCalMut?.isPending}
+                        isDisabled={scheduleToCalMut?.isPending}
+                        onPress={handleScheduleToCalendar}
+                      >
+                        {lang === "en" ? "→ Calendar" : "排程發布"}
                       </Button>
                     ) : (
                       <Button

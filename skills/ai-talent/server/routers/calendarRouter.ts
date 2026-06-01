@@ -269,31 +269,33 @@ export const calendarRouter = router({
   /**
    * Publish a scheduled post to its platform via Pipedream.
    * Reads the scheduled_post, extracts caption from mission_outputs,
-   * calls Pipedream webhook, then marks both records as published.
+   * routes to the platform-specific Pipedream webhook, then marks both
+   * scheduled_posts and mission_outputs as published.
    *
-   * Currently supports: Facebook (via PIPEDREAM_FB_PUBLISH_WEBHOOK).
-   * Other platforms will return PRECONDITION_FAILED until their webhooks are configured.
+   * Platform → env var mapping:
+   *   facebook / fb   → PIPEDREAM_FB_PUBLISH_WEBHOOK   (also uses brands.fbPageId)
+   *   instagram / ig  → PIPEDREAM_IG_PUBLISH_WEBHOOK
+   *   linkedin / li   → PIPEDREAM_LI_PUBLISH_WEBHOOK
+   *   youtube / yt    → PIPEDREAM_YT_PUBLISH_WEBHOOK
+   *   tiktok / tt     → PIPEDREAM_TT_PUBLISH_WEBHOOK
+   *   email           → PIPEDREAM_EMAIL_PUBLISH_WEBHOOK
+   *   pr / press      → PIPEDREAM_PR_PUBLISH_WEBHOOK
+   *
+   * If the env var is not set, returns PRECONDITION_FAILED with a clear message.
    */
   publish: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      const webhookUrl = (process.env as any).PIPEDREAM_FB_PUBLISH_WEBHOOK as string | undefined;
       const secret = (process.env as any).PIPEDREAM_WEBHOOK_SECRET as string | undefined;
-      if (!webhookUrl) {
-        console.error("[calendar.publish] missing env: PIPEDREAM_FB_PUBLISH_WEBHOOK");
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "FB 發布服務尚未啟用，請聯絡 sowork@sowork.ai。",
-        });
-      }
 
       const { default: localPool } = await import("../localDb");
 
-      // Load scheduled_post + verify ownership + mission_output + brand FB binding
+      // Load scheduled_post + verify ownership + mission_output + brand page bindings
       const [rows]: any = await localPool.execute(
         `SELECT sp.id, sp.outputId, sp.variantIndex, sp.platform, sp.status, sp.brandId,
                 o.content AS outputContent,
-                b.fbPageId AS brand_fb_page_id, b.fbPageName AS brand_fb_page_name
+                b.fbPageId AS brand_fb_page_id, b.fbPageName AS brand_fb_page_name,
+                b.name AS brandName
          FROM scheduled_posts sp
          LEFT JOIN mission_outputs o ON o.id = sp.outputId
          LEFT JOIN brands b ON b.id = sp.brandId
@@ -304,6 +306,47 @@ export const calendarRouter = router({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "排程不存在或無權限" });
       if (row.status !== "pending") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文已發布或已取消，無法重複發布" });
+      }
+
+      // Normalise platform to canonical form
+      const platformRaw: string = (row.platform ?? "").toLowerCase();
+      const platform =
+        platformRaw === "fb"        ? "facebook"  :
+        platformRaw === "ig"        ? "instagram" :
+        platformRaw === "li"        ? "linkedin"  :
+        platformRaw === "yt"        ? "youtube"   :
+        platformRaw === "tt"        ? "tiktok"    :
+        platformRaw === "pr"        ? "press"     :
+        platformRaw;
+
+      // Map platform to its Pipedream publish webhook env var
+      const WEBHOOK_ENV: Record<string, string> = {
+        facebook:  "PIPEDREAM_FB_PUBLISH_WEBHOOK",
+        instagram: "PIPEDREAM_IG_PUBLISH_WEBHOOK",
+        linkedin:  "PIPEDREAM_LI_PUBLISH_WEBHOOK",
+        youtube:   "PIPEDREAM_YT_PUBLISH_WEBHOOK",
+        tiktok:    "PIPEDREAM_TT_PUBLISH_WEBHOOK",
+        email:     "PIPEDREAM_EMAIL_PUBLISH_WEBHOOK",
+        press:     "PIPEDREAM_PR_PUBLISH_WEBHOOK",
+      };
+      const envKey = WEBHOOK_ENV[platform];
+      const webhookUrl = envKey ? (process.env as any)[envKey] as string | undefined : undefined;
+
+      if (!webhookUrl) {
+        const platformLabel =
+          platform === "facebook"  ? "Facebook"  :
+          platform === "instagram" ? "Instagram" :
+          platform === "linkedin"  ? "LinkedIn"  :
+          platform === "youtube"   ? "YouTube"   :
+          platform === "tiktok"    ? "TikTok"    :
+          platform === "email"     ? "Email"     :
+          platform === "press"     ? "新聞稿"    :
+          platform;
+        console.error(`[calendar.publish] missing env: ${envKey ?? "(unknown platform: " + platformRaw + ")"}`);
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `${platformLabel} 發布服務尚未啟用，請聯絡 sowork@sowork.ai。`,
+        });
       }
 
       // Extract caption from mission_output content (same logic as publishRouter.toFacebook)
@@ -319,18 +362,17 @@ export const calendarRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文沒有文字內容可發布" });
       }
 
-      // Require brand FB page binding
-      const pageId = row.brand_fb_page_id ?? null;
-      if (!pageId) {
+      // Facebook requires brand.fbPageId binding; other platforms use connect OAuth directly
+      if (platform === "facebook" && !row.brand_fb_page_id) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "此品牌尚未連接 Facebook 粉專。請到 品牌設定 → 連接 Facebook 完成綁定。",
         });
       }
 
-      // Build Pipedream payload (same shape as publishRouter.toFacebook)
-      const pipedreamPayload = {
-        page_id: pageId,
+      // Build platform-agnostic Pipedream payload
+      const pipedreamPayload: Record<string, any> = {
+        platform,
         message: caption,
         connect_external_user_id: String(ctx.user.id),
         _meta: {
@@ -338,12 +380,17 @@ export const calendarRouter = router({
           outputId: row.outputId,
           variantIndex: row.variantIndex ?? 0,
           brandId: row.brandId,
+          brandName: row.brandName ?? null,
           userId: ctx.user.id,
-          fbPageName: row.brand_fb_page_name ?? null,
           scheduledPostId: input.id,
           source: "calendar.publish",
         },
       };
+      // Facebook-specific fields
+      if (platform === "facebook") {
+        pipedreamPayload.page_id = row.brand_fb_page_id;
+        pipedreamPayload._meta.fbPageName = row.brand_fb_page_name ?? null;
+      }
 
       const t0 = Date.now();
       const resp = await fetch(webhookUrl, {
