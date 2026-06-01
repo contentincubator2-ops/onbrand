@@ -420,6 +420,47 @@ const YT_TASK_FORMAT_MAP: Record<string, YTActiveFormat> = {
   "yt-99-premiere-kit":      "系列 / 策略",
 };
 
+// ── Format category config (TT) ─────────────────────────────────────────────
+type TTActiveFormat =
+  | "all" | "腳本" | "字幕 / 文案" | "Trend / Duet"
+  | "Live 直播" | "個人頁" | "互動 / 工具" | "系列 / 策略";
+
+const TT_FORMAT_TABS: { id: TTActiveFormat; label: string }[] = [
+  { id: "all",          label: "全部"         },
+  { id: "腳本",         label: "腳本"         },
+  { id: "字幕 / 文案",  label: "字幕 / 文案"  },
+  { id: "Trend / Duet", label: "Trend / Duet" },
+  { id: "Live 直播",    label: "Live 直播"    },
+  { id: "個人頁",       label: "個人頁"       },
+  { id: "互動 / 工具",  label: "互動 / 工具"  },
+  { id: "系列 / 策略",  label: "系列 / 策略"  },
+];
+
+const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
+  // 腳本
+  "tt-30-opening-hook":     "腳本",
+  "tt-30-full-script":      "腳本",
+  "tt-60-foryou-full":      "腳本",
+  // 字幕 / 文案
+  "tt-30-caption-rhythm":   "字幕 / 文案",
+  "tt-30-caption-description": "字幕 / 文案",
+  // Trend / Duet
+  "tt-30-duet-angle":       "Trend / Duet",
+  "tt-30-trend-remix":      "Trend / Duet",
+  // Live 直播
+  "tt-30-live-opening":     "Live 直播",
+  // 個人頁
+  "tt-30-bio-rewrite":      "個人頁",
+  // 互動 / 工具
+  "tt-30-comment-reply":    "互動 / 工具",
+  "tt-30-hashtag-set":      "互動 / 工具",
+  // 系列 / 策略
+  "tt-60-series-3":         "系列 / 策略",
+  "tt-60-viral-rewrite":    "系列 / 策略",
+  "tt-99-30day-foryou":     "系列 / 策略",
+  "tt-99-trend-week":       "系列 / 策略",
+};
+
 // ── FBTaskCard type (same as QuickTask30sPage) ───────────────────────────────
 interface FBTaskCard {
   id: string;
@@ -548,6 +589,8 @@ function PlatformTaskPageInner() {
   const [activeLIFormat, setActiveLIFormat] = useState<LIActiveFormat>("all");
   // Format tab state (used for YT)
   const [activeYTFormat, setActiveYTFormat] = useState<YTActiveFormat>("all");
+  // Format tab state (used for TikTok)
+  const [activeTTFormat, setActiveTTFormat] = useState<TTActiveFormat>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -796,6 +839,11 @@ function PlatformTaskPageInner() {
       if (activeYTFormat !== "all") {
         list = list.filter((task) => YT_TASK_FORMAT_MAP[task.id] === activeYTFormat);
       }
+    } else if (platform === "tiktok") {
+      // Format-based filter for TikTok
+      if (activeTTFormat !== "all") {
+        list = list.filter((task) => TT_TASK_FORMAT_MAP[task.id] === activeTTFormat);
+      }
     } else {
       // Tier-based filter for other platforms
       if (activeTier !== "all") {
@@ -814,7 +862,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -864,6 +912,18 @@ function PlatformTaskPageInner() {
     const counts: Record<string, number> = { all: ytTasks.length };
     for (const task of ytTasks) {
       const fmt = YT_TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
+
+  // Count tasks per format category (TikTok)
+  const ttFormatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "tiktok") return {};
+    const ttTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: ttTasks.length };
+    for (const task of ttTasks) {
+      const fmt = TT_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
@@ -1206,6 +1266,41 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveYTFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "tiktok" ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {TT_FORMAT_TABS.map((tab) => {
+                  const active = activeTTFormat === tab.id;
+                  const count = ttFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTTFormat(tab.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active
