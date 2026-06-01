@@ -34,7 +34,6 @@ import {
   RefreshCw,
   Copy,
   Pencil,
-  Flag,
   Clock,
   CheckCircle2,
 } from "lucide-react";
@@ -252,8 +251,6 @@ function PlatformCell({
   onRedo,
   onCopy,
   onEdit,
-  onMarkRule,
-  onScheduleClick,
 }: {
   platform: TheaterPlatform;
   state: CellState;
@@ -266,8 +263,6 @@ function PlatformCell({
   onRedo?: () => void;
   onCopy?: () => void;
   onEdit?: () => void;
-  onMarkRule?: () => void;
-  onScheduleClick?: () => void;
 }) {
   const { t, lang } = useLang();
   const meta = PLATFORM_META[platform];
@@ -304,34 +299,22 @@ function PlatformCell({
         </span>
       )}
 
-      {/* ── Primary CTAs — always visible top-right when cell is done ─── */}
-      {isDone && caption && (
+      {/* ── Edit button — top-right, always visible when cell is done ─── */}
+      {isDone && caption && onEdit && (
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
-          {onEdit && (
-            <button
-              onClick={() => onEdit()}
-              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur-sm border border-neutral-300 text-neutral-700 hover:bg-white hover:border-neutral-500 shadow-sm transition"
-            >
-              <Pencil size={10} strokeWidth={2.5} />
-              {lang === "en" ? "Edit" : "編輯"}
-            </button>
-          )}
-          {onScheduleClick && (
-            <button
-              onClick={onScheduleClick}
-              className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg shadow-sm transition ${
-                state.scheduledPostId
-                  ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                  : "bg-neutral-900 hover:bg-neutral-700 text-white"
-              }`}
-            >
-              {state.scheduledPostId
-                ? <CheckCircle2 size={10} strokeWidth={2.5} />
-                : <CalendarIcon size={10} strokeWidth={2.5} />}
-              {state.scheduledPostId
-                ? (lang === "en" ? "Scheduled ✓" : "已排程 ✓")
-                : (lang === "en" ? "Schedule" : "送到行事曆")}
-            </button>
+          <button
+            onClick={() => onEdit()}
+            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur-sm border border-neutral-300 text-neutral-700 hover:bg-white hover:border-neutral-500 shadow-sm transition"
+          >
+            <Pencil size={10} strokeWidth={2.5} />
+            {lang === "en" ? "Edit" : "編輯"}
+          </button>
+          {/* Scheduled indicator — compact badge next to edit button */}
+          {state.scheduledPostId && (
+            <span className="flex items-center gap-0.5 text-[10px] font-medium px-2 py-1 rounded-lg bg-emerald-500/90 text-white backdrop-blur-sm shadow-sm">
+              <CheckCircle2 size={10} strokeWidth={2.5} />
+              {lang === "en" ? "Scheduled" : "已排程"}
+            </span>
           )}
         </div>
       )}
@@ -429,7 +412,7 @@ function PlatformCell({
         />
       )}
 
-      {/* Secondary actions — icon-only, below the mockup */}
+      {/* Secondary actions — copy + redo only, icon-only */}
       {isDone && caption && (
         <div className="mt-1 px-1 py-0.5 flex items-center gap-0.5">
           {onCopy && (
@@ -441,15 +424,6 @@ function PlatformCell({
               <Copy size={12} strokeWidth={2} />
             </button>
           )}
-          {onMarkRule && (
-            <button
-              onClick={onMarkRule}
-              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition"
-              title={t("theater_btn_mark_rule_tip")}
-            >
-              <Flag size={12} strokeWidth={2} />
-            </button>
-          )}
           {onRedo && (
             <button
               onClick={onRedo}
@@ -459,7 +433,7 @@ function PlatformCell({
               <RefreshCw size={12} strokeWidth={2} />
             </button>
           )}
-          {/* Scheduled time — shown inline when this cell has a scheduled time */}
+          {/* Scheduled time — tiny timestamp when scheduled */}
           {state.scheduledPostId && state.scheduledAt && (
             <span className="ml-auto text-[9px] text-emerald-600 pr-1 truncate">
               {new Date(state.scheduledAt).toLocaleString(
@@ -1629,8 +1603,6 @@ export default function TheaterPage() {
                       onCopy={() => copyCaption(key)}
                       onRedo={() => redoCell(key, p)}
                       onEdit={() => openEditModal(key, p, d.date, d.label)}
-                      onMarkRule={() => openRuleModal(key)}
-                      onScheduleClick={() => openScheduleModal(key, p, d.date, state.caption ?? "", state.imageUrl)}
                         />
                       {/* Platform connection status chip on done cells — always visible */}
                       {state.status === "done" && (
