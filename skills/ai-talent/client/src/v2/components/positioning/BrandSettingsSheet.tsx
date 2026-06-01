@@ -26,7 +26,7 @@ import AIPromptsEditor from "./AIPromptsEditor";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { useNavigate } from "react-router-dom";
-import { showToastGlobal } from "../../components/ui/Toast";
+import { showToastGlobal } from "../../../components/ui/Toast";
 
 // 2026-05-30 (CJ「modal 只留設定類 tab，內容類交給主頁面」):
 // 基本資料 和 視覺 都已在主工作區有完整 tab，不在 modal 重複。
