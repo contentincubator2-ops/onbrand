@@ -1214,9 +1214,25 @@ export default function TheaterPage() {
   const [scheduleDraft, setScheduleDraft] = useState<string>("");
 
   const openScheduleModal = (key: CellKey, platform: TheaterPlatform, date: string, caption: string, imageUrl?: string | null) => {
-    // Default to 09:00 on the cell date
     const pad = (n: number) => String(n).padStart(2, "0");
-    setScheduleAt(`${date}T09:00`);
+    // If the cell date is today or in the past, default to the next full hour
+    // (at least 5 min ahead) so the server's "must be future" guard never fires
+    // on submit without the user intentionally picking a past time.
+    const cellMidnight = new Date(`${date}T00:00`);
+    const now = new Date();
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(0, 0, 0, 0);
+    let defaultAt: string;
+    if (cellMidnight <= todayMidnight) {
+      // Today (or past date) — pick next round hour ≥ 5 min from now
+      const next = new Date(now.getTime() + 5 * 60_000);
+      next.setMinutes(0, 0, 0);
+      next.setTime(next.getTime() + 60 * 60_000); // advance to next hour
+      defaultAt = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:00`;
+    } else {
+      defaultAt = `${date}T09:00`;
+    }
+    setScheduleAt(defaultAt);
     setScheduleDraft(caption);
     setScheduleModal({ key, platform, date, caption, imageUrl });
   };
@@ -1224,22 +1240,26 @@ export default function TheaterPage() {
 
   const submitSchedule = async () => {
     if (!scheduleModal || !brandId) return;
-    const result = await scheduleCellMut?.mutateAsync?.({
-      brandId,
-      platform: scheduleModal.platform,
-      date: scheduleModal.date,
-      caption: scheduleDraft.trim() || scheduleModal.caption,
-      imageUrl: scheduleModal.imageUrl,
-      scheduledAt: new Date(scheduleAt).toISOString(),
-    });
-    if (result?.ok) {
-      updateCell(scheduleModal.key, {
-        scheduledPostId: result.scheduledPostId,
-        scheduledAt: new Date(scheduleAt).toISOString(),
-        // Persist the edited caption back to the cell
+    try {
+      const result = await scheduleCellMut?.mutateAsync?.({
+        brandId,
+        platform: scheduleModal.platform,
+        date: scheduleModal.date,
         caption: scheduleDraft.trim() || scheduleModal.caption,
+        imageUrl: scheduleModal.imageUrl,
+        scheduledAt: new Date(scheduleAt).toISOString(),
       });
-      closeScheduleModal();
+      if (result?.ok) {
+        updateCell(scheduleModal.key, {
+          scheduledPostId: result.scheduledPostId,
+          scheduledAt: new Date(scheduleAt).toISOString(),
+          caption: scheduleDraft.trim() || scheduleModal.caption,
+        });
+        closeScheduleModal();
+      }
+    } catch (e: any) {
+      // Show a user-visible error — the modal stays open so the user can retry
+      alert(e?.message ?? String(e));
     }
   };
 
