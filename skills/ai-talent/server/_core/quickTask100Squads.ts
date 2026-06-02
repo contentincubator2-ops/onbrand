@@ -248,7 +248,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-99-save-worthy",
     squad_slug: "ig-hormozi-save-worthy",
-    platform: "instagram", postType: "feed",
+    platform: "instagram", postType: "carousel",
     label: "IG × Hormozi 高收藏型策略",
     description: "用 carousel 教學 / 清單 / 對照表，讓粉絲想收藏分享給朋友",
     methodology: "Hormozi Save-Worthy",
