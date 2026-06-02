@@ -1218,30 +1218,35 @@ ${cleaned}
       }
 
       // 1) Synthetic mission
+      // Omit status — let MySQL use column DEFAULT ('inactive') so we never
+      // hit ENUM mismatch regardless of how the schema evolves in production.
       const missionTitle = `Theater · ${input.platform} · ${input.date}`;
       const [mRes]: any = await localPool.execute(
         `INSERT INTO missions
-           (userId, brandId, workspace, title, status, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, 'completed', NOW(3), NOW(3))`,
+           (userId, brandId, workspace, title, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, NOW(3), NOW(3))`,
         [ctx.user.id, input.brandId, input.platform, missionTitle],
       );
       const missionId = (mRes as any).insertId as number;
 
       // 2) Mission output
+      // Omit status — DEFAULT 'draft' is exactly what we need, and omitting
+      // it avoids any ENUM version mismatch on the production schema.
       const outputContent = JSON.stringify({ caption: input.caption, imageUrl: input.imageUrl ?? null });
       const [oRes]: any = await localPool.execute(
         `INSERT INTO mission_outputs
-           (missionId, content, status, createdAt, updatedAt)
-         VALUES (?, ?, 'draft', NOW(3), NOW(3))`,
+           (missionId, content, createdAt, updatedAt)
+         VALUES (?, ?, NOW(3), NOW(3))`,
         [missionId, outputContent],
       );
       const outputId = (oRes as any).insertId as number;
 
       // 3) Scheduled post
+      // Omit status — DEFAULT 'pending' is correct, avoids VARCHAR(12) surprises.
       const [spRes]: any = await localPool.execute(
         `INSERT INTO scheduled_posts
-           (userId, brandId, outputId, variantIndex, platform, scheduledAt, status)
-         VALUES (?, ?, ?, 0, ?, ?, 'pending')`,
+           (userId, brandId, outputId, variantIndex, platform, scheduledAt)
+         VALUES (?, ?, ?, 0, ?, ?)`,
         [ctx.user.id, input.brandId, outputId, input.platform, scheduledAt],
       );
       const scheduledPostId = (spRes as any).insertId as number;
