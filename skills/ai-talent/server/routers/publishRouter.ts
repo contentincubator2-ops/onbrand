@@ -92,7 +92,10 @@ export const publishRouter = router({
       const payload = {
         page_id: pageId,
         message: caption,
-        connect_external_user_id: String(ctx.user.id),
+        // MUST match the external_user_id used when creating the OAuth token —
+        // all Pipedream Connect tokens are stored under sowork-brand-{brandId},
+        // NOT under the raw userId.
+        connect_external_user_id: `sowork-brand-${row.brandId}`,
         // Diagnostics — Pipedream workflow can ignore these but they help
         // for support / dedupe / audit if Pipedream's logs are needed.
         _meta: {
@@ -438,11 +441,25 @@ export const publishRouter = router({
       const body = (await accsRes.json()) as { data?: Array<{ app?: string; id: string; name?: string }> };
       const accounts = body.data ?? [];
 
+      // Map Pipedream app slug → our platform key.
+      // Pipedream may register an account under different slug variants
+      // depending on project OAuth setup — cover all known variants.
       const APP_KEY: Record<string, string> = {
-        facebook_pages:      "facebook",
-        instagram_business:  "instagram",
-        linkedin:            "linkedin",
-        youtube:             "youtube",
+        // Facebook variants
+        facebook_pages:       "facebook",
+        facebook:             "facebook",
+        facebook_oauth2:      "facebook",
+        // Instagram variants (IG Business is linked through FB OAuth)
+        instagram_business:   "instagram",
+        instagram:            "instagram",
+        instagram_oauth2:     "instagram",
+        // LinkedIn variants
+        linkedin:             "linkedin",
+        linkedin_oauth2:      "linkedin",
+        // YouTube variants
+        youtube:              "youtube",
+        youtube_data_api:     "youtube",
+        youtube_oauth2:       "youtube",
       };
       const connected: Record<string, { accountId: string; name?: string }> = {};
       // 2026-05-30 diagnostic: log raw app slugs so we can verify APP_KEY mapping

@@ -401,7 +401,7 @@ export const calendarRouter = router({
 
       } else if (platform === "linkedin") {
         // ── LinkedIn: direct publish via Pipedream Connect OAuth ────────────
-        const liToken = await _pdGetOAuthToken(row.brandId, "linkedin", ["linkedin"]);
+        const liToken = await _pdGetOAuthToken(row.brandId, "linkedin", ["linkedin", "linkedin_oauth2"]);
         // Get LinkedIn member URN
         const meRes = await fetch("https://api.linkedin.com/v2/userinfo", {
           headers: { "Authorization": `Bearer ${liToken}` },
