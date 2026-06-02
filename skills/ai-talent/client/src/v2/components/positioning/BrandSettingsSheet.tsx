@@ -613,9 +613,11 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   const pdTokensRef = useRef<Record<string, TokenCache>>({});
 
   // ── Local state ───────────────────────────────────────────────────────
-  const [pendingPlatform, setPendingPlatform] = useState<string | null>(null);
-  const [fbPages, setFbPages]                 = useState<Array<{ id: string; name: string; category: string }>>([]);
-  const [fbPickerOpen, setFbPickerOpen]       = useState(false);
+  const [pendingPlatform, setPendingPlatform]   = useState<string | null>(null);
+  /** Platform currently being verified post-OAuth (polling Pipedream) */
+  const [verifyingPlatform, setVerifyingPlatform] = useState<string | null>(null);
+  const [fbPages, setFbPages]                   = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [fbPickerOpen, setFbPickerOpen]         = useState(false);
 
   const fbStatus    = fbStatusQ?.data;
   const fbConnected = !!fbStatus?.connected;
@@ -757,22 +759,48 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
       }
       popup.location.href = url;
 
-      // Poll for OAuth completion: check if popup closed + refetch status.
-      // We stagger 3 refetches (0s / 3s / 7s) to handle Pipedream's
-      // propagation delay — the popup may say "done" before their API
-      // reflects the new account.
-      const doRefetch = async (isFinal = false) => {
-        platformsQ?.refetch?.();
-        fbStatusQ?.refetch?.();
-        if (isFinal && platform.key === "facebook") {
+      // Once popup closes, poll Pipedream until the connection appears.
+      // Pipedream's API can take 5-20s to reflect a newly-completed OAuth,
+      // so we keep retrying every 2s for up to 30s before giving up.
+      const waitAndDetect = async () => {
+        const MAX_ATTEMPTS = 15; // 15 × 2s = 30s
+        let found = false;
+
+        for (let i = 0; i < MAX_ATTEMPTS; i++) {
+          // Small delay before first check (Pipedream needs ≥ 1s)
+          await new Promise<void>(r => setTimeout(r, i === 0 ? 1500 : 2000));
+
           try {
-            const pages = await fbPagesM?.mutateAsync?.({ brandId });
-            if ((pages?.pages?.length ?? 0) > 0) {
-              setFbPages(pages!.pages);
-              setFbPickerOpen(true);
+            const result = await platformsQ?.refetch?.();
+            const nowConnected = !!(result?.data as any)?.connected?.[platform.key];
+
+            if (nowConnected || i === MAX_ATTEMPTS - 1) {
+              // For Facebook: fetch manageable pages so user can pick one.
+              // Keep retrying until pages arrive (or we time out).
+              if (platform.key === "facebook") {
+                for (let fbTry = 0; fbTry < 5; fbTry++) {
+                  try {
+                    const pages = await fbPagesM?.mutateAsync?.({ brandId });
+                    if ((pages?.pages?.length ?? 0) > 0) {
+                      setFbPages(pages!.pages);
+                      setFbPickerOpen(true);
+                      break;
+                    }
+                  } catch { /* keep trying */ }
+                  if (fbTry < 4) await new Promise<void>(r => setTimeout(r, 2000));
+                }
+              }
+              fbStatusQ?.refetch?.();
+              prefetchTokens();
+              found = true;
+              break;
             }
-          } catch { /* non-fatal */ }
-          prefetchTokens();
+          } catch { /* refetch failed — keep polling */ }
+        }
+
+        if (!found) {
+          // Give up silently; user can re-click Connect if needed
+          fbStatusQ?.refetch?.();
         }
       };
 
@@ -780,12 +808,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         if (popup.closed) {
           clearInterval(timer);
           setPendingPlatform(null);
-          // Immediate refetch (may be empty — Pipedream hasn't propagated yet)
-          doRefetch(false);
-          // +3s: most connections register by now
-          setTimeout(() => doRefetch(false), 3_000);
-          // +7s: final attempt + FB page picker
-          setTimeout(() => doRefetch(true), 7_000);
+          setVerifyingPlatform(platform.key);
+          waitAndDetect().finally(() => setVerifyingPlatform(null));
         }
       }, 800);
     });
@@ -820,7 +844,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
           const pdConnected = !!connectedMap[p.key];
           // For Facebook, "connected" also means brand has a page binding
           const fullyConnected = p.key === "facebook" ? fbConnected : pdConnected;
-          const isPending = pendingPlatform === p.key;
+          const isPending   = pendingPlatform   === p.key;
+          const isVerifying = verifyingPlatform === p.key;
           const connectedAccount = connectedMap[p.key];
 
           return (
@@ -852,6 +877,11 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 {fullyConnected ? (
                   <span className="flex items-center gap-1 text-[11px] text-success-700 bg-success-100 border border-success-300 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">
                     <CheckCircle2 size={11} /> {en ? "Connected" : "已連接"}
+                  </span>
+                ) : isVerifying ? (
+                  <span className="flex items-center gap-1 text-[11px] text-primary-600 bg-primary-50 border border-primary-200 px-2 py-0.5 rounded-full flex-shrink-0 font-medium animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary-400 flex-shrink-0" />
+                    {en ? "Verifying…" : "確認中…"}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-[11px] text-default-400 bg-white border border-default-200 px-2 py-0.5 rounded-full flex-shrink-0">
@@ -891,22 +921,25 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 );
               })()}
 
-              {/* Connect / Re-authorize button — SDK handles popup internally */}
+              {/* Connect / Re-authorize button */}
               <div className="flex gap-2">
                 <Button
                   size="sm"
                   color={fullyConnected ? "default" : "primary"}
                   variant={fullyConnected ? "bordered" : "solid"}
-                  startContent={isPending ? undefined : <ExternalLink size={12} />}
-                  isLoading={isPending}
+                  startContent={(isPending || isVerifying) ? undefined : <ExternalLink size={12} />}
+                  isLoading={isPending || isVerifying}
+                  isDisabled={isPending || isVerifying}
                   onPress={() => connectWithSDK(p)}
                   className="flex-1"
                 >
                   {isPending
                     ? (en ? `Connecting ${p.label}…` : `連接 ${p.label} 中…`)
-                    : fullyConnected
-                      ? (en ? "Re-authorize" : "重新授權")
-                      : (en ? `Connect ${p.label}` : `連接 ${p.label}`)}
+                    : isVerifying
+                      ? (en ? "Verifying connection…" : "確認授權中…")
+                      : fullyConnected
+                        ? (en ? "Re-authorize" : "重新授權")
+                        : (en ? `Connect ${p.label}` : `連接 ${p.label}`)}
                 </Button>
                 {/* Disconnect — only Facebook has DB binding to clear */}
                 {p.key === "facebook" && fbConnected && (
