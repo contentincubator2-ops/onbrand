@@ -780,6 +780,7 @@ function PostPill({
   const [expanded, setExpanded] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const color = getPlatformColor(item.platform);
   const isPublished = item.kind === "published";
@@ -860,10 +861,13 @@ function PostPill({
                       ? `Publish to ${platformLabel} now? This will post immediately.`
                       : `確定立即發布到 ${platformLabel}？發布後無法撤回。`)) return;
                     setPublishing(true);
+                    setPublishError(null);
                     try {
                       await onPublish(item.id);
                     } catch (e: any) {
-                      alert(e?.message ?? String(e));
+                      const msg: string = e?.message ?? String(e);
+                      // Show friendly inline error; raw TRPC error contains the server message
+                      setPublishError(msg.replace(/^TRPCClientError:\s*/i, ""));
                     } finally {
                       setPublishing(false);
                     }
@@ -876,6 +880,18 @@ function PostPill({
                     ? (lang === "en" ? "Publishing…" : "發布中…")
                     : (lang === "en" ? "Publish now" : "立即發布")}
                 </button>
+              )}
+              {publishError && (
+                <div className="w-full mt-1 px-2 py-1.5 rounded-lg text-[10px] leading-relaxed"
+                  style={{ background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412" }}>
+                  ⚠️ {publishError}
+                  <button
+                    onClick={() => navigate(`/run/${item.outputId}`)}
+                    className="ml-2 underline text-[10px]"
+                  >
+                    {lang === "en" ? "View post →" : "查看貼文 →"}
+                  </button>
+                </div>
               )}
               <button
                 onClick={() => onReschedule(item.id, item.at)}
