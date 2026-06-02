@@ -633,107 +633,6 @@ export default function RunPage() {
   // handleFbConfirmAuth removed (2026-05-30): replaced by polling auto-detection.
   // startFbPolling() detects when Pipedream OAuth completes, then fetches pages.
 
-  // ── Unified schedule-dialog confirm handler ─────────────────────────────
-  // Called by the single Schedule modal for all three modes.
-  const handleScheduleConfirm = React.useCallback(async () => {
-    const _scheduledAt = new Date(scheduleAt).toISOString();
-
-    if (schedMode === "ics") {
-      // Mode A: download .ics only — no navigate
-      const _tid = (data as any)?.mission?.taskId ?? "";
-      const _pfxMap: Record<string, string> = {
-        fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
-        li: "linkedin", em: "email", pr: "press",
-      };
-      const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
-      const _platform = (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
-      scheduleMut.mutate({
-        id, variantIndex: activeIdx,
-        scheduledAt: _scheduledAt,
-        durationMinutes: 30,
-      }, {
-        onSuccess: () => {
-          setScheduleDialogOpen(false);
-          // Also register in scheduled_posts (non-fatal) so CalendarPage can see it
-          scheduleToCalMut?.mutateAsync?.({
-            outputId: id, variantIndex: activeIdx,
-            platform: _platform, scheduledAt: _scheduledAt,
-          }).catch(() => {/* non-fatal */});
-        },
-      });
-    } else {
-      // Mode B ("calendar") or Mode C ("publish") — write to scheduled_posts + navigate
-      const _platform = schedMode === "publish"
-        ? schedPlatform
-        : (() => {
-            const _tid = (data as any)?.mission?.taskId ?? "";
-            const _pfxMap: Record<string, string> = {
-              fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
-              li: "linkedin", em: "email", pr: "press",
-            };
-            const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
-            return (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
-          })();
-      try {
-        await scheduleToCalMut?.mutateAsync?.({
-          outputId: id, variantIndex: activeIdx,
-          platform: _platform, scheduledAt: _scheduledAt,
-        });
-        setScheduleDialogOpen(false);
-        navigate("/calendar");
-      } catch {
-        // error toast already shown by scheduleToCalMut.onError
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schedMode, schedPlatform, scheduleAt, id, activeIdx, data, scheduleMut, scheduleToCalMut, navigate]);
-
-  // ── Bulk .ics export (calendar-type tasks only) ──────────────────────────
-  const handleBulkIcsExport = React.useCallback(() => {
-    const esc = (s: string) => String(s ?? "")
-      .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
-      .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-    const ev: string[] = [];
-    let eventCount = 0;
-    variants.forEach((v: any, i: number) => {
-      const m = /(\d{4})\/(\d{2})\/(\d{2})/.exec(String(v.label ?? ""));
-      if (!m) return;
-      eventCount++;
-      const ymd = `${m[1]}${m[2]}${m[3]}`;
-      const next = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
-      const ymdEnd = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(next.getDate()).padStart(2, "0")}`;
-      const summary = String(v.label ?? "").replace(/^\d{4}\/\d{2}\/\d{2}\s*·\s*/, "");
-      ev.push(
-        "BEGIN:VEVENT",
-        `UID:${id}-${i}@onbrand.sowork.ai`,
-        `DTSTART;VALUE=DATE:${ymd}`,
-        `DTEND;VALUE=DATE:${ymdEnd}`,
-        `SUMMARY:${esc(((data as any)?.brand?.name ? (data as any).brand.name + " · " : "") + summary)}`,
-        `DESCRIPTION:${esc(v.caption ?? "")}`,
-        "END:VEVENT",
-      );
-    });
-    if (ev.length === 0) {
-      showToastGlobal(lang === "en" ? "No dated posts to export" : "沒有可匯出的日期貼文");
-      return;
-    }
-    const ics = [
-      "BEGIN:VCALENDAR", "VERSION:2.0",
-      "PRODID:-//OnBrand//Content Calendar//ZH",
-      "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
-    ].join("\r\n");
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `content-calendar-${id}.ics`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showToastGlobal(lang === "en"
-      ? `Exported ${eventCount} posts — drop the .ics into your calendar`
-      : `已匯出 ${eventCount} 篇 — 拖進日曆 App 即可`);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variants, id, data, lang]);
-
   // Video gen — async pipeline. Spawn job, poll for status until ready.
   // 2026-05-12 (CJ「我要改成只給腳本 — C」): storyboard mode replaces full
   // video gen. Calls video.generateStoryboard which returns a script with
@@ -870,6 +769,104 @@ export default function RunPage() {
     } catch { /* ignore */ }
     return [{ label: lang === "en" ? "Main version" : "主版本", caption: sanitizeCaption(data.content || "") }];
   }, [data]);
+
+  // ── Unified schedule-dialog confirm handler ─────────────────────────────
+  // (Defined here, after schedMode / schedPlatform / scheduleAt / variants are
+  //  all in scope — was above them before which caused TS2448 TDZ errors.)
+  const handleScheduleConfirm = React.useCallback(async () => {
+    const _scheduledAt = new Date(scheduleAt).toISOString();
+    if (schedMode === "ics") {
+      const _tid = (data as any)?.mission?.taskId ?? "";
+      const _pfxMap: Record<string, string> = {
+        fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+        li: "linkedin", em: "email", pr: "press",
+      };
+      const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
+      const _platform = (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
+      scheduleMut.mutate({
+        id, variantIndex: activeIdx,
+        scheduledAt: _scheduledAt,
+        durationMinutes: 30,
+      }, {
+        onSuccess: () => {
+          setScheduleDialogOpen(false);
+          scheduleToCalMut?.mutateAsync?.({
+            outputId: id, variantIndex: activeIdx,
+            platform: _platform, scheduledAt: _scheduledAt,
+          }).catch(() => {/* non-fatal */});
+        },
+      });
+    } else {
+      const _platform = schedMode === "publish"
+        ? schedPlatform
+        : (() => {
+            const _tid = (data as any)?.mission?.taskId ?? "";
+            const _pfxMap: Record<string, string> = {
+              fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+              li: "linkedin", em: "email", pr: "press",
+            };
+            const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
+            return (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
+          })();
+      try {
+        await scheduleToCalMut?.mutateAsync?.({
+          outputId: id, variantIndex: activeIdx,
+          platform: _platform, scheduledAt: _scheduledAt,
+        });
+        setScheduleDialogOpen(false);
+        navigate("/calendar");
+      } catch {
+        // error toast already shown by scheduleToCalMut.onError
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedMode, schedPlatform, scheduleAt, id, activeIdx, data, scheduleMut, scheduleToCalMut, navigate]);
+
+  // ── Bulk .ics export (calendar-type tasks only) ──────────────────────────
+  const handleBulkIcsExport = React.useCallback(() => {
+    const esc = (s: string) => String(s ?? "")
+      .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
+      .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+    const ev: string[] = [];
+    let eventCount = 0;
+    variants.forEach((v: any, i: number) => {
+      const m = /(\d{4})\/(\d{2})\/(\d{2})/.exec(String(v.label ?? ""));
+      if (!m) return;
+      eventCount++;
+      const ymd = `${m[1]}${m[2]}${m[3]}`;
+      const next = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
+      const ymdEnd = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(next.getDate()).padStart(2, "0")}`;
+      const summary = String(v.label ?? "").replace(/^\d{4}\/\d{2}\/\d{2}\s*·\s*/, "");
+      ev.push(
+        "BEGIN:VEVENT",
+        `UID:${id}-${i}@onbrand.sowork.ai`,
+        `DTSTART;VALUE=DATE:${ymd}`,
+        `DTEND;VALUE=DATE:${ymdEnd}`,
+        `SUMMARY:${esc(((data as any)?.brand?.name ? (data as any).brand.name + " · " : "") + summary)}`,
+        `DESCRIPTION:${esc(v.caption ?? "")}`,
+        "END:VEVENT",
+      );
+    });
+    if (ev.length === 0) {
+      showToastGlobal(lang === "en" ? "No dated posts to export" : "沒有可匯出的日期貼文");
+      return;
+    }
+    const ics = [
+      "BEGIN:VCALENDAR", "VERSION:2.0",
+      "PRODID:-//OnBrand//Content Calendar//ZH",
+      "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
+    ].join("\r\n");
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `content-calendar-${id}.ics`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToastGlobal(lang === "en"
+      ? `Exported ${eventCount} posts — drop the .ics into your calendar`
+      : `已匯出 ${eventCount} 篇 — 拖進日曆 App 即可`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variants, id, data, lang]);
 
   // Apply local overrides so mockup reflects unsaved edits in real time
   // 2026-05-12 pre-launch zombie audit: clamp activeIdx so deleted-variant
