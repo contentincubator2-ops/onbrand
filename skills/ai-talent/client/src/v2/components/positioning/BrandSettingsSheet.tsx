@@ -632,42 +632,32 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   }, []);
 
   // ── Pre-fetch tokens for all platforms ────────────────────────────────
+  // Only the token value matters — the URL is always built fresh via buildUrl()
+  // so we never store or depend on connectLinkUrl.
   const prefetchTokens = useCallback(async () => {
     if (!brandId) return;
-    // Facebook
+    // Facebook — uses publish.getFacebookConnectUrl (has server-side validation)
     try {
       const r = await fbConnectUrlM?.mutateAsync?.({ brandId });
       if (r?.token) {
-        // Treat empty string same as missing — use token-only fallback
-        const baseUrl = r.connectUrl || null;
         pdTokensRef.current["facebook"] = {
           token: r.token,
-          connectLinkUrl: baseUrl || `https://pipedream.com/_static/connect.html?token=${r.token}&app=facebook_pages`,
+          connectLinkUrl: "",   // unused — buildUrl() constructs from token
           appSlug: "facebook_pages",
           env: "production",
           expiresAt: r.expiresAt ? new Date(r.expiresAt).getTime() : Date.now() + 300_000,
         };
       }
-    } catch { /* silent — token just won't be cached yet */ }
+    } catch { /* silent — will fetch fresh on click */ }
     // Instagram / LinkedIn / YouTube
-    const PD_SLUG: Record<string, string> = {
-      instagram: "instagram_business",
-      linkedin:  "linkedin",
-      youtube:   "youtube",
-    };
     for (const key of ["instagram", "linkedin", "youtube"] as const) {
       try {
         const r = await getConnectTkM?.mutateAsync?.({ platform: key, brandId });
         if (r?.token) {
-          const slug = PD_SLUG[key];
-          // Server returns "" when Pipedream omits connect_link_url — treat as missing
-          const baseUrl = r.connectLinkUrl || null;
           pdTokensRef.current[key] = {
             token: r.token,
-            connectLinkUrl: baseUrl
-              ? `${baseUrl.replace(/[?&]app=[^&]*/g, "")}${baseUrl.includes("?") ? "&" : "?"}app=${slug}`
-              : `https://pipedream.com/_static/connect.html?token=${r.token}&app=${slug}`,
-            appSlug: slug,
+            connectLinkUrl: "",   // unused
+            appSlug: r.appSlug ?? key,
             env: r.env ?? "production",
             expiresAt: r.expiresAt ? new Date(r.expiresAt).getTime() : Date.now() + 300_000,
           };
@@ -710,7 +700,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 
     setPendingPlatform(platform.key);
 
-    // Map platform key → Pipedream app slug (must match exactly what Pipedream expects)
+    // Pipedream app slugs — must match exactly
     const PD_APP_SLUG: Record<string, string> = {
       facebook:  "facebook_pages",
       instagram: "instagram_business",
@@ -719,33 +709,22 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     };
     const appSlug = PD_APP_SLUG[platform.key] ?? platform.key;
 
-    // Belt-and-suspenders: ALWAYS force the correct ?app= slug into any
-    // connect URL. Pipedream sometimes omits or returns the wrong app param
-    // even when we send app in the token body, causing "Please include the
-    // app in the Connect URL". We unconditionally set() so a wrong existing
-    // value (e.g. "instagram" instead of "instagram_business") is corrected.
-    const ensureApp = (url: string): string => {
-      try {
-        const u = new URL(url);
-        u.searchParams.set("app", appSlug); // always override, never just add
-        return u.toString();
-      } catch {
-        // URL is not parseable — strip any existing app= and append correct one
-        const stripped = url.replace(/[?&]app=[^&]*/g, "");
-        return stripped + (stripped.includes("?") ? "&" : "?") + `app=${appSlug}`;
-      }
-    };
+    // Build the Pipedream Connect URL purely from the token.
+    // We NEVER trust connectLinkUrl returned by Pipedream — it sometimes
+    // omits ?app= regardless of what we send in the body. The documented
+    // URL format is fixed: ?token=TOKEN&app=APP_SLUG.
+    const buildUrl = (token: string) =>
+      `https://pipedream.com/_static/connect.html?token=${encodeURIComponent(token)}&app=${encodeURIComponent(appSlug)}`;
 
-    // Prefer cached token; if missing or expired, fetch a fresh one
+    // Use cached token if still valid; otherwise fetch fresh one
     const tk = pdTokensRef.current[platform.key];
     const fetchUrl = async (): Promise<string | null> => {
-      if (tk && tk.connectLinkUrl && tk.expiresAt - Date.now() > 30_000) {
-        return ensureApp(tk.connectLinkUrl);
+      if (tk?.token && tk.expiresAt - Date.now() > 30_000) {
+        return buildUrl(tk.token);
       }
       try {
         const r = await getConnectTkM?.mutateAsync?.({ platform: platform.key as any, brandId });
-        if (r?.connectLinkUrl) return ensureApp(r.connectLinkUrl);
-        if (r?.token) return `https://pipedream.com/_static/connect.html?token=${r.token}&app=${appSlug}`;
+        if (r?.token) return buildUrl(r.token);
       } catch { /* fall through */ }
       return null;
     };
