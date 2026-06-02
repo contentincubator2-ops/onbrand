@@ -283,14 +283,24 @@ export const calendarRouter = router({
    *
    * If the env var is not set, returns PRECONDITION_FAILED with a clear message.
    */
+  /**
+   * 2026-06-02 (CJ): Rewritten to use Pipedream Connect credentials directly
+   * for Facebook instead of requiring a separate PIPEDREAM_FB_PUBLISH_WEBHOOK.
+   *
+   * Facebook flow (no webhook needed):
+   *   1. Get Pipedream bearer token via client_credentials
+   *   2. Get user's FB OAuth token from Pipedream vault
+   *   3. Call /me/accounts to get page access token for brand.fbPageId
+   *   4. POST /v18.0/{pageId}/feed directly
+   *
+   * Other platforms: falls back to PIPEDREAM_*_PUBLISH_WEBHOOK if set.
+   */
   publish: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      const secret = (process.env as any).PIPEDREAM_WEBHOOK_SECRET as string | undefined;
-
       const { default: localPool } = await import("../localDb");
 
-      // Load scheduled_post + verify ownership + mission_output + brand page bindings
+      // Load scheduled_post + verify ownership
       const [rows]: any = await localPool.execute(
         `SELECT sp.id, sp.outputId, sp.variantIndex, sp.platform, sp.status, sp.brandId,
                 o.content AS outputContent,
@@ -308,48 +318,18 @@ export const calendarRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文已發布或已取消，無法重複發布" });
       }
 
-      // Normalise platform to canonical form
+      // Normalise platform
       const platformRaw: string = (row.platform ?? "").toLowerCase();
       const platform =
-        platformRaw === "fb"        ? "facebook"  :
-        platformRaw === "ig"        ? "instagram" :
-        platformRaw === "li"        ? "linkedin"  :
-        platformRaw === "yt"        ? "youtube"   :
-        platformRaw === "tt"        ? "tiktok"    :
-        platformRaw === "pr"        ? "press"     :
+        platformRaw === "fb" ? "facebook" :
+        platformRaw === "ig" ? "instagram" :
+        platformRaw === "li" ? "linkedin" :
+        platformRaw === "yt" ? "youtube" :
+        platformRaw === "tt" ? "tiktok" :
+        platformRaw === "pr" ? "press" :
         platformRaw;
 
-      // Map platform to its Pipedream publish webhook env var
-      const WEBHOOK_ENV: Record<string, string> = {
-        facebook:  "PIPEDREAM_FB_PUBLISH_WEBHOOK",
-        instagram: "PIPEDREAM_IG_PUBLISH_WEBHOOK",
-        linkedin:  "PIPEDREAM_LI_PUBLISH_WEBHOOK",
-        youtube:   "PIPEDREAM_YT_PUBLISH_WEBHOOK",
-        tiktok:    "PIPEDREAM_TT_PUBLISH_WEBHOOK",
-        email:     "PIPEDREAM_EMAIL_PUBLISH_WEBHOOK",
-        press:     "PIPEDREAM_PR_PUBLISH_WEBHOOK",
-      };
-      const envKey = WEBHOOK_ENV[platform];
-      const webhookUrl = envKey ? (process.env as any)[envKey] as string | undefined : undefined;
-
-      if (!webhookUrl) {
-        const platformLabel =
-          platform === "facebook"  ? "Facebook"  :
-          platform === "instagram" ? "Instagram" :
-          platform === "linkedin"  ? "LinkedIn"  :
-          platform === "youtube"   ? "YouTube"   :
-          platform === "tiktok"    ? "TikTok"    :
-          platform === "email"     ? "Email"     :
-          platform === "press"     ? "新聞稿"    :
-          platform;
-        console.error(`[calendar.publish] missing env: ${envKey ?? "(unknown platform: " + platformRaw + ")"}`);
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `${platformLabel} 發布服務尚未啟用，請聯絡 sowork@sowork.ai。`,
-        });
-      }
-
-      // Extract caption from mission_output content (same logic as publishRouter.toFacebook)
+      // Extract caption
       let caption = "";
       try {
         const parsed = JSON.parse(row.outputContent);
@@ -362,91 +342,190 @@ export const calendarRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文沒有文字內容可發布" });
       }
 
-      // Facebook requires brand.fbPageId binding; other platforms use connect OAuth directly
-      if (platform === "facebook" && !row.brand_fb_page_id) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "此品牌尚未連接 Facebook 粉專。請到 品牌設定 → 連接 Facebook 完成綁定。",
-        });
-      }
-
-      // Build platform-agnostic Pipedream payload
-      const pipedreamPayload: Record<string, any> = {
-        platform,
-        message: caption,
-        connect_external_user_id: String(ctx.user.id),
-        _meta: {
-          secret: secret ?? null,
-          outputId: row.outputId,
-          variantIndex: row.variantIndex ?? 0,
-          brandId: row.brandId,
-          brandName: row.brandName ?? null,
-          userId: ctx.user.id,
-          scheduledPostId: input.id,
-          source: "calendar.publish",
-        },
-      };
-      // Facebook-specific fields
-      if (platform === "facebook") {
-        pipedreamPayload.page_id = row.brand_fb_page_id;
-        pipedreamPayload._meta.fbPageName = row.brand_fb_page_name ?? null;
-      }
-
       const t0 = Date.now();
-      const resp = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pipedreamPayload),
-        signal: AbortSignal.timeout(30_000),
-      });
-      const text = await resp.text();
-      const latencyMs = Date.now() - t0;
+      let permalink: string | null = null;
+      let postId: string | null = null;
 
-      if (!resp.ok) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `Pipedream ${resp.status}: ${text.slice(0, 300)}`,
+      // ── Facebook: publish directly via Pipedream Connect OAuth ──────────
+      if (platform === "facebook") {
+        if (!row.brand_fb_page_id) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "此品牌尚未連接 Facebook 粉專。請先在右側面板連接 Facebook。",
+          });
+        }
+
+        const clientId     = process.env.PIPEDREAM_CLIENT_ID;
+        const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
+        const projectId    = process.env.PIPEDREAM_PROJECT_ID;
+        const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
+
+        if (!clientId || !clientSecret || !projectId) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Facebook 授權服務尚未設定（Pipedream Connect 憑證缺失），請聯絡 sowork@sowork.ai。",
+          });
+        }
+
+        // Step 1: Pipedream bearer token
+        const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+        const tokenRes = await fetch("https://api.pipedream.com/v1/oauth/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Basic ${basicAuth}` },
+          body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
+          signal: AbortSignal.timeout(15_000),
         });
+        if (!tokenRes.ok) {
+          const t = await tokenRes.text();
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream token 失敗：${t.slice(0, 200)}` });
+        }
+        const { access_token } = (await tokenRes.json()) as { access_token: string };
+
+        const pdHeaders = {
+          "Authorization":    `Bearer ${access_token}`,
+          "X-PD-Environment": pdEnv,
+          "x-pd-project-id":  projectId,
+        };
+        const externalUserId = `sowork-brand-${row.brandId}`;
+        const PD = "https://api.pipedream.com/v1";
+
+        // Step 2: find the FB account in Pipedream vault
+        const accsRes = await fetch(
+          `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`,
+          { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
+        );
+        if (!accsRes.ok) {
+          const t = await accsRes.text();
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream 帳號列表失敗：${t.slice(0, 200)}` });
+        }
+        const accsData = (await accsRes.json()) as { data?: Array<{ id: string; app?: string }> };
+        const FB_SLUGS = new Set(["facebook_pages", "facebook", "facebook_oauth2"]);
+        const fbAcc = (accsData.data ?? []).find(a => a.app && FB_SLUGS.has(a.app));
+        if (!fbAcc) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "找不到 Facebook 授權記錄，請重新連接 Facebook。",
+          });
+        }
+
+        // Step 3: get OAuth credentials
+        const credRes = await fetch(
+          `${PD}/connect/${projectId}/accounts/${fbAcc.id}?include_credentials=1`,
+          { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
+        );
+        if (!credRes.ok) {
+          const t = await credRes.text();
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得 FB 憑證：${t.slice(0, 200)}` });
+        }
+        const credData = (await credRes.json()) as { credentials?: { oauth_access_token?: string; access_token?: string } };
+        const userToken = credData.credentials?.oauth_access_token ?? credData.credentials?.access_token;
+        if (!userToken) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 FB OAuth token，請重新授權。" });
+        }
+
+        // Step 4: get page access token from /me/accounts
+        const pageId: string = row.brand_fb_page_id;
+        const meRes = await fetch(
+          `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&limit=50&access_token=${encodeURIComponent(userToken)}`,
+          { signal: AbortSignal.timeout(15_000) },
+        );
+        if (!meRes.ok) {
+          const t = await meRes.text();
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `FB Graph API /me/accounts 失敗：${t.slice(0, 200)}` });
+        }
+        const meData = (await meRes.json()) as { data?: Array<{ id: string; name: string; access_token?: string }> };
+        const page = (meData.data ?? []).find(p => p.id === pageId);
+        if (!page?.access_token) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `找不到粉專 ${pageId} 的存取權限。請確認此 FB 帳號是該粉專的管理員。`,
+          });
+        }
+        const pageToken = page.access_token;
+
+        // Step 5: POST to FB Graph API
+        const fbRes = await fetch(
+          `https://graph.facebook.com/v18.0/${pageId}/feed`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: caption, access_token: pageToken }),
+            signal: AbortSignal.timeout(30_000),
+          },
+        );
+        const fbText = await fbRes.text();
+        if (!fbRes.ok) {
+          let errMsg = fbText.slice(0, 300);
+          try { errMsg = JSON.parse(fbText)?.error?.message ?? errMsg; } catch { /* keep raw */ }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Facebook 發布失敗：${errMsg}` });
+        }
+        const fbResult = JSON.parse(fbText) as { id?: string };
+        postId = fbResult.id ?? null;
+        permalink = postId ? `https://www.facebook.com/${postId}` : null;
+
+      } else {
+        // ── Other platforms: use PIPEDREAM_*_PUBLISH_WEBHOOK if set ────────
+        const WEBHOOK_ENV: Record<string, string> = {
+          instagram: "PIPEDREAM_IG_PUBLISH_WEBHOOK",
+          linkedin:  "PIPEDREAM_LI_PUBLISH_WEBHOOK",
+          youtube:   "PIPEDREAM_YT_PUBLISH_WEBHOOK",
+          tiktok:    "PIPEDREAM_TT_PUBLISH_WEBHOOK",
+          email:     "PIPEDREAM_EMAIL_PUBLISH_WEBHOOK",
+          press:     "PIPEDREAM_PR_PUBLISH_WEBHOOK",
+        };
+        const envKey = WEBHOOK_ENV[platform];
+        const webhookUrl = envKey ? (process.env as any)[envKey] as string | undefined : undefined;
+
+        if (!webhookUrl) {
+          const label =
+            platform === "instagram" ? "Instagram" :
+            platform === "linkedin"  ? "LinkedIn"  :
+            platform === "youtube"   ? "YouTube"   :
+            platform === "tiktok"    ? "TikTok"    :
+            platform;
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `${label} 直接發布尚未設定，請聯絡 sowork@sowork.ai。`,
+          });
+        }
+
+        const resp = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platform, message: caption, brandId: row.brandId, outputId: row.outputId }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        const text = await resp.text();
+        if (!resp.ok) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Webhook 發布失敗 ${resp.status}: ${text.slice(0, 300)}` });
+        }
+        let result: any = text;
+        try { result = JSON.parse(text); } catch { /* keep text */ }
+        permalink = result?.permalink_url ?? result?.permalink ?? null;
+        postId = result?.post_id ?? result?.id ?? null;
       }
 
-      let pipedreamResult: any = text;
-      try { pipedreamResult = JSON.parse(text); } catch { /* keep as text */ }
-
-      const permalink = pipedreamResult?.permalink_url ?? pipedreamResult?.permalink ?? null;
+      const latencyMs = Date.now() - t0;
 
       // Mark scheduled_post as published
       try {
         await localPool.execute(
-          `UPDATE scheduled_posts
-           SET status = 'published', publishedAt = NOW(3), externalUrl = ?
-           WHERE id = ?`,
+          `UPDATE scheduled_posts SET status = 'published', publishedAt = NOW(3), externalUrl = ? WHERE id = ?`,
           [permalink, input.id],
         );
-      } catch (e) {
-        console.error("[calendar.publish] failed to update scheduled_posts:", e);
-      }
+      } catch (e) { console.error("[calendar.publish] update scheduled_posts failed:", e); }
 
       // Mark mission_output as published
       if (row.outputId) {
         try {
           await localPool.execute(
-            `UPDATE mission_outputs
-             SET status = 'published', publishedAt = NOW(), updatedAt = NOW()
-             WHERE id = ?`,
+            `UPDATE mission_outputs SET status = 'published', publishedAt = NOW(), updatedAt = NOW() WHERE id = ?`,
             [row.outputId],
           );
-        } catch (e) {
-          console.error("[calendar.publish] failed to update mission_outputs:", e);
-        }
+        } catch (e) { console.error("[calendar.publish] update mission_outputs failed:", e); }
       }
 
-      return {
-        ok: true,
-        latencyMs,
-        pipedreamResult,
-        postId: pipedreamResult?.post_id ?? pipedreamResult?.id ?? null,
-        permalink,
-      };
+      return { ok: true, latencyMs, postId, permalink };
     }),
 });
 
