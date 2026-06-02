@@ -93,7 +93,22 @@ export default function EditCellModal({
   const [polishing, setPolishing]   = useState(false);
   const [imaging, setImaging]       = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleAt, setScheduleAt] = useState(`${date}T09:00`);
+  const [scheduleAt, setScheduleAt] = useState(() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    // If the cell date is today or in the past, default to the next full hour
+    // (≥5 min from now) so we never pre-fill a past time.
+    const cellMidnight = new Date(`${date}T00:00`);
+    const now = new Date();
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(0, 0, 0, 0);
+    if (cellMidnight <= todayMidnight) {
+      const next = new Date(now.getTime() + 5 * 60_000);
+      next.setMinutes(0, 0, 0);
+      next.setTime(next.getTime() + 60 * 60_000); // advance to next hour
+      return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:00`;
+    }
+    return `${date}T09:00`;
+  });
   const [scheduling, setScheduling] = useState(false);
   const [hashtagInput, setHashtagInput] = useState("");
   const [polishError, setPolishError] = useState<string | null>(null);
