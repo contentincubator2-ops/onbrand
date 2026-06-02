@@ -170,10 +170,62 @@ export default function CalendarPage() {
     onSuccess: () => rangeQ?.refetch?.(),
   });
   const publishMut = (trpc as any).calendar?.publish?.useMutation?.({
-    onSuccess: (_r: any, vars: any) => {
+    onSuccess: (_r: any, _vars: any) => {
       rangeQ?.refetch?.();
     },
   });
+
+  // Facebook connect flow — same "open about:blank first" pattern as RunPage
+  // to avoid popup-blocking. Triggered from PostPill when publish fails due
+  // to missing FB page connection.
+  const fbConnectUrlMut = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
+  const fbPagesMut      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
+  const setFbPageMut    = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
+    onSuccess: () => rangeQ?.refetch?.(),
+  });
+  const [fbPages, setFbPages] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [fbPickerBrandId, setFbPickerBrandId] = useState<number | null>(null);
+
+  const connectFacebookFromCalendar = React.useCallback((calBrandId: number) => {
+    const popup = window.open("about:blank", "_blank", "popup,width=640,height=760");
+    if (!popup) {
+      alert(lang === "en"
+        ? "Popup blocked — allow popups for this site and try again."
+        : "彈出視窗被封鎖，請允許本站顯示彈出視窗後再試。");
+      return;
+    }
+    popup.document.write(
+      `<p style="font:14px sans-serif;padding:24px;color:#555">${lang === "en" ? "Loading…" : "載入授權頁面中…"}</p>`
+    );
+    fbConnectUrlMut?.mutateAsync?.({ brandId: calBrandId }).then((r: any) => {
+      if (r?.connectUrl) {
+        popup.location.href = r.connectUrl;
+        const timer = setInterval(async () => {
+          if (popup.closed) {
+            clearInterval(timer);
+            try {
+              const pages = await fbPagesMut?.mutateAsync?.({ brandId: calBrandId });
+              if ((pages?.pages?.length ?? 0) > 0) {
+                setFbPages(pages!.pages);
+                setFbPickerBrandId(calBrandId);
+              } else {
+                alert(lang === "en"
+                  ? "Connected! But no Facebook Pages found on this account."
+                  : "授權成功！但此帳號沒有可管理的 FB 粉專。");
+              }
+            } catch { /* user can retry */ }
+          }
+        }, 800);
+      } else {
+        popup.close();
+        alert(lang === "en" ? "Could not get connect URL." : "無法取得授權連結，請稍後再試。");
+      }
+    }).catch((e: any) => {
+      popup.close();
+      alert(e?.message ?? String(e));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang, fbConnectUrlMut, fbPagesMut]);
 
   // Platform picker modal state
   const [pickerDate, setPickerDate] = useState<Date | null>(null);
@@ -538,6 +590,7 @@ export default function CalendarPage() {
                               setRescheduleAt(formatLocalDatetimeInput(new Date(at)));
                             }}
                             onPublish={(id) => publishMut?.mutateAsync?.({ id })}
+                            onConnectFacebook={connectFacebookFromCalendar}
                             rescheduling={rescheduleId === it.id}
                           />
                         ))}
@@ -761,13 +814,65 @@ export default function CalendarPage() {
           </div>
         </div>
       )}
+
+      {/* ── Facebook Page Picker (after OAuth) ────────────────────── */}
+      {fbPickerBrandId !== null && fbPages.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => { setFbPickerBrandId(null); setFbPages([]); }}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-[15px] font-semibold mb-1">
+              {lang === "en" ? "Select Facebook Page to bind" : "選擇要綁定的粉絲團"}
+            </h2>
+            <p className="text-[12px] text-default-500 mb-4">
+              {lang === "en"
+                ? "After binding, click「Publish now」again to post."
+                : "綁定後，再次點「立即發布」即可發文。"}
+            </p>
+            <div className="space-y-2">
+              {fbPages.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={async () => {
+                    try {
+                      await setFbPageMut?.mutateAsync?.({
+                        brandId: fbPickerBrandId!,
+                        fbPageId: p.id,
+                        fbPageName: p.name,
+                      });
+                    } catch { /* non-fatal */ }
+                    setFbPickerBrandId(null);
+                    setFbPages([]);
+                    rangeQ?.refetch?.();
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg border border-default-200 hover:border-blue-400 hover:bg-blue-50 text-[13px]"
+                >
+                  <span className="font-medium">{p.name}</span>
+                  {p.category && <span className="ml-2 text-[11px] text-default-400">{p.category}</span>}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { setFbPickerBrandId(null); setFbPages([]); }}
+              className="mt-4 w-full py-2 rounded-lg border border-default-200 text-[13px] text-default-600"
+            >
+              {lang === "en" ? "Cancel" : "取消"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ── PostPill ─────────────────────────────────────────────────── */
 function PostPill({
-  item, lang, navigate, onCancel, onReschedule, onPublish, rescheduling,
+  item, lang, navigate, onCancel, onReschedule, onPublish, onConnectFacebook, rescheduling,
 }: {
   item: any;
   lang: "zh-TW" | "en";
@@ -775,6 +880,7 @@ function PostPill({
   onCancel: (id: number) => void;
   onReschedule: (id: number, at: string) => void;
   onPublish?: (id: number) => Promise<void>;
+  onConnectFacebook?: (brandId: number) => void;
   rescheduling: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -882,15 +988,28 @@ function PostPill({
                 </button>
               )}
               {publishError && (
-                <div className="w-full mt-1 px-2 py-1.5 rounded-lg text-[10px] leading-relaxed"
+                <div className="w-full mt-1 px-2 py-1.5 rounded-lg text-[10px] leading-relaxed space-y-1.5"
                   style={{ background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412" }}>
-                  ⚠️ {publishError}
-                  <button
-                    onClick={() => navigate(`/run/${item.outputId}`)}
-                    className="ml-2 underline text-[10px]"
-                  >
-                    {lang === "en" ? "View post →" : "查看貼文 →"}
-                  </button>
+                  <p>⚠️ {publishError}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* FB connect button — shown when error mentions missing page connection */}
+                    {(publishError.includes("粉專") || publishError.includes("Facebook") || publishError.includes("未連接")) &&
+                      onConnectFacebook && item.brandId && (
+                      <button
+                        onClick={() => { setPublishError(null); onConnectFacebook(item.brandId); }}
+                        className="px-2 py-1 rounded text-[10px] font-semibold text-white"
+                        style={{ background: "#1877F2" }}
+                      >
+                        🔗 {lang === "en" ? "Connect Facebook" : "連接 Facebook"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => navigate(`/run/${item.outputId}`)}
+                      className="px-2 py-1 rounded text-[10px] font-medium bg-white border border-orange-300 text-orange-800"
+                    >
+                      {lang === "en" ? "View post →" : "查看貼文 →"}
+                    </button>
+                  </div>
                 </div>
               )}
               <button

@@ -673,79 +673,72 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     { key: "youtube",   label: "YouTube",   color: "#FF0000", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
   ];
 
-  // ── Connect with SDK ───────────────────────────────────────────────────
-  // Called synchronously from the button click handler.
-  // Token is already cached from prefetchTokens() so no await is needed
-  // before connectAccount() — popup won't be blocked.
+  // ── Connect via direct popup URL (avoids SDK popup-blocking issues) ──────
+  // Pattern: open "about:blank" FIRST in the click handler (synchronous →
+  // browser allows it), THEN fetch the connect URL and redirect the window.
+  // The Pipedream SDK's connectAccount() can get blocked because it delays
+  // the window.open until after async token validation.
   function connectWithSDK(platform: PlatformCfg) {
     if (!brandId) { alert(en ? "Please save the brand first." : "請先儲存品牌。"); return; }
 
-    const Ctor = pdSdkRef.current;
-    const tk   = pdTokensRef.current[platform.key];
-
-    if (!Ctor || !tk || tk.expiresAt - Date.now() < 30_000) {
-      // Token not ready yet — kick off a fresh prefetch and ask user to retry
-      prefetchTokens();
+    // Open the popup window immediately — must be synchronous in the click handler
+    const popup = window.open("about:blank", "_blank", "popup,width=640,height=760");
+    if (!popup) {
       alert(en
-        ? "Preparing authorization — please try again in 2 seconds."
-        : "準備授權連結中，請稍候 2 秒後再按一次。");
+        ? "Popup was blocked — please allow popups for this site and try again."
+        : "彈出視窗被封鎖，請允許本站顯示彈出視窗後再試一次。");
       return;
     }
 
+    popup.document.write(
+      `<p style="font:14px sans-serif;padding:24px;color:#555">${en ? "Loading authorization…" : "正在載入授權頁面…"}</p>`
+    );
+
     setPendingPlatform(platform.key);
 
-    const pd = new Ctor({
-      projectEnvironment: tk.env as "production" | "development",
-      externalUserId: `sowork-brand-${brandId}`,
-      tokenCallback: async () => ({
-        token: tk.token,
-        expiresAt: new Date(tk.expiresAt),
-        connectLinkUrl: tk.connectLinkUrl,
-      }),
-    });
+    // Prefer cached token; if missing, fetch a fresh one
+    const tk = pdTokensRef.current[platform.key];
+    const fetchUrl = async (): Promise<string | null> => {
+      if (tk && tk.connectLinkUrl && tk.expiresAt - Date.now() > 30_000) {
+        return tk.connectLinkUrl;
+      }
+      try {
+        const r = await getConnectTkM?.mutateAsync?.({ platform: platform.key as any, brandId });
+        if (r?.connectLinkUrl) return r.connectLinkUrl;
+        if (r?.token) return `https://pipedream.com/_static/connect.html?token=${r.token}&app=${platform.key === "facebook" ? "facebook_pages" : platform.key}`;
+      } catch { /* fall through */ }
+      return null;
+    };
 
-    pd.connectAccount({
-      app: tk.appSlug,
-
-      onSuccess: async () => {
+    fetchUrl().then((url) => {
+      if (!url) {
+        popup.close();
         setPendingPlatform(null);
-        delete pdTokensRef.current[platform.key]; // consumed — will pre-warm below
+        alert(en ? "Could not get authorization URL. Please try again." : "無法取得授權連結，請稍後再試。");
+        return;
+      }
+      popup.location.href = url;
 
-        if (platform.key === "facebook" && brandId) {
-          try {
-            const pages = await fbPagesM?.mutateAsync?.({ brandId });
-            if ((pages?.pages?.length ?? 0) > 0) {
-              setFbPages(pages!.pages);
-              setFbPickerOpen(true);
-            } else {
-              alert(en
-                ? "Authorized but no Facebook Pages found — make sure your account manages at least one Page."
-                : "授權成功，但此帳號沒有可管理的 FB 粉專，請確認帳號有管理至少一個粉絲專頁。");
-            }
-          } catch (e: any) {
-            alert(en
-              ? `Could not load Facebook Pages: ${e?.message ?? "unknown error"}. Please re-connect.`
-              : `無法載入 FB 粉專列表：${e?.message ?? "未知錯誤"}。請重新授權一次。`);
+      // Poll for OAuth completion: check if popup closed + refetch status
+      const timer = setInterval(async () => {
+        if (popup.closed) {
+          clearInterval(timer);
+          setPendingPlatform(null);
+          platformsQ?.refetch?.();
+          fbStatusQ?.refetch?.();
+          // For Facebook: auto-fetch pages so user can pick their Page
+          if (platform.key === "facebook") {
+            try {
+              const pages = await fbPagesM?.mutateAsync?.({ brandId });
+              if ((pages?.pages?.length ?? 0) > 0) {
+                setFbPages(pages!.pages);
+                setFbPickerOpen(true);
+              }
+            } catch { /* non-fatal — user can retry */ }
           }
+          prefetchTokens();
         }
-
-        platformsQ?.refetch?.();
-        fbStatusQ?.refetch?.();
-        prefetchTokens(); // pre-warm a fresh token for next time
-      },
-
-      onError: (err: any) => {
-        setPendingPlatform(null);
-        alert(en
-          ? `Authorization failed: ${String(err).slice(0, 120)}`
-          : `授權失敗：${String(err).slice(0, 120)}`);
-        prefetchTokens();
-      },
-
-      onClose: ({ successful }: { successful: boolean }) => {
-        // onSuccess fires before onClose on success — only clear pending if not successful
-        if (!successful) setPendingPlatform(null);
-      },
+      }, 800);
     });
   }
 
