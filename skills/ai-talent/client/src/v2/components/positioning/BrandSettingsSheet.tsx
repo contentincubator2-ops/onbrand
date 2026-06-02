@@ -719,24 +719,35 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
       }
       popup.location.href = url;
 
-      // Poll for OAuth completion: check if popup closed + refetch status
-      const timer = setInterval(async () => {
+      // Poll for OAuth completion: check if popup closed + refetch status.
+      // We stagger 3 refetches (0s / 3s / 7s) to handle Pipedream's
+      // propagation delay — the popup may say "done" before their API
+      // reflects the new account.
+      const doRefetch = async (isFinal = false) => {
+        platformsQ?.refetch?.();
+        fbStatusQ?.refetch?.();
+        if (isFinal && platform.key === "facebook") {
+          try {
+            const pages = await fbPagesM?.mutateAsync?.({ brandId });
+            if ((pages?.pages?.length ?? 0) > 0) {
+              setFbPages(pages!.pages);
+              setFbPickerOpen(true);
+            }
+          } catch { /* non-fatal */ }
+          prefetchTokens();
+        }
+      };
+
+      const timer = setInterval(() => {
         if (popup.closed) {
           clearInterval(timer);
           setPendingPlatform(null);
-          platformsQ?.refetch?.();
-          fbStatusQ?.refetch?.();
-          // For Facebook: auto-fetch pages so user can pick their Page
-          if (platform.key === "facebook") {
-            try {
-              const pages = await fbPagesM?.mutateAsync?.({ brandId });
-              if ((pages?.pages?.length ?? 0) > 0) {
-                setFbPages(pages!.pages);
-                setFbPickerOpen(true);
-              }
-            } catch { /* non-fatal — user can retry */ }
-          }
-          prefetchTokens();
+          // Immediate refetch (may be empty — Pipedream hasn't propagated yet)
+          doRefetch(false);
+          // +3s: most connections register by now
+          setTimeout(() => doRefetch(false), 3_000);
+          // +7s: final attempt + FB page picker
+          setTimeout(() => doRefetch(true), 7_000);
         }
       }, 800);
     });
@@ -758,12 +769,30 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 
   return (
     <div className="max-w-[760px] mx-auto p-8">
-      <h2 className="text-2xl font-semibold text-default-900 mb-1">{en ? "Platform connections" : "平台連接"}</h2>
-      <p className="text-sm text-default-500 mb-6">
-        {en
-          ? "Connect your accounts once. OnBrand uses your authorization to publish content directly."
-          : "一次授權，之後 OnBrand 用你的授權直接發布內容。"}
-      </p>
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-default-900 mb-1">{en ? "Platform connections" : "平台連接"}</h2>
+          <p className="text-sm text-default-500">
+            {en
+              ? "Connect your accounts once. OnBrand uses your authorization to publish content directly."
+              : "一次授權，之後 OnBrand 用你的授權直接發布內容。"}
+          </p>
+        </div>
+        {/* Manual refresh — for when the popup closed but status didn't update */}
+        <button
+          onClick={() => { platformsQ?.refetch?.(); fbStatusQ?.refetch?.(); }}
+          disabled={platformsQ?.isFetching}
+          className="shrink-0 flex items-center gap-1.5 text-xs text-default-500 hover:text-default-800 px-3 py-1.5 rounded-lg border border-default-200 hover:border-default-400 transition disabled:opacity-50"
+          title={en ? "Refresh connection status" : "重新整理連接狀態"}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={platformsQ?.isFetching ? "animate-spin" : ""}>
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+          </svg>
+          {platformsQ?.isFetching
+            ? (en ? "Checking…" : "檢查中…")
+            : (en ? "Refresh status" : "重新整理狀態")}
+        </button>
+      </div>
 
       {/* Platform card grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
