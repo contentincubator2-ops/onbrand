@@ -355,73 +355,9 @@ export const calendarRouter = router({
           });
         }
 
-        const clientId     = process.env.PIPEDREAM_CLIENT_ID;
-        const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
-        const projectId    = process.env.PIPEDREAM_PROJECT_ID;
-        const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
-
-        if (!clientId || !clientSecret || !projectId) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "Facebook 授權服務尚未設定（Pipedream Connect 憑證缺失），請聯絡 sowork@sowork.ai。",
-          });
-        }
-
-        // Step 1: Pipedream bearer token
-        const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-        const tokenRes = await fetch("https://api.pipedream.com/v1/oauth/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Basic ${basicAuth}` },
-          body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (!tokenRes.ok) {
-          const t = await tokenRes.text();
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream token 失敗：${t.slice(0, 200)}` });
-        }
-        const { access_token } = (await tokenRes.json()) as { access_token: string };
-
-        const pdHeaders = {
-          "Authorization":    `Bearer ${access_token}`,
-          "X-PD-Environment": pdEnv,
-          "x-pd-project-id":  projectId,
-        };
-        const externalUserId = `sowork-brand-${row.brandId}`;
-        const PD = "https://api.pipedream.com/v1";
-
-        // Step 2: find the FB account in Pipedream vault
-        const accsRes = await fetch(
-          `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`,
-          { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
-        );
-        if (!accsRes.ok) {
-          const t = await accsRes.text();
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream 帳號列表失敗：${t.slice(0, 200)}` });
-        }
-        const accsData = (await accsRes.json()) as { data?: Array<{ id: string; app?: string }> };
-        const FB_SLUGS = new Set(["facebook_pages", "facebook", "facebook_oauth2"]);
-        const fbAcc = (accsData.data ?? []).find(a => a.app && FB_SLUGS.has(a.app));
-        if (!fbAcc) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "找不到 Facebook 授權記錄，請重新連接 Facebook。",
-          });
-        }
-
-        // Step 3: get OAuth credentials
-        const credRes = await fetch(
-          `${PD}/connect/${projectId}/accounts/${fbAcc.id}?include_credentials=1`,
-          { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
-        );
-        if (!credRes.ok) {
-          const t = await credRes.text();
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得 FB 憑證：${t.slice(0, 200)}` });
-        }
-        const credData = (await credRes.json()) as { credentials?: { oauth_access_token?: string; access_token?: string } };
-        const userToken = credData.credentials?.oauth_access_token ?? credData.credentials?.access_token;
-        if (!userToken) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 FB OAuth token，請重新授權。" });
-        }
+        // Steps 1–3: get FB user token via shared _pdGetOAuthToken helper
+        const userToken = await _pdGetOAuthToken(row.brandId, "Facebook",
+          ["facebook_pages", "facebook", "facebook_oauth2"]);
 
         // Step 4: get page access token from /me/accounts
         const pageId: string = row.brand_fb_page_id;
@@ -463,32 +399,162 @@ export const calendarRouter = router({
         postId = fbResult.id ?? null;
         permalink = postId ? `https://www.facebook.com/${postId}` : null;
 
-      } else {
-        // ── Other platforms: use PIPEDREAM_*_PUBLISH_WEBHOOK if set ────────
-        const WEBHOOK_ENV: Record<string, string> = {
-          instagram: "PIPEDREAM_IG_PUBLISH_WEBHOOK",
-          linkedin:  "PIPEDREAM_LI_PUBLISH_WEBHOOK",
-          youtube:   "PIPEDREAM_YT_PUBLISH_WEBHOOK",
-          tiktok:    "PIPEDREAM_TT_PUBLISH_WEBHOOK",
-          email:     "PIPEDREAM_EMAIL_PUBLISH_WEBHOOK",
-          press:     "PIPEDREAM_PR_PUBLISH_WEBHOOK",
-        };
-        const envKey = WEBHOOK_ENV[platform];
-        const webhookUrl = envKey ? (process.env as any)[envKey] as string | undefined : undefined;
+      } else if (platform === "linkedin") {
+        // ── LinkedIn: direct publish via Pipedream Connect OAuth ────────────
+        const liToken = await _pdGetOAuthToken(row.brandId, "linkedin", ["linkedin"]);
+        // Get LinkedIn member URN
+        const meRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+          headers: { "Authorization": `Bearer ${liToken}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!meRes.ok) {
+          const t = await meRes.text();
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `LinkedIn 身分驗證失敗：${t.slice(0, 200)}` });
+        }
+        const me = (await meRes.json()) as { sub?: string; id?: string };
+        const personId = me.sub ?? me.id;
+        if (!personId) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 LinkedIn 用戶 ID，請重新授權。" });
+        }
+        const authorUrn = `urn:li:person:${personId}`;
 
-        if (!webhookUrl) {
-          const label =
-            platform === "instagram" ? "Instagram" :
-            platform === "linkedin"  ? "LinkedIn"  :
-            platform === "youtube"   ? "YouTube"   :
-            platform === "tiktok"    ? "TikTok"    :
-            platform;
+        // Post to LinkedIn UGC Posts API
+        const liPostRes = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${liToken}`,
+            "Content-Type": "application/json",
+            "X-Restli-Protocol-Version": "2.0.0",
+          },
+          body: JSON.stringify({
+            author: authorUrn,
+            lifecycleState: "PUBLISHED",
+            specificContent: {
+              "com.linkedin.ugc.ShareContent": {
+                shareCommentary: { text: caption },
+                shareMediaCategory: "NONE",
+              },
+            },
+            visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
+          }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        const liText = await liPostRes.text();
+        if (!liPostRes.ok) {
+          let errMsg = liText.slice(0, 300);
+          try { errMsg = JSON.parse(liText)?.message ?? errMsg; } catch { /* keep */ }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `LinkedIn 發布失敗：${errMsg}` });
+        }
+        // LinkedIn returns the post URN in Location header or body
+        const liResult = JSON.parse(liText.trim() || "{}") as { id?: string };
+        postId = liPostRes.headers.get("x-restli-id") ?? liResult.id ?? null;
+        permalink = postId ? `https://www.linkedin.com/feed/update/${postId}` : null;
+
+      } else if (platform === "instagram") {
+        // ── Instagram: direct publish via Pipedream Connect OAuth ───────────
+        // Instagram Business requires an image — text-only posts not supported.
+        // Extract imageUrl from post content if available.
+        let imageUrl: string | null = null;
+        try {
+          const parsed = JSON.parse(row.outputContent);
+          const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
+          const v = variants[row.variantIndex ?? 0] ?? {};
+          imageUrl = v.imageUrl ?? v.image?.url ?? null;
+        } catch { /* no image */ }
+
+        if (!imageUrl) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: `${label} 直接發布尚未設定，請聯絡 sowork@sowork.ai。`,
+            message: "Instagram 不支援純文字貼文，需要圖片才能發布。請先在結果頁產生圖片後再排程。",
           });
         }
 
+        // Get Facebook user token (IG Business is connected through FB OAuth)
+        const igToken = await _pdGetOAuthToken(row.brandId, "instagram_business",
+          ["facebook_pages", "facebook", "facebook_oauth2", "instagram_business"]);
+
+        // Get IG Business Account ID from the user's linked pages
+        const igMeRes = await fetch(
+          `https://graph.facebook.com/v18.0/me?fields=instagram_business_account&access_token=${encodeURIComponent(igToken)}`,
+          { signal: AbortSignal.timeout(15_000) },
+        );
+        if (!igMeRes.ok) {
+          const t = await igMeRes.text();
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得 IG 帳號 ID：${t.slice(0, 200)}` });
+        }
+        const igMeData = (await igMeRes.json()) as { instagram_business_account?: { id: string } };
+        const igUserId = igMeData.instagram_business_account?.id;
+        if (!igUserId) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "此 Facebook 帳號尚未連接 Instagram 商業帳號，請在 Instagram 設定中完成連接。",
+          });
+        }
+
+        // Step 1: Create media container
+        const mediaRes = await fetch(
+          `https://graph.facebook.com/v18.0/${igUserId}/media`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image_url: imageUrl, caption, access_token: igToken }),
+            signal: AbortSignal.timeout(30_000),
+          },
+        );
+        const mediaText = await mediaRes.text();
+        if (!mediaRes.ok) {
+          let errMsg = mediaText.slice(0, 300);
+          try { errMsg = JSON.parse(mediaText)?.error?.message ?? errMsg; } catch { /* keep */ }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Instagram 媒體建立失敗：${errMsg}` });
+        }
+        const mediaData = JSON.parse(mediaText) as { id?: string };
+        const creationId = mediaData.id;
+        if (!creationId) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Instagram 媒體 ID 取得失敗" });
+        }
+
+        // Step 2: Publish media container
+        const publishRes = await fetch(
+          `https://graph.facebook.com/v18.0/${igUserId}/media_publish`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ creation_id: creationId, access_token: igToken }),
+            signal: AbortSignal.timeout(30_000),
+          },
+        );
+        const publishText = await publishRes.text();
+        if (!publishRes.ok) {
+          let errMsg = publishText.slice(0, 300);
+          try { errMsg = JSON.parse(publishText)?.error?.message ?? errMsg; } catch { /* keep */ }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Instagram 發布失敗：${errMsg}` });
+        }
+        const publishData = JSON.parse(publishText) as { id?: string };
+        postId = publishData.id ?? null;
+        permalink = postId ? `https://www.instagram.com/p/${postId}` : null;
+
+      } else if (platform === "youtube") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "YouTube 需要上傳影片才能發布，目前不支援從日曆直接發文。請到 YouTube Studio 手動上傳。",
+        });
+
+      } else if (platform === "tiktok") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "TikTok 需要影片內容才能發布，目前不支援從日曆直接發文。請到 TikTok 手動發布。",
+        });
+
+      } else {
+        // Fallback: try webhook if configured
+        const webhookEnvKey = `PIPEDREAM_${platform.toUpperCase()}_PUBLISH_WEBHOOK`;
+        const webhookUrl = (process.env as any)[webhookEnvKey] as string | undefined;
+        if (!webhookUrl) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `${platform} 直接發布尚未支援。`,
+          });
+        }
         const resp = await fetch(webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -499,8 +565,8 @@ export const calendarRouter = router({
         if (!resp.ok) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Webhook 發布失敗 ${resp.status}: ${text.slice(0, 300)}` });
         }
-        let result: any = text;
-        try { result = JSON.parse(text); } catch { /* keep text */ }
+        let result: any = {};
+        try { result = JSON.parse(text); } catch { /* keep */ }
         permalink = result?.permalink_url ?? result?.permalink ?? null;
         postId = result?.post_id ?? result?.id ?? null;
       }
@@ -528,6 +594,91 @@ export const calendarRouter = router({
       return { ok: true, latencyMs, postId, permalink };
     }),
 });
+
+/**
+ * Helper: get an OAuth access_token for a brand from Pipedream Connect vault.
+ * Reuses the same client_credentials → list accounts → get credentials flow
+ * as publishRouter.getFacebookPages / getConnectedPlatforms.
+ *
+ * @param brandId     - brand whose Pipedream external_user_id is `sowork-brand-{id}`
+ * @param platformKey - human label for error messages (e.g. "linkedin")
+ * @param appSlugs    - Pipedream app slugs to match (e.g. ["linkedin"])
+ */
+async function _pdGetOAuthToken(
+  brandId: number,
+  platformKey: string,
+  appSlugs: string[],
+): Promise<string> {
+  const clientId     = process.env.PIPEDREAM_CLIENT_ID;
+  const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
+  const projectId    = process.env.PIPEDREAM_PROJECT_ID;
+  const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
+
+  if (!clientId || !clientSecret || !projectId) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `${platformKey} 授權服務尚未啟用（Pipedream Connect 憑證缺失）。`,
+    });
+  }
+
+  const PD = "https://api.pipedream.com/v1";
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+  // Step 1: bearer token
+  const tokenRes = await fetch(`${PD}/oauth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Basic ${basicAuth}` },
+    body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!tokenRes.ok) {
+    const t = await tokenRes.text();
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream token 失敗：${t.slice(0, 200)}` });
+  }
+  const { access_token } = (await tokenRes.json()) as { access_token: string };
+
+  const pdHeaders = {
+    "Authorization":    `Bearer ${access_token}`,
+    "X-PD-Environment": pdEnv,
+    "x-pd-project-id":  projectId,
+  };
+  const externalUserId = `sowork-brand-${brandId}`;
+  const slugSet = new Set(appSlugs);
+
+  // Step 2: find the account
+  const accsRes = await fetch(
+    `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`,
+    { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
+  );
+  if (!accsRes.ok) {
+    const t = await accsRes.text();
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream 帳號列表失敗：${t.slice(0, 200)}` });
+  }
+  const accsData = (await accsRes.json()) as { data?: Array<{ id: string; app?: string }> };
+  const acc = (accsData.data ?? []).find(a => a.app && slugSet.has(a.app));
+  if (!acc) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `找不到 ${platformKey} 授權記錄，請先在右側面板連接 ${platformKey}。`,
+    });
+  }
+
+  // Step 3: get credentials
+  const credRes = await fetch(
+    `${PD}/connect/${projectId}/accounts/${acc.id}?include_credentials=1`,
+    { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
+  );
+  if (!credRes.ok) {
+    const t = await credRes.text();
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得 ${platformKey} 憑證：${t.slice(0, 200)}` });
+  }
+  const credData = (await credRes.json()) as { credentials?: { oauth_access_token?: string; access_token?: string } };
+  const oauthToken = credData.credentials?.oauth_access_token ?? credData.credentials?.access_token;
+  if (!oauthToken) {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得 ${platformKey} OAuth token，請重新授權。` });
+  }
+  return oauthToken;
+}
 
 function extractCaption(content: any, variantIndex: number): string {
   if (!content) return "";
