@@ -607,10 +607,9 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   });
   const getConnectTkM = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
 
-  // ── SDK + pre-fetched token cache ─────────────────────────────────────
-  // SDK is loaded once on mount. Tokens are pre-fetched so connectAccount()
-  // can be called synchronously from the click handler (avoids popup block).
-  const pdSdkRef    = useRef<any>(null);
+  // ── Pre-fetched token cache ────────────────────────────────────────────
+  // Tokens are pre-fetched on mount so connectAccount() can start instantly
+  // without waiting for a round-trip when the user clicks the button.
   type TokenCache = { token: string; connectLinkUrl: string; appSlug: string; env: string; expiresAt: number };
   const pdTokensRef = useRef<Record<string, TokenCache>>({});
 
@@ -626,12 +625,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   const connectedMap: Record<string, { accountId: string; name?: string }> =
     (platformsQ?.data as any)?.connected ?? {};
 
-  // ── Load SDK once ──────────────────────────────────────────────────────
-  useEffect(() => {
-    import("@pipedream/sdk/browser")
-      .then((m) => { pdSdkRef.current = (m as any).PipedreamClient; })
-      .catch(() => {});
-  }, []);
+  // ── Pre-warm SDK (dynamic import, non-blocking) ────────────────────────
+  useEffect(() => { import("@pipedream/sdk/browser").catch(() => {}); }, []);
 
   // ── Pre-fetch tokens for all platforms ────────────────────────────────
   // Only the token value matters — the URL is always built fresh via buildUrl()
@@ -679,30 +674,47 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     { key: "youtube",   label: "YouTube",   color: "#FF0000", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
   ];
 
-  // ── Connect via direct popup URL (avoids SDK popup-blocking issues) ──────
-  // Pattern: open "about:blank" FIRST in the click handler (synchronous →
-  // browser allows it), THEN fetch the connect URL and redirect the window.
-  // The Pipedream SDK's connectAccount() can get blocked because it delays
-  // the window.open until after async token validation.
+  // ── After OAuth: poll until Pipedream registers the connection ───────────
+  // Pipedream's API can lag 5-20s after OAuth completes. Poll every 2s
+  // for up to 30s; for Facebook also retry getFacebookPages so the page
+  // picker appears automatically.
+  const waitAndDetect = async (platformKey: string) => {
+    const MAX = 15; // 15 × 2s = 30s
+    for (let i = 0; i < MAX; i++) {
+      await new Promise<void>(r => setTimeout(r, i === 0 ? 1500 : 2000));
+      try {
+        const result = await platformsQ?.refetch?.();
+        const nowConnected = !!(result?.data as any)?.connected?.[platformKey];
+        if (nowConnected || i === MAX - 1) {
+          if (platformKey === "facebook") {
+            for (let fbTry = 0; fbTry < 5; fbTry++) {
+              try {
+                const pages = await fbPagesM?.mutateAsync?.({ brandId });
+                if ((pages?.pages?.length ?? 0) > 0) {
+                  setFbPages(pages!.pages);
+                  setFbPickerOpen(true);
+                  break;
+                }
+              } catch { /* keep retrying */ }
+              if (fbTry < 4) await new Promise<void>(r => setTimeout(r, 2000));
+            }
+          }
+          fbStatusQ?.refetch?.();
+          prefetchTokens();
+          break;
+        }
+      } catch { /* refetch failed — keep polling */ }
+    }
+    fbStatusQ?.refetch?.();
+  };
+
+  // ── Connect via Pipedream SDK (creates a full-screen iframe overlay) ──────
+  // Pipedream's connect.html REQUIRES an iframe context — window.open popup
+  // will throw "Must be inside iframe". The official SDK handles this correctly.
   function connectWithSDK(platform: PlatformCfg) {
     if (!brandId) { alert(en ? "Please save the brand first." : "請先儲存品牌。"); return; }
 
-    // Open the popup window immediately — must be synchronous in the click handler
-    const popup = window.open("about:blank", "_blank", "popup,width=640,height=760");
-    if (!popup) {
-      alert(en
-        ? "Popup was blocked — please allow popups for this site and try again."
-        : "彈出視窗被封鎖，請允許本站顯示彈出視窗後再試一次。");
-      return;
-    }
-
-    popup.document.write(
-      `<p style="font:14px sans-serif;padding:24px;color:#555">${en ? "Loading authorization…" : "正在載入授權頁面…"}</p>`
-    );
-
-    setPendingPlatform(platform.key);
-
-    // Pipedream app slugs — must match exactly
+    // Pipedream app slugs
     const PD_APP_SLUG: Record<string, string> = {
       facebook:  "facebook_pages",
       instagram: "instagram_business",
@@ -711,89 +723,69 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     };
     const appSlug = PD_APP_SLUG[platform.key] ?? platform.key;
 
-    // Build the Pipedream Connect URL purely from the token.
-    // We NEVER trust connectLinkUrl returned by Pipedream — it sometimes
-    // omits ?app= regardless of what we send in the body. The documented
-    // URL format is fixed: ?token=TOKEN&app=APP_SLUG.
-    const buildUrl = (token: string) =>
-      `https://pipedream.com/_static/connect.html?token=${encodeURIComponent(token)}&app=${encodeURIComponent(appSlug)}`;
+    setPendingPlatform(platform.key);
 
-    // Use cached token if still valid; otherwise fetch fresh one
-    const tk = pdTokensRef.current[platform.key];
-    const fetchUrl = async (): Promise<string | null> => {
+    (async () => {
+      // 1. Get a fresh token (or use valid cached one)
+      let token: string | null = null;
+      const tk = pdTokensRef.current[platform.key];
       if (tk?.token && tk.expiresAt - Date.now() > 30_000) {
-        return buildUrl(tk.token);
+        token = tk.token;
+      } else {
+        try {
+          const r = await getConnectTkM?.mutateAsync?.({ platform: platform.key as any, brandId });
+          if (r?.token) token = r.token;
+        } catch { /* fall through */ }
       }
-      try {
-        const r = await getConnectTkM?.mutateAsync?.({ platform: platform.key as any, brandId });
-        if (r?.token) return buildUrl(r.token);
-      } catch { /* fall through */ }
-      return null;
-    };
 
-    fetchUrl().then((url) => {
-      if (!url) {
-        popup.close();
+      if (!token) {
         setPendingPlatform(null);
-        alert(en ? "Could not get authorization URL. Please try again." : "無法取得授權連結，請稍後再試。");
+        alert(en ? "Could not get authorization token. Please try again." : "無法取得授權 token，請稍後再試。");
         return;
       }
-      popup.location.href = url;
 
-      // Once popup closes, poll Pipedream until the connection appears.
-      // Pipedream's API can take 5-20s to reflect a newly-completed OAuth,
-      // so we keep retrying every 2s for up to 30s before giving up.
-      const waitAndDetect = async () => {
-        const MAX_ATTEMPTS = 15; // 15 × 2s = 30s
-        let found = false;
+      // 2. Load SDK and open iframe-based connect flow
+      try {
+        const { createFrontendClient } = await import("@pipedream/sdk/browser");
+        // Token is passed directly to connectAccount; tokenCallback is a no-op
+        // placeholder required by the type (it won't be called since we always
+        // pass token explicitly to connectAccount).
+        const pd = createFrontendClient({
+          externalUserId: `sowork-brand-${brandId}`,
+          tokenCallback: async () => ({
+            token,
+            expiresAt: new Date(Date.now() + 300_000),
+            connectLinkUrl: "",
+          } as any),
+        });
 
-        for (let i = 0; i < MAX_ATTEMPTS; i++) {
-          // Small delay before first check (Pipedream needs ≥ 1s)
-          await new Promise<void>(r => setTimeout(r, i === 0 ? 1500 : 2000));
-
-          try {
-            const result = await platformsQ?.refetch?.();
-            const nowConnected = !!(result?.data as any)?.connected?.[platform.key];
-
-            if (nowConnected || i === MAX_ATTEMPTS - 1) {
-              // For Facebook: fetch manageable pages so user can pick one.
-              // Keep retrying until pages arrive (or we time out).
-              if (platform.key === "facebook") {
-                for (let fbTry = 0; fbTry < 5; fbTry++) {
-                  try {
-                    const pages = await fbPagesM?.mutateAsync?.({ brandId });
-                    if ((pages?.pages?.length ?? 0) > 0) {
-                      setFbPages(pages!.pages);
-                      setFbPickerOpen(true);
-                      break;
-                    }
-                  } catch { /* keep trying */ }
-                  if (fbTry < 4) await new Promise<void>(r => setTimeout(r, 2000));
-                }
-              }
-              fbStatusQ?.refetch?.();
-              prefetchTokens();
-              found = true;
-              break;
+        pd.connectAccount({
+          token,
+          app: appSlug,
+          onSuccess: () => {
+            // OAuth completed — start polling for registration
+            setPendingPlatform(null);
+            setVerifyingPlatform(platform.key);
+            waitAndDetect(platform.key).finally(() => setVerifyingPlatform(null));
+          },
+          onError: (err: any) => {
+            setPendingPlatform(null);
+            console.error("[Pipedream] connect error:", err?.message ?? err);
+            alert(en ? `Authorization failed: ${err?.message ?? "Unknown error"}` : `授權失敗：${err?.message ?? "未知錯誤"}`);
+          },
+          onClose: (status: any) => {
+            // User closed without completing — clear pending state
+            if (!status?.successful) {
+              setPendingPlatform(null);
             }
-          } catch { /* refetch failed — keep polling */ }
-        }
-
-        if (!found) {
-          // Give up silently; user can re-click Connect if needed
-          fbStatusQ?.refetch?.();
-        }
-      };
-
-      const timer = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(timer);
-          setPendingPlatform(null);
-          setVerifyingPlatform(platform.key);
-          waitAndDetect().finally(() => setVerifyingPlatform(null));
-        }
-      }, 800);
-    });
+          },
+        });
+      } catch (err: any) {
+        setPendingPlatform(null);
+        console.error("[Pipedream] SDK load error:", err);
+        alert(en ? "Could not load authorization service. Please try again." : "無法載入授權服務，請稍後再試。");
+      }
+    })();
   }
 
   // ── Disconnect Facebook ─────────────────────────────────────────────────
