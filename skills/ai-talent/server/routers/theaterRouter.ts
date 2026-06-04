@@ -406,6 +406,13 @@ export const theaterRouter = router({
         tag: z.string(),
         note: z.string().optional(),
       })).max(20).optional(),
+      // Phase 3c: promotion slots — per-day product/event assignments
+      // computed client-side by buildPromotionSlots(), used server-side
+      // to inject promo context into each cell's generation prompt.
+      promotionSlots: z.record(z.object({
+        products: z.array(z.object({ name: z.string(), usp: z.string() })),
+        events: z.array(z.object({ name: z.string(), date: z.string() })),
+      })).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const [pos, brandRules, lockState] = await Promise.all([

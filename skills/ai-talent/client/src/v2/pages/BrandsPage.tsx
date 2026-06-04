@@ -415,18 +415,6 @@ export default function BrandsPage() {
   })();
   const brandAssets: Record<string, any> = (fullPositioning?._assets ?? {}) as Record<string, any>;
 
-  // Products + events for brand tabs (定位卡片顯示)
-  const brandProductsQ = (trpc as any).product?.list?.useQuery?.(
-    { brandId: activeBrandIdForLocks ?? 0 },
-    { enabled: !!activeBrandIdForLocks && (category === "products"), refetchOnWindowFocus: false, staleTime: 30_000 },
-  );
-  const brandEventsQ = (trpc as any).event?.list?.useQuery?.(
-    { brandId: activeBrandIdForLocks ?? 0 },
-    { enabled: !!activeBrandIdForLocks && (category === "events"), refetchOnWindowFocus: false, staleTime: 30_000 },
-  );
-  const brandProductsList: any[] = brandProductsQ?.data ?? [];
-  const brandEventsList: any[] = brandEventsQ?.data ?? [];
-
   // Onboarding nudge: if this brand has no website / socialLinks yet,
   // auto-open Settings → 連結 once. localStorage tracks dismissal so
   // the prompt doesn't bug returning users.
@@ -606,6 +594,18 @@ export default function BrandsPage() {
     nextParams.set("cat", next);
     setSearchParams(nextParams, { replace: true });
   };
+
+  // Products + events for brand tabs — must be after `category` is declared (TDZ guard)
+  const brandProductsQ = (trpc as any).product?.list?.useQuery?.(
+    { brandId: activeBrandIdForLocks ?? 0 },
+    { enabled: !!activeBrandIdForLocks && category === "products", refetchOnWindowFocus: false, staleTime: 30_000 },
+  );
+  const brandEventsQ = (trpc as any).event?.list?.useQuery?.(
+    { brandId: activeBrandIdForLocks ?? 0 },
+    { enabled: !!activeBrandIdForLocks && category === "events", refetchOnWindowFocus: false, staleTime: 30_000 },
+  );
+  const brandProductsList: any[] = brandProductsQ?.data ?? [];
+  const brandEventsList: any[] = brandEventsQ?.data ?? [];
 
   const defaultSection: SectionId =
     category === "visual" ? "asset:all"
