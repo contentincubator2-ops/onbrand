@@ -1028,12 +1028,20 @@ export function DangerTab({ brandId, brandName, onClose }: { brandId: number | n
   const navigate = useNavigate();
   const [confirmed, setConfirmed] = useState(false);
 
+  // Fetch brand list so we can redirect to another brand after deletion
+  const brandsQ = (trpc as any).brand?.list?.useQuery?.(undefined, {
+    refetchOnWindowFocus: false, staleTime: 30_000,
+  });
+  const allBrands: Array<{ id: number; name: string }> = brandsQ?.data ?? [];
+
   const deleteMut = (trpc as any).brand?.delete?.useMutation
     ? (trpc as any).brand.delete.useMutation({
         onSuccess: () => {
           showToastGlobal(en ? `Brand "${brandName ?? brandId}" deleted` : `品牌「${brandName ?? brandId}」已刪除`, "success");
           onClose();
-          navigate("/brands", { replace: true });
+          // Navigate to another brand, or to /brands if none left
+          const next = allBrands.find((b) => b.id !== brandId);
+          navigate(next ? `/brands?b=${next.id}` : "/brands", { replace: true });
         },
         onError: (e: any) => {
           showToastGlobal((typeof e?.message === "string" ? e.message : null) ?? (en ? "Delete failed" : "刪除失敗"));
