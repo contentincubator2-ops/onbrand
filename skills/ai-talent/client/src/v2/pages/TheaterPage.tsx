@@ -1760,51 +1760,74 @@ export default function TheaterPage() {
               {/* ── Event tab ── */}
               {materialTab === "event" && (
                 <div className="space-y-4">
-                  {/* 從品牌選擇 */}
-                  {brandEvents.length > 0 && (
-                    <div>
-                      <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
-                        {lang === "en" ? "From your brand" : "從品牌選擇"}
-                      </p>
-                      <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                        {brandEvents.map((ev) => {
-                          const alreadyAdded = importantDates.some((d) => d.entityId === ev.id);
-                          return (
-                            <div key={ev.id} className="flex items-center gap-2 bg-violet-50 px-3 py-2 rounded-lg border border-violet-200">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{ev.name}</p>
-                                {ev.startAt && <p className="text-[10px] text-neutral-500">{ev.startAt}{ev.endAt ? ` → ${ev.endAt}` : ""}</p>}
-                              </div>
-                              <button
-                                disabled={alreadyAdded}
-                                onClick={() => {
-                                  if (alreadyAdded) return;
-                                  const dateStr = ev.startAt ?? new Date().toISOString().slice(0, 10);
-                                  setImportantDates((prev) => [...prev, {
-                                    id: `ev-${ev.id}-${Date.now()}`,
-                                    entityId: ev.id,
-                                    date: dateStr,
-                                    endDate: ev.endAt ?? undefined,
-                                    name: ev.name,
-                                    promoFreqPerWeek: 1,
-                                  }]);
-                                }}
-                                className={`shrink-0 text-[11px] px-2.5 py-1 rounded-md font-medium transition ${alreadyAdded ? "bg-neutral-100 text-neutral-400 cursor-not-allowed" : "bg-violet-600 text-white hover:bg-violet-700"}`}
-                              >
-                                {alreadyAdded ? (lang === "en" ? "Added" : "已加入") : (lang === "en" ? "+ Add" : "+ 加入")}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  {/* Dropdown selector */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide block mb-1.5">
+                      {lang === "en" ? "Select or create event" : "選擇活動或新增"}
+                    </label>
+                    <select
+                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) return;
+                        if (val === "__new__") {
+                          // reset manual form and let user fill it below
+                          setNewDate(""); setNewDateName("");
+                          return;
+                        }
+                        // val = entity id (number string)
+                        const ev = brandEvents.find((x) => String(x.id) === val);
+                        if (!ev || importantDates.some((d) => d.entityId === ev.id)) return;
+                        const dateStr = ev.startAt ?? new Date().toISOString().slice(0, 10);
+                        setImportantDates((prev) => [...prev, {
+                          id: `ev-${ev.id}-${Date.now()}`,
+                          entityId: ev.id,
+                          date: dateStr,
+                          endDate: ev.endAt ?? undefined,
+                          name: ev.name,
+                          promoFreqPerWeek: 1,
+                        }]);
+                        e.target.value = ""; // reset selector
+                      }}
+                    >
+                      <option value="">{lang === "en" ? "— Choose an event —" : "— 選擇活動 —"}</option>
+                      {brandEvents.length > 0 && (
+                        <optgroup label={lang === "en" ? "Your brand events" : "品牌現有活動"}>
+                          {brandEvents.map((ev) => {
+                            const added = importantDates.some((d) => d.entityId === ev.id);
+                            return (
+                              <option key={ev.id} value={String(ev.id)} disabled={added}>
+                                {ev.name}{ev.startAt ? ` (${ev.startAt})` : ""}{added ? (lang === "en" ? " ✓ added" : " ✓ 已加入") : ""}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      )}
+                      <optgroup label={lang === "en" ? "Create new" : "手動新增"}>
+                        <option value="__new__">{lang === "en" ? "＋ New event…" : "＋ 新增活動…"}</option>
+                      </optgroup>
+                    </select>
+                  </div>
 
-                  {/* Already added events with promo settings */}
+                  {/* Manual add form — shown when user picks "新增" OR has no brand events */}
+                  <div className="flex items-center gap-2">
+                    <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
+                    <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <button
+                      onClick={() => { handleAddDate(); }}
+                      disabled={!newDate || !newDateName}
+                      className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                    >
+                      {t("theater_btn_add_item")}
+                    </button>
+                  </div>
+
+                  {/* Added events with promo settings */}
                   {importantDates.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide">
-                        {lang === "en" ? "Added events" : "已加入的活動"}
+                        {lang === "en" ? "Added" : "已加入"}
                       </p>
                       {importantDates.map((d) => (
                         <div key={d.id} className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
@@ -1815,11 +1838,10 @@ export default function TheaterPage() {
                               {d.endDate && <span className="text-neutral-500 text-xs">→ {d.endDate}</span>}
                               <span className="ml-1">{d.name}</span>
                             </span>
-                            <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-600 hover:text-amber-900">
+                            <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-500 hover:text-amber-800">
                               <X size={14} />
                             </button>
                           </div>
-                          {/* Promo freq */}
                           <div className="flex items-center gap-2 text-[11px] text-neutral-600">
                             <span>{lang === "en" ? "Posts/week:" : "每週推廣:"}</span>
                             {[1, 2, 3].map((n) => (
@@ -1835,86 +1857,97 @@ export default function TheaterPage() {
                       ))}
                     </div>
                   )}
-
-                  {/* Manual add */}
-                  <div>
-                    <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
-                      {lang === "en" ? "Add manually" : "手動新增"}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
-                      <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                      <button
-                        onClick={() => { handleAddDate(); }}
-                        disabled={!newDate || !newDateName}
-                        className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
-                      >
-                        {t("theater_btn_add_item")}
-                      </button>
-                    </div>
-                  </div>
                 </div>
               )}
 
               {/* ── Product tab ── */}
               {materialTab === "product" && (
                 <div className="space-y-4">
-                  {/* 從品牌選擇 */}
-                  {brandProducts.length > 0 && (
-                    <div>
-                      <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
-                        {lang === "en" ? "From your brand" : "從品牌選擇"}
-                      </p>
-                      <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                        {brandProducts.map((bp) => {
-                          const alreadyAdded = products.some((p) => p.entityId === bp.id);
-                          return (
-                            <div key={bp.id} className="flex items-start gap-2 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium">{bp.name}</p>
-                                {bp.usp && <p className="text-[10px] text-neutral-500 truncate">{bp.usp}</p>}
-                              </div>
-                              <button
-                                disabled={alreadyAdded}
-                                onClick={() => {
-                                  if (alreadyAdded) return;
-                                  setProducts((prev) => [...prev, {
-                                    id: `bp-${bp.id}-${Date.now()}`,
-                                    entityId: bp.id,
-                                    name: bp.name,
-                                    usp: bp.usp,
-                                    promoFreqPerWeek: 2,
-                                  }]);
-                                }}
-                                className={`shrink-0 text-[11px] px-2.5 py-1 rounded-md font-medium transition ${alreadyAdded ? "bg-neutral-100 text-neutral-400 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}
-                              >
-                                {alreadyAdded ? (lang === "en" ? "Added" : "已加入") : (lang === "en" ? "+ Add" : "+ 加入")}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
+                  {/* Dropdown selector */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide block mb-1.5">
+                      {lang === "en" ? "Select or create product" : "選擇產品或新增"}
+                    </label>
+                    <select
+                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val || val === "__new__") return;
+                        const bp = brandProducts.find((x) => String(x.id) === val);
+                        if (!bp || products.some((p) => p.entityId === bp.id)) return;
+                        setProducts((prev) => [...prev, {
+                          id: `bp-${bp.id}-${Date.now()}`,
+                          entityId: bp.id,
+                          name: bp.name,
+                          usp: bp.usp,
+                          promoFreqPerWeek: 2,
+                        }]);
+                        e.target.value = "";
+                      }}
+                    >
+                      <option value="">{lang === "en" ? "— Choose a product —" : "— 選擇產品 —"}</option>
+                      {brandProducts.length > 0 && (
+                        <optgroup label={lang === "en" ? "Your brand products" : "品牌現有產品"}>
+                          {brandProducts.map((bp) => {
+                            const added = products.some((p) => p.entityId === bp.id);
+                            return (
+                              <option key={bp.id} value={String(bp.id)} disabled={added}>
+                                {bp.name}{bp.usp ? ` — ${bp.usp.slice(0, 30)}` : ""}{added ? (lang === "en" ? " ✓ added" : " ✓ 已加入") : ""}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      )}
+                      <optgroup label={lang === "en" ? "Create new" : "手動新增"}>
+                        <option value="__new__">{lang === "en" ? "＋ New product…" : "＋ 新增產品…"}</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  {/* Manual add form */}
+                  <div className="space-y-2">
+                    <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <div className="flex items-center gap-2">
+                      <input type="date" value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
+                      <button
+                        onClick={() => {
+                          if (!newProductName || !newProductUsp) return;
+                          setProducts((prev) => [...prev, {
+                            id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                            name: newProductName.trim(),
+                            usp: newProductUsp.trim(),
+                            launchDate: newProductLaunch || undefined,
+                            promoFreqPerWeek: 2,
+                          }]);
+                          setNewProductName(""); setNewProductUsp(""); setNewProductLaunch("");
+                        }}
+                        disabled={!newProductName || !newProductUsp}
+                        className="ml-auto text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                      >
+                        {t("theater_btn_add_item")}
+                      </button>
                     </div>
-                  )}
+                  </div>
 
                   {/* Added products with promo settings */}
                   {products.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide">
-                        {lang === "en" ? "Added products" : "已加入的產品"}
+                        {lang === "en" ? "Added" : "已加入"}
                       </p>
                       {products.map((p) => (
                         <div key={p.id} className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 space-y-2">
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium">{p.name}</p>
-                              <p className="text-[10px] text-neutral-500 truncate">{p.usp}</p>
+                              {p.usp && <p className="text-[10px] text-neutral-500 truncate">{p.usp}</p>}
                             </div>
                             <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900 mt-0.5 ml-2 shrink-0">
                               <X size={14} />
                             </button>
                           </div>
-                          {/* Promo settings */}
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
                               <p className="text-[10px] text-neutral-500">{lang === "en" ? "Posts/week" : "每週推廣篇數"}</p>
@@ -1931,20 +1964,9 @@ export default function TheaterPage() {
                             <div className="space-y-1">
                               <p className="text-[10px] text-neutral-500">{lang === "en" ? "Promo period" : "推廣區間"}</p>
                               <div className="flex items-center gap-1">
-                                <input
-                                  type="date"
-                                  value={p.promoStartDate ?? ""}
-                                  placeholder={days[0]?.date ?? ""}
-                                  onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoStartDate: e.target.value || undefined } : x))}
-                                  className="text-[10px] px-1.5 py-1 border border-neutral-300 rounded w-full"
-                                />
+                                <input type="date" value={p.promoStartDate ?? ""} onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoStartDate: e.target.value || undefined } : x))} className="text-[10px] px-1.5 py-1 border border-neutral-300 rounded w-full" />
                                 <span className="text-neutral-400 text-[10px]">→</span>
-                                <input
-                                  type="date"
-                                  value={p.promoEndDate ?? ""}
-                                  onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoEndDate: e.target.value || undefined } : x))}
-                                  className="text-[10px] px-1.5 py-1 border border-neutral-300 rounded w-full"
-                                />
+                                <input type="date" value={p.promoEndDate ?? ""} onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoEndDate: e.target.value || undefined } : x))} className="text-[10px] px-1.5 py-1 border border-neutral-300 rounded w-full" />
                               </div>
                             </div>
                           </div>
@@ -1953,36 +1975,6 @@ export default function TheaterPage() {
                     </div>
                   )}
 
-                  {/* Manual add */}
-                  <div>
-                    <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
-                      {lang === "en" ? "Add manually" : "手動新增"}
-                    </p>
-                    <div className="space-y-2">
-                      <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                      <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                      <div className="flex items-center gap-2">
-                        <input type="date" placeholder={t("theater_product_launch_ph")} value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
-                        <button
-                          onClick={() => {
-                            if (!newProductName || !newProductUsp) return;
-                            setProducts((prev) => [...prev, {
-                              id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                              name: newProductName.trim(),
-                              usp: newProductUsp.trim(),
-                              launchDate: newProductLaunch || undefined,
-                              promoFreqPerWeek: 2,
-                            }]);
-                            setNewProductName(""); setNewProductUsp(""); setNewProductLaunch("");
-                          }}
-                          disabled={!newProductName || !newProductUsp}
-                          className="ml-auto text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
-                        >
-                          {t("theater_btn_add_item")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
