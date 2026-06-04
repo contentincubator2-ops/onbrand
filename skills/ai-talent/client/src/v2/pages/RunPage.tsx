@@ -592,40 +592,51 @@ export default function RunPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang, id, activeIdx]);
 
+  // Uses Pipedream SDK iframe — window.open popup throws "Must be inside iframe"
   const connectFacebookViaUrl = () => {
-    const win = window.open("about:blank", "_blank", "popup,width=600,height=720");
-    if (!win) {
-      showToastGlobal(
-        lang === "en"
-          ? "The connect window was blocked — allow pop-ups for this site and tap again."
-          : "授權視窗被瀏覽器封鎖 — 請允許本站彈出視窗後再點一次"
-      );
-      return;
-    }
-    try {
-      win.document.write(
-        `<p style="font:14px sans-serif;padding:24px;color:#555">${lang === "en" ? "Opening Facebook authorization…" : "正在開啟 Facebook 授權…"}</p>`
-      );
-    } catch { /* cross-origin not yet — fine */ }
-
     (async () => {
       try {
         const r = await fbConnectUrlMut?.mutateAsync?.({ brandId: fbBrandId });
-        if (r?.connectUrl) {
-          win.location.href = r.connectUrl;
-          fbRunPopupRef.current = win;
-          // Show "waiting" indicator and start polling for auto-detection
-          setFbOauthPending(true);
-          startFbPolling();
-        } else {
-          win.close();
-          showToastGlobal(lang === "en" ? "Couldn't get the connect URL — contact sowork@sowork.ai" : "無法取得授權連結 — 請聯絡 sowork@sowork.ai");
+        if (!r?.token) {
+          showToastGlobal(lang === "en" ? "Couldn't get auth token — contact sowork@sowork.ai" : "無法取得授權 token — 請聯絡 sowork@sowork.ai");
+          return;
         }
+        const { createFrontendClient } = await import("@pipedream/sdk/browser");
+        const pd = createFrontendClient({
+          externalUserId: `sowork-brand-${fbBrandId}`,
+          tokenCallback: async () => ({ token: r.token, expiresAt: new Date(Date.now() + 300_000), connectLinkUrl: "" } as any),
+        });
+        setFbOauthPending(true);
+        pd.connectAccount({
+          token: r.token,
+          app: "facebook_pages",
+          onSuccess: async () => {
+            setFbOauthPending(false);
+            setFbOauthDone(true);
+            // Poll getFacebookPages with backoff for Pipedream propagation delay
+            for (let i = 0; i < 10; i++) {
+              await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
+              try {
+                const pages = await fbPagesMutRef.current?.mutateAsync?.({ brandId: fbBrandId });
+                if ((pages?.pages?.length ?? 0) > 0) {
+                  setFbPages(pages!.pages);
+                  setFbPagePickerOpen(true);
+                  return;
+                }
+              } catch { /* keep retrying */ }
+            }
+          },
+          onError: (err: any) => {
+            setFbOauthPending(false);
+            showToastGlobal(lang === "en" ? `Authorization failed: ${err?.message ?? "Unknown"}` : `授權失敗：${err?.message ?? "未知錯誤"}`);
+          },
+          onClose: (status: any) => {
+            if (!status?.successful) setFbOauthPending(false);
+          },
+        });
       } catch (e: any) {
-        try { win.close(); } catch { /* ignore */ }
-        showToastGlobal(
-          lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`
-        );
+        setFbOauthPending(false);
+        showToastGlobal(lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`);
       }
     })();
   };

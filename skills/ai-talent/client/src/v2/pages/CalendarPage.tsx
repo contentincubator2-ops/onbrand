@@ -175,9 +175,8 @@ export default function CalendarPage() {
     },
   });
 
-  // Facebook connect flow — same "open about:blank first" pattern as RunPage
-  // to avoid popup-blocking. Triggered from PostPill when publish fails due
-  // to missing FB page connection.
+  // Facebook connect flow — uses Pipedream SDK iframe (NOT window.open popup).
+  // connect.html requires iframe context; popup throws "Must be inside iframe".
   const fbConnectUrlMut = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
   const fbPagesMut      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
   const setFbPageMut    = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
@@ -187,43 +186,47 @@ export default function CalendarPage() {
   const [fbPickerBrandId, setFbPickerBrandId] = useState<number | null>(null);
 
   const connectFacebookFromCalendar = React.useCallback((calBrandId: number) => {
-    const popup = window.open("about:blank", "_blank", "popup,width=640,height=760");
-    if (!popup) {
-      alert(lang === "en"
-        ? "Popup blocked — allow popups for this site and try again."
-        : "彈出視窗被封鎖，請允許本站顯示彈出視窗後再試。");
-      return;
-    }
-    popup.document.write(
-      `<p style="font:14px sans-serif;padding:24px;color:#555">${lang === "en" ? "Loading…" : "載入授權頁面中…"}</p>`
-    );
-    fbConnectUrlMut?.mutateAsync?.({ brandId: calBrandId }).then((r: any) => {
-      if (r?.connectUrl) {
-        popup.location.href = r.connectUrl;
-        const timer = setInterval(async () => {
-          if (popup.closed) {
-            clearInterval(timer);
-            try {
-              const pages = await fbPagesMut?.mutateAsync?.({ brandId: calBrandId });
-              if ((pages?.pages?.length ?? 0) > 0) {
-                setFbPages(pages!.pages);
-                setFbPickerBrandId(calBrandId);
-              } else {
-                alert(lang === "en"
-                  ? "Connected! But no Facebook Pages found on this account."
-                  : "授權成功！但此帳號沒有可管理的 FB 粉專。");
-              }
-            } catch { /* user can retry */ }
-          }
-        }, 800);
-      } else {
-        popup.close();
-        alert(lang === "en" ? "Could not get connect URL." : "無法取得授權連結，請稍後再試。");
+    (async () => {
+      try {
+        const r = await fbConnectUrlMut?.mutateAsync?.({ brandId: calBrandId });
+        if (!r?.token) {
+          alert(lang === "en" ? "Could not get authorization token." : "無法取得授權 token，請稍後再試。");
+          return;
+        }
+        const { createFrontendClient } = await import("@pipedream/sdk/browser");
+        const pd = createFrontendClient({
+          externalUserId: `sowork-brand-${calBrandId}`,
+          tokenCallback: async () => ({ token: r.token, expiresAt: new Date(Date.now() + 300_000), connectLinkUrl: "" } as any),
+        });
+        pd.connectAccount({
+          token: r.token,
+          app: "facebook_pages",
+          onSuccess: async () => {
+            // Poll getFacebookPages with backoff — Pipedream may take 5-20s to propagate
+            for (let i = 0; i < 10; i++) {
+              await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
+              try {
+                const pages = await fbPagesMut?.mutateAsync?.({ brandId: calBrandId });
+                if ((pages?.pages?.length ?? 0) > 0) {
+                  setFbPages(pages!.pages);
+                  setFbPickerBrandId(calBrandId);
+                  return;
+                }
+              } catch { /* keep retrying */ }
+            }
+            alert(lang === "en"
+              ? "Connected! But no Facebook Pages found. Please try again in a moment."
+              : "授權成功！但目前找不到粉專，請稍後重試。");
+          },
+          onError: (err: any) => {
+            alert(lang === "en" ? `Authorization failed: ${err?.message ?? "Unknown error"}` : `授權失敗：${err?.message ?? "未知錯誤"}`);
+          },
+          onClose: () => {},
+        });
+      } catch (e: any) {
+        alert(e?.message ?? String(e));
       }
-    }).catch((e: any) => {
-      popup.close();
-      alert(e?.message ?? String(e));
-    });
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang, fbConnectUrlMut, fbPagesMut]);
 
