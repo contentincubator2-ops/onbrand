@@ -327,6 +327,13 @@ export const brandRouter = router({
         }
       }
 
+      // 2026-06-03: auto-enqueue product discovery if website URL provided
+      if (brandId && (input.website ?? "").trim()) {
+        import("../_core/productDiscovery").then(({ enqueueProductDiscovery }) => {
+          enqueueProductDiscovery(brandId, ctx.user.id, input.website!).catch(() => {/* non-fatal */});
+        }).catch(() => {/* non-fatal */});
+      }
+
       return { id: brandId, name: input.name };
     }),
 

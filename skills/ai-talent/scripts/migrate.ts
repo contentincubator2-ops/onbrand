@@ -2299,6 +2299,40 @@ async function main() {
     `);
     console.log("[migrate] market_profiles: OK");
 
+    // ─── 2026-06-03: product_discovery_jobs ──────────────────────────
+    // Auto-discovers products from brand website after brand creation.
+    // Worker processes one job at a time, positions each product with
+    // runInterim (fast) + start (full, background). Graceful: any failure
+    // is silently logged; partial results always visible to user.
+    //
+    // Status flow: pending → running → done | failed
+    // Phase flow:  crawl → extract → position (per-product)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS product_discovery_jobs (
+        id               BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        brandId          INT          NOT NULL,
+        userId           INT          NOT NULL,
+        websiteUrl       VARCHAR(500) NOT NULL,
+        status           VARCHAR(12)  NOT NULL DEFAULT 'pending'
+                         COMMENT 'pending | running | done | failed',
+        phase            VARCHAR(20)  NOT NULL DEFAULT 'crawl'
+                         COMMENT 'crawl | extract | position | complete',
+        totalFound       INT          NOT NULL DEFAULT 0,
+        totalPositioned  INT          NOT NULL DEFAULT 0,
+        currentProduct   VARCHAR(255) NULL     COMMENT 'product being positioned now',
+        errorLog         TEXT         NULL     COMMENT 'JSON array of silent errors',
+        startedAt        DATETIME(3)  NULL,
+        completedAt      DATETIME(3)  NULL,
+        createdAt        DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt        DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                         ON UPDATE CURRENT_TIMESTAMP(3),
+        INDEX idx_pdj_brand  (brandId),
+        INDEX idx_pdj_status (status, createdAt),
+        INDEX idx_pdj_user   (userId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] product_discovery_jobs: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

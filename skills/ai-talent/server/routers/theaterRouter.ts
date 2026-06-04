@@ -319,6 +319,16 @@ async function loadBrandRules(brandId: number, userId: number): Promise<string[]
 
 export const theaterRouter = router({
   /**
+   * 2026-06-03 — Product discovery status for the Products tab progress banner.
+   */
+  getProductDiscoveryStatus: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const { getDiscoveryStatus } = await import("../_core/productDiscovery");
+      return getDiscoveryStatus(input.brandId);
+    }),
+
+  /**
    * 2026-06-03 — Fetch brand's existing products + events so Theater
    * modal can offer "從品牌選擇" without manual re-entry.
    *

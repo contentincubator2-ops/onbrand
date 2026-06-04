@@ -46,6 +46,7 @@ import { startOrchestratorWorker } from "./queue/orchestratorWorker";
 import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
 import { resumeInterruptedPositioningJobs } from "./_core/positioningJobRunner";
 import { runStartupCleanup } from "./_core/startupCleanup";
+import { recoverStuckDiscoveryJobs, processNextDiscoveryJob } from "./_core/productDiscovery";
 import { computeMissionResources } from "./missionResourceComputer";
 
 const app = express();
@@ -623,6 +624,15 @@ const server = app.listen(PORT, async () => {
   runStartupCleanup();
   // Backfill mission resources for existing missions (fire-and-forget)
   backfillMissionResources();
+
+  // Product discovery worker — recover stuck jobs, then poll every 30s
+  await recoverStuckDiscoveryJobs();
+  setInterval(() => {
+    processNextDiscoveryJob().catch((e) => {
+      console.error("[productDiscovery] worker tick error:", e?.message ?? e);
+    });
+  }, 30_000);
+  console.log("[productDiscovery] Worker started (30s interval)");
 });
 
 // 2026-05-09: bump server timeouts so heavy orchestra calls (60s tier
