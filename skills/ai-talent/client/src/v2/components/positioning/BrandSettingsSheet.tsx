@@ -595,8 +595,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   );
 
   // ── Mutations ─────────────────────────────────────────────────────────
-  const fbConnectUrlM = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
-  const fbPagesM      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
+  const fbConnectUrlM   = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
+  const fbPagesM        = (trpc as any).publish?.getFacebookPages?.useMutation?.();
+  const importFbDnaMut  = (trpc as any).publish?.importFbPostsForDNA?.useMutation?.();
+  const [importResult, setImportResult] = useState<{ samplesImported: number; toneSummary: string } | null>(null);
   const setFbPageM    = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
     onSuccess: () => { fbStatusQ?.refetch?.(); platformsQ?.refetch?.(); },
   });
@@ -931,6 +933,49 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                   </Button>
                 )}
               </div>
+
+              {/* ── 匯入語氣範例 (Facebook only, fully connected) ── */}
+              {p.key === "facebook" && fullyConnected && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-3 space-y-2">
+                  <p className="text-[11px] text-violet-800 font-medium leading-relaxed">
+                    📥 {en ? "Import voice from real posts" : "從真實貼文學習語氣"}
+                  </p>
+                  <p className="text-[10px] text-violet-600 leading-relaxed">
+                    {en
+                      ? "Fetch your page's recent posts, analyze writing style, and store real examples in Brand DNA so AI generates content that sounds like you."
+                      : "抓取粉絲團最近 20-30 篇貼文，分析語氣特徵，存入品牌大腦作為真實範例。之後每次產文，AI 都會模仿你們真正的寫作風格。"}
+                  </p>
+                  {importResult && (
+                    <div className="text-[10px] text-violet-700 bg-violet-100 rounded-lg px-2 py-1.5 leading-relaxed">
+                      ✓ {en
+                        ? `Imported ${importResult.samplesImported} samples. Tone: "${importResult.toneSummary}"`
+                        : `已匯入 ${importResult.samplesImported} 篇範例。語氣定位：「${importResult.toneSummary}」`}
+                    </div>
+                  )}
+                  <Button
+                    size="sm" fullWidth
+                    color="secondary" variant="flat"
+                    isLoading={importFbDnaMut?.isPending}
+                    isDisabled={importFbDnaMut?.isPending}
+                    onPress={async () => {
+                      if (!brandId) return;
+                      try {
+                        const r = await importFbDnaMut?.mutateAsync?.({ brandId });
+                        if (r?.ok) {
+                          setImportResult({ samplesImported: r.samplesImported, toneSummary: r.toneSummary });
+                          fbStatusQ?.refetch?.();
+                        }
+                      } catch (e: any) {
+                        alert(e?.message ?? String(e));
+                      }
+                    }}
+                  >
+                    {importFbDnaMut?.isPending
+                      ? (en ? "Analyzing posts…" : "分析貼文中…")
+                      : (en ? "Import voice samples" : "匯入語氣範例")}
+                  </Button>
+                </div>
+              )}
             </div>
           );
         })}

@@ -493,6 +493,214 @@ export const publishRouter = router({
       return { ok: true };
     }),
 
+  /**
+   * 2026-06-03 (CJ): 從粉絲團歷史貼文萃取真實語氣，存回 brand DNA。
+   *
+   * Flow:
+   *   1. 用現有 Pipedream Connect FB token 取 page access token
+   *   2. GET /{pageId}/posts — 抓最近 30 篇有內容的貼文
+   *   3. 用 LLM 分析：常見開頭、句型、用詞、emoji、CTA、平均長度
+   *   4. 取前 3 篇最有代表性的全文存成 voice.samples
+   *   5. Merge 回 brands.positioning._assets.voice
+   *
+   * 結果：之後每次任務，AI 看到的是真實貼文範例，不是抽象描述。
+   */
+  importFbPostsForDNA: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+
+      // 確認品牌所有權 + 取得 fbPageId
+      const [brandRows]: any = await localPool.execute(
+        `SELECT fbPageId, fbPageName, positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      const brand = (brandRows as any[])[0];
+      if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "品牌不存在或無權限" });
+      if (!brand.fbPageId) throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "此品牌尚未連接 Facebook 粉專，請先在設定頁完成連接。",
+      });
+
+      // Step 1: 取 Pipedream FB user token（借用 _pdGetOAuthToken 邏輯）
+      const clientId     = process.env.PIPEDREAM_CLIENT_ID;
+      const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
+      const projectId    = process.env.PIPEDREAM_PROJECT_ID;
+      const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
+      if (!clientId || !clientSecret || !projectId) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Facebook 授權服務尚未啟用。" });
+      }
+      const PD = "https://api.pipedream.com/v1";
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      const tkRes = await fetch(`${PD}/oauth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Basic ${basicAuth}` },
+        body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!tkRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Pipedream token 失敗" });
+      const { access_token } = (await tkRes.json()) as { access_token: string };
+
+      const pdHeaders = { "Authorization": `Bearer ${access_token}`, "X-PD-Environment": pdEnv, "x-pd-project-id": projectId };
+      const externalUserId = `sowork-brand-${input.brandId}`;
+      const FB_SLUGS = new Set(["facebook_pages", "facebook", "facebook_oauth2"]);
+
+      const accsRes = await fetch(`${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`, { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });
+      if (!accsRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 Pipedream 帳號" });
+      const accsData = (await accsRes.json()) as { data?: Array<{ id: string; app?: string }> };
+      const fbAcc = (accsData.data ?? []).find(a => a.app && FB_SLUGS.has(a.app));
+      if (!fbAcc) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "找不到 Facebook 授權，請重新連接。" });
+
+      const credRes = await fetch(`${PD}/connect/${projectId}/accounts/${fbAcc.id}?include_credentials=1`, { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });
+      if (!credRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 FB 憑證" });
+      const credData = (await credRes.json()) as { credentials?: { oauth_access_token?: string; access_token?: string } };
+      const userToken = credData.credentials?.oauth_access_token ?? credData.credentials?.access_token;
+      if (!userToken) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 FB OAuth token，請重新授權。" });
+
+      // Step 2: 取 page access token
+      const meRes = await fetch(
+        `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&limit=50&access_token=${encodeURIComponent(userToken)}`,
+        { signal: AbortSignal.timeout(15_000) },
+      );
+      if (!meRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得粉絲團清單" });
+      const meData = (await meRes.json()) as { data?: Array<{ id: string; name: string; access_token?: string }> };
+      const page = (meData.data ?? []).find(p => p.id === brand.fbPageId);
+      if (!page?.access_token) throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `找不到粉專 ${brand.fbPageId} 的存取權限。請確認此 FB 帳號是該粉專的管理員，並重新授權。`,
+      });
+      const pageToken = page.access_token;
+
+      // Step 3: 抓最近 30 篇貼文
+      const postsRes = await fetch(
+        `https://graph.facebook.com/v18.0/${brand.fbPageId}/posts?fields=message,created_time&limit=30&access_token=${encodeURIComponent(pageToken)}`,
+        { signal: AbortSignal.timeout(15_000) },
+      );
+      if (!postsRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得粉絲團貼文" });
+      const postsData = (await postsRes.json()) as { data?: Array<{ message?: string; created_time?: string }> };
+      const posts = (postsData.data ?? [])
+        .map(p => (p.message ?? "").trim())
+        .filter(m => m.length > 30); // 過濾太短的 / 純圖片貼文
+
+      if (posts.length < 3) throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `粉絲團只找到 ${posts.length} 篇有文字的貼文（至少需要 3 篇）。請確認粉專有公開的文字貼文。`,
+      });
+
+      // Step 4: LLM 分析語氣特徵
+      const { invokeLLM } = await import("../localDb").then(() => import("./../_core/llm"));
+      const postsForAnalysis = posts.slice(0, 20).map((p, i) => `貼文 ${i + 1}：\n${p}`).join("\n\n---\n\n");
+      const analysisPrompt = `以下是「${brand.fbPageName ?? "此品牌"}」Facebook 粉絲專頁的真實貼文。
+
+${postsForAnalysis}
+
+請分析這些貼文的語氣特徵，輸出 JSON（只輸出 JSON，不要任何說明）：
+{
+  "typical_openings": ["3 個常見開頭句型或詞彙，用真實文字舉例"],
+  "sentence_style": "句型特徵描述（例：短句為主、愛用問句、條列式等）",
+  "vocabulary": ["5-8 個這個品牌常用的特定詞彙或口頭禪"],
+  "emoji_style": "emoji 使用習慣（頻繁/偶爾/不用，常用哪類）",
+  "avg_length": "平均貼文長短（字數區間）",
+  "cta_style": "常見 CTA 方式",
+  "tone_summary": "一句話描述這個品牌的語氣（例：親切鄰家風格、專業權威語氣）",
+  "best_samples": ["最能代表品牌語氣的 3 篇完整貼文原文"]
+}`;
+
+      const llmResult: any = await invokeLLM({
+        provider: "anthropic",
+        messages: [{ role: "user", content: analysisPrompt }],
+        maxTokens: 2000,
+      });
+
+      const analysisText = String(llmResult?.content ?? llmResult?.text ?? "").trim();
+      let analysis: any = null;
+      try {
+        const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) analysis = JSON.parse(jsonMatch[0]);
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "語氣分析解析失敗，請再試一次。" });
+      }
+      if (!analysis) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "語氣分析結果為空。" });
+
+      // Step 5: Merge 回 brand positioning._assets.voice
+      const existingPositioning: any = (() => {
+        if (!brand.positioning) return {};
+        if (typeof brand.positioning === "string") {
+          try { return JSON.parse(brand.positioning); } catch { return {}; }
+        }
+        return brand.positioning;
+      })();
+
+      const voiceSamples = (Array.isArray(analysis.best_samples) ? analysis.best_samples : [])
+        .filter((s: any) => typeof s === "string" && s.trim().length > 20)
+        .slice(0, 3)
+        .map((s: string) => ({ ours: s.trim(), source: "fb_import" }));
+
+      const fbVoiceNotes = [
+        analysis.tone_summary && `語氣定位：${analysis.tone_summary}`,
+        analysis.sentence_style && `句型風格：${analysis.sentence_style}`,
+        Array.isArray(analysis.vocabulary) && analysis.vocabulary.length
+          ? `常用詞彙：${analysis.vocabulary.join("、")}`
+          : null,
+        analysis.emoji_style && `Emoji 習慣：${analysis.emoji_style}`,
+        analysis.avg_length && `貼文長度：${analysis.avg_length}`,
+        analysis.cta_style && `CTA 風格：${analysis.cta_style}`,
+        Array.isArray(analysis.typical_openings) && analysis.typical_openings.length
+          ? `常見開頭：${analysis.typical_openings.join(" / ")}`
+          : null,
+      ].filter(Boolean).join("\n");
+
+      // Deep merge into _assets.voice
+      const updatedPositioning = {
+        ...existingPositioning,
+        _assets: {
+          ...(existingPositioning._assets ?? {}),
+          voice: {
+            ...(existingPositioning._assets?.voice ?? {}),
+            // Merge samples: keep existing manual ones + add FB-imported
+            items: [
+              ...((existingPositioning._assets?.voice?.items ?? []) as any[])
+                .filter((s: any) => s?.source !== "fb_import"), // replace old imports
+              ...voiceSamples,
+            ],
+            // Add analysis notes to the text field
+            text: [
+              existingPositioning._assets?.voice?.text
+                ? existingPositioning._assets.voice.text
+                : "",
+              `\n[FB 語氣分析 — ${new Date().toLocaleDateString("zh-TW")}]\n${fbVoiceNotes}`,
+            ].filter(Boolean).join(""),
+          },
+        },
+        // Also update top-level voice if it exists
+        voice: {
+          ...(existingPositioning.voice ?? {}),
+          samples: [
+            ...((existingPositioning.voice?.samples ?? []) as any[])
+              .filter((s: any) => s?.source !== "fb_import"),
+            ...voiceSamples,
+          ],
+        },
+      };
+
+      await localPool.execute(
+        `UPDATE brands SET positioning = ? WHERE id = ?`,
+        [JSON.stringify(updatedPositioning), input.brandId],
+      );
+
+      // 清除 brand context cache 讓新的語氣資料立刻生效
+      const { _clearBrandPrefixCache } = await import("../_core/brandContext");
+      _clearBrandPrefixCache();
+
+      return {
+        ok: true as const,
+        postsAnalyzed: posts.length,
+        samplesImported: voiceSamples.length,
+        toneSummary: analysis.tone_summary ?? "",
+        vocabulary: Array.isArray(analysis.vocabulary) ? analysis.vocabulary : [],
+      };
+    }),
+
   /** Read FB binding status for a brand (drives the settings UI). */
   getBrandFacebookStatus: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))

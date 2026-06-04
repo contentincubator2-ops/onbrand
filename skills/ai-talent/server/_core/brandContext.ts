@@ -147,6 +147,28 @@ function buildBrandCoreDigest(positioning: any): string {
   const pref = Array.isArray(a.preferred_terms?.items)
     ? a.preferred_terms.items.filter((s: any) => String(s ?? "").trim()).slice(0, 8).join("、") : "";
   if (pref) lines.push(`偏好用詞：${pref}`);
+
+  // 2026-06-03 (CJ): 加回 voice sample 和聲音原則到短任務 digest。
+  // voice samples（真實貼文範例）是最高價值的語氣訊號，之前被切掉了。
+  // 只取第一個範例，控制 token 使用量。
+  const posVoice = positioning?.voice;
+  const voiceSamples: any[] = [
+    // positioning.voice.samples (top-level, manual + FB import)
+    ...(Array.isArray(posVoice?.samples) ? posVoice.samples : []),
+    // _assets.voice.items (FB import alternative path)
+    ...(Array.isArray(a.voice?.items) ? a.voice.items : []),
+  ];
+  const bestSample = voiceSamples.find((s: any) => s?.ours && String(s.ours).trim().length > 10);
+  if (bestSample?.ours) {
+    lines.push(`語氣示範 ✓「${String(bestSample.ours).slice(0, 100)}」`);
+  }
+
+  // 聲音原則（前 3 條）
+  const vp = Array.isArray(a.voice_principles?.items)
+    ? a.voice_principles.items.filter((s: any) => String(s ?? "").trim()).slice(0, 3).join(" · ")
+    : "";
+  if (vp) lines.push(`聲音原則：${vp}`);
+
   if (!lines.length) return "";
   return "\n\n[品牌核心 — 所有產出必須貼合此精神]\n" + lines.map((l) => `- ${l}`).join("\n") + "\n";
 }
