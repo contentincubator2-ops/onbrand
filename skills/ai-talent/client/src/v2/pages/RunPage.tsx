@@ -371,9 +371,6 @@ export default function RunPage() {
   const pdSdkRef = React.useRef<any>(null);
   const pdTokenRef = React.useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string; connectLinkUrl: string }>>({});
   const pdPrefetchingRef = React.useRef<Record<string, boolean>>({});
-  // 2026-05-30: popup + poll refs for FB Canva-style auto-detect
-  const fbRunPopupRef = useRef<Window | null>(null);
-  const fbRunPollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const PLATFORM_LABEL: Record<string, string> = {
     facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube",
   };
@@ -493,66 +490,12 @@ export default function RunPage() {
     { enabled: fbBrandId > 0, refetchOnWindowFocus: false, staleTime: 20_000 },
   );
 
-  // Use a ref for fbPagesMut so startFbPolling can call it without stale closure
+  // fbPagesMutRef: ref so connectFacebookViaUrl's async retry loop can call
+  // the latest mutation without stale closure issues.
   const fbPagesMutRef = useRef<any>(null);
 
-  // 2026-05-30: start polling Pipedream every 4s while FB popup is open.
-  // When connection detected → fetch pages → show picker. Canva-style UX.
-  // CRITICAL FIX (2026-05-30): Pipedream closes the popup after OAuth success.
-  // Old code: checked popupClosed BEFORE refetch → returned immediately → connection never detected.
-  // Fix: track afterCloseTicks; keep polling for 6 more ticks (24s) after popup closes.
-  const startFbPolling = React.useCallback(() => {
-    if (fbRunPollRef.current) clearInterval(fbRunPollRef.current);
-    let elapsed = 0;
-    let afterCloseTicks = 0;
-    const MAX_AFTER_CLOSE = 6; // 6 × 4s = 24s grace period after popup closes
-
-    fbRunPollRef.current = setInterval(async () => {
-      elapsed += 4000;
-      const popupClosed = !fbRunPopupRef.current || fbRunPopupRef.current.closed;
-      if (popupClosed) afterCloseTicks++;
-
-      if (elapsed >= 300_000 || (popupClosed && afterCloseTicks > MAX_AFTER_CLOSE)) {
-        clearInterval(fbRunPollRef.current!);
-        fbRunPollRef.current = null;
-        setFbOauthPending(false);
-        return;
-      }
-
-      // Always refetch — even after popup closes (connection may propagate a few seconds late)
-      try {
-        const result = await platformsQRun?.refetch?.();
-        const connected: Record<string, any> = (result?.data as any)?.connected ?? {};
-        if (connected["facebook"]) {
-          clearInterval(fbRunPollRef.current!);
-          fbRunPollRef.current = null;
-          setFbOauthPending(false);
-          setFbOauthDone(true);
-          try { fbRunPopupRef.current?.close(); } catch { /* cross-origin */ }
-          // Fetch pages for picker
-          try {
-            const r = await fbPagesMutRef.current?.mutateAsync?.({ brandId: fbBrandId });
-            const pages: Array<{ id: string; name: string; category: string }> = r?.pages ?? [];
-            if (pages.length > 0) {
-              setFbPages(pages);
-              setFbPagePickerOpen(true);
-            }
-          } catch { /* non-fatal */ }
-          fbStatusQuery?.refetch?.();
-        }
-      } catch { /* transient — keep polling */ }
-    }, 4000);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fbBrandId, platformsQRun, fbStatusQuery]);
-
-  // 2026-05-18 (CJ「Connect account popup blocked」again): the @pipedream
-  // SDK opens its OWN window AFTER an async tokenCallback → still blocked.
-  // Use the plain Pipedream Connect-Link URL instead: open OUR popup
-  // SYNCHRONOUSLY on click (keeps user activation), then navigate it to
-  // the URL once the token mints. Same proven pattern as BrandSettingsSheet.
   const fbConnectUrlMut = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
   const fbPagesMut      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
-  // Keep ref in sync so startFbPolling (useCallback) can call the latest mutation
   fbPagesMutRef.current = fbPagesMut;
   const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();
   // 2026-06-01 (CJ): Route all publishing through Calendar instead of direct Pipedream call.
@@ -640,9 +583,6 @@ export default function RunPage() {
       }
     })();
   };
-
-  // handleFbConfirmAuth removed (2026-05-30): replaced by polling auto-detection.
-  // startFbPolling() detects when Pipedream OAuth completes, then fetches pages.
 
   // Video gen — async pipeline. Spawn job, poll for status until ready.
   // 2026-05-12 (CJ「我要改成只給腳本 — C」): storyboard mode replaces full
