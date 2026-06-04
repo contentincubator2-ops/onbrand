@@ -2075,38 +2075,58 @@ export default function BrandsPage() {
           )}
 
           {/* ── 產品 (products) — card grid with positioning preview ── */}
-          {derivedCategory === "products" && scopeMode === "brand" && (
-            <div style={{ padding: "8px 0 32px" }}>
-              <BrandEntityGrid
-                kind="product"
-                items={brandProductsList}
-                isLoading={brandProductsQ?.isLoading ?? false}
-                lang={lang}
-                onAdd={() => setAddModal({ open: true, tab: "product" })}
-                onOpen={(id) => {
-                  setScope({ brandId: activeBrandIdForLocks ?? 0, productId: id, eventId: null });
-                  setCategory("positioning");
-                }}
-              />
-            </div>
-          )}
+          {derivedCategory === "products" && scopeMode === "brand" && (() => {
+            const removeMut  = (trpc as any).product?.remove?.useMutation?.({ onSuccess: () => brandProductsQ?.refetch?.() });
+            const startMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
+            const interimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
+            return (
+              <div style={{ padding: "8px 0 32px" }}>
+                <BrandEntityGrid
+                  kind="product"
+                  items={brandProductsList}
+                  isLoading={brandProductsQ?.isLoading ?? false}
+                  lang={lang}
+                  onAdd={() => setAddModal({ open: true, tab: "product" })}
+                  onOpen={(id) => {
+                    setScope({ brandId: activeBrandIdForLocks ?? 0, productId: id, eventId: null });
+                    setCategory("positioning");
+                  }}
+                  onDelete={(id) => removeMut?.mutate?.({ id })}
+                  onPosition={(id) => {
+                    startMut?.mutate?.({ entityKind: "product", entityId: id });
+                    interimMut?.mutate?.({ entityKind: "product", entityId: id });
+                  }}
+                />
+              </div>
+            );
+          })()}
 
           {/* ── 活動 (events) — card grid with positioning preview ── */}
-          {derivedCategory === "events" && scopeMode === "brand" && (
-            <div style={{ padding: "8px 0 32px" }}>
-              <BrandEntityGrid
-                kind="event"
-                items={brandEventsList}
-                isLoading={brandEventsQ?.isLoading ?? false}
-                lang={lang}
-                onAdd={() => setAddModal({ open: true, tab: "event" })}
-                onOpen={(id) => {
-                  setScope({ brandId: activeBrandIdForLocks ?? 0, productId: null, eventId: id });
-                  setCategory("positioning");
-                }}
-              />
-            </div>
-          )}
+          {derivedCategory === "events" && scopeMode === "brand" && (() => {
+            const removeMut  = (trpc as any).event?.remove?.useMutation?.({ onSuccess: () => brandEventsQ?.refetch?.() });
+            const startMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
+            const interimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
+            return (
+              <div style={{ padding: "8px 0 32px" }}>
+                <BrandEntityGrid
+                  kind="event"
+                  items={brandEventsList}
+                  isLoading={brandEventsQ?.isLoading ?? false}
+                  lang={lang}
+                  onAdd={() => setAddModal({ open: true, tab: "event" })}
+                  onOpen={(id) => {
+                    setScope({ brandId: activeBrandIdForLocks ?? 0, productId: null, eventId: id });
+                    setCategory("positioning");
+                  }}
+                  onDelete={(id) => removeMut?.mutate?.({ id })}
+                  onPosition={(id) => {
+                    startMut?.mutate?.({ entityKind: "event", entityId: id });
+                    interimMut?.mutate?.({ entityKind: "event", entityId: id });
+                  }}
+                />
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -4397,7 +4417,7 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
  * Cards with no positioning show a placeholder state.
  * ─────────────────────────────────────────────────────────────────── */
 function BrandEntityGrid({
-  kind, items, isLoading, lang, onAdd, onOpen,
+  kind, items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
 }: {
   kind: "product" | "event";
   items: any[];
@@ -4405,6 +4425,8 @@ function BrandEntityGrid({
   lang: "zh-TW" | "en";
   onAdd: () => void;
   onOpen: (id: number) => void;
+  onDelete: (id: number) => void;
+  onPosition: (id: number) => void;
 }) {
   const en = lang === "en";
 
@@ -4528,17 +4550,36 @@ function BrandEntityGrid({
                   </div>
                 )}
 
-                <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                    positioned
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-neutral-100 text-neutral-500"
-                  }`}>
-                    {positioned ? (en ? "✓ Positioned" : "✓ 已定位") : (en ? "Not started" : "未開始")}
-                  </span>
-                  <span className="text-[10px] text-neutral-400 group-hover:text-neutral-700 transition">
-                    {en ? "Open →" : "查看 →"}
-                  </span>
+                <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center gap-1.5 flex-wrap">
+                  {/* Run positioning */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onPosition(item.id); }}
+                    className="text-[10px] font-medium px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition flex-1 min-w-0 text-center"
+                  >
+                    {positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
+                  </button>
+                  {/* Open */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onOpen(item.id); }}
+                    className="text-[10px] font-medium px-2 py-1 rounded-md bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition"
+                  >
+                    {en ? "View" : "查看"}
+                  </button>
+                  {/* Delete */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(en
+                        ? `Delete "${item.name}"? This cannot be undone.`
+                        : `確定刪除「${item.name}」？此操作無法復原。`)) {
+                        onDelete(item.id);
+                      }
+                    }}
+                    className="text-[10px] px-2 py-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition"
+                    title={en ? "Delete" : "刪除"}
+                  >
+                    ✕
+                  </button>
                 </div>
               </button>
             );
