@@ -251,7 +251,9 @@ export function IntakeChat({
     try {
       const pd = new Ctor({
         projectEnvironment: tk.env as "production" | "development",
-        externalUserId: "sowork-user",
+        // Must match the externalUserId used when the token was created on the server:
+        // platformConnectRouter.getConnectToken → sowork-brand-{brandId}
+        externalUserId: `sowork-brand-${brandId ?? 0}`,
         tokenCallback: async () => ({ token: tk.token, expiresAt: new Date(tk.expiresAt), connectLinkUrl: tk.connectLinkUrl }),
       });
       pd.connectAccount({
