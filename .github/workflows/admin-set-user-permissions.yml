@@ -1,8 +1,12 @@
 name: Admin — Set user permissions (admin + unlimited credits)
 
-# Grants role='admin' + hasUnlimitedCredits=1 + planCode='enterprise' to:
+# Grants full unlimited access to:
 #   - liudice@gmail.com
 #   - all users whose email ends with @sowork.tw
+#   (including jj.lu@sowork.tw)
+#
+# Sets: role=admin, hasUnlimitedCredits=1, planCode=enterprise,
+#       planStatus=active, planEndsAt=NULL (removes trial expiry), isActive=1
 #
 # Run via: GitHub → Actions → this workflow → Run workflow
 
@@ -44,10 +48,12 @@ jobs:
 
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
             "UPDATE users
-             SET role = 'admin',
+             SET role                = 'admin',
                  hasUnlimitedCredits = 1,
-                 planCode = 'enterprise',
-                 isActive = 1
+                 planCode            = 'enterprise',
+                 planStatus          = 'active',
+                 planEndsAt          = NULL,
+                 isActive            = 1
              WHERE email = 'liudice@gmail.com'
                 OR email LIKE '%@sowork.tw';"
 
@@ -64,7 +70,7 @@ jobs:
           DB_NAME="${LOCAL_DB_NAME:-mos_db}"
           echo "=== After update ==="
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
-            "SELECT id, email, role, isActive, hasUnlimitedCredits, planCode
+            "SELECT id, email, role, isActive, hasUnlimitedCredits, planCode, planStatus, planEndsAt
              FROM users
              WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw'
              ORDER BY email;"
