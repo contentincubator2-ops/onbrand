@@ -415,6 +415,18 @@ export default function BrandsPage() {
   })();
   const brandAssets: Record<string, any> = (fullPositioning?._assets ?? {}) as Record<string, any>;
 
+  // Products + events for brand tabs (定位卡片顯示)
+  const brandProductsQ = (trpc as any).product?.list?.useQuery?.(
+    { brandId: activeBrandIdForLocks ?? 0 },
+    { enabled: !!activeBrandIdForLocks && (category === "products"), refetchOnWindowFocus: false, staleTime: 30_000 },
+  );
+  const brandEventsQ = (trpc as any).event?.list?.useQuery?.(
+    { brandId: activeBrandIdForLocks ?? 0 },
+    { enabled: !!activeBrandIdForLocks && (category === "events"), refetchOnWindowFocus: false, staleTime: 30_000 },
+  );
+  const brandProductsList: any[] = brandProductsQ?.data ?? [];
+  const brandEventsList: any[] = brandEventsQ?.data ?? [];
+
   // Onboarding nudge: if this brand has no website / socialLinks yet,
   // auto-open Settings → 連結 once. localStorage tracks dismissal so
   // the prompt doesn't bug returning users.
@@ -577,7 +589,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -585,8 +597,11 @@ export default function BrandsPage() {
     : urlCat === "publish" ? "publish"
     : urlCat === "ai" ? "ai"
     : urlCat === "settings" ? "settings"
+    : urlCat === "products" ? "products"
+    : urlCat === "events" ? "events"
+    : urlCat === "tools" ? "tools"
     : "positioning";
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools") => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("cat", next);
     setSearchParams(nextParams, { replace: true });
@@ -1232,42 +1247,47 @@ export default function BrandsPage() {
               tagline preview lived in the bar redundantly. Kept the import
               available for any debug page that wants to surface it. */}
 
-          {/* Tab tiles — /30s circular colored style (5 tiles incl. 連結) */}
+          {/* Tab tiles — 7 consistent tiles in one scrollable row */}
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            <div className="flex items-start gap-3 w-max mx-auto px-2">
+            <div className="flex items-start gap-2 min-w-max mx-auto px-2">
               {(() => {
                 // Tile set adapts to scope:
                 //  - Brand:   all 5 (定位 / 文字 / 知識 / 基本資料 / 視覺)
                 //  - Product: 定位 + 基本資料 (copy / knowledge / visual inherit from brand)
                 //  - Event:   定位 + 基本資料 (same — events are seasonal overlays on a brand)
                 // CJ 2026-05-13「左上選活動時，這一頁就呈現該活動的定位等等資訊」.
+                // 2026-06-03 (CJ): Redesigned tab structure — 7 consistent tabs.
+                // 平台授權 removed (handled in Calendar connect flow).
+                // 知識 + AI指令 merged into 品牌工具.
+                // 產品 + 活動 added as independent tabs with card grids.
                 const allTiles = [
-                  { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位",     desc:
-                      scopeMode === "event"   ? (lang === "en" ? "Campaign positioning (11 steps)" : "活動定位（11 步）")
-                    : scopeMode === "product" ? (lang === "en" ? "Product positioning (6 steps)"   : "產品定位（6 步）")
-                    : (lang === "en" ? "Brand core / slogan" : "品牌核心 / Slogan"),
+                  { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位",
+                      desc: scopeMode === "event"   ? (lang === "en" ? "Campaign positioning" : "活動定位")
+                          : scopeMode === "product" ? (lang === "en" ? "Product positioning"  : "產品定位")
+                          : (lang === "en" ? "Brand core / Slogan" : "品牌核心 / Slogan"),
                       Icon: LucideTarget,    scopes: ["brand", "product", "event"] as string[] },
-                  { v: "copy"        as const, label: lang === "en" ? "Copy"        : "文字",
-                      desc: scopeMode === "product" ? (lang === "en" ? "Tone / style / keywords" : "語氣 / 溝通風格 / 關鍵詞")
-                          : scopeMode === "event"   ? (lang === "en" ? "Voice / must-have / don'ts" : "語氣 / 必用 / 禁用規範")
-                          : (lang === "en" ? "Words / banned / style"   : "用詞 / 禁忌詞 / 風格"),
+                  { v: "copy"        as const, label: lang === "en" ? "Copy"    : "文字",
+                      desc: scopeMode === "product" ? (lang === "en" ? "Tone / style" : "語氣 / 風格")
+                          : scopeMode === "event"   ? (lang === "en" ? "Voice / rules" : "語氣 / 規範")
+                          : (lang === "en" ? "Words / banned / style" : "用詞 / 禁忌 / 風格"),
                       Icon: LucideType,      scopes: ["brand", "product", "event"] as string[] },
-                  { v: "knowledge"   as const, label: lang === "en" ? "Knowledge"   : "知識",     desc: lang === "en" ? "FAQ / fact library"       : "FAQ / 常識資料庫",
-                      Icon: LucideBook,      scopes: ["brand"] },
-                  { v: "info"        as const, label: lang === "en" ? "Info"        : "基本資料",
-                      desc:
-                        scopeMode === "event"   ? (lang === "en" ? "Dates / brand / products"    : "起訖時間 / 品牌 / 產品")
-                      : scopeMode === "product" ? (lang === "en" ? "Name / SKU / brand link"     : "名稱 / SKU / 所屬品牌")
-                      : (lang === "en" ? "Name / industry / about" : "名稱 / 產業 / 描述"),
-                      Icon: LucideIdCard,    scopes: ["brand", "product", "event"] },
-                  { v: "visual"      as const, label: lang === "en" ? "Visual"      : "視覺",       desc: lang === "en" ? "Logo / palette / font"       : "Logo / 色票 / 字型",
+                  { v: "visual"      as const, label: lang === "en" ? "Visual"  : "視覺",
+                      desc: lang === "en" ? "Logo / palette / font" : "Logo / 色票 / 字型",
                       Icon: LucidePalette,   scopes: ["brand"] },
-                  // 2026-05-30 (CJ「modal 移除，功能全進主工作區」):
-                  // 平台授權 + AI 指令 moved from settings modal to main tabs.
-                  { v: "publish"     as const, label: lang === "en" ? "Platform auth" : "平台授權",  desc: lang === "en" ? "Facebook / IG / LinkedIn / YT" : "Facebook / IG / LinkedIn / YT",
-                      Icon: LucideShare,     scopes: ["brand"] },
-                  { v: "ai"          as const, label: lang === "en" ? "AI prompts"    : "AI 指令",   desc: lang === "en" ? "Per-platform text + image"     : "各平台文字 + 圖片指令",
+                  { v: "info"        as const, label: lang === "en" ? "Info"    : "基本資料",
+                      desc: scopeMode === "event"   ? (lang === "en" ? "Dates / products"    : "時間 / 產品")
+                          : scopeMode === "product" ? (lang === "en" ? "Name / brand"        : "名稱 / 品牌")
+                          : (lang === "en" ? "Name / industry" : "名稱 / 產業"),
+                      Icon: LucideIdCard,    scopes: ["brand", "product", "event"] },
+                  { v: "tools"       as const, label: lang === "en" ? "Brand tools" : "品牌工具",
+                      desc: lang === "en" ? "Knowledge / AI prompts" : "知識庫 / AI 指令",
+                      Icon: LucideBook,      scopes: ["brand"] },
+                  { v: "products"    as const, label: lang === "en" ? "Products" : "產品",
+                      desc: lang === "en" ? "Product cards & positioning" : "產品卡片與定位",
                       Icon: LucideRobotIcon, scopes: ["brand"] },
+                  { v: "events"      as const, label: lang === "en" ? "Events"   : "活動",
+                      desc: lang === "en" ? "Campaign cards & positioning" : "活動卡片與定位",
+                      Icon: LucideTarget,    scopes: ["brand"] },
                 ];
                 const visibleTiles = allTiles.filter((tile) =>
                   tile.scopes.includes(scopeMode === "none" ? "brand" : scopeMode),
@@ -1289,7 +1309,7 @@ export default function BrandsPage() {
                     key={t.v}
                     type="button"
                     onClick={() => setCategory(t.v)}
-                    className={`relative shrink-0 px-4 py-3 rounded-lg border transition text-left min-w-[140px] ${
+                    className={`relative px-3 py-2.5 rounded-lg border transition text-left flex-1 min-w-[100px] max-w-[160px] ${
                       active
                         ? "bg-neutral-900 border-neutral-900 text-white"
                         : "bg-white border-neutral-200 text-neutral-700 hover:border-neutral-400"
@@ -2029,10 +2049,62 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* ── AI 指令 (ai) — per-platform prompt overrides ── */}
+          {/* ── AI 指令 (ai) — per-platform prompt overrides (legacy route) ── */}
           {derivedCategory === "ai" && scopeMode === "brand" && (
             <div style={{ padding: "8px 0 32px" }}>
               <AIPromptsEditor brandId={activeBrandIdForLocks} />
+            </div>
+          )}
+
+          {/* ── 品牌工具 (tools) — 知識庫 + AI 指令 合一 ── */}
+          {derivedCategory === "tools" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }} className="space-y-8">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 mb-4 px-1">
+                  {lang === "en" ? "Knowledge Base" : "知識庫"}
+                </p>
+                <KnowledgeEditor brandId={activeBrandIdForLocks} />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 mb-4 px-1">
+                  {lang === "en" ? "AI Prompt Library" : "AI 指令庫"}
+                </p>
+                <AIPromptsEditor brandId={activeBrandIdForLocks} />
+              </div>
+            </div>
+          )}
+
+          {/* ── 產品 (products) — card grid with positioning preview ── */}
+          {derivedCategory === "products" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <BrandEntityGrid
+                kind="product"
+                items={brandProductsList}
+                isLoading={brandProductsQ?.isLoading ?? false}
+                lang={lang}
+                onAdd={() => setAddModal({ open: true, tab: "product" })}
+                onOpen={(id) => {
+                  setScope({ brandId: activeBrandIdForLocks ?? 0, productId: id, eventId: null });
+                  setCategory("positioning");
+                }}
+              />
+            </div>
+          )}
+
+          {/* ── 活動 (events) — card grid with positioning preview ── */}
+          {derivedCategory === "events" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <BrandEntityGrid
+                kind="event"
+                items={brandEventsList}
+                isLoading={brandEventsQ?.isLoading ?? false}
+                lang={lang}
+                onAdd={() => setAddModal({ open: true, tab: "event" })}
+                onOpen={(id) => {
+                  setScope({ brandId: activeBrandIdForLocks ?? 0, productId: null, eventId: id });
+                  setCategory("positioning");
+                }}
+              />
             </div>
           )}
         </div>
@@ -4315,6 +4387,175 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────── BrandEntityGrid ────────────────────────────
+ * Shared card grid for 產品 and 活動 tabs.
+ * Shows each entity's positioning preview (tagline / USP / audience).
+ * Cards with no positioning show a placeholder state.
+ * ─────────────────────────────────────────────────────────────────── */
+function BrandEntityGrid({
+  kind, items, isLoading, lang, onAdd, onOpen,
+}: {
+  kind: "product" | "event";
+  items: any[];
+  isLoading: boolean;
+  lang: "zh-TW" | "en";
+  onAdd: () => void;
+  onOpen: (id: number) => void;
+}) {
+  const en = lang === "en";
+
+  const extractField = (positioning: any, ...keys: string[]): string => {
+    if (!positioning) return "";
+    for (const key of keys) {
+      const parts = key.split(".");
+      let val: any = positioning;
+      for (const p of parts) { val = val?.[p]; }
+      if (typeof val === "string" && val.trim()) return val.trim();
+    }
+    return "";
+  };
+
+  const getPreview = (item: any) => {
+    const p = item.positioning ?? {};
+    if (kind === "product") {
+      return {
+        tagline: extractField(p, "tagline", "tagline.zhTagline", "differentiation.summary"),
+        usp:     extractField(p, "usp", "differentiation.functional", "differentiation.summary"),
+        audience: extractField(p, "audience.primary", "targetAudience"),
+      };
+    } else {
+      return {
+        tagline: extractField(p, "theme", "tagline", "tagline.zhTagline"),
+        usp:     extractField(p, "cta", "offer", "usp"),
+        audience: item.startAt
+          ? `${new Date(item.startAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}${item.endAt ? ` → ${new Date(item.endAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}` : ""}`
+          : "",
+      };
+    }
+  };
+
+  const hasPositioning = (item: any): boolean => {
+    const p = item.positioning ?? {};
+    return !!(
+      p.tagline || p.usp || p.theme || p.differentiation?.summary ||
+      p.audience?.primary || p.targetAudience
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 px-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="rounded-xl border border-neutral-100 bg-neutral-50 animate-pulse h-36" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2">
+      {items.length === 0 && (
+        <div className="text-center py-12 text-neutral-400">
+          <p className="text-sm font-medium mb-1">
+            {kind === "product"
+              ? (en ? "No products yet" : "還沒有產品")
+              : (en ? "No events yet" : "還沒有活動")}
+          </p>
+          <p className="text-xs mb-4">
+            {kind === "product"
+              ? (en ? "Add your first product to start positioning" : "新增第一個產品，開始建立定位")
+              : (en ? "Add a campaign or event" : "新增活動或行銷企劃")}
+          </p>
+          <button
+            onClick={onAdd}
+            className="text-xs px-4 py-2 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 transition"
+          >
+            {kind === "product" ? (en ? "+ New product" : "+ 新增產品") : (en ? "+ New event" : "+ 新增活動")}
+          </button>
+        </div>
+      )}
+      {items.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {items.map((item) => {
+            const preview = getPreview(item);
+            const positioned = hasPositioning(item);
+            return (
+              <button
+                key={item.id}
+                onClick={() => onOpen(item.id)}
+                className="text-left rounded-xl border border-neutral-200 bg-white p-4 hover:border-neutral-400 hover:shadow-sm transition group"
+              >
+                {/* Name */}
+                <p className="text-sm font-semibold text-neutral-900 mb-2 truncate">{item.name}</p>
+
+                {positioned ? (
+                  <div className="space-y-1.5">
+                    {preview.tagline && (
+                      <div>
+                        <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">
+                          {kind === "product" ? (en ? "Tagline" : "標語") : (en ? "Theme" : "主軸")}
+                        </span>
+                        <p className="text-[11px] text-neutral-700 leading-tight line-clamp-2 mt-0.5">{preview.tagline}</p>
+                      </div>
+                    )}
+                    {preview.usp && (
+                      <div>
+                        <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">
+                          {kind === "product" ? "USP" : (en ? "CTA / Offer" : "CTA / 優惠")}
+                        </span>
+                        <p className="text-[11px] text-neutral-600 line-clamp-1 mt-0.5">{preview.usp}</p>
+                      </div>
+                    )}
+                    {preview.audience && (
+                      <div>
+                        <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">
+                          {kind === "product" ? (en ? "Audience" : "受眾") : (en ? "Period" : "時間")}
+                        </span>
+                        <p className="text-[11px] text-neutral-500 line-clamp-1 mt-0.5">{preview.audience}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="text-[11px] text-neutral-400">
+                      {en ? "Positioning not yet run" : "尚未建立定位"}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                    positioned
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-neutral-100 text-neutral-500"
+                  }`}>
+                    {positioned ? (en ? "✓ Positioned" : "✓ 已定位") : (en ? "Not started" : "未開始")}
+                  </span>
+                  <span className="text-[10px] text-neutral-400 group-hover:text-neutral-700 transition">
+                    {en ? "Open →" : "查看 →"}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+
+          {/* Add new card */}
+          <button
+            onClick={onAdd}
+            className="rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50/50 p-4 flex flex-col items-center justify-center gap-2 hover:border-neutral-400 hover:bg-neutral-50 transition min-h-[140px]"
+          >
+            <span className="text-2xl text-neutral-300">+</span>
+            <span className="text-xs text-neutral-400 font-medium">
+              {kind === "product" ? (en ? "New product" : "新增產品") : (en ? "New event" : "新增活動")}
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
