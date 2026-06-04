@@ -607,6 +607,25 @@ export default function BrandsPage() {
   const brandProductsList: any[] = brandProductsQ?.data ?? [];
   const brandEventsList: any[] = brandEventsQ?.data ?? [];
 
+  // ── Product/Event tab hooks — MUST stay at top level (no IIFE) ──────────
+  // React error #300 occurs if hooks are called inside conditional IIFE.
+  const discoveryStatusQ = (trpc as any).theater?.getProductDiscoveryStatus?.useQuery?.(
+    { brandId: activeBrandIdForLocks ?? 0 },
+    { enabled: !!activeBrandIdForLocks && category === "products", refetchInterval: 5_000, staleTime: 0 },
+  );
+  const discoveryStatus = discoveryStatusQ?.data as {
+    status: string; phase: string; totalFound: number; totalPositioned: number; currentProduct: string | null;
+  } | null;
+  const discoveryRunning = discoveryStatus?.status === "running" || discoveryStatus?.status === "pending";
+
+  const prodRemoveMut  = (trpc as any).product?.remove?.useMutation?.({ onSuccess: () => brandProductsQ?.refetch?.() });
+  const prodStartMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
+  const prodInterimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
+
+  const evRemoveMut    = (trpc as any).event?.remove?.useMutation?.({ onSuccess: () => brandEventsQ?.refetch?.() });
+  const evStartMut     = (trpc as any).positioningJobs?.start?.useMutation?.();
+  const evInterimMut   = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
+
   const defaultSection: SectionId =
     category === "visual" ? "asset:all"
     : category === "copy" ? "asset:all"
@@ -2075,87 +2094,71 @@ export default function BrandsPage() {
           )}
 
           {/* ── 產品 (products) — card grid with positioning preview ── */}
-          {derivedCategory === "products" && scopeMode === "brand" && (() => {
-            const discoveryQ = (trpc as any).theater?.getProductDiscoveryStatus?.useQuery?.(
-              { brandId: activeBrandIdForLocks ?? 0 },
-              { enabled: !!activeBrandIdForLocks, refetchInterval: 5_000, staleTime: 0 },
-            );
-            const disc = discoveryQ?.data as { status: string; phase: string; totalFound: number; totalPositioned: number; currentProduct: string | null } | null;
-            const isRunning = disc?.status === "running" || disc?.status === "pending";
-            const removeMut  = (trpc as any).product?.remove?.useMutation?.({ onSuccess: () => brandProductsQ?.refetch?.() });
-            const startMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
-            const interimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
-            return (
-              <div style={{ padding: "8px 0 32px" }}>
-                {/* Discovery progress banner — shown while AI is crawling/positioning */}
-                {isRunning && (
-                  <div className="mx-2 mb-5 px-4 py-3 rounded-xl border border-indigo-200 bg-indigo-50 flex items-start gap-3">
-                    <span className="text-indigo-500 animate-spin text-base mt-0.5">⟳</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-indigo-900">
-                        {lang === "en" ? "AI is discovering products from your website" : "AI 正在從你的官網分析產品"}
-                      </p>
-                      <p className="text-[11px] text-indigo-700 mt-0.5">
-                        {disc?.phase === "crawl" && (lang === "en" ? "Crawling your website…" : "正在爬取官網內容…")}
-                        {disc?.phase === "extract" && (lang === "en" ? "Extracting product list…" : "正在抽取產品清單…")}
-                        {disc?.phase === "position" && disc?.currentProduct
-                          ? (lang === "en" ? `Positioning: ${disc.currentProduct}` : `正在定位：${disc.currentProduct}`)
-                          : disc?.phase === "position" ? (lang === "en" ? "Running product positioning…" : "正在進行產品定位…") : ""}
-                        {(disc?.totalFound ?? 0) > 0 && (
-                          <span className="ml-2 text-indigo-600">
-                            ({disc!.totalPositioned}/{disc!.totalFound} {lang === "en" ? "done" : "完成"})
-                          </span>
-                        )}
-                      </p>
-                    </div>
+          {derivedCategory === "products" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }}>
+              {/* Discovery progress banner — shown while AI is crawling/positioning */}
+              {discoveryRunning && (
+                <div className="mx-2 mb-5 px-4 py-3 rounded-xl border border-indigo-200 bg-indigo-50 flex items-start gap-3">
+                  <span className="text-indigo-500 animate-spin text-base mt-0.5">⟳</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-indigo-900">
+                      {lang === "en" ? "AI is discovering products from your website" : "AI 正在從你的官網分析產品"}
+                    </p>
+                    <p className="text-[11px] text-indigo-700 mt-0.5">
+                      {discoveryStatus?.phase === "crawl" && (lang === "en" ? "Crawling your website…" : "正在爬取官網內容…")}
+                      {discoveryStatus?.phase === "extract" && (lang === "en" ? "Extracting product list…" : "正在抽取產品清單…")}
+                      {discoveryStatus?.phase === "position" && discoveryStatus.currentProduct
+                        ? (lang === "en" ? `Positioning: ${discoveryStatus.currentProduct}` : `正在定位：${discoveryStatus.currentProduct}`)
+                        : discoveryStatus?.phase === "position" ? (lang === "en" ? "Running product positioning…" : "正在進行產品定位…") : ""}
+                      {(discoveryStatus?.totalFound ?? 0) > 0 && (
+                        <span className="ml-2 text-indigo-600">
+                          ({discoveryStatus!.totalPositioned}/{discoveryStatus!.totalFound} {lang === "en" ? "done" : "完成"})
+                        </span>
+                      )}
+                    </p>
                   </div>
-                )}
-                <BrandEntityGrid
-                  kind="product"
-                  items={brandProductsList}
-                  isLoading={brandProductsQ?.isLoading ?? false}
-                  lang={lang}
-                  onAdd={() => setAddModal({ open: true, tab: "product" })}
-                  onOpen={(id) => {
-                    setScope({ brandId: activeBrandIdForLocks ?? 0, productId: id, eventId: null });
-                    setCategory("positioning");
-                  }}
-                  onDelete={(id) => removeMut?.mutate?.({ id })}
-                  onPosition={(id) => {
-                    startMut?.mutate?.({ entityKind: "product", entityId: id });
-                    interimMut?.mutate?.({ entityKind: "product", entityId: id });
-                  }}
-                />
-              </div>
-            );
-          })()}
+                </div>
+              )}
+              <BrandEntityGrid
+                kind="product"
+                items={brandProductsList}
+                isLoading={brandProductsQ?.isLoading ?? false}
+                lang={lang}
+                onAdd={() => setAddModal({ open: true, tab: "product" })}
+                onOpen={(id) => {
+                  setScope({ brandId: activeBrandIdForLocks ?? 0, productId: id, eventId: null });
+                  setCategory("positioning");
+                }}
+                onDelete={(id) => prodRemoveMut?.mutate?.({ id })}
+                onPosition={(id) => {
+                  prodStartMut?.mutate?.({ entityKind: "product", entityId: id });
+                  prodInterimMut?.mutate?.({ entityKind: "product", entityId: id });
+                }}
+              />
+            </div>
+          )}
 
           {/* ── 活動 (events) — card grid with positioning preview ── */}
-          {derivedCategory === "events" && scopeMode === "brand" && (() => {
-            const removeMut  = (trpc as any).event?.remove?.useMutation?.({ onSuccess: () => brandEventsQ?.refetch?.() });
-            const startMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
-            const interimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
-            return (
-              <div style={{ padding: "8px 0 32px" }}>
-                <BrandEntityGrid
-                  kind="event"
-                  items={brandEventsList}
-                  isLoading={brandEventsQ?.isLoading ?? false}
-                  lang={lang}
-                  onAdd={() => setAddModal({ open: true, tab: "event" })}
-                  onOpen={(id) => {
-                    setScope({ brandId: activeBrandIdForLocks ?? 0, productId: null, eventId: id });
-                    setCategory("positioning");
-                  }}
-                  onDelete={(id) => removeMut?.mutate?.({ id })}
-                  onPosition={(id) => {
-                    startMut?.mutate?.({ entityKind: "event", entityId: id });
-                    interimMut?.mutate?.({ entityKind: "event", entityId: id });
-                  }}
-                />
-              </div>
-            );
-          })()}
+          {derivedCategory === "events" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <BrandEntityGrid
+                kind="event"
+                items={brandEventsList}
+                isLoading={brandEventsQ?.isLoading ?? false}
+                lang={lang}
+                onAdd={() => setAddModal({ open: true, tab: "event" })}
+                onOpen={(id) => {
+                  setScope({ brandId: activeBrandIdForLocks ?? 0, productId: null, eventId: id });
+                  setCategory("positioning");
+                }}
+                onDelete={(id) => evRemoveMut?.mutate?.({ id })}
+                onPosition={(id) => {
+                  evStartMut?.mutate?.({ entityKind: "event", entityId: id });
+                  evInterimMut?.mutate?.({ entityKind: "event", entityId: id });
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
