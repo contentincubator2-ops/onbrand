@@ -319,6 +319,68 @@ async function loadBrandRules(brandId: number, userId: number): Promise<string[]
 
 export const theaterRouter = router({
   /**
+   * 2026-06-03 — Fetch brand's existing products + events so Theater
+   * modal can offer "從品牌選擇" without manual re-entry.
+   *
+   * Returns USP extracted from positioning JSON (usp → differentiation.summary
+   * → description → name) so Theater can pass it to generation.
+   */
+  getBrandEntities: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const [prodRows]: any = await localPool.execute(
+        `SELECT id, name, positioning, createdAt
+         FROM products
+         WHERE brandId = ? AND userId = ?
+         ORDER BY createdAt DESC LIMIT 50`,
+        [input.brandId, ctx.user.id],
+      );
+      const [evRows]: any = await localPool.execute(
+        `SELECT id, name, startAt, endAt, positioning, createdAt
+         FROM events
+         WHERE brandId = ? AND userId = ?
+         ORDER BY COALESCE(startAt, createdAt) DESC LIMIT 50`,
+        [input.brandId, ctx.user.id],
+      );
+
+      const extractUsp = (row: any): string => {
+        try {
+          const p = typeof row.positioning === "string"
+            ? JSON.parse(row.positioning)
+            : (row.positioning ?? {});
+          return (
+            p.usp
+            ?? p.differentiation?.summary
+            ?? p.differentiation?.functional
+            ?? p.description
+            ?? ""
+          );
+        } catch { return ""; }
+      };
+
+      const toDateStr = (v: any): string | null => {
+        if (!v) return null;
+        try { return new Date(v).toISOString().slice(0, 10); } catch { return null; }
+      };
+
+      const products = (prodRows as any[]).map((r: any) => ({
+        id: r.id as number,
+        name: String(r.name ?? ""),
+        usp: extractUsp(r),
+      }));
+
+      const events = (evRows as any[]).map((r: any) => ({
+        id: r.id as number,
+        name: String(r.name ?? ""),
+        startAt: toDateStr(r.startAt),
+        endAt: toDateStr(r.endAt),
+        usp: extractUsp(r),
+      }));
+
+      return { products, events };
+    }),
+
+  /**
    * Load brand positioning, derive 5-7 USPs, ask LLM for the chief's
    * opening line. Single call, < 4s.
    */

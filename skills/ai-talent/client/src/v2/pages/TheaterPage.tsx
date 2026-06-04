@@ -81,17 +81,25 @@ import EditCellModal from "../components/theater/EditCellModal";
 
 interface ImportantDate {
   id: string;
-  date: string; // YYYY-MM-DD
+  entityId?: number;   // DB event id when imported from brand
+  date: string;        // YYYY-MM-DD  (primary/start date)
+  endDate?: string;    // YYYY-MM-DD  for multi-day events
   name: string;
+  promoFreqPerWeek?: number; // how many posts per week to dedicate (default 1 = just the day itself)
 }
 
 // Phase 3b — 素材 (產品 / 照片)
 interface ProductMaterial {
   id: string;
+  entityId?: number;   // DB product id when imported from brand
   name: string;
   usp: string;
   launchDate?: string; // YYYY-MM-DD
   photoUrl?: string;
+  // Promotion schedule settings
+  promoFreqPerWeek?: number; // 1–7 posts per week featuring this product
+  promoStartDate?: string;   // YYYY-MM-DD (default: first day of Theater window)
+  promoEndDate?: string;     // YYYY-MM-DD (default: last day of Theater window)
 }
 interface PhotoMaterial {
   id: string;
@@ -122,6 +130,58 @@ interface CellState {
 
 type CellKey = string; // `${platform}::${date}`
 const cellKey = (p: TheaterPlatform, d: string) => `${p}::${d}` as CellKey;
+
+/**
+ * 排程分配器 — 根據推廣設定把產品/活動分配到 7 天內的具體日期。
+ * 回傳 Record<YYYY-MM-DD, { products, events }> 供 server 注入 per-cell prompt。
+ */
+function buildPromotionSlots(
+  products: ProductMaterial[],
+  events: ImportantDate[],
+  days: string[], // 7 個 YYYY-MM-DD
+): Record<string, { products: Array<{ name: string; usp: string }>; events: Array<{ name: string; date: string }> }> {
+  const slots: Record<string, { products: Array<{ name: string; usp: string }>; events: Array<{ name: string; date: string }> }> = {};
+  days.forEach((d) => { slots[d] = { products: [], events: [] }; });
+
+  // Products — distribute based on freq + optional date range
+  for (const product of products) {
+    if (!product.promoFreqPerWeek) continue;
+    const eligible = days.filter((d) =>
+      (!product.promoStartDate || d >= product.promoStartDate) &&
+      (!product.promoEndDate   || d <= product.promoEndDate),
+    );
+    if (!eligible.length) continue;
+    const freq = Math.min(product.promoFreqPerWeek, eligible.length);
+    const step = eligible.length / freq;
+    for (let i = 0; i < freq; i++) {
+      const day = eligible[Math.floor(i * step)];
+      if (day && slots[day]) {
+        slots[day].products.push({ name: product.name, usp: product.usp });
+      }
+    }
+  }
+
+  // Events — appear on their date + optional pre-event warm-up posts
+  for (const ev of events) {
+    if (slots[ev.date]) {
+      slots[ev.date].events.push({ name: ev.name, date: ev.date });
+    }
+    // If freq > 1, warm-up posts on days leading up to the event
+    const freq = ev.promoFreqPerWeek ?? 1;
+    if (freq > 1) {
+      const before = days.filter((d) => d < ev.date);
+      const extra = Math.min(freq - 1, before.length);
+      for (let i = 1; i <= extra; i++) {
+        const day = before[before.length - i];
+        if (day && slots[day]) {
+          slots[day].events.push({ name: ev.name, date: ev.date });
+        }
+      }
+    }
+  }
+
+  return slots;
+}
 
 interface BrainStation {
   member: CastMember;
@@ -527,6 +587,17 @@ export default function TheaterPage() {
   // Phase 3b: 加入素材 modal state
   const [materialModalOpen, setMaterialModalOpen] = useState(false);
   const [materialTab, setMaterialTab] = useState<"event" | "product" | "photo">("event");
+
+  // Brand entities — 從品牌選擇 (products + events already created in the system)
+  const brandEntitiesQ = (trpc as any).theater?.getBrandEntities?.useQuery?.(
+    { brandId: brandId ?? 0 },
+    { enabled: !!brandId && materialModalOpen, refetchOnWindowFocus: false, staleTime: 30_000 },
+  );
+  const brandProducts: Array<{ id: number; name: string; usp: string }> =
+    brandEntitiesQ?.data?.products ?? [];
+  const brandEvents: Array<{ id: number; name: string; startAt: string | null; endAt: string | null; usp: string }> =
+    brandEntitiesQ?.data?.events ?? [];
+
   // event tab fields (reuses newDate / newDateName below)
   // product tab fields
   const [newProductName, setNewProductName] = useState("");
@@ -769,6 +840,8 @@ export default function TheaterPage() {
         // Phase 3b: 素材 (products + photos) so chief brief can mention them
         products: products.map((p) => ({ name: p.name, usp: p.usp, launchDate: p.launchDate })),
         photos: photos.map((ph) => ({ url: ph.url, tag: ph.tag, note: ph.note })),
+        // Promotion slots — computed here, used by server to inject per-cell promo context
+        promotionSlots: buildPromotionSlots(products, importantDates, days.map((d) => d.date)),
       });
     } catch (e) {
       console.error("[theater] runStart failed:", e);
@@ -1684,74 +1757,230 @@ export default function TheaterPage() {
                 ))}
               </div>
 
-              {/* Event tab */}
+              {/* ── Event tab ── */}
               {materialTab === "event" && (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* 從品牌選擇 */}
+                  {brandEvents.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
+                        {lang === "en" ? "From your brand" : "從品牌選擇"}
+                      </p>
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                        {brandEvents.map((ev) => {
+                          const alreadyAdded = importantDates.some((d) => d.entityId === ev.id);
+                          return (
+                            <div key={ev.id} className="flex items-center gap-2 bg-violet-50 px-3 py-2 rounded-lg border border-violet-200">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{ev.name}</p>
+                                {ev.startAt && <p className="text-[10px] text-neutral-500">{ev.startAt}{ev.endAt ? ` → ${ev.endAt}` : ""}</p>}
+                              </div>
+                              <button
+                                disabled={alreadyAdded}
+                                onClick={() => {
+                                  if (alreadyAdded) return;
+                                  const dateStr = ev.startAt ?? new Date().toISOString().slice(0, 10);
+                                  setImportantDates((prev) => [...prev, {
+                                    id: `ev-${ev.id}-${Date.now()}`,
+                                    entityId: ev.id,
+                                    date: dateStr,
+                                    endDate: ev.endAt ?? undefined,
+                                    name: ev.name,
+                                    promoFreqPerWeek: 1,
+                                  }]);
+                                }}
+                                className={`shrink-0 text-[11px] px-2.5 py-1 rounded-md font-medium transition ${alreadyAdded ? "bg-neutral-100 text-neutral-400 cursor-not-allowed" : "bg-violet-600 text-white hover:bg-violet-700"}`}
+                              >
+                                {alreadyAdded ? (lang === "en" ? "Added" : "已加入") : (lang === "en" ? "+ Add" : "+ 加入")}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Already added events with promo settings */}
                   {importantDates.length > 0 && (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide">
+                        {lang === "en" ? "Added events" : "已加入的活動"}
+                      </p>
                       {importantDates.map((d) => (
-                        <div key={d.id} className="flex items-center justify-between bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-                          <span className="text-sm flex items-center gap-1.5"><CalendarIcon size={13} className="text-neutral-500" /><b>{d.date}</b> {d.name}</span>
-                          <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-600 hover:text-amber-900">
-                            <X size={14} />
-                          </button>
+                        <div key={d.id} className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium flex items-center gap-1.5">
+                              <CalendarIcon size={13} className="text-amber-600" />
+                              <b>{d.date}</b>
+                              {d.endDate && <span className="text-neutral-500 text-xs">→ {d.endDate}</span>}
+                              <span className="ml-1">{d.name}</span>
+                            </span>
+                            <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-600 hover:text-amber-900">
+                              <X size={14} />
+                            </button>
+                          </div>
+                          {/* Promo freq */}
+                          <div className="flex items-center gap-2 text-[11px] text-neutral-600">
+                            <span>{lang === "en" ? "Posts/week:" : "每週推廣:"}</span>
+                            {[1, 2, 3].map((n) => (
+                              <button
+                                key={n}
+                                onClick={() => setImportantDates((prev) => prev.map((x) => x.id === d.id ? { ...x, promoFreqPerWeek: n } : x))}
+                                className={`w-6 h-6 rounded text-[11px] font-semibold transition ${(d.promoFreqPerWeek ?? 1) === n ? "bg-amber-500 text-white" : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-100"}`}
+                              >{n}</button>
+                            ))}
+                            <span className="text-neutral-400 text-[10px]">{lang === "en" ? "posts" : "篇"}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
-                    <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                    <button
-                      onClick={() => { handleAddDate(); }}
-                      disabled={!newDate || !newDateName}
-                      className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
-                    >
-                      {t("theater_btn_add_item")}
-                    </button>
+
+                  {/* Manual add */}
+                  <div>
+                    <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
+                      {lang === "en" ? "Add manually" : "手動新增"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
+                      <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <button
+                        onClick={() => { handleAddDate(); }}
+                        disabled={!newDate || !newDateName}
+                        className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                      >
+                        {t("theater_btn_add_item")}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Product tab */}
+              {/* ── Product tab ── */}
               {materialTab === "product" && (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* 從品牌選擇 */}
+                  {brandProducts.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
+                        {lang === "en" ? "From your brand" : "從品牌選擇"}
+                      </p>
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                        {brandProducts.map((bp) => {
+                          const alreadyAdded = products.some((p) => p.entityId === bp.id);
+                          return (
+                            <div key={bp.id} className="flex items-start gap-2 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium">{bp.name}</p>
+                                {bp.usp && <p className="text-[10px] text-neutral-500 truncate">{bp.usp}</p>}
+                              </div>
+                              <button
+                                disabled={alreadyAdded}
+                                onClick={() => {
+                                  if (alreadyAdded) return;
+                                  setProducts((prev) => [...prev, {
+                                    id: `bp-${bp.id}-${Date.now()}`,
+                                    entityId: bp.id,
+                                    name: bp.name,
+                                    usp: bp.usp,
+                                    promoFreqPerWeek: 2,
+                                  }]);
+                                }}
+                                className={`shrink-0 text-[11px] px-2.5 py-1 rounded-md font-medium transition ${alreadyAdded ? "bg-neutral-100 text-neutral-400 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}
+                              >
+                                {alreadyAdded ? (lang === "en" ? "Added" : "已加入") : (lang === "en" ? "+ Add" : "+ 加入")}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Added products with promo settings */}
                   {products.length > 0 && (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide">
+                        {lang === "en" ? "Added products" : "已加入的產品"}
+                      </p>
                       {products.map((p) => (
-                        <div key={p.id} className="flex items-start justify-between bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
-                          <div className="text-sm">
-                            <p><b>{p.name}</b> {p.launchDate && <span className="text-neutral-500 text-xs">· {p.launchDate} {t("theater_product_launched")}</span>}</p>
-                            <p className="text-xs text-neutral-600 mt-0.5">{p.usp}</p>
+                        <div key={p.id} className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">{p.name}</p>
+                              <p className="text-[10px] text-neutral-500 truncate">{p.usp}</p>
+                            </div>
+                            <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900 mt-0.5 ml-2 shrink-0">
+                              <X size={14} />
+                            </button>
                           </div>
-                          <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900 mt-1">
-                            <X size={14} />
-                          </button>
+                          {/* Promo settings */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-neutral-500">{lang === "en" ? "Posts/week" : "每週推廣篇數"}</p>
+                              <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map((n) => (
+                                  <button
+                                    key={n}
+                                    onClick={() => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoFreqPerWeek: n } : x))}
+                                    className={`w-7 h-7 rounded text-[11px] font-semibold transition ${(p.promoFreqPerWeek ?? 2) === n ? "bg-emerald-500 text-white" : "bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-100"}`}
+                                  >{n}</button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-neutral-500">{lang === "en" ? "Promo period" : "推廣區間"}</p>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="date"
+                                  value={p.promoStartDate ?? ""}
+                                  placeholder={days[0]?.date ?? ""}
+                                  onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoStartDate: e.target.value || undefined } : x))}
+                                  className="text-[10px] px-1.5 py-1 border border-neutral-300 rounded w-full"
+                                />
+                                <span className="text-neutral-400 text-[10px]">→</span>
+                                <input
+                                  type="date"
+                                  value={p.promoEndDate ?? ""}
+                                  onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoEndDate: e.target.value || undefined } : x))}
+                                  className="text-[10px] px-1.5 py-1 border border-neutral-300 rounded w-full"
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                    <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                    <div className="flex items-center gap-2">
-                      <input type="date" placeholder={t("theater_product_launch_ph")} value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
-                      <button
-                        onClick={() => {
-                          if (!newProductName || !newProductUsp) return;
-                          setProducts((prev) => [...prev, {
-                            id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                            name: newProductName.trim(),
-                            usp: newProductUsp.trim(),
-                            launchDate: newProductLaunch || undefined,
-                          }]);
-                          setNewProductName(""); setNewProductUsp(""); setNewProductLaunch("");
-                        }}
-                        disabled={!newProductName || !newProductUsp}
-                        className="ml-auto text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
-                      >
-                        {t("theater_btn_add_item")}
-                      </button>
+
+                  {/* Manual add */}
+                  <div>
+                    <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide mb-2">
+                      {lang === "en" ? "Add manually" : "手動新增"}
+                    </p>
+                    <div className="space-y-2">
+                      <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <div className="flex items-center gap-2">
+                        <input type="date" placeholder={t("theater_product_launch_ph")} value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
+                        <button
+                          onClick={() => {
+                            if (!newProductName || !newProductUsp) return;
+                            setProducts((prev) => [...prev, {
+                              id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                              name: newProductName.trim(),
+                              usp: newProductUsp.trim(),
+                              launchDate: newProductLaunch || undefined,
+                              promoFreqPerWeek: 2,
+                            }]);
+                            setNewProductName(""); setNewProductUsp(""); setNewProductLaunch("");
+                          }}
+                          disabled={!newProductName || !newProductUsp}
+                          className="ml-auto text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                        >
+                          {t("theater_btn_add_item")}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
