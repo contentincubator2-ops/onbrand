@@ -163,9 +163,11 @@ async function runDiscoveryJob(job: {
     });
 
     if (!pages.trim()) {
+      log(`crawl returned empty content for ${job.websiteUrl}`);
       await finishJob(job.id, "done", 0, 0, errors);
       return;
     }
+    log(`crawl OK: ${pages.length} chars from ${job.websiteUrl}`);
 
     // ── Phase 2: Extract product list ──────────────────────────────────
     await setPhase(job.id, "extract");
@@ -173,6 +175,7 @@ async function runDiscoveryJob(job: {
       log(`extract failed: ${e?.message ?? e}`);
       return [] as Array<{ name: string; description: string }>;
     });
+    log(`extract result: ${products.length} products found`);
 
     const capped = products.slice(0, MAX_PRODUCTS);
     await localPool.execute(
@@ -181,6 +184,7 @@ async function runDiscoveryJob(job: {
     );
 
     if (capped.length === 0) {
+      errors.push(`extract returned 0 products (pages length: ${pages.length})`);
       await finishJob(job.id, "done", 0, 0, errors);
       return;
     }
