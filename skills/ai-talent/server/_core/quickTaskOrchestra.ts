@@ -19,7 +19,7 @@ import { dispatchGenerate } from "./mediaGen";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
-import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText } from "./brandContext";
+import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "./brandContext";
 import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
 import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
@@ -157,6 +157,16 @@ export interface OrchestraResult {
   strategist?: OrchestraStrategist | null;
   /** Specialty role agent meta (FB 60s #10/11/12) */
   specialtyAgent?: AgentMeta | null;
+  /** 2026-06-05: brand-rule fixes (banned words / term substitutions detected
+   *  in raw captions). Empty when no fixes were needed. Used by RunPage to
+   *  surface a Mia nudge ("發現你寫了 X，想調整定位？") instead of silently
+   *  rewriting. */
+  brandFixes?: Array<{
+    variantIndex: number;
+    bannedHits: string[];
+    subsApplied: Array<{ from: string; to: string }>;
+    rewrittenByLLM: boolean;
+  }>;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -1628,17 +1638,32 @@ export async function runOrchestra(args: {
     // produced caption; if a banned word survives, regenerate that
     // caption ONCE with a hard "must not contain" instruction, then
     // re-apply subs. Guarantees the checkable brand-brain rules.
+    // 2026-06-05 (CJ「不阻擋，事後解釋」): use report variant so the UI can
+    // show a Mia nudge ("發現你寫了 X，已自動改成 Y，想調整定位嗎？")
+    // instead of silently rewriting. Accumulated into `brandFixes` for metadata.
+    const brandFixes: Array<{ variantIndex: number; bannedHits: string[]; subsApplied: Array<{ from: string; to: string }>; rewrittenByLLM: boolean }> = [];
     if (Array.isArray(captions) && captions.length && args.brandId) {
       try {
-        for (const v of captions) {
+        for (let vi = 0; vi < captions.length; vi++) {
+          const v = captions[vi];
           if (!v?.caption) continue;
-          const enforced = await enforceBrandRulesOnText(args.brandId, v.caption);
-          if (enforced && enforced !== v.caption) v.caption = enforced;
+          const report = await enforceBrandRulesOnTextWithReport(args.brandId, v.caption);
+          if (report.text && report.text !== v.caption) v.caption = report.text;
+          if (report.bannedHits.length > 0 || report.subsApplied.length > 0) {
+            brandFixes.push({
+              variantIndex: vi,
+              bannedHits: report.bannedHits,
+              subsApplied: report.subsApplied,
+              rewrittenByLLM: report.rewrittenByLLM,
+            });
+          }
         }
       } catch (e) {
         console.warn("[orchestra] brand-rule enforcement skipped:", (e as Error)?.message);
       }
     }
+    // expose brandFixes to caller via the return shape (attached lower)
+    (captions as any).__brandFixes = brandFixes;
 
     // ── EDM craft self-check: 7 維度產出後守門 (2026-05-17) ──
     // Email body tasks only. Cheap deterministic gate (spam-trigger
@@ -2187,6 +2212,9 @@ export async function runOrchestra(args: {
       stages,
       ok: variants.some((v) => v.caption.length > 0),
       errors,
+      // 2026-06-05 (CJ「不阻擋，事後解釋」): expose brand-rule fixes so
+      // RunPage can trigger a friendly Mia nudge after generation.
+      brandFixes: (captions as any).__brandFixes ?? [],
       strategist: strategistMeta && strategistAnchor
         ? { agentName: strategistMeta.name, agentTitle: strategistMeta.title, anchor: strategistAnchor }
         : null,
@@ -2276,6 +2304,10 @@ export async function runOrchestra(args: {
           // missions by product/event and /run page can re-apply scope.
           productId: args.productId ?? null,
           eventId: args.eventId ?? null,
+          // 2026-06-05 (CJ「不阻擋，事後解釋」): brand-rule fixes from
+          // enforceBrandRulesOnTextWithReport, so RunPage can trigger a
+          // Mia nudge ("發現你寫了 X，已自動改成 Y，想調整定位嗎？").
+          brandFixes: (result as any).brandFixes ?? [],
         };
 
         if (persistedOutputId) {

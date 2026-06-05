@@ -87,34 +87,72 @@ export async function enforceBrandRulesOnText(
   brandId: number | undefined | null,
   text: string,
 ): Promise<string> {
-  if (!brandId || !text || !text.trim()) return text;
+  const r = await enforceBrandRulesOnTextWithReport(brandId, text);
+  return r.text;
+}
+
+/**
+ * 2026-06-05 (CJ「不阻擋，事後解釋」): same enforcement logic but ALSO
+ * returns what was fixed so the UI layer can surface a friendly nudge
+ * ("我發現你寫了「X」，但你品牌定位裡標為禁用詞，已自動改寫成「Y」。
+ *   想調整定位？") instead of silently rewriting.
+ */
+export async function enforceBrandRulesOnTextWithReport(
+  brandId: number | undefined | null,
+  text: string,
+): Promise<{
+  text: string;
+  bannedHits: string[];
+  subsApplied: Array<{ from: string; to: string }>;
+  rewrittenByLLM: boolean;
+}> {
+  const empty = { text, bannedHits: [] as string[], subsApplied: [] as Array<{ from: string; to: string }>, rewrittenByLLM: false };
+  if (!brandId || !text || !text.trim()) return empty;
   try {
     const rules = await getBrandRuleAssets(brandId);
-    if (!rules.subs.length && !rules.banned.length) return text;
+    if (!rules.subs.length && !rules.banned.length) return empty;
+
+    // Detect which subs actually apply to this text (for reporting)
+    const subsApplied = rules.subs.filter(({ from }) => from && text.includes(from));
     const applySubs = (t: string) => {
       let s = t;
       for (const { from, to } of rules.subs) if (from) s = s.split(from).join(to);
       return s;
     };
-    const bannedHits = (t: string) => rules.banned.filter((b) => b && t.includes(b));
+    const findBannedHits = (t: string) => rules.banned.filter((b) => b && t.includes(b));
+
+    // Detect banned words BEFORE applying subs (subs may already neutralize some)
+    const bannedHits = findBannedHits(text);
+
     let c = applySubs(text);
-    if (bannedHits(c).length) {
+    let rewrittenByLLM = false;
+    const surviving = findBannedHits(c);
+
+    if (surviving.length) {
       try {
         const { invokeLLM } = await import("./llm");
         const r: any = await invokeLLM({
           provider: "anthropic",
           messages: [{ role: "user", content:
-            `改寫以下文字。嚴禁出現這些詞：${bannedHits(c).join("、")}。` +
+            `改寫以下文字。嚴禁出現這些詞：${surviving.join("、")}。` +
             (rules.subs.length ? `並務必套用替換：${rules.subs.map((s) => `「${s.from}」改說「${s.to}」`).join("、")}。` : "") +
             `保持原意、語氣、長度與換行，只輸出改寫後文字本身，不要前言：\n\n${c}` }],
           maxTokens: 1200,
         });
         const rewritten = String(r?.content ?? r?.text ?? "").trim();
-        if (rewritten) c = applySubs(rewritten);
+        if (rewritten) {
+          c = applySubs(rewritten);
+          rewrittenByLLM = true;
+        }
       } catch { /* keep substituted version */ }
     }
-    return c || text;
-  } catch { return text; }
+    return {
+      text: c || text,
+      bannedHits,
+      subsApplied,
+      rewrittenByLLM,
+    };
+  } catch { return empty; }
 }
 
 /**
