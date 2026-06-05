@@ -621,6 +621,14 @@ export default function BrandsPage() {
     onSuccess: () => discoveryStatusQ?.refetch?.(),
   });
 
+  // While discovery is running, poll product list every 3s so cards appear
+  // one-by-one as the AI positions each product (progressive reveal).
+  React.useEffect(() => {
+    if (!discoveryRunning) return;
+    const t = setInterval(() => { brandProductsQ?.refetch?.(); }, 3_000);
+    return () => clearInterval(t);
+  }, [discoveryRunning]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const prodRemoveMut  = (trpc as any).product?.remove?.useMutation?.({ onSuccess: () => brandProductsQ?.refetch?.() });
   const prodStartMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
   const prodInterimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
@@ -1732,7 +1740,7 @@ export default function BrandsPage() {
                             border: "2px solid #D6D3D1", borderTopColor: "#525252",
                             borderRadius: "50%", animation: "spin 0.9s linear infinite",
                           }} />
-                          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                          <style>{`@keyframes spin{to{transform:rotate(360deg)}}@keyframes fadeSlideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
                         </>
                       )}
                       <span style={{ fontSize: 12, color: autoPosPhase === "full-done" ? "#166534" : "#525252" }}>
@@ -4623,12 +4631,16 @@ function BrandEntityGrid({
       )}
       {items.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {items.map((item) => {
+          {items.map((item, idx) => {
             const preview = getPreview(item);
             const positioned = hasPositioning(item);
             return (
               <button
                 key={item.id}
+                style={{
+                  animation: `fadeSlideIn 0.35s ease both`,
+                  animationDelay: `${Math.min(idx * 60, 400)}ms`,
+                }}
                 onClick={() => onOpen(item.id)}
                 className="text-left rounded-xl border border-neutral-200 bg-white p-4 hover:border-neutral-400 hover:shadow-sm transition group"
               >
