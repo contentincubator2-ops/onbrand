@@ -193,6 +193,20 @@ export default function RunPage() {
   const [focusedAgent, setFocusedAgent] = useState<"caption"|"image"|null>(null);
   const [editText, setEditText] = useState<string | null>(null);
   const [chatPrompt, setChatPrompt] = useState("");
+
+  // React Router v6 reuses the RunPage component instance when navigating
+  // between /run/:id routes — it does NOT unmount. Without this reset,
+  // editText/mode/activeIdx/overrides from the previous run persist into
+  // the new run, causing the editor to show stale or empty content.
+  useEffect(() => {
+    setEditText(null);
+    setMode("chat");
+    setActiveIdx(0);
+    setRevealCount(REVEAL_STEP);
+    setOverrides({});
+    setChatPrompt("");
+    setFocusedAgent(null);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [copied, setCopied] = useState(false);
   // 2026-05-11 (CJ「Spotify 模式」): community-template publish modal state.
   const [shareModal, setShareModal] = useState(false);
