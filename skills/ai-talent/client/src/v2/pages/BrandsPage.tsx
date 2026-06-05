@@ -2099,50 +2099,113 @@ export default function BrandsPage() {
           {/* ── 產品 (products) — card grid with positioning preview ── */}
           {derivedCategory === "products" && scopeMode === "brand" && (
             <div style={{ padding: "8px 0 32px" }}>
-              {/* Scan website button — shown when not already running */}
-              {!discoveryRunning && connData?.website && (
-                <div className="mx-2 mb-4 flex items-center justify-between">
-                  <p className="text-[11px] text-neutral-400">
-                    {lang === "en" ? "AI can auto-discover products from your website" : "AI 可自動從官網分析產品清單"}
+
+              {/* ── AI Discovery progress banner (running) ── */}
+              {discoveryRunning && (
+                <div className="mx-2 mb-5 px-5 py-4 rounded-xl border-2 border-indigo-300 bg-gradient-to-r from-indigo-50 to-violet-50 flex items-start gap-4">
+                  <span className="text-2xl mt-0.5">🔍</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-indigo-900 mb-1">
+                      {lang === "en" ? "AI is scanning your website for products…" : "AI 正在掃描官網，自動分析產品清單…"}
+                    </p>
+                    <p className="text-[12px] text-indigo-700">
+                      {discoveryStatus?.phase === "crawl" && (lang === "en" ? "Reading website content…" : "讀取官網內容中…")}
+                      {discoveryStatus?.phase === "extract" && (lang === "en" ? "Identifying products…" : "識別產品項目中…")}
+                      {discoveryStatus?.phase === "position" && discoveryStatus.currentProduct
+                        ? (lang === "en" ? `Positioning: ${discoveryStatus.currentProduct}` : `正在定位「${discoveryStatus.currentProduct}」`)
+                        : discoveryStatus?.phase === "position" ? (lang === "en" ? "Running product positioning…" : "執行產品定位中…") : ""}
+                      {(discoveryStatus?.totalFound ?? 0) > 0 && (
+                        <span className="ml-2 font-semibold text-indigo-800">
+                          {discoveryStatus!.totalPositioned}/{discoveryStatus!.totalFound} {lang === "en" ? "products done" : "個完成"}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-indigo-500 mt-1">
+                      {lang === "en" ? "This usually takes 30–120 seconds." : "通常需要 30–120 秒，請稍候。"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Done but 0 products found ── */}
+              {!discoveryRunning && discoveryStatus?.status === "done" && discoveryStatus.totalFound === 0 && (brandProductsList?.length ?? 0) === 0 && (
+                <div className="mx-2 mb-5 px-5 py-4 rounded-xl border border-amber-200 bg-amber-50">
+                  <p className="text-sm font-semibold text-amber-800 mb-1">
+                    {lang === "en" ? "Scan complete — no products detected" : "掃描完成，未偵測到產品"}
+                  </p>
+                  <p className="text-[12px] text-amber-700 mb-3">
+                    {lang === "en"
+                      ? "The website may require login, or products aren't listed on public pages. You can add products manually, or retry the scan."
+                      : "官網可能需要登入才能看到產品，或產品資訊未在公開頁面列出。你可以手動新增，或重新掃描。"}
+                  </p>
+                  <div className="flex gap-2">
+                    {connData?.website && (
+                      <button
+                        onClick={() => {
+                          if (!activeBrandIdForLocks || !connData?.website) return;
+                          triggerDiscoveryMut?.mutate?.({ brandId: activeBrandIdForLocks, websiteUrl: connData.website });
+                        }}
+                        disabled={triggerDiscoveryMut?.isPending}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg border-2 border-amber-400 text-amber-800 hover:bg-amber-100 disabled:opacity-50 transition"
+                      >
+                        {lang === "en" ? "🔄 Retry scan" : "🔄 重新掃描"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setAddModal({ open: true, tab: "product" })}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 transition"
+                    >
+                      {lang === "en" ? "+ Add product manually" : "+ 手動新增產品"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── No products + has website → big CTA scan banner ── */}
+              {!discoveryRunning && (brandProductsList?.length ?? 0) === 0 && connData?.website && discoveryStatus?.status !== "done" && (
+                <div className="mx-2 mb-5 rounded-xl border-2 border-dashed border-indigo-300 bg-gradient-to-br from-indigo-50 to-white px-6 py-8 text-center">
+                  <div className="text-4xl mb-3">🔍</div>
+                  <p className="text-base font-bold text-neutral-900 mb-2">
+                    {lang === "en" ? "Let AI scan your website for products" : "讓 AI 自動從官網找出你的產品"}
+                  </p>
+                  <p className="text-[13px] text-neutral-500 mb-5 max-w-xs mx-auto">
+                    {lang === "en"
+                      ? "AI will crawl your website, extract all products/services, and start positioning each one automatically."
+                      : "AI 會爬取你的官網，自動列出所有產品與服務，並逐一開始定位。"}
                   </p>
                   <button
                     onClick={() => {
                       if (!activeBrandIdForLocks || !connData?.website) return;
-                      triggerDiscoveryMut?.mutate?.({
-                        brandId: activeBrandIdForLocks,
-                        websiteUrl: connData.website,
-                      });
+                      triggerDiscoveryMut?.mutate?.({ brandId: activeBrandIdForLocks, websiteUrl: connData.website });
                     }}
                     disabled={triggerDiscoveryMut?.isPending}
-                    className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-1.5 shrink-0 ml-4"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition disabled:opacity-50"
+                    style={{ background: "linear-gradient(135deg, #4F46E5, #7C3AED)" }}
                   >
-                    {triggerDiscoveryMut?.isPending
-                      ? (lang === "en" ? "Starting…" : "啟動中…")
-                      : (lang === "en" ? "🔍 Scan website" : "🔍 掃描官網")}
+                    {triggerDiscoveryMut?.isPending ? (lang === "en" ? "Starting…" : "啟動中…") : (lang === "en" ? "🔍 Scan website now" : "🔍 立即掃描官網")}
                   </button>
+                  <p className="text-[11px] text-neutral-400 mt-3">
+                    {lang === "en" ? "Or" : "或者"}{" "}
+                    <button onClick={() => setAddModal({ open: true, tab: "product" })} className="underline hover:text-neutral-600">
+                      {lang === "en" ? "add products manually" : "手動新增產品"}
+                    </button>
+                  </p>
                 </div>
               )}
-              {/* Discovery progress banner — shown while AI is crawling/positioning */}
-              {discoveryRunning && (
-                <div className="mx-2 mb-5 px-4 py-3 rounded-xl border border-indigo-200 bg-indigo-50 flex items-start gap-3">
-                  <span className="text-indigo-500 animate-spin text-base mt-0.5">⟳</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-indigo-900">
-                      {lang === "en" ? "AI is discovering products from your website" : "AI 正在從你的官網分析產品"}
-                    </p>
-                    <p className="text-[11px] text-indigo-700 mt-0.5">
-                      {discoveryStatus?.phase === "crawl" && (lang === "en" ? "Crawling your website…" : "正在爬取官網內容…")}
-                      {discoveryStatus?.phase === "extract" && (lang === "en" ? "Extracting product list…" : "正在抽取產品清單…")}
-                      {discoveryStatus?.phase === "position" && discoveryStatus.currentProduct
-                        ? (lang === "en" ? `Positioning: ${discoveryStatus.currentProduct}` : `正在定位：${discoveryStatus.currentProduct}`)
-                        : discoveryStatus?.phase === "position" ? (lang === "en" ? "Running product positioning…" : "正在進行產品定位…") : ""}
-                      {(discoveryStatus?.totalFound ?? 0) > 0 && (
-                        <span className="ml-2 text-indigo-600">
-                          ({discoveryStatus!.totalPositioned}/{discoveryStatus!.totalFound} {lang === "en" ? "done" : "完成"})
-                        </span>
-                      )}
-                    </p>
-                  </div>
+
+              {/* ── Has products + rescan button (compact, top-right) ── */}
+              {!discoveryRunning && (brandProductsList?.length ?? 0) > 0 && connData?.website && (
+                <div className="mx-2 mb-3 flex items-center justify-end">
+                  <button
+                    onClick={() => {
+                      if (!activeBrandIdForLocks || !connData?.website) return;
+                      triggerDiscoveryMut?.mutate?.({ brandId: activeBrandIdForLocks, websiteUrl: connData.website });
+                    }}
+                    disabled={triggerDiscoveryMut?.isPending}
+                    className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 transition flex items-center gap-1.5"
+                  >
+                    {triggerDiscoveryMut?.isPending ? "…" : (lang === "en" ? "🔍 Re-scan" : "🔍 重新掃描")}
+                  </button>
                 </div>
               )}
               <BrandEntityGrid
