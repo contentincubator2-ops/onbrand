@@ -360,13 +360,33 @@ ${pageContent}
     if (start === -1 || end === -1) return [];
     const parsed = JSON.parse(text.slice(start, end + 1));
     if (!Array.isArray(parsed)) return [];
-    return parsed
+    const items = parsed
       .filter((p: any) => typeof p?.name === "string" && p.name.trim())
       .map((p: any) => ({
         name: String(p.name ?? "").trim().slice(0, 255),
         description: String(p.description ?? "").trim().slice(0, 500),
       }));
-  } catch { return []; }
+    if (items.length > 0) return items;
+  } catch { /* fall through to regex */ }
+
+  // ── Regex fallback: extract names from "X 立即購買" patterns ──────────
+  // Covers e-commerce pages where products are listed before a "Buy" CTA.
+  const buyMatches = [...pageContent.matchAll(/([^\n]{3,40}?)\s+立即購買/g)];
+  if (buyMatches.length > 0) {
+    // Strip trailing product-tag words (全素/冷凍/常溫/限量 etc.)
+    const cleanName = (raw: string) =>
+      raw.trim()
+        .split(/\s+(全素|全葷|葷食|素食|冷凍|常溫|限量|冷藏|純素)/)[0]
+        ?.trim() ?? raw.trim();
+
+    return buyMatches
+      .map((m) => cleanName(m[1] ?? ""))
+      .filter((name) => name.length >= 2 && name.length <= 50)
+      .filter((name, i, arr) => arr.indexOf(name) === i)  // dedupe
+      .slice(0, MAX_PRODUCTS)
+      .map((name) => ({ name, description: "產品" }));
+  }
+  return [];
 }
 
 async function runInterimPositioning(productId: number, userId: number): Promise<void> {
