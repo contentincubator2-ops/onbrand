@@ -1,0 +1,17 @@
+name: "Ops — Check deployed productDiscovery code"
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Show deployed code version
+        run: |
+          echo "=== Git hash on VM ==="
+          cd /opt/onbrand/app && git log --oneline -3
+          echo "=== productDiscovery.js has afterMatches? ==="
+          grep -c "afterMatches" /opt/onbrand/app/skills/ai-talent/dist/server/_core/productDiscovery.js 2>/dev/null || echo "NOT FOUND (try .ts path)"
+          echo "=== productDiscovery.ts has afterMatches? ==="
+          grep -c "afterMatches" /opt/onbrand/app/skills/ai-talent/server/_core/productDiscovery.ts 2>/dev/null || echo "NOT FOUND"
+          echo "=== PM2 process info ==="
+          pm2 show onbrand 2>/dev/null | grep -E "script|pm_cwd|version" | head -5
