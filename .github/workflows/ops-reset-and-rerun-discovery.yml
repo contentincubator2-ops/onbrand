@@ -1,0 +1,53 @@
+name: "Ops — Reset and rerun product discovery brand 2916"
+on:
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 10
+    steps:
+      - name: Reset stuck job and insert fresh pending job
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          # Archive all non-pending jobs for this brand
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "UPDATE product_discovery_jobs SET status='archived' WHERE brandId=2916 AND status IN ('running','done','failed');"
+          echo "Archived old running/done jobs"
+          # Get userId for brand 2916
+          USERID=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se "SELECT userId FROM brands WHERE id=2916 LIMIT 1;" 2>/dev/null)
+          echo "userId=$USERID"
+          # Insert fresh pending job with correct URL (no /index.php)
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "INSERT INTO product_discovery_jobs (brandId, userId, websiteUrl, status, phase) VALUES (2916, ${USERID:-199}, 'https://www.laurel.com.tw', 'pending', 'crawl');"
+          NEWID=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se "SELECT MAX(id) FROM product_discovery_jobs WHERE brandId=2916 AND status='pending';" 2>/dev/null)
+          echo "New job ID: $NEWID"
+
+      - name: Poll every 15s for up to 8 minutes
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          JOBID=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se "SELECT MAX(id) FROM product_discovery_jobs WHERE brandId=2916;" 2>/dev/null)
+          echo "Watching job $JOBID..."
+          for i in $(seq 1 32); do
+            sleep 15
+            ROW=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se \
+              "SELECT CONCAT(status,'/',phase,'/found=',COALESCE(totalFound,0),'/pos=',COALESCE(totalPositioned,0),IF(currentProduct IS NOT NULL,CONCAT(' current=',currentProduct),'')) FROM product_discovery_jobs WHERE id=$JOBID;" 2>/dev/null)
+            echo "[$((i*15))s] $ROW"
+            if echo "$ROW" | grep -qE "^done|^failed"; then break; fi
+          done
+
+      - name: Final result
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          JOBID=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se "SELECT MAX(id) FROM product_discovery_jobs WHERE brandId=2916;" 2>/dev/null)
+          echo "=== Job $JOBID final ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, status, phase, totalFound, totalPositioned, LEFT(IFNULL(errorLog,'none'),1000) as errors FROM product_discovery_jobs WHERE id=$JOBID;"
+          echo "=== Products created ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, name FROM products WHERE brandId=2916 ORDER BY createdAt DESC LIMIT 20;"
