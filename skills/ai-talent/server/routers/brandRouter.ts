@@ -306,26 +306,10 @@ export const brandRouter = router({
         console.error('[brand.create] brand_members seed failed:', err);
       }
 
-      // Auto-seed 6 onboarding missions for this brand
-      const ONBOARDING_MISSIONS = [
-        { workspace: 'strategy', title: '品牌定位',    isRecurring: false, recurringSchedule: null,     squadSlug: 'tw-b2b-saas-gtm' },
-        { workspace: 'strategy', title: '競品每日情報', isRecurring: true,  recurringSchedule: 'daily',   squadSlug: 'mkt-analytics-attribution' },
-        { workspace: 'website',  title: '官網文案調整', isRecurring: false, recurringSchedule: null,     squadSlug: 'tw-website-rebuild' },
-        { workspace: 'website',  title: '每周長文',    isRecurring: true,  recurringSchedule: 'weekly',  squadSlug: 'mkt-seo-growth' },
-        { workspace: 'facebook', title: '固定品牌貼文', isRecurring: true,  recurringSchedule: 'weekly',  squadSlug: 'mkt-content-engine' },
-        { workspace: 'facebook', title: '廣告投放優化', isRecurring: false, recurringSchedule: null,     squadSlug: 'tw-ecom-full-funnel' },
-      ];
-      for (const m of ONBOARDING_MISSIONS) {
-        try {
-          await db.execute(
-            sql`INSERT INTO missions (userId, brandId, workspace, title, squadSlug, isRecurring, recurringSchedule, status)
-                VALUES (${ctx.user.id}, ${brandId}, ${m.workspace}, ${m.title}, ${m.squadSlug},
-                       ${m.isRecurring ? 1 : 0}, ${m.recurringSchedule ?? null}, 'active')`
-          );
-        } catch (err) {
-          console.error('[brand.create] mission seed failed:', m.title, err);
-        }
-      }
+      // NOTE: onboarding mission seeds removed 2026-06-05 — they created 6
+      // empty "shell" missions on every new brand that cluttered /projects
+      // with cards showing nothing when clicked. Users start with a clean
+      // workspace and create missions by actually running tasks.
 
       // 2026-06-03: auto-enqueue product discovery if website URL provided
       if (brandId && (input.website ?? "").trim()) {

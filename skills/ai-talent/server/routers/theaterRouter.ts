@@ -319,6 +319,173 @@ async function loadBrandRules(brandId: number, userId: number): Promise<string[]
 
 export const theaterRouter = router({
   /**
+   * 2026-06-05 — AI Scheduling Agent (排程策略師).
+   *
+   * Takes selected products/events + 7-day window + local festivals,
+   * and returns an intelligent day-by-day promotion plan with rationale.
+   *
+   * Design principles:
+   *   - Events with fixed dates are hard constraints (never moved)
+   *   - Products matched to day mood (weekend, pre-holiday warm-up, etc.)
+   *   - Festival connections create surprise ("端午節暖場 → 推禮盒產品")
+   *   - Days without focal products get brand-only content
+   */
+  planSchedule: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      /** Products user selected to feature this week */
+      selectedProducts: z.array(z.object({
+        id: z.number(),
+        name: z.string(),
+        usp: z.string().optional(),
+      })).max(20),
+      /** Events with fixed dates (hard constraints) */
+      lockedEvents: z.array(z.object({
+        id: z.number(),
+        name: z.string(),
+        date: z.string(), // YYYY-MM-DD
+        usp: z.string().optional(),
+      })).max(10),
+      /** 7 YYYY-MM-DD dates for the Theater window */
+      days: z.array(z.string()).min(1).max(14),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 1) Brand positioning (for voice + context)
+      const pos = await getBrandPositioningById(input.brandId, ctx.user.id);
+      // PositioningResult has no brandName — fetch it separately from brand row
+      const { default: lPoolBrand } = await import("../localDb");
+      const [bRows]: any = await lPoolBrand.execute(
+        `SELECT name FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, ctx.user.id],
+      );
+      const brandName = (bRows as any[])[0]?.name ?? "此品牌";
+      const brandVoice = pos?.brandVoice ?? "";
+      const brandUSP = pos?.usp ?? "";
+
+      // 2) Festivals in the date window
+      const { default: lPool } = await import("../localDb");
+      const firstDay = input.days[0]!;
+      const lastDay  = input.days[input.days.length - 1]!;
+      const [festRows]: any = await lPool.execute(
+        `SELECT name_zh, date, contentHint, emoji
+         FROM festivals
+         WHERE date >= ? AND date <= ?
+           AND priority >= 2
+         ORDER BY date ASC LIMIT 10`,
+        [firstDay, lastDay],
+      );
+      const festivals = (festRows as any[]).map((f: any) => ({
+        name: String(f.name_zh ?? ""),
+        date: String(f.date ?? "").slice(0, 10),
+        hint: String(f.contentHint ?? ""),
+        emoji: String(f.emoji ?? ""),
+      }));
+
+      // 3) Build scheduling agent prompt
+      const pad = (s: string) => s ? `\n${s}` : "";
+      const productList = input.selectedProducts.length > 0
+        ? input.selectedProducts.map((p) =>
+            `- ${p.name}${p.usp ? `（${p.usp}）` : ""}`
+          ).join("\n")
+        : "（本週無特定產品，以品牌內容為主）";
+
+      const lockedList = input.lockedEvents.length > 0
+        ? input.lockedEvents.map((e) =>
+            `- ${e.date} 【固定】${e.name}${e.usp ? `（${e.usp}）` : ""}`
+          ).join("\n")
+        : "（無固定活動日）";
+
+      const festivalList = festivals.length > 0
+        ? festivals.map((f) =>
+            `- ${f.date} ${f.emoji}${f.name}${f.hint ? `：${f.hint}` : ""}`
+          ).join("\n")
+        : "（本週無重大節慶）";
+
+      const weekdayMap: Record<string, string> = {
+        "0": "週日", "1": "週一", "2": "週二", "3": "週三",
+        "4": "週四", "5": "週五", "6": "週六",
+      };
+      const daysInfo = input.days.map((d) => {
+        const wd = weekdayMap[String(new Date(d + "T00:00").getDay())] ?? "";
+        return `${d}（${wd}）`;
+      }).join("、");
+
+      const systemPrompt = [
+        `你是 OnBrand 的品牌內容排程策略師，擅長為品牌設計有驚喜感的一週內容計畫。`,
+        `你會考慮：產品特性與日期氛圍是否匹配、節慶搭配的連結感、週間與週末的消費行為差異。`,
+      ].join("\n");
+
+      const userPrompt = [
+        `品牌：${brandName}`,
+        brandVoice ? `品牌聲音：${brandVoice.slice(0, 200)}` : "",
+        brandUSP ? `品牌 USP：${brandUSP.slice(0, 100)}` : "",
+        "",
+        `== 本週日期 ==`,
+        daysInfo,
+        "",
+        `== 本週要推的產品（用戶選定，請合理分配到適合的天）==`,
+        productList,
+        "",
+        `== 固定活動（日期不可更動）==`,
+        lockedList,
+        "",
+        `== 本週相關節慶（可搭配創造驚喜感）==`,
+        festivalList,
+        "",
+        `== 排程規則 ==`,
+        `1. 固定活動的日期不能改動，原樣輸出`,
+        `2. 每個產品至少安排 1 天（若產品多於天數，優先考慮最重要的）`,
+        `3. 週末（週六/週日）適合生活型、情境型內容`,
+        `4. 週一情緒較低落，適合激勵、故事型內容`,
+        `5. 有節慶時，優先搭配節慶氛圍的產品`,
+        `6. 沒有產品分配到的天數，輸出 type=brand（品牌一般內容）`,
+        `7. 每個安排要有令人意外但合理的「angle」（推廣角度，不是老套）`,
+        "",
+        `== 輸出格式（嚴格 JSON，不要其他文字）==`,
+        `{`,
+        `  "schedule": {`,
+        `    "YYYY-MM-DD": {`,
+        `      "type": "product" | "event" | "brand",`,
+        `      "name": "產品/活動/品牌名稱",`,
+        `      "angle": "這篇內容的推廣角度（15-30字，有創意）",`,
+        `      "rationale": "為什麼選這天推這個（20-40字，有驚喜邏輯）",`,
+        `      "entityId": 123 （僅 product/event 需要，brand 省略）`,
+        `    }`,
+        `  }`,
+        `}`,
+      ].filter(Boolean).join("\n");
+
+      // 4) Call LLM
+      const result = await invokeLLM({
+        provider: "anthropic",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        maxTokens: 2000,
+      });
+
+      const raw = String(
+        (result as any)?.content
+        ?? (result as any)?.choices?.[0]?.message?.content
+        ?? "",
+      ).trim();
+
+      // Parse JSON safely
+      try {
+        const start = raw.indexOf("{");
+        const end = raw.lastIndexOf("}");
+        if (start === -1 || end === -1) throw new Error("No JSON found");
+        const parsed = JSON.parse(raw.slice(start, end + 1));
+        return { ok: true as const, schedule: parsed.schedule ?? {} };
+      } catch {
+        // Fallback: return empty schedule (client falls back to basic generation)
+        console.warn("[planSchedule] LLM returned unparseable JSON:", raw.slice(0, 200));
+        return { ok: false as const, schedule: {} };
+      }
+    }),
+
+  /**
    * 2026-06-03 — Product discovery status for the Products tab progress banner.
    */
   getProductDiscoveryStatus: protectedProcedure

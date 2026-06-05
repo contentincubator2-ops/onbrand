@@ -123,13 +123,10 @@ export default function ProjectsPage() {
   // Filter
   const filtered = useMemo(() => {
     let r = rows;
-    // Hide missions that have no real output content (empty template rows).
-    // A row is considered "empty" when it has no thumbnailUrl AND no title.
-    r = r.filter((m) => {
-      const hasThumb = !!(m as any).thumbnailUrl || !!(m as any).outputThumbUrl || !!(m as any).outputImageUrl || !!(m as any).coverImageUrl;
-      const hasTitle = !!(m.title ?? "").trim();
-      return hasThumb || hasTitle;
-    });
+    // Only show missions that have an actual output run (mo.id != null).
+    // Template/seed missions with no runs have id = null in the query result
+    // and show nothing when clicked — exclude them entirely.
+    r = r.filter((m) => !!m.id);
     if (activeBrandId !== "all") r = r.filter((m) => m.brandId === activeBrandId);
     // 2026-05-11 (CJ): when shell scope has product/event, narrow projects too
     if (shellProductId) {
