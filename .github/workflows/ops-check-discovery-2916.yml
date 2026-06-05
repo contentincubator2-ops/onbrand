@@ -12,11 +12,9 @@ jobs:
           P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
           echo "=== All discovery jobs for brand 2916 ==="
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
-            "SELECT id, status, phase, totalFound, totalPositioned, websiteUrl, LEFT(IFNULL(errorLog,'ok'),300) AS errors, createdAt
+            "SELECT id, status, phase, totalFound, totalPositioned, websiteUrl,
+                    LEFT(IFNULL(errorLog,'ok'),3000) AS errors, createdAt
              FROM product_discovery_jobs WHERE brandId=2916 ORDER BY id DESC LIMIT 5;"
           echo "=== Products in DB for brand 2916 ==="
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
             "SELECT id, name FROM products WHERE brandId=2916 ORDER BY createdAt DESC LIMIT 20;"
-          echo "=== Pending jobs in queue ==="
-          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
-            "SELECT id, brandId, status, phase, websiteUrl FROM product_discovery_jobs WHERE status='pending' ORDER BY createdAt LIMIT 5;"

@@ -167,7 +167,8 @@ async function runDiscoveryJob(job: {
       await finishJob(job.id, "done", 0, 0, errors);
       return;
     }
-    log(`crawl OK: ${pages.length} chars. First 300: ${pages.slice(0, 300)}`);
+    const hasBuy = pages.includes("立即購買");
+    log(`crawl OK: ${pages.length} chars, hasBuyPattern=${hasBuy}, sample800: ${pages.slice(0, 800)}`);
 
     // ── Phase 2: Extract product list ──────────────────────────────────
     await setPhase(job.id, "extract");
