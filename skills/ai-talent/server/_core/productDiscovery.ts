@@ -377,19 +377,20 @@ ${pageContent}
   // The name is the SHORT text immediately AFTER the anchor.
   const afterMatches = [
     ...pageContent.matchAll(
-      // match the anchor, skip whitespace, then capture up to 30 non-space chars
+      // product names appear AFTER "立即購買" or "產品介紹" on TW e-commerce sites
       /(?:立即購買|產品介紹)\s+([\S]{2,30})/g,
     ),
   ];
+  console.warn(`[productDiscovery] regex afterMatches count=${afterMatches.length}, pageLen=${pageContent.length}`);
   if (afterMatches.length > 0) {
-    return afterMatches
+    const names = afterMatches
       .map((m) => (m[1] ?? "").trim())
       // keep only CJK-dominant names (>= 2 Chinese chars), drop nav/date noise
       .filter((name) => (name.match(/[一-鿿]/g) ?? []).length >= 2)
       .filter((name) => name.length >= 2 && name.length <= 30)
-      .filter((name, i, arr) => arr.indexOf(name) === i)  // dedupe
-      .slice(0, MAX_PRODUCTS)
-      .map((name) => ({ name, description: "產品" }));
+      .filter((name, i, arr) => arr.indexOf(name) === i);  // dedupe
+    console.warn(`[productDiscovery] regex names after filter=${names.length}: ${names.slice(0,5).join(", ")}`);
+    return names.slice(0, MAX_PRODUCTS).map((name) => ({ name, description: "產品" }));
   }
   return [];
 }
