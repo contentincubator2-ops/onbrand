@@ -802,12 +802,45 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
   //   headers:  x-api-key + anthropic-version
   //   response: { content: [{type:"text",text:"..."}] }
   if (providerKey === "anthropic" || providerKey === "azure-position") {
-    const anthropicMessages: Array<{ role: string; content: string }> = [];
+    // Convert OpenAI-style message content to Anthropic format.
+    // Critical for vision: image_url → { type:"image", source:{type:"base64",...} }
+    // Previously, arrays were JSON.stringify'd → Claude never saw the image.
+    const toAnthropicContent = (content: any): any => {
+      if (typeof content === "string") return content;
+      if (!Array.isArray(content)) return JSON.stringify(content);
+      const parts = (content as any[]).map((part: any) => {
+        if (typeof part === "string") return { type: "text", text: part };
+        if (part.type === "text") return { type: "text", text: String(part.text ?? "") };
+        if (part.type === "image_url") {
+          const url: string = part.image_url?.url ?? "";
+          const dataMatch = url.match(/^data:([^;]+);base64,(.+)$/s);
+          if (dataMatch) {
+            // Base64-encoded image — Anthropic requires source.type=base64
+            return {
+              type: "image",
+              source: { type: "base64", media_type: dataMatch[1], data: dataMatch[2] },
+            };
+          }
+          // Remote URL image
+          return { type: "image", source: { type: "url", url } };
+        }
+        return { type: "text", text: JSON.stringify(part) };
+      });
+      // Single-text optimisation: Anthropic accepts plain string too
+      if (parts.length === 1 && parts[0].type === "text") return parts[0].text;
+      return parts;
+    };
+
+    const anthropicMessages: Array<{ role: string; content: any }> = [];
     let systemPrompt = "";
     for (const m of params.messages) {
-      const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
-      if (m.role === "system") systemPrompt += (systemPrompt ? "\n\n" : "") + text;
-      else anthropicMessages.push({ role: m.role, content: text });
+      const content = toAnthropicContent(m.content);
+      if (m.role === "system") {
+        const text = typeof content === "string" ? content : JSON.stringify(content);
+        systemPrompt += (systemPrompt ? "\n\n" : "") + text;
+      } else {
+        anthropicMessages.push({ role: m.role, content });
+      }
     }
     const anthropicPayload: Record<string, unknown> = {
       model,

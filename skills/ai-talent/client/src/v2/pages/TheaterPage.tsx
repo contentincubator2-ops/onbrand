@@ -1997,7 +1997,37 @@ export default function TheaterPage() {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <input type="url" placeholder={t("theater_photo_url_ph")} value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    {/* File upload OR URL — two paths to add a photo */}
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border-2 border-dashed border-indigo-300 text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50 transition">
+                        📁 {lang === "en" ? "Upload from device" : "從電腦上傳"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const dataUrl = ev.target?.result as string;
+                              if (dataUrl) {
+                                setPhotos((prev) => [...prev, {
+                                  id: `ph-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                  url: dataUrl,
+                                  tag: newPhotoTag,
+                                  note: file.name,
+                                }]);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value = ""; // reset so same file can re-select
+                          }}
+                        />
+                      </label>
+                      <span className="text-neutral-400 text-xs">{lang === "en" ? "or" : "或"}</span>
+                      <input type="url" placeholder={t("theater_photo_url_ph")} value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    </div>
                     <div className="flex items-center gap-2">
                       <select value={newPhotoTag} onChange={(e) => setNewPhotoTag(e.target.value as any)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded">
                         <option value="product">{t("theater_photo_tag_product")}</option>
