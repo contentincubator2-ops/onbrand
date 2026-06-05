@@ -1,0 +1,22 @@
+name: "Ops — Check discovery result brand 2916"
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Check latest job and products
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          echo "=== All discovery jobs for brand 2916 ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, status, phase, totalFound, totalPositioned, websiteUrl, LEFT(IFNULL(errorLog,'ok'),300) AS errors, createdAt
+             FROM product_discovery_jobs WHERE brandId=2916 ORDER BY id DESC LIMIT 5;"
+          echo "=== Products in DB for brand 2916 ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, name FROM products WHERE brandId=2916 ORDER BY createdAt DESC LIMIT 20;"
+          echo "=== Pending jobs in queue ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, brandId, status, phase, websiteUrl FROM product_discovery_jobs WHERE status='pending' ORDER BY createdAt LIMIT 5;"
