@@ -292,7 +292,7 @@ async function crawlWebsite(url: string): Promise<string> {
   for (const suffix of suffixes) {
     try {
       const res = await fetch(`${base}${suffix}`, {
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(6_000),
         headers: { "User-Agent": "OnBrand/1.0 (brand intelligence crawler)" },
       });
       if (!res.ok) continue;
@@ -315,7 +315,8 @@ async function extractProducts(
   pageContent: string,
   websiteUrl: string,
 ): Promise<Array<{ name: string; description: string }>> {
-  const result = await invokeLLM({
+  // Hard 60-second timeout — AbortSignal.timeout is unreliable in some Node versions.
+  const llmCall = invokeLLM({
     provider: "anthropic",
     messages: [{
       role: "user",
@@ -340,6 +341,10 @@ ${pageContent}
     }],
     maxTokens: 4000,
   });
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("extractProducts LLM timeout after 60s")), 60_000),
+  );
+  const result = await Promise.race([llmCall, timeout]);
 
   const text = String((result as any)?.content ?? (result as any)?.text ?? "").trim();
   try {
