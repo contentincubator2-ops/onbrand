@@ -827,7 +827,7 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
         return { type: "text", text: JSON.stringify(part) };
       });
       // Single-text optimisation: Anthropic accepts plain string too
-      if (parts.length === 1 && parts[0].type === "text") return parts[0].text;
+      if (parts.length === 1 && parts[0] && parts[0].type === "text") return (parts[0] as any).text;
       return parts;
     };
 
