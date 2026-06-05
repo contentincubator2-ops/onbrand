@@ -355,12 +355,13 @@ ${pageContent}
   const result = await Promise.race([llmCall, timeout]);
 
   const text = String((result as any)?.content ?? (result as any)?.text ?? "").trim();
+  // Use throw instead of return [] so all non-product paths fall through to regex
   try {
     const start = text.indexOf("[");
     const end = text.lastIndexOf("]");
-    if (start === -1 || end === -1) return [];
+    if (start === -1 || end === -1) throw new Error("no JSON array in LLM response");
     const parsed = JSON.parse(text.slice(start, end + 1));
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) throw new Error("LLM response is not array");
     const items = parsed
       .filter((p: any) => typeof p?.name === "string" && p.name.trim())
       .map((p: any) => ({
@@ -368,7 +369,8 @@ ${pageContent}
         description: String(p.description ?? "").trim().slice(0, 500),
       }));
     if (items.length > 0) return items;
-  } catch { /* fall through to regex */ }
+    // 0 items → fall through to regex
+  } catch { /* fall through to regex fallback */ }
 
   // ── Regex fallback: product names appear AFTER "立即購買" or "產品介紹" ──────
   // On e-commerce pages the pattern is:
