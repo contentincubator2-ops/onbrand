@@ -123,6 +123,13 @@ export default function ProjectsPage() {
   // Filter
   const filtered = useMemo(() => {
     let r = rows;
+    // Hide missions that have no real output content (empty template rows).
+    // A row is considered "empty" when it has no thumbnailUrl AND no title.
+    r = r.filter((m) => {
+      const hasThumb = !!(m as any).thumbnailUrl || !!(m as any).outputThumbUrl || !!(m as any).outputImageUrl || !!(m as any).coverImageUrl;
+      const hasTitle = !!(m.title ?? "").trim();
+      return hasThumb || hasTitle;
+    });
     if (activeBrandId !== "all") r = r.filter((m) => m.brandId === activeBrandId);
     // 2026-05-11 (CJ): when shell scope has product/event, narrow projects too
     if (shellProductId) {
@@ -196,8 +203,8 @@ export default function ProjectsPage() {
             }}
           >
             {lang === "en"
-              ? "Outputs from 30s / 60s / 99s / 7-Day Publisher land here automatically"
-              : "30s / 60s / 99s / 七日發布台 的產出自動歸檔到這裡"}
+              ? "Every piece of content you've generated, automatically archived here"
+              : "每次執行的產出，自動歸檔到這裡"}
           </p>
           <p
             className="mt-2 mb-5 mx-auto text-default-700"
@@ -245,23 +252,31 @@ export default function ProjectsPage() {
             >
               {lang === "en" ? "All" : "全部"} · {rows.length}
             </button>
-            {brandsWithCount.filter((b) => b.count > 0).map((b) => {
-              const active = activeBrandId === b.id;
-              return (
-                <button
-                  key={b.id}
-                  onClick={() => setActiveBrandId(b.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition border ${
-                    active
-                      ? "bg-default-900 text-white border-default-900"
-                      : "bg-white text-default-700 border-default-200 hover:border-default-400"
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ background: brandColor(b.name) }} />
-                  {b.name} · {b.count}
-                </button>
-              );
-            })}
+            {brandsWithCount
+              // When a brand is active in shell, only show that brand chip
+              // (hide other brands — user already knows their context).
+              .filter((b) => {
+                if (b.count === 0) return false;
+                if (shellBrandId && shellBrandId !== b.id) return false;
+                return true;
+              })
+              .map((b) => {
+                const active = activeBrandId === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => setActiveBrandId(b.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition border ${
+                      active
+                        ? "bg-default-900 text-white border-default-900"
+                        : "bg-white text-default-700 border-default-200 hover:border-default-400"
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ background: brandColor(b.name) }} />
+                    {b.name} · {b.count}
+                  </button>
+                );
+              })}
           </div>
         </div>
       )}
