@@ -275,7 +275,7 @@ export const brandRouter = router({
         createdBy: ctx.user.id,
         slug,
         name: input.name,
-        websiteUrl: input.website ?? null,
+        website: input.website ?? null,
         targetAudience: input.targetAudience ?? null,
         soworkAnalysis: {
           competitors: input.competitors ?? null,
