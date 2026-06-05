@@ -304,18 +304,18 @@ async function crawlWebsite(url: string): Promise<string> {
         .replace(/<[^>]+>/g, " ")
         .replace(/\s+/g, " ")
         .trim()
-        .slice(0, 8000);
+        .slice(0, 4000);  // 4000 per page → faster LLM processing
       if (text.length > 200) chunks.push(`[${base}${suffix}]\n${text}`);
     } catch { /* skip unavailable pages */ }
   }
-  return chunks.join("\n\n").slice(0, 24000);
+  return chunks.join("\n\n").slice(0, 12000);  // 12000 total → ~30s LLM response time
 }
 
 async function extractProducts(
   pageContent: string,
   websiteUrl: string,
 ): Promise<Array<{ name: string; description: string }>> {
-  // Hard 60-second timeout — AbortSignal.timeout is unreliable in some Node versions.
+  // Hard 120-second timeout — Anthropic on large prompts can take 60-90s.
   const llmCall = invokeLLM({
     provider: "anthropic",
     messages: [{
@@ -342,7 +342,7 @@ ${pageContent}
     maxTokens: 4000,
   });
   const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("extractProducts LLM timeout after 60s")), 60_000),
+    setTimeout(() => reject(new Error("extractProducts LLM timeout after 120s")), 120_000),
   );
   const result = await Promise.race([llmCall, timeout]);
 
