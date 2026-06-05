@@ -370,19 +370,23 @@ ${pageContent}
     if (items.length > 0) return items;
   } catch { /* fall through to regex */ }
 
-  // ── Regex fallback: extract names from "X 立即購買" patterns ──────────
-  // Covers e-commerce pages where products are listed before a "Buy" CTA.
-  const buyMatches = [...pageContent.matchAll(/([^\n]{3,40}?)\s+立即購買/g)];
-  if (buyMatches.length > 0) {
-    // Strip trailing product-tag words (全素/冷凍/常溫/限量 etc.)
-    const cleanName = (raw: string) =>
-      raw.trim()
-        .split(/\s+(全素|全葷|葷食|素食|冷凍|常溫|限量|冷藏|純素)/)[0]
-        ?.trim() ?? raw.trim();
-
-    return buyMatches
-      .map((m) => cleanName(m[1] ?? ""))
-      .filter((name) => name.length >= 2 && name.length <= 50)
+  // ── Regex fallback: product names appear AFTER "立即購買" or "產品介紹" ──────
+  // On e-commerce pages the pattern is:
+  //   "...description~ 立即購買 [ProductName] next-description..."
+  //   "產品介紹 [ProductName] description..."
+  // The name is the SHORT text immediately AFTER the anchor.
+  const afterMatches = [
+    ...pageContent.matchAll(
+      // match the anchor, skip whitespace, then capture up to 30 non-space chars
+      /(?:立即購買|產品介紹)\s+([\S]{2,30})/g,
+    ),
+  ];
+  if (afterMatches.length > 0) {
+    return afterMatches
+      .map((m) => (m[1] ?? "").trim())
+      // keep only CJK-dominant names (>= 2 Chinese chars), drop nav/date noise
+      .filter((name) => (name.match(/[一-鿿]/g) ?? []).length >= 2)
+      .filter((name) => name.length >= 2 && name.length <= 30)
       .filter((name, i, arr) => arr.indexOf(name) === i)  // dedupe
       .slice(0, MAX_PRODUCTS)
       .map((name) => ({ name, description: "產品" }));
