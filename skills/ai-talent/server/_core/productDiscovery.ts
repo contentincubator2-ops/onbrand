@@ -167,7 +167,7 @@ async function runDiscoveryJob(job: {
       await finishJob(job.id, "done", 0, 0, errors);
       return;
     }
-    log(`crawl OK: ${pages.length} chars from ${job.websiteUrl}`);
+    log(`crawl OK: ${pages.length} chars. First 300: ${pages.slice(0, 300)}`);
 
     // ── Phase 2: Extract product list ──────────────────────────────────
     await setPhase(job.id, "extract");
@@ -305,7 +305,9 @@ async function crawlWebsite(url: string): Promise<string> {
       const text = html
         .replace(/<script[\s\S]*?<\/script>/gi, " ")
         .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<!--[\s\S]*?-->/g, " ")   // remove HTML comments including -->
         .replace(/<[^>]+>/g, " ")
+        .replace(/-->/g, " ")               // stray --> from improperly stripped HTML
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 4000);  // 4000 per page → faster LLM processing
@@ -331,16 +333,17 @@ ${pageContent}
 ---
 
 請從以上內容找出這個品牌銷售或提供的所有產品、服務或課程。
-最多列出 50 個，每個格式如下（JSON array）：
+只要出現產品名稱就列出，description 可以很短或直接用產品分類代替。
+最多列出 50 個，格式：
 [
-  { "name": "產品名稱", "description": "一句話描述這個產品/服務的特色或用途（20-60字）" },
+  { "name": "產品名稱", "description": "簡短描述或分類（可以只有 2-10 字，例如：冷凍食品、課程、服務等）" },
   ...
 ]
 
 規則：
-- 只列出真正的產品/服務，不要列出頁面導航或公司資訊
-- name 保持品牌原本的名稱
-- 如果找不到任何產品，回傳空 array []
+- 直接列出產品名稱，不必完整描述
+- 不要列出頁面導航連結、公司名稱、版權文字
+- 如果完全找不到任何產品或服務名稱，才回傳空 array []
 - 只輸出 JSON array，不要其他文字`,
     }],
     maxTokens: 4000,
