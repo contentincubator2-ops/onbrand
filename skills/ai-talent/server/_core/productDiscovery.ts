@@ -274,9 +274,19 @@ async function finishJob(
 }
 
 async function crawlWebsite(url: string): Promise<string> {
-  const normalize = (u: string) => u.endsWith("/") ? u.slice(0, -1) : u;
+  // Strip common homepage file paths so suffixes attach to the domain root.
+  // e.g. https://www.laurel.com.tw/index.php → https://www.laurel.com.tw
+  const normalize = (u: string): string => {
+    let s = u.trim().replace(/\/$/, "");
+    // Strip index files at root
+    s = s.replace(/\/(index|default|home)\.(php|html|htm|asp|aspx)$/i, "");
+    return s;
+  };
   const base = normalize(url);
-  const suffixes = ["", "/products", "/menu", "/services", "/shop", "/about"];
+  const suffixes = [
+    "", "/products", "/product", "/menu", "/services", "/service",
+    "/shop", "/about", "/品牌產品", "/產品", "/products.html",
+  ];
   const chunks: string[] = [];
 
   for (const suffix of suffixes) {

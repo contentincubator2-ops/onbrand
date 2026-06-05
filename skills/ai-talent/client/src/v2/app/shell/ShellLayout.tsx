@@ -173,6 +173,22 @@ export default function ShellLayout() {
 
   const [notifOpen, setNotifOpen] = React.useState(false);
   const [supportOpen, setSupportOpen] = React.useState(false);
+
+  // 2026-06-05 (CJ「Mia 變 contextual guide」): listen for global mia:nudge
+  // events so any page (Theater generation done, errors, onboarding triggers)
+  // can pop Mia open with a proactive message.
+  const [miaNudge, setMiaNudge] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { message?: string } | undefined;
+      if (detail?.message) {
+        setMiaNudge(detail.message);
+        setSupportOpen(true);
+      }
+    };
+    window.addEventListener("mia:nudge", handler);
+    return () => window.removeEventListener("mia:nudge", handler);
+  }, []);
   // 2026-05-13: badge count comes from the same trpc query as the panel.
   // Polled every 60s + when the user opens/closes the panel.
   const notifLastSeen = readLastSeen();
@@ -355,8 +371,10 @@ export default function ShellLayout() {
       </button>
       <SupportDrawer
         open={supportOpen}
-        onClose={() => setSupportOpen(false)}
+        onClose={() => { setSupportOpen(false); setMiaNudge(null); }}
         scope={scope}
+        nudgeMessage={miaNudge}
+        onNudgeConsumed={() => setMiaNudge(null)}
       />
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}

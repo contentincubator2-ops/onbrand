@@ -21,6 +21,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   scope: ScopeState;
+  /** 2026-06-05: proactive nudge from another page (e.g. Theater "generation done").
+   *  When set, drawer opens with this as Mia's first message in the thread. */
+  nudgeMessage?: string | null;
+  onNudgeConsumed?: () => void;
 }
 
 type MiaAction =
@@ -31,7 +35,7 @@ type Message = { id: number; role: string; content: string; createdAt: string; a
 const MIA_AVATAR =
   "https://api.dicebear.com/7.x/notionists/svg?seed=mia-cs-onbrand&backgroundColor=ede9fe&backgroundType=solid&radius=50";
 
-export default function SupportDrawer({ open, onClose, scope }: Props) {
+export default function SupportDrawer({ open, onClose, scope, nudgeMessage, onNudgeConsumed }: Props) {
   const { lang } = useLang();
   const isEn = lang === "en";
   const loc = useLocation();
@@ -69,6 +73,29 @@ export default function SupportDrawer({ open, onClose, scope }: Props) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // 2026-06-05: Inject proactive nudge as a Mia message once drawer is open.
+  // Skips if the exact same nudge is already at the bottom (prevents dupes
+  // if the user closes/reopens within the same session).
+  useEffect(() => {
+    if (!open || !nudgeMessage) return;
+    setMessages((m) => {
+      const last = m[m.length - 1];
+      if (last?.role === "mia" && last.content === nudgeMessage) return m;
+      return [
+        ...m,
+        {
+          id: Date.now(),
+          role: "mia",
+          content: nudgeMessage,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+    });
+    // Consume so re-renders don't re-inject
+    onNudgeConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, nudgeMessage]);
 
   // Auto-scroll on new message
   useEffect(() => {

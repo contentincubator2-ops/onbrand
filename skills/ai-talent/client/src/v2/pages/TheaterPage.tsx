@@ -588,15 +588,75 @@ export default function TheaterPage() {
   const [materialModalOpen, setMaterialModalOpen] = useState(false);
   const [materialTab, setMaterialTab] = useState<"event" | "product" | "photo">("event");
 
-  // Brand entities — 從品牌選擇 (products + events already created in the system)
+  // Brand entities — always loaded when brandId is known (needed for 本週焦點 chips)
   const brandEntitiesQ = (trpc as any).theater?.getBrandEntities?.useQuery?.(
     { brandId: brandId ?? 0 },
-    { enabled: !!brandId && materialModalOpen, refetchOnWindowFocus: false, staleTime: 30_000 },
+    { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 60_000 },
   );
   const brandProducts: Array<{ id: number; name: string; usp: string }> =
     brandEntitiesQ?.data?.products ?? [];
   const brandEvents: Array<{ id: number; name: string; startAt: string | null; endAt: string | null; usp: string }> =
     brandEntitiesQ?.data?.events ?? [];
+
+  // ── 本週焦點 (Weekly Focus) state ─────────────────────────────────────────
+  /** Product ids user selected to feature this week */
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
+  /** Event ids user selected (events with fixed dates become hard constraints) */
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<number>>(new Set());
+  /** AI-generated schedule: { "YYYY-MM-DD": { type, name, angle, rationale, entityId? } } */
+  const [aiSchedule, setAiSchedule] = useState<Record<string, {
+    type: "product" | "event" | "brand";
+    name: string;
+    angle: string;
+    rationale: string;
+    entityId?: number;
+  }> | null>(null);
+  const [scheduleVisible, setScheduleVisible] = useState(false);
+
+  const planScheduleMut = (trpc as any).theater?.planSchedule?.useMutation?.({
+    onSuccess: (data: any) => {
+      if (data?.ok && data.schedule && Object.keys(data.schedule).length > 0) {
+        setAiSchedule(data.schedule);
+        setScheduleVisible(true);
+      }
+    },
+  });
+
+  const handlePlanSchedule = () => {
+    if (!brandId) return;
+    const selProducts = brandProducts
+      .filter((p) => selectedProductIds.has(p.id))
+      .map((p) => ({ id: p.id, name: p.name, usp: p.usp }));
+    const selEvents = brandEvents
+      .filter((e) => selectedEventIds.has(e.id) && e.startAt)
+      .map((e) => ({ id: e.id, name: e.name, date: e.startAt!, usp: e.usp }));
+    planScheduleMut?.mutate?.({
+      brandId,
+      selectedProducts: selProducts,
+      lockedEvents: selEvents,
+      days: days.map((d) => d.date),
+    });
+  };
+
+  /** Merge AI schedule into promotionSlots for generation */
+  const scheduleToPromotionSlots = (): Record<string, {
+    products: Array<{ name: string; usp: string }>;
+    events: Array<{ name: string; date: string }>;
+  }> => {
+    if (!aiSchedule) return buildPromotionSlots(products, importantDates, days.map((d) => d.date));
+    const slots: Record<string, { products: Array<{ name: string; usp: string }>; events: Array<{ name: string; date: string }> }> = {};
+    days.forEach((d) => { slots[d.date] = { products: [], events: [] }; });
+    for (const [date, entry] of Object.entries(aiSchedule)) {
+      if (!slots[date]) continue;
+      if (entry.type === "product") {
+        const p = brandProducts.find((bp) => bp.id === entry.entityId);
+        slots[date].products.push({ name: entry.name, usp: p?.usp ?? entry.angle });
+      } else if (entry.type === "event") {
+        slots[date].events.push({ name: entry.name, date });
+      }
+    }
+    return slots;
+  };
 
   // event tab fields (reuses newDate / newDateName below)
   // product tab fields
@@ -840,8 +900,8 @@ export default function TheaterPage() {
         // Phase 3b: 素材 (products + photos) so chief brief can mention them
         products: products.map((p) => ({ name: p.name, usp: p.usp, launchDate: p.launchDate })),
         photos: photos.map((ph) => ({ url: ph.url, tag: ph.tag, note: ph.note })),
-        // Promotion slots — computed here, used by server to inject per-cell promo context
-        promotionSlots: buildPromotionSlots(products, importantDates, days.map((d) => d.date)),
+        // Promotion slots — from AI schedule (if planned) or classic buildPromotionSlots
+        promotionSlots: scheduleToPromotionSlots(),
       });
     } catch (e) {
       console.error("[theater] runStart failed:", e);
@@ -1173,6 +1233,19 @@ export default function TheaterPage() {
       imageWorker(),
     ]);
     setRunning(false);
+
+    // ── Mia nudge: generation complete ───────────────────────────────────
+    // Dispatch a global event that ShellLayout/SupportDrawer can listen to.
+    // This avoids prop-drilling openSupport all the way into TheaterPage.
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("mia:nudge", {
+        detail: {
+          message: lang === "en"
+            ? "✅ 7-day content is ready! To adjust dates or add brand photos, click the ✏️ Edit button on any post."
+            : "✅ 7 天內容排好了！想調整發布日期或加入品牌照片，點每格右上角的 ✏️ 編輯按鈕，可以送到日曆或換圖。",
+        },
+      }));
+    }, 800);
   };
 
   const updateCell = (key: CellKey, patch: Partial<CellState>) => {
@@ -1593,6 +1666,110 @@ export default function TheaterPage() {
             );
           })}
         </div>
+
+        {/* ── 本週焦點 — product/event chips + AI 排程 ──────────────── */}
+        {(brandProducts.length > 0 || brandEvents.length > 0) && (
+          <div className="mt-4 p-4 rounded-xl border border-neutral-200 bg-white space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                {lang === "en" ? "Weekly focus — select what to promote" : "本週焦點 — 選擇要推廣的產品 / 活動"}
+              </p>
+              {(selectedProductIds.size > 0 || selectedEventIds.size > 0) && (
+                <button
+                  onClick={handlePlanSchedule}
+                  disabled={planScheduleMut?.isPending || running}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition flex items-center gap-1.5"
+                >
+                  {planScheduleMut?.isPending
+                    ? (lang === "en" ? "✨ Planning…" : "✨ 排程中…")
+                    : (lang === "en" ? "✨ AI Schedule" : "✨ AI 智能排程")}
+                </button>
+              )}
+            </div>
+
+            {/* Product chips */}
+            {brandProducts.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {brandProducts.map((p) => {
+                  const selected = selectedProductIds.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedProductIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
+                        setAiSchedule(null); // reset schedule when selection changes
+                        return next;
+                      })}
+                      className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition ${
+                        selected
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-neutral-600 border-neutral-300 hover:border-emerald-400"
+                      }`}
+                    >
+                      {selected ? "✓ " : ""}{p.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Event chips (with fixed dates) */}
+            {brandEvents.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {brandEvents.map((e) => {
+                  const selected = selectedEventIds.has(e.id);
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => setSelectedEventIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(e.id)) next.delete(e.id); else next.add(e.id);
+                        setAiSchedule(null);
+                        return next;
+                      })}
+                      className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition ${
+                        selected
+                          ? "bg-amber-500 text-white border-amber-500"
+                          : "bg-white text-neutral-600 border-neutral-300 hover:border-amber-400"
+                      }`}
+                    >
+                      <CalendarIcon size={10} className="inline mr-1" />
+                      {selected ? "✓ " : ""}{e.name}
+                      {e.startAt && <span className="ml-1 opacity-70 text-[10px]">{e.startAt.slice(5)}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* AI Schedule preview */}
+            {scheduleVisible && aiSchedule && (
+              <div className="mt-1 border-t border-neutral-100 pt-3 space-y-1.5">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-semibold text-violet-700">
+                    {lang === "en" ? "✨ AI suggested schedule" : "✨ AI 排程建議"}
+                  </p>
+                  <button onClick={() => setScheduleVisible(false)} className="text-[10px] text-neutral-400 hover:text-neutral-700">
+                    {lang === "en" ? "hide" : "收起"}
+                  </button>
+                </div>
+                {days.map((d) => {
+                  const entry = aiSchedule[d.date];
+                  if (!entry) return null;
+                  const color = entry.type === "product" ? "#059669" : entry.type === "event" ? "#d97706" : "#6b7280";
+                  return (
+                    <div key={d.date} className="flex items-start gap-2 text-[11px]">
+                      <span className="text-neutral-400 w-14 shrink-0 tabular-nums">{d.label}</span>
+                      <span className="font-medium shrink-0" style={{ color }}>{entry.name}</span>
+                      <span className="text-neutral-500 truncate" title={entry.rationale}>· {entry.angle}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Phase 3b: 加入素材 toolbar — prominent button + summary chips */}
         <div className="flex items-center gap-2 flex-wrap mt-3">
