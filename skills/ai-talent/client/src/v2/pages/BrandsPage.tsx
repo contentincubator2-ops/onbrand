@@ -617,6 +617,9 @@ export default function BrandsPage() {
     status: string; phase: string; totalFound: number; totalPositioned: number; currentProduct: string | null;
   } | null;
   const discoveryRunning = discoveryStatus?.status === "running" || discoveryStatus?.status === "pending";
+  const triggerDiscoveryMut = (trpc as any).theater?.triggerProductDiscovery?.useMutation?.({
+    onSuccess: () => discoveryStatusQ?.refetch?.(),
+  });
 
   const prodRemoveMut  = (trpc as any).product?.remove?.useMutation?.({ onSuccess: () => brandProductsQ?.refetch?.() });
   const prodStartMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
@@ -2096,6 +2099,29 @@ export default function BrandsPage() {
           {/* ── 產品 (products) — card grid with positioning preview ── */}
           {derivedCategory === "products" && scopeMode === "brand" && (
             <div style={{ padding: "8px 0 32px" }}>
+              {/* Scan website button — shown when not already running */}
+              {!discoveryRunning && connData?.website && (
+                <div className="mx-2 mb-4 flex items-center justify-between">
+                  <p className="text-[11px] text-neutral-400">
+                    {lang === "en" ? "AI can auto-discover products from your website" : "AI 可自動從官網分析產品清單"}
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (!activeBrandIdForLocks || !connData?.website) return;
+                      triggerDiscoveryMut?.mutate?.({
+                        brandId: activeBrandIdForLocks,
+                        websiteUrl: connData.website,
+                      });
+                    }}
+                    disabled={triggerDiscoveryMut?.isPending}
+                    className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition flex items-center gap-1.5 shrink-0 ml-4"
+                  >
+                    {triggerDiscoveryMut?.isPending
+                      ? (lang === "en" ? "Starting…" : "啟動中…")
+                      : (lang === "en" ? "🔍 Scan website" : "🔍 掃描官網")}
+                  </button>
+                </div>
+              )}
               {/* Discovery progress banner — shown while AI is crawling/positioning */}
               {discoveryRunning && (
                 <div className="mx-2 mb-5 px-4 py-3 rounded-xl border border-indigo-200 bg-indigo-50 flex items-start gap-3">
