@@ -40,6 +40,7 @@ import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
+import ProductDetailModal from "../components/positioning/ProductDetailModal";
 import { EntityStats } from "../components/EntityStats";
 // Notion-style line icons
 import {
@@ -620,6 +621,9 @@ export default function BrandsPage() {
   const triggerDiscoveryMut = (trpc as any).theater?.triggerProductDiscovery?.useMutation?.({
     onSuccess: () => discoveryStatusQ?.refetch?.(),
   });
+
+  // Product detail modal
+  const [productDetailId, setProductDetailId] = useState<number | null>(null);
 
   // While discovery is running, poll product list every 3s so cards appear
   // one-by-one as the AI positions each product (progressive reveal).
@@ -2222,10 +2226,7 @@ export default function BrandsPage() {
                 isLoading={brandProductsQ?.isLoading ?? false}
                 lang={lang}
                 onAdd={() => setAddModal({ open: true, tab: "product" })}
-                onOpen={(id) => {
-                  setScope({ brandId: activeBrandIdForLocks ?? 0, productId: id, eventId: null });
-                  setCategory("positioning");
-                }}
+                onOpen={(id) => setProductDetailId(id)}
                 onDelete={(id) => prodRemoveMut?.mutate?.({ id })}
                 onPosition={(id) => {
                   prodStartMut?.mutate?.({ entityKind: "product", entityId: id });
@@ -2264,6 +2265,20 @@ export default function BrandsPage() {
           same screen corner. Same actions are reachable from the
           BrandHierarchyPill 「+ 新增品牌 / 產品 / 活動」 menu top-left.
           AddEntityModal is still mounted below (other triggers fire it). */}
+
+      {/* ProductDetailModal — 點選產品卡片時開啟 */}
+      {productDetailId && activeBrandIdForLocks && (
+        <ProductDetailModal
+          productId={productDetailId}
+          brandId={activeBrandIdForLocks}
+          onClose={() => setProductDetailId(null)}
+          onReposition={(id) => {
+            setProductDetailId(null);
+            prodStartMut?.mutate?.({ entityKind: "product", entityId: id });
+            prodInterimMut?.mutate?.({ entityKind: "product", entityId: id });
+          }}
+        />
+      )}
 
       {/* AddEntityModal — shared dialog for 品牌 / 產品 / 活動 */}
       <AddEntityModal
