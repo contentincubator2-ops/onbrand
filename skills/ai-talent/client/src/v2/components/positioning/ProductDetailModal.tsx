@@ -186,9 +186,12 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
           : (product.positioning ?? {});
       } catch { return {}; }
     })();
-    setTagline(pos.tagline ?? "");
-    setAudience(pos.targetAudience ?? pos.audience?.primary ?? "");
-    setUsp(pos.usp ?? pos.differentiation?.functional ?? "");
+    // Interim positioning is stored under _interim (auto-discovery quick-pulse).
+    // Full positioning overwrites these; fall back to _interim if not yet done.
+    const interim = (pos._interim as any) ?? {};
+    setTagline(pos.tagline ?? interim.tagline ?? "");
+    setAudience(pos.targetAudience ?? pos.audience?.primary ?? interim.targetAudience ?? "");
+    setUsp(pos.usp ?? pos.differentiation?.functional ?? interim.usp ?? "");
     setPreferred(Array.isArray(pos.preferredWords) ? pos.preferredWords : []);
     setForbidden(Array.isArray(pos.forbiddenWords) ? pos.forbiddenWords : []);
     setPeriods(Array.isArray(pos.promotionPeriods) ? pos.promotionPeriods : []);

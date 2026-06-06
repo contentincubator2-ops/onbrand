@@ -4587,11 +4587,15 @@ function BrandEntityGrid({
 
   const getPreview = (item: any) => {
     const p = item.positioning ?? {};
+    const interim = p._interim ?? {};   // interim positioning from auto-discovery
     if (kind === "product") {
       return {
-        tagline: extractField(p, "tagline", "tagline.zhTagline", "differentiation.summary"),
-        usp:     extractField(p, "usp", "differentiation.functional", "differentiation.summary"),
-        audience: extractField(p, "audience.primary", "targetAudience"),
+        tagline:  extractField(p, "tagline", "tagline.zhTagline", "differentiation.summary")
+                    || interim.tagline || "",
+        usp:      extractField(p, "usp", "differentiation.functional", "differentiation.summary")
+                    || interim.usp || "",
+        audience: extractField(p, "audience.primary", "targetAudience")
+                    || interim.targetAudience || "",
       };
     } else {
       return {
@@ -4606,9 +4610,11 @@ function BrandEntityGrid({
 
   const hasPositioning = (item: any): boolean => {
     const p = item.positioning ?? {};
+    const interim = p._interim ?? {};
     return !!(
       p.tagline || p.usp || p.theme || p.differentiation?.summary ||
-      p.audience?.primary || p.targetAudience
+      p.audience?.primary || p.targetAudience ||
+      interim.tagline || interim.usp || interim.targetAudience
     );
   };
 
