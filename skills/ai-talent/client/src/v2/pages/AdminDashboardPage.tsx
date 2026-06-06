@@ -18,7 +18,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
-import { RefreshCw, TrendingUp, DollarSign, Activity, AlertTriangle, Bug, Download } from "lucide-react";
+import { RefreshCw, TrendingUp, DollarSign, Activity, AlertTriangle, Bug, Download, Target, Users, Clock } from "lucide-react";
 
 const card: React.CSSProperties = {
   border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff",
@@ -56,6 +56,10 @@ export default function AdminDashboardPage() {
   const ovQ = (trpc as any).adminStats?.overview?.useQuery?.(undefined, opt);
   const ucQ = (trpc as any).adminStats?.usageCost?.useQuery?.(undefined, opt);
   const hQ  = (trpc as any).adminStats?.health?.useQuery?.(undefined, opt);
+  // 2026-06-07 (CJ「Part 1 投資人會看的指標」) — activation funnel + cohort retention + TTFV
+  const afQ = (trpc as any).adminStats?.activationFunnel?.useQuery?.({ days: 30 }, opt);
+  const crQ = (trpc as any).adminStats?.cohortRetention?.useQuery?.({ weeks: 8 }, opt);
+  const ttfvQ = (trpc as any).adminStats?.timeToFirstValue?.useQuery?.({ days: 30 }, opt);
   const fbQ = (trpc as any).adminStats?.featureBreakdown?.useQuery?.({ days: 30, limit: 60 }, opt);
   const fmQ = (trpc as any).adminStats?.frictionMap?.useQuery?.({ days: 7 }, opt);
   const ruQ = (trpc as any).adminStats?.recentUsers?.useQuery?.({ limit: 50 }, opt);
@@ -116,7 +120,7 @@ export default function AdminDashboardPage() {
             <Download size={13} /> 匯出 CSV
           </button>
           <button
-            onClick={() => { ovQ?.refetch?.(); ucQ?.refetch?.(); hQ?.refetch?.(); fbQ?.refetch?.(); fmQ?.refetch?.(); ruQ?.refetch?.(); refetchBugs(); }}
+            onClick={() => { ovQ?.refetch?.(); ucQ?.refetch?.(); hQ?.refetch?.(); fbQ?.refetch?.(); fmQ?.refetch?.(); ruQ?.refetch?.(); afQ?.refetch?.(); crQ?.refetch?.(); ttfvQ?.refetch?.(); refetchBugs(); }}
             style={{
               display: "flex", alignItems: "center", gap: 6, fontSize: 12,
               border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 12px",
@@ -150,6 +154,152 @@ export default function AdminDashboardPage() {
         <Stat label="任務數" value={ov?.entities.missions ?? "—"} />
         <Stat label="總產出" value={ov?.entities.outputs ?? "—"}
           sub={`7d: ${ov?.entities.outputs7d ?? 0}`} />
+      </div>
+
+      {/* ── 1.5 Activation Funnel — 投資人最在意的單一指標 ── */}
+      <div style={sectionTitle}><Target size={13} /> Activation Funnel（過去 30 天註冊用戶）</div>
+      <div style={card}>
+        {afQ?.data?.stages ? (
+          <>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: "#737373" }}>
+                Activation Rate（3+ 任務）
+                <span style={{ marginLeft: 8, color: "#9ca3af" }}>·</span>
+                <span style={{ marginLeft: 8 }}>投資人健康範圍 &gt; 40%</span>
+              </div>
+              <div style={{
+                fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                color: (afQ.data.activationRate ?? 0) >= 40 ? "#15803d" :
+                       (afQ.data.activationRate ?? 0) >= 25 ? "#a16207" : "#b91c1c",
+              }}>
+                {afQ.data.activationRate}%
+              </div>
+            </div>
+            {/* Horizontal bars */}
+            {afQ.data.stages.map((s: any) => {
+              const widthPct = Math.max(2, s.pctOfTotal); // min 2% for visibility
+              return (
+                <div key={s.key} style={{ marginBottom: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 2 }}>
+                    <span style={{ color: "#374151", fontWeight: 500 }}>{s.label}</span>
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                      <span style={{ color: "#171717", fontWeight: 600 }}>{s.count}</span>
+                      <span style={{ color: "#9ca3af", marginLeft: 6 }}>
+                        {s.pctOfTotal}% {s.key !== "signed_up" && `(${s.pctOfPrev}% prev)`}
+                      </span>
+                    </span>
+                  </div>
+                  <div style={{ height: 8, background: "#f3f4f6", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{
+                      width: `${widthPct}%`, height: "100%",
+                      background: s.key === "activated" ? "#0d9488" : s.key === "d7_retained" ? "#15803d" : "#171717",
+                      transition: "width 0.4s ease",
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        ) : (
+          <div style={{ color: "#9ca3af", fontSize: 13 }}>{afQ?.isLoading ? "載入中…" : "無資料"}</div>
+        )}
+      </div>
+
+      {/* ── 1.6 Time to First Value ── */}
+      <div style={sectionTitle}><Clock size={13} /> Time-to-First-Value（從註冊到第一次跑任務）</div>
+      <div style={grid(180)}>
+        <Stat
+          label="中位數（P50）"
+          value={ttfvQ?.data ? `${ttfvQ.data.p50Minutes} 分鐘` : "—"}
+          sub="投資人健康 < 10 分鐘"
+          warn={(ttfvQ?.data?.p50Minutes ?? 0) > 30}
+        />
+        <Stat
+          label="P75（75% 用戶以內）"
+          value={ttfvQ?.data ? `${ttfvQ.data.p75Minutes} 分鐘` : "—"}
+        />
+        <Stat
+          label="P95（95% 用戶以內）"
+          value={ttfvQ?.data ? `${ttfvQ.data.p95Minutes} 分鐘` : "—"}
+        />
+        <Stat
+          label="達成首次價值用戶"
+          value={ttfvQ?.data ? `${ttfvQ.data.usersWhoActivated} / ${ttfvQ.data.totalSignups}` : "—"}
+          sub={`${ttfvQ?.data?.activationRate ?? 0}% 註冊轉跑任務`}
+        />
+      </div>
+      {ttfvQ?.data?.buckets && (
+        <div style={{ ...card, marginTop: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#525252", marginBottom: 8 }}>
+            分佈直方圖
+          </div>
+          {[
+            { label: "< 5 分鐘 (極快)", count: ttfvQ.data.buckets.under5min, color: "#15803d" },
+            { label: "5–15 分鐘 (快)", count: ttfvQ.data.buckets.under15min, color: "#22c55e" },
+            { label: "15–60 分鐘 (普通)", count: ttfvQ.data.buckets.under60min, color: "#eab308" },
+            { label: "1–24 小時 (慢)", count: ttfvQ.data.buckets.under24h, color: "#f97316" },
+            { label: "> 24 小時 (很慢)", count: ttfvQ.data.buckets.over24h, color: "#b91c1c" },
+          ].map((b) => {
+            const total = ttfvQ.data.usersWhoActivated;
+            const pct = total > 0 ? Math.round((b.count / total) * 100) : 0;
+            return (
+              <div key={b.label} style={{ marginBottom: 5 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 2 }}>
+                  <span style={{ color: "#374151" }}>{b.label}</span>
+                  <span style={{ color: "#9ca3af", fontVariantNumeric: "tabular-nums" }}>
+                    {b.count} 人 · {pct}%
+                  </span>
+                </div>
+                <div style={{ height: 5, background: "#f3f4f6", borderRadius: 3, overflow: "hidden" }}>
+                  <div style={{ width: `${Math.max(2, pct)}%`, height: "100%", background: b.color }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── 1.7 Cohort Retention ── */}
+      <div style={sectionTitle}><Users size={13} /> Cohort Retention（按註冊週分組）</div>
+      <div style={{ ...card, overflowX: "auto" }}>
+        {crQ?.data?.grid?.length > 0 ? (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+            <thead>
+              <tr style={{ color: "#737373", textAlign: "left" }}>
+                <th style={{ padding: "6px 8px", fontWeight: 600 }}>註冊週</th>
+                <th style={{ padding: "6px 8px", fontWeight: 600 }}>新增</th>
+                {crQ.data.grid[0].retention.map((_: any, i: number) => (
+                  <th key={i} style={{ padding: "6px 8px", fontWeight: 600, textAlign: "center", minWidth: 50 }}>
+                    W{i}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {crQ.data.grid.map((row: any) => (
+                <tr key={row.cohortWeek} style={{ borderTop: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "6px 8px", color: "#374151" }}>{row.cohortWeek}</td>
+                  <td style={{ padding: "6px 8px", color: "#171717", fontWeight: 600 }}>{row.size}</td>
+                  {row.retention.map((r: number, i: number) => {
+                    if (r === -1) return <td key={i} style={{ padding: "6px 8px", color: "#d1d5db", textAlign: "center" }}>—</td>;
+                    const bg = r >= 50 ? "#15803d" : r >= 25 ? "#22c55e" : r >= 10 ? "#eab308" : r > 0 ? "#f97316" : "#fee2e2";
+                    const fg = r >= 25 ? "#fff" : r > 0 ? "#171717" : "#9ca3af";
+                    return (
+                      <td key={i} style={{
+                        padding: "6px 8px", textAlign: "center",
+                        background: bg, color: fg, fontWeight: 600,
+                      }}>
+                        {r}%
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div style={{ color: "#9ca3af", fontSize: 13 }}>{crQ?.isLoading ? "載入中…" : "尚無足夠資料"}</div>
+        )}
       </div>
 
       {/* ── 2. 用量與成本 ── */}

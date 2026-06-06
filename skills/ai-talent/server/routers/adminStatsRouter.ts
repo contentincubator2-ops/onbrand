@@ -34,6 +34,205 @@ const csvCell = (v: any) => {
 };
 
 export const adminStatsRouter = router({
+  /**
+   * 2026-06-07 (CJ「Part 1 投資人會看的指標」): three new queries built
+   * directly for fundraising metric review. Activation funnel + cohort
+   * retention + time-to-first-value.
+   *
+   *   activationFunnel — Sign up → Build brand → Run first task → Run 3rd → D7 active
+   *                       For the cohort of users who signed up in the last N days.
+   *   cohortRetention  — Weekly cohort table: each row = signup week,
+   *                       columns = % still active on week 1/2/4/8
+   *   timeToFirstValue — Median/p75 minutes from signup to first mission_output
+   */
+
+  /**
+   * Activation funnel for users who signed up in the last `days` days.
+   * Returns absolute counts at each stage + conversion percentages.
+   */
+  activationFunnel: adminProcedure
+    .input(z.object({ days: z.number().int().min(1).max(180).default(30) }).optional())
+    .query(async ({ input }) => {
+      const { default: localPool } = await import("../localDb");
+      const days = input?.days ?? 30;
+
+      const [[row]]: any = await localPool.execute(`
+        SELECT
+          /* Stage 1: signed up */
+          COUNT(DISTINCT u.id) AS signed_up,
+
+          /* Stage 2: verified email (isActive = 1) */
+          COUNT(DISTINCT CASE WHEN u.isActive = 1 THEN u.id END) AS verified,
+
+          /* Stage 3: created at least one brand */
+          COUNT(DISTINCT CASE WHEN b.userId IS NOT NULL THEN u.id END) AS built_brand,
+
+          /* Stage 4: completed at least one mission_output (= ran a real task) */
+          COUNT(DISTINCT CASE WHEN mo_first.userId IS NOT NULL THEN u.id END) AS first_task,
+
+          /* Stage 5: ran 3+ tasks (the "activated" milestone) */
+          COUNT(DISTINCT CASE WHEN mo_count.task_count >= 3 THEN u.id END) AS activated,
+
+          /* Stage 6: still active in the last 7 days (D7 retention) */
+          COUNT(DISTINCT CASE WHEN mo_recent.userId IS NOT NULL THEN u.id END) AS d7_retained
+        FROM users u
+        LEFT JOIN (SELECT DISTINCT userId FROM brands) b
+               ON b.userId = u.id
+        LEFT JOIN (SELECT DISTINCT m.userId FROM missions m
+                     JOIN mission_outputs mo ON mo.missionId = m.id) mo_first
+               ON mo_first.userId = u.id
+        LEFT JOIN (SELECT m.userId, COUNT(*) AS task_count
+                     FROM missions m
+                     JOIN mission_outputs mo ON mo.missionId = m.id
+                     GROUP BY m.userId) mo_count
+               ON mo_count.userId = u.id
+        LEFT JOIN (SELECT DISTINCT m.userId
+                     FROM missions m
+                     JOIN mission_outputs mo ON mo.missionId = m.id
+                     WHERE mo.createdAt >= NOW() - INTERVAL 7 DAY) mo_recent
+               ON mo_recent.userId = u.id
+        WHERE u.createdAt >= NOW() - INTERVAL ${days} DAY
+      `);
+
+      const pct = (numer: number, denom: number): number =>
+        denom > 0 ? Math.round((numer / denom) * 100) : 0;
+
+      const signedUp = n(row.signed_up);
+      const verified = n(row.verified);
+      const builtBrand = n(row.built_brand);
+      const firstTask = n(row.first_task);
+      const activated = n(row.activated);
+      const d7Retained = n(row.d7_retained);
+
+      return {
+        windowDays: days,
+        stages: [
+          { key: "signed_up",   label: "註冊",         count: signedUp,    pctOfTotal: 100, pctOfPrev: 100 },
+          { key: "verified",    label: "驗證 Email",   count: verified,    pctOfTotal: pct(verified, signedUp),    pctOfPrev: pct(verified, signedUp) },
+          { key: "built_brand", label: "建立品牌",     count: builtBrand,  pctOfTotal: pct(builtBrand, signedUp),  pctOfPrev: pct(builtBrand, verified) },
+          { key: "first_task",  label: "跑首個任務",   count: firstTask,   pctOfTotal: pct(firstTask, signedUp),   pctOfPrev: pct(firstTask, builtBrand) },
+          { key: "activated",   label: "Activated (3+ 任務)", count: activated, pctOfTotal: pct(activated, signedUp), pctOfPrev: pct(activated, firstTask) },
+          { key: "d7_retained", label: "D7 仍活躍",   count: d7Retained,  pctOfTotal: pct(d7Retained, signedUp),  pctOfPrev: pct(d7Retained, activated) },
+        ],
+        activationRate: pct(activated, signedUp),
+      };
+    }),
+
+  /**
+   * Weekly cohort retention table.
+   * Rows = signup week. Columns = % of cohort still producing outputs in week N.
+   */
+  cohortRetention: adminProcedure
+    .input(z.object({ weeks: z.number().int().min(2).max(16).default(8) }).optional())
+    .query(async ({ input }) => {
+      const { default: localPool } = await import("../localDb");
+      const weeks = input?.weeks ?? 8;
+
+      // Get cohorts (last N weeks of signups, grouped by week)
+      const [cohortRows]: any = await localPool.execute(`
+        SELECT
+          DATE(DATE_SUB(createdAt, INTERVAL WEEKDAY(createdAt) DAY)) AS cohort_week,
+          COUNT(*) AS cohort_size
+        FROM users
+        WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL ${weeks} WEEK)
+        GROUP BY cohort_week
+        ORDER BY cohort_week DESC
+      `);
+      const cohorts = (cohortRows as any[]).map((r) => ({
+        week: String(r.cohort_week).slice(0, 10),
+        size: n(r.cohort_size),
+      }));
+
+      if (cohorts.length === 0) return { cohorts: [], grid: [] };
+
+      // For each cohort, count who was active in each following week
+      const grid: Array<{ cohortWeek: string; size: number; retention: number[] }> = [];
+      for (const c of cohorts) {
+        const retention: number[] = [];
+        for (let weekOffset = 0; weekOffset < weeks; weekOffset++) {
+          // Skip if this week hasn't happened yet for this cohort
+          const cohortDate = new Date(c.week + "T00:00:00Z");
+          const checkDate = new Date(cohortDate.getTime() + weekOffset * 7 * 86_400_000);
+          if (checkDate > new Date()) {
+            retention.push(-1); // -1 marker = not yet measurable
+            continue;
+          }
+          const [[r]]: any = await localPool.execute(`
+            SELECT COUNT(DISTINCT m.userId) AS active
+            FROM users u
+            JOIN missions m ON m.userId = u.id
+            JOIN mission_outputs mo ON mo.missionId = m.id
+            WHERE DATE(DATE_SUB(u.createdAt, INTERVAL WEEKDAY(u.createdAt) DAY)) = ?
+              AND mo.createdAt >= DATE_ADD(?, INTERVAL ${weekOffset} WEEK)
+              AND mo.createdAt <  DATE_ADD(?, INTERVAL ${weekOffset + 1} WEEK)
+          `, [c.week, c.week, c.week]);
+          retention.push(c.size > 0 ? Math.round((n(r.active) / c.size) * 100) : 0);
+        }
+        grid.push({ cohortWeek: c.week, size: c.size, retention });
+      }
+      return { cohorts, grid };
+    }),
+
+  /**
+   * Time-to-First-Value: median + p75 + p95 minutes between
+   * signup and the user's first mission_output.
+   */
+  timeToFirstValue: adminProcedure
+    .input(z.object({ days: z.number().int().min(1).max(180).default(30) }).optional())
+    .query(async ({ input }) => {
+      const { default: localPool } = await import("../localDb");
+      const days = input?.days ?? 30;
+
+      // Get all (signup_time, first_output_time) pairs for users who reached first_task
+      const [rows]: any = await localPool.execute(`
+        SELECT
+          u.id,
+          u.createdAt AS signup_at,
+          MIN(mo.createdAt) AS first_output_at,
+          TIMESTAMPDIFF(MINUTE, u.createdAt, MIN(mo.createdAt)) AS minutes_to_value
+        FROM users u
+        JOIN missions m ON m.userId = u.id
+        JOIN mission_outputs mo ON mo.missionId = m.id
+        WHERE u.createdAt >= NOW() - INTERVAL ${days} DAY
+        GROUP BY u.id, u.createdAt
+        HAVING minutes_to_value IS NOT NULL AND minutes_to_value >= 0
+        ORDER BY minutes_to_value ASC
+      `);
+      const minutes = (rows as any[]).map((r) => Number(r.minutes_to_value));
+      const usersWhoActivated = minutes.length;
+
+      // Get total signups for context
+      const [[total]]: any = await localPool.execute(`
+        SELECT COUNT(*) AS total FROM users WHERE createdAt >= NOW() - INTERVAL ${days} DAY
+      `);
+      const totalSignups = n(total.total);
+
+      const pct = (sortedArr: number[], p: number): number => {
+        if (!sortedArr.length) return 0;
+        const idx = Math.min(sortedArr.length - 1, Math.floor((sortedArr.length - 1) * p));
+        return sortedArr[idx] ?? 0;
+      };
+
+      return {
+        windowDays: days,
+        usersWhoActivated,
+        totalSignups,
+        activationRate: totalSignups > 0 ? Math.round((usersWhoActivated / totalSignups) * 100) : 0,
+        p50Minutes: pct(minutes, 0.5),
+        p75Minutes: pct(minutes, 0.75),
+        p95Minutes: pct(minutes, 0.95),
+        meanMinutes: minutes.length ? Math.round(minutes.reduce((a, b) => a + b, 0) / minutes.length) : 0,
+        // Bucket counts for histogram display
+        buckets: {
+          under5min:   minutes.filter((m) => m < 5).length,
+          under15min:  minutes.filter((m) => m >= 5 && m < 15).length,
+          under60min:  minutes.filter((m) => m >= 15 && m < 60).length,
+          under24h:    minutes.filter((m) => m >= 60 && m < 24 * 60).length,
+          over24h:     minutes.filter((m) => m >= 24 * 60).length,
+        },
+      };
+    }),
+
   /** Growth funnel + entity counts. */
   overview: adminProcedure.query(async () => {
     const { default: localPool } = await import("../localDb");
