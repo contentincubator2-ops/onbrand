@@ -130,6 +130,35 @@ export default function BrandsManagePage() {
     return <Navigate to={`/brands/edit${bid ? `?b=${bid}` : ""}`} replace />;
   }
 
+  // 2026-06-05 (CJ「Mia 給的連結是空白頁」fail-safe): if the URL has ?b=<id>
+  // but the brand list is loaded AND that brandId doesn't exist in our list,
+  // show a friendly error with a way to recover instead of a blank screen.
+  // This catches Mia hallucinating brandIds, deleted brands, cross-user shares.
+  const brandsLoaded = (ctx as any)?.brandsLoaded === true;
+  if (!forceGrid && urlBrandId && brandsLoaded && !brands.find((b) => b.id === urlBrandId)) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-6">
+        <div className="text-center max-w-md">
+          <p className="text-5xl mb-4">🤔</p>
+          <h2 className="text-xl font-semibold text-neutral-900 mb-2">
+            {lang === "en" ? "Brand not found" : "找不到這個品牌"}
+          </h2>
+          <p className="text-sm text-neutral-500 mb-6">
+            {lang === "en"
+              ? `Brand #${urlBrandId} doesn't exist in your account — it may have been deleted, or the link was incorrect.`
+              : `品牌 #${urlBrandId} 不存在於你的帳號 — 可能已被刪除，或連結有誤。`}
+          </p>
+          <button
+            onClick={() => navigate("/brands?all=1", { replace: true })}
+            className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-700"
+          >
+            {lang === "en" ? "← Back to all brands" : "← 回到全部品牌"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // 2026-05-16 (CJ「按下左側品牌功能時，總會先出現空白畫面」):
   // When the URL carries ?b=<id> we KNOW a redirect into the editor is
   // imminent (the effect above is mid-flight syncing it into scope).

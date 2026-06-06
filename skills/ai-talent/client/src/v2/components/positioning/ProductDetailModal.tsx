@@ -13,8 +13,8 @@
  */
 
 import React, { useEffect, useState, useRef } from "react";
-import { trpc } from "../../lib/trpc";
-import { useLang } from "../../lib/i18n";
+import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 import { X, Plus, Trash2, RefreshCw, Sparkles } from "lucide-react";
 
 interface PromotionPeriod {

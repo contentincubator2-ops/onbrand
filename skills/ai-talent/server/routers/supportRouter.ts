@@ -110,6 +110,23 @@ async function gatherSessionContext(args: {
   const ctx: string[] = [];
   if (args.currentPath) ctx.push(`當前頁面：${args.currentPath}`);
 
+  // 2026-06-05 (CJ「Mia 給的連結是空白頁」fail-safe):
+  // Inject the user's actual brand list so Mia can never hallucinate brand IDs.
+  // When user says "幫我看桂冠的定位" Mia must find the matching ID here,
+  // not invent one. If the brand isn't in this list, Mia must say so.
+  try {
+    const [brandRows]: any = await localPool.execute(
+      `SELECT id, name FROM brands WHERE userId = ? ORDER BY createdAt DESC LIMIT 20`,
+      [args.userId],
+    );
+    const list = (brandRows as any[]).map((b) => `id=${b.id} 名稱="${b.name}"`).join("、");
+    if (list) {
+      ctx.push(`用戶擁有的品牌（你必須從這份清單找 brandId，不能自己猜編號；若用戶提到的品牌不在這份清單，直接說「找不到這個品牌」）：${list}`);
+    } else {
+      ctx.push(`用戶尚未建立任何品牌（先引導去 /brands 建立第一個品牌）`);
+    }
+  } catch { /* non-fatal */ }
+
   // Brand info
   if (args.brandId) {
     try {
@@ -203,7 +220,13 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 - 30 秒任務：3 個 caption 變體 + 視覺 brief（不直接生圖，按「用此風格生圖」才生）
 - 60 秒任務：5 個 caption + 真的生圖（Flux Schnell）+ 留言模板 + 發文時段建議
 - 99 秒任務：60s 內容 + 前端加 web research scout
-- 主要頁面：/brands（品牌總覽）/ /brands/edit（編輯品牌定位）/ /30s /60s /99s（任務）/ /projects（產出存放處）/ /calendar（節慶日曆）/ /run/:id（單筆任務結果頁，可手動改文案、生圖、發 FB）
+- 主要頁面：/brands（品牌總覽，不需 ?b=）/ /brands/edit?b=<brandId>（編輯特定品牌定位 — brandId 必須來自 session-context 裡的品牌清單，絕對不能自己猜）/ /30s /60s /99s（任務）/ /projects（產出存放處）/ /calendar（節慶日曆）/ /run/:id（單筆任務結果頁，可手動改文案、生圖、發 FB）
+
+【brandId 規則 — 違反就會給用戶空白頁，CJ 特別警告】
+✅ /brands/edit?b=<id>  ← id 必須是 session-context 裡明確列出的某個品牌 id
+✅ /brands              ← 沒指定品牌時用這個（總覽頁）
+❌ 不要自己編 brand id（會跳到空白頁）
+❌ 用戶提到的品牌名不在清單裡 → 必須說「找不到這個品牌，要不要在 /brands 看你現有的品牌？」，不要硬給連結
 
 常見痛點 + 你的標準回答：
 - 「文案不像我的品牌」→ 先檢查品牌定位有沒有鎖定（/brands/edit → 鎖定按鈕）；不然 AI 還在猜
@@ -361,7 +384,31 @@ export const supportRouter = router({
       // 2026-05-14 (CJ「他直接幫我切換頁面」): parse <<action:...>> markers
       // out of Mia's reply into structured action buttons. Stored content
       // is the clean version; actions ride on the response payload only.
-      const { clean: miaReply, actions } = parseActions(miaReplyRaw);
+      const parsed = parseActions(miaReplyRaw);
+      // 2026-06-05 (CJ「Mia 給的連結是空白頁」fail-safe): scrub navigate
+      // URLs whose ?b=<id> doesn't exist in this user's brand list. Mia
+      // can hallucinate brand IDs from chat history; the only reliable
+      // defense is post-validation here.
+      const validBrandIds = await (async () => {
+        try {
+          const [rows]: any = await localPool.execute(
+            `SELECT id FROM brands WHERE userId = ?`,
+            [ctx.user!.id],
+          );
+          return new Set<number>((rows as any[]).map((r: any) => Number(r.id)));
+        } catch { return new Set<number>(); }
+      })();
+      const actions = parsed.actions.filter((a) => {
+        if (a.kind !== "navigate") return true;
+        // Check for ?b=<digits> in url
+        const m = a.url.match(/[?&]b=(\d+)/);
+        if (!m) return true; // no brand-id constraint
+        const bid = Number(m[1]);
+        if (validBrandIds.has(bid)) return true;
+        console.warn(`[mia] dropping action with invalid brandId=${bid}: ${a.url}`);
+        return false;
+      });
+      const miaReply = parsed.clean;
       const miaMsgId = await insertMessage({
         conversationId: input.conversationId,
         role: "mia",
