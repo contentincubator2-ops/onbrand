@@ -1,0 +1,15 @@
+name: "Ops — Read bug report"
+on:
+  workflow_dispatch:
+    inputs:
+      bug_id:
+        required: true
+jobs:
+  read:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Read bug
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          mysql -h"${LOCAL_DB_HOST:-127.0.0.1}" -u"${LOCAL_DB_USER:-mos_user}" -p"${LOCAL_DB_PASSWORD:-mos_secure_2026}" "${LOCAL_DB_NAME:-mos_db}" -e \
+            "SELECT id, title, body, pageUrl, triageReason FROM bug_reports WHERE id=${{ github.event.inputs.bug_id }};"
