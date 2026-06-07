@@ -121,7 +121,12 @@ export default function LoginPage() {
       {/* Left brand panel */}
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
         <div className="text-white">
-          <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
+          <div className="text-4xl font-bold mb-3 flex items-center gap-2">
+            {lang === "en" ? "OnBrand" : "OnBrand · 對版"}
+            <span className="text-[9px] font-extrabold tracking-widest text-white px-1.5 py-0.5 rounded" style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}>
+              BETA
+            </span>
+          </div>
           <div className="text-xl opacity-80 mb-8">
             {lang === "en"
               ? "Always on-brand. Your AI marketing studio."
@@ -162,7 +167,12 @@ export default function LoginPage() {
         {/* Mobile-only brand strip (hidden on desktop where left panel shows) */}
         <div className="lg:hidden w-full max-w-md mb-6 pt-8">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-base font-bold text-gray-900">OnBrand</span>
+            <span className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+              OnBrand
+              <span className="text-[8px] font-extrabold tracking-widest text-white px-1 py-0.5 rounded" style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}>
+                BETA
+              </span>
+            </span>
             <button
               onClick={() => setLang(lang === "en" ? "zh-TW" : "en")}
               className="text-xs text-gray-400 hover:text-gray-600 underline transition"

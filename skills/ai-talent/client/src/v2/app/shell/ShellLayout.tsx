@@ -448,7 +448,7 @@ function IconBar({
           redirect chain had several failure modes (Rules-of-Hooks bug,
           scope race conditions). /30s is the actual entry point users
           use 90% of the time, and it works without a redirect chain. */}
-      <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
         <Tooltip content={isEn ? "OnBrand AI · home" : "OnBrand AI · 回首頁"} placement="right">
           <span>
             <OnBrandLogo
@@ -457,6 +457,27 @@ function IconBar({
               onClick={() => onNavigate("/tasks/fb")}
               style={{ padding: 4, borderRadius: 8 }}
             />
+          </span>
+        </Tooltip>
+        {/* 2026-06-07 (CJ「全站加 BETA 標」): tiny BETA badge anchored to
+            the logo. Tooltip explains we're actively iterating. Visible on
+            every page in this layout, no per-page work needed. */}
+        <Tooltip
+          content={isEn
+            ? "We're in beta — features are evolving fast. Feedback welcome via the chat bubble."
+            : "我們在 Beta 階段，每天都在優化功能。歡迎透過右下角客服回饋。"}
+          placement="right"
+        >
+          <span style={{
+            position: "absolute",
+            top: 4, right: 4,
+            fontSize: 8, fontWeight: 800, letterSpacing: "0.08em",
+            color: "#fff", background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+            padding: "1.5px 4px", borderRadius: 3,
+            lineHeight: 1, cursor: "default",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
+          }}>
+            BETA
           </span>
         </Tooltip>
       </div>

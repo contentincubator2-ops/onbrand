@@ -134,7 +134,12 @@ export default function RegisterPage() {
         {/* Left brand panel */}
         <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
           <div className="text-white">
-            <div className="text-4xl font-bold mb-3">OnBrand · 對版</div>
+            <div className="text-4xl font-bold mb-3 flex items-center gap-2">
+              OnBrand · 對版
+              <span className="text-[9px] font-extrabold tracking-widest text-white px-1.5 py-0.5 rounded" style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}>
+                BETA
+              </span>
+            </div>
             <div className="text-xl opacity-80">永遠 on-brand 的行銷作戰指揮台</div>
           </div>
         </div>
@@ -176,7 +181,12 @@ export default function RegisterPage() {
       {/* Left brand panel */}
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
         <div className="text-white">
-          <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
+          <div className="text-4xl font-bold mb-3 flex items-center gap-2">
+            {lang === "en" ? "OnBrand" : "OnBrand · 對版"}
+            <span className="text-[9px] font-extrabold tracking-widest text-white px-1.5 py-0.5 rounded" style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}>
+              BETA
+            </span>
+          </div>
           <div className="text-xl opacity-80 mb-8">
             {lang === "en" ? "Marketing on autopilot — always on-brand." : "永遠 on-brand 的行銷作戰指揮台"}
           </div>
