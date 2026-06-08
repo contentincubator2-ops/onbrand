@@ -1,0 +1,37 @@
+name: "Ops — Daily CS check"
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Bug reports + payments today
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          echo "=== Bug reports (open / recent 7 days) ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, title, LEFT(body,80) AS body, status, createdAt
+             FROM bug_reports
+             WHERE status IN ('open','triaged') OR createdAt > DATE_SUB(NOW(), INTERVAL 7 DAY)
+             ORDER BY createdAt DESC LIMIT 20;"
+          echo "=== Payments today ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, userId, planCode, amountTwd, status, createdAt
+             FROM payment_events
+             WHERE DATE(createdAt) = CURDATE()
+             ORDER BY createdAt DESC LIMIT 20;" 2>/dev/null || echo "(payment_events table not found)"
+          echo "=== Recent new paid users (plan not trial, last 7 days) ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT u.id, u.email, u.planCode, u.planStatus, u.createdAt
+             FROM users u
+             WHERE u.planCode NOT IN ('trial','') AND u.planCode IS NOT NULL
+               AND u.createdAt > DATE_SUB(NOW(), INTERVAL 7 DAY)
+             ORDER BY u.createdAt DESC LIMIT 20;"
+          echo "=== All non-trial active users ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, email, planCode, planStatus, createdAt
+             FROM users
+             WHERE planCode NOT IN ('trial') AND planCode IS NOT NULL AND planStatus='active'
+             ORDER BY createdAt DESC LIMIT 20;"
