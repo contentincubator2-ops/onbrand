@@ -27,19 +27,25 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 90s
           script: |
-            # NOTE: NO `set -e` — we want to continue probing even if individual
-            # tables/queries fail (e.g. table doesn't exist on this DB). Each
-            # call uses `|| true` so a failure prints the error and moves on.
             APP=/opt/onbrand/app
             AI=$APP/skills/ai-talent
-            set -a; source "$AI/.env"; set +a
 
-            echo "→ DB connection: host=${LOCAL_DB_HOST:-localhost} db=$LOCAL_DB_NAME user=$LOCAL_DB_USER"
+            # Parse .env manually — `source` chokes on values with special chars
+            # (quotes, =, spaces). grep + cut is more reliable.
+            envval() {
+              grep -E "^$1=" "$AI/.env" | head -1 | cut -d= -f2- | sed 's/^"//; s/"$//' | sed "s/^'//; s/'$//"
+            }
+            DB_HOST=$(envval LOCAL_DB_HOST); DB_HOST=${DB_HOST:-localhost}
+            DB_PORT=$(envval LOCAL_DB_PORT); DB_PORT=${DB_PORT:-3306}
+            DB_USER=$(envval LOCAL_DB_USER); DB_USER=${DB_USER:-mos_user}
+            DB_NAME=$(envval LOCAL_DB_NAME); DB_NAME=${DB_NAME:-mos_db}
+            DB_PASS=$(envval LOCAL_DB_PASSWORD)
+
+            echo "→ DB connection: host=$DB_HOST db=$DB_NAME user=$DB_USER (pwd_len=${#DB_PASS})"
             which mysql && mysql --version || echo "⚠️  mysql CLI not in PATH"
 
             run() {
-              mysql -u"$LOCAL_DB_USER" -p"$LOCAL_DB_PASSWORD" -h "${LOCAL_DB_HOST:-localhost}" \
-                -P "${LOCAL_DB_PORT:-3306}" "$LOCAL_DB_NAME" -e "$1" 2>&1 || echo "(query failed: $1)"
+              MYSQL_PWD="$DB_PASS" mysql -u"$DB_USER" -h "$DB_HOST" -P "$DB_PORT" "$DB_NAME" -e "$1" 2>&1 || echo "(query failed)"
             }
 
             echo "════════════════════════════════════════════════════════════════"
