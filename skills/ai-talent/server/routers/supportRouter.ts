@@ -290,9 +290,21 @@ export const supportRouter = router({
   startConversation: protectedProcedure
     .input(z.object({
       brandId: z.number().nullable().optional(),
+      /** When true, close existing open conversation and create a fresh one. */
+      fresh: z.boolean().optional(),
     }).optional())
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
+
+      // If fresh=true: close existing open conversation so we get a clean slate
+      if (input?.fresh) {
+        await localPool.execute(
+          `UPDATE support_conversations SET status = 'closed', updatedAt = NOW()
+           WHERE userId = ? AND status = 'open'`,
+          [userId],
+        );
+      }
+
       const conversationId = await ensureOpenConversation(userId, input?.brandId ?? null);
       const messages = await loadMessages(conversationId);
       // Greeting message on a brand-new conversation
@@ -308,6 +320,50 @@ export const supportRouter = router({
       }
       return {
         conversationId,
+        messages: messages.map((m) => ({
+          ...m,
+          actions: extractActionsFromSnapshot(m.contextSnapshot),
+          createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt),
+        })),
+      };
+    }),
+
+  /** List past conversations for the history panel. */
+  listConversations: protectedProcedure
+    .query(async ({ ctx }) => {
+      const userId = ctx.user!.id;
+      const [rows]: any = await localPool.execute(
+        `SELECT c.id, c.status, c.createdAt, c.updatedAt,
+                (SELECT LEFT(content, 80) FROM support_messages
+                 WHERE conversationId = c.id AND role = 'user'
+                 ORDER BY id ASC LIMIT 1) AS firstUserMsg,
+                (SELECT COUNT(*) FROM support_messages WHERE conversationId = c.id) AS msgCount
+         FROM support_conversations c
+         WHERE c.userId = ?
+         ORDER BY c.updatedAt DESC
+         LIMIT 30`,
+        [userId],
+      );
+      return (rows as any[]).map((r: any) => ({
+        id: Number(r.id),
+        status: String(r.status ?? ""),
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+        updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : String(r.updatedAt),
+        firstUserMsg: r.firstUserMsg ?? null,
+        msgCount: Number(r.msgCount ?? 0),
+      }));
+    }),
+
+  /** Load a specific conversation by ID (for history view). */
+  getConversation: protectedProcedure
+    .input(z.object({ conversationId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const conv = await loadConversation(input.conversationId, userId);
+      if (!conv) throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      const messages = await loadMessages(input.conversationId);
+      return {
+        conversationId: input.conversationId,
         messages: messages.map((m) => ({
           ...m,
           actions: extractActionsFromSnapshot(m.contextSnapshot),

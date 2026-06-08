@@ -45,29 +45,46 @@ export default function SupportDrawer({ open, onClose, scope, nudgeMessage, onNu
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [showEscalate, setShowEscalate] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   // 2026-05-14 (CJ「同意，帶 auto 標誌」): pending auto-navigate state.
-  // Only set on FRESH replies (not history reload) so refreshing the page
-  // doesn't re-trigger a navigate from an old <<action:...:auto>> marker.
   const [pendingAuto, setPendingAuto] = useState<{ action: MiaAction; secondsLeft: number } | null>(null);
 
   const startMut    = (trpc as any).support?.startConversation?.useMutation?.();
   const sendMut     = (trpc as any).support?.sendMessage?.useMutation?.();
   const escalateMut = (trpc as any).support?.escalateToHuman?.useMutation?.();
   const reportBugMut = (trpc as any).support?.reportBug?.useMutation?.();
+  const listConvsQ  = (trpc as any).support?.listConversations?.useQuery?.(
+    undefined,
+    { enabled: showHistory, staleTime: 10_000 },
+  );
+  const getConvQ    = (trpc as any).support?.getConversation?.useQuery;
 
-  // Bootstrap conversation on open
+  const [historyConvId, setHistoryConvId] = useState<number | null>(null);
+  const historyMsgQ = getConvQ?.(
+    { conversationId: historyConvId ?? 0 },
+    { enabled: !!historyConvId, staleTime: 5_000 },
+  );
+
+  // Bootstrap: ALWAYS start fresh when Mia opens (close old conv → new)
   useEffect(() => {
-    if (!open || conversationId != null) return;
+    if (!open) return;
+    // Reset local state for the new conversation
+    setConversationId(null);
+    setMessages([]);
+    setInput("");
+    setShowEscalate(false);
+    setShowHistory(false);
+    setHistoryConvId(null);
+    setPendingAuto(null);
     (async () => {
       try {
-        const r = await startMut?.mutateAsync?.({ brandId: scope.brandId ?? null });
+        const r = await startMut?.mutateAsync?.({ brandId: scope.brandId ?? null, fresh: true });
         if (r?.conversationId) {
           setConversationId(r.conversationId);
           setMessages(r.messages ?? []);
         }
       } catch (e) {
-        // swallow — drawer still works, user can retry
         console.warn("[SupportDrawer] start failed:", e);
       }
     })();
@@ -260,6 +277,20 @@ export default function SupportDrawer({ open, onClose, scope, nudgeMessage, onNu
             {isEn ? "Online — typically replies in seconds" : "在線中 — 通常秒回"}
           </div>
         </div>
+        {/* History button */}
+        <button
+          onClick={() => { setShowHistory(true); setHistoryConvId(null); }}
+          title={isEn ? "View conversation history" : "查看歷史訊息"}
+          style={{
+            fontSize: 11, fontWeight: 500, padding: "4px 8px", borderRadius: 6,
+            border: "1px solid #e5e7eb", background: "white", color: "#6b7280",
+            cursor: "pointer", whiteSpace: "nowrap",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#7c3aed"; (e.currentTarget as HTMLButtonElement).style.color = "#7c3aed"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e5e7eb"; (e.currentTarget as HTMLButtonElement).style.color = "#6b7280"; }}
+        >
+          {isEn ? "History" : "歷史"}
+        </button>
         <button onClick={onClose} style={{
           width: 28, height: 28, borderRadius: "50%", border: "none", background: "transparent",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -271,6 +302,84 @@ export default function SupportDrawer({ open, onClose, scope, nudgeMessage, onNu
           <X size={16} />
         </button>
       </div>
+
+      {/* ── History panel ── */}
+      {showHistory && (
+        <div style={{ position: "absolute", inset: 0, background: "white", zIndex: 10, display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "12px 14px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              onClick={() => { setShowHistory(false); setHistoryConvId(null); }}
+              style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: "2px 6px", borderRadius: 4 }}
+            >← {isEn ? "Back" : "返回"}</button>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
+              {historyConvId
+                ? (isEn ? "Past conversation" : "歷史對話")
+                : (isEn ? "Conversation history" : "歷史訊息")}
+            </span>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px" }}>
+            {!historyConvId ? (
+              // Conversation list
+              listConvsQ?.isLoading ? (
+                <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 24 }}>
+                  {isEn ? "Loading…" : "載入中…"}
+                </p>
+              ) : (listConvsQ?.data ?? []).length === 0 ? (
+                <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 24 }}>
+                  {isEn ? "No past conversations" : "還沒有歷史對話"}
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {(listConvsQ?.data as any[] ?? []).map((c: any) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setHistoryConvId(c.id)}
+                      style={{
+                        textAlign: "left", padding: "10px 12px", borderRadius: 8,
+                        border: "1px solid #e5e7eb", background: "white", cursor: "pointer",
+                        display: "flex", flexDirection: "column", gap: 2,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
+                    >
+                      <span style={{ fontSize: 12, color: "#374151", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {c.firstUserMsg ?? (isEn ? "(no messages)" : "（無訊息）")}
+                      </span>
+                      <span style={{ fontSize: 10, color: "#9ca3af" }}>
+                        {new Date(c.updatedAt).toLocaleDateString(isEn ? "en-US" : "zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        {" · "}{c.msgCount}{isEn ? " msgs" : " 則"}
+                        {" · "}<span style={{ color: c.status === "open" ? "#10b981" : "#9ca3af" }}>{c.status}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              // Single conversation messages
+              historyMsgQ?.isLoading ? (
+                <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 24 }}>
+                  {isEn ? "Loading…" : "載入中…"}
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {(historyMsgQ?.data?.messages ?? []).map((m: any) => (
+                    <div key={m.id} style={{
+                      alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+                      maxWidth: "85%",
+                      background: m.role === "user" ? "#7c3aed" : "#f3f4f6",
+                      color: m.role === "user" ? "white" : "#111827",
+                      padding: "8px 12px", borderRadius: 10,
+                      fontSize: 12, lineHeight: 1.5,
+                    }}>
+                      {m.content}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Auto-navigate countdown banner (Gmail-undo-send style) */}
       {pendingAuto && (
