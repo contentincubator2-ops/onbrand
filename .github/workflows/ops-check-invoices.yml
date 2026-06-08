@@ -1,0 +1,22 @@
+name: "Ops — Check invoices"
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Check invoices table
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          echo "=== invoices table structure ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e "DESCRIBE invoices;" 2>/dev/null || echo "(no invoices table)"
+          echo "=== All invoices ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT i.id, i.userId, u.email, i.planCode, i.amount, i.currency, i.status, i.merchantTradeNo, i.createdAt
+             FROM invoices i LEFT JOIN users u ON u.id=i.userId
+             ORDER BY i.createdAt DESC LIMIT 30;" 2>/dev/null || echo "(no invoices table)"
+          echo "=== Stripe webhook failures ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT * FROM failed_stripe_events ORDER BY createdAt DESC LIMIT 10;" 2>/dev/null || echo "(no failed_stripe_events table)"
