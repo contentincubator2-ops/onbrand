@@ -1,0 +1,96 @@
+name: Admin — Probe Marketing Stats (agents/squads/skills/awards counts)
+
+# CJ 2026-06-08: pull the REAL numbers from production DB so we can use
+# them in landing-page + ad copy (no more guessing or making up "17,000+").
+#
+# Reads:
+#   - sowork_db.agents              → total + by layer + by availability
+#   - mos_db.squads                 → total + curated + by L1-L6 layer
+#   - mos_db.skills                 → total + by origin model
+#   - mos_db.award_frameworks       → total + names
+#   - mos_db.creative_cases         → total + by award_name + by year
+#   - mos_db.users / brands         → users on platform / brands created
+#
+# Output: prints all counts in CI log, easy to copy/paste.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set -e
+            APP=/opt/onbrand/app
+            AI=$APP/skills/ai-talent
+            set -a; source "$AI/.env"; set +a
+
+            run() {
+              mysql -u"$LOCAL_DB_USER" -p"$LOCAL_DB_PASSWORD" -h "${LOCAL_DB_HOST:-localhost}" \
+                -P "${LOCAL_DB_PORT:-3306}" "$LOCAL_DB_NAME" -e "$1" 2>/dev/null
+            }
+
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  AGENTS"
+            echo "════════════════════════════════════════════════════════════════"
+            run "SELECT COUNT(*) AS total_agents FROM agents;"
+            run "SELECT layer, COUNT(*) AS n FROM agents GROUP BY layer;"
+            run "SELECT isAvailable, COUNT(*) AS n FROM agents GROUP BY isAvailable;"
+
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  SQUADS"
+            echo "════════════════════════════════════════════════════════════════"
+            run "SELECT COUNT(*) AS total_squads FROM squads;"
+            run "SELECT COUNT(*) AS active_squads FROM squads WHERE is_active = 1;"
+            run "SELECT COUNT(*) AS curated_squads FROM squads WHERE is_active = 1 AND is_curated = 1;"
+            run "SELECT LEFT(strategy_layer, 2) AS layer, COUNT(*) AS n FROM squads WHERE is_active = 1 GROUP BY LEFT(strategy_layer, 2) ORDER BY layer;"
+
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  SKILLS"
+            echo "════════════════════════════════════════════════════════════════"
+            run "SELECT COUNT(*) AS total_skills FROM skills;" || echo "(skills table absent)"
+            run "SELECT COUNT(*) AS active_skills FROM skills WHERE is_active = 1;" || true
+            run "SELECT origin_model, COUNT(*) AS n FROM skills WHERE is_active = 1 GROUP BY origin_model;" || true
+
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  AWARD FRAMEWORKS (named methods)"
+            echo "════════════════════════════════════════════════════════════════"
+            run "SELECT COUNT(*) AS total_award_frameworks FROM award_frameworks;"
+            run "SELECT name, category FROM award_frameworks ORDER BY name;"
+
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  CREATIVE CASES (国際獎項得獎案例庫)"
+            echo "════════════════════════════════════════════════════════════════"
+            run "SELECT COUNT(*) AS total_cases FROM creative_cases;"
+            run "SELECT award_name, COUNT(*) AS n FROM creative_cases GROUP BY award_name ORDER BY n DESC LIMIT 20;"
+            run "SELECT year, COUNT(*) AS n FROM creative_cases WHERE year IS NOT NULL GROUP BY year ORDER BY year DESC LIMIT 10;"
+            run "SELECT award_level, COUNT(*) AS n FROM creative_cases GROUP BY award_level ORDER BY n DESC LIMIT 10;"
+            run "SELECT country, COUNT(*) AS n FROM creative_cases WHERE country IS NOT NULL GROUP BY country ORDER BY n DESC LIMIT 15;"
+            run "SELECT industry, COUNT(*) AS n FROM creative_cases WHERE industry IS NOT NULL GROUP BY industry ORDER BY n DESC LIMIT 15;"
+
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  PLATFORM USAGE"
+            echo "════════════════════════════════════════════════════════════════"
+            run "SELECT COUNT(*) AS total_users FROM users;"
+            run "SELECT COUNT(*) AS verified_users FROM users WHERE isActive = 1;"
+            run "SELECT COUNT(*) AS total_brands FROM brands;"
+            run "SELECT COUNT(*) AS brands_positioned FROM brands WHERE positioningStatus = 'completed';"
+            run "SELECT COUNT(*) AS total_outputs FROM mission_outputs;"
+            run "SELECT COUNT(*) AS outputs_last_7d FROM mission_outputs WHERE createdAt >= NOW() - INTERVAL 7 DAY;"
+
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  ✅ Done. Copy these numbers for ad copy / landing page."
+            echo "════════════════════════════════════════════════════════════════"
