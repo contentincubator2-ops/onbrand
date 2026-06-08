@@ -1,0 +1,27 @@
+name: "Ops — Check subscriptions"
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Check subscriptions and plan upgrades
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          echo "=== subscriptions table structure ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e "DESCRIBE subscriptions;" 2>/dev/null
+          echo "=== All subscriptions ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT s.*, u.email FROM subscriptions s LEFT JOIN users u ON u.id=s.userId ORDER BY s.createdAt DESC LIMIT 20;" 2>/dev/null
+          echo "=== user_credits table ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e "DESCRIBE user_credits;" 2>/dev/null
+          echo "=== Recent user_credits changes ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT uc.*, u.email FROM user_credits uc LEFT JOIN users u ON u.id=uc.userId ORDER BY uc.updatedAt DESC LIMIT 20;" 2>/dev/null
+          echo "=== Users with non-trial planCode (all time) ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, email, planCode, planStatus, planEndsAt, createdAt FROM users WHERE planCode IS NOT NULL AND planCode != 'trial' ORDER BY createdAt DESC LIMIT 20;" 2>/dev/null
+          echo "=== promo_codes ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e "SELECT * FROM promo_codes ORDER BY createdAt DESC LIMIT 10;" 2>/dev/null
