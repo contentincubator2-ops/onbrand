@@ -27,14 +27,19 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 90s
           script: |
-            set -e
+            # NOTE: NO `set -e` — we want to continue probing even if individual
+            # tables/queries fail (e.g. table doesn't exist on this DB). Each
+            # call uses `|| true` so a failure prints the error and moves on.
             APP=/opt/onbrand/app
             AI=$APP/skills/ai-talent
             set -a; source "$AI/.env"; set +a
 
+            echo "→ DB connection: host=${LOCAL_DB_HOST:-localhost} db=$LOCAL_DB_NAME user=$LOCAL_DB_USER"
+            which mysql && mysql --version || echo "⚠️  mysql CLI not in PATH"
+
             run() {
               mysql -u"$LOCAL_DB_USER" -p"$LOCAL_DB_PASSWORD" -h "${LOCAL_DB_HOST:-localhost}" \
-                -P "${LOCAL_DB_PORT:-3306}" "$LOCAL_DB_NAME" -e "$1" 2>/dev/null
+                -P "${LOCAL_DB_PORT:-3306}" "$LOCAL_DB_NAME" -e "$1" 2>&1 || echo "(query failed: $1)"
             }
 
             echo "════════════════════════════════════════════════════════════════"
