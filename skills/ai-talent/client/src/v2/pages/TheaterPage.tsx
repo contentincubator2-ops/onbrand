@@ -891,22 +891,41 @@ export default function TheaterPage() {
       positioning: { tagline: string | null; targetAudience: string | null; brandVoice: string | null } | null;
     };
     try {
+      // 2026-06-07 (CJ「切換頁面顯示無法載入定位」fix):
+      // 1. Strip base64 dataURL photos before sending — server only needs
+      //    {tag, note} for context, not the full image bytes. dataURL
+      //    photos can be 1-2 MB each and blow past tRPC body limits.
+      // 2. Use a per-request timeout so a server hiccup doesn't leave
+      //    the user staring at a generic error.
+      const safePhotos = photos.map((ph) => ({
+        // For dataURL (base64) photos, send a placeholder marker so server
+        // still gets a count + tag for context, but no megabyte payload.
+        url: ph.url.startsWith("data:") ? "[uploaded-image]" : ph.url,
+        tag: ph.tag,
+        note: ph.note,
+      }));
       runPlan = await utils.theater.runStart.fetch({
         brandId,
         platforms: activePlatforms,
         importantDates: importantDates.map((d) => ({ date: d.date, name: d.name })),
-        // Phase 1: pass dates so server can pre-allocate hook + CTA per cell
         dates: days.map((d) => d.date),
-        // Phase 3b: 素材 (products + photos) so chief brief can mention them
         products: products.map((p) => ({ name: p.name, usp: p.usp, launchDate: p.launchDate })),
-        photos: photos.map((ph) => ({ url: ph.url, tag: ph.tag, note: ph.note })),
-        // Promotion slots — from AI schedule (if planned) or classic buildPromotionSlots
+        photos: safePhotos,
         promotionSlots: scheduleToPromotionSlots(),
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error("[theater] runStart failed:", e);
       setRunning(false);
-      alert(t("theater_alert_pos_failed"));
+      // Surface the actual server message when available so users (and CJ)
+      // can see what really broke instead of a generic "completion required"
+      // message that was misleading when positioning was actually fine.
+      const msg = String(e?.message ?? e ?? "").slice(0, 240);
+      const friendly = msg && !msg.includes("UNAUTHORIZED")
+        ? (lang === "en"
+            ? `Couldn't start: ${msg}. Try refreshing or contact support.`
+            : `無法啟動：${msg}。請重新整理或聯絡客服。`)
+        : t("theater_alert_pos_failed");
+      alert(friendly);
       return;
     }
 

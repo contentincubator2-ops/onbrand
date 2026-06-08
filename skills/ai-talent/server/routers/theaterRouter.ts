@@ -603,9 +603,12 @@ export const theaterRouter = router({
         launchDate: z.string().optional(),
       })).max(20).optional(),
       photos: z.array(z.object({
-        url: z.string(),
-        tag: z.string(),
-        note: z.string().optional(),
+        // 2026-06-07: cap URL length so a stray base64 dataURL can't
+        // blow up the request. Client should pre-strip dataURLs to a
+        // placeholder marker; this is defense-in-depth.
+        url: z.string().max(2048),
+        tag: z.string().max(32),
+        note: z.string().max(280).optional(),
       })).max(20).optional(),
       // Phase 3c: promotion slots — per-day product/event assignments
       // computed client-side by buildPromotionSlots(), used server-side
