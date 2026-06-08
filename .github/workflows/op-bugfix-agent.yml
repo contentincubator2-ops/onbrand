@@ -1,6 +1,6 @@
 name: Ops — Bugfix agent (Claude Code → PR)
 
-# 2026-05-16 (CJ「網站能自己使用 claude code 除錯後，透過通知/客服告訴客戶」)
+# 2026-05-16 (refreshed) (CJ「網站能自己使用 claude code 除錯後，透過通知/客服告訴客戶」)
 #
 # ── SAFETY BOUNDARY (read before changing) ─────────────────────────────
 # A user bug report is UNTRUSTED input. We must NOT let it autonomously
