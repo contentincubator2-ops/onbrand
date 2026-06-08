@@ -90,9 +90,16 @@ export function inferBillingCountryFromAcceptLanguage(header: string | null | un
   return "US";
 }
 
-/** Stripe-compatible unit_amount. TWD is zero-decimal; USD needs cents. */
+/** Stripe-compatible unit_amount (smallest currency unit).
+ *
+ * Despite being a "whole" currency in everyday use, Stripe treats TWD
+ * the same as USD — amounts must be in the smallest unit (1/100 of NT$).
+ * NT$750 → unit_amount = 75000  (NOT 750, which would show as NT$7.50).
+ * See: https://stripe.com/docs/currencies (TWD is NOT in the zero-decimal list)
+ */
 export function toStripeUnitAmount(amount: number, currency: Currency): number {
-  return currency === "TWD" ? Math.round(amount) : Math.round(amount * 100);
+  // Both TWD and USD: multiply by 100 to convert to smallest unit
+  return Math.round(amount * 100);
 }
 
 /** Resolve a top-up pack's amount in the caller's currency at the live rate. */
