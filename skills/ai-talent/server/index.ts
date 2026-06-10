@@ -39,6 +39,7 @@ import { squadSearchRouter } from "./routers/squadSearchRouter";
 import { entitySearchRouter } from "./routers/entitySearchRouter";
 import { intakeRouter } from "./routers/intakeRouter";
 import { missionStepStreamRouter } from "./routes/missionStepStreamRoute";
+import { publicAgentsRoute } from "./routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
@@ -292,7 +293,8 @@ if (existsSync(publicDir)) {
       req.path.startsWith("/trpc") ||
       req.path.startsWith("/api") ||
       req.path.startsWith("/static/") ||
-      req.path === "/health"
+      req.path === "/health" ||
+      req.path === "/agents"
     ) {
       return next();
     }
@@ -354,6 +356,9 @@ app.use("/api/squads/search", squadSearchRouter);
 app.use("/api/entity/search", entitySearchRouter);
 app.use("/api/intake", intakeRouter);
 app.use("/api/missions", missionStepStreamRouter);
+
+// ─── Public agent showcase (no auth required by default) ─────────────────────
+app.use(publicAgentsRoute);
 
 // ─── Health check (SEC-7: no version number) ────────────────────────────────
 // 2026-05-14 (CJ「系統安全穩定」P0): real health check that monitors can act on.
