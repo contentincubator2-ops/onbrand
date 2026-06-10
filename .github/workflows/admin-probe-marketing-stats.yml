@@ -54,6 +54,12 @@ jobs:
             run "SELECT COUNT(*) AS total_agents FROM agents;"
             run "SELECT layer, COUNT(*) AS n FROM agents GROUP BY layer;"
             run "SELECT isAvailable, COUNT(*) AS n FROM agents GROUP BY isAvailable;"
+            echo "→ Agents with caseStudies populated:"
+            run "SELECT COUNT(*) AS agents_with_caseStudies FROM agents WHERE caseStudies IS NOT NULL AND caseStudies != 'null' AND caseStudies != '[]' AND caseStudies != '';"
+            echo "→ Sample of caseStudies content (first 5 agents):"
+            run "SELECT id, name, LEFT(caseStudies, 200) AS sample FROM agents WHERE caseStudies IS NOT NULL AND caseStudies != 'null' AND caseStudies != '[]' LIMIT 5;"
+            echo "→ Agents assigned to FB tasks (theater-cell-facebook):"
+            run "SELECT COUNT(*) AS fb_agents FROM agents WHERE id IN (SELECT DISTINCT agentId FROM agent_assignments WHERE taskKey LIKE 'theater-cell-facebook%' OR taskKey LIKE 'fb-%') OR title LIKE '%Facebook%';"
 
             echo ""
             echo "════════════════════════════════════════════════════════════════"
