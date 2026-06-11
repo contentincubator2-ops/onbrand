@@ -955,30 +955,45 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
       const craftBlock = buildTheaterCraftBlock(input.brandId, input.date, input.platform);
       const craftSection = craftBlock ? `\n\n${craftBlock}\n` : "";
 
+      // 2026-06-10 (CJ「減少疊床架屋 + 資訊不夠時智能補完」): completely
+      // restructured prompt. Old version repeated "first sentence must be
+      // strong" across master + hookInstruction + craft + 鐵則. New version:
+      //   1. Each rule stated ONCE
+      //   2. Craft block placed LAST (LLMs weight the tail more)
+      //   3. New "smart fallback" clause replaces the "[請補充：…]" pattern
+      //      with "用場景敘述取代具體事實"
       const sys = `${masterBlock}${theaterPersona}
 
 # 本次貼文寫作
 
 為以下品牌寫一則 ${input.platform} 貼文。
 
-品牌：${input.brandTagline ?? "（請從 USP 反推主張）"}
-品牌語氣：${input.brandVoice ?? "口語、溫暖、誠實"}
+【品牌身份】
+• 品牌定位：${input.brandTagline ?? "（從 USP 反推）"}
+• 品牌語氣：${input.brandVoice ?? "口語、溫暖、誠實"}
 
-【平台原生結構（必讀）】
+【平台原生結構】
 ${guide}
-${hookInstruction}${ctaInstruction}${priorOpeningsInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}${craftSection}
 
-【鐵則 — 違反任一條都算失敗】
-1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。
-2. 不要把 USP 原文照搬到貼文裡 — 用故事 / 場景 / 具體例子包裝，讓讀者自己感覺到。
-3. **絕對不要把貼文標題或主題重複講兩次**。第一句和第二句不能在意思上重複。
-4. 不要寫「祝大家 X 快樂」「希望大家 X」這種制式套話。
-5. 不要使用 markdown / heading / bullet（除非平台規則明確要求）。
-6. 字數要落在平台規則的範圍內，不要過長或過短。
-7. 直接輸出貼文純文字，**不要寫「這是一則 ___ 貼文：」這種前綴**。
-8. **嚴格遵守上方指定的 Hook 類型與 CTA 意圖** — 如果今天分配的是「數字驚奇」，就不能用「你有沒有遇過...」開場；如果今天 CTA 是「分享給朋友」，就不能寫「留言告訴我」。
+【今日執行框架（強制）】
+• Hook 類型：${input.hook ? HOOK_PLAYBOOK[input.hook] : "依平台 best practice 自選"}
+• CTA 意圖：${input.cta ? CTA_PLAYBOOK[input.cta] : "依貼文目標自選"}${priorOpeningsInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}
 
-備註：你寫到一半發現要改沒關係，可以重新寫。後面有資深編輯（QA agent）會掃過你的草稿、清掉重複開頭與斷句、把節奏調順。專心把訊息寫好就行。`;
+【鐵則（違反等於失敗）】
+1. **一篇只打一個 USP** — 不要塞功能清單。
+2. **USP 用故事/場景包裝** — 不要原文照搬到貼文裡。
+3. **第一句和第二句不能語意重複**。
+4. **不要套話**（祝 X 快樂 / 希望大家 / 大家好今天要分享）。
+5. 直接輸出貼文純文字，禁用「這是一則 ___ 貼文：」前綴 / markdown / heading / bullet（除非平台規則允許）。
+
+【缺資訊時的處理（重要）】
+不要寫「[請補充：…]」這種佔位符，**改用三步降級**：
+1. 先從上方〈品牌身份〉〈可運用素材〉〈品牌知識〉抓真實素材填空。
+2. 還是不夠 → **用具體場景敘述**取代「具體數據宣稱」。
+  ✗ 壞例：「87% 的人都這樣...」（沒來源就不要寫數字）
+  ✓ 好例：「晚上 8 點打開冰箱發現...」（場景畫面，不需來源）
+3. 場景也想不出 → 用「對話起手式」：「我跟一位 [TA 角色] 聊到...」「上週客人說了一句話讓我想很久...」
+**任何情況下都不准輸出『[請補充：]』或『[ASSUMPTION]』這類括號標記。**${craftSection}`;
 
       // Phase 2: structured per-platform output. The shape varies by
       // platform so the cell mockup can render IG hashtags, YT chapters,
@@ -1059,6 +1074,21 @@ ${importantHint}
             caption = caption.slice(1, -1).trim();
           }
         }
+        // 2026-06-10 (CJ「資訊不夠 → 顯示佔位符」defensive scrub):
+        // Even with the "no placeholder" rule in the system prompt, LLMs
+        // occasionally slip a [請補充：…] / [ASSUMPTION] / [待補] marker.
+        // Strip those before persist so users never see them.
+        if (caption) {
+          // Remove standalone bracket placeholders (with optional content + comma/period after)
+          caption = caption
+            .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|placeholder|TBD)[：:][^\[\]【】\n]*[\]】][。，,\.\s]*/g, "")
+            .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|placeholder|TBD)\s*[\]】][。，,\.\s]*/g, "")
+            // Clean up double spaces / orphan punctuation left behind
+            .replace(/\s{2,}/g, " ")
+            .replace(/\n\s*\n\s*\n+/g, "\n\n")
+            .trim();
+        }
+
         // 2026-05-17 (CJ「是否所有任務都按照規範」): same deterministic
         // brand-rule enforcement as the quick-task orchestra, applied
         // BEFORE persist + return so Theater cells also obey
