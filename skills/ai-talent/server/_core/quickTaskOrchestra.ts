@@ -360,6 +360,28 @@ function mergeCalendarPosts(captionStrings: string[]): string {
 // a final pass right before variants are persisted — a guaranteed
 // backstop independent of which upstream path populated the caption.
 // Deterministic, zero-cost, idempotent (safe to run twice).
+/**
+ * 2026-06-10 (CJ「資訊不夠時不要用 [請補充] 佔位符」改造):
+ * Strip [請補充：…] / [待補：…] / [ASSUMPTION] / [TODO] / [TBD] / [placeholder]
+ * markers from body captions. Used by ALL 30s/60s body tasks (NOT 99s docs
+ * which legitimately use these placeholders for strategy briefs).
+ *
+ * Cleans up orphan whitespace / trailing punctuation left behind so the
+ * scrub doesn't leave weird artifacts like "我們的活動。。從昨天開始" etc.
+ */
+export function stripPlaceholderBrackets(s: string): string {
+  if (!s) return s;
+  return s
+    // With content: "[請補充：日期]" + optional trailing punctuation
+    .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|TBD|placeholder)[：:][^\[\]【】\n]*[\]】][。，,\.\s]*/g, "")
+    // Without content: "[請補充]" + optional trailing punctuation
+    .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|TBD|placeholder)\s*[\]】][。，,\.\s]*/g, "")
+    // Cleanup
+    .replace(/\s{2,}/g, " ")
+    .replace(/\n\s*\n\s*\n+/g, "\n\n")
+    .trim();
+}
+
 export function voiceSanitizeZhTW(s: string): string {
   return s
     // emoji 一律移除（含 😉 俏皮符號）
@@ -417,8 +439,16 @@ export function voiceSanitizeZhTW(s: string): string {
     .replace(/通過(?=直播|首映|預告|頻道|這場|本次|這次|社群|留言|評論)/g, "透過")
     // 英文直引號包中文 → 全形「」
     .replace(/"([^"\n]{1,40})"/g, "「$1」")
-    // 正文被中括號整句包起來（非 [請補充/待補/請填入] 佔位）→ 拆掉括號
-    .replace(/(^|\n)\s*[\[【]\s*((?!請補充|待補|請填入)[^\[\]【】\n]{6,})\s*[\]】]\s*(?=\n|$)/g, "$1$2")
+    // 2026-06-10 (CJ「資訊不夠時不要用 [請補充] 佔位符」改造):
+    // OLD: kept [請補充/待補/請填入] as placeholders (preserved by exclusion).
+    // NEW: STRIP all placeholder brackets — including these and any
+    // [ASSUMPTION] / [TODO] / [TBD] markers. With content (e.g.
+    // "[請補充：日期]"), drop the whole token; with optional trailing
+    // punctuation (。，,.) consumed in one pass.
+    .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|TBD|placeholder)[：:][^\[\]【】\n]*[\]】][。，,\.\s]*/g, "")
+    .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|TBD|placeholder)\s*[\]】][。，,\.\s]*/g, "")
+    // OTHER bracket-wrapped sentences (not placeholders) → unwrap
+    .replace(/(^|\n)\s*[\[【]\s*([^\[\]【】\n]{6,})\s*[\]】]\s*(?=\n|$)/g, "$1$2")
     // 句尾與句中驚嘆號（! 與 ！）一律 → 句號
     .replace(/[!！]+/g, "。")
     // 清理改寫後的殘留
@@ -732,14 +762,24 @@ async function callOneVariant(args: {
     `- 段落像真人寫的，不要排成「標題｜內文｜hashtag」結構化卡片。\n` +
     `- 若任務有時間戳結構（如 [0-3s]），務必保留每段秒數標記，不要省略。\n\n` +
     // 2026-05-16 (CJ「品質不佳，是否第一題要強制更多資訊」root cause):
-    // 這是一鍵產出的 30 秒任務，使用者不會回頭補資料。模型若反問
-    // 「我需要更多資訊，請提供…」= 直接交付失敗、品質歸零。強制：
-    // 永遠先交出可用成品，未知處用 [待補：xxx] 佔位，絕不反問。
+    // 2026-06-10 (CJ「資訊不夠時不要用 [請補充] 佔位符」改造):
+    // Old version told AI to use [待補：xxx] placeholders when missing data.
+    // Those leaked to users as ugly bracket-text in the final caption.
+    // New version: 3-step smart fallback (素材 → 場景 → 對話起手式).
+    // Placeholders forbidden entirely; defensive scrub also strips them
+    // post-LLM (see sanitizeCaption regex below).
     `【絕不反問 — 最高優先，違反即視為失敗】\n` +
     `這是一鍵速產任務，使用者不會再補充。**無論資訊多不足，都必須直接產出一份完整、可用的成品**。\n` +
     `- 嚴禁輸出任何「我需要更多資訊」「請提供」「請補充」「為了完成需要…」之類反問或要求清單。\n` +
-    `- 缺具體事實（日期 / 數字 / 人名 / 連結 / 活動細節）時：用合理假設寫完，把不確定處用「[待補：例如 活動日期]」這種中括號佔位字串標出，讓用戶一眼能替換。\n` +
-    `- caption 必須是最終可發布的文字本身，不是給用戶的提問或工作說明。\n\n` +
+    `- caption 必須是最終可發布的文字本身，不是給用戶的提問或工作說明。\n` +
+    `\n【缺資訊時的處理 — 三步降級，禁用任何佔位符】\n` +
+    `**絕對不准**輸出「[待補：xxx]」「[請補充：xxx]」「[填入：xxx]」「[ASSUMPTION]」這類括號標記。\n` +
+    `缺具體事實（日期 / 數字 / 人名 / 連結）時，按順序降級：\n` +
+    `1. 先從〈品牌大腦〉〈URL 抓到的內容〉抓真實素材填空。\n` +
+    `2. 還是不夠 → **用具體場景敘述**取代「具體數據宣稱」。\n` +
+    `   ✗ 壞：「87% 的人都這樣」（沒來源不准寫數字）\n` +
+    `   ✓ 好：「晚上 8 點打開冰箱，看到剩半盒...」（場景畫面不需來源）\n` +
+    `3. 場景也想不出 → 用「對話起手式」：「我跟一位 [TA 角色] 聊到...」「上週客人說了一句話讓我想很久...」\n\n` +
     `輸出嚴格 JSON 物件（不是陣列）：\n` +
     `{"caption":"<完整貼文>","hashtags":["..."]}\n` +
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
@@ -2000,6 +2040,13 @@ export async function runOrchestra(args: {
       // writer LLM duplicating its own hook + hashtag groups within a
       // single output.
       if (caption) caption = deduplicateInternalCaption(caption);
+      // 2026-06-10 (CJ「資訊不夠時不要用 [請補充] 佔位符」改造):
+      // Strip placeholder brackets from body captions.
+      // 99s strategy docs (calendar / toolkit / playbook) legitimately use
+      // [請補充：來源] for user fill-in — skip those by tier.
+      const isStrategyDoc = (args.template.id ?? "").includes("-99-") &&
+        /calendar|toolkit|playbook|策略|月曆|工具包/.test(args.template.id ?? "");
+      if (caption && !isStrategyDoc) caption = stripPlaceholderBrackets(caption);
       if (caption && _voiceGated) caption = voiceSanitizeZhTW(caption);
       if (!caption) {
         errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
