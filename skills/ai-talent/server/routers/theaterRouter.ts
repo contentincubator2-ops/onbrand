@@ -24,6 +24,7 @@ import { invokeLLM } from "../_core/llm";
 import { withUserLLMSlot } from "../_core/userLLMSemaphore";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
+import { buildTheaterCraftBlock } from "../_core/theaterCraftRef";
 import localPool from "../localDb";
 
 // Per-(brand, platform, day) scout cache. The cache key encloses the
@@ -947,6 +948,13 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
         : { persona: "", aiModel: null };
       const theaterPersona = theaterPersonaLoad.persona ? `\n# 你的角色（per-platform 真人模擬 agent）\n${theaterPersonaLoad.persona}\n` : "";
 
+      // 2026-06-10 (CJ「文章結構都很像」根因 fix): inject platform craft +
+      // a varied international award case for this (brand, date, platform).
+      // Same week's 7 days × N platforms each get a DIFFERENT case → forced
+      // structural diversity. Empty string for platforms without a craft file.
+      const craftBlock = buildTheaterCraftBlock(input.brandId, input.date, input.platform);
+      const craftSection = craftBlock ? `\n\n${craftBlock}\n` : "";
+
       const sys = `${masterBlock}${theaterPersona}
 
 # 本次貼文寫作
@@ -958,7 +966,7 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 
 【平台原生結構（必讀）】
 ${guide}
-${hookInstruction}${ctaInstruction}${priorOpeningsInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}
+${hookInstruction}${ctaInstruction}${priorOpeningsInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}${craftSection}
 
 【鐵則 — 違反任一條都算失敗】
 1. 一篇貼文只聚焦 1 個 USP，不要試圖塞多個賣點。

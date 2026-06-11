@@ -70,7 +70,7 @@ Facebook 是社群優先媒介——觸及靠分享/留言/儲存賺來，廣告
  * this specific task type + the transferable craft pattern.
  * Principle only — NOT copying the campaign's creative.
  */
-const FB_TASK_REF: Record<string, string> = {
+export const FB_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "fb-30-caption-short":
     "Wendy's 社群策略 (Shorty Awards 多年最佳品牌社群 + Ad Age Social Media Campaign of the Year 2018)：每則短貼文是獨立的文化時刻；品牌機智 > 產品功能；不需要 setup，直接就是 punchline。",

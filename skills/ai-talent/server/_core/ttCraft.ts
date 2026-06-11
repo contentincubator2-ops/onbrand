@@ -61,7 +61,7 @@ TikTok 是注意力極度稀缺的媒介——1.5 秒沒抓住就滑掉；聲音
 /**
  * Per-task award reference — keyed by exact taskId (30s + 60s + 99s).
  */
-const TT_TASK_REF: Record<string, string> = {
+export const TT_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "tt-30-opening-hook":
     "E.l.f. Cosmetics「#EyesLipsFace」TikTok 挑戰 (Shorty Award Best Use of TikTok 2020；5 百萬+ UGC 影片、5 十億+ 觀看次數，TikTok 最早的品牌 challenge 成功案例)：第一幀 = 視覺衝擊或行動後果，不是 logo；原創 TikTok 音效 × 挑戰機制 = 有機觸及爆發。",

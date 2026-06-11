@@ -70,7 +70,7 @@ YouTube 是搜尋發現 + 留存媒介——標題/縮圖決定點擊；開場 h
 /**
  * Per-task award reference — keyed by exact taskId (30s + 60s + 99s).
  */
-const YT_TASK_REF: Record<string, string> = {
+export const YT_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "yt-30-title-strategies":
     "MrBeast YouTube 頻道 (Streamy Award Creator of the Year 2023；超過 3 億訂閱者)：標題公式 WHAT + 數字/最高級 + 好奇缺口（告訴你是什麼但不說怎麼或誰贏）；好奇缺口是工程設計，不是意外；每個標題都在 A/B 測試後才上線。",

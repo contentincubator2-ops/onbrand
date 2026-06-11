@@ -65,7 +65,7 @@ Instagram 是視覺優先媒介——圖/影是內容本體，文案是輔助。
  * Appended to the pattern playbook so generation is guided by a proven
  * award model, brand-agnostic.
  */
-const IG_TASK_REF: Record<string, string> = {
+export const IG_TASK_REF: Record<string, string> = {
   "ig-30-caption-short":        "Veronika NYC「Feast For The Eyes」(IAC 餐飲 Best of Show)：短 caption = 一個簡化的引人概念；抽象勾引勝過列功能；一句一情緒；不解釋圖片，讓圖片說話，文案製造張力。",
   "ig-30-pure-text-hook":       "Adobe「The Unfinished Film」(IAC Best of Show)：hook 設計成開放邀請/挑釁，把滑過變參與。",
   "ig-30-reel-hook":            "93 Boyz「Channel 93」(IAC)：首幀＝有風險的真實行動（非 logo/開場），真實感勝過精緻。",

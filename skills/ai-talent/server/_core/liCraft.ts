@@ -65,7 +65,7 @@ LinkedIn 是專業可信度媒介——觸及靠展現真實洞察賺來，不�
 /**
  * Per-task award reference — keyed by exact taskId (30s + 60s + 99s).
  */
-const LI_TASK_REF: Record<string, string> = {
+export const LI_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "li-30-insight-post":
     "Salesforce LinkedIn 思想領袖貼文策略 (Cannes Lions B2B Lions Grand Prix 2022；Salesforce 是 LinkedIn 最具影響力的 B2B 品牌之一)：真實從業者視角 + 具體數據 + 開放問題；pattern：數據點→個人看法→「你怎麼想？」",
