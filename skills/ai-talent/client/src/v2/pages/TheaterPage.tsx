@@ -938,6 +938,7 @@ export default function TheaterPage() {
     if (lockState?.visual)      lockedTabs.push(t("theater_lock_visual"));
     const brandTagline = positioning?.tagline ?? null;
     const brandVoice   = positioning?.brandVoice ?? null;
+    const targetAudience = positioning?.targetAudience ?? null;
 
     // 1) Chief opening monologue (real LLM-generated)
     //    Append brand-rule count chip if any are active so user sees the
@@ -1008,7 +1009,7 @@ export default function TheaterPage() {
     });
 
     // Drive the station carousel + cell progression (real backend)
-    runStations(stations, { usps, brandTagline, brandVoice, hookPlan, ctaPlan, scoutByPlatform });
+    runStations(stations, { usps, brandTagline, brandVoice, targetAudience, hookPlan, ctaPlan, scoutByPlatform });
   };
 
   const stopRun = () => {
@@ -1024,6 +1025,8 @@ export default function TheaterPage() {
       usps: string[];
       brandTagline: string | null;
       brandVoice: string | null;
+      // 2026-06-10 (CJ「一篇文章只針對一個 TA 講一個 USP」改造)
+      targetAudience: string | null;
       hookPlan: Record<string, string>;
       ctaPlan: Record<string, string>;
       // Phase 1.5: real scout patterns per platform
@@ -1143,6 +1146,7 @@ export default function TheaterPage() {
               importantDateName: task.importantDateName,
               brandTagline: plan.brandTagline,
               brandVoice: plan.brandVoice,
+              targetAudience: plan.targetAudience,
               // Phase 1: enforce hook + CTA diversity
               hook: task.hook as any,
               cta:  task.cta  as any,

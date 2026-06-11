@@ -41,6 +41,10 @@ export function isInstagramBodyTask(template: FBTaskTemplate): boolean {
 export const IG_CRAFT_RUBRIC = `
 # IG 得獎級工藝準則（嚴格遵守）
 Instagram 是視覺優先媒介——圖/影是內容本體，文案是輔助。雙軌都要達標：
+【每一篇都必守：鎖定一個 TA + 一個 USP（最高優先，違反＝不合格）】
+- 鎖定一個 TA：這篇只對「一個具體的人、在一個具體情境」說話；首圖／首句就讓那個人覺得「這在講我」。
+- 只打一個 USP：整篇聚焦一個最強的賣點，把它講深；不要塞功能清單、不要這篇想講三件事。其他賣點留給別篇。
+- 自我檢查：若把品牌名遮掉仍適用任何競品 → 太通用，重寫；若一篇在講超過一個賣點 → 砍到剩一個。
 【視覺 craft】
 - 首屏鉤子：feed 首圖／Reel 前 1 秒／carousel 封面必須 0.5 秒內讓人停下；高對比、單一焦點、留白給文字。
 - 比例正確：feed 直式 4:5 或 1:1；Reels/Story 9:16 滿版；carousel 1:1。錯比例＝被裁切＝失敗。

@@ -845,6 +845,11 @@ ${platformAsks}
       importantDateName: z.string().nullable().optional(),
       brandTagline: z.string().nullable().optional(),
       brandVoice: z.string().nullable().optional(),
+      // 2026-06-10 (CJ「一篇文章只針對一個 TA 講一個 USP」改造): TA
+      // wasn't being shipped to per-cell prompts even though Theater's
+      // runStart pulled it. Without TA, the writer LLM had no way to
+      // honor "鎖定一個人說話". Now optional in input; falls back to DB.
+      targetAudience: z.string().nullable().optional(),
       // Phase 1 — diversity controls (frontend pulls from runStart's plans)
       hook: z.enum(HOOK_KEYS).optional(),
       cta:  z.enum(CTA_KEYS).optional(),
@@ -867,13 +872,21 @@ ${platformAsks}
       priorOpenings: z.array(z.string()).max(20).optional(),
     }))
     .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
-      const [brandRules, knowledgeBlock, realContent] = await Promise.all([
+      // 2026-06-10 (CJ「一篇文章只針對一個 TA 講一個 USP」改造): if client
+      // didn't ship targetAudience, fall back to DB. Tagline/voice already
+      // covered by client payload — only TA was missing.
+      const needsTaLookup = !input.targetAudience;
+      const [brandRules, knowledgeBlock, realContent, taLookup] = await Promise.all([
         loadBrandRules(input.brandId, ctx.user.id),
         loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
         // Real public content (website + social via Perplexity) — strongest
         // grounding signal; prevents AI from hallucinating industry from name.
         getBrandRealContent(input.brandId).then(r => r.context).catch(() => ""),
+        needsTaLookup
+          ? getBrandPositioningById(input.brandId, ctx.user.id).then(p => p?.targetAudience ?? null).catch(() => null)
+          : Promise.resolve(input.targetAudience ?? null),
       ]);
+      const targetAudience = (input.targetAudience ?? taLookup ?? "").trim();
       const allRules = [...brandRules, ...(input.adhocRules ?? [])].filter(Boolean);
       const rulesInstruction = allRules.length > 0
         ? `\n【品牌規則 — 強制遵守，違反等於失敗】
@@ -971,6 +984,7 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 【品牌身份】
 • 品牌定位：${input.brandTagline ?? "（從 USP 反推）"}
 • 品牌語氣：${input.brandVoice ?? "口語、溫暖、誠實"}
+• 主要受眾（TA）：${targetAudience || "（從 USP 反推一個具體的人）"}
 
 【平台原生結構】
 ${guide}
@@ -980,8 +994,8 @@ ${guide}
 • CTA 意圖：${input.cta ? CTA_PLAYBOOK[input.cta] : "依貼文目標自選"}${priorOpeningsInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}
 
 【鐵則（違反等於失敗）】
-1. **一篇只打一個 USP** — 不要塞功能清單。
-2. **USP 用故事/場景包裝** — 不要原文照搬到貼文裡。
+1. **鎖定一個 TA + 一個 USP** — 整篇只對「主要受眾」這一個具體的人說話，只打「本篇 USP」這一個賣點。如果腦中浮現「兩種人會在意這個」或「這篇還可以順便提到 ___」，**全部砍掉**。寫完自問：把品牌名遮掉，這篇是不是還能套到任何競品上？如果是，太通用，重寫。
+2. **USP 用故事/場景包裝** — 不要原文照搬「我們的 USP 是 X」這種句子。
 3. **第一句和第二句不能語意重複**。
 4. **不要套話**（祝 X 快樂 / 希望大家 / 大家好今天要分享）。
 5. 直接輸出貼文純文字，禁用「這是一則 ___ 貼文：」前綴 / markdown / heading / bullet（除非平台規則允許）。
