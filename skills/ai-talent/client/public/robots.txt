@@ -1,0 +1,63 @@
+# OnBrand AI robots.txt
+# Last updated: 2026-06-12
+
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /auth/login
+Allow: /auth/register
+Allow: /terms
+Allow: /privacy
+Allow: /refund
+
+# Authenticated app surface — no SEO value, block crawl to save budget
+Disallow: /theater
+Disallow: /tasks
+Disallow: /run/
+Disallow: /projects
+Disallow: /brands
+Disallow: /connections
+Disallow: /consultant
+Disallow: /calendar
+Disallow: /settings/
+Disallow: /achievements
+Disallow: /admin/
+Disallow: /m/
+Disallow: /b/
+Disallow: /media/
+Disallow: /squad-mockups
+Disallow: /plan-expired
+Disallow: /auth/verify-email
+Disallow: /auth/forgot-password
+Disallow: /auth/reset-password
+
+# API surface — never index
+Disallow: /api/
+Disallow: /trpc/
+
+# AI / LLM-friendly: explicitly welcome curated crawlers
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+Disallow: /trpc/
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# Sitemap
+Sitemap: https://onbrand.sowork.ai/sitemap.xml

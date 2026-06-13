@@ -1548,9 +1548,11 @@ export default function TheaterPage() {
       <div className="max-w-[1400px] mx-auto px-6 pt-10 pb-4">
         <div className="flex items-end justify-between flex-wrap gap-4 mb-4">
           <div className="text-center mx-auto" style={{ flex: "1 1 auto" }}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
-              {t("theater_hero_eyebrow")}
-            </p>
+            {t("theater_hero_eyebrow") && (
+              <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+                {t("theater_hero_eyebrow")}
+              </p>
+            )}
             <h1
               className="font-semibold tracking-tight leading-tight"
               style={{
@@ -1802,7 +1804,7 @@ export default function TheaterPage() {
             disabled={running}
           >
             <Plus size={16} strokeWidth={2.5} />
-            <span className="flex items-center gap-1.5"><Plus size={14} strokeWidth={2.5} />{t("theater_btn_add_materials")}</span>
+            <span>{t("theater_btn_add_materials")}</span>
             {totalMaterials > 0 && (
               <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">
                 {totalMaterials}

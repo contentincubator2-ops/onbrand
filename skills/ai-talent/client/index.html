@@ -4,31 +4,301 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>OnBrand AI｜每一篇都對得上你的品牌 | by SoWork</title>
-    <meta name="description" content="百間品牌實證的 SoWork 品牌定位法 × 30/60/99 秒 AI 任務鏈 — 先鎖定你是誰，AI 寫每篇都對得上你的品牌調性、用詞、知識庫。台灣 SMB 與行銷代理商的 AI 行銷夥伴。" />
-    <meta name="keywords" content="AI 行銷, 品牌定位, 社群貼文 AI, FB 文案, IG 文案, SoWork, AI 寫文案, 行銷代理商工具, 台灣 SMB" />
-    <meta name="author" content="SoWork 摘星社群行銷顧問" />
+    <meta name="theme-color" content="#E85D2E" />
+
+    <!-- ── Perf hints (preconnect / dns-prefetch) ──────────────────────── -->
+    <!-- Pre-warm the connection to our own API/tRPC + Google fonts (when used) -->
+    <link rel="preconnect" href="https://onbrand.sowork.ai" crossorigin />
+    <link rel="dns-prefetch" href="https://onbrand.sowork.ai" />
+    <!-- Google OAuth — pre-warm so login click is faster -->
+    <link rel="dns-prefetch" href="https://accounts.google.com" />
+    <!-- Analytics endpoints (only effective once IDs are filled in below) -->
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://connect.facebook.net" />
+    <link rel="dns-prefetch" href="https://www.clarity.ms" />
+
+    <!-- ── Primary SEO (2026-06-12 SEO audit overhaul) ──────────────────── -->
+    <title>OnBrand AI — 永遠 on-brand 的 AI 行銷工作室｜SoWork 14 步品牌定位法 × 168 個得獎工藝任務</title>
+    <meta name="description" content="OnBrand 是 SoWork 推出的 AI 行銷工作室。先用 14 步品牌定位法把你的 WHY、TA、差異化、Voice 寫進品牌大腦，鎖定一次，之後 FB、IG、YouTube、TikTok、EDM、PR 每一篇文案都自動 on-brand。168 個任務內建得獎工藝案例，七日發布台一次排好 7 天。台灣中小品牌免費試用，免綁卡。" />
+    <meta name="keywords" content="AI 行銷, AI 行銷工作室, 品牌定位, 品牌大腦, SoWork, OnBrand, 七日發布台, FB 文案 AI, IG 文案 AI, TikTok 腳本 AI, EDM 文案 AI, PR 新聞稿 AI, 行銷自動化, 中小企業 AI, 台灣 SaaS, AI agent, A2A 行銷" />
+    <meta name="author" content="SoWork 摘星社群行銷顧問股份有限公司" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+
+    <!-- Canonical + hreflang -->
+    <link rel="canonical" href="https://onbrand.sowork.ai/" />
+    <link rel="alternate" hreflang="zh-TW" href="https://onbrand.sowork.ai/" />
+    <link rel="alternate" hreflang="en" href="https://onbrand.sowork.ai/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://onbrand.sowork.ai/" />
 
     <!-- Open Graph (Facebook, LINE, LinkedIn) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="OnBrand AI by SoWork" />
-    <meta property="og:title" content="OnBrand AI｜每一篇都對得上你的品牌 | by SoWork" />
-    <meta property="og:description" content="百間品牌實證的 SoWork 品牌定位法 × 30/60/99 秒 AI 任務鏈 — 每一篇都對得上你的品牌調性。" />
-    <meta property="og:url" content="https://onbrand.sowork.ai" />
+    <meta property="og:title" content="OnBrand AI — 永遠 on-brand 的 AI 行銷工作室" />
+    <meta property="og:description" content="鎖定一次品牌定位，AI 在每篇貼文之前先讀懂你的 WHY、TA、差異化。168 個任務內建得獎工藝案例。" />
+    <meta property="og:url" content="https://onbrand.sowork.ai/" />
     <meta property="og:locale" content="zh_TW" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <!-- 2026-06-12: og-onbrand-cover.png is the canonical asset (production CDN).
+         If/when missing, the .svg fallback below is a 1200×630 editorial-style
+         placeholder shipped in /public/static/covers/og-onbrand-cover.svg.
+         Most crawlers honour the first valid tag, so PNG stays primary. -->
     <meta property="og:image" content="https://onbrand.sowork.ai/static/covers/og-onbrand-cover.png" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="OnBrand AI — 每一篇都對得上你的品牌" />
+    <meta property="og:image:alt" content="OnBrand AI — 永遠 on-brand 的 AI 行銷工作室" />
+    <!-- SVG fallback (works on Facebook + most modern crawlers; Twitter/LinkedIn skip) -->
+    <meta property="og:image" content="https://onbrand.sowork.ai/static/covers/og-onbrand-cover.svg" />
+    <meta property="og:image:type" content="image/svg+xml" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="OnBrand AI｜每一篇都對得上你的品牌" />
-    <meta name="twitter:description" content="百間品牌實證的 SoWork 品牌定位法 × 30/60/99 秒 AI 任務鏈。" />
+    <meta name="twitter:site" content="@SoWorkAI" />
+    <meta name="twitter:title" content="OnBrand AI — 永遠 on-brand 的 AI 行銷工作室" />
+    <meta name="twitter:description" content="鎖定一次品牌定位，AI 寫的每一篇都對得上你。168 個任務 × 得獎工藝。" />
+    <!-- Twitter doesn't accept SVG; if PNG is missing the card falls back to text-only -->
     <meta name="twitter:image" content="https://onbrand.sowork.ai/static/covers/og-onbrand-cover.png" />
+    <meta name="twitter:image:alt" content="OnBrand AI — 永遠 on-brand 的 AI 行銷工作室" />
+
+    <!-- ── JSON-LD: Organization (parent SoWork + this product) ─────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": "https://onbrand.sowork.ai/#organization",
+      "name": "OnBrand AI",
+      "alternateName": ["OnBrand", "對版", "OnBrand 對版"],
+      "url": "https://onbrand.sowork.ai/",
+      "logo": "https://onbrand.sowork.ai/static/covers/og-onbrand-cover.png",
+      "description": "OnBrand 是 SoWork 推出的 AI 行銷工作室，把 SoWork 14 步品牌定位法做成可執行流程，鎖定品牌定位後，FB、IG、YouTube、TikTok、EDM、PR 全平台內容自動 on-brand。",
+      "areaServed": {
+        "@type": "Country",
+        "name": "Taiwan"
+      },
+      "knowsLanguage": ["zh-TW", "en"],
+      "parentOrganization": {
+        "@type": "Organization",
+        "name": "SoWork 摘星社群行銷顧問股份有限公司",
+        "url": "https://www.sowork.ai/",
+        "alternateName": "SoWork"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "sowork@sowork.ai",
+        "contactType": "Customer Support",
+        "areaServed": "TW",
+        "availableLanguage": ["zh-TW", "en"]
+      },
+      "sameAs": [
+        "https://www.sowork.ai/",
+        "https://www.facebook.com/SoWorkAI",
+        "https://www.instagram.com/sowork.ai/",
+        "https://www.linkedin.com/company/sowork-ai/",
+        "https://www.youtube.com/@SoWorkAI"
+      ]
+    }
+    </script>
+
+    <!-- ── JSON-LD: SoftwareApplication (the OnBrand product) ───────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "https://onbrand.sowork.ai/#software",
+      "name": "OnBrand AI",
+      "applicationCategory": "BusinessApplication",
+      "applicationSubCategory": "Marketing Automation",
+      "operatingSystem": "Web (any modern browser)",
+      "url": "https://onbrand.sowork.ai/",
+      "description": "AI marketing studio that locks your brand positioning once using SoWork's 14-step Brand Positioning Method, then auto-generates on-brand content for Facebook, Instagram, YouTube, TikTok, Email, and PR. 168 award-craft tasks built in.",
+      "inLanguage": ["zh-TW", "en"],
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "30s 一篇內容方案",
+          "price": "750",
+          "priceCurrency": "TWD",
+          "url": "https://onbrand.sowork.ai/pricing",
+          "availability": "https://schema.org/InStock"
+        },
+        {
+          "@type": "Offer",
+          "name": "60s 內容套組方案",
+          "price": "1500",
+          "priceCurrency": "TWD",
+          "url": "https://onbrand.sowork.ai/pricing",
+          "availability": "https://schema.org/InStock"
+        },
+        {
+          "@type": "Offer",
+          "name": "99s 完整活動方案",
+          "price": "3000",
+          "priceCurrency": "TWD",
+          "url": "https://onbrand.sowork.ai/pricing",
+          "availability": "https://schema.org/InStock"
+        }
+      ],
+      "featureList": [
+        "Brand Brain — lock positioning once",
+        "14-step SoWork Brand Positioning Method",
+        "30s a post · 60s a pack · 99s a campaign",
+        "7-Day Publisher — schedule a week across channels",
+        "168 award-craft tasks (FB, IG, YT, TikTok, Email, PR)",
+        "16,113 specialized AI agents",
+        "Verifiable methodology (6-dimension brand audit)"
+      ],
+      "publisher": { "@id": "https://onbrand.sowork.ai/#organization" }
+    }
+    </script>
+
+    <!-- ── JSON-LD: WebSite (enables sitelinks search box) ──────────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://onbrand.sowork.ai/#website",
+      "url": "https://onbrand.sowork.ai/",
+      "name": "OnBrand AI",
+      "publisher": { "@id": "https://onbrand.sowork.ai/#organization" },
+      "inLanguage": "zh-TW",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://onbrand.sowork.ai/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- ── JSON-LD: FAQPage (mirrors the FAQ rendered on / ) ────────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "OnBrand 跟 ChatGPT 寫文案有什麼差別？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ChatGPT 每篇都從空白頁從零開始，所以越寫越不像你的品牌。OnBrand 先用 SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 寫進品牌大腦——之後每篇文案都以這份大腦為骨架自動產出，所有平台都跟著你的調性走。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "我需要多久時間才能上手？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "14 步品牌定位流程約 10 分鐘完成。完成後第一篇貼文 30 秒就能產出，跨平台套組 60 秒，完整活動規劃 99 秒。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "OnBrand 適合哪些行業？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "餐飲、服飾、美妝、健康、科技、寵物、房產、教育——任何有自己品牌定位的台灣中小企業、行銷代理商、in-house 行銷專員都適用。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "支援哪些社群與內容平台？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Facebook、Instagram、YouTube、TikTok、Email（EDM）、PR 新聞稿、LinkedIn、品牌策略——共 7 大管道全部支援。每個平台都有對應的得獎工藝案例參考。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "有免費試用嗎？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "有，7 天 / 1,000 點雙限試用，免綁信用卡。完成註冊即可開始 14 步品牌定位流程。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "OnBrand 和 SoWork 是什麼關係？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "OnBrand 是 SoWork（摘星社群行銷顧問股份有限公司）推出的 AI 產品。SoWork 是台灣資深品牌行銷顧問公司，把累積多年的方法論做成 AI 工具，就是 OnBrand。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "168 個任務裡的「得獎工藝」是什麼？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "每個任務都對應一個真實、有名字的得獎或市場驗證案例——例如 FB 廣告主文用 Aviation Gin（Cannes Lions Silver）的反共識前置；IG Reels 腳本用 Adobe《The Unfinished Film》（IAC Best of Show）的開放邀請；EDM 主旨借 Patagonia 的承諾代價結構。AI 用這些工藝原則寫，輸出讀起來像專家寫的。"
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- ── Analytics placeholders (fill in real IDs to activate) ───────── -->
+    <!-- TODO[analytics] (CJ to supply IDs): replace G-PLACEHOLDER and PIXEL_ID_PLACEHOLDER -->
+    <!-- Google Analytics 4 -->
+    <script>
+      (function () {
+        var GA_ID = "G-PLACEHOLDER";
+        if (GA_ID && GA_ID !== "G-PLACEHOLDER") {
+          var s = document.createElement("script");
+          s.async = true;
+          s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+          document.head.appendChild(s);
+          window.dataLayer = window.dataLayer || [];
+          function gtag() { window.dataLayer.push(arguments); }
+          window.gtag = gtag;
+          gtag("js", new Date());
+          gtag("config", GA_ID, { anonymize_ip: true });
+        }
+      })();
+    </script>
+    <!-- Meta Pixel -->
+    <script>
+      (function () {
+        var PIXEL_ID = "PIXEL_ID_PLACEHOLDER";
+        if (PIXEL_ID && PIXEL_ID !== "PIXEL_ID_PLACEHOLDER") {
+          !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+          n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+          n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+          t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+          document,'script','https://connect.facebook.net/en_US/fbevents.js');
+          fbq('init', PIXEL_ID); fbq('track', 'PageView');
+        }
+      })();
+    </script>
+    <!-- Microsoft Clarity (behavior recording) -->
+    <script>
+      (function () {
+        var CLARITY_ID = "CLARITY_ID_PLACEHOLDER";
+        if (CLARITY_ID && CLARITY_ID !== "CLARITY_ID_PLACEHOLDER") {
+          (function(c,l,a,r,i,t,y){
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+          })(window, document, "clarity", "script", CLARITY_ID);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="padding: 40px; font-family: sans-serif; max-width: 720px; margin: 60px auto; text-align: center; line-height: 1.6;">
+        <h1 style="font-size: 28px; margin-bottom: 16px;">OnBrand AI — 永遠 on-brand 的 AI 行銷工作室</h1>
+        <p style="color: #555; margin-bottom: 24px;">
+          OnBrand 是 SoWork 推出的 AI 行銷工作室。先用 14 步品牌定位法鎖定品牌大腦，
+          之後 FB / IG / YouTube / TikTok / EDM / PR 每篇貼文都自動 on-brand。
+          168 個任務內建得獎工藝案例。
+        </p>
+        <p style="color: #777; font-size: 14px;">
+          請啟用 JavaScript 以使用 OnBrand AI。
+          有任何問題請聯絡 <a href="mailto:sowork@sowork.ai">sowork@sowork.ai</a>。
+        </p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

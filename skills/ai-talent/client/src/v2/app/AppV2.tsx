@@ -19,57 +19,102 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "../../lib/i18n";
 
-// Legacy auth — kept until Sprint 2 visual rework
-import LoginPage from "../../pages/auth/LoginPage";
-import RegisterPage from "../../pages/auth/RegisterPage";
-import VerifyEmailPage from "../../pages/auth/VerifyEmailPage";
-import ForgotPasswordPage from "../../pages/auth/ForgotPasswordPage";
-import ResetPasswordPage from "../../pages/auth/ResetPasswordPage";
-import OnboardingWizard from "../../pages/OnboardingWizard";
+// ─────────────────────────────────────────────────────────────────────────
+// 2026-06-12 (SEO audit perf fix): route-based code splitting.
+// Mobile PageSpeed was 55 because every anonymous visitor downloaded the
+// whole protected app (TheaterPage, all /admin/*, /tasks/*, /media/*).
+// Strategy:
+//   - EAGER: critical first-paint surfaces (LandingPage, LoginPage,
+//     RegisterPage), the auth shell (RequireAuthV2 / ShellLayout), and
+//     small redirect utilities. These ship in the initial bundle.
+//   - LAZY: everything else — protected app pages, legal/pricing pages,
+//     auth utility pages (verify / forgot / reset). Each becomes its own
+//     chunk, fetched only when the user navigates there.
+// ─────────────────────────────────────────────────────────────────────────
 
-// v2
+// ── Eager (first-paint critical) ─────────────────────────────────────────
+// Only LandingPage is eager (it's `/` — the SEO entry point and most-
+// likely first paint). Everything else, including LoginPage and
+// RegisterPage, is split out so anonymous landing visitors don't pay
+// for them. The brief Suspense flash on /auth/login is acceptable —
+// LoginPage itself shows an authChecking spinner anyway.
+import LandingPage from "../pages/LandingPage";
 import RequireAuthV2 from "./RequireAuthV2";
 import ShellLayout from "./shell/ShellLayout";
-// 2026-05-14 (CJ): retired MissionsHome / MethodologyCatalog / MethodologyDetail /
-// PickerWorkspace / BoardroomPage / PlaybooksPage / CommunityPage. Sidebar
-// has no entries for these and there are no remaining navigation paths.
 import MissionRedirect from "./MissionRedirect";
-import ProjectsPage from "../pages/ProjectsPage";
-import BrandsPage from "../pages/BrandsPage";
-import RunPage from "../pages/RunPage";
-import StrategyConsultantPage from "../pages/StrategyConsultantPage";
-import TheaterPage from "../pages/TheaterPage";
-import SquadMockupsGalleryPage from "../pages/SquadMockupsGalleryPage";
-import SquadLabPage from "../pages/admin/SquadLabPage";
-// 2026-05-10 (CJ「明天串金流，今天都做」)
-import PricingPage from "../pages/PricingPage";
-import AccountPage from "../pages/AccountPage";
-import AdminSupportPage from "../pages/AdminSupportPage";
-import ChangelogPage from "../pages/ChangelogPage";
-import WorkspaceSettingsPage from "../pages/WorkspaceSettingsPage";
-import TermsPage from "../pages/legal/TermsPage";
-import PrivacyPage from "../pages/legal/PrivacyPage";
-import RefundPage from "../pages/legal/RefundPage";
-import AchievementsPage from "../pages/AchievementsPage";
-import BrandsManagePage from "../pages/BrandsManagePage";
 import ConnectionsRedirect from "../pages/ConnectionsRedirect";
-import BrandSettingsPage from "../pages/BrandSettingsPage";
-// 2026-05-11 (CJ「補 Sentry-style error tracking」): admin dashboard for
-// auto-captured tRPC / frontend errors. Gated server-side by adminProcedure.
-import AdminErrorsPage from "../pages/AdminErrorsPage";
-import AdminDashboardPage from "../pages/AdminDashboardPage";
-import AdminUserDetailPage from "../pages/AdminUserDetailPage";
-import LandingPage from "../pages/LandingPage";
-// 2026-05-11 (CJ「P0-1 內容日曆」): vs Buffer
-import CalendarPage from "../pages/CalendarPage";
-// 2026-05-18 (CJ): media-to-copy feature pages
-import PhotoCopyPage from "../pages/media/PhotoCopyPage";
-import VideoCopyPage from "../pages/media/VideoCopyPage";
-import DocRewritePage from "../pages/media/DocRewritePage";
-// 2026-05-26 (CJ「左欄改成平台優先」): platform-first task pages
-import PlatformTaskPage from "../pages/PlatformTaskPage";
 import NotFoundPage from "../pages/NotFoundPage";
-import PlanExpiredPage from "../pages/PlanExpiredPage";
+
+// ── Lazy (route-split chunks) ────────────────────────────────────────────
+// Auth pages — heaviest among public surfaces (Google OAuth SVG, form
+// state, password rules), moved out of main bundle.
+const LoginPage = React.lazy(() => import("../../pages/auth/LoginPage"));
+const RegisterPage = React.lazy(() => import("../../pages/auth/RegisterPage"));
+const VerifyEmailPage = React.lazy(() => import("../../pages/auth/VerifyEmailPage"));
+const ForgotPasswordPage = React.lazy(() => import("../../pages/auth/ForgotPasswordPage"));
+const ResetPasswordPage = React.lazy(() => import("../../pages/auth/ResetPasswordPage"));
+const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard"));
+
+// Protected app surface — never loaded by anonymous visitors
+const TheaterPage = React.lazy(() => import("../pages/TheaterPage"));
+const PlatformTaskPage = React.lazy(() => import("../pages/PlatformTaskPage"));
+const RunPage = React.lazy(() => import("../pages/RunPage"));
+const ProjectsPage = React.lazy(() => import("../pages/ProjectsPage"));
+const BrandsPage = React.lazy(() => import("../pages/BrandsPage"));
+const BrandsManagePage = React.lazy(() => import("../pages/BrandsManagePage"));
+const BrandSettingsPage = React.lazy(() => import("../pages/BrandSettingsPage"));
+const StrategyConsultantPage = React.lazy(() => import("../pages/StrategyConsultantPage"));
+const SquadMockupsGalleryPage = React.lazy(() => import("../pages/SquadMockupsGalleryPage"));
+const SquadLabPage = React.lazy(() => import("../pages/admin/SquadLabPage"));
+const CalendarPage = React.lazy(() => import("../pages/CalendarPage"));
+const AccountPage = React.lazy(() => import("../pages/AccountPage"));
+const WorkspaceSettingsPage = React.lazy(() => import("../pages/WorkspaceSettingsPage"));
+const AchievementsPage = React.lazy(() => import("../pages/AchievementsPage"));
+const ChangelogPage = React.lazy(() => import("../pages/ChangelogPage"));
+const PhotoCopyPage = React.lazy(() => import("../pages/media/PhotoCopyPage"));
+const VideoCopyPage = React.lazy(() => import("../pages/media/VideoCopyPage"));
+const DocRewritePage = React.lazy(() => import("../pages/media/DocRewritePage"));
+
+// Admin (heaviest — adminProcedure-gated, almost never needed by general traffic)
+const AdminErrorsPage = React.lazy(() => import("../pages/AdminErrorsPage"));
+const AdminDashboardPage = React.lazy(() => import("../pages/AdminDashboardPage"));
+const AdminUserDetailPage = React.lazy(() => import("../pages/AdminUserDetailPage"));
+const AdminSupportPage = React.lazy(() => import("../pages/AdminSupportPage"));
+
+// Public-but-not-first-paint (legal / pricing / plan-expired)
+const PricingPage = React.lazy(() => import("../pages/PricingPage"));
+const TermsPage = React.lazy(() => import("../pages/legal/TermsPage"));
+const PrivacyPage = React.lazy(() => import("../pages/legal/PrivacyPage"));
+const RefundPage = React.lazy(() => import("../pages/legal/RefundPage"));
+const PlanExpiredPage = React.lazy(() => import("../pages/PlanExpiredPage"));
+
+// ── Suspense fallback — cream-themed minimal loader matching SoWork.ai ──
+function RouteFallback() {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#F7F2EB",
+      }}
+      aria-label="Loading"
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: "50%",
+          border: "3px solid #EFE7D6",
+          borderTopColor: "#E85D2E",
+          animation: "spin 0.8s linear infinite",
+        }}
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
 
 /**
  * Top-level error boundary — catches any render-time exception that
@@ -188,6 +233,7 @@ export default function AppV2() {
   return (
     <AppErrorBoundary>
     <LanguageProvider>
+      <React.Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* Auth — unchanged */}
         <Route path="/auth/login" element={<LoginPage />} />
@@ -279,6 +325,7 @@ export default function AppV2() {
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </React.Suspense>
     </LanguageProvider>
     </AppErrorBoundary>
   );
