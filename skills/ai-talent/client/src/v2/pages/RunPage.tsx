@@ -77,20 +77,62 @@ function sanitizeCaption(s: unknown): string {
  * Mirrors the 【得獎工藝參考】 baked into each PR task's systemPrompt.
  * Wording is deliberately "工藝原則參考，非案例背書" — we apply the
  * transferable craft principle, NOT a claim of award/endorsement. */
-const PR_CRAFT_REF: Record<string, { case: string; award: string; principle: string }> = {
-  "pr-30-headline":        { case: "The Tampon Book", award: "Cannes Lions 2019 PR 全場大獎", principle: "用一個「重新框架」把舊事實變成不可忽視的新聞——標題＝reframe＋具體數字。" },
-  "pr-30-subhead":         { case: "Project Revoice", award: "Cannes Lions 2018 健康類全場大獎", principle: "副標扛起標題扛不動的「人的代價/影響」，補上利害關係，不是重述標題。" },
-  "pr-30-lead-paragraph":  { case: "The Lost Class", award: "Cannes Lions 2022", principle: "第一句就是一個讓人重新理解全局的事實揭露，不鋪陳。" },
-  "pr-30-ceo-quote":       { case: "Patagonia「Earth is now our only shareholder」", award: "2022 全球 earned-media 典範", principle: "高層發言＝行動＋價值，每句可被記者原句引用，不是場面話。" },
-  "pr-30-boilerplate":     { case: "PR Awards 評審準則 + Dove 長青一致性", award: "業界評審共通準則", principle: "用可驗證事實＋第三方背書建立可信度，能長期沿用不過期。" },
-  "pr-30-fact-sheet":      { case: "Spotify Wrapped", award: "全球 earned / 多獎", principle: "把資料變成「10 秒看懂、想分享」的數字，掃描性 > 完整性。" },
-  "pr-30-media-pitch":     { case: "Whopper Detour", award: "Cannes Lions 2019", principle: "賣「記者的讀者會在乎的角度」與不可抗拒的鉤，不是賣品牌。" },
-  "pr-30-spokesperson-qa": { case: "KFC「FCK」", award: "Cannes Lions 2019 多項金獅 + D&AD", principle: "危機回應：立刻 own it＋坦誠＋機智＋馬上講怎麼修，化攻擊為信任。" },
-  "pr-30-launch-social":   { case: "Spotify Wrapped 社群擴散", award: "全球 earned", principle: "被分享的是「有觀點、有梗、與我有關」，不是公告。" },
-  "pr-100-launch-toolkit": { case: "Whopper Detour（整合 earned）", award: "Cannes Lions 2019", principle: "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。" },
-  "pr-99-launch-toolkit":  { case: "Whopper Detour（整合 earned）", award: "Cannes Lions 2019", principle: "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。" },
-  "pr-30-news-hook":       { case: "The Tampon Book + Whopper Detour", award: "Cannes Lions 2019 PR", principle: "得獎不是把公告寫好，而是先找到「記者會主動報、群眾會主動傳」的角度（earned idea）。" },
-  "pr-99-newsjack":        { case: "Oreo「Dunk in the Dark」", award: "2013 即時 newsjack 經典", principle: "在對的時刻、用對的角度、夠快且自然地把品牌接上正在發燒的話題——不硬蹭。" },
+const PR_CRAFT_REF: Record<string, {
+  case: string; award: string; principle: string;
+  caseEn: string; awardEn: string; principleEn: string;
+}> = {
+  "pr-30-headline":        {
+    case: "The Tampon Book", award: "Cannes Lions 2019 PR 全場大獎", principle: "用一個「重新框架」把舊事實變成不可忽視的新聞——標題＝reframe＋具體數字。",
+    caseEn: "The Tampon Book", awardEn: "Cannes Lions 2019 PR Grand Prix", principleEn: "One reframe turns an old fact into unmissable news — headline = reframe + specific number.",
+  },
+  "pr-30-subhead":         {
+    case: "Project Revoice", award: "Cannes Lions 2018 健康類全場大獎", principle: "副標扛起標題扛不動的「人的代價/影響」，補上利害關係，不是重述標題。",
+    caseEn: "Project Revoice", awardEn: "Cannes Lions 2018 Health & Wellness Grand Prix", principleEn: "The subhead carries what the headline can't — the human cost, the stakes. It adds context, not a restatement.",
+  },
+  "pr-30-lead-paragraph":  {
+    case: "The Lost Class", award: "Cannes Lions 2022", principle: "第一句就是一個讓人重新理解全局的事實揭露，不鋪陳。",
+    caseEn: "The Lost Class", awardEn: "Cannes Lions 2022", principleEn: "First sentence = a fact that reframes everything. No buildup. No preamble.",
+  },
+  "pr-30-ceo-quote":       {
+    case: "Patagonia「Earth is now our only shareholder」", award: "2022 全球 earned-media 典範", principle: "高層發言＝行動＋價值，每句可被記者原句引用，不是場面話。",
+    caseEn: "Patagonia — \"Earth is now our only shareholder\"", awardEn: "2022 global earned-media benchmark", principleEn: "Executive quotes = action + values. Every sentence quotable as-is. Not corporate filler.",
+  },
+  "pr-30-boilerplate":     {
+    case: "PR Awards 評審準則 + Dove 長青一致性", award: "業界評審共通準則", principle: "用可驗證事實＋第三方背書建立可信度，能長期沿用不過期。",
+    caseEn: "PR Awards judging criteria + Dove long-term consistency", awardEn: "Industry standard", principleEn: "Verifiable facts + third-party proof = credibility that doesn't expire.",
+  },
+  "pr-30-fact-sheet":      {
+    case: "Spotify Wrapped", award: "全球 earned / 多獎", principle: "把資料變成「10 秒看懂、想分享」的數字，掃描性 > 完整性。",
+    caseEn: "Spotify Wrapped", awardEn: "Global earned media + multiple awards", principleEn: "Turn data into numbers people grasp in 10 seconds and want to share. Scannable beats comprehensive.",
+  },
+  "pr-30-media-pitch":     {
+    case: "Whopper Detour", award: "Cannes Lions 2019", principle: "賣「記者的讀者會在乎的角度」與不可抗拒的鉤，不是賣品牌。",
+    caseEn: "Whopper Detour", awardEn: "Cannes Lions 2019", principleEn: "Sell the angle the journalist's readers will care about — and an irresistible hook. Not the brand.",
+  },
+  "pr-30-spokesperson-qa": {
+    case: "KFC「FCK」", award: "Cannes Lions 2019 多項金獅 + D&AD", principle: "危機回應：立刻 own it＋坦誠＋機智＋馬上講怎麼修，化攻擊為信任。",
+    caseEn: "KFC \"FCK\"", awardEn: "Cannes Lions 2019 multiple Gold Lions + D&AD", principleEn: "Crisis response: own it immediately + be honest + use wit + say what you're fixing. Turn attack into trust.",
+  },
+  "pr-30-launch-social":   {
+    case: "Spotify Wrapped 社群擴散", award: "全球 earned", principle: "被分享的是「有觀點、有梗、與我有關」，不是公告。",
+    caseEn: "Spotify Wrapped — social amplification", awardEn: "Global earned media", principleEn: "What gets shared: has a POV, has a hook, feels personal. Not an announcement.",
+  },
+  "pr-100-launch-toolkit": {
+    case: "Whopper Detour（整合 earned）", award: "Cannes Lions 2019", principle: "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。",
+    caseEn: "Whopper Detour (integrated earned)", awardEn: "Cannes Lions 2019", principleEn: "One news hook threads through every asset — each amplifies the others instead of going solo.",
+  },
+  "pr-99-launch-toolkit":  {
+    case: "Whopper Detour（整合 earned）", award: "Cannes Lions 2019", principle: "一個新聞鉤貫穿所有素材，互相加乘而非各說各話。",
+    caseEn: "Whopper Detour (integrated earned)", awardEn: "Cannes Lions 2019", principleEn: "One news hook threads through every asset — each amplifies the others instead of going solo.",
+  },
+  "pr-30-news-hook":       {
+    case: "The Tampon Book + Whopper Detour", award: "Cannes Lions 2019 PR", principle: "得獎不是把公告寫好，而是先找到「記者會主動報、群眾會主動傳」的角度（earned idea）。",
+    caseEn: "The Tampon Book + Whopper Detour", awardEn: "Cannes Lions 2019 PR", principleEn: "Awards don't go to well-written press releases. They go to the angle journalists want to cover and audiences want to share — the earned idea.",
+  },
+  "pr-99-newsjack":        {
+    case: "Oreo「Dunk in the Dark」", award: "2013 即時 newsjack 經典", principle: "在對的時刻、用對的角度、夠快且自然地把品牌接上正在發燒的話題——不硬蹭。",
+    caseEn: "Oreo \"Dunk in the Dark\"", awardEn: "2013 real-time newsjack classic", principleEn: "Right moment, right angle, fast and natural — attach the brand to a trending story. Never force it.",
+  },
 };
 
 // 2026-05-18 (CJ「承諾是完整貼文 → 圖完成才展示 mockup」): tasks whose
@@ -104,6 +146,9 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
   const [open, setOpen] = React.useState(false);
   const ref = taskId ? PR_CRAFT_REF[taskId] : undefined;
   if (!ref) return null;
+  const caseLabel  = en ? ref.caseEn  : ref.case;
+  const awardLabel = en ? ref.awardEn : ref.award;
+  const princLabel = en ? ref.principleEn : ref.principle;
   return (
     <div className="relative">
       <button
@@ -112,16 +157,16 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
         style={{ borderColor: "#e5d9b6", background: "#fbf6e7", color: "#8a6d1d" }}
         title={en ? "Craft reference" : "工藝依據"}
       >
-        ✨ {en ? "Craft reference" : "工藝依據"}：{ref.case}
+        ✨ {en ? "Craft reference" : "工藝依據"}：{caseLabel}
       </button>
       {open && (
         <div
           className="absolute z-50 mt-1 left-0 rounded-lg border bg-white p-3 shadow-lg"
           style={{ width: 300, borderColor: "#ece7d6" }}
         >
-          <div className="text-[11px] font-bold text-neutral-900 mb-0.5">{ref.case}</div>
-          <div className="text-[10px] text-neutral-500 mb-2">{ref.award}</div>
-          <div className="text-[11px] leading-relaxed text-neutral-700">{ref.principle}</div>
+          <div className="text-[11px] font-bold text-neutral-900 mb-0.5">{caseLabel}</div>
+          <div className="text-[10px] text-neutral-500 mb-2">{awardLabel}</div>
+          <div className="text-[11px] leading-relaxed text-neutral-700">{princLabel}</div>
           <div className="mt-2 pt-2 border-t text-[9px] text-neutral-400" style={{ borderColor: "#f0eee6" }}>
             {en
               ? "Transferable craft principle applied — not an award certification or endorsement."
