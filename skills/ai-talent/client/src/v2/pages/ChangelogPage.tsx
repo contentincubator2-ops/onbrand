@@ -9,11 +9,11 @@
 import { useEffect, useState } from "react";
 import { useLang } from "../../lib/i18n";
 
-const TAG_STYLES: Record<string, { bg: string; fg: string; label: string }> = {
-  NEW:     { bg: "rgba(124,58,237,0.10)", fg: "#5B21B6", label: "新功能" },
-  FIX:     { bg: "rgba(239,68,68,0.10)",  fg: "#991B1B", label: "修復" },
-  IMPROVE: { bg: "rgba(59,130,246,0.10)", fg: "#1E3A8A", label: "改進" },
-  BREAKING:{ bg: "rgba(245,158,11,0.10)", fg: "#92400E", label: "變更" },
+const TAG_STYLES: Record<string, { bg: string; fg: string; label: string; labelEn: string }> = {
+  NEW:     { bg: "rgba(124,58,237,0.10)", fg: "#5B21B6", label: "新功能", labelEn: "New"     },
+  FIX:     { bg: "rgba(239,68,68,0.10)",  fg: "#991B1B", label: "修復",   labelEn: "Fix"     },
+  IMPROVE: { bg: "rgba(59,130,246,0.10)", fg: "#1E3A8A", label: "改進",   labelEn: "Improve" },
+  BREAKING:{ bg: "rgba(245,158,11,0.10)", fg: "#92400E", label: "變更",   labelEn: "Change"  },
 };
 
 interface ChangelogEntry {
@@ -117,7 +117,7 @@ export default function ChangelogPage() {
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
               {entry.items.map((item, i) => {
                 const style = TAG_STYLES[item.tag] ?? {
-                  bg: "#f3f4f6", fg: "#525252", label: item.tag,
+                  bg: "#f3f4f6", fg: "#525252", label: item.tag, labelEn: item.tag,
                 };
                 return (
                   <li key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -128,7 +128,7 @@ export default function ChangelogPage() {
                       whiteSpace: "nowrap", minWidth: 50, textAlign: "center",
                       letterSpacing: 0.5,
                     }}>
-                      {style.label}
+                      {isEn ? style.labelEn : style.label}
                     </span>
                     <span style={{ fontSize: 14, color: "#1A1A18", lineHeight: 1.6 }}>
                       {item.text}

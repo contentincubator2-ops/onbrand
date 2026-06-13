@@ -313,7 +313,7 @@ export default function AccountPage() {
                   ].map(({ key, label }) => (
                     <div key={key} className="bg-neutral-50 rounded-lg px-3 py-2">
                       <div className="text-neutral-500 text-[11px]">{label}</div>
-                      <div className="text-neutral-900 font-semibold tabular-nums">{pts.costs[key]} 點</div>
+                      <div className="text-neutral-900 font-semibold tabular-nums">{pts.costs[key]} {lang === "en" ? "pts" : "點"}</div>
                     </div>
                   ))}
                 </div>
