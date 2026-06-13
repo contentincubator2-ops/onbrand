@@ -414,7 +414,7 @@ function IconBar({
   onOpenSupport?: () => void;
   brands: any[];
 }) {
-  const { lang } = useLang();
+  const { lang, setLang } = useLang();
   const isEn = lang === "en";
   const NAV_ITEMS = React.useMemo(() => buildNavItems(lang), [lang]);
   const [avatarOpen, setAvatarOpen] = React.useState(false);
@@ -522,8 +522,48 @@ function IconBar({
             → /brands list, S-menu → 帳號設定 / 方案 / Workspace, etc. */}
       </nav>
 
-      {/* Bottom: bell + avatar */}
+      {/* Bottom: lang toggle + bell + avatar */}
       <div style={{ flexShrink: 0, paddingBottom: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+
+        {/* ── Language toggle — always visible ── */}
+        <Tooltip content={isEn ? "Switch to 繁體中文" : "Switch to English"} placement="right">
+          <button
+            onClick={() => setLang(isEn ? "zh-TW" : "en")}
+            aria-label={isEn ? "Switch language" : "切換語言"}
+            style={{
+              width: 48, height: 22, borderRadius: 11,
+              border: "1.5px solid #e5e7eb",
+              background: "#f9fafb",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+              padding: 0, overflow: "hidden",
+              transition: "border-color 0.15s, background 0.15s",
+              position: "relative",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = "#F97316";
+              e.currentTarget.style.background = "#fff7ed";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = "#e5e7eb";
+              e.currentTarget.style.background = "#f9fafb";
+            }}
+          >
+            {/* Sliding active indicator */}
+            <span style={{
+              position: "absolute",
+              left: isEn ? "auto" : 2,
+              right: isEn ? 2 : "auto",
+              top: 2, width: 20, height: 16, borderRadius: 8,
+              background: "#F97316",
+              transition: "left 0.18s, right 0.18s",
+              zIndex: 0,
+            }} />
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.02em", color: isEn ? "#9ca3af" : "#fff", zIndex: 1, width: 22, textAlign: "center", position: "relative" }}>中</span>
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.02em", color: isEn ? "#fff" : "#9ca3af", zIndex: 1, width: 22, textAlign: "center", position: "relative" }}>EN</span>
+          </button>
+        </Tooltip>
+
         {/* Bell with badge */}
         <Tooltip content={isEn ? "Notifications" : "通知"} placement="right">
           <button
@@ -681,41 +721,58 @@ function BrandHierarchyPill({
         transition: "right 0.22s cubic-bezier(0.4,0,0.2,1)",
       }}
     >
+      {/* ── Pill trigger button ── */}
+      {/* Empty state (no brand selected): orange dashed CTA */}
+      {/* Active state: Notion-style subtle white pill */}
       <button
         onClick={() => setOpen((v) => !v)}
         style={{
           width: "100%",
           height: 40,
           borderRadius: 8,
-          // Notion-style: subtle border, never tint background with brand color
-          border: open ? "1px solid #d4d4d4" : "1px solid #e5e7eb",
-          background: "#fff",
+          border: activeBrand
+            ? (open ? "1px solid #d4d4d4" : "1px solid #e5e7eb")
+            : "1.5px dashed #F97316",
+          background: activeBrand ? "#fff" : (open ? "#fff7ed" : "#fff"),
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 8,
           padding: "0 10px 0 8px",
           cursor: "pointer",
-          boxShadow: open
-            ? "0 4px 12px rgba(0,0,0,0.06)"
-            : "0 1px 2px rgba(0,0,0,0.04)",
-          transition: "border-color 0.12s, box-shadow 0.12s",
+          boxShadow: activeBrand
+            ? (open ? "0 4px 12px rgba(0,0,0,0.06)" : "0 1px 2px rgba(0,0,0,0.04)")
+            : "0 1px 4px rgba(249,115,22,0.12)",
+          transition: "border-color 0.12s, box-shadow 0.12s, background 0.12s",
+        }}
+        onMouseEnter={e => {
+          if (!activeBrand) e.currentTarget.style.background = "#fff7ed";
+        }}
+        onMouseLeave={e => {
+          if (!activeBrand) e.currentTarget.style.background = open ? "#fff7ed" : "#fff";
         }}
       >
-        {/* 品牌大腦 — Brain icon ALWAYS visible (Notion-style outline) */}
+        {/* Icon: brand logo / initial / brain / + */}
         <span style={{
           width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-          background: "#fafafa",
-          border: "1px solid #ececec",
+          background: activeBrand
+            ? (activeBrand.logoUrl ? "#fafafa" : brandColor(activeBrand.name).bgGradient)
+            : "rgba(249,115,22,0.12)",
+          border: activeBrand ? "none" : "none",
           display: "flex", alignItems: "center", justifyContent: "center",
           overflow: "hidden",
+          color: activeBrand ? "#fff" : "#F97316",
+          fontSize: activeBrand ? 11 : 14,
+          fontWeight: 700,
         }}>
           {activeBrand?.logoUrl ? (
             <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : activeBrand ? (
+            <span>{activeBrand.name.charAt(0).toUpperCase()}</span>
           ) : (
-            <LucideBrain size={15} strokeWidth={1.5} color="#404040" />
+            <FontAwesomeIcon icon={faPlus} style={{ fontSize: 11 }} />
           )}
         </span>
-        {/* Hierarchy text — breadcrumbs Brand › Product › Event */}
+        {/* Label */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15 }}>
           {(activeProduct || activeEvent) && (
             <span style={{
@@ -726,7 +783,9 @@ function BrandHierarchyPill({
             </span>
           )}
           <span style={{
-            fontSize: 13, color: "#1f2937", fontWeight: 700,
+            fontSize: 13,
+            color: activeBrand ? "#1f2937" : "#F97316",
+            fontWeight: activeBrand ? 700 : 600,
             maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
             {displayName}
@@ -737,7 +796,7 @@ function BrandHierarchyPill({
           icon={faChevronDown}
           style={{
             fontSize: 11,
-            color: "#9ca3af",
+            color: activeBrand ? "#9ca3af" : "#F97316",
             transition: "transform 0.15s",
             transform: open ? "rotate(180deg)" : "none",
           }}
@@ -773,13 +832,42 @@ function BrandHierarchyPill({
             />
           )}
 
+          {/* ── When no brands: full-width primary CTA at top ── */}
+          {brands.length === 0 && (
+            <div style={{ padding: "8px 8px 4px" }}>
+              <button
+                onClick={() => { setAddModal({ open: true, tab: "brand" }); setOpen(false); }}
+                style={{
+                  width: "100%", padding: "11px 14px",
+                  borderRadius: 8,
+                  background: "linear-gradient(135deg, #F97316, #ea580c)",
+                  border: "none", cursor: "pointer", color: "#fff",
+                  fontSize: 13, fontWeight: 700,
+                  display: "flex", alignItems: "center", gap: 8,
+                  boxShadow: "0 2px 8px rgba(249,115,22,0.30)",
+                  transition: "opacity 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+                {isEn ? "Add your first brand" : "新增你的第一個品牌"}
+              </button>
+              <p style={{ fontSize: 11, color: "#9ca3af", padding: "8px 4px 0", lineHeight: 1.5 }}>
+                {isEn
+                  ? "Add a brand to unlock all AI marketing tools."
+                  : "新增品牌後，所有 AI 行銷工具將解鎖。"}
+              </p>
+            </div>
+          )}
+
           {/* BRAND section */}
+          {brands.length > 0 && (
           <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>
             {isEn ? "Switch brand" : "切換品牌"}
           </p>
-          {brands.length === 0 ? (
-            <p style={{ fontSize: 12, color: "#9ca3af", padding: "6px 10px" }}>{isEn ? "No brands yet" : "還沒建立品牌"}</p>
-          ) : brands.map((b: any) => {
+          )}
+          {brands.length > 0 && brands.map((b: any) => {
             const isActive = b.id === scope.brandId;
             const bColor = brandColor(b.name);
             return (
@@ -920,34 +1008,64 @@ function BrandHierarchyPill({
           )}
 
           {/* Add new — opens unified modal instead of navigating */}
+          {brands.length > 0 && (
+          <>
           <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
+          {/* New brand — dashed outline CTA (prominent but not primary) */}
+          <div style={{ padding: "4px 8px" }}>
+            <button
+              onClick={() => { setAddModal({ open: true, tab: "brand" }); setOpen(false); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 8,
+                padding: "7px 10px", border: "1.5px dashed #e5e7eb", borderRadius: 7,
+                background: "transparent", cursor: "pointer", textAlign: "left",
+                transition: "border-color 0.15s, background 0.15s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = "#7C3AED";
+                e.currentTarget.style.background = "rgba(124,58,237,0.04)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <span style={{
+                width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                background: "rgba(124,58,237,0.10)", color: "#7C3AED",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
+              }}>
+                <FontAwesomeIcon icon={faPlus} />
+              </span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: "#7C3AED" }}>
+                {isEn ? "New brand" : "新增品牌"}
+              </span>
+            </button>
+          </div>
+          {/* New product / event — smaller secondary row */}
           {([
-            { tab: "brand"   as const, label: isEn ? "New brand" : "新增品牌",  icon: faRocket,        accent: "#7C3AED" },
             { tab: "product" as const, label: isEn ? "New product" : "新增產品",  icon: faBoxOpen,       accent: "#059669" },
-            { tab: "event"   as const, label: isEn ? "New event" : "新增活動",  icon: faCalendarDays,  accent: "#F97316" },
+            { tab: "event"   as const, label: isEn ? "New event" : "新增活動",    icon: faCalendarDays,  accent: "#F97316" },
           ]).map((opt) => (
             <button
               key={opt.tab}
               onClick={() => { setAddModal({ open: true, tab: opt.tab }); setOpen(false); }}
               style={{
                 width: "100%", display: "flex", alignItems: "center", gap: 8,
-                padding: "6px 10px", border: "none", borderRadius: 6,
+                padding: "5px 18px", border: "none", borderRadius: 6,
                 background: "transparent", cursor: "pointer", textAlign: "left",
               }}
               onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             >
-              <span style={{
-                width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                background: `${opt.accent}15`, color: opt.accent,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 11,
-              }}>
+              <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", color: opt.accent, fontSize: 10 }}>
                 <FontAwesomeIcon icon={opt.icon} />
               </span>
-              <span style={{ fontSize: 12.5, fontWeight: 500, color: "#374151" }}>{opt.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "#6b7280" }}>{opt.label}</span>
             </button>
           ))}
+          </>
+          )}
         </div>
       )}
       {/* AddEntityModal — fires on bottom button click; defaults brand for product/event */}
