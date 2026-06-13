@@ -556,17 +556,15 @@ export default function BrandsPage() {
       });
     }
     if (scopeMode === "brand") {
-      for (const a of BRAND_ASSET_SUBNAV) {
-        items.push(a);
-      }
+      items.push({ id: "asset:logo",   label: lang === "en" ? "Logo"   : "標誌", group: "visuals" });
+      items.push({ id: "asset:colors", label: lang === "en" ? "Colors" : "顏色", group: "visuals" });
+      items.push({ id: "asset:fonts",  label: lang === "en" ? "Fonts"  : "字型", group: "visuals" });
     }
     if (scopeMode === "event") {
-      for (const a of EVENT_SETTINGS_SUBNAV) {
-        items.push(a);
-      }
+      items.push({ id: "settings", label: lang === "en" ? "Campaign settings" : "設定（品牌 / 期間 / 產品）", group: "settings" });
     }
     return items;
-  }, [scopeMode, segments]);
+  }, [scopeMode, segments, lang]);
 
   // ── Navigation ────────────────────────────────────────────────────────────
   // `cat` URL param drives the large category. After 2026-05-07 restructure,
@@ -1495,9 +1493,16 @@ export default function BrandsPage() {
               letterSpacing: "0.10em", textTransform: "uppercase",
               padding: "4px 4px 6px", margin: 0,
             }}>
-              {category === "visual" ? "視覺資產" : category === "settings" ? "設定" : (
-                scopeMode === "product" ? "產品定位" : scopeMode === "event" ? "活動定位" : "品牌定位"
-              )}
+              {category === "visual"
+                ? (lang === "en" ? "Visual assets" : "視覺資產")
+                : category === "settings"
+                  ? (lang === "en" ? "Settings" : "設定")
+                  : scopeMode === "product"
+                    ? (lang === "en" ? "Product positioning" : "產品定位")
+                    : scopeMode === "event"
+                      ? (lang === "en" ? "Campaign positioning" : "活動定位")
+                      : (lang === "en" ? "Brand positioning" : "品牌定位")
+              }
             </p>
 
             {/* 品牌定位 sub-items */}
@@ -1526,19 +1531,19 @@ export default function BrandsPage() {
               );
             })}
 
-            {/* 視覺資產 sub-items */}
+            {/* Visual assets sub-items */}
             {category === "visual" && [
-              { id: "asset:all",        label: "所有資產"               },
-              { id: "asset:guidelines", label: "準則"                   },
-              { id: "asset:templates",  label: "品牌範本", badge: "最新" },
-              { id: "asset:logo",       label: "標誌"                   },
-              { id: "asset:colors",     label: "顏色"                   },
-              { id: "asset:fonts",      label: "字型"                   },
-              { id: "asset:voice",      label: "品牌口吻"               },
-              { id: "asset:photos",     label: "照片"                   },
-              { id: "asset:images",     label: "圖像"                   },
-              { id: "asset:icons",      label: "圖示"                   },
-              { id: "asset:charts",     label: "圖表"                   },
+              { id: "asset:all",        label: lang === "en" ? "All assets"   : "所有資產",  badge: undefined },
+              { id: "asset:guidelines", label: lang === "en" ? "Guidelines"   : "準則",      badge: undefined },
+              { id: "asset:templates",  label: lang === "en" ? "Templates"    : "品牌範本",  badge: lang === "en" ? "New" : "最新" },
+              { id: "asset:logo",       label: lang === "en" ? "Logo"         : "標誌",      badge: undefined },
+              { id: "asset:colors",     label: lang === "en" ? "Colors"       : "顏色",      badge: undefined },
+              { id: "asset:fonts",      label: lang === "en" ? "Fonts"        : "字型",      badge: undefined },
+              { id: "asset:voice",      label: lang === "en" ? "Brand voice"  : "品牌口吻",  badge: undefined },
+              { id: "asset:photos",     label: lang === "en" ? "Photos"       : "照片",      badge: undefined },
+              { id: "asset:images",     label: lang === "en" ? "Images"       : "圖像",      badge: undefined },
+              { id: "asset:icons",      label: lang === "en" ? "Icons"        : "圖示",      badge: undefined },
+              { id: "asset:charts",     label: lang === "en" ? "Charts"       : "圖表",      badge: undefined },
             ].map(item => (
               <VisualNavItem
                 key={item.id}

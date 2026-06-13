@@ -35,7 +35,7 @@ const PLATFORMS: Array<{
   { key: "yt",       label: "YouTube",   color: "#FF0000", route: "/tasks/yt" },
   { key: "tt",       label: "TikTok",    color: "#000000", route: "/tasks/tt" },
   { key: "email",    label: "Email",     color: "#0EA5E9", route: "/tasks/email" },
-  { key: "pr",       label: "新聞稿",    color: "#525252", route: "/tasks/pr" },
+  { key: "pr",       label: "PR",        color: "#525252", route: "/tasks/pr" },
 ];
 
 const PLATFORM_COLOR: Record<string, string> = Object.fromEntries(
@@ -56,9 +56,9 @@ function getPlatformColor(p: string): string {
 function getPlatformLabel(p: string): string {
   const map: Record<string, string> = {
     fb: "Facebook", ig: "Instagram", li: "LinkedIn",
-    yt: "YouTube", tt: "TikTok", email: "Email", pr: "新聞稿",
+    yt: "YouTube", tt: "TikTok", email: "Email", pr: "PR",
     facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn",
-    youtube: "YouTube", tiktok: "TikTok", press: "新聞稿",
+    youtube: "YouTube", tiktok: "TikTok", press: "PR",
   };
   return map[p?.toLowerCase()] ?? p ?? "—";
 }

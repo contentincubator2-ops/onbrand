@@ -80,51 +80,51 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
   facebook: {
     label: "Facebook", labelZh: "Facebook", icon: faFacebookF, bg: "#1877F2",
     heroZh: "讓每篇 Facebook 貼文，都有爆款的骨架",
-    heroEn: "Every post built on a viral framework — not blank-page guessing",
+    heroEn: "Every post has a proven structure — no more starting from scratch",
     subZh: "Clio 獲獎敘事公式 × 品牌定位鎖定，自然引發互動",
-    subEn: "Award-winning narrative structures, locked to your brand voice",
+    subEn: "Narrative frameworks from award-winning campaigns, locked to your brand voice",
   },
   instagram: {
     label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#E4405F",
     heroZh: "文案 × 視覺指令同步產出，不再是漂亮圖片配隨便文字",
-    heroEn: "Caption and visual brief generated together — not pasted separately",
+    heroEn: "Caption and visual brief in one run — never pieced together separately",
     subZh: "文案代理人 + 圖片指導代理人協作，輸出比競品深一層",
-    subEn: "Caption agent + image director agent working in sync",
+    subEn: "Caption agent and image director agent work in sync, every time",
   },
   linkedin: {
     label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedinIn, bg: "#0A66C2",
     heroZh: "不只是發文，是在 LinkedIn 建立你的專業話語權",
-    heroEn: "Thought leadership that generates real business — not just impressions",
+    heroEn: "Thought leadership that earns real attention — not just vanity metrics",
     subZh: "PR Strategist 代理人以記者邏輯構建你的觀點",
-    subEn: "PR Strategist agent thinks in journalist psychology and B2B conversion",
+    subEn: "PR Strategist agent thinks like a journalist, writes like an executive",
   },
   youtube: {
     label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#FF0000",
     heroZh: "標題、章節、縮圖文案、結尾鉤子 — YouTube 影片完整佈局",
-    heroEn: "Title · chapters · thumbnail brief · end hook — all in one run",
+    heroEn: "Title, chapters, thumbnail brief, end hook — one run, done",
     subZh: "Strategist 規劃敘事弧，再由文案代理人完成每一段腳本",
-    subEn: "Strategist maps the narrative arc; writer handles every segment",
+    subEn: "Strategist maps the arc; writer handles every segment",
   },
   tiktok: {
     label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#EE1D52",
     heroZh: "前 3 秒留人，後 60 秒轉化 — TikTok 腳本不靠靈感",
-    heroEn: "Hook in 3 seconds, convert in 60 — scripts built for retention",
+    heroEn: "Grab them in 3 seconds, keep them for 60 — retention built in",
     subZh: "TikTok 專屬代理人以角色弧度 × 未解懸念設計驅動完播率",
-    subEn: "TikTok-specialized agent that thinks in character arcs and unresolved tension",
+    subEn: "TikTok agent that thinks in character arcs and unresolved tension",
   },
   email: {
     label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#7B5BC8",
     heroZh: "每封電子報都是品牌聲音的延伸，不是隨機發文",
-    heroEn: "Every newsletter sounds exactly like you — not like a template",
+    heroEn: "Every email sounds like you — consistent voice, every send",
     subZh: "品牌定位鎖定主旨行、開場鉤子與 CTA，完整結構一次產出",
-    subEn: "Brand voice locks the subject line, opener, and CTA — zero drift",
+    subEn: "Brand voice locks the subject line, opening hook, and CTA — zero drift",
   },
   pr: {
     label: "PR", labelZh: "新聞稿", icon: faBullhorn, bg: "#475569",
     heroZh: "讓媒體真正想報導你 — 不是寫稿，是設計新聞角度",
-    heroEn: "Designed to be covered — not written to fill a checklist",
+    heroEn: "Written to get picked up — not just to check a box",
     subZh: "PR Strategist 代理人以記者視角找到新聞價值，再產出完整稿件",
-    subEn: "PR Strategist agent finds the news angle before writing a single word",
+    subEn: "PR Strategist finds the news angle before writing a single word",
   },
 };
 
@@ -212,18 +212,18 @@ type ActiveFormat =
   | "all" | "貼文" | "連結貼文" | "廣告" | "輪播 Carousel"
   | "多媒體" | "直播" | "釘選貼文" | "活動 / 系列" | "月曆 / 策略" | "互動 / 工具";
 
-const FORMAT_TABS: { id: ActiveFormat; label: string }[] = [
-  { id: "all",            label: "全部"           },
-  { id: "貼文",           label: "貼文"           },
-  { id: "連結貼文",       label: "連結貼文"       },
-  { id: "廣告",           label: "廣告"           },
-  { id: "輪播 Carousel",  label: "輪播 Carousel"  },
-  { id: "多媒體",         label: "多媒體"         },
-  { id: "直播",           label: "直播"           },
-  { id: "釘選貼文",       label: "釘選貼文"       },
-  { id: "活動 / 系列",    label: "活動 / 系列"    },
-  { id: "月曆 / 策略",    label: "月曆 / 策略"    },
-  { id: "互動 / 工具",    label: "互動 / 工具"    },
+const FORMAT_TABS: { id: ActiveFormat; label: string; labelEn: string }[] = [
+  { id: "all",            label: "全部",          labelEn: "All"                },
+  { id: "貼文",           label: "貼文",          labelEn: "Posts"              },
+  { id: "連結貼文",       label: "連結貼文",      labelEn: "Link Posts"         },
+  { id: "廣告",           label: "廣告",          labelEn: "Ads"                },
+  { id: "輪播 Carousel",  label: "輪播 Carousel", labelEn: "Carousel"           },
+  { id: "多媒體",         label: "多媒體",        labelEn: "Media"              },
+  { id: "直播",           label: "直播",          labelEn: "Live"               },
+  { id: "釘選貼文",       label: "釘選貼文",      labelEn: "Pinned Posts"       },
+  { id: "活動 / 系列",    label: "活動 / 系列",   labelEn: "Events & Series"    },
+  { id: "月曆 / 策略",    label: "月曆 / 策略",   labelEn: "Calendar & Strategy"},
+  { id: "互動 / 工具",    label: "互動 / 工具",   labelEn: "Engagement & Tools" },
 ];
 
 const TASK_FORMAT_MAP: Record<string, ActiveFormat> = {
@@ -276,16 +276,16 @@ type IGActiveFormat =
   | "all" | "Feed 貼文" | "Reels" | "Carousel 輪播"
   | "Story 限時" | "Live 直播" | "個人頁" | "互動 / 工具" | "策略 / 月曆";
 
-const IG_FORMAT_TABS: { id: IGActiveFormat; label: string }[] = [
-  { id: "all",            label: "全部"           },
-  { id: "Feed 貼文",      label: "Feed 貼文"      },
-  { id: "Reels",          label: "Reels"          },
-  { id: "Carousel 輪播",  label: "Carousel 輪播"  },
-  { id: "Story 限時",     label: "Story 限時"     },
-  { id: "Live 直播",      label: "Live 直播"      },
-  { id: "個人頁",         label: "個人頁"         },
-  { id: "互動 / 工具",    label: "互動 / 工具"    },
-  { id: "策略 / 月曆",    label: "策略 / 月曆"    },
+const IG_FORMAT_TABS: { id: IGActiveFormat; label: string; labelEn: string }[] = [
+  { id: "all",            label: "全部",          labelEn: "All"                  },
+  { id: "Feed 貼文",      label: "Feed 貼文",     labelEn: "Feed Posts"           },
+  { id: "Reels",          label: "Reels",         labelEn: "Reels"                },
+  { id: "Carousel 輪播",  label: "Carousel 輪播", labelEn: "Carousel"             },
+  { id: "Story 限時",     label: "Story 限時",    labelEn: "Stories"              },
+  { id: "Live 直播",      label: "Live 直播",     labelEn: "Live"                 },
+  { id: "個人頁",         label: "個人頁",        labelEn: "Profile"              },
+  { id: "互動 / 工具",    label: "互動 / 工具",   labelEn: "Engagement & Tools"   },
+  { id: "策略 / 月曆",    label: "策略 / 月曆",   labelEn: "Strategy & Calendar"  },
 ];
 
 const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
@@ -337,16 +337,16 @@ type LIActiveFormat =
   | "all" | "貼文" | "Article 長文" | "投票"
   | "Newsletter" | "Document" | "Thought Leadership" | "客戶案例" | "個人頁 / 觸達";
 
-const LI_FORMAT_TABS: { id: LIActiveFormat; label: string }[] = [
-  { id: "all",                label: "全部"              },
-  { id: "貼文",               label: "貼文"              },
-  { id: "Article 長文",       label: "Article 長文"      },
-  { id: "投票",               label: "投票"              },
-  { id: "Newsletter",         label: "Newsletter"        },
-  { id: "Document",           label: "Document"          },
-  { id: "Thought Leadership", label: "Thought Leadership"},
-  { id: "客戶案例",           label: "客戶案例"          },
-  { id: "個人頁 / 觸達",      label: "個人頁 / 觸達"     },
+const LI_FORMAT_TABS: { id: LIActiveFormat; label: string; labelEn: string }[] = [
+  { id: "all",                label: "全部",             labelEn: "All"               },
+  { id: "貼文",               label: "貼文",             labelEn: "Posts"             },
+  { id: "Article 長文",       label: "Article 長文",     labelEn: "Articles"          },
+  { id: "投票",               label: "投票",             labelEn: "Polls"             },
+  { id: "Newsletter",         label: "Newsletter",       labelEn: "Newsletter"        },
+  { id: "Document",           label: "Document",         labelEn: "Documents"         },
+  { id: "Thought Leadership", label: "Thought Leadership",labelEn: "Thought Leadership"},
+  { id: "客戶案例",           label: "客戶案例",         labelEn: "Case Studies"      },
+  { id: "個人頁 / 觸達",      label: "個人頁 / 觸達",    labelEn: "Profile & Outreach"},
 ];
 
 const LI_TASK_FORMAT_MAP: Record<string, LIActiveFormat> = {
@@ -380,15 +380,15 @@ type YTActiveFormat =
   | "all" | "影片 / 腳本" | "SEO / 元資料" | "Shorts"
   | "縮圖" | "Community" | "互動 / 工具" | "系列 / 策略";
 
-const YT_FORMAT_TABS: { id: YTActiveFormat; label: string }[] = [
-  { id: "all",          label: "全部"         },
-  { id: "影片 / 腳本",  label: "影片 / 腳本"  },
-  { id: "SEO / 元資料", label: "SEO / 元資料" },
-  { id: "Shorts",       label: "Shorts"       },
-  { id: "縮圖",         label: "縮圖"         },
-  { id: "Community",    label: "Community"    },
-  { id: "互動 / 工具",  label: "互動 / 工具"  },
-  { id: "系列 / 策略",  label: "系列 / 策略"  },
+const YT_FORMAT_TABS: { id: YTActiveFormat; label: string; labelEn: string }[] = [
+  { id: "all",          label: "全部",         labelEn: "All"                  },
+  { id: "影片 / 腳本",  label: "影片 / 腳本",  labelEn: "Video & Scripts"      },
+  { id: "SEO / 元資料", label: "SEO / 元資料", labelEn: "SEO & Metadata"       },
+  { id: "Shorts",       label: "Shorts",       labelEn: "Shorts"               },
+  { id: "縮圖",         label: "縮圖",         labelEn: "Thumbnails"           },
+  { id: "Community",    label: "Community",    labelEn: "Community"            },
+  { id: "互動 / 工具",  label: "互動 / 工具",  labelEn: "Engagement & Tools"   },
+  { id: "系列 / 策略",  label: "系列 / 策略",  labelEn: "Series & Strategy"    },
 ];
 
 const YT_TASK_FORMAT_MAP: Record<string, YTActiveFormat> = {
@@ -425,15 +425,15 @@ type TTActiveFormat =
   | "all" | "腳本" | "字幕 / 文案" | "Trend / Duet"
   | "Live 直播" | "個人頁" | "互動 / 工具" | "系列 / 策略";
 
-const TT_FORMAT_TABS: { id: TTActiveFormat; label: string }[] = [
-  { id: "all",          label: "全部"         },
-  { id: "腳本",         label: "腳本"         },
-  { id: "字幕 / 文案",  label: "字幕 / 文案"  },
-  { id: "Trend / Duet", label: "Trend / Duet" },
-  { id: "Live 直播",    label: "Live 直播"    },
-  { id: "個人頁",       label: "個人頁"       },
-  { id: "互動 / 工具",  label: "互動 / 工具"  },
-  { id: "系列 / 策略",  label: "系列 / 策略"  },
+const TT_FORMAT_TABS: { id: TTActiveFormat; label: string; labelEn: string }[] = [
+  { id: "all",          label: "全部",         labelEn: "All"                  },
+  { id: "腳本",         label: "腳本",         labelEn: "Scripts"              },
+  { id: "字幕 / 文案",  label: "字幕 / 文案",  labelEn: "Captions & Copy"      },
+  { id: "Trend / Duet", label: "Trend / Duet", labelEn: "Trend & Duet"         },
+  { id: "Live 直播",    label: "Live 直播",    labelEn: "Live"                 },
+  { id: "個人頁",       label: "個人頁",       labelEn: "Profile"              },
+  { id: "互動 / 工具",  label: "互動 / 工具",  labelEn: "Engagement & Tools"   },
+  { id: "系列 / 策略",  label: "系列 / 策略",  labelEn: "Series & Strategy"    },
 ];
 
 const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
@@ -466,14 +466,14 @@ type EMActiveFormat =
   | "all" | "主旨 / 預覽" | "Newsletter / 培育"
   | "促銷 / 發佈" | "歡迎 / Onboarding" | "挽回 / 再活化" | "開發 / 交易";
 
-const EM_FORMAT_TABS: { id: EMActiveFormat; label: string }[] = [
-  { id: "all",              label: "全部"             },
-  { id: "主旨 / 預覽",      label: "主旨 / 預覽"      },
-  { id: "Newsletter / 培育",label: "Newsletter / 培育" },
-  { id: "促銷 / 發佈",      label: "促銷 / 發佈"      },
-  { id: "歡迎 / Onboarding",label: "歡迎 / Onboarding" },
-  { id: "挽回 / 再活化",    label: "挽回 / 再活化"    },
-  { id: "開發 / 交易",      label: "開發 / 交易"      },
+const EM_FORMAT_TABS: { id: EMActiveFormat; label: string; labelEn: string }[] = [
+  { id: "all",               label: "全部",              labelEn: "All"                        },
+  { id: "主旨 / 預覽",       label: "主旨 / 預覽",       labelEn: "Subject & Preview"          },
+  { id: "Newsletter / 培育", label: "Newsletter / 培育", labelEn: "Newsletter & Nurture"       },
+  { id: "促銷 / 發佈",       label: "促銷 / 發佈",       labelEn: "Promo & Launch"             },
+  { id: "歡迎 / Onboarding", label: "歡迎 / Onboarding", labelEn: "Welcome & Onboarding"       },
+  { id: "挽回 / 再活化",     label: "挽回 / 再活化",     labelEn: "Win-back & Re-engagement"   },
+  { id: "開發 / 交易",       label: "開發 / 交易",       labelEn: "Prospecting & Transactional"},
 ];
 
 const EM_TASK_FORMAT_MAP: Record<string, EMActiveFormat> = {
@@ -504,13 +504,13 @@ const EM_TASK_FORMAT_MAP: Record<string, EMActiveFormat> = {
 type PRActiveFormat =
   | "all" | "新聞稿" | "文件 / 素材" | "媒體關係" | "社群擴散" | "策略 / 發佈";
 
-const PR_FORMAT_TABS: { id: PRActiveFormat; label: string }[] = [
-  { id: "all",        label: "全部"       },
-  { id: "新聞稿",     label: "新聞稿"     },
-  { id: "文件 / 素材", label: "文件 / 素材" },
-  { id: "媒體關係",   label: "媒體關係"   },
-  { id: "社群擴散",   label: "社群擴散"   },
-  { id: "策略 / 發佈", label: "策略 / 發佈" },
+const PR_FORMAT_TABS: { id: PRActiveFormat; label: string; labelEn: string }[] = [
+  { id: "all",         label: "全部",         labelEn: "All"                    },
+  { id: "新聞稿",      label: "新聞稿",       labelEn: "Press Releases"         },
+  { id: "文件 / 素材", label: "文件 / 素材",  labelEn: "Docs & Assets"          },
+  { id: "媒體關係",    label: "媒體關係",     labelEn: "Media Relations"        },
+  { id: "社群擴散",    label: "社群擴散",     labelEn: "Social Amplification"   },
+  { id: "策略 / 發佈", label: "策略 / 發佈",  labelEn: "Strategy & Launch"      },
 ];
 
 const PR_TASK_FORMAT_MAP: Record<string, PRActiveFormat> = {
@@ -1279,7 +1279,7 @@ function PlatformTaskPageInner() {
                           : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
                       }
                     >
-                      {tab.label}
+                      {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
@@ -1314,7 +1314,7 @@ function PlatformTaskPageInner() {
                           : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
                       }
                     >
-                      {tab.label}
+                      {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
@@ -1349,7 +1349,7 @@ function PlatformTaskPageInner() {
                           : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
                       }
                     >
-                      {tab.label}
+                      {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
@@ -1384,7 +1384,7 @@ function PlatformTaskPageInner() {
                           : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
                       }
                     >
-                      {tab.label}
+                      {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
@@ -1419,7 +1419,7 @@ function PlatformTaskPageInner() {
                           : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
                       }
                     >
-                      {tab.label}
+                      {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
@@ -1454,7 +1454,7 @@ function PlatformTaskPageInner() {
                           : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
                       }
                     >
-                      {tab.label}
+                      {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
@@ -1489,7 +1489,7 @@ function PlatformTaskPageInner() {
                           : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
                       }
                     >
-                      {tab.label}
+                      {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
