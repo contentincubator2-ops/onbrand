@@ -20,6 +20,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
+import { fireNudge } from "../components/mia/miaNudges";
 import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Avatar, Button, Spinner } from "@heroui/react";
@@ -1258,16 +1259,11 @@ export default function TheaterPage() {
     setRunning(false);
 
     // ── Mia nudge: generation complete ───────────────────────────────────
-    // Dispatch a global event that ShellLayout/SupportDrawer can listen to.
-    // This avoids prop-drilling openSupport all the way into TheaterPage.
+    // 2026-06-12: switched from inline dispatchEvent to catalog-driven
+    // fireNudge. Message text + action button live in miaNudgeCatalog
+    // under "theater.generation_done". Page just reports the event.
     setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("mia:nudge", {
-        detail: {
-          message: lang === "en"
-            ? "✅ 7-day content is ready! To adjust dates or add brand photos, click the ✏️ Edit button on any post."
-            : "✅ 7 天內容排好了！想調整發布日期或加入品牌照片，點每格右上角的 ✏️ 編輯按鈕，可以送到日曆或換圖。",
-        },
-      }));
+      fireNudge("theater.generation_done");
     }, 800);
   };
 

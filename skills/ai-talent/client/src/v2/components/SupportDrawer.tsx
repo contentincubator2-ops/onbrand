@@ -21,21 +21,35 @@ interface Props {
   open: boolean;
   onClose: () => void;
   scope: ScopeState;
-  /** 2026-06-05: proactive nudge from another page (e.g. Theater "generation done").
-   *  When set, drawer opens with this as Mia's first message in the thread. */
-  nudgeMessage?: string | null;
-  onNudgeConsumed?: () => void;
+  /**
+   * 2026-06-12 (CJ「Mia 細緻化」): pending nudges drained from the unread
+   * queue when the user clicks the avatar. Each gets injected as a Mia
+   * message in fire order. Drawer notifies parent via onNudgesConsumed
+   * once they've been rendered so parent can clear local state.
+   *
+   * Legacy single-message prop removed; ShellLayout always passes an array
+   * (possibly empty).
+   */
+  pendingNudges?: Array<{
+    id: string;
+    message: string;
+    actions?: MiaAction[];
+    firedAt: string;
+  }>;
+  onNudgesConsumed?: () => void;
 }
 
-type MiaAction =
-  | { kind: "navigate"; url: string; label: string; auto?: boolean }
-  | { kind: "open_task"; tier: "30s" | "60s" | "99s"; topic?: string; label: string; auto?: boolean };
-type Message = { id: number; role: string; content: string; createdAt: string; actions?: MiaAction[] };
+// MiaAction lives in SupportDrawer.types.ts so miaNudgeCatalog can import
+// it without dragging in the whole drawer module.
+import type { MiaAction } from "./SupportDrawer.types";
+// 2026-06-12: telemetry hook for action_clicked events.
+import { logNudgeActionClicked } from "./mia/miaNudges";
+type Message = { id: number; role: string; content: string; createdAt: string; actions?: MiaAction[]; sourceNudgeId?: string };
 
 const MIA_AVATAR =
   "https://api.dicebear.com/7.x/notionists/svg?seed=mia-cs-onbrand&backgroundColor=ede9fe&backgroundType=solid&radius=50";
 
-export default function SupportDrawer({ open, onClose, scope, nudgeMessage, onNudgeConsumed }: Props) {
+export default function SupportDrawer({ open, onClose, scope, pendingNudges, onNudgesConsumed }: Props) {
   const { lang } = useLang();
   const isEn = lang === "en";
   const loc = useLocation();
@@ -91,28 +105,33 @@ export default function SupportDrawer({ open, onClose, scope, nudgeMessage, onNu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // 2026-06-05: Inject proactive nudge as a Mia message once drawer is open.
-  // Skips if the exact same nudge is already at the bottom (prevents dupes
-  // if the user closes/reopens within the same session).
+  // 2026-06-12 (CJ「Mia 細緻化」): drain pending nudges into the thread
+  // when the drawer opens. Each queued nudge becomes its own Mia message
+  // with action buttons preserved. Order matches fire order (FIFO).
   useEffect(() => {
-    if (!open || !nudgeMessage) return;
+    if (!open || !pendingNudges || pendingNudges.length === 0) return;
     setMessages((m) => {
-      const last = m[m.length - 1];
-      if (last?.role === "mia" && last.content === nudgeMessage) return m;
-      return [
-        ...m,
-        {
-          id: Date.now(),
+      const existingContents = new Set(
+        m.filter((x) => x.role === "mia").map((x) => x.content),
+      );
+      const newMessages: Message[] = [];
+      const base = Date.now();
+      pendingNudges.forEach((n, i) => {
+        if (existingContents.has(n.message)) return; // anti-dupe across reopens
+        newMessages.push({
+          id: base + i,
           role: "mia",
-          content: nudgeMessage,
-          createdAt: new Date().toISOString(),
-        },
-      ];
+          content: n.message,
+          createdAt: n.firedAt,
+          actions: n.actions,
+          sourceNudgeId: n.id, // for telemetry on button click
+        });
+      });
+      return [...m, ...newMessages];
     });
-    // Consume so re-renders don't re-inject
-    onNudgeConsumed?.();
+    onNudgesConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, nudgeMessage]);
+  }, [open, pendingNudges]);
 
   // Auto-scroll on new message
   useEffect(() => {
@@ -188,7 +207,12 @@ export default function SupportDrawer({ open, onClose, scope, nudgeMessage, onNu
     }
   };
 
-  const runAction = (a: MiaAction) => {
+  const runAction = (a: MiaAction, sourceNudgeId?: string) => {
+    // Telemetry: which nudge's button got clicked? Skipped for actions
+    // that arrive from the LLM-backed chat (no sourceNudgeId set).
+    if (sourceNudgeId) {
+      logNudgeActionClicked(sourceNudgeId, a.label, a.kind);
+    }
     // 2026-05-14 (CJ「他直接幫我切換頁面，到他幫我創造好的任務」):
     // Mia can return action buttons; user clicks → we navigate.
     // We DON'T auto-execute mutations (e.g. spending LLM credits) —
@@ -582,7 +606,7 @@ export default function SupportDrawer({ open, onClose, scope, nudgeMessage, onNu
   );
 }
 
-function MessageBubble({ message, onAction }: { message: Message; onAction: (a: MiaAction) => void }) {
+function MessageBubble({ message, onAction }: { message: Message; onAction: (a: MiaAction, sourceNudgeId?: string) => void }) {
   const isUser = message.role === "user";
   const isAdmin = message.role === "admin";
   const showAvatar = !isUser;
@@ -628,7 +652,7 @@ function MessageBubble({ message, onAction }: { message: Message; onAction: (a: 
         {actions.length > 0 && (
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
             {actions.map((a, i) => (
-              <button key={i} onClick={() => onAction(a)} style={{
+              <button key={i} onClick={() => onAction(a, message.sourceNudgeId)} style={{
                 textAlign: "left",
                 padding: "6px 10px",
                 borderRadius: 8,

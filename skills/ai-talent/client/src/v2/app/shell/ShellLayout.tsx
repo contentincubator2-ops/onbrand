@@ -22,6 +22,11 @@ import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher"
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
 import FestivalGlobalNudge from "../../components/FestivalGlobalNudge";
 import SupportDrawer from "../../components/SupportDrawer";
+// 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
+// sessionStorage; this hook surfaces the count for the avatar badge and
+// the drain function for the drawer.
+import { useUnreadNudges, fireNudge } from "../../components/mia/miaNudges";
+import type { QueuedNudge } from "../../components/mia/miaNudges";
 import OnBrandLogo from "../../components/OnBrandLogo";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
@@ -174,20 +179,49 @@ export default function ShellLayout() {
   const [notifOpen, setNotifOpen] = React.useState(false);
   const [supportOpen, setSupportOpen] = React.useState(false);
 
-  // 2026-06-05 (CJ「Mia 變 contextual guide」): listen for global mia:nudge
-  // events so any page (Theater generation done, errors, onboarding triggers)
-  // can pop Mia open with a proactive message.
-  const [miaNudge, setMiaNudge] = React.useState<string | null>(null);
+  // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge subscription.
+  // - Nudges are queued in sessionStorage by fireNudge() calls from any page
+  // - Avatar shows an unread badge with the count
+  // - Clicking the avatar opens the drawer, which drains the queue and
+  //   renders pending nudges as Mia messages
+  // - Auto-open behaviour intentionally removed (see CJ direction)
+  const { unreadCount: miaUnread, drain: drainMiaNudges } = useUnreadNudges();
+  const [drainedNudges, setDrainedNudges] = React.useState<QueuedNudge[]>([]);
+
+  // Legacy adapter: the old `mia:nudge` event (raw message) still works for
+  // any page we haven't migrated yet — it routes through fireNudge with a
+  // synthetic ad-hoc ID so the new pipeline owns rendering.
   React.useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { message?: string } | undefined;
-      if (detail?.message) {
-        setMiaNudge(detail.message);
-        setSupportOpen(true);
-      }
+      if (!detail?.message) return;
+      // Synthetic id keyed on payload so the same message doesn't double-fire
+      const synthId = `legacy.${detail.message.slice(0, 24).replace(/\W+/g, "_")}`;
+      // We're not in the catalog, so write directly to the queue via a
+      // minimal shim. We import fireNudge but it requires a catalog entry,
+      // so instead push straight to sessionStorage and emit the change event.
+      try {
+        const key = "mia:nudge:queue";
+        const existing = JSON.parse(sessionStorage.getItem(key) || "[]");
+        existing.push({
+          id: synthId,
+          message: detail.message,
+          firedAt: new Date().toISOString(),
+        });
+        sessionStorage.setItem(key, JSON.stringify(existing));
+        window.dispatchEvent(new CustomEvent("mia:nudge:changed"));
+      } catch { /* swallow */ }
     };
     window.addEventListener("mia:nudge", handler);
     return () => window.removeEventListener("mia:nudge", handler);
+    // fireNudge is intentionally not deps — it's a stable module-level fn
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fire a one-time greeting on first login so the user understands what
+  // the avatar badge means (this is itself dedupe-once-per-session).
+  React.useEffect(() => {
+    fireNudge("onboarding.first_login");
   }, []);
   // 2026-05-13: badge count comes from the same trpc query as the panel.
   // Polled every 60s + when the user opens/closes the panel.
@@ -331,11 +365,21 @@ export default function ShellLayout() {
           LLM-backed customer success agent with session context. If she
           can't help, "我要找真人 →" inside the drawer opens a ticket. */}
       <button
-        onClick={() => setSupportOpen(true)}
-        aria-label={lang === "en" ? "Open support chat" : "打開客服對話"}
+        onClick={() => {
+          // Drain the queue at open-time so pending nudges render as Mia
+          // messages inside the drawer. We snapshot to local state so the
+          // drawer (mounted via prop) can iterate it once.
+          if (miaUnread > 0) {
+            setDrainedNudges(drainMiaNudges());
+          }
+          setSupportOpen(true);
+        }}
+        aria-label={lang === "en"
+          ? `Open support chat${miaUnread > 0 ? ` (${miaUnread} unread)` : ""}`
+          : `打開客服對話${miaUnread > 0 ? `（${miaUnread} 則未讀）` : ""}`}
         title={lang === "en"
-          ? "Mia · Customer Success"
-          : "Mia · 客戶成功經理"}
+          ? (miaUnread > 0 ? `Mia · ${miaUnread} unread tip${miaUnread > 1 ? "s" : ""}` : "Mia · Customer Success")
+          : (miaUnread > 0 ? `Mia · ${miaUnread} 則新訊息` : "Mia · 客戶成功經理")}
         style={{
           position: "fixed", bottom: 20, right: 20, zIndex: 50,
           width: 56, height: 56, borderRadius: "50%",
@@ -362,19 +406,62 @@ export default function ShellLayout() {
           alt="Mia · Customer Success"
           style={{ width: "100%", height: "100%", display: "block" }}
         />
-        <span style={{
-          position: "absolute", bottom: 4, right: 4,
-          width: 12, height: 12, borderRadius: "50%",
-          background: "#10b981",
-          border: "2px solid white",
-        }} />
+        {/* 2026-06-12: badge UI changes based on unread state.
+            - No unread → small green "online" dot (status)
+            - Unread → orange-red badge with count (action) + gentle pulse */}
+        {miaUnread === 0 ? (
+          <span style={{
+            position: "absolute", bottom: 4, right: 4,
+            width: 12, height: 12, borderRadius: "50%",
+            background: "#10b981",
+            border: "2px solid white",
+          }} />
+        ) : (
+          /* 2026-06-12 Slack-style red unread:
+             - Inner pill: solid red #E01E5A (Slack's exact unread red)
+             - Outer halo: same red with fading expanding ring (ripple)
+             - Bold white count with tabular nums
+             - The whole avatar gets a subtle "wiggle" twice on new arrival
+               via the miaAvatarWiggle keyframe (limited iteration count). */
+          <>
+            <span style={{
+              position: "absolute", top: -5, right: -5,
+              minWidth: 22, height: 22, padding: "0 6px", borderRadius: 11,
+              background: "#E01E5A",
+              border: "2px solid white",
+              color: "white",
+              fontSize: 11, fontWeight: 900, lineHeight: "18px",
+              fontVariantNumeric: "tabular-nums",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 3px 10px rgba(224, 30, 90, 0.5)",
+              zIndex: 2,
+            }}>
+              {miaUnread > 9 ? "9+" : miaUnread}
+            </span>
+            <span aria-hidden style={{
+              position: "absolute", top: -5, right: -5,
+              width: 22, height: 22, borderRadius: "50%",
+              border: "2px solid #E01E5A",
+              animation: "miaUnreadRipple 1.8s ease-out infinite",
+              zIndex: 1,
+              pointerEvents: "none",
+            }} />
+          </>
+        )}
+        <style>{`
+          @keyframes miaUnreadRipple {
+            0%   { transform: scale(1);   opacity: 0.7; }
+            70%  { transform: scale(2.2); opacity: 0;   }
+            100% { transform: scale(2.2); opacity: 0;   }
+          }
+        `}</style>
       </button>
       <SupportDrawer
         open={supportOpen}
-        onClose={() => { setSupportOpen(false); setMiaNudge(null); }}
+        onClose={() => { setSupportOpen(false); setDrainedNudges([]); }}
         scope={scope}
-        nudgeMessage={miaNudge}
-        onNudgeConsumed={() => setMiaNudge(null)}
+        pendingNudges={drainedNudges}
+        onNudgesConsumed={() => setDrainedNudges([])}
       />
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}

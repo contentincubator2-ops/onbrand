@@ -753,6 +753,73 @@ export const supportRouter = router({
 
       return { ok: true as const, bugId };
     }),
+
+  /**
+   * 2026-06-12 (CJ「Mia 細緻化 — LLM 個人化下一步建議」):
+   * Resolve an "llm" kind contextual nudge against the user's brand brain.
+   * Frontend fires a nudge with kind="llm" → posts here with the prompt
+   * template (already interpolated client-side) + nudge ID. We run the
+   * prompt through the multi-model router with a short token budget and
+   * return the personalised message back. Frontend swaps it into the
+   * queued nudge entry. On failure, client keeps the static fallback.
+   *
+   * Rate-limited so a hot-loop in the client (or a malicious actor)
+   * can't burn LLM credits.
+   */
+  contextNudge: protectedProcedure
+    .input(z.object({
+      nudgeId: z.string().min(1).max(80),
+      prompt: z.string().min(1).max(2000),
+      lang: z.enum(["zh-TW", "en"]).default("zh-TW"),
+      contextVars: z.record(z.string(), z.any()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Rate limit: reuse the existing per-user rate state so a chat-spamming
+      // user can't bypass Mia message limits by spamming contextNudge.
+      const rate = checkRateLimit(ctx.user.id);
+      if (!rate.allowed) {
+        // Don't error — return the empty result so the static fallback stays.
+        return { ok: false as const, reason: rate.reason ?? "rate_limited", message: null };
+      }
+
+      // Personalize system prompt with brand context if available.
+      // We don't bail when no brand is found — the frontend already passes
+      // {brandName} / {brandVoice} in the prompt for the common case.
+      const systemPrompt = input.lang === "en"
+        ? "You are Mia, OnBrand's customer success manager. Respond in natural English. " +
+          "No greetings or sign-offs — just the actionable next-step text. " +
+          "Maximum 80 words. Never invent metrics or features."
+        : "你是 Mia，OnBrand 客戶成功經理。用自然口語繁體中文回應。" +
+          "不要打招呼或結尾——直接給可執行的下一步建議。" +
+          "最多 80 字。不要編造數字或功能。";
+
+      try {
+        const result = await callModel({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: input.prompt },
+          ],
+          // Short budget keeps response snappy + cheap. 80 words ≈ 200 tokens.
+          maxTokens: 280,
+          temperature: 0.7,
+          purpose: "support_mia_nudge",
+          userId: ctx.user.id,
+        } as any);
+        const message = String((result as any)?.text ?? (result as any)?.content ?? "").trim();
+        if (message.length === 0) {
+          return { ok: false as const, reason: "empty_llm_response", message: null };
+        }
+        return { ok: true as const, message };
+      } catch (e: any) {
+        // Eat the error — frontend keeps the static fallback. We log to
+        // stderr so PM2 captures it; no need to throw upstream.
+        console.warn(
+          `[support.contextNudge] ${input.nudgeId} LLM call failed:`,
+          e?.message ?? e,
+        );
+        return { ok: false as const, reason: "llm_error", message: null };
+      }
+    }),
 });
 
 /**
