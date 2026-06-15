@@ -88,6 +88,18 @@ function buildPrompt(input: ImageGenInput): string {
   if (bc.audience) lines.push(`Audience: ${bc.audience}`);
   if (bc.colourHints?.length) lines.push(`Colour palette: ${bc.colourHints.join(", ")}`);
   if (input.channel) lines.push(`Channel: ${input.channel.toUpperCase()}`);
+  // Brand override: the scene may come from a commercial-photography
+  // template that references another brand's product (e.g. Coca-Cola,
+  // Sprite). Instruct the model to adapt the style for this brand instead.
+  if (bc.brandName) {
+    lines.push("");
+    lines.push(
+      `BRAND ADAPTATION: This image represents ${bc.brandName}. ` +
+      `If the scene below references any other brand or product by name, ` +
+      `visually replace it with ${bc.brandName}'s product while keeping ` +
+      `the exact same composition, lighting, and atmosphere.`
+    );
+  }
   lines.push("");
   lines.push("Scene:");
   lines.push(input.prompt);

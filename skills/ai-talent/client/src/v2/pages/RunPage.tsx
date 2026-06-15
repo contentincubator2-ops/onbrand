@@ -2019,15 +2019,48 @@ export default function RunPage() {
                         <button
                           key={t.id}
                           onClick={async () => {
-                            // Fetch full prompt body, then prepend to user's prompt
                             try {
                               const full = await (utils as any).promptTemplate?.detail?.fetch?.({ id: t.id });
                               if (full?.prompt) {
-                                setImagePrompt(full.prompt);
+                                // Brand substitution: replace the template's hardcoded
+                                // product/brand references with the user's own brand.
+                                // Nano-Banana templates embed real brand names (Coca-Cola,
+                                // Sprite, etc.) as style anchors — we swap them out so
+                                // the image comes out as the user's product, not the
+                                // template's original product.
+                                const brandName = (data as any)?.brand?.name ?? "";
+                                const productName = (data as any)?.product?.name ?? brandName;
+                                const subjectLabel = productName || brandName;
+
+                                let adapted = full.prompt;
+                                if (subjectLabel) {
+                                  // 1. JSON templates: replace focus_object field value
+                                  adapted = adapted.replace(
+                                    /"focus_object"\s*:\s*"([^"]+)"/g,
+                                    `"focus_object": "${subjectLabel} product"`
+                                  );
+                                  // 2. All templates: replace the most common hardcoded
+                                  //    beverage/consumer brand names that appear in this
+                                  //    prompt library, keeping the rest of the style intact.
+                                  const brandTokens = [
+                                    "Coca-Cola Can", "Coca-Cola Bottle", "Coca-Cola",
+                                    "Sprite Bottle", "Sprite Can", "Sprite",
+                                    "Fanta Bottle", "Fanta Can", "Fanta",
+                                    "Pepsi Bottle", "Pepsi Can", "Pepsi",
+                                    "Red Bull Can", "Red Bull",
+                                    "iPhone", "Samsung Galaxy",
+                                  ];
+                                  for (const token of brandTokens) {
+                                    adapted = adapted.split(token).join(`${subjectLabel} product`);
+                                  }
+                                }
+
+                                setImagePrompt(adapted);
+                                const didSub = adapted !== full.prompt;
                                 showToastGlobal(
                                   lang === "en"
-                                    ? `Template applied: ${full.title.slice(0, 30)}`
-                                    : `已套用範本：${full.title.slice(0, 30)}`
+                                    ? `Template applied${didSub && subjectLabel ? ` — product swapped to "${subjectLabel}"` : ""}. Edit the prompt to fine-tune.`
+                                    : `已套用範本${didSub && subjectLabel ? `，產品已替換為「${subjectLabel}」` : ""}。可在上方 prompt 欄位微調。`
                                 );
                               }
                             } catch (e: any) {
