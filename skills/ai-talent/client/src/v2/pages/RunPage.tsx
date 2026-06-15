@@ -179,6 +179,61 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
   );
 }
 
+/**
+ * Convert a Nano-Banana JSON prompt template into a clean natural-language
+ * image prompt, substituting the original product/brand with the user's brand.
+ *
+ * Nano-Banana templates store the brand name in `concept_id` (e.g.
+ * "iron_man_coke") and multiple nested fields (focus_object, character_element,
+ * artistic_direction, etc.). Passing the raw JSON to an image model causes it
+ * to generate the original brand's product even when focus_object is replaced.
+ *
+ * This function extracts only the visual/compositional elements (environment,
+ * character, lighting, mood, style) and synthesizes a clean English prompt
+ * that never mentions any competitor brand name.
+ */
+function nanoBananaJsonToPrompt(rawJson: string, brandLabel: string): string | null {
+  let obj: any;
+  try { obj = JSON.parse(rawJson); } catch { return null; }
+  if (Array.isArray(obj)) obj = obj[0];
+  if (!obj || typeof obj !== "object") return null;
+
+  // Recursively find the first non-empty string value for any of the given keys.
+  const find = (node: any, ...keys: string[]): string | undefined => {
+    if (!node || typeof node !== "object") return undefined;
+    for (const k of keys) {
+      if (typeof node[k] === "string" && node[k].trim()) return node[k].trim();
+    }
+    for (const v of Object.values(node)) {
+      const r = find(v, ...keys);
+      if (r) return r;
+    }
+    return undefined;
+  };
+
+  const subject   = brandLabel ? `${brandLabel} product` : "product";
+  const charEl    = find(obj, "character_element", "character", "hand_element");
+  const env       = find(obj, "environment", "setting", "background", "scene");
+  const lighting  = find(obj, "lighting", "light", "illumination");
+  const mood      = find(obj, "mood", "atmosphere", "emotion", "feeling");
+  const style     = find(obj, "style", "aesthetic", "render_style", "rendering", "visual_style");
+  const camera    = find(obj, "camera_angle", "camera", "shot_type", "framing", "perspective");
+  const texture   = find(obj, "texture", "material", "surface");
+
+  const parts: string[] = [
+    subject,
+    charEl   ? `featuring ${charEl}` : undefined,
+    env      ? `set in ${env}` : undefined,
+    camera   ? camera : undefined,
+    lighting ? `${lighting} lighting` : undefined,
+    mood     ? `${mood} atmosphere` : undefined,
+    style    ? `${style} render` : undefined,
+    texture  ? texture : undefined,
+  ].filter((x): x is string => Boolean(x));
+
+  return parts.join(", ");
+}
+
 export default function RunPage() {
   const { outputId } = useParams<{ outputId: string }>();
   const navigate = useNavigate();
@@ -2079,16 +2134,24 @@ export default function RunPage() {
                                 const productName = (data as any)?.product?.name ?? brandName;
                                 const subjectLabel = productName || brandName;
 
+                                // For JSON-format Nano-Banana templates, convert to a
+                                // clean natural-language prompt so the model never sees
+                                // `concept_id: "iron_man_coke"` or any other competitor-
+                                // brand anchor that causes the wrong product to appear.
+                                // For plain-text templates, fall back to token replacement.
                                 let adapted = full.prompt;
-                                if (subjectLabel) {
-                                  // 1. JSON templates: replace focus_object field value
-                                  adapted = adapted.replace(
-                                    /"focus_object"\s*:\s*"([^"]+)"/g,
-                                    `"focus_object": "${subjectLabel} product"`
-                                  );
-                                  // 2. All templates: replace the most common hardcoded
-                                  //    beverage/consumer brand names that appear in this
-                                  //    prompt library, keeping the rest of the style intact.
+                                const trimmedPrompt = adapted.trim();
+                                const isJsonTemplate =
+                                  trimmedPrompt.startsWith("{") || trimmedPrompt.startsWith("[");
+
+                                if (isJsonTemplate && subjectLabel) {
+                                  const converted = nanoBananaJsonToPrompt(trimmedPrompt, subjectLabel);
+                                  if (converted) {
+                                    adapted = converted;
+                                  }
+                                } else if (subjectLabel) {
+                                  // Plain-text templates: replace the most common hardcoded
+                                  // beverage/consumer brand names in this prompt library.
                                   const brandTokens = [
                                     "Coca-Cola Can", "Coca-Cola Bottle", "Coca-Cola",
                                     "Sprite Bottle", "Sprite Can", "Sprite",
