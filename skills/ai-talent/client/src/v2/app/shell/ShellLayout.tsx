@@ -20,7 +20,6 @@ import TrialCountdownBar from "../../components/TrialCountdownBar";
 import WorkspacePill from "../../components/WorkspacePill";
 import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
-import FestivalGlobalNudge from "../../components/FestivalGlobalNudge";
 import SupportDrawer from "../../components/SupportDrawer";
 // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
 // sessionStorage; this hook surfaces the count for the avatar badge and
@@ -340,9 +339,9 @@ export default function ShellLayout() {
         </div>
         */}
         <AchievementUnlockWatcher />
-        {/* 2026-05-11 (CJ「節慶日曆 + 自動提醒」): global festival nudge,
-            shows only when priority ≥ 4 festival is within 7 days. */}
-        <FestivalGlobalNudge />
+        {/* FestivalGlobalNudge removed 2026-06-15 — CJ: banner is distracting
+            and the /99s deep-link route returns 404. Festival prep handled
+            through normal task picker instead. */}
         <RouteErrorBoundary>
           <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
         </RouteErrorBoundary>
