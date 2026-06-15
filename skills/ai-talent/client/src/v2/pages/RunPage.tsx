@@ -42,6 +42,7 @@ import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
+import { fireNudge } from "../components/mia/miaNudges";
 
 type Mode = "edit" | "chat" | "image" | "video" | "agent" | "regen" | "settings" | "publish";
 
@@ -202,17 +203,41 @@ export default function RunPage() {
 
   const [activeIdx, setActiveIdx] = useState(0);
 
-  // 2026-06-05 (CJ「不阻擋，事後解釋」): when output loads with brand-rule fixes,
-  // trigger a Mia nudge that explains what was auto-corrected and offers a
-  // shortcut to the brand positioning tab. Only fires once per output (ref guard).
-  const nudgeFiredRef = useRef<number | null>(null);
+  // ── Mia contextual nudges for RunPage ────────────────────────────────
+  // Fires when output first loads: tells user what they can do right now
+  // on screen (AI copywriter, image prompt). Uses platform-specific catalog
+  // entries so the message is accurate. Ref-guarded to fire once per output.
+  const outputNudgeFiredRef = useRef<number | null>(null);
   React.useEffect(() => {
-    if (!data || nudgeFiredRef.current === id) return;
+    if (!data?.content || outputNudgeFiredRef.current === id) return;
+    outputNudgeFiredRef.current = id;
+    const taskId = String(data?.mission?.taskId ?? "");
+    const nudgeId =
+      taskId.startsWith("ig-")       ? "run.ig.output_ready" :
+      taskId.startsWith("fb-")       ? "run.fb.output_ready" :
+      taskId.startsWith("linkedin-") ? "run.linkedin.output_ready" :
+      taskId.startsWith("tiktok-")   ? "run.tiktok.output_ready" :
+      taskId.startsWith("yt-")       ? "run.yt.output_ready" :
+      taskId.startsWith("email-")    ? "run.email.output_ready" :
+      taskId.startsWith("pr-")       ? "run.pr.output_ready" :
+                                       "run.output_ready";
+    setTimeout(() => fireNudge(nudgeId as any), 1500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.content, id]);
+
+  // imageNudgeFiredRef declared here; the useEffect that uses `variants`
+  // is placed after the variants declaration below to avoid hoisting issues.
+  const imageNudgeFiredRef = useRef<number | null>(null);
+
+  // 2026-06-05 (CJ「不阻擋，事後解釋」): when output loads with brand-rule fixes,
+  // trigger a Mia nudge that explains what was auto-corrected.
+  const brandFixNudgeFiredRef = useRef<number | null>(null);
+  React.useEffect(() => {
+    if (!data || brandFixNudgeFiredRef.current === id) return;
     const fixes: Array<{ variantIndex: number; bannedHits: string[]; subsApplied: Array<{ from: string; to: string }>; rewrittenByLLM: boolean }> =
       (data as any)?.metadata?.brandFixes ?? [];
     if (!Array.isArray(fixes) || fixes.length === 0) return;
 
-    // Aggregate unique banned hits + subs across all variants
     const allBanned = new Set<string>();
     const allSubs = new Set<string>();
     for (const f of fixes) {
@@ -221,28 +246,17 @@ export default function RunPage() {
     }
     if (allBanned.size === 0 && allSubs.size === 0) return;
 
-    nudgeFiredRef.current = id;
+    brandFixNudgeFiredRef.current = id;
     const en = lang === "en";
-    const lines: string[] = [];
-    if (allBanned.size > 0) {
-      lines.push(en
-        ? `I noticed AI wrote: ${[...allBanned].slice(0, 3).map((w) => `"${w}"`).join(", ")} — these are on your brand's banned list, so I auto-rewrote them.`
-        : `我注意到 AI 寫到：${[...allBanned].slice(0, 3).map((w) => `「${w}」`).join("、")} — 這些是你品牌定位裡的禁用詞，所以幫你自動改寫了。`);
-    }
-    if (allSubs.size > 0) {
-      lines.push(en
-        ? `Substitutions applied: ${[...allSubs].slice(0, 3).join(", ")}.`
-        : `自動套用替換：${[...allSubs].slice(0, 3).join("、")}。`);
-    }
-    lines.push(en
-      ? "If this doesn't match what you want, want to adjust your brand voice or banned word list?"
-      : "如果不符合你想要的調性，要不要去調整一下品牌定位的語氣或禁用詞？");
-
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("mia:nudge", {
-        detail: { message: lines.join("\n\n") },
-      }));
-    }, 1200);
+    const bannedWords = en
+      ? [...allBanned].slice(0, 3).map((w) => `"${w}"`).join(", ")
+      : [...allBanned].slice(0, 3).map((w) => `「${w}」`).join("、");
+    const subs = allSubs.size > 0
+      ? (en
+          ? `Substitutions: ${[...allSubs].slice(0, 3).join(", ")}. `
+          : `自動套用替換：${[...allSubs].slice(0, 3).join("、")}。`)
+      : "";
+    setTimeout(() => fireNudge("run.brand_fix_applied", { bannedWords, subs }), 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, id]);
   // 2026-05-17 (CJ「存很多產出，每次給幾個，不滿意再多給」): for a large
@@ -822,6 +836,17 @@ export default function RunPage() {
     } catch { /* ignore */ }
     return [{ label: lang === "en" ? "Main version" : "主版本", caption: sanitizeCaption(data.content || "") }];
   }, [data]);
+
+  // Fires when the active variant's image finishes generating. Placed here
+  // (after variants declaration) so the hook can safely read variants[activeIdx].
+  React.useEffect(() => {
+    const currentVariant = variants[activeIdx];
+    if (currentVariant?.imageStatus !== "ready" || !currentVariant?.imageUrl) return;
+    if (imageNudgeFiredRef.current === id) return;
+    imageNudgeFiredRef.current = id;
+    setTimeout(() => fireNudge("run.image_ready"), 800);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variants[activeIdx]?.imageStatus, id]);
 
   // ── Unified schedule-dialog confirm handler ─────────────────────────────
   // (Defined here, after schedMode / schedPlatform / scheduleAt / variants are

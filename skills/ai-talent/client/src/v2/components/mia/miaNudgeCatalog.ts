@@ -451,6 +451,174 @@ export const NUDGE_CATALOG = {
     },
   },
 
+  // ─── RunPage contextual — fires from RunPage when output / image loads ──
+  // These tell the user what they can do RIGHT NOW on the current screen,
+  // not abstract next-step advice. Platform-specific so the message is
+  // accurate about available sidebar actions.
+
+  "run.ig.output_ready": {
+    id: "run.ig.output_ready",
+    dedupePerSession: false, // re-fire each new output
+    message: {
+      "zh-TW":
+        "IG 貼文產好了 🎉 右側有兩個工具可以幫你細調：\n" +
+        "① 點工具列的 💬 →「跟 AI 專家改文案」，直接告訴 AI 哪段不夠好、想換哪種語氣\n" +
+        "② 點 🖼️ → 修改圖片提示詞，按「重新生圖」換一張\n" +
+        "想換完全不同方向？上方「再給我 2 個」可以生新版本。",
+      en:
+        "IG post ready 🎉 Two tools on the right sidebar to fine-tune:\n" +
+        "① Tap 💬 → 'Refine with AI Expert' — tell it which line feels off or what tone you want\n" +
+        "② Tap 🖼️ → edit the image prompt, then hit Regenerate\n" +
+        "Want a completely different take? 'Give me 2 more' at the top generates fresh variants.",
+    },
+  },
+
+  "run.fb.output_ready": {
+    id: "run.fb.output_ready",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "FB 貼文好了！右側可以做的事：\n" +
+        "① 💬「跟 AI 專家改文案」→ 調整 CTA 語氣、縮短段落、或讓 hook 更強\n" +
+        "② 🖼️ → 換配圖提示詞重新生圖\n" +
+        "想做 A/B 三版本？切到「60s 套組」。",
+      en:
+        "FB post ready! What you can do on the right:\n" +
+        "① 💬 'Refine with AI Expert' → sharpen the CTA, shorten a paragraph, or punch up the hook\n" +
+        "② 🖼️ → swap image prompt and regenerate\n" +
+        "Want 3 A/B versions? Switch to the 60s pack tier.",
+    },
+  },
+
+  "run.linkedin.output_ready": {
+    id: "run.linkedin.output_ready",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "LinkedIn 文章好了。右側工具提醒：\n" +
+        "① 💬「跟 AI 專家改文案」→ 可以請 AI 讓開頭更抓眼、或加個數據佐證\n" +
+        "② 🖼️ → 換橫幅圖片提示詞\n" +
+        "LinkedIn 頭兩行是關鍵——如果展開前看不到鉤子，點擊率會掉很多。",
+      en:
+        "LinkedIn article ready. Sidebar tips:\n" +
+        "① 💬 'Refine with AI Expert' → ask AI to strengthen the opening line or add a data point\n" +
+        "② 🖼️ → swap the banner image prompt\n" +
+        "The first two lines are critical — if the hook isn't visible before 'more', click-through drops.",
+    },
+  },
+
+  "run.tiktok.output_ready": {
+    id: "run.tiktok.output_ready",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "TikTok 腳本好了！右側工具：\n" +
+        "① 💬「跟 AI 專家改文案」→ 可以叫 AI 讓第一秒更爆、或加一個反轉\n" +
+        "② 🖼️ → 換封面圖提示詞重新生\n" +
+        "TikTok 前 1.5 秒決定留存率——開頭不夠鉤，其他寫得再好也沒用。",
+      en:
+        "TikTok script ready! Sidebar tools:\n" +
+        "① 💬 'Refine with AI Expert' → make the first second more explosive, or add a twist\n" +
+        "② 🖼️ → swap the cover image prompt\n" +
+        "First 1.5 seconds determine retention — everything else is irrelevant if the hook doesn't land.",
+    },
+  },
+
+  "run.yt.output_ready": {
+    id: "run.yt.output_ready",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "YouTube 腳本好了。右側工具：\n" +
+        "① 💬「跟 AI 專家改文案」→ 讓 intro hook 更強、或重寫 CTA\n" +
+        "② 🖼️ → 換縮圖提示詞重新生圖\n" +
+        "前 15 秒 retention 是 YouTube 演算法最重視的指標——可以請 AI 專門重寫 intro。",
+      en:
+        "YouTube script ready. Sidebar tools:\n" +
+        "① 💬 'Refine with AI Expert' → strengthen the intro hook or rewrite the CTA\n" +
+        "② 🖼️ → swap the thumbnail prompt\n" +
+        "First-15-second retention is YouTube's top signal — ask the AI to specifically rewrite the intro.",
+    },
+  },
+
+  "run.email.output_ready": {
+    id: "run.email.output_ready",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "EDM 草稿好了。右側工具：\n" +
+        "① 💬「跟 AI 專家改文案」→ 調整主旨行、強化 CTA、或縮短段落\n" +
+        "② 🖼️ → 換 Header 圖提示詞\n" +
+        "主旨行是開信率關鍵——可以叫 AI 幫你給 5 個替代版本，拿去 A/B test。",
+      en:
+        "Email draft ready. Sidebar tools:\n" +
+        "① 💬 'Refine with AI Expert' → tweak the subject line, punch up the CTA, or trim a paragraph\n" +
+        "② 🖼️ → swap the header image prompt\n" +
+        "Subject line drives open rate — ask AI to give you 5 alternates for A/B testing.",
+    },
+  },
+
+  "run.pr.output_ready": {
+    id: "run.pr.output_ready",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "PR 新聞稿好了。右側工具：\n" +
+        "① 💬「跟 AI 專家改文案」→ 改新聞鉤角度、或強化數據引用\n" +
+        "② 🖼️ → 換配圖提示詞\n" +
+        "記者最看重第一段——如果想試不同框架（反共識 / 數據驅動 / 對抗框架），告訴 AI 專家。",
+      en:
+        "Press release ready. Sidebar tools:\n" +
+        "① 💬 'Refine with AI Expert' → try a different news angle or sharpen a data citation\n" +
+        "② 🖼️ → swap the image prompt\n" +
+        "Journalists weigh the first paragraph most — tell the AI Expert if you want a different frame.",
+    },
+  },
+
+  "run.output_ready": {
+    id: "run.output_ready",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "內容好了 🎉 右側工具可以幫你細調：\n" +
+        "① 💬「跟 AI 專家改文案」→ 告訴 AI 哪段不夠好、想換哪種語氣\n" +
+        "② 🖼️ → 修改圖片提示詞重新生圖",
+      en:
+        "Content ready 🎉 Use the right sidebar to fine-tune:\n" +
+        "① 💬 'Refine with AI Expert' — tell it which line feels off or what tone you want\n" +
+        "② 🖼️ → edit the image prompt and regenerate",
+    },
+  },
+
+  "run.image_ready": {
+    id: "run.image_ready",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "🖼️ 圖片出來了。不滿意可以在右側「🖼️ 圖片設定」改提示詞重新生——" +
+        "也可以切換 AI 模型（目前預設 gpt-image-2）試試不同風格。",
+      en:
+        "🖼️ Image generated. Not happy with it? Open 🖼️ Image Settings on the right, " +
+        "edit the prompt, and hit Regenerate. You can also swap AI models (currently defaulting to gpt-image-2).",
+    },
+  },
+
+  "run.brand_fix_applied": {
+    id: "run.brand_fix_applied",
+    dedupePerSession: false,
+    message: {
+      "zh-TW":
+        "我注意到 AI 寫到了你品牌定位裡的禁用詞：{bannedWords}——已自動改寫。{subs}" +
+        "如果不符合你想要的調性，要不要去調整一下品牌定位的語氣或禁用詞？",
+      en:
+        "I noticed AI used words on your brand's banned list: {bannedWords} — auto-corrected. {subs}" +
+        "If this doesn't match your intended tone, want to adjust your brand voice or banned word list?",
+    },
+    actions: [
+      { kind: "navigate", url: "/brand", label: "調整品牌定位 →" },
+    ],
+  },
+
   // ─── Media / asset generation ─────────────────────────────────────────
 
   "media.first_image_generated": {
