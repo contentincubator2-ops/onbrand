@@ -116,6 +116,12 @@ jobs:
             rm -rf "$BUILD_TMP"
             echo "✓ public/ swapped"
 
+            echo "===== Clear compiled artifacts (stale dist/ can shadow .ts source) ====="
+            rm -rf "$AI/dist" 2>/dev/null || true
+
+            echo "===== Verify imageRouter enum includes gpt-image-2 ====="
+            grep -c "gpt-image-2" "$AI/server/routers/imageRouter.ts" && echo "✓ gpt-image-2 present in imageRouter.ts" || echo "✗ gpt-image-2 MISSING from imageRouter.ts"
+
             echo "===== Restart PM2 ====="
             TSX=$AI/node_modules/.bin/tsx
             set -a
