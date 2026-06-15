@@ -121,6 +121,14 @@ export function igPlaybookFor(taskId: string): string {
     return P("3-8 個分層（大流量/中精準/小社群/品牌專屬）、與內容相關、不重複堆砌。");
   if (/dm|comment/.test(id))
     return P("像真人、先共鳴再回應；不模板、不冷淡；一個自然的下一步。");
+  if (/countdown/.test(id))
+    return P(
+      "5天倒數弧 — 每天獨立受眾 + 獨立 USP，不可重複：\n" +
+      "第5天：認知（這是什麼）→ 第4天：差異化（為什麼是你）→ 第3天：信任（別人怎麼說）→ 第2天：誘因（現在行動的理由）→ 第1天：最後衝刺（稀缺＋強CTA）。\n" +
+      "每篇開頭必須用中文自然點出倒數天數（「還有X天」「只剩X天」），不可出現英文 Day。\n" +
+      "視覺要隨日期升溫：第5天溫和介紹感，第1天最強視覺衝擊＋緊迫色彩。\n" +
+      "參考「Select Registry Stay for the Story」(IAC)：5天分眾升級，每天一個獨立目標。"
+    );
   if (/live/.test(id))
     return P("開場 30 秒講清楚「為什麼留下來」；預告 hook；CTA 互動。");
   return P("IG 通用：視覺首屏鉤子＋文案首行 hook＋單一 CTA＋分層 hashtag。");

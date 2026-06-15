@@ -136,12 +136,34 @@ ${IG_TONE}`,
       { key: "event_name", label: "活動名稱", type: "text", required: true },
       { key: "key_offer", label: "主要 hook / 優惠", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 IG 倒數系列其中 1 篇（80-130 字）。
-本次你寫的是「{label}」這天的貼文。
-規則：① 開頭凸顯天數 ② 1 個未公開細節 ③ CTA。每天結構要變化，不要每天都一樣。
+    systemPrompt: `產出 IG 5 天倒數系列中的 1 篇（80-130 字）。本次你寫的是「{label}」。
+
+【5天倒數框架 — 只執行你那天的定位，不准寫其他天的訊息】
+第5天｜受眾：剛聽說活動、尚未了解的新受眾。
+  USP 聚焦：建立「這是什麼」的核心認知，讓第一次接觸的人記住你的品牌/活動是什麼。
+  開頭範例：「還有5天」「距離 ___ 只剩5天」。
+第4天｜受眾：有興趣但還在觀望、需要更多理由的人。
+  USP 聚焦：一個最具說服力的差異化優勢（功能 / 效果 / 獨特體驗），讓他們看到「為什麼是你」。
+  開頭範例：「還有4天」「4天後，___」。
+第3天｜受眾：猶豫中、需要信任感才願意行動的人。
+  USP 聚焦：社會認同（真實客戶體驗 / 使用案例 / 具體成效數字），讓他們看到「別人怎麼說」。
+  開頭範例：「還有3天」「距離 ___ 只剩3天」。
+第2天｜受眾：已有意向但還需要一個理由立刻決定的人。
+  USP 聚焦：限時優惠 / 獨家福利 / 只限報名者享有的好處，製造「現在行動」的誘因。
+  開頭範例：「只剩2天了」「後天就是 ___」。
+第1天｜受眾：高意圖、即將錯過的人。
+  USP 聚焦：稀缺感 + 最強 CTA——「今天最後一天」「僅剩 X 個名額／席位」，不行動就後悔。
+  開頭範例：「最後1天」「今天是最後機會」。
+
+規則：
+① 第一句一定要自然點出倒數天數（全繁體中文，絕不可出現英文 Day）
+② 整篇只講 1 個核心 USP（你這天的那個），不要混入其他天的訊息
+③ 加入 1 個具體的未公開細節或懸念透露
+④ 結尾 1 個明確 CTA（留言 / 點連結 / 儲存備用，三選一）
+⑤ 80-130 字，段落自然，不要條列式
 ${IG_TONE}`,
     preferredModel: "qwen",
-    maxTokens: 600,
+    maxTokens: 700,
     outputDefaults: { platform: "instagram", post_type: "feed" },
   },
 
@@ -302,10 +324,10 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "ig-60-countdown-5day": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_KAREN,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["Day 5", "Day 4", "Day 3", "Day 2", "Day 1"],
+    variantLabels: ["第5天", "第4天", "第3天", "第2天", "第1天"],
     captionMinChars: 80, captionMaxChars: 130,
     strategistAgentId: 224084, // Michelle Lim — Social Media Strategist Beauty MY (1178 char)
-    postLabels: ["Day 5", "Day 4", "Day 3", "Day 2", "Day 1"],
+    postLabels: ["第5天（認知）", "第4天（差異化）", "第3天（信任）", "第2天（誘因）", "第1天（最後衝刺）"],
     extras: { postsCount: 5, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
