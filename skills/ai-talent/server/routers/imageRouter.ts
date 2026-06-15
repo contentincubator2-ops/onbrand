@@ -17,10 +17,12 @@ import { assertBrandOwner } from "../_core/brandAuth";
 const channel = z.enum(["fb", "ig", "linkedin", "youtube", "pr"]);
 const size = z.enum(["1024x1024", "1024x1536", "1536x1024"]);
 // 2026-05-12 (CJ「給用戶選 image model」): user-facing model picker.
+// 2026-06-15: added gpt-image-2 (OpenAI latest, now the global default).
 const modelChoice = z.enum([
   "auto",
   "flux-schnell",
   "gpt-image-1",
+  "gpt-image-2",
   "flux-realism",
   "ideogram-v3",
   "imagen-3",
@@ -57,10 +59,11 @@ export const imageRouter = router({
       // Imagen/Ideogram middle = 50 pts.
       const { assertPoints, deductPoints } = await import("../_core/pointsService");
       const imageAction =
-        input.modelChoice === "gpt-image-1"   ? "image_gpt"      :
-        input.modelChoice === "imagen-3"      ? "image_imagen"   :
-        input.modelChoice === "ideogram-v3"   ? "image_ideogram" :
-        /* default flux-schnell / flux-realism / auto */          "image_flux";
+        (input.modelChoice === "gpt-image-1" ||
+         input.modelChoice === "gpt-image-2")  ? "image_gpt"      :
+        input.modelChoice === "imagen-3"       ? "image_imagen"   :
+        input.modelChoice === "ideogram-v3"    ? "image_ideogram" :
+        /* default flux-schnell / flux-realism / auto */           "image_flux";
       await assertPoints(ctx.user.id, imageAction as any);
       await deductPoints(ctx.user.id, imageAction as any, { kind: "brand", id: input.brandId });
 

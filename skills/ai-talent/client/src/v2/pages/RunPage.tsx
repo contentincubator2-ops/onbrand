@@ -808,6 +808,20 @@ export default function RunPage() {
     return d.toISOString().slice(0, 16); // local datetime-local format
   });
 
+  // Multi-day series: countdown / serial / live-suite etc. need a date-range
+  // picker so each post lands on the right day automatically.
+  const taskIdStr = String((data as any)?.mission?.taskId ?? "");
+  const isCountdownTask = taskIdStr.includes("countdown");
+  const isMultiDayTask = /countdown|serial|highlight-suite|live-suite|launch-kit|reel-series/.test(taskIdStr);
+  // For countdown: anchor = event date (posts count back from it).
+  // For others: anchor = start date (posts count forward from it).
+  const [seriesAnchorDate, setSeriesAnchorDate] = useState(() => {
+    const d = new Date();
+    // Default anchor: 7 days out so there's room for the series
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
+
   const variants: VariantData[] = useMemo(() => {
     if (!data) return [];
     try {
@@ -848,19 +862,106 @@ export default function RunPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variants[activeIdx]?.imageStatus, id]);
 
+  // Compute per-variant post dates for multi-day series tasks.
+  // Countdown: anchor = event date, posts go Day5…Day1 (earliest to latest).
+  // Others: anchor = start date, posts go Day1, Day2… (forward).
+  const postDates: Date[] = useMemo(() => {
+    if (!isMultiDayTask || variants.length === 0) return [];
+    const anchor = new Date(seriesAnchorDate + "T09:00:00");
+    return variants.map((_, i) => {
+      const d = new Date(anchor);
+      if (isCountdownTask) {
+        d.setDate(anchor.getDate() - variants.length + i);
+      } else {
+        d.setDate(anchor.getDate() + i);
+      }
+      return d;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seriesAnchorDate, variants.length, isMultiDayTask, isCountdownTask]);
+
   // ── Unified schedule-dialog confirm handler ─────────────────────────────
   // (Defined here, after schedMode / schedPlatform / scheduleAt / variants are
   //  all in scope — was above them before which caused TS2448 TDZ errors.)
   const handleScheduleConfirm = React.useCallback(async () => {
+    const _tid = (data as any)?.mission?.taskId ?? "";
+    const _pfxMap: Record<string, string> = {
+      fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
+      li: "linkedin", em: "email", pr: "press",
+    };
+    const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
+    const _platform = schedMode === "publish"
+      ? schedPlatform
+      : ((data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook");
+
+    // ── Multi-day series path ─────────────────────────────────────────────
+    if (isMultiDayTask && postDates.length === variants.length && schedMode !== "publish") {
+      const esc = (s: string) => String(s ?? "")
+        .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
+        .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+
+      if (schedMode === "ics") {
+        // Build multi-event .ics, one per variant
+        const brandName = (data as any)?.brand?.name ?? "";
+        const ev: string[] = [];
+        variants.forEach((v, i) => {
+          const d = postDates[i];
+          if (!d) return;
+          const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+          const dEnd = new Date(d); dEnd.setDate(d.getDate() + 1);
+          const ymdEnd = `${dEnd.getFullYear()}${String(dEnd.getMonth() + 1).padStart(2, "0")}${String(dEnd.getDate()).padStart(2, "0")}`;
+          const summary = (brandName ? brandName + " · " : "") + (v.label ?? `Day ${i + 1}`);
+          ev.push(
+            "BEGIN:VEVENT",
+            `UID:${id}-series-${i}@onbrand.sowork.ai`,
+            `DTSTART;VALUE=DATE:${ymd}`,
+            `DTEND;VALUE=DATE:${ymdEnd}`,
+            `SUMMARY:${esc(summary)}`,
+            `DESCRIPTION:${esc(v.caption ?? "")}`,
+            "END:VEVENT",
+          );
+        });
+        const icsStr = [
+          "BEGIN:VCALENDAR", "VERSION:2.0",
+          "PRODID:-//OnBrand//Content Calendar//ZH",
+          "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
+        ].join("\r\n");
+        const blob = new Blob([icsStr], { type: "text/calendar;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `series-${id}.ics`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        setScheduleDialogOpen(false);
+        showToastGlobal(lang === "en"
+          ? `Exported ${variants.length} posts — drop the .ics into your calendar`
+          : `已匯出 ${variants.length} 篇 — 拖進日曆 App 即可`);
+        return;
+      }
+
+      // "calendar" mode: write each variant to scheduled_posts sequentially
+      try {
+        for (let i = 0; i < variants.length; i++) {
+          const d = postDates[i];
+          if (!d) continue;
+          await scheduleToCalMut?.mutateAsync?.({
+            outputId: id,
+            variantIndex: i,
+            platform: _platform,
+            scheduledAt: d.toISOString(),
+          });
+        }
+        setScheduleDialogOpen(false);
+        navigate("/calendar");
+      } catch {
+        // error toast already shown by scheduleToCalMut.onError
+      }
+      return;
+    }
+
+    // ── Single-post path (original behaviour) ────────────────────────────
     const _scheduledAt = new Date(scheduleAt).toISOString();
     if (schedMode === "ics") {
-      const _tid = (data as any)?.mission?.taskId ?? "";
-      const _pfxMap: Record<string, string> = {
-        fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
-        li: "linkedin", em: "email", pr: "press",
-      };
-      const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
-      const _platform = (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
       scheduleMut.mutate({
         id, variantIndex: activeIdx,
         scheduledAt: _scheduledAt,
@@ -875,17 +976,6 @@ export default function RunPage() {
         },
       });
     } else {
-      const _platform = schedMode === "publish"
-        ? schedPlatform
-        : (() => {
-            const _tid = (data as any)?.mission?.taskId ?? "";
-            const _pfxMap: Record<string, string> = {
-              fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
-              li: "linkedin", em: "email", pr: "press",
-            };
-            const _pfx = (_tid.match(/^([a-z]+)-/) ?? [])[1] ?? "";
-            return (data as any)?.metadata?.platform ?? _pfxMap[_pfx] ?? "facebook";
-          })();
       try {
         await scheduleToCalMut?.mutateAsync?.({
           outputId: id, variantIndex: activeIdx,
@@ -898,7 +988,7 @@ export default function RunPage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schedMode, schedPlatform, scheduleAt, id, activeIdx, data, scheduleMut, scheduleToCalMut, navigate]);
+  }, [schedMode, schedPlatform, scheduleAt, seriesAnchorDate, id, activeIdx, data, variants, postDates, isMultiDayTask, scheduleMut, scheduleToCalMut, navigate, lang]);
 
   // ── Bulk .ics export (calendar-type tasks only) ──────────────────────────
   const handleBulkIcsExport = React.useCallback(() => {
@@ -2455,25 +2545,75 @@ export default function RunPage() {
               : (lang === "en" ? `Publish — ${schedPlatform}` : `排程發布 — ${schedPlatform}`)}
           </ModalHeader>
           <ModalBody className="space-y-3">
-            <Input
-              type="datetime-local"
-              label={lang === "en" ? "Publish at" : "發布時間"}
-              value={scheduleAt}
-              onChange={(e) => setScheduleAt(e.target.value)}
-            />
-            <p className="text-tiny text-default-500">
-              {schedMode === "ics"
-                ? (lang === "en"
-                  ? "Downloads a .ics file — drag into Google Calendar / Outlook / Apple Calendar."
-                  : "產生 .ics 檔 — 拖進 Google Calendar / Outlook / Apple Calendar 即可。")
-                : schedMode === "calendar"
-                ? (lang === "en"
-                  ? "Adds this post to Calendar. You can track it and publish from the Calendar page."
-                  : "將此貼文加入日曆。確認後自動跳轉日曆頁面，可在那裡追蹤並一鍵發布。")
-                : (lang === "en"
-                  ? `Schedules this post to ${schedPlatform}. After confirming you'll be taken to the Calendar page to publish.`
-                  : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡一鍵發布。`)}
-            </p>
+            {/* Multi-day series: show anchor-date picker + per-post date preview */}
+            {isMultiDayTask && schedMode !== "publish" ? (
+              <>
+                <Input
+                  type="date"
+                  label={
+                    isCountdownTask
+                      ? (lang === "en" ? "Event date" : "活動日期")
+                      : (lang === "en" ? "First post date" : "第一篇發布日期")
+                  }
+                  value={seriesAnchorDate}
+                  onChange={(e) => setSeriesAnchorDate(e.target.value)}
+                />
+                <p className="text-tiny text-default-500">
+                  {isCountdownTask
+                    ? (lang === "en"
+                        ? "Posts are scheduled day-by-day counting down to the event date."
+                        : "系統會自動從活動日期往前，每天一篇排好 5 天倒數。")
+                    : (lang === "en"
+                        ? "Posts are scheduled one per day starting from the first post date."
+                        : "從第一篇日期開始，每天依序排一篇。")}
+                </p>
+                {/* Per-variant date preview */}
+                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #E5E5E5" }}>
+                  {variants.map((v, i) => {
+                    const d = postDates[i];
+                    const weekdays = lang === "en"
+                      ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                      : ["日", "一", "二", "三", "四", "五", "六"];
+                    const dateStr = d
+                      ? `${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）`
+                      : "—";
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between px-3 py-2 text-[12px]"
+                        style={i < variants.length - 1 ? { borderBottom: "1px solid #F5F5F5" } : undefined}
+                      >
+                        <span className="font-medium text-default-700">{v.label ?? `Day ${i + 1}`}</span>
+                        <span className="text-default-400">{dateStr}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              /* Single-post: original datetime-local picker */
+              <Input
+                type="datetime-local"
+                label={lang === "en" ? "Publish at" : "發布時間"}
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+              />
+            )}
+            {!isMultiDayTask || schedMode === "publish" ? (
+              <p className="text-tiny text-default-500">
+                {schedMode === "ics"
+                  ? (lang === "en"
+                    ? "Downloads a .ics file — drag into Google Calendar / Outlook / Apple Calendar."
+                    : "產生 .ics 檔 — 拖進 Google Calendar / Outlook / Apple Calendar 即可。")
+                  : schedMode === "calendar"
+                  ? (lang === "en"
+                    ? "Adds this post to Calendar. You can track it and publish from the Calendar page."
+                    : "將此貼文加入日曆。確認後自動跳轉日曆頁面，可在那裡追蹤並一鍵發布。")
+                  : (lang === "en"
+                    ? `Schedules this post to ${schedPlatform}. After confirming you'll be taken to the Calendar page to publish.`
+                    : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡一鍵發布。`)}
+              </p>
+            ) : null}
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={() => setScheduleDialogOpen(false)}>{t("cancel")}</Button>
@@ -2482,7 +2622,9 @@ export default function RunPage() {
               isLoading={schedMode === "ics" ? scheduleMut.isPending : (scheduleToCalMut?.isPending ?? false)}
               onPress={handleScheduleConfirm}
             >
-              {schedMode === "ics"
+              {isMultiDayTask && schedMode !== "publish"
+                ? (lang === "en" ? `Schedule all ${variants.length} posts` : `排程全部 ${variants.length} 篇`)
+                : schedMode === "ics"
                 ? (lang === "en" ? "Download" : "下載")
                 : (lang === "en" ? "Confirm" : "確認排程")}
             </Button>
