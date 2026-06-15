@@ -202,6 +202,18 @@ export default function RunPage() {
 
   const [activeIdx, setActiveIdx] = useState(0);
 
+  // 2026-06-15: set image model default based on platform once data loads.
+  // IG is visual-first — gpt-image-1 produces notably higher quality than
+  // Flux Schnell (auto) and makes the difference visible in the feed.
+  // Only sets once (when imageModel is still "auto") so manual overrides stick.
+  useEffect(() => {
+    if (!data?.mission?.taskId) return;
+    if (imageModel !== "auto") return;
+    if (String(data.mission.taskId).startsWith("ig-")) {
+      setImageModel("gpt-image-1");
+    }
+  }, [data?.mission?.taskId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 2026-06-05 (CJ「不阻擋，事後解釋」): when output loads with brand-rule fixes,
   // trigger a Mia nudge that explains what was auto-corrected and offers a
   // shortcut to the brand positioning tab. Only fires once per output (ref guard).
@@ -315,7 +327,9 @@ export default function RunPage() {
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
-  /** 2026-05-12: user-selected image model for 改圖 dropdown. */
+  /** 2026-05-12: user-selected image model for 改圖 dropdown.
+   *  2026-06-15: IG tasks default to gpt-image-1 (higher quality for
+   *  visual-first platform); all others remain "auto" (env default). */
   const [imageModel, setImageModel] = useState<string>("auto");
   /** Video gen state — async job, polled for status. */
   const [videoDuration, setVideoDuration] = useState<number>(30);
