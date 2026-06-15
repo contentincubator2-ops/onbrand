@@ -2122,8 +2122,19 @@ export const quickTaskRouter = router({
       const row = (rows as any[])[0];
       if (!row) throw new Error("output not found or no permission");
       const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
-      const taskId = row.taskId;
+      let taskId: string = row.taskId ?? "";
       const inputs = md.inputs ?? {};
+
+      // Fallback: if taskId missing from metadata, recover from mission description tag [task:<id>]
+      if (!taskId && row.missionId) {
+        const [mRows]: any = await localPool.execute(
+          `SELECT description FROM missions WHERE id = ? LIMIT 1`,
+          [row.missionId],
+        );
+        const desc: string = (mRows as any[])[0]?.description ?? "";
+        const m = desc.match(/\[task:([^\]]+)\]/);
+        if (m?.[1]) taskId = m[1];
+      }
       if (!taskId) throw new Error("此 output 沒有 taskId metadata，無法重生");
 
       const template =
@@ -2136,7 +2147,12 @@ export const quickTaskRouter = router({
         PR_30S_TASKS.find((t) => t.id === taskId) ??
         BRAND_30S_TASKS.find((t) => t.id === taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === taskId) ??
-        KOL_30S_TASKS.find((t) => t.id === taskId);
+        KOL_30S_TASKS.find((t) => t.id === taskId) ??
+        getFB60Template(taskId) ??
+        getIG60Template(taskId) ??
+        getYT60Template(taskId) ??
+        getMulti60Template(taskId) ??
+        get99Template(taskId);
       if (!template) throw new Error(`未知 task: ${taskId}`);
 
       const { getOrchestraConfig } = await import("../_core/quickTaskFB");
@@ -2149,7 +2165,12 @@ export const quickTaskRouter = router({
         getEmailOrchestraConfig(taskId) ??
         getPROrchestraConfig(taskId) ??
         getBrandOrchestraConfig(taskId) ??
-        getResearchOrchestraConfig(taskId);
+        getResearchOrchestraConfig(taskId) ??
+        getFB60OrchestraConfig(taskId) ??
+        getIG60OrchestraConfig(taskId) ??
+        getYT60OrchestraConfig(taskId) ??
+        getMulti60OrchestraConfig(taskId) ??
+        get99OrchestraConfig(taskId);
       if (!fullConfig) throw new Error(`no orchestra config for ${taskId}`);
 
       // Override config to produce ONE variant only — use the same label
@@ -2161,9 +2182,13 @@ export const quickTaskRouter = router({
       const targetLabel = existingVariants[input.variantIndex]?.label ?? fullConfig.variantLabels[input.variantIndex] ?? `版本 ${input.variantIndex + 1}`;
       const singleConfig = { ...fullConfig, variants: 1, images: 0, runImageGen: false, variantLabels: [targetLabel] };
 
+      const taskTier: "30s" | "60s" | "99s" =
+        get99Template(taskId)  ? "99s" :
+        (getFB60Template(taskId) ?? getIG60Template(taskId) ?? getYT60Template(taskId) ?? getMulti60Template(taskId)) ? "60s" :
+        "30s";
       const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const r = await runOrchestra({
-        template, config: singleConfig, inputs, brandId: row.mission_brand_id ?? undefined, userId, tier: "30s",
+        template, config: singleConfig, inputs, brandId: row.mission_brand_id ?? undefined, userId, tier: taskTier,
       });
       const newVariant = r.variants?.[0];
       if (!newVariant?.caption) throw new Error("重生失敗，agent 沒回傳內容");
