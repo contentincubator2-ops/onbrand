@@ -24,7 +24,8 @@ export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
 export type ImageModelChoice =
   | "auto"
   | "flux-schnell"      // PiAPI Flux Schnell — fast (5-10s), 4-step
-  | "gpt-image-1"       // OpenAI — best realism
+  | "gpt-image-1"       // OpenAI gpt-image-1 — strong realism
+  | "gpt-image-2"       // OpenAI gpt-image-2 — latest, higher quality
   | "flux-realism"      // PiAPI Flux Dev with realism LoRA
   | "ideogram-v3"       // PiAPI Ideogram — strongest at text-in-image
   | "imagen-3";         // Google Imagen 3
@@ -99,11 +100,12 @@ function buildPrompt(input: ImageGenInput): string {
 
 async function runOpenAI(
   promptText: string,
-  size: ImageSize
+  size: ImageSize,
+  modelOverride?: string,
 ): Promise<{ url: string | null; b64: string | null; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-  const model = process.env.IMAGE_GEN_MODEL_OPENAI || "gpt-image-1";
+  const model = modelOverride || process.env.IMAGE_GEN_MODEL_OPENAI || "gpt-image-1";
 
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
@@ -214,7 +216,8 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   let primaryModelId: string | null = null;
   switch (choice) {
     case "flux-schnell":   effectivePrimary = "piapi";  primaryModelId = "piapi/flux-schnell"; break;
-    case "gpt-image-1":    effectivePrimary = "openai"; break;
+    case "gpt-image-1":    effectivePrimary = "openai"; primaryModelId = "gpt-image-1"; break;
+    case "gpt-image-2":    effectivePrimary = "openai"; primaryModelId = "gpt-image-2"; break;
     case "flux-realism":   effectivePrimary = "piapi";  primaryModelId = "piapi/flux-realism"; break;
     case "ideogram-v3":    effectivePrimary = "piapi";  primaryModelId = "piapi/ideogram-v3"; break;
     case "imagen-3":       effectivePrimary = "google"; break;
@@ -223,7 +226,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   }
 
   const run = async (p: ImageProvider, modelId?: string | null) => {
-    if (p === "openai") return await runOpenAI(promptText, size);
+    if (p === "openai") return await runOpenAI(promptText, size, modelId ?? undefined);
     if (p === "google") return await runGoogleImagen(promptText, size);
     if (p === "piapi")  return await runPiapi(promptText, size, modelId ?? "piapi/flux-schnell");
     throw new Error(`Provider ${p} not implemented`);

@@ -210,7 +210,7 @@ export default function RunPage() {
     if (!data?.mission?.taskId) return;
     if (imageModel !== "auto") return;
     if (String(data.mission.taskId).startsWith("ig-")) {
-      setImageModel("gpt-image-1");
+      setImageModel("gpt-image-2");
     }
   }, [data?.mission?.taskId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1957,7 +1957,8 @@ export default function RunPage() {
                   >
                     <option value="auto">{lang === "en" ? "Auto (default)" : "自動（預設）"}</option>
                     <option value="flux-schnell">{lang === "en" ? "Fast — Flux Schnell (5-10s)" : "快速 — Flux Schnell（5-10 秒）"}</option>
-                    <option value="gpt-image-1">{lang === "en" ? "Photo-real — GPT Image-1 (15-25s, most photo-like)" : "寫實 — GPT Image-1（15-25 秒，最像照片）"}</option>
+                    <option value="gpt-image-2">{lang === "en" ? "Best — GPT Image-2 (20-30s, OpenAI latest)" : "最佳 — GPT Image-2（20-30 秒，OpenAI 最新）"}</option>
+                    <option value="gpt-image-1">{lang === "en" ? "Photo-real — GPT Image-1 (15-25s)" : "寫實 — GPT Image-1（15-25 秒）"}</option>
                     <option value="flux-realism">{lang === "en" ? "Photographic — Flux Realism (15-30s)" : "攝影感 — Flux Realism（15-30 秒）"}</option>
                     <option value="ideogram-v3">{lang === "en" ? "With text — Ideogram V3 (best in-image text)" : "含文字 — Ideogram V3（圖中文字最強）"}</option>
                     <option value="imagen-3">Google Imagen 4</option>
