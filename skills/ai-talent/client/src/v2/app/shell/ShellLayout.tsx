@@ -2846,6 +2846,26 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
    navigation stay intact. User can click a different sidebar item and
    continue working without a hard refresh.
    ══════════════════════════════════════════════════════════════════ */
+// Detect Vite code-split chunk load failures that happen when a user has a
+// stale index.html cached after a new deployment. The fix is a one-time hard
+// reload: the browser will fetch the new index.html and all chunk URLs will
+// resolve correctly. sessionStorage prevents infinite reload loops.
+function isChunkLoadError(err: Error): boolean {
+  const text = (err.message ?? "") + " " + (err.stack ?? "");
+  return /Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk|Loading CSS chunk|error loading dynamically imported module/i.test(text);
+}
+function autoReloadOnce(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem("_chunk_reload_at") ?? 0);
+    if (Date.now() - last > 15_000) {
+      sessionStorage.setItem("_chunk_reload_at", String(Date.now()));
+      window.location.reload();
+      return true;
+    }
+  } catch { /* sessionStorage blocked */ }
+  return false;
+}
+
 class RouteErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null; resetKey: number }
@@ -2853,6 +2873,8 @@ class RouteErrorBoundary extends React.Component<
   state = { error: null as Error | null, resetKey: 0 };
   static getDerivedStateFromError(error: Error) { return { error, resetKey: 0 }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
+    if (isChunkLoadError(error) && autoReloadOnce()) return;
     // eslint-disable-next-line no-console
     console.error("[RouteErrorBoundary] route render error:", error, info);
     try {
