@@ -2165,13 +2165,43 @@ export default function RunPage() {
                                   }
                                 }
 
-                                setImagePrompt(adapted);
-                                const didSub = adapted !== full.prompt;
-                                showToastGlobal(
-                                  lang === "en"
-                                    ? `Template applied${didSub && subjectLabel ? ` — product swapped to "${subjectLabel}"` : ""}. Edit the prompt to fine-tune.`
-                                    : `已套用範本${didSub && subjectLabel ? `，產品已替換為「${subjectLabel}」` : ""}。可在上方 prompt 欄位微調。`
-                                );
+                                // If there's a caption for the active variant, blend
+                                // the template's visual style with the caption content
+                                // via the LLM — so the image reflects BOTH what the post
+                                // is about AND how the template should look.
+                                // Without this, the template's visual style is used as-is
+                                // and the caption is silently ignored.
+                                const activeCaption = variants[activeIdx]?.caption ?? "";
+                                const brandId = (data as any)?.brand?.id;
+                                if (activeCaption && brandId) {
+                                  const channelVal = (
+                                    mockupVariant?.platform === "facebook"  ? "fb" :
+                                    mockupVariant?.platform === "instagram" ? "ig" :
+                                    mockupVariant?.platform === "linkedin"  ? "linkedin" :
+                                    mockupVariant?.platform === "youtube"   ? "youtube" :
+                                    mockupVariant?.platform === "tiktok"    ? "tiktok" :
+                                    undefined
+                                  ) as any;
+                                  captionToPromptMut.mutate({
+                                    brandId,
+                                    caption: activeCaption,
+                                    channel: channelVal,
+                                    imageStyle: adapted,
+                                  });
+                                  showToastGlobal(
+                                    lang === "en"
+                                      ? "Blending template style with your caption…"
+                                      : "正在將範本風格與你的文案結合，產生圖片指令…"
+                                  );
+                                } else {
+                                  // No caption yet: set the template style directly.
+                                  setImagePrompt(adapted);
+                                  showToastGlobal(
+                                    lang === "en"
+                                      ? "Template applied. Edit the prompt or write a caption first for best results."
+                                      : "已套用範本視覺風格。建議先寫好文案，再點範本效果更佳。"
+                                  );
+                                }
                               }
                             } catch (e: any) {
                               showToastGlobal(
