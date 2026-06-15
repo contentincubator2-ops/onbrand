@@ -202,18 +202,6 @@ export default function RunPage() {
 
   const [activeIdx, setActiveIdx] = useState(0);
 
-  // 2026-06-15: set image model default based on platform once data loads.
-  // IG is visual-first — gpt-image-1 produces notably higher quality than
-  // Flux Schnell (auto) and makes the difference visible in the feed.
-  // Only sets once (when imageModel is still "auto") so manual overrides stick.
-  useEffect(() => {
-    if (!data?.mission?.taskId) return;
-    if (imageModel !== "auto") return;
-    if (String(data.mission.taskId).startsWith("ig-")) {
-      setImageModel("gpt-image-2");
-    }
-  }, [data?.mission?.taskId]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // 2026-06-05 (CJ「不阻擋，事後解釋」): when output loads with brand-rule fixes,
   // trigger a Mia nudge that explains what was auto-corrected and offers a
   // shortcut to the brand positioning tab. Only fires once per output (ref guard).
@@ -328,9 +316,8 @@ export default function RunPage() {
   /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
   /** 2026-05-12: user-selected image model for 改圖 dropdown.
-   *  2026-06-15: IG tasks default to gpt-image-1 (higher quality for
-   *  visual-first platform); all others remain "auto" (env default). */
-  const [imageModel, setImageModel] = useState<string>("auto");
+   *  2026-06-15: default gpt-image-2 across all platforms. */
+  const [imageModel, setImageModel] = useState<string>("gpt-image-2");
   /** Video gen state — async job, polled for status. */
   const [videoDuration, setVideoDuration] = useState<number>(30);
   const [videoJobId, setVideoJobId] = useState<number | null>(null);
@@ -800,8 +787,6 @@ export default function RunPage() {
   //   "publish"  → platform-specific write to scheduled_posts + navigate /calendar
   const [schedMode, setSchedMode] = useState<"ics" | "calendar" | "publish">("ics");
   const [schedPlatform, setSchedPlatform] = useState("facebook");
-  // publishExpanded: show/hide platform list under 直接發佈
-  const [publishExpanded, setPublishExpanded] = useState(false);
   const [scheduleAt, setScheduleAt] = useState(() => {
     const d = new Date();
     d.setHours(d.getHours() + 24);
@@ -2324,129 +2309,10 @@ export default function RunPage() {
             </Card>
           )}
 
-          {/* 2026-06-02 (CJ): Simplified publish panel — 4 clean actions.
-              直接發佈 / 送到行事曆 / 下載 .ics / 分享連結.
-              Platform list collapses under 直接發佈 to keep the panel compact. */}
           <Card>
             <CardBody className="space-y-2 p-3">
 
-              {/* ── 1. 直接發佈 ──────────────────────────── */}
-              <Button
-                fullWidth color="primary"
-                startContent={<FontAwesomeIcon icon={faRocket} />}
-                endContent={
-                  <FontAwesomeIcon
-                    icon={publishExpanded ? faChevronUp : faChevronDown}
-                    style={{ fontSize: 10, marginLeft: "auto" }}
-                  />
-                }
-                className="justify-start"
-                onPress={() => setPublishExpanded((v) => !v)}
-              >
-                {lang === "en" ? "Direct Publish" : "直接發佈"}
-              </Button>
-
-              {/* Expandable platform list */}
-              {publishExpanded && (
-                <div
-                  className="rounded-xl overflow-hidden"
-                  style={{ border: "1px solid #E5E5E5" }}
-                >
-                  {[
-                    { key: "facebook",  label: "Facebook",  icon: faFacebook,  color: "#1877F2" },
-                    { key: "instagram", label: "Instagram", icon: faInstagram, color: "#E1306C" },
-                    { key: "linkedin",  label: "LinkedIn",  icon: faLinkedin,  color: "#0A66C2" },
-                    { key: "youtube",   label: "YouTube",   icon: faYoutube,   color: "#FF0000" },
-                  ].map((p, idx) => {
-                    const isFb        = p.key === "facebook";
-                    const pdConn      = (platformsQRun?.data as any)?.connected?.[p.key];
-                    const isConnected = isFb ? (fbConnected || fbOauthDone) : !!pdConn;
-                    const accountName = isFb
-                      ? ((fbStatusQuery?.data as any)?.fbPageName ?? null)
-                      : (pdConn?.name ?? null);
-                    return (
-                      <div
-                        key={p.key}
-                        className="flex items-center gap-2 px-3 py-2"
-                        style={idx < 3 ? { borderBottom: "1px solid #F5F5F5" } : undefined}
-                      >
-                        <div
-                          className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
-                          style={{ background: p.color + "18" }}
-                        >
-                          <FontAwesomeIcon icon={p.icon} style={{ color: p.color, fontSize: 11 }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium leading-tight text-default-900">{p.label}</p>
-                          <p className="text-[9px] leading-tight truncate" style={{ color: isConnected ? "#16a34a" : "#9ca3af" }}>
-                            {isConnected
-                              ? (accountName ?? (lang === "en" ? "Connected" : "已連接"))
-                              : (lang === "en" ? "Not connected" : "尚未連接")}
-                          </p>
-                        </div>
-                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: isConnected ? "#4ade80" : "#e5e7eb" }} />
-                        {isFb ? (
-                          fbOauthPending ? (
-                            <Button size="sm" variant="flat" isDisabled className="min-w-[52px] text-[10px]">
-                              <span className="animate-spin text-primary">⟳</span>
-                            </Button>
-                          ) : isConnected ? (
-                            <Button
-                              size="sm" color="primary" className="min-w-[52px] text-[10px]"
-                              isLoading={scheduleToCalMut?.isPending}
-                              isDisabled={scheduleToCalMut?.isPending}
-                              onPress={() => {
-                                setSchedPlatform("facebook");
-                                setSchedMode("publish");
-                                setScheduleDialogOpen(true);
-                              }}
-                            >
-                              {lang === "en" ? "Publish" : "發布"}
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm" color="primary" variant="flat" className="min-w-[52px] text-[10px]"
-                              isLoading={fbConnectUrlMut?.isPending}
-                              isDisabled={fbConnectUrlMut?.isPending}
-                              onPress={connectFacebookViaUrl}
-                            >
-                              {lang === "en" ? "Connect" : "連接"}
-                            </Button>
-                          )
-                        ) : isConnected ? (
-                          <Button
-                            size="sm" color="primary" className="min-w-[52px] text-[10px]"
-                            isLoading={scheduleToCalMut?.isPending}
-                            isDisabled={scheduleToCalMut?.isPending}
-                            onPress={() => {
-                              setSchedPlatform(p.key);
-                              setSchedMode("publish");
-                              setScheduleDialogOpen(true);
-                            }}
-                          >
-                            {lang === "en" ? "Publish" : "發布"}
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm" color="default" variant="flat" className="min-w-[52px] text-[10px]"
-                            isLoading={pipedreamBusy}
-                            isDisabled={pipedreamBusy}
-                            onMouseEnter={() => prefetchConnect(p.key as any)}
-                            onFocus={() => prefetchConnect(p.key as any)}
-                            onPress={() => openPipedreamConnect(p.key as any)}
-                          >
-                            {lang === "en" ? "Connect" : "連接"}
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div style={{ height: 1, background: "#F5F5F5", margin: "2px 0" }} />
-
-              {/* ── 2. 送到行事曆 ─────────────────────────── */}
+              {/* ── 1. 送到行事曆 ─────────────────────────── */}
               <Button
                 variant="flat" fullWidth
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
