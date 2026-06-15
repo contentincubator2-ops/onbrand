@@ -791,6 +791,21 @@ export default function RunPage() {
       })
     : { mutate: () => {}, isPending: false };
 
+  // 2026-06-15: generate image prompt from the current variant's caption.
+  const captionToPromptMut = (trpc as any).image?.promptFromCaption?.useMutation
+    ? (trpc as any).image.promptFromCaption.useMutation({
+        onSuccess: (r: any) => {
+          if (r?.prompt) {
+            setImagePrompt(r.prompt);
+            showToastGlobal(lang === "en" ? "Image prompt generated from caption ✓" : "已從文案產生圖片指令 ✓");
+          }
+        },
+        onError: (e: any) => showToastGlobal(
+          lang === "en" ? `Couldn't generate prompt: ${e?.message ?? e}` : `產生失敗：${e?.message ?? e}`
+        ),
+      })
+    : { mutate: () => {}, isPending: false };
+
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState("");
   const [emailNote, setEmailNote] = useState("");
@@ -1992,6 +2007,38 @@ export default function RunPage() {
                       generated image now renders in the mockup's own
                       image slot (left), so the duplicate "目前這篇的圖"
                       preview here is removed to avoid showing it twice. */}
+                  {/* 2026-06-15: auto-generate image prompt from the current
+                      variant's caption + brand context via LLM. Replaces
+                      manual template hunting for caption-aware prompts. */}
+                  {variants[activeIdx]?.caption && data.brand?.id && (
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="secondary"
+                      fullWidth
+                      isLoading={captionToPromptMut.isPending}
+                      onPress={() => {
+                        captionToPromptMut.mutate({
+                          brandId: data.brand!.id,
+                          caption: variants[activeIdx].caption,
+                          channel: (
+                            mockupVariant?.platform === "facebook"  ? "fb" :
+                            mockupVariant?.platform === "instagram" ? "ig" :
+                            mockupVariant?.platform === "linkedin"  ? "linkedin" :
+                            mockupVariant?.platform === "youtube"   ? "youtube" :
+                            mockupVariant?.platform === "tiktok"    ? "tiktok" :
+                            undefined
+                          ) as any,
+                          imageStyle: variants[activeIdx]?.imageStyle ?? undefined,
+                        });
+                      }}
+                    >
+                      {captionToPromptMut.isPending
+                        ? (lang === "en" ? "Generating…" : "產生中…")
+                        : (lang === "en" ? "✨ Auto-generate prompt from this post" : "✨ 根據這篇文案自動產生圖片指令")}
+                    </Button>
+                  )}
+
                   {/* 2026-05-12 Phase 1 (CJ「prompt library 整合」):
                       Nano-Banana 175 商業攝影 prompt 範本。先選類別 → 列表
                       → 點 card 套用到 prompt textarea。 */}

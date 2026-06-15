@@ -110,6 +110,74 @@ export const imageRouter = router({
       return result;
     }),
 
+  /**
+   * 2026-06-15: Generate an image prompt from a post caption.
+   * Reads the caption + brand context → asks the LLM to produce a
+   * concise, model-ready image generation prompt in English.
+   * The client can then drop this into the imagePrompt textarea and
+   * generate with any model (GPT, Flux, Imagen, etc.).
+   */
+  promptFromCaption: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      caption: z.string().min(1).max(6000),
+      channel: z.enum(["fb", "ig", "linkedin", "youtube", "tiktok", "email", "pr"]).optional(),
+      imageStyle: z.string().max(1000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+
+      const resolved = await resolveBrandVisualContext(input.brandId);
+      const { invokeLLM } = await import("../_core/llm");
+
+      const brandBlock = [
+        resolved.brandName   ? `Brand name: ${resolved.brandName}`     : "",
+        resolved.positioning ? `Positioning: ${resolved.positioning}`   : "",
+        resolved.archetype   ? `Archetype: ${resolved.archetype}`       : "",
+        resolved.voiceTone   ? `Voice/Tone: ${resolved.voiceTone}`      : "",
+        resolved.audience    ? `Target audience: ${resolved.audience}`  : "",
+        resolved.colourHints?.length ? `Brand colours: ${resolved.colourHints.join(", ")}` : "",
+      ].filter(Boolean).join("\n");
+
+      const channelHint =
+        input.channel === "ig"        ? "Instagram feed post (square 1:1)"     :
+        input.channel === "fb"        ? "Facebook post (landscape 4:3)"        :
+        input.channel === "linkedin"  ? "LinkedIn post (landscape 16:9)"       :
+        input.channel === "youtube"   ? "YouTube thumbnail (landscape 16:9)"   :
+        input.channel === "tiktok"    ? "TikTok post (portrait 9:16)"          :
+        "social media post";
+
+      const styleHint = input.imageStyle
+        ? `\nVisual brief already drafted by art director:\n${input.imageStyle}`
+        : "";
+
+      const systemPrompt = `You are a senior commercial photography art director.
+Given a social media caption and brand context, write a concise, specific image-generation prompt in English (80–160 words).
+
+Rules:
+- Describe: main subject, environment/setting, lighting, mood, camera angle/framing
+- Reflect the caption's core message visually — do NOT illustrate literally (no text in frame)
+- Use the brand's visual identity (colours, archetype, tone)
+- Do NOT mention any competitor brand names
+- Output ONLY the image prompt — no explanation, no preamble, no quotes`;
+
+      const userMsg = `Brand context:\n${brandBlock}\n\nPlatform: ${channelHint}${styleHint}\n\nCaption:\n${input.caption}`;
+
+      const result = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user",   content: userMsg },
+        ],
+        maxTokens: 250,
+      });
+
+      const raw = result.choices?.[0]?.message?.content ?? "";
+      const text = (typeof raw === "string" ? raw : "").trim();
+      if (!text) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "LLM returned empty prompt" });
+      return { prompt: text };
+    }),
+
   listForDecision: protectedProcedure
     .input(z.object({ decisionId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
