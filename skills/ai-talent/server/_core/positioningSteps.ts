@@ -26,7 +26,7 @@
  *     messaging_strategy, tagline_creative, golden_circle_refine,
  *     brand_personality — folded into the segment steps above).
  *
- * Product (6 steps): market_fit, target_user, value_prop, differentiation, messaging, gtm_summary
+ * Product (6 steps = PRODUCT_SEGMENTS ids): core, audience, value, competition, strategy, marketing
  * Event   (4 steps): audience_brief, value_hook, messaging, callouts
  */
 import { invokeLLM } from "./llm";
@@ -75,21 +75,6 @@ async function callJSON(ctx: StepContext, stepId: string, system: string, user: 
   return safeJSON(text, fallback);
 }
 
-async function callText(ctx: StepContext, stepId: string, system: string, user: string, maxTokens = 800): Promise<string> {
-  const r = await invokeLLM({
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-    maxTokens,
-  });
-  const content = r.choices[0]?.message?.content;
-  const text = typeof content === "string" ? content : "";
-  const inTok  = r.usage?.prompt_tokens ?? 0;
-  const outTok = r.usage?.completion_tokens ?? 0;
-  await ctx.recordUsage(`positioning_step:${stepId}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok, costFor(inTok, outTok));
-  return text.trim();
-}
 
 const SYS = (lang: string) => `你是品牌定位專家，請用${lang}回答，輸出純 JSON。`;
 
@@ -293,77 +278,101 @@ samples 3-4 組。`,
 
 // ─── Product 6-step pipeline ─────────────────────────────────────────────
 
+// ─── Product pipeline — one step per PRODUCT_SEGMENTS id ─────────────────
+//
+// 2026-06-16 ROOT-CAUSE FIX (CJ「產品定位看起來沒跑完」): the previous
+// product pipeline emitted ad-hoc keys (marketFit / targetUser / valueProp /
+// productDifferentiation / productMessaging / gtmSummary) that NO reader
+// understood. The 品牌大腦 cards, the task-modal context chips, and
+// positioningJobsRouter.getCurrent all read products.positioning.<segmentId>
+// where segmentId ∈ PRODUCT_SEGMENTS (client/src/v2/lib/positioningSchema.ts):
+// core / audience / value / competition / strategy / marketing. So the job
+// would report done 6/6 yet every field showed「尚未填寫」.
+//
+// Now: ONE step per PRODUCT_SEGMENTS id; each step's id IS the segment id and
+// its LLM prompt emits JSON in EXACTLY that segment's field schema. The runner
+// merges { [segmentId]: <segment object> } straight into products.positioning.
 export function buildProductPositioningSteps(opts: { lang?: string } = {}): PositioningStep[] {
   const lang = opts.lang === "en" ? "English" : "繁體中文";
   const sys = SYS(lang);
-  const pCtx = (c: StepContext) =>
-    `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+  const pCtx = (c: StepContext) => {
+    const base = `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+    if (c.realContent) {
+      return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
+    }
+    return base;
+  };
 
   return [
+    // ── Wave 1 (no deps) ──
     {
-      id: "marketFit",
-      label: "市場契合度",
+      id: "core",
+      label: "產品核心定位",
       deps: [],
       run: async (c) => ({
-        marketFit: await callJSON(c, "marketFit", sys,
-          `${pCtx(c)}\n\n分析產品市場契合度，輸出 JSON：
-{"marketNeed":"市場需求","competingProducts":["競品1","競品2"],"whitespace":"市場空隙"}`,
-          { marketNeed: "", competingProducts: [], whitespace: "" }, 1000),
+        core: await callJSON(c, "core", sys,
+          `${pCtx(c)}\n\n撰寫此產品的核心定位。只輸出 JSON，鍵名固定如下：
+{"name":"產品名稱","zhTagline":"中文標語（12字內）","enTagline":"英文標語","coreStatement":"核心定位敘述（80-150字）","oneLineValueProp":"一句話價值主張（速查卡用，30字內）"}`,
+          { name: "", zhTagline: "", enTagline: "", coreStatement: "", oneLineValueProp: "" }, 1200),
       }),
     },
     {
-      id: "targetUser",
-      label: "目標用戶",
+      id: "audience",
+      label: "目標族群",
       deps: [],
       run: async (c) => ({
-        targetUser: await callJSON(c, "targetUser", sys,
-          `${pCtx(c)}\n\n定義產品目標用戶，輸出 JSON：
-{"primaryUser":"主要用戶輪廓","useCases":["使用情境1","使用情境2","使用情境3"],"userPainPoints":["痛點1","痛點2"]}`,
-          { primaryUser: "", useCases: [], userPainPoints: [] }, 1000),
+        audience: await callJSON(c, "audience", sys,
+          `${pCtx(c)}\n\n定義此產品的目標族群。只輸出 JSON，鍵名固定如下：
+{"primary":"主目標族群完整敘事（人口統計 / 心理 / 使用情境 / 痛點，120-250字）","secondary":"次目標族群（60-120字）","pains":["痛點1","痛點2","痛點3"],"needs":["需求1","需求2","需求3"]}`,
+          { primary: "", secondary: "", pains: [], needs: [] }, 1400),
       }),
     },
+    // ── Wave 2 (deps core) ──
     {
-      id: "valueProp",
-      label: "價值主張",
-      deps: ["marketFit", "targetUser"],
+      id: "value",
+      label: "產品價值主張",
+      deps: ["core"],
       run: async (c) => ({
-        valueProp: await callJSON(c, "valueProp", sys,
-          `${pCtx(c)}\n\n撰寫產品價值主張，輸出 JSON：
-{"headline":"主訴求（10字內）","keyBenefits":["效益1","效益2","效益3"],"emotionalHook":"情感勾子"}`,
-          { headline: "", keyBenefits: [], emotionalHook: "" }, 1000),
+        value: await callJSON(c, "value", sys,
+          `${pCtx(c)}\n\n撰寫此產品的價值主張。只輸出 JSON，鍵名固定如下：
+{"coreFunctions":["核心功能1","核心功能2","核心功能3"],"features":["特色1","特色2"],"advantages":["優勢1","優勢2"],"primaryEmotion":"主要情緒價值（一句話）","personality":"品牌個性（一句話）","userFeeling":"使用者感受（一句話）"}`,
+          { coreFunctions: [], features: [], advantages: [], primaryEmotion: "", personality: "", userFeeling: "" }, 1400),
       }),
     },
     {
-      id: "productDifferentiation",
-      label: "產品差異化",
-      deps: ["marketFit"],
+      id: "competition",
+      label: "競爭定位",
+      deps: ["core"],
       run: async (c) => ({
-        productDifferentiation: await callJSON(c, "productDifferentiation", sys,
-          `${pCtx(c)}\n\n分析產品差異化，輸出 JSON：
-{"keyDifferentiators":["差異化點1","差異化點2","差異化點3"],"comparisonHook":"vs 競品的一句話差異"}`,
-          { keyDifferentiators: [], comparisonHook: "" }, 1000),
+        competition: await callJSON(c, "competition", sys,
+          `${pCtx(c)}\n\n分析此產品的競爭定位。只輸出 JSON，鍵名固定如下：
+{"competitors":[{"name":"競品名","position":"市場定位"}],"uniqueUsp":"獨家賣點（只有你說得出口，80-150字）","rareUsp":"少數競品也說的賣點","commonUsp":"多數競爭者都說的賣點"}
+competitors 2-3 個。`,
+          { competitors: [], uniqueUsp: "", rareUsp: "", commonUsp: "" }, 1600),
       }),
     },
+    // ── Wave 3 (deps wave 2) ──
     {
-      id: "productMessaging",
-      label: "產品訊息",
-      deps: ["valueProp", "productDifferentiation"],
+      id: "strategy",
+      label: "產品策略",
+      deps: ["audience", "competition"],
       run: async (c) => ({
-        productMessaging: await callJSON(c, "productMessaging", sys,
-          `${pCtx(c)}\n\n制定產品訊息，輸出 JSON：
-{"tagline":"產品 tagline（8字內）","oneLiner":"一句話介紹","threePillars":["訊息支柱1","訊息支柱2","訊息支柱3"]}`,
-          { tagline: "", oneLiner: "", threePillars: [] }, 1000),
+        strategy: await callJSON(c, "strategy", sys,
+          `${pCtx(c)}\n\n制定此產品的市場策略。只輸出 JSON，鍵名固定如下：
+{"positioning":"產品定位策略（一句話）","pricing":"定價策略","channel":"通路策略","promotion":["推廣手法1","推廣手法2"],"lifecycleStage":"生命週期階段","marketGap":"市場受眾缺口","channelGap":"銷售通路缺口","priceGap":"價格區間缺口","promotionGap":"推廣策略缺口"}`,
+          { positioning: "", pricing: "", channel: "", promotion: [], lifecycleStage: "", marketGap: "", channelGap: "", priceGap: "", promotionGap: "" }, 1600),
       }),
     },
     {
-      id: "gtmSummary",
-      label: "GTM 摘要",
-      deps: ["productMessaging", "targetUser"],
-      run: async (c) => {
-        const text = await callText(c, "gtmSummary", `你是產品行銷顧問，請用${lang}撰寫。`,
-          `${pCtx(c)}\n\n撰寫 150 字以內的 go-to-market 重點摘要，純文字。`, 600);
-        return { gtmSummary: text };
-      },
+      id: "marketing",
+      label: "行銷文字指引",
+      deps: ["value"],
+      run: async (c) => ({
+        marketing: await callJSON(c, "marketing", sys,
+          `${pCtx(c)}\n\n制定此產品的行銷文字指引（文字 DNA，所有文案都要符合）。只輸出 JSON，鍵名固定如下：
+{"tone":"品牌語氣（一句話）","style":"溝通風格（一句話）","keywords":["關鍵詞1","關鍵詞2","關鍵詞3"],"visualStyle":"視覺文字搭配","colorStrategy":"色彩與情緒聯想","imageStyle":"圖像語言"}`,
+          { tone: "", style: "", keywords: [], visualStyle: "", colorStrategy: "", imageStyle: "" }, 1200),
+      }),
     },
   ];
 }
