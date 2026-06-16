@@ -2182,11 +2182,16 @@ export default function RunPage() {
                                     mockupVariant?.platform === "tiktok"    ? "tiktok" :
                                     undefined
                                   ) as any;
+                                  // Plain-text templates can be up to ~2600 chars; server
+                                  // allows max 3000. Truncate to 2800 to leave margin.
+                                  const styleHint = adapted.length > 2800
+                                    ? adapted.slice(0, 2797) + "…"
+                                    : adapted;
                                   captionToPromptMut.mutate({
                                     brandId,
                                     caption: activeCaption,
                                     channel: channelVal,
-                                    imageStyle: adapted,
+                                    imageStyle: styleHint,
                                   });
                                   showToastGlobal(
                                     lang === "en"

@@ -122,7 +122,9 @@ export const imageRouter = router({
       brandId: z.number().int().positive(),
       caption: z.string().min(1).max(6000),
       channel: z.enum(["fb", "ig", "linkedin", "youtube", "tiktok", "email", "pr"]).optional(),
-      imageStyle: z.string().max(1000).optional(),
+      // 3000 chars: plain-text Nano-Banana templates can reach ~2600 chars;
+      // JSON-converted templates are ~200-530 chars after nanoBananaJsonToPrompt.
+      imageStyle: z.string().max(3000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
