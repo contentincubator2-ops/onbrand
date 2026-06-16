@@ -4013,9 +4013,22 @@ function PositioningTopRow({
   const [optimisticStarting, setOptimisticStarting] = useState(false);
   const utils = (trpc as any).useUtils?.() ?? null;
 
+  // 2026-06-16 (CJ「產品定位卡住了，無法完成」): job 376 (product 46) showed
+  // backend status=done after 26s, but the UI stayed on "分析中 0/6" forever.
+  // Root cause: refetchInterval pauses while the tab is backgrounded (React
+  // Query default), and this pipeline can finish faster than the user
+  // switches back. refetchIntervalInBackground keeps polling even when the
+  // tab isn't focused; refetchOnWindowFocus/refetchOnMount force a fresh
+  // read the moment the user does look back, instead of trusting stale cache.
   const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
     { entityKind: entityKind ?? "brand", entityId: brandId ?? 0 },
-    { enabled: !!brandId && !!entityKind, refetchInterval: 4_000 },
+    {
+      enabled: !!brandId && !!entityKind,
+      refetchInterval: 4_000,
+      refetchIntervalInBackground: true,
+      refetchOnWindowFocus: true,
+      refetchOnMount: "always",
+    },
   );
   const jobData = (job?.data as any) ?? null;
   const isRunning = jobData?.status === "running" || optimisticStarting;
@@ -4103,6 +4116,18 @@ function PositioningTopRow({
               <div className="h-full bg-neutral-900 transition-all" style={{ width: `${Math.min(100, (cur / total) * 100)}%` }} />
             </div>
             <span className="text-xs text-default-700 tabular-nums">{cur}/{total}</span>
+            {/* 2026-06-16: manual escape hatch — if polling ever misses the
+                done/failed transition (e.g. tab was backgrounded mid-run),
+                this forces an immediate re-read instead of leaving the user
+                staring at a stale "分析中 0/總數" with no way to recover
+                short of a full page reload. */}
+            <button
+              onClick={() => utils?.positioningJobs?.getStatus?.invalidate?.()}
+              className="text-[11px] text-default-500 hover:text-default-800 underline"
+              title={lang === "en" ? "Force-refresh status" : "強制重新查詢狀態"}
+            >
+              {lang === "en" ? "refresh" : "重新查詢"}
+            </button>
           </div>
         )}
         {isFailed && jobData?.lastError && (
