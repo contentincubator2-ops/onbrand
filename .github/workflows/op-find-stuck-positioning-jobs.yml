@@ -13,10 +13,7 @@ jobs:
           ENV=/opt/onbrand/app/skills/ai-talent/.env
           set -a; source "$ENV"; set +a
           export MYSQL_PWD="$LOCAL_DB_PASSWORD"
-          DB_HOST="${LOCAL_DB_HOST:-localhost}"
-          DB_USER="${LOCAL_DB_USER:-root}"
-          DB_NAME="${LOCAL_DB_NAME:-mos_db}"
-          MYSQL="mysql -h$DB_HOST -u$DB_USER $DB_NAME -B -t"
+          MYSQL="mysql -h localhost -u mos_user mos_db -B -t"
 
           echo "════ All running/pending jobs right now ════"
           $MYSQL -e "
