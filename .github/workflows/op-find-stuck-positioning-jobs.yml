@@ -18,7 +18,7 @@ jobs:
           echo "════ All running/pending jobs right now ════"
           $MYSQL -e "
             SELECT pj.id, pj.entityKind, pj.entityId,
-                   COALESCE(b.brandName, b.name, p.name, e.name) AS entityName,
+                   COALESCE(b.name, p.name, e.name) AS entityName,
                    pj.status, pj.currentStep, pj.totalSteps, pj.retryCount,
                    TIMESTAMPDIFF(MINUTE, pj.startedAt, NOW()) AS ageMin,
                    LEFT(IFNULL(pj.lastError,''), 200) AS lastErr
