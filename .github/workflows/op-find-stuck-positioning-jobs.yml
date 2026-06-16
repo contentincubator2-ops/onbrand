@@ -32,6 +32,23 @@ jobs:
           " 2>&1
 
           echo ""
+          echo "════ product 46 (brandId 2890) — ALL job rows, any status ════"
+          $MYSQL -e "
+            SELECT id, entityKind, entityId, status, currentStep, totalSteps,
+                   retryCount, startedAt, finishedAt,
+                   LEFT(IFNULL(lastError,''), 300) AS lastErr
+              FROM positioning_jobs
+             WHERE entityKind='product' AND entityId=46
+             ORDER BY id DESC LIMIT 5;
+          " 2>&1
+
+          echo ""
+          echo "════ product 46 row + positioning JSON preview ════"
+          $MYSQL -e "
+            SELECT id, userId, brandId, name, LEFT(positioning, 200) AS positioning_preview
+              FROM products WHERE id=46\G" 2>&1
+
+          echo ""
           echo "════ pm2 status ════"
           pm2 list 2>&1 | head -10
 
