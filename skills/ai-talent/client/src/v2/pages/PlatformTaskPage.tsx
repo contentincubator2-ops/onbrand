@@ -622,11 +622,42 @@ function PlatformTaskPageInner() {
   // 2026-05-26 fix: was hardcoded productId/eventId: null → always fetched
   // brand-only positioning even when a product/event scope was active.
   // Now passes the real scope ids so context chips show the correct entity.
+  // 2026-06-16 (CJ「右上只選品牌，產品/活動在任務卡跳窗時選」): per-task
+  // entity selection. Defaults to brand-only; the user picks a product or
+  // event inside the launch modal. This replaces relying on the global
+  // scope.productId/eventId so the right-top picker can eventually drop
+  // those options. Initialized from global scope when a task opens (so
+  // existing right-top selections still carry through during the
+  // transition), then editable in-modal.
+  const [modalEntity, setModalEntity] = useState<{ kind: "brand" | "product" | "event"; id: number | null }>(
+    { kind: "brand", id: null },
+  );
+  // Effective per-task ids fed to context resolution + orchestra. Brand
+  // scope → both null; product/event scope → the matching id.
+  const taskProductId = modalEntity.kind === "product" ? modalEntity.id : null;
+  const taskEventId   = modalEntity.kind === "event"   ? modalEntity.id : null;
+
+  // Product / event lists for the in-modal picker, scoped to current brand.
+  const modalProductsQuery = (trpc as any).product?.list?.useQuery
+    ? (trpc as any).product.list.useQuery(
+        { brandId: brandId ?? undefined },
+        { enabled: !!brandId, refetchOnWindowFocus: false },
+      )
+    : { data: [] };
+  const modalEventsQuery = (trpc as any).event?.list?.useQuery
+    ? (trpc as any).event.list.useQuery(
+        { brandId: brandId ?? undefined },
+        { enabled: !!brandId, refetchOnWindowFocus: false },
+      )
+    : { data: [] };
+  const modalProducts = (modalProductsQuery.data as any[]) ?? [];
+  const modalEvents = (modalEventsQuery.data as any[]) ?? [];
+
   const scopeActiveQuery = (trpc as any).scope?.active?.useQuery?.(
     {
       brandId:   brandId ?? 0,
-      productId: ctx?.scope?.productId ?? null,
-      eventId:   ctx?.scope?.eventId   ?? null,
+      productId: taskProductId,
+      eventId:   taskEventId,
     },
     { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 60_000 },
   );
@@ -715,8 +746,8 @@ function PlatformTaskPageInner() {
     const basePositioning    = data.brand.positioning    ?? {};
     const productPositioning = (data.product?.positioning ?? {}) as Record<string, any>;
     const eventPositioning   = (data.event?.positioning   ?? {}) as Record<string, any>;
-    const productScopeActive = !!(ctx?.scope?.productId);
-    const eventScopeActive   = !!(ctx?.scope?.eventId);
+    const productScopeActive = !!taskProductId;
+    const eventScopeActive   = !!taskEventId;
 
     /** Does a positioning object have real (non-internal) segment data? */
     const posHasReal = (pos: Record<string, any>): boolean =>
@@ -759,7 +790,7 @@ function PlatformTaskPageInner() {
       product: data.product ?? null,
       event:   data.event   ?? null,
     };
-  }, [scopeActiveQuery?.data, ctx?.scope?.productId, ctx?.scope?.eventId]);
+  }, [scopeActiveQuery?.data, taskProductId, taskEventId]);
 
   // Auto-trigger interim positioning for product/event scope with no positioning.
   // Mirrors BrandsPage auto-trigger so users don't need to visit BrandsPage first.
@@ -769,8 +800,8 @@ function PlatformTaskPageInner() {
   const autoStartJobMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
   const trpcUtils = (trpc as any).useUtils?.() ?? null;
   useEffect(() => {
-    const productId = ctx?.scope?.productId ?? null;
-    const eventId   = ctx?.scope?.eventId   ?? null;
+    const productId = taskProductId;
+    const eventId   = taskEventId;
     if (!productId && !eventId) return; // Brand scope — BrandsPage handles it
     const kind: "product" | "event" = productId ? "product" : "event";
     const entityId = (productId ?? eventId) as number;
@@ -804,7 +835,7 @@ function PlatformTaskPageInner() {
       trpcUtils?.scope?.active?.invalidate?.();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx?.scope?.productId, ctx?.scope?.eventId, scopeActiveQuery?.data]);
+  }, [taskProductId, taskEventId, scopeActiveQuery?.data]);
 
   // Polish input
   const polishInputMut = (trpc as any).quickTask?.polishInput?.useMutation();
@@ -864,6 +895,15 @@ function PlatformTaskPageInner() {
     const primaryKey = (task as any).primary_input?.key ?? "topic";
     const prior = inputs[primaryKey] ?? Object.values(inputs)[0] ?? "";
     setActiveTask(task);
+    // Rerun: restore the entity the original run used if recorded, else fall
+    // back to current global scope, else brand.
+    const rpid = (r.metadata as any)?.productId ?? ctx?.scope?.productId ?? null;
+    const reid = (r.metadata as any)?.eventId ?? ctx?.scope?.eventId ?? null;
+    setModalEntity(
+      reid ? { kind: "event", id: reid } :
+      rpid ? { kind: "product", id: rpid } :
+      { kind: "brand", id: null },
+    );
     setPrimaryAnswer(typeof prior === "string" ? prior : "");
     const next = new URLSearchParams(searchParams);
     next.delete("rerun");
@@ -1048,6 +1088,16 @@ function PlatformTaskPageInner() {
     }
     recordTaskUsed(task.id);
     setActiveTask(task);
+    // Seed the per-task entity selector from the (legacy) global scope so an
+    // existing right-top product/event selection still carries through. Once
+    // the right-top picker drops these options, this just defaults to brand.
+    const gp = ctx?.scope?.productId ?? null;
+    const ge = ctx?.scope?.eventId ?? null;
+    setModalEntity(
+      ge ? { kind: "event", id: ge } :
+      gp ? { kind: "product", id: gp } :
+      { kind: "brand", id: null },
+    );
     let prefill = "";
     const derive = (task as any).primary_input?.derive;
     if (derive && brandCtx) {
@@ -1065,6 +1115,7 @@ function PlatformTaskPageInner() {
     setRunning(false);
     setCountdownStart(null);
     setOrchestraStages(null);
+    setModalEntity({ kind: "brand", id: null });
   };
 
   // ── Determine effective tier for running (tab || task.tier) ──────────────
@@ -1125,8 +1176,8 @@ function PlatformTaskPageInner() {
           taskId: activeTask.id,
           inputs: { [inputKey]: primaryAnswer },
           brandId: brandId ?? undefined,
-          productId: ctx?.scope?.productId ?? null,
-          eventId: ctx?.scope?.eventId ?? null,
+          productId: taskProductId,
+          eventId: taskEventId,
         });
 
         if ((r as any).outputId) {
@@ -1722,6 +1773,56 @@ function PlatformTaskPageInner() {
               </ModalHeader>
 
               <ModalBody>
+                {/* 2026-06-16: per-task entity picker. Brand by default; the
+                    user can switch to a specific product or event for THIS run.
+                    Selecting one re-runs the context resolution so the chips
+                    below + the generated content use that entity's positioning. */}
+                {brandId && (modalProducts.length > 0 || modalEvents.length > 0) && (
+                  <div className="mb-3">
+                    <p className="text-tiny text-default-500 mb-1.5">
+                      {lang === "en" ? "Generate for" : "這次要為哪個對象產出"}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => setModalEntity({ kind: "brand", id: null })}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                          modalEntity.kind === "brand"
+                            ? "bg-neutral-900 text-white border-neutral-900"
+                            : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                        }`}
+                      >
+                        {lang === "en" ? "Brand" : "品牌"}{brandName ? ` · ${brandName}` : ""}
+                      </button>
+                      {modalProducts.map((p: any) => (
+                        <button
+                          key={`p-${p.id}`}
+                          onClick={() => setModalEntity({ kind: "product", id: p.id })}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                            modalEntity.kind === "product" && modalEntity.id === p.id
+                              ? "bg-neutral-900 text-white border-neutral-900"
+                              : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                          }`}
+                        >
+                          {lang === "en" ? "Product · " : "產品 · "}{p.name}
+                        </button>
+                      ))}
+                      {modalEvents.map((e: any) => (
+                        <button
+                          key={`e-${e.id}`}
+                          onClick={() => setModalEntity({ kind: "event", id: e.id })}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                            modalEntity.kind === "event" && modalEntity.id === e.id
+                              ? "bg-neutral-900 text-white border-neutral-900"
+                              : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                          }`}
+                        >
+                          {lang === "en" ? "Event · " : "活動 · "}{e.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Brand assets empty hint */}
                 {textAssetsEmpty && brandId && (
                   <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
