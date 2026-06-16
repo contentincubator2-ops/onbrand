@@ -557,6 +557,38 @@ interface FBTaskCard {
   methodology?: string;
 }
 
+// ── Inline positioning-edit helpers (task modal) ─────────────────────────────
+// A context chip's `source` is "brand.positioning.<segment>.<field>" (the
+// "brand.positioning." prefix is a display convention even in product/event
+// scope). Editing must target the raw entity positioning at "<segment>.<field>".
+function chipFieldPath(source: string): string {
+  return source.replace(/^brand\.positioning\./, "");
+}
+function getNested(obj: any, path: string): any {
+  return path.split(".").reduce((acc, k) => (acc == null ? undefined : acc[k]), obj);
+}
+/** Immutable deep-set: returns a new object with `path` set to `value`. */
+function setNested(obj: any, path: string, value: any): any {
+  const keys = path.split(".");
+  const root = Array.isArray(obj) ? [...obj] : { ...(obj ?? {}) };
+  let cur: any = root;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const k = keys[i]!;
+    cur[k] = (cur[k] && typeof cur[k] === "object") ? (Array.isArray(cur[k]) ? [...cur[k]] : { ...cur[k] }) : {};
+    cur = cur[k];
+  }
+  cur[keys[keys.length - 1]!] = value;
+  return root;
+}
+// Sibling fields offered as one-click "pick a different option" candidates
+// when editing a given chip. Keyed by the chip field path (prefix stripped).
+const CHIP_SIBLING_CANDIDATES: Record<string, string[]> = {
+  "audience.primary":         ["audience.secondary"],
+  "competition.uniqueUsp":    ["competition.rareUsp", "competition.commonUsp"],
+  "core.coreStatement":       ["core.oneLineValueProp"],
+  "value.userFeeling":        ["value.primaryEmotion"],
+};
+
 // ── Error boundary ───────────────────────────────────────────────────────────
 class PlatformPageErrorBoundary extends React.Component<
   { children: React.ReactNode; platform: string },
@@ -652,6 +684,15 @@ function PlatformTaskPageInner() {
     : { data: [] };
   const modalProducts = (modalProductsQuery.data as any[]) ?? [];
   const modalEvents = (modalEventsQuery.data as any[]) ?? [];
+
+  // 2026-06-16 (CJ「受眾不對／想改賣點 — 可下拉選也可改寫」): inline editing
+  // of a context field straight from the task modal. editingChip holds the
+  // chip source path being edited; editValue is the working text. Saves write
+  // back to the SELECTED entity's RAW positioning (never the merged overlay,
+  // which would pollute a product with brand data).
+  const [editingChip, setEditingChip] = useState<{ source: string; label: string } | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const savePositioningMut = (trpc as any).scope?.savePositioning?.useMutation?.();
 
   const scopeActiveQuery = (trpc as any).scope?.active?.useQuery?.(
     {
@@ -1116,6 +1157,54 @@ function PlatformTaskPageInner() {
     setCountdownStart(null);
     setOrchestraStages(null);
     setModalEntity({ kind: "brand", id: null });
+    setEditingChip(null);
+    setEditValue("");
+  };
+
+  // ── Inline context-field editing ────────────────────────────────────────
+  // Save target = the SELECTED entity (brand/product/event), and its RAW
+  // positioning (not the merged overlay shown in chips).
+  const editSaveTarget = useMemo(() => {
+    const data: any = scopeActiveQuery?.data;
+    if (modalEntity.kind === "product" && modalEntity.id) {
+      return { kind: "product" as const, id: modalEntity.id, raw: (data?.product?.positioning ?? {}) as any };
+    }
+    if (modalEntity.kind === "event" && modalEntity.id) {
+      return { kind: "event" as const, id: modalEntity.id, raw: (data?.event?.positioning ?? {}) as any };
+    }
+    if (brandId) {
+      return { kind: "brand" as const, id: brandId, raw: (data?.brand?.positioning ?? {}) as any };
+    }
+    return null;
+  }, [modalEntity, scopeActiveQuery?.data, brandId]);
+
+  const openChipEditor = (chip: { source: string; label: string }) => {
+    if (!editSaveTarget) return;
+    const fieldPath = chipFieldPath(chip.source);
+    const cur = getNested(editSaveTarget.raw, fieldPath);
+    // Only string-typed fields are inline-editable; arrays/objects (matrix,
+    // competitors, pains, etc.) are left to the full positioning editor.
+    if (cur != null && typeof cur !== "string") return;
+    setEditingChip(chip);
+    setEditValue(typeof cur === "string" ? cur : "");
+  };
+
+  const commitChipEdit = async () => {
+    if (!editingChip || !editSaveTarget || !savePositioningMut?.mutateAsync) return;
+    const fieldPath = chipFieldPath(editingChip.source);
+    const nextPositioning = setNested(editSaveTarget.raw, fieldPath, editValue.trim());
+    try {
+      await savePositioningMut.mutateAsync({
+        kind: editSaveTarget.kind,
+        id: editSaveTarget.id,
+        positioning: nextPositioning,
+      });
+      await trpcUtils?.scope?.active?.invalidate?.();
+      setEditingChip(null);
+      setEditValue("");
+    } catch (e: any) {
+      setErrorMsg(lang === "en" ? `Couldn't save: ${e?.message ?? e}` : `儲存失敗：${e?.message ?? e}`);
+    }
   };
 
   // ── Determine effective tier for running (tab || task.tier) ──────────────
@@ -1892,31 +1981,108 @@ function PlatformTaskPageInner() {
                     : DEFAULT_SOURCES;
                   const chips = brandCtx ? buildContextChips(brandCtx, sources) : [];
                   const anyContent = chips.some((c: any) => c.hasContent);
-                  if (!anyContent) return null;
+                  // Is a chip inline-editable? Only string-typed (or empty)
+                  // segment fields; arrays/objects route to the full editor.
+                  const isEditable = (source: string): boolean => {
+                    if (!editSaveTarget) return false;
+                    const v = getNested(editSaveTarget.raw, chipFieldPath(source));
+                    return v == null || typeof v === "string";
+                  };
+                  // Render nothing only if there's truly nothing to show or edit.
+                  if (!anyContent && chips.every((c: any) => !isEditable(c.source))) return null;
+                  const shownMissing = chips.filter((c: any) => !c.hasContent && c.source !== "brand.name").slice(0, 4);
+                  const renderChip = (c: any, missing: boolean) => {
+                    const editable = isEditable(c.source) && c.source !== "brand.name";
+                    const base: React.CSSProperties = {
+                      fontSize: 11, padding: "3px 8px", borderRadius: 4, fontWeight: 500,
+                      ...(missing
+                        ? { background: "transparent", color: "#A3A3A3", border: "1px dashed #D4D4D4" }
+                        : { background: "#171717", color: "#FFFFFF" }),
+                      ...(editable ? { cursor: "pointer" } : {}),
+                    };
+                    if (!editable) {
+                      return <span key={c.source} title={c.source} style={base}>{c.label}</span>;
+                    }
+                    return (
+                      <button
+                        key={c.source}
+                        title={lang === "en" ? "Click to edit / rewrite" : "點擊編輯／改寫"}
+                        style={base}
+                        onClick={() => openChipEditor(c)}
+                      >
+                        {c.label}{missing ? " ＋" : " ✎"}
+                      </button>
+                    );
+                  };
                   return (
                     <div className="mb-3 rounded-lg px-3 py-2.5" style={{ background: "#FAFAF9", border: "1px solid #171717" }}>
                       <p style={{ fontSize: 9, fontWeight: 700, color: "#525252", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 6 }}>
                         {(() => {
-                          // Use product/event name when scope is active;
-                          // fall back to parent brand name for brand scope.
                           const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
                           return lang === "en"
-                            ? `Context · pulling these from ${entityName} for this task`
-                            : `Context · 我會用 ${entityName} 的這些資料來跑這個任務`;
+                            ? `Context · from ${entityName} · click a chip to edit`
+                            : `Context · 來自 ${entityName} · 點任一項可改寫`;
                         })()}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
-                        {chips.filter((c: any) => c.hasContent).map((c: any, i: number) => (
-                          <span key={i} title={c.source} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: "#171717", color: "#FFFFFF", fontWeight: 500 }}>
-                            {c.label}
-                          </span>
-                        ))}
-                        {chips.filter((c: any) => !c.hasContent).slice(0, 3).map((c: any, i: number) => (
-                          <span key={`m${i}`} title={c.source} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: "transparent", color: "#A3A3A3", border: "1px dashed #D4D4D4" }}>
-                            {c.label}
-                          </span>
-                        ))}
+                        {chips.filter((c: any) => c.hasContent).map((c: any) => renderChip(c, false))}
+                        {shownMissing.map((c: any) => renderChip(c, true))}
                       </div>
+
+                      {/* Inline editor for the selected chip */}
+                      {editingChip && (() => {
+                        const fieldPath = chipFieldPath(editingChip.source);
+                        const siblings = (CHIP_SIBLING_CANDIDATES[fieldPath] ?? [])
+                          .map((sp) => ({ path: sp, val: getNested(editSaveTarget?.raw, sp) }))
+                          .filter((s) => typeof s.val === "string" && s.val.trim().length > 0);
+                        return (
+                          <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #E5E5E5" }}>
+                            <p className="text-tiny text-default-600 mb-1">
+                              {(lang === "en" ? "Editing: " : "編輯：") + editingChip.label.split(" · ")[0]}
+                            </p>
+                            {siblings.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-1.5">
+                                <span className="text-[10px] text-default-400 self-center">
+                                  {lang === "en" ? "Pick:" : "可選用："}
+                                </span>
+                                {siblings.map((s) => (
+                                  <button
+                                    key={s.path}
+                                    onClick={() => setEditValue(s.val)}
+                                    className="text-[10px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
+                                    title={s.val}
+                                  >
+                                    {s.val.length > 24 ? s.val.slice(0, 24) + "…" : s.val}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <Textarea
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              minRows={2}
+                              autoFocus
+                              placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
+                            />
+                            <p className="text-[10px] text-default-400 mt-1">
+                              {lang === "en"
+                                ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
+                                : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
+                            </p>
+                            <div className="flex gap-2 mt-1.5">
+                              <Button size="sm" color="secondary"
+                                isLoading={savePositioningMut?.isPending}
+                                onPress={commitChipEdit}>
+                                {lang === "en" ? "Save" : "儲存"}
+                              </Button>
+                              <Button size="sm" variant="flat"
+                                onPress={() => { setEditingChip(null); setEditValue(""); }}>
+                                {lang === "en" ? "Cancel" : "取消"}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })()}
