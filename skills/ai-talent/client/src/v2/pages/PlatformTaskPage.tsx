@@ -583,10 +583,15 @@ function setNested(obj: any, path: string, value: any): any {
 // Sibling fields offered as one-click "pick a different option" candidates
 // when editing a given chip. Keyed by the chip field path (prefix stripped).
 const CHIP_SIBLING_CANDIDATES: Record<string, string[]> = {
-  "audience.primary":         ["audience.secondary"],
-  "competition.uniqueUsp":    ["competition.rareUsp", "competition.commonUsp"],
-  "core.coreStatement":       ["core.oneLineValueProp"],
-  "value.userFeeling":        ["value.primaryEmotion"],
+  // Product / brand
+  "audience.primary":               ["audience.secondary"],
+  "competition.uniqueUsp":          ["competition.rareUsp", "competition.commonUsp"],
+  "core.coreStatement":             ["core.oneLineValueProp"],
+  "value.userFeeling":              ["value.primaryEmotion"],
+  // Event
+  "audience.primaryAudience":       ["audience.secondaryAudience", "audience.keyInsight"],
+  "smp.singleMindedProposition":    ["smp.rationale"],
+  "creative.coreTranslation":       ["creative.creativeTheme", "creative.coreMetaphor"],
 };
 
 // ── Error boundary ───────────────────────────────────────────────────────────
@@ -1966,11 +1971,11 @@ function PlatformTaskPageInner() {
                     "brand.positioning.value.userFeeling",          // product.value.userFeeling
                   ];
                   const EVENT_SOURCES = [
-                    "brand.name",                                   // displayName = event name
-                    "brand.positioning.audience.primary",           // event.audience.primary
-                    "brand.positioning.smp.statement",              // event.smp.statement
-                    "brand.positioning.messaging.coreMessage",      // event.messaging.coreMessage
-                    "brand.positioning.strategy.approach",          // event.strategy.approach
+                    "brand.name",                                          // displayName = event name
+                    "brand.positioning.audience.primaryAudience",          // event.audience.primaryAudience
+                    "brand.positioning.smp.singleMindedProposition",       // event.smp.singleMindedProposition
+                    "brand.positioning.messaging.coreMessage",             // event.messaging.coreMessage
+                    "brand.positioning.creative.coreTranslation",          // event.creative.coreTranslation
                   ];
                   const DEFAULT_SOURCES =
                     isProductScope ? PRODUCT_SOURCES :

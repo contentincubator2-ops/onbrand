@@ -27,7 +27,8 @@
  *     brand_personality — folded into the segment steps above).
  *
  * Product (6 steps = PRODUCT_SEGMENTS ids): core, audience, value, competition, strategy, marketing
- * Event   (4 steps): audience_brief, value_hook, messaging, callouts
+ * Event   (11 steps = EVENT_SEGMENTS ids): brief, context, audience, objectives,
+ *           awards, smp, messaging, creative, guidelines, channels, journey
  */
 import { invokeLLM } from "./llm";
 import type { PositioningStep, StepContext } from "./positioningJobRunner";
@@ -377,57 +378,159 @@ competitors 2-3 個。`,
   ];
 }
 
-// ─── Event 4-step pipeline ───────────────────────────────────────────────
-
+// ─── Event pipeline — one step per EVENT_SEGMENTS id ─────────────────────
+//
+// 2026-06-16 ROOT-CAUSE FIX (CJ「請繼續修產品和活動」): same schema mismatch
+// as the product pipeline had. The old event pipeline emitted ad-hoc keys
+// (audienceBrief / valueHook / eventMessaging / callouts) that NO reader
+// understood — the 品牌大腦 cards, task-modal EVENT_SOURCES chips, and
+// positioningJobsRouter.getCurrent all read events.positioning.<segmentId>
+// where segmentId ∈ EVENT_SEGMENTS (client/src/v2/lib/positioningSchema.ts):
+// brief / context / audience / objectives / awards / smp / messaging /
+// creative / guidelines / channels / journey.
+//
+// Now: ONE step per EVENT_SEGMENTS id, each emitting JSON in that segment's
+// exact field schema. `awards` is left for the dedicated DB-RAG award-matcher
+// in BrandsPage (it needs creative_cases); the background step seeds plausible
+// award DIRECTIONS only, clearly framed, never fabricated DB matches.
 export function buildEventPositioningSteps(opts: { lang?: string } = {}): PositioningStep[] {
   const lang = opts.lang === "en" ? "English" : "繁體中文";
   const sys = SYS(lang);
-  const eCtx = (c: StepContext) =>
-    `活動名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+  const eCtx = (c: StepContext) => {
+    const base = `活動名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+    if (c.realContent) {
+      return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
+    }
+    return base;
+  };
 
   return [
+    // ── Wave 1 (no deps) ──
     {
-      id: "audienceBrief",
-      label: "活動受眾簡報",
+      id: "brief",
+      label: "戰略 Brief",
       deps: [],
       run: async (c) => ({
-        audienceBrief: await callJSON(c, "audienceBrief", sys,
-          `${eCtx(c)}\n\n撰寫活動受眾簡報，輸出 JSON：
-{"primaryAudience":"主要受眾","motivation":"出席動機","decisionFactors":["決策因素1","決策因素2"]}`,
-          { primaryAudience: "", motivation: "", decisionFactors: [] }, 1000),
+        brief: await callJSON(c, "brief", sys,
+          `${eCtx(c)}\n\n撰寫此活動的戰略 brief。只輸出 JSON，鍵名固定如下：
+{"eventType":"活動類型（brand / growth / conversion / hybrid 擇一）","roleThisRound":"本次角色（品牌升維 / 新市場切入 / 認知建立 / 轉換衝刺 擇一）","briefSummary":"活動定位摘要（150-200字）","relatedProducts":["對應產品（若有）"]}`,
+          { eventType: "", roleThisRound: "", briefSummary: "", relatedProducts: [] }, 1200),
       }),
     },
     {
-      id: "valueHook",
-      label: "活動價值勾子",
+      id: "context",
+      label: "背景與問題",
       deps: [],
       run: async (c) => ({
-        valueHook: await callJSON(c, "valueHook", sys,
-          `${eCtx(c)}\n\n撰寫活動價值勾子，輸出 JSON：
-{"hook":"一句話勾子","topBenefits":["效益1","效益2","效益3"],"urgencyAngle":"急迫感切角"}`,
-          { hook: "", topBenefits: [], urgencyAngle: "" }, 800),
+        context: await callJSON(c, "context", sys,
+          `${eCtx(c)}\n\n分析此活動的商業背景與核心問題。只輸出 JSON，鍵名固定如下：
+{"businessBackground":"商業背景（公司/品牌目前狀態，80-150字）","marketingStatus":"當前行銷現況（被市場怎麼認知）","coreProblem":"核心問題（1 句話）","rootCause":"根本原因（為什麼會發生）"}`,
+          { businessBackground: "", marketingStatus: "", coreProblem: "", rootCause: "" }, 1200),
       }),
     },
     {
-      id: "eventMessaging",
-      label: "活動訊息",
-      deps: ["audienceBrief", "valueHook"],
+      id: "audience",
+      label: "目標受眾",
+      deps: [],
       run: async (c) => ({
-        eventMessaging: await callJSON(c, "eventMessaging", sys,
-          `${eCtx(c)}\n\n制定活動訊息，輸出 JSON：
-{"tagline":"活動 tagline","ctaPrimary":"主 CTA","ctaSecondary":"備 CTA","emailSubject":"報名信主旨"}`,
-          { tagline: "", ctaPrimary: "", ctaSecondary: "", emailSubject: "" }, 800),
+        audience: await callJSON(c, "audience", sys,
+          `${eCtx(c)}\n\n定義此活動的目標受眾。只輸出 JSON，鍵名固定如下：
+{"primaryAudience":"核心受眾（人群輪廓 / 行為特徵 / 心理洞察，120-250字）","secondaryAudience":"次要受眾（60-120字）","keyInsight":"關鍵洞察（一句話）"}`,
+          { primaryAudience: "", secondaryAudience: "", keyInsight: "" }, 1400),
+      }),
+    },
+    // ── Wave 2 (deps context + audience) ──
+    {
+      id: "objectives",
+      label: "活動目標（三層）",
+      deps: ["context", "audience"],
+      run: async (c) => ({
+        objectives: await callJSON(c, "objectives", sys,
+          `${eCtx(c)}\n\n制定此活動的三層目標。只輸出 JSON，鍵名固定如下：
+{"businessGoal":"商業目標（Business）","marketingGoal":"行銷目標（Marketing / Brand）","userActionGoal":"用戶行為目標（User Action）","kpis":["可量化 KPI 1","可量化 KPI 2","可量化 KPI 3"]}`,
+          { businessGoal: "", marketingGoal: "", userActionGoal: "", kpis: [] }, 1200),
       }),
     },
     {
-      id: "callouts",
-      label: "活動亮點",
-      deps: ["eventMessaging"],
+      id: "smp",
+      label: "單一核心命題（SMP）",
+      deps: ["context", "audience"],
       run: async (c) => ({
-        callouts: await callJSON(c, "callouts", sys,
-          `${eCtx(c)}\n\n列出活動亮點，輸出 JSON：
-{"highlights":["亮點1","亮點2","亮點3","亮點4"],"socialProof":["社會證明1","社會證明2"]}`,
-          { highlights: [], socialProof: [] }, 800),
+        smp: await callJSON(c, "smp", sys,
+          `${eCtx(c)}\n\n為此活動提煉單一核心命題（SMP）。只輸出 JSON，鍵名固定如下：
+{"singleMindedProposition":"SMP（一句話，最高創意原則）","rationale":"為什麼是這句（200 字內）"}`,
+          { singleMindedProposition: "", rationale: "" }, 1200),
+      }),
+    },
+    // ── Wave 3 ──
+    {
+      id: "awards",
+      label: "獎項方向（建議）",
+      deps: ["objectives"],
+      run: async (c) => ({
+        awards: await callJSON(c, "awards", sys,
+          `${eCtx(c)}\n\n建議此活動可投件的「獎項方向」（非實際比對，僅方向建議）。只輸出 JSON，鍵名固定如下：
+{"selectedAwards":[{"name":"獎項方向名稱","subCategory":"適合的子類別","matchReason":"為什麼適合（建議方向，1 句）"}]}
+selectedAwards 2-3 個。`,
+          { selectedAwards: [] }, 1200),
+      }),
+    },
+    {
+      id: "messaging",
+      label: "訊息架構",
+      deps: ["smp"],
+      run: async (c) => ({
+        messaging: await callJSON(c, "messaging", sys,
+          `${eCtx(c)}\n\n依 SMP「${c.prevOutputs?.smp?.smp?.singleMindedProposition ?? ""}」制定訊息架構。只輸出 JSON，鍵名固定如下：
+{"coreMessage":"核心訊息（Core Message）","supportingPoints":["支撐訊息1","支撐訊息2","支撐訊息3"],"proofs":["證據/案例/數據1","證據2"]}`,
+          { coreMessage: "", supportingPoints: [], proofs: [] }, 1400),
+      }),
+    },
+    {
+      id: "creative",
+      label: "創意概念",
+      deps: ["smp"],
+      run: async (c) => ({
+        creative: await callJSON(c, "creative", sys,
+          `${eCtx(c)}\n\n為此活動發展創意概念（big idea）。只輸出 JSON，鍵名固定如下：
+{"creativeTheme":"創意主題（活動 big idea）","coreMetaphor":"核心比喻","coreTranslation":"核心轉譯（一句話 hook）","referenceCases":[]}`,
+          { creativeTheme: "", coreMetaphor: "", coreTranslation: "", referenceCases: [] }, 1400),
+      }),
+    },
+    // ── Wave 4 ──
+    {
+      id: "guidelines",
+      label: "創意與內容規範",
+      deps: ["creative"],
+      run: async (c) => ({
+        guidelines: await callJSON(c, "guidelines", sys,
+          `${eCtx(c)}\n\n制定此活動的創意與內容規範。只輸出 JSON，鍵名固定如下：
+{"visualLanguage":"視覺語言（Visual System）","toneOfVoice":"語氣（Tone of Voice）","mustHaveElements":["必須出現元素1","必須出現元素2"],"forbiddenElements":["禁用元素1","禁用元素2"]}`,
+          { visualLanguage: "", toneOfVoice: "", mustHaveElements: [], forbiddenElements: [] }, 1200),
+      }),
+    },
+    {
+      id: "channels",
+      label: "內容與管道策略",
+      deps: ["messaging", "objectives"],
+      run: async (c) => ({
+        channels: await callJSON(c, "channels", sys,
+          `${eCtx(c)}\n\n規劃此活動的內容與管道策略（分階段）。只輸出 JSON，鍵名固定如下：
+{"phases":[{"stage":"階段名（如 預熱/開跑/衝刺）","channels":"管道（逗號分隔）","contentTypes":"內容型態（逗號分隔）","rationale":"為何這配置（1 句）"}]}
+phases 3-4 個階段。`,
+          { phases: [] }, 1400),
+      }),
+    },
+    {
+      id: "journey",
+      label: "用戶旅程",
+      deps: ["audience", "messaging"],
+      run: async (c) => ({
+        journey: await callJSON(c, "journey", sys,
+          `${eCtx(c)}\n\n描繪此活動的用戶旅程（Awareness → Conversion）。只輸出 JSON，鍵名固定如下：
+{"journey":[{"step":"步驟名","emotion":"情緒狀態","touchpoint":"接觸點","outcome":"預期反應"}]}
+journey 5 步。`,
+          { journey: [] }, 1400),
       }),
     },
   ];

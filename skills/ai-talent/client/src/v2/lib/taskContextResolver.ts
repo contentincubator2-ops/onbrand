@@ -129,10 +129,12 @@ const PATH_LABELS: Record<string, string> = {
   "brand.positioning.competition.uniqueUsp":   "獨家賣點",
   "brand.positioning.marketing.tone":          "tone",
   "brand.positioning.marketing.style":         "溝通風格",
-  // ── Event scope paths ──
-  "brand.positioning.smp.statement":           "SMP",
-  "brand.positioning.messaging.coreMessage":   "核心訊息",
-  "brand.positioning.strategy.approach":       "活動策略",
+  // ── Event scope paths (segment ids: brief/context/audience/objectives/awards/smp/messaging/creative/guidelines/channels/journey) ──
+  "brand.positioning.audience.primaryAudience":      "核心受眾",
+  "brand.positioning.smp.singleMindedProposition":   "SMP",
+  "brand.positioning.messaging.coreMessage":         "核心訊息",
+  "brand.positioning.creative.coreTranslation":      "創意 hook",
+  "brand.positioning.context.coreProblem":           "核心問題",
 };
 
 export function buildContextChips(ctx: any, sources: string[] | undefined): ContextChip[] {

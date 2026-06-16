@@ -328,12 +328,14 @@ export default function BrandsPage() {
       if (favorable.length > 0 || risks.length > 0) setIfEmpty("trends", { favorable, risks });
     }
 
-    // ── Product pipeline → UI segment key translation (2026-05-26) ──────────
-    // buildProductPositioningSteps writes: marketFit, targetUser, valueProp,
-    // productDifferentiation, productMessaging, gtmSummary.
-    // PRODUCT_SEGMENTS expects: core, audience, value, competition, strategy.
-    // Same setIfEmpty pattern as brand translations above — never overwrites
-    // manually-edited data.
+    // ── LEGACY product data → canonical segment translation (2026-05-26) ────
+    // 2026-06-16: the product pipeline now writes canonical PRODUCT_SEGMENTS
+    // keys directly (core/audience/value/competition/strategy/marketing), so
+    // this block is a BACKWARD-COMPAT shim only — it migrates products whose
+    // positioning still holds the OLD ad-hoc keys (marketFit / targetUser /
+    // valueProp / productDifferentiation / productMessaging / gtmSummary) from
+    // before the fix. setIfEmpty never overwrites canonical data, so it no-ops
+    // for freshly-run products and only fills gaps for legacy ones.
     const pMktFit = merged.marketFit;
     const pTargetUser = merged.targetUser;
     const pValProp = merged.valueProp;
@@ -4064,7 +4066,9 @@ function PositioningTopRow({
   };
 
   // 2026-05-17: brand pipeline = 10 steps (one per BRAND_SEGMENTS id).
-  const totalSteps = entityKind === "brand" ? 10 : entityKind === "product" ? 6 : 4;
+  // 2026-06-16: event pipeline = 11 steps (one per EVENT_SEGMENTS id);
+  // product = 6 (one per PRODUCT_SEGMENTS id). Match positioningSteps.ts.
+  const totalSteps = entityKind === "brand" ? 10 : entityKind === "product" ? 6 : 11;
   // 2026-05-11 (reviewer:「重新自動定位 可以更名... 強調套用SoWork 品牌定位框架」)
   // — frame the button as applying a named methodology, not as a generic
   // "AI fills it in" action. Methodology becomes the competitive moat.
