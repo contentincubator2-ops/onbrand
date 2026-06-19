@@ -107,7 +107,41 @@ interface Tile {
 
 export default function BrandsPage() {
   const { t, lang } = useLang();
-  const { brandId, setBrandId, brands, scope, setScope } = useOutletContext<ShellOutletCtx>();
+  const { brandId, setBrandId, brands, scope: globalScope, setScope } = useOutletContext<ShellOutletCtx>();
+
+  // 2026-06-19 Phase 2 (CJ「BrandsPage 改用 URL 帶 id」): the global scope is
+  // brand-only now. The specific product / event being edited comes from the
+  // URL (?p= / ?e=), local to this editor session, so it never leaks to other
+  // pages. brandId still comes from the global scope (or the ?b= the shell
+  // already synced into it). All downstream `scope?.productId/eventId` reads
+  // keep working against this merged object.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlProductId = Number(searchParams.get("p")) || null;
+  const urlEventId = Number(searchParams.get("e")) || null;
+  const scope = React.useMemo(
+    () => ({
+      brandId: globalScope?.brandId ?? brandId ?? null,
+      productId: urlProductId,
+      eventId: urlEventId,
+    }),
+    [globalScope?.brandId, brandId, urlProductId, urlEventId],
+  );
+  // Navigate the editor to a specific entity by writing ?p= / ?e= (replaces
+  // the old setScope({productId/eventId}) which the brand-only global scope
+  // no longer supports).
+  const goToEntity = React.useCallback(
+    (kind: "brand" | "product" | "event", id: number | null) => {
+      setSearchParams((prev) => {
+        const sp = new URLSearchParams(prev);
+        sp.delete("p");
+        sp.delete("e");
+        if (kind === "product" && id) sp.set("p", String(id));
+        if (kind === "event" && id) sp.set("e", String(id));
+        return sp;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
 
   // Add entity modal (新增品牌 / 產品 / 活動)
   const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
@@ -572,8 +606,7 @@ export default function BrandsPage() {
   // `cat` URL param drives the large category. After 2026-05-07 restructure,
   // we have 3 top-level tabs: positioning / copy / visual. The 200px left
   // sub-nav was removed — content area now full-bleed with a horizontal
-  // tab strip above it.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // tab strip above it. (searchParams/setSearchParams declared at top.)
   const urlCat = searchParams.get("cat") ?? "positioning";
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
@@ -1225,7 +1258,7 @@ export default function BrandsPage() {
         {/* 2026-05-11 (CJ「品牌管理」): breadcrumb back to /brands manager */}
         <div className="absolute top-5 left-5 z-10">
           <a
-            href="/brands"
+            href="/brands?all=1"
             className="flex items-center gap-1 text-xs text-neutral-700 hover:text-neutral-900 transition"
           >
             ← {lang === "en" ? "All brands" : "所有品牌"}
@@ -2253,7 +2286,7 @@ export default function BrandsPage() {
                 lang={lang}
                 onAdd={() => setAddModal({ open: true, tab: "event" })}
                 onOpen={(id) => {
-                  setScope({ brandId: activeBrandIdForLocks ?? 0, productId: null, eventId: id });
+                  goToEntity("event", id);
                   setCategory("positioning");
                 }}
                 onDelete={(id) => evRemoveMut?.mutate?.({ id })}
@@ -2295,8 +2328,8 @@ export default function BrandsPage() {
         onClose={() => setAddModal({ open: false, tab: addModal.tab })}
         onCreated={(kind, id) => {
           if (kind === "brand") { setBrandId(id); setScope({ brandId: id, productId: null, eventId: null }); }
-          else if (kind === "product") setScope({ brandId: scope?.brandId ?? brandId ?? null, productId: id, eventId: null });
-          else if (kind === "event") setScope({ brandId: scope?.brandId ?? brandId ?? null, productId: scope?.productId ?? null, eventId: id });
+          else if (kind === "product") goToEntity("product", id);
+          else if (kind === "event") goToEntity("event", id);
         }}
       />
     </main>

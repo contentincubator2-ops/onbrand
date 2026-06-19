@@ -38,6 +38,33 @@ export default function BrandsManagePage() {
     : { data: [], refetch: () => {} };
   const brands = (listQuery?.data ?? []) as Array<any>;
 
+  // 2026-06-19 Phase 2: products/events are now reached by clicking them on
+  // the brand card (deep-link into the editor with ?p= / ?e=) — the global
+  // scope picker no longer carries product/event. scope.options returns all
+  // products/events with their brandId so we can group them per card.
+  const scopeOptionsQuery = (trpc as any).scope?.options?.useQuery?.(
+    undefined, { refetchOnWindowFocus: false },
+  );
+  const allProducts = ((scopeOptionsQuery?.data as any)?.products ?? []) as Array<any>;
+  const allEvents = ((scopeOptionsQuery?.data as any)?.events ?? []) as Array<any>;
+  const productsByBrand = React.useMemo(() => {
+    const m = new Map<number, any[]>();
+    for (const p of allProducts) {
+      if (!m.has(p.brandId)) m.set(p.brandId, []);
+      m.get(p.brandId)!.push(p);
+    }
+    return m;
+  }, [allProducts]);
+  const eventsByBrand = React.useMemo(() => {
+    const m = new Map<number, any[]>();
+    for (const e of allEvents) {
+      if (e.brandId == null) continue;
+      if (!m.has(e.brandId)) m.set(e.brandId, []);
+      m.get(e.brandId)!.push(e);
+    }
+    return m;
+  }, [allEvents]);
+
   // Resolve the active scope so we can show a direct CTA into the
   // positioning editor when the user has picked a product or event from
   // the ScopeBar — without this banner there's no obvious path from the
@@ -325,10 +352,20 @@ export default function BrandsManagePage() {
               <BrandCard
                 key={b.id}
                 brand={b}
+                products={productsByBrand.get(b.id) ?? []}
+                events={eventsByBrand.get(b.id) ?? []}
                 onOpen={() => {
-                  // Set scope to this brand + go to editor
+                  // Set scope to this brand + go to editor (brand positioning)
                   ctx?.setBrandId?.(b.id);
                   navigate(`/brands/edit?b=${b.id}`);
+                }}
+                onOpenProduct={(pid) => {
+                  ctx?.setBrandId?.(b.id);
+                  navigate(`/brands/edit?b=${b.id}&p=${pid}`);
+                }}
+                onOpenEvent={(eid) => {
+                  ctx?.setBrandId?.(b.id);
+                  navigate(`/brands/edit?b=${b.id}&e=${eid}`);
                 }}
                 onDelete={() => setPendingDelete({ id: b.id, name: b.name })}
                 lastActivityLabel={formatDate(b.lastActivity)}
@@ -400,10 +437,14 @@ export default function BrandsManagePage() {
 }
 
 function BrandCard({
-  brand, onOpen, onDelete, lastActivityLabel, lang,
+  brand, products, events, onOpen, onOpenProduct, onOpenEvent, onDelete, lastActivityLabel, lang,
 }: {
   brand: any;
+  products: any[];
+  events: any[];
   onOpen: () => void;
+  onOpenProduct: (id: number) => void;
+  onOpenEvent: (id: number) => void;
   onDelete: () => void;
   lastActivityLabel: string;
   lang: "zh-TW" | "en";
@@ -454,6 +495,52 @@ function BrandCard({
         <Stat icon={Layers}   label={lang === "en" ? "Projects" : "任務"} n={brand.missionCount} />
         <Stat icon={FileText} label={lang === "en" ? "Outputs" : "產出"} n={brand.outputCount} />
       </div>
+
+      {/* 2026-06-19 Phase 2: clickable product / event list → deep-links into
+          the editor scoped to that entity (?p= / ?e=). This is the entry point
+          that replaced the removed global product/event picker. */}
+      {(products.length > 0 || events.length > 0) && (
+        <div className="mb-4 space-y-2">
+          {products.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400 mb-1 flex items-center gap-1">
+                <Package size={10} /> {lang === "en" ? "Products" : "產品"}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {products.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={(e) => { e.stopPropagation(); onOpenProduct(p.id); }}
+                    className="text-[11px] px-2 py-1 rounded-md border border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50 transition max-w-[160px] truncate"
+                    title={p.name}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {events.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400 mb-1 flex items-center gap-1">
+                <Calendar size={10} /> {lang === "en" ? "Events" : "活動"}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {events.map((ev) => (
+                  <button
+                    key={ev.id}
+                    onClick={(e) => { e.stopPropagation(); onOpenEvent(ev.id); }}
+                    className="text-[11px] px-2 py-1 rounded-md border border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50 transition max-w-[160px] truncate"
+                    title={ev.name}
+                  >
+                    {ev.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Footer row */}
       <div className="flex items-center justify-between pt-3 border-t border-neutral-100">

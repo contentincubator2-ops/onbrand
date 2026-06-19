@@ -11,7 +11,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
-import ScopeBar, { useScopeState, type ScopeState } from "./ScopeBar";
+import { useScopeState, type ScopeState } from "./ScopeBar";
 import AddEntityModal, { type AddEntityTab } from "../../components/AddEntityModal";
 import PositioningNotificationCenter from "../../components/PositioningNotificationCenter";
 import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
@@ -988,110 +988,10 @@ function BrandHierarchyPill({
             );
           })}
 
-          {/* PRODUCT section (only when brand selected) */}
-          {scope.brandId && products.length > 0 && (
-            <>
-              <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
-              <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "4px 10px", textTransform: "uppercase" }}>
-                {isEn ? "Product" : "產品"}
-              </p>
-              {scope.productId && (
-                <button
-                  onClick={() => { setScope({ ...scope, productId: null, eventId: null }); setOpen(false); }}
-                  style={{
-                    width: "100%", padding: "4px 10px", border: "none", borderRadius: 6,
-                    background: "transparent", cursor: "pointer", textAlign: "left",
-                    fontSize: 11, color: "#9ca3af",
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                >
-                  {isEn ? "← Any product" : "← 不限定產品"}
-                </button>
-              )}
-              {products.map((p: any) => {
-                const isActive = p.id === scope.productId;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => { setScope({ brandId: scope.brandId, productId: p.id, eventId: null }); setOpen(false); }}
-                    style={{
-                      width: "100%", display: "flex", alignItems: "center", gap: 8,
-                      padding: "5px 10px", border: "none", borderRadius: 6,
-                      background: isActive ? "rgba(22,163,74,0.08)" : "transparent",
-                      cursor: "pointer", textAlign: "left",
-                    }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f9fafb"; }}
-                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
-                  >
-                    <span style={{ width: 6, height: 6, borderRadius: 3, background: isActive ? "#16a34a" : "#d1d5db", flexShrink: 0 }} />
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: isActive ? 600 : 500, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {p.name}
-                    </span>
-                    {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: "#16a34a" }} />}
-                  </button>
-                );
-              })}
-            </>
-          )}
-
-          {/* EVENT section (only when brand selected) */}
-          {scope.brandId && events.length > 0 && (
-            <>
-              <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
-              <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "4px 10px", textTransform: "uppercase" }}>
-                {isEn ? "Event" : "活動"}
-              </p>
-              {scope.eventId && (
-                <button
-                  onClick={() => { setScope({ ...scope, eventId: null }); setOpen(false); }}
-                  style={{
-                    width: "100%", padding: "4px 10px", border: "none", borderRadius: 6,
-                    background: "transparent", cursor: "pointer", textAlign: "left",
-                    fontSize: 11, color: "#9ca3af",
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                >
-                  {isEn ? "← Any event" : "← 不限定活動"}
-                </button>
-              )}
-              {events.map((ev: any) => {
-                const isActive = ev.id === scope.eventId;
-                return (
-                  <button
-                    key={ev.id}
-                    onClick={() => {
-                      // Auto-bind brand from event row + product if single.
-                      // NEVER fall back to the currently-selected brand — that
-                      // mis-attributes orphan events to whatever's on screen.
-                      const evBrandId = ev.brandId ?? null;
-                      const productIds: number[] = ev.productIds ?? [];
-                      const evProductId = productIds.length === 1
-                        ? productIds[0]
-                        : (ev.productId ?? null);
-                      setScope({ brandId: evBrandId, productId: evProductId ?? null, eventId: ev.id });
-                      setOpen(false);
-                    }}
-                    style={{
-                      width: "100%", display: "flex", alignItems: "center", gap: 8,
-                      padding: "5px 10px", border: "none", borderRadius: 6,
-                      background: isActive ? "rgba(37,99,235,0.08)" : "transparent",
-                      cursor: "pointer", textAlign: "left",
-                    }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f9fafb"; }}
-                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
-                  >
-                    <span style={{ width: 6, height: 6, borderRadius: 3, background: isActive ? "#2563eb" : "#d1d5db", flexShrink: 0 }} />
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: isActive ? 600 : 500, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {ev.name}
-                    </span>
-                    {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: "#2563eb" }} />}
-                  </button>
-                );
-              })}
-            </>
-          )}
+          {/* 2026-06-19 Phase 2: product/event pickers removed from the global
+              switcher. Brand is the only global scope now; a specific product /
+              event is chosen per-task in the task modal, or edited via the
+              brand-list page cards (which deep-link to /brands/edit?b=&p= / &e=). */}
 
           {/* Add new — opens unified modal instead of navigating */}
           {brands.length > 0 && (
@@ -2483,8 +2383,8 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
     {
       icon: faShareNodes, label: isEn ? "Brand & social connections" : "品牌與社群連結", arrow: true, badge: null, danger: false,
       // 連結社群帳號（FB OAuth / IG / LinkedIn）住在每個品牌的 publish tab。
-      // 從這裡去品牌管理頁，點任何品牌 → 設定 → 發布即可連結。
-      action: () => { navigate("/brands"); onClose(); },
+      // 從這裡去品牌管理頁（grid），點任何品牌 → 設定 → 發布即可連結。
+      action: () => { navigate("/brands?all=1"); onClose(); },
     },
     {
       icon: faBriefcase, label: isEn ? "Plans & pricing" : "方案和定價", arrow: true, badge: null, danger: false,
