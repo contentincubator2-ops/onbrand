@@ -128,7 +128,8 @@ export async function aggregateBrandPalette(
   for (let iter = 0; iter < maxIter; iter++) {
     let changed = 0;
     for (let i = 0; i < pool.length; i++) {
-      const best = nearestCentroid(pool[i].lab, centroids);
+      const p = pool[i]!;
+      const best = nearestCentroid(p.lab, centroids);
       if (assignments[i] !== best) {
         assignments[i] = best;
         changed++;
@@ -140,18 +141,22 @@ export async function aggregateBrandPalette(
     );
     const wsums = new Float64Array(k);
     for (let i = 0; i < pool.length; i++) {
-      const c = assignments[i];
-      sums[c][0] += pool[i].lab[0] * pool[i].weight;
-      sums[c][1] += pool[i].lab[1] * pool[i].weight;
-      sums[c][2] += pool[i].lab[2] * pool[i].weight;
-      wsums[c] += pool[i].weight;
+      const c = assignments[i]!;
+      const p = pool[i]!;
+      const slot = sums[c]!;
+      slot[0] += p.lab[0] * p.weight;
+      slot[1] += p.lab[1] * p.weight;
+      slot[2] += p.lab[2] * p.weight;
+      wsums[c]! += p.weight;
     }
     for (let c = 0; c < k; c++) {
-      if (wsums[c] === 0) continue;
+      const w = wsums[c] ?? 0;
+      if (w === 0) continue;
+      const slot = sums[c]!;
       centroids[c] = [
-        sums[c][0] / wsums[c],
-        sums[c][1] / wsums[c],
-        sums[c][2] / wsums[c],
+        slot[0] / w,
+        slot[1] / w,
+        slot[2] / w,
       ];
     }
     if (changed === 0) break;
@@ -159,13 +164,16 @@ export async function aggregateBrandPalette(
 
   // 4. Build candidate swatches with pooled weight
   const clusterWeight = new Float64Array(k);
-  for (let i = 0; i < pool.length; i++) clusterWeight[assignments[i]] += pool[i].weight;
+  for (let i = 0; i < pool.length; i++) {
+    const idx = assignments[i]!;
+    clusterWeight[idx]! += pool[i]!.weight;
+  }
   const totalWeight = clusterWeight.reduce((a, b) => a + b, 0) || 1;
 
   let candidates = centroids.map((c, idx) => {
     const [L, a, b] = c;
     const rgb = labToRgb(L, a, b);
-    const w = clusterWeight[idx] / totalWeight;
+    const w = (clusterWeight[idx] ?? 0) / totalWeight;
     return {
       hex: rgbToHex(rgb.r, rgb.g, rgb.b),
       rgb,
@@ -225,7 +233,7 @@ function assignRoles(
   // ink = darkest below L=35
   const inkIdx = remaining.findIndex((s) => s.lab.L < 35);
   if (inkIdx !== -1) {
-    const ink = remaining.splice(inkIdx, 1)[0];
+    const ink = remaining.splice(inkIdx, 1)[0]!;
     ink.role = "ink";
     out.push(ink);
   }
@@ -236,7 +244,7 @@ function assignRoles(
     return s.lab.L > 78 && chroma < 18;
   });
   if (neutralIdx !== -1) {
-    const neutral = remaining.splice(neutralIdx, 1)[0];
+    const neutral = remaining.splice(neutralIdx, 1)[0]!;
     neutral.role = "neutral";
     out.push(neutral);
   }
@@ -244,12 +252,12 @@ function assignRoles(
   // accent = highest chroma remaining
   if (remaining.length > 0) {
     let accentIdx = 0;
-    let bestChroma = chromaOf(remaining[0]);
+    let bestChroma = chromaOf(remaining[0]!);
     for (let i = 1; i < remaining.length; i++) {
-      const c = chromaOf(remaining[i]);
+      const c = chromaOf(remaining[i]!);
       if (c > bestChroma) { bestChroma = c; accentIdx = i; }
     }
-    const accent = remaining.splice(accentIdx, 1)[0];
+    const accent = remaining.splice(accentIdx, 1)[0]!;
     accent.role = "accent";
     out.push(accent);
   }
@@ -260,7 +268,7 @@ function assignRoles(
     let pickIdx = -1;
     let bestChroma = -1;
     for (let i = 0; i < remaining.length; i++) {
-      const r = remaining[i];
+      const r = remaining[i]!;
       const c = chromaOf(r);
       const hueDiff = accent ? hueDistance(r, accent) : 0;
       // Score = chroma, gated by hue distinct from accent
@@ -270,7 +278,7 @@ function assignRoles(
       }
     }
     if (pickIdx !== -1) {
-      const highlight = remaining.splice(pickIdx, 1)[0];
+      const highlight = remaining.splice(pickIdx, 1)[0]!;
       highlight.role = "highlight";
       out.push(highlight);
     }
@@ -311,31 +319,39 @@ function weightedKmeansPlusPlus(
   let target = rng() * totalWeight;
   for (const p of pool) {
     target -= p.weight;
-    if (target <= 0) { centroids.push([...p.lab]); break; }
+    if (target <= 0) {
+      centroids.push([p.lab[0], p.lab[1], p.lab[2]]);
+      break;
+    }
   }
-  if (centroids.length === 0) centroids.push([...pool[0].lab]);
+  if (centroids.length === 0) {
+    const p0 = pool[0]!;
+    centroids.push([p0.lab[0], p0.lab[1], p0.lab[2]]);
+  }
 
   while (centroids.length < k) {
     const distances = new Float64Array(pool.length);
     let total = 0;
     for (let i = 0; i < pool.length; i++) {
+      const p = pool[i]!;
       let minD = Infinity;
       for (const c of centroids) {
-        const d = sqDist(pool[i].lab, c);
+        const d = sqDist(p.lab, c);
         if (d < minD) minD = d;
       }
       // Weight by frequency (avoid picking 1-off background noise as a centroid)
-      const w = minD * pool[i].weight;
+      const w = minD * p.weight;
       distances[i] = w;
       total += w;
     }
     let t = rng() * total;
     let pick = 0;
     for (let i = 0; i < distances.length; i++) {
-      t -= distances[i];
+      t -= distances[i]!;
       if (t <= 0) { pick = i; break; }
     }
-    centroids.push([...pool[pick].lab]);
+    const picked = pool[pick]!;
+    centroids.push([picked.lab[0], picked.lab[1], picked.lab[2]]);
   }
   return centroids;
 }
@@ -347,7 +363,7 @@ function nearestCentroid(
   let best = 0;
   let bestD = Infinity;
   for (let i = 0; i < centroids.length; i++) {
-    const d = sqDist(px, centroids[i]);
+    const d = sqDist(px, centroids[i]!);
     if (d < bestD) { bestD = d; best = i; }
   }
   return best;

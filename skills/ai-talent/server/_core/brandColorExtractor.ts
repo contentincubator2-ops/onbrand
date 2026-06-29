@@ -94,9 +94,9 @@ export async function extractPaletteFromImage(
   const labPixels: Array<[number, number, number]> = []; // [L, a, b]
   const channels = info.channels; // 4 (RGBA)
   for (let i = 0; i < data.length; i += channels) {
-    const alpha = data[i + 3];
+    const alpha = data[i + 3] ?? 0;
     if (alpha < 128) continue; // skip transparent pixels (PNGs with cutouts)
-    const lab = rgbToLab(data[i], data[i + 1], data[i + 2]);
+    const lab = rgbToLab(data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0);
     labPixels.push([lab.L, lab.a, lab.b]);
   }
   if (labPixels.length === 0) return [];
@@ -110,7 +110,8 @@ export async function extractPaletteFromImage(
     // Assign
     let changed = 0;
     for (let i = 0; i < labPixels.length; i++) {
-      const best = nearestCentroid(labPixels[i], centroids);
+      const px = labPixels[i]!; // index is guaranteed in range by loop bound
+      const best = nearestCentroid(px, centroids);
       if (assignments[i] !== best) {
         assignments[i] = best;
         changed++;
@@ -123,17 +124,21 @@ export async function extractPaletteFromImage(
     );
     const counts = new Int32Array(o.k);
     for (let i = 0; i < labPixels.length; i++) {
-      const c = assignments[i];
-      newCentroids[c][0] += labPixels[i][0];
-      newCentroids[c][1] += labPixels[i][1];
-      newCentroids[c][2] += labPixels[i][2];
-      counts[c]++;
+      const c = assignments[i]!;
+      const px = labPixels[i]!;
+      const target = newCentroids[c]!;
+      target[0] += px[0];
+      target[1] += px[1];
+      target[2] += px[2];
+      counts[c] = (counts[c] ?? 0) + 1;
     }
     for (let c = 0; c < o.k; c++) {
-      if (counts[c] === 0) continue; // empty cluster — keep prior centroid
-      newCentroids[c][0] /= counts[c];
-      newCentroids[c][1] /= counts[c];
-      newCentroids[c][2] /= counts[c];
+      const ct = counts[c] ?? 0;
+      if (ct === 0) continue; // empty cluster — keep prior centroid
+      const cen = newCentroids[c]!;
+      cen[0] /= ct;
+      cen[1] /= ct;
+      cen[2] /= ct;
     }
     centroids = newCentroids;
     if (changed === 0) break;
@@ -141,7 +146,10 @@ export async function extractPaletteFromImage(
 
   // 4. Count cluster membership for frequency
   const counts = new Int32Array(o.k);
-  for (let i = 0; i < labPixels.length; i++) counts[assignments[i]]++;
+  for (let i = 0; i < labPixels.length; i++) {
+    const idx = assignments[i]!;
+    counts[idx] = (counts[idx] ?? 0) + 1;
+  }
   const totalAssigned = labPixels.length;
 
   // 5. Build swatch records
@@ -152,7 +160,7 @@ export async function extractPaletteFromImage(
       hex: rgbToHex(rgb.r, rgb.g, rgb.b),
       rgb,
       lab: { L, a, b },
-      frequency: counts[idx] / totalAssigned,
+      frequency: (counts[idx] ?? 0) / totalAssigned,
     };
   });
 
@@ -279,15 +287,17 @@ function kmeansPlusPlusInit(
 ): Array<[number, number, number]> {
   const centroids: Array<[number, number, number]> = [];
   // First centroid: random pixel
-  centroids.push([...pixels[Math.floor(rng() * pixels.length)]] as [number, number, number]);
+  const first = pixels[Math.floor(rng() * pixels.length)]!;
+  centroids.push([first[0], first[1], first[2]]);
   while (centroids.length < k) {
     // Distance to nearest existing centroid, squared
     const distances = new Float64Array(pixels.length);
     let total = 0;
     for (let i = 0; i < pixels.length; i++) {
+      const pi = pixels[i]!;
       let minD = Infinity;
       for (const c of centroids) {
-        const d = sqDist(pixels[i], c);
+        const d = sqDist(pi, c);
         if (d < minD) minD = d;
       }
       distances[i] = minD;
@@ -297,10 +307,11 @@ function kmeansPlusPlusInit(
     let target = rng() * total;
     let pick = 0;
     for (let i = 0; i < distances.length; i++) {
-      target -= distances[i];
+      target -= distances[i]!;
       if (target <= 0) { pick = i; break; }
     }
-    centroids.push([...pixels[pick]] as [number, number, number]);
+    const px = pixels[pick]!;
+    centroids.push([px[0], px[1], px[2]]);
   }
   return centroids;
 }
@@ -312,7 +323,7 @@ function nearestCentroid(
   let best = 0;
   let bestD = Infinity;
   for (let i = 0; i < centroids.length; i++) {
-    const d = sqDist(px, centroids[i]);
+    const d = sqDist(px, centroids[i]!);
     if (d < bestD) { bestD = d; best = i; }
   }
   return best;

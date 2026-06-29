@@ -247,7 +247,7 @@ export const opsRouter = router({
 
       for (const [, stages] of byUser) {
         STAGES.forEach((s, i) => {
-          if (stages[s.id]) funnel[i].users++;
+          if (stages[s.id]) funnel[i]!.users++;
         });
         const start = stages["activation.register_completed"];
         const end = stages["activation.first_week_generated"];
@@ -257,10 +257,10 @@ export const opsRouter = router({
       }
 
       // Conversion %
-      const registered = funnel[0].users || 1;
+      const registered = funnel[0]!.users || 1;
       funnel.forEach((s, i) => {
         s.pctOfRegistered = Math.round((s.users / registered) * 1000) / 10;
-        const prev = i > 0 ? funnel[i - 1].users : s.users;
+        const prev = i > 0 ? funnel[i - 1]!.users : s.users;
         s.pctFromPrev = prev > 0 ? Math.round((s.users / prev) * 1000) / 10 : 0;
       });
 
@@ -325,7 +325,7 @@ export const opsRouter = router({
 
       return {
         window: input.days,
-        cohortSize: funnel[0].users,
+        cohortSize: funnel[0]!.users,
         funnel,
         ttfvMs,
         recent: recent.slice(0, 20),
