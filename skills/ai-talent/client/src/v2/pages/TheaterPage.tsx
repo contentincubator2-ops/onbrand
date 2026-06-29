@@ -18,9 +18,10 @@
  * wire the real `runCalendar` backend (next commit).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { fireNudge } from "../components/mia/miaNudges";
+import { logActivation } from "../lib/activationTelemetry";
 import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { Avatar, Button, Spinner } from "@heroui/react";
@@ -565,6 +566,49 @@ export default function TheaterPage() {
     () => (ctx?.brands ?? []).find((b: any) => b.id === brandId)?.name ?? null,
     [ctx?.brands, brandId],
   );
+
+  // 2026-06-21 (CJ「TTFV」): activation flow detection.
+  // ?firstTime=1 in the URL means we got here from the onboarding wizard
+  // right after express-brain finished. We:
+  //   1. Fire `theater.first_time_arrived` Mia nudge once
+  //   2. Display a banner showing background-pipeline progress
+  //   3. Strip the param after consumption so a refresh doesn't re-fire
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isFirstTime = searchParams.get("firstTime") === "1";
+
+  React.useEffect(() => {
+    if (!isFirstTime) return;
+    fireNudge("theater.first_time_arrived");
+    // Activation funnel — stage 4
+    logActivation("first_theater_arrived", { brandId });
+    // Clean the URL — keep ?b= but drop firstTime so refresh / share doesn't re-trigger
+    const next = new URLSearchParams(searchParams);
+    next.delete("firstTime");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFirstTime]);
+
+  // Poll the background 14-step pipeline status. When it flips done → fire
+  // the `brand.positioning_complete` Mia nudge so the user knows future
+  // regenerations will be sharper. Only enabled when we have a brand.
+  const pipelineStatusQ = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+    { entityKind: "brand", entityId: brandId ?? 0 },
+    {
+      enabled: !!brandId,
+      // Poll every 8s while running, stop polling once done
+      refetchInterval: (data: any) =>
+        data?.status === "done" || data?.status === "failed" ? false : 8_000,
+    },
+  );
+  const prevPipelineStatusRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const s = pipelineStatusQ?.data?.status as string | undefined;
+    if (!s) return;
+    if (prevPipelineStatusRef.current !== "done" && s === "done") {
+      fireNudge("brand.positioning_complete");
+    }
+    prevPipelineStatusRef.current = s;
+  }, [pipelineStatusQ?.data?.status]);
 
   // Hydrate from localStorage on first mount (if there's a persisted run for this brand).
   const persisted = useMemo(() => loadPersisted(brandId), [brandId]);
@@ -1263,7 +1307,24 @@ export default function TheaterPage() {
     // fireNudge. Message text + action button live in miaNudgeCatalog
     // under "theater.generation_done". Page just reports the event.
     setTimeout(() => {
-      fireNudge("theater.generation_done");
+      // 2026-06-21 (CJ「TTFV」): on the user's FIRST 7-day generation
+      // (sessionStorage flag), fire the dedicated first-week nudge
+      // instead of the generic one — the activation moment is different
+      // ("21 cards exist!" vs "you ran the workflow again").
+      const isFirstGen =
+        typeof sessionStorage !== "undefined" &&
+        sessionStorage.getItem("theater.firstGenerated") !== "1";
+      if (isFirstGen) {
+        try { sessionStorage.setItem("theater.firstGenerated", "1"); } catch {}
+        fireNudge("theater.first_week_generated");
+        // Activation funnel — stage 5 (final TTFV stop point)
+        logActivation("first_week_generated", {
+          brandId,
+          platforms: activePlatforms.length,
+        });
+      } else {
+        fireNudge("theater.generation_done");
+      }
     }, 800);
   };
 
@@ -1535,6 +1596,66 @@ export default function TheaterPage() {
               {t("theater_idle_brain")}
             </p>
           </div>
+        </div>
+      )}
+
+      {/* 2026-06-21 (CJ「TTFV」): background-pipeline progress banner.
+          Shows while the 14-step SoWork positioning is still running
+          (user got here via Express Brain after onboarding). Disappears
+          when status is "done" or "failed" — the Mia nudge
+          `brand.positioning_complete` takes over from there. */}
+      {pipelineStatusQ?.data &&
+       pipelineStatusQ.data.status !== "done" &&
+       pipelineStatusQ.data.status !== "failed" && (
+        <div
+          className="max-w-[1400px] mx-auto px-6 mt-4"
+        >
+          <div
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-[13px]"
+            style={{
+              background: "#FFF7ED",
+              border: "1px solid #FDBA74",
+              color: "#7C2D12",
+            }}
+          >
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+              style={{
+                background: "#EA580C",
+                animation: "miaUnreadRipple 1.6s ease-in-out infinite",
+              }}
+              aria-hidden
+            />
+            <span className="flex-1">
+              {lang === "en" ? (
+                <>
+                  <strong>Express Brain active.</strong> Full 14-step SoWork
+                  positioning still running in the background — Mia will ping
+                  you when it's done (~{Math.max(
+                    1,
+                    14 - (pipelineStatusQ.data.currentStep ?? 0),
+                  )} steps left).
+                </>
+              ) : (
+                <>
+                  <strong>正在用品牌大腦初版生成內容。</strong>
+                  完整 14 步 SoWork 定位仍在背景跑——完成後 Mia 會通知你
+                  （剩 {Math.max(1, 14 - (pipelineStatusQ.data.currentStep ?? 0))} 步）。
+                </>
+              )}
+            </span>
+            <span
+              className="text-[11px] font-mono tabular-nums opacity-70"
+            >
+              {pipelineStatusQ.data.currentStep ?? 0} / {pipelineStatusQ.data.totalSteps ?? 14}
+            </span>
+          </div>
+          <style>{`
+            @keyframes miaUnreadRipple {
+              0%, 100% { transform: scale(1);   opacity: 1;   }
+              50%      { transform: scale(1.4); opacity: 0.6; }
+            }
+          `}</style>
         </div>
       )}
 

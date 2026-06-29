@@ -1900,6 +1900,16 @@ export default function BrandsPage() {
                 />
               )}
               <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 32 }}>
+
+              {/* 2026-06-21 (CJ「按 riverflow 標準」brand DNA): hero strip
+                  surfacing the auto-extracted brand palette at the TOP of
+                  the visual tab, so the most distinctive thing OnBrand
+                  knows about the brand is visible without a click. The
+                  per-asset card grid below remains unchanged. */}
+              {section === "asset:all" && activeBrandIdForLocks && (
+                <BrandPaletteHero brandId={activeBrandIdForLocks} lang={lang} locked={!!tabLocks.visual} />
+              )}
+
               {/* ── 若選了具體資產類別，顯示其編輯器 ── */}
               {(() => {
                 const VALID_ASSET_KEYS: AssetKey[] = [
@@ -4622,6 +4632,186 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
   );
 }
 
+/* ─────────────────────── BrandPaletteHero ────────────────────────────
+ * 2026-06-21 (CJ「按 riverflow 標準」brand DNA): hero strip above the
+ * Visual asset cards that surfaces the auto-extracted brand palette.
+ * Calls brandColors.getCurrent for read + extractForBrand for trigger.
+ * Empty-state / loading / locked / live-swatches states are all handled
+ * inline so the host tab doesn't need to thread props.
+ * ─────────────────────────────────────────────────────────────────── */
+function BrandPaletteHero({
+  brandId, lang, locked,
+}: { brandId: number; lang: "zh-TW" | "en"; locked: boolean }) {
+  const en = lang === "en";
+  const paletteQ = (trpc as any).brandColors?.getCurrent?.useQuery?.(
+    { brandId },
+    { enabled: !!brandId, staleTime: 30_000 },
+  );
+  const extractMut = (trpc as any).brandColors?.extractForBrand?.useMutation?.({
+    onSuccess: () => paletteQ?.refetch?.(),
+  });
+  const data = paletteQ?.data as any;
+  const swatches: Array<{
+    hex: string; role: string; weight: number;
+    lab: { L: number; a: number; b: number };
+  }> = data?.swatches ?? [];
+  const sourceCount = data?.sourceImageCount ?? 0;
+  const userLocked = !!data?.userLocked;
+  const isLoading = paletteQ?.isLoading || extractMut?.isPending;
+
+  const handleExtract = () => {
+    if (locked || !brandId) return;
+    extractMut?.mutate?.({ brandId, targetSize: 7, force: userLocked });
+  };
+
+  // Pick text color (black / white) by luminance for contrast on each chip
+  const pickFg = (hex: string): string => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 150 ? "#1a1a1a" : "#ffffff";
+  };
+
+  return (
+    <div
+      style={{
+        borderRadius: 14,
+        border: "1px solid #E5E7EB",
+        background: "linear-gradient(180deg, #FAFAFA 0%, #FFFFFF 100%)",
+        padding: 20,
+        position: "relative",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <p style={{
+            fontSize: 10, fontWeight: 600, letterSpacing: "0.18em",
+            textTransform: "uppercase", color: "#78716C", margin: 0,
+          }}>
+            {en ? "Brand DNA · Color palette" : "品牌 DNA · 色彩"}
+          </p>
+          <h3 style={{
+            fontSize: 17, fontWeight: 700, color: "#171717",
+            margin: "4px 0 0", letterSpacing: "-0.01em",
+          }}>
+            {swatches.length > 0
+              ? (en
+                  ? `${swatches.length} core colors auto-extracted from ${sourceCount} product image${sourceCount === 1 ? "" : "s"}`
+                  : `從 ${sourceCount} 張產品圖自動萃取出 ${swatches.length} 個核心色`)
+              : (en ? "Not yet extracted" : "尚未萃取")}
+          </h3>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {userLocked && (
+            <span
+              title={en ? "User-locked — re-extracting will overwrite manual edits" : "已鎖定 — 重新萃取會覆寫手動編輯"}
+              style={{
+                fontSize: 10, fontWeight: 600, padding: "3px 8px",
+                borderRadius: 4, background: "#FEF3C7", color: "#92400E",
+                letterSpacing: "0.08em", textTransform: "uppercase",
+              }}
+            >
+              {en ? "Locked" : "已鎖定"}
+            </span>
+          )}
+          <button
+            onClick={handleExtract}
+            disabled={locked || isLoading}
+            style={{
+              fontSize: 12, fontWeight: 600, padding: "7px 14px",
+              borderRadius: 8, cursor: locked || isLoading ? "not-allowed" : "pointer",
+              border: "1px solid #171717",
+              background: swatches.length === 0 ? "#171717" : "#FFFFFF",
+              color: swatches.length === 0 ? "#FFFFFF" : "#171717",
+              opacity: locked ? 0.5 : 1,
+              transition: "all 0.15s",
+            }}
+          >
+            {isLoading
+              ? (en ? "Extracting…" : "萃取中…")
+              : swatches.length === 0
+                ? (en ? "✨ Extract from products" : "✨ 從產品圖萃取")
+                : userLocked
+                  ? (en ? "Re-extract (overwrites lock)" : "重新萃取（覆寫鎖定）")
+                  : (en ? "Re-extract" : "重新萃取")}
+          </button>
+        </div>
+      </div>
+
+      {/* States */}
+      {extractMut?.error && (
+        <p style={{ fontSize: 12, color: "#DC2626", marginBottom: 10 }}>
+          {String((extractMut.error as any)?.message ?? extractMut.error).slice(0, 200)}
+        </p>
+      )}
+      {extractMut?.data?.ok === false && extractMut.data.reason === "no_product_images" && (
+        <p style={{ fontSize: 12, color: "#92400E", marginBottom: 10 }}>
+          {en
+            ? "No product images available yet. Add a website URL or import products first, then come back."
+            : "目前還沒有產品圖。請先填入官網或匯入產品，再回來這裡。"}
+        </p>
+      )}
+
+      {/* Empty hint */}
+      {swatches.length === 0 && !isLoading && (
+        <p style={{ fontSize: 13, color: "#737373", margin: 0, lineHeight: 1.6 }}>
+          {en
+            ? "Run the extractor — Mia reads your product photos, runs K-means in LAB color space, and surfaces the 5–7 colors that actually define this brand. Future content generation will use these as canonical brand colors."
+            : "按「從產品圖萃取」— Mia 會讀你的產品照、在 LAB 色彩空間跑 K-means，挑出真正代表這個品牌的 5-7 個核心色。之後生成的所有內容都會用這份色票。"}
+        </p>
+      )}
+
+      {/* Swatches row */}
+      {swatches.length > 0 && (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${Math.min(swatches.length, 7)}, minmax(0, 1fr))`,
+          gap: 8,
+          marginTop: 4,
+        }}>
+          {swatches.map((s, i) => {
+            const fg = pickFg(s.hex);
+            return (
+              <div
+                key={`${s.hex}-${i}`}
+                title={`${s.hex} · ${s.role} · ${(s.weight * 100).toFixed(1)}%`}
+                style={{
+                  background: s.hex,
+                  borderRadius: 10,
+                  padding: 12,
+                  minHeight: 96,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  color: fg,
+                  cursor: "default",
+                }}
+              >
+                <span style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: "0.12em",
+                  textTransform: "uppercase", opacity: 0.85,
+                }}>
+                  {s.role}
+                </span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.01em" }}>
+                    {s.hex.toUpperCase()}
+                  </div>
+                  <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+                    {(s.weight * 100).toFixed(0)}%
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────────────── BrandEntityGrid ────────────────────────────
  * Shared card grid for 產品 and 活動 tabs.
  * Shows each entity's positioning preview (tagline / USP / audience).
@@ -4640,6 +4830,18 @@ function BrandEntityGrid({
   onPosition: (id: number) => void;
 }) {
   const en = lang === "en";
+
+  // 2026-06-21 (CJ「按 riverflow 標準」brand DNA): branded variant generator
+  // state. When user clicks "品牌變體" on a card, we mutate, store results
+  // in this state, and render a modal showing 4 variants.
+  const [variantState, setVariantState] = React.useState<{
+    productId: number;
+    productName: string;
+    variants: Array<{ layout: string; pngDataUrl: string }> | null;
+    error: string | null;
+    cutoutAvailable?: boolean;
+  } | null>(null);
+  const genVariantsMut = (trpc as any).brandColors?.generateBrandedVariants?.useMutation?.();
 
   const extractField = (positioning: any, ...keys: string[]): string => {
     if (!positioning) return "";
@@ -4730,8 +4932,39 @@ function BrandEntityGrid({
                   animationDelay: `${Math.min(idx * 60, 400)}ms`,
                 }}
                 onClick={() => onOpen(item.id)}
-                className="text-left rounded-xl border border-neutral-200 bg-white p-4 hover:border-neutral-400 hover:shadow-sm transition group"
+                className="text-left rounded-xl border border-neutral-200 bg-white p-0 overflow-hidden hover:border-neutral-400 hover:shadow-sm transition group flex flex-col"
               >
+                {/* 2026-06-21 (CJ「產品頁籤加縮圖」): thumbnail at top.
+                    productDiscovery writes imageUrl when crawling sites.
+                    Falls back to a soft placeholder if missing or 404. */}
+                {kind === "product" && (
+                  <div
+                    className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden"
+                    style={{ aspectRatio: "4 / 3", maxHeight: 140 }}
+                  >
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        onError={(e) => {
+                          // Hide broken image; parent placeholder still shows
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-neutral-300">
+                        <FontAwesomeIcon icon={faBox} className="text-2xl" />
+                        <span className="text-[10px] uppercase tracking-wider">
+                          {en ? "no image" : "無圖"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className={kind === "product" ? "p-3" : "p-4"}>
                 {/* Name */}
                 <p className="text-sm font-semibold text-neutral-900 mb-2 truncate">{item.name}</p>
 
@@ -4779,6 +5012,52 @@ function BrandEntityGrid({
                   >
                     {positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
                   </button>
+                  {/* 2026-06-21 (CJ「按 riverflow 標準」): branded variant generator */}
+                  {kind === "product" && item.imageUrl && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setVariantState({
+                          productId: item.id,
+                          productName: item.name,
+                          variants: null,
+                          error: null,
+                        });
+                        try {
+                          const r = await genVariantsMut?.mutateAsync?.({ productId: item.id });
+                          if (r?.ok) {
+                            setVariantState({
+                              productId: item.id,
+                              productName: item.name,
+                              variants: r.variants,
+                              error: null,
+                              cutoutAvailable: r.cutoutAvailable,
+                            });
+                          } else {
+                            const reason = (r as any)?.reason ?? "unknown";
+                            const msg = reason === "no_palette_yet"
+                              ? (en
+                                  ? "Brand palette not extracted yet. Open the Visual tab and click ✨ Extract from products first."
+                                  : "品牌色彩還沒萃取。請先到「視覺」tab 按「✨ 從產品圖萃取」。")
+                              : reason === "product_has_no_image"
+                                ? (en ? "This product has no image to compose." : "這個產品沒有圖片可合成。")
+                                : reason;
+                            setVariantState({ productId: item.id, productName: item.name, variants: null, error: msg });
+                          }
+                        } catch (err: any) {
+                          setVariantState({
+                            productId: item.id, productName: item.name,
+                            variants: null,
+                            error: String(err?.message ?? err).slice(0, 200),
+                          });
+                        }
+                      }}
+                      className="text-[10px] font-medium px-2 py-1 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
+                      title={en ? "Generate 4 branded variants" : "用品牌色生成 4 種變體"}
+                    >
+                      {en ? "✨ Variants" : "✨ 品牌變體"}
+                    </button>
+                  )}
                   {/* Open */}
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpen(item.id); }}
@@ -4802,6 +5081,7 @@ function BrandEntityGrid({
                     ✕
                   </button>
                 </div>
+                </div>
               </button>
             );
           })}
@@ -4816,6 +5096,114 @@ function BrandEntityGrid({
               {kind === "product" ? (en ? "New product" : "新增產品") : (en ? "New event" : "新增活動")}
             </span>
           </button>
+        </div>
+      )}
+
+      {/* 2026-06-21 (CJ「按 riverflow 標準」): branded variants modal.
+          Renders inline at the bottom — no portal, no fixed positioning, just
+          a centered overlay that contributes flow height. Shows loading,
+          error, or the 4 generated variants in a 2x2 grid with download links. */}
+      {variantState && (
+        <div
+          onClick={() => setVariantState(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 60,
+            background: "rgba(15,15,14,0.55)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#FFFFFF", borderRadius: 14,
+              maxWidth: 920, width: "100%", maxHeight: "90vh", overflow: "auto",
+              border: "2px solid #0F0F0E",
+              boxShadow: "8px 8px 0 #0F0F0E",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #E5E7EB" }}>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#78716C", margin: 0 }}>
+                  {en ? "Branded variants" : "品牌變體"}
+                </p>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#171717", margin: "3px 0 0" }}>
+                  {variantState.productName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setVariantState(null)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8, border: "1px solid #E5E7EB",
+                  background: "transparent", cursor: "pointer", fontSize: 16, color: "#78716C",
+                }}
+                aria-label={en ? "Close" : "關閉"}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 20 }}>
+              {variantState.error && (
+                <div style={{ padding: 16, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, color: "#991B1B", fontSize: 13, lineHeight: 1.6 }}>
+                  {variantState.error}
+                </div>
+              )}
+              {!variantState.error && !variantState.variants && (
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "#78716C" }}>
+                  <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#E85D2E", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
+                  <p style={{ fontSize: 13, margin: 0 }}>
+                    {en
+                      ? "Compositing — running cutout + 4 layouts (~8 sec)…"
+                      : "正在合成 — 跑去背 + 4 個版型（約 8 秒）…"}
+                  </p>
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                </div>
+              )}
+              {variantState.variants && variantState.variants.length > 0 && (
+                <>
+                  {variantState.cutoutAvailable === false && (
+                    <p style={{ fontSize: 11, color: "#92400E", background: "#FEF3C7", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>
+                      {en
+                        ? "⚠ REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
+                        : "⚠ 還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
+                    </p>
+                  )}
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 14,
+                  }}>
+                    {variantState.variants.map((v) => (
+                      <div key={v.layout} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <img
+                          src={v.pngDataUrl}
+                          alt={v.layout}
+                          style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, border: "1px solid #E5E7EB" }}
+                        />
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                          <span style={{ fontSize: 11, color: "#78716C", fontWeight: 500 }}>
+                            {v.layout}
+                          </span>
+                          <a
+                            href={v.pngDataUrl}
+                            download={`${variantState.productName}_${v.layout}.png`}
+                            style={{
+                              fontSize: 11, fontWeight: 600, color: "#E85D2E",
+                              textDecoration: "none", padding: "4px 8px",
+                              border: "1px solid #E85D2E", borderRadius: 6,
+                            }}
+                          >
+                            {en ? "Download" : "下載"}
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

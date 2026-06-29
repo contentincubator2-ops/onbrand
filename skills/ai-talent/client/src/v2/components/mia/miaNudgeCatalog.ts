@@ -105,6 +105,45 @@ export const NUDGE_CATALOG = {
     },
   },
 
+  // 2026-06-21 (CJ「TTFV」): post-onboarding redirect to Theater.
+  // Fired when user lands at /theater?firstTime=1 — right after they've
+  // built their first brand and the express brain finished.
+  "theater.first_time_arrived": {
+    id: "theater.first_time_arrived",
+    message: {
+      "zh-TW":
+        "👋 歡迎！你的品牌大腦初版好了，我幫你預設了 FB / IG / YouTube 三個平台 + 本週日期。" +
+        "按底下橘色「✨ 一鍵生成 7 天」就會出來 21 張卡（每天 × 3 平台）——大概 3 分鐘。" +
+        "完整 14 步品牌定位還在背景跑，完成後我會再叫你來看。",
+      en:
+        "👋 Welcome! Your Brand Brain (express version) is ready. I've pre-" +
+        "selected FB / IG / YouTube + this week. Hit the orange '✨ Generate " +
+        "7 Days' button below — you'll see 21 cards (7 days × 3 channels) " +
+        "in ~3 minutes. The full 14-step positioning is still running in " +
+        "the background; I'll ping you when it's done.",
+    },
+  },
+
+  // Fired right after the first 7-day generation completes — captures
+  // the "aha" moment and points the user to the most useful next move.
+  "theater.first_week_generated": {
+    id: "theater.first_week_generated",
+    message: {
+      "zh-TW":
+        "🎉 你的第一週 21 篇內容好了！每張卡都可以：(1) 右上 ✏️ 改文字 / 換圖，" +
+        "(2) 點「重生」用不同 hook 重寫，(3) 整週送進「日曆」自動排程發布。" +
+        "想看每天的結構為什麼這樣安排，我可以解釋。",
+      en:
+        "🎉 Your first 21 posts are ready! Each card lets you: (1) edit text / " +
+        "swap image via the ✏️ top-right, (2) hit 'Regenerate' for a different " +
+        "hook, (3) send the whole week to the Calendar for auto-publish. " +
+        "Want me to explain why this week's structure is sequenced this way?",
+    },
+    actions: [
+      { kind: "navigate", url: "/calendar", label: "送進日曆 →" },
+    ],
+  },
+
   // ─── Platform tasks (FB / IG / YT / TikTok / Email / PR) ─────────────
 
   "task.fb.first_run_done": {

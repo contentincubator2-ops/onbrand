@@ -80,6 +80,8 @@ const AdminErrorsPage = React.lazy(() => import("../pages/AdminErrorsPage"));
 const AdminDashboardPage = React.lazy(() => import("../pages/AdminDashboardPage"));
 const AdminUserDetailPage = React.lazy(() => import("../pages/AdminUserDetailPage"));
 const AdminSupportPage = React.lazy(() => import("../pages/AdminSupportPage"));
+// 2026-06-21 (CJ「TTFV dashboard」)
+const AdminActivationPage = React.lazy(() => import("../pages/AdminActivationPage"));
 
 // Public-but-not-first-paint (legal / pricing / plan-expired)
 const PricingPage = React.lazy(() => import("../pages/PricingPage"));
@@ -329,6 +331,8 @@ export default function AppV2() {
           {/* 2026-05-16 (CJ「後台監控使用者」) — growth/usage/health dashboard */}
           <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
           <Route path="/admin/user/:id" element={<AdminUserDetailPage />} />
+          {/* 2026-06-21 (CJ「TTFV dashboard」) — register→first-week funnel */}
+          <Route path="/admin/activation" element={<AdminActivationPage />} />
           {/* 2026-05-11 — content calendar (P0-1) */}
           <Route path="/calendar" element={<CalendarPage />} />
           {/* 2026-05-10 account settings + achievements */}

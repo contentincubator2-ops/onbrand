@@ -41,6 +41,8 @@ import { promptTemplateRouter } from "./promptTemplateRouter";
 import { strategyConsultantRouter } from "./strategyConsultantRouter";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc → brand-aligned platform copy.
 import { mediaCopyRouter } from "./mediaCopyRouter";
+// 2026-06-21 (CJ「按 riverflow 標準」brand DNA): auto-extracted brand color palette.
+import { brandColorsRouter } from "./brandColorsRouter";
 
 // 2026-05-14: removed 28 dead routers — none of them had any v2 callers
 // after the v1 frontend deletion. See git history (commit before this)
@@ -90,6 +92,7 @@ export const appRouter = router({
   promptTemplate:      promptTemplateRouter,
   strategyConsultant:  strategyConsultantRouter,
   mediaCopy:           mediaCopyRouter,
+  brandColors:         brandColorsRouter,
 });
 
 export type AppRouter = typeof appRouter;

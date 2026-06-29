@@ -19,6 +19,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
+import { logActivation } from "../../lib/activationTelemetry";
 import { Modal, ModalContent, ModalBody, Button, Input, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrademark, faGlobe, faArrowRight, faCheck, faWandMagicSparkles, faLanguage } from "@fortawesome/free-solid-svg-icons";
@@ -125,6 +126,8 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
       const newId = Number(r?.id ?? r?.brandId ?? 0);
       if (!newId) { setErr(lang === "en" ? "Couldn't create — try again in a sec" : "建立失敗，請稍後再試"); return; }
       setCreatedBrandId(newId);
+      // Activation funnel — stage 2
+      logActivation("first_brand_created", { brandId: newId, industry: industry || null });
 
       // Save connector data (website + FB)
       const socialLinks: Record<string, string> = {};
@@ -139,11 +142,39 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
         } catch {/* non-fatal */}
       }
 
-      // Fire interim quick-pulse + full pipeline (background)
-      runInterimMut?.mutate?.({ entityKind: "brand", entityId: newId });
+      // 2026-06-21 (CJ「TTFV from 38min」): activation refactor.
+      //  Before: fire interim + start, then wait 9 min for `start` to finish
+      //         before advancing the wizard. TTFV ~38 min.
+      //  After:  AWAIT interim only (~30 sec express brain), fire start
+      //         to run in background (~9 min, surfaces via Mia nudge when
+      //         done), then route straight to /theater with firstTime=1
+      //         so the user lands on the 7-day publisher with the AHA
+      //         moment of 21 cards generated using the express brain.
+      setStep(3); // "正在分析品牌..." waiting screen
+      const interimStartMs = Date.now();
+      try {
+        await runInterimMut?.mutateAsync?.({ entityKind: "brand", entityId: newId });
+        // Activation funnel — stage 3 (only fire on success path so the
+        // metric reflects actual express-brain delivery, not just attempt).
+        logActivation("express_brain_ready", {
+          brandId: newId,
+          interimLatencyMs: Date.now() - interimStartMs,
+        });
+      } catch (e) {
+        // Interim failed — don't block; Theater can still run with whatever
+        // exists (industry-level defaults). Log for telemetry.
+        // eslint-disable-next-line no-console
+        console.warn("[onboarding] runInterim failed (non-fatal):", e);
+      }
+      // Fire full pipeline in the background — completion surfaces via
+      // Mia nudge (brand.positioning_complete fired by Theater polling).
       startPositioningMut?.mutate?.({ entityKind: "brand", entityId: newId, lang: "zh-TW" });
 
-      setStep(3);
+      // Hand control back to caller (sets scope + brandId) then jump to
+      // Theater with the first-time flag so it knows to show the
+      // oversized "Generate 7 days" CTA and progress banner.
+      onComplete(newId);
+      navigate(`/theater?firstTime=1&b=${newId}`);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
     }
@@ -458,7 +489,11 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
               </div>
             )}
 
-            {/* STEP 3 — 自動定位中 */}
+            {/* STEP 3 — Express Brain 分析中（~30s）
+                2026-06-21 (CJ「TTFV from 38min」): collapsed from "wait
+                9 min for full pipeline" to "wait ~30 sec for express brain
+                then auto-redirect to Theater". Background full pipeline
+                still runs; user sees it as a banner inside Theater. */}
             {step === 3 && (
               <div>
                 <div className="mb-3">
@@ -467,54 +502,42 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     letterSpacing: "0.28em", textTransform: "uppercase",
                     marginBottom: 6,
                   }}>
-                    SoWork Method · In Progress
+                    {lang === "en" ? "Express Brain · ~30 sec" : "品牌大腦初版 · 約 30 秒"}
                   </p>
                   <h2 style={{
-                    fontSize: 20, fontWeight: 700, color: "#171717",
-                    letterSpacing: "-0.01em", marginBottom: 6,
+                    fontSize: 22, fontWeight: 700, color: "#171717",
+                    letterSpacing: "-0.01em", marginBottom: 8,
                   }}>
                     {lang === "en"
-                      ? "AI is running the SoWork Brand Method"
-                      : "AI 正在套用 SoWork 品牌定位法"}
+                      ? "Reading your website + Facebook…"
+                      : "正在讀你的官網 + Facebook…"}
                   </h2>
                   <p style={{
-                    fontSize: 12.5, lineHeight: 1.7, color: "#525252",
+                    fontSize: 13.5, lineHeight: 1.75, color: "#525252",
                     fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                    maxWidth: 520,
+                    maxWidth: 540,
                   }}>
                     {lang === "en"
-                      ? "14 steps from Golden Circle to differentiation and Voice — each one gets written into your Brand DNA. It runs in the background; feel free to skip ahead and watch the progress live."
-                      : "14 步從黃金圈推導到差異化、Voice — 每一步都會持續寫入品牌大腦。背景執行，可以略過先到工作區看實時進度。"}
+                      ? "Building a quick Brand Brain so you can generate your first week of content in ~3 minutes. The full 14-step SoWork positioning will keep running in the background — Mia will ping you when it's ready (~9 min)."
+                      : "正在建立品牌大腦初版，讓你 3 分鐘內就能看到第一週內容。完整的 14 步 SoWork 定位會在背景繼續跑（約 9 分鐘），完成後 Mia 會通知你。"}
                   </p>
                 </div>
 
                 <RunningAgentCarousel
                   agents={lang === "en" ? [
-                    { name: "Aiden Hsu", title: "Caption Writer", role: "Drafting positioning" },
-                    { name: "Mandy Cheng", title: "Brand Strategist", role: "Differentiation analysis" },
-                    { name: "Jordan Hayes", title: "QA Reviewer", role: "Final review" },
+                    { name: "Mia", title: "Customer Success", role: "Reading website + FB" },
+                    { name: "Aiden Hsu", title: "Brand Voice", role: "Extracting tone" },
+                    { name: "Mandy Cheng", title: "Strategist", role: "Quick USP draft" },
                   ] : [
-                    { name: "Aiden Hsu", title: "文案撰寫師", role: "撰寫定位草稿" },
-                    { name: "Mandy Cheng", title: "品牌策略師", role: "差異化分析" },
-                    { name: "Jordan Hayes", title: "QA 審核師", role: "整合審稿" },
+                    { name: "Mia", title: "客戶成功", role: "讀取官網 + FB" },
+                    { name: "Aiden Hsu", title: "品牌聲音", role: "萃取調性" },
+                    { name: "Mandy Cheng", title: "策略師", role: "USP 初稿" },
                   ]}
-                  stages={
-                    jobData
-                      ? [{ key: "running", label: lang === "en" ? `Step ${jobData.currentStep ?? 0} / ${jobData.totalSteps ?? 14}` : `步驟 ${jobData.currentStep ?? 0} / ${jobData.totalSteps ?? 14}`, status: "running" }]
-                      : null
-                  }
-                  accentColor="#7C3AED"
-                  progressPct={jobData ? Math.round(((jobData.currentStep ?? 0) / Math.max(1, jobData.totalSteps ?? 14)) * 100) : 5}
-                  elapsedText={jobData
-                    ? `${jobData.status === "running" ? (lang === "en" ? "Running" : "進行中") : jobData.status} · ${jobData.currentStep ?? 0}/${jobData.totalSteps ?? 14}`
-                    : (lang === "en" ? "Starting…" : "啟動中…")}
+                  stages={null}
+                  accentColor="#E85D2E"
+                  progressPct={50}
+                  elapsedText={lang === "en" ? "Building express brain…" : "建立品牌大腦初版中…"}
                 />
-
-                <div className="mt-2 flex items-center justify-end gap-2">
-                  <Button variant="light" size="sm" onPress={handleSkipToFinish}>
-                    {lang === "en" ? "Skip ahead to workspace →" : "略過，先到工作區 →"}
-                  </Button>
-                </div>
               </div>
             )}
 

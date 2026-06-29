@@ -195,6 +195,145 @@ export const opsRouter = router({
     }),
 
   /**
+   * 2026-06-21 (CJ「TTFV dashboard」): activation funnel from register to
+   * first-week-generated. Reads activation.* events out of error_log
+   * (where level="info"), groups by user, takes MIN(createdAt) per
+   * (userId, stage) as the user's first occurrence of that stage.
+   *
+   * Returns:
+   *   - funnel: count of users reaching each stage + % conversion
+   *   - ttfvMs: p50 / p90 / avg ms from register to first_week_generated
+   *   - recent: latest N completed activations (for an "activity feed" panel)
+   *   - daily: per-day register + completed counts for the last `days` days
+   */
+  activationFunnel: adminProcedure
+    .input(z.object({
+      days: z.number().int().min(1).max(90).default(30),
+    }))
+    .query(async ({ input }) => {
+      const { default: localPool } = await import("../localDb");
+
+      // First occurrence of each activation.* event per user in window
+      const [rows]: any = await localPool.execute(
+        `SELECT userId, source, MIN(createdAt) AS firstSeen
+         FROM error_log
+         WHERE source LIKE 'activation.%'
+           AND createdAt > NOW() - INTERVAL ? DAY
+           AND userId IS NOT NULL
+         GROUP BY userId, source
+         ORDER BY userId, firstSeen`,
+        [input.days],
+      );
+
+      // Group by userId → { stage: firstSeen }
+      type UserTrace = Record<string, Date>;
+      const byUser = new Map<number, UserTrace>();
+      for (const r of (rows as any[])) {
+        const uid = Number(r.userId);
+        if (!byUser.has(uid)) byUser.set(uid, {});
+        byUser.get(uid)![r.source as string] = new Date(r.firstSeen);
+      }
+
+      const STAGES: Array<{ id: string; label: string }> = [
+        { id: "activation.register_completed",    label: "Registered" },
+        { id: "activation.first_brand_created",   label: "Brand created" },
+        { id: "activation.express_brain_ready",   label: "Express brain ready" },
+        { id: "activation.first_theater_arrived", label: "Arrived at Theater" },
+        { id: "activation.first_week_generated",  label: "First 7-day generated" },
+      ];
+
+      const funnel = STAGES.map((s) => ({ ...s, users: 0, pctOfRegistered: 0, pctFromPrev: 0 }));
+      const ttfvs: number[] = []; // ms
+
+      for (const [, stages] of byUser) {
+        STAGES.forEach((s, i) => {
+          if (stages[s.id]) funnel[i].users++;
+        });
+        const start = stages["activation.register_completed"];
+        const end = stages["activation.first_week_generated"];
+        if (start && end && end.getTime() > start.getTime()) {
+          ttfvs.push(end.getTime() - start.getTime());
+        }
+      }
+
+      // Conversion %
+      const registered = funnel[0].users || 1;
+      funnel.forEach((s, i) => {
+        s.pctOfRegistered = Math.round((s.users / registered) * 1000) / 10;
+        const prev = i > 0 ? funnel[i - 1].users : s.users;
+        s.pctFromPrev = prev > 0 ? Math.round((s.users / prev) * 1000) / 10 : 0;
+      });
+
+      // TTFV stats
+      ttfvs.sort((a, b) => a - b);
+      const pick = (q: number) =>
+        ttfvs.length ? ttfvs[Math.min(ttfvs.length - 1, Math.floor(ttfvs.length * q))] : 0;
+      const ttfvMs = {
+        count: ttfvs.length,
+        p50: pick(0.5),
+        p90: pick(0.9),
+        avg: ttfvs.length
+          ? Math.round(ttfvs.reduce((a, b) => a + b, 0) / ttfvs.length)
+          : 0,
+      };
+
+      // Recent completed activations (for the live feed panel)
+      const recent: Array<{
+        userId: number;
+        registeredAt: string;
+        completedAt: string;
+        ttfvMs: number;
+      }> = [];
+      for (const [uid, stages] of byUser) {
+        const r = stages["activation.register_completed"];
+        const c = stages["activation.first_week_generated"];
+        if (r && c) {
+          recent.push({
+            userId: uid,
+            registeredAt: r.toISOString(),
+            completedAt: c.toISOString(),
+            ttfvMs: c.getTime() - r.getTime(),
+          });
+        }
+      }
+      recent.sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+
+      // Daily aggregation
+      const [dailyRows]: any = await localPool.execute(
+        `SELECT DATE(createdAt) AS day,
+                source,
+                COUNT(DISTINCT userId) AS users
+         FROM error_log
+         WHERE source IN ('activation.register_completed', 'activation.first_week_generated')
+           AND createdAt > NOW() - INTERVAL ? DAY
+           AND userId IS NOT NULL
+         GROUP BY DATE(createdAt), source
+         ORDER BY day DESC`,
+        [input.days],
+      );
+      const dayMap = new Map<string, { registered: number; completed: number }>();
+      for (const r of (dailyRows as any[])) {
+        const day = r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day);
+        if (!dayMap.has(day)) dayMap.set(day, { registered: 0, completed: 0 });
+        const slot = dayMap.get(day)!;
+        if (r.source === "activation.register_completed") slot.registered = Number(r.users);
+        if (r.source === "activation.first_week_generated") slot.completed = Number(r.users);
+      }
+      const daily = Array.from(dayMap.entries())
+        .map(([day, v]) => ({ day, ...v }))
+        .sort((a, b) => b.day.localeCompare(a.day));
+
+      return {
+        window: input.days,
+        cohortSize: funnel[0].users,
+        funnel,
+        ttfvMs,
+        recent: recent.slice(0, 20),
+        daily,
+      };
+    }),
+
+  /**
    * 2026-05-15 (P1): post-deploy self-test for the recordTaskRun pipeline.
    * Exercises the same code path a real task run does (ensureMission →
    * mission_outputs INSERT → cleanup). If this fails after a deploy, the

@@ -2333,6 +2333,33 @@ async function main() {
     `);
     console.log("[migrate] product_discovery_jobs: OK");
 
+    // ─── 2026-06-21 (CJ「按照 riverflow.ai 做法」brand DNA sprint) ────────────
+    // brand_colors: JSON column on brands that holds the auto-extracted
+    // brand palette (5-7 swatches with role + frequency metadata).
+    // Schema example:
+    //   {
+    //     "extractedAt": "2026-06-21T10:00:00Z",
+    //     "sourceCount": 18,                 // number of product images sampled
+    //     "swatches": [
+    //       { "hex": "#C9826A", "role": "primary",   "frequency": 0.31 },
+    //       { "hex": "#5C7A56", "role": "accent",    "frequency": 0.18 },
+    //       { "hex": "#2A2422", "role": "ink",       "frequency": 0.16 },
+    //       { "hex": "#F5E8D8", "role": "neutral",   "frequency": 0.14 },
+    //       { "hex": "#E8A47F", "role": "highlight", "frequency": 0.11 }
+    //     ],
+    //     "userLocked": false               // true once user manually edits
+    //   }
+    const [bcCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brands' AND COLUMN_NAME = 'brand_colors'
+    `) as any;
+    if ((bcCol as any[]).length === 0) {
+      await conn.execute(`ALTER TABLE brands ADD COLUMN brand_colors JSON NULL`);
+      console.log("[migrate] brands.brand_colors: added");
+    } else {
+      console.log("[migrate] brands.brand_colors: already exists, skipped");
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

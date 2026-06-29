@@ -15,6 +15,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
+import { logActivation } from "../../v2/lib/activationTelemetry";
 
 // SoWork.ai design tokens
 const C = {
@@ -133,6 +134,10 @@ export default function RegisterPage() {
         const loginData = await loginRes.json();
         if (loginRes.ok && loginData.token) {
           try { localStorage.setItem("authToken", loginData.token); } catch {}
+          // 2026-06-21 (TTFV): activation funnel — stage 1 (register_completed).
+          // Fired BEFORE redirect so the event sticks even if the navigation
+          // teardown cancels in-flight requests on slow mobiles.
+          logActivation("register_completed", { method: "email" });
           window.location.replace("/theater");
           return;
         }
