@@ -1,0 +1,73 @@
+name: "Ops — VM diagnose (memory / processes / runner / disk)"
+
+# Reads system health from the VM via SSH so we can decide whether a stuck
+# deploy is due to (a) memory pressure, (b) orphan build processes holding
+# locks, or (c) the self-hosted runner service being dead. Read-only — no
+# commands modify any state.
+#
+# Trigger: GitHub UI → Actions → "Ops — VM diagnose" → "Run workflow".
+# Output: scroll the run's "Diagnose" step log; all 6 sections are labelled.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Diagnose
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set +e
+
+            echo "===== 1. Memory (free -h) ====="
+            free -h
+            echo
+
+            echo "===== 2. Swap usage ====="
+            swapon --show
+            echo
+            cat /proc/meminfo | grep -E "MemTotal|MemAvailable|SwapTotal|SwapFree"
+            echo
+
+            echo "===== 3. Top processes by RAM (top 10) ====="
+            ps -eo pid,user,%mem,%cpu,etime,comm --sort=-%mem | head -11
+            echo
+
+            echo "===== 4. Build / install / node processes (anything stuck?) ====="
+            ps -ef | grep -E "vite|tsx|esbuild|npm|node" | grep -v grep | head -20
+            echo
+
+            echo "===== 5. Disk space ====="
+            df -h / /opt 2>/dev/null
+            echo
+
+            echo "===== 6. Self-hosted GH runner service ====="
+            sudo systemctl list-units --type=service --all 'actions.runner.*' --no-pager 2>/dev/null | head -20
+            echo
+            sudo systemctl status 'actions.runner.*' --no-pager --lines=5 2>/dev/null | head -30
+            echo
+
+            echo "===== 7. PM2 process status ====="
+            pm2 list 2>/dev/null || echo "(pm2 not available for this user)"
+            echo
+
+            echo "===== 8. VM specs (CPU / total RAM) ====="
+            nproc
+            echo "CPU cores ^"
+            grep "model name" /proc/cpuinfo | head -1
+            cat /proc/meminfo | grep MemTotal
+            echo
+
+            echo "===== 9. Locks under node_modules (orphan installs) ====="
+            ls -la /opt/onbrand/app/skills/ai-talent/node_modules/.package-lock.json 2>/dev/null || echo "(no server lock)"
+            ls -la /opt/onbrand/app/skills/ai-talent/client/node_modules/.package-lock.json 2>/dev/null || echo "(no client lock)"
+            echo
+
+            echo "===== Diagnose complete ====="
+            exit 0
