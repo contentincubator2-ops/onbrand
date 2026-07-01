@@ -41,39 +41,74 @@ const swatchOverrideSchema = z.object({
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-/** Pull up to N product image URLs for a brand. Falls back gracefully. */
+/**
+ * Pull up to N product image URLs for a brand.
+ *
+ * 2026-06-30 (CJ prod bug): originally assumed `products.imageUrl` +
+ * `products.extraImages` columns exist. They don't — the real `products`
+ * schema is (id, userId, brandId, slug, name, positioning JSON, timestamps).
+ * Image URLs, if present at all, live inside the `positioning` JSON blob
+ * as one of:
+ *   - positioning.imageUrl (top-level, if any writer sets it)
+ *   - positioning._interim.imageUrl (interim-pulse writers)
+ *   - positioning._assets.photos[] (asset panel)
+ *   - positioning.images[] (LLM extractors)
+ * We walk all four locations. Returns [] if none — caller returns
+ * `no_product_images` and the UI shows the empty-state CTA.
+ */
 async function loadBrandProductImageUrls(
   brandId: number,
   userId: number,
   cap = 30,
 ): Promise<string[]> {
-  // products table: imageUrl (single hero) + extraImages (JSON array)
   const [rows]: any = await localPool.execute(
-    `SELECT imageUrl, extraImages FROM products
+    `SELECT positioning FROM products
        WHERE brandId = ? AND userId = ?
        ORDER BY id DESC
        LIMIT 100`,
     [brandId, userId],
   );
   const urls: string[] = [];
+  const isHttp = (v: unknown): v is string =>
+    typeof v === "string" && /^https?:\/\//.test(v);
+
   for (const r of (rows as any[])) {
-    if (typeof r.imageUrl === "string" && /^https?:\/\//.test(r.imageUrl)) {
-      urls.push(r.imageUrl);
+    let p: any = r.positioning;
+    if (typeof p === "string") {
+      try { p = JSON.parse(p); } catch { p = null; }
     }
-    if (r.extraImages) {
-      let extras: any = r.extraImages;
-      if (typeof extras === "string") {
-        try { extras = JSON.parse(extras); } catch { extras = []; }
-      }
-      if (Array.isArray(extras)) {
-        for (const u of extras) {
-          if (typeof u === "string" && /^https?:\/\//.test(u)) urls.push(u);
+    if (!p || typeof p !== "object") continue;
+
+    // Common locations
+    const candidates: unknown[] = [
+      p.imageUrl,
+      p.image,
+      p._interim?.imageUrl,
+      p._interim?.image,
+    ];
+    // Array-style locations
+    const arrays: unknown[] = [
+      p.images,
+      p._interim?.images,
+      p._assets?.photos,
+      p._assets?.images,
+    ];
+    for (const c of candidates) {
+      if (isHttp(c)) urls.push(c);
+    }
+    for (const arr of arrays) {
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          if (isHttp(item)) urls.push(item);
+          else if (item && typeof item === "object" && isHttp((item as any).url)) {
+            urls.push((item as any).url);
+          }
         }
       }
     }
+
     if (urls.length >= cap) break;
   }
-  // De-dupe + cap
   return Array.from(new Set(urls)).slice(0, cap);
 }
 
@@ -251,8 +286,10 @@ export const brandColorsRouter = router({
       const userId = ctx.user!.id;
 
       // Load product + parent brand
+      // 2026-06-30 (CJ prod bug): products table has no imageUrl column —
+      // read image from positioning JSON same locations as loadBrandProductImageUrls.
       const [prodRows]: any = await localPool.execute(
-        `SELECT id, brandId, name, imageUrl, positioning
+        `SELECT id, brandId, name, positioning
            FROM products WHERE id = ? AND userId = ? LIMIT 1`,
         [input.productId, userId],
       );
@@ -260,7 +297,29 @@ export const brandColorsRouter = router({
       if (!product) {
         return { ok: false as const, reason: "product_not_found" as const };
       }
-      if (!product.imageUrl) {
+
+      // Extract image URL + tagline from positioning JSON
+      let productImageUrl = "";
+      let tagline = "";
+      try {
+        let p: any = product.positioning;
+        if (typeof p === "string") p = JSON.parse(p);
+        const candidates = [
+          p?.imageUrl, p?.image,
+          p?._interim?.imageUrl, p?._interim?.image,
+          Array.isArray(p?.images) ? p.images[0] : null,
+          Array.isArray(p?._interim?.images) ? p._interim.images[0] : null,
+          Array.isArray(p?._assets?.photos) ? (typeof p._assets.photos[0] === "string" ? p._assets.photos[0] : p._assets.photos[0]?.url) : null,
+        ];
+        for (const c of candidates) {
+          if (typeof c === "string" && /^https?:\/\//.test(c)) { productImageUrl = c; break; }
+        }
+        tagline = p?.tagline ?? p?._interim?.tagline ?? p?.usp ?? p?._interim?.usp ?? "";
+        if (typeof tagline !== "string") tagline = "";
+        tagline = tagline.slice(0, 60);
+      } catch { /* fall through */ }
+
+      if (!productImageUrl) {
         return { ok: false as const, reason: "product_has_no_image" as const };
       }
 
@@ -269,18 +328,8 @@ export const brandColorsRouter = router({
         return { ok: false as const, reason: "no_palette_yet" as const };
       }
 
-      // Pull a tagline from positioning JSON if available (otherwise blank)
-      let tagline = "";
-      try {
-        let p: any = product.positioning;
-        if (typeof p === "string") p = JSON.parse(p);
-        tagline = p?.tagline ?? p?._interim?.tagline ?? p?.usp ?? p?._interim?.usp ?? "";
-        if (typeof tagline !== "string") tagline = "";
-        tagline = tagline.slice(0, 60);
-      } catch { /* no tagline */ }
-
       const result = await composeBrandedProductImage({
-        productImageUrl: product.imageUrl,
+        productImageUrl,
         productName: product.name,
         tagline,
         palette: palette.swatches.map((s) => ({ hex: s.hex, role: s.role })),

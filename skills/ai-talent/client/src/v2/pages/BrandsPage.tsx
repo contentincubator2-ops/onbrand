@@ -4935,16 +4935,28 @@ function BrandEntityGrid({
                 className="text-left rounded-xl border border-neutral-200 bg-white p-0 overflow-hidden hover:border-neutral-400 hover:shadow-sm transition group flex flex-col"
               >
                 {/* 2026-06-21 (CJ「產品頁籤加縮圖」): thumbnail at top.
-                    productDiscovery writes imageUrl when crawling sites.
-                    Falls back to a soft placeholder if missing or 404. */}
-                {kind === "product" && (
+                    2026-06-30 (prod bug): products.imageUrl column doesn't
+                    exist — dig into positioning JSON for image locations. */}
+                {kind === "product" && (() => {
+                  const pos: any = item.positioning ?? {};
+                  const parsed = typeof pos === "string" ? (() => { try { return JSON.parse(pos); } catch { return {}; } })() : pos;
+                  const imgCandidates = [
+                    parsed?.imageUrl, parsed?.image,
+                    parsed?._interim?.imageUrl, parsed?._interim?.image,
+                    Array.isArray(parsed?.images) ? parsed.images[0] : null,
+                    Array.isArray(parsed?._interim?.images) ? parsed._interim.images[0] : null,
+                    Array.isArray(parsed?._assets?.photos) ? (typeof parsed._assets.photos[0] === "string" ? parsed._assets.photos[0] : parsed._assets.photos[0]?.url) : null,
+                    item.imageUrl,   // legacy top-level, if any writer sets it
+                  ];
+                  const imgUrl = imgCandidates.find((c: any) => typeof c === "string" && /^https?:\/\//.test(c)) as string | undefined;
+                  return (
                   <div
                     className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden"
                     style={{ aspectRatio: "4 / 3", maxHeight: 140 }}
                   >
-                    {item.imageUrl ? (
+                    {imgUrl ? (
                       <img
-                        src={item.imageUrl}
+                        src={imgUrl}
                         alt={item.name}
                         loading="lazy"
                         className="w-full h-full object-cover transition-transform group-hover:scale-105"
@@ -4962,7 +4974,8 @@ function BrandEntityGrid({
                       </div>
                     )}
                   </div>
-                )}
+                  );
+                })()}
 
                 <div className={kind === "product" ? "p-3" : "p-4"}>
                 {/* Name */}
@@ -5012,8 +5025,11 @@ function BrandEntityGrid({
                   >
                     {positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
                   </button>
-                  {/* 2026-06-21 (CJ「按 riverflow 標準」): branded variant generator */}
-                  {kind === "product" && item.imageUrl && (
+                  {/* 2026-06-21 (CJ「按 riverflow 標準」): branded variant generator.
+                      2026-06-30: dropped item.imageUrl gate — column doesn't
+                      exist. Backend returns `product_has_no_image` if positioning
+                      JSON has no image, and the modal shows that message. */}
+                  {kind === "product" && (
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
