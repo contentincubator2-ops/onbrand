@@ -697,9 +697,20 @@ export default function BrandsPage() {
 
   // (brand dropdown moved to ShellLayout sidebar)
 
-  // Reset to positioning grid when scope changes
+  // Reset section when scope changes — but respect the ACTIVE category's
+  // default. 2026-07-01 (CJ「hero 初始不渲染」bug): this used to hardcode
+  // "pos:home", which stomped the "asset:all" initial value during the
+  // none→brand scope hydration on direct URL loads like ?cat=visual.
+  // category never *changes* in that flow, so the category-change effect
+  // above never restored it → BrandPaletteHero + TabActionBar (gated on
+  // section === "asset:all") silently didn't render until the user
+  // clicked into an asset and back out.
   React.useEffect(() => {
-    setSection("pos:home");
+    setSection(
+      category === "visual" || category === "copy" ? "asset:all"
+      : category === "settings" ? "settings"
+      : "pos:home",
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode]);
 

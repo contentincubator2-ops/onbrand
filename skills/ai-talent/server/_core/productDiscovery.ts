@@ -18,6 +18,9 @@
  */
 import localPool from "../localDb";
 import { invokeLLM } from "./llm";
+// 2026-07-01 (CJ「跟 riverflow 一樣」): image scraping + name-matching so
+// discovered products carry a real imageUrl inside their positioning JSON.
+import { scrapeWebsiteImages, matchImageToProduct, type ScrapedImage } from "./websiteImageScraper";
 
 const MAX_PRODUCTS = 50;
 const POSITION_DELAY_MS = 2_000;
@@ -194,12 +197,27 @@ async function runDiscoveryJob(job: {
     await setPhase(job.id, "position");
     let positioned = 0;
 
+    // 2026-07-01: scrape product images once for the whole site, then
+    // best-effort match each product by name against alt text / URL slug.
+    // Failures are non-fatal — products simply stay imageless.
+    let scrapedImages: ScrapedImage[] = [];
+    try {
+      scrapedImages = await scrapeWebsiteImages(job.websiteUrl, 40);
+      log(`image scrape OK: ${scrapedImages.length} images`);
+    } catch (e: any) {
+      log(`image scrape failed (non-fatal): ${e?.message ?? e}`);
+    }
+
     for (const p of capped) {
       try {
         await localPool.execute(
           `UPDATE product_discovery_jobs SET currentProduct = ? WHERE id = ?`,
           [p.name.slice(0, 255), job.id],
         );
+
+        const matchedImage = scrapedImages.length > 0
+          ? matchImageToProduct(p.name, scrapedImages)
+          : null;
 
         // Create product record if not already exists
         const slug = toSlug(p.name);
@@ -211,8 +229,22 @@ async function runDiscoveryJob(job: {
         let productId: number;
         if ((existing as any[]).length > 0) {
           productId = (existing as any[])[0].id;
+          // Backfill imageUrl on re-scan if the product doesn't have one yet.
+          // JSON_SET on NULL-guarded positioning avoids read-modify-write.
+          if (matchedImage) {
+            await localPool.execute(
+              `UPDATE products
+                 SET positioning = JSON_SET(COALESCE(positioning, '{}'), '$.imageUrl',
+                       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.imageUrl')), ?))
+               WHERE id = ?`,
+              [matchedImage, productId],
+            ).catch((e) => log(`imageUrl backfill failed for "${p.name}": ${e?.message ?? e}`));
+          }
         } else {
-          const posJson = JSON.stringify({ description: p.description });
+          const posJson = JSON.stringify({
+            description: p.description,
+            ...(matchedImage ? { imageUrl: matchedImage } : {}),
+          });
           const [ins]: any = await localPool.execute(
             `INSERT INTO products (userId, brandId, slug, name, positioning)
              VALUES (?, ?, ?, ?, ?)`,

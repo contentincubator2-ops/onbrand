@@ -26,6 +26,7 @@ import {
   composeBrandedProductImage,
   type Layout,
 } from "../_core/brandedComposer";
+import { scrapeWebsiteImages } from "../_core/websiteImageScraper";
 
 // ── Zod ────────────────────────────────────────────────────────────────
 
@@ -179,7 +180,29 @@ export const brandColorsRouter = router({
         }
       }
 
-      const urls = await loadBrandProductImageUrls(input.brandId, userId, 30);
+      let urls = await loadBrandProductImageUrls(input.brandId, userId, 30);
+
+      // 2026-07-01 (CJ「跟 riverflow 一樣」): products rarely carry images
+      // yet (productDiscovery is text-first). Riverflow's actual flow is
+      // URL → images → palette, so when the product path is dry, scrape
+      // the brand website directly. This makes extraction work minutes
+      // after brand creation with zero manual steps.
+      if (urls.length === 0) {
+        const [brandRows]: any = await localPool.execute(
+          `SELECT website FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+          [input.brandId, userId],
+        );
+        const website: string | null = (brandRows as any[])[0]?.website ?? null;
+        if (website && /^https?:\/\//.test(website)) {
+          try {
+            const scraped = await scrapeWebsiteImages(website, 30);
+            urls = scraped.map((s) => s.url);
+          } catch (e) {
+            console.warn(`[brandColors] website scrape failed for brand ${input.brandId}:`, (e as Error).message);
+          }
+        }
+      }
+
       if (urls.length === 0) {
         return {
           ok: false as const,
