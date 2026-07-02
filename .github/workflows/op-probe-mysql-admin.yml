@@ -1,0 +1,30 @@
+name: Ops — Probe MySQL admin auth (read-only)
+# 2026-06-28: confirm HOW we can run privileged MySQL (ALTER USER) on the VM,
+# so the password-rotation workflow uses the right method. Reads nothing
+# sensitive, changes nothing.
+on: { workflow_dispatch: {} }
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set +e
+          echo "── method 1: sudo mysql (unix_socket root) ──"
+          sudo mysql -e "SELECT 1 AS ok, CURRENT_USER() AS who;" 2>&1 | head -5
+          echo "  exit=$?"
+
+          echo ""
+          echo "── method 2: mysql as mos_user with .env password ──"
+          set -a; source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          mysql -h localhost -u "${LOCAL_DB_USER:-mos_user}" -e "SELECT 1 AS ok, CURRENT_USER() AS who;" 2>&1 | head -5
+          echo "  exit=$?"
+
+          echo ""
+          echo "── mos_user host entries (so rotation covers every host) ──"
+          sudo mysql -N -e "SELECT CONCAT(user,'@',host) FROM mysql.user WHERE user='mos_user';" 2>&1 | head -10
+
+          echo ""
+          echo "── can mos_user ALTER its own password? (privilege probe, no change) ──"
+          mysql -h localhost -u "${LOCAL_DB_USER:-mos_user}" -e "SHOW GRANTS FOR CURRENT_USER();" 2>&1 | head -10
