@@ -12,6 +12,8 @@
  * complexity. Full tool-loop stays as a follow-up.
  */
 
+import { assertUrlSafe } from "./urlGuard";
+
 const MAX_URLS_PER_TURN = 3;
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_BYTES = 500 * 1024; // 500KB hard cap on raw HTML
@@ -101,22 +103,45 @@ function htmlToReadableText(html: string): { title?: string; text: string } {
   return { title, text: s };
 }
 
-/** Fetch a single URL with timeout + size cap. */
+/** Fetch a single URL with timeout + size cap.
+ *  SSRF-guarded: the initial URL and every redirect hop are validated with
+ *  assertUrlSafe() (DNS-resolved private-range check). Redirects are followed
+ *  MANUALLY (max 5) so each Location target is re-validated — `redirect:"follow"`
+ *  would let a public host bounce us to an internal address unchecked. */
+const MAX_REDIRECTS = 5;
 export async function fetchReadable(url: string): Promise<FetchedPage> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      method: "GET",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (compatible; SoWork-OnBrand/1.0; +https://onbrand.sowork.ai)",
-        "accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
-        "accept-language": "en;q=0.9,zh-TW;q=0.8,zh;q=0.7",
-      },
-    });
+    let current = url;
+    let res: Response;
+    for (let hop = 0; ; hop++) {
+      try {
+        await assertUrlSafe(current);
+      } catch (e: any) {
+        return { url, ok: false, error: e?.message ?? "blocked by SSRF guard" };
+      }
+      res = await fetch(current, {
+        method: "GET",
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          "user-agent":
+            "Mozilla/5.0 (compatible; SoWork-OnBrand/1.0; +https://onbrand.sowork.ai)",
+          "accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
+          "accept-language": "en;q=0.9,zh-TW;q=0.8,zh;q=0.7",
+        },
+      });
+      // Follow 3xx redirects manually, re-validating each target.
+      if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
+        if (hop >= MAX_REDIRECTS) {
+          return { url, ok: false, statusCode: res.status, error: "too many redirects" };
+        }
+        current = new URL(res.headers.get("location")!, current).toString();
+        continue;
+      }
+      break;
+    }
 
     const ctype = (res.headers.get("content-type") ?? "").toLowerCase();
     if (!ctype.includes("html") && !ctype.includes("text/plain") && !ctype.includes("xml")) {
@@ -161,7 +186,7 @@ export async function fetchReadable(url: string): Promise<FetchedPage> {
       url,
       ok: true,
       statusCode: res.status,
-      finalUrl: res.url,
+      finalUrl: res.url || current,
       title: parsed.title,
       text: truncated,
     };

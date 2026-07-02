@@ -20,6 +20,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import { callLLM } from "../_core/llmRouter";
+import { assertUrlSafe } from "../_core/urlGuard";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function safeJson(s: any): any {
@@ -342,12 +343,26 @@ export const scopeRouter = router({
         let url = raw.trim();
         if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
         try {
-          const resp = await fetch(url, {
-            method: "GET",
-            redirect: "follow",
-            signal: AbortSignal.timeout(15_000),
-            headers: { "User-Agent": "Mozilla/5.0 SoWork-MarketingOS-Verifier/1.0" },
-          });
+          // SSRF guard: validate the initial URL + every redirect hop against
+          // the DNS-resolved private-range blocklist. Manual redirects so an
+          // allowed host can't 302 us to an internal address unchecked.
+          let current = url;
+          let resp: Response;
+          for (let hop = 0; ; hop++) {
+            await assertUrlSafe(current);
+            resp = await fetch(current, {
+              method: "GET",
+              redirect: "manual",
+              signal: AbortSignal.timeout(15_000),
+              headers: { "User-Agent": "Mozilla/5.0 SoWork-MarketingOS-Verifier/1.0" },
+            });
+            if (resp.status >= 300 && resp.status < 400 && resp.headers.get("location")) {
+              if (hop >= 5) return; // too many redirects
+              current = new URL(resp.headers.get("location")!, current).toString();
+              continue;
+            }
+            break;
+          }
           if (!resp.ok) return;
           const html = await resp.text();
           // Extract title + meta description + og tags + first h1 + first chunk of body text
