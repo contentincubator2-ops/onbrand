@@ -18,7 +18,12 @@ async function main() {
     host:     process.env.LOCAL_DB_HOST     ?? "127.0.0.1",
     port:     Number(process.env.LOCAL_DB_PORT ?? 3306),
     user:     process.env.LOCAL_DB_USER     ?? "mos_user",
-    password: process.env.LOCAL_DB_PASSWORD ?? "mos_secure_2026",
+    // 2026-06-28 (security scan): no hardcoded DB password fallback — require env.
+    password: (() => {
+      const p = process.env.LOCAL_DB_PASSWORD;
+      if (!p) throw new Error("LOCAL_DB_PASSWORD must be set");
+      return p;
+    })(),
     database: process.env.LOCAL_DB_NAME     ?? "mos_db",
     ssl: undefined,
   });

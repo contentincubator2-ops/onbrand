@@ -1,9 +1,13 @@
 const mysql = require('mysql2/promise');
 
 async function main() {
+  // 2026-06-28 (security scan): no hardcoded DB password — require env.
+  if (!process.env.LOCAL_DB_PASSWORD) throw new Error("LOCAL_DB_PASSWORD must be set");
   const conn = await mysql.createConnection({
-    host: 'localhost', user: 'mos_user',
-    password: 'mos_secure_2026', database: 'mos_db'
+    host: process.env.LOCAL_DB_HOST || 'localhost',
+    user: process.env.LOCAL_DB_USER || 'mos_user',
+    password: process.env.LOCAL_DB_PASSWORD,
+    database: process.env.LOCAL_DB_NAME || 'mos_db'
   });
 
   // Get all squads with their members JSON

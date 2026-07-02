@@ -258,8 +258,12 @@ export const communityRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
+      // 2026-06-28 (security scan): do NOT select u.email here — this is a
+      // publicProcedure and the result is spread ({...t}) to the client, which
+      // leaked author emails to unauthenticated callers. Only authorName is
+      // shown in the UI.
       const [rows]: any = await localPool.execute(
-        `SELECT t.*, u.name AS authorName, u.email AS authorEmail
+        `SELECT t.*, u.name AS authorName
          FROM community_templates t
          LEFT JOIN users u ON u.id = t.authorUserId
          WHERE t.id = ? AND t.status = 'active' LIMIT 1`,

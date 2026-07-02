@@ -28,7 +28,7 @@ jobs:
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
           DB_USER="${LOCAL_DB_USER:-mos_user}"
-          DB_PASS="${LOCAL_DB_PASSWORD:-mos_secure_2026}"
+          DB_PASS="${LOCAL_DB_PASSWORD:?LOCAL_DB_PASSWORD not set (source .env)}"
           DB_NAME="${LOCAL_DB_NAME:-mos_db}"
           echo "=== Before update ==="
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
@@ -43,7 +43,7 @@ jobs:
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
           DB_USER="${LOCAL_DB_USER:-mos_user}"
-          DB_PASS="${LOCAL_DB_PASSWORD:-mos_secure_2026}"
+          DB_PASS="${LOCAL_DB_PASSWORD:?LOCAL_DB_PASSWORD not set (source .env)}"
           DB_NAME="${LOCAL_DB_NAME:-mos_db}"
 
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
@@ -66,7 +66,7 @@ jobs:
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
           DB_USER="${LOCAL_DB_USER:-mos_user}"
-          DB_PASS="${LOCAL_DB_PASSWORD:-mos_secure_2026}"
+          DB_PASS="${LOCAL_DB_PASSWORD:?LOCAL_DB_PASSWORD not set (source .env)}"
           DB_NAME="${LOCAL_DB_NAME:-mos_db}"
           echo "=== After update ==="
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
