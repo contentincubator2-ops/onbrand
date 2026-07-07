@@ -177,11 +177,34 @@ async function runDiscoveryJob(job: {
     await setPhase(job.id, "extract");
     const products = await extractProducts(pages, job.websiteUrl).catch((e) => {
       log(`extract failed: ${e?.message ?? e}`);
-      return [] as Array<{ name: string; description: string }>;
+      return [] as Array<{ name: string; description: string; imageUrl?: string }>;
     });
     log(`extract result: ${products.length} products found`);
 
-    const capped = products.slice(0, MAX_PRODUCTS);
+    // 2026-07-07: image scrape hoisted BEFORE the zero-product check —
+    // it powers both per-product image matching AND the SPA alt-text
+    // fallback below. Failures are non-fatal.
+    let scrapedImages: ScrapedImage[] = [];
+    try {
+      scrapedImages = await scrapeWebsiteImages(job.websiteUrl, 40);
+      log(`image scrape OK: ${scrapedImages.length} images`);
+    } catch (e: any) {
+      log(`image scrape failed (non-fatal): ${e?.message ?? e}`);
+    }
+
+    // 2026-07-07 (CJ「克服像 lativ 這種的網站」): SPA fallback. Client-
+    // rendered sites (Angular/React storefronts) serve an empty text shell
+    // — the LLM text extraction finds 0 products — but their homepage
+    // <img> alt texts are real product blurbs (server-rendered for SEO).
+    // Turn those alts into product entries, each pre-bound to its image.
+    let capped = products.slice(0, MAX_PRODUCTS);
+    if (capped.length === 0 && scrapedImages.some((s) => (s.alt ?? "").trim().length >= 4)) {
+      log(`text extract empty — trying image-alt fallback (${scrapedImages.length} images)`);
+      const fromAlts = await productsFromImageAlts(scrapedImages, log);
+      log(`image-alt fallback: ${fromAlts.length} products`);
+      capped = fromAlts.slice(0, MAX_PRODUCTS);
+    }
+
     await localPool.execute(
       `UPDATE product_discovery_jobs SET totalFound = ? WHERE id = ?`,
       [capped.length, job.id],
@@ -197,17 +220,6 @@ async function runDiscoveryJob(job: {
     await setPhase(job.id, "position");
     let positioned = 0;
 
-    // 2026-07-01: scrape product images once for the whole site, then
-    // best-effort match each product by name against alt text / URL slug.
-    // Failures are non-fatal — products simply stay imageless.
-    let scrapedImages: ScrapedImage[] = [];
-    try {
-      scrapedImages = await scrapeWebsiteImages(job.websiteUrl, 40);
-      log(`image scrape OK: ${scrapedImages.length} images`);
-    } catch (e: any) {
-      log(`image scrape failed (non-fatal): ${e?.message ?? e}`);
-    }
-
     for (const p of capped) {
       try {
         await localPool.execute(
@@ -215,9 +227,10 @@ async function runDiscoveryJob(job: {
           [p.name.slice(0, 255), job.id],
         );
 
-        const matchedImage = scrapedImages.length > 0
-          ? matchImageToProduct(p.name, scrapedImages)
-          : null;
+        // Alt-fallback products carry their image directly; LLM-extracted
+        // ones get best-effort matched against the scraped pool.
+        const matchedImage = p.imageUrl
+          ?? (scrapedImages.length > 0 ? matchImageToProduct(p.name, scrapedImages) : null);
 
         // Create product record if not already exists
         const slug = toSlug(p.name);
@@ -350,10 +363,89 @@ async function crawlWebsite(url: string): Promise<string> {
   return chunks.join("\n\n").slice(0, 12000);  // 12000 total → ~30s LLM response time
 }
 
+/**
+ * 2026-07-07 (CJ「克服像 lativ 這種的網站」): build product candidates from
+ * scraped image alt texts when the text crawl yields nothing (SPA sites).
+ * An LLM pass separates real products from campaign banners and distills
+ * each blurb into a concise product name; every entry keeps its exact
+ * image (index-mapped), so no fuzzy matching is needed downstream.
+ * LLM failure falls back to a CJK-heuristic pass — degraded but non-empty.
+ */
+async function productsFromImageAlts(
+  images: ScrapedImage[],
+  log: (msg: string) => void,
+): Promise<Array<{ name: string; description: string; imageUrl?: string }>> {
+  const candidates = images
+    .map((img, idx) => ({ idx, alt: (img.alt ?? "").trim(), url: img.url }))
+    .filter((c) => c.alt.length >= 4 && c.alt.length <= 80)
+    // Drop alts that are just URLs or nav labels
+    .filter((c) => !/^https?:\/\//i.test(c.alt))
+    .filter((c) => !/^(facebook|instagram|line|youtube|logo|banner|icon)$/i.test(c.alt))
+    .slice(0, 25);
+  if (candidates.length === 0) return [];
+
+  try {
+    const llmCall = invokeLLM({
+      provider: "anthropic",
+      messages: [{
+        role: "user",
+        content: `以下是品牌官網圖片的 alt 文字清單（含編號）：
+
+${candidates.map((c) => `${c.idx}. ${c.alt}`).join("\n")}
+
+---
+
+請挑出「描述具體產品」的項目（略過純活動宣傳、節慶 banner、免運廣告等），
+把每一項濃縮成產品名稱。輸出 JSON array：
+[
+  { "idx": 編號, "name": "精簡產品名（2-20 字）", "description": "原 alt 或分類" },
+  ...
+]
+規則：
+- name 要像商品名，不要句子（例：「100%純棉，清爽背心，繽紛百搭」→「純棉清爽背心」）
+- 拿不準是不是產品就略過
+- 只輸出 JSON array`,
+      }],
+      maxTokens: 2000,
+    });
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("productsFromImageAlts LLM timeout after 60s")), 60_000),
+    );
+    const result = await Promise.race([llmCall, timeout]);
+    const text = String((result as any)?.content ?? (result as any)?.text ?? "").trim();
+    const start = text.indexOf("[");
+    const end = text.lastIndexOf("]");
+    if (start === -1 || end === -1) throw new Error("no JSON array in alt-fallback LLM response");
+    const parsed = JSON.parse(text.slice(start, end + 1));
+    if (!Array.isArray(parsed)) throw new Error("alt-fallback LLM response is not array");
+
+    const byIdx = new Map(candidates.map((c) => [c.idx, c]));
+    const items = parsed
+      .filter((p: any) => typeof p?.name === "string" && p.name.trim() && byIdx.has(Number(p?.idx)))
+      .map((p: any) => ({
+        name: String(p.name).trim().slice(0, 255),
+        description: String(p.description ?? "").trim().slice(0, 500) || "產品",
+        imageUrl: byIdx.get(Number(p.idx))!.url,
+      }));
+    if (items.length > 0) return items;
+  } catch (e: any) {
+    log(`alt-fallback LLM failed, using heuristic: ${e?.message ?? e}`);
+  }
+
+  // Heuristic fallback: keep CJK-dominant alts, name = alt trimmed
+  return candidates
+    .filter((c) => (c.alt.match(/[一-鿿]/g) ?? []).length >= 3)
+    .map((c) => ({
+      name: c.alt.split(/[，,。!！]/)[0]!.trim().slice(0, 30) || c.alt.slice(0, 30),
+      description: c.alt.slice(0, 200),
+      imageUrl: c.url,
+    }));
+}
+
 async function extractProducts(
   pageContent: string,
   websiteUrl: string,
-): Promise<Array<{ name: string; description: string }>> {
+): Promise<Array<{ name: string; description: string; imageUrl?: string }>> {
   // Hard 120-second timeout — Anthropic on large prompts can take 60-90s.
   const llmCall = invokeLLM({
     provider: "anthropic",
