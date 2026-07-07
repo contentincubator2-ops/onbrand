@@ -44,6 +44,13 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # 2026-07-07: two pushes 14s apart ran `npm install` concurrently on the
+    # VM and corrupted client/node_modules (ENOTEMPTY). Serialize deploys —
+    # a superseded pending deploy is safe to drop because each deploy does
+    # `git reset --hard origin/main` (always ships the newest commit).
+    concurrency:
+      group: deploy-vm
+      cancel-in-progress: false
     steps:
       - name: Deploy to VM
         uses: appleboy/ssh-action@v1.0.3
