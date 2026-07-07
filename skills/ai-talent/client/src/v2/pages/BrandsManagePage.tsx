@@ -342,7 +342,7 @@ export default function BrandsManagePage() {
                   : "品牌是 OnBrand 一切的起點。建立後 AI 自動分析定位、用詞、視覺風格，之後所有任務都會吃這份品牌大腦。"}
               </p>
               <button
-                onClick={() => navigate("/brands/edit?new=1")}
+                onClick={() => setAddBrandOpen(true)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold transition"
               >
                 {lang === "en" ? "Get started" : "開始建立"}
