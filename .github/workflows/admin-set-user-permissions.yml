@@ -2,8 +2,8 @@ name: Admin — Set user permissions (admin + unlimited credits)
 
 # Grants full unlimited access to:
 #   - liudice@gmail.com
-#   - all users whose email ends with @sowork.tw
-#   (including jj.lu@sowork.tw)
+#   - all users whose email ends with @sowork.tw OR @sowork.ai
+#   (including jj.lu@sowork.tw, celine.cheng@sowork.ai)
 #
 # Sets: role=admin, hasUnlimitedCredits=1, planCode=enterprise,
 #       planStatus=active, planEndsAt=NULL (removes trial expiry), isActive=1
@@ -34,7 +34,7 @@ jobs:
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
             "SELECT id, email, role, isActive, hasUnlimitedCredits, planCode, orgRole
              FROM users
-             WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw'
+             WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw' OR email LIKE '%@sowork.ai'
              ORDER BY email;"
 
       - name: Grant admin + unlimited credits + enterprise plan
@@ -55,7 +55,8 @@ jobs:
                  planEndsAt          = NULL,
                  isActive            = 1
              WHERE email = 'liudice@gmail.com'
-                OR email LIKE '%@sowork.tw';"
+                OR email LIKE '%@sowork.tw'
+                OR email LIKE '%@sowork.ai';"
 
           echo "Rows affected: $(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -se \
             "SELECT ROW_COUNT();")"
@@ -72,6 +73,6 @@ jobs:
           mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
             "SELECT id, email, role, isActive, hasUnlimitedCredits, planCode, planStatus, planEndsAt
              FROM users
-             WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw'
+             WHERE email = 'liudice@gmail.com' OR email LIKE '%@sowork.tw' OR email LIKE '%@sowork.ai'
              ORDER BY email;"
           echo "✓ Done"
