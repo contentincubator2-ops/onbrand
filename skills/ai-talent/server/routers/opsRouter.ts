@@ -17,6 +17,16 @@
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure, adminProcedure } from "../_core/trpc";
 
+// 2026-07-05 (security scan): logError is a publicProcedure (unauthenticated),
+// so it's a DB-write flood vector. Coarse global fixed-window cap: beyond
+// LOG_MAX_PER_WINDOW inserts per minute we skip the DB write (still console.*
+// so nothing is lost in PM2 logs). Legit frontend error volume is far below
+// this; the cap only bites on abuse.
+const LOG_WINDOW_MS = 60_000;
+const LOG_MAX_PER_WINDOW = 500;
+let _logWindowStart = 0;
+let _logWindowCount = 0;
+
 export const opsRouter = router({
   /** Frontend uncaught error / API error logger. publicProcedure so unauthed
    *  pages (auth/register etc.) can also report errors. */
@@ -31,6 +41,17 @@ export const opsRouter = router({
       meta: z.record(z.string(), z.any()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Flood guard (see note above): cap DB writes per rolling minute.
+      const now = Date.now();
+      if (now - _logWindowStart > LOG_WINDOW_MS) {
+        _logWindowStart = now;
+        _logWindowCount = 0;
+      }
+      if (++_logWindowCount > LOG_MAX_PER_WINDOW) {
+        // eslint-disable-next-line no-console
+        console.warn(`[opsRouter.logError] rate limit hit (${LOG_MAX_PER_WINDOW}/min) — dropping DB write for: ${input.source}`);
+        return { ok: true, dropped: true as const };
+      }
       await logError({
         source: input.source,
         route: input.route,

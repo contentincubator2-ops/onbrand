@@ -21,7 +21,7 @@ jobs:
           envs: OUTPUT_ID
           script: |
             cd /opt/marketing-os/app/skills/ai-talent
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             MYSQL="mysql -h localhost -u mos_user mos_db"
 
             echo "════════ DEPLOY STATE ════════"

@@ -14,7 +14,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 90s
           script: |
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
 
             # All previously used (FB+IG+YT+TT+LI+Email+PR+Brand+Research + 60s extras: Helen Sung 180163, David Wang 30003, Sophie Ho 60012)

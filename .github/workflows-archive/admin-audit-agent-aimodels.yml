@@ -23,7 +23,7 @@ jobs:
             set -e
             cd /opt/marketing-os/app/skills/ai-talent
             export AGENT_IDS=$(grep -ohE 'agent_id:\s*[0-9]+' server/_core/quickTask*.ts | awk '{print $2}' | sort -u | paste -sd,)
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             MYSQLT="mysql -h localhost -u mos_user mos_db -t --default-character-set=utf8mb4"
 
             echo "════════════════════════════════════════════════════════"

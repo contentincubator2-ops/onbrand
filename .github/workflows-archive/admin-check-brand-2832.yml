@@ -14,7 +14,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 30s
           script: |
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
 
             echo "════════ brands row (主要表) ════════"
             mysql -h localhost -u mos_user mos_db -e "

@@ -24,7 +24,7 @@ jobs:
             set -e
             cd /opt/marketing-os/app/skills/ai-talent
             set -a; . ./.env; set +a
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
 
             echo "════════════════════════════════════════════════════════"
             echo "  PHASE 1 VERIFY — dedupe + thick-agent loadout"
@@ -85,7 +85,7 @@ jobs:
 
             const mysql = require("mysql2/promise");
             const pool = await mysql.createPool({
-              host: "localhost", user: "mos_user", password: "mos_secure_2026",
+              host: "localhost", user: "mos_user", password: "${LOCAL_DB_PASSWORD}",
               database: "mos_db", connectionLimit: 2,
               charset: "utf8mb4",
             });

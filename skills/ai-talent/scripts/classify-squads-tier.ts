@@ -441,7 +441,7 @@ async function main() {
     password:
       process.env.LOCAL_DB_PASSWORD ||
       process.env.DB_PASSWORD ||
-      "mos_secure_2026",
+      "MUST_SET_LOCAL_DB_PASSWORD",
     database: process.env.LOCAL_DB_NAME || process.env.DB_NAME || "mos_db",
     charset: "utf8mb4",
   });

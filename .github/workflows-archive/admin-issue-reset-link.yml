@@ -93,7 +93,7 @@ jobs:
             MYSQL_HOST_ARG="${LOCAL_DB_HOST:-${DB_HOST:-localhost}}"
             MYSQL_DB_ARG="${LOCAL_DB_NAME:-${DB_NAME:-mos_db}}"
             MYSQL_PORT_ARG="${LOCAL_DB_PORT:-${DB_PORT:-3306}}"
-            MYSQL_PWD_ARG="${LOCAL_DB_PASSWORD:-${DB_PASSWORD:-mos_secure_2026}}"
+            MYSQL_PWD_ARG="${LOCAL_DB_PASSWORD:-${DB_PASSWORD:-${LOCAL_DB_PASSWORD}}}"
 
             export MYSQL_PWD="$MYSQL_PWD_ARG"
             MYSQL="mysql -h $MYSQL_HOST_ARG -P $MYSQL_PORT_ARG -u $MYSQL_USER_ARG $MYSQL_DB_ARG -B -N --silent"

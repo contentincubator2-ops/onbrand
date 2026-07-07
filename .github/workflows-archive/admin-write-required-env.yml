@@ -2,7 +2,7 @@ name: Admin — Write required env vars (LOCAL_DB_*, APP_URL, EMAIL_FROM)
 
 # Pre-requisite for B-02 (remove hardcoded DB password fallback in
 # db.ts / localDb.ts). Without LOCAL_DB_PASSWORD in .env, the fallback
-# 'mos_secure_2026' was the only thing keeping the app connected to DB.
+# '${LOCAL_DB_PASSWORD}' was the only thing keeping the app connected to DB.
 # This workflow writes the canonical values into VM's .env so the
 # upcoming B-02 commit (removing the fallback) doesn't crash prod.
 #
@@ -47,7 +47,7 @@ jobs:
             upsert_kv "LOCAL_DB_HOST"     "localhost"
             upsert_kv "LOCAL_DB_PORT"     "3306"
             upsert_kv "LOCAL_DB_USER"     "mos_user"
-            upsert_kv "LOCAL_DB_PASSWORD" "mos_secure_2026"
+            upsert_kv "LOCAL_DB_PASSWORD" "${LOCAL_DB_PASSWORD}"
             upsert_kv "LOCAL_DB_NAME"     "mos_db"
 
             # Auth / email base config (currently missing — caused the

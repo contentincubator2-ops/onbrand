@@ -192,7 +192,7 @@ async function main() {
     host:     process.env.LOCAL_DB_HOST     || "localhost",
     port:     parseInt(process.env.LOCAL_DB_PORT || "3306"),
     user:     process.env.LOCAL_DB_USER     || "mos_user",
-    password: process.env.LOCAL_DB_PASSWORD || "mos_secure_2026",
+    password: process.env.LOCAL_DB_PASSWORD || "MUST_SET_LOCAL_DB_PASSWORD",
     database: process.env.LOCAL_DB_NAME     || "mos_db",
     charset:  "utf8mb4",
     multipleStatements: false,

@@ -25,7 +25,7 @@ jobs:
             echo "  jobId=$JOB"
             [ -z "$JOB" ] && { echo "✗ no jobId. resp: $R" | head -c 500; exit 1; }
 
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             echo ""
             echo "════════ Polling DB every 15s for 90s ════════"
             for i in 1 2 3 4 5 6; do

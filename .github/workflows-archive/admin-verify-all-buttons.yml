@@ -41,7 +41,7 @@ jobs:
             fi
 
             echo "════════ STEP 2 (P2 agent timeline): metadata.stages persisted? ════════"
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             mysql -h localhost -u mos_user mos_db -BN -e "
               SELECT
                 JSON_EXTRACT(metadata, '\$.stages') AS stages_json,

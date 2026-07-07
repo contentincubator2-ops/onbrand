@@ -16,7 +16,7 @@ jobs:
       DB_PASSWORD: test
       DB_NAME: test
       # LOCAL_DB_* — the actual env vars db.ts / localDb.ts read.
-      # Required after B-02 removed the hardcoded "mos_secure_2026" fallback.
+      # Required after B-02 removed the hardcoded DB-password fallback.
       LOCAL_DB_HOST: localhost
       LOCAL_DB_PORT: "3306"
       LOCAL_DB_USER: test

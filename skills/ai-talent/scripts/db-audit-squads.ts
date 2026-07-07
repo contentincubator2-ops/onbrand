@@ -8,7 +8,7 @@ const conn = await mysql.createConnection({
   host:     process.env.DB_HOST     ?? "127.0.0.1",
   port:     Number(process.env.DB_PORT ?? 3306),
   user:     process.env.DB_USER     ?? "mos_user",
-  password: process.env.DB_PASSWORD ?? "mos_secure_2026",
+  password: process.env.DB_PASSWORD ?? "MUST_SET_LOCAL_DB_PASSWORD",
   database: process.env.DB_NAME     ?? "mos_db",
 });
 

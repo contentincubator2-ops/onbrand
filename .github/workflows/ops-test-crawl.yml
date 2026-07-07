@@ -9,7 +9,7 @@ jobs:
         run: |
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           # Mark old done jobs as archived so enqueue doesn't skip
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
             "UPDATE product_discovery_jobs SET status='archived' WHERE brandId=2916 AND status='done';"
@@ -29,7 +29,7 @@ jobs:
         run: |
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           echo "=== Latest discovery jobs ==="
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
             "SELECT id, status, phase, totalFound, totalPositioned, websiteUrl, LEFT(errorLog,500) AS errors, createdAt

@@ -26,7 +26,7 @@ jobs:
 
             echo ""
             echo "════════ Recent video jobs in DB ════════"
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             mysql -h localhost -u mos_user mos_db -e "
               SELECT id, status, progress, LEFT(errorMessage, 100) AS err, createdAt
               FROM video_jobs

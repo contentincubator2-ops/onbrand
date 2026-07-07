@@ -23,7 +23,7 @@ jobs:
           script: |
             set -e
             cd /opt/marketing-os/app/skills/ai-talent
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
 
             echo "── 1. Run migrate.ts ─────"
             npx tsx scripts/migrate.ts 2>&1 | grep -E "pointsBalance|pointsLastResetAt|point_transactions" | head -10

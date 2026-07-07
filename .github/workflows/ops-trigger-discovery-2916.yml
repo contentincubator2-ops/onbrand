@@ -10,7 +10,7 @@ jobs:
         run: |
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           USERID=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se "SELECT userId FROM brands WHERE id=2916 LIMIT 1;")
           echo "Brand userId: $USERID"
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
@@ -26,7 +26,7 @@ jobs:
             sleep 10
             source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
             H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-            P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+            P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
             STATUS=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se \
               "SELECT CONCAT(status,'/',phase,'/found=',COALESCE(totalFound,0),'/pos=',COALESCE(totalPositioned,0)) FROM product_discovery_jobs WHERE id=$JOB_ID;")
             echo "[$((i*10))s] job $JOB_ID: $STATUS"
@@ -37,7 +37,7 @@ jobs:
         run: |
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           echo "=== Job result ==="
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
             "SELECT id, status, phase, totalFound, totalPositioned, LEFT(errorLog,800) AS errors FROM product_discovery_jobs WHERE id=$JOB_ID;"

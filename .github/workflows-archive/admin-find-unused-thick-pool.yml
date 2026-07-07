@@ -20,7 +20,7 @@ jobs:
           command_timeout: 90s
           envs: EXCLUDED_CSV
           script: |
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             MYSQLT="mysql -h localhost -u mos_user mos_db -t"
             EXCL="${EXCLUDED_CSV}"
             THICK="(CHAR_LENGTH(IFNULL(bio,''))+CHAR_LENGTH(IFNULL(specialty,''))+CHAR_LENGTH(IFNULL(methodology,''))+CHAR_LENGTH(IFNULL(experienceDetail,'')))"

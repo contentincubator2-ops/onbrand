@@ -14,7 +14,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 60s
           script: |
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             MYSQLT="mysql -h localhost -u mos_user mos_db -t"
             MYSQLB="mysql -h localhost -u mos_user mos_db -B --silent"
 

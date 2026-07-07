@@ -9,7 +9,7 @@ jobs:
         run: |
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           echo "=== subscriptions table structure ==="
           mysql -h"$H" -u"$U" -p"$P" "$D" -e "DESCRIBE subscriptions;" 2>/dev/null
           echo "=== All subscriptions ==="

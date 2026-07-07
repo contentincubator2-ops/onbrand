@@ -45,7 +45,7 @@ jobs:
 
             echo ""
             echo "════════ If response had outputId, query the row ════════"
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             OUT_ID=$(grep -oE '"outputId":[0-9]+' /tmp/orchestra-resp.txt | head -1 | cut -d: -f2)
             if [ -n "$OUT_ID" ]; then
               echo "outputId=$OUT_ID — querying:"

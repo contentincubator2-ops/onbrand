@@ -23,7 +23,7 @@ jobs:
               exit 1
             fi
 
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             export AGENT_IDS="238853,221080,239024,239023,222638,222665,222504,223253,223755,223197,222204,222206,222392,220871,220583,220584,220862,220949,220870"
 
             python3 - <<'PYEOF'
@@ -36,7 +36,7 @@ jobs:
 
             def mysql(sql):
                 env = os.environ.copy()
-                env["MYSQL_PWD"] = "mos_secure_2026"
+                env["MYSQL_PWD"] = "${LOCAL_DB_PASSWORD}"
                 r = subprocess.run(
                     ["mysql", "-h", "localhost", "-u", "mos_user", "mos_db",
                      "--batch", "--raw", "--skip-column-names",

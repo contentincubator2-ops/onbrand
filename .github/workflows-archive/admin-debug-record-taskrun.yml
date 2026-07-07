@@ -23,7 +23,7 @@ jobs:
             pm2 logs marketing-os --lines 100 --nostream 2>&1 | grep -E "recordTaskRun|outputId|missionId|orchestra|ERROR|Error" | tail -30
             echo ""
             echo "=== Direct DB check — last 3 mission_outputs rows ==="
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             mysql -h localhost -u mos_user mos_db -t -e "
               SELECT id, missionId, platform, outputType, status,
                 LEFT(title, 30) AS title,

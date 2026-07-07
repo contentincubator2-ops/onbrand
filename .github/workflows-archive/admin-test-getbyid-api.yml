@@ -18,7 +18,7 @@ jobs:
             cat > scripts/probe-getbyid.ts <<'EOF'
             import mysql from "mysql2/promise";
             const conn = await mysql.createConnection({
-              host: "localhost", user: "mos_user", password: "mos_secure_2026", database: "mos_db",
+              host: "localhost", user: "mos_user", password: "${LOCAL_DB_PASSWORD}", database: "mos_db",
               decimalNumbers: true,
             });
             for (const id of [60, 61, 62]) {

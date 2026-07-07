@@ -26,7 +26,7 @@ jobs:
             cd /opt/marketing-os/app/skills/ai-talent
             set -a; . ./.env; set +a
             if [ -z "$ANTHROPIC_API_KEY" ]; then echo "ANTHROPIC_API_KEY missing"; exit 1; fi
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
 
             # Derive used-set from source
             export AGENT_IDS=$(grep -ohE 'agent_id:\s*[0-9]+' server/_core/quickTask*.ts | awk '{print $2}' | sort -u | paste -sd,)
@@ -38,7 +38,7 @@ jobs:
             ALL_IDS = os.environ["AGENT_IDS"].split(",")
 
             def mysql(sql):
-                env = os.environ.copy(); env["MYSQL_PWD"] = "mos_secure_2026"
+                env = os.environ.copy(); env["MYSQL_PWD"] = "${LOCAL_DB_PASSWORD}"
                 r = subprocess.run(
                     ["mysql","-h","localhost","-u","mos_user","mos_db",
                      "--batch","--raw","--skip-column-names","--default-character-set=utf8mb4",
@@ -86,7 +86,7 @@ jobs:
             def fetch_one(aid):
                 # Use TSV with NULL replaced; we just take ONE row so newlines
                 # inside fields won't fragment line-counting.
-                env = os.environ.copy(); env["MYSQL_PWD"]="mos_secure_2026"
+                env = os.environ.copy(); env["MYSQL_PWD"]="${LOCAL_DB_PASSWORD}"
                 r = subprocess.run(
                     ["mysql","-h","localhost","-u","mos_user","mos_db",
                      "--batch","--skip-column-names","--default-character-set=utf8mb4",

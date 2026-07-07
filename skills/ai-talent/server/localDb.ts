@@ -6,7 +6,7 @@ import mysql from 'mysql2/promise';
  * 來源: ytcreator-ai-server.mysql.database.azure.com/sowork_db
  * 同步時間: 2026-04-12
  *
- * SEC-B-02 (2026-05-04): hardcoded "mos_secure_2026" fallback removed.
+ * SEC-B-02 (2026-05-04): hardcoded "MUST_SET_LOCAL_DB_PASSWORD" fallback removed.
  * LOCAL_DB_PASSWORD must be set via .env (see admin-write-required-env.yml).
  */
 const password = process.env.LOCAL_DB_PASSWORD;

@@ -117,7 +117,7 @@ async function main() {
 
   const localHost = process.env.LOCAL_DB_HOST || 'localhost';
   const localUser = process.env.LOCAL_DB_USER || 'mos_user';
-  const localPassword = process.env.LOCAL_DB_PASSWORD || 'mos_secure_2026';
+  const localPassword = process.env.LOCAL_DB_PASSWORD || 'MUST_SET_LOCAL_DB_PASSWORD';
   const localDatabase = process.env.LOCAL_DB_NAME || 'mos_db';
 
   console.log('📊 Connecting to databases...\n');

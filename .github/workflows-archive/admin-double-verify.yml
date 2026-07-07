@@ -52,9 +52,9 @@ jobs:
 
             ##### B-02: no hardcoded password literal in source CODE (not comments) #####
             echo ""
-            echo "── B-02: no hardcoded 'mos_secure_2026' literal in CODE ──"
-            # Match: literal "mos_secure_2026" with surrounding quotes used as a value (not in a comment).
-            CODE_HITS=$(grep -rn '"mos_secure_2026"' "$AI/server" 2>/dev/null | grep -v ":[[:space:]]*//\|:[[:space:]]*\*\|^.* \\* ")
+            echo "── B-02: no hardcoded '${LOCAL_DB_PASSWORD}' literal in CODE ──"
+            # Match: literal "${LOCAL_DB_PASSWORD}" with surrounding quotes used as a value (not in a comment).
+            CODE_HITS=$(grep -rn '"${LOCAL_DB_PASSWORD}"' "$AI/server" 2>/dev/null | grep -v ":[[:space:]]*//\|:[[:space:]]*\*\|^.* \\* ")
             if [ -n "$CODE_HITS" ]; then
               fail "B-02 hardcoded password literal still in CODE:"
               echo "$CODE_HITS" | head -10

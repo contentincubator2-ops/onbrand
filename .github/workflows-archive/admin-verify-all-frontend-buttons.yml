@@ -40,7 +40,7 @@ jobs:
               echo "  $LABEL → $OK"
             }
 
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
 
             echo "════════ A. Tier home pages → list-task endpoints ════════"
             P "taskCatalog.listForPicker (tier home grid)" "$(HIT GET 'taskCatalog.listForPicker' '{"0":{}}')"

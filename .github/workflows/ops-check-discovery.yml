@@ -10,7 +10,7 @@ jobs:
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"
           U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"
           D="${LOCAL_DB_NAME:-mos_db}"
           echo "=== product_discovery_jobs for brand 2916 ==="
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \

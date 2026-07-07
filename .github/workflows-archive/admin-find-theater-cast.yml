@@ -21,7 +21,7 @@ jobs:
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 180s
           script: |
-            export MYSQL_PWD="mos_secure_2026"
+            export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
             MYSQL="mysql -h localhost -u mos_user mos_db -B -N --silent"
             EXCLUDE="id NOT IN (180159,239180,239181,239182,239183,239184,239185,24)"
 

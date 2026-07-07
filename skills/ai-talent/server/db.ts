@@ -23,7 +23,7 @@ let pool: Pool | null = null;
 export async function getDb(): Promise<DB> {
   if (db) return db;
 
-  // SEC-B-02 (2026-05-04): hardcoded "mos_secure_2026" fallback removed.
+  // SEC-B-02 (2026-05-04): hardcoded "MUST_SET_LOCAL_DB_PASSWORD" fallback removed.
   // Anyone reading the public source repo previously had the prod DB
   // password in plain text. Now we fail-fast at first connection if env
   // is misconfigured, instead of silently using the published string.

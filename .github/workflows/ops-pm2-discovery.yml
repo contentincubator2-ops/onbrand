@@ -11,6 +11,6 @@ jobs:
           echo "=== Job 15 status ==="
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
             "SELECT id, status, phase, totalFound, LEFT(IFNULL(errorLog,'none'),600) as err FROM product_discovery_jobs WHERE id=15;"

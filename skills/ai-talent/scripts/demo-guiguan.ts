@@ -34,7 +34,7 @@ async function main() {
   const pool = mysql.createPool({
     host: process.env.LOCAL_DB_HOST || process.env.DB_HOST || "127.0.0.1",
     user: process.env.LOCAL_DB_USER || process.env.DB_USER || "mos_user",
-    password: process.env.LOCAL_DB_PASSWORD || process.env.DB_PASSWORD || "mos_secure_2026",
+    password: process.env.LOCAL_DB_PASSWORD || process.env.DB_PASSWORD || "MUST_SET_LOCAL_DB_PASSWORD",
     database: process.env.LOCAL_DB_NAME || process.env.DB_NAME || "mos_db",
   });
   const [rows]: any = await pool.execute(

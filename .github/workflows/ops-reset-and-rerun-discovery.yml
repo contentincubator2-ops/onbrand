@@ -10,7 +10,7 @@ jobs:
         run: |
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           # Archive all non-pending jobs for this brand
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
             "UPDATE product_discovery_jobs SET status='archived' WHERE brandId=2916 AND status IN ('running','done','failed');"
@@ -28,7 +28,7 @@ jobs:
         run: |
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           JOBID=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se "SELECT MAX(id) FROM product_discovery_jobs WHERE brandId=2916;" 2>/dev/null)
           echo "Watching job $JOBID..."
           for i in $(seq 1 32); do
@@ -43,7 +43,7 @@ jobs:
         run: |
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
-          P="${LOCAL_DB_PASSWORD:-mos_secure_2026}"; D="${LOCAL_DB_NAME:-mos_db}"
+          P="${LOCAL_DB_PASSWORD:-${LOCAL_DB_PASSWORD}}"; D="${LOCAL_DB_NAME:-mos_db}"
           JOBID=$(mysql -h"$H" -u"$U" -p"$P" "$D" -se "SELECT MAX(id) FROM product_discovery_jobs WHERE brandId=2916;" 2>/dev/null)
           echo "=== Job $JOBID final ==="
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
