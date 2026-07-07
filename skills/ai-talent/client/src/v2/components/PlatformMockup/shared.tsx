@@ -165,6 +165,11 @@ export interface MockupFields {
     image: { style: string | null; url: string | null; status: string; errorMsg?: string };
   }>;
   liveTitle?: string;
+  /** 2026-07-07 (CJ): user-editable title text overlaid ON the thumbnail
+   *  image (AI image is text-free; the real title is a controllable layer).
+   *  Rendered by the YT thumbnail mockups; included in the html2canvas
+   *  "帶版型" download. */
+  overlayTitle?: string;
   liveDescription?: string;
   liveImageDesc?: string;
   liveVideoDesc?: string;
@@ -185,6 +190,13 @@ export interface MockupFields {
    */
   liveImageUrl?: string;
   liveImageStatus?: "ready" | "failed" | "skipped" | "timeout";
+  /**
+   * 2026-07-07 (CJ「廣告主圖點此生成沒反應」bug): the image placeholders
+   * literally say「點此生成」but were dead text with no handler. Host
+   * page (RunPage) passes this callback to open its image-generation
+   * panel when the user clicks the placeholder.
+   */
+  onGenerateImage?: () => void;
   /**
    * Brand profile picture URL — when present, mockups use it for the
    * "posting as" avatar instead of dicebear placeholder. Source is

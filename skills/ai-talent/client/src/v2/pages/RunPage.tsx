@@ -384,6 +384,11 @@ export default function RunPage() {
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
+  /** 2026-07-07 (CJ): user-editable thumbnail title text overlaid on the (now
+   *  text-free) AI thumbnail. Seeded from the variant title/caption, editable
+   *  in the right panel; passed to the YT mockup as overlayTitle. */
+  const [overlayTitle, setOverlayTitle] = useState<string>("");
+  const overlaySeededRef = useRef<string | null>(null);
   /** 2026-05-12: user-selected image model for 改圖 dropdown.
    *  2026-06-15: default gpt-image-2 across all platforms. */
   const [imageModel, setImageModel] = useState<string>("gpt-image-2");
@@ -931,6 +936,19 @@ export default function RunPage() {
     setTimeout(() => fireNudge("run.image_ready"), 800);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variants[activeIdx]?.imageStatus, id]);
+
+  // 2026-07-07 (CJ): seed the editable thumbnail-title overlay from the active
+  // variant (title or first caption line), once per (id, activeIdx) so a user's
+  // edits aren't clobbered on re-render. Only meaningful for YT thumbnail tasks.
+  React.useEffect(() => {
+    const seedKey = `${id}:${activeIdx}`;
+    if (overlaySeededRef.current === seedKey) return;
+    overlaySeededRef.current = seedKey;
+    const cap = variants[activeIdx]?.caption ?? "";
+    const seed = (data?.title?.trim() || cap.split("\n").map((l) => l.trim()).find(Boolean) || "").slice(0, 60);
+    setOverlayTitle(seed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, activeIdx, variants]);
 
   // Compute per-variant post dates for multi-day series tasks.
   // Countdown: anchor = event date, posts go Day5…Day1 (earliest to latest).
@@ -1605,6 +1623,8 @@ export default function RunPage() {
                 liveImageUrl={slide.imageUrl ?? undefined}
                 liveImageStatus={slide.imageStatus as any}
                 liveCards={slide.cards as any}
+                overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
+                onGenerateImage={() => setMode("image")}
               />
               ) : null;
             })()}
@@ -2036,6 +2056,28 @@ export default function RunPage() {
               {mode === "image" && (
                 <>
                   <p className="text-tiny font-semibold">{t("run_mode_image")}</p>
+                  {/* 2026-07-07 (CJ「產圖畫面有不是國字的國字」→ 圖改為無字背景，
+                      標題文字改成用戶可編輯的疊層。只在 YT（縮圖有標題）顯示。 */}
+                  {mockupVariant?.platform === "youtube" && (
+                    <div className="bg-warning-50 border border-warning-200 rounded-lg p-2.5 space-y-1.5">
+                      <label className="block text-tiny font-semibold text-warning-800">
+                        {lang === "en" ? "Thumbnail title (overlaid on the image)" : "縮圖標題文字（疊在圖片上）"}
+                      </label>
+                      <input
+                        type="text"
+                        value={overlayTitle}
+                        onChange={(e) => setOverlayTitle(e.target.value.slice(0, 60))}
+                        placeholder={lang === "en" ? "e.g. 3 signs your kid isn't just picky" : "例：孩子挑食的 3 個警訊"}
+                        maxLength={60}
+                        className="w-full text-sm border border-warning-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:border-warning-500"
+                      />
+                      <p className="text-[10px] text-warning-700 leading-relaxed">
+                        {lang === "en"
+                          ? "AI can't render Chinese cleanly, so the image is generated text-free. Type your real title here — it overlays on the thumbnail and is included in the templated download."
+                          : "AI 無法正確畫中文，所以圖片刻意產成無字背景。真正的標題在這裡打 — 會疊在縮圖上，並包含在「帶版型下載」裡。"}
+                      </p>
+                    </div>
+                  )}
                   {/* 2026-05-11 (CJ feedback「應該要先給用戶指令」):
                       明確分兩步 — Step 1 寫指令 → Step 2 產圖。
                       底下圖片變成「目前的圖」獨立區塊，不混在 prompt 裡 */}
