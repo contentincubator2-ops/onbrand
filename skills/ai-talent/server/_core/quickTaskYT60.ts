@@ -123,6 +123,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "yt-60-video-package": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: NINA_FALLBACK,
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
+    imageModelOverride: "openai/gpt-image-2", // CJ: lock YT video cover to gpt-image-2
     variantLabels: ["教學版", "故事版", "數據版", "懸念版", "對比版"],
     captionMinChars: 400, captionMaxChars: 800,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
@@ -138,6 +139,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "yt-60-thumbnail-suite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_REINA,
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
+    imageModelOverride: "openai/gpt-image-2", // CJ: lock YT thumbnail to gpt-image-2
     variantLabels: ["數字式", "反問式", "反差式", "誇張式", "懸念式"],
     captionMinChars: 30, captionMaxChars: 50,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
@@ -145,6 +147,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "yt-60-series-3ep": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: YT60_DIR_BLAKE,
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
+    imageModelOverride: "openai/gpt-image-2", // CJ: lock YT series cover to gpt-image-2
     variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 350, captionMaxChars: 700,
     strategistAgentId: 30014, // Nina Liu — YouTube Script Creator (1929 char)
@@ -161,6 +164,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "yt-60-viral-rewrite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_UMA,
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
+    imageModelOverride: "openai/gpt-image-2", // CJ: lock YT viral-rewrite cover to gpt-image-2
     variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 350, captionMaxChars: 700,
     strategistAgentId: 180158, // Oliver Fang — Social Media Analytics Specialist (1697 char)

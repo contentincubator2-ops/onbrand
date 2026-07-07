@@ -72,17 +72,24 @@ async function downloadAndSave(url: string, kind: "img" | "vid"): Promise<string
   return `${COVERS_URL_PREFIX}/media-${id}.${ext}`;
 }
 
-// ── 1. OpenAI gpt-image-1 ─────────────────────────────────────────────────
-async function genOpenAIImage(opts: GenOptions): Promise<GenResult> {
+// ── 1. OpenAI gpt-image-1 / gpt-image-2 ──────────────────────────────────
+async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-image-2" = "gpt-image-1"): Promise<GenResult> {
   const key = process.env.OPENAI_API_KEY ?? "";
   if (!key) throw new Error("OPENAI_API_KEY missing");
+  // Derive an OpenAI-supported size from the aspect ratio when an explicit
+  // size isn't given (the orchestra passes aspectRatio, not size). Without
+  // this a 16:9 thumbnail would default to a 1024x1024 square.
+  const size = opts.size
+    ?? (opts.aspectRatio === "16:9" ? "1536x1024"
+      : opts.aspectRatio === "9:16" ? "1024x1536"
+      : "1024x1024");
   const resp = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-image-1",
+      model,
       prompt: opts.prompt,
-      size: opts.size ?? "1024x1024",
+      size,
       quality: opts.quality ?? "high",
       n: 1,
     }),
@@ -95,7 +102,7 @@ async function genOpenAIImage(opts: GenOptions): Promise<GenResult> {
   const data: any = await resp.json();
   const b64 = data?.data?.[0]?.b64_json;
   if (!b64) throw new Error("OpenAI no b64");
-  return { status: "ready", modelId: "openai/gpt-image-1", url: saveB64(b64, "img") };
+  return { status: "ready", modelId: `openai/${model}`, url: saveB64(b64, "img") };
 }
 
 // ── 2. Azure gpt-image-2 (existing pattern, reuse) ───────────────────────
@@ -567,7 +574,8 @@ export async function dispatchGenerate(modelId: string, opts: GenOptions): Promi
   }
 
   switch (modelId) {
-    case "openai/gpt-image-1":     return genOpenAIImage(opts);
+    case "openai/gpt-image-1":     return genOpenAIImage(opts, "gpt-image-1");
+    case "openai/gpt-image-2":     return genOpenAIImage(opts, "gpt-image-2");
     case "azure/gpt-image-2":      return genAzureImage2(opts);
     // Imagen 4 (real model on account). Removed legacy imagen-3 /
     // imagen-4 alias cases 2026-04-30 — client registry uses explicit

@@ -1375,10 +1375,16 @@ async function genOneImage(prompt: string, config: OrchestraConfig): Promise<Orc
     // to the proven (faster) Flux sooner. Saves up to ~7s/image on the
     // slow path — directly shortens the hold-for-images wait.
     const IMAGEN_CAP_MS = 18_000;
+    // 2026-07-07 (CJ「鎖定 gpt-image-2」): a task may pin its primary image
+    // model (e.g. YT → gpt-image-2 for clean 16:9 backgrounds). gpt-image-2 is
+    // slower than imagen-4, so give the override a wider cap. Flux Schnell
+    // stays the reliability fallback either way.
+    const primaryModel = config.imageModelOverride ?? "google/imagen-4-default";
+    const primaryCapMs = config.imageModelOverride ? 35_000 : IMAGEN_CAP_MS;
     let r;
     try {
-      r = await tryModel("google/imagen-4-default", "imagen-4", IMAGEN_CAP_MS);
-      if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? "imagen-4 no url");
+      r = await tryModel(primaryModel, primaryModel, primaryCapMs);
+      if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
     } catch {
       // fall back to the fast, content-permissive, proven Flux tier
       r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);

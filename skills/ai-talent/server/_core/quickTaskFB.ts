@@ -506,6 +506,14 @@ export interface OrchestraConfig {
   aspectRatio: "1:1" | "1.91:1" | "9:16" | "16:9" | null;
   fluxSize: "square_hd" | "landscape_4_3" | "portrait_9_16" | "landscape_16_9" | null;
   imageQualitySteps: number; // Flux Schnell: 4 default, 8 for higher quality
+  /**
+   * 2026-07-07 (CJ): per-task image-model override for genOneImage's primary
+   * attempt. When set (e.g. "azure/gpt-image-2"), that model is tried first
+   * instead of the imagen-4 default; flux-schnell stays the reliability
+   * fallback. Used to lock YT thumbnail/video backgrounds to gpt-image-2
+   * (best prompt adherence for clean, text-free 16:9 backgrounds).
+   */
+  imageModelOverride?: string;
   variantLabels: string[];
   /** Caption length range hint (chars, lower bound) for prompt + UI badge */
   captionMinChars: number;
