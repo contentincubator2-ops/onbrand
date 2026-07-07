@@ -128,14 +128,28 @@ export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCapt
                   <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
                 </>
               ) : (
-                <p className="text-tiny">{lang === "en" ? "Video player · waiting for craft agent" : "影片播放器 · 等待 AI 生成"}</p>
+                <p className="text-tiny">{lang === "en" ? "Thumbnail · waiting for craft agent" : "縮圖 · 等待 AI 生成"}</p>
               )}
             </div>
           )}
           {liveImageUrl && liveImageStatus === "ready" && <ThumbnailTextOverlay text={overlayTitle} />}
-          <Button isIconOnly radius="full" size="lg" color="danger" className="absolute opacity-90 z-20" aria-label="play">
-            <FontAwesomeIcon icon={faPlay} />
-          </Button>
+          {/* 2026-07-07 (CJ「用戶以為會生影片，其實不會」): this mockup is a
+              THUMBNAIL / LAYOUT preview — the task produces a caption package +
+              thumbnail, NOT a playable video. Make the play glyph clearly
+              decorative (non-interactive) + label the preview so nobody expects
+              a video to play. */}
+          <div
+            aria-hidden
+            title={lang === "en" ? "Layout preview — not a playable video" : "版型預覽，不會產生可播放影片"}
+            className="absolute z-20 flex items-center justify-center rounded-full bg-danger/80"
+            style={{ width: 54, height: 54, pointerEvents: "none" }}
+          >
+            <FontAwesomeIcon icon={faPlay} className="text-white text-xl pl-0.5" />
+          </div>
+          <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-black/70 text-white text-[10px] font-medium px-2 py-1 rounded-full pointer-events-none">
+            <FontAwesomeIcon icon={faImages} className="text-[9px]" />
+            {lang === "en" ? "Layout preview · no video file" : "版型預覽 · 不含影片檔"}
+          </div>
           <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20">
             <div className="h-full w-1/3 bg-danger" />
           </div>
