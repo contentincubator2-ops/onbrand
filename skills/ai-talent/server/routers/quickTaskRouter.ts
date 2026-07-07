@@ -1460,7 +1460,10 @@ export const quickTaskRouter = router({
   // agent rewrites it inline. Replaces the old "換語氣 → 跳到 /brands" flow.
   refineCaption: protectedProcedure
     .input(z.object({
-      currentCaption: z.string().min(1).max(5000),
+      // 2026-07-07: was 5000 — long-form outputs (email sequences, PR
+      // toolkits, YT scripts) exceeded it and the rewrite-agent picker
+      // failed with a zod error on those tasks.
+      currentCaption: z.string().min(1).max(20000),
       userFeedback: z.string().min(1).max(1000),
       agentName: z.string().max(120).optional(),
       agentTitle: z.string().max(200).optional(),
