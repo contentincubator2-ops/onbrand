@@ -1500,12 +1500,16 @@ export const quickTaskRouter = router({
         const r = await callModel(messages, undefined, "anthropic");
         const text = (r.content ?? "").trim();
         // Split on triple newline to separate explanation from rewritten caption
-        const parts = text.split(/\n\n\n+/);
+        let parts = text.split(/\n\n\n+/);
+        // 2026-07-07 (verified live on /run/2887): models sometimes use a
+        // markdown horizontal rule as the separator instead of blank lines —
+        // the triple-newline split then fails and the explanation + '---'
+        // leak into the published caption. Fall back to splitting on the hr.
+        if (parts.length === 1) {
+          parts = text.split(/\n+[-—_*]{3,}\s*\n+/);
+        }
         const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
         let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
-        // 2026-07-07 (verified live): models sometimes emit a markdown
-        // horizontal rule (---) as the separator — it survives the
-        // triple-newline split and leaks into the published caption.
         rewritten = rewritten.replace(/^(?:[-—_*]{3,}\s*\n+)+/, "").replace(/\n+(?:[-—_*]{3,}\s*)+$/, "").trim();
         // Brand-rule hard enforcement: an inline rewrite must not
         // reintroduce banned words / skip substitutions.
