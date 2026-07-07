@@ -36,6 +36,10 @@ export interface GenResult {
 
 export interface GenOptions {
   prompt: string;
+  /** Negative prompt (things to exclude). Passed to providers that support a
+   *  real negative_prompt field (PiAPI Flux / SDXL / Ideogram). Far more
+   *  effective than in-prompt negatives — used to suppress hallucinated text. */
+  negativePrompt?: string;
   /** Aspect ratio hint — provider-specific mapping. */
   aspectRatio?: "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
   /** Image size when provider supports explicit pixels. */
@@ -347,6 +351,7 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
     sync: true,
     buildInput: (o) => ({
       prompt: o.prompt,
+      ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
       width:  o.aspectRatio === "9:16" ? 768  : o.aspectRatio === "16:9" ? 1344 : 1024,
       height: o.aspectRatio === "9:16" ? 1344 : o.aspectRatio === "16:9" ? 768  : 1024,
     }),
@@ -355,7 +360,11 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
     model: "Qubico/flux1-dev",
     task_type: "txt2img-lora",
     sync: true,
-    buildInput: (o) => ({ prompt: o.prompt, lora_settings: [{ lora_type: "realism", lora_strength: 1.0 }] }),
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
+      lora_settings: [{ lora_type: "realism", lora_strength: 1.0 }],
+    }),
   },
   "piapi/ideogram-v3": {
     // PiAPI namespaces Ideogram under Qubico (verified 2026-04-29 — bare
@@ -365,6 +374,7 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
     sync: true,
     buildInput: (o) => ({
       prompt: o.prompt,
+      ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
       aspect_ratio: o.aspectRatio ?? "1:1",
       style_type: "AUTO",
       magic_prompt_option: "AUTO",
@@ -375,7 +385,11 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
     model: "Qubico/sdxl",
     task_type: "txt2img",
     sync: true,
-    buildInput: (o) => ({ prompt: o.prompt, aspect_ratio: o.aspectRatio ?? "1:1" }),
+    buildInput: (o) => ({
+      prompt: o.prompt,
+      ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
+      aspect_ratio: o.aspectRatio ?? "1:1",
+    }),
   },
   "piapi/kling-v2-master": {
     model: "kling",

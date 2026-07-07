@@ -211,7 +211,18 @@ async function runPiapi(
   const aspect: "1:1" | "9:16" | "16:9" =
     size === "1024x1536" ? "9:16" :
     size === "1536x1024" ? "16:9" : "1:1";
-  const r = await dispatchGenerate(modelId, { prompt, aspectRatio: aspect });
+  // 2026-07-07: Flux/SDXL/Ideogram ignore in-prompt "no text" but honour a
+  // real negative_prompt. Suppress the hallucinated (garbled CJK) text baked
+  // into thumbnails — the real title is overlaid in the mockup layer.
+  const r = await dispatchGenerate(modelId, {
+    prompt,
+    aspectRatio: aspect,
+    negativePrompt:
+      "text, letters, words, numbers, chinese characters, japanese characters, " +
+      "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
+      "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
+      "fake characters, writing",
+  });
   if (r.status !== "ready" || !r.url) {
     throw new Error(`PiAPI ${modelId}: ${r.errorMsg ?? `status=${r.status}`}`);
   }
