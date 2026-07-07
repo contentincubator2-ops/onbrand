@@ -33,7 +33,7 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import {
   Pencil, MessageCircle, Image as LucideImage, Video,
-  Wand2, Sliders as LucideSliders, Save, Copy as LucideCopy,
+  Wand2, Users as LucideUsers, Save, Copy as LucideCopy,
   Share2 as LucideShare,
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
@@ -44,7 +44,50 @@ import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
 
-type Mode = "edit" | "chat" | "image" | "video" | "agent" | "regen" | "settings" | "publish";
+type Mode = "edit" | "chat" | "image" | "video" | "agent" | "regen" | "rewrite" | "publish";
+
+/* 2026-07-07 (CJ「參數儀表板 technical data 客戶看不懂，乾脆換成可以選擇
+ * 不同 agent 幫他重寫」): the settings/telemetry panel is gone from the
+ * client UI. In its place: a rewrite-agent picker. Each persona maps to
+ * quickTask.refineCaption's existing agentName/agentTitle params (the
+ * server builds the system prompt from them), so no new endpoint. */
+const REWRITE_AGENTS: Array<{
+  name: string;
+  title: string; titleEn: string;          // card subtitle + agentTitle param
+  style: string; styleEn: string;          // one-line pitch shown on the card
+  instruction: string; instructionEn: string; // sent as userFeedback
+}> = [
+  {
+    name: "林曉青", title: "感性故事文案", titleEn: "Story-driven Copywriter",
+    style: "小故事帶入，品牌溫度", styleEn: "Warm, narrative-led",
+    instruction: "請用你最擅長的感性說故事風格完整重寫這篇文案：以一個貼近受眾日常的小情境開場，把產品自然帶進故事，結尾收在情感共鳴加上輕聲的行動呼籲。保留原文的關鍵賣點與事實，不要新增原文沒有的功能或承諾。",
+    instructionEn: "Rewrite fully in your signature story-driven style: open with a relatable everyday scene, weave the product in naturally, close with emotional resonance and a soft CTA. Keep every factual selling point; invent nothing.",
+  },
+  {
+    name: "張凱強", title: "直球促購文案", titleEn: "Direct-response Copywriter",
+    style: "第一句就是賣點，轉單導向", styleEn: "Punchy, conversion-first",
+    instruction: "請用直球促購風格完整重寫：第一句就丟最強賣點，全篇短句有力、節奏快，營造明確的行動急迫感，結尾一個不囉嗦的行動呼籲。保留原文的關鍵資訊與優惠條件，不得捏造價格、折扣或期限。",
+    instructionEn: "Rewrite in direct-response style: strongest hook in the first line, short punchy sentences, clear urgency, one crisp CTA. Keep original facts and offer terms; never invent prices or deadlines.",
+  },
+  {
+    name: "Ray", title: "網感幽默文案", titleEn: "Meme-savvy Copywriter",
+    style: "口語有梗，年輕化", styleEn: "Playful, youthful, witty",
+    instruction: "請用年輕、有網感的幽默風格完整重寫：口語、有梗、帶一點自嘲或反差，讓人看完想 tag 朋友。梗要新不要老，幽默不能蓋過賣點，品牌的禁用語與事實照舊遵守。",
+    instructionEn: "Rewrite with playful internet humor: conversational, witty, tag-a-friend energy. Keep the selling points visible under the humor and respect all brand rules.",
+  },
+  {
+    name: "沈以柔", title: "專業顧問文案", titleEn: "Expert-authority Copywriter",
+    style: "觀點與信任感，專業口吻", styleEn: "Credible, insight-led",
+    instruction: "請用專業顧問的口吻完整重寫：以觀點或洞察切入，語氣可信、克制、不浮誇，讓讀者覺得是內行人給的建議。只使用原文已有的數據與事實，沒有數據就用定性描述，不得編造數字。",
+    instructionEn: "Rewrite in a credible consultant voice: lead with an insight, restrained and trustworthy. Use only facts present in the original; never fabricate numbers.",
+  },
+  {
+    name: "阿捷", title: "極簡俐落文案", titleEn: "Minimalist Copywriter",
+    style: "砍到最短，一眼看完", styleEn: "Cut to the bone",
+    instruction: "請把這篇文案砍到最精簡：保留一個主賣點加一個行動呼籲，其餘全部拿掉，句子要短，總長度不超過原文的一半。刪減可以，但不能改變原意，也不能遺漏優惠的關鍵條件。",
+    instructionEn: "Cut this caption to the bone: one key selling point plus one CTA, short lines, under half the original length. Trim aggressively but never change meaning or drop offer terms.",
+  },
+];
 
 interface VariantData {
   label: string;
@@ -382,6 +425,9 @@ export default function RunPage() {
   /** AI chat history per variant. */
   const [chatHistory, setChatHistory] = useState<Array<{ role: "user"|"assistant"; content: string }>>([]);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
+  // 2026-07-07 (CJ): rewrite-agent picker — persona name in flight + preview
+  const [rewriteBusy, setRewriteBusy] = useState<string | null>(null);
+  const [rewritePreview, setRewritePreview] = useState<{ agent: string; text: string } | null>(null);
   /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
   /** 2026-07-07 (CJ): user-editable thumbnail title text overlaid on the (now
@@ -1898,7 +1944,8 @@ export default function RunPage() {
               </Tooltip>
               <Divider />
               <ToolbarBtn icon={Wand2}         label={lang === "en" ? "Rewrite this" : "重生這段"}       active={mode==="regen"}    onClick={() => setMode("regen")} />
-              <ToolbarBtn icon={LucideSliders} label={lang === "en" ? "Settings" : "參數"}           active={mode==="settings"} onClick={() => setMode("settings")} />
+              {/* 2026-07-07 (CJ「參數儀表板客戶看不懂 → 換成選不同 agent 重寫」) */}
+              <ToolbarBtn icon={LucideUsers}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
               <Divider />
               <ToolbarBtn icon={LucideCopy}    label={lang === "en" ? "Copy caption" : "複製文案"}       onClick={onCopy} highlight={copied} />
               {/* 2026-05-11 (CJ feedback「存 Mission 不要出現在工具列，只要在下方」):
@@ -2608,17 +2655,87 @@ export default function RunPage() {
                   )}
                 </>
               )}
-              {mode === "settings" && (
+              {mode === "rewrite" && (
                 <>
-                  <p className="text-tiny font-semibold">{lang === "en" ? "Settings" : "參數設定"}</p>
-                  <div className="text-[11px] space-y-1.5 text-default-700">
-                    <div className="flex justify-between"><span>{lang === "en" ? "Task" : "任務"}</span><span className="font-mono text-tiny">{data.mission?.taskId ?? "—"}</span></div>
-                    <div className="flex justify-between"><span>Tier</span><span>{data.mission?.tier ?? "—"}</span></div>
-                    <div className="flex justify-between"><span>{lang === "en" ? "Versions" : "變體數"}</span><span>{variants.length}</span></div>
-                    <div className="flex justify-between"><span>{lang === "en" ? "Latency" : "產出延遲"}</span><span>{data.metadata?.latencyMs ? `${(data.metadata.latencyMs/1000).toFixed(1)}s` : "—"}</span></div>
-                    <div className="flex justify-between"><span>{lang === "en" ? "Caption agent" : "撰寫者"}</span><span>{(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "—"}</span></div>
-                    <div className="flex justify-between"><span>{lang === "en" ? "Visual agent" : "視覺 agent"}</span><span>{(typeof data.metadata?.imageAgent === "object" ? data.metadata.imageAgent?.name : data.metadata?.imageAgent) ?? "—"}</span></div>
+                  <p className="text-tiny font-semibold">{lang === "en" ? "Have another agent rewrite it" : "換一位 AI 專家重寫"}</p>
+                  <p className="text-[11px] text-default-500 leading-relaxed">
+                    {lang === "en"
+                      ? "Pick a specialist below — they rewrite this caption in their own style. Nothing changes until you accept the preview."
+                      : "挑一位不同風格的專家，用他的寫法重寫這篇文案。改完先給你預覽，按「採用」才會生效。"}
+                  </p>
+                  <div className="space-y-1.5">
+                    {REWRITE_AGENTS.map((a) => (
+                      <button
+                        key={a.name}
+                        disabled={!!rewriteBusy || !refineMut}
+                        onClick={async () => {
+                          if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return; }
+                          const caption = slide?.caption ?? "";
+                          if (!caption.trim()) { showToastGlobal(lang === "en" ? "This version has no caption yet" : "這個版本還沒有文案可以重寫"); return; }
+                          setRewriteBusy(a.name);
+                          try {
+                            const r = await refineMut.mutateAsync({
+                              currentCaption: caption,
+                              userFeedback: lang === "en" ? a.instructionEn : a.instruction,
+                              agentName: a.name,
+                              agentTitle: lang === "en" ? a.titleEn : a.title,
+                              brandId: data.mission?.brandId ?? undefined,
+                            });
+                            if (r.ok) {
+                              setRewritePreview({ agent: a.name, text: r.rewritten });
+                            } else {
+                              showToastGlobal(
+                                lang === "en"
+                                  ? `Rewrite failed: ${typeof r.error === "string" ? r.error : "unknown error"}`
+                                  : `改寫失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`
+                              );
+                            }
+                          } catch (e: any) {
+                            showToastGlobal(lang === "en" ? `Error: ${e.message ?? String(e)}` : `錯誤：${e.message ?? String(e)}`);
+                          } finally {
+                            setRewriteBusy(null);
+                          }
+                        }}
+                        className={`w-full flex items-center gap-2.5 rounded-lg border p-2 text-left transition ${
+                          rewritePreview?.agent === a.name
+                            ? "border-secondary bg-secondary-50"
+                            : "border-default-200 hover:border-secondary hover:bg-default-50"
+                        } ${rewriteBusy && rewriteBusy !== a.name ? "opacity-40" : ""}`}
+                      >
+                        <Avatar
+                          src={`https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(a.name)}`}
+                          className="w-8 h-8 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12px] font-semibold text-default-900 leading-tight">
+                            {a.name}
+                            <span className="ml-1.5 font-normal text-default-500">{lang === "en" ? a.titleEn : a.title}</span>
+                          </p>
+                          <p className="text-[11px] text-default-500 truncate">{lang === "en" ? a.styleEn : a.style}</p>
+                        </div>
+                        {rewriteBusy === a.name && <Spinner size="sm" color="secondary" />}
+                      </button>
+                    ))}
                   </div>
+                  {rewritePreview && (
+                    <div className="text-[11px] bg-secondary-50 border border-secondary-200 rounded-lg p-2 space-y-1.5">
+                      <p className="font-semibold text-secondary-700">
+                        {lang === "en" ? `Rewritten by ${rewritePreview.agent}` : `${rewritePreview.agent} 的重寫版本`}
+                      </p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-default-800 max-h-40 overflow-y-auto">{rewritePreview.text}</p>
+                      <div className="flex gap-1.5 pt-1">
+                        <Button size="sm" color="secondary"
+                          isDisabled={updateMut.isPending}
+                          onPress={() => {
+                            setOverrides(o => ({ ...o, [activeIdx]: { caption: rewritePreview.text } }));
+                            updateMut.mutate({ id, variantIndex: activeIdx, caption: rewritePreview.text });
+                            setRewritePreview(null);
+                          }}
+                        >{lang === "en" ? "Use it" : "採用"}</Button>
+                        <Button size="sm" variant="flat" onPress={() => setRewritePreview(null)}>{lang === "en" ? "Discard" : "放棄"}</Button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </CardBody>
