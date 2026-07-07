@@ -391,7 +391,11 @@ export const outputRouter = router({
         FROM mission_outputs o
         LEFT JOIN missions m ON m.id = o.missionId
         LEFT JOIN brands b ON b.id = m.brandId
-        WHERE o.id = ? AND (m.userId = ? OR m.userId IS NULL)
+        -- 2026-07-05 (security scan): require ownership. Dropped the
+        -- "OR m.userId IS NULL" branch, which let any authenticated user read
+        -- outputs of ownerless (null-userId) missions. All missions are created
+        -- with a userId, so this only closes an IDOR edge, no legit access lost.
+        WHERE o.id = ? AND m.userId = ?
         LIMIT 1`,
         [input.id, ctx.user.id],
       );
