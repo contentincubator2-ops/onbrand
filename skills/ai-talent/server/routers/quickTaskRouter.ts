@@ -1500,6 +1500,10 @@ export const quickTaskRouter = router({
         const parts = text.split(/\n\n\n+/);
         const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
         let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
+        // 2026-07-07 (verified live): models sometimes emit a markdown
+        // horizontal rule (---) as the separator — it survives the
+        // triple-newline split and leaks into the published caption.
+        rewritten = rewritten.replace(/^(?:[-—_*]{3,}\s*\n+)+/, "").replace(/\n+(?:[-—_*]{3,}\s*)+$/, "").trim();
         // Brand-rule hard enforcement: an inline rewrite must not
         // reintroduce banned words / skip substitutions.
         try {

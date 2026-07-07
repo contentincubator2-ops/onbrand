@@ -1228,7 +1228,18 @@ function PlatformTaskPageInner() {
     const hasDerive = !!(activeTask.primary_input as any)?.derive
       || !!(activeTask.contextSources && activeTask.contextSources.length > 0);
     if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive) {
-      setErrorMsg(lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成");
+      // 2026-07-07 (CJ「開始做按下去沒反應」— live repro): the errorMsg card
+      // renders at the BOTTOM of the scrollable ModalBody, below the fold on
+      // laptop screens, so this validation read as a silent no-op. Toast it
+      // and scroll the question input into view so the user sees what's asked.
+      const msg = lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成";
+      setErrorMsg(msg);
+      showToastGlobal(msg);
+      try {
+        const el = document.querySelector<HTMLElement>("[data-primary-question]");
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        el?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+      } catch { /* non-fatal */ }
       return;
     }
     setRunning(true);
@@ -2094,7 +2105,7 @@ function PlatformTaskPageInner() {
 
                 {/* Primary question input */}
                 {activeTask.primary_input && (
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-primary-question>
                     <p className="text-small font-medium">{activeTask.primary_question}</p>
                     {activeTask.primary_input.type === "textarea" ? (
                       <Textarea
