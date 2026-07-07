@@ -22,7 +22,7 @@ import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── FB Feed ─────────────── */
 
-export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard, pinned }: MockupFields) {
+export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard, pinned, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   // 2026-05-05: liveImageStyle takes priority over liveImageDesc — it's the
   // "style direction" the quick-task agent produced, kept inside the image
@@ -139,7 +139,13 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
               )}
             </div>
           ) : (
-            <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
+            <div
+              role={onGenerateImage ? "button" : undefined}
+              tabIndex={onGenerateImage ? 0 : undefined}
+              onClick={onGenerateImage}
+              onKeyDown={onGenerateImage ? (e) => { if (e.key === "Enter" || e.key === " ") onGenerateImage(); } : undefined}
+              className={`aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative ${onGenerateImage ? "cursor-pointer hover:bg-default-200 transition" : ""}`}
+            >
               {!hasContent && <Skeleton className="absolute inset-0" />}
               <div className={`text-center relative z-10 p-4 ${hasContent ? "bg-default-50/80 backdrop-blur-sm rounded-medium m-3" : ""}`}>
                 <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
@@ -250,7 +256,7 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── FB Story ─────────────── */
 
-export function FBStory({ title, brandName, variantLabel, liveCaption, liveTitle, liveImageUrl, liveImageStatus, liveImageStyle }: MockupFields) {
+export function FBStory({ title, brandName, variantLabel, liveCaption, liveTitle, liveImageUrl, liveImageStatus, liveImageStyle, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   // 2026-05-18 (CJ「FB Story 文案任務沒有產出文字」): FBStory previously
@@ -293,7 +299,13 @@ export function FBStory({ title, brandName, variantLabel, liveCaption, liveTitle
           </div>
         </div>
         {!hasImage && (
-          <div className="absolute inset-0 flex items-center justify-center z-0">
+          <div
+            role={onGenerateImage ? "button" : undefined}
+            tabIndex={onGenerateImage ? 0 : undefined}
+            onClick={onGenerateImage}
+            onKeyDown={onGenerateImage ? (e) => { if (e.key === "Enter" || e.key === " ") onGenerateImage(); } : undefined}
+            className={`absolute inset-0 flex items-center justify-center z-0 ${onGenerateImage ? "cursor-pointer" : ""}`}
+          >
             <Skeleton className="absolute inset-0 opacity-30" />
             <div className="relative z-10 text-center text-white/50 px-4">
               <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
@@ -440,7 +452,7 @@ function RailIcon({ icon, count }: { icon: any; count?: string }) {
 
 /* ─────────────── FB Ad (feed + Sponsored + CTA) ─────────────── */
 
-export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus }: MockupFields) {
+export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   // 2026-05-18 (CJ): FBAd ignored the generated headline — showed the
   // run title (same for every pill). Use the variant's caption (the
@@ -476,7 +488,13 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
                 className="w-full h-auto object-contain" style={{ maxHeight: 420 }} />
             </div>
           ) : (
-            <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
+            <div
+              role={onGenerateImage ? "button" : undefined}
+              tabIndex={onGenerateImage ? 0 : undefined}
+              onClick={onGenerateImage}
+              onKeyDown={onGenerateImage ? (e) => { if (e.key === "Enter" || e.key === " ") onGenerateImage(); } : undefined}
+              className={`aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative ${onGenerateImage ? "cursor-pointer hover:bg-default-200 transition" : ""}`}
+            >
               {liveImageStatus === "ready" ? <Skeleton className="absolute inset-0" /> : null}
               <div className="text-center relative z-10">
                 <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />

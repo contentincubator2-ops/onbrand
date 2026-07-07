@@ -1,0 +1,47 @@
+name: "Ops — Debug RunPage chat bounce (error_log + pm2)"
+
+# 2026-07-07 (CJ bug report #2): after sending a message in RunPage's
+# 「跟 AI 專家改文案」panel, the screen bounced back to the task-cards
+# page and the generated post disappeared. The submit handler itself
+# doesn't navigate, so the cause must be an error path (stale-bundle
+# reload / crashed render / failed tRPC). Dump the evidence. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump error_log + pm2 refine lines
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+
+            echo "=== error_log: last 24h, level=error (latest 25) ==="
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+              "SELECT id, source, route, LEFT(message,200) AS msg, createdAt
+               FROM error_log
+               WHERE level='error' AND createdAt > NOW() - INTERVAL 24 HOUR
+               ORDER BY id DESC LIMIT 25\G"
+
+            echo "=== pm2 out/err: refineCaption / quickTask lines (last 40) ==="
+            grep -hE "refineCaption|refine|quickTask.*error" \
+              ~/.pm2/logs/onbrand-out.log ~/.pm2/logs/onbrand-error.log 2>/dev/null | tail -40
+
+            echo "=== recent FB-ad outputs (fb-30-ad-cta) ==="
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+              "SELECT mo.id, mo.missionId, LEFT(mo.metadata,120) AS meta, mo.createdAt
+               FROM mission_outputs mo
+               JOIN missions m ON m.id = mo.missionId
+               WHERE m.taskId LIKE '%ad-cta%' AND mo.createdAt > NOW() - INTERVAL 48 HOUR
+               ORDER BY mo.id DESC LIMIT 10;"
+            exit 0

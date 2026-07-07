@@ -1912,10 +1912,24 @@ export default function RunPage() {
               <Tooltip content={lang === "en" ? "Re-run task" : "重跑同任務"} placement="bottom">
                 <button
                   onClick={() => {
-                    const tier = data.mission?.tier ?? "30s";
                     const taskId = data.mission?.taskId;
                     if (!taskId) { showToastGlobal(lang === "en" ? "Original task ID not found" : "找不到原任務 ID"); return; }
-                    navigate(`/${tier}?rerun=${id}`);
+                    // 2026-07-07 (CJ「重跑同任務 404」): tier routes (/30s
+                    // /60s /99s) were removed 2026-05-27 when tasks went
+                    // platform-first — this still navigated to /${tier} and
+                    // landed on the 404 page. Map the mission's workspace to
+                    // the /tasks/:platform slug instead; PlatformTaskPage
+                    // already understands ?rerun=<outputId>.
+                    const ws = String(data.mission?.workspace ?? "").toLowerCase();
+                    const slug =
+                      ws.includes("instagram") ? "ig" :
+                      ws.includes("linkedin")  ? "li" :
+                      ws.includes("youtube")   ? "yt" :
+                      ws.includes("tiktok")    ? "tt" :
+                      ws.includes("email")     ? "email" :
+                      (ws.includes("press") || ws.includes("pr")) ? "pr" :
+                      "fb";
+                    navigate(`/tasks/${slug}?rerun=${id}`);
                   }}
                   className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
                   aria-label={lang === "en" ? "Re-run" : "重跑"}
