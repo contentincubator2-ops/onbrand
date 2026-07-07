@@ -35,7 +35,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHouse, faFolderOpen, faUserGroup, faBrain, faWandMagicSparkles, faRocket,
   faMicrophone, faBookBookmark, faEllipsis, faBell, faChessKnight,
-  faPlus, faRightFromBracket,
+  faPlus, faRightFromBracket, faLayerGroup,
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
   faCircleHalfStroke, faCircleInfo, faBorderAll, faDisplay, faBriefcase,
@@ -997,6 +997,29 @@ function BrandHierarchyPill({
           {brands.length > 0 && (
           <>
           <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
+          {/* 2026-07-07 (CJ「沒有清楚路徑到『所有品牌』頁」): explicit link to
+              the brand-management grid so it's reachable from the always-visible
+              top-right pill, not just the editor breadcrumb / settings menu. */}
+          <div style={{ borderTop: "1px solid #f3f4f6", margin: "6px 0 4px" }} />
+          <div style={{ padding: "0 8px 4px" }}>
+            <button
+              onClick={() => { onNavigate("/brands?all=1"); setOpen(false); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 8,
+                padding: "6px 10px", border: "none", borderRadius: 7,
+                background: "transparent", cursor: "pointer", textAlign: "left",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              <span style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", fontSize: 12 }}>
+                <FontAwesomeIcon icon={faLayerGroup} />
+              </span>
+              <span style={{ fontSize: 12.5, fontWeight: 500, color: "#374151" }}>
+                {isEn ? "See all brands →" : "查看所有品牌 →"}
+              </span>
+            </button>
+          </div>
           {/* New brand — dashed outline CTA (prominent but not primary) */}
           <div style={{ padding: "4px 8px" }}>
             <button
