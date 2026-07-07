@@ -165,20 +165,26 @@ async function runDiscoveryJob(job: {
       return "";
     });
 
+    // 2026-07-07 (CJ「克服像 lativ 這種的網站」): an empty text crawl used
+    // to early-return here — which skipped the image-alt fallback below and
+    // left SPA storefronts (client-rendered, tag-stripped text ≈ empty) at
+    // 0 products forever. Now we continue: images + alts are usually still
+    // server-rendered even when the text shell is empty.
     if (!pages.trim()) {
-      log(`crawl returned empty content for ${job.websiteUrl}`);
-      await finishJob(job.id, "done", 0, 0, errors);
-      return;
+      log(`crawl returned empty text for ${job.websiteUrl} — relying on image-alt fallback`);
+    } else {
+      const hasBuy = pages.includes("立即購買");
+      log(`crawl OK: ${pages.length} chars, hasBuyPattern=${hasBuy}, sample800: ${pages.slice(0, 800)}`);
     }
-    const hasBuy = pages.includes("立即購買");
-    log(`crawl OK: ${pages.length} chars, hasBuyPattern=${hasBuy}, sample800: ${pages.slice(0, 800)}`);
 
     // ── Phase 2: Extract product list ──────────────────────────────────
     await setPhase(job.id, "extract");
-    const products = await extractProducts(pages, job.websiteUrl).catch((e) => {
-      log(`extract failed: ${e?.message ?? e}`);
-      return [] as Array<{ name: string; description: string; imageUrl?: string }>;
-    });
+    const products = pages.trim()
+      ? await extractProducts(pages, job.websiteUrl).catch((e) => {
+          log(`extract failed: ${e?.message ?? e}`);
+          return [] as Array<{ name: string; description: string; imageUrl?: string }>;
+        })
+      : [];
     log(`extract result: ${products.length} products found`);
 
     // 2026-07-07: image scrape hoisted BEFORE the zero-product check —
