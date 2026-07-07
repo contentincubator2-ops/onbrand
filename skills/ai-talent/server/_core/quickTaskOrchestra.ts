@@ -1338,10 +1338,27 @@ async function genOneImage(prompt: string, config: OrchestraConfig): Promise<Orc
     // positives than gpt-image-1). Flux Schnell stays as the reliability
     // fallback so a provider hiccup never blanks the card.
     const aspect = (config.aspectRatio === "1.91:1" ? "16:9" : config.aspectRatio) as any;
+    // 2026-07-07 (CJ「YT 縮圖出現不是國字的國字」): image models hallucinate
+    // garbled CJK text, worst under 16:9 thumbnail framing. The real title is
+    // overlaid in the mockup/output layer, so this image must be a CLEAN,
+    // text-free background. Append a dominant NO-TEXT directive to the positive
+    // prompt (imagen-4 has no negative_prompt field) AND pass a real
+    // negative_prompt (honoured by the flux-schnell fallback + SDXL/Ideogram).
+    const promptNoText =
+      prompt +
+      "\n\nABSOLUTELY NO TEXT: render zero written characters — no text, letters, " +
+      "words, numbers, Chinese/Japanese/Korean characters, titles, headlines, " +
+      "captions, labels, badges, signage, logos, watermarks or typography anywhere. " +
+      "Leave any title area as empty visual space; text is added later on a separate layer.";
     const opts = {
-      prompt,
+      prompt: promptNoText,
       aspectRatio: aspect,
       quality: "high" as const,
+      negativePrompt:
+        "text, letters, words, numbers, chinese characters, japanese characters, " +
+        "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
+        "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
+        "fake characters, writing",
     };
     const tryModel = async (modelId: string, label: string, capMs: number) =>
       Promise.race([
