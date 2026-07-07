@@ -18,7 +18,7 @@
 import React, { useState, useEffect } from "react";
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
-import { Modal, ModalBody, ModalContent, ModalHeader, Button, Input, Textarea, Select, SelectItem } from "@heroui/react";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Input, Textarea, Select, SelectItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark, faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 
@@ -194,7 +194,11 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     : entityLabel(k);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="2xl" backdrop="blur">
+    // 2026-07-07 (CJ「建立品牌送出按鈕被切一半」— Windows 筆電):
+    // scrollBehavior="inside" caps the modal at the viewport and lets
+    // ModalBody scroll internally; action buttons moved to ModalFooter
+    // so they are always visible regardless of viewport height.
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl" backdrop="blur" scrollBehavior="inside" classNames={{ base: "max-h-[92dvh]" }}>
       <ModalContent>
         <ModalHeader className="flex items-center justify-between">
           <span className="text-lg font-semibold">{lang === "en" ? `Add a ${entityLabel(tab)}` : `新增 ${entityLabel(tab)}`}</span>
@@ -327,27 +331,26 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
               {errorMsg}
             </div>
           )}
-
-          <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-default-100">
-            <Button variant="light" onPress={onClose} isDisabled={busy}>{lang === "en" ? "Cancel" : "取消"}</Button>
-            <Button
-              color="primary"
-              isLoading={busy}
-              isDisabled={busy ||
-                (tab === "brand"   && !brandName.trim()) ||
-                (tab === "product" && (!prodName.trim() || !prodBrandId)) ||
-                (tab === "event"   && (!evName.trim() || !evBrandId))
-              }
-              onPress={() => {
-                if (tab === "brand") return handleCreateBrand();
-                if (tab === "product") return handleCreateProduct();
-                return handleCreateEvent();
-              }}
-            >
-              {lang === "en" ? `Create ${entityLabel(tab)}` : `建立 ${entityLabel(tab)}`}
-            </Button>
-          </div>
         </ModalBody>
+        <ModalFooter className="border-t border-default-100">
+          <Button variant="light" onPress={onClose} isDisabled={busy}>{lang === "en" ? "Cancel" : "取消"}</Button>
+          <Button
+            color="primary"
+            isLoading={busy}
+            isDisabled={busy ||
+              (tab === "brand"   && !brandName.trim()) ||
+              (tab === "product" && (!prodName.trim() || !prodBrandId)) ||
+              (tab === "event"   && (!evName.trim() || !evBrandId))
+            }
+            onPress={() => {
+              if (tab === "brand") return handleCreateBrand();
+              if (tab === "product") return handleCreateProduct();
+              return handleCreateEvent();
+            }}
+          >
+            {lang === "en" ? `Create ${entityLabel(tab)}` : `建立 ${entityLabel(tab)}`}
+          </Button>
+        </ModalFooter>
       </ModalContent>
     </Modal>
   );

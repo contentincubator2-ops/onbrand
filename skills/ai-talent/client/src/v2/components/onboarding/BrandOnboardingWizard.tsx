@@ -207,7 +207,11 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
       hideCloseButton={step !== 1 && step !== 4}
       isDismissable={false}
       backdrop="blur"
-      classNames={{ base: "max-h-[90vh]" }}
+      // 2026-07-07 (CJ「送出按鈕被切一半」— short laptop viewports):
+      // scrollBehavior="inside" makes the body scroll within max-h instead
+      // of clipping the bottom (CTA buttons) with no way to reach them.
+      scrollBehavior="inside"
+      classNames={{ base: "max-h-[90dvh]" }}
     >
       <ModalContent>
         <ModalBody className="p-0">
