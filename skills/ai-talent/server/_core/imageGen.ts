@@ -104,8 +104,25 @@ function buildPrompt(input: ImageGenInput): string {
   lines.push("Scene:");
   lines.push(input.prompt);
   lines.push("");
+  // 2026-07-07 (CJ「YT 縮圖出現不是國字的國字」): image models (Flux /
+  // gpt-image / Imagen) cannot render CJK text — they hallucinate glyphs that
+  // look Chinese but are gibberish. For "YouTube"/thumbnail 16:9 framing they
+  // lean HARD into adding a big title, producing exactly that garbage. The
+  // real title is overlaid later in the mockup layer, so the generated image
+  // must be a CLEAN, TEXT-FREE background. This must be a dominant, explicit
+  // directive — a weak trailing "no text" clause gets ignored.
   lines.push(
-    "Rendering: editorial photography, natural light, no text overlays, no watermarks, clean composition."
+    "ABSOLUTELY NO TEXT — this is the most important rule: do NOT render any " +
+    "text, letters, words, numbers, Chinese / Japanese / Korean characters, " +
+    "titles, headlines, captions, subtitles, labels, badges, stickers, signage, " +
+    "logos, watermarks, or typography ANYWHERE in the image. The image must " +
+    "contain ZERO written characters — it is a clean background; any title text " +
+    "is added afterwards on a separate layer. If you are tempted to add a title " +
+    "or thumbnail text, leave that area as empty visual space instead."
+  );
+  lines.push("");
+  lines.push(
+    "Rendering: editorial photography, natural light, clean composition, no text, no watermarks."
   );
   return lines.join("\n");
 }
