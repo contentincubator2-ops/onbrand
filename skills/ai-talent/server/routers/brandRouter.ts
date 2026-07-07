@@ -228,14 +228,20 @@ export const brandRouter = router({
       try {
         const { default: localPool } = await import("../localDb");
         const [pRows]: any = await localPool.execute(
-          `SELECT planCode, hasUnlimitedCredits, role FROM users WHERE id = ? LIMIT 1`,
+          `SELECT planCode, hasUnlimitedCredits, role, email FROM users WHERE id = ? LIMIT 1`,
           [ctx.user.id],
         );
         const row = (pRows as any[])[0];
         // Admins and unlimited-credit users have no brand cap.
         // Use Number() cast because mysql2 may return TINYINT(1) as boolean true
         // rather than the integer 1, making strict === 1 fail.
-        const isUnlimited = Number(row?.hasUnlimitedCredits) === 1 || row?.role === "admin";
+        // 2026-07-07 (CJ「sowork.tw 網域底下都可以使用很多品牌」): internal team
+        // accounts (@sowork.tw / @sowork.ai) are uncapped by policy — same
+        // domain whitelist used by adminProcedure (_core/trpc.ts) + support.
+        // This means a new colleague isn't blocked at 1 brand before someone
+        // manually grants them enterprise.
+        const isSoworkTeam = typeof row?.email === "string" && /@sowork\.(tw|ai)$/i.test(row.email);
+        const isUnlimited = Number(row?.hasUnlimitedCredits) === 1 || row?.role === "admin" || isSoworkTeam;
         if (!isUnlimited) {
           const planCode = row?.planCode ?? "trial";
           const { getPlan } = await import("../_core/plans");
