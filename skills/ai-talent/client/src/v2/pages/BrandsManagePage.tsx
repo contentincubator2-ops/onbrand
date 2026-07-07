@@ -22,6 +22,7 @@ import { useOutletContext } from "react-router-dom";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { useLang } from "../../lib/i18n";
+import AddEntityModal from "../components/AddEntityModal";
 import {
   Plus, Trash2, ChevronRight, Calendar, Package, Layers,
   FileText, ExternalLink, AlertTriangle,
@@ -132,6 +133,10 @@ export default function BrandsManagePage() {
   // that React bails on with a blank screen. Move all hook calls up.
   const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
+  // 2026-07-07 (CJ「新增第二個品牌沒有彈跳視窗會迷失方向」): open the same
+  // AddEntityModal the top-right pill uses, instead of navigating to a full
+  // editor page (/brands/edit?new=1).
+  const [addBrandOpen, setAddBrandOpen] = useState(false);
 
   const deleteMut = (trpc as any).brand?.delete?.useMutation
     ? (trpc as any).brand.delete.useMutation({
@@ -279,7 +284,7 @@ export default function BrandsManagePage() {
             </p>
           </div>
           <button
-            onClick={() => navigate("/brands/edit?new=1")}
+            onClick={() => setAddBrandOpen(true)}
             className="absolute right-0 top-2 px-4 py-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold transition flex items-center gap-2"
           >
             <Plus size={16} /> {t("create_brand")}
@@ -431,6 +436,23 @@ export default function BrandsManagePage() {
             </div>
           </div>
         )}
+
+        {/* Add-brand modal — same 彈跳視窗 the top-right pill uses, so creating
+            a second brand from the grid doesn't jump to a disorienting full page. */}
+        <AddEntityModal
+          isOpen={addBrandOpen}
+          initialTab="brand"
+          defaultBrandId={null}
+          onClose={() => setAddBrandOpen(false)}
+          onCreated={(kind, id) => {
+            setAddBrandOpen(false);
+            if (kind === "brand") {
+              ctx?.setBrandId?.(id);
+              ctx?.setScope?.({ brandId: id, productId: null, eventId: null });
+              navigate(`/brands/edit?b=${id}`);
+            }
+          }}
+        />
       </div>
     </div>
   );
