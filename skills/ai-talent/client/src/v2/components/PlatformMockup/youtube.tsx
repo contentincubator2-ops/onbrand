@@ -12,7 +12,7 @@ import { Avatar, Button, Divider, Skeleton, User } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faYoutube } from "@fortawesome/free-brands-svg-icons";
 import {
-  faPlay, faVideo, faThumbsUp, faThumbsDown, faComment, faShareNodes,
+  faVideo, faThumbsUp, faThumbsDown, faComment, faShareNodes,
   faMusic, faImages, faDownload, faBell, faScissors,
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, dicebear } from "./shared";
@@ -133,25 +133,14 @@ export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCapt
             </div>
           )}
           {liveImageUrl && liveImageStatus === "ready" && <ThumbnailTextOverlay text={overlayTitle} />}
-          {/* 2026-07-07 (CJ「用戶以為會生影片，其實不會」): this mockup is a
-              THUMBNAIL / LAYOUT preview — the task produces a caption package +
-              thumbnail, NOT a playable video. Make the play glyph clearly
-              decorative (non-interactive) + label the preview so nobody expects
-              a video to play. */}
-          <div
-            aria-hidden
-            title={lang === "en" ? "Layout preview — not a playable video" : "版型預覽，不會產生可播放影片"}
-            className="absolute z-20 flex items-center justify-center rounded-full bg-danger/80"
-            style={{ width: 54, height: 54, pointerEvents: "none" }}
-          >
-            <FontAwesomeIcon icon={faPlay} className="text-white text-xl pl-0.5" />
-          </div>
+          {/* 2026-07-07 (CJ「用戶以為會生影片，其實不會」, round 2 「我現在
+              看到的還是這樣」): the tooltip-only fix wasn't enough — a filled
+              red circle still reads as YouTube's real play button. Remove
+              every playback affordance (play glyph + fake progress bar); the
+              frame reads as a thumbnail, and the badge says why. */}
           <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-black/70 text-white text-[10px] font-medium px-2 py-1 rounded-full pointer-events-none">
             <FontAwesomeIcon icon={faImages} className="text-[9px]" />
             {lang === "en" ? "Layout preview · no video file" : "版型預覽 · 不含影片檔"}
-          </div>
-          <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20">
-            <div className="h-full w-1/3 bg-danger" />
           </div>
         </div>
 
@@ -404,9 +393,12 @@ export function YTLive({ title, brandName, variantLabel }: MockupFields) {
             </span>
             <span className="bg-black/70 text-white text-tiny px-2 py-0.5 rounded">{lang === "en" ? "2,345 watching" : "2,345 人觀看"}</span>
           </div>
-          <Button isIconOnly radius="full" size="lg" color="danger" className="absolute opacity-90" aria-label="watch">
-            <FontAwesomeIcon icon={faPlay} />
-          </Button>
+          {/* 2026-07-07 (CJ): no playback affordance — this is a layout
+              preview, a red play button implies a watchable stream. */}
+          <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-black/70 text-white text-[10px] font-medium px-2 py-1 rounded-full pointer-events-none">
+            <FontAwesomeIcon icon={faImages} className="text-[9px]" />
+            {lang === "en" ? "Layout preview · no video file" : "版型預覽 · 不含影片檔"}
+          </div>
         </div>
         {/* Live chat preview */}
         <div className="px-4 py-2.5 border-b border-divider bg-default-50 space-y-1 max-h-32 overflow-hidden">
