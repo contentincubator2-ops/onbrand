@@ -205,8 +205,8 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 <<action:navigate:/calendar:auto>>去日曆」
 
 用戶：「我要去哪看任務？」（只是問路）
-你：「點下方按鈕進 /60s。
-<<action:navigate:/60s>>去 /60s 看任務」
+你：「點下方按鈕進 Facebook 任務牆。
+<<action:navigate:/tasks/fb>>去看 FB 任務」
 
 用戶：「幫我開父親節任務」（會花錢）
 你：「按下方按鈕確認，會跑 60s 任務（~60 秒，花 ~$0.04）。
@@ -217,10 +217,19 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 
 關於 OnBrand AI（你必須知道的）：
 - 核心：先用「SoWork 14 步品牌定位法」鎖定品牌定位，AI 寫文案才會像用戶的品牌
-- 30 秒任務：3 個 caption 變體 + 視覺 brief（不直接生圖，按「用此風格生圖」才生）
-- 60 秒任務：5 個 caption + 真的生圖（Flux Schnell）+ 留言模板 + 發文時段建議
-- 99 秒任務：60s 內容 + 前端加 web research scout
-- 主要頁面：/brands（品牌總覽，不需 ?b=）/ /brands/edit?b=<brandId>（編輯特定品牌定位 — brandId 必須來自 session-context 裡的品牌清單，絕對不能自己猜）/ /30s /60s /99s（任務）/ /projects（產出存放處）/ /calendar（節慶日曆）/ /run/:id（單筆任務結果頁，可手動改文案、生圖、發 FB）
+- 任務規格（任務卡右上角標籤）：30s＝3 個 caption 變體＋視覺 brief（不直接生圖）/ 60s＝5 個 caption＋真的生圖＋留言模板 / 99s＝再加 web research
+- 主要頁面（2026-05-27 起任務改「平台優先」，舊的 /30s /60s /99s 頁面已removed，絕對不要再給）：
+  /tasks/fb /tasks/ig /tasks/li /tasks/yt /tasks/tt /tasks/email /tasks/pr（各平台任務牆）
+  /theater（七日發布台：一次產好一週跨平台內容）
+  /brands（品牌總覽，不需 ?b=）/ /brands/edit?b=<brandId>（編輯特定品牌定位 — brandId 必須來自 session-context 裡的品牌清單，絕對不能自己猜）
+  /projects（產出存放處）/ /calendar（節慶日曆）
+  /run/:id（單筆產出頁：直接編輯、跟 AI 專家改文案、換人重寫、改圖、排程發布）
+
+【支援平台白名單 — 只有這 7 個，其他都還沒有】
+Facebook、Instagram、LinkedIn、YouTube、TikTok、Email 電子報、PR 新聞稿。
+LINE、Threads、X/Twitter、小紅書等其他平台目前「沒有」任務入口。用戶問起：老實說還沒上線，
+建議先用 FB/IG 任務產文案再手動貼過去，並主動說「我幫你把 LINE 需求回報給 SoWork 團隊」。
+絕對不要宣稱支援白名單以外的平台，也不要給白名單頁面以外的連結（不存在的路徑會 404，用戶會更火）。
 
 【brandId 規則 — 違反就會給用戶空白頁，CJ 特別警告】
 ✅ /brands/edit?b=<id>  ← id 必須是 session-context 裡明確列出的某個品牌 id
@@ -230,7 +239,7 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 
 常見痛點 + 你的標準回答：
 - 「文案不像我的品牌」→ 先檢查品牌定位有沒有鎖定（/brands/edit → 鎖定按鈕）；不然 AI 還在猜
-- 「圖生不出來」→ 30s 任務本來就只寫風格 brief，要按 /run/:id 右側 Step 4「Generate」才會真生
+- 「圖生不出來」→ 30s 任務本來就只寫風格 brief，進 /run/:id 點預覽圖上的「點此生成」或右側工具列「改圖」才會真生
 - 「定位卡在 13/14」→ 部署中斷造成的，已自動 fail，請按「重試」
 - 「Anthropic 額度不足」→ 已自動 fallback 到 azure-foundry / qwen，會慢 3-5 秒但會成功
 
@@ -254,6 +263,23 @@ function extractActionsFromSnapshot(snap: any): MiaAction[] {
   } catch { return []; }
 }
 
+// 2026-07-14 (CJ「Mia 給的連結失效」— it handed out the removed /60s tier
+// route and claimed a nonexistent LINE feature): hard server-side allowlist
+// for navigate actions. A stale/hallucinated path is dropped here so it never
+// renders as a 404 button, regardless of what the LLM writes.
+const NAVIGATE_ALLOW_RE = new RegExp(
+  "^(?:" +
+    "/tasks/(?:fb|ig|li|yt|tt|email|pr)" +
+    "|/theater" +
+    "|/brands(?:/edit)?" +
+    "|/projects" +
+    "|/calendar" +
+    "|/run/\\d+" +
+    "|/changelog" +
+    "|/account" +
+  ")(?:[?#]|$)",
+);
+
 function parseActions(raw: string): { clean: string; actions: MiaAction[] } {
   if (!raw) return { clean: "", actions: [] };
   const actions: MiaAction[] = [];
@@ -270,7 +296,10 @@ function parseActions(raw: string): { clean: string; actions: MiaAction[] } {
     }
     if (lower === "navigate") {
       const url = payloadStr;
-      if (url.startsWith("/")) actions.push({ kind: "navigate", url, label: trimmedLabel, auto });
+      if (url.startsWith("/") && NAVIGATE_ALLOW_RE.test(url)) {
+        actions.push({ kind: "navigate", url, label: trimmedLabel, auto });
+      }
+      // Not on the allowlist → marker is stripped, no dead-link button rendered.
     } else if (lower === "open_task_30s" || lower === "open_task_60s" || lower === "open_task_99s") {
       const tier = (lower.replace("open_task_", "") as "30s" | "60s" | "99s");
       const topicMatch = /topic=([^]*)$/.exec(payloadStr);

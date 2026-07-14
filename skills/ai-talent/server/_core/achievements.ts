@@ -59,7 +59,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     title: "初試身手",
     description: "跑完第一個 30 秒任務，看到 AI 產出",
     icon: "Zap",
-    ctaPath: "/30s", ctaText: "挑一個任務試試",
+    // 2026-07-14: /30s tier route removed 2026-05-27 → 404; tasks are platform-first
+    ctaPath: "/tasks/fb", ctaText: "挑一個任務試試",
   },
 
   // ───── Day 2 — Explore ─────
@@ -69,7 +70,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     title: "多元嘗試",
     description: "在 3 個不同平台（FB / IG / YT...）跑過任務",
     icon: "LayoutGrid",
-    ctaPath: "/30s", ctaText: "換平台試試",
+    ctaPath: "/tasks/ig", ctaText: "換平台試試",
   },
   {
     code: "use_chat_refine",
