@@ -1,0 +1,44 @@
+name: Ops — Activation funnel probe (read-only)
+on: { workflow_dispatch: {} }
+jobs:
+  funnel:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 3
+    steps:
+      - run: |
+          set -e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD:?set LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h localhost -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -B -t"
+          # Exclude internal team + smoke tests to measure REAL external activation.
+          EXCL="u.email NOT LIKE '%@sowork.tw' AND u.email NOT LIKE '%@sowork.ai' AND u.email NOT LIKE 'smoke+%'"
+
+          echo "════ Activation funnel — REAL external users, all-time ════"
+          $MYSQL -e "
+            SELECT
+              COUNT(DISTINCT u.id) AS signed_up,
+              COUNT(DISTINCT CASE WHEN u.isActive=1 THEN u.id END) AS verified,
+              COUNT(DISTINCT CASE WHEN b.userId IS NOT NULL THEN u.id END) AS built_brand,
+              COUNT(DISTINCT CASE WHEN mo_first.userId IS NOT NULL THEN u.id END) AS first_task,
+              COUNT(DISTINCT CASE WHEN mo_count.task_count >= 3 THEN u.id END) AS activated_3plus,
+              COUNT(DISTINCT CASE WHEN mo_recent.userId IS NOT NULL THEN u.id END) AS d7_active
+            FROM users u
+            LEFT JOIN (SELECT DISTINCT userId FROM brands) b ON b.userId=u.id
+            LEFT JOIN (SELECT DISTINCT m.userId FROM missions m JOIN mission_outputs mo ON mo.missionId=m.id) mo_first ON mo_first.userId=u.id
+            LEFT JOIN (SELECT m.userId, COUNT(*) task_count FROM missions m JOIN mission_outputs mo ON mo.missionId=m.id GROUP BY m.userId) mo_count ON mo_count.userId=u.id
+            LEFT JOIN (SELECT DISTINCT m.userId FROM missions m JOIN mission_outputs mo ON mo.missionId=m.id WHERE mo.createdAt >= NOW() - INTERVAL 7 DAY) mo_recent ON mo_recent.userId=u.id
+            WHERE ${EXCL};" 2>&1
+
+          echo ""
+          echo "════ Per-user drop-off (real external users) ════"
+          $MYSQL -e "
+            SELECT u.id, u.email, u.isActive,
+                   u.createdAt,
+                   (SELECT COUNT(*) FROM brands b WHERE b.userId=u.id) AS brands,
+                   (SELECT COUNT(*) FROM missions m WHERE m.userId=u.id) AS missions,
+                   (SELECT COUNT(*) FROM missions m JOIN mission_outputs mo ON mo.missionId=m.id WHERE m.userId=u.id) AS outputs,
+                   (SELECT MAX(mo.createdAt) FROM missions m JOIN mission_outputs mo ON mo.missionId=m.id WHERE m.userId=u.id) AS last_output
+            FROM users u
+            WHERE ${EXCL}
+            ORDER BY u.createdAt DESC
+            LIMIT 60;" 2>&1
