@@ -395,7 +395,9 @@ export const adminStatsRouter = router({
     let errors24h = 0;
     try {
       const [[er]]: any = await localPool.execute(
-        `SELECT COUNT(*) AS c FROM error_log WHERE createdAt >= NOW() - INTERVAL 1 DAY`,
+        // level filter: error_log also carries info-level analytics rows
+        `SELECT COUNT(*) AS c FROM error_log
+          WHERE createdAt >= NOW() - INTERVAL 1 DAY AND level IN ('error','warn')`,
       );
       errors24h = n(er.c);
     } catch { /* error_log may lag on older deploys */ }
@@ -510,7 +512,8 @@ export const adminStatsRouter = router({
       try {
         const [er]: any = await localPool.execute(
           `SELECT id, source, message, createdAt FROM error_log
-            WHERE userId = ? ORDER BY id DESC LIMIT 20`, [uid]);
+            WHERE userId = ? AND level IN ('error','warn')
+            ORDER BY id DESC LIMIT 20`, [uid]);
         errors = er;
       } catch { /* error_log optional */ }
 
@@ -644,6 +647,10 @@ export const adminStatsRouter = router({
       const days = Math.max(1, Math.min(30, Math.floor(input?.days ?? 7)));
       let rows: any[] = [];
       try {
+        // 2026-07-14 (CJ「請解決摩擦地圖 · 錯誤集中點」): error_log doubles
+        // as the lightweight analytics sink (mia.nudge.* / activation.* rows
+        // are level='info'). Without the level filter the friction map showed
+        // 113 analytics events as "errors" while actual errors were zero.
         const [r]: any = await localPool.execute(
           `SELECT COALESCE(NULLIF(route, ''), '(no route)') AS route,
                   COALESCE(NULLIF(source, ''), '(no source)') AS source,
@@ -653,6 +660,7 @@ export const adminStatsRouter = router({
                   MAX(createdAt)            AS lastSeen
              FROM error_log
             WHERE createdAt >= NOW() - INTERVAL ${days} DAY
+              AND level IN ('error', 'warn')
             GROUP BY route, source
             ORDER BY errors DESC
             LIMIT 40`,
@@ -752,6 +760,7 @@ export const adminStatsRouter = router({
         const [er]: any = await localPool.execute(
           `SELECT source, message, createdAt FROM error_log
             WHERE userId=? AND createdAt>=NOW()-INTERVAL 3 DAY
+              AND level IN ('error','warn')
             ORDER BY id DESC LIMIT 8`, [b.userId]);
         if ((er as any[]).length) {
           errCtx = (er as any[]).map((e: any) =>
