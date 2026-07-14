@@ -418,18 +418,24 @@ authRouter.post("/me", async (req: Request, res: Response) => {
     // a separate billing API call.
     let planStatus: string | null = null;
     let planEndsAt: string | null = null;
+    // 2026-07-15 (activation Leak A): brandCount lets post-login landing route
+    // a brandless user into guided brand creation instead of the empty /theater.
+    let brandCount = 0;
     try {
       const { default: localPool } = await import("../localDb");
       const [planRows]: any = await localPool.execute(
-        `SELECT planStatus, planEndsAt FROM users WHERE id = ? LIMIT 1`,
-        [session.userId],
+        `SELECT planStatus, planEndsAt,
+                (SELECT COUNT(*) FROM brands WHERE userId = ?) AS brandCount
+           FROM users WHERE id = ? LIMIT 1`,
+        [session.userId, session.userId],
       );
       const planRow = Array.isArray(planRows) ? planRows[0] : null;
       planStatus = planRow?.planStatus ?? null;
       planEndsAt = planRow?.planEndsAt ? new Date(planRow.planEndsAt).toISOString() : null;
+      brandCount = Number(planRow?.brandCount ?? 0);
     } catch { /* non-fatal — return user without plan info */ }
 
-    res.json({ user: { ...user[0], planStatus, planEndsAt } });
+    res.json({ user: { ...user[0], planStatus, planEndsAt }, brandCount });
   } catch (err) {
     console.error("[auth] me error:", err);
     res.status(500).json({ error: "伺服器錯誤" });

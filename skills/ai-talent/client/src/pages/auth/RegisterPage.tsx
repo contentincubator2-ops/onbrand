@@ -138,7 +138,11 @@ export default function RegisterPage() {
           // Fired BEFORE redirect so the event sticks even if the navigation
           // teardown cancels in-flight requests on slow mobiles.
           logActivation("register_completed", { method: "email" });
-          window.location.replace("/theater");
+          // 2026-07-15 (activation funnel — Leak A fix): a brand-new account
+          // has 0 brands. Landing on /theater (empty publishing calendar) was
+          // a dead end — 37% of signups never created a brand. Route straight
+          // to the brand grid's guided "建立你的第一個品牌" empty-state + modal.
+          window.location.replace("/brands?all=1");
           return;
         }
       } catch (e) {

@@ -76,9 +76,15 @@ export default function LandingPage() {
       headers: { "Content-Type": "application/json" },
       body: "{}",
     })
-      .then((r) => {
+      .then(async (r) => {
         if (dead) return;
-        if (r.ok) navigate("/theater", { replace: true });
+        if (!r.ok) return;
+        // 2026-07-15 (activation Leak A): send brandless users (incl. OAuth
+        // first-login) into guided brand creation, not the empty /theater.
+        let brandCount = 1;
+        try { brandCount = Number((await r.json())?.brandCount ?? 1); } catch {}
+        if (dead) return;
+        navigate(brandCount > 0 ? "/theater" : "/brands?all=1", { replace: true });
       })
       .catch(() => {});
     document.title = en
