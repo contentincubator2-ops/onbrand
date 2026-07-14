@@ -387,7 +387,11 @@ export default function ShellLayout() {
           display: "flex", alignItems: "center", justifyContent: "center",
           border: "2px solid rgba(124,58,237,0.18)",
           transition: "transform 0.18s, box-shadow 0.18s",
-          overflow: "hidden",
+          // 2026-07-15 (CJ「通知數字有一半被遮住」): overflow:hidden clipped
+          // the unread badge (positioned at top:-5/right:-5, outside the
+          // circle). Clip the avatar <img> itself instead — badge + ripple
+          // must render beyond the button bounds.
+          overflow: "visible",
           cursor: "pointer",
           padding: 0,
         }}
@@ -403,7 +407,7 @@ export default function ShellLayout() {
         <img
           src="https://api.dicebear.com/7.x/notionists/svg?seed=mia-cs-onbrand&backgroundColor=ede9fe&backgroundType=solid&radius=50"
           alt="Mia · Customer Success"
-          style={{ width: "100%", height: "100%", display: "block" }}
+          style={{ width: "100%", height: "100%", display: "block", borderRadius: "50%" }}
         />
         {/* 2026-06-12: badge UI changes based on unread state.
             - No unread → small green "online" dot (status)
