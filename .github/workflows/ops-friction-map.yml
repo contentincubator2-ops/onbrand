@@ -1,0 +1,55 @@
+name: "Ops — Friction map dump (error_log 7d)"
+
+# 2026-07-14 (CJ「請解決摩擦地圖 · 錯誤集中點（近 7 天）」): dump the exact
+# data behind /admin dashboard's friction-map section so the top error
+# clusters can be diagnosed and fixed. Read-only.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query error_log clusters
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== A. level breakdown (7d) ====="
+            Q "SELECT level, COUNT(*) c FROM error_log
+               WHERE createdAt >= NOW() - INTERVAL 7 DAY
+               GROUP BY level ORDER BY c DESC;"
+
+            echo "===== B. dashboard query verbatim (NO level filter, top 25) ====="
+            Q "SELECT COALESCE(NULLIF(route,''),'(no route)') route,
+                      COALESCE(NULLIF(source,''),'(no source)') source,
+                      COUNT(*) errors, COUNT(DISTINCT userId) users,
+                      LEFT(MAX(message),120) sampleMessage, MAX(createdAt) lastSeen
+               FROM error_log WHERE createdAt >= NOW() - INTERVAL 7 DAY
+               GROUP BY route, source ORDER BY errors DESC LIMIT 25;"
+
+            echo "===== C. level='error' only clusters (top 25) ====="
+            Q "SELECT COALESCE(NULLIF(route,''),'(no route)') route,
+                      COALESCE(NULLIF(source,''),'(no source)') source,
+                      COUNT(*) errors, COUNT(DISTINCT userId) users,
+                      LEFT(MAX(message),120) sampleMessage, MAX(createdAt) lastSeen
+               FROM error_log WHERE createdAt >= NOW() - INTERVAL 7 DAY
+                 AND level='error'
+               GROUP BY route, source ORDER BY errors DESC LIMIT 25;"
+
+            echo "===== D. latest 30 full error rows (7d) ====="
+            Q "SELECT id, userId, level, source, route, LEFT(message,300) msg, createdAt
+               FROM error_log
+               WHERE createdAt >= NOW() - INTERVAL 7 DAY AND level='error'
+               ORDER BY id DESC LIMIT 30\G"
+            exit 0
