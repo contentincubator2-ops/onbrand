@@ -1327,9 +1327,48 @@ function safeOutputTypeForPostType(
 
 // ── Single image gen with per-image timeout ─────────────────────────────
 
+/* 2026-07-16 (CJ「其他任務生成的圖常跟提示詞不同，七日發布台的圖反而好」):
+ * root cause — orchestra briefs are deliberately written in Traditional
+ * Chinese (they double as the UI's 風格方向 display), and were passed to the
+ * image models VERBATIM. Imagen/Flux follow English prompts far better than
+ * Chinese, so adherence was poor. Theater's path converts the caption to a
+ * short ENGLISH brief before dispatch — and CJ prefers those images. Compile
+ * the Chinese brief into a concise English prompt the same way; the UI keeps
+ * showing the Chinese brief (returned via `style`). Fail-safe: on timeout or
+ * empty result, fall back to the raw Chinese brief (= old behavior). */
+async function compileImagePromptEn(briefZh: string): Promise<string | null> {
+  try {
+    const r = await Promise.race([
+      callModel(
+        [
+          {
+            role: "system",
+            content:
+              "Convert this Chinese visual direction into a concise English text-to-image prompt. " +
+              "1-3 sentences. Keep every concrete element (subject, setting, composition, lighting, " +
+              "color palette, mood, aspect framing) — do not add new objects or drop stated ones. " +
+              "Photorealistic unless the direction says otherwise. No text in image, no logos. " +
+              "Output ONLY the English prompt.",
+          },
+          { role: "user", content: briefZh },
+        ],
+        undefined,
+        "qwen",
+      ),
+      timeoutPromise<never>(8_000, "brief-en-compile"),
+    ]);
+    const en = (r.content ?? "").trim();
+    return en.length > 10 ? en.slice(0, 900) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function genOneImage(prompt: string, config: OrchestraConfig): Promise<OrchestraVariant["image"]> {
   if (!prompt) return { style: null, url: null, status: "skipped" };
   try {
+    // Chinese brief → English model prompt (see compileImagePromptEn above).
+    const modelPrompt = (await compileImagePromptEn(prompt)) ?? prompt;
     // 2026-05-18 (CJ「目前的圖很不行，最好的生圖模型是什麼」): quick-task
     // images were hardcoded to piapi/flux-schnell — the fastest/lowest-
     // quality Flux tier (draft-grade, weak prompt adherence). Upgrade the
@@ -1345,7 +1384,7 @@ async function genOneImage(prompt: string, config: OrchestraConfig): Promise<Orc
     // prompt (imagen-4 has no negative_prompt field) AND pass a real
     // negative_prompt (honoured by the flux-schnell fallback + SDXL/Ideogram).
     const promptNoText =
-      prompt +
+      modelPrompt +
       "\n\nABSOLUTELY NO TEXT: render zero written characters — no text, letters, " +
       "words, numbers, Chinese/Japanese/Korean characters, titles, headlines, " +
       "captions, labels, badges, signage, logos, watermarks or typography anywhere. " +
