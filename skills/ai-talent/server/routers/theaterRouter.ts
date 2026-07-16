@@ -21,6 +21,7 @@ import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywrit
 import { resolveAgentId } from "../_core/agentAssignments";
 import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
+import { composeVisualBrief } from "../_core/visualBrief";
 import { withUserLLMSlot } from "../_core/userLLMSemaphore";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -1265,40 +1266,27 @@ ${cleaned}
       customPrompt: z.string().max(1000).optional(),
     }))
     .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
-      // 1) Caption → short visual brief (skip if user provided customPrompt)
-      let brief = "";
-      if (input.customPrompt?.trim()) {
-        brief = input.customPrompt.trim();
-      } else
-      try {
-        const r = await invokeLLM({
-          provider: "anthropic",
-          // 2026-05-16: removed model:"claude-haiku-4-5" — invalid on the
-          // direct Anthropic API (Azure naming) → 404 every theater cell
-          // → fallback chain → 企劃台 crawl. Let anthropic use its
-          // proven default (claude-sonnet-4-6).
-          maxTokens: 180,
-          messages: [
-            {
-              role: "system",
-              content: "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic, brand-friendly, no text in image, no logos. Output only the brief.",
-            },
-            {
-              role: "user",
-              content: `Brand: ${input.brandTagline ?? "(unknown)"}\nPlatform: ${input.platform}\nCaption:\n${input.caption}`,
-            },
-          ],
-        });
-        brief = r.choices[0]?.message?.content?.toString().trim() ?? "";
-      } catch {
-        brief = `Photorealistic editorial scene representing: ${input.caption.slice(0, 120)}`;
-      }
-
-      // 2) Flux schnell — fastest, square
       const aspect = input.platform === "youtube" ? "16:9"
         : input.platform === "instagram" ? "1:1"
         : input.platform === "blog" ? "16:9"
         : "1:1";
+
+      // 1) Caption → visual brief (skip if user provided customPrompt).
+      // 2026-07-16 (CJ「不要疊床架屋——送模型的語言、prompt 內容來源要相同」):
+      // theater now uses the SAME shared composer as orchestra
+      // (_core/visualBrief.ts): one dual-language contract, en → model.
+      let brief = "";
+      if (input.customPrompt?.trim()) {
+        brief = input.customPrompt.trim();
+      } else {
+        const vb = await composeVisualBrief({
+          content: input.caption,
+          brandContext: input.brandTagline ? `品牌：${input.brandTagline}` : undefined,
+          platform: input.platform,
+          aspectRatio: aspect,
+        });
+        brief = vb.en;
+      }
       // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back
       // to openai/gpt-image-1 when PIAPI_KEY is absent so Theater images
       // still work when only OPENAI_API_KEY is configured.
