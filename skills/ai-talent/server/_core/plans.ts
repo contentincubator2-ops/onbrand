@@ -178,13 +178,17 @@ export const PLANS: Record<PlanCode, Plan> = {
   drop_starter: {
     code: "drop_starter",
     name: "OnBrand Starter",
+    // 2026-07-15 (CJ「取消早鳥優惠，只呈現原價」): early-bird offer CLOSED for
+    // new signups — standard price is the only public price. earlyBird* fields
+    // are kept ONLY so existing users with the earlyBird DB flag keep their
+    // grandfathered rate (永久保價 promise). Annual = standard ×10 (2 mo free).
     priceTwdMonthly:         2250,   // NT$2,250 standard
-    priceTwdAnnually:        7500,   // NT$7,500 early-bird annual (NT$750×10, 2 months free)
-    earlyBirdPriceTwdMonthly: 750,   // NT$750 early-bird monthly (fixed, not exchange-rate derived)
+    priceTwdAnnually:       22500,   // NT$22,500 standard annual (×10, 2 months free)
+    earlyBirdPriceTwdMonthly: 750,   // grandfathered only — offer closed 2026-07-15
     standardPriceTwdMonthly: 2250,
     priceUsdMonthly:          75,    // standard US$75
-    priceUsdAnnually:        300,    // annual = $25×12 (no discount — same early-bird rate locked for 12 mo)
-    earlyBirdPriceUsdMonthly: 25,    // early-bird US$25
+    priceUsdAnnually:        750,    // standard annual US$750 (×10, 2 months free)
+    earlyBirdPriceUsdMonthly: 25,    // grandfathered only — offer closed 2026-07-15
     standardPriceUsdMonthly:  75,
     trialDays: 0,
     quota: {
@@ -208,11 +212,10 @@ export const PLANS: Record<PlanCode, Plan> = {
       "每月 50 次執行（30s + 60s 任務，每次含所有變體 + 圖）",
       "AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
       "品牌大腦定位（USP · 語氣 · 受眾）",
-      "FB / IG 直接發布 + 排程",
       "電子發票（個人 / B2B）",
       "99s 深度研究任務：升級 Solo 解鎖",
     ],
-    highlight: "早鳥 US$25／標準 US$75",
+    highlight: "US$75／月",
   },
 
   /** New users get 7 days OR 1000 points (whichever runs out first).
@@ -264,14 +267,15 @@ export const PLANS: Record<PlanCode, Plan> = {
   drop_pro: {
     code: "drop_pro",
     name: "OnBrand Solo",
+    // 2026-07-15 (CJ): early-bird offer closed — see drop_starter note.
     priceTwdMonthly: 9000,                 // NT$9,000 standard monthly
-    priceTwdAnnually: 30000,              // NT$30,000 early-bird annual (NT$3,000×10, 2 months free)
-    earlyBirdPriceTwdMonthly: 3000,        // NT$3,000 early-bird monthly (fixed, not exchange-rate derived)
+    priceTwdAnnually: 90000,               // NT$90,000 standard annual (×10, 2 months free)
+    earlyBirdPriceTwdMonthly: 3000,        // grandfathered only — offer closed 2026-07-15
     standardPriceTwdMonthly: 9000,
     // 2026-05-14 (CJ Solo pivot): USD is the canonical price.
     priceUsdMonthly: 300,                  // standard US$300
-    priceUsdAnnually: 3300,                // 11× standard monthly ($300×11)
-    earlyBirdPriceUsdMonthly: 100,         // early-bird US$100 (永久保價 for 早鳥)
+    priceUsdAnnually: 3000,                // standard annual US$3,000 (×10, 2 months free)
+    earlyBirdPriceUsdMonthly: 100,         // grandfathered only — offer closed 2026-07-15
     standardPriceUsdMonthly: 300,
     trialDays: 0,
     quota: {
@@ -296,12 +300,11 @@ export const PLANS: Record<PlanCode, Plan> = {
       "1 個品牌 · 1 位用戶",
       "無限文案（30s / 60s / 99s 全任務模板）",
       "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-      "FB / IG 直接發布 + 排程（無限）",
       "電子發票",
       "影片：roadmap 加購包",
       "改名 / 換品牌：聯繫客服",
     ],
-    highlight: "早鳥 US$100／標準 US$300",
+    highlight: "US$300／月",
   },
 
   /** OnBrand Studio — for solo brand owners managing 2-3 brands.
@@ -472,11 +475,12 @@ export function getEffectivePrice(
   const twdMonthly = isEarlyBird && plan.earlyBirdPriceTwdMonthly && plan.earlyBirdPriceTwdMonthly > 0
     ? plan.earlyBirdPriceTwdMonthly
     : (plan.priceTwdMonthly ?? Math.round(usdMonthly * rate));
-  // Use the plan's priceTwdAnnually directly (already set to ×10 values).
-  // Fall back to twdMonthly×10 if the field is missing.
-  const twdAnnually = plan.priceTwdAnnually && plan.priceTwdAnnually > 0
-    ? plan.priceTwdAnnually
-    : twdMonthly * 10;
+  // 2026-07-15: priceTwdAnnually now holds the STANDARD annual (offer closed).
+  // Grandfathered early-bird users derive annual from their locked monthly ×10
+  // (same 2-months-free rule; matches the old 7,500 / 30,000 values exactly).
+  const twdAnnually = isEarlyBird && plan.earlyBirdPriceTwdMonthly && plan.earlyBirdPriceTwdMonthly > 0
+    ? plan.earlyBirdPriceTwdMonthly * 10
+    : (plan.priceTwdAnnually && plan.priceTwdAnnually > 0 ? plan.priceTwdAnnually : twdMonthly * 10);
   return {
     monthly:  twdMonthly,
     annually: twdAnnually,

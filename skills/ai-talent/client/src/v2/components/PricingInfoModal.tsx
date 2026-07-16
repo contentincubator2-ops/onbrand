@@ -38,19 +38,17 @@ function getPlans(lang: "zh-TW" | "en") {
     },
     {
       name: "OnBrand Starter",
-      price: en ? "US$25 / mo" : "NT$750 / 月",
-      badge: en ? "Early bird" : "早鳥",
-      detail: en ? "50 runs / mo · 1 brand · annual US$300 ($25×12)" : "每月 50 次執行 · 1 品牌 · 年約 NT$7,500（×10，送 2 個月）",
+      price: en ? "US$75 / mo" : "NT$2,250 / 月",
+      badge: null as string | null,
+      detail: en ? "50 runs / mo · 1 brand · annual US$750 (×10, 2 months free)" : "每月 50 次執行 · 1 品牌 · 年約 NT$22,500（×10，送 2 個月）",
       features: en ? [
         "50 runs / mo (1 run = all variants + images)",
         "30s & 60s templates · brand brain",
-        "FB / IG publish + schedule",
         "E-invoices · cancel anytime",
         "99s deep-research: Solo only",
       ] : [
         "每月 50 次執行（1 次含所有版本 + 圖）",
         "30s / 60s 模板 · 品牌大腦",
-        "FB / IG 發布 + 排程",
         "電子發票 · 隨時取消",
         "99s 深度研究：需升級 Solo",
       ],
@@ -59,20 +57,18 @@ function getPlans(lang: "zh-TW" | "en") {
     },
     {
       name: "OnBrand Solo",
-      price: en ? "US$100 / mo" : "NT$3,000 / 月",
+      price: en ? "US$300 / mo" : "NT$9,000 / 月",
       badge: en ? "Popular" : "熱門",
-      detail: en ? "Unlimited runs · 1 brand" : "無限次執行 · 1 品牌 · 年約 NT$30,000（×10，送 2 個月）",
+      detail: en ? "Unlimited runs · 1 brand · annual US$3,000 (×10, 2 months free)" : "無限次執行 · 1 品牌 · 年約 NT$90,000（×10，送 2 個月）",
       features: en ? [
         "Unlimited runs — 30s / 60s / 99s",
         "Unlimited AI images",
         "99s deep-research pipeline",
-        "FB / IG publish + schedule",
         "E-invoices · cancel anytime",
       ] : [
         "無限次執行 — 30s / 60s / 99s 全開",
         "無限 AI 圖",
         "99s 深度研究流程",
-        "FB / IG 發布 + 排程",
         "電子發票 · 隨時取消",
       ],
       cta: en ? "See pricing" : "查看定價",
@@ -117,8 +113,8 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
             )}
             <p className="text-xs opacity-75 mt-2">
               {lang === "en"
-                ? "⭐ Early-bird prices — locked forever for accounts opened now"
-                : "⭐ 早鳥優惠 — 現在開通即永久保價"}
+                ? "Cancel anytime — keep access until the current period ends"
+                : "隨時可取消 — 當期結束前皆可正常使用"}
             </p>
           </div>
 

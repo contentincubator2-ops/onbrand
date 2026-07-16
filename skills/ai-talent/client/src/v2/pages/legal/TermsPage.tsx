@@ -62,8 +62,8 @@ export default function TermsPage() {
             </li>
             <li>
               {isEn
-                ? <>Paid plans (Starter / Solo): see current prices at <a href="/pricing" className="text-blue-600 underline">/pricing</a>. Early-bird subscribers lock in their price permanently. Solo annual = 11 months (1 month free, ~8%); Starter annual = 12 months at the same monthly rate (no discount).</>
-                : <>付費方案（Starter / Solo）：現行定價請見 <a href="/pricing" className="text-blue-600 underline">/pricing</a>。早鳥方案用戶永久保價。Solo 年繳 = 11 個月（送 1 個月，約 8%）；Starter 年繳 = 12 個月同月費（無額外折扣）。</>}
+                ? <>Paid plans (Starter / Solo): see current prices at <a href="/pricing" className="text-blue-600 underline">/pricing</a>. Annual billing = 10 months' rate for 12 months of service (2 months free). Subscribers who joined during the past early-bird period keep their locked price as promised.</>
+                : <>付費方案（Starter / Solo）：現行定價請見 <a href="/pricing" className="text-blue-600 underline">/pricing</a>。年繳 = 以 10 個月月費計、使用 12 個月（送 2 個月）。過去早鳥期間訂閱之用戶，依原承諾維持保價。</>}
             </li>
             <li>
               {isEn

@@ -673,8 +673,8 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   </div>
                   <p style={{ fontSize: 11, color: "#737373", marginTop: 8, fontStyle: "italic" }}>
                     {lang === "en"
-                      ? "Early-bird locked forever — sign up today, your price never goes up."
-                      : "早鳥永久保價 — 今天訂閱、之後不漲。"}
+                      ? "Cancel anytime — keep access until the current period ends."
+                      : "隨時可取消 — 當期結束前皆可正常使用。"}
                   </p>
                 </div>
               </div>
