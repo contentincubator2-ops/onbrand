@@ -307,7 +307,7 @@ function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean
           <Textarea minRows={3} value={description} onChange={(e) => setDescription(e.target.value)}
             placeholder={en ? "One paragraph the AI should treat as ground truth about this brand." : "用一段話描述這個品牌——AI 會把這段當成關於你的事實依據。"} />
         </Field>
-        <Field label={en ? "Tagline" : "品牌標語 Tagline"}>
+        <Field label={en ? "Tagline" : "品牌標語"}>
           <Input size="sm" value={tagline} onChange={(e) => setTagline(e.target.value)} />
         </Field>
         <Field label={en ? "AI positioning summary — edit to hard-correct" : "AI 推導的定位摘要 — 可直接手改校正"}>
@@ -485,7 +485,7 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
         <p className="text-xs text-default-500 mb-4">
           {en
             ? "AI builds the visual foundation around these three colors. Tip: Primary = logo color / Secondary = complement / Accent = CTA button color."
-            : "AI 生圖時會以這三色為主視覺基調。建議：主色 = logo 主色 / 副色 = 互補色 / 強調色 = CTA 按鈕用色。"}
+            : "AI 生圖時會以這三色為主視覺基調。建議：主色 = logo 主色 / 副色 = 互補色 / 強調色 = 行動呼籲按鈕用色。"}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[

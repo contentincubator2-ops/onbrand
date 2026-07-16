@@ -39,7 +39,7 @@ const BEAT_TONE: Record<ReelsShot["beat"], { label: string; color: "primary" | "
   hold:   { label: "⏱ Hold",    color: "secondary" },
   build:  { label: "📈 Build",  color: "warning" },
   payoff: { label: "💥 Payoff", color: "success" },
-  cta:    { label: "👉 CTA",    color: "default" },
+  cta:    { label: "👉 行動呼籲",    color: "default" },
 };
 
 function toMockupFields(data: ReelsScript): MockupFields {

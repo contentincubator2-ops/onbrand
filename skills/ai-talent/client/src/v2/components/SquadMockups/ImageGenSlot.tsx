@@ -18,7 +18,7 @@
  *
  * Visual 3-step flow (project_media_gen_flow.md):
  *   1. 設計方向提案
- *   2. AI Prompt 生成
+ *   2. AI 指令生成
  *   3. 模型選擇 + 執行
  */
 import React from "react";
@@ -60,7 +60,7 @@ const STEP_LABELS: Record<ImageGenPhase, { step: number; label: string; icon: st
   idle:       { step: 0, label: "等待 AI",      icon: "🎨" },
   designing:  { step: 1, label: "設計方向提案",     icon: "🤔" },
   direction:  { step: 1, label: "設計方向確認",     icon: "✅" },
-  prompting:  { step: 2, label: "AI Prompt 生成",  icon: "✍️" },
+  prompting:  { step: 2, label: "AI 指令生成",  icon: "✍️" },
   generating: { step: 3, label: "模型執行中",       icon: "🤖" },
   done:       { step: 3, label: "圖片完成",         icon: "✨" },
   error:      { step: 3, label: "生成失敗",         icon: "⚠️" },
@@ -135,7 +135,7 @@ function OverlayContent({ phase, designDirection, aiPrompt, modelName, errorMsg,
       {(phase === "prompting" || phase === "generating" || phase === "done") && (
         <div className="space-y-1 border-t border-white/10 pt-2">
           <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">
-            {phase === "prompting" ? "✍️ AI Prompt 生成中…" : "✍️ AI Prompt"}
+            {phase === "prompting" ? "✍️ AI 指令生成中…" : "✍️ AI 指令"}
           </p>
           {aiPrompt ? (
             <p className="text-[11px] text-white/80 leading-snug font-mono break-all">{aiPrompt}</p>

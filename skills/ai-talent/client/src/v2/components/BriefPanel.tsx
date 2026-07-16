@@ -762,7 +762,7 @@ export function BriefPanel({
             ? (lang === "en" ? `Filling in (${filledCount}/${totalFields})` : `自動填寫中（${filledCount}/${totalFields}）`)
             : canLaunch
               ? (lang === "en" ? "Start" : "開始執行")
-              : (lang === "en" ? "Please fill the brief first" : "請先填寫 Brief")}
+              : (lang === "en" ? "Please fill the brief first" : "請先填寫簡報")}
         </button>
       </div>
 

@@ -6,7 +6,7 @@
  *   Step 2  AI prompt crafted from picked direction (English + 中文摘要)
  *   Step 3  Model picker (gpt-image / Imagen / Hailuo / Seedance / etc.)
  *
- * User can SKIP step 1 and/or 2 by using the "直接給 prompt" shortcut —
+ * User can SKIP step 1 and/or 2 by using the "直接給指令" shortcut —
  * lands straight at Step 3 with a textarea to paste their own prompt.
  */
 import React from "react";
@@ -154,7 +154,7 @@ export default function MediaGenFlow({
     if (m.status === "manual") {
       // copy to clipboard, signal manual workflow
       try { await navigator.clipboard.writeText(promptEn); } catch { /* */ }
-      setGenResult({ ok: true, message: lang === "en" ? `Prompt copied. Paste it into ${m.name} (no API).` : `Prompt 已複製。請手動貼到 ${m.name}（無 API）。` });
+      setGenResult({ ok: true, message: lang === "en" ? `Prompt copied. Paste it into ${m.name} (no API).` : `指令已複製。請手動貼到 ${m.name}（無 API）。` });
       setPhase("model");
       return;
     }
@@ -307,7 +307,7 @@ function InputPhase({
     <>
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label={lang === "en" ? "Brief (what visual do you want?)" : "Brief（你想要什麼樣的視覺？）"}
+        label={lang === "en" ? "Brief (what visual do you want?)" : "視覺簡報（你想要什麼樣的視覺？）"}
         labelPlacement="outside"
         placeholder={lang === "en"
           ? "e.g. Hero visual for SoWork's launch — pioneers finding their way in a data universe; techy but warm."
@@ -322,9 +322,9 @@ function InputPhase({
           isDisabled={!brief.trim()}>
           {lang === "en" ? "Ask AI for directions (recommended)" : "請 AI 提設計方向（推薦）"}
         </Button>
-        <Tooltip content={lang === "en" ? "Skip directions — go straight to prompt" : "跳過設計方向，直接寫 prompt"}>
+        <Tooltip content={lang === "en" ? "Skip directions — go straight to prompt" : "跳過設計方向，直接寫指令"}>
           <Button variant="light" startContent={<FontAwesomeIcon icon={faForward} />} onPress={onSkip}>
-            {lang === "en" ? "I have ideas — write prompt" : "我已有想法，直接給 prompt"}
+            {lang === "en" ? "I have ideas — write prompt" : "我已有想法，直接給指令"}
           </Button>
         </Tooltip>
       </div>
@@ -358,7 +358,7 @@ function DirectionsPhase({
             </Button>
           </Tooltip>
           <Button size="sm" variant="light" startContent={<FontAwesomeIcon icon={faForward} />} onPress={onSkip}>
-            {lang === "en" ? "Skip — write prompt" : "跳過，直接給 prompt"}
+            {lang === "en" ? "Skip — write prompt" : "跳過，直接給指令"}
           </Button>
         </div>
       </div>
@@ -412,7 +412,7 @@ function PromptPhase({
       )}
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label={lang === "en" ? "AI Prompt (English)" : "AI Prompt（英文）"} labelPlacement="outside"
+        label={lang === "en" ? "AI Prompt (English)" : "AI 指令（英文）"} labelPlacement="outside"
         placeholder="Auto-crafted from your direction — edit if needed."
         minRows={6}
         value={promptEn}
@@ -506,12 +506,12 @@ function ModelPhase({
         </Card>
       )}
       <div className="flex items-center justify-end">
-        <Tooltip content={lang === "en" ? "Copy prompt" : "複製 prompt"}>
+        <Tooltip content={lang === "en" ? "Copy prompt" : "複製指令"}>
           <Button size="sm" variant="bordered" startContent={<FontAwesomeIcon icon={faCopy} className="text-tiny" />}
             onPress={async () => {
               try { await navigator.clipboard.writeText(promptEn); } catch { /* */ }
             }}>
-            {lang === "en" ? "Copy prompt" : "複製 Prompt"}
+            {lang === "en" ? "Copy prompt" : "複製指令"}
           </Button>
         </Tooltip>
       </div>

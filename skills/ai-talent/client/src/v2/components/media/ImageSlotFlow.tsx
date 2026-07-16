@@ -145,7 +145,7 @@ export default function ImageSlotFlow({
     setPickedModel(m);
     if (m.status === "manual") {
       try { await navigator.clipboard.writeText(promptEn); setCopied(true); } catch { /**/ }
-      setErr(`Prompt 已複製。請手動貼到 ${m.name}（無 API）。`);
+      setErr(`指令已複製。請手動貼到 ${m.name}（無 API）。`);
       return;
     }
     if (!generateMutation) {
@@ -238,7 +238,7 @@ export default function ImageSlotFlow({
               size="sm" variant="light" className="text-tiny h-6 px-2 text-default-500"
               onPress={() => { setPickedDir(null); setPromptEn(""); setPhase("prompt_edit"); }}
             >
-              自訂 prompt →
+              自訂指令 →
             </Button>
           </div>
         </div>
@@ -286,7 +286,7 @@ export default function ImageSlotFlow({
         <div className="shrink-0 flex items-center justify-between px-2.5 py-1.5 border-b border-divider bg-default-50/80">
           <div className="flex items-center gap-1.5">
             <FontAwesomeIcon icon={faWandSparkles} className="text-primary text-tiny" />
-            <span className="text-tiny font-semibold text-default-700">Prompt + 模型</span>
+            <span className="text-tiny font-semibold text-default-700">指令 + 模型</span>
           </div>
           <Button
             size="sm" variant="light" className="text-tiny h-6 px-2 text-default-500"
@@ -322,7 +322,7 @@ export default function ImageSlotFlow({
               onClick={async () => {
                 try { await navigator.clipboard.writeText(promptEn); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {/**/}
               }}
-              title="複製 Prompt"
+              title="複製指令"
             >
               <FontAwesomeIcon icon={copied ? faCheck : faCopy} className="text-tiny" />
             </button>

@@ -190,7 +190,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
             <div>
               <label className="text-xs font-semibold text-default-700 mb-1.5 block flex items-center gap-1.5">
                 <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[10px]">{en ? "Text prompt" : "文字指令"}</span>
-                {en ? "System prompt for copywriting" : "寫文案時的 system prompt"}
+                {en ? "System prompt for copywriting" : "寫文案時的系統指令"}
               </label>
               <Textarea
                 size="sm"

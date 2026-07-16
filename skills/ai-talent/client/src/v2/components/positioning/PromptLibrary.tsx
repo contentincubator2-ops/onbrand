@@ -97,7 +97,7 @@ function PromptCard({ template, vars }: { template: PromptTemplate; vars: Record
   const unfilled = template.variables.filter((v) => !vars[v] || !vars[v].trim());
 
   // Visual generation templates get an extra CTA — open the 3-step
-  // MediaGenFlow (設計方向 → AI prompt → 模型選擇) instead of just
+  // MediaGenFlow (設計方向 → AI 指令 → 模型選擇) instead of just
   // copy-paste. Per CJ direction 2026-04-29.
   const isVisual = template.category === "視覺生成"
     || template.llms.includes("midjourney");
@@ -112,7 +112,7 @@ function PromptCard({ template, vars }: { template: PromptTemplate; vars: Record
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {isVisual && (
-              <Tooltip content="3-step 視覺生成（設計方向 → AI prompt → 模型選擇）" placement="top">
+              <Tooltip content="3-step 視覺生成（設計方向 → AI 指令 → 模型選擇）" placement="top">
                 <Button
                   size="sm"
                   color="primary"

@@ -146,7 +146,7 @@ export function UnsupportedVariantPlaceholder({
       </Card>
 
       <p className="text-tiny text-default-400 text-center mt-3">
-        想看其他格式預覽？切上方 Tabs 試試 feed / carousel / story 等支援格式。
+        想看其他格式預覽？切上方分頁試試 動態 / 輪播 / 限時動態 等支援格式。
       </p>
     </div>
   );

@@ -125,7 +125,7 @@ export default function ThinkingOverlay({
             <p>系統正在執行：</p>
             <ul className="list-disc list-inside mt-1 space-y-1 text-default-500">
               <li>Web search 抓取產業 / 競品 / 受眾資料</li>
-              <li>Anthropic Claude Sonnet 4.5 推理（依本步驟的 prompt 規範）</li>
+              <li>Anthropic Claude Sonnet 4.5 推理（依本步驟的指令 規範）</li>
               <li>結構化輸出符合 segment schema 的 JSON</li>
             </ul>
             <p className="mt-2 text-tiny text-default-400">

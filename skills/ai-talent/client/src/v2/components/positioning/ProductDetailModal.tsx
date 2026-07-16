@@ -4,7 +4,7 @@
  * 顯示產品的定位摘要（標語 / 受眾 / USP），並提供完整的手動編輯欄位：
  *   - 標語 (tagline)
  *   - 受眾描述 (target audience)
- *   - 獨特賣點 (USP)
+ *   - 獨特賣點
  *   - 常用詞彙 (preferred words — chip 輸入)
  *   - 禁用詞彙 (forbidden words — chip 輸入)
  *   - 重點推廣時間 (promotion periods — 日期區間清單)
@@ -348,7 +348,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
             {/* USP */}
             <div>
               <label className="block text-xs font-semibold text-neutral-600 mb-1.5">
-                {en ? "Unique Selling Point (USP)" : "獨特賣點 (USP)"}
+                {en ? "Unique Selling Point (USP)" : "獨特賣點"}
               </label>
               <textarea
                 value={usp}

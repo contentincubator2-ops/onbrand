@@ -113,7 +113,7 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
       <NotionCard>
         <SectionHeader eyebrow="貼文文案" title="完整貼文文字" />
         <pre className="text-small leading-relaxed whitespace-pre-wrap font-sans bg-default-50 border border-divider rounded-md p-3">
-          {data.caption || "（caption 未產出）"}
+          {data.caption || "（文案未產出）"}
         </pre>
         {data.hashtags && data.hashtags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-1">
@@ -126,7 +126,7 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
         )}
         {data.firstComment && (
           <div className="mt-2 p-2 rounded-md bg-default-50 border border-divider">
-            <p className="text-tiny text-default-500 mb-0.5">第一則自動留言（hashtag bundle）：</p>
+            <p className="text-tiny text-default-500 mb-0.5">第一則自動留言（主題標籤）：</p>
             <p className="text-tiny text-default-700">{data.firstComment}</p>
           </div>
         )}

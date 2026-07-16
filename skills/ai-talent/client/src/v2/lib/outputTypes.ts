@@ -84,7 +84,7 @@ export const OUTPUT_TYPE_REGISTRY: Record<string, OutputTypeMeta> = {
     labelEn: "Social Media Post",
     color: "#7C3AED",
     format: "doc",
-    description: "適合特定平台的貼文文案（含 hashtag）",
+    description: "適合特定平台的貼文文案（含主題標籤）",
   },
   seo_keywords: {
     label: "SEO 關鍵字清單",

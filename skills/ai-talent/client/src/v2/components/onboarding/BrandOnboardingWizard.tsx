@@ -535,7 +535,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   ] : [
                     { name: "Mia", title: "客戶成功", role: "讀取官網 + FB" },
                     { name: "Aiden Hsu", title: "品牌聲音", role: "萃取調性" },
-                    { name: "Mandy Cheng", title: "策略師", role: "USP 初稿" },
+                    { name: "Mandy Cheng", title: "策略師", role: "獨家賣點初稿" },
                   ]}
                   stages={null}
                   accentColor="#E85D2E"

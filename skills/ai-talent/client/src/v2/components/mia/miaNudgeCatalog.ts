@@ -306,7 +306,7 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "🎉 FB 連好了。試試到任意一篇 FB 貼文點「直接發布」——OnBrand 會把文字" +
-        "（含 hashtag、CTA）一次推到粉專。發布紀錄保留在「行事曆」可以追蹤。",
+        "（含主題標籤、行動呼籲）一次推到粉專。發布紀錄保留在「行事曆」可以追蹤。",
       en:
         "🎉 FB connected. Try any FB post → 'Publish directly' — OnBrand " +
         "pushes the copy (with hashtags + CTA) to your Page in one call. " +
@@ -354,7 +354,7 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "📦 60s 內容套組好了！這是 FB + IG + YT 三平台版本，每個都套同一個品牌大腦——" +
-        "但語氣 / 長度 / hashtag 是各平台優化過的。想看每個平台的差異對照，按右上「並排檢視」。",
+        "但語氣 / 長度 / 主題標籤是各平台優化過的。想看每個平台的差異對照，按右上「並排檢視」。",
       en:
         "📦 60s pack ready! Same Brand Brain applied to FB / IG / YT versions, " +
         "but tone / length / hashtags are platform-tuned. Hit 'Side-by-side' " +

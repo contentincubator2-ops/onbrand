@@ -103,13 +103,13 @@ const PIPELINE_AGENTS: AgentSlot[] = [
     agentTitle: "hashtag / reply / schedule / followup",
     icon: faComments,
     thinking: [
-      "Emma：根據主題挑 hashtag 分層…",
+      "Emma：根據主題挑主題標籤分層…",
       "Helen：預測 5 種留言並寫品牌回覆…",
       "David：分析最佳發文時段…",
       "Sophie：草擬 24h 跟進貼文…",
       "（4 人並行進行中）",
     ],
-    doneText: "✓ Hashtag / 5 組留言模板 / 發文時段 / 跟進貼文 完成",
+    doneText: "✓ 主題標籤 / 5 組留言模板 / 發文時段 / 跟進貼文 完成",
   },
   {
     stageKey: "specialty",

@@ -280,7 +280,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                 <p className="text-tiny text-default-400 mt-1">{lang === "en" ? "The AI reads this page so the positioning is accurate." : "AI 會讀取這個頁面，讓定位分析更準確"}</p>
               </div>
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Positioning / USP (optional)" : "產品定位 / USP（可選）"}</label>
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Positioning / USP (optional)" : "產品定位 / 獨家賣點（可選）"}</label>
                 <Textarea value={prodPositioning} onValueChange={setProdPositioning} placeholder={lang === "en" ? "One line on what makes this product different" : "一句話描述產品的核心差異"} minRows={2} />
               </div>
             </div>

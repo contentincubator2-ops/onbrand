@@ -274,7 +274,7 @@ function EventSpeedCard({ scopeName, data, en }: { scopeName: string; data: any;
 
       <Card shadow="none" className="border border-divider">
         <CardBody className="p-6 gap-4">
-          <SubHeader icon={faRocket} title={en ? "Strategic brief" : "戰略 Brief"} sub={en ? "Auto-generated from intake (type / role / summary)" : "intake 自動產出（活動類型 / 角色 / 摘要）"} />
+          <SubHeader icon={faRocket} title={en ? "Strategic brief" : "戰略簡報"} sub={en ? "Auto-generated from intake (type / role / summary)" : "intake 自動產出（活動類型 / 角色 / 摘要）"} />
           <Pair label={en ? "Event type" : "活動類型"}>{brief?.eventType ?? dash}</Pair>
           <Pair label={en ? "Role this round" : "本次角色"}>{brief?.roleThisRound ?? dash}</Pair>
           <Pair label={en ? "Positioning summary" : "活動定位摘要"}>{brief?.briefSummary ?? overview?.positioningStatement ?? dash}</Pair>

@@ -56,9 +56,9 @@ function getMeta(en: boolean): Record<AssetKey, { icon: any; title: string; sub:
     branded_terms:       { icon: faPenNib, title: en ? "Branded terms"        : "品牌術語",     sub: en ? "Coined or trademarked terms"              : "自家發明 / 註冊的詞彙" },
     product_naming:      { icon: faPenNib, title: en ? "Product naming"       : "產品名稱規範", sub: en ? "Naming rules, EN/CN mapping"              : "產品命名規則、英中對照" },
     abbreviations:       { icon: faPenNib, title: en ? "Abbreviations"        : "縮寫對照",     sub: en ? "Company / product / industry acronyms"    : "公司 / 產品 / 行業縮寫" },
-    cta_library:         { icon: faPenNib, title: en ? "CTA library"          : "CTA 庫",       sub: en ? "Common closing CTAs / 8 intents"          : "常用結尾行動句 / 8 種意圖" },
+    cta_library:         { icon: faPenNib, title: en ? "CTA library"          : "行動呼籲庫",       sub: en ? "Common closing CTAs / 8 intents"          : "常用結尾行動句 / 8 種意圖" },
     hook_library:        { icon: faPenNib, title: en ? "Hook library"         : "Hook 庫",      sub: en ? "Common opening line templates"            : "常用開場句型範本" },
-    ai_prompts:          { icon: faPenNib, title: en ? "AI prompt library"    : "AI 指令庫",    sub: en ? "Reusable prompts / system messages"       : "常用 prompt / system message" },
+    ai_prompts:          { icon: faPenNib, title: en ? "AI prompt library"    : "AI 指令庫",    sub: en ? "Reusable prompts / system messages"       : "常用指令 / 系統訊息" },
     templates_copy:      { icon: faPenNib, title: en ? "Copy templates"       : "文案範本",     sub: en ? "Campaign / announcement / EDM templates"  : "活動文 / 公告 / EDM 範本" },
   };
 }
@@ -119,9 +119,9 @@ export default function BrandAssetEditor({ assetKey, value, onChange, readOnly =
         {assetKey === "branded_terms"       && <ListEditor v={v} onChange={safeOnChange} keyName="items" en={en} label={en ? "Branded terms (one per line)" : "品牌術語（每行一個）"} placeholder={en ? "e.g. SoWork workflow" : "例：SoWork 工作流"} />}
         {assetKey === "product_naming"      && <GenericTextarea v={v} onChange={safeOnChange} keyName="text" label={en ? "Product naming rules" : "產品命名規範"} />}
         {assetKey === "abbreviations"       && <PairListEditor v={v} onChange={safeOnChange} keyName="pairs" en={en} label={en ? "Abbreviations (short → full)" : "縮寫對照（縮寫 → 全稱）"} placeholderL={en ? "e.g. CMO" : "例：CMO"} placeholderR={en ? "e.g. Chief Marketing Officer" : "例：Chief Marketing Officer"} />}
-        {assetKey === "cta_library"         && <ListEditor v={v} onChange={safeOnChange} keyName="items" en={en} label={en ? "CTAs (one per line)" : "CTA 句子（每行一條）"} placeholder={en ? "e.g. Tap the link below for details" : "例：點下方連結看詳情"} />}
+        {assetKey === "cta_library"         && <ListEditor v={v} onChange={safeOnChange} keyName="items" en={en} label={en ? "CTAs (one per line)" : "行動呼籲句子（每行一條）"} placeholder={en ? "e.g. Tap the link below for details" : "例：點下方連結看詳情"} />}
         {assetKey === "hook_library"        && <ListEditor v={v} onChange={safeOnChange} keyName="items" en={en} label={en ? "Hook openers (one per line)" : "開場 Hook（每行一條）"} placeholder={en ? "e.g. I met a mom last week who told me…" : "例：上週遇到一個媽媽，她說..."} />}
-        {assetKey === "ai_prompts"          && <ListEditor v={v} onChange={safeOnChange} keyName="items" en={en} label={en ? "AI prompts (one per line)" : "常用 AI Prompt（每行一條）"} placeholder={en ? "e.g. Write in Laurel's voice…" : "例：用桂冠口吻寫一段..."} />}
+        {assetKey === "ai_prompts"          && <ListEditor v={v} onChange={safeOnChange} keyName="items" en={en} label={en ? "AI prompts (one per line)" : "常用 AI 指令（每行一條）"} placeholder={en ? "e.g. Write in Laurel's voice…" : "例：用桂冠口吻寫一段..."} />}
         {assetKey === "templates_copy"      && <ListEditor v={v} onChange={safeOnChange} keyName="items" en={en} label={en ? "Copy templates (title / URL per line)" : "文案範本（每行一個範本標題 / URL）"} placeholder={en ? "e.g. Mother's Day EDM template https://..." : "例：母親節 EDM 範本 https://..."} />}
       </CardBody>
     </Card>

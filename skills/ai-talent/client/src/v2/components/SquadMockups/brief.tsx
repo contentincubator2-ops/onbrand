@@ -33,7 +33,7 @@ const PILLAR_COLORS = ["#7c5dfa", "#10b981", "#f59e0b", "#3b82f6", "#ec4899"] as
 const FORMAT_LABEL: Record<PostBrief["format"], string> = {
   "post":      "📝 圖文",
   "reel":      "🎬 Reel",
-  "carousel":  "🖼 Carousel",
+  "carousel":  "🖼 輪播圖文",
   "long-text": "📊 長文",
   "story":     "📱 Story",
 };
