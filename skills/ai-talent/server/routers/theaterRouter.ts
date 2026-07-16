@@ -21,7 +21,7 @@ import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywrit
 import { resolveAgentId } from "../_core/agentAssignments";
 import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
-import { composeVisualBrief } from "../_core/visualBrief";
+import { captionToVisualBrief } from "../_core/visualBrief";
 import { withUserLLMSlot } from "../_core/userLLMSemaphore";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -1271,21 +1271,20 @@ ${cleaned}
         : input.platform === "blog" ? "16:9"
         : "1:1";
 
-      // 1) Caption → visual brief (skip if user provided customPrompt).
-      // 2026-07-16 (CJ「不要疊床架屋——送模型的語言、prompt 內容來源要相同」):
-      // theater now uses the SAME shared composer as orchestra
-      // (_core/visualBrief.ts): one dual-language contract, en → model.
+      // 1) Caption → short visual brief (skip if user provided customPrompt).
+      // 2026-07-16 (CJ「七日發布台的是標準，不應該被更改」): this logic was
+      // extracted VERBATIM into _core/visualBrief.ts (same provider, prompt,
+      // params) so other tasks align to THIS standard — behavior here is
+      // identical to the original inline version.
       let brief = "";
       if (input.customPrompt?.trim()) {
         brief = input.customPrompt.trim();
       } else {
-        const vb = await composeVisualBrief({
-          content: input.caption,
-          brandContext: input.brandTagline ? `品牌：${input.brandTagline}` : undefined,
+        brief = await captionToVisualBrief({
+          caption: input.caption,
+          brandTagline: input.brandTagline,
           platform: input.platform,
-          aspectRatio: aspect,
         });
-        brief = vb.en;
       }
       // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back
       // to openai/gpt-image-1 when PIAPI_KEY is absent so Theater images

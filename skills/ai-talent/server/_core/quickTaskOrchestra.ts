@@ -16,7 +16,7 @@
  */
 import { callModel, type ModelProvider } from "./multiModelRouter";
 import { dispatchGenerate } from "./mediaGen";
-import { VISUAL_BRIEF_JSON_SPEC, normalizeVisualBrief, type VisualBrief } from "./visualBrief";
+import { captionToVisualBrief } from "./visualBrief";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
@@ -961,7 +961,7 @@ async function callOneBrief(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
-}): Promise<VisualBrief> {
+}): Promise<string> {
   const { config, label, imagePersona, brandPrefix, urlContext, userMsg } = args;
   const hasUrl = urlContext.length > 0;
   const subjectRule = hasUrl
@@ -1005,11 +1005,12 @@ async function callOneBrief(args: {
     `比例：${config.aspectRatio ?? "1:1"}\n` +
     igVisualBlock +
     subjectRule +
-    // 2026-07-16 (CJ「不要疊床架屋」): dual-language output in ONE call —
-    // zh for the UI 風格方向, en sent verbatim to the image model. Shared
-    // contract with theater via visualBrief.ts (no second translation pass).
+    // 2026-07-16 (CJ「七日發布台的是標準」): this Chinese brief is DISPLAY
+    // ONLY (the UI 風格方向 text). The image-model prompt is derived from
+    // the finished caption via captionToVisualBrief — theater's standard.
     `規則：30-60 字繁中、涵蓋主體 / 構圖 / 光線 / 色彩 / 氛圍、不要疊文字、不要 logo。\n\n` +
-    `${VISUAL_BRIEF_JSON_SPEC}\n` +
+    `輸出嚴格 JSON 物件：{"summary":"<中文視覺描述>"}\n` +
+    `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
     (hasUrl ? brandPrefix : `\n${brandPrefix}`) +
     (hasUrl ? `\n# URL 抓到的內容（主題來源）\n${urlContext}` : "");
 
@@ -1030,12 +1031,13 @@ async function callOneBrief(args: {
         timeoutPromise<never>(LLM_BUDGET_MS, `brief[${label}]`),
       ]);
       const parsed = tryParseJson(r.content);
-      const brief = normalizeVisualBrief(
-        parsed,
-        // sometimes LLM returns a bare string instead of JSON
-        typeof r.content === "string" && !r.content.includes("{") ? r.content : undefined,
-      );
-      if (brief) return brief;
+      const summary =
+        typeof (parsed as any)?.summary === "string" ? (parsed as any).summary.trim() : "";
+      if (summary.length > 0) return summary;
+      // sometimes LLM returns string directly
+      if (typeof r.content === "string" && r.content.trim().length > 0 && !r.content.includes("{")) {
+        return r.content.trim().slice(0, 280);
+      }
       lastErr = new Error(`empty brief for ${label}`);
     } catch (e) { lastErr = e; }
     if (attempt < 2) await new Promise((r) => setTimeout(r, 200));
@@ -1050,7 +1052,7 @@ async function callImageDirector(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
-}): Promise<VisualBrief[]> {
+}): Promise<string[]> {
   const { config } = args;
   if (!config.imageDirectorId || config.images === 0) return [];
 
@@ -1060,9 +1062,7 @@ async function callImageDirector(args: {
     labels.map((label) => callOneBrief({ ...args, label })),
   );
   return settled.map((s, i) =>
-    s.status === "fulfilled"
-      ? s.value
-      : { zh: `（${labels[i] ?? `brief ${i + 1}`} brief 生成失敗 — 請點「用此風格生圖」自己描述）`, en: "" },
+    s.status === "fulfilled" ? s.value : `（${labels[i] ?? `brief ${i + 1}`} brief 生成失敗 — 請點「用此風格生圖」自己描述）`,
   );
 }
 
@@ -1080,7 +1080,7 @@ async function callCarouselCards(args: {
   brandPrefix: string;
   imagePersona: string;
   aspectRatio: string;
-}): Promise<Array<{ headline: string; body: string; imageBrief: VisualBrief }>> {
+}): Promise<Array<{ headline: string; body: string; imageBrief: string }>> {
   const { caption, topic, n, brandPrefix, imagePersona, aspectRatio } = args;
   const system =
     imagePersona +
@@ -1089,11 +1089,8 @@ async function callCarouselCards(args: {
     `- headline：≤ 14 字、強鉤、可單獨成立\n` +
     `- body：≤ 40 字、承接 headline、口語\n` +
     `- image：該卡的視覺方向描述（30-60 字繁中，涵蓋主體/構圖/光線/色彩/氛圍，比例 ${aspectRatio}，不疊文字、不放 logo），每張卡視覺要明顯不同\n` +
-    // 2026-07-16 (CJ「不要疊床架屋」): same dual-language contract as every
-    // other brief — image_en is what the image model actually receives.
-    `- image_en：與 image 同一畫面的英文 text-to-image prompt（1-3 句，含 subject/setting/composition/lighting/color/mood，photorealistic unless stated，no text，no logos）\n` +
     `嚴格規則：只根據貼文內容拆解與重組，**不可新增或捏造事實**。\n` +
-    `輸出嚴格 JSON 陣列，長度正好 ${n}：[{"headline":"...","body":"...","image":"...","image_en":"..."}, ...]\n` +
+    `輸出嚴格 JSON 陣列，長度正好 ${n}：[{"headline":"...","body":"...","image":"..."}, ...]\n` +
     `第一個字元就是 [。不要 markdown code fence、不要前言。\n` +
     brandPrefix;
   const userMsg = `主題：${topic}\n\n輪播貼文：\n${caption}`;
@@ -1116,10 +1113,7 @@ async function callCarouselCards(args: {
         return arr.slice(0, n).map((c: any, i: number) => ({
           headline: String(c?.headline ?? c?.title ?? `卡 ${i + 1}`).trim().slice(0, 28),
           body: String(c?.body ?? c?.desc ?? c?.text ?? "").trim().slice(0, 90),
-          imageBrief: normalizeVisualBrief({
-            zh: String(c?.image ?? c?.imageBrief ?? c?.visual ?? "").trim(),
-            en: String(c?.image_en ?? c?.imageEn ?? "").trim(),
-          }) ?? { zh: "", en: "" },
+          imageBrief: String(c?.image ?? c?.imageBrief ?? c?.visual ?? "").trim().slice(0, 280),
         }));
       }
       lastErr = new Error("empty cards");
@@ -1337,19 +1331,26 @@ function safeOutputTypeForPostType(
 
 // ── Single image gen with per-image timeout ─────────────────────────────
 
-/* 2026-07-16 (CJ「不要疊床架屋 — 送模型的語言、prompt 內容來源要相同」):
- * the brief writers now emit a dual-language VisualBrief in ONE call
- * (zh = UI 風格方向 display, en = model prompt) via the shared contract in
- * visualBrief.ts — same as theater. The interim translate-at-dispatch pass
- * is gone. A bare string still works (legacy callers / failure placeholders):
- * it is used for both display and model prompt. */
-async function genOneImage(brief: VisualBrief | string, config: OrchestraConfig): Promise<OrchestraVariant["image"]> {
-  const zh = typeof brief === "string" ? brief : brief.zh;
-  const en = typeof brief === "string" ? brief : (brief.en || brief.zh);
-  const prompt = zh; // returned as `style` — what the UI shows
-  if (!en) return { style: zh || null, url: null, status: "skipped" };
+/* 2026-07-16 (CJ「七日發布台的是標準，不應該被更改，是其他任務要對齊七日
+ * 發布台的標準」): the image prompt is now produced EXACTLY the way theater
+ * does it — the finished CAPTION is converted to a short English visual
+ * brief by the shared captionToVisualBrief (verbatim theater logic: same
+ * provider, same prompt, same params). The agent-written Chinese 風格方向
+ * (`style`) is display-only and never reaches the model. When no caption is
+ * available (empty variant / failure placeholder), the Chinese style text is
+ * fed to the same converter instead — identical pipeline either way. */
+async function genOneImage(
+  args: { content: string; style: string | null; platform?: string },
+  config: OrchestraConfig,
+): Promise<OrchestraVariant["image"]> {
+  const prompt = args.style ?? ""; // returned as `style` — what the UI shows
+  const source = (args.content || args.style || "").trim();
+  if (!source) return { style: args.style, url: null, status: "skipped" };
   try {
-    const modelPrompt = en;
+    const modelPrompt = await captionToVisualBrief({
+      caption: source,
+      platform: args.platform,
+    });
     // 2026-05-18 (CJ「目前的圖很不行，最好的生圖模型是什麼」): quick-task
     // images were hardcoded to piapi/flux-schnell — the fastest/lowest-
     // quality Flux tier (draft-grade, weak prompt adherence). Upgrade the
@@ -1718,7 +1719,7 @@ export async function runOrchestra(args: {
             errors.push(`brief: ${String(e?.message ?? e)}`);
             return [];
           })
-        : Promise.resolve<VisualBrief[]>([]),
+        : Promise.resolve<string[]>([]),
     ]);
 
     // ── Brand-rule enforcement: 硬檢查 + 自動修正 (2026-05-17) ──
@@ -1931,7 +1932,7 @@ export async function runOrchestra(args: {
                 label: cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`,
                 caption: (cap?.caption ?? "").trim(),
                 hashtags: cap?.hashtags ?? [],
-                image: { style: briefs[i]?.zh ?? null, url: null, status: "pending" as any },
+                image: { style: briefs[i] ?? null, url: null, status: "pending" as any },
               };
             });
         const partial: OrchestraResult = {
@@ -2021,10 +2022,14 @@ export async function runOrchestra(args: {
       ? stage("gen", `Flux Schnell ×${args.config.images} 平行生圖`)
       : null;
 
+    const taskPlatform = args.template.id.split("-")[0];
     const images: OrchestraVariant["image"][] = willRender && briefs.length
-      ? await Promise.all(briefs.map((b) => genOneImage(b, args.config)))
+      ? await Promise.all(briefs.map((b, i) =>
+          // Theater standard: prompt derives from the variant's CAPTION;
+          // the Chinese brief is display-only (style).
+          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform }, args.config)))
       : briefs.length
-        ? briefs.map((b) => ({ style: b.zh, url: null, status: "skipped" as const }))
+        ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
         : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
 
     if (stGen) {
@@ -2111,7 +2116,7 @@ export async function runOrchestra(args: {
         // state instead of a red "generation failed" error the user didn't trigger.
         // Actual failures (both Imagen + Flux returned errors) already push
         // an explicit {status:"failed"} into images[i] above.
-        image: images[i] ?? { style: briefs[i]?.zh ?? null, url: null, status: "skipped" },
+        image: images[i] ?? { style: briefs[i] ?? null, url: null, status: "skipped" },
       });
     }
 
@@ -2153,12 +2158,16 @@ export async function runOrchestra(args: {
           aspectRatio: args.config.aspectRatio ?? "1:1",
         });
         const cardImages = await Promise.all(
-          cardSpecs.map((c) => genOneImage(c.imageBrief, args.config)),
+          cardSpecs.map((c) => genOneImage(
+            // Theater standard: each card's own text is the caption source.
+            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0] },
+            args.config,
+          )),
         );
         variants[0].cards = cardSpecs.map((c, idx) => ({
           headline: c.headline,
           body: c.body,
-          image: cardImages[idx] ?? { style: c.imageBrief.zh, url: null, status: "failed" as const },
+          image: cardImages[idx] ?? { style: c.imageBrief, url: null, status: "failed" as const },
         }));
         const okCards = (variants[0].cards ?? []).filter((c) => c.image.status === "ready").length;
         if (okCards === 0) errors.push("carousel: 卡片圖全部生成失敗");
