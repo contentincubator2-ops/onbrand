@@ -141,7 +141,7 @@ export const FB_30S_TASKS: FBTaskTemplate[] = [
     id: "fb-30-caption-short",
     tier: "30s",
     postType: "feed",
-    label: "FB 短貼文",
+    label: { en: "FB Short Post", zh: "FB 短貼文" },
     description: "100-200 字圖文貼文，含開場吸引句 + 行動呼籲",
     agent_id: 30020,              // Iris Yi — Social Media Manager (2001 char persona)
     skill_slug: "fb-copywriting",
@@ -162,7 +162,7 @@ ${FB_TONE_SUFFIX}
     id: "fb-30-pure-text-hook",
     tier: "30s",
     postType: "feed",
-    label: "FB 純文字開場句 3 種",
+    label: { en: "FB Text-Only Openers ×3", zh: "FB 純文字開場句 3 種" },
     description: "3 種不同口吻的開場句，自動接上你原本的貼文內容",
     agent_id: 224079,             // Kavitha Nair — Social Media Strategist (1191 char)
     skill_slug: "hook-writing",
@@ -196,7 +196,7 @@ ${FB_TONE_SUFFIX}`,
     id: "fb-30-link-caption",
     tier: "30s",
     postType: "feed",
-    label: "FB 連結貼文",
+    label: { en: "FB Link Post", zh: "FB 連結貼文" },
     description: "分享網址時的引言文（含 OG 預覽期待）",
     agent_id: 60021,              // Tina Ji — Facebook/Instagram Social Copywriter
     skill_slug: "social-copy",
@@ -217,7 +217,7 @@ ${FB_TONE_SUFFIX}`,
     id: "fb-30-comment-reply",
     tier: "30s",
     postType: "comment",
-    label: "FB 留言回覆（一般）",
+    label: { en: "FB Comment Reply (General)", zh: "FB 留言回覆（一般）" },
     description: "正面 / 中性留言的品牌回覆",
     agent_id: 180162,             // Jason Peng | Social Media Copywriter
     skill_slug: "social-copy",
@@ -242,7 +242,7 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
     id: "fb-30-ad-headline",
     tier: "30s",
     postType: "ad",
-    label: "FB 廣告標題 5 種",
+    label: { en: "FB Ad Headlines ×5", zh: "FB 廣告標題 5 種" },
     description: "5 種切角的廣告標題（25 字內），直接複製到 Ads Manager 用",
     agent_id: 239023,             // Ellis Yeh — VP Breakthrough Advertising（Eugene Schwartz headline 大師）
     skill_slug: "fb-ad-copy",
@@ -270,7 +270,7 @@ caption 欄位就放這「一個」headline 本身，不要解釋、不要前綴
     id: "fb-30-ad-primary",
     tier: "30s",
     postType: "ad",
-    label: "FB 廣告主文案 5 種",
+    label: { en: "FB Ad Primary Text ×5", zh: "FB 廣告主文案 5 種" },
     description: "5 種口吻的廣告主內文（80-150 字），對應不同受眾心理",
     agent_id: 224114,             // Bùi Thị Thu — Social Media Strategist eCommerce (1160 char)
     skill_slug: "fb-ad-copy",
@@ -299,7 +299,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-ad-cta",
     tier: "30s",
     postType: "ad",
-    label: "FB 廣告行動呼籲 5 種",
+    label: { en: "FB Ad CTAs ×5", zh: "FB 廣告行動呼籲 5 種" },
     description: "5 個 CTA 按鈕文字 + 每個 CTA 的搭配情境建議",
     agent_id: 239024,             // Emerson Huang — VP Customer Value Optimization（funnel CTA）
     skill_slug: "fb-ad-copy",
@@ -328,7 +328,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-ad-description",
     tier: "30s",
     postType: "ad",
-    label: "FB 連結廣告說明文字 5 種",
+    label: { en: "FB Link-Ad Descriptions ×5", zh: "FB 連結廣告說明文字 5 種" },
     description: "連結廣告下方 description（30 字內），5 種切入角度",
     agent_id: 224054,             // Mei Xin Ho — Social Media Strategist Health SG (1148 char)
     skill_slug: "fb-ad-copy",
@@ -353,7 +353,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-pinned-short",
     tier: "30s",
     postType: "pinned",
-    label: "FB 釘選貼文短文案",
+    label: { en: "FB Pinned-Post Short Copy", zh: "FB 釘選貼文短文案" },
     description: "粉專置頂用，講清楚「我們是誰」「為什麼追蹤」",
     agent_id: 60024,             // Jason Gong | Tech Brand Social Copywriter
     skill_slug: "fb-copywriting",
@@ -374,7 +374,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-story-text",
     tier: "30s",
     postType: "story",
-    label: "FB 限時動態文案",
+    label: { en: "FB Story Copy", zh: "FB 限時動態文案" },
     description: "9:16 ephemeral 配文 + overlay 主標",
     agent_id: 30002,              // Sarah Liu — AI Brand Story CMO
     skill_slug: "fb-copywriting",
@@ -400,7 +400,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-live-title",
     tier: "30s",
     postType: "feed", // pre-live announcement post is feed-shaped
-    label: "FB 直播標題 + 預告短文",
+    label: { en: "FB Live Title + Teaser", zh: "FB 直播標題 + 預告短文" },
     description: "直播開始前 1-2 小時的預告 caption",
     agent_id: 180150,             // Brian Lin — Influencer Marketing Manager (live promotion expert)
     skill_slug: "social-copy",
@@ -431,7 +431,7 @@ output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"�
     id: "fb-30-hashtag-set",
     tier: "30s",
     postType: "feed",
-    label: "FB 主題標籤建議組",
+    label: { en: "FB Hashtag Set", zh: "FB 主題標籤建議組" },
     description: "10-15 個分層 hashtag（核心 / 中型 / 長尾）",
     agent_id: 220583,             // Hsin-Yi Weng — IG/FB Marketing Specialist（hashtag 在地化）
     skill_slug: "fb-best-practices",
@@ -451,7 +451,7 @@ output: hashtags 陣列（不要含 # 前綴），caption 放 1 句使用建議�
     id: "fb-30-countdown-1day",
     tier: "30s",
     postType: "feed",
-    label: "FB 活動倒數一句造勢",
+    label: { en: "FB Event-Countdown Hype Line", zh: "FB 活動倒數一句造勢" },
     description: "倒數 N 天的單篇推文（系列中的一篇）",
     agent_id: 180159,             // Claire Hsu — fb-countdown-series lead
     skill_slug: "social-media-manager",
@@ -817,20 +817,20 @@ export const FB_90S_TASK_INDEX: Array<{
   id: string;
   squad_slug: string;
   postType: string;
-  label: string;
+  label: string | { en: string; zh: string };
   description: string;
 }> = [
-  { id: "fb-90-monthly-calendar",       squad_slug: "fb-monthly-calendar",       postType: "feed",     label: "FB 完整月曆 30 天", description: "Joe Pulizzi 內容支柱法 + KPI 預估 + pillar 配比" },
-  { id: "fb-90-monthly-calendar-promo", squad_slug: "fb-monthly-calendar-product-promo", postType: "feed", label: "FB 月曆（商品促銷）", description: "促銷型內容支柱配比" },
-  { id: "fb-90-event-launch",           squad_slug: "fb-event-launch-kit",       postType: "event",    label: "FB 活動上線套組",    description: "GaryVee Jab-Jab-Right-Hook 法" },
-  { id: "fb-90-countdown-series",       squad_slug: "fb-countdown-series",       postType: "feed",     label: "FB 倒數活動系列 7-14 天", description: "Cialdini Scarcity 緊迫倒數法" },
-  { id: "fb-90-account-reposition",     squad_slug: "fb-account-reposition",     postType: "feed",     label: "FB 帳號重新定位",    description: "Trout & Ries Positioning + Pulizzi Tilt" },
-  { id: "fb-90-quarterly-strategy",     squad_slug: "fb-quarterly-strategy",     postType: "feed",     label: "FB 季度策略",        description: "Pulizzi Quarterly Cadence" },
-  { id: "fb-90-monthly-analytics",      squad_slug: "fb-monthly-analytics",      postType: "feed",     label: "FB 月度成效報告",    description: "Kaushik Web Analytics 2.0 + Engagement Pyramid" },
-  { id: "fb-90-carousel-10frame",       squad_slug: "fb-carousel",               postType: "carousel", label: "FB 輪播 10 卡完整敘事", description: "Hook-Build-Turn-Payoff 完整弧" },
-  { id: "fb-90-reels-full",             squad_slug: "fb-reels-script",           postType: "reel",     label: "FB Reels 完整腳本",  description: "Hook-Hold-Payoff（含分鏡 + 配樂方向）" },
-  { id: "fb-90-livestream-suite",       squad_slug: "fb-livestream-prep",        postType: "feed",     label: "FB 直播完整套組",    description: "預告 + 摘要 + 轉錄重點剪（成對敘事）" },
-  { id: "fb-90-crisis-full",            squad_slug: "fb-crisis-comms",           postType: "comment",  label: "FB 完整危機公關",    description: "Lagadec 4 段 + 後續追蹤 + 媒體聲明" },
+  { id: "fb-90-monthly-calendar",       squad_slug: "fb-monthly-calendar",       postType: "feed",     label: { en: "FB Full 30-Day Calendar", zh: "FB 完整月曆 30 天" }, description: "Joe Pulizzi 內容支柱法 + KPI 預估 + pillar 配比" },
+  { id: "fb-90-monthly-calendar-promo", squad_slug: "fb-monthly-calendar-product-promo", postType: "feed", label: { en: "FB Calendar (Product Promo)", zh: "FB 月曆（商品促銷）" }, description: "促銷型內容支柱配比" },
+  { id: "fb-90-event-launch",           squad_slug: "fb-event-launch-kit",       postType: "event",    label: { en: "FB Event Launch Kit", zh: "FB 活動上線套組" },    description: "GaryVee Jab-Jab-Right-Hook 法" },
+  { id: "fb-90-countdown-series",       squad_slug: "fb-countdown-series",       postType: "feed",     label: { en: "FB Countdown Series (7–14 Days)", zh: "FB 倒數活動系列 7-14 天" }, description: "Cialdini Scarcity 緊迫倒數法" },
+  { id: "fb-90-account-reposition",     squad_slug: "fb-account-reposition",     postType: "feed",     label: { en: "FB Account Repositioning", zh: "FB 帳號重新定位" },    description: "Trout & Ries Positioning + Pulizzi Tilt" },
+  { id: "fb-90-quarterly-strategy",     squad_slug: "fb-quarterly-strategy",     postType: "feed",     label: { en: "FB Quarterly Strategy", zh: "FB 季度策略" },        description: "Pulizzi Quarterly Cadence" },
+  { id: "fb-90-monthly-analytics",      squad_slug: "fb-monthly-analytics",      postType: "feed",     label: { en: "FB Monthly Performance Report", zh: "FB 月度成效報告" },    description: "Kaushik Web Analytics 2.0 + Engagement Pyramid" },
+  { id: "fb-90-carousel-10frame",       squad_slug: "fb-carousel",               postType: "carousel", label: { en: "FB 10-Card Carousel Narrative", zh: "FB 輪播 10 卡完整敘事" }, description: "Hook-Build-Turn-Payoff 完整弧" },
+  { id: "fb-90-reels-full",             squad_slug: "fb-reels-script",           postType: "reel",     label: { en: "FB Reels Full Script", zh: "FB Reels 完整腳本" },  description: "Hook-Hold-Payoff（含分鏡 + 配樂方向）" },
+  { id: "fb-90-livestream-suite",       squad_slug: "fb-livestream-prep",        postType: "feed",     label: { en: "FB Livestream Full Kit", zh: "FB 直播完整套組" },    description: "預告 + 摘要 + 轉錄重點剪（成對敘事）" },
+  { id: "fb-90-crisis-full",            squad_slug: "fb-crisis-comms",           postType: "comment",  label: { en: "FB Full Crisis PR", zh: "FB 完整危機公關" },    description: "Lagadec 4 段 + 後續追蹤 + 媒體聲明" },
 ];
 
 /** Helper: get all FB tasks across tiers in a single list.

@@ -13,7 +13,7 @@ export const LI_30S_TASKS: FBTaskTemplate[] = [
   {
     id: "li-30-insight-post",
     tier: "30s", postType: "feed",
-    label: "LI 短貼文（專業觀點）",
+    label: { en: "LI Short Post (Professional Insight)", zh: "LI 短貼文（專業觀點）" },
     description: "150-300 字的專業觀點貼文",
     agent_id: 30018, skill_slug: "linkedin-b2b",
     primary_question: "今天想分享什麼專業洞察？",
@@ -28,7 +28,7 @@ ${LI_TONE}`,
   {
     id: "li-30-hook-3",
     tier: "30s", postType: "feed",
-    label: "LI 開場句 3 種（吸引滑停）",
+    label: { en: "LI Openers ×3 (Scroll-Stopping)", zh: "LI 開場句 3 種（吸引滑停）" },
     description: "前 1-2 句鉤子（決定看不看下去）",
     agent_id: 60005, skill_slug: "hook-copywriter", // Aaron Pei — B2B Tech Brand Marketing (1181 char)
     primary_question: "貼文主題？",
@@ -42,7 +42,7 @@ LI 演算法看頭 2 行決定要不要展開（"see more"），鉤子要強。$
   {
     id: "li-30-article-opener",
     tier: "30s", postType: "article",
-    label: "LI 長文開頭（前 200 字）",
+    label: { en: "LI Article Opener (First 200 Words)", zh: "LI 長文開頭（前 200 字）" },
     description: "LinkedIn Article 開頭 200 字（決定讀者要不要繼續）",
     agent_id: 180172, skill_slug: "thought-leadership",
     primary_question: "這篇 Article 想討論什麼？",
@@ -57,7 +57,7 @@ LI 演算法看頭 2 行決定要不要展開（"see more"），鉤子要強。$
   {
     id: "li-30-poll",
     tier: "30s", postType: "poll",
-    label: "LI 投票貼文（問題 + 4 選項）",
+    label: { en: "LI Poll Post (Question + 4 Options)", zh: "LI 投票貼文（問題 + 4 選項）" },
     description: "投票貼文的問題 + 4 個選項",
     agent_id: 180173, skill_slug: "linkedin-engagement",
     primary_question: "想問你產業的什麼？",
@@ -72,7 +72,7 @@ LI 演算法看頭 2 行決定要不要展開（"see more"），鉤子要強。$
   {
     id: "li-30-event-invite",
     tier: "30s", postType: "feed",
-    label: "LI 活動邀請貼文",
+    label: { en: "LI Event Invitation Post", zh: "LI 活動邀請貼文" },
     description: "邀請別人參加 webinar / meetup / 工作坊",
     agent_id: 180176, skill_slug: "linkedin-events",
     primary_question: "活動主題 / 時間 / 對象？",
@@ -87,7 +87,7 @@ ${LI_TONE}`,
   {
     id: "li-30-dm-intro",
     tier: "30s", postType: "feed",
-    label: "LI 私訊開場（陌生連結）",
+    label: { en: "LI DM Opener (Cold Connection)", zh: "LI 私訊開場（陌生連結）" },
     description: "連結後的第一封私訊",
     agent_id: 180197, skill_slug: "linkedin-outreach",
     primary_question: "你想 connect 的對象是誰？目的？",
@@ -101,7 +101,7 @@ ${LI_TONE}`,
   {
     id: "li-30-comment",
     tier: "30s", postType: "feed",
-    label: "LI 留言互動（給別人貼文）",
+    label: { en: "LI Comment Engagement (On Others' Posts)", zh: "LI 留言互動（給別人貼文）" },
     description: "在別人 LI 貼文下留一則有價值的留言",
     agent_id: 180203, skill_slug: "linkedin-engagement",
     primary_question: "貼上原貼文 / 描述貼文內容",
@@ -115,7 +115,7 @@ LI 留言能帶曝光 — 要寫得讓原 PO 想回覆你（給連結機會）�
   {
     id: "li-30-headline",
     tier: "30s", postType: "feed",
-    label: "LI 個人簡介標語",
+    label: { en: "LI Profile Headline", zh: "LI 個人簡介標語" },
     description: "你的 LinkedIn 個人頁眉標題（120 字內）",
     agent_id: 180199, skill_slug: "personal-branding",
     primary_question: "你做什麼？想吸引誰？",
@@ -129,7 +129,7 @@ LI 留言能帶曝光 — 要寫得讓原 PO 想回覆你（給連結機會）�
   {
     id: "li-30-newsletter",
     tier: "30s", postType: "newsletter",
-    label: "LI 電子報標題 + 開頭",
+    label: { en: "LI Newsletter Title + Opening", zh: "LI 電子報標題 + 開頭" },
     description: "LI Newsletter 標題 + 第一段（決定要不要訂閱）",
     agent_id: 180009, skill_slug: "newsletter-editor",
     primary_question: "本期 Newsletter 要講什麼？",
@@ -144,7 +144,7 @@ LI 留言能帶曝光 — 要寫得讓原 PO 想回覆你（給連結機會）�
   {
     id: "li-30-document",
     tier: "30s", postType: "document",
-    label: "LI 文件貼文（PDF 輪播）8 頁結構",
+    label: { en: "LI Document Post (PDF Carousel) — 8-Page Structure", zh: "LI 文件貼文（PDF 輪播）8 頁結構" },
     description: "8 頁的 LI 文件貼文結構 + 每頁文字",
     agent_id: 220862, skill_slug: "narrative-editor",
     primary_question: "Document 想教 / 解釋什麼？",

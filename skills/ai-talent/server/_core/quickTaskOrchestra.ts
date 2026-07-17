@@ -764,7 +764,7 @@ async function callOneVariant(args: {
     `不要寫「我是 ___」、「___ 專家，幫 ___ 做 ___」、不要把你的姓名（例如 #NinaYeh / @JanetChang）寫成 hashtag、@mention 或 caption 內任何形式。\n` +
     subjectRule +
     `\n【格式要求 — 重要】\n` +
-    `- caption 欄位**絕對不要**寫「${template.label}」、「${label}」或任務 / label 名稱。\n` +
+    `- caption 欄位**絕對不要**寫「${typeof template.label === "string" ? template.label : (template.label?.zh ?? template.label?.en ?? template.id)}」、「${label}」或任務 / label 名稱。\n` +
     `- caption 欄位**絕對不要**夾雜視覺描述、英文 prompt、「image_style:」、「visual:」等技術註記。圖片風格由另一位 agent 獨立處理，這裡只放最終發到平台的純文字內容。\n` +
     `- 用自然斷行（兩個 newline 分段）。**不要**用「｜」全形管道符號當分隔線。\n` +
     `- emoji 點綴用就好，不要每段開頭都塞 emoji。\n` +

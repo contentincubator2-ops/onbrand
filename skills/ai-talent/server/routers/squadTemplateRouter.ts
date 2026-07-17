@@ -2119,7 +2119,7 @@ ${agentCtx.systemPromptPrefix}`;
           let viral = cached?.data;
           const cacheAge = cached ? Date.now() - cached.ts : Infinity;
           if (!viral || cacheAge > 5 * 60_000) {
-            const topic = `${matched.label} ${mission?.title ?? ""}`.slice(0, 120);
+            const topic = `${typeof matched.label === "string" ? matched.label : matched.label.zh} ${mission?.title ?? ""}`.slice(0, 120);
             viral = await fetchViralPatterns({
               channel: matched.platform,
               topic,

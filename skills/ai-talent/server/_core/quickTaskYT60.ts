@@ -14,7 +14,7 @@ export const YT_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "yt-60-video-package",
     tier: "60s", postType: "video",
-    label: "YT 影片完整文案包",
+    label: { en: "YT Full Video Copy Pack", zh: "YT 影片完整文案包" },
     description: "Title + description + chapters + 5 個替代 title + 縮圖風格",
     agent_id: 224000, // Yu-Chia Chen — YouTube Marketing Strategist 食品飲料 (~1000 char)
     skill_slug: "youtube-content",
@@ -29,7 +29,7 @@ ${YT_TONE}`,
   {
     id: "yt-60-shorts-script",
     tier: "60s", postType: "shorts",
-    label: "YT Shorts 完整腳本",
+    label: { en: "YT Shorts Full Script", zh: "YT Shorts 完整腳本" },
     description: "Strategist 規劃結構 + 60 秒腳本 + 縮圖 brief",
     agent_id: 223996, // Yu-Ting Su — YouTube Marketing Strategist B2B SaaS (1025 char)
     skill_slug: "shorts-scriptwriter",
@@ -45,7 +45,7 @@ ${YT_TONE}`,
   {
     id: "yt-60-thumbnail-suite",
     tier: "60s", postType: "thumbnail",
-    label: "YT 縮圖 5 種風格",
+    label: { en: "YT Thumbnails — 5 Styles", zh: "YT 縮圖 5 種風格" },
     description: "5 種縮圖視覺方向 + 配合的 title 變體",
     agent_id: 36, // Nina Yeh | YouTube Scriptwriter
     skill_slug: "youtube-thumbnail",
@@ -61,7 +61,7 @@ ${YT_TONE}`,
   {
     id: "yt-60-series-3ep",
     tier: "60s", postType: "video",
-    label: "YT 3 集系列",
+    label: { en: "YT 3-Episode Series", zh: "YT 3 集系列" },
     description: "Strategist 設計 3 集弧 + 3 部影片完整 caption + 連貫敘事",
     agent_id: 180509, // Nina Liu
     skill_slug: "youtube-content",
@@ -77,7 +77,7 @@ ${YT_TONE}`,
   {
     id: "yt-60-community-post",
     tier: "60s", postType: "community",
-    label: "YT 社群貼文",
+    label: { en: "YT Community Post", zh: "YT 社群貼文" },
     description: "5 種社群貼文（投票 / 圖片 / 文字 / 問答 / 預告）",
     agent_id: 180157, // Nina Cheng | Social Media Engagement Manager
     skill_slug: "youtube-community",
@@ -93,7 +93,7 @@ ${YT_TONE}`,
   {
     id: "yt-60-viral-rewrite",
     tier: "60s", postType: "video",
-    label: "YT 爆款影片改寫",
+    label: { en: "YT Viral Video Rewrite", zh: "YT 爆款影片改寫" },
     description: "Strategist 找原爆款結構 + 改寫為品牌版 + 對照表",
     agent_id: 180545, // Chun-Hao Cheng
     skill_slug: "youtube-content",

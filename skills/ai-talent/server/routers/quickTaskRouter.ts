@@ -1734,7 +1734,7 @@ export const quickTaskRouter = router({
             : "viral";
           const viral = await fetchViralPatterns({
             channel: matched.platform,
-            topic: `${matched.label} ${input.topic}`.slice(0, 120),
+            topic: `${typeof matched.label === "string" ? matched.label : matched.label.zh} ${input.topic}`.slice(0, 120),
             brandId: input.brandId,
             kind,
           });

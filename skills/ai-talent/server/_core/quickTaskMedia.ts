@@ -10,7 +10,8 @@
 export type MediaTaskTemplate = {
   id: string;
   tier: "30s";
-  label: string;
+  /** 2026-07-17 多市場: bilingual like FBTaskTemplate. */
+  label: string | { en: string; zh: string };
   description: string;
   platform: "facebook" | "instagram" | "tiktok" | "youtube";
   mediaType: "photo" | "video" | "doc";
@@ -22,7 +23,7 @@ export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-photo-fb",
     tier: "30s",
-    label: "照片 → FB 貼文",
+    label: { en: "Photo → FB Post", zh: "照片 → FB 貼文" },
     description: "上傳照片，AI 看圖產出符合品牌調性的 FB 貼文",
     platform: "facebook",
     mediaType: "photo",
@@ -32,7 +33,7 @@ export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-photo-ig",
     tier: "30s",
-    label: "照片 → IG 貼文 + 標籤",
+    label: { en: "Photo → IG Post + Hashtags", zh: "照片 → IG 貼文 + 標籤" },
     description: "上傳照片，AI 看圖產出 IG 貼文文案 + 標籤",
     platform: "instagram",
     mediaType: "photo",
@@ -42,7 +43,7 @@ export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-photo-tiktok",
     tier: "30s",
-    label: "照片 → TikTok 文案",
+    label: { en: "Photo → TikTok Caption", zh: "照片 → TikTok 文案" },
     description: "上傳照片，AI 看圖產出 TikTok 貼文文案",
     platform: "tiktok",
     mediaType: "photo",
@@ -52,7 +53,7 @@ export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-photo-yt",
     tier: "30s",
-    label: "照片 → YouTube 縮圖文字",
+    label: { en: "Photo → YouTube Thumbnail Text", zh: "照片 → YouTube 縮圖文字" },
     description: "上傳縮圖，AI 產出 YouTube 標題、描述與 tags",
     platform: "youtube",
     mediaType: "photo",
@@ -65,7 +66,7 @@ export const MEDIA_VIDEO_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-video-fb",
     tier: "30s",
-    label: "影片 → FB 貼文",
+    label: { en: "Video → FB Post", zh: "影片 → FB 貼文" },
     description: "貼上 YouTube 連結，AI 分析影片產出 FB 貼文",
     platform: "facebook",
     mediaType: "video",
@@ -75,7 +76,7 @@ export const MEDIA_VIDEO_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-video-ig",
     tier: "30s",
-    label: "影片 → IG Reels 文案",
+    label: { en: "Video → IG Reels Caption", zh: "影片 → IG Reels 文案" },
     description: "貼上 YouTube 連結，AI 產出 IG Reels 文案",
     platform: "instagram",
     mediaType: "video",
@@ -85,7 +86,7 @@ export const MEDIA_VIDEO_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-video-tiktok",
     tier: "30s",
-    label: "影片 → TikTok 腳本",
+    label: { en: "Video → TikTok Script", zh: "影片 → TikTok 腳本" },
     description: "貼上 YouTube 連結，AI 產出 TikTok 文案",
     platform: "tiktok",
     mediaType: "video",
@@ -95,7 +96,7 @@ export const MEDIA_VIDEO_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-video-yt",
     tier: "30s",
-    label: "影片 → YouTube 標題＋說明",
+    label: { en: "Video → YouTube Title + Description", zh: "影片 → YouTube 標題＋說明" },
     description: "貼上 YouTube 連結，AI 幫你改寫標題、描述、tags",
     platform: "youtube",
     mediaType: "video",
@@ -108,7 +109,7 @@ export const MEDIA_DOC_TASKS: MediaTaskTemplate[] = [
   {
     id: "media-doc-rewrite",
     tier: "30s",
-    label: "文件改寫（品牌調性）",
+    label: { en: "Document Rewrite (Brand Tone)", zh: "文件改寫（品牌調性）" },
     description: "上傳文件，AI 按照你的品牌語氣改寫全文",
     platform: "facebook", // placeholder — doc rewrite is channel-agnostic
     mediaType: "doc",
