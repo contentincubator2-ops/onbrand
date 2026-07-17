@@ -3062,11 +3062,10 @@ function PositioningCompletionBridge({
         </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {/* 2026-05-12 pre-launch zombie audit: routes were /b/X/30s which
-            don't exist (404). Real routes are /30s?b=X */}
-        <BridgeBtn label={lang === "en" ? "30s Single"    : "30s 單品"}    onClick={() => navigate(`/30s?b=${brandId}`)} primary />
-        <BridgeBtn label={lang === "en" ? "60s Pack"  : "60s 套組"}  onClick={() => navigate(`/60s?b=${brandId}`)} />
-        <BridgeBtn label={lang === "en" ? "99s Slate" : "99s 檔期"}  onClick={() => navigate(`/99s?b=${brandId}`)} />
+        {/* 2026-07-17 (CJ 去除時間分類 + zombie audit round 2): the /30s /60s
+            /99s tier routes were removed 2026-05-27 — these three buttons all
+            404'd. Tasks are platform-first now, one wall covers all sizes. */}
+        <BridgeBtn label={lang === "en" ? "Run a task" : "去跑任務"} onClick={() => navigate(`/tasks/fb?b=${brandId}`)} primary />
         <BridgeBtn label={lang === "en" ? "7-Day Publisher" : "七日發布台"} onClick={() => navigate(`/theater?b=${brandId}`)} />
       </div>
     </div>
@@ -3160,8 +3159,8 @@ const SOWORK_GROUP_INTRO: Record<string, { zh: string; en: string }> = {
     en: "External coordinates — see direct, indirect, and latent competitors clearly so you know where to cut your differentiation.",
   },
   "5": {
-    zh: "把功能 × 情感雙差異化結合成一句話 — 這是 30s / 60s / 99s 內容的母題。",
-    en: "Fuse functional × emotional differentiation into one line — this becomes the parent theme for every 30s / 60s / 99s piece.",
+    zh: "把功能 × 情感雙差異化結合成一句話 — 這是所有內容的母題。",
+    en: "Fuse functional × emotional differentiation into one line — this becomes the parent theme for every piece.",
   },
   "7": {
     zh: "切入時機 — 對的策略放錯時機等於 0。識別有利趨勢 + 風險，作為議題日曆的母本。",
