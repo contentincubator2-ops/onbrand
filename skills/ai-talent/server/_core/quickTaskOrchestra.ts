@@ -35,7 +35,8 @@ import { isCrossplatformBodyTask, CW_CRAFT_RUBRIC, cwPlaybookFor } from "./cwCra
 import { loadBrandKnowledgeForPrompt } from "../routers/brandKnowledgeRouter";
 import { getBrandRealContent } from "./brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
-import { getCopywritingMasterPrompt, type PlatformCode } from "./copywritingMaster";
+import { getCopywritingMasterPrompt, type MarketCode, type PlatformCode } from "./copywritingMaster";
+import { getBrandMarket, DEFAULT_BRAND_MARKET, type BrandMarket } from "./brandMarket";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
 
@@ -526,8 +527,10 @@ async function callOneVariant(args: {
   agentAiModel?: string | null;
   /** Strategist anchor (multi-post / narrativeArc tasks) — injected before user msg */
   strategistAnchor?: string;
+  /** 2026-07-17 多市場: brand's master-persona market. undefined = legacy zh-TW; null = no matching master → omit block. */
+  market?: MarketCode | null;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
-  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor } = args;
+  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor, market } = args;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
   // {today} → YYYY年M月D日（台北時區）so PR datelines / calendar dates are never stale.
@@ -591,7 +594,13 @@ async function callOneVariant(args: {
   // master with cultural element bank + ban list, then platform guide,
   // THEN task-specific systemPrompt. 3 layers of grounding.
   const platformCode = (template.outputDefaults?.platform ?? "facebook") as PlatformCode;
-  const masterBlock = getCopywritingMasterPrompt({ market: "zh-TW", platform: platformCode });
+  // 2026-07-17 多市場: market comes from brands.targetCountry/outputLanguage.
+  // null = brand's language has no master persona (e.g. th/vi) → omit the
+  // block entirely; the market section in brandPrefix carries the language
+  // directive. undefined (legacy callers) keeps the zh-TW default.
+  const masterBlock = market === null
+    ? ""
+    : getCopywritingMasterPrompt({ market: market ?? "zh-TW", platform: platformCode });
 
   // 2026-05-16 (CJ「KOL Brief 完全不符標準」root cause): document
   // tasks bypass the social-caption scaffolding entirely. The 台灣社群
@@ -933,6 +942,7 @@ async function callCaptionWriter(args: {
   userMsg: string;
   agentAiModel?: string | null;
   strategistAnchor?: string;
+  market?: MarketCode | null;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
   // Parallel fanout — each variant in its own LLM call.
@@ -1544,7 +1554,7 @@ export async function runOrchestra(args: {
     const resolvedStrategistId = resolveAgentId(taskId, "strategist",   args.config.strategistAgentId);
     const resolvedSpecialtyId  = resolveAgentId(taskId, "specialty",    args.config.specialtyAgentId);
 
-    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix, viralPatterns] = await Promise.all([
+    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix, viralPatterns, brandMarket] = await Promise.all([
       loadAgent(resolvedLeadId),
       loadAgent(resolvedImageDirId),
       ytUrlInput
@@ -1605,6 +1615,9 @@ export async function runOrchestra(args: {
             } catch { return null; }
           })()
         : Promise.resolve(null),
+      // 2026-07-17 多市場: brand's targetCountry/outputLanguage → master
+      // persona market + zh-TW sanitizer gate. Fail-safe zh-TW default.
+      getBrandMarket(args.brandId).catch(() => DEFAULT_BRAND_MARKET),
     ]);
 
     // Record scout stage for 100s
@@ -1700,6 +1713,7 @@ export async function runOrchestra(args: {
         urlContext,
         userMsg,
         strategistAnchor: strategistAnchor || undefined,
+        market: brandMarket.marketCode, // 2026-07-17 多市場
       }).then((c) => { stCap.status = "done"; stCap.completedAt = Date.now() - startedAt; return c; }).catch((e) => {
         stCap.status = "failed";
         stCap.completedAt = Date.now() - startedAt;
@@ -1840,7 +1854,10 @@ export async function runOrchestra(args: {
     // 倒數 ×5 子分支同樣漏驚嘆號 + 業配腔（「響亮無比！」）。改用「確定性
     // regex 一律清洗 + 必要時 LLM 收緊」的雙層守門（同 EDM/IG self-check
     // 證實有效的模式），對每一個變體都生效，不依賴模型自律。
-    if (Array.isArray(captions) && captions.length &&
+    // 2026-07-17 多市場: zh-TW-only gate — voiceSanitizeZhTW converts to
+    // Traditional Chinese / Taiwan wording, strips emoji, ！→。 — it would
+    // corrupt English / Japanese output. Non-zh-TW brands skip this block.
+    if (brandMarket.isZhTW && Array.isArray(captions) && captions.length &&
         (isTikTokBodyTask(args.template) || isYouTubeBodyTask(args.template) ||
          isKOLBodyTask(args.template))) {
       // L1 deterministic: 高信心、零成本、一律套用（hoisted 共用函式）。
@@ -2071,8 +2088,10 @@ export async function runOrchestra(args: {
     // final backstop — even if the post-caption gate's mutation was lost
     // (stale process / repopulated captions / different path), clean the
     // caption ONE more time here, the last point before persistence.
-    const _voiceGated = isTikTokBodyTask(args.template) ||
-      isYouTubeBodyTask(args.template) || isKOLBodyTask(args.template);
+    // 2026-07-17 多市場: gate on zh-TW too — the sanitizer would corrupt
+    // non-Chinese output (emoji strip / ！→。 / straight→「」quotes).
+    const _voiceGated = brandMarket.isZhTW && (isTikTokBodyTask(args.template) ||
+      isYouTubeBodyTask(args.template) || isKOLBodyTask(args.template));
     for (let i = 0; i < N; i++) {
       const cap = captions[i];
       const label = cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`;

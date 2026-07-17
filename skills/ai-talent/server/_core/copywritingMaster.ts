@@ -302,3 +302,39 @@ export function getCopywritingMasterPrompt(args: {
 export function getMasterPersonaOnly(market: MarketCode = "zh-TW"): string {
   return MASTERS[market]?.persona ?? MASTERS["zh-TW"].persona;
 }
+
+/**
+ * 2026-07-17 (CJ 多市場): map a brand's outputLanguage (BCP 47) +
+ * targetCountry (ISO 3166-1) to the closest master-persona MarketCode.
+ *
+ * Returns null when NO master fits (e.g. th / vi / id) — callers must
+ * then OMIT the master block entirely rather than inject the zh-TW
+ * Taiwan persona into a Thai brand's prompt. The market section from
+ * buildMarketContext still carries the language directive.
+ */
+export function resolveMarketCode(
+  outputLanguage?: string | null,
+  targetCountry?: string | null,
+): MarketCode | null {
+  const lang = (outputLanguage ?? "zh-TW").trim().toLowerCase();
+  const cc = (targetCountry ?? "").trim().toUpperCase();
+
+  const exact: Record<string, MarketCode> = {
+    "zh-tw": "zh-TW", "zh-cn": "zh-CN", "zh-hk": "zh-HK",
+    "ja-jp": "ja-JP", "ko-kr": "ko-KR",
+    "en-us": "en-US", "en-gb": "en-GB", "en-sg": "en-SG",
+    "de-de": "de-DE", "fr-fr": "fr-FR", "es-es": "es-ES",
+  };
+  if (exact[lang]) return exact[lang];
+
+  switch (lang.split("-")[0]) {
+    case "zh": return cc === "CN" ? "zh-CN" : cc === "HK" ? "zh-HK" : "zh-TW";
+    case "ja": return "ja-JP";
+    case "ko": return "ko-KR";
+    case "en": return cc === "GB" ? "en-GB" : cc === "SG" ? "en-SG" : "en-US";
+    case "de": return "de-DE";
+    case "fr": return "fr-FR";
+    case "es": return "es-ES";
+    default: return null;
+  }
+}

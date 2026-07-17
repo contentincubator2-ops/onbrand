@@ -1715,6 +1715,10 @@ export const quickTaskRouter = router({
       // competition), NOT the lean core digest.
       const { buildBrandPrefix } = await import("../_core/brandContext");
       const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "full").catch(() => "");
+      // 2026-07-17 多市場: brand's outputLanguage drives step language +
+      // whether the zh-TW deterministic sanitizer may run on step output.
+      const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
+      const brandMarket = await getBrandMarket(input.brandId).catch(() => DEFAULT_BRAND_MARKET);
 
       // 3. Inject 100s scout data (real-time festivals/trending/news)
       let scoutBlock = "";
@@ -1787,8 +1791,13 @@ export const quickTaskRouter = router({
         // 斷裂 + 場景錯亂」根因): squad-pipeline 每個 step 共用此 prompt，
         // 全無文字衛生與「交付物要對得上 step 名稱」的約束 → 後段 step
         // 退回陌生業配信，且每個 step 都寫成同款邀約信。補兩塊守門。
-        const VOICE_GUARD = `\n══════════════════════════════════════════\n【文字衛生與交付物保真 — 違反直接不合格，輸出前逐句自查】\n══════════════════════════════════════════\n▸ 全文禁句尾與句中驚嘆號（! 與 ！都禁）；禁 emoji；繁體台灣用語（用「管道」非「渠道」，不得簡體字）。\n▸ 禁業配 / 空洞套語：「強大功能」「突破性的功能」「期待你的回音」「期待聽到你的想法」「非常期待與你合作」「讓我們一起創造」「一起創造美好的合作」「管理品牌形象」「在這個數位時代」「更加精彩」「非常契合」等一律不准出現。沉穩、真誠、務實的守護者語氣，5 個 step 語氣必須一致。\n▸ 收尾用一個對方會想回的具體問句，不要 PR 套語。\n▸ **交付物必須對得上本 step 的名稱與功能，不是每個 step 都寫一封邀約信**：\n  ・名稱含「Brief / 資料包」＝給 KOL 看的品牌資料文件（條列：品牌背景、目標受眾、合作規格、報酬與時程方向、使用方式），**不是邀請信**。\n  ・名稱含「報價回應 / 議價」＝在「KOL 已回覆報價」情境下你方的回信（含可接受 / 需調整兩種談法），**不是群發邀約**。\n  ・名稱含「追蹤 / follow-up」＝未回覆時的短追蹤（不催促，給新切入點）。\n  ・名稱含「感謝 / 結案」＝內容上線後的感謝＋成效回饋詢問＋長期關係。\n  ・名稱含「邀請 / 開場 / 主信」＝完整可寄出的邀約信。\n══════════════════════════════════════════`;
-        const system = `${persona}\nSquad「${squad.name}」步驟「${stageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}\n步驟說明：${step.description ?? ""}\n預期產出：${step.outputType ?? step.outputKind ?? "(未指定)"}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n用繁體中文（台灣用語，不得簡體字）輸出，扣回品牌語氣；本 step 的交付物形態必須符合上方「交付物保真」對「${stageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
+        // 2026-07-17 多市場: zh-TW 的文字衛生規則（禁驚嘆號/emoji/台灣用語）
+        // 是台灣市場語感政策，非中文市場改為「目標市場語言 + 語氣一致」通則。
+        const voiceLangRules = brandMarket.isZhTW
+          ? `▸ 全文禁句尾與句中驚嘆號（! 與 ！都禁）；禁 emoji；繁體台灣用語（用「管道」非「渠道」，不得簡體字）。\n▸ 禁業配 / 空洞套語：「強大功能」「突破性的功能」「期待你的回音」「期待聽到你的想法」「非常期待與你合作」「讓我們一起創造」「一起創造美好的合作」「管理品牌形象」「在這個數位時代」「更加精彩」「非常契合」等一律不准出現。沉穩、真誠、務實的守護者語氣，5 個 step 語氣必須一致。`
+          : `▸ 全文一律使用 ${brandMarket.outputLanguage}（品牌目標市場語言）撰寫，不得混入中文。\n▸ 語氣沉穩、真誠、務實，5 個 step 語氣必須一致；避免浮誇銷售腔、空洞套語與 PR 腔。`;
+        const VOICE_GUARD = `\n══════════════════════════════════════════\n【文字衛生與交付物保真 — 違反直接不合格，輸出前逐句自查】\n══════════════════════════════════════════\n${voiceLangRules}\n▸ 收尾用一個對方會想回的具體問句，不要 PR 套語。\n▸ **交付物必須對得上本 step 的名稱與功能，不是每個 step 都寫一封邀約信**：\n  ・名稱含「Brief / 資料包」＝給 KOL 看的品牌資料文件（條列：品牌背景、目標受眾、合作規格、報酬與時程方向、使用方式），**不是邀請信**。\n  ・名稱含「報價回應 / 議價」＝在「KOL 已回覆報價」情境下你方的回信（含可接受 / 需調整兩種談法），**不是群發邀約**。\n  ・名稱含「追蹤 / follow-up」＝未回覆時的短追蹤（不催促，給新切入點）。\n  ・名稱含「感謝 / 結案」＝內容上線後的感謝＋成效回饋詢問＋長期關係。\n  ・名稱含「邀請 / 開場 / 主信」＝完整可寄出的邀約信。\n══════════════════════════════════════════`;
+        const system = `${persona}\nSquad「${squad.name}」步驟「${stageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}\n步驟說明：${step.description ?? ""}\n預期產出：${step.outputType ?? step.outputKind ?? "(未指定)"}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合上方「交付物保真」對「${stageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
 
         const userMsg = [
           `【任務主題】${input.topic || "(未指定)"}`,
@@ -1807,8 +1816,12 @@ export const quickTaskRouter = router({
           // 2026-05-19 (CJ 驗收 v#3): deterministic 文字衛生 backstop on
           // squad-step output — guaranteed, independent of model adherence.
           try {
-            const { voiceSanitizeZhTW } = await import("../_core/quickTaskOrchestra");
-            if (text) text = voiceSanitizeZhTW(text);
+            // 2026-07-17 多市場: zh-TW only — the sanitizer would corrupt
+            // non-Chinese output (emoji strip / ！→。 / 簡→繁 rewrites).
+            if (text && brandMarket.isZhTW) {
+              const { voiceSanitizeZhTW } = await import("../_core/quickTaskOrchestra");
+              text = voiceSanitizeZhTW(text);
+            }
           } catch { /* fail-safe: keep raw text */ }
           prevOutputs.push(`【${stageLabel}】${text.slice(0, 800)}`);
           variants.push({

@@ -18,6 +18,7 @@ import { getBrandPositioningById } from "../positioningBridge";
 import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
 import { getBrandRealContent } from "../_core/brandRealContent";
 import { getCopywritingMasterPrompt, type PlatformCode } from "../_core/copywritingMaster";
+import { getBrandMarket, DEFAULT_BRAND_MARKET } from "../_core/brandMarket";
 import { resolveAgentId } from "../_core/agentAssignments";
 import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
@@ -877,7 +878,7 @@ ${platformAsks}
       // didn't ship targetAudience, fall back to DB. Tagline/voice already
       // covered by client payload — only TA was missing.
       const needsTaLookup = !input.targetAudience;
-      const [brandRules, knowledgeBlock, realContent, taLookup] = await Promise.all([
+      const [brandRules, knowledgeBlock, realContent, taLookup, brandMarket] = await Promise.all([
         loadBrandRules(input.brandId, ctx.user.id),
         loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
         // Real public content (website + social via Perplexity) — strongest
@@ -886,6 +887,8 @@ ${platformAsks}
         needsTaLookup
           ? getBrandPositioningById(input.brandId, ctx.user.id).then(p => p?.targetAudience ?? null).catch(() => null)
           : Promise.resolve(input.targetAudience ?? null),
+        // 2026-07-17 多市場: master persona follows the brand's market.
+        getBrandMarket(input.brandId).catch(() => DEFAULT_BRAND_MARKET),
       ]);
       const targetAudience = (input.targetAudience ?? taLookup ?? "").trim();
       const allRules = [...brandRules, ...(input.adhocRules ?? [])].filter(Boolean);
@@ -908,7 +911,11 @@ ${allRules.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
               : ""
           }`
         : "";
-      const guide = PLATFORM_GUIDE[input.platform];
+      // 2026-07-17 多市場: PLATFORM_GUIDE 內建「繁體中文」字樣 — 非 zh-TW
+      // 品牌時追加語言覆寫，避免 guide 與品牌市場語言互相矛盾。
+      const guide = PLATFORM_GUIDE[input.platform] + (brandMarket.isZhTW
+        ? ""
+        : `\n（語言覆寫：本品牌目標市場語言為 ${brandMarket.outputLanguage}，全文一律用 ${brandMarket.outputLanguage} 撰寫；上方「繁體中文」不適用，字數規範改以該語言的等效長度衡量。）`);
       const importantHint = input.importantDateName
         ? `當天有「${input.importantDateName}」檔期，請從 USP 與這個檔期的「真實連結」切入（例如母親節 = 媽媽的具體場景，不是「祝媽媽快樂」這種空話）。`
         : "";
@@ -948,10 +955,14 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
 
       // 2026-05-08: prepend master persona (sowork-ai-v2 inspired) so the
       // LLM grounds in cultural context BEFORE task-specific rules.
-      const masterBlock = getCopywritingMasterPrompt({
-        market: "zh-TW",
-        platform: input.platform as PlatformCode,
-      });
+      // 2026-07-17 多市場: null marketCode（無對應 master 的語言）→ 省略
+      // master block，由 brand prefix 的市場段落帶語言指令。
+      const masterBlock = brandMarket.marketCode === null
+        ? ""
+        : getCopywritingMasterPrompt({
+            market: brandMarket.marketCode,
+            platform: input.platform as PlatformCode,
+          });
 
       // 2026-05-08: also inject the platform-specific theater agent's persona
       // (B+, ≥400 char real-person modeled). One DB read, cached after first
