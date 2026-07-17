@@ -1182,6 +1182,24 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides]);
 
+  // 2026-07-17 (CJ「文案偶爾很短、沒講重點，推測系統不穩」— seen on
+  // fb-30-ad-headline / link-desc): those are COMPONENT tasks — the
+  // deliverable per variant is ONE short line (ad headline ≤25字 / link
+  // description / CTA button text / email subject), by design. Rendered
+  // inside a full-post mockup they read as a broken half-empty post, so
+  // both CJ and end customers misdiagnose them as system instability.
+  // Detect them (short-form task id + every caption short + no images
+  // configured) and explain the deliverable right above the preview.
+  const isComponentTask = useMemo(() => {
+    const tid = data?.mission?.taskId ?? "";
+    if (!/(headline|desc|cta|subject|hook|title|bio|hashtag|comment|reply|opening)/i.test(tid)) return false;
+    const caps = (variants ?? []).map((v) => (v?.caption ?? "").trim()).filter(Boolean);
+    if (caps.length === 0) return false;
+    const allShort = caps.every((c) => c.length <= 80);
+    const noImages = (variants ?? []).every((v) => !v?.imageUrl);
+    return allShort && noImages;
+  }, [data?.mission?.taskId, variants]);
+
   // 2026-05-19: for email tasks (EDM), extract the per-slide email subject
   // so the title row can show "主旨：<current email subject>" rather than
   // the static mission title which always shows slide-0's subject.
@@ -1664,6 +1682,17 @@ export default function RunPage() {
                 );
               }
               return effectiveVariant && slide ? (
+              <>
+              {isComponentTask && (
+                <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2">
+                  <span className="text-small leading-none pt-0.5">🧩</span>
+                  <p className="text-tiny text-primary-800 leading-relaxed">
+                    {lang === "en"
+                      ? "Component task: each version is ONE short, copy-ready line (e.g. ad headline / description / button text) — not a full post. Switch the version pills above to compare angles; the post frame is just placement context."
+                      : "元件任務：每個版本是「一條」可直接複製使用的短句（廣告標題／描述／按鈕文字等），本來就不是完整貼文。切換上方版本標籤比較不同切角；貼文外框只是示意擺放位置。"}
+                  </p>
+                </div>
+              )}
               <PlatformMockup
                 variant={{ ...effectiveVariant, label: `${effectiveVariant.label} · ${slide.label}` }}
                 title={data.title ?? ""}
@@ -1679,6 +1708,7 @@ export default function RunPage() {
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
                 onGenerateImage={() => setMode("image")}
               />
+              </>
               ) : null;
             })()}
             {/* 2026-05-18 (CJ「下載圖示出現在圖片某個地方就好」): a small
