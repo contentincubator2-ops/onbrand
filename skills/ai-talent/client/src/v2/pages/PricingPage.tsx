@@ -71,18 +71,18 @@ export default function PricingPage() {
       members: isEn ? "1 brand · 1 user" : "1 個品牌 · 1 位用戶",
       features: isEn ? [
         "50 runs / month (each run = all variants + images)",
-        "30s & 60s task templates",
+        "Single-post & content-pack task templates",
         "AI images (Flux / GPT Image-1 / Imagen / Ideogram)",
         "Brand brain positioning (USP · voice · audience)",
         "E-invoices (personal / B2B)",
-        "99s deep research — available on Solo and above",
+        "Deep-research campaigns — available on Solo and above",
       ] : [
         "每月 50 次執行（每次含所有文案變體 + 圖）",
-        "30s 及 60s 全任務模板",
+        "單篇與套組全任務模板",
         "AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
         "品牌大腦定位（USP · 語氣 · 受眾）",
         "電子發票（個人 / B2B）",
-        "99s 深度研究任務：升級 Solo 解鎖",
+        "深度研究企劃：升級 Solo 解鎖",
       ],
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: false,
@@ -104,16 +104,16 @@ export default function PricingPage() {
       isEarlyBird: false,
       members: isEn ? "1 brand · 1 user" : "1 個品牌 · 1 位用戶",
       features: isEn ? [
-        "Unlimited runs (30s / 60s / 99s — all templates)",
+        "Unlimited runs (single / pack / campaign — all templates)",
         "Unlimited AI images (Flux / GPT Image-1 / Imagen / Ideogram)",
-        "99s deep-research pipeline",
+        "Deep-research campaign pipeline",
         "E-invoices (personal / B2B)",
         "Video generation — coming soon",
         "Brand rename or swap — contact support",
       ] : [
-        "無限次執行（30s / 60s / 99s 全任務模板）",
+        "無限次執行（單篇 / 套組 / 企劃全任務模板）",
         "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-        "99s 深度研究流程",
+        "深度研究企劃流程",
         "電子發票（個人 / B2B）",
         "影片生成：roadmap 加購包",
         "改名 / 換品牌：聯繫客服",
@@ -131,23 +131,23 @@ export default function PricingPage() {
   ];
 
   const faq: [string, string][] = isEn ? [
-    ["What counts as a 'run' in Starter?", "One run = one task execution, no matter how many variants or images are generated. If a 60s task produces 5 caption variants + 5 images, that still counts as 1 run. System failures are automatically refunded — unsatisfied with the output and re-running counts as a new run."],
+    ["What counts as a 'run' in Starter?", "One run = one task execution, no matter how many variants or images are generated. If a content-pack task produces 5 caption variants + 5 images, that still counts as 1 run. System failures are automatically refunded — unsatisfied with the output and re-running counts as a new run."],
     ["What happens when my trial ends?", "Trial stops when EITHER the 7 days OR your 1,000 trial points run out — whichever comes first. We'll email you 1 day before expiry. After that, your account becomes read-only — you can still sign in and view history, but can't produce new content."],
     ["Can I cancel anytime?", "Yes. Hit Cancel in Account settings whenever you want. You'll keep access until the current period ends, then no more charges."],
     ["Do Starter's 50 runs roll over?", "No. The 50 runs reset on the 1st of each month. Annual plans also reset monthly on the 1st."],
     ["Can I upgrade from Starter to Solo later?", "Yes — upgrade any time in Account settings. The change takes effect immediately and billing switches to the Solo rate."],
     ["Who owns the output?", "You do. We claim zero rights. Use it commercially, remix it, resell it — it's all yours."],
     ["Can I get a company invoice?", "Yes. Add your tax ID + company name in Account settings → Invoice info, and the next charge will auto-issue a B2B e-invoice."],
-    ["What's the difference between 30s, 60s, and 99s tasks?", "30s = single fast output (1 variant). 60s = 5 variants + 5 images in parallel (~60 seconds). 99s = deep-research pipeline with live web data, competitive analysis, and full content strategy (Solo+ only)."],
+    ["What's the difference between Single, Pack, and Campaign tasks?", "Single = one fast output (1 variant). Pack = 5 variants + 5 images generated in parallel. Campaign = deep-research pipeline with live web data, competitive analysis, and full content strategy (Solo+ only)."],
   ] : [
-    ["Starter 的「50 次執行」是什麼意思？", "一次執行 = 跑一次任務，不管產出幾個變體或圖片都算 1 次。例如 60s 任務產出 5 份文案 + 5 張圖，仍算 1 次。系統錯誤自動退回；對輸出不滿意而主動重跑，算新的 1 次。"],
+    ["Starter 的「50 次執行」是什麼意思？", "一次執行 = 跑一次任務，不管產出幾個變體或圖片都算 1 次。例如套組任務產出 5 份文案 + 5 張圖，仍算 1 次。系統錯誤自動退回；對輸出不滿意而主動重跑，算新的 1 次。"],
     ["試用期過了會怎樣？", "試用在「7 天到期」或「1,000 試用點數用完」時停止，先到先停。到期前 1 天會 email 通知。若沒升級，帳號切到唯讀模式（仍能登入查歷史，但無法產出新內容）。"],
     ["可以中途取消嗎？", "可以，隨時於「帳號設定」取消。當期到期前仍能正常使用，到期後不再扣款。"],
     ["Starter 的 50 次用不完會累積嗎？", "不會，每月 1 號重置。年費方案每月 1 號也重置（不累積）。"],
     ["之後可以從 Starter 升級到 Solo 嗎？", "可以，隨時在帳號設定升級，立即生效並改按 Solo 費率計費。"],
     ["產出的內容版權歸誰？", "全部歸您。我們不主張任何權利，可商用、二次創作、轉售。"],
     ["能開公司發票嗎？", "可以。在「帳號設定 → 發票資訊」填統編 + 公司名，下次扣款自動開立 B2B 三聯式電子發票。"],
-    ["30s / 60s / 99s 任務有什麼差別？", "30s = 單一快速輸出（1 個變體）。60s = 5 個文案變體 + 5 張圖並行（約 60 秒）。99s = 附帶即時網路研究、競品分析、完整內容策略的深度研究流程（Solo 以上才有）。"],
+    ["單篇 / 套組 / 企劃任務有什麼差別？", "單篇 = 單一快速輸出（1 個變體）。套組 = 5 個文案變體 + 5 張圖並行產出。企劃 = 附帶即時網路研究、競品分析、完整內容策略的深度研究流程（Solo 以上才有）。"],
   ];
 
   // 2026-07-15 (CJ): early-bird banner removed — offer closed, standard price only.

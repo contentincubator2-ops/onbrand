@@ -57,7 +57,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     code: "first_task",
     route: "onboarding", order: 3, points: 10,
     title: "初試身手",
-    description: "跑完第一個 30 秒任務，看到 AI 產出",
+    description: "跑完第一個任務，看到 AI 產出",
     icon: "Zap",
     // 2026-07-14: /30s tier route removed 2026-05-27 → 404; tasks are platform-first
     ctaPath: "/tasks/fb", ctaText: "挑一個任務試試",
@@ -183,7 +183,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     code: "subscribed",
     route: "upgrade", order: 2, points: 50,
     title: "OnBrand 付費用戶",
-    description: "升級至付費方案，無限 30 秒任務一路跑",
+    description: "升級至付費方案，任務無限一路跑",
     icon: "Crown",
     ctaPath: "/pricing", ctaText: "查看方案",
   },

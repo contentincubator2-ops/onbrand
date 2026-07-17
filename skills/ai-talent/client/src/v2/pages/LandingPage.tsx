@@ -101,8 +101,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? "Lock your brand positioning once. Every caption stays on-brand. Brand Brain · 30s/60s/99s · 7-Day Publisher · 168 award-craft tasks."
-        : "鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 30s/60s/99s · 七日發布台 · 168 個得獎工藝任務。",
+        ? "Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · 7-Day Publisher · 168 award-craft tasks."
+        : "鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 七日發布台 · 168 個得獎工藝任務。",
     );
     return () => {
       dead = true;
@@ -135,13 +135,13 @@ export default function LandingPage() {
   const FEATURES = en
     ? [
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
-        ["02", "Content Tiers", "30s a post · 60s a pack · 99s a campaign."],
+        ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
         ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
         ["04", "Award-Craft", "168 tasks, each carrying its own award-winning craft."],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
-        ["02", "三種規格", "30s 一篇 · 60s 套組 · 99s 完整活動"],
+        ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
         ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
         ["04", "得獎工藝", "168 個任務，每個內建得獎案例工藝"],
       ];
@@ -562,7 +562,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "我需要多久時間才能上手？",
-          a: "14 步品牌定位流程約 10 分鐘完成。完成後第一篇貼文 30 秒就能產出，跨平台套組 60 秒，完整活動規劃 99 秒。",
+          a: "14 步品牌定位流程約 10 分鐘完成。完成後即可產出單篇貼文、跨平台內容套組，或完整的活動企劃。",
         },
         {
           q: "OnBrand 適合哪些行業？",

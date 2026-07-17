@@ -122,8 +122,8 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
           </div>
           <p className="text-sm text-default-500">
             {en
-              ? "Set brand-specific text and image instructions for each platform. 30s, 60s, 99s, and 7-Day Publisher tasks automatically apply these when generating content for that platform."
-              : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。30s / 60s / 99s / 七日發布台 在該平台跑任務時會自動套用。"}
+              ? "Set brand-specific text and image instructions for each platform. Every task and the 7-Day Publisher automatically applies these when generating content for that platform."
+              : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。所有任務與七日發布台在該平台跑任務時會自動套用。"}
           </p>
         </div>
       </div>
@@ -228,8 +228,8 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
       <div className="mt-4 text-xs text-default-500 bg-default-50 rounded-lg p-3 leading-relaxed">
         <div className="font-medium text-default-700 mb-1">{en ? "💡 How it works" : "💡 使用說明"}</div>
         {en
-          ? "Every time a task runs for this platform (e.g. a 30s Facebook post), the system applies the Text and Image instructions above to the content AI for that platform. Platforms left blank fall back to the general brand voice."
-          : "每次跑該平台的任務（如 30s FB 短貼文）時，系統會自動把這裡的「文字指令」+「圖片指令」套用到對應的 AI 專家。未填寫的平台會自動套用通用品牌口吻。"}
+          ? "Every time a task runs for this platform (e.g. a Facebook short post), the system applies the Text and Image instructions above to the content AI for that platform. Platforms left blank fall back to the general brand voice."
+          : "每次跑該平台的任務（如 FB 短貼文）時，系統會自動把這裡的「文字指令」+「圖片指令」套用到對應的 AI 專家。未填寫的平台會自動套用通用品牌口吻。"}
       </div>
     </div>
   );

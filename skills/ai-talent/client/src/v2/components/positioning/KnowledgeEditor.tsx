@@ -111,8 +111,8 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         fontStyle: "italic", maxWidth: 720, marginBottom: 18,
       }}>
         {en
-          ? "Upload your past hits, reference articles, and competitor case studies — when 30s / 60s / 99s / 7-Day Publisher run, they pull from this library first. Closer to your real voice than letting AI start from scratch."
-          : "上傳你過去成功的貼文、外部參考文章、競品案例 — 任務跑 30s / 60s / 99s / 七日發布台 時，會優先從這份知識庫取材，比起讓 AI 從零生成，輸出會更貼近你的真實調性。"}
+          ? "Upload your past hits, reference articles, and competitor case studies — every task and the 7-Day Publisher pulls from this library first. Closer to your real voice than letting AI start from scratch."
+          : "上傳你過去成功的貼文、外部參考文章、競品案例 — 所有任務與七日發布台會優先從這份知識庫取材，比起讓 AI 從零生成，輸出會更貼近你的真實調性。"}
       </p>
 
       {/* Capacity meter */}

@@ -149,10 +149,13 @@ function tierAccent(tier: string | undefined | null): string {
   return "#00b4bc";
 }
 
+// 2026-07-17 (CJ「去除 30s/60s/99s 分類標籤，不再使用時間長度分類」):
+// tier stays as INTERNAL engine config (routing / quota / timeouts), but the
+// user-facing classification is by deliverable, never by duration.
 function tierLabel(tier: string | undefined | null, lang: string): string {
-  if (tier === "60s") return lang === "en" ? "60s" : "60 秒";
-  if (tier === "99s") return lang === "en" ? "99s" : "99 秒";
-  return lang === "en" ? "30s" : "30 秒";
+  if (tier === "60s") return lang === "en" ? "Pack" : "套組";
+  if (tier === "99s") return lang === "en" ? "Campaign" : "企劃";
+  return lang === "en" ? "Single" : "單篇";
 }
 
 // Tasks that should hold the modal open until image is done
@@ -201,10 +204,10 @@ interface TierTab {
 }
 
 const TIER_TABS: TierTab[] = [
-  { id: "all",  labelZh: "全部",           labelEn: "All",            accent: "#171717" },
-  { id: "30s",  labelZh: "一篇內容 · 30s", labelEn: "Single · 30s",   accent: "#00b4bc" },
-  { id: "60s",  labelZh: "內容套組 · 60s", labelEn: "Pack · 60s",     accent: "#7c3aed" },
-  { id: "99s",  labelZh: "完整活動 · 99s", labelEn: "Campaign · 99s", accent: "#f59e0b" },
+  { id: "all",  labelZh: "全部",     labelEn: "All",      accent: "#171717" },
+  { id: "30s",  labelZh: "單篇內容", labelEn: "Single",   accent: "#00b4bc" },
+  { id: "60s",  labelZh: "內容套組", labelEn: "Pack",     accent: "#7c3aed" },
+  { id: "99s",  labelZh: "完整企劃", labelEn: "Campaign", accent: "#f59e0b" },
 ];
 
 // ── Format category config (FB only) ────────────────────────────────────────
@@ -1771,12 +1774,12 @@ function PlatformTaskPageInner() {
                         color="default"
                         className="w-20 h-20 ring-2 ring-white/60"
                       />
-                      {/* Speed badge — top right */}
+                      {/* Deliverable badge — top right (no duration labels) */}
                       <span
-                        className="absolute top-2 right-2 text-tiny font-bold px-2 py-0.5 rounded-full text-white shadow-sm tabular-nums"
+                        className="absolute top-2 right-2 text-tiny font-bold px-2 py-0.5 rounded-full text-white shadow-sm"
                         style={{ background: accent, fontSize: 9, letterSpacing: "0.06em" }}
                       >
-                        {taskTier === "99s" ? "99s" : taskTier}
+                        {tierLabel(taskTier, lang)}
                       </span>
                       {/* Last-used badge — bottom right, only when used before */}
                       {(() => {
@@ -1867,12 +1870,12 @@ function PlatformTaskPageInner() {
                       )}
                     </p>
                   </div>
-                  {/* Tier badge in modal header */}
+                  {/* Deliverable badge in modal header (no duration labels) */}
                   <span
-                    className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
                     style={{ background: tierAccent(effectiveTier(activeTask)) }}
                   >
-                    {effectiveTier(activeTask)}
+                    {tierLabel(effectiveTier(activeTask), lang)}
                   </span>
                 </div>
               </ModalHeader>

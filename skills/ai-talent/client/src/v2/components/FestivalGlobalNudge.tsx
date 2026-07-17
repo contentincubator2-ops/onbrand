@@ -74,7 +74,9 @@ export default function FestivalGlobalNudge() {
         <button
           onClick={() => {
             const topic = `${f.name_zh}${f.contentHint ? " — " + f.contentHint : ""}`;
-            navigate(`/99s?topic=${encodeURIComponent(topic)}`);
+            // 2026-07-17: /99s tier route was removed 2026-05-27 (404) —
+            // tasks are platform-first now.
+            navigate(`/tasks/fb?topic=${encodeURIComponent(topic)}`);
           }}
           className="px-3 py-1 rounded text-[11px] font-semibold whitespace-nowrap"
           style={{ background: "#171717", color: "white" }}

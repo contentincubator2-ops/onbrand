@@ -209,11 +209,11 @@ export const PLANS: Record<PlanCode, Plan> = {
     },
     features: [
       "1 個品牌 · 1 位用戶",
-      "每月 50 次執行（30s + 60s 任務，每次含所有變體 + 圖）",
+      "每月 50 次執行（單篇＋套組任務，每次含所有變體 + 圖）",
       "AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
       "品牌大腦定位（USP · 語氣 · 受眾）",
       "電子發票（個人 / B2B）",
-      "99s 深度研究任務：升級 Solo 解鎖",
+      "深度研究企劃：升級 Solo 解鎖",
     ],
     highlight: "US$75／月",
   },
@@ -249,7 +249,7 @@ export const PLANS: Record<PlanCode, Plan> = {
     },
     features: [
       "1000 點試用額度（不重置，用完即停）",
-      "30s / 60s / 99s 任務模板（≈10–16 篇文案或 10 張圖）",
+      "全任務模板（≈10–16 篇文案或 10 張圖）",
       "7 天時間上限（先到先停）",
       "Email / LINE 客服",
       "免綁信用卡",
@@ -298,7 +298,7 @@ export const PLANS: Record<PlanCode, Plan> = {
     },
     features: [
       "1 個品牌 · 1 位用戶",
-      "無限文案（30s / 60s / 99s 全任務模板）",
+      "無限文案（單篇 / 套組 / 企劃全任務模板）",
       "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
       "電子發票",
       "影片：roadmap 加購包",

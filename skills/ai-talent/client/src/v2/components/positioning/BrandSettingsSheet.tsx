@@ -314,7 +314,7 @@ function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean
           <Textarea minRows={5} value={positioning} onChange={(e) => setPositioning(e.target.value)}
             placeholder={en ? "If the AI misunderstood the brand, correct it here. This text is injected into every task." : "如果 AI 對品牌的理解有誤，直接在這裡改正。這段會被注入到每一個任務。"} />
           <p className="text-tiny text-default-400 mt-1">
-            {en ? "Injected into all 30s/60s/99s tasks as ground truth." : "會作為事實依據注入所有 30s/60s/99s 任務。"}
+            {en ? "Injected into every task as ground truth." : "會作為事實依據注入所有任務。"}
           </p>
         </Field>
       </div>
@@ -354,8 +354,8 @@ function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean
         </div>
         <p className="text-tiny text-default-400 mt-3 leading-relaxed">
           {en
-            ? "Auto-fill, test scenarios, and all 30s/99s tasks pull real content from these URLs so output matches your actual brand voice — not a guess."
-            : "AI 自動填寫、測試情境、所有 30s/99s 任務都會去抓這些連結的真實內容，讓產出貼合品牌語氣，而不是亂猜。"}
+            ? "Auto-fill, test scenarios, and every task pull real content from these URLs so output matches your actual brand voice — not a guess."
+            : "AI 自動填寫、測試情境、所有任務都會去抓這些連結的真實內容，讓產出貼合品牌語氣，而不是亂猜。"}
         </p>
       </div>
 

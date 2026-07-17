@@ -306,9 +306,9 @@ export default function AccountPage() {
                 {/* Cost cheatsheet */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {[
-                    { key: "task_30s",   label: lang === "en" ? "30s · Single"  : "30s 單品" },
-                    { key: "task_60s",   label: lang === "en" ? "60s · Pack"    : "60s 套組" },
-                    { key: "task_99s",   label: lang === "en" ? "99s · Slate"   : "99s 檔期" },
+                    { key: "task_30s",   label: lang === "en" ? "Single"   : "單篇" },
+                    { key: "task_60s",   label: lang === "en" ? "Pack"     : "套組" },
+                    { key: "task_99s",   label: lang === "en" ? "Campaign" : "企劃" },
                     { key: "image_flux", label: lang === "en" ? "AI image"      : "AI 圖片" },
                   ].map(({ key, label }) => (
                     <div key={key} className="bg-neutral-50 rounded-lg px-3 py-2">

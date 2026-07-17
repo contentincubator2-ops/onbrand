@@ -526,8 +526,8 @@ export default function BrandsPage() {
         await unlockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       } else {
         const msg = lang === "en"
-          ? `Lock "${tabName}"?\nAfter locking:\n· Editor goes read-only (unlock to change)\n· Every channel uses this as the single source of truth\n· All 30s / 60s / 99s / 7-Day Publisher tasks show the locked badge\nYou can unlock anytime.`
-          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有 30s/60s/99s/七日發布台任務都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`;
+          ? `Lock "${tabName}"?\nAfter locking:\n· Editor goes read-only (unlock to change)\n· Every channel uses this as the single source of truth\n· All tasks and the 7-Day Publisher show the locked badge\nYou can unlock anytime.`
+          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有任務與七日發布台都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`;
         if (!confirm(msg)) return;
         await lockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       }
@@ -1493,8 +1493,8 @@ export default function BrandsPage() {
                       </p>
                       <p className="text-tiny text-default-700 m-0">
                         {lang === "en"
-                          ? "Once locked: editor goes read-only · every channel (30s / 60s / 99s / 7-Day Publisher) uses this as the single source of truth"
-                          : "鎖定後：編輯欄變唯讀 · 全平台 (30s/60s/99s/七日發布台) 用這份為單一真相"}
+                          ? "Once locked: editor goes read-only · every task and the 7-Day Publisher uses this as the single source of truth"
+                          : "鎖定後：編輯欄變唯讀 · 所有任務與七日發布台用這份為單一真相"}
                       </p>
                     </>
                   )}
@@ -3057,8 +3057,8 @@ function PositioningCompletionBridge({
           maxWidth: 620,
         }}>
           {lang === "en"
-            ? "This positioning becomes the backbone for 30s Singles, 60s Packs, 99s Slates, and 7-Day Publisher — every post is built from it, so the AI never sounds off-brand again."
-            : "這份定位現在會自動成為 30s 單品、60s 套組、99s 檔期、七日發布台 的內容骨架 — 每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。"}
+            ? "This positioning becomes the backbone for every task and the 7-Day Publisher — every post is built from it, so the AI never sounds off-brand again."
+            : "這份定位現在會自動成為所有任務與七日發布台的內容骨架 — 每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。"}
         </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

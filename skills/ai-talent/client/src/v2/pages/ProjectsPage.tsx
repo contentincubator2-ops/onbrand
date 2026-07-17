@@ -573,9 +573,9 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
           </p>
           <p className="text-tiny text-default-500 mb-4">
             {lang === "en" ? (
-              <>Run a task in 30s / 60s / 99s / 7-Day Publisher and outputs land here.<br />Or start a new project:</>
+              <>Run any platform task or the 7-Day Publisher and outputs land here.<br />Or start a new project:</>
             ) : (
-              <>到 30s / 60s / 99s / 七日發布台 跑任務，產出會自動進來。<br />或直接建立新任務：</>
+              <>到各平台任務牆或七日發布台跑任務，產出會自動進來。<br />或直接建立新任務：</>
             )}
           </p>
           <button

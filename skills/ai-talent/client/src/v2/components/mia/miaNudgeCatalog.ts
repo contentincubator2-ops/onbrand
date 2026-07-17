@@ -150,10 +150,10 @@ export const NUDGE_CATALOG = {
     id: "task.fb.first_run_done",
     message: {
       "zh-TW":
-        "FB 廣告文寫好了！想做 A/B Test？切到「60s 套組」可以一鍵生成 3 種變體" +
+        "FB 廣告文寫好了！想做 A/B Test？「內容套組」任務可以一鍵生成 3 種變體" +
         "（同一個 USP、不同切入角度）。要是想搭配主視覺，按右上「生成主視覺」就會用同一份品牌大腦配圖。",
       en:
-        "Your FB ad copy is ready. Want to A/B test? Switch to the 60s pack " +
+        "Your FB ad copy is ready. Want to A/B test? A content-pack task " +
         "tier — you'll get 3 variants (same USP, different angles). Need an " +
         "image? The 'Generate Visual' button uses the same Brand Brain.",
     },
@@ -167,11 +167,11 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "IG Reels 腳本好了。下一步可以配主視覺或縮圖——按右上「生成主視覺」" +
-        "用同一份品牌大腦做圖。想做完整貼文套組（單圖 + 輪播 + Reels），切到 60s 套組。",
+        "用同一份品牌大腦做圖。想做完整貼文套組（單圖 + 輪播 + Reels），改跑「內容套組」任務。",
       en:
         "IG Reels script ready. Next: generate matching cover or visuals via " +
         "the top-right button (uses your Brand Brain). For a full set " +
-        "(single image + carousel + Reels), switch to 60s pack tier.",
+        "(single image + carousel + Reels), run a content-pack task.",
     },
     actions: [
       { kind: "open_task", tier: "60s", topic: "ig-pack", label: "做完整套組 →" },
@@ -196,10 +196,10 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "TikTok 腳本好了！如果想做系列（埋伏筆 → 解謎 → 反轉的三集結構），" +
-        "切到 99s 完整活動，會一次給你 3-5 集的弧線。",
+        "改跑「完整企劃」任務，會一次給你 3-5 集的弧線。",
       en:
         "TikTok script ready. Want a series (setup → reveal → twist across 3 " +
-        "episodes)? Switch to 99s campaign tier — you'll get the full arc.",
+        "episodes)? Run a campaign task — you'll get the full arc.",
     },
     actions: [
       { kind: "open_task", tier: "99s", topic: "tiktok-series", label: "做系列 →" },
@@ -353,10 +353,10 @@ export const NUDGE_CATALOG = {
     id: "tier.60s_pack_done",
     message: {
       "zh-TW":
-        "📦 60s 內容套組好了！這是 FB + IG + YT 三平台版本，每個都套同一個品牌大腦——" +
+        "📦 內容套組好了！這是 FB + IG + YT 三平台版本，每個都套同一個品牌大腦——" +
         "但語氣 / 長度 / 主題標籤是各平台優化過的。想看每個平台的差異對照，按右上「並排檢視」。",
       en:
-        "📦 60s pack ready! Same Brand Brain applied to FB / IG / YT versions, " +
+        "📦 Content pack ready! Same Brand Brain applied to FB / IG / YT versions, " +
         "but tone / length / hashtags are platform-tuned. Hit 'Side-by-side' " +
         "(top-right) to compare across channels.",
     },
@@ -468,11 +468,11 @@ export const NUDGE_CATALOG = {
     id: "payment.upgrade_success",
     message: {
       "zh-TW":
-        "🎊 方案升級完成！多解鎖的功能我幫你列一下：(1) 七日發布台無上限，(2) 99s 完整活動，" +
+        "🎊 方案升級完成！多解鎖的功能我幫你列一下：(1) 七日發布台無上限，(2) 完整企劃任務，" +
         "(3) FB 直接發布，(4) 多人協作。想看完整功能差異，「設定 → 方案 → 比較」。",
       en:
         "🎊 Plan upgraded! Newly unlocked: (1) Unlimited 7-Day Publisher, " +
-        "(2) 99s campaign tier, (3) Direct FB publish, (4) Team collaboration. " +
+        "(2) campaign tasks, (3) Direct FB publish, (4) Team collaboration. " +
         "See full diff: Settings → Plan → Compare.",
     },
   },
@@ -520,12 +520,12 @@ export const NUDGE_CATALOG = {
         "FB 貼文好了！右側可以做的事：\n" +
         "① 💬「跟 AI 專家改文案」→ 調整 CTA 語氣、縮短段落、或讓 hook 更強\n" +
         "② 🖼️ → 換配圖提示詞重新生圖\n" +
-        "想做 A/B 三版本？切到「60s 套組」。",
+        "想做 A/B 三版本？改跑「內容套組」任務。",
       en:
         "FB post ready! What you can do on the right:\n" +
         "① 💬 'Refine with AI Expert' → sharpen the CTA, shorten a paragraph, or punch up the hook\n" +
         "② 🖼️ → swap image prompt and regenerate\n" +
-        "Want 3 A/B versions? Switch to the 60s pack tier.",
+        "Want 3 A/B versions? Run a content-pack task.",
     },
   },
 
@@ -709,10 +709,10 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "👋 歡迎回來。你上次離開後我們新加了幾個東西：(1) 七日發布台支援 LINE，" +
-        "(2) 99s 完整活動類別擴充，(3) 多模型可選 Claude 4.8 / GPT-5。要不要快速看一下？",
+        "(2) 完整企劃任務類別擴充，(3) 多模型可選 Claude 4.8 / GPT-5。要不要快速看一下？",
       en:
         "👋 Welcome back. Since you left: (1) 7-Day Publisher now supports " +
-        "LINE, (2) more 99s campaign categories, (3) Claude 4.8 / GPT-5 model " +
+        "LINE, (2) more campaign task categories, (3) Claude 4.8 / GPT-5 model " +
         "options. Quick tour?",
     },
     actions: [

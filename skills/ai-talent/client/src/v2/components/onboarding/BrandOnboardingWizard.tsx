@@ -286,11 +286,11 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   {(lang === "en" ? [
                     { num: "01", label: "Add your brand", desc: "Name, site, FB — entry points so AI pulls real content" },
                     { num: "02", label: "Run the method", desc: "14-step deep dive: Golden Circle → Differentiation → Voice" },
-                    { num: "03", label: "Auto-generate content", desc: "30s Single / 60s Pack / 99s Slate" },
+                    { num: "03", label: "Auto-generate content", desc: "Singles / Packs / Campaigns" },
                   ] : [
                     { num: "01", label: "建立品牌", desc: "名稱、官網、FB — 給 AI 抓真實內容的入口" },
                     { num: "02", label: "套用定位法", desc: "14 步深度分析：黃金圈 → 差異化 → Voice" },
-                    { num: "03", label: "內容自動產出", desc: "30s 單品 / 60s 套組 / 99s 檔期" },
+                    { num: "03", label: "內容自動產出", desc: "單篇 / 套組 / 完整企劃" },
                   ]).map((s, i, arr) => (
                     <div
                       key={s.num}
@@ -571,8 +571,8 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 }}>
                   {jobData?.status === "done"
                     ? (lang === "en"
-                      ? "All 10 sections are done — Golden Circle, target audience, differentiation, and Voice are written to your Brand DNA. From here on, every 30s / 60s / 99s / 7-Day Publisher post uses this as its backbone."
-                      : "10 個段落全部完成 — 黃金圈、目標受眾、差異化、Voice 已寫入品牌大腦。從現在起 30s / 60s / 99s / 七日發布台 的每一篇內容都會以此為骨架產出。")
+                      ? "All 10 sections are done — Golden Circle, target audience, differentiation, and Voice are written to your Brand DNA. From here on, every task and 7-Day Publisher post uses this as its backbone."
+                      : "10 個段落全部完成 — 黃金圈、目標受眾、差異化、Voice 已寫入品牌大腦。從現在起所有任務與七日發布台的每一篇內容都會以此為骨架產出。")
                     : (lang === "en"
                       ? "Full positioning still running in the background (we'll ping you bottom-left). You can head to the workspace to watch the 10 steps live, or jump in with the interim positioning and write your first post."
                       : "完整定位仍在背景跑（左下會通知）— 你可以先到工作區看 10 步即時推理，或直接用臨時定位開始試寫第一篇。")}

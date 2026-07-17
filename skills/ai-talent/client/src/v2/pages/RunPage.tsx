@@ -1582,7 +1582,14 @@ export default function RunPage() {
         <Chip size="sm" variant="flat" className="font-mono text-[10px]">
           {effectiveVariant ? `${effectiveVariant.platform}:${effectiveVariant.format}` : "?"} · {data.mission?.taskId ?? "no-task"}
         </Chip>
-        {data.mission?.tier && <Chip size="sm" variant="flat" color="secondary">{data.mission.tier}</Chip>}
+        {/* 2026-07-17 (CJ): deliverable label, not duration — tier is internal config */}
+        {data.mission?.tier && (
+          <Chip size="sm" variant="flat" color="secondary">
+            {data.mission.tier === "60s" ? (lang === "en" ? "Pack" : "套組")
+              : data.mission.tier === "99s" ? (lang === "en" ? "Campaign" : "企劃")
+              : (lang === "en" ? "Single" : "單篇")}
+          </Chip>
+        )}
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
           {data.status}
         </Chip>

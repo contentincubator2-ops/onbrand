@@ -47,8 +47,8 @@ function getPersonas(lang: Lang): Record<PersonaId, PersonaMeta> {
       label: en ? "Copy Director" : "文字總監",
       seed: "Copywriter-Drop",
       defaultLine: en
-        ? "Once your positioning is locked, I'll build a unified brand voice, preferred words, and banned terms — every 30s / 60s / 99s task pulls from this playbook."
-        : "等你的定位鎖定後，我會為你建立統一的品牌語氣、用字偏好、禁用詞，30s / 60s / 99s 任務都會吃這份手冊。",
+        ? "Once your positioning is locked, I'll build a unified brand voice, preferred words, and banned terms — every task pulls from this playbook."
+        : "等你的定位鎖定後，我會為你建立統一的品牌語氣、用字偏好、禁用詞，所有任務都會吃這份手冊。",
       domain: en ? "Brand Voice & Copy" : "Brand Voice & Copy",
     },
     librarian: {
@@ -63,8 +63,8 @@ function getPersonas(lang: Lang): Record<PersonaId, PersonaMeta> {
       label: en ? "Creative Director" : "創意總監",
       seed: "Creative-Drop",
       defaultLine: en
-        ? "Once positioning + copy + knowledge are ready, I turn them into the skeleton of every post — 30s quick drafts, 60s production packs, 99s full plans."
-        : "定位 + 文字 + 知識備好後，我會把它們轉成每篇貼文的骨架 — 30s 單品、60s 套組、99s 檔期。",
+        ? "Once positioning + copy + knowledge are ready, I turn them into the skeleton of every post — quick singles, production packs, full campaigns."
+        : "定位 + 文字 + 知識備好後，我會把它們轉成每篇貼文的骨架 — 單篇、套組、完整企劃。",
       domain: en ? "Creative Direction" : "Creative Direction",
     },
   };
