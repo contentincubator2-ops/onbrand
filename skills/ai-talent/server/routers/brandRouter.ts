@@ -667,7 +667,8 @@ export const brandRouter = router({
         brandName: (brand as any).name,
         industry: (brand as any).industry ?? undefined,
         description: (brand as any).description ?? undefined,
-        steps: buildBrandPositioningSteps({ lang: "zh-TW" }),
+        // 2026-07-17 多市場: 用品牌自己的 outputLanguage（was 硬寫 zh-TW）。
+        steps: buildBrandPositioningSteps({ lang: "zh-TW", outputLanguage: (brand as any).outputLanguage ?? undefined }),
       });
       return { ok: true as const };
     }),

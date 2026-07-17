@@ -69,6 +69,14 @@ export interface StepContext {
    *  Injected before wave-1 so ALL steps can ground their output in real
    *  brand content rather than hallucinating from the name alone. */
   realContent?: string;
+  /** 2026-07-17 多市場: compact market block from buildMarketContext —
+   *  scopes competitor / trend / audience research to the brand's
+   *  target market. Loaded once per pipeline in runPipelineDetached
+   *  (product/event inherit the parent brand's market). */
+  marketContext?: string;
+  /** Brand's outputLanguage (BCP 47). Steps' SYS language derives from
+   *  the builder opts; this is here for ctx-level consumers. */
+  outputLanguage?: string;
   // outputs from already-completed steps in this run, keyed by step id
   prevOutputs: Record<string, any>;
   /** Helper to record cost — runner calls this after each LLM call. */
@@ -218,11 +226,14 @@ export async function resumeInterruptedPositioningJobs(): Promise<void> {
       `SELECT pj.userId, pj.entityKind, pj.entityId, pj.totalSteps,
               COALESCE(b.brandName, p.name, e.name) AS entityName,
               b.industry                             AS brandIndustry,
-              p.positioning                          AS productPositioning
+              p.positioning                          AS productPositioning,
+              COALESCE(b.outputLanguage, pb.outputLanguage, eb.outputLanguage) AS outputLanguage
          FROM positioning_jobs pj
          LEFT JOIN brands   b ON pj.entityKind = 'brand'   AND b.id = pj.entityId AND b.userId   = pj.userId
          LEFT JOIN products p ON pj.entityKind = 'product' AND p.id = pj.entityId AND p.userId   = pj.userId
          LEFT JOIN events   e ON pj.entityKind = 'event'   AND e.id = pj.entityId AND e.userId   = pj.userId
+         LEFT JOIN brands  pb ON pb.id = p.brandId
+         LEFT JOIN brands  eb ON eb.id = e.brandId
         WHERE pj.status IN ('pending', 'running')
           AND pj.finishedAt IS NULL`,
     );
@@ -261,10 +272,13 @@ export async function resumeInterruptedPositioningJobs(): Promise<void> {
         } catch { /* ignore */ }
       }
 
+      // 2026-07-17 多市場: resume with the brand's outputLanguage (was
+      // hardcoded zh-TW — a US brand's interrupted job resumed in Chinese).
+      const stepOpts = { lang: "zh-TW", outputLanguage: row.outputLanguage ?? undefined };
       const steps =
-        kind === "brand"   ? buildBrandPositioningSteps({ lang: "zh-TW" }) :
-        kind === "product" ? buildProductPositioningSteps({ lang: "zh-TW" }) :
-                             buildEventPositioningSteps({ lang: "zh-TW" });
+        kind === "brand"   ? buildBrandPositioningSteps(stepOpts) :
+        kind === "product" ? buildProductPositioningSteps(stepOpts) :
+                             buildEventPositioningSteps(stepOpts);
 
       console.log(`[positioningJobRunner] startup: re-queuing ${kind}:${entityId} "${name}"`);
       startPositioningJob({
@@ -404,6 +418,37 @@ async function runPipelineDetached(args: {
     }
   }
 
+  // 2026-07-17 多市場: load the entity's market ONCE per pipeline and inject
+  // into every step's ctx so competitor / trend / audience research is
+  // scoped to the brand's target market (product/event inherit from the
+  // parent brand). Fail-safe: no market fields → empty context (= legacy).
+  let marketContext: string | undefined;
+  let outputLanguage: string | undefined;
+  try {
+    const brandIdForMarket = args.entityKind === "brand"
+      ? args.entityId
+      : await (async () => {
+          const table = args.entityKind === "product" ? "products" : "events";
+          const [r]: any = await localPool.execute(
+            `SELECT brandId FROM \`${table}\` WHERE id = ? LIMIT 1`, [args.entityId]);
+          return Number((r as any[])[0]?.brandId ?? 0) || null;
+        })();
+    if (brandIdForMarket) {
+      const [br]: any = await localPool.execute(
+        `SELECT targetCountry, outputLanguage, marketContextOverride FROM brands WHERE id = ? LIMIT 1`,
+        [brandIdForMarket],
+      );
+      const b = (br as any[])[0];
+      if (b?.targetCountry) {
+        const { buildMarketContext } = await import("./marketProfiles");
+        marketContext = await buildMarketContext(b.targetCountry, b.outputLanguage, b.marketContextOverride) || undefined;
+        outputLanguage = b.outputLanguage ?? undefined;
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[positioningJobRunner] market load failed (non-fatal):`, e?.message ?? e);
+  }
+
   // Build adjacency: id → step
   const stepMap = new Map(args.steps.map((s) => [s.id, s]));
   const completed = new Set<string>();
@@ -443,6 +488,8 @@ async function runPipelineDetached(args: {
             industry: args.industry,
             description: args.description,
             realContent,
+            marketContext,
+            outputLanguage,
             prevOutputs: outputs,
             recordUsage,
           };

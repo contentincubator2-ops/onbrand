@@ -32,7 +32,7 @@ import localPool from "../localDb";
 const entityKindSchema = z.enum(["brand", "product", "event"]);
 
 async function loadEntity(kind: "brand"|"product"|"event", id: number, userId: number): Promise<{
-  name: string; industry?: string; description?: string;
+  name: string; industry?: string; description?: string; outputLanguage?: string;
 } | null> {
   const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
   const [rows]: any = await localPool.execute(
@@ -41,11 +41,22 @@ async function loadEntity(kind: "brand"|"product"|"event", id: number, userId: n
   );
   const row = (rows as any[])[0];
   if (!row) return null;
+  // 2026-07-17 多市場: brand carries outputLanguage itself; product/event
+  // inherit the parent brand's. Drives the positioning report language.
+  let outputLanguage: string | undefined = row.outputLanguage ?? undefined;
+  if (kind !== "brand" && !outputLanguage && row.brandId) {
+    try {
+      const [br]: any = await localPool.execute(
+        `SELECT outputLanguage FROM brands WHERE id = ? LIMIT 1`, [row.brandId]);
+      outputLanguage = (br as any[])[0]?.outputLanguage ?? undefined;
+    } catch { /* non-fatal */ }
+  }
   // Brand uses brandName / industry / description; product/event use name / category / description
   return {
     name: String(row.brandName ?? row.name ?? ""),
     industry: row.industry ?? row.category ?? undefined,
     description: row.description ?? undefined,
+    outputLanguage,
   };
 }
 
@@ -67,7 +78,9 @@ export const positioningJobsRouter = router({
       if (!ent) {
         return { ok: false as const, error: `${input.entityKind} not found` };
       }
-      const langOpt = { lang: input.lang === "en" ? "en" : "zh-TW" };
+      // 2026-07-17 多市場: 品牌的 outputLanguage 優先於 client 傳的 lang
+      // （client 全部硬寫 zh-TW；伺服器從品牌列推導才是正解）。
+      const langOpt = { lang: input.lang === "en" ? "en" : "zh-TW", outputLanguage: ent.outputLanguage };
       const steps =
         input.entityKind === "brand"   ? buildBrandPositioningSteps(langOpt) :
         input.entityKind === "product" ? buildProductPositioningSteps(langOpt) :

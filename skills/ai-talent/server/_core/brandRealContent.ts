@@ -39,18 +39,28 @@ async function fetchSocialViaPerplexity(args: {
   platform: string;
   label: string;
   url: string;
+  /** 2026-07-17 多市場: brand outputLanguage — non-zh brands get searched
+   *  with English keywords (Chinese queries find nothing for a US brand). */
+  outputLanguage?: string | null;
 }): Promise<string | null> {
   try {
+    const isZh = !args.outputLanguage || args.outputLanguage.toLowerCase().startsWith("zh");
     const items = await Promise.race([
       perplexityScout.fetch({
         brandId: 0,
         brandName: args.brandName,
         industry: undefined,
-        keywords: [
-          `${args.brandName} ${args.label} 最近貼文`,
-          `${args.brandName} ${args.platform} 內容語氣 風格`,
-          args.url,
-        ],
+        keywords: isZh
+          ? [
+              `${args.brandName} ${args.label} 最近貼文`,
+              `${args.brandName} ${args.platform} 內容語氣 風格`,
+              args.url,
+            ]
+          : [
+              `${args.brandName} ${args.platform} recent posts`,
+              `${args.brandName} ${args.platform} content tone style`,
+              args.url,
+            ],
         competitors: [],
         industryTags: [],
         days: 60,
@@ -90,10 +100,11 @@ export interface BrandRealContent {
 async function loadBrandUrls(brandId: number): Promise<{
   name: string; industry: string | null; description: string | null;
   website: string | null; socialLinks: Record<string, string> | null;
+  outputLanguage: string | null;
 } | null> {
   try {
     const [rows]: any = await localPool.execute(
-      `SELECT name, industry, description, website, socialLinks FROM brands WHERE id = ? LIMIT 1`,
+      `SELECT name, industry, description, website, socialLinks, outputLanguage FROM brands WHERE id = ? LIMIT 1`,
       [brandId],
     );
     const row = (rows as any[])[0];
@@ -105,6 +116,7 @@ async function loadBrandUrls(brandId: number): Promise<{
       industry: row.industry ?? null,
       description: row.description ?? null,
       website: row.website ?? null,
+      outputLanguage: row.outputLanguage ?? null,
       socialLinks: (social && typeof social === "object") ? social : null,
     };
   } catch { return null; }
@@ -185,6 +197,7 @@ export async function getBrandRealContent(
       // Strategy A: Perplexity first (real post content from web index)
       const viaPerplexity = await fetchSocialViaPerplexity({
         brandName: brand.name, platform: cls.platform, label: cls.label, url,
+        outputLanguage: brand.outputLanguage,
       });
       if (viaPerplexity) {
         return { label: cls.label, block: viaPerplexity.slice(0, MAX_CHARS_PER_SOURCE) };

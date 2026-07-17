@@ -79,8 +79,30 @@ async function callJSON(ctx: StepContext, stepId: string, system: string, user: 
 
 const SYS = (lang: string) => `你是品牌定位專家，請用${lang}回答，輸出純 JSON。`;
 
+// 2026-07-17 多市場: brands.outputLanguage (BCP 47) → SYS 語言標籤。
+// 回傳 null = 沿用舊 lang 參數（zh-TW/en 二元）行為。
+function langLabelOf(outputLanguage?: string | null): string | null {
+  if (!outputLanguage) return null;
+  const l = outputLanguage.trim().toLowerCase();
+  if (!l || l === "zh-tw" || l === "zh-hant") return null; // legacy default
+  if (l.startsWith("en")) return "English";
+  if (l.startsWith("ja")) return "日本語";
+  if (l.startsWith("ko")) return "한국어";
+  if (l === "zh-cn" || l === "zh-hans") return "简体中文";
+  return `${outputLanguage}（品牌目標市場語言）`;
+}
+
+// 2026-07-17 多市場: 市場段落注入 — 讓競品 / 趨勢 / 受眾研究以品牌目標
+// 市場為範圍，而不是預設台灣。marketContext 由 positioningJobRunner 從
+// brands.targetCountry 經 buildMarketContext 載入（product/event 繼承母品牌）。
+function marketBlock(c: StepContext): string {
+  return c.marketContext
+    ? `\n\n【目標市場設定 — 所有研究（受眾/競品/趨勢/定價）必須以此市場為範圍】${c.marketContext}`
+    : "";
+}
+
 function brandCtx(c: StepContext): string {
-  const base = `品牌名稱：${c.brandName}\n產業：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+  const base = `品牌名稱：${c.brandName}\n產業：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}`;
   if (c.realContent) {
     return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
   }
@@ -94,8 +116,9 @@ function brandCtx(c: StepContext): string {
 // positioningJobRunner.mergePositioning() spreads these straight into
 // brands.positioning — NO post-transform, NO soworkAnalysis detour.
 
-export function buildBrandPositioningSteps(opts: { lang?: string } = {}): PositioningStep[] {
-  const lang = opts.lang === "en" ? "English" : "繁體中文";
+export function buildBrandPositioningSteps(opts: { lang?: string; outputLanguage?: string } = {}): PositioningStep[] {
+  // 多市場: outputLanguage（品牌欄位）優先；否則沿用舊 lang 二元參數。
+  const lang = langLabelOf(opts.outputLanguage) ?? (opts.lang === "en" ? "English" : "繁體中文");
   const sys = SYS(lang);
 
   return [
@@ -224,7 +247,7 @@ WHY：${gc?.why || ""}
 差異化總結：${diff?.summary || ""}
 
 輸出 JSON，鍵名固定如下：
-{"zhTagline":"中文主標語","enTagline":"英文主標語","type":"標語類型（如：四字單句、直擊核心）","scenes":["應用場景1","應用場景2","應用場景3"],"competitorDiff":"與競品標語的差異（一段）","story":"標語背後的品牌故事（150-300字）"}`,
+{"zhTagline":"${lang === "繁體中文" ? "中文主標語" : `主標語（用${lang}——品牌目標市場語言，不要用中文）`}","enTagline":"英文主標語","type":"標語類型（如：四字單句、直擊核心）","scenes":["應用場景1","應用場景2","應用場景3"],"competitorDiff":"與競品標語的差異（一段）","story":"標語背後的品牌故事（150-300字）"}`,
             { zhTagline: "", enTagline: "", type: "", scenes: [], competitorDiff: "", story: "" }, 1200),
         };
       },
@@ -293,11 +316,11 @@ samples 3-4 組。`,
 // Now: ONE step per PRODUCT_SEGMENTS id; each step's id IS the segment id and
 // its LLM prompt emits JSON in EXACTLY that segment's field schema. The runner
 // merges { [segmentId]: <segment object> } straight into products.positioning.
-export function buildProductPositioningSteps(opts: { lang?: string } = {}): PositioningStep[] {
-  const lang = opts.lang === "en" ? "English" : "繁體中文";
+export function buildProductPositioningSteps(opts: { lang?: string; outputLanguage?: string } = {}): PositioningStep[] {
+  const lang = langLabelOf(opts.outputLanguage) ?? (opts.lang === "en" ? "English" : "繁體中文");
   const sys = SYS(lang);
   const pCtx = (c: StepContext) => {
-    const base = `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+    const base = `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}`;
     if (c.realContent) {
       return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
     }
@@ -313,7 +336,7 @@ export function buildProductPositioningSteps(opts: { lang?: string } = {}): Posi
       run: async (c) => ({
         core: await callJSON(c, "core", sys,
           `${pCtx(c)}\n\n撰寫此產品的核心定位。只輸出 JSON，鍵名固定如下：
-{"name":"產品名稱","zhTagline":"中文標語（12字內）","enTagline":"英文標語","coreStatement":"核心定位敘述（80-150字）","oneLineValueProp":"一句話價值主張（速查卡用，30字內）"}`,
+{"name":"產品名稱","zhTagline":"${lang === "繁體中文" ? "中文標語（12字內）" : `標語（用${lang}——目標市場語言，不要用中文）`}","enTagline":"英文標語","coreStatement":"核心定位敘述（80-150字）","oneLineValueProp":"一句話價值主張（速查卡用，30字內）"}`,
           { name: "", zhTagline: "", enTagline: "", coreStatement: "", oneLineValueProp: "" }, 1200),
       }),
     },
@@ -393,11 +416,11 @@ competitors 2-3 個。`,
 // exact field schema. `awards` is left for the dedicated DB-RAG award-matcher
 // in BrandsPage (it needs creative_cases); the background step seeds plausible
 // award DIRECTIONS only, clearly framed, never fabricated DB matches.
-export function buildEventPositioningSteps(opts: { lang?: string } = {}): PositioningStep[] {
-  const lang = opts.lang === "en" ? "English" : "繁體中文";
+export function buildEventPositioningSteps(opts: { lang?: string; outputLanguage?: string } = {}): PositioningStep[] {
+  const lang = langLabelOf(opts.outputLanguage) ?? (opts.lang === "en" ? "English" : "繁體中文");
   const sys = SYS(lang);
   const eCtx = (c: StepContext) => {
-    const base = `活動名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}`;
+    const base = `活動名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}`;
     if (c.realContent) {
       return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
     }
