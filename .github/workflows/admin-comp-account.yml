@@ -1,0 +1,70 @@
+name: "Admin — Comp account (permanent free plan)"
+
+# 2026-07-17 (CJ「將 celine.3c@gmail.com 設定為永久免費帳號」): grant a
+# user a permanent complimentary plan. Sets users.planCode + planStatus
+# ='active' + planEndsAt=NULL (never expires, no Stripe involvement) and
+# syncs the user's workspaces rows. Reusable for future comps.
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "User email to comp"
+        required: true
+        type: string
+      plan:
+        description: "Plan code to grant"
+        required: true
+        default: "drop_pro"
+        type: choice
+        options: [drop_pro, drop_starter, drop_team]
+
+jobs:
+  comp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Grant permanent plan
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          COMP_EMAIL: ${{ inputs.email }}
+          COMP_PLAN: ${{ inputs.plan }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: COMP_EMAIL,COMP_PLAN
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+            # Escape single quotes for SQL safety
+            E=$(printf "%s" "$COMP_EMAIL" | sed "s/'/''/g")
+            PL=$(printf "%s" "$COMP_PLAN" | sed "s/'/''/g")
+
+            echo "===== BEFORE ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive
+               FROM users WHERE email='$E'\G"
+
+            N=$(mysql -h"$H" -u"$U" -p"$P" "$D" -N -e "SELECT COUNT(*) FROM users WHERE email='$E'")
+            if [ "$N" != "1" ]; then
+              echo "❌ Found $N users with email $COMP_EMAIL — aborting (need exactly 1; user must register first)."
+              exit 1
+            fi
+
+            echo "===== APPLY ====="
+            Q "UPDATE users
+                 SET planCode='$PL', planStatus='active', planEndsAt=NULL, isActive=1
+               WHERE email='$E';"
+            Q "UPDATE workspaces
+                 SET planCode='$PL', planStatus='active'
+               WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');"
+
+            echo "===== AFTER ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive
+               FROM users WHERE email='$E'\G"
+            Q "SELECT id, slug, planCode, planStatus FROM workspaces
+               WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');"
+            echo "✓ $COMP_EMAIL comped to $PL (permanent)"
