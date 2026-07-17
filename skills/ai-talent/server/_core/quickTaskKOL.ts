@@ -50,7 +50,7 @@ ${KOL_TONE}`,
   {
     id: "kl-30-influencer-brief",
     tier: "30s", postType: "generic",
-    label: { en: "Influencer Brief", zh: "KOL 合作 Brief（可直接給網紅）" },
+    label: { en: "Influencer Brief", zh: "KOL 合作需求說明（可直接給網紅）" },
     description: "一份結構化的網紅合作 brief：背景、目標、核心訊息、必提必避、產出規格、時程",
     // 2026-05-16 全 KOL 稽核 + CJ「每任務配不同的真 KOL agent」:
     // was 25 = Kevin Lee「SEO Strategist (E-commerce)」(舊 oneliner

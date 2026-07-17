@@ -46,7 +46,7 @@ ${YT_TONE_SUFFIX}
     id: "yt-30-thumbnail-text",
     tier: "30s",
     postType: "video-card",
-    label: "YT 縮圖文案 + 視覺 brief",
+    label: "YT 縮圖文案 + 視覺需求",
     description: "縮圖大字（5-8 字）+ 整體視覺風格方向",
     agent_id: 30014, // Nina Liu — YouTube Script Creator (1929 char persona)
     skill_slug: "youtube-publisher",
@@ -70,7 +70,7 @@ ${YT_TONE_SUFFIX}`,
     id: "yt-30-description-seo",
     tier: "30s",
     postType: "watch",
-    label: "YT description SEO 完整版",
+    label: "YT 說明欄 SEO 完整版",
     description: "含時間戳 / 連結 / hashtag / tags",
     agent_id: 30013, // Eric Chen — SEO Content Writer
     skill_slug: "seo-content-engine",
@@ -157,7 +157,7 @@ image_style_direction.summary 給縮圖風格（9:16）。`,
     id: "yt-30-opening-hook",
     tier: "30s",
     postType: "watch",
-    label: "YT 開場 hook（前 15 秒）",
+    label: "YT 開場鉤子（前 15 秒）",
     description: "口播 + 字幕 + 鏡頭",
     agent_id: 224007, // YouTube Marketing Strategist 跨產業 (~1000 char)
     skill_slug: "youtube-publisher",
@@ -186,7 +186,7 @@ image_style_direction.summary 給縮圖風格（16:9）。`,
     id: "yt-30-end-cta",
     tier: "30s",
     postType: "watch",
-    label: "YT 結尾 CTA + End Screen",
+    label: "YT 結尾行動呼籲 + 片尾畫面",
     description: "訂閱 / 鈴鐺 / 推薦下一片 / 留言引導",
     agent_id: 30004, // Kevin Lin — YouTube Strategy PM
     skill_slug: "youtube-publisher",
@@ -237,7 +237,7 @@ caption 規則：
     id: "yt-30-pinned-comment",
     tier: "30s",
     postType: "watch",
-    label: "YT 釘選留言（hook 引討論）",
+    label: "YT 釘選留言（鉤子引討論）",
     description: "影片發布後第一個釘留言，引討論",
     agent_id: 210252, // Chun-Hao Cheng — Senior YouTube Content Creator
     skill_slug: "youtube-publisher",
@@ -261,14 +261,14 @@ caption 結構：每個變體寫 1 個不同策略的釘留言（80-150 字）�
     id: "yt-30-community-post",
     tier: "30s",
     postType: "community",
-    label: "YT 社群貼文（Community tab）",
+    label: "YT 社群貼文（社群分頁）",
     description: "文字 / 民調 / 預告 3 種型",
     agent_id: 180186, // Mark Yang — KOL Partnership Specialist
     skill_slug: "youtube-publisher",
     primary_question: "今天想在 Community tab 講什麼？",
     primary_input: { key: "topic", placeholder: "例：下集預告 / 問粉絲想看什麼 / 幕後", type: "textarea" },
     inputs: [{ key: "topic", label: "貼文主題", type: "textarea", required: true }],
-    systemPrompt: `產出 YT Community 貼文（每變體 1 種型態）。
+    systemPrompt: `產出 YT 社群貼文（每變體 1 種型態）。
 
 caption 結構（每變體不同）：
 變體 1（純文字型）：100-200 字情感 / 觀點貼文

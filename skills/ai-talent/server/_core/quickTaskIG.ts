@@ -22,7 +22,7 @@ export const IG_30S_TASKS: FBTaskTemplate[] = [
     id: "ig-30-caption-short",
     tier: "30s",
     postType: "feed",
-    label: "IG 短貼文 caption（單圖）",
+    label: "IG 短貼文文案（單圖）",
     description: "80–150 字 IG feed caption + 5-10 個 hashtag",
     agent_id: 180166, // Iris Liang — Instagram Marketing Specialist
     skill_slug: "instagram-copywriting",
@@ -41,7 +41,7 @@ ${FB_TONE_SUFFIX}
     id: "ig-30-pure-text-hook",
     tier: "30s",
     postType: "feed",
-    label: "IG hook 3 種（搭配你的原文）",
+    label: "IG 開場鉤子 3 種（搭配你的原文）",
     description: "3 種不同口吻 hook，自動接你原本的貼文內容",
     agent_id: 222311, // Ming-Han Zhou — Brand Strategist B2B SaaS & SEA (1621 char persona)
     skill_slug: "hook-copywriter",
@@ -62,7 +62,7 @@ ${FB_TONE_SUFFIX}`,
     id: "ig-30-reel-hook",
     tier: "30s",
     postType: "reel",
-    label: "IG Reel 開場 hook（前 3 秒）",
+    label: "IG Reel 開場鉤子（前 3 秒）",
     description: "前 3 秒口播 + 字幕節奏 + 視覺開場 brief",
     agent_id: 60029, // Siyu Lin — TikTok/Reels Short Video Scriptwriter
     skill_slug: "short-video-scriptwriter",
@@ -113,13 +113,13 @@ caption 結構：
     id: "ig-30-story-text",
     tier: "30s",
     postType: "story",
-    label: "IG Story 文案 + sticker 建議",
+    label: "IG 限時動態文案 + 貼圖建議",
     description: "9:16 主標 + 內文 + 推薦 sticker",
     agent_id: 180170, // Nancy Yeh | Social Media Visual Designer
     skill_slug: "brand-story",
     primary_question: "今天的 Story 想說什麼？",
     primary_input: { key: "topic", placeholder: "例：幕後 / 限時優惠 / 提問 / 投票", type: "textarea" },
-    inputs: [{ key: "topic", label: "Story 主題", type: "textarea", required: true }],
+    inputs: [{ key: "topic", label: "限時動態主題", type: "textarea", required: true }],
     systemPrompt: `產出 IG Story 文案。caption 純文字，**絕對不要**夾雜視覺描述、英文 prompt。
 本則固定走「{label}」這一種（驚奇式＝用意外資訊勾住；提問式＝拋問題引互動；幕後式＝給未公開的真實畫面感），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
 caption 結構 — 用換行分段：
@@ -137,13 +137,13 @@ caption 結構 — 用換行分段：
     id: "ig-30-carousel-structure",
     tier: "30s",
     postType: "carousel",
-    label: "IG Carousel 10 頁結構",
+    label: "IG 輪播 10 頁結構",
     description: "1 標題頁 + 8 內容頁 + 1 CTA 頁，每頁文字",
     agent_id: 224094, // Jing Yi Lim — Social Media Strategist B2B SaaS MY (1143 char)
     skill_slug: "short-form-copywriting",
     primary_question: "想做什麼主題的 carousel？（教學 / 清單 / 反差 / 故事）",
     primary_input: { key: "topic", placeholder: "例：5 個被低估的 IG 演算法技巧 / 我從 0 學設計的 3 個錯誤", type: "textarea" },
-    inputs: [{ key: "topic", label: "Carousel 主題", type: "textarea", required: true }],
+    inputs: [{ key: "topic", label: "輪播主題", type: "textarea", required: true }],
     systemPrompt: `產出 IG Carousel（10 頁）的每頁文字。
 本組固定走「{label}」這一種（教學清單型＝可操作的編號清單；故事型＝用敘事弧串起每頁；反差型＝用預期落差貫穿輪播），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
 caption 結構：
@@ -162,7 +162,7 @@ caption 欄位請用「---」分隔每一頁。標號用 1. 2. 3. 結構清楚�
     id: "ig-30-bio-rewrite",
     tier: "30s",
     postType: "profile",
-    label: "IG bio 改寫",
+    label: "IG 個人簡介改寫",
     description: "150 字 bio 含 emoji + 換行 + CTA",
     agent_id: 180168, // Wendy Su — Link in Bio Specialist
     skill_slug: "link-in-bio",
@@ -189,7 +189,7 @@ emoji 適度，不要每行都塞。bio 有字數限制，每字都要算。`,
     id: "ig-30-hashtag-set",
     tier: "30s",
     postType: "feed",
-    label: "IG hashtag 30 個套組",
+    label: "IG 主題標籤 30 個套組",
     description: "3 階分層：核心 5 / 中型 15 / 長尾 10",
     agent_id: 180176, // Michael Wu | Social Media Specialist
     skill_slug: "hashtag-discoverability",
@@ -257,14 +257,14 @@ caption 結構：
     id: "ig-30-live-opening",
     tier: "30s",
     postType: "live",
-    label: "IG Live 開場 30 秒",
+    label: "IG 直播開場 30 秒",
     description: "開場詞 + 暖場互動 + CTA 引留言",
     agent_id: 60072, // Yiting Tsai — Live Shopping Script (Beauty)
     skill_slug: "live-shopping-script",
     primary_question: "今晚直播主題 / 想聊什麼？",
     primary_input: { key: "topic", placeholder: "例：新品試色 / Q&A / 開箱 / 教學", type: "textarea" },
     inputs: [{ key: "topic", label: "直播主題", type: "textarea", required: true }],
-    systemPrompt: `產出 IG Live 開場 30 秒腳本。
+    systemPrompt: `產出 IG 直播開場 30 秒腳本。
 本則固定走「{label}」這一種（懸念式＝拋未解鉤子吊胃口；互動式＝立刻拉觀眾留言參與；直球式＝開門見山講價值），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
 caption 結構：
 [0-10s] 開場詞：[第一句要 hook，不要 "大家好我是 ___"]
@@ -307,7 +307,7 @@ caption 結構：
     skill_slug: "threads-copywriter",
     primary_question: "貼上 IG 那篇 caption（要改寫成 Threads 版本）",
     primary_input: { key: "ig_caption", placeholder: "整段 IG caption 貼進來", type: "textarea" },
-    inputs: [{ key: "ig_caption", label: "原 IG caption", type: "textarea", required: true }],
+    inputs: [{ key: "ig_caption", label: "原 IG 文案", type: "textarea", required: true }],
     systemPrompt: `把 IG caption 改寫成 Threads 風格。Threads ≠ IG：
 - 文字優先，不依賴 hashtag
 - 對話感重（像在 Twitter，不像 IG 廣告）

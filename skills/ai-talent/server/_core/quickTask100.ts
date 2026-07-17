@@ -110,7 +110,7 @@ export const FB_99S_TASKS: FBTaskTemplate[] = [
     // budget to render 5 card images + copy.
     id: "fb-99-carousel-5",
     tier: "99s", postType: "carousel",
-    label: "FB Carousel 5 卡輪播",
+    label: "FB 5 卡輪播",
     description: "Hook→Build→Turn→Payoff→CTA 敘事弧 + 5 張卡（每卡獨立文案＋專屬圖）",
     agent_id: 180148, // David Chen | Social Media Manager
     skill_slug: "social-copy",
@@ -232,7 +232,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
       type: "textarea",
     },
     inputs: [
-      { key: "event_name", label: "活動名稱 + hook/優惠 + 倒數天數 + 截止日", type: "textarea", required: true },
+      { key: "event_name", label: "活動名稱 + 鉤子/優惠 + 倒數天數 + 截止日", type: "textarea", required: true },
     ],
     systemPrompt: `你負責倒數系列的「{label}」這一篇 FB 貼文（80-130 字），這是一篇可直接發佈的 FB 貼文（不是文件）。
 依用戶輸入的「倒數天數（7 或 14）」與「截止日」對位三幕節奏：
@@ -247,7 +247,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
   {
     id: "fb-99-launch-toolkit",
     tier: "99s", postType: "event",
-    label: "FB 完整 Launch Toolkit (8 篇)",
+    label: "FB 完整上線工具包（8 篇）",
     description: "預告 ×3 / 當日 / 即時 ×2 / 事後 / 跨平台 IG 改寫 + scout 抓節慶/時事",
     agent_id: 60014, // Cindy Mo | Social Media Marketing (F&B)
     skill_slug: "fb-copywriting",
@@ -487,7 +487,7 @@ YYYY年M月D日（週N）｜發布時機：[星期幾 時段]
   {
     id: "yt-99-premiere-kit",
     tier: "99s", postType: "premiere",
-    label: "YT Premiere 完整 kit",
+    label: "YT 首播完整包",
     description: "預告影片 + 倒數 community 貼文 + 直播配套 + 精華剪輯指南",
     agent_id: 223995, // Pei-Hsuan Liu — YouTube Marketing Strategist 電商/DTC (1025 char)
     skill_slug: "shorts-scriptwriter",
@@ -515,7 +515,7 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
   {
     id: "tt-99-30day-foryou",
     tier: "99s", postType: "foryou",
-    label: "TikTok 30 天 ForYou 配方",
+    label: "TikTok 30 天推薦頁配方",
     description: "30 天每天 1 支腳本 + trend 對應 + sound 建議 + scout 抓節慶/時事",
     agent_id: 27, skill_slug: "short-video-script", // Chloe Chen | Short Video Strategist (Beauty)
     primary_question: "本月想衝什麼方向？",
@@ -571,7 +571,7 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     // 修法：(1) 統計數據硬規則擴充至 hook；(2) 結尾問句品質規則；(3) 增加禁詞。
     id: "li-99-30day-thought-leadership",
     tier: "99s", postType: "feed",
-    label: "LI 30 天 Thought-Leadership 月曆",
+    label: "LI 30 天意見領袖月曆",
     description: "30 天 = 10 觀點 / 10 案例 / 10 趨勢預測 + scout 抓即時節慶",
     agent_id: 222342, skill_slug: "linkedin-b2b", // Hung Ya-Wen | Social Media Strategist – B2B SaaS
     primary_question: "這個月想立什麼專業 image？（月份 + 核心主題 + 目標受眾職稱 + 你的品牌主張，四項合填）",
@@ -642,7 +642,7 @@ SoWork 語氣 = 「精準守護者、有憑據的科技感」，不是散文，�
     //   (3) hashtag 改為「所有期（含第1期）全文禁 # 字符」。
     id: "li-99-newsletter-quarterly",
     tier: "99s", postType: "newsletter",
-    label: "LI 季度 Newsletter 4 期",
+    label: "LI 季度電子報 4 期",
     description: "季度 4 期 newsletter 完整內容 + 訂閱成長策略",
     agent_id: 60062, skill_slug: "linkedin-b2b", // Nathan Lu | Media Newsletter Copywriter
     primary_question: "季度大主題 + 各期子題 + 目標讀者行動 + 品牌主張（四項合填）",
@@ -735,7 +735,7 @@ SoWork 語氣 = 「精準守護者、有憑據的科技感」，深度論述但�
     // 完整重寫 prompt（對照 em-99-launch-sequence 工法）+問題+orchestra 修復。
     id: "em-99-4week-nurture",
     tier: "99s", postType: "edm",
-    label: "Email 4 週 Onboarding Nurture",
+    label: "Email 4 週新客培育序列",
     description: "4 週 onboarding：第1週 Why / 第2週 What / 第3週 How / 第4週 Deepen",
     agent_id: 224161, skill_slug: "email-marketing", // Xenia Anggraini — Email & CRM Strategist Beauty ID
     primary_question: "品牌/產品名稱 + 目標受眾職稱 + 4 週各週主題 + 核心功能名稱（四項一起填）",
@@ -817,7 +817,7 @@ SoWork 語氣＝「精準守護者、有憑據的科技感」，不是散文、�
   {
     id: "em-99-launch-sequence",
     tier: "99s", postType: "edm",
-    label: "Email 產品上線完整自動化 Sequence",
+    label: "Email 產品上線完整自動化序列",
     description: "預告 ×2 / 上線 / 提醒 ×2 / 最後機會 / 後續 follow-up = 7 封",
     agent_id: 60061, skill_slug: "email-marketing", // Yahan Tsai — Retail E-commerce Newsletter Copywriter
     // 2026-05-18 (CJ 驗收 P0): 原本只問「產品名+賣點」→ 主旨空白、CTA
@@ -875,7 +875,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     //    f. 媒體聯絡結尾：沉穩守護者調性，禁業配腔。
     id: "pr-99-launch-toolkit",
     tier: "99s", postType: "press",
-    label: "PR 完整 Launch 媒體 Toolkit",
+    label: "PR 完整上線媒體工具包",
     description: "新聞稿 + 採訪問答 + 媒體聯絡話術 + 後續追蹤 + spokesperson talking points",
     agent_id: 223197, skill_slug: "pr-writing", // Yi-Wen Wu — PR Strategist B2B SaaS (476 char)
     primary_question: "Launch 主題 + 目標媒體類型 + 發言人姓名職稱 + 發稿時機（四項一起填）",
@@ -884,7 +884,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
       placeholder: "例：推出「品牌一致性溯源證」新功能；目標：數位時代、TechOrange（科技媒體）；發言人：CJ Wang，Founder & CEO；embargo：2026-06-01 10:00 AM",
       type: "textarea",
     },
-    inputs: [{ key: "launch_topic", label: "Launch 主題 + 目標媒體 + 發言人 + 時機", type: "textarea", required: true }],
+    inputs: [{ key: "launch_topic", label: "上線主題 + 目標媒體 + 發言人 + 時機", type: "textarea", required: true }],
     systemPrompt: `══════════ 開始寫作前必讀：數字核對 + 驚嘆號禁令 ══════════
 你即將寫「{label}」。動筆前完成以下兩個協議，違反任一即輸出不合格。
 
@@ -953,7 +953,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     // scout 抓回「此刻正在發燒的趨勢/新聞」，把品牌安全地接上去。
     id: "pr-99-newsjack",
     tier: "99s", postType: "press",
-    label: "借時事新聞鉤（Newsjack）",
+    label: "借時事新聞鉤",
     description: "把品牌安全接上此刻正在發燒的時事，產出可報導的角度",
     agent_id: 223197, skill_slug: "pr-writing",
     primary_question: "品牌想被看見的點 / 可連結的專業或產品？（若有想接的時事可一併寫）",
@@ -992,7 +992,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
   {
     id: "br-99-reposition-toolkit",
     tier: "99s", postType: "press",
-    label: { en: "Brand Reposition Toolkit", zh: "品牌重新定位完整 Toolkit" },
+    label: { en: "Brand Reposition Toolkit", zh: "品牌重新定位完整工具包" },
     description: "Positioning + Tagline 套 + Voice guide + Visual direction + 應用範例",
     agent_id: 60002, skill_slug: "brand-strategy", // Ethan Chiang | DTC E-commerce Brand Strategist
     primary_question: "想往什麼方向轉？（已讀入現有定位作為起點）",
@@ -1012,7 +1012,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
   {
     id: "br-99-voice-playbook",
     tier: "99s", postType: "press",
-    label: { en: "Brand Voice Playbook", zh: "品牌語氣完整 Playbook" },
+    label: { en: "Brand Voice Playbook", zh: "品牌語氣完整手冊" },
     description: "8 個應用情境 + Do/Don't 詳細 + 5 個範例 + 跨平台 voice 適配",
     agent_id: 32, skill_slug: "brand-strategy", // Fiona Hsu | Copywriter
     primary_question: "想補充或微調哪些情境？（已讀入既有 Voice — 留空即直接展開 8 情境 playbook）",
@@ -1030,7 +1030,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
   {
     id: "rs-99-discovery-sprint",
     tier: "99s", postType: "press",
-    label: { en: "User Research · Discovery Sprint", zh: "用戶研究 5 天 Discovery Sprint" },
+    label: { en: "User Research · Discovery Sprint", zh: "用戶研究 5 天探索衝刺" },
     description: "訪綱 + 5 personas + JTBD map + insights synthesis + 行動建議",
     agent_id: 90043, skill_slug: "user-research", // Lydia Chiu | Qualitative Research Director
     primary_question: "想了解用戶什麼？（已讀入既有受眾定位 — 留空即用既有 persona 延伸研究假設）",
@@ -1145,7 +1145,7 @@ ${TONE_100}`,
   {
     id: "kl-99-campaign-toolkit",
     tier: "99s", postType: "press",
-    label: { en: "KOL Campaign Toolkit", zh: "KOL Campaign 完整話術包" },
+    label: { en: "KOL Campaign Toolkit", zh: "KOL 活動完整話術包" },
     description: "多 KOL 分層邀請 + 漏斗訊息 + brief 模板 + 報價回應 + 結案報告",
     agent_id: 220920, skill_slug: "kol-outreach", // Chloe Chen | Senior KOL & Influencer Manager
     // 2026-05-18 (CJ 驗收「問題設計 1/2」): 99s 表單只送單一主輸入，把
@@ -1158,7 +1158,7 @@ ${TONE_100}`,
       type: "textarea",
     },
     inputs: [
-      { key: "campaign_brief", label: "活動 brief（主題/量級/合作形式/平台/時程）", type: "textarea", required: true },
+      { key: "campaign_brief", label: "活動需求（主題/量級/合作形式/平台/時程）", type: "textarea", required: true },
       { key: "kol_tiers", label: "KOL 分層（選填）", type: "text", required: false,
         placeholder: "例：1 位 100K+ + 2 位 30-100K + 5 位 1-10K" },
     ],

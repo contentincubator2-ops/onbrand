@@ -90,7 +90,7 @@ title 寫 OG title（45-65 字）；description 寫 OG description（150 字內�
     id: "fb-60-album-4",
     tier: "60s",
     postType: "album",
-    label: "FB Album 4 張組合",
+    label: "FB 相簿 4 張組合",
     description: "Strategist 規劃敘事弧 + 4 張一致風格 + caption 統合敘事",
     agent_id: 60068, // Yizhen Lai (Brand Story Copy)
     skill_slug: "social-copy",
@@ -125,7 +125,7 @@ ${FB60_TONE}`,
     inputs: [
       { key: "event_name", label: "活動名稱", type: "text", required: true },
       { key: "event_date", label: "活動日期", type: "text", required: false, placeholder: "例：5/15" },
-      { key: "key_offer", label: "主要優惠 / hook", type: "textarea", required: true },
+      { key: "key_offer", label: "主要優惠 / 鉤子", type: "textarea", required: true },
     ],
     systemPrompt: `產出 FB 倒數系列其中 1 篇（80-130 字）。
 規則：① 開頭凸顯天數（用數字 + emoji） ② 中間放 1 個尚未公開的小細節 / 倒數獨家 ③ 最後 CTA。
@@ -142,7 +142,7 @@ ${FB60_TONE}`,
     id: "fb-60-launch-kit",
     tier: "60s",
     postType: "event",
-    label: "FB 活動 launch kit (4 篇)",
+    label: "FB 活動上線包（4 篇）",
     description: "Eric Lin 設計 launch arc + 預告×2 / 當日 / 事後 4 篇平行",
     agent_id: 30016, // Grace Lin — Brand Copywriter (2308 char)
     skill_slug: "fb-copywriting",
@@ -205,7 +205,7 @@ ${FB60_TONE}`,
     primary_question: "想讓新訪客 3 秒內知道你做什麼？",
     primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼追蹤", type: "textarea" },
     inputs: [
-      { key: "brand_focus", label: "品牌 focus", type: "textarea", required: true },
+      { key: "brand_focus", label: "品牌重點", type: "textarea", required: true },
     ],
     systemPrompt: `產出 FB 釘選 + 配套貼文其中 1 篇。
 本次你寫的是「{label}」（釘選主文 / 常見問答 FAQ / 關於我們 About / 代表案例＝挑一個最有代表性的客戶成功故事當門面）。
@@ -246,7 +246,7 @@ ${FB60_TONE}`,
     primary_question: "這檔廣告的主推產品 / 受眾 / 賣點？",
     primary_input: { key: "campaign", placeholder: "例：母親節健力餐高蛋白組合，職業媽媽 35-50 歲", type: "textarea" },
     inputs: [
-      { key: "campaign", label: "Campaign 主題", type: "textarea", required: true },
+      { key: "campaign", label: "活動主題", type: "textarea", required: true },
     ],
     systemPrompt: `產出 FB 廣告完整包其中 1 支廣告（150-300 字）。
 本次你寫的是「{label}」這個切角的完整廣告。

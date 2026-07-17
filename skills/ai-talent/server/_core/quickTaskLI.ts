@@ -47,7 +47,7 @@ LI 演算法看頭 2 行決定要不要展開（"see more"），鉤子要強。$
     agent_id: 180172, skill_slug: "thought-leadership",
     primary_question: "這篇 Article 想討論什麼？",
     primary_input: { key: "topic", placeholder: "例：為何 70% 的數位轉型會失敗", type: "textarea" },
-    inputs: [{ key: "topic", label: "Article 主題", type: "textarea", required: true }],
+    inputs: [{ key: "topic", label: "文章主題", type: "textarea", required: true }],
     systemPrompt: `產出 LinkedIn Article 開頭（150-250 字）。
 結構：1 段強烈場景或 1 個事實 → 1 段個人連結 / 為何寫這篇 → 1 段這篇會談的 3 個重點。
 不要 "在這篇文章中我會分享..." 這種範本式起手。${LI_TONE}`,
@@ -129,7 +129,7 @@ LI 留言能帶曝光 — 要寫得讓原 PO 想回覆你（給連結機會）�
   {
     id: "li-30-newsletter",
     tier: "30s", postType: "newsletter",
-    label: "LI Newsletter 標題 + 開頭",
+    label: "LI 電子報標題 + 開頭",
     description: "LI Newsletter 標題 + 第一段（決定要不要訂閱）",
     agent_id: 180009, skill_slug: "newsletter-editor",
     primary_question: "本期 Newsletter 要講什麼？",
@@ -144,12 +144,12 @@ LI 留言能帶曝光 — 要寫得讓原 PO 想回覆你（給連結機會）�
   {
     id: "li-30-document",
     tier: "30s", postType: "document",
-    label: "LI Document（PDF 輪播）8 頁結構",
+    label: "LI 文件貼文（PDF 輪播）8 頁結構",
     description: "8 頁的 LI 文件貼文結構 + 每頁文字",
     agent_id: 220862, skill_slug: "narrative-editor",
     primary_question: "Document 想教 / 解釋什麼？",
     primary_input: { key: "topic", placeholder: "例：B2B 漏斗的 5 個常見錯誤", type: "textarea" },
-    inputs: [{ key: "topic", label: "Document 主題", type: "textarea", required: true }],
+    inputs: [{ key: "topic", label: "文件主題", type: "textarea", required: true }],
     systemPrompt: `產出 LI Document 8 頁結構。
 caption 用 "---" 分隔每一頁：
 頁 1（封面）：5-8 字大標 + 副標 1 句

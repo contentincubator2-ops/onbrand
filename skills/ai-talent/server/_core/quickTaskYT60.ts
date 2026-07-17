@@ -14,14 +14,14 @@ export const YT_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "yt-60-video-package",
     tier: "60s", postType: "video",
-    label: "YT 影片完整 caption 包",
+    label: "YT 影片完整文案包",
     description: "Title + description + chapters + 5 個替代 title + 縮圖風格",
     agent_id: 224000, // Yu-Chia Chen — YouTube Marketing Strategist 食品飲料 (~1000 char)
     skill_slug: "youtube-content",
     primary_question: "影片主題 / 賣點？",
     primary_input: { key: "topic", placeholder: "例：教學 / 開箱 / 評測", type: "textarea" },
     inputs: [{ key: "topic", label: "影片主題", type: "textarea", required: true }],
-    systemPrompt: `產出 YT 影片完整 caption 包（title 50-60 字 / description 800-1500 字 / chapters）。
+    systemPrompt: `產出 YT 影片完整文案包（title 50-60 字 / description 800-1500 字 / chapters）。
 ${YT_TONE}`,
     preferredModel: "qwen", maxTokens: 1500,
     outputDefaults: { platform: "youtube", post_type: "video" },
@@ -77,14 +77,14 @@ ${YT_TONE}`,
   {
     id: "yt-60-community-post",
     tier: "60s", postType: "community",
-    label: "YT Community 貼文",
+    label: "YT 社群貼文",
     description: "5 種社群貼文（投票 / 圖片 / 文字 / 問答 / 預告）",
     agent_id: 180157, // Nina Cheng | Social Media Engagement Manager
     skill_slug: "youtube-community",
     primary_question: "Community 想傳達什麼？",
     primary_input: { key: "topic", placeholder: "新片預告 / 互動問答 / 幕後", type: "textarea" },
-    inputs: [{ key: "topic", label: "Community 主題", type: "textarea", required: true }],
-    systemPrompt: `產出 YT Community 貼文（80-200 字）。
+    inputs: [{ key: "topic", label: "社群主題", type: "textarea", required: true }],
+    systemPrompt: `產出 YT 社群貼文（80-200 字）。
 本次是「{label}」類型（投票 / 圖片 / 文字 / 問答 / 預告）。
 ${YT_TONE}`,
     preferredModel: "qwen", maxTokens: 700,

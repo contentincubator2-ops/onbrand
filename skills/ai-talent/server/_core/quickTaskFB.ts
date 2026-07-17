@@ -242,7 +242,7 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
     id: "fb-30-ad-headline",
     tier: "30s",
     postType: "ad",
-    label: "FB 廣告 Headline 5 種",
+    label: "FB 廣告標題 5 種",
     description: "5 種切角的廣告標題（25 字內），直接複製到 Ads Manager 用",
     agent_id: 239023,             // Ellis Yeh — VP Breakthrough Advertising（Eugene Schwartz headline 大師）
     skill_slug: "fb-ad-copy",
@@ -270,7 +270,7 @@ caption 欄位就放這「一個」headline 本身，不要解釋、不要前綴
     id: "fb-30-ad-primary",
     tier: "30s",
     postType: "ad",
-    label: "FB 廣告 Primary Text 5 種",
+    label: "FB 廣告主文案 5 種",
     description: "5 種口吻的廣告主內文（80-150 字），對應不同受眾心理",
     agent_id: 224114,             // Bùi Thị Thu — Social Media Strategist eCommerce (1160 char)
     skill_slug: "fb-ad-copy",
@@ -299,7 +299,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-ad-cta",
     tier: "30s",
     postType: "ad",
-    label: "FB 廣告 CTA 5 種",
+    label: "FB 廣告行動呼籲 5 種",
     description: "5 個 CTA 按鈕文字 + 每個 CTA 的搭配情境建議",
     agent_id: 239024,             // Emerson Huang — VP Customer Value Optimization（funnel CTA）
     skill_slug: "fb-ad-copy",
@@ -328,7 +328,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-ad-description",
     tier: "30s",
     postType: "ad",
-    label: "FB 連結廣告 Description 5 種",
+    label: "FB 連結廣告說明文字 5 種",
     description: "連結廣告下方 description（30 字內），5 種切入角度",
     agent_id: 224054,             // Mei Xin Ho — Social Media Strategist Health SG (1148 char)
     skill_slug: "fb-ad-copy",
@@ -374,20 +374,20 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-story-text",
     tier: "30s",
     postType: "story",
-    label: "FB Story 文案",
+    label: "FB 限時動態文案",
     description: "9:16 ephemeral 配文 + overlay 主標",
     agent_id: 30002,              // Sarah Liu — AI Brand Story CMO
     skill_slug: "fb-copywriting",
     primary_question: "今天的 Story 想說什麼？",
     primary_input: { key: "topic", placeholder: "例：幕後花絮 / 限時優惠 / 提問 sticker", type: "textarea" },
     inputs: [
-      { key: "topic", label: "Story 想傳達什麼", type: "textarea", required: true },
+      { key: "topic", label: "限時動態想傳達什麼", type: "textarea", required: true },
     ],
-    // 2026-05-18 (CJ「FB Story 文案任務沒有產出文字」): orchestra 只抽
+    // 2026-05-18 (CJ「FB 限時動態文案任務沒有產出文字」): orchestra 只抽
     // caption 欄位，title/image_style_direction 會被丟掉或污染 caption。
     // 改成只回乾淨 JSON {caption}，caption 內第一行就是 5-8 字主標、
     // 換行後接 Story 文，全部疊圖呈現，確保一定有文字產出。
-    systemPrompt: `產出 1 則 FB Story 文案，只輸出 JSON：{"caption":"<主標>\\n<Story文>"}
+    systemPrompt: `產出 1 則 FB 限時動態文案，只輸出 JSON：{"caption":"<主標>\\n<Story文>"}
 規則：
 - 第 1 行 = 5-8 字 overlay 主標（強鉤、可單獨成立）
 - 換行後 = Story 文 30-60 字，口語、快速吸睛即拋，不要長段、不要 hashtag
@@ -431,7 +431,7 @@ output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"�
     id: "fb-30-hashtag-set",
     tier: "30s",
     postType: "feed",
-    label: "FB hashtag 建議組",
+    label: "FB 主題標籤建議組",
     description: "10-15 個分層 hashtag（核心 / 中型 / 長尾）",
     agent_id: 220583,             // Hsin-Yi Weng — IG/FB Marketing Specialist（hashtag 在地化）
     skill_slug: "fb-best-practices",
@@ -451,7 +451,7 @@ output: hashtags 陣列（不要含 # 前綴），caption 放 1 句使用建議�
     id: "fb-30-countdown-1day",
     tier: "30s",
     postType: "feed",
-    label: "FB 活動倒數一句 hype",
+    label: "FB 活動倒數一句造勢",
     description: "倒數 N 天的單篇推文（系列中的一篇）",
     agent_id: 180159,             // Claire Hsu — fb-countdown-series lead
     skill_slug: "social-media-manager",
@@ -827,7 +827,7 @@ export const FB_90S_TASK_INDEX: Array<{
   { id: "fb-90-account-reposition",     squad_slug: "fb-account-reposition",     postType: "feed",     label: "FB 帳號重新定位",    description: "Trout & Ries Positioning + Pulizzi Tilt" },
   { id: "fb-90-quarterly-strategy",     squad_slug: "fb-quarterly-strategy",     postType: "feed",     label: "FB 季度策略",        description: "Pulizzi Quarterly Cadence" },
   { id: "fb-90-monthly-analytics",      squad_slug: "fb-monthly-analytics",      postType: "feed",     label: "FB 月度成效報告",    description: "Kaushik Web Analytics 2.0 + Engagement Pyramid" },
-  { id: "fb-90-carousel-10frame",       squad_slug: "fb-carousel",               postType: "carousel", label: "FB Carousel 10 卡完整敘事", description: "Hook-Build-Turn-Payoff 完整弧" },
+  { id: "fb-90-carousel-10frame",       squad_slug: "fb-carousel",               postType: "carousel", label: "FB 輪播 10 卡完整敘事", description: "Hook-Build-Turn-Payoff 完整弧" },
   { id: "fb-90-reels-full",             squad_slug: "fb-reels-script",           postType: "reel",     label: "FB Reels 完整腳本",  description: "Hook-Hold-Payoff（含分鏡 + 配樂方向）" },
   { id: "fb-90-livestream-suite",       squad_slug: "fb-livestream-prep",        postType: "feed",     label: "FB 直播完整套組",    description: "預告 + 摘要 + 轉錄重點剪（成對敘事）" },
   { id: "fb-90-crisis-full",            squad_slug: "fb-crisis-comms",           postType: "comment",  label: "FB 完整危機公關",    description: "Lagadec 4 段 + 後續追蹤 + 媒體聲明" },

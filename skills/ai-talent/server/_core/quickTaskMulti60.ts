@@ -26,7 +26,7 @@ export const TT_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "tt-60-foryou-full",
     tier: "60s", postType: "foryou",
-    label: "TikTok ForYou 完整影片包",
+    label: "TikTok 推薦頁完整影片包",
     description: "Hook + hold + payoff 完整 60 秒腳本 + 5 變體",
     agent_id: 30011, skill_slug: "short-video-script", // Jason Huang | Short Video Script Creator
     primary_question: "這支 TikTok 主題？",
@@ -136,7 +136,7 @@ export const LI_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "li-60-thought-leader",
     tier: "60s", postType: "feed",
-    label: "LI Thought Leadership 完整貼文",
+    label: "LI 意見領袖完整貼文",
     description: "Strategist 設計觀點 + 800 字深度文 + 1:1 引文卡配圖",
     agent_id: 30018, skill_slug: "linkedin-b2b", // Fiona Fang | LinkedIn B2B Marketing Exec
     primary_question: "想分享什麼 B2B 觀點？",
@@ -173,12 +173,12 @@ ${TONE("LinkedIn")}`,
   {
     id: "li-60-newsletter",
     tier: "60s", postType: "newsletter",
-    label: "LI Newsletter 一期",
+    label: "LI 電子報一期",
     description: "Strategist 設計目錄 + 完整 newsletter（標題 + 引言 + 3 段 + CTA）",
     agent_id: 60060, skill_slug: "linkedin-b2b", // Zeyu Hsu | B2B Newsletter Copywriter
     primary_question: "本期主題？",
     primary_input: { key: "topic", placeholder: "本期 newsletter 想講什麼", type: "textarea" },
-    inputs: [{ key: "topic", label: "Newsletter 主題", type: "textarea", required: true }],
+    inputs: [{ key: "topic", label: "電子報主題", type: "textarea", required: true }],
     systemPrompt: `你在產出「{label}」版本的 LinkedIn Newsletter 一期完整內容。
 
 【各版本切角 — 嚴格照自己被指派的版本走】
@@ -299,12 +299,12 @@ export const EMAIL_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "em-60-newsletter-full",
     tier: "60s", postType: "edm",
-    label: "Email Newsletter 完整一期",
-    description: "Strategist 設計結構 + 主旨 + 引言 + 3 段內容 + CTA + 預覽文字",
+    label: "Email 電子報完整一期",
+    description: "Strategist 設計結構 + 主旨 + 引言 + 3 段內容 + 行動呼籲 + 預覽文字",
     agent_id: 224101, skill_slug: "email-marketing", // Faisal Rahman — Email & CRM Strategist F&B MY (1230 char)
     primary_question: "本期 newsletter 主題？",
     primary_input: { key: "topic", placeholder: "本期想跟訂閱者說什麼", type: "textarea" },
-    inputs: [{ key: "topic", label: "Newsletter 主題", type: "textarea", required: true }],
+    inputs: [{ key: "topic", label: "電子報主題", type: "textarea", required: true }],
     systemPrompt: `產出 Email Newsletter 完整內容（500-1000 字 body + subject 30 字）。
 避免 spam 詞（FREE / urgent / !!!）。${TONE("Email")}`,
     preferredModel: "qwen", maxTokens: 1500,
@@ -327,13 +327,13 @@ ${TONE("Email")}`,
   {
     id: "em-60-onboarding-3",
     tier: "60s", postType: "edm",
-    label: "Email Onboarding 3 封",
+    label: "Email 新客導入信 3 封",
     description: "新訂閱者前 3 封歡迎序列（D0 / D3 / D7）",
     agent_id: 180567, skill_slug: "email-marketing", // Zeyu Hsu — B2B Newsletter Copywriter
     primary_question: "你的服務 / 產品給新訂閱者的價值？",
     primary_input: { key: "value_prop", placeholder: "新訂閱者最該知道什麼", type: "textarea" },
     inputs: [{ key: "value_prop", label: "核心價值", type: "textarea", required: true }],
-    systemPrompt: `產出 Email Onboarding 3 封序列其中 1 封（300-500 字）。本封是「{label}」（D0 歡迎 / D3 教學 / D7 邀請）。
+    systemPrompt: `產出 Email 新客導入信 3 封序列其中 1 封（300-500 字）。本封是「{label}」（D0 歡迎 / D3 教學 / D7 邀請）。
 ${TONE("Email")}`,
     preferredModel: "qwen", maxTokens: 1100,
     outputDefaults: { platform: "email", post_type: "edm" },
@@ -406,7 +406,7 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "br-60-tagline-suite",
     tier: "60s", postType: "generic",
-    label: "品牌 Tagline 5 種版本",
+    label: "品牌標語 5 種版本",
     description: "Strategist 定原型 + 5 個 tagline 候選 + 應用情境",
     agent_id: 30016, skill_slug: "brand-strategy", // Grace Lin | Brand Copywriter
     primary_question: "品牌精神 / 核心差異？",
@@ -426,7 +426,7 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "br-60-value-prop",
     tier: "60s", postType: "generic",
-    label: "Value Proposition 完整改寫",
+    label: "價值主張完整改寫",
     description: "Strategist 找競品差異 + 5 種 value prop 版本",
     agent_id: 60035, skill_slug: "brand-strategy", // Yizhen Lin — Tech Brand PR Writer
     primary_question: "品牌 / 產品做什麼？",
@@ -440,7 +440,7 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "br-60-brand-voice",
     tier: "60s", postType: "generic",
-    label: "Brand Voice Guideline",
+    label: "品牌語氣指南",
     description: "5 種品牌語氣樣本 + Do / Don't 對照",
     agent_id: 32, skill_slug: "brand-strategy", // Fiona Hsu — Copywriter (deep specialty)
     primary_question: "想塑造什麼樣的品牌語氣？",
@@ -501,7 +501,7 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
   {
     id: "rs-60-persona-suite",
     tier: "60s", postType: "generic",
-    label: "用戶 Persona 5 張組",
+    label: "用戶輪廓 5 張組",
     description: "5 種主要 persona 名片（demo + psycho + 痛點 + 渠道）",
     agent_id: 90004, skill_slug: "user-research", // Darren Chiu — Research Director, Consumer Insights
     primary_question: "你的產品 / 服務？",

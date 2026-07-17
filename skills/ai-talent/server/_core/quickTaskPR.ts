@@ -86,7 +86,7 @@ ${PR_TONE}`,
   {
     id: "pr-30-lead-paragraph",
     tier: "30s", postType: "press-release",
-    label: "倒金字塔 lead 第一段",
+    label: "倒金字塔導言第一段",
     description: "5W1H 第一段（最重要的事實）",
     agent_id: 60035, skill_slug: "press", // Yizhen Lin | Tech Brand PR Writer
     primary_question: "事件的 5W1H？",
@@ -136,7 +136,7 @@ ${PR_TONE}`,
     // for routing/data; behaviour fully reworked.
     id: "pr-30-ceo-quote",
     tier: "30s", postType: "press-release",
-    label: "CEO 致辭講稿（CEO Speech）",
+    label: "CEO 致辭講稿",
     description: "可直接上台念的完整致辭稿 + 主講人/場合",
     agent_id: 60036, skill_slug: "press",
     primary_question: "致辭主題與想傳達的核心觀點？",
@@ -182,7 +182,7 @@ ${PR_TONE}`,
   {
     id: "pr-30-boilerplate",
     tier: "30s", postType: "press-release",
-    label: "公司簡介 boilerplate",
+    label: "公司簡介定型段落",
     description: "新聞稿底部固定的「關於 XXX」段落",
     agent_id: 60037, skill_slug: "press",
     primary_question: "公司核心業務 / 規模 / 重要里程碑？",
@@ -199,7 +199,7 @@ ${PR_TONE}`,
   {
     id: "pr-30-fact-sheet",
     tier: "30s", postType: "press-release",
-    label: "Fact sheet（一頁式事實彙整）",
+    label: "事實資料表（一頁式彙整）",
     description: "給記者快速 reference 的 bullet 清單",
     agent_id: 60038, skill_slug: "press",
     primary_question: "事件的所有可量化事實？",
@@ -245,12 +245,12 @@ ${PR_TONE}`,
   {
     id: "pr-30-media-pitch",
     tier: "30s", postType: "press-release",
-    label: "Media pitch email",
+    label: "媒體邀訪信",
     description: "寄給記者的「為何要報導我」信",
     agent_id: 180175, skill_slug: "press",
     primary_question: "新聞主題 + 為何這個記者會感興趣？",
     primary_input: { key: "context", placeholder: "新聞主題 + 記者過往報導 + 為何相關", type: "textarea" },
-    inputs: [{ key: "context", label: "Pitch 脈絡", type: "textarea", required: true }],
+    inputs: [{ key: "context", label: "邀約脈絡", type: "textarea", required: true }],
     systemPrompt: `【得獎工藝參考】Whopper Detour（Burger King / FCB，Cannes Lions 2019）：媒體會報導，是因為「角度本身就是故事」、且與讀者切身。pitch 要賣「這位記者的讀者會在乎的角度」與一個不可抗拒的鉤，不是賣品牌、不是發稿通知。
 產出 media pitch email（總長 120–200 字，越短越強）。
 這封信只有一個目的：讓這位記者覺得「這是寫給我的、而且值得我報」。得獎級 pitch 的共通點是「站在記者的讀者角度賣角度，不是賣公司」。
@@ -270,7 +270,7 @@ ${PR_TONE}`,
   {
     id: "pr-30-spokesperson-qa",
     tier: "30s", postType: "press-release",
-    label: "發言人 Q&A（媒體採訪準備）",
+    label: "發言人問答（媒體採訪準備）",
     description: "預期記者會問什麼 + 標準答案",
     agent_id: 210266, skill_slug: "spokesperson",
     primary_question: "新聞主題 + 預期會被質疑的點？",
@@ -320,7 +320,7 @@ ${PR_TONE}`,
     agent_id: 180193, skill_slug: "press",
     primary_question: "新聞主題 + 想讓社群點進新聞稿做什麼？",
     primary_input: { key: "context", placeholder: "新聞核心 + CTA", type: "textarea" },
-    inputs: [{ key: "context", label: "新聞 + CTA", type: "textarea", required: true }],
+    inputs: [{ key: "context", label: "新聞 + 行動呼籲", type: "textarea", required: true }],
     systemPrompt: `【得獎工藝參考】Spotify Wrapped 社群擴散：被分享的不是「公告」，是「有觀點、有梗、與我有關」的一句話。社群同步文要有態度、可被轉發，且事實與新聞稿一致。
 產出新聞發布同步社群文（每變體 1 個平台口吻：FB / LinkedIn / Threads）。
 這是新聞稿發出當天，品牌官方帳號用「人話」把新聞推出去、引導點進完整稿。社群版要做新聞稿做不到的事：有觀點、有情緒、可被分享。

@@ -75,12 +75,12 @@ ${IG_TONE}`,
     outputDefaults: { platform: "instagram", post_type: "reel" },
   },
 
-  // 3. IG Carousel 7 卡輪播 — Tyler Brooks, strategist: Kevin Lin
+  // 3. IG 7 卡輪播 — Tyler Brooks, strategist: Kevin Lin
   {
     id: "ig-60-carousel-7",
     tier: "60s",
     postType: "carousel",
-    label: "IG Carousel 7 卡輪播",
+    label: "IG 7 卡輪播",
     description: "Strategist 規劃敘事弧 + 7 卡內容 + 統一視覺基調",
     agent_id: 224159, // Lukman Hakim — Social Media Strategist Beauty ID (1135 char)
     skill_slug: "carousel-copywriter",
@@ -102,14 +102,14 @@ ${IG_TONE}`,
     id: "ig-60-story-3frame",
     tier: "60s",
     postType: "story",
-    label: "IG Story 3 幀完整組",
+    label: "IG 限時動態 3 幀完整組",
     description: "前情 / 重點 / CTA 三幀連貫敘事 + sticker 互動建議",
     agent_id: 180182, // Brian Hsieh | Social Media Specialist
     skill_slug: "social-copy",
-    primary_question: "Story 想傳達什麼？",
+    primary_question: "限時動態想傳達什麼？",
     primary_input: { key: "topic", placeholder: "例：新品預告、限時優惠、提問互動", type: "textarea" },
     inputs: [
-      { key: "topic", label: "Story 主題", type: "textarea", required: true },
+      { key: "topic", label: "限時動態主題", type: "textarea", required: true },
     ],
     systemPrompt: `產出 IG Story 其中 1 幀內容。
 本次你寫的是「{label}」幀（前情鋪陳 / 重點揭曉 / CTA 收束）。
@@ -134,7 +134,7 @@ ${IG_TONE}`,
     primary_input: { key: "event_name", placeholder: "例：新品 / 週年慶 / 直播", type: "text" },
     inputs: [
       { key: "event_name", label: "活動名稱", type: "text", required: true },
-      { key: "key_offer", label: "主要 hook / 優惠", type: "textarea", required: true },
+      { key: "key_offer", label: "主要鉤子 / 優惠", type: "textarea", required: true },
     ],
     systemPrompt: `產出 IG 5 天倒數系列中的 1 篇（80-130 字）。本次你寫的是「{label}」。
 
@@ -172,14 +172,14 @@ ${IG_TONE}`,
     id: "ig-60-highlight-suite",
     tier: "60s",
     postType: "profile",
-    label: "IG Profile Highlight 5 組封面 + 內容",
+    label: "IG 個人檔案精選 5 組封面 + 內容",
     description: "5 個精選封面（about / 商品 / FAQ / 客評 / 案例）+ 視覺一致",
     agent_id: 180196, // Kevin Liao — Product Marketing Manager (1750 char)
     skill_slug: "instagram-strategy",
     primary_question: "想凸顯什麼樣的精選？",
     primary_input: { key: "highlight_focus", placeholder: "例：產品介紹 / 創辦故事 / 客戶見證", type: "textarea" },
     inputs: [
-      { key: "highlight_focus", label: "Highlight 主題", type: "textarea", required: true },
+      { key: "highlight_focus", label: "精選主題", type: "textarea", required: true },
     ],
     systemPrompt: `產出 IG Profile Highlight 其中 1 組（封面 + 內容說明）。
 本次你寫的是「{label}」這個 highlight。
@@ -195,7 +195,7 @@ ${IG_TONE}`,
     id: "ig-60-live-suite",
     tier: "60s",
     postType: "live",
-    label: "IG Live 直播完整配套 (5 段)",
+    label: "IG 直播完整配套（5 段）",
     description: "預告 / 開場 / 高潮 / 結尾 / 精華 5 段平行",
     agent_id: 60072, // Yiting Tsai | Live Shopping Script - Beauty
     skill_slug: "live-content",
