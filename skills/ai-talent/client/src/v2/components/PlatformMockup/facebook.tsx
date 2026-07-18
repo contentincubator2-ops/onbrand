@@ -452,7 +452,22 @@ function RailIcon({ icon, count }: { icon: any; count?: string }) {
 
 /* ─────────────── FB Ad (feed + Sponsored + CTA) ─────────────── */
 
-export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
+/* 2026-07-17 (CJ「headline 類產出的示意會讓人覺得應該有全文，怎麼避開誤會」):
+ * ghost skeleton for ad areas NOT produced by the current component task —
+ * dashed placeholder bars + a label naming the missing part, so the layout
+ * clearly says「這一區不是本任務的交付物」instead of implying a lost post. */
+function GhostSlot({ label, lines = 2 }: { label: string; lines?: number }) {
+  return (
+    <div className="rounded-md border border-dashed border-default-300 bg-default-50 px-3 py-2">
+      {Array.from({ length: lines }).map((_, i) => (
+        <div key={i} className={`h-2.5 rounded bg-default-200 mb-1.5 ${i === lines - 1 ? "w-7/12" : "w-11/12"}`} />
+      ))}
+      <p className="text-[10px] text-default-400">{label}</p>
+    </div>
+  );
+}
+
+export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, onGenerateImage, componentSlot }: MockupFields) {
   const { lang } = useLang();
   // 2026-05-18 (CJ): FBAd ignored the generated headline — showed the
   // run title (same for every pill). Use the variant's caption (the
@@ -462,6 +477,20 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
   // an image actually exists or was attempted. Headline-only ad tasks
   // (images:0 → no url, no status) → no fake forever-skeleton box.
   const showImage = !!liveImageUrl || !!liveImageStatus;
+  // Component-task rendering: the deliverable goes INTO its real ad slot;
+  // everything this task does NOT produce becomes a ghost skeleton.
+  const isComponent = !!componentSlot;
+  // CTA captions may carry「按鈕文字 + 情境建議」— first short line drives
+  // the button; the full text stays visible in the highlighted note below.
+  const ctaFirstLine = (adText.split(/\n/)[0] ?? "").trim();
+  const ctaBtnText = componentSlot === "cta" && ctaFirstLine.length > 0 && ctaFirstLine.length <= 12
+    ? ctaFirstLine
+    : (lang === "en" ? "Shop" : "選購");
+  const deliverableTag = (
+    <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-secondary-600 bg-secondary-50 border border-secondary-200 rounded px-1 py-px mr-1.5 align-middle">
+      {lang === "en" ? "Deliverable" : "本任務產出"}
+    </span>
+  );
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -478,8 +507,16 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
           />
         </div>
         <div className="px-4 py-3">
-          <p className="text-small font-medium leading-relaxed whitespace-pre-wrap">{adText}</p>
-          <p className="text-tiny text-default-500 mt-1">{lang === "en" ? "Shop now — 10% off, limited time →" : "立即購買，限時 9 折優惠 →"}</p>
+          {isComponent ? (
+            <GhostSlot label={lang === "en"
+              ? "Primary text — not part of this task (run “FB Ad Primary Text ×5”)"
+              : "主文案區 · 非本任務產出（可用「FB 廣告 Primary Text 5 種」任務產生）"} lines={3} />
+          ) : (
+            <>
+              <p className="text-small font-medium leading-relaxed whitespace-pre-wrap">{adText}</p>
+              <p className="text-tiny text-default-500 mt-1">{lang === "en" ? "Shop now — 10% off, limited time →" : "立即購買，限時 9 折優惠 →"}</p>
+            </>
+          )}
         </div>
         {showImage && (
           liveImageUrl ? (
@@ -507,16 +544,40 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
             </div>
           )
         )}
-        {/* CTA bar (FB ad signature) */}
+        {/* CTA bar (FB ad signature) — component tasks render their
+            deliverable in its REAL slot here, highlighted */}
         <div className="px-4 py-2.5 bg-default-100 border-y border-divider flex items-center justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-tiny text-default-500 uppercase tracking-wider">YOUR-BRAND.COM</p>
-            <p className="text-small font-semibold truncate">{lang === "en" ? "Shop now · Limited offer" : "立即購買 · 限時優惠"}</p>
+            {componentSlot === "headline" ? (
+              <p className="text-small font-semibold rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-0.5 whitespace-pre-wrap">
+                {deliverableTag}{adText}
+              </p>
+            ) : isComponent ? (
+              <div className="mt-0.5"><GhostSlot label={lang === "en" ? "Headline — not part of this task" : "廣告標題 · 非本任務產出"} lines={1} /></div>
+            ) : (
+              <p className="text-small font-semibold truncate">{lang === "en" ? "Shop now · Limited offer" : "立即購買 · 限時優惠"}</p>
+            )}
+            {componentSlot === "description" && (
+              <p className="text-tiny text-default-600 rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-1 whitespace-pre-wrap">
+                {deliverableTag}{adText}
+              </p>
+            )}
           </div>
-          <Button color="default" size="sm" radius="md" className="bg-default-200 font-semibold ml-2">
-            {lang === "en" ? "Shop" : "選購"}
+          <Button
+            color="default" size="sm" radius="md"
+            className={`font-semibold ml-2 shrink-0 ${componentSlot === "cta" ? "bg-secondary-100 ring-2 ring-secondary-300" : "bg-default-200"}`}
+          >
+            {ctaBtnText}
           </Button>
         </div>
+        {componentSlot === "cta" && (
+          <div className="px-4 py-2 border-b border-divider">
+            <p className="text-tiny text-default-700 rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-1 whitespace-pre-wrap">
+              {deliverableTag}{adText}
+            </p>
+          </div>
+        )}
         <div className="px-4 py-2 flex items-center justify-between text-default-500 text-tiny">
           <span>👍❤️🎉 12K</span>
           <span className="text-default-400">{lang === "en" ? "Comments · Shares" : "留言 · 分享"}</span>

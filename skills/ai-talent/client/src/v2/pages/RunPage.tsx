@@ -1200,6 +1200,17 @@ export default function RunPage() {
     return allShort && noImages;
   }, [data?.mission?.taskId, variants]);
 
+  // 2026-07-17 (CJ「產出的示意會讓人覺得應該有全文，怎麼避開誤會」): for FB
+  // ad component tasks, tell the mockup WHICH ad slot the deliverable fills —
+  // it renders the caption into that slot (highlighted) and ghosts the rest.
+  const componentSlot: "headline" | "description" | "cta" | undefined = useMemo(() => {
+    const tid = data?.mission?.taskId ?? "";
+    if (/ad-headline/.test(tid)) return "headline";
+    if (/ad-description|link-desc/.test(tid)) return "description";
+    if (/ad-cta/.test(tid)) return "cta";
+    return undefined;
+  }, [data?.mission?.taskId]);
+
   // 2026-05-19: for email tasks (EDM), extract the per-slide email subject
   // so the title row can show "主旨：<current email subject>" rather than
   // the static mission title which always shows slide-0's subject.
@@ -1687,9 +1698,13 @@ export default function RunPage() {
                 <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2">
                   <span className="text-small leading-none pt-0.5">🧩</span>
                   <p className="text-tiny text-primary-800 leading-relaxed">
-                    {lang === "en"
-                      ? "Component task: each version is ONE short, copy-ready line (e.g. ad headline / description / button text) — not a full post. Switch the version pills above to compare angles; the post frame is just placement context."
-                      : "元件任務：每個版本是「一條」可直接複製使用的短句（廣告標題／描述／按鈕文字等），本來就不是完整貼文。切換上方版本標籤比較不同切角；貼文外框只是示意擺放位置。"}
+                    {componentSlot
+                      ? (lang === "en"
+                          ? "Component task: your deliverable is rendered in its real ad slot below (purple highlight). Dashed gray areas are NOT produced by this task. Switch the version pills above to compare angles."
+                          : "元件任務：交付物已放進下方版型的實際位置（紫色標記處）；灰色虛線區塊非本任務產出。切換上方版本標籤比較不同切角。")
+                      : (lang === "en"
+                          ? "Component task: each version is ONE short, copy-ready line (e.g. ad headline / description / button text) — not a full post. Switch the version pills above to compare angles; the post frame is just placement context."
+                          : "元件任務：每個版本是「一條」可直接複製使用的短句（廣告標題／描述／按鈕文字等），本來就不是完整貼文。切換上方版本標籤比較不同切角；貼文外框只是示意擺放位置。")}
                   </p>
                 </div>
               )}
@@ -1707,6 +1722,7 @@ export default function RunPage() {
                 liveCards={slide.cards as any}
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
                 onGenerateImage={() => setMode("image")}
+                componentSlot={componentSlot}
               />
               </>
               ) : null;

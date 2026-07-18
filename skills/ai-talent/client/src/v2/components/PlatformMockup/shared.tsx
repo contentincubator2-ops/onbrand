@@ -198,6 +198,14 @@ export interface MockupFields {
    */
   onGenerateImage?: () => void;
   /**
+   * 2026-07-17 (CJ「headline 類產出的示意會讓人覺得應該有全文」): for ad
+   * COMPONENT tasks the deliverable is one slot of the ad, not the whole
+   * post. When set, the mockup renders the caption INTO that slot
+   * (highlighted) and turns the not-produced areas into ghost skeletons,
+   * so nobody expects a full post from a headline/description/CTA task.
+   */
+  componentSlot?: "headline" | "description" | "cta";
+  /**
    * Brand profile picture URL — when present, mockups use it for the
    * "posting as" avatar instead of dicebear placeholder. Source is
    * `brands.logoUrl` (which can be auto-filled from FB Graph picture
