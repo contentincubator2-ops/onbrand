@@ -3191,8 +3191,11 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
   rationale?: string;
 }) {
   const { lang } = useLang();
-  // Split "1.1 Golden Circle" → eyebrow "01.1" + title "Golden Circle"
-  const m = label.match(/^(\S+)\s+(.+)$/);
+  // Split "1.1 Golden Circle" → eyebrow "1.1" + title "Golden Circle".
+  // 2026-07-18 (CJ「CTA/HOOK 卡片標題被截斷」): only split when the first
+  // token is a NUMBERING token (digits/dots) — the old \S+ heuristic tore
+  // "CTA 庫" into eyebrow "CTA" + title "庫" and the card looked broken.
+  const m = label.match(/^([\d.]+)\s+(.+)$/);
   const eyebrow = m ? m[1] : "";
   const titleText = m ? m[2] : label;
 
