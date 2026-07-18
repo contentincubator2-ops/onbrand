@@ -1,0 +1,25 @@
+name: "Admin — Seed missing FB 90s squads"
+
+# 2026-07-18 (CJ「8 個 FB 90s 任務 squad not found」): run
+# seed-fb-90s-missing-squads.ts on the VM to create fb-reels-script /
+# fb-livestream-prep / fb-crisis-reply. Idempotent (upsert by slug).
+# Run AFTER the CI deploy that ships the script.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run seed script on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            npx tsx scripts/seed-fb-90s-missing-squads.ts

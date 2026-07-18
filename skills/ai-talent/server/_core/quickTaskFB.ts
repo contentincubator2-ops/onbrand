@@ -821,17 +821,22 @@ export const FB_90S_TASK_INDEX: Array<{
   label: string | { en: string; zh: string };
   description: string | { en: string; zh: string };
 }> = [
-  { id: "fb-90-monthly-calendar",       squad_slug: "fb-monthly-calendar",       postType: "feed",     label: { en: "FB Full 30-Day Calendar", zh: "FB 完整月曆 30 天" }, description: { en: "Joe Pulizzi content pillars + KPI estimates + pillar mix", zh: "Joe Pulizzi 內容支柱法 + KPI 預估 + pillar 配比" } },
+  // 2026-07-18 (CJ「8 個 90s 任務 squad not found」): 4 slugs below were
+  // remapped to squads that actually exist in the consolidated `squads`
+  // table (fb-monthly-calendar / fb-event-launch-kit / fb-carousel /
+  // fb-crisis-comms were never seeded). fb-reels-script / fb-livestream-
+  // prep / fb-crisis-reply are created by seed-fb-90s-missing-squads.ts.
+  { id: "fb-90-monthly-calendar",       squad_slug: "fb-monthly-calendar-pulizzi", postType: "feed",   label: { en: "FB Full 30-Day Calendar", zh: "FB 完整月曆 30 天" }, description: { en: "Joe Pulizzi content pillars + KPI estimates + pillar mix", zh: "Joe Pulizzi 內容支柱法 + KPI 預估 + pillar 配比" } },
   { id: "fb-90-monthly-calendar-promo", squad_slug: "fb-monthly-calendar-product-promo", postType: "feed", label: { en: "FB Calendar (Product Promo)", zh: "FB 月曆（商品促銷）" }, description: { en: "Promo-weighted content pillar mix", zh: "促銷型內容支柱配比" } },
-  { id: "fb-90-event-launch",           squad_slug: "fb-event-launch-kit",       postType: "event",    label: { en: "FB Event Launch Kit", zh: "FB 活動上線套組" },    description: { en: "GaryVee Jab-Jab-Right-Hook method", zh: "GaryVee Jab-Jab-Right-Hook 法" } },
+  { id: "fb-90-event-launch",           squad_slug: "fb-garyvee-jab-hook",       postType: "event",    label: { en: "FB Event Launch Kit", zh: "FB 活動上線套組" },    description: { en: "GaryVee Jab-Jab-Right-Hook method", zh: "GaryVee Jab-Jab-Right-Hook 法" } },
   { id: "fb-90-countdown-series",       squad_slug: "fb-countdown-series",       postType: "feed",     label: { en: "FB Countdown Series (7–14 Days)", zh: "FB 倒數活動系列 7-14 天" }, description: { en: "Cialdini scarcity countdown method", zh: "Cialdini Scarcity 緊迫倒數法" } },
   { id: "fb-90-account-reposition",     squad_slug: "fb-account-reposition",     postType: "feed",     label: { en: "FB Account Repositioning", zh: "FB 帳號重新定位" },    description: { en: "Trout & Ries Positioning + Pulizzi Tilt", zh: "Trout & Ries Positioning + Pulizzi Tilt" } },
   { id: "fb-90-quarterly-strategy",     squad_slug: "fb-quarterly-strategy",     postType: "feed",     label: { en: "FB Quarterly Strategy", zh: "FB 季度策略" },        description: { en: "Pulizzi Quarterly Cadence", zh: "Pulizzi Quarterly Cadence" } },
   { id: "fb-90-monthly-analytics",      squad_slug: "fb-monthly-analytics",      postType: "feed",     label: { en: "FB Monthly Performance Report", zh: "FB 月度成效報告" },    description: { en: "Kaushik Web Analytics 2.0 + Engagement Pyramid", zh: "Kaushik Web Analytics 2.0 + Engagement Pyramid" } },
-  { id: "fb-90-carousel-10frame",       squad_slug: "fb-carousel",               postType: "carousel", label: { en: "FB 10-Card Carousel Narrative", zh: "FB 輪播 10 卡完整敘事" }, description: { en: "Full Hook-Build-Turn-Payoff arc", zh: "Hook-Build-Turn-Payoff 完整弧" } },
+  { id: "fb-90-carousel-10frame",       squad_slug: "fb-deiss-cvo",              postType: "carousel", label: { en: "FB 10-Card Carousel Narrative", zh: "FB 輪播 10 卡完整敘事" }, description: { en: "Full Hook-Build-Turn-Payoff arc", zh: "Hook-Build-Turn-Payoff 完整弧" } },
   { id: "fb-90-reels-full",             squad_slug: "fb-reels-script",           postType: "reel",     label: { en: "FB Reels Full Script", zh: "FB Reels 完整腳本" },  description: { en: "Hook-Hold-Payoff (with storyboard + music direction)", zh: "Hook-Hold-Payoff（含分鏡 + 配樂方向）" } },
   { id: "fb-90-livestream-suite",       squad_slug: "fb-livestream-prep",        postType: "feed",     label: { en: "FB Livestream Full Kit", zh: "FB 直播完整套組" },    description: { en: "Teaser + recap + transcript highlight cuts (paired narrative)", zh: "預告 + 摘要 + 轉錄重點剪（成對敘事）" } },
-  { id: "fb-90-crisis-full",            squad_slug: "fb-crisis-comms",           postType: "comment",  label: { en: "FB Full Crisis PR", zh: "FB 完整危機公關" },    description: { en: "Lagadec 4 stages + follow-up + media statement", zh: "Lagadec 4 段 + 後續追蹤 + 媒體聲明" } },
+  { id: "fb-90-crisis-full",            squad_slug: "fb-crisis-reply",           postType: "comment",  label: { en: "FB Full Crisis PR", zh: "FB 完整危機公關" },    description: { en: "Lagadec 4 stages + follow-up + media statement", zh: "Lagadec 4 段 + 後續追蹤 + 媒體聲明" } },
 ];
 
 /** Helper: get all FB tasks across tiers in a single list.
