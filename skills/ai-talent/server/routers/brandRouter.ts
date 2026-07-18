@@ -630,6 +630,30 @@ export const brandRouter = router({
       if (input.website            !== undefined) patch.website            = input.website?.trim() || null;
       if (input.socialLinks        !== undefined) patch.socialLinks        = input.socialLinks ?? null;
       if (input.tagline            !== undefined) patch.tagline            = input.tagline?.trim() || null;
+      // 2026-07-19 (CJ「基本資料頁 vs 定位頁 標語不一致」): a manual tagline
+      // edit must also land in the CANONICAL positioning JSON
+      // (tagline.zhTagline) — otherwise 定位頁 keeps showing the old
+      // pipeline value and the next finalize would clobber the edit.
+      if (input.tagline !== undefined && input.tagline?.trim()) {
+        try {
+          const { default: localPool } = await import("../localDb");
+          const [pRows]: any = await localPool.execute(
+            `SELECT positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+            [input.brandId, ctx.user.id],
+          );
+          let pos: any = (pRows as any[])[0]?.positioning ?? null;
+          if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = null; } }
+          if (pos && typeof pos === "object") {
+            pos.tagline = { ...(pos.tagline ?? {}), zhTagline: input.tagline.trim() };
+            await localPool.execute(
+              `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
+              [JSON.stringify(pos), input.brandId, ctx.user.id],
+            );
+          }
+        } catch (e) {
+          console.warn("[brand.update] canonical tagline sync failed (non-fatal):", (e as Error)?.message);
+        }
+      }
       if (input.targetAudience     !== undefined) patch.targetAudience     = input.targetAudience?.trim() || null;
       if (input.brandVoice         !== undefined) patch.brandVoice         = input.brandVoice?.trim() || null;
       if (input.positioningSummary !== undefined) patch.positioningSummary = input.positioningSummary?.trim() || null;

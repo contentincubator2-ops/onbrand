@@ -647,10 +647,19 @@ export async function finalizeBrandAfterPipeline(userId: number, brandId: number
   // "Data too long for column 'audienceB'" threw and aborted finalize
   // (status never flipped to completed). These columns are legacy
   // fallbacks (agentContextLoader); a trimmed value is sufficient.
+  // 2026-07-19 (CJ「基本資料頁 vs 定位頁 標語不一致」): was
+  // COALESCE(NULLIF(col,''), ?) — only wrote when the column was EMPTY.
+  // But runInterim populates these columns EARLY with the quick-pulse
+  // draft, so the final canonical value (e.g. tagline from the full
+  // pipeline) never landed and 基本資料頁 showed the stale interim draft
+  // forever. Canonical positioning JSON is the single source of truth →
+  // these legacy mirror columns now ALWAYS follow it on finalize.
+  // (Manual tagline edits stay safe: brand.update now writes the edit
+  // into positioning.tagline.zhTagline too, so finalize re-mirrors it.)
   const maybeSet = (col: string, val: string | null) => {
     const v = val ? String(val).slice(0, 180) : val;
     filled[col] = !!v;
-    if (v) { sets.push(`${col} = COALESCE(NULLIF(${col}, ''), ?)`); params.push(v); }
+    if (v) { sets.push(`${col} = ?`); params.push(v); }
   };
   maybeSet("tagline", tagline);
   maybeSet("valueProposition", valueProposition);

@@ -1,0 +1,49 @@
+name: "Admin — Backfill brands.tagline from canonical positioning"
+
+# 2026-07-19 (CJ「基本資料頁 vs 定位頁 標語不一致」): one-time backfill.
+# The legacy brands.tagline column kept the early interim draft because
+# finalize only wrote it when empty. Canonical = positioning.tagline
+# .zhTagline. This aligns every diverged row and reports before/after.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync tagline column from positioning JSON
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== BEFORE: diverged rows ====="
+            Q "SELECT id, name, tagline AS legacy_col,
+                      JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')) AS canonical
+                 FROM brands
+                WHERE JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')) IS NOT NULL
+                  AND JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')) <> ''
+                  AND (tagline IS NULL OR tagline <> JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')));"
+
+            echo "===== APPLY ====="
+            Q "UPDATE brands
+                  SET tagline = JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline'))
+                WHERE JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')) IS NOT NULL
+                  AND JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')) <> ''
+                  AND (tagline IS NULL OR tagline <> JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')));"
+
+            echo "===== AFTER: remaining diverged (expect empty) ====="
+            Q "SELECT COUNT(*) AS still_diverged
+                 FROM brands
+                WHERE JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')) IS NOT NULL
+                  AND JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')) <> ''
+                  AND (tagline IS NULL OR tagline <> JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.tagline.zhTagline')));"
