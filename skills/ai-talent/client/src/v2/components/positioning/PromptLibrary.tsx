@@ -12,6 +12,7 @@ import {
   type PromptTemplate, type LLM,
 } from "../../lib/positioningPrompts";
 import MediaGenFlow from "../media/MediaGenFlow";
+import { showToastGlobal } from "../../../components/ui/Toast";
 
 interface PromptLibraryProps {
   scopeMode: "brand" | "product" | "event";
@@ -85,12 +86,39 @@ function PromptCard({ template, vars }: { template: PromptTemplate; vars: Record
   const [copied, setCopied] = React.useState<LLM | null>(null);
   const [mediaFlowOpen, setMediaFlowOpen] = React.useState(false);
 
+  // 2026-07-18 (CJ「ChatGPT/Claude/Gemini 按鈕點了沒任何回饋」): the old
+  // handler swallowed clipboard failures silently — no toast, no icon
+  // change, nothing. Now: (a) execCommand fallback when the async
+  // Clipboard API is unavailable/denied, (b) explicit success/failure
+  // toast so the click ALWAYS gives feedback.
   const onCopy = async (llm: LLM) => {
-    try {
-      await navigator.clipboard.writeText(filled);
+    const ok = await (async () => {
+      try {
+        await navigator.clipboard.writeText(filled);
+        return true;
+      } catch {
+        // Fallback: hidden textarea + execCommand (works without the
+        // Clipboard-API permission, e.g. stricter browser settings).
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = filled;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          const done = document.execCommand("copy");
+          document.body.removeChild(ta);
+          return done;
+        } catch { return false; }
+      }
+    })();
+    if (ok) {
       setCopied(llm);
       setTimeout(() => setCopied(null), 1800);
-    } catch { /* ignore */ }
+      showToastGlobal(`已複製指令 — 貼到 ${llmLabel(llm)} 即可使用`, "success");
+    } else {
+      showToastGlobal("複製失敗 — 請直接框選下方指令文字手動複製", "error");
+    }
   };
 
   // Identify variables that are still unfilled (template still has {變數})
