@@ -23,7 +23,7 @@ export const IG_30S_TASKS: FBTaskTemplate[] = [
     tier: "30s",
     postType: "feed",
     label: { en: "IG Short Caption (Single Image)", zh: "IG 短貼文文案（單圖）" },
-    description: "80–150 字 IG feed caption + 5-10 個 hashtag",
+    description: { en: "80-150-word IG feed caption + 5-10 hashtags", zh: "80–150 字 IG feed caption + 5-10 個 hashtag" },
     agent_id: 180166, // Iris Liang — Instagram Marketing Specialist
     skill_slug: "instagram-copywriting",
     primary_question: "今天這篇 IG 貼文要講什麼？",
@@ -42,7 +42,7 @@ ${FB_TONE_SUFFIX}
     tier: "30s",
     postType: "feed",
     label: { en: "IG Hooks ×3 (For Your Draft)", zh: "IG 開場鉤子 3 種（搭配你的原文）" },
-    description: "3 種不同口吻 hook，自動接你原本的貼文內容",
+    description: { en: "3 hooks in different voices, spliced onto your draft", zh: "3 種不同口吻 hook，自動接你原本的貼文內容" },
     agent_id: 222311, // Ming-Han Zhou — Brand Strategist B2B SaaS & SEA (1621 char persona)
     skill_slug: "hook-copywriter",
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會寫不同口吻的 IG 開場接上去",
@@ -63,7 +63,7 @@ ${FB_TONE_SUFFIX}`,
     tier: "30s",
     postType: "reel",
     label: { en: "IG Reel Opening Hook (First 3s)", zh: "IG Reel 開場鉤子（前 3 秒）" },
-    description: "前 3 秒口播 + 字幕節奏 + 視覺開場 brief",
+    description: { en: "First-3-seconds VO + caption rhythm + opening visual brief", zh: "前 3 秒口播 + 字幕節奏 + 視覺開場 brief" },
     agent_id: 60029, // Siyu Lin — TikTok/Reels Short Video Scriptwriter
     skill_slug: "short-video-scriptwriter",
     primary_question: "這支 Reel 的主題 / 賣點是？",
@@ -86,7 +86,7 @@ caption 結構：
     tier: "30s",
     postType: "reel",
     label: { en: "IG Reel Full Script (15–30s)", zh: "IG Reel 完整腳本（15-30s）" },
-    description: "結構化分鏡：hook→承諾→3 段內容→CTA",
+    description: { en: "Structured storyboard: hook→promise→3 segments→CTA", zh: "結構化分鏡：hook→承諾→3 段內容→CTA" },
     agent_id: 35, // Jason Fang — Short Video Scriptwriter (exec)
     skill_slug: "short-video-scriptwriter",
     primary_question: "這支 Reel 想傳達什麼價值？",
@@ -114,7 +114,7 @@ caption 結構：
     tier: "30s",
     postType: "story",
     label: { en: "IG Story Copy + Sticker Ideas", zh: "IG 限時動態文案 + 貼圖建議" },
-    description: "9:16 主標 + 內文 + 推薦 sticker",
+    description: { en: "9:16 headline + body + recommended stickers", zh: "9:16 主標 + 內文 + 推薦 sticker" },
     agent_id: 180170, // Nancy Yeh | Social Media Visual Designer
     skill_slug: "brand-story",
     primary_question: "今天的 Story 想說什麼？",
@@ -138,7 +138,7 @@ caption 結構 — 用換行分段：
     tier: "30s",
     postType: "carousel",
     label: { en: "IG 10-Page Carousel Structure", zh: "IG 輪播 10 頁結構" },
-    description: "1 標題頁 + 8 內容頁 + 1 CTA 頁，每頁文字",
+    description: { en: "1 title page + 8 content pages + 1 CTA page, copy per page", zh: "1 標題頁 + 8 內容頁 + 1 CTA 頁，每頁文字" },
     agent_id: 224094, // Jing Yi Lim — Social Media Strategist B2B SaaS MY (1143 char)
     skill_slug: "short-form-copywriting",
     primary_question: "想做什麼主題的 carousel？（教學 / 清單 / 反差 / 故事）",
@@ -163,7 +163,7 @@ caption 欄位請用「---」分隔每一頁。標號用 1. 2. 3. 結構清楚�
     tier: "30s",
     postType: "profile",
     label: { en: "IG Bio Rewrite", zh: "IG 個人簡介改寫" },
-    description: "150 字 bio 含 emoji + 換行 + CTA",
+    description: { en: "150-char bio with emoji + line breaks + CTA", zh: "150 字 bio 含 emoji + 換行 + CTA" },
     agent_id: 180168, // Wendy Su — Link in Bio Specialist
     skill_slug: "link-in-bio",
     primary_question: "你的 IG 帳號是誰、做什麼、想吸引誰？",
@@ -190,7 +190,7 @@ emoji 適度，不要每行都塞。bio 有字數限制，每字都要算。`,
     tier: "30s",
     postType: "feed",
     label: { en: "IG 30-Hashtag Set", zh: "IG 主題標籤 30 個套組" },
-    description: "3 階分層：核心 5 / 中型 15 / 長尾 10",
+    description: { en: "3 tiers: 5 core / 15 mid / 10 long-tail", zh: "3 階分層：核心 5 / 中型 15 / 長尾 10" },
     agent_id: 180176, // Michael Wu | Social Media Specialist
     skill_slug: "hashtag-discoverability",
     primary_question: "貼文主題 / 你的利基領域是？",
@@ -211,7 +211,7 @@ caption 直接列 hashtag（每個 # 前綴 + 空格分隔，可換行）。
     tier: "30s",
     postType: "feed",
     label: { en: "IG Comment Reply (General)", zh: "IG 留言回覆（一般）" },
-    description: "5 種口吻回覆（粉絲互動 / 友善討論 / 同行交流 / KOL 互動 / 一般詢問）",
+    description: { en: "5 reply voices (fans / friendly debate / peers / KOL / general inquiry)", zh: "5 種口吻回覆（粉絲互動 / 友善討論 / 同行交流 / KOL 互動 / 一般詢問）" },
     agent_id: 180143, // Emily Wang — Community Manager
     skill_slug: "community-manager",
     primary_question: "貼上原始用戶留言（或留言情境）",
@@ -234,7 +234,7 @@ caption 放回覆文。description 可放原始用戶留言（mockup 顯示用�
     tier: "30s",
     postType: "feed", // no dedicated DM mockup yet — fallback to feed
     label: { en: "IG DM Auto-Reply Script", zh: "IG DM 自動回覆腳本" },
-    description: "3 種情境：詢價 / 售後 / 合作邀約",
+    description: { en: "3 scenarios: price inquiry / after-sales / collab invite", zh: "3 種情境：詢價 / 售後 / 合作邀約" },
     agent_id: 180163, // Helen Sung | Social Media Community Builder
     skill_slug: "customer-service-copy",
     primary_question: "你想處理哪類 DM？貼上常見訊息範例",
@@ -258,7 +258,7 @@ caption 結構：
     tier: "30s",
     postType: "live",
     label: { en: "IG Live 30-Second Opener", zh: "IG 直播開場 30 秒" },
-    description: "開場詞 + 暖場互動 + CTA 引留言",
+    description: { en: "Opening lines + warm-up + comment-driving CTA", zh: "開場詞 + 暖場互動 + CTA 引留言" },
     agent_id: 60072, // Yiting Tsai — Live Shopping Script (Beauty)
     skill_slug: "live-shopping-script",
     primary_question: "今晚直播主題 / 想聊什麼？",
@@ -282,7 +282,7 @@ caption 結構：
     tier: "30s",
     postType: "story",
     label: { en: "IG Story 24h Repost Strategy", zh: "IG 限動 24h 後重發策略" },
-    description: "限動失效後該怎麼接（精選 / 改編 feed / 新限動）",
+    description: { en: "What follows the 24h expiry (highlights / feed remix / new Story)", zh: "限動失效後該怎麼接（精選 / 改編 feed / 新限動）" },
     agent_id: 220751, // Jake Chou — Insights Storyteller
     skill_slug: "insights-storyteller",
     primary_question: "原本那則限動是什麼內容？",
@@ -302,7 +302,7 @@ caption 結構：
     tier: "30s",
     postType: "post", // threads:post mockup
     label: { en: "IG → Threads Cross-Post Rewrite", zh: "IG → Threads 跨平台改寫" },
-    description: "把 IG 貼文改寫成 Threads 風格",
+    description: { en: "Rewrite your IG post in Threads style", zh: "把 IG 貼文改寫成 Threads 風格" },
     agent_id: 60022, // Kevin Huang — LINE/Threads Social Copywriter
     skill_slug: "threads-copywriter",
     primary_question: "貼上 IG 那篇 caption（要改寫成 Threads 版本）",

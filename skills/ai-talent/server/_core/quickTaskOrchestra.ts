@@ -460,6 +460,41 @@ export function voiceSanitizeZhTW(s: string): string {
     .replace(/\n{3,}/g, "\n\n");
 }
 
+/**
+ * 2026-07-18 (CJ 多市場實測): the writer LLM occasionally slips CJK
+ * punctuation into non-CJK output because the prompt scaffolding is
+ * Chinese (observed: "part of the Lumen Coffee crew。" in an EN email).
+ * Deterministic cleanup for languages that use Latin punctuation.
+ *
+ * Do NOT run for zh* (obviously) or ja* (Japanese legitimately uses
+ * 。、「」) — use latinPunctLang() as the gate.
+ */
+export function latinPunctLang(outputLanguage?: string | null): boolean {
+  const l = (outputLanguage ?? "zh-TW").toLowerCase();
+  return !l.startsWith("zh") && !l.startsWith("ja");
+}
+export function normalizeLatinPunct(s: string): string {
+  return s
+    .replace(/。/g, ". ")
+    .replace(/，/g, ", ")
+    .replace(/、/g, ", ")
+    .replace(/：/g, ": ")
+    .replace(/；/g, "; ")
+    .replace(/！/g, "! ")
+    .replace(/？/g, "? ")
+    .replace(/[「『]/g, " “")
+    .replace(/[」』]/g, "” ")
+    .replace(/（/g, " (")
+    .replace(/）/g, ") ")
+    .replace(/％/g, "%")
+    .replace(/　/g, " ")
+    // cleanup: no space before closing punct / collapse doubles
+    .replace(/ +([,.;:!?)])/g, "$1")
+    .replace(/\( +/g, "(")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ +$/gm, "");
+}
+
 // 2026-05-18 (CJ「每篇一個可編輯 mockup + 日期 + 批量 .ics」): expand the
 // merged calendar posts into ONE VARIANT PER POST so the existing
 // per-variant UI (pills nav / 跟 agent 改文案 / 改圖 / 排程發布) works
@@ -2143,6 +2178,10 @@ export async function runOrchestra(args: {
         /calendar|toolkit|playbook|策略|月曆|工具包/.test(args.template.id ?? "");
       if (caption && !isStrategyDoc) caption = stripPlaceholderBrackets(caption);
       if (caption && _voiceGated) caption = voiceSanitizeZhTW(caption);
+      // 2026-07-18 多市場: Latin-punctuation markets get stray CJK
+      // punctuation cleaned (writer prompt scaffolding is Chinese, the
+      // model occasionally slips a 。／， into EN/DE/FR output).
+      if (caption && latinPunctLang(brandMarket.outputLanguage)) caption = normalizeLatinPunct(caption);
       if (!caption) {
         errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
       }

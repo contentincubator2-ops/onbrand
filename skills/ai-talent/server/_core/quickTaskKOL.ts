@@ -24,7 +24,7 @@ export const KOL_30S_TASKS: FBTaskTemplate[] = [
     id: "kl-30-invite-opener",
     tier: "30s", postType: "generic",
     label: { en: "KOL Invite DM Opener", zh: "KOL 邀請開場 DM（3 種口吻）" },
-    description: "3 種開場口吻，避開「您好我是」業配機器人感",
+    description: { en: "3 opening voices that avoid the \"Hi, I'm from…\" sponsored-bot feel", zh: "3 種開場口吻，避開「您好我是」業配機器人感" },
     agent_id: 30015, skill_slug: "kol-outreach",
     primary_question: "想找什麼 KOL 合作什麼主題？",
     primary_input: {
@@ -51,7 +51,7 @@ ${KOL_TONE}`,
     id: "kl-30-influencer-brief",
     tier: "30s", postType: "generic",
     label: { en: "Influencer Brief", zh: "KOL 合作需求說明（可直接給網紅）" },
-    description: "一份結構化的網紅合作 brief：背景、目標、核心訊息、必提必避、產出規格、時程",
+    description: { en: "A structured influencer brief: background, goals, key messages, must-say/never-say, deliverables, timeline", zh: "一份結構化的網紅合作 brief：背景、目標、核心訊息、必提必避、產出規格、時程" },
     // 2026-05-16 全 KOL 稽核 + CJ「每任務配不同的真 KOL agent」:
     // was 25 = Kevin Lee「SEO Strategist (E-commerce)」(舊 oneliner
     // 遺留、錯配)。改派 210214 = Ming-Chang Ko「Senior Word-of-Mouth
@@ -121,7 +121,7 @@ ${KOL_TONE}`,
     id: "kl-30-followup",
     tier: "30s", postType: "generic",
     label: { en: "KOL Follow-Up Message", zh: "KOL 追蹤訊息（沒回 / 已聊 / 已合作後）" },
-    description: "3 種情境的後續追蹤訊息，自然不催促",
+    description: { en: "Follow-up messages for 3 scenarios — natural, never pushy", zh: "3 種情境的後續追蹤訊息，自然不催促" },
     // 2026-05-16 全 KOL 稽核 + CJ「每任務配不同的真 KOL agent」:
     // was 60067 = Victor Liao「SEO Data Analysis Report」(錯配)。
     // 改派 180150 = Brian Lin「Influencer Marketing Manager」—

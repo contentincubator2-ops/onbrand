@@ -18,9 +18,34 @@
 import React, { useState, useEffect } from "react";
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
-import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Input, Textarea, Select, SelectItem } from "@heroui/react";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Input, Textarea, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark, faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
+import { COUNTRIES, getCountry } from "../../lib/countries";
+
+// 2026-07-18 (CJ 多市場): same list as BrandOnboardingWizard — common
+// languages first; the selected country's native language is auto-added.
+const COMMON_LANGS: Array<{ code: string; label: string }> = [
+  { code: "zh-TW", label: "繁體中文" },
+  { code: "zh-CN", label: "简体中文" },
+  { code: "en",    label: "English" },
+  { code: "en-US", label: "English (US)" },
+  { code: "en-GB", label: "English (UK)" },
+  { code: "ja",    label: "日本語" },
+  { code: "ko",    label: "한국어" },
+  { code: "th",    label: "ภาษาไทย" },
+  { code: "vi",    label: "Tiếng Việt" },
+  { code: "id",    label: "Bahasa Indonesia" },
+  { code: "ms",    label: "Bahasa Melayu" },
+  { code: "de",    label: "Deutsch" },
+  { code: "fr",    label: "Français" },
+  { code: "es",    label: "Español" },
+  { code: "pt",    label: "Português" },
+  { code: "it",    label: "Italiano" },
+  { code: "ru",    label: "Русский" },
+  { code: "ar",    label: "العربية" },
+  { code: "hi",    label: "हिन्दी" },
+];
 
 export type AddEntityTab = "brand" | "product" | "event";
 
@@ -77,6 +102,16 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   const [brandName, setBrandName] = useState("");
   const [brandWebsite, setBrandWebsite] = useState("");
   const [brandTA, setBrandTA] = useState("");
+  // 2026-07-18 (CJ 多市場): target market + output language — was only in
+  // the first-brand onboarding wizard, so existing users adding brands here
+  // couldn't pick a market at all.
+  const [brandCountry, setBrandCountry] = useState("TW");
+  const [brandLang, setBrandLang] = useState("zh-TW");
+  const handleBrandCountryChange = (code: string) => {
+    setBrandCountry(code);
+    const profile = getCountry(code);
+    if (profile) setBrandLang(profile.languageCode);
+  };
   // Product
   const [prodBrandId, setProdBrandId] = useState<number | null>(defaultBrandId ?? null);
   const [prodName, setProdName] = useState("");
@@ -93,6 +128,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   useEffect(() => {
     if (!isOpen) return;
     setBrandName(""); setBrandWebsite(""); setBrandTA("");
+    setBrandCountry("TW"); setBrandLang("zh-TW");
     setProdBrandId(defaultBrandId ?? null); setProdName(""); setProdPositioning("");
     setEvBrandId(defaultBrandId ?? null); setEvName(""); setEvStart(""); setEvEnd(""); setEvNote("");
   }, [isOpen, defaultBrandId]);
@@ -118,6 +154,8 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
         name: brandName.trim(),
         website: brandWebsite.trim() || undefined,
         targetAudience: brandTA.trim() || undefined,
+        targetCountry: brandCountry || undefined,
+        outputLanguage: brandLang || undefined,
       });
       const newId = Number(r?.id ?? r?.brandId ?? 0);
       await refreshLists();
@@ -240,6 +278,47 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
               <div>
                 <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Website (optional)" : "官網（可選）"}</label>
                 <Input value={brandWebsite} onValueChange={setBrandWebsite} placeholder="https://..." />
+              </div>
+              {/* 2026-07-18 (CJ 多市場): market picker — parity with the onboarding wizard */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Target market" : "目標市場"}</label>
+                  <Autocomplete
+                    aria-label={lang === "en" ? "Target market" : "目標市場"}
+                    placeholder={lang === "en" ? "Search country…" : "搜尋國家…"}
+                    defaultSelectedKey={brandCountry}
+                    onSelectionChange={(key) => { if (key) handleBrandCountryChange(String(key)); }}
+                  >
+                    {COUNTRIES.map((c) => (
+                      <AutocompleteItem key={c.code} textValue={`${c.emoji} ${lang === "en" ? c.name : (c.nameZh ?? c.name)} (${c.code})`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{c.emoji}</span>
+                          <span className="text-sm">{lang === "en" ? c.name : (c.nameZh ?? c.name)}</span>
+                          <span className="text-xs text-default-400 ml-auto">{c.code}</span>
+                        </div>
+                      </AutocompleteItem>
+                    ))}
+                  </Autocomplete>
+                  <p className="text-tiny text-default-400 mt-1">{lang === "en" ? "AI researches competitors & trends in this market" : "AI 依此市場做競品 / 趨勢研究"}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Output language" : "輸出語言"}</label>
+                  <Select
+                    aria-label={lang === "en" ? "Output language" : "輸出語言"}
+                    selectedKeys={brandLang ? [brandLang] : ["zh-TW"]}
+                    onSelectionChange={(keys) => setBrandLang(Array.from(keys)[0] as string ?? "zh-TW")}
+                  >
+                    {[
+                      ...COMMON_LANGS,
+                      ...((() => {
+                        const c = getCountry(brandCountry);
+                        if (!c || COMMON_LANGS.some((l) => l.code === c.languageCode)) return [];
+                        return [{ code: c.languageCode, label: c.languageName }];
+                      })()),
+                    ].map((l) => <SelectItem key={l.code}>{l.label}</SelectItem>)}
+                  </Select>
+                  <p className="text-tiny text-default-400 mt-1">{lang === "en" ? "Language AI writes copy in" : "AI 產出文案的語言"}</p>
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Target audience (optional, one line)" : "目標受眾（可選，1 句話）"}</label>

@@ -32,8 +32,8 @@ export interface SquadIndexEntry {
   postType: string;
   /** User-facing card label. 2026-07-17 多市場: bilingual like FBTaskTemplate. */
   label: string | { en: string; zh: string };
-  /** 1-line description shown on card */
-  description: string;
+  /** 1-line description shown on card. 2026-07-18 多市場: bilingual. */
+  description: string | { en: string; zh: string };
   /** Methodology / framework note (subtle text on card) */
   methodology?: string;
   /** Override the generic intake question shown in the modal.
@@ -64,7 +64,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "fb-account-reposition",
     platform: "facebook", postType: "feed",
     label: { en: "FB Account Repositioning", zh: "FB 帳號重新定位" },
-    description: "Trout & Ries Positioning + Pulizzi Tilt + 完整轉型 launch posts",
+    description: { en: "Trout & Ries Positioning + Pulizzi Tilt + full transformation launch posts", zh: "Trout & Ries Positioning + Pulizzi Tilt + 完整轉型 launch posts" },
     methodology: "Trout & Ries Positioning",
     primary_question: "為什麼想重新定位？想往哪個方向走、或有想參考的品牌？",
     primary_input: {
@@ -78,7 +78,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "fb-quarterly-strategy",
     platform: "facebook", postType: "feed",
     label: { en: "FB Quarterly Content Strategy", zh: "FB 一季的內容策略" },
-    description: "3 個月的整體節奏：每月主題 + 12 個重點貼文題目 + 內容支柱配比",
+    description: { en: "3-month cadence: monthly themes + 12 flagship post topics + content-pillar mix", zh: "3 個月的整體節奏：每月主題 + 12 個重點貼文題目 + 內容支柱配比" },
     methodology: "Pulizzi Quarterly Cadence",
     primary_question: "這一季的主要目標是什麼？有沒有重要節點、新產品或要主打的方向？",
     primary_input: {
@@ -92,7 +92,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "fb-monthly-analytics",
     platform: "facebook", postType: "feed",
     label: { en: "FB Monthly Performance Review", zh: "FB 一個月成效檢討報告" },
-    description: "看數據找洞察：互動 / 觸及 / 收藏 全面分析 + 下月優化建議",
+    description: { en: "Insights from your data: engagement / reach / saves analysis + next month's optimizations", zh: "看數據找洞察：互動 / 觸及 / 收藏 全面分析 + 下月優化建議" },
     methodology: "Kaushik Web Analytics 2.0",
     primary_question: "這個月的數據大概怎樣？貼上主要指標，agents 會幫你找問題、提建議",
     primary_input: {
@@ -106,7 +106,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "fb-deiss-cvo",
     platform: "facebook", postType: "carousel",
     label: { en: "FB Carousel: Awareness-to-Purchase Story", zh: "FB 多卡輪播：從認識到下單的故事" },
-    description: "10 卡輪播完整敘事：陌生人怎麼一步步變成顧客（認識→興趣→評估→購買）",
+    description: { en: "10-card carousel narrative: how a stranger becomes a customer (aware→interest→evaluate→buy)", zh: "10 卡輪播完整敘事：陌生人怎麼一步步變成顧客（認識→興趣→評估→購買）" },
     methodology: "Ryan Deiss CVO 漏斗",
     primary_question: "要把哪個產品或服務從陌生人帶到下單？目標顧客是誰、最大的購買顧慮是什麼？",
     primary_input: {
@@ -120,7 +120,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "fb-hormozi-offer-first",
     platform: "facebook", postType: "feed",
     label: { en: "FB Offer-First Post", zh: "FB 直接主打優惠的貼文" },
-    description: "把優惠寫到讓人沒辦法拒絕：價值疊加 + 風險反轉 + 急迫感",
+    description: { en: "Write the offer they can't refuse: value stacking + risk reversal + urgency", zh: "把優惠寫到讓人沒辦法拒絕：價值疊加 + 風險反轉 + 急迫感" },
     methodology: "Hormozi 不可拒絕的提案",
     primary_question: "這次的優惠方案是什麼？包含折扣、贈品、截止日期、或其他讓人心動的條件",
     primary_input: {
@@ -134,7 +134,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "fb-kennedy-magnetic",
     platform: "facebook", postType: "feed",
     label: { en: "FB Magnetic Marketing: Customer-Pull Posts", zh: "FB 把自己變磁鐵：吸客貼文" },
-    description: "讓對的人主動找上你：精準定位、強烈訴求、明確行動呼籲",
+    description: { en: "Make the right people come to you: sharp positioning, strong appeal, clear CTA", zh: "讓對的人主動找上你：精準定位、強烈訴求、明確行動呼籲" },
     methodology: "Kennedy Magnetic Marketing",
     primary_question: "你最想吸引的是哪種人？他們現在最大的痛點或渴望是什麼？",
     primary_input: {
@@ -148,7 +148,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "fb-kern-mass-control",
     platform: "facebook", postType: "feed",
     label: { en: "FB Big-Launch Marketing Playbook", zh: "FB 大型發表會行銷劇本" },
-    description: "造勢式 launch：3 階段預告 → 開場壓軸 → 後續收束（適合年度大事件）",
+    description: { en: "Hype-cycle launch: 3-stage teasers → showtime → wind-down (built for annual flagship events)", zh: "造勢式 launch：3 階段預告 → 開場壓軸 → 後續收束（適合年度大事件）" },
     methodology: "Kern Mass Control",
     primary_question: "這次要發表什麼？預計發表日期、目標是什麼（報名 / 銷售 / 知名度）？",
     primary_input: {
@@ -166,7 +166,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "ig-monthly-calendar-pulizzi",
     platform: "instagram", postType: "feed",
     label: { en: "IG × Pulizzi 30-Day Calendar Strategy", zh: "IG × Pulizzi 30 天月曆策略" },
-    description: "每天 feed / reel / story 配置 + 抓本月節慶 + 主題 + 視覺一致性",
+    description: { en: "Daily feed / reel / story allocation + this month's holidays + themes + visual consistency", zh: "每天 feed / reel / story 配置 + 抓本月節慶 + 主題 + 視覺一致性" },
     methodology: "Pulizzi 內容支柱",
     primary_question: "這個月的主要主題或重點是什麼？有特別想主打的產品、活動或節慶嗎？",
     primary_input: {
@@ -180,7 +180,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "ig-baer-youtility",
     platform: "instagram", postType: "feed",
     label: { en: "IG × Youtility Pure-Utility Strategy", zh: "IG × Youtility 純實用型策略" },
-    description: "30 天「真的能用」的內容（不推銷、純幫忙），讓粉絲收藏分享",
+    description: { en: "30 days of genuinely useful content (no selling, pure help) that followers save and share", zh: "30 天「真的能用」的內容（不推銷、純幫忙），讓粉絲收藏分享" },
     methodology: "Baer Youtility",
     primary_question: "你的粉絲最需要學會或解決的是什麼？你能幫他們省什麼麻煩或時間？",
     primary_input: {
@@ -194,7 +194,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "ig-chrisdo-visual-story",
     platform: "instagram", postType: "feed",
     label: { en: "IG × Chris Do Visual-Consistency Strategy", zh: "IG × Chris Do 視覺一致型策略" },
-    description: "整套視覺識別 + 配色 + 構圖風格 + 30 天 feed 視覺一致",
+    description: { en: "Full visual identity + palette + composition style + 30-day visually consistent feed", zh: "整套視覺識別 + 配色 + 構圖風格 + 30 天 feed 視覺一致" },
     methodology: "Chris Do Visual Story",
     primary_question: "目前的視覺風格是什麼感覺？希望改成什麼方向、或有想參考的帳號嗎？",
     primary_input: {
@@ -208,7 +208,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "ig-fanzo-live-first",
     platform: "instagram", postType: "live",
     label: { en: "IG × Live-First Strategy", zh: "IG × Live-First 直播優先型策略" },
-    description: "以直播為核心：預告 + 直播配套 + 後續 reel 剪輯（高互動策略）",
+    description: { en: "Livestream at the core: teasers + live kit + follow-up reel edits (high-engagement strategy)", zh: "以直播為核心：預告 + 直播配套 + 後續 reel 剪輯（高互動策略）" },
     methodology: "Fanzo Live-First",
     primary_question: "要直播什麼主題？預計幾場、多久一次、目的是漲粉、互動、還是銷售？",
     primary_input: {
@@ -222,7 +222,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "ig-garyvee-document",
     platform: "instagram", postType: "feed",
     label: { en: "IG × GaryVee Document-Don't-Create Strategy", zh: "IG × GaryVee 紀實型策略" },
-    description: "拍真實日常工作場景，不過度包裝，建立品牌真實感與信任",
+    description: { en: "Film real day-to-day work, skip the gloss — build authenticity and trust", zh: "拍真實日常工作場景，不過度包裝，建立品牌真實感與信任" },
     methodology: "GaryVee Document",
     primary_question: "你的日常工作或品牌過程裡，有哪些場景想讓粉絲看到？",
     primary_input: {
@@ -236,7 +236,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "ig-hollis-radical-transparency",
     platform: "instagram", postType: "feed",
     label: { en: "IG × Hollis Radical-Transparency Strategy", zh: "IG × Hollis 真實透明型策略" },
-    description: "把品牌幕後 / 失敗 / 成長過程公開，建立深度信任",
+    description: { en: "Share the behind-the-scenes, failures and growth openly to build deep trust", zh: "把品牌幕後 / 失敗 / 成長過程公開，建立深度信任" },
     methodology: "Hollis Radical Transparency",
     primary_question: "有什麼品牌幕後、挑戰或失敗的故事，是你願意公開分享的？",
     primary_input: {
@@ -250,7 +250,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     squad_slug: "ig-hormozi-save-worthy",
     platform: "instagram", postType: "carousel",
     label: { en: "IG × Hormozi Save-Worthy Strategy", zh: "IG × Hormozi 高收藏型策略" },
-    description: "用 carousel 教學 / 清單 / 對照表，讓粉絲想收藏分享給朋友",
+    description: { en: "Carousel tutorials / checklists / comparison charts followers want to save and share", zh: "用 carousel 教學 / 清單 / 對照表，讓粉絲想收藏分享給朋友" },
     methodology: "Hormozi Save-Worthy",
     primary_question: "你想教粉絲什麼？什麼是你的領域裡、大家最想存起來的知識或清單？",
     primary_input: {

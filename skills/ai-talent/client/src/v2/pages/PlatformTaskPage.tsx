@@ -548,6 +548,7 @@ interface FBTaskCard {
   label_zh?: string | null;
   contextSources?: string[] | null;
   description: string;
+  description_en?: string | null;
   kind: "fast" | "mid" | "squad";
   inputs?: any[];
   primary_question?: string | null;
@@ -1808,7 +1809,9 @@ function PlatformTaskPageInner() {
                       <p className="text-small font-semibold leading-tight line-clamp-2">
                         {lang === "en" ? (task.label_en ?? task.label) : task.label}
                       </p>
-                      <p className="text-tiny text-default-500 line-clamp-2">{task.description}</p>
+                      <p className="text-tiny text-default-500 line-clamp-2">
+                        {lang === "en" ? (task.description_en ?? task.description) : task.description}
+                      </p>
                       {(task as any).methodology && (
                         <span className="text-[10px] text-default-400 italic">📚 {(task as any).methodology}</span>
                       )}

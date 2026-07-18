@@ -33,7 +33,7 @@ export const FB_99S_TASKS: FBTaskTemplate[] = [
     id: "fb-99-30day-calendar",
     tier: "99s", postType: "feed",
     label: { en: "FB 30-Day Content Calendar", zh: "FB 30 天內容行事曆" },
-    description: "結構化 30 天行事曆：4 理念WHY / 4 產品 / 2 節慶 / 2 UGC見證 / 2 國際權威",
+    description: { en: "Structured 30-day calendar: 4 WHY / 4 product / 2 seasonal / 2 UGC testimonial / 2 authority posts", zh: "結構化 30 天行事曆：4 理念WHY / 4 產品 / 2 節慶 / 2 UGC見證 / 2 國際權威" },
     agent_id: 224089, // Kevin Tan — Social Media Strategist eCommerce MY (1147 char)
     skill_slug: "content-calendar",
     primary_question: "本月主推 / 主題？（可寫多個產品與目標族群）",
@@ -73,7 +73,7 @@ export const FB_99S_TASKS: FBTaskTemplate[] = [
     id: "fb-99-monthly-calendar-promo",
     tier: "99s", postType: "feed",
     label: { en: "FB 30-Day Promo Calendar (Multi-Product)", zh: "FB 30 天促銷月曆（多商品）" },
-    description: "結構化促銷月曆：6 產品促銷 / 3 急迫限時 / 2 節慶檔期 / 2 UGC見證 / 1 理念",
+    description: { en: "Structured promo calendar: 6 product promos / 3 urgency / 2 seasonal / 2 UGC / 1 purpose post", zh: "結構化促銷月曆：6 產品促銷 / 3 急迫限時 / 2 節慶檔期 / 2 UGC見證 / 1 理念" },
     agent_id: 224089,
     skill_slug: "content-calendar",
     primary_question: "本檔促銷主題 + 要推哪些商品（各對誰、各一賣點）？",
@@ -111,7 +111,7 @@ export const FB_99S_TASKS: FBTaskTemplate[] = [
     id: "fb-99-carousel-5",
     tier: "99s", postType: "carousel",
     label: { en: "FB 5-Card Carousel", zh: "FB 5 卡輪播" },
-    description: "Hook→Build→Turn→Payoff→CTA 敘事弧 + 5 張卡（每卡獨立文案＋專屬圖）",
+    description: { en: "Hook→Build→Turn→Payoff→CTA narrative arc + 5 cards (own copy + dedicated image per card)", zh: "Hook→Build→Turn→Payoff→CTA 敘事弧 + 5 張卡（每卡獨立文案＋專屬圖）" },
     agent_id: 180148, // David Chen | Social Media Manager
     skill_slug: "social-copy",
     primary_question: "輪播主題是什麼？",
@@ -131,7 +131,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     id: "fb-99-serial-3",
     tier: "99s", postType: "feed",
     label: { en: "FB 3-Part Serial Narrative", zh: "FB 3 篇連載敘事" },
-    description: "Nelson Chen 設計 3 集弧 + Reed Lee 寫 3 篇有勾連（每集配圖＋產製配套）",
+    description: { en: "Nelson Chen designs a 3-part arc + Reed Lee writes 3 hooked posts (image + production kit per part)", zh: "Nelson Chen 設計 3 集弧 + Reed Lee 寫 3 篇有勾連（每集配圖＋產製配套）" },
     agent_id: 220752, // Reed Lee
     skill_slug: "social-copy",
     primary_question: "想連載講什麼故事？",
@@ -154,7 +154,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     id: "fb-99-viral-rewrite",
     tier: "99s", postType: "feed",
     label: { en: "FB Viral Post Rewrite", zh: "FB 爆款改寫" },
-    description: "Kevin Liu 找原爆款結構 + Siyu Li 改寫品牌版 + 對照表（scout 抓同類爆款）",
+    description: { en: "Kevin Liu maps the original viral structure + Siyu Li rewrites your brand version + comparison table (scout pulls similar virals)", zh: "Kevin Liu 找原爆款結構 + Siyu Li 改寫品牌版 + 對照表（scout 抓同類爆款）" },
     agent_id: 60048, // Siyu Li
     skill_slug: "fb-copywriting",
     primary_question: "貼上爆款原文（或連結），我們會分析結構並改寫成你的版本",
@@ -173,7 +173,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     id: "fb-99-testimonial-rewrite",
     tier: "99s", postType: "feed",
     label: { en: "FB Testimonial Rewrite", zh: "FB 客戶見證改寫文" },
-    description: "Kurt Chen 找見證結構 + Yawen Ma 改寫敘事 + Jason Evans 法務檢核",
+    description: { en: "Kurt Chen maps testimonial structure + Yawen Ma rewrites the narrative + Jason Evans legal check", zh: "Kurt Chen 找見證結構 + Yawen Ma 改寫敘事 + Jason Evans 法務檢核" },
     agent_id: 60026, // Kevin Chiang
     skill_slug: "fb-copywriting",
     primary_question: "貼上原始客戶見證 / 訪談 / 評價",
@@ -199,7 +199,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     id: "fb-99-trend-rewrite",
     tier: "99s", postType: "feed",
     label: { en: "FB Trending-Topic Rewrite", zh: "FB 時事改寫文" },
-    description: "Mark Davis 評估時事關聯 + Dale Yu 寫品牌切入點 + 時效性檢核（scout 抓即時時事）",
+    description: { en: "Mark Davis assesses trend relevance + Dale Yu writes the brand angle + timeliness check (scout pulls live trends)", zh: "Mark Davis 評估時事關聯 + Dale Yu 寫品牌切入點 + 時效性檢核（scout 抓即時時事）" },
     agent_id: 220755, // Dale Yu
     skill_slug: "social-copy",
     primary_question: "想搭哪個時事？",
@@ -222,7 +222,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     id: "fb-99-14day-countdown",
     tier: "99s", postType: "feed",
     label: { en: "FB Countdown Series (7 / 14 Days)", zh: "FB 倒數活動系列（7 / 14 天）" },
-    description: "每天一篇獨立倒數貼文 + 三幕節奏 + D-4 起含可執行 CTA + scout 抓節慶/時事",
+    description: { en: "One standalone countdown post per day + three-act pacing + actionable CTAs from D-4 + scout pulls holidays/trends", zh: "每天一篇獨立倒數貼文 + 三幕節奏 + D-4 起含可執行 CTA + scout 抓節慶/時事" },
     agent_id: 224116, // Hoàng Thị Mai — Email & CRM Strategist eCommerce VN (1251 char)
     skill_slug: "fb-countdown-series",
     primary_question: "活動名稱 + 主要 hook/優惠 + 倒數天數(7或14) + 活動截止日？",
@@ -248,7 +248,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     id: "fb-99-launch-toolkit",
     tier: "99s", postType: "event",
     label: { en: "FB Full Launch Toolkit (8 Posts)", zh: "FB 完整上線工具包（8 篇）" },
-    description: "預告 ×3 / 當日 / 即時 ×2 / 事後 / 跨平台 IG 改寫 + scout 抓節慶/時事",
+    description: { en: "Teasers ×3 / launch day / live ×2 / post-mortem / IG cross-post rewrite + scout pulls holidays/trends", zh: "預告 ×3 / 當日 / 即時 ×2 / 事後 / 跨平台 IG 改寫 + scout 抓節慶/時事" },
     agent_id: 60014, // Cindy Mo | Social Media Marketing (F&B)
     skill_slug: "fb-copywriting",
     primary_question: "活動名稱 + 日期 + 重點？",
@@ -268,7 +268,7 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     id: "fb-99-livestream-9seg",
     tier: "99s", postType: "feed",
     label: { en: "FB Livestream Full 9-Segment Kit", zh: "FB 直播完整 9 段配套" },
-    description: "預告 + 開場 + 5 爆點 + 結尾 + 精華回顧 + reel 剪輯指南",
+    description: { en: "Teaser + opener + 5 peak moments + closer + highlight recap + reel editing guide", zh: "預告 + 開場 + 5 爆點 + 結尾 + 精華回顧 + reel 剪輯指南" },
     agent_id: 224154, // Dewi Rahayu — Social Media Strategist Health ID (1135 char)
     skill_slug: "social-copy",
     primary_question: "直播主題 + 重點？",
@@ -287,7 +287,7 @@ ${TONE_100}`,
     id: "fb-99-crisis-playbook",
     tier: "99s", postType: "comment",
     label: { en: "FB Full Crisis-PR Playbook", zh: "FB 完整危機公關劇本" },
-    description: "偵測 + 第一份聲明 + 中期更新 ×3 + 後期 follow-up + 內部 talking points",
+    description: { en: "Detection + first statement + mid-cycle updates ×3 + follow-up + internal talking points", zh: "偵測 + 第一份聲明 + 中期更新 ×3 + 後期 follow-up + 內部 talking points" },
     agent_id: 222204, // Chen Jing-Yi — Senior Press Release Writer (1040 char)
     skill_slug: "crisis-communication",
     primary_question: "事件 / 危機內容？",
@@ -311,7 +311,7 @@ export const IG_99S_TASKS: FBTaskTemplate[] = [
     id: "ig-99-30day-calendar",
     tier: "99s", postType: "feed",
     label: { en: "IG 30-Day Content Calendar", zh: "IG 30 天內容月曆" },
-    description: "30 天 feed/reel/story 配比 + 每篇 hook + hashtag 策略 + 真實爆款參考",
+    description: { en: "30-day feed/reel/story mix + per-post hook + hashtag strategy + real viral references", zh: "30 天 feed/reel/story 配比 + 每篇 hook + hashtag 策略 + 真實爆款參考" },
     agent_id: 60008, // Fiona Hsieh | Social Media Marketing Strategist (Beauty)
     skill_slug: "instagram-strategy",
     primary_question: "本月主題？",
@@ -326,7 +326,7 @@ export const IG_99S_TASKS: FBTaskTemplate[] = [
     id: "ig-99-reel-series-6",
     tier: "99s", postType: "reel",
     label: { en: "IG Reel 6-Episode Series", zh: "IG Reel 6 集系列" },
-    description: "Strategist 設計 6 集弧 + 每集完整腳本（hook + hold + payoff）+ 縮圖 brief",
+    description: { en: "Strategist designs a 6-episode arc + full script per episode (hook + hold + payoff) + thumbnail brief", zh: "Strategist 設計 6 集弧 + 每集完整腳本（hook + hold + payoff）+ 縮圖 brief" },
     agent_id: 60033, // Yawen Yeh | E-commerce Short Video Scriptwriter
     skill_slug: "short-video-scriptwriter",
     primary_question: "6 集系列主題？",
@@ -341,7 +341,7 @@ export const IG_99S_TASKS: FBTaskTemplate[] = [
     id: "ig-99-account-reposition",
     tier: "99s", postType: "profile",
     label: { en: "IG Account Repositioning Kit", zh: "IG 帳號重新定位完整套組" },
-    description: "新 bio + 9 個 highlight 主題 + 9 篇 launch posts + visual direction",
+    description: { en: "New bio + 9 highlight themes + 9 launch posts + visual direction", zh: "新 bio + 9 個 highlight 主題 + 9 篇 launch posts + visual direction" },
     agent_id: 180141, // Rachel Chen | Social Media Strategy Director
     skill_slug: "instagram-strategy",
     primary_question: "想重新定位的方向？",
@@ -361,7 +361,7 @@ export const YT_99S_TASKS: FBTaskTemplate[] = [
     id: "yt-99-series-6ep",
     tier: "99s", postType: "video",
     label: { en: "YT 6-Episode Series Production Pack", zh: "YT 6 集系列完整製作包" },
-    description: "6 集 title + description 800-1200 字 + 縮圖 brief 各 3 種 + community 配套",
+    description: { en: "6 episode titles + 800-1200-word descriptions + 3 thumbnail briefs each + community companion posts", zh: "6 集 title + description 800-1200 字 + 縮圖 brief 各 3 種 + community 配套" },
     agent_id: 224005, // Pin-Chen Lin — YouTube Marketing Strategist 金融科技 (~1000 char)
     skill_slug: "youtube-content",
     primary_question: "6 集系列主題？",
@@ -394,7 +394,7 @@ export const YT_99S_TASKS: FBTaskTemplate[] = [
     id: "yt-99-quarterly-strategy",
     tier: "99s", postType: "video",
     label: { en: "YT Quarterly Channel Strategy", zh: "YT 季度頻道策略" },
-    description: "即時趨勢報告 + 內容支柱 + 12 個 video title + community 月曆",
+    description: { en: "Live trend report + content pillars + 12 video titles + community calendar", zh: "即時趨勢報告 + 內容支柱 + 12 個 video title + community 月曆" },
     agent_id: 224001, // Yun-Hsuan Chen — YouTube Marketing Strategist 服飾時尚 (~1019 char)
     skill_slug: "youtube-strategy",
     primary_question: "頻道主題 + 目標受眾職稱 + 品牌主張 + 競品（四項合填）",
@@ -488,7 +488,7 @@ YYYY年M月D日（週N）｜發布時機：[星期幾 時段]
     id: "yt-99-premiere-kit",
     tier: "99s", postType: "premiere",
     label: { en: "YT Premiere Launch Kit", zh: "YT 首播完整包" },
-    description: "預告影片 + 倒數 community 貼文 + 直播配套 + 精華剪輯指南",
+    description: { en: "Trailer video + countdown community posts + livestream kit + highlights editing guide", zh: "預告影片 + 倒數 community 貼文 + 直播配套 + 精華剪輯指南" },
     agent_id: 223995, // Pei-Hsuan Liu — YouTube Marketing Strategist 電商/DTC (1025 char)
     skill_slug: "shorts-scriptwriter",
     primary_question: "Premiere 主題？",
@@ -516,7 +516,7 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     id: "tt-99-30day-foryou",
     tier: "99s", postType: "foryou",
     label: { en: "TikTok 30-Day For You Formula", zh: "TikTok 30 天推薦頁配方" },
-    description: "30 天每天 1 支腳本 + trend 對應 + sound 建議 + scout 抓節慶/時事",
+    description: { en: "One script per day for 30 days + trend mapping + sound picks + scout pulls holidays/trends", zh: "30 天每天 1 支腳本 + trend 對應 + sound 建議 + scout 抓節慶/時事" },
     agent_id: 27, skill_slug: "short-video-script", // Chloe Chen | Short Video Strategist (Beauty)
     primary_question: "本月想衝什麼方向？",
     primary_input: { key: "monthly_theme", placeholder: "教學 / 反差 / 開箱 為主", type: "textarea" },
@@ -530,7 +530,7 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     id: "tt-99-trend-week",
     tier: "99s", postType: "foryou",
     label: { en: "TikTok 1-Week Trend-Riding Kit", zh: "TikTok 1 週追熱點完整套組" },
-    description: "7 天每天 1 個 trend + 品牌 hook + 3 種 hook 變化 + sound 建議",
+    description: { en: "One trend per day for 7 days + brand hook + 3 hook variations + sound picks", zh: "7 天每天 1 個 trend + 品牌 hook + 3 種 hook 變化 + sound 建議" },
     agent_id: 220507, skill_slug: "short-video-script", // Pin-Yen Liu — Short-form Video Producer Beauty
     primary_question: "想搭哪類熱點？",
     primary_input: { key: "trend_focus", placeholder: "節日 / meme / 新聞", type: "textarea" },
@@ -572,7 +572,7 @@ export const MULTI_99S_TASKS: FBTaskTemplate[] = [
     id: "li-99-30day-thought-leadership",
     tier: "99s", postType: "feed",
     label: { en: "LI 30-Day Thought-Leadership Calendar", zh: "LI 30 天意見領袖月曆" },
-    description: "30 天 = 10 觀點 / 10 案例 / 10 趨勢預測 + scout 抓即時節慶",
+    description: { en: "30 days = 10 viewpoints / 10 case studies / 10 trend predictions + scout pulls live dates", zh: "30 天 = 10 觀點 / 10 案例 / 10 趨勢預測 + scout 抓即時節慶" },
     agent_id: 222342, skill_slug: "linkedin-b2b", // Hung Ya-Wen | Social Media Strategist – B2B SaaS
     primary_question: "這個月想立什麼專業 image？（月份 + 核心主題 + 目標受眾職稱 + 你的品牌主張，四項合填）",
     primary_input: {
@@ -643,7 +643,7 @@ SoWork 語氣 = 「精準守護者、有憑據的科技感」，不是散文，�
     id: "li-99-newsletter-quarterly",
     tier: "99s", postType: "newsletter",
     label: { en: "LI Quarterly Newsletter (4 Issues)", zh: "LI 季度電子報 4 期" },
-    description: "季度 4 期 newsletter 完整內容 + 訂閱成長策略",
+    description: { en: "Four full quarterly newsletter issues + subscriber growth strategy", zh: "季度 4 期 newsletter 完整內容 + 訂閱成長策略" },
     agent_id: 60062, skill_slug: "linkedin-b2b", // Nathan Lu | Media Newsletter Copywriter
     primary_question: "季度大主題 + 各期子題 + 目標讀者行動 + 品牌主張（四項合填）",
     primary_input: {
@@ -736,7 +736,7 @@ SoWork 語氣 = 「精準守護者、有憑據的科技感」，深度論述但�
     id: "em-99-4week-nurture",
     tier: "99s", postType: "edm",
     label: { en: "Email 4-Week Nurture Sequence", zh: "Email 4 週新客培育序列" },
-    description: "4 週 onboarding：第1週 Why / 第2週 What / 第3週 How / 第4週 Deepen",
+    description: { en: "4-week onboarding: Week 1 Why / Week 2 What / Week 3 How / Week 4 Deepen", zh: "4 週 onboarding：第1週 Why / 第2週 What / 第3週 How / 第4週 Deepen" },
     agent_id: 224161, skill_slug: "email-marketing", // Xenia Anggraini — Email & CRM Strategist Beauty ID
     primary_question: "品牌/產品名稱 + 目標受眾職稱 + 4 週各週主題 + 核心功能名稱（四項一起填）",
     primary_input: {
@@ -818,7 +818,7 @@ SoWork 語氣＝「精準守護者、有憑據的科技感」，不是散文、�
     id: "em-99-launch-sequence",
     tier: "99s", postType: "edm",
     label: { en: "Email Product-Launch Automation Sequence", zh: "Email 產品上線完整自動化序列" },
-    description: "預告 ×2 / 上線 / 提醒 ×2 / 最後機會 / 後續 follow-up = 7 封",
+    description: { en: "Teasers ×2 / launch / reminders ×2 / last chance / follow-up = 7 emails", zh: "預告 ×2 / 上線 / 提醒 ×2 / 最後機會 / 後續 follow-up = 7 封" },
     agent_id: 60061, skill_slug: "email-marketing", // Yahan Tsai — Retail E-commerce Newsletter Copywriter
     // 2026-05-18 (CJ 驗收 P0): 原本只問「產品名+賣點」→ 主旨空白、CTA
     // 不分階段、最後機會/follow-up 無從設計。四項合一引導 textarea。
@@ -876,7 +876,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     id: "pr-99-launch-toolkit",
     tier: "99s", postType: "press",
     label: { en: "PR Full Launch Media Toolkit", zh: "PR 完整上線媒體工具包" },
-    description: "新聞稿 + 採訪問答 + 媒體聯絡話術 + 後續追蹤 + spokesperson talking points",
+    description: { en: "Press release + interview Q&A + media outreach scripts + follow-up + spokesperson talking points", zh: "新聞稿 + 採訪問答 + 媒體聯絡話術 + 後續追蹤 + spokesperson talking points" },
     agent_id: 223197, skill_slug: "pr-writing", // Yi-Wen Wu — PR Strategist B2B SaaS (476 char)
     primary_question: "Launch 主題 + 目標媒體類型 + 發言人姓名職稱 + 發稿時機（四項一起填）",
     primary_input: {
@@ -954,7 +954,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     id: "pr-99-newsjack",
     tier: "99s", postType: "press",
     label: { en: "Newsjacking Hook", zh: "借時事新聞鉤" },
-    description: "把品牌安全接上此刻正在發燒的時事，產出可報導的角度",
+    description: { en: "Safely attach your brand to what's trending right now — angles reporters can actually run", zh: "把品牌安全接上此刻正在發燒的時事，產出可報導的角度" },
     agent_id: 223197, skill_slug: "pr-writing",
     primary_question: "品牌想被看見的點 / 可連結的專業或產品？（若有想接的時事可一併寫）",
     primary_input: { key: "context", placeholder: "品牌專業領域/產品/觀點 + 手上事實或數字。系統會自動抓此刻熱門時事；若你已有想接的具體時事事件也可直接寫進來（沒抓到時就用你寫的）", type: "textarea" },
@@ -993,7 +993,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     id: "br-99-reposition-toolkit",
     tier: "99s", postType: "press",
     label: { en: "Brand Reposition Toolkit", zh: "品牌重新定位完整工具包" },
-    description: "Positioning + Tagline 套 + Voice guide + Visual direction + 應用範例",
+    description: { en: "Positioning + tagline suite + voice guide + visual direction + application examples", zh: "Positioning + Tagline 套 + Voice guide + Visual direction + 應用範例" },
     agent_id: 60002, skill_slug: "brand-strategy", // Ethan Chiang | DTC E-commerce Brand Strategist
     primary_question: "想往什麼方向轉？（已讀入現有定位作為起點）",
     primary_input: { key: "new_position", placeholder: "新定位方向 / 想拋下的舊包袱", type: "textarea" },
@@ -1013,7 +1013,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     id: "br-99-voice-playbook",
     tier: "99s", postType: "press",
     label: { en: "Brand Voice Playbook", zh: "品牌語氣完整手冊" },
-    description: "8 個應用情境 + Do/Don't 詳細 + 5 個範例 + 跨平台 voice 適配",
+    description: { en: "8 application scenarios + detailed Do/Don't + 5 samples + cross-platform voice adaptation", zh: "8 個應用情境 + Do/Don't 詳細 + 5 個範例 + 跨平台 voice 適配" },
     agent_id: 32, skill_slug: "brand-strategy", // Fiona Hsu | Copywriter
     primary_question: "想補充或微調哪些情境？（已讀入既有 Voice — 留空即直接展開 8 情境 playbook）",
     primary_input: { key: "voice_direction", placeholder: "選填 — 想強化的特定情境，如客服 / 危機 / 跨國", type: "textarea" },
@@ -1031,7 +1031,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     id: "rs-99-discovery-sprint",
     tier: "99s", postType: "press",
     label: { en: "User Research · Discovery Sprint", zh: "用戶研究 5 天探索衝刺" },
-    description: "訪綱 + 5 personas + JTBD map + insights synthesis + 行動建議",
+    description: { en: "Interview guide + 5 personas + JTBD map + insights synthesis + action recommendations", zh: "訪綱 + 5 personas + JTBD map + insights synthesis + 行動建議" },
     agent_id: 90043, skill_slug: "user-research", // Lydia Chiu | Qualitative Research Director
     primary_question: "想了解用戶什麼？（已讀入既有受眾定位 — 留空即用既有 persona 延伸研究假設）",
     primary_input: {
@@ -1057,7 +1057,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     // 2026-05-11 (CJ「中英文研究意圖不一樣」): split label + correct EN
     // (this is competitor research, not user research).
     label: { en: "Competitor Research Map", zh: "競品研究完整地圖" },
-    description: "5-10 競品分析 + 定位 map + opportunity gaps + 推薦策略",
+    description: { en: "5-10 competitor analysis + positioning map + opportunity gaps + recommended strategy", zh: "5-10 競品分析 + 定位 map + opportunity gaps + 推薦策略" },
     agent_id: 90006, skill_slug: "competitive-intel", // Steven Chen — Research Manager, Consumer Insights
     primary_question: "想補充什麼？（系統已讀入品牌的競品定位 — 可留空直接跑）",
     primary_input: {
@@ -1105,7 +1105,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     id: "rs-99-competitor-ads",
     tier: "99s", postType: "press",
     label: { en: "Competitor Ad Intelligence", zh: "競品廣告偵察報告（Meta Ads Library）" },
-    description: "撈最多 5 個競品在 Meta Ads Library 的近期投放 → LLM 分析比例 / 訴求 / 視覺",
+    description: { en: "Pull up to 5 competitors' recent Meta Ads Library campaigns → LLM analyzes mix / appeals / visuals", zh: "撈最多 5 個競品在 Meta Ads Library 的近期投放 → LLM 分析比例 / 訴求 / 視覺" },
     agent_id: 210225, skill_slug: "competitive-intel",
     primary_question: "要監測哪些競品？（最多 5 個品牌名，用逗號分隔）",
     primary_input: {
@@ -1146,7 +1146,7 @@ ${TONE_100}`,
     id: "kl-99-campaign-toolkit",
     tier: "99s", postType: "press",
     label: { en: "KOL Campaign Toolkit", zh: "KOL 活動完整話術包" },
-    description: "多 KOL 分層邀請 + 漏斗訊息 + brief 模板 + 報價回應 + 結案報告",
+    description: { en: "Multi-KOL tiered invitations + funnel messaging + brief template + rate-negotiation replies + wrap-up report", zh: "多 KOL 分層邀請 + 漏斗訊息 + brief 模板 + 報價回應 + 結案報告" },
     agent_id: 220920, skill_slug: "kol-outreach", // Chloe Chen | Senior KOL & Influencer Manager
     // 2026-05-18 (CJ 驗收「問題設計 1/2」): 99s 表單只送單一主輸入，把
     // 合作形式 + 平台 併進同一引導 textarea（這兩點對 outreach 話術影響

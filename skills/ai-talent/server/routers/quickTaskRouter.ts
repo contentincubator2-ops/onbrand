@@ -1267,9 +1267,15 @@ export const quickTaskRouter = router({
       const labelStr = typeof t.label === "string"
         ? t.label
         : (t.label?.zh ?? t.label?.en ?? t.id);
+      // 2026-07-18 多市場: description is bilingual too — flatten to the
+      // zh string (legacy field) + surface description_en for the EN UI.
+      const descStr = typeof t.description === "string"
+        ? t.description
+        : (t.description?.zh ?? t.description?.en ?? "");
       const base = {
         id: t.id, tier: t.tier, postType: t.postType, platform,
-        label: labelStr, description: t.description, kind: t.kind,
+        label: labelStr, description: descStr, kind: t.kind,
+        description_en: typeof t.description === "object" && t.description?.en ? t.description.en : null,
       };
       if (t.kind === "squad") {
         // 100s squad tasks: surface lead agent + team roster + a primary
@@ -1821,6 +1827,11 @@ export const quickTaskRouter = router({
             if (text && brandMarket.isZhTW) {
               const { voiceSanitizeZhTW } = await import("../_core/quickTaskOrchestra");
               text = voiceSanitizeZhTW(text);
+            } else if (text) {
+              // 2026-07-18: Latin-punct markets — clean stray CJK punctuation
+              // the model slips in because the step prompt is Chinese.
+              const { latinPunctLang, normalizeLatinPunct } = await import("../_core/quickTaskOrchestra");
+              if (latinPunctLang(brandMarket.outputLanguage)) text = normalizeLatinPunct(text);
             }
           } catch { /* fail-safe: keep raw text */ }
           prevOutputs.push(`【${stageLabel}】${text.slice(0, 800)}`);
