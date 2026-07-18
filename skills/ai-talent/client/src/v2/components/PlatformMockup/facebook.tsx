@@ -17,7 +17,7 @@ import {
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
   faChevronRight, faArrowRight, faThumbtack,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption } from "./shared";
+import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption, ImageGenSlot } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── FB Feed ─────────────── */
@@ -213,9 +213,10 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 
 /* ─────────────── FB Reel ─────────────── */
 
-export function FBReel({ title, brandName, variantLabel }: MockupFields) {
+export function FBReel({ title, brandName, variantLabel, liveImageUrl, liveImageStatus, liveImageStyle, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
+  const hasImage = !!liveImageUrl && liveImageStatus === "ready";
   return (
     <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
@@ -224,13 +225,22 @@ export function FBReel({ title, brandName, variantLabel }: MockupFields) {
           <span className="text-small font-semibold">Reels</span>
           <FontAwesomeIcon icon={faVideo} />
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
-            <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "9:16 video · waiting for craft agent" : "9:16 影片 · 等待 AI 生成"}</p>
+        {/* 2026-07-17 (CJ): was a dead「9:16 影片 · 等待 AI 生成」skeleton —
+            implied a video was coming and offered nothing to click. */}
+        {hasImage ? (
+          <img src={liveImageUrl!} alt={liveImageStyle ?? "Reel cover"} className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0">
+            <ImageGenSlot
+              brief={liveImageStyle}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+              videoFrame
+            />
           </div>
-        </div>
+        )}
         <div className="absolute right-2 bottom-20 z-10 flex flex-col items-center gap-3.5 text-white drop-shadow-lg">
           <RailIcon icon={faThumbsUp} count="12K" />
           <RailIcon icon={faComment} count="456" />
@@ -298,27 +308,19 @@ export function FBStory({ title, brandName, variantLabel, liveCaption, liveTitle
             <FontAwesomeIcon icon={faXmark} className="text-medium" />
           </div>
         </div>
+        {/* 2026-07-17 (CJ「畫面讓人混淆能不能產圖…提示詞秀在那邊不知道怎麼
+            用」— screenshot was THIS component): the raw visual brief used to
+            float mid-frame with no CTA. Standardized ImageGenSlot: centered
+            點此生成主圖 button + the brief as labeled supporting text. */}
         {!hasImage && (
-          <div
-            role={onGenerateImage ? "button" : undefined}
-            tabIndex={onGenerateImage ? 0 : undefined}
-            onClick={onGenerateImage}
-            onKeyDown={onGenerateImage ? (e) => { if (e.key === "Enter" || e.key === " ") onGenerateImage(); } : undefined}
-            className={`absolute inset-0 flex items-center justify-center z-0 ${onGenerateImage ? "cursor-pointer" : ""}`}
-          >
-            <Skeleton className="absolute inset-0 opacity-30" />
-            <div className="relative z-10 text-center text-white/50 px-4">
-              <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-              <p className="text-tiny">
-                {liveImageStyle
-                  ? liveImageStyle
-                  : liveImageStatus === "timeout"
-                    ? (lang === "en" ? "Story image timed out · tap to retry" : "限動圖超時 · 點此重試")
-                    : liveImageStatus === "failed"
-                      ? (lang === "en" ? "Story image · tap to generate" : "限動背景圖 · 點此生成")
-                      : (lang === "en" ? "Story image · tap to generate" : "限動背景圖 · 點此生成")}
-              </p>
-            </div>
+          <div className="absolute inset-0 z-0">
+            <ImageGenSlot
+              brief={liveImageStyle}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+            />
           </div>
         )}
         {/* Overlay 主標 (5-8 字) + Story 文案 (30-60 字) — the actual deliverable */}

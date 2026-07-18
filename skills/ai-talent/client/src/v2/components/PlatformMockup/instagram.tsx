@@ -25,13 +25,13 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
-  dicebear, handleOf, SlotContent, MarkdownText, titleEchoesCaption,
+  dicebear, handleOf, SlotContent, MarkdownText, titleEchoesCaption, ImageGenSlot,
 } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
 
-export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, slotMap, imageSlotFlow }: MockupFields) {
+export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage, slotMap, imageSlotFlow }: MockupFields) {
   const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
@@ -95,22 +95,15 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           ) : imageSlot?.status === "filled" && typeof imageSlot.value === "string" && imageSlot.value.startsWith("http") ? (
             <img src={imageSlot.value as string} alt="generated" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <>
-              <Skeleton className="absolute inset-0" />
-              <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
-                <div className="text-center bg-default-50/80 backdrop-blur-sm rounded-medium m-3 p-3">
-                  <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-                  {liveImageStyle ? (
-                    <>
-                      <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Visual direction" : "圖片風格方向"}</p>
-                      <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
-                    </>
-                  ) : (
-                    <p className="text-tiny line-clamp-3">{effectiveImageDesc ?? (lang === "en" ? "Hero image · waiting for craft agent" : "主圖 · 等待 AI 生成")}</p>
-                  )}
-                </div>
-              </div>
-            </>
+            // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle || effectiveImageDesc}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+              />
+            </div>
           )}
         </div>
 
@@ -215,7 +208,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 
 /* ─────────────── IG Carousel ─────────────── */
 
-export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
@@ -250,22 +243,15 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
           {liveImageUrl && liveImageStatus === "ready" ? (
             <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <>
-              <Skeleton className="absolute inset-0" />
-              <div className="absolute inset-0 flex items-center justify-center text-default-400 p-4">
-                <div className="text-center bg-default-50/80 backdrop-blur-sm rounded-medium m-3 p-3">
-                  <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-                  {liveImageStyle ? (
-                    <>
-                      <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Per-slide visual style" : "每頁視覺風格"}</p>
-                      <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
-                    </>
-                  ) : (
-                    <p className="text-tiny line-clamp-3">{liveImageDesc ?? (lang === "en" ? `Slide 1 / ${carouselCount} · waiting for craft agent` : `輪播 1 / ${carouselCount} · 等待 AI 生成`)}</p>
-                  )}
-                </div>
-              </div>
-            </>
+            // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle || liveImageDesc}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+              />
+            </div>
           )}
           <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-tiny font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
             1/{carouselCount}
@@ -324,7 +310,7 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
 
 /* ─────────────── IG Reels (9:16 + side action rail) ─────────────── */
 
-export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveVideoDesc, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveVideoDesc, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const handle = handleOf(brandName);
   return (
@@ -341,19 +327,16 @@ export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCapt
         {liveImageUrl && liveImageStatus === "ready" ? (
           <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Skeleton className="absolute inset-0 opacity-30" />
-            <div className="relative z-10 text-center text-white/80 p-4 max-w-[80%]">
-              <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-              {liveImageStyle ? (
-                <>
-                  <p className="text-tiny font-semibold mb-1 text-white">{lang === "en" ? "Cover direction" : "封面風格方向"}</p>
-                  <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
-                </>
-              ) : (
-                <p className="text-tiny line-clamp-3">{liveVideoDesc ?? (lang === "en" ? "9:16 video · waiting for craft agent" : "9:16 影片 · 等待 AI 生成")}</p>
-              )}
-            </div>
+          // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+          <div className="absolute inset-0">
+            <ImageGenSlot
+              brief={liveImageStyle || liveVideoDesc}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+              videoFrame
+            />
           </div>
         )}
         {/* Avatar overlay so brand logo is visible */}
@@ -390,7 +373,7 @@ export function IGReels({ title, brandName, brandLogoUrl, variantLabel, liveCapt
 
 /* ─────────────── IG Stories (top progress bars + 9:16) ─────────────── */
 
-export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const handle = handleOf(brandName);
   const segCount = 5;
@@ -430,20 +413,21 @@ export function IGStories({ title, brandName, brandLogoUrl, variantLabel, liveCa
         {liveImageUrl && liveImageStatus === "ready" ? (
           <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-95" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Skeleton className="absolute inset-0 opacity-30" />
-            {liveImageStyle && (
-              <div className="relative z-10 text-center text-white/80 px-6 max-w-[80%]">
-                <FontAwesomeIcon icon={faImages} className="text-2xl mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">{lang === "en" ? "Background style" : "背景風格"}</p>
-                <p className="text-tiny line-clamp-4">{liveImageStyle}</p>
-              </div>
-            )}
+          // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+          <div className="absolute inset-0">
+            <ImageGenSlot
+              brief={liveImageStyle}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+            />
           </div>
         )}
 
-        {/* Overlay text — large main 主標 (caption line 1), small sub (rest) */}
-        <div className="absolute top-1/2 -translate-y-1/2 inset-x-4 z-10 text-center">
+        {/* Overlay text — large main 主標 (caption line 1), small sub (rest)
+            pointer-events-none so the underlying 點此生成主圖 CTA stays clickable */}
+        <div className="absolute top-1/2 -translate-y-1/2 inset-x-4 z-10 text-center pointer-events-none">
           <p className="text-white font-bold text-2xl drop-shadow-md leading-tight" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
             {overlayMain}
           </p>
@@ -540,7 +524,7 @@ export function IGProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
 
 /* ─────────────── IG Live (9:16 + LIVE chip + viewers + chat) ─────────────── */
 
-export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
@@ -568,15 +552,16 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         {liveImageUrl && liveImageStatus === "ready" ? (
           <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Skeleton className="absolute inset-0 opacity-30" />
-            {liveImageStyle && (
-              <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
-                <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">{lang === "en" ? "Cover style" : "封面風格"}</p>
-                <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
-              </div>
-            )}
+          // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+          <div className="absolute inset-0">
+            <ImageGenSlot
+              brief={liveImageStyle}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+              videoFrame
+            />
           </div>
         )}
         {/* Live opening script overlay — shows the caption (host's opening 30s) */}
@@ -611,7 +596,7 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 
 /* ─────────────── IG Ad (feed + Sponsored + CTA bar) ─────────────── */
 
-export function IGAd({ title, brandName, variantLabel }: MockupFields) {
+export function IGAd({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const handle = handleOf(brandName);
   return (
@@ -632,13 +617,19 @@ export function IGAd({ title, brandName, variantLabel }: MockupFields) {
           <span className="text-medium tracking-tighter">⋯</span>
         </div>
         <div className="relative aspect-square bg-default-100">
-          <Skeleton className="absolute inset-0" />
-          <div className="absolute inset-0 flex items-center justify-center text-default-400">
-            <div className="text-center">
-              <FontAwesomeIcon icon={faShoppingBag} className="text-4xl mb-2" />
-              <p className="text-tiny">{lang === "en" ? "Ad image · waiting for craft agent" : "廣告主圖 · 等待 AI 生成"}</p>
+          {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot */}
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+              />
             </div>
-          </div>
+          )}
         </div>
         {/* CTA bar — distinguishes ad from feed */}
         <div className="px-3 py-2.5 border-y border-divider bg-default-50 flex items-center justify-between">

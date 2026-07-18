@@ -14,18 +14,17 @@ import {
   faImages, faComment, faShare, faVideo, faHeart, faXmark,
   faUserGroup, faCircle, faStar, faThumbtack, faReply, faChartColumn,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, MarkdownText, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, MarkdownText, dicebear, ImageGenSlot } from "./shared";
 import { FBFeed } from "./facebook";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── FB Live (broadcast preview) ─────────────── */
-export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc }: MockupFields) {
+export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   return (
     <div className="w-full max-w-[420px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook Live" variantLabel={variantLabel} />
       <div className="bg-black border border-divider rounded-xl overflow-hidden shadow-lg relative aspect-[9/16]">
-        {!liveImageStyle && !liveImageDesc && <Skeleton className="absolute inset-0" />}
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70 z-10" />
         <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
           <span className="bg-red-600 text-white text-tiny font-bold px-2 py-0.5 rounded flex items-center gap-1">
@@ -38,20 +37,21 @@ export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageS
         <button className="absolute top-3 right-3 z-20 bg-black/60 text-white w-7 h-7 rounded-full flex items-center justify-center">
           <FontAwesomeIcon icon={faXmark} className="text-tiny" />
         </button>
-        <div className="absolute inset-0 flex items-center justify-center text-default-200 z-10 p-6">
-          {liveImageStyle ? (
-            <div className="text-center bg-black/40 backdrop-blur-sm rounded-medium p-4 max-w-[80%]">
-              <FontAwesomeIcon icon={faVideo} className="text-3xl mb-2 text-default-100" />
-              <p className="text-tiny font-semibold text-default-100 mb-1">{lang === "en" ? "Live visual style" : "直播畫面風格"}</p>
-              <p className="text-tiny text-default-200 leading-relaxed line-clamp-5">{liveImageStyle}</p>
-            </div>
-          ) : (
-            <div className="text-center">
-              <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-              <p className="text-tiny line-clamp-3">{liveImageDesc ?? (lang === "en" ? "Live · waiting to start" : "直播畫面 · 等待開播")}</p>
-            </div>
-          )}
-        </div>
+        {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot */}
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 z-10">
+            <ImageGenSlot
+              brief={liveImageStyle || liveImageDesc}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+              videoFrame
+            />
+          </div>
+        )}
         <div className="absolute bottom-12 left-3 right-3 z-20 space-y-1">
           {liveCaption ? (
             <div className="bg-black/40 backdrop-blur-sm rounded-medium px-3 py-2">
@@ -74,28 +74,27 @@ export function FBLive({ title, brandName, variantLabel, liveCaption, liveImageS
 }
 
 /* ─────────────── FB Cover (851×315) ─────────────── */
-export function FBCover({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc }: MockupFields) {
+export function FBCover({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   return (
     <div className="w-full max-w-[680px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook Cover (851×315)" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="aspect-[851/315] bg-gradient-to-br from-blue-900 to-blue-600 relative flex items-center justify-center">
-          {!liveImageStyle && !liveImageDesc && <Skeleton className="absolute inset-0" />}
-          <div className="text-center text-white relative z-10 p-4 max-w-[80%]">
-            {liveImageStyle ? (
-              <div className="bg-black/40 backdrop-blur-sm rounded-medium p-3">
-                <FontAwesomeIcon icon={faImages} className="text-2xl mb-1" />
-                <p className="text-tiny font-semibold mb-0.5">{lang === "en" ? "Cover direction" : "封面風格方向"}</p>
-                <p className="text-tiny line-clamp-3 leading-relaxed">{liveImageStyle}</p>
-              </div>
-            ) : (
-              <>
-                <FontAwesomeIcon icon={faImages} className="text-3xl mb-2" />
-                <p className="text-tiny line-clamp-2">{liveImageDesc ?? (lang === "en" ? "Cover · waiting for craft agent" : "封面 · 等待 AI 生成")}</p>
-              </>
-            )}
-          </div>
+        <div className="aspect-[851/315] bg-gradient-to-br from-blue-900 to-blue-600 relative">
+          {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot */}
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle || liveImageDesc}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+                dark
+              />
+            </div>
+          )}
         </div>
         <div className="px-6 pt-2 pb-4 -mt-8 relative">
           <div className="flex items-end gap-4">
@@ -220,7 +219,7 @@ export function FBComment({ title, brandName, variantLabel, liveCaption, liveDes
 }
 
 /* ─────────────── FB Group post ─────────────── */
-export function FBGroup({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveHashtags }: MockupFields) {
+export function FBGroup({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveHashtags, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const styleText = liveImageStyle || liveImageDesc;
   return (
@@ -249,19 +248,18 @@ export function FBGroup({ title, brandName, variantLabel, liveCaption, liveImage
             </p>
           )}
         </div>
+        {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot */}
         {styleText && (
-          <div className="aspect-[16/9] bg-default-100 flex items-center justify-center text-default-400 relative">
-            {!liveImageStyle && <Skeleton className="absolute inset-0" />}
-            <div className="text-center relative z-10 p-4">
-              <FontAwesomeIcon icon={faImages} className="text-3xl mb-2 text-default-400" />
-              {liveImageStyle ? (
-                <>
-                  <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Visual direction" : "圖片風格方向"}</p>
-                  <p className="text-tiny line-clamp-3 text-default-700">{liveImageStyle}</p>
-                </>
-              ) : <p className="text-tiny line-clamp-3">{liveImageDesc}</p>}
-            </div>
-          </div>
+          liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="w-full aspect-[16/9] object-cover" />
+          ) : (
+            <ImageGenSlot
+              brief={styleText}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="aspect-[16/9]"
+            />
+          )
         )}
         <div className="px-4 py-2 border-t border-divider flex items-center gap-4 text-default-500 text-tiny">
           <span>👍 156</span>
@@ -332,7 +330,7 @@ export function FBPinned(props: MockupFields) {
 }
 
 /* ─────────────── FB Album (multi-image grid) ─────────────── */
-export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveHashtags }: MockupFields) {
+export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveHashtags, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   return (
     <div className="w-full max-w-[520px] mx-auto">
@@ -354,18 +352,29 @@ export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImage
             </p>
           )}
         </div>
+        {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot — hero cell
+            only; small cells stay plain skeletons (no dead 點此生成 text) */}
         <div className="grid grid-cols-2 gap-0.5 bg-default-200">
-          {[0,1,2,3].map(i => (
+          <div className="aspect-square bg-default-100 relative overflow-hidden">
+            {liveImageUrl && liveImageStatus === "ready" ? (
+              <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0">
+                <ImageGenSlot
+                  brief={liveImageStyle || liveImageDesc}
+                  status={liveImageStatus}
+                  onGenerate={onGenerateImage}
+                  aspectClass="w-full h-full"
+                />
+              </div>
+            )}
+          </div>
+          {[1, 2, 3].map(i => (
             <div key={i} className="aspect-square bg-default-100 flex items-center justify-center text-default-400 relative">
-              {!liveImageStyle && !liveImageDesc && <Skeleton className="absolute inset-0" />}
+              <Skeleton className="absolute inset-0" />
               <div className="text-center relative z-10 p-2">
                 <FontAwesomeIcon icon={faImages} className="text-2xl text-default-400" />
-                {i === 0 && liveImageStyle && (
-                  <p className="text-[10px] line-clamp-3 mt-1 text-default-700">{liveImageStyle}</p>
-                )}
-                {i > 0 && liveImageStyle && (
-                  <p className="text-[10px] mt-1 text-default-500">{lang === "en" ? `Image ${i + 1}` : `圖 ${i + 1}`}</p>
-                )}
+                <p className="text-[10px] mt-1 text-default-500">{lang === "en" ? `Image ${i + 1}` : `圖 ${i + 1}`}</p>
               </div>
             </div>
           ))}

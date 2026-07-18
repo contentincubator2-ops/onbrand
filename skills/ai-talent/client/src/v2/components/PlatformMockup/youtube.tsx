@@ -15,7 +15,7 @@ import {
   faVideo, faThumbsUp, faThumbsDown, faComment, faShareNodes,
   faMusic, faImages, faDownload, faBell, faScissors,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, ImageGenSlot } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── Thumbnail title overlay ───────────────
@@ -49,7 +49,7 @@ function ThumbnailTextOverlay({ text }: { text?: string }) {
 
 /* ─────────────── YT Video Card ─────────────── */
 
-export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, overlayTitle }: MockupFields) {
+export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, overlayTitle, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
@@ -60,23 +60,19 @@ export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, live
           {liveImageUrl && liveImageStatus === "ready" ? (
             <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <>
-              <Skeleton className="absolute inset-0" />
-              <div className="text-center text-default-500 relative z-10 p-4 max-w-[80%]">
-                <FontAwesomeIcon icon={faVideo} className="text-3xl mb-2" />
-                {liveImageStyle ? (
-                  <>
-                    <p className="text-tiny font-semibold mb-1">{lang === "en" ? "Thumbnail direction" : "縮圖風格方向"}</p>
-                    <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
-                  </>
-                ) : (
-                  <p className="text-tiny">{lang === "en" ? "Thumbnail · waiting for craft agent" : "縮圖 · 等待 AI 生成"}</p>
-                )}
-              </div>
-            </>
+            // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+                videoFrame
+              />
+            </div>
           )}
           {liveImageUrl && liveImageStatus === "ready" && <ThumbnailTextOverlay text={overlayTitle} />}
-          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded z-20">12:34</div>
+          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded z-20 pointer-events-none">12:34</div>
         </div>
         <div className="p-4 space-y-2">
           <p className="text-medium font-semibold leading-snug line-clamp-2">{title || (liveCaption ? liveCaption.split("\n")[0] : (lang === "en" ? "Video title" : "影片標題"))}</p>
@@ -103,7 +99,7 @@ export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, live
 
 /* ─────────────── YT Watch (player + meta + actions) ─────────────── */
 
-export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, overlayTitle }: MockupFields) {
+export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, overlayTitle, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   // For YT tasks the caption typically IS the deliverable (title list / chapter
@@ -120,16 +116,16 @@ export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCapt
           {liveImageUrl && liveImageStatus === "ready" ? (
             <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <div className="text-center text-white/70 relative z-10 p-4 max-w-[70%]">
-              <FontAwesomeIcon icon={faVideo} className="text-4xl mb-2" />
-              {liveImageStyle ? (
-                <>
-                  <p className="text-tiny font-semibold mb-1 text-white">{lang === "en" ? "Thumbnail direction" : "縮圖風格方向"}</p>
-                  <p className="text-tiny line-clamp-4 leading-relaxed">{liveImageStyle}</p>
-                </>
-              ) : (
-                <p className="text-tiny">{lang === "en" ? "Thumbnail · waiting for craft agent" : "縮圖 · 等待 AI 生成"}</p>
-              )}
+            // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+                dark
+                videoFrame
+              />
             </div>
           )}
           {liveImageUrl && liveImageStatus === "ready" && <ThumbnailTextOverlay text={overlayTitle} />}
@@ -260,7 +256,7 @@ export function YTCommunity({ title, brief, brandName, brandLogoUrl, variantLabe
 
 /* ─────────────── YT Shorts ─────────────── */
 
-export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "channel");
   return (
@@ -275,15 +271,16 @@ export function YTShorts({ title, brandName, brandLogoUrl, variantLabel, liveCap
         {liveImageUrl && liveImageStatus === "ready" ? (
           <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Skeleton className="absolute inset-0 opacity-30" />
-            {liveImageStyle && (
-              <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
-                <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">{lang === "en" ? "Cover style" : "封面風格"}</p>
-                <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
-              </div>
-            )}
+          // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+          <div className="absolute inset-0">
+            <ImageGenSlot
+              brief={liveImageStyle}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+              videoFrame
+            />
           </div>
         )}
         {/* Script overlay — render the Shorts script body so user sees the deliverable */}
@@ -335,26 +332,40 @@ function VerticalActionItem({ icon, count }: { icon: any; count: string }) {
 
 /* ─────────────── YT Premiere (countdown overlay) ─────────────── */
 
-export function YTPremiere({ title, brandName, variantLabel }: MockupFields) {
+export function YTPremiere({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   return (
     <div className="w-full max-w-[640px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="relative aspect-video bg-black flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-40" />
+        <div className="relative aspect-video bg-black overflow-hidden">
+          {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot — countdown
+              moved to bottom strip so the centered 點此生成主圖 CTA stays clickable */}
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+                dark
+                videoFrame
+              />
+            </div>
+          )}
           {/* Premiere chip top-left */}
-          <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
+          <div className="absolute top-3 left-3 flex items-center gap-2 z-10 pointer-events-none">
             <span className="bg-danger text-white text-tiny font-bold px-2 py-0.5 rounded uppercase">{lang === "en" ? "Premiere" : "首播"}</span>
             <span className="bg-black/70 text-white text-tiny px-2 py-0.5 rounded">{lang === "en" ? "Starting soon" : "即將開始"}</span>
           </div>
-          {/* Countdown center */}
-          <div className="relative z-10 text-center text-white">
-            <p className="text-tiny uppercase tracking-wider opacity-80 mb-1">{lang === "en" ? "Premiere in" : "距離首播"}</p>
-            <p className="text-4xl font-bold tabular-nums tracking-tight">02:14:35</p>
-            <p className="text-tiny opacity-80 mt-2">{lang === "en" ? "Remind me + Set notification" : "提醒我 + 設定通知"}</p>
+          {/* Countdown bottom strip */}
+          <div className="absolute bottom-2 inset-x-0 z-10 text-center text-white pointer-events-none">
+            <p className="text-tiny opacity-90">
+              {lang === "en" ? "Premiere in" : "距離首播"} <span className="font-bold tabular-nums tracking-tight">02:14:35</span>
+            </p>
           </div>
-          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">12:34</div>
         </div>
         <div className="p-4 space-y-2">
           <p className="text-medium font-semibold leading-snug line-clamp-2">{title}</p>
@@ -375,19 +386,30 @@ export function YTPremiere({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── YT Live (LIVE chip + viewers + chat panel) ─────────────── */
 
-export function YTLive({ title, brandName, variantLabel }: MockupFields) {
+export function YTLive({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   return (
     <div className="w-full max-w-[640px] mx-auto">
       <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <div className="relative aspect-video bg-black flex items-center justify-center">
-          <div className="text-white/50 text-center relative z-10">
-            <FontAwesomeIcon icon={faVideo} className="text-5xl mb-2" />
-            <p className="text-tiny">{lang === "en" ? "Live · waiting for craft agent" : "直播中 · 等待 AI 生成"}</p>
-          </div>
+        <div className="relative aspect-video bg-black overflow-hidden">
+          {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot */}
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+                dark
+                videoFrame
+              />
+            </div>
+          )}
           {/* LIVE chip top-left */}
-          <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
+          <div className="absolute top-3 left-3 flex items-center gap-2 z-10 pointer-events-none">
             <span className="bg-danger text-white text-tiny font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
             </span>

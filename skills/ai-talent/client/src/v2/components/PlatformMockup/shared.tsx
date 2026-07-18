@@ -9,6 +9,86 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Chip, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useLang } from "../../../lib/i18n";
+
+/* ── ImageGenSlot — THE standard image placeholder for every mockup ─────────
+ *
+ * 2026-07-17 (CJ「畫面讓人混淆能不能產圖/產影片…盤查一遍，完全都補上一個
+ * 程序：至少要在圖片中央產出提示詞，用戶可以點選生圖」):
+ * every image slot in every mockup renders this instead of ad-hoc
+ * placeholders. It always shows
+ *   1. a CENTERED, obviously-clickable 「點此生成主圖」 button (wired to the
+ *      host page's image-generation panel via onGenerate; retry copy on
+ *      failed/timeout),
+ *   2. the generated visual direction (視覺方向) as supporting text — so the
+ *      baked-in prompt text stops looking like mystery content,
+ *   3. for video-form mockups (Story/Reels/直播/YT), an explicit note that
+ *      the frame is layout preview only and no video file is produced.
+ * If the host passes no onGenerate handler the slot degrades to a passive
+ * note (never a dead「點此生成」that ignores clicks — that was the bug). */
+export function ImageGenSlot({
+  brief,
+  status,
+  onGenerate,
+  aspectClass = "aspect-[16/9]",
+  dark = false,
+  videoFrame = false,
+  className = "",
+}: {
+  brief?: string | null;
+  status?: MockupFields["liveImageStatus"];
+  onGenerate?: () => void;
+  /** Tailwind aspect/size classes; pass "" when the parent fixes dimensions. */
+  aspectClass?: string;
+  /** Dark treatment for story/reels/video frames. */
+  dark?: boolean;
+  /** Video-form mockup: adds the「不產出影片檔」clarification. */
+  videoFrame?: boolean;
+  className?: string;
+}) {
+  const { lang } = useLang();
+  const clickable = !!onGenerate;
+  const failed = status === "timeout" || status === "failed";
+  const ctaText = failed
+    ? (lang === "en" ? "Image failed · tap to retry" : "圖片生成失敗 · 點此重試")
+    : (lang === "en" ? "Tap to generate image" : "點此生成主圖");
+  return (
+    <div
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      aria-label={clickable ? ctaText : undefined}
+      onClick={onGenerate}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGenerate!(); } } : undefined}
+      className={`relative flex flex-col items-center justify-center text-center px-5 py-6 gap-2 ${aspectClass} ${
+        dark ? "bg-black/30" : "bg-default-100"
+      } ${clickable ? `cursor-pointer transition ${dark ? "hover:bg-black/40" : "hover:bg-default-200"}` : ""} ${className}`}
+    >
+      {clickable ? (
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-tiny font-semibold shadow-sm ${
+          dark ? "bg-white/90 text-default-900" : "bg-white text-default-800 border border-default-300"
+        }`}>
+          🎨 {ctaText}
+        </span>
+      ) : (
+        <span className={`text-tiny font-medium ${dark ? "text-white/70" : "text-default-500"}`}>
+          {lang === "en" ? "No image in this step" : "此步驟不含主圖"}
+        </span>
+      )}
+      {brief && (
+        <p className={`text-[10px] leading-relaxed line-clamp-3 max-w-[92%] ${dark ? "text-white/55" : "text-default-400"}`}>
+          {lang === "en" ? "Visual direction: " : "視覺方向："}{brief}
+        </p>
+      )}
+      {videoFrame && (
+        <p className={`text-[9px] ${dark ? "text-white/45" : "text-default-400"}`}>
+          {lang === "en"
+            ? "Video frame is a layout preview — this task does not render a video file"
+            : "影片外框僅為版位示意 · 本任務不產出影片檔"}
+        </p>
+      )}
+    </div>
+  );
+}
 
 // ── MarkdownText — renders social post content with Markdown formatting ───────
 /**

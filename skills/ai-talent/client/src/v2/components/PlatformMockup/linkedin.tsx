@@ -23,8 +23,10 @@ import {
   faFileLines, faNewspaper, faChartSimple, faCircle, faCircleDot,
   faBell, faHome, faSearch, faBriefcase, faUsers,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
-import { ImageGenSlot, type ImageGenPhase } from "../SquadMockups/ImageGenSlot";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot } from "./shared";
+// 2026-07-17 (CJ「盤查生圖佔位」): the phase-driven 3-step flow slot (LIFeed only)
+// is aliased so the standardized shared ImageGenSlot owns the plain name.
+import { ImageGenSlot as ImageGenFlowSlot, type ImageGenPhase } from "../SquadMockups/ImageGenSlot";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── LI Feed ─────────────── */
@@ -156,8 +158,8 @@ export function LIFeed({
           )}
         </div>
 
-        {/* ── Image area — ImageGenSlot replaces static skeleton ────── */}
-        <ImageGenSlot
+        {/* ── Image area — ImageGenFlowSlot replaces static skeleton ────── */}
+        <ImageGenFlowSlot
           phase={imageGenPhase ?? "idle"}
           designDirection={imageGenDesignDirection}
           aiPrompt={imageGenAiPrompt}
@@ -206,7 +208,7 @@ export function LIFeed({
 
 /* ─────────────── LI Article ─────────────── */
 
-export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   const lines = (liveCaption ?? "").split(/\n+/).filter(Boolean);
@@ -220,15 +222,14 @@ export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCa
           <div className="aspect-[3/1] bg-default-100 overflow-hidden">
             <img src={liveImageUrl} alt="" className="w-full h-full object-cover" />
           </div>
-        ) : liveImageStyle ? (
-          <div className="aspect-[3/1] bg-default-100 flex items-center justify-center p-4 text-default-500">
-            <div className="text-center max-w-[80%]">
-              <p className="text-tiny font-semibold mb-1">{lang === "en" ? "Cover direction" : "封面風格方向"}</p>
-              <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
-            </div>
-          </div>
         ) : (
-          <ImageGenSlot phase="idle" aspectRatio="3/1" />
+          // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+          <ImageGenSlot
+            brief={liveImageStyle}
+            status={liveImageStatus}
+            onGenerate={onGenerateImage}
+            aspectClass="aspect-[3/1]"
+          />
         )}
         <div className="px-8 py-6 space-y-3">
           <h2 className="text-2xl font-semibold leading-tight tracking-tight">{headline}</h2>
@@ -263,7 +264,7 @@ export function LIArticle({ title, brandName, brandLogoUrl, variantLabel, liveCa
 
 /* ─────────────── LI Newsletter (article + subscribe CTA) ─────────────── */
 
-export function LINewsletter({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function LINewsletter({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   void avatarSrc;
@@ -289,12 +290,14 @@ export function LINewsletter({ title, brandName, brandLogoUrl, variantLabel, liv
           <div className="aspect-[3/1] bg-default-100 overflow-hidden">
             <img src={liveImageUrl} alt="" className="w-full h-full object-cover" />
           </div>
-        ) : liveImageStyle ? (
-          <div className="aspect-[3/1] bg-default-100 flex items-center justify-center p-4 text-default-500">
-            <div className="text-center max-w-[80%]"><p className="text-tiny font-semibold mb-1">{lang === "en" ? "Cover style" : "封面風格"}</p><p className="text-tiny line-clamp-3">{liveImageStyle}</p></div>
-          </div>
         ) : (
-          <ImageGenSlot phase="idle" aspectRatio="3/1" />
+          // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+          <ImageGenSlot
+            brief={liveImageStyle}
+            status={liveImageStatus}
+            onGenerate={onGenerateImage}
+            aspectClass="aspect-[3/1]"
+          />
         )}
         <div className="px-8 py-6 space-y-3">
           <p className="text-tiny text-default-500 uppercase tracking-wider">{lang === "en" ? "Issue 042 · May 15" : "第 042 期 · 5 月 15 日"}</p>
@@ -457,7 +460,7 @@ export function LIDocument({ title, brandName, brandLogoUrl, variantLabel, liveC
 
 /* ─────────────── LI Native Video (feed + video player) ─────────────── */
 
-export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) {
+export function LINativeVideo({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   return (
     <div className="w-full max-w-[540px] mx-auto">
@@ -475,21 +478,24 @@ export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) 
           <Skeleton className="h-2.5 w-[88%] rounded" />
           <Skeleton className="h-2.5 w-[72%] rounded" />
         </div>
-        {/* Video player */}
-        <div className="relative aspect-video bg-black flex items-center justify-center">
-          <div className="text-white/50 text-tiny">{lang === "en" ? "Loading video…" : "影片載入中…"}</div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-              <span className="ml-1 text-foreground text-xl">▶</span>
-            </span>
-          </div>
-          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">3:45</div>
-          {/* Caption indicator */}
-          <div className="absolute top-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded">CC</div>
-          {/* Play progress bar */}
-          <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20">
-            <div className="h-full w-1/4 bg-primary" />
-          </div>
+        {/* Video player — 2026-07-17 (CJ「盤查生圖佔位」): standardized
+            ImageGenSlot; fake play button / progress bar removed (implied a
+            real video file, same confusion CJ flagged on YT frames) */}
+        <div className="relative aspect-video bg-black overflow-hidden">
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0">
+              <ImageGenSlot
+                brief={liveImageStyle}
+                status={liveImageStatus}
+                onGenerate={onGenerateImage}
+                aspectClass="w-full h-full"
+                dark
+                videoFrame
+              />
+            </div>
+          )}
         </div>
         <div className="px-4 py-2 flex items-center justify-between text-tiny text-default-500">
           <span>{lang === "en" ? "👍❤️💡 1,234 · 12K views" : "👍❤️💡 1,234 · 12K 次觀看"}</span>
@@ -515,7 +521,7 @@ export function LINativeVideo({ title, brandName, variantLabel }: MockupFields) 
 
 /* ─────────────── LI Ad (feed + Promoted + CTA) ─────────────── */
 
-export function LIAd({ title, brandName, variantLabel }: MockupFields) {
+export function LIAd({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   return (
     <div className="w-full max-w-[540px] mx-auto">
@@ -538,7 +544,19 @@ export function LIAd({ title, brandName, variantLabel }: MockupFields) {
           <p className="text-small">{title}</p>
           <Skeleton className="h-2.5 w-[90%] rounded" />
         </div>
-        <ImageGenSlot phase="idle" aspectRatio="1.91/1" />
+        {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot */}
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <div className="aspect-[1.91/1] bg-default-100 overflow-hidden">
+            <img src={liveImageUrl} alt="" className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <ImageGenSlot
+            brief={liveImageStyle}
+            status={liveImageStatus}
+            onGenerate={onGenerateImage}
+            aspectClass="aspect-[1.91/1]"
+          />
+        )}
         {/* CTA bar */}
         <div className="px-4 py-3 bg-default-50 border-y border-divider flex items-center justify-between">
           <div className="min-w-0">
@@ -558,13 +576,25 @@ export function LIAd({ title, brandName, variantLabel }: MockupFields) {
 
 /* ─────────────── LI Event (event card + RSVP) ─────────────── */
 
-export function LIEvent({ title, brief, brandName, variantLabel }: MockupFields) {
+export function LIEvent({ title, brief, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faLinkedin} label="LinkedIn" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
-        <ImageGenSlot phase="idle" aspectRatio="2.5/1" />
+        {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot */}
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <div className="aspect-[2.5/1] bg-default-100 overflow-hidden">
+            <img src={liveImageUrl} alt="" className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <ImageGenSlot
+            brief={liveImageStyle}
+            status={liveImageStatus}
+            onGenerate={onGenerateImage}
+            aspectClass="aspect-[2.5/1]"
+          />
+        )}
         <div className="px-5 pt-4 pb-3 space-y-2">
           <Chip size="sm" variant="flat" color="primary" className="uppercase tracking-wider">
             {lang === "en" ? "Online event" : "線上活動"}

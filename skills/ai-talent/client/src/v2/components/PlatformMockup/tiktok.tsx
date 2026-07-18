@@ -11,11 +11,11 @@ import {
   faVideo, faHeart, faComment, faShareNodes, faMusic, faPlus,
   faPlay, faLock, faShare, faGear,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, ImageGenSlot } from "./shared";
 
 /* ─────────────── TT For-You ─────────────── */
 
-export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
@@ -29,15 +29,16 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
         {liveImageUrl && liveImageStatus === "ready" ? (
           <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Skeleton className="absolute inset-0 opacity-30" />
-            {liveImageStyle && (
-              <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
-                <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">封面風格</p>
-                <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
-              </div>
-            )}
+          // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+          <div className="absolute inset-0">
+            <ImageGenSlot
+              brief={liveImageStyle}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+              videoFrame
+            />
           </div>
         )}
         {liveCaption && (
@@ -140,7 +141,7 @@ export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
 
 /* ─────────────── TT Photo Carousel ─────────────── */
 
-export function TTCarousel({ title, brandName, variantLabel }: MockupFields) {
+export function TTCarousel({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   return (
     <div className="w-full max-w-[400px] mx-auto">
@@ -149,13 +150,21 @@ export function TTCarousel({ title, brandName, variantLabel }: MockupFields) {
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-center gap-4 pt-3 text-white text-small">
           <span className="font-semibold border-b-2 border-white pb-1">為你推薦</span>
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="absolute inset-0 opacity-30" />
-          <div className="relative z-10 text-center text-white/60">
-            <FontAwesomeIcon icon={faPlay} className="text-4xl mb-2" />
-            <p className="text-tiny">圖文 1 / 8 · 等待 AI 生成</p>
+        {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot（圖文輪播
+            第 1 格 — 產出是圖片，非影片，故不加 videoFrame 註記） */}
+        {liveImageUrl && liveImageStatus === "ready" ? (
+          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+        ) : (
+          <div className="absolute inset-0">
+            <ImageGenSlot
+              brief={liveImageStyle}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+            />
           </div>
-        </div>
+        )}
         <div className="absolute top-12 right-3 z-10 bg-black/50 backdrop-blur-sm text-white text-tiny px-2 py-0.5 rounded-full">
           1/8
         </div>
@@ -199,7 +208,7 @@ function RailItem({ icon, count }: { icon: any; count: string }) {
 
 /* ─────────────── TT Live (LIVE chip + viewers + gifts) ─────────────── */
 
-export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus }: MockupFields) {
+export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   void title;
@@ -221,15 +230,16 @@ export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         {liveImageUrl && liveImageStatus === "ready" ? (
           <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Skeleton className="absolute inset-0 opacity-30" />
-            {liveImageStyle && (
-              <div className="relative z-10 text-center text-white/80 px-4 max-w-[80%]">
-                <FontAwesomeIcon icon={faVideo} className="text-2xl mb-2" />
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1">封面風格</p>
-                <p className="text-tiny line-clamp-3">{liveImageStyle}</p>
-              </div>
-            )}
+          // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+          <div className="absolute inset-0">
+            <ImageGenSlot
+              brief={liveImageStyle}
+              status={liveImageStatus}
+              onGenerate={onGenerateImage}
+              aspectClass="w-full h-full"
+              dark
+              videoFrame
+            />
           </div>
         )}
         {liveCaption && (
