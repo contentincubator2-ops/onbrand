@@ -533,9 +533,15 @@ async function callOneVariant(args: {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor, market } = args;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
-  // {today} → YYYY年M月D日（台北時區）so PR datelines / calendar dates are never stale.
+  // {today} → market-appropriate date format so PR datelines / calendar
+  // dates are never stale. zh markets (and legacy undefined) keep
+  // YYYY年M月D日; other known markets use their locale; unmapped → ISO.
   const _now = new Date();
-  const todayStr = `${_now.getFullYear()}年${_now.getMonth() + 1}月${_now.getDate()}日`;
+  const todayStr = (market === undefined || (market ?? "").startsWith("zh"))
+    ? `${_now.getFullYear()}年${_now.getMonth() + 1}月${_now.getDate()}日`
+    : market
+    ? _now.toLocaleDateString(market, { year: "numeric", month: "long", day: "numeric" })
+    : _now.toISOString().slice(0, 10);
   const filledSystemPrompt = template.systemPrompt
     .replace(/\{label\}/g, label)
     .replace(/\{today\}/g, todayStr);
@@ -661,6 +667,20 @@ async function callOneVariant(args: {
     ? `\n\n${CW_CRAFT_RUBRIC}\n\n${cwPlaybookFor(template.id)}\n`
     : "";
 
+  // 2026-07-18 多市場 (P2): the 11 award-craft rubrics are zh-TW "structure
+  // textbooks" with Taiwan cultural framing. Rather than maintaining 11×N
+  // per-market rewrites, non-zh-TW markets get ONE override: keep the
+  // STRUCTURE (hook / narrative arc / rhythm / close), localize everything
+  // else. Applies when the brand's market is known and not zh-TW (null =
+  // unmapped language — note still applies; undefined = legacy zh-TW).
+  const anyCraft = edmBlock || igBlock || fbBlock || liBlock || ttBlock ||
+    ytBlock || prBlock || brBlock || klBlock || rsBlock || cwBlock;
+  const craftLocaleNote = (market !== undefined && market !== "zh-TW" && anyCraft)
+    ? `\n\n【工藝準則在地化 — 重要】上方得獎工藝準則是以台灣市場中文寫成的「結構教材」：` +
+      `只取其結構（開場鉤子 / 敘事弧 / 節奏 / 收尾 / 格式），**輸出一律用品牌目標市場語言**；` +
+      `文化引用（節慶 / 場景 / 慣用語 / 平台梗）改用目標市場的在地等效，不得出現台灣特有元素（夜市 / 便利商店 / 中元節…）。\n`
+    : "";
+
   // 2026-05-18 (CJ「行事曆其他支柱格式是亂的」): calendar pillar agents
   // must emit a STRICT JSON array. The social-caption scaffolding below
   // (craft rubric + 「只寫 1 個變體 caption」+「不要排成結構化卡片」+
@@ -725,6 +745,7 @@ async function callOneVariant(args: {
       klBlock +
       rsBlock +
       cwBlock +
+      craftLocaleNote +
       strategistSection +
       `\n\n【本次只產 1 個變體】**${label}**：在不更動章節結構的前提下，` +
       `用此變體的風格詮釋（完整正式版＝最詳盡；精簡重點版＝每節更精煉；活動主題版＝圍繞本次活動主軸）。\n` +
@@ -755,6 +776,7 @@ async function callOneVariant(args: {
     klBlock +
     rsBlock +
     cwBlock +
+    craftLocaleNote +
     strategistSection +
     `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
     `${lengthHint}\n\n` +

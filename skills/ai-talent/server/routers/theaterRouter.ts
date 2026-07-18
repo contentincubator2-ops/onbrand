@@ -978,7 +978,12 @@ ${input.scoutPatterns.slice(0, 4).map((p, i) => `${i + 1}. ${p}`).join("\n")}`
       // Same week's 7 days × N platforms each get a DIFFERENT case → forced
       // structural diversity. Empty string for platforms without a craft file.
       const craftBlock = buildTheaterCraftBlock(input.brandId, input.date, input.platform);
-      const craftSection = craftBlock ? `\n\n${craftBlock}\n` : "";
+      // 2026-07-18 多市場 (P2): craft 是台灣框架的結構教材 — 非 zh-TW 品牌
+      // 只取結構、輸出與文化引用一律在地化（同 orchestra craftLocaleNote）。
+      const craftLocale = (!brandMarket.isZhTW && craftBlock)
+        ? `\n【工藝準則在地化 — 重要】上方工藝準則是以台灣市場中文寫成的「結構教材」：只取其結構（開場鉤子 / 敘事弧 / 節奏 / 收尾），輸出一律用 ${brandMarket.outputLanguage}；文化引用改用目標市場在地等效，不得出現台灣特有元素。\n`
+        : "";
+      const craftSection = craftBlock ? `\n\n${craftBlock}\n${craftLocale}` : "";
 
       // 2026-06-10 (CJ「減少疊床架屋 + 資訊不夠時智能補完」): completely
       // restructured prompt. Old version repeated "first sentence must be

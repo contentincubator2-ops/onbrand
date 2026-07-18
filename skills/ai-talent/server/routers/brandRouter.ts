@@ -285,8 +285,12 @@ export const brandRouter = router({
         targetAudience: input.targetAudience ?? null,
         soworkAnalysis: {
           competitors: input.competitors ?? null,
-          targetMarket: input.targetMarket ?? 'Taiwan',
-          contentLanguage: input.contentLanguage ?? 'zh-TW',
+          // 2026-07-18 多市場 (P2): derive from the wizard's country pick
+          // instead of hardcoding Taiwan/zh-TW for every new brand.
+          targetMarket: input.targetMarket
+            ?? (input.targetCountry && input.targetCountry.toUpperCase() !== 'TW'
+                  ? input.targetCountry.toUpperCase() : 'Taiwan'),
+          contentLanguage: input.contentLanguage ?? input.outputLanguage ?? 'zh-TW',
         },
         // 2026-05-21 global localisation
         targetCountry: input.targetCountry ?? null,

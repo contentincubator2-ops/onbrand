@@ -104,7 +104,18 @@ async function suggestOne(args: {
 }): Promise<{ ok: true; value: any; shape: string } | { ok: false; error: string }> {
   const spec = ASSET_SPEC[args.assetKey];
   const hasReal = (args.realContent ?? "").length > 0;
-  const sys = `你是品牌文案顧問，繁體中文。任務：根據可得資訊填寫文字資產欄位。
+  // 2026-07-18 多市場 (P2): asset copy follows the brand's outputLanguage.
+  // The industry-vocab examples below are TW-market illustrations — for
+  // non-zh brands instruct the model to produce local-language equivalents.
+  const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
+  const mkt = await getBrandMarket(args.brandId).catch(() => DEFAULT_BRAND_MARKET);
+  const langDirective = mkt.isZhTW
+    ? "繁體中文"
+    : `所有產出內容一律使用 ${mkt.outputLanguage}（品牌目標市場語言），不得混入中文`;
+  const localizeNote = mkt.isZhTW
+    ? ""
+    : `\n5. 下面各產業的「語感範例詞」是台灣市場的中文示意 — **不要照抄**，請產出 ${mkt.outputLanguage} 中相同語感的在地說法（節慶 / 場景 / 慣用語一律用目標市場的，例如美國用 Black Friday / back-to-school，不要用中元節 / 母親節伴手禮）。`;
+  const sys = `你是品牌文案顧問，${langDirective}。任務：根據可得資訊填寫文字資產欄位。
 ${spec.ask}
 ${formatHintFor(spec.shape, spec.n)}
 直接輸出 JSON 物件，**第一個字元就是 {**。不要前綴「以下是…」、不要 markdown code fence、不要解釋。
@@ -121,7 +132,7 @@ ${formatHintFor(spec.shape, spec.n)}
   ? "下方提供了品牌的官網 / 社群實際內容，**必須**以該內容為準推斷產業 / 受眾 / 語氣。"
   : "下方資料有限，但仍要根據品牌名稱 + 描述 + 產業常識**精準推斷產業**。寧可少寫幾條真正貼合的，也不要塞通用詞充數。"
 }
-4. 如果真的判斷不出產業，回傳空陣列 / 空物件，**不要編造跟品牌無關的內容**。
+4. 如果真的判斷不出產業，回傳空陣列 / 空物件，**不要編造跟品牌無關的內容**。${localizeNote}
 ${args.brandPrefix}${args.realContent}${args.knowledgeBlock}`;
 
   try {
@@ -299,7 +310,15 @@ export const brandKnowledgeRouter = router({
       };
       const label = labelMap[input.platform] ?? input.platform;
       const hasReal = real.hasContent;
-      const sys = `你是品牌文案顧問，繁體中文。
+      // 2026-07-18 多市場 (P2): generated per-platform system prompts must
+      // themselves command the brand's market language, or every downstream
+      // caption inherits a zh-TW instruction.
+      const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
+      const mkt = await getBrandMarket(input.brandId).catch(() => DEFAULT_BRAND_MARKET);
+      const langLine = mkt.isZhTW
+        ? "繁體中文"
+        : `產出的指令內容必須明確要求「所有貼文 / 配圖文字一律使用 ${mkt.outputLanguage}（品牌目標市場語言）」，指令本身也用 ${mkt.outputLanguage} 撰寫`;
+      const sys = `你是品牌文案顧問，${langLine}。
 任務：為這個品牌產出在 ${label} 平台寫貼文 / 配圖時可以直接 inject 給 LLM 的 system prompt。
 ${hasReal
   ? "下方有品牌官網 / 社群實際內容 — 以該內容推斷產業 / 受眾 / 語氣。"
