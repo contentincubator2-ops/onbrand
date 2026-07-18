@@ -53,8 +53,15 @@ const authAwareFetch: typeof fetch = async (input, init) => {
     });
   }
   if (res.status === 401 && typeof window !== "undefined") {
+    // 2026-07-18 (CJ「未登入逛定價頁幾秒就被踢回登入」): public marketing /
+    // legal pages fire background tRPC queries (notifications, plan info…)
+    // that 401 for anonymous visitors — that must NOT hard-bounce them to
+    // /login. Only redirect when the visitor is on a PROTECTED route.
+    const PUBLIC_PATHS = ["/", "/pricing", "/terms", "/privacy", "/refund", "/plan-expired", "/login"];
+    const path = window.location.pathname;
+    const isPublic = PUBLIC_PATHS.includes(path) || path.startsWith("/auth/");
     const w = window as any;
-    if (!w.__authRedirecting && window.location.pathname !== "/login") {
+    if (!isPublic && !w.__authRedirecting) {
       w.__authRedirecting = true;
       try { localStorage.removeItem("authToken"); } catch {}
       window.location.replace("/login");
