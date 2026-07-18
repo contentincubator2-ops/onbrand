@@ -1,0 +1,42 @@
+name: "Op — Check 90s squad slugs (read-only)"
+
+# 2026-07-18 (CJ「8 個 FB 90s 任務全部 squad not found」): read-only probe —
+# list which squad slugs referenced by FB_90S_TASK_INDEX exist in squads,
+# their is_active flag, and step counts, plus all fb-% slugs for diffing.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query squads table
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== referenced 90s slugs ====="
+            Q "SELECT slug, is_active, JSON_LENGTH(steps) AS steps_n, name
+                 FROM squads
+                WHERE slug IN ('fb-monthly-calendar','fb-monthly-calendar-product-promo',
+                               'fb-event-launch-kit','fb-countdown-series','fb-account-reposition',
+                               'fb-quarterly-strategy','fb-monthly-analytics','fb-carousel',
+                               'fb-reels-script','fb-livestream-prep','fb-crisis-comms')
+                ORDER BY slug;"
+
+            echo "===== ALL fb-% squads in DB ====="
+            Q "SELECT slug, is_active, JSON_LENGTH(steps) AS steps_n
+                 FROM squads WHERE slug LIKE 'fb-%' ORDER BY slug;"
+
+            echo "===== total squads ====="
+            Q "SELECT COUNT(*) AS total, SUM(is_active=1) AS active FROM squads;"
