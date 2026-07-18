@@ -1,0 +1,50 @@
+name: "Ops — Debug brand visual (palette ok, variants missing)"
+
+# 2026-07-19 (CJ「品牌視覺頁只有色號跑得出來」): read-only evidence dump —
+# pm2 lines for brandColors/replicate/compose, recent real errors, and
+# per-brand product-image coverage (variants need a per-product image).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump visual pipeline evidence
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== A. REPLICATE token present? ====="
+            [ -n "$REPLICATE_API_TOKEN" ] && echo "REPLICATE_API_TOKEN: set (len ${#REPLICATE_API_TOKEN})" || echo "REPLICATE_API_TOKEN: MISSING"
+
+            echo "===== B. pm2 lines: brandColors / replicate / compose / cutout (last 60) ====="
+            grep -hiE "brandColor|replicate|composeBrand|cutout|BiRefNet|generateBrandedVariants" \
+              ~/.pm2/logs/onbrand-out.log ~/.pm2/logs/onbrand-error.log 2>/dev/null | tail -60
+
+            echo "===== C. error_log real errors (7d, latest 15) ====="
+            Q "SELECT id, level, source, route, LEFT(message,180) msg, createdAt
+               FROM error_log
+               WHERE createdAt >= NOW() - INTERVAL 7 DAY AND level IN ('error','warn')
+               ORDER BY id DESC LIMIT 15\G"
+
+            echo "===== D. brands: palette + product-image coverage ====="
+            Q "SELECT b.id, b.name,
+                      b.brand_colors IS NOT NULL AS hasPalette,
+                      (SELECT COUNT(*) FROM products p WHERE p.brandId=b.id) AS products,
+                      (SELECT COUNT(*) FROM products p WHERE p.brandId=b.id
+                         AND (JSON_UNQUOTE(JSON_EXTRACT(p.positioning,'$.imageUrl')) IS NOT NULL
+                           OR JSON_UNQUOTE(JSON_EXTRACT(p.positioning,'$._interim.imageUrl')) IS NOT NULL
+                           OR JSON_LENGTH(JSON_EXTRACT(p.positioning,'$.images')) > 0)) AS productsWithImage
+               FROM brands b ORDER BY b.id DESC LIMIT 12;"
+            exit 0
