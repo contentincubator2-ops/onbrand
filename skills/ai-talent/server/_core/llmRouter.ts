@@ -29,7 +29,7 @@ interface CallArgs {
   budgetMs?: number;
 }
 
-type Provider = "anthropic" | "azure-foundry" | "azure-openai";
+type Provider = "anthropic" | "azure-foundry" | "azure-openai" | "openrouter";
 
 interface ProviderAttempt {
   provider: Provider;
@@ -65,7 +65,11 @@ const AZURE_OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT ?? "gpt-4o-m
 
 // Provider order: Anthropic direct first (cheapest + best for our use case),
 // Azure Foundry second (cheap stable), Azure OpenAI third, OpenRouter last.
-const PROVIDER_ORDER: Provider[] = ["anthropic", "azure-foundry", "azure-openai"];
+// 2026-07-19 (CJ 定位管線連續 10 次「credit balance too low」全鏈失敗):
+// callOpenRouter existed and the docs promised it as the last resort, but it
+// was never wired into PROVIDER_ORDER — the chain silently ended one rung
+// short. Wired in, gated on OPENROUTER_API_KEY presence.
+const PROVIDER_ORDER: Provider[] = ["anthropic", "azure-foundry", "azure-openai", "openrouter"];
 
 async function callAnthropic(key: string, args: CallArgs): Promise<string> {
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -239,9 +243,25 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
     } else if (provider === "azure-openai") {
       const text = await tryProvider("azure-openai", "default", (t) => callAzureOpenAI({ ...args, timeoutMs: t }));
       if (text) return { text, attempts };
+    } else if (provider === "openrouter") {
+      if (!OPENROUTER_KEY) continue;
+      const text = await tryProvider("openrouter", "default", (t) => callOpenRouter({ ...args, timeoutMs: t }));
+      if (text) return { text, attempts };
     }
   }
 
   const summary = attempts.map((a) => `${a.provider}/${a.key}: ${a.ok ? "OK" : a.error ?? "fail"}`).join(" | ");
+  // 2026-07-19: a total-chain outage must surface in the admin friction map,
+  // not just in a user-facing toast. Fire-and-forget structured log.
+  try {
+    const { logError } = await import("../routers/opsRouter");
+    void logError({
+      source: "llm.callLLM",
+      message: `All LLM providers failed — ${summary.slice(0, 480)}`,
+      fingerprint: "llm-all-providers-failed",
+      meta: { attempts },
+      level: "error",
+    });
+  } catch { /* logging must never mask the real error */ }
   throw new Error(`All LLM providers failed — ${summary}`);
 }

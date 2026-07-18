@@ -1,0 +1,45 @@
+name: "Ops — LLM fallback audit (key presence + outage evidence)"
+
+# 2026-07-19 (CJ: positioning threw ~10x「credit balance too low」then
+# recovered): read-only audit — which fallback keys exist on the VM
+# (PRESENCE ONLY, values never printed), plus recent llmRouter failures
+# from pm2 logs and error_log.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit fallback configuration + outage traces
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            has() { [ -n "$(eval echo \\\"\$$1\\\")" ] && echo "SET" || echo "missing"; }
+            echo "===== LLM fallback key presence (values never printed) ====="
+            for v in ANTHROPIC_API_KEY ANTHROPIC_API_KEY_BACKUP_1 ANTHROPIC_API_KEY_BACKUP_2 \
+                     AZURE_FOUNDRY_API_KEY AZURE_AI_API_KEY AZURE_FOUNDRY_PROJECT_ENDPOINT AZURE_AI_ENDPOINT \
+                     AZURE_OPENAI_API_KEY AZURE_OPENAI_ENDPOINT OPENROUTER_API_KEY \
+                     OPENAI_API_KEY GEMINI_API_KEY DASHSCOPE_API_KEY; do
+              printf "%-36s %s\n" "$v" "$(has $v)"
+            done
+
+            echo "===== pm2 logs: llmRouter failures (last 200 hits) ====="
+            grep -h "\[llmRouter\]" ~/.pm2/logs/onbrand-out.log ~/.pm2/logs/onbrand-error.log 2>/dev/null | tail -30
+
+            echo "===== error_log: level=error last 3 days ====="
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+              "SELECT id, source, route, LEFT(message,160) msg, createdAt
+               FROM error_log
+               WHERE level='error' AND createdAt > NOW() - INTERVAL 3 DAY
+               ORDER BY id DESC LIMIT 25\G"
+            exit 0

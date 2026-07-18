@@ -419,9 +419,16 @@ ${JSON.stringify(cleanContext, null, 2).slice(0, 6000)}${parentBrandProductBlock
         const result = await callLLM({ system: sys, user, maxTokens: 4000 });
         raw = result.text;
       } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        // 2026-07-19 (CJ 定位時連續看到「credit balance too low」原始錯誤):
+        // billing/quota outages get a human message — the raw provider dump
+        // (key names, API bodies) belongs in error_log, not in a user toast.
+        const isBilling = /credit\s*balance|insufficient|quota|402|billing/i.test(detail);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `LLM call failed: ${e instanceof Error ? e.message : String(e)}`,
+          message: isBilling
+            ? "AI 供應商額度暫時不足，系統已自動通報團隊。請過幾分鐘再重試這一步（進度不會遺失）。"
+            : `LLM call failed: ${detail.slice(0, 300)}`,
         });
       }
       if (!raw) {
