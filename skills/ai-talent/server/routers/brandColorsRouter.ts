@@ -299,61 +299,111 @@ export const brandColorsRouter = router({
    */
   generateBrandedVariants: protectedProcedure
     .input(z.object({
-      productId: z.number().int().positive(),
+      // 2026-07-19 (CJ「品牌視覺頁通常只有色號跑得出來」): productId is now
+      // optional — most real brands have zero products with images, so the
+      // variants pipeline had no entry point / no subject. Brand-level calls
+      // pass brandId only; the subject image falls back product → website
+      // scrape (the SAME source the palette 色號 extraction already uses).
+      productId: z.number().int().positive().optional(),
+      brandId: z.number().int().positive().optional(),
       layouts: z
         .array(z.enum(["centered-hero", "left-bias-bar", "corner-pop", "dual-band"]))
         .min(1).max(4).optional(),
       skipCutout: z.boolean().default(false),
-    }))
+    }).refine((v) => !!v.productId || !!v.brandId, { message: "productId or brandId required" }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
 
-      // Load product + parent brand
-      // 2026-06-30 (CJ prod bug): products table has no imageUrl column —
-      // read image from positioning JSON same locations as loadBrandProductImageUrls.
-      const [prodRows]: any = await localPool.execute(
-        `SELECT id, brandId, name, positioning
-           FROM products WHERE id = ? AND userId = ? LIMIT 1`,
-        [input.productId, userId],
-      );
-      const product = (prodRows as any[])[0];
-      if (!product) {
-        return { ok: false as const, reason: "product_not_found" as const };
-      }
-
-      // Extract image URL + tagline from positioning JSON
-      let productImageUrl = "";
+      let resolvedBrandId = 0;
+      let subjectName = "";
+      let subjectImageUrl = "";
       let tagline = "";
-      try {
-        let p: any = product.positioning;
-        if (typeof p === "string") p = JSON.parse(p);
-        const candidates = [
-          p?.imageUrl, p?.image,
-          p?._interim?.imageUrl, p?._interim?.image,
-          Array.isArray(p?.images) ? p.images[0] : null,
-          Array.isArray(p?._interim?.images) ? p._interim.images[0] : null,
-          Array.isArray(p?._assets?.photos) ? (typeof p._assets.photos[0] === "string" ? p._assets.photos[0] : p._assets.photos[0]?.url) : null,
-        ];
-        for (const c of candidates) {
-          if (typeof c === "string" && /^https?:\/\//.test(c)) { productImageUrl = c; break; }
-        }
-        tagline = p?.tagline ?? p?._interim?.tagline ?? p?.usp ?? p?._interim?.usp ?? "";
-        if (typeof tagline !== "string") tagline = "";
-        tagline = tagline.slice(0, 60);
-      } catch { /* fall through */ }
 
-      if (!productImageUrl) {
-        return { ok: false as const, reason: "product_has_no_image" as const };
+      const pickTagline = (p: any): string => {
+        let t = p?.tagline ?? p?._interim?.tagline ?? p?.usp ?? p?._interim?.usp ?? "";
+        if (typeof t !== "string") t = "";
+        return t.slice(0, 60);
+      };
+
+      if (input.productId) {
+        // Load product + parent brand
+        // 2026-06-30 (CJ prod bug): products table has no imageUrl column —
+        // read image from positioning JSON same locations as loadBrandProductImageUrls.
+        const [prodRows]: any = await localPool.execute(
+          `SELECT id, brandId, name, positioning
+             FROM products WHERE id = ? AND userId = ? LIMIT 1`,
+          [input.productId, userId],
+        );
+        const product = (prodRows as any[])[0];
+        if (!product) {
+          return { ok: false as const, reason: "product_not_found" as const };
+        }
+        resolvedBrandId = Number(product.brandId);
+        subjectName = product.name;
+        try {
+          let p: any = product.positioning;
+          if (typeof p === "string") p = JSON.parse(p);
+          const candidates = [
+            p?.imageUrl, p?.image,
+            p?._interim?.imageUrl, p?._interim?.image,
+            Array.isArray(p?.images) ? p.images[0] : null,
+            Array.isArray(p?._interim?.images) ? p._interim.images[0] : null,
+            Array.isArray(p?._assets?.photos) ? (typeof p._assets.photos[0] === "string" ? p._assets.photos[0] : p._assets.photos[0]?.url) : null,
+          ];
+          for (const c of candidates) {
+            if (typeof c === "string" && /^https?:\/\//.test(c)) { subjectImageUrl = c; break; }
+          }
+          tagline = pickTagline(p);
+        } catch { /* fall through */ }
+      } else {
+        const [bRows]: any = await localPool.execute(
+          `SELECT id, name, positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+          [input.brandId!, userId],
+        );
+        const brand = (bRows as any[])[0];
+        if (!brand) {
+          return { ok: false as const, reason: "brand_not_found" as const };
+        }
+        resolvedBrandId = Number(brand.id);
+        subjectName = brand.name;
+        try {
+          let p: any = brand.positioning;
+          if (typeof p === "string") p = JSON.parse(p);
+          tagline = pickTagline(p);
+        } catch { /* ignore */ }
+        // Brand-level subject: newest product image if any exists
+        const productUrls = await loadBrandProductImageUrls(resolvedBrandId, userId, 5);
+        subjectImageUrl = productUrls[0] ?? "";
       }
 
-      const palette = await readBrandColors(product.brandId, userId);
+      // Fallback: no product image → scrape the brand website (same source
+      // extractForBrand already uses for 色號, so if colors worked this works).
+      if (!subjectImageUrl) {
+        try {
+          const [wRows]: any = await localPool.execute(
+            `SELECT website FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+            [resolvedBrandId, userId],
+          );
+          const website = (wRows as any[])[0]?.website;
+          if (typeof website === "string" && website.trim()) {
+            const { scrapeWebsiteImages } = await import("../_core/websiteImageScraper");
+            const imgs = await scrapeWebsiteImages(website, 8);
+            subjectImageUrl = imgs[0]?.url ?? "";
+          }
+        } catch { /* fall through to the reason below */ }
+      }
+      if (!subjectImageUrl) {
+        return { ok: false as const, reason: "no_subject_image" as const };
+      }
+
+      const palette = await readBrandColors(resolvedBrandId, userId);
       if (!palette || !palette.swatches?.length) {
         return { ok: false as const, reason: "no_palette_yet" as const };
       }
 
       const result = await composeBrandedProductImage({
-        productImageUrl,
-        productName: product.name,
+        productImageUrl: subjectImageUrl,
+        productName: subjectName,
         tagline,
         palette: palette.swatches.map((s) => ({ hex: s.hex, role: s.role })),
         layouts: input.layouts as Layout[] | undefined,
@@ -375,7 +425,7 @@ export const brandColorsRouter = router({
         ok: true as const,
         variants,
         totalMs: result.totalMs,
-        productName: product.name,
+        productName: subjectName,
         cutoutAvailable: !!process.env.REPLICATE_API_TOKEN,
       };
     }),

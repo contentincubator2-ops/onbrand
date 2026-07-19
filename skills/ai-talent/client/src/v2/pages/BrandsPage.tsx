@@ -4645,6 +4645,124 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
   );
 }
 
+/* ─────────────────── BrandedVariantsModal (shared) ───────────────────
+ * 2026-07-19 (CJ「品牌視覺頁通常只有色號跑得出來」): extracted from the
+ * per-product grid so the palette hero's brand-level「生成品牌視覺」can
+ * reuse the exact same overlay. */
+function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable, onClose, en }: {
+  title: string;
+  loading: boolean;
+  error: string | null;
+  variants: Array<{ layout: string; pngDataUrl: string }> | null;
+  cutoutAvailable?: boolean;
+  onClose: () => void;
+  en: boolean;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 60,
+        background: "rgba(15,15,14,0.55)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#FFFFFF", borderRadius: 14,
+          maxWidth: 920, width: "100%", maxHeight: "90vh", overflow: "auto",
+          border: "2px solid #0F0F0E",
+          boxShadow: "8px 8px 0 #0F0F0E",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #E5E7EB" }}>
+          <div>
+            <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#78716C", margin: 0 }}>
+              {en ? "Branded variants" : "品牌變體"}
+            </p>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: "#171717", margin: "3px 0 0" }}>
+              {title}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 32, height: 32, borderRadius: 8, border: "1px solid #E5E7EB",
+              background: "transparent", cursor: "pointer", fontSize: 16, color: "#78716C",
+            }}
+            aria-label={en ? "Close" : "關閉"}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ padding: 20 }}>
+          {error && (
+            <div style={{ padding: 16, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, color: "#991B1B", fontSize: 13, lineHeight: 1.6 }}>
+              {error}
+            </div>
+          )}
+          {!error && loading && (
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "#78716C" }}>
+              <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#E85D2E", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
+              <p style={{ fontSize: 13, margin: 0 }}>
+                {en
+                  ? "Compositing — running cutout + 4 layouts (~8 sec)…"
+                  : "正在合成 — 跑去背 + 4 個版型（約 8 秒）…"}
+              </p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
+          {variants && variants.length > 0 && (
+            <>
+              {cutoutAvailable === false && (
+                <p style={{ fontSize: 11, color: "#92400E", background: "#FEF3C7", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>
+                  {en
+                    ? "⚠ REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
+                    : "⚠ 還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
+                </p>
+              )}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 14,
+              }}>
+                {variants.map((v) => (
+                  <div key={v.layout} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <img
+                      src={v.pngDataUrl}
+                      alt={v.layout}
+                      style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, border: "1px solid #E5E7EB" }}
+                    />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                      <span style={{ fontSize: 11, color: "#78716C", fontWeight: 500 }}>
+                        {v.layout}
+                      </span>
+                      <a
+                        href={v.pngDataUrl}
+                        download={`${title}_${v.layout}.png`}
+                        style={{
+                          fontSize: 11, fontWeight: 600, color: "#E85D2E",
+                          textDecoration: "none", padding: "4px 8px",
+                          border: "1px solid #E85D2E", borderRadius: 6,
+                        }}
+                      >
+                        {en ? "Download" : "下載"}
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────────────── BrandPaletteHero ────────────────────────────
  * 2026-06-21 (CJ「按 riverflow 標準」brand DNA): hero strip above the
  * Visual asset cards that surfaces the auto-extracted brand palette.
@@ -4663,6 +4781,39 @@ function BrandPaletteHero({
   const extractMut = (trpc as any).brandColors?.extractForBrand?.useMutation?.({
     onSuccess: () => paletteQ?.refetch?.(),
   });
+  // 2026-07-19 (CJ「品牌視覺頁通常只有色號跑得出來」): brand-level visual
+  // generator — most brands have no product with an image, so the only
+  // variants entry (per-product ✨ button) never appeared. This button runs
+  // generateBrandedVariants({brandId}); the server falls back to website
+  // images (the same source the palette extraction already used).
+  const genVisualMut = (trpc as any).brandColors?.generateBrandedVariants?.useMutation?.();
+  const [brandVisual, setBrandVisual] = React.useState<null | {
+    variants: Array<{ layout: string; pngDataUrl: string }> | null;
+    error: string | null;
+    cutoutAvailable?: boolean;
+  }>(null);
+  const handleBrandVisual = async () => {
+    if (locked || !brandId || !genVisualMut) return;
+    setBrandVisual({ variants: null, error: null });
+    try {
+      const r = await genVisualMut.mutateAsync({ brandId });
+      if (r?.ok) {
+        setBrandVisual({ variants: r.variants, error: null, cutoutAvailable: r.cutoutAvailable });
+      } else {
+        const reason = (r as any)?.reason ?? "unknown";
+        const msg = reason === "no_palette_yet"
+          ? (en ? "Extract the palette first (✨ Extract from products)." : "請先按「✨ 從產品圖萃取」取得色彩。")
+          : reason === "no_subject_image"
+            ? (en
+                ? "No usable image found — fill in the brand website or add a product with an image, then retry."
+                : "找不到可用的圖片素材 — 請先填品牌官網網址（基本資料頁）或新增一個有圖片的產品，再試一次。")
+            : String(reason);
+        setBrandVisual({ variants: null, error: msg });
+      }
+    } catch (e: any) {
+      setBrandVisual({ variants: null, error: String(e?.message ?? e).slice(0, 200) });
+    }
+  };
   const data = paletteQ?.data as any;
   const swatches: Array<{
     hex: string; role: string; weight: number;
@@ -4749,8 +4900,37 @@ function BrandPaletteHero({
                   ? (en ? "Re-extract (overwrites lock)" : "重新萃取（覆寫鎖定）")
                   : (en ? "Re-extract" : "重新萃取")}
           </button>
+          {swatches.length > 0 && (
+            <button
+              onClick={handleBrandVisual}
+              disabled={locked || genVisualMut?.isPending}
+              style={{
+                fontSize: 12, fontWeight: 600, padding: "7px 14px",
+                borderRadius: 8, cursor: locked || genVisualMut?.isPending ? "not-allowed" : "pointer",
+                border: "1px solid #E85D2E",
+                background: "#E85D2E", color: "#FFFFFF",
+                opacity: locked ? 0.5 : 1,
+                transition: "all 0.15s",
+              }}
+            >
+              {genVisualMut?.isPending
+                ? (en ? "Generating…" : "生成中…")
+                : (en ? "✨ Brand visuals" : "✨ 生成品牌視覺")}
+            </button>
+          )}
         </div>
       </div>
+      {brandVisual && (
+        <BrandedVariantsModal
+          title={en ? "Brand visuals" : "品牌視覺"}
+          loading={!brandVisual.error && !brandVisual.variants}
+          error={brandVisual.error}
+          variants={brandVisual.variants}
+          cutoutAvailable={brandVisual.cutoutAvailable}
+          onClose={() => setBrandVisual(null)}
+          en={en}
+        />
+      )}
 
       {/* States */}
       {extractMut?.error && (
@@ -5128,112 +5308,19 @@ function BrandEntityGrid({
         </div>
       )}
 
-      {/* 2026-06-21 (CJ「按 riverflow 標準」): branded variants modal.
-          Renders inline at the bottom — no portal, no fixed positioning, just
-          a centered overlay that contributes flow height. Shows loading,
-          error, or the 4 generated variants in a 2x2 grid with download links. */}
+      {/* 2026-06-21 (CJ「按 riverflow 標準」) → 2026-07-19: markup extracted
+          to the shared BrandedVariantsModal (also used by the palette hero's
+          brand-level 生成品牌視覺 button). */}
       {variantState && (
-        <div
-          onClick={() => setVariantState(null)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 60,
-            background: "rgba(15,15,14,0.55)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#FFFFFF", borderRadius: 14,
-              maxWidth: 920, width: "100%", maxHeight: "90vh", overflow: "auto",
-              border: "2px solid #0F0F0E",
-              boxShadow: "8px 8px 0 #0F0F0E",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #E5E7EB" }}>
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#78716C", margin: 0 }}>
-                  {en ? "Branded variants" : "品牌變體"}
-                </p>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#171717", margin: "3px 0 0" }}>
-                  {variantState.productName}
-                </h3>
-              </div>
-              <button
-                onClick={() => setVariantState(null)}
-                style={{
-                  width: 32, height: 32, borderRadius: 8, border: "1px solid #E5E7EB",
-                  background: "transparent", cursor: "pointer", fontSize: 16, color: "#78716C",
-                }}
-                aria-label={en ? "Close" : "關閉"}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ padding: 20 }}>
-              {variantState.error && (
-                <div style={{ padding: 16, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, color: "#991B1B", fontSize: 13, lineHeight: 1.6 }}>
-                  {variantState.error}
-                </div>
-              )}
-              {!variantState.error && !variantState.variants && (
-                <div style={{ textAlign: "center", padding: "40px 20px", color: "#78716C" }}>
-                  <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#E85D2E", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
-                  <p style={{ fontSize: 13, margin: 0 }}>
-                    {en
-                      ? "Compositing — running cutout + 4 layouts (~8 sec)…"
-                      : "正在合成 — 跑去背 + 4 個版型（約 8 秒）…"}
-                  </p>
-                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                </div>
-              )}
-              {variantState.variants && variantState.variants.length > 0 && (
-                <>
-                  {variantState.cutoutAvailable === false && (
-                    <p style={{ fontSize: 11, color: "#92400E", background: "#FEF3C7", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>
-                      {en
-                        ? "⚠ REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
-                        : "⚠ 還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
-                    </p>
-                  )}
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: 14,
-                  }}>
-                    {variantState.variants.map((v) => (
-                      <div key={v.layout} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <img
-                          src={v.pngDataUrl}
-                          alt={v.layout}
-                          style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, border: "1px solid #E5E7EB" }}
-                        />
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                          <span style={{ fontSize: 11, color: "#78716C", fontWeight: 500 }}>
-                            {v.layout}
-                          </span>
-                          <a
-                            href={v.pngDataUrl}
-                            download={`${variantState.productName}_${v.layout}.png`}
-                            style={{
-                              fontSize: 11, fontWeight: 600, color: "#E85D2E",
-                              textDecoration: "none", padding: "4px 8px",
-                              border: "1px solid #E85D2E", borderRadius: 6,
-                            }}
-                          >
-                            {en ? "Download" : "下載"}
-                          </a>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <BrandedVariantsModal
+          title={variantState.productName}
+          loading={!variantState.error && !variantState.variants}
+          error={variantState.error}
+          variants={variantState.variants}
+          cutoutAvailable={variantState.cutoutAvailable}
+          onClose={() => setVariantState(null)}
+          en={en}
+        />
       )}
     </div>
   );
