@@ -20,7 +20,7 @@ import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Input, Textarea, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark, faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
+import { faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 import { COUNTRIES, getCountry } from "../../lib/countries";
 
 // 2026-07-18 (CJ 多市場): same list as BrandOnboardingWizard — common
@@ -238,11 +238,11 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     // so they are always visible regardless of viewport height.
     <Modal isOpen={isOpen} onClose={onClose} size="2xl" backdrop="blur" scrollBehavior="inside" classNames={{ base: "max-h-[92dvh]" }}>
       <ModalContent>
-        <ModalHeader className="flex items-center justify-between">
+        {/* 2026-07-19 (CJ「彈窗右上角兩個重疊的 ×」): the custom close button
+            sat under HeroUI Modal's BUILT-IN close at the same corner →
+            double ×. Keep the built-in one (proper hover/ESC semantics). */}
+        <ModalHeader className="flex items-center justify-between pr-10">
           <span className="text-lg font-semibold">{lang === "en" ? `Add a ${entityLabel(tab)}` : `新增 ${entityLabel(tab)}`}</span>
-          <button onClick={onClose} className="text-default-400 hover:text-default-700">
-            <FontAwesomeIcon icon={faXmark} />
-          </button>
         </ModalHeader>
         <ModalBody className="pb-6">
           {/* Tab strip */}
