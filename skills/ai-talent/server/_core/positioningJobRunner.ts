@@ -222,6 +222,22 @@ export function startPositioningJob(args: {
  */
 export async function resumeInterruptedPositioningJobs(): Promise<void> {
   try {
+    // 2026-07-19 (CJ「目標受眾一直被改回去」root cause): zombie rows from
+    // June were stuck in 'running' forever, so EVERY pm2 restart re-queued
+    // them → each deploy silently re-ran 12 pipelines and overwrote those
+    // brands' positioning (including manual edits). Only jobs interrupted
+    // RECENTLY (≤2h) are worth resuming; anything older is a zombie →
+    // mark failed so it never auto-runs again (user can re-trigger manually).
+    await localPool.execute(
+      `UPDATE positioning_jobs
+          SET status = 'failed',
+              lastError = COALESCE(lastError, 'stale job — not auto-resumed after restart (>2h old)'),
+              finishedAt = NOW(3)
+        WHERE status IN ('pending','running')
+          AND finishedAt IS NULL
+          AND startedAt < NOW() - INTERVAL 2 HOUR`,
+    );
+
     const [rows]: any = await localPool.execute(
       `SELECT pj.userId, pj.entityKind, pj.entityId, pj.totalSteps,
               COALESCE(b.brandName, p.name, e.name) AS entityName,
