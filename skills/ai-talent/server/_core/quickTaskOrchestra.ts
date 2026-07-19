@@ -16,7 +16,7 @@
  */
 import { callModel, type ModelProvider } from "./multiModelRouter";
 import { dispatchGenerate } from "./mediaGen";
-import { captionToVisualBrief } from "./visualBrief";
+import { captionToVisualBrief, loadBrandPaletteHexes } from "./visualBrief";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
@@ -1407,16 +1407,19 @@ function safeOutputTypeForPostType(
  * available (empty variant / failure placeholder), the Chinese style text is
  * fed to the same converter instead — identical pipeline either way. */
 async function genOneImage(
-  args: { content: string; style: string | null; platform?: string },
+  args: { content: string; style: string | null; platform?: string; palette?: Array<{ hex: string; role: string }> },
   config: OrchestraConfig,
 ): Promise<OrchestraVariant["image"]> {
   const prompt = args.style ?? ""; // returned as `style` — what the UI shows
   const source = (args.content || args.style || "").trim();
   if (!source) return { style: args.style, url: null, status: "skipped" };
   try {
+    // 2026-07-19 (CJ「品牌顏色會被貫穿到圖片生成的指令中嗎」): brand palette
+    // rides along into the shared brief converter → on-brand color schemes.
     const modelPrompt = await captionToVisualBrief({
       caption: source,
       platform: args.platform,
+      palette: args.palette,
     });
     // 2026-05-18 (CJ「目前的圖很不行，最好的生圖模型是什麼」): quick-task
     // images were hardcoded to piapi/flux-schnell — the fastest/lowest-
@@ -2097,11 +2100,14 @@ export async function runOrchestra(args: {
       : null;
 
     const taskPlatform = args.template.id.split("-")[0];
+    // 2026-07-19: brand palette loaded once per run → injected into every
+    // image brief so generated visuals carry the brand color scheme.
+    const brandPalette = await loadBrandPaletteHexes(args.brandId);
     const images: OrchestraVariant["image"][] = willRender && briefs.length
       ? await Promise.all(briefs.map((b, i) =>
           // Theater standard: prompt derives from the variant's CAPTION;
           // the Chinese brief is display-only (style).
-          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform }, args.config)))
+          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform, palette: brandPalette }, args.config)))
       : briefs.length
         ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
         : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
@@ -2240,7 +2246,7 @@ export async function runOrchestra(args: {
         const cardImages = await Promise.all(
           cardSpecs.map((c) => genOneImage(
             // Theater standard: each card's own text is the caption source.
-            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0] },
+            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0], palette: brandPalette },
             args.config,
           )),
         );

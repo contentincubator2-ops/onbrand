@@ -22,7 +22,7 @@ import { getBrandMarket, DEFAULT_BRAND_MARKET } from "../_core/brandMarket";
 import { resolveAgentId } from "../_core/agentAssignments";
 import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
-import { captionToVisualBrief } from "../_core/visualBrief";
+import { captionToVisualBrief, loadBrandPaletteHexes } from "../_core/visualBrief";
 import { withUserLLMSlot } from "../_core/userLLMSemaphore";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -1296,10 +1296,13 @@ ${cleaned}
       if (input.customPrompt?.trim()) {
         brief = input.customPrompt.trim();
       } else {
+        // 2026-07-19 (CJ): brand palette rides into the brief so theater
+        // images carry the brand color scheme too (same shared contract).
         brief = await captionToVisualBrief({
           caption: input.caption,
           brandTagline: input.brandTagline,
           platform: input.platform,
+          palette: await loadBrandPaletteHexes(input.brandId),
         });
       }
       // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back

@@ -15,11 +15,50 @@
  */
 import { invokeLLM } from "./llm";
 
+/**
+ * 2026-07-19 (CJ「品牌顏色會被貫穿到圖片生成的指令中嗎」— answer was no):
+ * load the brand's extracted palette (brands.brand_colors, written by the
+ * 色號 extraction on the 視覺頁) as hex+role pairs for prompt injection.
+ * Returns [] when the brand has no palette — callers degrade gracefully.
+ */
+export async function loadBrandPaletteHexes(
+  brandId?: number | null,
+): Promise<Array<{ hex: string; role: string }>> {
+  if (!brandId) return [];
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT brand_colors FROM brands WHERE id = ? LIMIT 1`,
+      [brandId],
+    );
+    let bc: any = (rows as any[])[0]?.brand_colors;
+    if (!bc) return [];
+    if (typeof bc === "string") bc = JSON.parse(bc);
+    const swatches: any[] = Array.isArray(bc?.swatches) ? bc.swatches : [];
+    // Lead with the roles that define brand look; cap at 5 so the prompt
+    // stays a hint, not a paint-by-numbers constraint.
+    const roleOrder = ["primary", "accent", "highlight", "ink", "support", "neutral"];
+    return swatches
+      .filter((s) => typeof s?.hex === "string" && /^#[0-9a-fA-F]{6}$/.test(s.hex))
+      .sort((a, b) => roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role))
+      .slice(0, 5)
+      .map((s) => ({ hex: s.hex.toUpperCase(), role: String(s.role ?? "") }));
+  } catch {
+    return [];
+  }
+}
+
 export async function captionToVisualBrief(args: {
   caption: string;
   brandTagline?: string | null;
   platform?: string;
+  /** Brand palette (from loadBrandPaletteHexes) — woven into the brief as
+   *  the scene's dominant color scheme so generated images stay on-brand. */
+  palette?: Array<{ hex: string; role: string }>;
 }): Promise<string> {
+  const paletteLine = args.palette && args.palette.length > 0
+    ? `\nBrand colors: ${args.palette.map((p) => `${p.hex}${p.role ? ` (${p.role})` : ""}`).join(", ")}`
+    : "";
   try {
     const r = await invokeLLM({
       provider: "anthropic",
@@ -31,11 +70,13 @@ export async function captionToVisualBrief(args: {
       messages: [
         {
           role: "system",
-          content: "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic, brand-friendly, no text in image, no logos. Output only the brief.",
+          content:
+            "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic, brand-friendly, no text in image, no logos. " +
+            "If brand colors are provided, make them the scene's dominant color palette (props, backdrop, lighting accents) while keeping the scene natural. Output only the brief.",
         },
         {
           role: "user",
-          content: `Brand: ${args.brandTagline ?? "(unknown)"}\nPlatform: ${args.platform ?? "social"}\nCaption:\n${args.caption}`,
+          content: `Brand: ${args.brandTagline ?? "(unknown)"}${paletteLine}\nPlatform: ${args.platform ?? "social"}\nCaption:\n${args.caption}`,
         },
       ],
     });
