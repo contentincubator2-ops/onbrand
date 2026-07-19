@@ -60,6 +60,28 @@ function safeJSON<T>(text: string, fallback: T): T {
   return fallback;
 }
 
+// 2026-07-19 (CJ「競品分析 7/17-18 突然變不精準」post-mortem): the LLM
+// chain silently degraded to gpt-4.1 for two days (Anthropic credits ran
+// out) and nobody noticed until output quality complaints came in.
+// Surface degradation loudly: one warn per (model, hour) into error_log
+// so the ops dashboard flags it within minutes, not days.
+const _degradedModelWarnedAt = new Map<string, number>();
+async function warnIfDegradedModel(model: string, stepId: string): Promise<void> {
+  if (!model || /claude/i.test(model)) return; // claude family = primary, healthy
+  const now = Date.now();
+  if (now - (_degradedModelWarnedAt.get(model) ?? 0) < 60 * 60_000) return;
+  _degradedModelWarnedAt.set(model, now);
+  try {
+    const { logError } = await import("../routers/opsRouter");
+    await logError({
+      source: "positioningSteps",
+      level: "warn",
+      fingerprint: "positioning-degraded-model",
+      message: `定位步驟正在用降級模型「${model}」跑（step: ${stepId}）— 主力 claude 鏈可能額度耗盡或故障，分析深度會下降（7/17-18 競品分析退化即此原因）`,
+    });
+  } catch { /* non-fatal */ }
+}
+
 async function callJSON(ctx: StepContext, stepId: string, system: string, user: string, fallback: any, maxTokens = 1500): Promise<any> {
   const r = await invokeLLM({
     messages: [
@@ -73,6 +95,7 @@ async function callJSON(ctx: StepContext, stepId: string, system: string, user: 
   const inTok  = r.usage?.prompt_tokens ?? 0;
   const outTok = r.usage?.completion_tokens ?? 0;
   await ctx.recordUsage(`positioning_step:${stepId}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok, costFor(inTok, outTok));
+  void warnIfDegradedModel(r.model || "", stepId);
   return safeJSON(text, fallback);
 }
 
