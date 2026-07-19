@@ -1,0 +1,60 @@
+name: "Op — Diagnose positioning LLM degradation (read-only)"
+
+# 2026-07-19 (CJ「競爭者分析突然變不精準、抓不到競品」): which model has
+# been serving positioning steps day by day, and are there chain outages?
+# Suspect: Anthropic credit exhaustion 7/18 → fallback chain → weak model
+# → competition JSON unparseable → silent empty segment.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query usage_log + error_log
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== positioning steps: model mix by day (last 7 days) ====="
+            Q "SELECT DATE(createdAt) AS day, model, COUNT(*) AS calls,
+                      ROUND(AVG(outputTokens)) AS avg_out
+                 FROM usage_log
+                WHERE kind LIKE 'positioning_step%'
+                  AND createdAt > NOW() - INTERVAL 7 DAY
+                GROUP BY day, model ORDER BY day DESC, calls DESC;"
+
+            echo "===== competition step specifically ====="
+            Q "SELECT DATE(createdAt) AS day, model, COUNT(*) AS calls,
+                      ROUND(AVG(outputTokens)) AS avg_out
+                 FROM usage_log
+                WHERE kind = 'positioning_step:competition'
+                  AND createdAt > NOW() - INTERVAL 7 DAY
+                GROUP BY day, model ORDER BY day DESC;"
+
+            echo "===== llm chain outage errors (last 3 days) ====="
+            Q "SELECT createdAt, level, LEFT(message,150) AS msg
+                 FROM error_log
+                WHERE level IN ('error','warn')
+                  AND (message LIKE '%credit%' OR message LIKE '%All LLM providers%'
+                       OR message LIKE '%Anthropic 400%' OR message LIKE '%openrouter%')
+                ORDER BY id DESC LIMIT 20;"
+
+            echo "===== brands with EMPTY competition segment (recent runs) ====="
+            Q "SELECT b.id, b.name,
+                      JSON_LENGTH(JSON_EXTRACT(b.positioning,'$.competition.direct')) AS direct_n,
+                      pj.finishedAt
+                 FROM brands b
+                 JOIN positioning_jobs pj ON pj.entityKind='brand' AND pj.entityId=b.id
+                WHERE pj.finishedAt > NOW() - INTERVAL 3 DAY
+                ORDER BY pj.finishedAt DESC LIMIT 15;"
