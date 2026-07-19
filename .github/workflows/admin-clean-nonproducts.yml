@@ -1,0 +1,38 @@
+name: "Admin — Clean non-product records"
+
+# 2026-07-19 (CJ picked「清舊資料」): scan existing products with the SAME
+# looksLikeNonProduct gate now used at ingestion; mode=delete removes them.
+# Default is scan-only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "scan = list only; delete = remove listed rows"
+        required: true
+        default: "scan"
+        type: choice
+        options: [scan, delete]
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run cleanup script on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          MODE: ${{ inputs.mode }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: MODE
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            if [ "$MODE" = "delete" ]; then
+              npx tsx scripts/clean-nonproduct-records.ts --delete
+            else
+              npx tsx scripts/clean-nonproduct-records.ts
+            fi
