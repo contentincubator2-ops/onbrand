@@ -31,6 +31,9 @@ jobs:
           script: |
             set -e
             cd /opt/onbrand/app/skills/ai-talent
+            # ESM imports hoist above dotenv.config() in the script — the
+            # imported server/localDb throws without env. Load .env first.
+            set -a; source .env; set +a
             if [ "$MODE" = "delete" ]; then
               npx tsx scripts/clean-nonproduct-records.ts --delete
             else
