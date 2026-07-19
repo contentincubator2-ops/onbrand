@@ -1,0 +1,55 @@
+name: "Op — Diagnose audience drift (小安素, read-only)"
+
+# 2026-07-19 (CJ「目標受眾突然抓錯、手改會跳回」): read-only probe.
+# Hypothesis: a stuck positioning_jobs row gets re-queued by
+# resumeInterruptedPositioningJobs on EVERY pm2 restart (many deploys
+# today), each re-run overwriting the audience segment / manual edits.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query brand + jobs + errors
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== brand row (小安素) ====="
+            Q "SELECT id, userId, name, website, LEFT(description,120) AS descr,
+                      targetCountry, outputLanguage, positioningStatus, isEstimate
+                 FROM brands WHERE name LIKE '%小安素%' OR name LIKE '%安素%';"
+
+            echo "===== its audience segment (canonical JSON) ====="
+            Q "SELECT id, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'$.audience.primary')),200) AS audience_primary
+                 FROM brands WHERE name LIKE '%安素%';"
+
+            echo "===== positioning_jobs for that brand ====="
+            Q "SELECT pj.* FROM positioning_jobs pj
+                 JOIN brands b ON b.id = pj.entityId AND pj.entityKind='brand'
+                WHERE b.name LIKE '%安素%' ORDER BY pj.id DESC LIMIT 5;"
+
+            echo "===== ALL stuck jobs (pending/running, would re-run on every restart) ====="
+            Q "SELECT id, userId, entityKind, entityId, status, currentStep, totalSteps,
+                      retryCount, startedAt, finishedAt
+                 FROM positioning_jobs
+                WHERE status IN ('pending','running') AND finishedAt IS NULL
+                ORDER BY startedAt DESC LIMIT 20;"
+
+            echo "===== recent positioning errors ====="
+            Q "SELECT createdAt, level, LEFT(message, 160) AS msg
+                 FROM error_log
+                WHERE level IN ('error','warn')
+                  AND (message LIKE '%positioning%' OR message LIKE '%audience%')
+                ORDER BY id DESC LIMIT 15;"
