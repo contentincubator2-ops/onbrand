@@ -1,0 +1,42 @@
+name: "Op — Diagnose usage_log writes (read-only)"
+
+# 2026-07-19 (CJ「usage_log 沒有定位步驟記錄」): why do positioning
+# recordUsageRow INSERTs fail silently? Inspect schema + recent rows +
+# pm2 log warnings.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect usage_log
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== does usage_log exist? ====="
+            Q "SHOW TABLES LIKE 'usage%';"
+
+            echo "===== usage_log schema ====="
+            Q "SHOW COLUMNS FROM usage_log;" 2>&1 | head -30
+
+            echo "===== recent usage_log rows (any kind) ====="
+            Q "SELECT kind, model, COUNT(*) AS n, MAX(createdAt) AS latest
+                 FROM usage_log GROUP BY kind, model
+                ORDER BY latest DESC LIMIT 15;" 2>&1 | head -20
+
+            echo "===== pm2 log: usage_log write failures ====="
+            tail -n 3000 /home/*/.pm2/logs/onbrand-out.log 2>/dev/null | grep -i "usage_log" | tail -5
+            tail -n 3000 /home/*/.pm2/logs/onbrand-error.log 2>/dev/null | grep -i "usage_log" | tail -5
+            echo "(end)"
