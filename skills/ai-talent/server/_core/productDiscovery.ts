@@ -211,6 +211,17 @@ async function runDiscoveryJob(job: {
       capped = fromAlts.slice(0, MAX_PRODUCTS);
     }
 
+    // 2026-07-19 (CJ): single non-product gate for ALL extraction paths —
+    // news / promos / notices never become product records again.
+    {
+      const before = capped.length;
+      const dropped = capped.filter((p) => looksLikeNonProduct(p.name)).map((p) => p.name);
+      capped = capped.filter((p) => !looksLikeNonProduct(p.name));
+      if (dropped.length > 0) {
+        log(`non-product gate dropped ${dropped.length}/${before}: ${dropped.slice(0, 8).join("、")}`);
+      }
+    }
+
     await localPool.execute(
       `UPDATE product_discovery_jobs SET totalFound = ? WHERE id = ?`,
       [capped.length, job.id],
@@ -377,6 +388,36 @@ async function crawlWebsite(url: string): Promise<string> {
  * image (index-mapped), so no fuzzy matching is needed downstream.
  * LLM failure falls back to a CJK-heuristic pass — degraded but non-empty.
  */
+/* 2026-07-19 (CJ「有時候抓到產品，有時候抓到最新消息或促銷活動」):
+ * deterministic non-product gate applied to EVERY discovery path right
+ * before records are created. The LLM prompts also carry exclusion rules,
+ * but adherence varies and the alt-heuristic fallback had NO filtering at
+ * all (any alt with ≥3 CJK chars became a "product" whenever the LLM path
+ * timed out — that's exactly the observed instability). A hard regex gate
+ * makes behavior stable regardless of which extraction path ran. */
+const NON_PRODUCT_RE = new RegExp(
+  [
+    // promos / campaigns
+    "優惠", "促銷", "特價", "折扣", "免運", "滿額", "限時", "抽獎", "回饋", "專區", "倒數", "活動",
+    // news / notices / trust-safety banners
+    "最新消息", "新聞", "快訊", "公告", "通知", "詐騙", "防詐",
+    // site chrome / account / support
+    "客服", "登入", "註冊", "購物車", "會員", "關於我們", "聯絡我們", "常見問題", "隱私", "條款",
+    // editorial / navigation labels
+    "穿搭推薦", "推薦清單", "排行榜", "LOOKBOOK",
+    // hype-only phrases that aren't product names by themselves
+    "新品上市", "新裝上市", "新品快訊",
+    // english equivalents
+    "\\bsale\\b", "\\bnews\\b", "\\bpromo", "coupon", "\\blogin\\b", "sign ?up", "about us", "contact us", "\\bfaq\\b",
+  ].join("|"),
+  "i",
+);
+export function looksLikeNonProduct(name: string): boolean {
+  const n = (name ?? "").trim();
+  if (n.length < 2) return true;
+  return NON_PRODUCT_RE.test(n);
+}
+
 async function productsFromImageAlts(
   images: ScrapedImage[],
   log: (msg: string) => void,
@@ -387,6 +428,9 @@ async function productsFromImageAlts(
     // Drop alts that are just URLs or nav labels
     .filter((c) => !/^https?:\/\//i.test(c.alt))
     .filter((c) => !/^(facebook|instagram|line|youtube|logo|banner|icon)$/i.test(c.alt))
+    // 2026-07-19 (CJ): pre-drop obvious news/promo alts so the LLM never
+    // even sees them (and the heuristic fallback can't resurrect them).
+    .filter((c) => !looksLikeNonProduct(c.alt))
     .slice(0, 25);
   if (candidates.length === 0) return [];
 
@@ -401,15 +445,16 @@ ${candidates.map((c) => `${c.idx}. ${c.alt}`).join("\n")}
 
 ---
 
-請挑出「描述具體產品」的項目（略過純活動宣傳、節慶 banner、免運廣告等），
-把每一項濃縮成產品名稱。輸出 JSON array：
+請挑出「描述具體可購買產品」的項目，把每一項濃縮成產品名稱。輸出 JSON array：
 [
   { "idx": 編號, "name": "精簡產品名（2-20 字）", "description": "原 alt 或分類" },
   ...
 ]
 規則：
 - name 要像商品名，不要句子（例：「100%純棉，清爽背心，繽紛百搭」→「純棉清爽背心」）
-- 拿不準是不是產品就略過
+- **嚴格排除**以下類型（這些不是產品）：最新消息 / 新聞 / 公告 / 防詐提醒、促銷或優惠活動（免運、折扣、滿額禮、限時搶購）、節慶 banner、穿搭或情境推薦標題、分類專區名稱、會員 / 客服 / 導航文字
+- 判斷標準：這個名稱能不能單獨放上商品貨架？不能就略過
+- 拿不準是不是產品就略過（寧缺勿濫）
 - 只輸出 JSON array`,
       }],
       maxTokens: 2000,
@@ -463,8 +508,8 @@ ${pageContent}
 
 ---
 
-請從以上內容找出這個品牌銷售或提供的所有產品、服務或課程。
-只要出現產品名稱就列出，description 可以很短或直接用產品分類代替。
+請從以上內容找出這個品牌「銷售或提供的具體產品、服務或課程」。
+description 可以很短或直接用產品分類代替。
 最多列出 50 個，格式：
 [
   { "name": "產品名稱", "description": "簡短描述或分類（可以只有 2-10 字，例如：冷凍食品、課程、服務等）" },
@@ -473,7 +518,8 @@ ${pageContent}
 
 規則：
 - 直接列出產品名稱，不必完整描述
-- 不要列出頁面導航連結、公司名稱、版權文字
+- **嚴格排除**以下類型（這些不是產品，列了就是錯）：最新消息 / 新聞稿 / 部落格文章標題、促銷或優惠活動（免運、折扣、滿額禮、限時搶購、抽獎）、公告與防詐提醒、節慶 banner 文案、分類專區與導航連結、公司名稱與版權文字、會員 / 客服相關文字
+- 判斷標準：這個名稱能不能單獨放上商品貨架或服務目錄？不能就略過（寧缺勿濫）
 - 如果完全找不到任何產品或服務名稱，才回傳空 array []
 - 只輸出 JSON array，不要其他文字`,
     }],
