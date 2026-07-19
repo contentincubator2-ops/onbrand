@@ -2936,6 +2936,21 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
           hasContent: true,
         };
       }
+      // 2026-07-19 (CJ「活動定位總覽第 10/11 章顯示尚未填寫但內容存在」):
+      // tableRows segments (event channels.phases / journey.journey) are
+      // arrays of row OBJECTS whose keys are stage/channels/step/… — no
+      // name/label — so the two checks above missed them and the card
+      // showed empty. Any row with a non-empty string value = filled;
+      // preview shows the first row's string cells.
+      const rowish = arr.filter((x: any) =>
+        x && typeof x === "object" && !Array.isArray(x) &&
+        Object.values(x).some((val: any) => typeof val === "string" && val.trim()));
+      if (rowish.length > 0) {
+        const firstVals = Object.values(rowish[0])
+          .filter((val: any) => typeof val === "string" && val.trim())
+          .map((val: any) => String(val)) as string[];
+        return { node: <TagRow items={firstVals} max={4} />, hasContent: true };
+      }
     }
   }
   return { node: null, hasContent: false };
