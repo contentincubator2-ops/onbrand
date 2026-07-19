@@ -155,6 +155,12 @@ export const brands = mysqlTable("brands", {
   positioningStatus: mysqlEnum("positioningStatus", ["pending", "in_progress", "completed"]).default("pending"),
   positioningSummary: text("positioningSummary"),
   positioningReport: json("positioningReport"),
+  // 2026-07-19 (CJ 基本資料同步): the canonical 14-step positioning JSON.
+  // The column has existed in MySQL all along (written via raw SQL in
+  // positioningJobRunner.mergePositioning) but was missing from this drizzle
+  // schema — so drizzle-based reads (brand.get) silently dropped it and any
+  // read-time fallback derivation got undefined.
+  positioning: json("positioning"),
   createdBy: int("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow(),

@@ -685,6 +685,19 @@ export async function finalizeBrandAfterPipeline(userId: number, brandId: number
   maybeSet("emotionalDiff", emotionalDiff);
   maybeSet("functionalDiff", functionalDiff);
 
+  // 2026-07-19 (CJ「基本資料頁：產業/品牌在做什麼/AI 定位摘要 在定位完成後
+  // 仍空白」): mirror the two 基本資料 text fields too. Unlike tagline these
+  // are user-editable ground-truth fields with NO write-back into the
+  // positioning JSON, so overwriting would clobber manual corrections —
+  // fill-if-empty only (COALESCE(NULLIF(col,''))).
+  const fillIfEmpty = (col: string, val: string | null, cap = 2000) => {
+    const v = val ? String(val).slice(0, cap) : null;
+    filled[col] = !!v;
+    if (v) { sets.push(`${col} = COALESCE(NULLIF(${col}, ''), ?)`); params.push(v); }
+  };
+  fillIfEmpty("positioningSummary", pickStr(a, "differentiation.summary", "goldenCircle.why"));
+  fillIfEmpty("description", pickStr(a, "goldenCircle.what", "differentiation.summary"));
+
   // Always flip status + step + isEstimate, regardless of whether we found
   // every field. Pipeline successfully completed → user shouldn't be told
   // "not ready" just because one column couldn't be picked.
