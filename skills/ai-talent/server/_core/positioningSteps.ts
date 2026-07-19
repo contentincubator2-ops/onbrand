@@ -95,9 +95,17 @@ function langLabelOf(outputLanguage?: string | null): string | null {
 // 2026-07-17 多市場: 市場段落注入 — 讓競品 / 趨勢 / 受眾研究以品牌目標
 // 市場為範圍，而不是預設台灣。marketContext 由 positioningJobRunner 從
 // brands.targetCountry 經 buildMarketContext 載入（product/event 繼承母品牌）。
+// 2026-07-19 (CJ「競品分析突然抓不到 copy.ai / posty.ai」regression fix):
+// 原句「所有研究必須以此市場為範圍」讓模型把「總部不在該國」的競品
+// 全部排除 — SoWork(TW) 的真實競品是國際 SaaS，卻被換成泛泛本地選項。
+// 市場設定約束的是「受眾、語言、文化與法規」；競品的正確定義是
+// 「在此市場爭奪同一群客戶的所有選項」，國際產品/線上工具當然算。
 function marketBlock(c: StepContext): string {
   return c.marketContext
-    ? `\n\n【目標市場設定 — 所有研究（受眾/競品/趨勢/定價）必須以此市場為範圍】${c.marketContext}`
+    ? `\n\n【目標市場設定 — 受眾/語言/文化/法規以此市場為準】${c.marketContext}` +
+      `\n（競品注意：競爭格局要涵蓋「在此市場爭奪同一群目標客戶」的所有實際選項 — ` +
+      `包含國際品牌、跨境電商、線上工具/SaaS。不要因為公司總部不在此國就排除；` +
+      `也不要為了湊在地性而編造不知名的本地品牌。）`
     : "";
 }
 
