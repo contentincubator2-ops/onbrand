@@ -132,7 +132,9 @@ export function InfoTab({ brandId, brandName }: { brandId: number | null; brandN
   const { lang } = useLang();
   const en = lang === "en";
   return (
-    <div className="max-w-[700px] mx-auto p-8">
+    // 2026-07-19 (CJ「每一列的卡片數量不一致，不容易讀取」): widen the column
+    // and keep a consistent 2-per-row field rhythm inside every card.
+    <div className="max-w-[960px] mx-auto p-8">
       <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Basic info" : "基本資料"}</h2>
       <p className="text-sm text-default-500 mb-6">{en ? "Name / industry / description" : "名稱 / 產業 / 描述"}</p>
 
@@ -298,17 +300,21 @@ function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean
   return (
     <div className="space-y-4 mt-4">
       {/* ── Brand info ──────────────────────────────────────────────────── */}
+      {/* 2026-07-19 (CJ 排版): short inputs pair up 2-per-row; long textareas
+          span the full width — consistent rhythm with the links card below. */}
       <div className="bg-default-50 rounded-xl border border-default-200 p-5">
-        <Field label={en ? "Industry" : "產業"}>
-          <Input size="sm" value={industry} onChange={(e) => setIndustry(e.target.value)}
-            placeholder={en ? "e.g. SaaS / F&B / retail" : "例：SaaS / 餐飲 / 零售"} />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={en ? "Industry" : "產業"}>
+            <Input size="sm" value={industry} onChange={(e) => setIndustry(e.target.value)}
+              placeholder={en ? "e.g. SaaS / F&B / retail" : "例：SaaS / 餐飲 / 零售"} />
+          </Field>
+          <Field label={en ? "Tagline" : "品牌標語"}>
+            <Input size="sm" value={tagline} onChange={(e) => setTagline(e.target.value)} />
+          </Field>
+        </div>
         <Field label={en ? "What the brand does (used by the AI)" : "品牌在做什麼（AI 會用這段認識你）"}>
           <Textarea minRows={3} value={description} onChange={(e) => setDescription(e.target.value)}
             placeholder={en ? "One paragraph the AI should treat as ground truth about this brand." : "用一段話描述這個品牌——AI 會把這段當成關於你的事實依據。"} />
-        </Field>
-        <Field label={en ? "Tagline" : "品牌標語"}>
-          <Input size="sm" value={tagline} onChange={(e) => setTagline(e.target.value)} />
         </Field>
         <Field label={en ? "AI positioning summary — edit to hard-correct" : "AI 推導的定位摘要 — 可直接手改校正"}>
           <Textarea minRows={5} value={positioning} onChange={(e) => setPositioning(e.target.value)}
@@ -326,19 +332,19 @@ function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean
         <div className="text-xs font-semibold uppercase tracking-widest text-default-500 mb-3">
           {en ? "External links — AI reads these before each task" : "外部連結 — AI 每次任務前都會讀取"}
         </div>
-        {/* Website */}
-        <div className="flex items-center gap-3 mb-3">
-          <FontAwesomeIcon icon={faGlobe} style={{ color: "#64748B", fontSize: 16, width: 18 }} />
-          <Input
-            size="sm"
-            label={en ? "Official website" : "官方網站"}
-            placeholder="https://example.com"
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-          />
-        </div>
-        {/* Social platforms — 2-column grid */}
+        {/* 2026-07-19 (CJ 排版): website joins the same 2-column grid as the
+            social links — 8 uniform cells, every row has exactly two. */}
         <div className="grid gap-2 sm:grid-cols-2">
+          <div className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faGlobe} style={{ color: "#64748B", fontSize: 16, width: 18, flexShrink: 0 }} />
+            <Input
+              size="sm"
+              label={en ? "Official website" : "官方網站"}
+              placeholder="https://example.com"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
+          </div>
           {SOCIAL_FIELDS.map((f) => (
             <div key={f.key} className="flex items-center gap-2">
               <FontAwesomeIcon icon={f.icon} style={{ color: f.tone, fontSize: 16, width: 18, flexShrink: 0 }} />

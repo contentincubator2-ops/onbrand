@@ -120,6 +120,9 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
     try {
       const r = await createBrandMut.mutateAsync({
         name: name.trim(),
+        // 2026-07-19 (CJ 基本資料同步): the wizard collected industry but
+        // never sent it — brands.industry stayed blank on the 基本資料頁.
+        industry: industry.trim() || undefined,
         targetCountry: targetCountry || undefined,
         outputLanguage: outputLanguage || undefined,
       });

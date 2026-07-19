@@ -197,13 +197,42 @@ export const brandRouter = router({
       const rows = await db.select().from(brands)
         .where(and(eq(brands.id, input.id), eq(brands.userId, ctx.user.id)))
         .limit(1);
-      return rows[0] ?? null;
+      const b: any = rows[0] ?? null;
+      if (!b) return null;
+      // 2026-07-19 (CJ「基本資料頁欄位未與定位同步 — 產業／品牌在做什麼／AI
+      // 定位摘要在定位完成後仍空白」): the 14-step pipeline writes the
+      // canonical positioning JSON but never backfills these flat columns,
+      // and the onboarding wizard didn't send industry at all. Derive
+      // read-time fallbacks from the positioning JSON (canonical segments +
+      // _interim quick pulse) — no migration needed; a manually edited
+      // (non-empty) column always wins.
+      try {
+        let p: any = b.positioning;
+        if (typeof p === "string") p = JSON.parse(p);
+        p = p ?? {};
+        const interim = p._interim ?? {};
+        const gc = p.goldenCircle ?? {};
+        const diff = p.differentiation ?? {};
+        const tl = p.tagline ?? {};
+        const fb = (...vals: any[]): string =>
+          (vals.find((v) => typeof v === "string" && v.trim()) as string | undefined)?.trim() ?? "";
+        if (!b.industry) b.industry = fb(p.industry, interim.industry) || b.industry;
+        if (!b.description) b.description = fb(gc.what, interim.positioning, diff.summary) || b.description;
+        if (!b.tagline) b.tagline = fb(tl.zhTagline, tl.enTagline, interim.tagline) || b.tagline;
+        if (!b.positioningSummary) {
+          b.positioningSummary = fb(diff.summary, gc.why, interim.positioningSummary, interim.positioning) || b.positioningSummary;
+        }
+      } catch { /* display fallback only — never block the read */ }
+      return b;
     }),
 
   create: protectedProcedure
     .input(z.object({
       name: z.string().min(1).max(128),
       website: z.string().optional(),
+      // 2026-07-19 (CJ 基本資料同步): the onboarding wizard collects 產業
+      // but had nowhere to send it — brands.industry stayed NULL forever.
+      industry: z.string().max(64).optional().nullable(),
       targetAudience: z.string().optional(),
       competitors: z.string().optional(),
       targetMarket: z.string().optional(),
@@ -282,6 +311,7 @@ export const brandRouter = router({
         slug,
         name: input.name,
         website: input.website ?? null,
+        industry: input.industry?.trim() || null,
         targetAudience: input.targetAudience ?? null,
         soworkAnalysis: {
           competitors: input.competitors ?? null,
