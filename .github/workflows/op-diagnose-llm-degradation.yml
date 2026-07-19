@@ -27,23 +27,23 @@ jobs:
             Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
 
             echo "===== positioning steps: model mix by day (last 7 days) ====="
-            Q "SELECT DATE(createdAt) AS day, model, COUNT(*) AS calls,
+            Q "SELECT DATE(ts) AS day, model, COUNT(*) AS calls,
                       ROUND(AVG(outputTokens)) AS avg_out
                  FROM usage_log
                 WHERE kind LIKE 'positioning_step%'
-                  AND createdAt > NOW() - INTERVAL 7 DAY
+                  AND ts > NOW() - INTERVAL 7 DAY
                 GROUP BY day, model ORDER BY day DESC, calls DESC;"
 
             echo "===== competition step specifically ====="
-            Q "SELECT DATE(createdAt) AS day, model, COUNT(*) AS calls,
+            Q "SELECT DATE(ts) AS day, model, COUNT(*) AS calls,
                       ROUND(AVG(outputTokens)) AS avg_out
                  FROM usage_log
                 WHERE kind = 'positioning_step:competition'
-                  AND createdAt > NOW() - INTERVAL 7 DAY
+                  AND ts > NOW() - INTERVAL 7 DAY
                 GROUP BY day, model ORDER BY day DESC;"
 
             echo "===== llm chain outage errors (last 3 days) ====="
-            Q "SELECT createdAt, level, LEFT(message,150) AS msg
+            Q "SELECT ts, level, LEFT(message,150) AS msg
                  FROM error_log
                 WHERE level IN ('error','warn')
                   AND (message LIKE '%credit%' OR message LIKE '%All LLM providers%'
