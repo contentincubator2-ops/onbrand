@@ -262,7 +262,8 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
 - 反問引發式：一個讓人停下滑動的問句。
 - 情境共鳴式：描述用戶真實生活場景的一句。
 - 結果承諾式：明確、可信的利益承諾。
-caption 欄位就放這「一個」headline 本身，不要解釋、不要前綴。${FB_TONE_SUFFIX}`,
+caption 欄位就放這「一個」headline 本身，不要解釋、不要前綴。
+輸入籠統或資訊不足時：**照樣產出**——用品牌定位與常識補足合理假設，寫出通用但有力的 headline。**絕對不要**反問、要求澄清、說明資訊不足；caption 出現任何非 headline 的內容都算錯誤。${FB_TONE_SUFFIX}`,
     preferredModel: "qwen",
     maxTokens: 120,
     outputDefaults: { platform: "facebook", post_type: "ad" },
@@ -830,7 +831,11 @@ export const FB_90S_TASK_INDEX: Array<{
   { id: "fb-90-monthly-calendar-promo", squad_slug: "fb-monthly-calendar-product-promo", postType: "feed", label: { en: "FB Calendar (Product Promo)", zh: "FB 月曆（商品促銷）" }, description: { en: "Promo-weighted content pillar mix", zh: "促銷型內容支柱配比" } },
   { id: "fb-90-event-launch",           squad_slug: "fb-garyvee-jab-hook",       postType: "event",    label: { en: "FB Event Launch Kit", zh: "FB 活動上線套組" },    description: { en: "GaryVee Jab-Jab-Right-Hook method", zh: "GaryVee Jab-Jab-Right-Hook 法" } },
   { id: "fb-90-countdown-series",       squad_slug: "fb-countdown-series",       postType: "feed",     label: { en: "FB Countdown Series (7–14 Days)", zh: "FB 倒數活動系列 7-14 天" }, description: { en: "Cialdini scarcity countdown method", zh: "Cialdini Scarcity 緊迫倒數法" } },
-  { id: "fb-90-account-reposition",     squad_slug: "fb-account-reposition",     postType: "feed",     label: { en: "FB Account Repositioning", zh: "FB 帳號重新定位" },    description: { en: "Trout & Ries Positioning + Pulizzi Tilt", zh: "Trout & Ries Positioning + Pulizzi Tilt" } },
+  // 2026-07-20 (CJ「兩張同名 FB帳號重新定位，90s 版卡在 100% 處理中」):
+  // fb-90-account-reposition removed — fb-99-account-reposition points at
+  // the SAME squad (fb-account-reposition) but runs via the async-polling
+  // 99s path, so it completes; the legacy 90s sync path times out at
+  // nginx's 60s and hangs forever at「處理中」. One card is enough.
   { id: "fb-90-quarterly-strategy",     squad_slug: "fb-quarterly-strategy",     postType: "feed",     label: { en: "FB Quarterly Strategy", zh: "FB 季度策略" },        description: { en: "Pulizzi Quarterly Cadence", zh: "Pulizzi Quarterly Cadence" } },
   { id: "fb-90-monthly-analytics",      squad_slug: "fb-monthly-analytics",      postType: "feed",     label: { en: "FB Monthly Performance Report", zh: "FB 月度成效報告" },    description: { en: "Kaushik Web Analytics 2.0 + Engagement Pyramid", zh: "Kaushik Web Analytics 2.0 + Engagement Pyramid" } },
   { id: "fb-90-carousel-10frame",       squad_slug: "fb-deiss-cvo",              postType: "carousel", label: { en: "FB 10-Card Carousel Narrative", zh: "FB 輪播 10 卡完整敘事" }, description: { en: "Full Hook-Build-Turn-Payoff arc", zh: "Hook-Build-Turn-Payoff 完整弧" } },
