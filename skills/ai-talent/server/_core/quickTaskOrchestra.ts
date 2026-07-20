@@ -1796,6 +1796,37 @@ export async function runOrchestra(args: {
         : Promise.resolve<string[]>([]),
     ]);
 
+    // ── Small-cap caption post-validation (2026-07-20) ─────────────────
+    // CJ QA:「FB 廣告 Headline 5 種：輸入籠統時 AI 回傳一大段要求澄清的
+    // 文字（遠超 25 字），直接塞進廣告標題視覺區塊，破壞版型」。The
+    // length rule lives in the prompt, but nothing enforced it after
+    // generation. For micro-caption tasks (captionMaxChars ≤ 60):
+    //   1. clarification-request output → blank the caption + push an
+    //      explicit error (no silent fallback, per 2026-05-28 principle)
+    //   2. multi-line/oversized output → reduce to first line, hard-cap
+    //      with … so a non-compliant answer can never break the layout.
+    if (args.config.captionMaxChars > 0 && args.config.captionMaxChars <= 60 && Array.isArray(captions)) {
+      const CLARIFY_RE = /請(再)?提供|請補充|需要更多|更多資訊|請告訴我|能否分享|請說明|資訊不足|無法(直接)?產出|我需要知道/;
+      const cap = args.config.captionMaxChars;
+      for (let vi = 0; vi < captions.length; vi++) {
+        const v = captions[vi];
+        if (!v?.caption) continue;
+        let c = v.caption.trim();
+        if (CLARIFY_RE.test(c)) {
+          errors.push(`caption(${v.label ?? vi + 1}): model asked for clarification instead of producing — 重生這段 to retry`);
+          v.caption = "";
+          continue;
+        }
+        // First non-empty line only (micro tasks are single-line by spec)
+        const firstLine = c.split(/\n+/).map((l) => l.trim()).find((l) => l.length > 0) ?? "";
+        if (firstLine && firstLine.length < c.length) c = firstLine;
+        // Hard cap at 2× the spec (small tolerance), ellipsis-truncated
+        const cps = Array.from(c);
+        if (cps.length > cap * 2) c = cps.slice(0, cap).join("") + "…";
+        v.caption = c;
+      }
+    }
+
     // ── Brand-rule enforcement: 硬檢查 + 自動修正 (2026-05-17) ──
     // Soft prompt injection never guaranteed adherence. Deterministically
     // apply term_substitutions (X→Y) and detect banned_words on every

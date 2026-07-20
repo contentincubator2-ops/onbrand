@@ -552,7 +552,9 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
           <div className="min-w-0 flex-1">
             <p className="text-tiny text-default-500 uppercase tracking-wider">YOUR-BRAND.COM</p>
             {componentSlot === "headline" ? (
-              <p className="text-small font-semibold rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-0.5 whitespace-pre-wrap">
+              // 2026-07-20 (CJ QA): line-clamp guards the layout even if a
+              // non-compliant over-long caption slips past server validation.
+              <p className="text-small font-semibold rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-0.5 whitespace-pre-wrap line-clamp-2">
                 {deliverableTag}{adText}
               </p>
             ) : isComponent ? (
@@ -561,7 +563,7 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
               <p className="text-small font-semibold truncate">{lang === "en" ? "Shop now · Limited offer" : "立即購買 · 限時優惠"}</p>
             )}
             {componentSlot === "description" && (
-              <p className="text-tiny text-default-600 rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-1 whitespace-pre-wrap">
+              <p className="text-tiny text-default-600 rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-1 whitespace-pre-wrap line-clamp-3">
                 {deliverableTag}{adText}
               </p>
             )}
