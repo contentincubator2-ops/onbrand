@@ -11,7 +11,7 @@
  * Speed badges appear on every card so the timing expectation is clear
  * without requiring users to navigate tiers before seeing tasks.
  */
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
@@ -1164,7 +1164,15 @@ function PlatformTaskPageInner() {
     setAgentMeta(null);
   };
 
+  // 2026-07-20 (CJ QA「取消後 AI 仍在後端執行，完成時不經同意自動跳轉，
+  // 中斷當下操作」): the in-flight run attempt is invalidated whenever the
+  // modal closes. The server keeps generating (an HTTP mutation can't be
+  // recalled) and the output still lands in /projects — but a cancelled
+  // attempt must NEVER navigate or mutate UI state when it resolves.
+  const runSeqRef = useRef(0);
+
   const closeTask = () => {
+    runSeqRef.current++; // invalidate any in-flight run attempt
     setActiveTask(null);
     setRunning(false);
     setCountdownStart(null);
@@ -1253,6 +1261,13 @@ function PlatformTaskPageInner() {
     setRunning(true);
     setErrorMsg(null);
     setCountdownStart(Date.now());
+    // 2026-07-20 (CJ QA): this attempt's ticket. closeTask() bumps the ref,
+    // so a cancelled attempt resolves silently — no navigation, no state.
+    const mySeq = ++runSeqRef.current;
+    const isStale = () => runSeqRef.current !== mySeq;
+    const notifyBackgroundDone = () => showToastGlobal(lang === "en"
+      ? "The task you closed finished in the background — find it in Projects."
+      : "先前關閉的任務已在背景完成，結果已存到「專案」。");
 
     try {
       // Squad tasks (99s campaign workflows)
@@ -1263,6 +1278,7 @@ function PlatformTaskPageInner() {
             topic: primaryAnswer || activeTask.label,
             brandId: brandId ?? undefined,
           });
+          if (isStale()) { if ((r as any).outputId) notifyBackgroundDone(); return; }
           if ((r as any).outputId) {
             closeTask();
             navigate(`/run/${(r as any).outputId}`);
@@ -1292,6 +1308,7 @@ function PlatformTaskPageInner() {
           productId: taskProductId,
           eventId: taskEventId,
         });
+        if (isStale()) { if ((r as any).outputId) notifyBackgroundDone(); return; }
 
         if ((r as any).outputId) {
           const oid = (r as any).outputId;
@@ -1300,12 +1317,14 @@ function PlatformTaskPageInner() {
             const deadline = Date.now() + 95_000;
             while (Date.now() < deadline) {
               await new Promise((res) => setTimeout(res, 3000));
+              if (isStale()) { notifyBackgroundDone(); return; }
               try {
                 const o: any = await holdUtils.output.getById.fetch({ id: oid });
                 if (o?.progress && o.progress !== "caption_ready") break;
               } catch { /* transient */ }
             }
           }
+          if (isStale()) { notifyBackgroundDone(); return; }
           closeTask();
           navigate(`/run/${oid}`);
           return;
@@ -1334,10 +1353,14 @@ function PlatformTaskPageInner() {
         ? "This task isn't ready yet."
         : "這個任務還在開發中，請改試其他任務。");
     } catch (e: any) {
-      setErrorMsg(e?.message ?? String(e));
+      if (!isStale()) setErrorMsg(e?.message ?? String(e));
     } finally {
-      setRunning(false);
-      setCountdownStart(null);
+      // Only the CURRENT attempt may reset run state — a cancelled attempt
+      // resolving late must not clobber a newer run the user has started.
+      if (!isStale()) {
+        setRunning(false);
+        setCountdownStart(null);
+      }
     }
   };
 
