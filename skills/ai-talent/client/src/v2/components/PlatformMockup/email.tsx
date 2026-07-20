@@ -55,7 +55,25 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
   // strip so "主旨：<text>" → "<text>" regardless of where it came from.
   const _stripMetaPrefix = (s: string) =>
     s.replace(/^[\s#*>\-]*(?:主旨|Subject)\s*[：:]\s*/i, "").trim();
-  const subject = _stripMetaPrefix((liveTitle || _grab("主旨") || _grab("Subject") || title || "").trim());
+  // 2026-07-20 (CJ「促銷信主旨看起來斷字/漏字」): when the caption has no
+  // 主旨： line, the fallback subject is the body's first sentence hard-cut
+  // at 32 chars — often mid-phrase（…數量有限——一…）which reads as broken
+  // text. Trim a "…"-suffixed derived subject back to the last punctuation
+  // boundary so it ends on a clean phrase. Real 主旨： lines are untouched.
+  const _tidyDerivedSubject = (s: string): string => {
+    if (!s.endsWith("…")) return s;
+    const core = s.slice(0, -1);
+    let last = -1;
+    for (const ch of ["，", "、", "；", "：", "。", "—", "–", ",", ";", ":"]) {
+      const i = core.lastIndexOf(ch);
+      if (i > last) last = i;
+    }
+    if (last < 8) return s; // no useful boundary — keep the ellipsis version
+    return core.slice(0, last).replace(/[，、；：。,;:\s—–-]+$/u, "");
+  };
+  const subject = _tidyDerivedSubject(
+    _stripMetaPrefix((liveTitle || _grab("主旨") || _grab("Subject") || title || "").trim()),
+  );
   // "preheader" added 2026-07-20 — the EDM craft rubric teaches the concept
   // by that English name, so models label the line accordingly.
   const previewText = _grab("預覽(?:文字)?") || _grab("Preview") || _grab("preheader");

@@ -71,6 +71,11 @@ ${EMAIL_TONE}`,
     primary_input: { key: "promo", placeholder: "例：週年慶全館 8 折 / 新會員首單 9 折 / 限量商品", type: "textarea" },
     inputs: [{ key: "promo", label: "促銷內容", type: "textarea", required: true }],
     systemPrompt: `產出 1 封促銷 Email（200-350 字）。**本封策略固定走「{label}」這一種（稀缺感＝限量/限時張力；價值論證＝為何值得這個價；故事感＝用情境/人物帶出），必須與其他變體明顯不同，嚴禁混用或寫成通用版。**
+輸出格式（前兩行為信件中繼資料，之後才是內文）：
+主旨：<15 字內、含具體誘因的主旨行>
+預覽：<25 字內的預覽文字，補強主旨、不重複>
+
+<內文>
 結構：1 句具體誘因（含數字，依此策略）→ 為什麼這次特別 → 商品 / 活動細節 → 1 個 CTA 按鈕文字 → 緊迫性（時限 / 名額）。
 不要全大寫、不要 ! 連發。${EMAIL_TONE}`,
     preferredModel: "qwen", maxTokens: 700,
