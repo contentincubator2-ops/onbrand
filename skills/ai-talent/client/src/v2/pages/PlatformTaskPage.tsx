@@ -914,10 +914,14 @@ function PlatformTaskPageInner() {
   };
 
   // Task data
+  // 2026-07-20 (CJ「直連 /tasks/fb?b=XXXX 顯示 0/0 個任務」): a failed
+  // catalog fetch used to silently render as「0/0 個任務」— retry transient
+  // fresh-load hiccups and surface a real error state instead.
   const listQuery = (trpc as any).quickTask?.listFB?.useQuery
-    ? (trpc as any).quickTask.listFB.useQuery(undefined, { refetchOnWindowFocus: false })
+    ? (trpc as any).quickTask.listFB.useQuery(undefined, { refetchOnWindowFocus: false, retry: 2 })
     : { data: [] };
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
+  const catalogFailed = !!listQuery?.error && allTasks.length === 0;
 
   // Mutations
   const runOrchestraMut    = (trpc as any).quickTask?.runOrchestra?.useMutation();
@@ -1705,6 +1709,23 @@ function PlatformTaskPageInner() {
               </span>
             )}
           </div>
+          {/* 2026-07-20 (CJ): failed catalog fetch is now visible + retryable
+              instead of a silent 0/0. */}
+          {catalogFailed && (
+            <div className="mt-3 flex items-center gap-3 rounded-lg border border-warning-300 bg-warning-50 px-3 py-2 max-w-xl mx-auto">
+              <p className="text-tiny text-warning-800 flex-1 text-left">
+                {lang === "en"
+                  ? "Task list failed to load — this is a network hiccup, not missing tasks."
+                  : "任務清單載入失敗——這是連線問題，不是沒有任務。"}
+              </p>
+              <button
+                onClick={() => listQuery?.refetch?.()}
+                className="text-tiny font-semibold px-3 py-1 rounded-md bg-warning-500 text-white hover:bg-warning-600 transition shrink-0"
+              >
+                {lang === "en" ? "Reload" : "重新載入"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

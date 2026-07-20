@@ -156,6 +156,20 @@ export default function ShellLayout() {
     if (scope.brandId && scope.brandId !== brandId) setBrandId(scope.brandId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope.brandId]);
+  // 2026-07-20 (CJ「直接以網址列導覽 /tasks/fb?b=XXXX 時品牌情境遺失，
+  // 顯示選擇品牌，需手動重選」): recover from a scope brandId that isn't in
+  // this account's brand list (cross-account shared link, stale/mistyped id,
+  // deleted brand). Previously the pill showed 選擇品牌 forever and every
+  // brand-gated query sat dead because the auto-pick effect only fires when
+  // brandId is NULL. Once the list is loaded, snap to the first valid brand
+  // (updates URL + both storages via setScope).
+  React.useEffect(() => {
+    if (!brandsLoaded || brands.length === 0) return;
+    if (scope.brandId && !brands.some((b: any) => b.id === scope.brandId)) {
+      setScope({ brandId: brands[0].id, productId: null, eventId: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandsLoaded, brands.length, scope.brandId]);
 
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
     try { return localStorage.getItem("sowork.sidebar") !== "expanded"; }
