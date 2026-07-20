@@ -1188,7 +1188,9 @@ export const quickTaskRouter = router({
       ...t,
       kind: "fast" as const,
       isMediaTask: true as const,
-      agent_id: null,
+      // 2026-07-20 (CJ QA「任務卡作者顯示 AI Agent」): agent_id now comes
+      // from the media task template — was hard-coded null, which made all
+      // 9 media cards fall back to the generic "AI Agent" persona.
       squadName: null,
     }));
 

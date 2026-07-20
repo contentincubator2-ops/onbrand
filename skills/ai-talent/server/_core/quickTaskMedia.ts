@@ -17,6 +17,10 @@ export type MediaTaskTemplate = {
   mediaType: "photo" | "video" | "doc";
   primary_question: string;
   ctaPath: string; // client-side route to navigate to
+  /** 2026-07-20 (CJ QA「任務卡作者顯示 AI Agent 而非人名」): existing
+   *  agents.id in mos_db — media cards were the last tasks without a
+   *  named persona, falling back to the generic "AI Agent" avatar. */
+  agent_id: number;
 };
 
 export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
@@ -29,6 +33,7 @@ export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
     mediaType: "photo",
     primary_question: "上傳一張產品或活動照片",
     ctaPath: "/media/photo/fb",
+    agent_id: 60021, // Tina Ji — Facebook/Instagram Social Copywriter
   },
   {
     id: "media-photo-ig",
@@ -39,6 +44,7 @@ export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
     mediaType: "photo",
     primary_question: "上傳一張照片",
     ctaPath: "/media/photo/ig",
+    agent_id: 220583, // Hsin-Yi Weng — IG/FB Marketing Specialist（hashtag 在地化）
   },
   {
     id: "media-photo-tiktok",
@@ -49,6 +55,7 @@ export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
     mediaType: "photo",
     primary_question: "上傳一張照片",
     ctaPath: "/media/photo/tiktok",
+    agent_id: 35, // Jason Fang — Short Video Scriptwriter
   },
   {
     id: "media-photo-yt",
@@ -59,6 +66,7 @@ export const MEDIA_PHOTO_TASKS: MediaTaskTemplate[] = [
     mediaType: "photo",
     primary_question: "上傳 YouTube 縮圖",
     ctaPath: "/media/photo/youtube",
+    agent_id: 24, // Janet Chang — YouTube Strategist
   },
 ];
 
@@ -72,6 +80,7 @@ export const MEDIA_VIDEO_TASKS: MediaTaskTemplate[] = [
     mediaType: "video",
     primary_question: "貼上影片的 YouTube 連結",
     ctaPath: "/media/video/fb",
+    agent_id: 180162, // Jason Peng | Social Media Copywriter
   },
   {
     id: "media-video-ig",
@@ -82,6 +91,7 @@ export const MEDIA_VIDEO_TASKS: MediaTaskTemplate[] = [
     mediaType: "video",
     primary_question: "貼上影片的 YouTube 連結",
     ctaPath: "/media/video/ig",
+    agent_id: 180166, // Iris Liang — Instagram Marketing Specialist
   },
   {
     id: "media-video-tiktok",
@@ -92,6 +102,7 @@ export const MEDIA_VIDEO_TASKS: MediaTaskTemplate[] = [
     mediaType: "video",
     primary_question: "貼上影片的 YouTube 連結",
     ctaPath: "/media/video/tiktok",
+    agent_id: 60029, // Siyu Lin — TikTok/Reels Short Video Scriptwriter
   },
   {
     id: "media-video-yt",
@@ -102,6 +113,7 @@ export const MEDIA_VIDEO_TASKS: MediaTaskTemplate[] = [
     mediaType: "video",
     primary_question: "貼上你要改寫的 YouTube 影片連結",
     ctaPath: "/media/video/youtube",
+    agent_id: 30013, // Eric Chen — SEO Content Writer（標題/描述/tags 改寫）
   },
 ];
 
@@ -115,5 +127,6 @@ export const MEDIA_DOC_TASKS: MediaTaskTemplate[] = [
     mediaType: "doc",
     primary_question: "上傳要改寫的文件",
     ctaPath: "/media/doc",
+    agent_id: 30002, // Sarah Liu — AI Brand Story CMO（品牌語氣改寫）
   },
 ];

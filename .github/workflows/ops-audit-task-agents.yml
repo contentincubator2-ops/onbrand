@@ -1,0 +1,52 @@
+name: "Ops — Audit task agent_ids vs agents table"
+
+# 2026-07-20 (CJ QA「還是有些任務卡，負責的 AGENT 叫 AI Agent 而非人名」):
+# every agent_id referenced by task definitions must exist in `agents` with a
+# non-empty name — a missing row (or NULL name) makes the card fall back to
+# the generic "AI Agent" persona. Read-only audit: prints missing ids and
+# rows with empty name/title/avatar.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit agent ids
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+
+            IDS="24,27,29,32,35,36,30002,30003,30004,30008,30009,30011,30013,30014,30015,30016,30017,30018,30020,60002,60005,60008,60011,60012,60014,60021,60022,60024,60025,60026,60027,60028,60029,60030,60031,60033,60035,60036,60037,60038,60046,60048,60055,60060,60061,60062,60063,60066,60068,60072,60073,90004,90005,90006,90031,90032,90043,90060,180009,180039,180054,180062,180068,180141,180143,180145,180148,180150,180152,180157,180158,180159,180162,180163,180166,180167,180168,180170,180172,180173,180175,180176,180182,180186,180193,180196,180197,180199,180203,180360,180509,180521,180545,180567,180797,210019,210173,210214,210225,210252,210261,210266,210279,210303,210310,210311,211502,220001,220506,220507,220508,220528,220529,220583,220584,220751,220752,220755,220862,220869,220870,220871,220915,220920,220927,220949,221080,222204,222311,222342,222392,222504,223197,223993,223995,223996,224000,224001,224005,224007,224054,224059,224079,224089,224094,224101,224114,224116,224154,224159,224161,224179,238853,239023,239024"
+
+            echo "===== 1. ids referenced in code but MISSING from agents ====="
+            echo "$IDS" | tr ',' '\n' | sort -n > /tmp/expected_ids.txt
+            mysql -h"$H" -u"$U" -p"$P" "$D" -N -e \
+              "SELECT id FROM agents WHERE id IN ($IDS) ORDER BY id;" | sort -n > /tmp/found_ids.txt
+            comm -23 /tmp/expected_ids.txt /tmp/found_ids.txt | sed 's/^/MISSING: /'
+            echo "(expected $(wc -l < /tmp/expected_ids.txt), found $(wc -l < /tmp/found_ids.txt))"
+
+            echo "===== 2. rows with empty name (would still render AI Agent) ====="
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+              "SELECT id, name, title FROM agents
+               WHERE id IN ($IDS) AND (name IS NULL OR name = '');"
+
+            echo "===== 3. rows with no avatarUrl (dicebear fallback, cosmetic) ====="
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+              "SELECT id, name FROM agents
+               WHERE id IN ($IDS) AND (avatarUrl IS NULL OR avatarUrl = '');"
+
+            echo "===== 4. the 9 media-task agents (sanity: names resolve) ====="
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+              "SELECT id, name, title, avatarUrl IS NOT NULL AS hasAvatar
+               FROM agents WHERE id IN (60021,220583,35,24,180162,180166,60029,30002);"
+            exit 0
