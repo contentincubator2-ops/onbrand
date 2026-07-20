@@ -44,6 +44,15 @@ jobs:
                WHERE mo.content LIKE '%肚子不太舒服%'
                ORDER BY mo.id DESC LIMIT 3\G"
 
+            echo "===== A4. sanity: known output 3321 + latest missions ====="
+            Q "SELECT mo.id, mo.missionId, mo.status, LEFT(mo.content,120) c
+               FROM mission_outputs mo WHERE mo.id IN (2886, 3321)\G"
+            Q "SELECT id, taskId, brandId, createdAt FROM missions
+               ORDER BY id DESC LIMIT 8;"
+            Q "SELECT mo.id, m.taskId, mo.createdAt FROM mission_outputs mo
+               JOIN missions m ON m.id = mo.missionId
+               ORDER BY mo.id DESC LIMIT 8;"
+
             echo "===== B. brand caption rules for those brands ====="
             Q "SELECT id, brandId, rule, scope, active FROM brand_caption_rules
                ORDER BY id DESC LIMIT 10\G" 2>/dev/null || echo "(no brand_caption_rules table)"
