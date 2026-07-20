@@ -929,6 +929,11 @@ function PlatformTaskPageInner() {
   const runOrchestra99Mut  = (trpc as any).quickTask?.runOrchestra99?.useMutation();
   const runSquadAutoMut    = (trpc as any).quickTask?.runSquadAuto?.useMutation();
   const holdUtils          = (trpc as any).useUtils?.() ?? null;
+  // 2026-07-20 (CJ「取消的任務應該就死掉，不需要留在專案中」): cancelled
+  // runs archive their output on arrival (soft delete — hidden from
+  // Projects). recordTaskRun's finalize never touches `status`, so the
+  // archive sticks even when the server finishes writing afterwards.
+  const deleteOutputMut    = (trpc as any).output?.delete?.useMutation?.();
 
   // ?rerun=<outputId> support
   const rerunId = Number(searchParams.get("rerun") ?? "0");
@@ -1265,9 +1270,14 @@ function PlatformTaskPageInner() {
     // so a cancelled attempt resolves silently — no navigation, no state.
     const mySeq = ++runSeqRef.current;
     const isStale = () => runSeqRef.current !== mySeq;
-    const notifyBackgroundDone = () => showToastGlobal(lang === "en"
-      ? "The task you closed finished in the background — find it in Projects."
-      : "先前關閉的任務已在背景完成，結果已存到「專案」。");
+    // Cancelled attempt resolving late: archive the output so it never
+    // shows up in Projects (取消 = 死掉), and say so quietly.
+    const discardCancelledOutput = (oid: number | null | undefined) => {
+      if (oid) { try { deleteOutputMut?.mutate?.({ id: Number(oid) }); } catch { /* best-effort */ } }
+      showToastGlobal(lang === "en"
+        ? "Cancelled task discarded."
+        : "已取消的任務已捨棄。");
+    };
 
     try {
       // Squad tasks (99s campaign workflows)
@@ -1278,7 +1288,7 @@ function PlatformTaskPageInner() {
             topic: primaryAnswer || activeTask.label,
             brandId: brandId ?? undefined,
           });
-          if (isStale()) { if ((r as any).outputId) notifyBackgroundDone(); return; }
+          if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
           if ((r as any).outputId) {
             closeTask();
             navigate(`/run/${(r as any).outputId}`);
@@ -1308,7 +1318,7 @@ function PlatformTaskPageInner() {
           productId: taskProductId,
           eventId: taskEventId,
         });
-        if (isStale()) { if ((r as any).outputId) notifyBackgroundDone(); return; }
+        if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
 
         if ((r as any).outputId) {
           const oid = (r as any).outputId;
@@ -1317,14 +1327,14 @@ function PlatformTaskPageInner() {
             const deadline = Date.now() + 95_000;
             while (Date.now() < deadline) {
               await new Promise((res) => setTimeout(res, 3000));
-              if (isStale()) { notifyBackgroundDone(); return; }
+              if (isStale()) { discardCancelledOutput(oid); return; }
               try {
                 const o: any = await holdUtils.output.getById.fetch({ id: oid });
                 if (o?.progress && o.progress !== "caption_ready") break;
               } catch { /* transient */ }
             }
           }
-          if (isStale()) { notifyBackgroundDone(); return; }
+          if (isStale()) { discardCancelledOutput(oid); return; }
           closeTask();
           navigate(`/run/${oid}`);
           return;
