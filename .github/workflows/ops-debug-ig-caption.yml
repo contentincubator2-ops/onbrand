@@ -25,11 +25,15 @@ jobs:
             P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
             Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
 
-            echo "===== A. affected outputs (媽媽們都是) ====="
-            Q "SELECT mo.id, m.taskId, m.brandId, LEFT(mo.content, 600) AS content
-               FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
+            echo "===== A0. missions columns ====="
+            Q "DESCRIBE missions;" | head -20
+
+            echo "===== A. affected outputs (媽媽們都是) — no join ====="
+            Q "SELECT mo.id, mo.missionId, mo.status, mo.createdAt,
+                      LEFT(mo.content, 900) AS content
+               FROM mission_outputs mo
                WHERE mo.content LIKE '%媽媽們都是%'
-               ORDER BY mo.id DESC LIMIT 3\G"
+               ORDER BY mo.id DESC LIMIT 2\G"
 
             echo "===== A2. recent IG single-post outputs (any text) ====="
             Q "SELECT mo.id, m.taskId, m.brandId, mo.status, mo.createdAt,
