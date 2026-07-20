@@ -1,0 +1,42 @@
+name: "Ops — Debug IG caption corruption"
+
+# 2026-07-20 (CJ QA「IG 單篇完整貼文 產出文案有斷字/漏字」): read-only dump
+# of the affected output row + the brand's term-substitution rules so we can
+# identify which deterministic transform mangled the text.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump caption + brand rules
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== A. affected outputs (媽媽們都是) ====="
+            Q "SELECT mo.id, m.taskId, m.brandId, LEFT(mo.content, 600) AS content
+               FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
+               WHERE mo.content LIKE '%媽媽們都是%'
+               ORDER BY mo.id DESC LIMIT 3\G"
+
+            echo "===== B. brand caption rules for those brands ====="
+            Q "SELECT id, brandId, rule, scope, active FROM brand_caption_rules
+               ORDER BY id DESC LIMIT 10\G" 2>/dev/null || echo "(no brand_caption_rules table)"
+
+            echo "===== C. 小安素 brands' forbidden/substitution (positioning voice) ====="
+            Q "SELECT id, name,
+                      LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.voice')), 500) AS voice
+               FROM brands WHERE name LIKE '%小安素%' ORDER BY id DESC LIMIT 4\G"
+            exit 0
