@@ -18,6 +18,31 @@ import { loadLineage } from "./decisionBridge";
 export type ImageProvider = "openai" | "google" | "stability" | "piapi";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
 
+/**
+ * 2026-07-20 (CJ「EDM 換圖後出現錯誤中文字」): the anti-garbled-CJK rules
+ * lived only inside buildPrompt/runPiapi here, so the THIRD generation
+ * path (media.generate ← MediaGenFlow/ImageSlotFlow 手動生圖/換圖) shipped
+ * raw prompts and models baked fake Chinese onto packaging. Exported as
+ * shared constants so every image path uses the same guard.
+ * Policy (project_image_text_overlay): AI 圖一律不烤字 — text is overlaid
+ * later on a separate editable layer.
+ */
+export const NO_TEXT_PROMPT_BLOCK =
+  "ABSOLUTELY NO TEXT — this is the most important rule: do NOT render any " +
+  "text, letters, words, numbers, Chinese / Japanese / Korean characters, " +
+  "titles, headlines, captions, subtitles, labels, badges, stickers, signage, " +
+  "logos, watermarks, or typography ANYWHERE in the image. This includes text " +
+  "on product packaging, bottles, boxes, and signs — render those surfaces as " +
+  "clean, unlabeled designs. The image must contain ZERO written characters — " +
+  "it is a clean background; any title text is added afterwards on a separate " +
+  "layer. If you are tempted to add a title or label, leave that area as empty " +
+  "visual space instead.";
+export const NO_TEXT_NEGATIVE_PROMPT =
+  "text, letters, words, numbers, chinese characters, japanese characters, " +
+  "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
+  "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
+  "fake characters, writing, packaging text, product label text";
+
 // 2026-05-12 (CJ「改圖要給用戶選 model」): user-facing model IDs.
 // "auto" = use IMAGE_GEN_PROVIDER_PRIMARY env (currently openai).
 // Other values map to specific providers in generateImage's switch.
@@ -111,15 +136,7 @@ function buildPrompt(input: ImageGenInput): string {
   // real title is overlaid later in the mockup layer, so the generated image
   // must be a CLEAN, TEXT-FREE background. This must be a dominant, explicit
   // directive — a weak trailing "no text" clause gets ignored.
-  lines.push(
-    "ABSOLUTELY NO TEXT — this is the most important rule: do NOT render any " +
-    "text, letters, words, numbers, Chinese / Japanese / Korean characters, " +
-    "titles, headlines, captions, subtitles, labels, badges, stickers, signage, " +
-    "logos, watermarks, or typography ANYWHERE in the image. The image must " +
-    "contain ZERO written characters — it is a clean background; any title text " +
-    "is added afterwards on a separate layer. If you are tempted to add a title " +
-    "or thumbnail text, leave that area as empty visual space instead."
-  );
+  lines.push(NO_TEXT_PROMPT_BLOCK);
   lines.push("");
   lines.push(
     "Rendering: editorial photography, natural light, clean composition, no text, no watermarks."
@@ -217,11 +234,7 @@ async function runPiapi(
   const r = await dispatchGenerate(modelId, {
     prompt,
     aspectRatio: aspect,
-    negativePrompt:
-      "text, letters, words, numbers, chinese characters, japanese characters, " +
-      "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
-      "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
-      "fake characters, writing",
+    negativePrompt: NO_TEXT_NEGATIVE_PROMPT,
   });
   if (r.status !== "ready" || !r.url) {
     throw new Error(`PiAPI ${modelId}: ${r.errorMsg ?? `status=${r.status}`}`);

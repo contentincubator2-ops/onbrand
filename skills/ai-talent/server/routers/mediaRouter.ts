@@ -134,8 +134,16 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       quality: z.enum(["low", "medium", "high"]).optional(),
     }))
     .mutation(async ({ input }) => {
+      // 2026-07-20 (CJ「EDM 換圖後出現錯誤中文字」): this was the ONE image
+      // path that shipped the raw prompt — models baked garbled fake-CJK
+      // onto packaging/labels. Same guard as imageGen's buildPrompt:
+      // dominant NO-TEXT directive + negative_prompt (PiAPI models honour
+      // the negative; gpt-image/Imagen honour the in-prompt directive).
+      const { NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT } = await import("../_core/imageGen");
+      const isImage = input.kind === "image";
       const opts: GenOptions = {
-        prompt: input.promptEn,
+        prompt: isImage ? `${input.promptEn}\n\n${NO_TEXT_PROMPT_BLOCK}` : input.promptEn,
+        negativePrompt: isImage ? NO_TEXT_NEGATIVE_PROMPT : undefined,
         aspectRatio: input.aspectRatio,
         size: input.size,
         imageUrl: input.imageUrl,
