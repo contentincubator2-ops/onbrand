@@ -157,6 +157,24 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
       type: "textarea",
     },
   },
+  // 2026-07-20 (CJ 90s 整層退役 option B): moved here from the retired
+  // FB_90S_TASK_INDEX — the only 90s card with no 99s/60s equivalent.
+  // Same seeded squad (seed-fb-90s-missing-squads.ts), now running via
+  // the async-polling 99s path instead of the sync 60s-timeout one.
+  {
+    id: "fb-99-reels-script",
+    squad_slug: "fb-reels-script",
+    platform: "facebook", postType: "reel",
+    label: { en: "FB Reels Full Script", zh: "FB Reels 完整腳本" },
+    description: { en: "Hook-Hold-Payoff (with storyboard + music direction)", zh: "Hook-Hold-Payoff（含分鏡 + 配樂方向）" },
+    methodology: "短影音 Hook-Hold-Payoff 法",
+    primary_question: "這支 Reels 要講什麼？主題、想帶出的重點、或想模仿的影片都可以",
+    primary_input: {
+      key: "topic",
+      placeholder: "例：新品開箱 30 秒 / 門市日常幕後 / 3 個常見保養錯誤",
+      type: "textarea",
+    },
+  },
 ];
 
 // ─── IG 100s squads (7 — slugs verified to exist in DB 2026-05-06) ─────
