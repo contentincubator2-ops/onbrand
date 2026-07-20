@@ -17,7 +17,13 @@
  */
 
 const SENTENCE_TERMINATORS = /[\n。！？!?]/;
-const LEADING_NOISE = /^[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Extended_Pictographic}#＃\s]+/u;
+// 2026-07-20 (CJ「摘要標題首字被截斷：5歲小朋友挑食 → 歲小朋友挑食」):
+// \p{Emoji} and \p{Emoji_Component} BOTH match ASCII digits 0-9 (and #, *)
+// because Unicode marks them as keycap-emoji components (5️⃣ = "5"+FE0F+20E3)
+// — so a caption starting with a number lost its first character(s). Match
+// only real pictographs + the emoji glue codepoints (variation selector,
+// ZWJ, keycap, skin-tone modifiers) + hashtag marks + whitespace.
+const LEADING_NOISE = /^(?:[\p{Extended_Pictographic}\p{Emoji_Modifier}#＃\s]|️|‍|⃣)+/u;
 const TITLE_MAX_LEN = 32;
 
 export function titleFromCaption(
