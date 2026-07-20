@@ -1,0 +1,48 @@
+name: "Op — Diagnose em-30-promo 斷字 (read-only)"
+
+# 2026-07-20 (CJ「Email促銷信 產出斷字/漏字」): pull the latest em-30-promo
+# outputs and diff metadata.rawCaptions (pre-transform, persisted by the
+# forensics commit 757b527a) against the final content to identify which
+# transform layer eats characters.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump raw vs final captions
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== recent em-30-promo outputs ====="
+            Q "SELECT mo.id, mo.createdAt, m.title
+                 FROM mission_outputs mo
+                 JOIN missions m ON m.id = mo.missionId
+                WHERE m.description LIKE '%em-30-promo%'
+                ORDER BY mo.id DESC LIMIT 5;"
+
+            echo "===== latest run: FINAL content (first 1500 chars) ====="
+            Q "SELECT LEFT(mo.content, 1500) AS final_content
+                 FROM mission_outputs mo
+                 JOIN missions m ON m.id = mo.missionId
+                WHERE m.description LIKE '%em-30-promo%'
+                ORDER BY mo.id DESC LIMIT 1\G"
+
+            echo "===== latest run: RAW pre-transform captions ====="
+            Q "SELECT LEFT(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.rawCaptions')), 2500) AS raw_captions
+                 FROM mission_outputs mo
+                 JOIN missions m ON m.id = mo.missionId
+                WHERE m.description LIKE '%em-30-promo%'
+                ORDER BY mo.id DESC LIMIT 1\G"
