@@ -21,9 +21,31 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
   // 2026-05-18 (CJ 驗收 P0「主旨行全空白」): the launch-sequence prompt
   // now emits "主旨：…\n預覽：…\n\n<body>". Parse it so the EDM mockup
   // shows the real subject + preview text and a clean body.
-  const _cap = liveCaption ?? "";
+  // 2026-07-20 (CJ QA「教學版：preheader 字樣裸露、下半段空白、整篇粗體」—
+  // output 3314): the writer emitted ONE line with no newlines
+  // (「主旨：X preheader：Y <body>」) — the line-anchored parsing then
+  // swallowed everything into the bold subject slot and the body went
+  // empty. Deterministically re-break single-line captions before parsing:
+  // newline before the preview label, and end the preview value at the
+  // first 。 (or ~48 chars) so the body starts on its own paragraph.
+  let _cap = liveCaption ?? "";
+  if (!/\n/.test(_cap) && /(?:主旨|Subject)\s*[：:]/i.test(_cap)) {
+    _cap = _cap
+      // newline before the preview label
+      .replace(/\s*(?=(?:preheader|Preview|預覽(?:文字)?)\s*[：:])/i, "\n")
+      // end the preview value at the first whitespace gap (single-line
+      // outputs separate segments with spaces; CJK values have none inside)
+      .replace(/((?:preheader|Preview|預覽(?:文字)?)\s*[：:]\s*[^\s\n]{4,60})[ \t]+/i, "$1\n\n")
+      // fallback when the value has no space gap: cut at the first 。
+      .replace(/((?:preheader|Preview|預覽(?:文字)?)\s*[：:]\s*[^。\n]{0,48}。)[ \t]*(?=\S)/i, "$1\n\n");
+    // 主旨-only single line (no preview label): body starts after the
+    // subject's first whitespace gap
+    if (!/\n/.test(_cap)) {
+      _cap = _cap.replace(/^([\s#*>\-]*(?:主旨|Subject)\s*[：:]\s*[^\s\n]{2,40})[ \t]+/i, "$1\n\n");
+    }
+  }
   const _grab = (kw: string) => {
-    const m = _cap.match(new RegExp(`^[\\s#*>\\-]*${kw}\\s*[：:]\\s*(.+?)\\**\\s*$`, "m"));
+    const m = _cap.match(new RegExp(`^[\\s#*>\\-]*${kw}\\s*[：:]\\s*(.+?)\\**\\s*$`, "mi"));
     return m?.[1]?.trim() || "";
   };
   // 2026-05-19 (CJ 驗收 v#2 Week-2 bug): _grab returns capture group after
@@ -34,7 +56,9 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
   const _stripMetaPrefix = (s: string) =>
     s.replace(/^[\s#*>\-]*(?:主旨|Subject)\s*[：:]\s*/i, "").trim();
   const subject = _stripMetaPrefix((liveTitle || _grab("主旨") || _grab("Subject") || title || "").trim());
-  const previewText = _grab("預覽(?:文字)?") || _grab("Preview");
+  // "preheader" added 2026-07-20 — the EDM craft rubric teaches the concept
+  // by that English name, so models label the line accordingly.
+  const previewText = _grab("預覽(?:文字)?") || _grab("Preview") || _grab("preheader");
   // 2026-05-19 v#2: loose fallback was picking up CTA occurrences INSIDE the
   // body text (e.g. embedded reminder "（CTA：設定我的品牌腳色）"), producing a
   // double CTA button when the strict header-line match also succeeded.
@@ -74,6 +98,7 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
       .replace(/^[\s#*>\-]*Subject\s*[：:].*$/img, "")
       .replace(/^[\s#*>\-]*預覽(?:文字)?\s*[：:].*$/mg, "")
       .replace(/^[\s#*>\-]*Preview\s*[：:].*$/img, "")
+      .replace(/^[\s#*>\-]*preheader\s*[：:].*$/img, "")
       .replace(/^[\s#*>\-]*(?:CTA|行動呼籲)\s*[：:].*$/mg, "")
       // Strip inline parenthesised CTA hints that slipped into body paragraphs
       // e.g. "（CTA：設定我的品牌腳色）" — greedy up to closing bracket or EOL
