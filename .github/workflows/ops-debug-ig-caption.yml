@@ -35,17 +35,18 @@ jobs:
                WHERE mo.content LIKE '%媽媽們都是%'
                ORDER BY mo.id DESC LIMIT 2\G"
 
-            echo "===== A2. recent IG single-post outputs (any text) ====="
-            Q "SELECT mo.id, m.taskId, m.brandId, mo.status, mo.createdAt,
-                      LEFT(mo.content, 700) AS content
-               FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
-               WHERE m.taskId LIKE 'ig-60%' OR m.taskId LIKE 'ig-%single%'
+            echo "===== A2. latest outputs with ig task metadata ====="
+            Q "SELECT mo.id, mo.status, mo.createdAt,
+                      LEFT(mo.metadata, 160) AS meta,
+                      LEFT(mo.content, 200) AS content
+               FROM mission_outputs mo
+               WHERE mo.metadata LIKE '%ig-60%'
                ORDER BY mo.id DESC LIMIT 4\G"
 
-            echo "===== A3. any output mentioning 肚子不太舒服 ====="
-            Q "SELECT mo.id, m.taskId, LEFT(mo.content, 400) AS content
-               FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
-               WHERE mo.content LIKE '%肚子不太舒服%'
+            echo "===== A3. outputs mentioning 肚子不太舒服 / 媽媽們 — no join ====="
+            Q "SELECT mo.id, mo.status, mo.createdAt, LEFT(mo.content, 900) AS content
+               FROM mission_outputs mo
+               WHERE mo.content LIKE '%肚子不太舒服%' OR mo.content LIKE '%媽媽們%'
                ORDER BY mo.id DESC LIMIT 3\G"
 
             echo "===== A4. sanity: known output 3321 + latest missions ====="
