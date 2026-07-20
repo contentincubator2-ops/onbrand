@@ -972,6 +972,19 @@ export default function RunPage() {
     return [{ label: lang === "en" ? "Main version" : "主版本", caption: sanitizeCaption(data.content || "") }];
   }, [data]);
 
+  // 2026-07-20 (CJ「FB 短貼文的『改圖』應隱藏但仍顯示、點了也不會生圖」):
+  // text-only tasks (every variant image status "skipped", no url) have
+  // nothing to redo — hide the 改圖 toolbar entry for them. Manual opt-in
+  // image gen stays available via the mockup's 點此手動生圖.
+  const hasImageSlot = useMemo(
+    () => variants.some((v) => v.imageUrl || (v.imageStatus && v.imageStatus !== "skipped")),
+    [variants],
+  );
+  // If the panel somehow lands on the (now hidden) image mode, fall back.
+  React.useEffect(() => {
+    if (!hasImageSlot && mode === "image") setMode("chat");
+  }, [hasImageSlot, mode]);
+
   // Fires when the active variant's image finishes generating. Placed here
   // (after variants declaration) so the hook can safely read variants[activeIdx].
   React.useEffect(() => {
@@ -1961,7 +1974,9 @@ export default function RunPage() {
             <div className="flex items-center gap-0.5 px-2 py-1.5 flex-wrap">
               <ToolbarBtn icon={Pencil}        label={lang === "en" ? "Edit text" : "直接編輯"}      active={mode==="edit"}  onClick={() => setMode("edit")} />
               <ToolbarBtn icon={MessageCircle} label={lang === "en" ? "Chat with AI" : "跟 AI 專家對話"} active={mode==="chat"}  onClick={() => setMode("chat")} />
-              <ToolbarBtn icon={LucideImage}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
+              {hasImageSlot && (
+                <ToolbarBtn icon={LucideImage}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
+              )}
               {/* 2026-05-12 (CJ「影片功能我想要先拿掉，現在看起來不穩」):
                   hide 改影片 entry. The /trpc/video.* router still exists
                   so existing video jobs continue to render, but new
