@@ -2560,18 +2560,27 @@ function PositioningGrid({
     const map = new Map<string, { label: string; prefix: string; segs: typeof segments }>();
     for (const s of segments) {
       const prefix = s.num.split(".")[0]!;
-      const pair = groupLabels[prefix];
+      // 2026-07-20 (CJ「活動定位頁第 9-11 章顯示通用編號，其餘有描述性名稱，
+      // 命名不一致」): groupLabels only covers 1-8 AND its wording is
+      // brand-specific (品牌識別/市場分析…). Event segments are one-per-
+      // chapter with proper titles of their own (戰略 Brief…用戶旅程) —
+      // use those directly so all 11 chapters are descriptive and
+      // semantically correct. Brand/product grouping unchanged.
+      const pair = scopeMode === "event" ? undefined : groupLabels[prefix];
+      const ownTitle = scopeMode === "event"
+        ? (lang === "en" ? ((s as any).titleEn ?? s.title) : s.title)
+        : null;
       const label = pair
         ? (lang === "en" ? pair.en : pair.zh)
-        : (lang === "en" ? `Chapter ${prefix}` : `第 ${prefix} 章`);
+        : ownTitle ?? (lang === "en" ? `Chapter ${prefix}` : `第 ${prefix} 章`);
       // Stable key by zh label so intro lookup works regardless of UI language
-      const key = pair ? pair.zh : `第 ${prefix} 章`;
+      const key = pair ? pair.zh : (scopeMode === "event" ? s.title : `第 ${prefix} 章`);
       if (!map.has(key)) map.set(key, { label, prefix, segs: [] });
       map.get(key)!.segs.push(s);
     }
     return Array.from(map.values());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [segments, lang]);
+  }, [segments, lang, scopeMode]);
 
   // Icon map per segment id
   const ICONS: Record<string, any> = {
