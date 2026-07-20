@@ -5263,8 +5263,10 @@ function BrandEntityGrid({
                               ? (en
                                   ? "Brand palette not extracted yet. Open the Visual tab and click ✨ Extract from products first."
                                   : "品牌色彩還沒萃取。請先到「視覺」tab 按「✨ 從產品圖萃取」。")
-                              : reason === "product_has_no_image"
-                                ? (en ? "This product has no image to compose." : "這個產品沒有圖片可合成。")
+                              : reason === "product_has_no_image" || reason === "no_subject_image"
+                                ? (en
+                                    ? "No usable image found — this product has no image and the brand website yielded none. Add a product image or fill in the website first."
+                                    : "找不到可用圖片 — 這個產品沒有圖片，官網也抓不到素材。請先補產品圖或到基本資料頁填官網網址。")
                                 : reason;
                             setVariantState({ productId: item.id, productName: item.name, variants: null, error: msg });
                           }
