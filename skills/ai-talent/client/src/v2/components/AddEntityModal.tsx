@@ -60,13 +60,18 @@ interface Props {
   onCreated?: (kind: AddEntityTab, id: number) => void;
 }
 
-function autoSlug(name: string): string {
+// 2026-07-19 (CJ「新增活動 slug 直接用中文字元，未做 URL 編碼」): slugs must
+// be URL-safe ASCII. CJK has no meaningful ASCII form — for
+// Chinese-only names fall back to the entity kind; the random suffix
+// carries uniqueness (e.g.「母親節活動」→ "event-x7k2").
+function autoSlug(name: string, kind: string = "item"): string {
   const base = name.toLowerCase().trim()
-    .replace(/[^\w一-鿿-]+/g, "-")
+    .normalize("NFKD").replace(/[̀-ͯ]/g, "") // é→e, ü→u
+    .replace(/[^a-z0-9-]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
-    .slice(0, 80) || "item";
-  return `${base}-${Math.random().toString(36).slice(2, 6)}`;
+    .slice(0, 80);
+  return `${base || kind}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultBrandId, onCreated }: Props) {
@@ -184,7 +189,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
         (s || w) ? { summary: summary || undefined, website: w || undefined } : undefined;
       const r = await upsertProductMut.mutateAsync({
         brandId: prodBrandId,
-        slug: autoSlug(prodName),
+        slug: autoSlug(prodName, "product"),
         name: prodName.trim(),
         positioning,
       });
@@ -206,7 +211,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     try {
       const r = await upsertEventMut.mutateAsync({
         brandId: evBrandId,
-        slug: autoSlug(evName),
+        slug: autoSlug(evName, "event"),
         name: evName.trim(),
         startAt: evStart || null,
         endAt: evEnd || null,

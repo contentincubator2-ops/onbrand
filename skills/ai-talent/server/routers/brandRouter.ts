@@ -297,13 +297,15 @@ export const brandRouter = router({
         console.warn("[brand.create] quota check failed (non-fatal):", (e as Error)?.message);
       }
 
-      // Auto-generate a unique slug from the brand name (lowercase,
-      // ascii/CJK-safe). brands.slug has NOT NULL with no default.
+      // Auto-generate a unique slug from the brand name. 2026-07-19 (CJ
+      // 「slug 直接用中文字元」): ASCII-only — CJK names fall back to the
+      // "brand" prefix; the random suffix carries uniqueness.
       const slugBase = input.name.toLowerCase().trim()
-        .replace(/[^\w一-鿿-]+/g, "-")
+        .normalize("NFKD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9-]+/g, "-")
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "")
-        .slice(0, 80) || `brand-${Date.now()}`;
+        .slice(0, 80) || "brand";
       const slug = `${slugBase}-${Math.random().toString(36).slice(2, 7)}`;
       const result = await (db.insert(brands) as any).values({
         userId: ctx.user.id,
