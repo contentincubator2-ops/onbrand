@@ -31,6 +31,19 @@ jobs:
                WHERE mo.content LIKE '%媽媽們都是%'
                ORDER BY mo.id DESC LIMIT 3\G"
 
+            echo "===== A2. recent IG single-post outputs (any text) ====="
+            Q "SELECT mo.id, m.taskId, m.brandId, mo.status, mo.createdAt,
+                      LEFT(mo.content, 700) AS content
+               FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
+               WHERE m.taskId LIKE 'ig-60%' OR m.taskId LIKE 'ig-%single%'
+               ORDER BY mo.id DESC LIMIT 4\G"
+
+            echo "===== A3. any output mentioning 肚子不太舒服 ====="
+            Q "SELECT mo.id, m.taskId, LEFT(mo.content, 400) AS content
+               FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
+               WHERE mo.content LIKE '%肚子不太舒服%'
+               ORDER BY mo.id DESC LIMIT 3\G"
+
             echo "===== B. brand caption rules for those brands ====="
             Q "SELECT id, brandId, rule, scope, active FROM brand_caption_rules
                ORDER BY id DESC LIMIT 10\G" 2>/dev/null || echo "(no brand_caption_rules table)"
