@@ -2087,7 +2087,7 @@ export default function BrandsPage() {
                   scopeBrandId={scope?.brandId ?? null}
                   scopeProductId={scope.productId}
                   scopeEventId={null}
-                  pipelineThinking={null}
+                  pipelineThinking={pipelineThinking}
                   onAutoFill={runSegmentAutoFill}
                   locked={!!tabLocks.copy}
                 />
@@ -2103,6 +2103,9 @@ export default function BrandsPage() {
                     : "此活動的創意與內容規範 — 語氣基調、必須出現元素、禁用元素，從品牌聲音與活動概念推導而來。"}
                 />
               </div>
+              {/* 2026-07-19 (CJ「文字頁自動填寫沒反應」): pipelineThinking was
+                  null here — the autofill DID run server-side, but with no
+                  thinking overlay the 90s execution looked completely dead. */}
               <div style={{ padding: "16px 28px 32px" }}>
                 <PositioningPanel
                   section="seg:guidelines"
@@ -2111,7 +2114,7 @@ export default function BrandsPage() {
                   scopeBrandId={scope?.brandId ?? null}
                   scopeProductId={scope?.productId ?? null}
                   scopeEventId={scope.eventId}
-                  pipelineThinking={null}
+                  pipelineThinking={pipelineThinking}
                   onAutoFill={runSegmentAutoFill}
                   locked={!!tabLocks.copy}
                 />
