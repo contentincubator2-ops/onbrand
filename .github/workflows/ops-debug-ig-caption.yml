@@ -49,6 +49,17 @@ jobs:
                WHERE mo.content LIKE '%肚子不太舒服%' OR mo.content LIKE '%媽媽們%'
                ORDER BY mo.id DESC LIMIT 3\G"
 
+            echo "===== A5. metadata (archivedVariants) mentioning the text ====="
+            Q "SELECT mo.id, mo.status, mo.createdAt,
+                      LEFT(mo.metadata, 500) AS meta
+               FROM mission_outputs mo
+               WHERE mo.metadata LIKE '%肚子不太舒服%' OR mo.metadata LIKE '%媽媽們都是%'
+               ORDER BY mo.id DESC LIMIT 3\G"
+
+            echo "===== A6. absolute latest outputs (id/status/first chars) ====="
+            Q "SELECT id, status, createdAt, LEFT(content, 80) c
+               FROM mission_outputs ORDER BY id DESC LIMIT 10;"
+
             echo "===== A4. sanity: known output 3321 + latest missions ====="
             Q "SELECT mo.id, mo.missionId, mo.status, LEFT(mo.content,120) c
                FROM mission_outputs mo WHERE mo.id IN (2886, 3321)\G"
