@@ -169,6 +169,10 @@ export interface OrchestraResult {
     subsApplied: Array<{ from: string; to: string }>;
     rewrittenByLLM: boolean;
   }>;
+  /** 2026-07-20 (CJ QA 斷字/漏字 forensics): raw writer captions for any
+   *  variant the post-processing chain modified — persisted to metadata so
+   *  the corrupting transform can be identified by diffing against content. */
+  rawCaptions?: Array<{ label: string; raw: string }>;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -2186,10 +2190,17 @@ export async function runOrchestra(args: {
     // non-Chinese output (emoji strip / ！→。 / straight→「」quotes).
     const _voiceGated = brandMarket.isZhTW && (isTikTokBodyTask(args.template) ||
       isYouTubeBodyTask(args.template) || isKOLBodyTask(args.template));
+    // 2026-07-20 (CJ QA「產出文案有斷字/漏字」— original text was gone so the
+    // corrupting layer couldn't be identified): keep the writer's RAW caption
+    // (pre-dedupe/pre-sanitize) in metadata whenever the transform chain
+    // changed it. Next report = diff metadata.rawCaptions vs content and the
+    // guilty transform falls out immediately.
+    const rawCaptions: Array<{ label: string; raw: string }> = [];
     for (let i = 0; i < N; i++) {
       const cap = captions[i];
       const label = cap?.label ?? args.config.variantLabels[i] ?? `版本 ${i + 1}`;
       let caption = (cap?.caption ?? "").trim();
+      const _rawCaption = caption;
       if (caption && isHookTask && articleBody) {
         // 2026-05-11 (CJ「文案前面幾句重複的問題」): the LLM is told to write
         // ONLY a hook, but sometimes ignores the instruction and writes the
@@ -2221,6 +2232,9 @@ export async function runOrchestra(args: {
       if (caption && latinPunctLang(brandMarket.outputLanguage)) caption = normalizeLatinPunct(caption);
       if (!caption) {
         errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
+      }
+      if (_rawCaption && _rawCaption !== caption) {
+        rawCaptions.push({ label, raw: _rawCaption.slice(0, 1200) });
       }
       variants.push({
         label,
@@ -2437,6 +2451,8 @@ export async function runOrchestra(args: {
       // 2026-06-05 (CJ「不阻擋，事後解釋」): expose brand-rule fixes so
       // RunPage can trigger a friendly Mia nudge after generation.
       brandFixes: (captions as any).__brandFixes ?? [],
+      // 2026-07-20 (CJ QA 斷字/漏字 forensics): raw pre-transform captions.
+      rawCaptions,
       strategist: strategistMeta && strategistAnchor
         ? { agentName: strategistMeta.name, agentTitle: strategistMeta.title, anchor: strategistAnchor }
         : null,
@@ -2530,6 +2546,10 @@ export async function runOrchestra(args: {
           // enforceBrandRulesOnTextWithReport, so RunPage can trigger a
           // Mia nudge ("發現你寫了 X，已自動改成 Y，想調整定位嗎？").
           brandFixes: (result as any).brandFixes ?? [],
+          // 2026-07-20 (CJ QA 斷字/漏字 forensics): raw writer captions for
+          // any variant the transform chain modified — diff against content
+          // to identify the corrupting layer.
+          rawCaptions: (result as any).rawCaptions ?? [],
         };
 
         if (persistedOutputId) {
