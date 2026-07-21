@@ -53,8 +53,16 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
   // header line in an unexpected format (e.g. no newline before it, or the
   // regex fails to match), liveTitle may fall through as-is. Add a safety
   // strip so "主旨：<text>" → "<text>" regardless of where it came from.
+  // 2026-07-20 (CJ QA 截圖: 主旨列裸露「…preheader：膳食纖維…」): when the
+  // model emits everything on one line and the pre-split misses, the
+  // subject string can still carry a trailing "preheader：/預覽：/CTA：…"
+  // fragment. A subject must never contain other metadata — cut at the
+  // first such marker.
   const _stripMetaPrefix = (s: string) =>
-    s.replace(/^[\s#*>\-]*(?:主旨|Subject)\s*[：:]\s*/i, "").trim();
+    s
+      .replace(/^[\s#*>\-]*(?:主旨|Subject)\s*[：:]\s*/i, "")
+      .replace(/\s*(?:preheader|Preview|預覽(?:文字)?|CTA|行動呼籲)\s*[：:].*$/i, "")
+      .trim();
   // 2026-07-20 (CJ「促銷信主旨看起來斷字/漏字」): when the caption has no
   // 主旨： line, the fallback subject is the body's first sentence hard-cut
   // at 32 chars — often mid-phrase（…數量有限——一…）which reads as broken
