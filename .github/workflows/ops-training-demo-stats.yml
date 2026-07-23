@@ -59,13 +59,11 @@ jobs:
 
             echo "===== 6. IRIS / Iris Girls 抓取的產品清單（品質檢查）====="
             Q "SELECT p.id, b.name AS brand, LEFT(p.name,40) AS product,
-                      p.imageUrl IS NOT NULL AS hasImg,
-                      p.positioning IS NOT NULL AS hasPositioning
+                      JSON_EXTRACT(p.positioning,'\$.imageUrl') IS NOT NULL AS hasImg,
+                      JSON_EXTRACT(p.positioning,'\$.core') IS NOT NULL AS hasDeepPositioning
                FROM products p JOIN brands b ON b.id = p.brandId
                WHERE p.brandId IN (2956, 2957)
                ORDER BY p.brandId, p.id;"
-            Q "SELECT brandId, status, phase,
-                      LEFT(COALESCE(error,''),120) AS err
-               FROM product_discovery_jobs
+            Q "SELECT brandId, status, phase FROM product_discovery_jobs
                WHERE brandId IN (2956, 2957) ORDER BY id DESC LIMIT 4;"
             exit 0
