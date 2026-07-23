@@ -8,10 +8,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "full = 建品牌+定位+抓產品；discovery-only = 只清雜訊+重抓產品"
+        description: "full = 建品牌+定位+抓產品；discovery-only = 只清雜訊+重抓產品；seed-products = 種入分類頁商品+跑產品定位"
         type: choice
         default: "full"
-        options: ["full", "discovery-only"]
+        options: ["full", "discovery-only", "seed-products"]
 
 jobs:
   create:
@@ -28,6 +28,10 @@ jobs:
             set -e
             cd /opt/onbrand/app/skills/ai-talent
             set -a; source .env; set +a
-            FLAG=""
-            if [ "${{ github.event.inputs.mode }}" = "discovery-only" ]; then FLAG="--discovery-only"; fi
-            npx tsx scripts/admin-create-iris-brands.ts $FLAG
+            if [ "${{ github.event.inputs.mode }}" = "seed-products" ]; then
+              npx tsx scripts/admin-seed-iris-products.ts
+            else
+              FLAG=""
+              if [ "${{ github.event.inputs.mode }}" = "discovery-only" ]; then FLAG="--discovery-only"; fi
+              npx tsx scripts/admin-create-iris-brands.ts $FLAG
+            fi
