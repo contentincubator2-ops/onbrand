@@ -30,11 +30,10 @@ jobs:
             Q "SELECT COUNT(DISTINCT title) AS distinct_roles FROM agents;"
 
             echo "===== 2. 品牌清單 + 定位完成度（挑示範品牌用；名字截短）====="
+            Q "DESCRIBE brands;" | head -25
             Q "SELECT id, LEFT(name,20) AS name,
                       positioning IS NOT NULL AS has_positioning,
-                      JSON_LENGTH(JSON_KEYS(positioning)) AS segments,
-                      brandColors IS NOT NULL AS has_colors,
-                      createdAt
+                      brand_colors IS NOT NULL AS has_colors
                FROM brands ORDER BY id DESC LIMIT 12;"
 
             echo "===== 3. 產出總量 + 近 7 天（展示活躍度）====="
@@ -55,6 +54,6 @@ jobs:
 
             echo "===== 5. 品牌色展示（Lativ palette hex）====="
             Q "SELECT LEFT(name,20) AS name,
-                      LEFT(JSON_EXTRACT(brandColors,'\$'), 400) AS colors
+                      LEFT(JSON_EXTRACT(brand_colors,'\$'), 400) AS colors
                FROM brands WHERE name LIKE '%Lativ%' OR name LIKE '%lativ%' LIMIT 1\G"
             exit 0
