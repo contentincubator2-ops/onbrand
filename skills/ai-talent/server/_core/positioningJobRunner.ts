@@ -77,6 +77,12 @@ export interface StepContext {
   /** Brand's outputLanguage (BCP 47). Steps' SYS language derives from
    *  the builder opts; this is here for ctx-level consumers. */
   outputLanguage?: string;
+  /** 2026-07-23 (CJ IRIS 訓練「要確保都是用他們確定的客群…系統做更深入
+   *  地描繪」): brands.targetAudience — the brand-confirmed target audience.
+   *  When set, it is a HARD ANCHOR: audience-related steps must deepen this
+   *  exact segment (persona, pains, needs, MOT), never replace it with an
+   *  invented one. Loaded from the parent brand row for product/event too. */
+  officialAudience?: string;
   // outputs from already-completed steps in this run, keyed by step id
   prevOutputs: Record<string, any>;
   /** Helper to record cost — runner calls this after each LLM call. */
@@ -440,6 +446,7 @@ async function runPipelineDetached(args: {
   // parent brand). Fail-safe: no market fields → empty context (= legacy).
   let marketContext: string | undefined;
   let outputLanguage: string | undefined;
+  let officialAudience: string | undefined;
   try {
     const brandIdForMarket = args.entityKind === "brand"
       ? args.entityId
@@ -451,7 +458,7 @@ async function runPipelineDetached(args: {
         })();
     if (brandIdForMarket) {
       const [br]: any = await localPool.execute(
-        `SELECT targetCountry, outputLanguage, marketContextOverride FROM brands WHERE id = ? LIMIT 1`,
+        `SELECT targetCountry, outputLanguage, marketContextOverride, targetAudience FROM brands WHERE id = ? LIMIT 1`,
         [brandIdForMarket],
       );
       const b = (br as any[])[0];
@@ -460,6 +467,10 @@ async function runPipelineDetached(args: {
         marketContext = await buildMarketContext(b.targetCountry, b.outputLanguage, b.marketContextOverride) || undefined;
         outputLanguage = b.outputLanguage ?? undefined;
       }
+      // 2026-07-23: brand-confirmed audience = hard anchor for all audience
+      // reasoning (brand steps + product/event steps inherit it).
+      const ta = typeof b?.targetAudience === "string" ? b.targetAudience.trim() : "";
+      if (ta) officialAudience = ta;
     }
   } catch (e: any) {
     console.warn(`[positioningJobRunner] market load failed (non-fatal):`, e?.message ?? e);
@@ -506,6 +517,7 @@ async function runPipelineDetached(args: {
             realContent,
             marketContext,
             outputLanguage,
+            officialAudience,
             prevOutputs: outputs,
             recordUsage,
           };

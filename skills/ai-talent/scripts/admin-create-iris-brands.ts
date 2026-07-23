@@ -96,13 +96,11 @@ async function main() {
 
     if (existing) {
       brandId = existing.id;
-      console.log(`REUSE: brand "${spec.name}" already exists (id ${brandId}, positioning=${existing.positioningStatus})`);
-      if (existing.positioningStatus === "completed") {
-        // still (re-)enqueue discovery in case products are missing
-        await enqueueProductDiscovery(brandId, userId, WEBSITE);
-        targets.push({ id: brandId, name: spec.name });
-        continue;
-      }
+      // 2026-07-23 anchor rerun: ALWAYS re-kick positioning on reuse — the
+      // officialAudience anchor (brands.targetAudience → every step prompt)
+      // must overwrite the pre-anchor first pass. mergePositioning replaces
+      // segments wholesale, so this is a clean regeneration.
+      console.log(`REUSE: brand "${spec.name}" (id ${brandId}, positioning=${existing.positioningStatus}) — re-kicking positioning with official-audience anchor`);
     } else {
       const slug = `${spec.slugBase}-${Math.random().toString(36).slice(2, 7)}`;
       const [res]: any = await localPool.execute(
@@ -173,6 +171,7 @@ async function main() {
   const [fin]: any = await localPool.execute(
     `SELECT b.id, b.name, b.positioningStatus,
             JSON_LENGTH(JSON_KEYS(b.positioning)) AS segments,
+            LEFT(JSON_UNQUOTE(JSON_EXTRACT(b.positioning, '$.audience.primary')), 260) AS audiencePreview,
             (SELECT COUNT(*) FROM products p WHERE p.brandId = b.id) AS products,
             (SELECT CONCAT(dj.status, '/', dj.phase) FROM product_discovery_jobs dj
               WHERE dj.brandId = b.id ORDER BY dj.id DESC LIMIT 1) AS discovery
@@ -181,6 +180,7 @@ async function main() {
   );
   for (const r of fin as any[]) {
     console.log(`${r.name} (id ${r.id}): positioning=${r.positioningStatus}, segments=${r.segments}, products=${r.products}, discovery=${r.discovery ?? "not-queued"}`);
+    console.log(`  audience.primary → ${r.audiencePreview ?? "(empty)"}`);
   }
   process.exit(0);
 }

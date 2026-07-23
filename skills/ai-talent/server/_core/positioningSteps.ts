@@ -132,8 +132,20 @@ function marketBlock(c: StepContext): string {
     : "";
 }
 
+// 2026-07-23 (CJ IRIS 訓練「要確保都是用他們確定的客群，例如 30-40 歲皇家
+// 經典客群，但我們系統中，可以針對該客群，做更深入地描繪」): 品牌方已定案
+// 的客群是「錨點」— 受眾相關輸出只能在此基礎上深化（人物誌、生活場景、
+// 痛點、需求、MOT），絕不可換成 AI 自己發明的其他客群輪廓。
+function audienceAnchorBlock(c: StepContext): string {
+  return c.officialAudience
+    ? `\n\n【官方確認客群 — 品牌方已定案，此為不可更改的錨點】${c.officialAudience}` +
+      `\n（所有受眾相關內容必須以此客群為基礎做更深入的描繪與展開；` +
+      `不可替換、擴大或縮小成其他輪廓的客群。）`
+    : "";
+}
+
 function brandCtx(c: StepContext): string {
-  const base = `品牌名稱：${c.brandName}\n產業：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}`;
+  const base = `品牌名稱：${c.brandName}\n產業：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}${audienceAnchorBlock(c)}`;
   if (c.realContent) {
     return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
   }
@@ -160,7 +172,7 @@ export function buildBrandPositioningSteps(opts: { lang?: string; outputLanguage
       deps: [],
       run: async (c) => ({
         audience: await callJSON(c, "audience", sys,
-          `${brandCtx(c)}\n\n定義此品牌的目標受眾。輸出 JSON，鍵名固定如下：
+          `${brandCtx(c)}\n\n定義此品牌的目標受眾。若上文提供【官方確認客群】，primary 與 secondary 都必須以該客群為錨點向下深化——展開其生活場景、心理動機、情感需求、痛點、偏好管道與購買關鍵時刻（MOT），不可發明不同輪廓的受眾。輸出 JSON，鍵名固定如下：
 {"primary":"主受眾完整敘事（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道，150-300字）","secondary":"次受眾敘事（80-150字）","matrix":[{"dim":"情感需求維度","primary":主受眾分數1-10,"fan":粉絲分數1-10,"weight":"★★★★★"}]}
 matrix 至少 5 個維度。`,
           { primary: "", secondary: "", matrix: [] }, 1500),
@@ -351,7 +363,8 @@ export function buildProductPositioningSteps(opts: { lang?: string; outputLangua
   const lang = langLabelOf(opts.outputLanguage) ?? (opts.lang === "en" ? "English" : "繁體中文");
   const sys = SYS(lang);
   const pCtx = (c: StepContext) => {
-    const base = `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}`;
+    // audienceAnchorBlock: 產品受眾必須落在母品牌官方客群之內（2026-07-23）。
+    const base = `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}${audienceAnchorBlock(c)}`;
     if (c.realContent) {
       return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
     }
@@ -377,7 +390,7 @@ export function buildProductPositioningSteps(opts: { lang?: string; outputLangua
       deps: [],
       run: async (c) => ({
         audience: await callJSON(c, "audience", sys,
-          `${pCtx(c)}\n\n定義此產品的目標族群。只輸出 JSON，鍵名固定如下：
+          `${pCtx(c)}\n\n定義此產品的目標族群。若上文提供【官方確認客群】，主/次族群必須落在該客群之內並向下深化（此產品對應的具體使用情境、痛點、需求），不可發明品牌客群以外的族群。只輸出 JSON，鍵名固定如下：
 {"primary":"主目標族群完整敘事（人口統計 / 心理 / 使用情境 / 痛點，120-250字）","secondary":"次目標族群（60-120字）","pains":["痛點1","痛點2","痛點3"],"needs":["需求1","需求2","需求3"]}`,
           { primary: "", secondary: "", pains: [], needs: [] }, 1400),
       }),
@@ -451,7 +464,8 @@ export function buildEventPositioningSteps(opts: { lang?: string; outputLanguage
   const lang = langLabelOf(opts.outputLanguage) ?? (opts.lang === "en" ? "English" : "繁體中文");
   const sys = SYS(lang);
   const eCtx = (c: StepContext) => {
-    const base = `活動名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}`;
+    // audienceAnchorBlock: 活動受眾同樣鎖在母品牌官方客群（2026-07-23）。
+    const base = `活動名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}${audienceAnchorBlock(c)}`;
     if (c.realContent) {
       return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
     }
