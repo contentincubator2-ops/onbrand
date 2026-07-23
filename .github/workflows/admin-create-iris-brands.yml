@@ -1,0 +1,25 @@
+name: "Admin — Create IRIS/Iris Girls brands (sowork@sowork.tw)"
+
+# 2026-07-23 (CJ: 7/27 教育訓練): one-shot brand creation grounded on the
+# official 品牌手冊. Script is idempotent — safe to re-run; waits in-process
+# for the positioning pipelines to finish (up to ~25 min).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create brands + run positioning
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 35m
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env; set +a
+            npx tsx scripts/admin-create-iris-brands.ts
