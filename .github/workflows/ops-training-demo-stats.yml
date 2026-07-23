@@ -66,4 +66,19 @@ jobs:
                ORDER BY p.brandId, p.id;"
             Q "SELECT brandId, status, phase FROM product_discovery_jobs
                WHERE brandId IN (2956, 2957) ORDER BY id DESC LIMIT 4;"
+
+            echo "===== 7. IRIS / Iris Girls 定位品質核對（課前審閱用）====="
+            for BID in 2956 2957; do
+              echo "--- brand $BID ---"
+              Q "SELECT name,
+                        LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.goldenCircle.why')),200)  AS why,
+                        LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.goldenCircle.how')),200)  AS how,
+                        LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.goldenCircle.what')),150) AS what
+                 FROM brands WHERE id = $BID\G"
+              Q "SELECT LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.tagline.zhTagline')),80)          AS tagline,
+                        LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.differentiation.summary')),260)   AS diff,
+                        LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.voice.tone')),200)                AS voice_tone,
+                        LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.audience.secondary')),200)        AS audience_secondary
+                 FROM brands WHERE id = $BID\G"
+            done
             exit 0
