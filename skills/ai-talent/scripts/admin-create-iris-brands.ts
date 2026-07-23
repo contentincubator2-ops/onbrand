@@ -21,10 +21,17 @@ dotenv.config();
 import localPool from "../server/localDb";
 import { startPositioningJob } from "../server/_core/positioningJobRunner";
 import { buildBrandPositioningSteps } from "../server/_core/positioningSteps";
-import { enqueueProductDiscovery } from "../server/_core/productDiscovery";
+import { enqueueProductDiscovery, looksLikeNonProduct } from "../server/_core/productDiscovery";
 
 const OWNER_EMAIL = "sowork@sowork.tw";
 const WEBSITE = "https://www.iris.com.tw/";
+// 2026-07-23: the homepage is a JS storefront with no product list — the
+// first discovery pass only found the company name + 春夏新品 labels. The
+// curator category page is the real product listing for both lines.
+const PRODUCTS_URL = "https://www.iris.com.tw/v2/official/SalePageCategory/582194?sortMode=Curator";
+// --discovery-only: skip positioning re-kick (already anchored & completed);
+// just clean junk products + re-scan from PRODUCTS_URL.
+const DISCOVERY_ONLY = process.argv.includes("--discovery-only");
 
 const BRAND_SPECS = [
   {
@@ -129,41 +136,77 @@ async function main() {
       }
     }
 
-    await enqueueProductDiscovery(brandId, userId, WEBSITE);
-    await localPool.execute(
-      `UPDATE brands SET positioningStatus = 'in_progress' WHERE id = ?`,
-      [brandId],
+    // Clean junk rows from earlier scans (company legal name, standalone
+    // seasonal labels, CJK-slug duplicates) before re-scanning.
+    const [pRows]: any = await localPool.execute(
+      `SELECT id, name FROM products WHERE brandId = ?`, [brandId],
     );
-    startPositioningJob({
-      userId,
-      entityKind: "brand",
-      entityId: brandId,
-      brandName: spec.name,
-      industry: spec.industry,
-      description: spec.description,
-      steps: buildBrandPositioningSteps({ lang: "zh-TW", outputLanguage: "zh-TW" }),
-    });
-    console.log(`KICKED: positioning pipeline for "${spec.name}" (id ${brandId})`);
+    const junkIds = (pRows as Array<{ id: number; name: string }>)
+      .filter((p) => looksLikeNonProduct(String(p.name ?? "")))
+      .map((p) => p.id);
+    if (junkIds.length > 0) {
+      await localPool.execute(
+        `DELETE FROM products WHERE brandId = ? AND id IN (${junkIds.map(() => "?").join(",")})`,
+        [brandId, ...junkIds],
+      );
+      console.log(`CLEANED: ${junkIds.length} non-product rows for "${spec.name}"`);
+    }
+
+    await enqueueProductDiscovery(brandId, userId, PRODUCTS_URL);
+
+    if (!DISCOVERY_ONLY) {
+      await localPool.execute(
+        `UPDATE brands SET positioningStatus = 'in_progress' WHERE id = ?`,
+        [brandId],
+      );
+      startPositioningJob({
+        userId,
+        entityKind: "brand",
+        entityId: brandId,
+        brandName: spec.name,
+        industry: spec.industry,
+        description: spec.description,
+        steps: buildBrandPositioningSteps({ lang: "zh-TW", outputLanguage: "zh-TW" }),
+      });
+      console.log(`KICKED: positioning pipeline for "${spec.name}" (id ${brandId})`);
+    }
     targets.push({ id: brandId, name: spec.name });
   }
 
-  // The pipelines run detached in THIS process — poll until both finish.
   const ids = targets.map((t) => t.id);
-  const deadline = Date.now() + 25 * 60 * 1000;
-  while (Date.now() < deadline) {
-    await sleep(15_000);
-    const [rows]: any = await localPool.execute(
-      `SELECT b.id, b.name, b.positioningStatus,
-              (SELECT CONCAT(pj.status, ' ', pj.currentStep, '/', pj.totalSteps)
-                 FROM positioning_jobs pj
-                WHERE pj.entityKind = 'brand' AND pj.entityId = b.id
-                ORDER BY pj.id DESC LIMIT 1) AS job
-         FROM brands b WHERE b.id IN (${ids.map(() => "?").join(",")})`,
-      ids,
-    );
-    const states = rows as Array<{ id: number; name: string; positioningStatus: string; job: string | null }>;
-    console.log(states.map((s) => `${s.name}: ${s.positioningStatus} (job ${s.job ?? "—"})`).join(" | "));
-    if (states.every((s) => s.positioningStatus === "completed" || String(s.job ?? "").startsWith("failed"))) break;
+  if (!DISCOVERY_ONLY) {
+    // The positioning pipelines run detached in THIS process — poll until done.
+    const deadline = Date.now() + 25 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await sleep(15_000);
+      const [rows]: any = await localPool.execute(
+        `SELECT b.id, b.name, b.positioningStatus,
+                (SELECT CONCAT(pj.status, ' ', pj.currentStep, '/', pj.totalSteps)
+                   FROM positioning_jobs pj
+                  WHERE pj.entityKind = 'brand' AND pj.entityId = b.id
+                  ORDER BY pj.id DESC LIMIT 1) AS job
+           FROM brands b WHERE b.id IN (${ids.map(() => "?").join(",")})`,
+        ids,
+      );
+      const states = rows as Array<{ id: number; name: string; positioningStatus: string; job: string | null }>;
+      console.log(states.map((s) => `${s.name}: ${s.positioningStatus} (job ${s.job ?? "—"})`).join(" | "));
+      if (states.every((s) => s.positioningStatus === "completed" || String(s.job ?? "").startsWith("failed"))) break;
+    }
+  } else {
+    // Discovery jobs are processed by the pm2 server worker — poll the queue.
+    const deadline = Date.now() + 12 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await sleep(10_000);
+      const [rows]: any = await localPool.execute(
+        `SELECT dj.brandId, dj.status, dj.phase FROM product_discovery_jobs dj
+          WHERE dj.brandId IN (${ids.map(() => "?").join(",")})
+            AND dj.id IN (SELECT MAX(id) FROM product_discovery_jobs WHERE brandId IN (${ids.map(() => "?").join(",")}) GROUP BY brandId)`,
+        [...ids, ...ids],
+      );
+      const states = rows as Array<{ brandId: number; status: string; phase: string }>;
+      console.log(states.map((s) => `brand ${s.brandId}: ${s.status}/${s.phase}`).join(" | "));
+      if (states.length > 0 && states.every((s) => s.status === "done" || s.status === "failed")) break;
+    }
   }
 
   // Final report
@@ -182,6 +225,12 @@ async function main() {
     console.log(`${r.name} (id ${r.id}): positioning=${r.positioningStatus}, segments=${r.segments}, products=${r.products}, discovery=${r.discovery ?? "not-queued"}`);
     console.log(`  audience.primary → ${r.audiencePreview ?? "(empty)"}`);
   }
+  const [plist]: any = await localPool.execute(
+    `SELECT p.brandId, p.name FROM products p
+      WHERE p.brandId IN (${ids.map(() => "?").join(",")}) ORDER BY p.brandId, p.id`,
+    ids,
+  );
+  for (const p of plist as any[]) console.log(`  product[${p.brandId}] ${p.name}`);
   process.exit(0);
 }
 

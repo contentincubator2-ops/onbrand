@@ -6,6 +6,12 @@ name: "Admin — Create IRIS/Iris Girls brands (sowork@sowork.tw)"
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "full = 建品牌+定位+抓產品；discovery-only = 只清雜訊+重抓產品"
+        type: choice
+        default: "full"
+        options: ["full", "discovery-only"]
 
 jobs:
   create:
@@ -22,4 +28,6 @@ jobs:
             set -e
             cd /opt/onbrand/app/skills/ai-talent
             set -a; source .env; set +a
-            npx tsx scripts/admin-create-iris-brands.ts
+            FLAG=""
+            if [ "${{ github.event.inputs.mode }}" = "discovery-only" ]; then FLAG="--discovery-only"; fi
+            npx tsx scripts/admin-create-iris-brands.ts $FLAG

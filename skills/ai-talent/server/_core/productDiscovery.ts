@@ -407,6 +407,10 @@ const NON_PRODUCT_RE = new RegExp(
     "穿搭推薦", "推薦清單", "排行榜", "LOOKBOOK",
     // hype-only phrases that aren't product names by themselves
     "新品上市", "新裝上市", "新品快訊",
+    // 2026-07-23 (IRIS): company legal names + standalone seasonal labels
+    // scraped off storefront homepages are not products
+    "股份有限公司", "有限公司",
+    "^春夏新品$", "^秋冬新品$", "^[春夏秋冬]季?新品$", "^新品$",
     // english equivalents
     "\\bsale\\b", "\\bnews\\b", "\\bpromo", "coupon", "\\blogin\\b", "sign ?up", "about us", "contact us", "\\bfaq\\b",
   ].join("|"),
@@ -594,9 +598,12 @@ async function runInterimPositioning(productId: number, userId: number): Promise
 }
 
 function toSlug(name: string): string {
+  // 2026-07-23 (IRIS 重複產品 bug): \w 不含 CJK — 中文品名被整串洗掉，
+  // fallback 到 product-<timestamp>，每次掃描 slug 都不同 → 去重永遠
+  // 失效、每次 re-scan 都重複插入。改用 unicode-aware 保留 CJK。
   return name
     .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 120)
