@@ -1,0 +1,60 @@
+name: "Ops — Training demo stats (read-only)"
+
+# 2026-07-23 (CJ: IRIS/iris girl 教育訓練 7/27): pull citable, non-sensitive
+# aggregates + the Lativ showcase inventory for the 3-hour course deck.
+# Read-only. No client PII, no output bodies beyond short previews.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Demo stats
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== 1. AI agent 總數（課堂可引用）====="
+            Q "SELECT COUNT(*) AS total_agents FROM agents;"
+            Q "SELECT COUNT(DISTINCT title) AS distinct_roles FROM agents;"
+
+            echo "===== 2. 品牌清單 + 定位完成度（挑示範品牌用；名字截短）====="
+            Q "SELECT id, LEFT(name,20) AS name,
+                      positioning IS NOT NULL AS has_positioning,
+                      JSON_LENGTH(JSON_KEYS(positioning)) AS segments,
+                      brandColors IS NOT NULL AS has_colors,
+                      createdAt
+               FROM brands ORDER BY id DESC LIMIT 12;"
+
+            echo "===== 3. 產出總量 + 近 7 天（展示活躍度）====="
+            Q "SELECT COUNT(*) AS total_outputs FROM mission_outputs;"
+            Q "SELECT COUNT(*) AS last7d FROM mission_outputs
+               WHERE createdAt >= NOW() - INTERVAL 7 DAY;"
+
+            echo "===== 4. Lativ 示範素材盤點（定位段落 + 有圖產出）====="
+            Q "SELECT id, LEFT(name,20) AS name FROM brands WHERE name LIKE '%Lativ%' OR name LIKE '%lativ%';"
+            Q "SELECT mo.id, mo.createdAt, LEFT(mo.content,60) AS preview,
+                      mo.metadata LIKE '%imageUrl%' AS has_image
+               FROM mission_outputs mo
+               JOIN missions m ON m.id = mo.missionId
+               JOIN brands b ON b.id = m.brandId
+               WHERE (b.name LIKE '%Lativ%' OR b.name LIKE '%lativ%')
+                 AND mo.status != 'archived'
+               ORDER BY mo.id DESC LIMIT 6;"
+
+            echo "===== 5. 品牌色展示（Lativ palette hex）====="
+            Q "SELECT LEFT(name,20) AS name,
+                      LEFT(JSON_EXTRACT(brandColors,'\$'), 400) AS colors
+               FROM brands WHERE name LIKE '%Lativ%' OR name LIKE '%lativ%' LIMIT 1\G"
+            exit 0
