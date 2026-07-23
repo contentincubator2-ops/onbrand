@@ -56,4 +56,16 @@ jobs:
             Q "SELECT LEFT(name,20) AS name,
                       LEFT(JSON_EXTRACT(brand_colors,'\$'), 400) AS colors
                FROM brands WHERE name LIKE '%Lativ%' OR name LIKE '%lativ%' LIMIT 1\G"
+
+            echo "===== 6. IRIS / Iris Girls 抓取的產品清單（品質檢查）====="
+            Q "SELECT p.id, b.name AS brand, LEFT(p.name,40) AS product,
+                      p.imageUrl IS NOT NULL AS hasImg,
+                      p.positioning IS NOT NULL AS hasPositioning
+               FROM products p JOIN brands b ON b.id = p.brandId
+               WHERE p.brandId IN (2956, 2957)
+               ORDER BY p.brandId, p.id;"
+            Q "SELECT brandId, status, phase,
+                      LEFT(COALESCE(error,''),120) AS err
+               FROM product_discovery_jobs
+               WHERE brandId IN (2956, 2957) ORDER BY id DESC LIMIT 4;"
             exit 0
