@@ -58,11 +58,17 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           {/* 2026-05-14 (CJ「標題重複問題已經解決很多次，怎都無法根除」):
               use shared titleEchoesCaption helper — handles ellipsis,
               punctuation, leading-bracket cases that the previous inline
-              startsWith() comparison kept missing. */}
+              startsWith() comparison kept missing.
+              2026-07-23 (CJ IRIS QA「內文寫得不錯，但跟標題似乎沒關係」):
+              the output title derives from variant #1's caption, so on
+              variants #2/#3 it passed the echo check and rendered a bold
+              headline belonging to a DIFFERENT variant. A FB post has no
+              separate title — when the caption is present it IS the post,
+              so never render the run title above it. */}
           {(() => {
+            if (liveCaption) return null;
             const t = (title ?? "").trim();
             if (!t) return null;
-            if (titleEchoesCaption(t, liveCaption)) return null;
             return <p className="text-small font-medium">{t}</p>;
           })()}
           {liveCaption ? (

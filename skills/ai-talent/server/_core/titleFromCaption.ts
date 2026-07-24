@@ -47,7 +47,19 @@ export function titleFromCaption(
   // so emojis count as 1 char (more intuitive for human-facing limit).
   const codepoints = Array.from(s);
   if (codepoints.length > TITLE_MAX_LEN) {
-    s = codepoints.slice(0, TITLE_MAX_LEN - 1).join("") + "…";
+    const cut = codepoints.slice(0, TITLE_MAX_LEN - 1).join("");
+    // 2026-07-23 (CJ IRIS QA「好像已經很...這句話沒寫完」): a hard cut lands
+    // mid-phrase and reads unfinished. Trim back to the last punctuation /
+    // space boundary when one exists past the halfway mark so the title
+    // ends on a complete phrase; only fall back to "…" when no boundary.
+    let best = -1;
+    for (const ch of ["，", "、", "；", "：", "—", "–", ",", ";", ":", " "]) {
+      const i = cut.lastIndexOf(ch);
+      if (i > best) best = i;
+    }
+    s = best >= Math.floor(TITLE_MAX_LEN / 2)
+      ? cut.slice(0, best).replace(/[，、；：,;:\s—–-]+$/u, "")
+      : cut + "…";
   }
   return s || fallback;
 }
