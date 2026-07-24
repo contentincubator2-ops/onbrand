@@ -16,6 +16,18 @@
  */
 
 import { z } from "zod";
+
+function redactProviderSecrets(text: string): string {
+  return String(text)
+    .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
+    .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
+    .replace(/API KEY\s*:?\s*[A-Za-z0-9_\-]+/gi, "API KEY:[REDACTED]")
+    .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
+}
+
+function isProviderKeyError(text: string): boolean {
+  return /key|unauthorized|api_key|permission_denied|suspended|consumer|forbidden|403/i.test(text);
+}
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callLLM } from "../_core/llmRouter";
@@ -169,15 +181,21 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
           modelId: res.modelId,
           url: res.url,
           taskId: res.taskId,
-          message: res.errorMsg ??
-            (res.status === "ready"   ? "生成完成"
+          message: res.errorMsg
+            ? (isProviderKeyError(res.errorMsg)
+                ? "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。"
+                : redactProviderSecrets(res.errorMsg))
+            : (res.status === "ready"   ? "生成完成"
             : res.status === "submitted" ? "已提交，等候生成（請稍後輪詢）"
             : "生成失敗"),
         };
       } catch (e) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: e instanceof Error ? e.message : String(e),
+          message: (() => {
+            const msg = redactProviderSecrets(e instanceof Error ? e.message : String(e));
+            return isProviderKeyError(msg) ? "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。" : msg;
+          })(),
         });
       }
     }),
@@ -238,12 +256,15 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
           status: res.status,
           url: res.url,
           taskId: res.taskId,
-          message: res.errorMsg ?? "",
+          message: res.errorMsg ? redactProviderSecrets(res.errorMsg) : "",
         };
       } catch (e) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: e instanceof Error ? e.message : String(e),
+          message: (() => {
+            const msg = redactProviderSecrets(e instanceof Error ? e.message : String(e));
+            return isProviderKeyError(msg) ? "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。" : msg;
+          })(),
         });
       }
     }),

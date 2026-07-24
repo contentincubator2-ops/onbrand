@@ -277,6 +277,20 @@ function nanoBananaJsonToPrompt(rawJson: string, brandLabel: string): string | n
   return parts.join(", ");
 }
 
+
+function sanitizeProviderErrorForToast(input: unknown): string {
+  const raw = String(input ?? "");
+  const redacted = raw
+    .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
+    .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
+    .replace(/API KEY\s*:?\s*[A-Za-z0-9_\-]+/gi, "API KEY:[REDACTED]")
+    .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
+  if (/key|unauthorized|api_key|permission_denied|suspended|consumer|forbidden|403/i.test(redacted)) {
+    return "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。";
+  }
+  return redacted;
+}
+
 export default function RunPage() {
   const { outputId } = useParams<{ outputId: string }>();
   const navigate = useNavigate();
@@ -881,7 +895,7 @@ export default function RunPage() {
             // 2026-05-12: server should TRPCError on failure now; this branch
             // only reaches if a provider returned success-shaped but empty
             // data. Include any returned errorMsg if present.
-            const detail = String(r?.errorMsg ?? r?.message ?? "").slice(0, 200);
+            const detail = sanitizeProviderErrorForToast(r?.errorMsg ?? r?.message ?? "").slice(0, 200);
             showToastGlobal(
               detail
                 ? (lang === "en" ? `Image failed: ${detail}` : `產圖失敗：${detail}`)
@@ -891,9 +905,10 @@ export default function RunPage() {
             );
           }
         },
-        onError: (e: any) => showToastGlobal(
-          lang === "en" ? `Image failed: ${e?.message ?? e}` : `產圖失敗：${e?.message ?? e}`
-        ),
+        onError: (e: any) => {
+          const detail = sanitizeProviderErrorForToast(e?.message ?? e);
+          showToastGlobal(lang === "en" ? `Image failed: ${detail}` : `產圖失敗：${detail}`);
+        },
       })
     : { mutate: () => {}, isPending: false };
 

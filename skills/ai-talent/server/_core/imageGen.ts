@@ -405,9 +405,10 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
     `);
     return { id, provider, model: out.model, url: out.url, b64: out.b64, status: "ready" };
   }
+  const safeErrorMsg = redactProviderSecrets(errorMsg ?? "unknown").slice(0, 800);
   await db.execute(sql`
     UPDATE generated_images
-    SET status = 'failed', errorMsg = ${errorMsg ?? "unknown"}
+    SET status = 'failed', errorMsg = ${safeErrorMsg}
     WHERE id = ${id}
   `);
   return {
@@ -417,7 +418,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
     url: null,
     b64: null,
     status: "failed",
-    errorMsg,
+    errorMsg: safeErrorMsg,
   };
 }
 

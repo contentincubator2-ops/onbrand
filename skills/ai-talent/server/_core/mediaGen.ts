@@ -230,7 +230,7 @@ async function genImagen4(opts: GenOptions, variant: "fast" | "default" | "ultra
     signal: AbortSignal.timeout(120_000),
   });
   if (!resp.ok) {
-    const t = await resp.text();
+    const t = redactProviderSecrets(await resp.text());
     throw new Error(`Imagen ${resp.status}: ${t.slice(0, 200)}`);
   }
   const data: any = await resp.json();
@@ -353,7 +353,7 @@ async function submitVeo3(opts: GenOptions, fast = false): Promise<GenResult> {
     signal: AbortSignal.timeout(60_000),
   });
   if (!resp.ok) {
-    const t = await resp.text();
+    const t = redactProviderSecrets(await resp.text());
     throw new Error(`Veo submit ${resp.status}: ${t.slice(0, 200)}`);
   }
   const data: any = await resp.json();
@@ -368,7 +368,7 @@ async function pollVeo3(taskId: string): Promise<GenResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/${taskId}?key=${key}`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   if (!resp.ok) {
-    const t = await resp.text();
+    const t = redactProviderSecrets(await resp.text());
     throw new Error(`Veo poll ${resp.status}: ${t.slice(0, 200)}`);
   }
   const data: any = await resp.json();
