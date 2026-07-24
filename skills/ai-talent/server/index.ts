@@ -99,6 +99,11 @@ app.use(helmet({
     includeSubDomains: true,
     preload: true,
   },
+  // Pipedream Connect opens third-party OAuth in a popup from its embedded
+  // iframe. Helmet's default `same-origin` COOP severs the popup's opener,
+  // leaving it stuck on connect-oauth-start-handoff.html. This policy keeps
+  // same-origin isolation while allowing the trusted OAuth popup handoff.
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   crossOriginEmbedderPolicy: false,  // allow SPA iframe embeds if needed
   // 2026-05-29 (security): explicit referrer policy — don't leak URL path in
   // Referer header when navigating to external sites (GDPR data minimisation).

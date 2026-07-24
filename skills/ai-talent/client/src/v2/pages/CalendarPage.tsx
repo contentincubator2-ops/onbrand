@@ -185,50 +185,104 @@ export default function CalendarPage() {
   const [fbPages, setFbPages] = useState<Array<{ id: string; name: string; category: string }>>([]);
   const [fbPickerBrandId, setFbPickerBrandId] = useState<number | null>(null);
 
-  const connectFacebookFromCalendar = React.useCallback((calBrandId: number) => {
-    (async () => {
-      try {
-        const r = await fbConnectUrlMut?.mutateAsync?.({ brandId: calBrandId });
-        if (!r?.token) {
-          alert(lang === "en" ? "Could not get authorization token." : "無法取得授權 token，請稍後再試。");
-          return;
-        }
-        const { createFrontendClient } = await import("@pipedream/sdk/browser");
-        const pd = createFrontendClient({
-          externalUserId: `sowork-brand-${calBrandId}`,
-          tokenCallback: async () => ({ token: r.token, expiresAt: new Date(Date.now() + 300_000), connectLinkUrl: "" } as any),
-        });
-        pd.connectAccount({
-          token: r.token,
-          app: "facebook_pages",
-          onSuccess: async () => {
-            // Poll getFacebookPages with backoff — Pipedream may take 5-20s to propagate
-            for (let i = 0; i < 10; i++) {
-              await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
-              try {
-                const pages = await fbPagesMut?.mutateAsync?.({ brandId: calBrandId });
-                if ((pages?.pages?.length ?? 0) > 0) {
-                  setFbPages(pages!.pages);
-                  setFbPickerBrandId(calBrandId);
-                  return;
-                }
-              } catch { /* keep retrying */ }
-            }
-            alert(lang === "en"
-              ? "Connected! But no Facebook Pages found. Please try again in a moment."
-              : "授權成功！但目前找不到粉專，請稍後重試。");
-          },
-          onError: (err: any) => {
-            alert(lang === "en" ? `Authorization failed: ${err?.message ?? "Unknown error"}` : `授權失敗：${err?.message ?? "未知錯誤"}`);
-          },
-          onClose: () => {},
-        });
-      } catch (e: any) {
-        alert(e?.message ?? String(e));
+  // Pipedream opens its OAuth popup inside connectAccount(). Keep both the SDK
+  // and one-time Connect token warm so the actual button click can call it
+  // synchronously while the browser's user activation is still valid.
+  type FacebookConnectToken = { token: string; expiresAt: number };
+  const pdCreateClientRef = useRef<any>(null);
+  const pdFacebookTokensRef = useRef<Record<number, FacebookConnectToken>>({});
+  const pdFacebookPrefetchingRef = useRef<Record<number, boolean>>({});
+
+  useEffect(() => {
+    import("@pipedream/sdk/browser")
+      .then((m) => { pdCreateClientRef.current = m.createFrontendClient; })
+      .catch(() => { /* retried by prefetchFacebookConnect */ });
+  }, []);
+
+  const prefetchFacebookConnect = React.useCallback(async (calBrandId: number) => {
+    if (pdFacebookPrefetchingRef.current[calBrandId]) return;
+    const cached = pdFacebookTokensRef.current[calBrandId];
+    if (pdCreateClientRef.current && cached?.expiresAt - Date.now() > 60_000) return;
+
+    pdFacebookPrefetchingRef.current[calBrandId] = true;
+    try {
+      const [sdk, response] = await Promise.all([
+        pdCreateClientRef.current
+          ? Promise.resolve(null)
+          : import("@pipedream/sdk/browser"),
+        cached?.expiresAt - Date.now() > 60_000
+          ? Promise.resolve(null)
+          : fbConnectUrlMut?.mutateAsync?.({ brandId: calBrandId }),
+      ]);
+      if (sdk) pdCreateClientRef.current = sdk.createFrontendClient;
+      if (response?.token) {
+        pdFacebookTokensRef.current[calBrandId] = {
+          token: response.token,
+          expiresAt: response.expiresAt
+            ? new Date(response.expiresAt).getTime()
+            : Date.now() + 300_000,
+        };
       }
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang, fbConnectUrlMut, fbPagesMut]);
+    } finally {
+      pdFacebookPrefetchingRef.current[calBrandId] = false;
+    }
+  }, [fbConnectUrlMut]);
+
+  const connectFacebookFromCalendar = React.useCallback((calBrandId: number) => {
+    const createFrontendClient = pdCreateClientRef.current;
+    const cached = pdFacebookTokensRef.current[calBrandId];
+    if (!createFrontendClient || !cached || cached.expiresAt - Date.now() < 30_000) {
+      void prefetchFacebookConnect(calBrandId).catch((err: any) => {
+        alert(err?.message ?? String(err));
+      });
+      alert(lang === "en"
+        ? "Preparing authorization — please try again in a moment."
+        : "正在準備授權，請稍候 1–2 秒再點一次。");
+      return;
+    }
+
+    const pd = createFrontendClient({
+      externalUserId: `sowork-brand-${calBrandId}`,
+      tokenCallback: async () => ({
+        token: cached.token,
+        expiresAt: new Date(cached.expiresAt),
+        connectLinkUrl: "",
+      } as any),
+    });
+    pd.connectAccount({
+      token: cached.token,
+      app: "facebook_pages",
+      onSuccess: async () => {
+        delete pdFacebookTokensRef.current[calBrandId];
+        // Poll getFacebookPages with backoff — Pipedream may take 5-20s to propagate
+        for (let i = 0; i < 10; i++) {
+          await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
+          try {
+            const pages = await fbPagesMut?.mutateAsync?.({ brandId: calBrandId });
+            if ((pages?.pages?.length ?? 0) > 0) {
+              setFbPages(pages!.pages);
+              setFbPickerBrandId(calBrandId);
+              return;
+            }
+          } catch { /* keep retrying */ }
+        }
+        alert(lang === "en"
+          ? "Connected! But no Facebook Pages found. Please try again in a moment."
+          : "授權成功！但目前找不到粉專，請稍後重試。");
+      },
+      onError: (err: any) => {
+        delete pdFacebookTokensRef.current[calBrandId];
+        void prefetchFacebookConnect(calBrandId).catch(() => {});
+        alert(lang === "en" ? `Authorization failed: ${err?.message ?? "Unknown error"}` : `授權失敗：${err?.message ?? "未知錯誤"}`);
+      },
+      onClose: ({ successful }: any) => {
+        if (!successful) {
+          delete pdFacebookTokensRef.current[calBrandId];
+          void prefetchFacebookConnect(calBrandId).catch(() => {});
+        }
+      },
+    });
+  }, [lang, fbPagesMut, prefetchFacebookConnect]);
 
   // Platform picker modal state
   const [pickerDate, setPickerDate] = useState<Date | null>(null);
@@ -594,6 +648,7 @@ export default function CalendarPage() {
                             }}
                             onPublish={(id) => publishMut?.mutateAsync?.({ id })}
                             onConnectFacebook={connectFacebookFromCalendar}
+                            onPrefetchFacebook={prefetchFacebookConnect}
                             rescheduling={rescheduleId === it.id}
                           />
                         ))}
@@ -875,7 +930,8 @@ export default function CalendarPage() {
 
 /* ── PostPill ─────────────────────────────────────────────────── */
 function PostPill({
-  item, lang, navigate, onCancel, onReschedule, onPublish, onConnectFacebook, rescheduling,
+  item, lang, navigate, onCancel, onReschedule, onPublish,
+  onConnectFacebook, onPrefetchFacebook, rescheduling,
 }: {
   item: any;
   lang: "zh-TW" | "en";
@@ -884,6 +940,7 @@ function PostPill({
   onReschedule: (id: number, at: string) => void;
   onPublish?: (id: number) => Promise<void>;
   onConnectFacebook?: (brandId: number) => void;
+  onPrefetchFacebook?: (brandId: number) => Promise<void>;
   rescheduling: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -977,6 +1034,13 @@ function PostPill({
                       const msg: string = e?.message ?? String(e);
                       // Show friendly inline error; raw TRPC error contains the server message
                       setPublishError(msg.replace(/^TRPCClientError:\s*/i, ""));
+                      if (
+                        item.brandId
+                        && (msg.includes("粉專") || msg.includes("Facebook") || msg.includes("未連接"))
+                        && onPrefetchFacebook
+                      ) {
+                        void onPrefetchFacebook(item.brandId).catch(() => {});
+                      }
                     } finally {
                       setPublishing(false);
                     }
@@ -1000,6 +1064,12 @@ function PostPill({
                       onConnectFacebook && item.brandId && (
                       <button
                         onClick={() => { setPublishError(null); onConnectFacebook(item.brandId); }}
+                        onMouseEnter={() => {
+                          if (onPrefetchFacebook) void onPrefetchFacebook(item.brandId).catch(() => {});
+                        }}
+                        onFocus={() => {
+                          if (onPrefetchFacebook) void onPrefetchFacebook(item.brandId).catch(() => {});
+                        }}
                         className="px-2 py-1 rounded text-[10px] font-semibold text-white"
                         style={{ background: "#1877F2" }}
                       >
