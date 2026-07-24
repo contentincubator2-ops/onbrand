@@ -94,6 +94,11 @@ export interface ImageGenInput {
   brandContext?: BrandVisualContext;
   /** 2026-05-12: user-selected model. "auto" or undefined = env default. */
   modelChoice?: ImageModelChoice;
+  /** 2026-07-25 (CJ product-faithful gen): URL of the REAL product photo.
+   *  When set, generation routes to Nano Banana subject-reference with the
+   *  PRODUCT-FIDELITY guard, and does NOT fall back to text-only providers
+   *  on failure — a hallucinated product is worse than a failed run. */
+  subjectImageUrl?: string;
 }
 
 export interface ImageGenResult {
@@ -156,11 +161,22 @@ function buildPrompt(input: ImageGenInput): string {
   // real title is overlaid later in the mockup layer, so the generated image
   // must be a CLEAN, TEXT-FREE background. This must be a dominant, explicit
   // directive — a weak trailing "no text" clause gets ignored.
-  lines.push(NO_TEXT_PROMPT_BLOCK);
-  lines.push("");
-  lines.push(
-    "Rendering: editorial photography, natural light, clean composition, no text, no watermarks."
-  );
+  // 2026-07-25 product-faithful: with a real product photo attached, the
+  // blanket NO-TEXT rule would strip the product's own label — use the
+  // fidelity guard instead (label letter-perfect, no OTHER generated text).
+  if (input.subjectImageUrl) {
+    lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK);
+    lines.push("");
+    lines.push(
+      "Rendering: editorial product photography, natural light, realistic contact shadows, clean composition, no watermarks."
+    );
+  } else {
+    lines.push(NO_TEXT_PROMPT_BLOCK);
+    lines.push("");
+    lines.push(
+      "Rendering: editorial photography, natural light, clean composition, no text, no watermarks."
+    );
+  }
   return lines.join("\n");
 }
 
@@ -278,6 +294,38 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
        ${"openai"}, ${"pending"}, ${promptText}, ${size}, 'pending')
   `)) as any;
   const id = Number(ins?.insertId ?? 0);
+
+  // 2026-07-25 product-faithful: subject-reference runs ONLY on Nano Banana.
+  // No fallback to text-only providers — they can't see the real product,
+  // and a hallucinated product violates the fidelity bar. Fail loudly.
+  if (input.subjectImageUrl) {
+    try {
+      const { dispatchGenerate } = await import("./mediaGen");
+      const aspect = size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
+      const r = await dispatchGenerate("google/nano-banana", {
+        prompt: promptText,
+        imageUrl: input.subjectImageUrl,
+        aspectRatio: aspect as any,
+        brandId: input.brandId,
+      });
+      if (r.status === "ready" && r.url) {
+        await db.execute(sql`
+          UPDATE generated_images
+          SET provider = 'google', model = 'nano-banana', url = ${r.url},
+              status = 'ready', errorMsg = NULL
+          WHERE id = ${id}
+        `);
+        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready" };
+      }
+      const msg = r.errorMsg ?? "nano-banana returned no image";
+      await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
+      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", errorMsg: msg };
+    } catch (e: any) {
+      const msg = `nano-banana: ${String(e?.message ?? e).slice(0, 200)}`;
+      await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
+      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", errorMsg: msg };
+    }
+  }
 
   const primary = (process.env.IMAGE_GEN_PROVIDER_PRIMARY || "openai") as ImageProvider;
   const fallback = (process.env.IMAGE_GEN_PROVIDER_FALLBACK || "google") as ImageProvider;

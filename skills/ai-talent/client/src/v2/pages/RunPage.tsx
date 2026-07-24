@@ -897,6 +897,21 @@ export default function RunPage() {
       })
     : { mutate: () => {}, isPending: false };
 
+  // 2026-07-25 (CJ product-faithful gen「📦 使用真實產品圖」— 改圖面板入口):
+  // this is the panel the mockup's 點此手動生圖 opens, so the product picker
+  // must live HERE (MediaGenFlow got it first, but that flow isn't on this
+  // click path). When on, image.generate routes to Nano Banana with the
+  // real photo + fidelity guard (see project_product_faithful_imagegen).
+  const runProductImagesQ = (trpc as any).media?.listProductImages?.useQuery?.(
+    { brandId: data?.brand?.id ?? 0 },
+    { enabled: !!data?.brand?.id, refetchOnWindowFocus: false, staleTime: 60_000 },
+  ) ?? { data: null };
+  const runProductImages: Array<{ productId: number; name: string; imageUrl: string }> =
+    (runProductImagesQ.data as any)?.products ?? [];
+  const [useRealProduct, setUseRealProduct] = React.useState(false);
+  const [pickedRunProduct, setPickedRunProduct] = React.useState<{ productId: number; name: string; imageUrl: string } | null>(null);
+  const realProductMode = useRealProduct && !!pickedRunProduct;
+
   // 2026-06-15: generate image prompt from the current variant's caption.
   const captionToPromptMut = (trpc as any).image?.promptFromCaption?.useMutation
     ? (trpc as any).image.promptFromCaption.useMutation({
@@ -2401,6 +2416,47 @@ export default function RunPage() {
                       ))}
                     </div>
                   )}
+                  {/* 2026-07-25 (CJ): real-product compositing — the actual
+                      IRIS/Iris Girls photo instead of an AI-imagined product. */}
+                  {runProductImages.length > 0 && (
+                    <div className="rounded-lg border border-default-200 bg-default-50 px-3 py-2.5 mt-2">
+                      <label className="flex items-center gap-2 cursor-pointer flex-wrap">
+                        <input
+                          type="checkbox"
+                          checked={useRealProduct}
+                          onChange={(e) => {
+                            setUseRealProduct(e.target.checked);
+                            if (e.target.checked && !pickedRunProduct) setPickedRunProduct(runProductImages[0] ?? null);
+                          }}
+                        />
+                        <span className="text-tiny font-semibold">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
+                        <span className="text-[10px] text-default-500">
+                          {lang === "en"
+                            ? "Composites the actual product (Nano Banana; model picker below is ignored)"
+                            : "把真實產品原貌合成進場景 — 自動用 Nano Banana 保真模型，下方模型選擇不適用"}
+                        </span>
+                      </label>
+                      {useRealProduct && (
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          {runProductImages.slice(0, 12).map((p) => (
+                            <button
+                              key={p.productId}
+                              onClick={() => setPickedRunProduct(p)}
+                              title={p.name}
+                              className={`w-12 h-12 rounded-md overflow-hidden border-2 transition ${
+                                pickedRunProduct?.productId === p.productId ? "border-secondary" : "border-transparent hover:border-default-300"
+                              }`}
+                            >
+                              <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                          {pickedRunProduct && (
+                            <span className="text-[10px] text-default-600 self-center ml-1 truncate max-w-[160px]">{pickedRunProduct.name}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
                     {lang === "en"
                       ? "Step 3: Pick a model (each is best for a different style)"
@@ -2410,7 +2466,8 @@ export default function RunPage() {
                   <select
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
-                    className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary"
+                    disabled={realProductMode}
+                    className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary disabled:opacity-50"
                   >
                     <option value="auto">{lang === "en" ? "Auto (default)" : "自動（預設）"}</option>
                     <option value="flux-schnell">{lang === "en" ? "Fast — Flux Schnell (5-10s)" : "快速 — Flux Schnell（5-10 秒）"}</option>
@@ -2451,6 +2508,7 @@ export default function RunPage() {
                           "fb"
                         ) as any,
                         modelChoice: imageModel as any,
+                        ...(realProductMode ? { subjectImageUrl: pickedRunProduct!.imageUrl } : {}),
                       });
                     }}
                   >

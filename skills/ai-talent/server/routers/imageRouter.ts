@@ -40,6 +40,9 @@ export const imageRouter = router({
         upstreamDecisionId: z.number().int().positive().optional(),
         size: size.optional(),
         modelChoice: modelChoice.optional(),
+        /** 2026-07-25 (CJ product-faithful gen): real product photo URL —
+         *  routes to Nano Banana subject-reference with the fidelity guard. */
+        subjectImageUrl: z.string().url().max(2048).optional(),
         overrideBrandContext: z
           .object({
             positioning: z.string().optional(),
@@ -59,6 +62,7 @@ export const imageRouter = router({
       // Imagen/Ideogram middle = 50 pts.
       const { assertPoints, deductPoints } = await import("../_core/pointsService");
       const imageAction =
+        input.subjectImageUrl                  ? "image_imagen"   : // nano-banana ≈ Gemini tier
         (input.modelChoice === "gpt-image-1" ||
          input.modelChoice === "gpt-image-2")  ? "image_gpt"      :
         input.modelChoice === "imagen-3"       ? "image_imagen"   :
@@ -81,6 +85,7 @@ export const imageRouter = router({
         channel: input.channel,
         size: input.size,
         modelChoice: input.modelChoice,
+        subjectImageUrl: input.subjectImageUrl,
         brandContext,
       });
       // 2026-05-12: surface actual provider failures to the client.
