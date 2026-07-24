@@ -38,6 +38,7 @@ import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
+import { showToastGlobal } from "../../components/ui/Toast";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
@@ -673,6 +674,74 @@ export default function BrandsPage() {
   const evRemoveMut    = (trpc as any).event?.remove?.useMutation?.({ onSuccess: () => brandEventsQ?.refetch?.() });
   const evStartMut     = (trpc as any).positioningJobs?.start?.useMutation?.();
   const evInterimMut   = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
+
+  // 2026-07-24 (CJ「產品按下重新定位時，會沒有反應」): the start mutation
+  // fires a BACKGROUND pipeline — with no toast, no running state and no
+  // completion refetch the click looked dead and the card stayed stale
+  // until a manual page reload. Track running entity ids, poll a batch
+  // status query, refetch the grid + toast on completion.
+  const [posRunning, setPosRunning] = useState<{ product: number[]; event: number[] }>({ product: [], event: [] });
+  const markPosRunning = (kind: "product" | "event", id: number) =>
+    setPosRunning((s) => (s[kind].includes(id) ? s : { ...s, [kind]: [...s[kind], id] }));
+  const unmarkPosRunning = (kind: "product" | "event", id: number) =>
+    setPosRunning((s) => ({ ...s, [kind]: s[kind].filter((x) => x !== id) }));
+  const kickReposition = (kind: "product" | "event", id: number, name?: string) => {
+    markPosRunning(kind, id);
+    showToastGlobal(
+      lang === "en"
+        ? `Re-positioning started${name ? ` for ${name}` : ""} — the card updates automatically when done.`
+        : `已開始重新定位${name ? `「${name}」` : ""}，完成後卡片會自動更新`,
+      "success",
+    );
+    const startMut = kind === "product" ? prodStartMut : evStartMut;
+    const interimMut = kind === "product" ? prodInterimMut : evInterimMut;
+    startMut?.mutate?.({ entityKind: kind, entityId: id }, {
+      onSuccess: (r: any) => {
+        if (r && r.ok === false) {
+          unmarkPosRunning(kind, id);
+          showToastGlobal(lang === "en" ? `Positioning failed to start: ${r.error ?? "unknown"}` : `定位啟動失敗：${r.error ?? "未知原因"}`);
+        }
+      },
+      onError: (e: any) => {
+        unmarkPosRunning(kind, id);
+        showToastGlobal((typeof e?.message === "string" ? e.message : null) ?? (lang === "en" ? "Positioning failed to start" : "定位啟動失敗"));
+      },
+    });
+    interimMut?.mutate?.({ entityKind: kind, entityId: id });
+  };
+  const prodPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
+    { entityKind: "product", entityIds: posRunning.product },
+    { enabled: posRunning.product.length > 0, refetchInterval: 4000 },
+  );
+  const evPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
+    { entityKind: "event", entityIds: posRunning.event },
+    { enabled: posRunning.event.length > 0, refetchInterval: 4000 },
+  );
+  React.useEffect(() => {
+    for (const [kind, q, listQ] of [["product", prodPosStatusQ, brandProductsQ], ["event", evPosStatusQ, brandEventsQ]] as const) {
+      const rows: Array<{ entityId: number; status: string }> = q?.data ?? [];
+      for (const r of rows) {
+        if (r.status === "done" || r.status === "failed") {
+          unmarkPosRunning(kind, r.entityId);
+          listQ?.refetch?.();
+          showToastGlobal(
+            r.status === "done"
+              ? (lang === "en" ? "✓ Positioning complete" : "✓ 定位完成，卡片已更新")
+              : (lang === "en" ? "Positioning failed — try again" : "定位失敗，請再試一次"),
+            r.status === "done" ? "success" : undefined,
+          );
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prodPosStatusQ?.data, evPosStatusQ?.data]);
+  // progress map for card buttons: id → "3/6"
+  const posProgress: Record<string, string> = {};
+  for (const [kind, q] of [["product", prodPosStatusQ], ["event", evPosStatusQ]] as const) {
+    for (const r of (q?.data ?? []) as Array<{ entityId: number; status: string; currentStep: number; totalSteps: number }>) {
+      if (r.status === "running" || r.status === "pending") posProgress[`${kind}:${r.entityId}`] = `${r.currentStep}/${r.totalSteps}`;
+    }
+  }
 
   const defaultSection: SectionId =
     category === "visual" ? "asset:all"
@@ -2288,10 +2357,9 @@ export default function BrandsPage() {
                 onAdd={() => setAddModal({ open: true, tab: "product" })}
                 onOpen={(id) => setProductDetailId(id)}
                 onDelete={(id) => prodRemoveMut?.mutate?.({ id })}
-                onPosition={(id) => {
-                  prodStartMut?.mutate?.({ entityKind: "product", entityId: id });
-                  prodInterimMut?.mutate?.({ entityKind: "product", entityId: id });
-                }}
+                onPosition={(id) => kickReposition("product", id, brandProductsList?.find((p: any) => p.id === id)?.name)}
+                runningIds={posRunning.product}
+                progressMap={posProgress}
               />
             </div>
           )}
@@ -2310,10 +2378,9 @@ export default function BrandsPage() {
                   setCategory("positioning");
                 }}
                 onDelete={(id) => evRemoveMut?.mutate?.({ id })}
-                onPosition={(id) => {
-                  evStartMut?.mutate?.({ entityKind: "event", entityId: id });
-                  evInterimMut?.mutate?.({ entityKind: "event", entityId: id });
-                }}
+                onPosition={(id) => kickReposition("event", id, brandEventsList?.find((p: any) => p.id === id)?.name)}
+                runningIds={posRunning.event}
+                progressMap={posProgress}
               />
             </div>
           )}
@@ -2334,8 +2401,7 @@ export default function BrandsPage() {
           onClose={() => setProductDetailId(null)}
           onReposition={(id) => {
             setProductDetailId(null);
-            prodStartMut?.mutate?.({ entityKind: "product", entityId: id });
-            prodInterimMut?.mutate?.({ entityKind: "product", entityId: id });
+            kickReposition("product", id, brandProductsList?.find((p: any) => p.id === id)?.name);
           }}
         />
       )}
@@ -5035,6 +5101,7 @@ function BrandPaletteHero({
  * ─────────────────────────────────────────────────────────────────── */
 function BrandEntityGrid({
   kind, items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
+  runningIds, progressMap,
 }: {
   kind: "product" | "event";
   items: any[];
@@ -5044,6 +5111,10 @@ function BrandEntityGrid({
   onOpen: (id: number) => void;
   onDelete: (id: number) => void;
   onPosition: (id: number) => void;
+  /** 2026-07-24: entity ids with a positioning pipeline in flight. */
+  runningIds?: number[];
+  /** id-keyed (`kind:id`) progress labels, e.g. "3/6". */
+  progressMap?: Record<string, string>;
 }) {
   const en = lang === "en";
 
@@ -5251,13 +5322,26 @@ function BrandEntityGrid({
                 )}
 
                 <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center gap-1.5 flex-wrap">
-                  {/* Run positioning */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onPosition(item.id); }}
-                    className="text-[10px] font-medium px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition flex-1 min-w-0 text-center"
-                  >
-                    {positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
-                  </button>
+                  {/* Run positioning — running state shows live step progress */}
+                  {(() => {
+                    const isRunning = runningIds?.includes(item.id) ?? false;
+                    const prog = progressMap?.[`${kind}:${item.id}`];
+                    return (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (!isRunning) onPosition(item.id); }}
+                        disabled={isRunning}
+                        className={`text-[10px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
+                          isRunning
+                            ? "bg-indigo-100 text-indigo-500 cursor-wait animate-pulse"
+                            : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                        }`}
+                      >
+                        {isRunning
+                          ? (en ? `Positioning… ${prog ?? ""}` : `定位中…${prog ? ` ${prog}` : ""}`)
+                          : positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
+                      </button>
+                    );
+                  })()}
                   {/* 2026-06-21 (CJ「按 riverflow 標準」): branded variant generator.
                       2026-06-30: dropped item.imageUrl gate — column doesn't
                       exist. Backend returns `product_has_no_image` if positioning

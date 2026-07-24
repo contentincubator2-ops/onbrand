@@ -52,10 +52,22 @@ async function loadEntity(kind: "brand"|"product"|"event", id: number, userId: n
     } catch { /* non-fatal */ }
   }
   // Brand uses brandName / industry / description; product/event use name / category / description
+  // 2026-07-24 (CJ「產品按重新定位沒反應」root-cause sweep): products have no
+  // description COLUMN — it lives inside positioning JSON ($.description,
+  // written by discovery/seeding). Without it the re-run pipeline was
+  // grounded on the bare name only. Fall back to the JSON value.
+  let description: string | undefined = row.description ?? undefined;
+  if (!description && row.positioning != null) {
+    try {
+      const pos = typeof row.positioning === "string" ? JSON.parse(row.positioning) : row.positioning;
+      const d = pos?.description ?? pos?._interim?.description;
+      if (typeof d === "string" && d.trim()) description = d.trim();
+    } catch { /* non-fatal */ }
+  }
   return {
     name: String(row.brandName ?? row.name ?? ""),
     industry: row.industry ?? row.category ?? undefined,
-    description: row.description ?? undefined,
+    description,
     outputLanguage,
   };
 }
@@ -476,6 +488,34 @@ ${fullCtx.block}${real.context}${knowledgeBlock}`;
       if (input.entityId === 0) return null;
       const userId = ctx.user!.id;
       return await getPositioningJob(input.entityKind, input.entityId, userId);
+    }),
+
+  /** 2026-07-24 (CJ「產品按重新定位沒反應」): batch job status for the
+   *  product/event card grids — one query per grid instead of a hook per
+   *  card, so the UI can show 定位中 x/y and refresh on completion. */
+  getStatusBatch: protectedProcedure
+    .input(z.object({
+      entityKind: entityKindSchema,
+      entityIds: z.array(z.number().int().positive()).min(1).max(50),
+    }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const ph = input.entityIds.map(() => "?").join(",");
+      const [rows]: any = await localPool.execute(
+        `SELECT pj.entityId, pj.status, pj.currentStep, pj.totalSteps
+           FROM positioning_jobs pj
+          WHERE pj.userId = ? AND pj.entityKind = ? AND pj.entityId IN (${ph})
+            AND pj.id IN (SELECT MAX(id) FROM positioning_jobs
+                           WHERE userId = ? AND entityKind = ? AND entityId IN (${ph})
+                           GROUP BY entityId)`,
+        [userId, input.entityKind, ...input.entityIds, userId, input.entityKind, ...input.entityIds],
+      );
+      return (rows as any[]).map((r) => ({
+        entityId: Number(r.entityId),
+        status: String(r.status),
+        currentStep: Number(r.currentStep ?? 0),
+        totalSteps: Number(r.totalSteps ?? 0),
+      }));
     }),
 
   /** Recent completions for notification center. */
