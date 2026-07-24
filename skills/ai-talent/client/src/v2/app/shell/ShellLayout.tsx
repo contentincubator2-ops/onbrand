@@ -42,7 +42,7 @@ import {
   faShareNodes, faTrophy, faUsers, faLanguage,
   faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
-  faEnvelope, faBullhorn,
+  faEnvelope, faBullhorn, faChartLine, faDatabase,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -90,9 +90,18 @@ interface NavItem {
 // with platform icons. Users pick the *platform* first; speed is shown as
 // a badge on each task card inside the platform page.
 // Brand Strategy + Research Analysis removed per CJ direction; Brand Brain kept.
-function buildNavItems(lang: "zh-TW" | "en"): NavItem[] {
+function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null): NavItem[] {
   const en = lang === "en";
+  const privatePreview = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw"
+    ? [
+        { to: "/performance", label: en ? "Performance" : "成效", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance",
+          tooltip: en ? "Private preview: performance agents" : "sowork@sowork.tw 限定：廣告成效 Agent 工作區" },
+        { to: "/market-intel", label: en ? "Market" : "市場", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/market-intel",
+          tooltip: en ? "Private preview: market intelligence agents" : "sowork@sowork.tw 限定：市場數據 Agent 工作區" },
+      ]
+    : [];
   return [
+    ...privatePreview,
     // ── Platform tier (primary content creation entry points) ──────────────
     { to: "/tasks/fb",    label: "Facebook",  icon: <FontAwesomeIcon icon={faFacebookF} />,  matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
@@ -191,6 +200,18 @@ export default function ShellLayout() {
 
   const [notifOpen, setNotifOpen] = React.useState(false);
   const [supportOpen, setSupportOpen] = React.useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/auth/me", { method: "POST", credentials: "include" });
+        const d = r.ok ? await r.json() : null;
+        if (!cancelled) setCurrentUserEmail(String(d?.user?.email ?? "").toLowerCase());
+      } catch { if (!cancelled) setCurrentUserEmail(null); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge subscription.
   // - Nudges are queued in sessionStorage by fireNudge() calls from any page
@@ -295,6 +316,7 @@ export default function ShellLayout() {
         notifUnread={notifUnread}
         onOpenSupport={() => setSupportOpen(true)}
         brands={brands}
+        userEmail={currentUserEmail}
       />
 
       {/* 2026-05-14: SlidePanel removed. Content lives as in-page tiles
@@ -503,7 +525,7 @@ export default function ShellLayout() {
 
 function IconBar({
   collapsed, onToggle, currentPath, onNavigate,
-  scope, setScope, onLogout, notifOpen, onNotifToggle, notifUnread, onOpenSupport, brands,
+  scope, setScope, onLogout, notifOpen, onNotifToggle, notifUnread, onOpenSupport, brands, userEmail,
 }: {
   collapsed: boolean;
   onToggle: () => void;
@@ -517,10 +539,11 @@ function IconBar({
   onNotifToggle: () => void;
   onOpenSupport?: () => void;
   brands: any[];
+  userEmail?: string | null;
 }) {
   const { lang, setLang } = useLang();
   const isEn = lang === "en";
-  const NAV_ITEMS = React.useMemo(() => buildNavItems(lang), [lang]);
+  const NAV_ITEMS = React.useMemo(() => buildNavItems(lang, userEmail), [lang, userEmail]);
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
 

@@ -58,6 +58,7 @@ const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard")
 // Protected app surface — never loaded by anonymous visitors
 const TheaterPage = React.lazy(() => import("../pages/TheaterPage"));
 const PlatformTaskPage = React.lazy(() => import("../pages/PlatformTaskPage"));
+const DataWorkspacePage = React.lazy(() => import("../pages/DataWorkspacePage"));
 const RunPage = React.lazy(() => import("../pages/RunPage"));
 const ProjectsPage = React.lazy(() => import("../pages/ProjectsPage"));
 const BrandsPage = React.lazy(() => import("../pages/BrandsPage"));
@@ -304,6 +305,8 @@ export default function AppV2() {
               /tasks/:platform renders PlatformTaskPage with tier tabs inside. */}
           <Route path="/tasks" element={<Navigate to="/tasks/fb" replace />} />
           <Route path="/tasks/:platform" element={<PlatformTaskPage />} />
+          <Route path="/performance" element={<DataWorkspacePage />} />
+          <Route path="/market-intel" element={<DataWorkspacePage />} />
           {/* 2026-05-09 (CJ): Phase 2 route-based output workspace.
               Replaces modal-based viewing for 60s/100s tasks. URL is
               shareable, browser back works, can multi-tab compare. */}
