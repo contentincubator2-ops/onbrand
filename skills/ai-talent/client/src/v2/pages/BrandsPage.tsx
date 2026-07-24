@@ -1999,14 +1999,10 @@ export default function BrandsPage() {
                             letterSpacing: "0.10em", textTransform: "uppercase",
                             whiteSpace: "nowrap",
                           }}>{group.label}</span>
+                          {/* 2026-07-21 (CJ「顯示更多按下去沒用」): the button had
+                              no onClick and every group's cards are already all
+                              rendered — nothing more to show. Removed. */}
                           <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
-                          <button style={{
-                            fontSize: 12, color: "#6366F1", background: "none", border: "none",
-                            cursor: "pointer", whiteSpace: "nowrap", padding: 0,
-                            fontWeight: 500,
-                          }}>
-                            {lang === "en" ? "Show more" : "顯示更多"}
-                          </button>
                         </div>
 
                         {/* 4-col card grid */}
