@@ -980,9 +980,17 @@ export default function RunPage() {
     () => variants.some((v) => v.imageUrl || (v.imageStatus && v.imageStatus !== "skipped")),
     [variants],
   );
+  // 2026-07-23 (CJ IRIS QA「點此手動生圖，但我按下去以後，並沒有生圖」):
+  // the fallback below used to bounce EVERY entry into image mode back to
+  // chat on text-only tasks — including the mockup's 點此手動生圖 click,
+  // which set mode="image" and got instantly reverted (= click did
+  // nothing). Track manual intent so opt-in survives; the fallback only
+  // guards against LANDING on the hidden mode without a click.
+  const manualImageRef = React.useRef(false);
+  React.useEffect(() => { manualImageRef.current = false; }, [id]);
   // If the panel somehow lands on the (now hidden) image mode, fall back.
   React.useEffect(() => {
-    if (!hasImageSlot && mode === "image") setMode("chat");
+    if (!hasImageSlot && mode === "image" && !manualImageRef.current) setMode("chat");
   }, [hasImageSlot, mode]);
 
   // Fires when the active variant's image finishes generating. Placed here
@@ -1734,7 +1742,7 @@ export default function RunPage() {
                 liveImageStatus={slide.imageStatus as any}
                 liveCards={slide.cards as any}
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
-                onGenerateImage={() => setMode("image")}
+                onGenerateImage={() => { manualImageRef.current = true; setMode("image"); }}
                 componentSlot={componentSlot}
               />
               </>

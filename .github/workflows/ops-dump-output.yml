@@ -1,0 +1,46 @@
+name: "Ops — Dump output by content match (read-only)"
+
+# 2026-07-23: generic forensics — dump the latest mission_outputs rows whose
+# content matches a LIKE pattern (content + metadata incl. rawCaptions).
+
+on:
+  workflow_dispatch:
+    inputs:
+      like:
+        description: "content LIKE %…% 關鍵字"
+        required: true
+        type: string
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump matching outputs
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          LIKE_KW: ${{ github.event.inputs.like }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          envs: LIKE_KW
+          command_timeout: 90s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            KW=$(printf '%s' "$LIKE_KW" | sed "s/'/''/g")
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e "
+              SELECT mo.id, mo.missionId, mo.status, mo.createdAt,
+                     LEFT(mo.content, 2600) AS content
+                FROM mission_outputs mo
+               WHERE mo.content LIKE CONCAT('%', '$KW', '%')
+               ORDER BY mo.id DESC LIMIT 2\G"
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e "
+              SELECT mo.id,
+                     LEFT(mo.metadata, 3200) AS metadata
+                FROM mission_outputs mo
+               WHERE mo.content LIKE CONCAT('%', '$KW', '%')
+               ORDER BY mo.id DESC LIMIT 2\G"
+            exit 0
