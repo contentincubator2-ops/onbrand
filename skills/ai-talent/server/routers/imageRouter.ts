@@ -99,6 +99,7 @@ export const imageRouter = router({
           .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
           .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
         let friendly = "生圖失敗，請稍後再試";
+        const isProviderKeyError = /key|unauthorized|api_key|permission_denied|suspended|consumer|forbidden|403/i.test(raw);
         if (/safety system|content_policy|rejected by the safety|moderation/i.test(raw)) {
           friendly = "OpenAI 的內容政策擋下了這個 prompt（常見原因：提到版權角色如 Pokémon / Disney / 寶可夢）。已嘗試切換到 Flux 但也失敗。建議修改 prompt — 把角色名稱換成形容（例：「圓滾滾的卡通生物」）。";
         } else if (/quota|insufficient.*credit|balance/i.test(raw)) {
@@ -107,12 +108,14 @@ export const imageRouter = router({
           friendly = "AI 圖片服務速率限制中，請等 30 秒再試。";
         } else if (/timeout|timed out/i.test(raw)) {
           friendly = "生圖超時（>60 秒）。建議用 Flux Schnell 模型（最快 5-10 秒）。";
-        } else if (/key|unauthorized|api_key/i.test(raw)) {
+        } else if (isProviderKeyError) {
           friendly = "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。";
         }
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `${friendly}\n\n[技術細節] ${raw.slice(0, 300)}`,
+          message: isProviderKeyError
+            ? friendly
+            : `${friendly}\n\n[技術細節] ${raw.slice(0, 300)}`,
         });
       }
       return result;

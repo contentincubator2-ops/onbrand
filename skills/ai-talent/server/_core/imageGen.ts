@@ -75,6 +75,13 @@ export type ImageModelChoice =
   | "ideogram-v3"       // PiAPI Ideogram — strongest at text-in-image
   | "imagen-3";         // Google Imagen 3
 
+function redactProviderSecrets(text: string): string {
+  return String(text)
+    .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
+    .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
+    .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
+}
+
 export interface BrandVisualContext {
   brandName?: string;
   positioning?: string;
@@ -241,7 +248,7 @@ async function runGoogleImagen(
     }
   );
   if (!res.ok) {
-    const text = await res.text();
+    const text = redactProviderSecrets(await res.text());
     throw new Error(`Google Imagen ${res.status}: ${text.slice(0, 300)}`);
   }
   const json: any = await res.json();
@@ -317,11 +324,11 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
         `);
         return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready" };
       }
-      const msg = r.errorMsg ?? "nano-banana returned no image";
+      const msg = redactProviderSecrets(r.errorMsg ?? "nano-banana returned no image");
       await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
       return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", errorMsg: msg };
     } catch (e: any) {
-      const msg = `nano-banana: ${String(e?.message ?? e).slice(0, 200)}`;
+      const msg = redactProviderSecrets(`nano-banana: ${String(e?.message ?? e).slice(0, 400)}`).slice(0, 240);
       await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
       return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", errorMsg: msg };
     }
