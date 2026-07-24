@@ -519,7 +519,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                     handleSend();
                   }
                 }}
-                placeholder={isEn ? "Describe your issue and we'll get back to you…" : "卡在哪裡？跟 Mia 說…"}
+                placeholder={isEn ? "Ask Mia anything — how-tos, issues, shortcuts…" : "想問操作、排除問題、找頁面，都跟 Mia 說…"}
                 rows={1}
                 style={{
                   flex: 1, resize: "none",

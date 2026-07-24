@@ -338,7 +338,16 @@ export const supportRouter = router({
       const messages = await loadMessages(conversationId);
       // Greeting message on a brand-new conversation
       if (messages.length === 0) {
-        const greeting = "嗨，我是 Mia，OnBrand AI 的客戶成功經理。\n你卡在哪裡？或哪一步不會用？跟我說。";
+        // 2026-07-25 (CJ「不要一出來就問別人卡在哪裡，應該要自我介紹，
+        // 讓別人知道怎麼運用它」): lead with who Mia is + what she can do,
+        // with concrete example asks — not an interrogation.
+        const greeting =
+          "嗨，我是 Mia，OnBrand AI 的客戶成功經理 👋\n" +
+          "你可以這樣用我：\n" +
+          "① 教你操作 — 例如問「七日發布台怎麼用？」「怎麼讓文案更像我的品牌？」\n" +
+          "② 排除問題 — 例如「定位跑不完」「圖生不出來」，我會幫你診斷並給解法\n" +
+          "③ 帶路 — 跟我說你想做什麼，我直接給你捷徑按鈕，一鍵到對的頁面\n" +
+          "直接輸入你的問題就可以開始。";
         const id = await insertMessage({
           conversationId, role: "mia", content: greeting,
         });
