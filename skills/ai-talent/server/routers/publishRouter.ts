@@ -22,6 +22,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { assertBrandAccess } from "../_core/brandAuth";
+import { getPipedreamConnectTokenUrl } from "../_core/pipedreamConnect";
 
 const ENV = process.env;
 
@@ -157,6 +159,8 @@ export const publishRouter = router({
   getFacebookConnectUrl: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user.id, input.brandId);
+
       // 2026-05-26: migrated from PIPEDREAM_API_KEY (static, unsupported by
       // Pipedream Connect) to OAuth client_credentials flow using
       // PIPEDREAM_CLIENT_ID (pub_...) + PIPEDREAM_CLIENT_SECRET (sec_...).
@@ -195,11 +199,10 @@ export const publishRouter = router({
       }
       const { access_token } = (await tokenRes.json()) as { access_token: string };
 
-      // Step 2: mint a Connect user token for the popup flow.
-      // 2026-05-28 fix: include app so connect_link_url embeds ?app=facebook_pages.
-      // Without this, Pipedream returns a connect_link_url without the app
-      // parameter and its iframe shows "Please include the app in the Connect URL".
-      const resp = await fetch(`https://api.pipedream.com/v1/connect/tokens`, {
+      // Step 2: mint a Connect user token for the popup flow. Connect resources
+      // are project-scoped in the URL path; the request body only scopes the
+      // token to our external user. The browser SDK receives the app separately.
+      const resp = await fetch(getPipedreamConnectTokenUrl(projectId), {
         method: "POST",
         headers: {
           "Authorization":    `Bearer ${access_token}`,
@@ -208,8 +211,6 @@ export const publishRouter = router({
         },
         body: JSON.stringify({
           external_user_id: `sowork-brand-${input.brandId}`,
-          project_id:       projectId,
-          app:              "facebook_pages",
         }),
         signal: AbortSignal.timeout(15_000),
       });

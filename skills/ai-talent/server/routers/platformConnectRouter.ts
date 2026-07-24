@@ -18,10 +18,10 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
+import { assertBrandAccess } from "../_core/brandAuth";
+import { getPipedreamConnectTokenUrl } from "../_core/pipedreamConnect";
 
 // Pipedream Connect REST endpoint for issuing user tokens
-const PD_API = "https://api.pipedream.com/v1/connect";
-
 const PLATFORM_APP: Record<string, string> = {
   facebook:  "facebook_pages",
   instagram: "instagram_business",
@@ -31,7 +31,6 @@ const PLATFORM_APP: Record<string, string> = {
 
 async function getPipedreamToken(
   externalUserId: string,
-  appSlug: string,
 ): Promise<{ token: string; expires_at: string; connect_link_url?: string }> {
   const clientId     = process.env.PIPEDREAM_CLIENT_ID;
   const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
@@ -50,7 +49,7 @@ async function getPipedreamToken(
   // Step 1: exchange OAuth App credentials for a short-lived Bearer token.
   // Pipedream Connect requires a two-step flow:
   //   1. POST /v1/oauth/token with Basic Auth (CLIENT_ID:CLIENT_SECRET)
-  //   2. POST /v1/connect/tokens with Bearer access_token
+  //   2. POST /v1/connect/{project_id}/tokens with Bearer access_token
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const tokenRes = await fetch("https://api.pipedream.com/v1/oauth/token", {
     method: "POST",
@@ -71,12 +70,10 @@ async function getPipedreamToken(
 
   const { access_token } = (await tokenRes.json()) as { access_token: string };
 
-  // Step 2: mint a Connect user token with the Bearer access_token.
-  // 2026-05-28 fix: include `app` in the token body so Pipedream embeds
-  // the app slug in connect_link_url. Without it Pipedream returns a URL
-  // with no ?app= param and its iframe shows "Please include the app in
-  // the Connect URL".
-  const connectRes = await fetch(`${PD_API}/tokens`, {
+  // Step 2: mint a Connect user token with the Bearer access token. Connect
+  // resources are project-scoped in the URL path; the browser SDK receives
+  // appSlug separately when it opens the account connection flow.
+  const connectRes = await fetch(getPipedreamConnectTokenUrl(projectId), {
     method: "POST",
     headers: {
       "Content-Type":    "application/json",
@@ -85,8 +82,6 @@ async function getPipedreamToken(
     },
     body: JSON.stringify({
       external_user_id: externalUserId,
-      project_id:       projectId,
-      app:              appSlug,
     }),
   });
 
@@ -122,13 +117,15 @@ export const platformConnectRouter = router({
       platform: z.enum(["facebook", "instagram", "linkedin", "youtube"]),
       brandId:  z.number().int().positive(),
     }))
-    .mutation(async ({ input, ctx: _ctx }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertBrandAccess(ctx.user.id, input.brandId);
+
       const externalUserId = `sowork-brand-${input.brandId}`;
       const appSlug = PLATFORM_APP[input.platform]!;
       const projectId = process.env.PIPEDREAM_PROJECT_ID ?? "";
       const env = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
 
-      const { token, expires_at, connect_link_url } = await getPipedreamToken(externalUserId, appSlug);
+      const { token, expires_at, connect_link_url } = await getPipedreamToken(externalUserId);
 
       return {
         token,
