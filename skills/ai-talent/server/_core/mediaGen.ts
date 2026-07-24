@@ -22,6 +22,27 @@ const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
 mkdirSync(COVERS_DIR, { recursive: true });
 
+function redactProviderSecrets(text: string): string {
+  return String(text)
+    .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
+    .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
+    .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
+}
+
+function googleApiKeyPool(): string[] {
+  const raw = [
+    ...(process.env.GEMINI_API_KEY_POOL ?? "").split(","),
+    process.env.GEMINI_API_KEY ?? "",
+    process.env.GOOGLE_AI_API_KEY ?? "",
+    process.env.GOOGLE_API_KEY ?? "",
+  ];
+  return Array.from(new Set(raw.map((s) => s.trim()).filter(Boolean)));
+}
+
+function isRetryableGoogleKeyError(text: string): boolean {
+  return /suspended|permission_denied|api[_ ]key|consumer|unauthorized|forbidden|403/i.test(text);
+}
+
 export type GenStatus = "ready" | "submitted" | "failed";
 
 export interface GenResult {
@@ -141,11 +162,9 @@ async function genAzureImage2(opts: GenOptions): Promise<GenResult> {
 // reference. 2026-07-25 (CJ「合成 IRIS 真實產品」product-faithful gen):
 // takes the REAL product photo via opts.imageUrl and composites it into
 // the prompted scene while preserving the product exactly (the quality
-// bar = Photoroom Product Staging / imagine.art; see
-// project_product_faithful_imagegen memory). Also works text-only.
 async function genNanoBanana(opts: GenOptions): Promise<GenResult> {
-  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
-  if (!key) throw new Error("GEMINI_API_KEY missing");
+  const keys = googleApiKeyPool();
+  if (!keys.length) throw new Error("GEMINI_API_KEY missing");
   const model = process.env.NANO_BANANA_MODEL ?? "gemini-2.5-flash-image";
 
   const parts: any[] = [];
@@ -157,32 +176,40 @@ async function genNanoBanana(opts: GenOptions): Promise<GenResult> {
     parts.push({ inline_data: { mime_type: mime, data: b64 } });
   }
   // Aspect-ratio hint goes in-prompt — flash-image has no size parameter.
-  const arHint = opts.aspectRatio ? `\n\nOutput aspect ratio: ${opts.aspectRatio}.` : "";
+  const arHint = opts.aspectRatio ? `
+
+Output aspect ratio: ${opts.aspectRatio}.` : "";
   parts.push({ text: `${opts.prompt}${arHint}` });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts }],
-      generationConfig: { responseModalities: ["IMAGE"] },
-    }),
-    signal: AbortSignal.timeout(120_000),
-  });
-  if (!resp.ok) {
-    const t = await resp.text();
-    throw new Error(`NanoBanana ${resp.status}: ${t.slice(0, 200)}`);
+  const errors: string[] = [];
+  for (const key of keys) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: { responseModalities: ["IMAGE"] },
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!resp.ok) {
+      const t = redactProviderSecrets(await resp.text());
+      errors.push(`NanoBanana ${resp.status}: ${t.slice(0, 200)}`);
+      if (isRetryableGoogleKeyError(t)) continue;
+      break;
+    }
+    const data: any = await resp.json();
+    const outParts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
+    const imgPart = outParts.find((p) => p?.inlineData?.data || p?.inline_data?.data);
+    const b64out = imgPart?.inlineData?.data ?? imgPart?.inline_data?.data;
+    if (!b64out) {
+      const finish = data?.candidates?.[0]?.finishReason ?? "no image part";
+      throw new Error(`NanoBanana no image (${finish})`);
+    }
+    return { status: "ready", modelId: "google/nano-banana", url: saveB64(b64out, "img") };
   }
-  const data: any = await resp.json();
-  const outParts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
-  const imgPart = outParts.find((p) => p?.inlineData?.data || p?.inline_data?.data);
-  const b64out = imgPart?.inlineData?.data ?? imgPart?.inline_data?.data;
-  if (!b64out) {
-    const finish = data?.candidates?.[0]?.finishReason ?? "no image part";
-    throw new Error(`NanoBanana no image (${finish})`);
-  }
-  return { status: "ready", modelId: "google/nano-banana", url: saveB64(b64out, "img") };
+  throw new Error(errors.join("\n") || "NanoBanana failed");
 }
 
 // ── 3. Google Imagen 4 (current available model on the account) ──────────

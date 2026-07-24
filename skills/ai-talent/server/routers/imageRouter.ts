@@ -94,7 +94,10 @@ export const imageRouter = router({
       if (result.status === "failed") {
         // 2026-05-14: translate raw provider errors into human-readable
         // Chinese messages so users know what to do, not just what broke.
-        const raw = String(result.errorMsg ?? "unknown");
+        const raw = String(result.errorMsg ?? "unknown")
+          .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
+          .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
+          .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
         let friendly = "生圖失敗，請稍後再試";
         if (/safety system|content_policy|rejected by the safety|moderation/i.test(raw)) {
           friendly = "OpenAI 的內容政策擋下了這個 prompt（常見原因：提到版權角色如 Pokémon / Disney / 寶可夢）。已嘗試切換到 Flux 但也失敗。建議修改 prompt — 把角色名稱換成形容（例：「圓滾滾的卡通生物」）。";
