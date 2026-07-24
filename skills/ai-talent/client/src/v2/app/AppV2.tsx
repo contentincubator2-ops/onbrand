@@ -306,7 +306,9 @@ export default function AppV2() {
           <Route path="/tasks" element={<Navigate to="/tasks/fb" replace />} />
           <Route path="/tasks/:platform" element={<PlatformTaskPage />} />
           <Route path="/performance" element={<DataWorkspacePage />} />
+          <Route path="/performance/:sourceId" element={<DataWorkspacePage />} />
           <Route path="/market-intel" element={<DataWorkspacePage />} />
+          <Route path="/market-intel/:sourceId" element={<DataWorkspacePage />} />
           {/* 2026-05-09 (CJ): Phase 2 route-based output workspace.
               Replaces modal-based viewing for 60s/100s tasks. URL is
               shareable, browser back works, can multi-tab compare. */}

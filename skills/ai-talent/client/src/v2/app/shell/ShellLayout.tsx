@@ -90,16 +90,47 @@ interface NavItem {
 // with platform icons. Users pick the *platform* first; speed is shown as
 // a badge on each task card inside the platform page.
 // Brand Strategy + Research Analysis removed per CJ direction; Brand Brain kept.
-function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null): NavItem[] {
+function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string): NavItem[] {
   const en = lang === "en";
-  const privatePreview = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw"
+  const isPrivate = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
+  const privatePreview = isPrivate
     ? [
         { to: "/performance", label: en ? "Performance" : "成效", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance",
-          tooltip: en ? "Private preview: performance agents" : "sowork@sowork.tw 限定：廣告成效 Agent 工作區" },
+          tooltip: en ? "Switch to performance data workspace" : "切換到成效數據工作區" },
         { to: "/market-intel", label: en ? "Market" : "市場", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/market-intel",
-          tooltip: en ? "Private preview: market intelligence agents" : "sowork@sowork.tw 限定：市場數據 Agent 工作區" },
+          tooltip: en ? "Switch to market intelligence workspace" : "切換到市場情報工作區" },
       ]
     : [];
+
+  // In data modes, the same left rail that normally shows Facebook / IG / LinkedIn
+  // becomes the data-function rail. This matches CJ’s intended mental model:
+  // mode switch changes what the platform icons mean, not an extra nested sidebar.
+  if (isPrivate && currentPath?.startsWith("/market-intel")) {
+    return [
+      ...privatePreview,
+      { to: "/market-intel/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/market-intel/overview", tooltip: en ? "Market overview" : "市場總覽" },
+      { to: "/market-intel/listening", label: en ? "Listening" : "輿情", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/market-intel/listening", tooltip: en ? "Social listening" : "輿情監測" },
+      { to: "/market-intel/keywords", label: en ? "Keywords" : "關鍵字", icon: <FontAwesomeIcon icon={faMagnifyingGlass} />, matchPrefix: "/market-intel/keywords", tooltip: en ? "Keyword analysis" : "關鍵字分析" },
+      { to: "/market-intel/geo", label: "GEO", icon: <FontAwesomeIcon icon={faTrademark} />, matchPrefix: "/market-intel/geo", tooltip: en ? "GEO / SEO visibility" : "GEO / SEO 可見度" },
+      { to: "/market-intel/competitors", label: en ? "Competitors" : "競品", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/market-intel/competitors", tooltip: en ? "Competitor intelligence" : "競品情報" },
+      { to: "/market-intel/opportunity", label: en ? "Opportunity" : "機會", icon: <FontAwesomeIcon icon={faBrain} />, matchPrefix: "/market-intel/opportunity", tooltip: en ? "Opportunity diagnosis" : "機會診斷" },
+      { to: "/tasks/fb", label: en ? "Content" : "內容", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/tasks/fb", tooltip: en ? "Back to content workspace" : "回到內容工作區" },
+    ];
+  }
+
+  if (isPrivate && currentPath?.startsWith("/performance")) {
+    return [
+      ...privatePreview,
+      { to: "/performance/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/overview", tooltip: en ? "Cross-platform overview" : "跨平台總覽" },
+      { to: "/performance/meta", label: "Meta", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/performance/meta", tooltip: "Meta Ads" },
+      { to: "/performance/google", label: "Google", icon: <FontAwesomeIcon icon={faMagnifyingGlass} />, matchPrefix: "/performance/google", tooltip: "Google Ads" },
+      { to: "/performance/shopline", label: "Shopline", icon: <FontAwesomeIcon icon={faFolderOpen} />, matchPrefix: "/performance/shopline", tooltip: "Shopline / Ecommerce" },
+      { to: "/performance/ga", label: "GA", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/ga", tooltip: "GA / Website" },
+      { to: "/performance/attribution", label: en ? "Attribution" : "歸因", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/performance/attribution", tooltip: en ? "Attribution" : "整合歸因" },
+      { to: "/tasks/fb", label: en ? "Content" : "內容", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/tasks/fb", tooltip: en ? "Back to content workspace" : "回到內容工作區" },
+    ];
+  }
+
   return [
     ...privatePreview,
     // ── Platform tier (primary content creation entry points) ──────────────
@@ -543,7 +574,7 @@ function IconBar({
 }) {
   const { lang, setLang } = useLang();
   const isEn = lang === "en";
-  const NAV_ITEMS = React.useMemo(() => buildNavItems(lang, userEmail), [lang, userEmail]);
+  const NAV_ITEMS = React.useMemo(() => buildNavItems(lang, userEmail, currentPath), [lang, userEmail, currentPath]);
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
 

@@ -7,7 +7,7 @@
  * from content generation to data diagnosis.
  */
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity, BarChart3, Database, Globe2, LineChart, Megaphone,
   MousePointerClick, Search, ShoppingBag, Sparkles, Target, TrendingUp,
@@ -143,13 +143,13 @@ function useCurrentUserEmail() {
 export default function DataWorkspacePage() {
   const loc = useLocation();
   const navigate = useNavigate();
+  const { sourceId } = useParams<{ sourceId?: string }>();
   const mode: Mode = loc.pathname.startsWith("/market-intel") ? "market" : "performance";
   const { email, loading } = useCurrentUserEmail();
   const sources = mode === "performance" ? performanceSources : marketSources;
   const tasksBySource = mode === "performance" ? performanceTasks : marketTasks;
-  const [activeSource, setActiveSource] = React.useState("overview");
-
-  React.useEffect(() => { setActiveSource("overview"); }, [mode]);
+  const validSourceIds = React.useMemo(() => new Set(sources.map(s => s.id)), [sources]);
+  const activeSource = sourceId && validSourceIds.has(sourceId) ? sourceId : "overview";
 
   if (loading) {
     return <div style={{ padding: 28, color: "#9ca3af", fontSize: 13 }}>載入資料工作區…</div>;
@@ -179,7 +179,7 @@ export default function DataWorkspacePage() {
             {isPerformance ? "成效儀表板" : "市場情報"}
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6b7280" }}>
-            {isPerformance ? "把 Meta、Google、GA、Shopline 轉成 Agent 診斷與下一步。" : "把輿情、關鍵字、GEO、競品訊號轉成策略任務。"}
+            {isPerformance ? "左側平台列已切換成 Meta、Google、GA、Shopline 等成效資料源。" : "左側平台列已切換成總覽、輿情、關鍵字、GEO、競品、機會等市場情報功能。"}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, padding: 4, border: "1px solid #e5e7eb", borderRadius: 999, background: "#fff" }}>
@@ -193,7 +193,7 @@ export default function DataWorkspacePage() {
           {sources.map(source => {
             const active = source.id === activeSource;
             return (
-              <button key={source.id} onClick={() => setActiveSource(source.id)} title={source.label} style={{
+              <button key={source.id} onClick={() => navigate(`/${mode === "market" ? "market-intel" : "performance"}/${source.id}`)} title={source.label} style={{
                 width: "100%", height: 62, borderRadius: 16, border: active ? `1.5px solid ${source.color}` : "1px solid transparent",
                 background: active ? `${source.color}12` : "transparent", color: active ? source.color : "#6b7280",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
