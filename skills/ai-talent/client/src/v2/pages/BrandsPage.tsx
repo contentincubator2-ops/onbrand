@@ -5167,20 +5167,37 @@ function BrandEntityGrid({
                   const imgUrl = imgCandidates.find((c: any) => typeof c === "string" && /^https?:\/\//.test(c)) as string | undefined;
                   return (
                   <div
-                    className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden"
+                    className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden relative"
                     style={{ aspectRatio: "4 / 3", maxHeight: 140 }}
                   >
                     {imgUrl ? (
-                      <img
-                        src={imgUrl}
-                        alt={item.name}
-                        loading="lazy"
-                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                        onError={(e) => {
-                          // Hide broken image; parent placeholder still shows
-                          (e.currentTarget as HTMLImageElement).style.display = "none";
-                        }}
-                      />
+                      // 2026-07-24 (CJ「圖片頭都被切一半…如何適應不同品牌官網
+                      // 圖片不一致，但又能完整呈現」): source sites ship any
+                      // aspect ratio (fashion sites = portrait model shots) and
+                      // object-cover in a 4:3 box beheads them. Universal fix:
+                      // the REAL image is object-contain (always fully visible,
+                      // any ratio), and the letterbox gap is filled by the same
+                      // image blown up + blurred as a soft backdrop — adapts to
+                      // every source site with zero per-brand tuning.
+                      <>
+                        <img
+                          src={imgUrl}
+                          aria-hidden
+                          className="absolute inset-0 w-full h-full object-cover scale-110 opacity-50"
+                          style={{ filter: "blur(16px)" }}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                        />
+                        <img
+                          src={imgUrl}
+                          alt={item.name}
+                          loading="lazy"
+                          className="relative w-full h-full object-contain transition-transform group-hover:scale-105"
+                          onError={(e) => {
+                            // Hide broken image; parent placeholder still shows
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      </>
                     ) : (
                       <div className="flex flex-col items-center gap-1 text-neutral-300">
                         <FontAwesomeIcon icon={faBox} className="text-2xl" />
