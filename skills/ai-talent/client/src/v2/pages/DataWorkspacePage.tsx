@@ -84,7 +84,7 @@ const marketSources: Source[] = [
   { id: "listening", label: "輿情監測", short: "輿情", icon: <Activity size={18} />, color: "#DC2626", desc: "把討論切成價格、版型、甜美風格、通路信任四類訊號" },
   { id: "keywords", label: "關鍵字分析", short: "KW", icon: <Search size={18} />, color: "#2563EB", desc: "產品資料 → 品類詞 / 風格詞 / 場景詞 / 高意圖詞" },
   { id: "geo", label: "GEO / SEO", short: "GEO", icon: <Globe2 size={18} />, color: "#059669", desc: "AI 搜尋與一般搜尋需要引用的品牌證據缺口" },
-  { id: "competitors", label: "競品情報", short: "競品", icon: <Database size={18} />, color: "#9333EA", desc: "以定位、商品、官方頁與可搜尋語境定義競品集合" },
+  { id: "competitors", label: "競品情報", short: "競品", icon: <Database size={18} />, color: "#9333EA", desc: "用 social listening 儀表板檢查溫柔、自然、質感三個溝通點在競品間是否被市場認定" },
   { id: "opportunity", label: "機會診斷", short: "機會", icon: <Sparkles size={18} />, color: "#EA580C", desc: "把市場情報轉成內容、SEO、廣告與商品頁任務" },
 ];
 
@@ -144,9 +144,9 @@ const marketTasks: Record<string, TaskCard[]> = {
     { title: "競品引用比較", agent: AGENTS.marketPm, skill: "source-backed-competitive-evidence", data: "官方頁標題與描述", output: "誰更容易被搜尋與 AI 推薦" },
   ],
   competitors: [
-    { title: "競品集合定義", agent: AGENTS.marketPm, skill: "source-backed-competitive-evidence", data: "品牌定位 + 產品 + 官方公開頁", output: "直接 / 間接 / 風格競品分層" },
-    { title: "競品訊息地圖", agent: AGENTS.seo, skill: "branding-3-layer", data: "官網 meta / 商品線 / 價值主張", output: "訊息空白與我方切入點" },
-    { title: "案例靈感庫", agent: AGENTS.ecommerceVisual, skill: "market-intel", data: "creative_cases + competitor pages", output: "可借鏡 campaign pattern" },
+    { title: "形象認知監測", agent: AGENTS.social, skill: "social-listening-reporting", data: "Iris Girls / AIR SPACE / PAZZO / Mercci22 / IRIS GARDEN × 溫柔/自然/質感 query pack", output: "市場是否真的把品牌與三個宣稱連在一起" },
+    { title: "競品形象雷達圖", agent: AGENTS.marketPm, skill: "opview-social-listening", data: "OpView/Meltwater mentions + sentiment + topic co-occurrence", output: "三軸聲量、情緒與佔有率比較" },
+    { title: "溝通缺口轉任務", agent: AGENTS.content, skill: "source-backed-competitive-evidence", data: "官方定位 + 社群原文 + IG footprint", output: "每個弱軸對應內容、商品頁、廣告測試任務" },
   ],
   opportunity: [
     { title: "本週機會點排序", agent: AGENTS.marketPm, skill: "consulting-delivery-playbooks", data: "趨勢 + 聲量 + 競品空白", output: "P0/P1/P2 機會清單" },
@@ -257,28 +257,60 @@ const irisMarketDesign: Record<string, PageDesign> = {
     ],
   },
   competitors: {
-    hypothesis: "競品頁要用真實公開資料呈現『為什麼是競品』，並把官方定位、IG 量級、可攻空白放在同一張 matrix。",
-    actions: ["競品卡片加入官方 URL、官方描述、IG followers、Iris Girls 切入點", "把直接/間接/風格競品分層", "後續接社群聲量後增加 mentions/sentiment 欄位"],
+    hypothesis: "競品情報改成 social listening 儀表板：不是只比粉絲數，而是用 Iris Girls 想溝通的『溫柔、自然、質感』三個形象詞，監測市場是否真的把這些詞跟 Iris Girls 連在一起，並比較 AIR SPACE、PAZZO、Mercci22、IRIS GARDEN 的認知佔位。",
+    actions: ["建立三個形象 query pack：溫柔 / 自然 / 質感", "每個競品同時看 co-mention、sentiment、代表原文與來源平台", "把未被市場認定的溝通點轉成內容與商品頁補強任務"],
     blocks: [
       {
-        headline: "Iris Girls 競品 matrix：官方定位 × IG footprint × 可攻空白",
-        summary: "直接競品/替代選擇包含 AIR SPACE、PAZZO、Mercci22、IRIS GARDEN；IRIS 主線是同集團升級參照。AIR SPACE 強在平價時尚和 385K IG 量級；PAZZO 強在生活好感與 303K IG；Mercci22 強在多支線/品牌 IP 與 223K IG；IRIS GARDEN 強在韓系清新風格與 33K IG。Iris Girls 的差異化應聚焦專櫃信任 × 甜美符號 × 價格親和。",
+        headline: "Social listening 競品儀表板：三個宣稱點不是品牌自己說了算",
+        summary: "新版競品頁會用社群聆聽儀表板檢查：當市場討論 Iris Girls 與競品時，是否自然出現『溫柔、自然、質感』這三個形象。Iris Girls 若想主張溫柔、自然、質感，就不能只看官方定位文字；要看 Dcard、Threads、IG caption/comment、PTT、新聞/Blog 中，這些詞是否與品牌或商品一起被提到。",
         metrics: [
-          { label: "AIR SPACE", value: "385K", note: "IG followers｜平價時尚" },
-          { label: "PAZZO", value: "303K", note: "IG followers｜生活好感" },
-          { label: "Mercci22", value: "223K", note: "IG followers｜多元支線" },
+          { label: "溫柔", value: "Image axis 01", note: "query: 溫柔/柔和/氣質/柔美/舒服" },
+          { label: "自然", value: "Image axis 02", note: "query: 自然/日常/不刻意/清新/舒服穿" },
+          { label: "質感", value: "Image axis 03", note: "query: 質感/材質/剪裁/不廉價/精緻" },
         ],
-        bullets: ["AIR SPACE 是流量/價格/女孩情緒語境競品。", "PAZZO 是日常質感與生活好感競品。", "Mercci22 是社群支線與多風格內容競品。", "IRIS GARDEN 是韓系清新風格競品。"],
+        bullets: ["判斷方式：品牌詞 × 形象詞的共同出現量，不是單看品牌自己官網文案。", "每個競品要同時看 mentions、sentiment、source mix、代表原文，才知道市場認不認。", "若 Iris Girls 在『質感』低於 PAZZO/Mercci22，就代表商品頁與素材要補材質、剪裁、實穿證據。"],
         evidence: [
-          { label: "IRIS official", source: "https://www.iris.com.tw", url: "https://www.iris.com.tw", note: "細緻工藝、女性迷人氣質、裝扮喜悅與感動。" },
-          { label: "AIR SPACE official + IG", source: "official site / @airspacetaiwan", url: "https://www.airspaceonline.com/tw/zh-hant/", note: "平價時尚；IG 385K followers。" },
-          { label: "PAZZO official + IG", source: "official site / @pazzo", url: "https://www.pazzo.com.tw", note: "生活好感衣著；IG 303K followers。" },
-          { label: "Mercci22 official + IG", source: "official site / @mercci22", url: "https://www.mercci22.com", note: "多元質感穿搭；IG 223K followers。" },
-          { label: "IRIS GARDEN official + IG", source: "official site / @irisgarden2023", url: "https://www.irisgarden.com.tw", note: "韓系清新服飾；IG 33K followers。" },
+          { label: "Monitoring design", source: "social-listening-reporting + OpView/Meltwater dashboard pattern", note: "以形象詞 co-mention、情緒、來源分布、熱門原文作為競品比較欄位。" },
+          { label: "Brand claim seed", source: "brands#2957 Iris Girls", note: "Iris Girls 目前要溝通的核心形象：溫柔、自然、質感。" },
+          { label: "Competitor set", source: "IRIS / AIR SPACE / PAZZO / Mercci22 / IRIS GARDEN", note: "由商品定位、女裝場景、官方頁與社群 footprint 定義。" },
+        ],
+      },
+      {
+        headline: "競品三軸認知看板：誰更像『溫柔』、誰更像『自然』、誰更像『質感』",
+        summary: "頁面視覺改成 social listening dashboard：橫向比較五個品牌在三個形象軸上的市場認知。初版先放 query pack 與資料源狀態；一旦接上 OpView/Meltwater export，就把每格填入 mentions、正負情緒、代表原文與來源平台，直接看 Iris Girls 的宣稱是否被市場承認。",
+        metrics: [
+          { label: "Iris Girls", value: "待監測", note: "主張：溫柔 / 自然 / 質感；需驗證市場是否 co-mention" },
+          { label: "PAZZO", value: "質感/日常", note: "官方語境：生活好感衣著、質地、幸福感" },
+          { label: "AIR SPACE", value: "女孩/平價", note: "官方語境：平價時尚、女孩穿搭" },
+          { label: "Mercci22", value: "質感/多元", note: "官方語境：多元質感穿搭、流行趨勢" },
+          { label: "IRIS GARDEN", value: "自然/清新", note: "官方語境：韓系清新服飾" },
+        ],
+        bullets: ["PAZZO、Mercci22 會是『質感』軸的主要競爭者。", "AIR SPACE 在『女孩感/流行/價格親和』很強，會稀釋 Iris Girls 的甜美主張。", "IRIS GARDEN 可作為『自然/清新』軸的對照組。", "Iris Girls 要贏，不能只喊三個詞；要補真實穿搭情境與材質證據，讓社群原文開始使用這些詞。"],
+        evidence: [
+          { label: "PAZZO official", source: "official meta", url: "https://www.pazzo.com.tw", note: "生活好感衣著、質地、幸福感、新生活哲學。" },
+          { label: "AIR SPACE official", source: "official meta", url: "https://www.airspaceonline.com/tw/zh-hant/", note: "平價時尚、女孩穿搭語境清楚。" },
+          { label: "Mercci22 official", source: "official meta", url: "https://www.mercci22.com", note: "多元質感穿搭、流行趨勢、支線與品牌 IP。" },
+          { label: "IRIS GARDEN official", source: "official site / @irisgarden2023", url: "https://www.irisgarden.com.tw", note: "韓系清新服飾；IG 33K followers。" },
+        ],
+      },
+      {
+        headline: "前台要呈現的 social listening 欄位",
+        summary: "每一個競品 × 溝通點都應呈現四個欄位：①聲量/佔有率，②正負情緒，③代表原文，④來源平台。這樣 PM 可以直接判斷：Iris Girls 的『溫柔』是市場已認定、還是只是品牌想講；『自然』是否被 IRIS GARDEN 佔走；『質感』是否被 PAZZO/Mercci22 佔走。",
+        metrics: [
+          { label: "Volume", value: "mentions", note: "品牌詞 × 形象詞共同命中" },
+          { label: "Sentiment", value: "+ / -", note: "同一軸上的正負評與疑慮" },
+          { label: "Evidence", value: "原文", note: "每格至少保留 3 則代表貼文/留言" },
+        ],
+        bullets: ["看板上方：三軸雷達圖，快速看 Iris Girls 是否符合自己宣稱。", "中段：競品矩陣，五品牌 × 三形象詞。", "右側：代表原文與下一步內容任務，避免只剩抽象分數。"],
+        evidence: [
+          { label: "OpView fields", source: "Trend / Sentiment / Source / PopularArticle", note: "可填入總聲量、情緒、來源分布、熱門文章與命中原文。" },
+          { label: "Meltwater fields", source: "Volume / Sentiment / Source mix / Top posts", note: "若 OpView topic pool 不可用，可用 Meltwater dashboard-only 讀數補同版型。" },
+          { label: "Frontend source status", source: "connector-pending", note: "目前前台已改成 social-listening 儀表板版型；live mentions 接入後欄位會直接更新。" },
         ],
       },
     ],
   },
+
   opportunity: {
     hypothesis: "市場機會頁要把真實數據轉成可派工任務：Search/GEO 補證據、IG 補社群量級、商品 seed 補集合頁。",
     actions: ["P0：甜美但不幼稚 SEO/IG campaign", "P1：Iris Girls vs AIR SPACE/PAZZO/Mercci22 比較頁", "P2：IRIS 熟齡客跨線 Iris Girls 的 LINE/FB 再行銷"],
