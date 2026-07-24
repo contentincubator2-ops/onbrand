@@ -7,7 +7,7 @@
  * from content generation to data diagnosis.
  */
 import React from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import {
   Activity, BarChart3, Database, Globe2, LineChart, Megaphone,
   MousePointerClick, Search, ShoppingBag, Sparkles, Target, TrendingUp,
@@ -142,7 +142,6 @@ function useCurrentUserEmail() {
 
 export default function DataWorkspacePage() {
   const loc = useLocation();
-  const navigate = useNavigate();
   const { sourceId } = useParams<{ sourceId?: string }>();
   const mode: Mode = loc.pathname.startsWith("/market-intel") ? "market" : "performance";
   const { email, loading } = useCurrentUserEmail();
@@ -182,30 +181,9 @@ export default function DataWorkspacePage() {
             {isPerformance ? "左側平台列已切換成 Meta、Google、GA、Shopline 等成效資料源。" : "左側平台列已切換成總覽、輿情、關鍵字、GEO、競品、機會等市場情報功能。"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, padding: 4, border: "1px solid #e5e7eb", borderRadius: 999, background: "#fff" }}>
-          <button onClick={() => navigate("/performance")} style={modeBtn(isPerformance)}>廣告成效</button>
-          <button onClick={() => navigate("/market-intel")} style={modeBtn(!isPerformance)}>市場數據</button>
-        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "86px minmax(0, 1fr) 320px", gap: 16, alignItems: "start" }}>
-        <aside style={{ border: "1px solid #e5e7eb", borderRadius: 22, background: "#fff", padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-          {sources.map(source => {
-            const active = source.id === activeSource;
-            return (
-              <button key={source.id} onClick={() => navigate(`/${mode === "market" ? "market-intel" : "performance"}/${source.id}`)} title={source.label} style={{
-                width: "100%", height: 62, borderRadius: 16, border: active ? `1.5px solid ${source.color}` : "1px solid transparent",
-                background: active ? `${source.color}12` : "transparent", color: active ? source.color : "#6b7280",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
-                cursor: "pointer", transition: "all 0.14s ease",
-              }}>
-                {source.icon}
-                <span style={{ fontSize: 11, fontWeight: 750 }}>{source.short}</span>
-              </button>
-            );
-          })}
-        </aside>
-
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 320px", gap: 16, alignItems: "start" }}>
         <main style={{ minWidth: 0 }}>
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "linear-gradient(135deg,#fff 0%,#fafafa 100%)", padding: 22, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -255,12 +233,4 @@ export default function DataWorkspacePage() {
       </div>
     </div>
   );
-}
-
-function modeBtn(active: boolean): React.CSSProperties {
-  return {
-    border: "none", borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 800,
-    background: active ? "#111827" : "transparent", color: active ? "#fff" : "#6b7280",
-    cursor: "pointer", transition: "all 0.14s ease",
-  };
 }
