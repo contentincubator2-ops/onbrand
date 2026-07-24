@@ -496,9 +496,14 @@ ${fullCtx.block}${real.context}${knowledgeBlock}`;
   getStatusBatch: protectedProcedure
     .input(z.object({
       entityKind: entityKindSchema,
-      entityIds: z.array(z.number().int().positive()).min(1).max(50),
+      // 2026-07-24 (CJ「載入失敗：Array must contain at least 1 element」):
+      // react-query can emit one request during the enabled=false boundary
+      // when the running set empties — accept the empty array and return []
+      // instead of a Zod error the UI surfaces as a scary 載入失敗.
+      entityIds: z.array(z.number().int().positive()).max(50),
     }))
     .query(async ({ ctx, input }) => {
+      if (input.entityIds.length === 0) return [];
       const userId = ctx.user!.id;
       const ph = input.entityIds.map(() => "?").join(",");
       const [rows]: any = await localPool.execute(
