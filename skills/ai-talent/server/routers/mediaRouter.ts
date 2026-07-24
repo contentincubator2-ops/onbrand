@@ -20,6 +20,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callLLM } from "../_core/llmRouter";
 import { dispatchGenerate, checkJob, type GenOptions } from "../_core/mediaGen";
+import localPool from "../localDb";
 
 // ── Step 1 — design direction proposal (LLM, no media gen) ───────────────
 export const mediaRouter = router({
@@ -132,6 +133,10 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       size: z.enum(["1024x1024", "1024x1536", "1536x1024", "1024x1792", "1792x1024"]).optional(),
       imageUrl: z.string().optional(),
       quality: z.enum(["low", "medium", "high"]).optional(),
+      /** 2026-07-25 (CJ product-faithful gen): "product" = imageUrl is a
+       *  REAL product photo to composite faithfully — swaps the NO-TEXT
+       *  guard for the PRODUCT-FIDELITY guard (real label must survive). */
+      subjectMode: z.enum(["product"]).optional(),
     }))
     .mutation(async ({ input }) => {
       // 2026-07-20 (CJ「EDM 換圖後出現錯誤中文字」): this was the ONE image
@@ -139,11 +144,17 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       // onto packaging/labels. Same guard as imageGen's buildPrompt:
       // dominant NO-TEXT directive + negative_prompt (PiAPI models honour
       // the negative; gpt-image/Imagen honour the in-prompt directive).
-      const { NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT } = await import("../_core/imageGen");
+      // 2026-07-25: product-subject mode uses PRODUCT_FAITHFUL_PROMPT_BLOCK
+      // instead — the real product's own label must remain letter-perfect,
+      // so the blanket text-suppression negative is NOT sent.
+      const { NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT, PRODUCT_FAITHFUL_PROMPT_BLOCK } = await import("../_core/imageGen");
       const isImage = input.kind === "image";
+      const isProductSubject = isImage && input.subjectMode === "product" && !!input.imageUrl;
       const opts: GenOptions = {
-        prompt: isImage ? `${input.promptEn}\n\n${NO_TEXT_PROMPT_BLOCK}` : input.promptEn,
-        negativePrompt: isImage ? NO_TEXT_NEGATIVE_PROMPT : undefined,
+        prompt: isProductSubject
+          ? `${input.promptEn}\n\n${PRODUCT_FAITHFUL_PROMPT_BLOCK}`
+          : isImage ? `${input.promptEn}\n\n${NO_TEXT_PROMPT_BLOCK}` : input.promptEn,
+        negativePrompt: isImage && !isProductSubject ? NO_TEXT_NEGATIVE_PROMPT : undefined,
         aspectRatio: input.aspectRatio,
         size: input.size,
         imageUrl: input.imageUrl,
@@ -169,6 +180,48 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
           message: e instanceof Error ? e.message : String(e),
         });
       }
+    }),
+
+  /**
+   * 2026-07-25 (CJ product-faithful gen): list the brand's products that
+   * have a REAL photo — drives the「📦 使用真實產品圖」picker in the media
+   * flows. Image candidates read from positioning JSON, same locations as
+   * brandColorsRouter.generateBrandedVariants.
+   */
+  listProductImages: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const [bRows]: any = await localPool.execute(
+        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, userId],
+      );
+      if (!(bRows as any[])[0]) return { products: [] as Array<{ productId: number; name: string; imageUrl: string }> };
+      const [rows]: any = await localPool.execute(
+        `SELECT id, name, positioning FROM products WHERE brandId = ? AND userId = ? LIMIT 100`,
+        [input.brandId, userId],
+      );
+      const products: Array<{ productId: number; name: string; imageUrl: string }> = [];
+      for (const row of (rows as any[])) {
+        try {
+          let p: any = row.positioning;
+          if (typeof p === "string") p = JSON.parse(p);
+          const candidates = [
+            p?.imageUrl, p?.image,
+            p?._interim?.imageUrl, p?._interim?.image,
+            Array.isArray(p?.images) ? p.images[0] : null,
+            Array.isArray(p?._interim?.images) ? p._interim.images[0] : null,
+            Array.isArray(p?._assets?.photos) ? (typeof p._assets.photos[0] === "string" ? p._assets.photos[0] : p._assets.photos[0]?.url) : null,
+          ];
+          for (const c of candidates) {
+            if (typeof c === "string" && /^https?:\/\//.test(c)) {
+              products.push({ productId: Number(row.id), name: String(row.name ?? ""), imageUrl: c });
+              break;
+            }
+          }
+        } catch { /* skip malformed rows */ }
+      }
+      return { products };
     }),
 
   /** Poll an async generation (video) by taskId. */

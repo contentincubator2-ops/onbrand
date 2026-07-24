@@ -84,6 +84,21 @@ export default function MediaGenFlow({
   const [pickedModel, setPickedModel] = React.useState<MediaModel | null>(null);
   const [genResult, setGenResult]     = React.useState<{ ok: boolean; message?: string; url?: string } | null>(null);
 
+  // 2026-07-25 (CJ product-faithful gen「📦 使用真實產品圖」): brands with
+  // real product photos (IRIS/Iris Girls seeded from 91APP) can composite
+  // the ACTUAL product instead of an AI-imagined one. When enabled, the
+  // generation runs on Nano Banana (subject-reference) with the fidelity
+  // guard — see project_product_faithful_imagegen quality bar.
+  const productImagesQ = (trpc as any).media?.listProductImages?.useQuery?.(
+    { brandId: brandId ?? 0 },
+    { enabled: !!brandId && kind === "image", refetchOnWindowFocus: false, staleTime: 60_000 },
+  ) ?? { data: null };
+  const productImages: Array<{ productId: number; name: string; imageUrl: string }> =
+    (productImagesQ.data as any)?.products ?? [];
+  const [useProduct, setUseProduct] = React.useState(false);
+  const [pickedProduct, setPickedProduct] = React.useState<{ productId: number; name: string; imageUrl: string } | null>(null);
+  const productMode = useProduct && kind === "image" && !!pickedProduct;
+
   React.useEffect(() => {
     if (open) {
       setPhase("input");
@@ -165,8 +180,12 @@ export default function MediaGenFlow({
     }
     setBusy(true); setErr(null);
     try {
+      // Product mode routes to Nano Banana (the only wired subject-reference
+      // model) regardless of the picked card, with the real photo attached.
+      const effectiveModelId = productMode ? "google/nano-banana" : m.id;
       const res: any = await generateMutation.mutateAsync({
-        kind, modelId: m.id, promptEn, brandId,
+        kind, modelId: effectiveModelId, promptEn, brandId,
+        ...(productMode ? { imageUrl: pickedProduct!.imageUrl, subjectMode: "product" as const } : {}),
       });
       setGenResult({
         ok: !!res?.ok,
@@ -175,7 +194,7 @@ export default function MediaGenFlow({
       });
       // Notify the squad-runner so it can attach the URL to the active step.
       if (res?.ok && res?.url && onComplete) {
-        onComplete({ url: String(res.url), modelId: m.id, promptEn });
+        onComplete({ url: String(res.url), modelId: effectiveModelId, promptEn });
       }
     } catch (e: any) {
       setGenResult({ ok: false, message: e?.message ?? String(e) });
@@ -217,6 +236,48 @@ export default function MediaGenFlow({
           onSkip={onSkipToPrompt}
           busy={busy}
         />
+      )}
+      {/* 2026-07-25 (CJ product-faithful gen): real-product subject picker —
+          shown when the brand has products with photos. When on, generation
+          routes to Nano Banana with the real photo + fidelity guard. */}
+      {kind === "image" && (phase === "prompt" || phase === "model") && productImages.length > 0 && (
+        <div className="rounded-lg border border-default-200 bg-default-50 px-3 py-2.5">
+          <label className="flex items-center gap-2 cursor-pointer flex-wrap">
+            <input
+              type="checkbox"
+              checked={useProduct}
+              onChange={(e) => {
+                setUseProduct(e.target.checked);
+                if (e.target.checked && !pickedProduct) setPickedProduct(productImages[0] ?? null);
+              }}
+            />
+            <span className="text-small font-medium">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
+            <span className="text-tiny text-default-500">
+              {lang === "en"
+                ? "Composite the actual product into the scene (auto-routes to Nano Banana)"
+                : "把真實產品原貌合成進場景 — 自動改用 Nano Banana 產品保真模型"}
+            </span>
+          </label>
+          {useProduct && (
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {productImages.slice(0, 12).map((p) => (
+                <button
+                  key={p.productId}
+                  onClick={() => setPickedProduct(p)}
+                  title={p.name}
+                  className={`w-14 h-14 rounded-md overflow-hidden border-2 transition ${
+                    pickedProduct?.productId === p.productId ? "border-primary" : "border-transparent hover:border-default-300"
+                  }`}
+                >
+                  <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                </button>
+              ))}
+              {pickedProduct && (
+                <span className="text-tiny text-default-600 self-center ml-1 truncate max-w-[200px]">{pickedProduct.name}</span>
+              )}
+            </div>
+          )}
+        </div>
       )}
       {phase === "prompt" && (
         <PromptPhase

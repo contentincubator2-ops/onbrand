@@ -137,6 +137,54 @@ async function genAzureImage2(opts: GenOptions): Promise<GenResult> {
   return { status: "ready", modelId: "azure/gpt-image-2", url: saveB64(b64, "img") };
 }
 
+// ── 2.5 Google Gemini 2.5 Flash Image（Nano Banana）— image edit / subject
+// reference. 2026-07-25 (CJ「合成 IRIS 真實產品」product-faithful gen):
+// takes the REAL product photo via opts.imageUrl and composites it into
+// the prompted scene while preserving the product exactly (the quality
+// bar = Photoroom Product Staging / imagine.art; see
+// project_product_faithful_imagegen memory). Also works text-only.
+async function genNanoBanana(opts: GenOptions): Promise<GenResult> {
+  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
+  if (!key) throw new Error("GEMINI_API_KEY missing");
+  const model = process.env.NANO_BANANA_MODEL ?? "gemini-2.5-flash-image";
+
+  const parts: any[] = [];
+  if (opts.imageUrl) {
+    const imgResp = await fetch(opts.imageUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!imgResp.ok) throw new Error(`subject image download ${imgResp.status}`);
+    const mime = imgResp.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+    const b64 = Buffer.from(await imgResp.arrayBuffer()).toString("base64");
+    parts.push({ inline_data: { mime_type: mime, data: b64 } });
+  }
+  // Aspect-ratio hint goes in-prompt — flash-image has no size parameter.
+  const arHint = opts.aspectRatio ? `\n\nOutput aspect ratio: ${opts.aspectRatio}.` : "";
+  parts.push({ text: `${opts.prompt}${arHint}` });
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts }],
+      generationConfig: { responseModalities: ["IMAGE"] },
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`NanoBanana ${resp.status}: ${t.slice(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  const outParts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
+  const imgPart = outParts.find((p) => p?.inlineData?.data || p?.inline_data?.data);
+  const b64out = imgPart?.inlineData?.data ?? imgPart?.inline_data?.data;
+  if (!b64out) {
+    const finish = data?.candidates?.[0]?.finishReason ?? "no image part";
+    throw new Error(`NanoBanana no image (${finish})`);
+  }
+  return { status: "ready", modelId: "google/nano-banana", url: saveB64(b64out, "img") };
+}
+
 // ── 3. Google Imagen 4 (current available model on the account) ──────────
 async function genImagen4(opts: GenOptions, variant: "fast" | "default" | "ultra" = "default"): Promise<GenResult> {
   const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
@@ -576,6 +624,7 @@ export async function dispatchGenerate(modelId: string, opts: GenOptions): Promi
   switch (modelId) {
     case "openai/gpt-image-1":     return genOpenAIImage(opts, "gpt-image-1");
     case "openai/gpt-image-2":     return genOpenAIImage(opts, "gpt-image-2");
+    case "google/nano-banana":     return genNanoBanana(opts);
     case "azure/gpt-image-2":      return genAzureImage2(opts);
     // Imagen 4 (real model on account). Removed legacy imagen-3 /
     // imagen-4 alias cases 2026-04-30 — client registry uses explicit

@@ -37,6 +37,26 @@ export const NO_TEXT_PROMPT_BLOCK =
   "it is a clean background; any title text is added afterwards on a separate " +
   "layer. If you are tempted to add a title or label, leave that area as empty " +
   "visual space instead.";
+/**
+ * 2026-07-25 (CJ product-faithful gen): when a REAL product photo is the
+ * subject reference, the NO-TEXT rule must NOT strip the product's own
+ * label — fidelity criteria per project_product_faithful_imagegen memory:
+ * product pixel-true (shape/material/colors/label text verbatim), natural
+ * placement (matching light, perspective, contact shadow), and still zero
+ * GENERATED text anywhere else in the frame.
+ */
+export const PRODUCT_FAITHFUL_PROMPT_BLOCK =
+  "PRODUCT FIDELITY — the attached image is the REAL product; this is the " +
+  "most important rule: reproduce the product EXACTLY as shown — identical " +
+  "shape, proportions, materials, colors, and every printed label, logo and " +
+  "text on the product itself must remain letter-perfect and unaltered. Do " +
+  "NOT redraw, restyle, re-color or re-label the product. Place it naturally " +
+  "into the scene: lighting direction consistent with the environment, " +
+  "correct perspective and scale, realistic contact shadows and reflections " +
+  "— it must look photographed in place, never pasted on. Apart from the " +
+  "product's own printed label, do NOT add any other text, captions, " +
+  "watermarks, badges or typography anywhere in the image.";
+
 export const NO_TEXT_NEGATIVE_PROMPT =
   "text, letters, words, numbers, chinese characters, japanese characters, " +
   "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +

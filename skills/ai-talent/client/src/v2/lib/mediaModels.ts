@@ -47,6 +47,23 @@ export interface MediaModel {
 // ── Image ────────────────────────────────────────────────────────────────
 export const IMAGE_MODELS: MediaModel[] = [
   {
+    // 2026-07-25 (CJ product-faithful gen): Gemini 2.5 Flash Image —
+    // subject-reference compositing. Feed the REAL product photo and it
+    // places it into the prompted scene while preserving the product
+    // (quality bar = Photoroom Product Staging / imagine.art).
+    id: "google/nano-banana",
+    name: "Nano Banana（產品保真）",
+    vendor: "Google",
+    provider: "google-gemini",
+    kind: "image",
+    status: "ready",
+    strengths: "真實產品置入最強 — 保留產品原貌與標籤，光影自然融合場景；也可純文字生圖",
+    costEstimateUsd: 0.04,
+    durationSecEstimate: 15,
+    formats: ["1:1", "4:3", "16:9", "9:16"],
+    tags: ["product-staging", "subject-reference", "ecommerce-edit", "realism"],
+  },
+  {
     id: "openai/gpt-image-1",
     name: "GPT Image 1",
     vendor: "OpenAI",
