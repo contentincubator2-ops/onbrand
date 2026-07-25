@@ -50,10 +50,20 @@ Instagram 走同一條 Facebook OAuth 取 token，**根因完全相同**。Linke
 | `server/_core/publishProvider.ts` | 新增 | 純函式，決定平台走哪個供應商 |
 | `server/_core/bundleSocial.ts` | 新增 | bundle.social HTTP client |
 | `server/_core/bundlePublish.ts` | 新增 | OnBrand 資料 → bundle.social payload 轉換 |
+| `server/_core/bundlePublishService.ts` | 新增 | 發布流程編排（讀 teamId → 上傳 → 發文 → 解析錯誤） |
 | `server/routers/bundleConnectRouter.ts` | 新增 | 前端連接用的 tRPC 端點 |
 | `server/routers/calendarRouter.ts` | **僅插入早期分派** | 現有 facebook / instagram / linkedin 分支不動 |
 | `client/src/v2/pages/CalendarPage.tsx` | 小改 | 連接按鈕依 provider 分流 |
 | `client/src/v2/pages/RunPage.tsx` | 小改 | 同上 |
+| `client/src/v2/components/positioning/BrandSettingsSheet.tsx` | 小改 | 同上，另含連接狀態判斷 |
+
+### 3.1.1 實作時對本節的三處增補
+
+設計定稿後，實作過程中發現三件原設計沒涵蓋的事，均為往上增補、未取消任何原有承諾：
+
+1. **`bundlePublishService.ts` 獨立成第四個模組**——發布流程需要注入資料庫讀取與 HTTP client 才能離線測試；併入 `bundlePublish.ts` 會與 `bundleSocial.ts` 形成循環 import。
+2. **`bundleConnectRouter` 多一個 `getProviders` 端點**——前端必須知道每個平台走哪條路，否則得在瀏覽器複製一份環境變數判斷邏輯。
+3. **`BrandSettingsSheet.tsx` 一併改動**——它是第三個連接入口，且其「已連接」綠燈原本讀 `brands.fbPageId`；bundle 路徑下該欄位為空，會永遠顯示未連接，因此改為在 bundle 平台上讀 bundle.social 的實際狀態。
 
 ### 3.2 供應商開關
 
@@ -195,6 +205,7 @@ vitest，測試檔放 `server/_core/*.test.ts`，比照既有慣例。
 | `publishProvider.test.ts` | 預設值、全域覆寫、每平台覆寫、空字串、無法辨識的值 |
 | `bundlePublish.test.ts` | FB 純文字 payload、IG 需圖、IG 缺圖報錯、LinkedIn、平台名稱對照、`referenceKey` 格式 |
 | `bundleSocial.test.ts` | 注入 `fetchImpl`（比照 [`pipedreamFacebook.ts`](../../../skills/ai-talent/server/_core/pipedreamFacebook.ts) 慣例）驗證 URL / header / body / 錯誤轉譯 |
+| `bundlePublishService.test.ts` | 未連接時拒絕發布、純文字不呼叫上傳 API、有圖先上傳、平台錯誤視為失敗、缺 permalink 仍算成功 |
 
 不撰寫打真實 API 的自動化測試——該部分由 PoC 手動驗證。
 
