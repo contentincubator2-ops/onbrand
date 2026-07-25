@@ -189,8 +189,10 @@ export default function CalendarPage() {
   // and one-time Connect token warm so the actual button click can call it
   // synchronously while the browser's user activation is still valid.
   type FacebookConnectToken = { token: string; expiresAt: number };
+  type FacebookPage = { id: string; name: string; category: string };
   const pdCreateClientRef = useRef<any>(null);
   const pdFacebookTokensRef = useRef<Record<number, FacebookConnectToken>>({});
+  const pdFacebookPagesRef = useRef<Record<number, FacebookPage[] | undefined>>({});
   const pdFacebookPrefetchingRef = useRef<Record<number, boolean>>({});
 
   useEffect(() => {
@@ -202,17 +204,24 @@ export default function CalendarPage() {
   const prefetchFacebookConnect = React.useCallback(async (calBrandId: number) => {
     if (pdFacebookPrefetchingRef.current[calBrandId]) return;
     const cached = pdFacebookTokensRef.current[calBrandId];
-    if (pdCreateClientRef.current && cached?.expiresAt - Date.now() > 60_000) return;
+    const pagesChecked = pdFacebookPagesRef.current[calBrandId] !== undefined;
+    if (pdCreateClientRef.current && cached?.expiresAt - Date.now() > 60_000 && pagesChecked) return;
 
     pdFacebookPrefetchingRef.current[calBrandId] = true;
     try {
-      const [sdk, response] = await Promise.all([
+      const [sdk, response, existing] = await Promise.all([
         pdCreateClientRef.current
           ? Promise.resolve(null)
           : import("@pipedream/sdk/browser"),
         cached?.expiresAt - Date.now() > 60_000
           ? Promise.resolve(null)
           : fbConnectUrlMut?.mutateAsync?.({ brandId: calBrandId }),
+        pagesChecked
+          ? Promise.resolve(null)
+          : fbPagesMut?.mutateAsync?.({
+              brandId: calBrandId,
+              waitForPropagation: false,
+            }).catch(() => null),
       ]);
       if (sdk) pdCreateClientRef.current = sdk.createFrontendClient;
       if (response?.token) {
@@ -223,12 +232,22 @@ export default function CalendarPage() {
             : Date.now() + 300_000,
         };
       }
+      if (existing) {
+        pdFacebookPagesRef.current[calBrandId] = existing.pages ?? [];
+      }
     } finally {
       pdFacebookPrefetchingRef.current[calBrandId] = false;
     }
-  }, [fbConnectUrlMut]);
+  }, [fbConnectUrlMut, fbPagesMut]);
 
   const connectFacebookFromCalendar = React.useCallback((calBrandId: number) => {
+    const existingPages = pdFacebookPagesRef.current[calBrandId];
+    if ((existingPages?.length ?? 0) > 0) {
+      setFbPages(existingPages!);
+      setFbPickerBrandId(calBrandId);
+      return;
+    }
+
     const createFrontendClient = pdCreateClientRef.current;
     const cached = pdFacebookTokensRef.current[calBrandId];
     if (!createFrontendClient || !cached || cached.expiresAt - Date.now() < 30_000) {
@@ -254,12 +273,14 @@ export default function CalendarPage() {
       app: "facebook_pages",
       onSuccess: async () => {
         delete pdFacebookTokensRef.current[calBrandId];
+        delete pdFacebookPagesRef.current[calBrandId];
         // Poll getFacebookPages with backoff — Pipedream may take 5-20s to propagate
         for (let i = 0; i < 10; i++) {
           await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
           try {
             const pages = await fbPagesMut?.mutateAsync?.({ brandId: calBrandId });
             if ((pages?.pages?.length ?? 0) > 0) {
+              pdFacebookPagesRef.current[calBrandId] = pages!.pages;
               setFbPages(pages!.pages);
               setFbPickerBrandId(calBrandId);
               return;
