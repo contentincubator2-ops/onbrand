@@ -131,6 +131,57 @@ jobs:
               print('invalid response')
           " 2>/dev/null || echo "invalid response")
             echo "  • account=${ACCOUNT_ID} HTTP=${HTTP} ${SUMMARY}"
+
+            BUSINESS_TARGET="https://graph.facebook.com/v25.0/me/businesses?fields=id,name&limit=50"
+            BUSINESS_B64=$(printf '%s' "$BUSINESS_TARGET" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+            BUSINESS_HTTP=$(curl -s -o "/tmp/pd_businesses_${ACCOUNT_ID}.json" -w "%{http_code}" \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "X-PD-Environment: $PD_ENV" \
+              -H "x-pd-project-id: $PIPEDREAM_PROJECT_ID" \
+              "https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/proxy/${BUSINESS_B64}?external_user_id=${EXTERNAL_USER}&account_id=${ACCOUNT_ID}")
+            BUSINESS_SUMMARY=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_businesses_${ACCOUNT_ID}.json'))
+              businesses = d.get('data') or []
+              names = ', '.join(f\"{b.get('name','?')} ({b.get('id','?')})\" for b in businesses)
+              print(f\"businesses={len(businesses)} [{names}]\")
+          except Exception:
+              print('invalid response')
+          " 2>/dev/null || echo "invalid response")
+            echo "    businesses HTTP=${BUSINESS_HTTP} ${BUSINESS_SUMMARY}"
+
+            python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_businesses_${ACCOUNT_ID}.json'))
+              for business in d.get('data') or []:
+                  print(business.get('id', ''))
+          except Exception:
+              pass
+          " | while read -r BUSINESS_ID; do
+              [ -z "$BUSINESS_ID" ] && continue
+              for EDGE in owned_pages client_pages; do
+                EDGE_TARGET="https://graph.facebook.com/v25.0/${BUSINESS_ID}/${EDGE}?fields=id,name&limit=50"
+                EDGE_B64=$(printf '%s' "$EDGE_TARGET" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+                EDGE_HTTP=$(curl -s -o "/tmp/pd_${EDGE}_${ACCOUNT_ID}_${BUSINESS_ID}.json" -w "%{http_code}" \
+                  -H "Authorization: Bearer $ACCESS_TOKEN" \
+                  -H "X-PD-Environment: $PD_ENV" \
+                  -H "x-pd-project-id: $PIPEDREAM_PROJECT_ID" \
+                  "https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/proxy/${EDGE_B64}?external_user_id=${EXTERNAL_USER}&account_id=${ACCOUNT_ID}")
+                EDGE_SUMMARY=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_${EDGE}_${ACCOUNT_ID}_${BUSINESS_ID}.json'))
+              pages = d.get('data') or []
+              names = ', '.join(f\"{p.get('name','?')} ({p.get('id','?')})\" for p in pages)
+              print(f\"pages={len(pages)} [{names}]\")
+          except Exception:
+              print('invalid response')
+          " 2>/dev/null || echo "invalid response")
+                echo "      ${EDGE} HTTP=${EDGE_HTTP} ${EDGE_SUMMARY}"
+              done
+            done
           done
           echo ""
 
