@@ -15,6 +15,10 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { assertBrandOwner } from "../_core/brandAuth";
+import {
+  buildPipedreamAccountsUrl,
+  buildPipedreamProxyUrl,
+} from "../_core/pipedreamConnect";
 
 const CONTENT_TYPES = [
   "fb-content",
@@ -359,15 +363,26 @@ export const calendarRouter = router({
           });
         }
 
-        // Steps 1–3: get FB user token via shared _pdGetOAuthToken helper
-        const userToken = await _pdGetOAuthToken(row.brandId, "Facebook",
+        // Get the connected account metadata, then call Facebook through the
+        // Pipedream Connect Proxy. This works with Pipedream-managed OAuth;
+        // managed user credentials are intentionally not returned by the
+        // Accounts API.
+        const fbConnect = await _pdGetAccountContext(row.brandId, "Facebook",
           ["facebook_pages", "facebook", "facebook_oauth2"]);
 
-        // Step 4: get page access token from /me/accounts
+        // Get the Page access token from /me/accounts. The Connect Proxy
+        // injects the managed Facebook user token into this request.
         const pageId: string = row.brand_fb_page_id;
+        const pagesTarget = "https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token&limit=50";
         const meRes = await fetch(
-          `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&limit=50&access_token=${encodeURIComponent(userToken)}`,
-          { signal: AbortSignal.timeout(15_000) },
+          buildPipedreamProxyUrl(
+            fbConnect.apiBase,
+            fbConnect.projectId,
+            fbConnect.externalUserId,
+            fbConnect.account.id,
+            pagesTarget,
+          ),
+          { headers: fbConnect.headers, signal: AbortSignal.timeout(15_000) },
         );
         if (!meRes.ok) {
           const t = await meRes.text();
@@ -385,7 +400,7 @@ export const calendarRouter = router({
 
         // Step 5: POST to FB Graph API
         const fbRes = await fetch(
-          `https://graph.facebook.com/v18.0/${pageId}/feed`,
+          `https://graph.facebook.com/v25.0/${pageId}/feed`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -651,7 +666,7 @@ async function _pdGetOAuthToken(
 
   // Step 2: find the account
   const accsRes = await fetch(
-    `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`,
+    buildPipedreamAccountsUrl(PD, projectId, externalUserId),
     { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
   );
   if (!accsRes.ok) {
@@ -685,6 +700,77 @@ async function _pdGetOAuthToken(
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得 ${platformKey} OAuth token，請重新授權。` });
   }
   return oauthToken;
+}
+
+/**
+ * Resolve an end user's connected account without attempting to read its
+ * managed OAuth credentials. The returned metadata can be used with the
+ * Pipedream Connect Proxy.
+ */
+async function _pdGetAccountContext(
+  brandId: number,
+  platformKey: string,
+  appSlugs: string[],
+): Promise<{
+  account: PipedreamAccountSummary;
+  apiBase: string;
+  projectId: string;
+  externalUserId: string;
+  headers: Record<string, string>;
+}> {
+  const clientId     = process.env.PIPEDREAM_CLIENT_ID;
+  const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
+  const projectId    = process.env.PIPEDREAM_PROJECT_ID;
+  const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
+
+  if (!clientId || !clientSecret || !projectId) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `${platformKey} 授權服務尚未啟用（Pipedream Connect 憑證缺失）。`,
+    });
+  }
+
+  const apiBase = "https://api.pipedream.com/v1";
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const tokenRes = await fetch(`${apiBase}/oauth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": `Basic ${basicAuth}` },
+    body: new URLSearchParams({ grant_type: "client_credentials" }).toString(),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!tokenRes.ok) {
+    const text = await tokenRes.text();
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream token 失敗：${text.slice(0, 200)}` });
+  }
+  const { access_token } = (await tokenRes.json()) as { access_token: string };
+  const headers = {
+    "Authorization": `Bearer ${access_token}`,
+    "X-PD-Environment": pdEnv,
+    "x-pd-project-id": projectId,
+  };
+  const externalUserId = `sowork-brand-${brandId}`;
+  const accountsRes = await fetch(
+    buildPipedreamAccountsUrl(apiBase, projectId, externalUserId),
+    { headers, signal: AbortSignal.timeout(15_000) },
+  );
+  if (!accountsRes.ok) {
+    const text = await accountsRes.text();
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream 帳號列表失敗：${text.slice(0, 200)}` });
+  }
+  const body = (await accountsRes.json()) as { data?: PipedreamAccountSummary[] };
+  const slugSet = new Set(appSlugs);
+  const account = (body.data ?? []).find(candidate => {
+    const slug = getPipedreamAppSlug(candidate.app);
+    return slug ? slugSet.has(slug) : false;
+  });
+  if (!account) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `找不到 ${platformKey} 授權記錄，請先連接 ${platformKey}。`,
+    });
+  }
+
+  return { account, apiBase, projectId, externalUserId, headers };
 }
 
 function extractCaption(content: any, variantIndex: number): string {

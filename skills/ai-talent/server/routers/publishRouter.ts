@@ -23,7 +23,11 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { assertBrandAccess } from "../_core/brandAuth";
-import { getPipedreamConnectTokenUrl } from "../_core/pipedreamConnect";
+import {
+  buildPipedreamAccountsUrl,
+  buildPipedreamProxyUrl,
+  getPipedreamConnectTokenUrl,
+} from "../_core/pipedreamConnect";
 import {
   getPipedreamAppSlug,
   type PipedreamAccountSummary,
@@ -260,14 +264,16 @@ export const publishRouter = router({
    *
    * Flow:
    *   1. Get Pipedream Bearer token (same client_credentials flow)
-   *   2. GET /v1/connect/{projectId}/users/{externalUserId}/accounts?app=facebook_pages
+   *   2. GET /v1/connect/{projectId}/accounts?external_user_id=...
    *      → find the connected Facebook account ID
-   *   3. GET /v1/connect/{projectId}/accounts/{accountId}?include_credentials=1
-   *      → extract the OAuth user access token
-   *   4. GET graph.facebook.com/v18.0/me/accounts → pages the user manages
+   *   3. GET /v1/connect/{projectId}/proxy/{graph-url}
+   *      → list managed pages without exposing the managed OAuth credential
    */
   getFacebookPages: protectedProcedure
-    .input(z.object({ brandId: z.number().int().positive() }))
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      waitForPropagation: z.boolean().optional().default(true),
+    }))
     .mutation(async ({ ctx: _ctx, input }) => {
       const clientId     = process.env.PIPEDREAM_CLIENT_ID;
       const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
@@ -311,10 +317,12 @@ export const publishRouter = router({
       //
       // Retry up to 4× with increasing delay — Pipedream can take 2–4 seconds
       // to propagate the OAuth callback after the user completes the popup.
-      const allAccountsUrl = `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`;
+      const allAccountsUrl = buildPipedreamAccountsUrl(PD, projectId, externalUserId);
       const FB_SLUGS = new Set(["facebook_pages", "facebook", "facebook_oauth2"]);
       let accounts: PipedreamAccountSummary[] = [];
-      const RETRIES = [0, 2000, 3000, 4000]; // ms to wait before each attempt
+      const RETRIES = input.waitForPropagation
+        ? [0, 2000, 3000, 4000] // ms to wait before each attempt
+        : [0];
       for (let attempt = 0; attempt < RETRIES.length; attempt++) {
         if (RETRIES[attempt]! > 0) {
           await new Promise((r) => setTimeout(r, RETRIES[attempt]));
@@ -346,29 +354,20 @@ export const publishRouter = router({
       }
       const accountId = accounts[0]!.id;
 
-      // Step 3: get OAuth credentials for the account
-      const credRes = await fetch(
-        `${PD}/connect/${projectId}/accounts/${accountId}?include_credentials=1`,
-        { headers, signal: AbortSignal.timeout(15_000) },
-      );
-      if (!credRes.ok) {
-        const t = await credRes.text();
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得 FB token：${t.slice(0, 200)}` });
-      }
-      const credData = (await credRes.json()) as { credentials?: { oauth_access_token?: string; access_token?: string } };
-      const fbToken = credData.credentials?.oauth_access_token ?? credData.credentials?.access_token;
-      if (!fbToken) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 FB 存取 token，請重新授權。" });
-      }
-
-      // Step 4: call FB Graph API to list managed pages
+      // Step 3: call Facebook through Pipedream Connect Proxy.
+      //
+      // This project uses Pipedream's managed Facebook OAuth client. Pipedream
+      // intentionally does not expose managed-client credentials through the
+      // Account API, so `include_credentials=1` can never be the integration
+      // path here. The proxy injects and refreshes the user's OAuth token.
+      const graphUrl = "https://graph.facebook.com/v25.0/me/accounts?fields=id,name,category&limit=30";
       const pagesRes = await fetch(
-        `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,category&limit=30&access_token=${encodeURIComponent(fbToken)}`,
-        { signal: AbortSignal.timeout(15_000) },
+        buildPipedreamProxyUrl(PD, projectId, externalUserId, accountId, graphUrl),
+        { headers, signal: AbortSignal.timeout(15_000) },
       );
       if (!pagesRes.ok) {
         const t = await pagesRes.text();
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `FB Graph API 失敗：${t.slice(0, 200)}` });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `FB Graph API Proxy 失敗：${t.slice(0, 200)}` });
       }
       const pagesData = (await pagesRes.json()) as { data?: Array<{ id: string; name: string; category?: string }> };
       const pages = (pagesData.data ?? []).map((p) => ({ id: p.id, name: p.name, category: p.category ?? "" }));
@@ -442,7 +441,7 @@ export const publishRouter = router({
 
       // Step 2: list all connected accounts for this external user
       const accsRes = await fetch(
-        `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`,
+        buildPipedreamAccountsUrl(PD, projectId, externalUserId),
         { headers: pdHeaders, signal: AbortSignal.timeout(10_000) },
       );
       if (!accsRes.ok) return { connected: {} as Record<string, { accountId: string; name?: string }> };
@@ -554,7 +553,7 @@ export const publishRouter = router({
       const externalUserId = `sowork-brand-${input.brandId}`;
       const FB_SLUGS = new Set(["facebook_pages", "facebook", "facebook_oauth2"]);
 
-      const accsRes = await fetch(`${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`, { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });
+      const accsRes = await fetch(buildPipedreamAccountsUrl(PD, projectId, externalUserId), { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });
       if (!accsRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 Pipedream 帳號" });
       const accsData = (await accsRes.json()) as { data?: PipedreamAccountSummary[] };
       const fbAcc = (accsData.data ?? []).find(a => {
@@ -563,16 +562,13 @@ export const publishRouter = router({
       });
       if (!fbAcc) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "找不到 Facebook 授權，請重新連接。" });
 
-      const credRes = await fetch(`${PD}/connect/${projectId}/accounts/${fbAcc.id}?include_credentials=1`, { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });
-      if (!credRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 FB 憑證" });
-      const credData = (await credRes.json()) as { credentials?: { oauth_access_token?: string; access_token?: string } };
-      const userToken = credData.credentials?.oauth_access_token ?? credData.credentials?.access_token;
-      if (!userToken) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 FB OAuth token，請重新授權。" });
-
-      // Step 2: 取 page access token
+      // Step 2: list pages through the Connect Proxy. Requesting access_token
+      // here gives us the short-lived Page token needed for the following
+      // Page-specific Graph request without exposing the managed user token.
+      const pagesTarget = "https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token&limit=50";
       const meRes = await fetch(
-        `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&limit=50&access_token=${encodeURIComponent(userToken)}`,
-        { signal: AbortSignal.timeout(15_000) },
+        buildPipedreamProxyUrl(PD, projectId, externalUserId, fbAcc.id, pagesTarget),
+        { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
       );
       if (!meRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得粉絲團清單" });
       const meData = (await meRes.json()) as { data?: Array<{ id: string; name: string; access_token?: string }> };
@@ -585,7 +581,7 @@ export const publishRouter = router({
 
       // Step 3: 抓最近 30 篇貼文
       const postsRes = await fetch(
-        `https://graph.facebook.com/v18.0/${brand.fbPageId}/posts?fields=message,created_time&limit=30&access_token=${encodeURIComponent(pageToken)}`,
+        `https://graph.facebook.com/v25.0/${brand.fbPageId}/posts?fields=message,created_time&limit=30&access_token=${encodeURIComponent(pageToken)}`,
         { signal: AbortSignal.timeout(15_000) },
       );
       if (!postsRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得粉絲團貼文" });
