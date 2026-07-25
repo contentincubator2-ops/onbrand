@@ -32,7 +32,7 @@ scripts/install-all.sh
 scripts/verify-env.sh
 *.md
 !skills/ai-talent/server/_core/playbooks/*.md
-!docs/*.md
+!docs/**/*.md
 
 # Local-only: dumps, dev-only env, scratch
 .local/
