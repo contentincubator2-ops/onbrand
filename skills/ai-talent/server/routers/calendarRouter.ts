@@ -10,15 +10,19 @@ import { TRPCError } from "@trpc/server";
 import {
   getPipedreamAccounts,
   getPipedreamAppSlug,
+  prioritizePipedreamAccounts,
   type PipedreamAccountSummary,
 } from "../_core/pipedreamAccounts";
+import {
+  findPipedreamFacebookPage,
+  probePipedreamFacebookAccounts,
+} from "../_core/pipedreamFacebook";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { assertBrandOwner } from "../_core/brandAuth";
 import {
   buildPipedreamAccountsUrl,
-  buildPipedreamProxyUrl,
 } from "../_core/pipedreamConnect";
 
 const CONTENT_TYPES = [
@@ -371,26 +375,26 @@ export const calendarRouter = router({
         const fbConnect = await _pdGetAccountContext(row.brandId, "Facebook",
           ["facebook_pages", "facebook", "facebook_oauth2"]);
 
-        // Get the Page access token from /me/accounts. The Connect Proxy
-        // injects the managed Facebook user token into this request.
+        // Get the Page access token from /me/accounts. Repeated Connect flows
+        // create multiple Pipedream account records, so probe all matching
+        // accounts and select the one that can actually see this saved Page.
         const pageId: string = row.brand_fb_page_id;
-        const pagesTarget = "https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token&limit=50";
-        const meRes = await fetch(
-          buildPipedreamProxyUrl(
-            fbConnect.apiBase,
-            fbConnect.projectId,
-            fbConnect.externalUserId,
-            fbConnect.account.id,
-            pagesTarget,
-          ),
-          { headers: fbConnect.headers, signal: AbortSignal.timeout(15_000) },
-        );
-        if (!meRes.ok) {
-          const t = await meRes.text();
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `FB Graph API /me/accounts 失敗：${t.slice(0, 200)}` });
+        const probes = await probePipedreamFacebookAccounts({
+          apiBase: fbConnect.apiBase,
+          projectId: fbConnect.projectId,
+          externalUserId: fbConnect.externalUserId,
+          headers: fbConnect.headers,
+          accounts: fbConnect.accounts,
+          fields: ["access_token"],
+        });
+        if (probes.every((probe) => probe.error)) {
+          const detail = probes.find((probe) => probe.error)?.error ?? "unknown proxy error";
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `FB Graph API /me/accounts 失敗：${detail.slice(0, 200)}`,
+          });
         }
-        const meData = (await meRes.json()) as { data?: Array<{ id: string; name: string; access_token?: string }> };
-        const page = (meData.data ?? []).find(p => p.id === pageId);
+        const page = findPipedreamFacebookPage(probes, pageId)?.page;
         if (!page?.access_token) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
@@ -712,7 +716,7 @@ async function _pdGetAccountContext(
   platformKey: string,
   appSlugs: string[],
 ): Promise<{
-  account: PipedreamAccountSummary;
+  accounts: PipedreamAccountSummary[];
   apiBase: string;
   projectId: string;
   externalUserId: string;
@@ -758,18 +762,20 @@ async function _pdGetAccountContext(
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream 帳號列表失敗：${text.slice(0, 200)}` });
   }
   const slugSet = new Set(appSlugs);
-  const account = getPipedreamAccounts(await accountsRes.json()).find(candidate => {
-    const slug = getPipedreamAppSlug(candidate.app);
-    return slug ? slugSet.has(slug) : false;
-  });
-  if (!account) {
+  const accounts = prioritizePipedreamAccounts(
+    getPipedreamAccounts(await accountsRes.json()).filter(candidate => {
+      const slug = getPipedreamAppSlug(candidate.app);
+      return slug ? slugSet.has(slug) : false;
+    }),
+  );
+  if (accounts.length === 0) {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
       message: `找不到 ${platformKey} 授權記錄，請先連接 ${platformKey}。`,
     });
   }
 
-  return { account, apiBase, projectId, externalUserId, headers };
+  return { accounts, apiBase, projectId, externalUserId, headers };
 }
 
 function extractCaption(content: any, variantIndex: number): string {

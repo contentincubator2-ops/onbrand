@@ -25,13 +25,18 @@ import { TRPCError } from "@trpc/server";
 import { assertBrandAccess } from "../_core/brandAuth";
 import {
   buildPipedreamAccountsUrl,
-  buildPipedreamProxyUrl,
   getPipedreamConnectTokenUrl,
 } from "../_core/pipedreamConnect";
 import {
   getPipedreamAccounts,
   getPipedreamAppSlug,
+  prioritizePipedreamAccounts,
 } from "../_core/pipedreamAccounts";
+import {
+  findPipedreamFacebookPage,
+  mergePipedreamFacebookPages,
+  probePipedreamFacebookAccounts,
+} from "../_core/pipedreamFacebook";
 
 const ENV = process.env;
 
@@ -349,28 +354,48 @@ export const publishRouter = router({
         if (accounts.length > 0) break; // found — stop retrying
       }
       if (accounts.length === 0) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "尚未連接 Facebook，請先完成授權。" });
+        return {
+          ok: true as const,
+          pages: [],
+          connectedAccountCount: 0,
+        };
       }
-      const accountId = accounts[0]!.id;
+      accounts = prioritizePipedreamAccounts(accounts);
 
-      // Step 3: call Facebook through Pipedream Connect Proxy.
+      // Step 3: call Facebook through every matching Pipedream Connect account.
       //
       // This project uses Pipedream's managed Facebook OAuth client. Pipedream
       // intentionally does not expose managed-client credentials through the
-      // Account API, so `include_credentials=1` can never be the integration
-      // path here. The proxy injects and refreshes the user's OAuth token.
-      const graphUrl = "https://graph.facebook.com/v25.0/me/accounts?fields=id,name,category&limit=30";
-      const pagesRes = await fetch(
-        buildPipedreamProxyUrl(PD, projectId, externalUserId, accountId, graphUrl),
-        { headers, signal: AbortSignal.timeout(15_000) },
-      );
-      if (!pagesRes.ok) {
-        const t = await pagesRes.text();
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `FB Graph API Proxy 失敗：${t.slice(0, 200)}` });
+      // Account API, so the Connect Proxy injects and refreshes each managed
+      // OAuth token. Repeated OAuth flows create duplicate account records;
+      // probing all of them prevents an older/stale account from hiding a valid
+      // Page on a newer authorization.
+      const probes = await probePipedreamFacebookAccounts({
+        apiBase: PD,
+        projectId,
+        externalUserId,
+        headers,
+        accounts,
+        fields: ["category"],
+      });
+      if (probes.every((probe) => probe.error)) {
+        const detail = probes.find((probe) => probe.error)?.error ?? "unknown proxy error";
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `FB Graph API Proxy 失敗：${detail.slice(0, 200)}`,
+        });
       }
-      const pagesData = (await pagesRes.json()) as { data?: Array<{ id: string; name: string; category?: string }> };
-      const pages = (pagesData.data ?? []).map((p) => ({ id: p.id, name: p.name, category: p.category ?? "" }));
-      return { ok: true as const, pages };
+      const pages = mergePipedreamFacebookPages(probes)
+        .map((page) => ({
+          id: page.id,
+          name: page.name,
+          category: page.category ?? "",
+        }));
+      return {
+        ok: true as const,
+        pages,
+        connectedAccountCount: accounts.length,
+      };
     }),
 
   /**
@@ -553,23 +578,29 @@ export const publishRouter = router({
 
       const accsRes = await fetch(buildPipedreamAccountsUrl(PD, projectId, externalUserId), { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });
       if (!accsRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 Pipedream 帳號" });
-      const fbAcc = getPipedreamAccounts(await accsRes.json()).find(a => {
+      const fbAccounts = prioritizePipedreamAccounts(
+        getPipedreamAccounts(await accsRes.json()).filter(a => {
         const slug = getPipedreamAppSlug(a.app);
         return slug ? FB_SLUGS.has(slug) : false;
-      });
-      if (!fbAcc) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "找不到 Facebook 授權，請重新連接。" });
+        }),
+      );
+      if (fbAccounts.length === 0) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "找不到 Facebook 授權，請重新連接。" });
+      }
 
       // Step 2: list pages through the Connect Proxy. Requesting access_token
       // here gives us the short-lived Page token needed for the following
       // Page-specific Graph request without exposing the managed user token.
-      const pagesTarget = "https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token&limit=50";
-      const meRes = await fetch(
-        buildPipedreamProxyUrl(PD, projectId, externalUserId, fbAcc.id, pagesTarget),
-        { headers: pdHeaders, signal: AbortSignal.timeout(15_000) },
-      );
-      if (!meRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得粉絲團清單" });
-      const meData = (await meRes.json()) as { data?: Array<{ id: string; name: string; access_token?: string }> };
-      const page = (meData.data ?? []).find(p => p.id === brand.fbPageId);
+      const probes = await probePipedreamFacebookAccounts({
+        apiBase: PD,
+        projectId,
+        externalUserId,
+        headers: pdHeaders,
+        accounts: fbAccounts,
+        fields: ["access_token"],
+      });
+      const match = findPipedreamFacebookPage(probes, brand.fbPageId);
+      const page = match?.page;
       if (!page?.access_token) throw new TRPCError({
         code: "PRECONDITION_FAILED",
         message: `找不到粉專 ${brand.fbPageId} 的存取權限。請確認此 FB 帳號是該粉專的管理員，並重新授權。`,

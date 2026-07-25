@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getPipedreamAccounts,
   getPipedreamAppSlug,
+  prioritizePipedreamAccounts,
 } from "./pipedreamAccounts";
 
 describe("getPipedreamAccounts", () => {
@@ -43,5 +44,25 @@ describe("getPipedreamAppSlug", () => {
     expect(getPipedreamAppSlug(undefined)).toBeUndefined();
     expect(getPipedreamAppSlug(null)).toBeUndefined();
     expect(getPipedreamAppSlug({})).toBeUndefined();
+  });
+});
+
+describe("prioritizePipedreamAccounts", () => {
+  it("prefers healthy accounts and then the newest authorization", () => {
+    const old = { id: "old", healthy: true, created_at: "2026-07-25T03:58:44Z" };
+    const newest = { id: "new", healthy: true, created_at: "2026-07-25T04:25:12Z" };
+    const dead = { id: "dead", healthy: false, created_at: "2026-07-25T04:30:00Z" };
+
+    expect(prioritizePipedreamAccounts([old, dead, newest])).toEqual([
+      newest,
+      old,
+      dead,
+    ]);
+  });
+
+  it("keeps API order when account metadata has no timestamps", () => {
+    const first = { id: "first" };
+    const second = { id: "second" };
+    expect(prioritizePipedreamAccounts([first, second])).toEqual([first, second]);
   });
 });

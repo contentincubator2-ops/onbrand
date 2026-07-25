@@ -101,7 +101,40 @@ jobs:
           " 2>/dev/null || true
           echo ""
 
-          echo "──── 4. List accounts with ?app=facebook_pages filter (OLD code behavior) ────"
+          echo "──── 4. Probe managed Pages through every Facebook account ────"
+          TARGET_URL="https://graph.facebook.com/v25.0/me/accounts?fields=id,name&limit=50"
+          TARGET_B64=$(printf '%s' "$TARGET_URL" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/pd_all.json'))
+          accs = d if isinstance(d, list) else (d.get('data') or [])
+          for a in accs:
+              app = a.get('app')
+              slug = app.get('name_slug') if isinstance(app, dict) else app
+              if slug in ('facebook_pages', 'facebook', 'facebook_oauth2'):
+                  print(a.get('id', ''))
+          " | while read -r ACCOUNT_ID; do
+            [ -z "$ACCOUNT_ID" ] && continue
+            HTTP=$(curl -s -o "/tmp/pd_pages_${ACCOUNT_ID}.json" -w "%{http_code}" \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "X-PD-Environment: $PD_ENV" \
+              -H "x-pd-project-id: $PIPEDREAM_PROJECT_ID" \
+              "https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/proxy/${TARGET_B64}?external_user_id=${EXTERNAL_USER}&account_id=${ACCOUNT_ID}")
+            SUMMARY=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_pages_${ACCOUNT_ID}.json'))
+              pages = d.get('data') or []
+              names = ', '.join(f\"{p.get('name','?')} ({p.get('id','?')})\" for p in pages)
+              print(f\"pages={len(pages)} [{names}]\")
+          except Exception:
+              print('invalid response')
+          " 2>/dev/null || echo "invalid response")
+            echo "  • account=${ACCOUNT_ID} HTTP=${HTTP} ${SUMMARY}"
+          done
+          echo ""
+
+          echo "──── 5. List accounts with ?app=facebook_pages filter (OLD code behavior) ────"
           HTTP=$(curl -s -o /tmp/pd_fb.json -w "%{http_code}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "X-PD-Environment: $PD_ENV" \
@@ -117,7 +150,7 @@ jobs:
           echo "  Accounts with app=facebook_pages filter: $FB_COUNT"
           echo ""
 
-          echo "──── 5. DB check — brands.fbPageId column ────"
+          echo "──── 6. DB check — brands.fbPageId column ────"
           export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
           MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -N -s --silent"
 
@@ -143,5 +176,5 @@ jobs:
             echo "   → Check the app slugs listed above and add them to FB_SLUGS in publishRouter.ts if needed."
           else
             echo "✅ User has $FB_COUNT Facebook account(s). OAuth is working."
-            echo "   → If still failing, check that fbPageId column exists (see step 5 above)."
+            echo "   → If still failing, compare the per-account Page probes and DB binding above."
           fi

@@ -190,9 +190,14 @@ export default function CalendarPage() {
   // synchronously while the browser's user activation is still valid.
   type FacebookConnectToken = { token: string; expiresAt: number };
   type FacebookPage = { id: string; name: string; category: string };
+  type FacebookPagesCache = {
+    pages: FacebookPage[];
+    connectedAccountCount: number;
+    checkedAt: number;
+  };
   const pdCreateClientRef = useRef<any>(null);
   const pdFacebookTokensRef = useRef<Record<number, FacebookConnectToken>>({});
-  const pdFacebookPagesRef = useRef<Record<number, FacebookPage[] | undefined>>({});
+  const pdFacebookPagesRef = useRef<Record<number, FacebookPagesCache | undefined>>({});
   const pdFacebookPrefetchingRef = useRef<Record<number, boolean>>({});
 
   useEffect(() => {
@@ -204,7 +209,8 @@ export default function CalendarPage() {
   const prefetchFacebookConnect = React.useCallback(async (calBrandId: number) => {
     if (pdFacebookPrefetchingRef.current[calBrandId]) return;
     const cached = pdFacebookTokensRef.current[calBrandId];
-    const pagesChecked = pdFacebookPagesRef.current[calBrandId] !== undefined;
+    const pageCache = pdFacebookPagesRef.current[calBrandId];
+    const pagesChecked = !!pageCache && Date.now() - pageCache.checkedAt < 10_000;
     if (pdCreateClientRef.current && cached?.expiresAt - Date.now() > 60_000 && pagesChecked) return;
 
     pdFacebookPrefetchingRef.current[calBrandId] = true;
@@ -233,7 +239,11 @@ export default function CalendarPage() {
         };
       }
       if (existing) {
-        pdFacebookPagesRef.current[calBrandId] = existing.pages ?? [];
+        pdFacebookPagesRef.current[calBrandId] = {
+          pages: existing.pages ?? [],
+          connectedAccountCount: existing.connectedAccountCount ?? 0,
+          checkedAt: Date.now(),
+        };
       }
     } finally {
       pdFacebookPrefetchingRef.current[calBrandId] = false;
@@ -241,22 +251,39 @@ export default function CalendarPage() {
   }, [fbConnectUrlMut, fbPagesMut]);
 
   const connectFacebookFromCalendar = React.useCallback((calBrandId: number) => {
-    const existingPages = pdFacebookPagesRef.current[calBrandId];
-    if ((existingPages?.length ?? 0) > 0) {
-      setFbPages(existingPages!);
+    const pageCache = pdFacebookPagesRef.current[calBrandId];
+    if ((pageCache?.pages.length ?? 0) > 0) {
+      setFbPages(pageCache!.pages);
       setFbPickerBrandId(calBrandId);
       return;
     }
 
     const createFrontendClient = pdCreateClientRef.current;
     const cached = pdFacebookTokensRef.current[calBrandId];
-    if (!createFrontendClient || !cached || cached.expiresAt - Date.now() < 30_000) {
+    const pageCheckFresh = !!pageCache && Date.now() - pageCache.checkedAt < 10_000;
+    if (
+      !createFrontendClient
+      || !cached
+      || cached.expiresAt - Date.now() < 30_000
+      || !pageCheckFresh
+      || pdFacebookPrefetchingRef.current[calBrandId]
+    ) {
       void prefetchFacebookConnect(calBrandId).catch((err: any) => {
         alert(err?.message ?? String(err));
       });
       alert(lang === "en"
-        ? "Preparing authorization — please try again in a moment."
-        : "正在準備授權，請稍候 1–2 秒再點一次。");
+        ? "Checking your existing Facebook connection — please try again in a moment."
+        : "正在檢查既有 Facebook 授權，請稍候 1–2 秒再點一次。");
+      return;
+    }
+
+    // A Pipedream account already exists, but it currently exposes no managed
+    // Pages. Opening Connect again would only create another duplicate account
+    // record and repeat the same loop.
+    if (pageCache.connectedAccountCount > 0) {
+      alert(lang === "en"
+        ? "Facebook is authorized, but this account does not expose any managed Pages. Check your Page access in Meta Business Settings, then try again."
+        : "Facebook 已授權，但此帳號目前沒有可管理的粉專。請先到 Meta 商業設定確認粉專存取權，再重試。");
       return;
     }
 
@@ -283,16 +310,25 @@ export default function CalendarPage() {
               waitForPropagation: false,
             });
             if ((pages?.pages?.length ?? 0) > 0) {
-              pdFacebookPagesRef.current[calBrandId] = pages!.pages;
+              pdFacebookPagesRef.current[calBrandId] = {
+                pages: pages!.pages,
+                connectedAccountCount: pages?.connectedAccountCount ?? 1,
+                checkedAt: Date.now(),
+              };
               setFbPages(pages!.pages);
               setFbPickerBrandId(calBrandId);
               return;
             }
           } catch { /* keep retrying */ }
         }
+        pdFacebookPagesRef.current[calBrandId] = {
+          pages: [],
+          connectedAccountCount: 1,
+          checkedAt: Date.now(),
+        };
         alert(lang === "en"
-          ? "Connected! But no Facebook Pages found. Please try again in a moment."
-          : "授權成功！但目前找不到粉專，請稍後重試。");
+          ? "Facebook is authorized, but no managed Pages were returned. Check your Page access in Meta Business Settings."
+          : "Facebook 已授權，但沒有取得可管理的粉專。請到 Meta 商業設定確認粉專存取權。");
       },
       onError: (err: any) => {
         delete pdFacebookTokensRef.current[calBrandId];
