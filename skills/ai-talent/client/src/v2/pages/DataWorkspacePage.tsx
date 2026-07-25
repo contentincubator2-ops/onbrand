@@ -6,7 +6,7 @@
  * changes functions based on the selected mode.
  */
 import React from "react";
-import { useLocation, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Activity, BarChart3, Database, ExternalLink, Globe2, LineChart, Megaphone,
   MousePointerClick, Play, Search, ShoppingBag, Sparkles, Target, TrendingUp,
@@ -97,6 +97,7 @@ const marketSources: Source[] = [
   { id: "overview", label: "市場總覽", short: "總覽", icon: <TrendingUp size={18} />, color: "#111827", desc: "從 Iris Girls 資料與公開來源定義競品、需求與機會" },
   { id: "listening", label: "輿情監測", short: "輿情", icon: <Activity size={18} />, color: "#DC2626", desc: "品牌聲量、情緒風險、議題高峰、來源平台與內容機會；純競品監測保留在競品情報" },
   { id: "keywords", label: "關鍵字分析", short: "KW", icon: <Search size={18} />, color: "#2563EB", desc: "產品資料 → 品類詞 / 風格詞 / 場景詞 / 高意圖詞" },
+  { id: "hot_topics", label: "AI 熱門話題", short: "話題", icon: <Sparkles size={18} />, color: "#DB2777", desc: "AI 從市場與社群訊號找熱門話題，選定產品/品牌與內容型態後，直接進入內容任務" },
   { id: "geo", label: "GEO / SEO", short: "GEO", icon: <Globe2 size={18} />, color: "#059669", desc: "AI 搜尋與一般搜尋需要引用的品牌證據缺口" },
   { id: "competitors", label: "競品情報", short: "競品", icon: <Database size={18} />, color: "#9333EA", desc: "用 social listening 儀表板檢查溫柔、自然、質感三個溝通點在競品間是否被市場認定" },
   { id: "opportunity", label: "機會診斷", short: "機會", icon: <Sparkles size={18} />, color: "#EA580C", desc: "把市場情報轉成內容、SEO、廣告與商品頁任務" },
@@ -152,6 +153,12 @@ const marketTasks: Record<string, TaskCard[]> = {
     { title: "關鍵字需求分群", agent: AGENTS.seo, skill: "source-backed-competitive-evidence", data: "Iris Girls 商品名 + 競品 meta description", output: "品類詞、風格詞、場景詞、品牌比較詞" },
     { title: "內容缺口分析", agent: AGENTS.seo, skill: "website-design-cloning", data: "官方頁 / SERP / FAQ 可見內容", output: "應補文章、FAQ、商品集合頁" },
     { title: "高意圖詞優先級", agent: AGENTS.marketPm, skill: "taiwan-solo-founder-market-research", data: "甜美洋裝 / 蕾絲上衣 / 小香風 / 百褶裙", output: "先做哪些詞、接哪個商品頁" },
+  ],
+
+  hot_topics: [
+    { title: "AI 熱門話題偵測", agent: AGENTS.marketPm, skill: "social-listening-reporting", data: "OpView / GWI / 公開社群 / 競品內容", output: "3–5 個可轉內容的熱門話題與趨勢理由" },
+    { title: "話題 × 產品配對", agent: AGENTS.content, skill: "client-facing-chinese-content-writing", data: "熱門話題 + products#144–155 + brands#2957", output: "每個話題最適合搭配的品牌或商品" },
+    { title: "一鍵轉內容任務", agent: AGENTS.qa, skill: "content-task-routing", data: "topic / entity / platform / task type", output: "帶 topic prefill 進 Facebook、Instagram、TikTok、Email 或 PR 任務" },
   ],
   geo: [
     { title: "AI 搜尋可見度檢查", agent: AGENTS.seo, skill: "official-public-source-research", data: "官網可引用文字 + 競品可引用文字", output: "Iris Girls 缺少可被 AI 引用的品牌證據" },
@@ -255,6 +262,28 @@ const irisMarketDesign: Record<string, PageDesign> = {
           { label: "Representative post", source: "Facebook粉絲團 > 西西和Q米", note: "台北民生社區 IRIS 艾莉詩女裝快閃特賣會：聲量 11、正評 8、負評 0。" },
           { label: "Representative post", source: "Instagram > momo購物網", note: "IRIS x 專櫃香水盛夏香旅：聲量 10、正評 6、負評 0。" },
           { label: "Representative post", source: "Instagram > The Butters 奶油家族", note: "穿搭商品貼文：聲量 7、正評 5、負評 0。" },
+        ],
+      },
+    ],
+  },
+
+  hot_topics: {
+    hypothesis: "AI 熱門話題頁不是單純列趨勢，而是把市場訊號直接變成內容任務入口：先判斷哪個話題正在升溫，再選品牌或商品，最後選 Facebook、Instagram、TikTok、Email 或 PR 任務，帶著完整題目進入內容產出流程。",
+    actions: ["用 AI 每週整理可轉內容的熱門話題", "讓使用者在同頁完成話題、產品/品牌、內容型態三段選擇", "把選擇結果寫入 topic prefill，直接進入對應內容任務"],
+    blocks: [
+      {
+        headline: "從熱門討論到內容任務，縮短成一個操作流程",
+        summary: "這個頁籤的核心是把市場情報轉成執行。使用者不需要先讀完整報告、再自己想貼文題目；AI 會先整理近期可用話題，例如快閃特賣、香水聯名、30+ 甜美穿搭、商品實穿與品牌質感，再由使用者選擇要搭配品牌或哪一件商品，最後送到指定平台的內容任務。",
+        metrics: [
+          { label: "Topic source", value: "AI scan", note: "輿情、搜尋、社群與競品內容" },
+          { label: "Entity", value: "品牌 / 商品", note: "Iris Girls 或 products#144–155" },
+          { label: "Task type", value: "5+", note: "FB / IG / TikTok / Email / PR" },
+        ],
+        bullets: ["AI 先負責找到市場上值得跟的話題，使用者只需要挑選要採用哪一個。", "話題必須連到品牌或商品，避免產出與銷售無關的泛內容。", "內容任務頁會帶入已整理好的 topic prefill，降低重新輸入與 brief 失真的成本。", "同一個話題可以被轉成不同平台格式，例如 FB 貼文、IG Reels、TikTok 腳本或 EDM。"],
+        evidence: [
+          { label: "Listening signal", source: "Iris Girls 近 30 天輿情", note: "快閃、直播、聯名與穿搭內容是目前可轉素材的主要來源。" },
+          { label: "Product seed", source: "products#144–155", note: "商品名稱可直接成為話題與內容任務的搭配對象。" },
+          { label: "Workflow", source: "PlatformTaskPage topic prefill", note: "內容任務支援 ?topic= 預填，可從本頁直接帶入。" },
         ],
       },
     ],
@@ -379,6 +408,51 @@ const irisMarketDesign: Record<string, PageDesign> = {
   },
 };
 
+type HotTopic = {
+  id: string;
+  title: string;
+  signal: string;
+  angle: string;
+  whyNow: string;
+};
+
+type HotTopicEntity = {
+  id: string;
+  label: string;
+  kind: "brand" | "product";
+  detail: string;
+};
+
+type ContentTaskRoute = {
+  id: string;
+  label: string;
+  route: string;
+  output: string;
+};
+
+const hotTopics: HotTopic[] = [
+  { id: "popup", title: "快閃特賣與現場試穿", signal: "07/18 聲量高峰 24 則", angle: "把快閃現場的試穿、版型與真實互動整理成限時感內容", whyNow: "近 30 天最高峰由快閃與直播販售帶動，適合延伸成社群轉換素材。" },
+  { id: "fragrance", title: "盛夏香氛聯名", signal: "Instagram 熱門文章聲量 10", angle: "把香水聯名轉成夏日穿搭情境與質感生活提案", whyNow: "聯名內容具備視覺與情境延展性，適合 IG / Reels / EDM。" },
+  { id: "thirty", title: "30+ 也能穿的甜美", signal: "品牌定位：溫柔、自然、質感", angle: "降低少女感疑慮，強調成熟但保留甜美細節", whyNow: "Iris Girls 需要把甜美轉成更清楚的年齡與場合語言。" },
+  { id: "bow", title: "蝴蝶結與蕾絲細節回潮", signal: "products#144–155 商品 seed", angle: "用材質、剪裁與搭配場合包裝甜美元素", whyNow: "商品資料中已具備蝴蝶結、蕾絲、百褶與小香風等可搜尋元素。" },
+];
+
+const hotTopicEntities: HotTopicEntity[] = [
+  { id: "brand", label: "Iris Girls 品牌", kind: "brand", detail: "主打整體品牌形象與社群溝通" },
+  { id: "p144", label: "水晶鑽蝴蝶上衣", kind: "product", detail: "適合蝴蝶結、精緻細節、場合穿搭" },
+  { id: "p145", label: "初戀花園洋裝", kind: "product", detail: "適合夏日、約會、溫柔自然情境" },
+  { id: "p146", label: "月光蕾絲百褶裙", kind: "product", detail: "適合蕾絲、百褶、甜美但不幼稚" },
+  { id: "p148", label: "霧藍緞帶洋裝", kind: "product", detail: "適合緞帶、清新、質感穿搭" },
+];
+
+const contentTaskRoutes: ContentTaskRoute[] = [
+  { id: "fb", label: "Facebook 貼文", route: "/tasks/fb", output: "社群貼文與互動 CTA" },
+  { id: "ig", label: "Instagram / Reels", route: "/tasks/ig", output: "IG caption、Reels 腳本與 Hashtag" },
+  { id: "tt", label: "TikTok 短影音", route: "/tasks/tt", output: "短影音 hook、分鏡與字幕" },
+  { id: "email", label: "EDM / LINE 文案", route: "/tasks/email", output: "銷售信件、會員推播或 LINE 訊息" },
+  { id: "pr", label: "PR / 新聞稿", route: "/tasks/pr", output: "品牌故事、活動稿與媒體素材" },
+];
+
 function useCurrentUserEmail() {
   const [email, setEmail] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -406,6 +480,7 @@ function AgentLine({ agent }: { agent: AgentRef }) {
 
 export default function DataWorkspacePage() {
   const loc = useLocation();
+  const navigate = useNavigate();
   const { sourceId } = useParams<{ sourceId?: string }>();
   const [searchParams] = useSearchParams();
   const mode: Mode = loc.pathname.startsWith("/market-intel") ? "market" : "performance";
@@ -424,6 +499,19 @@ export default function DataWorkspacePage() {
   const [liveResults, setLiveResults] = React.useState<Record<string, LiveRunResult>>({});
   const [runningKey, setRunningKey] = React.useState<string | null>(null);
   const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
+  const [selectedHotTopicId, setSelectedHotTopicId] = React.useState(hotTopics[0].id);
+  const [selectedHotEntityId, setSelectedHotEntityId] = React.useState(hotTopicEntities[0].id);
+  const [selectedContentRouteId, setSelectedContentRouteId] = React.useState(contentTaskRoutes[0].id);
+
+  const selectedHotTopic = hotTopics.find(t => t.id === selectedHotTopicId) ?? hotTopics[0];
+  const selectedHotEntity = hotTopicEntities.find(e => e.id === selectedHotEntityId) ?? hotTopicEntities[0];
+  const selectedContentRoute = contentTaskRoutes.find(r => r.id === selectedContentRouteId) ?? contentTaskRoutes[0];
+
+  const launchHotTopicTask = () => {
+    const topic = `${selectedHotTopic.title}｜${selectedHotEntity.label}：${selectedHotTopic.angle}。請產出${selectedContentRoute.label}，重點包含市場訊號（${selectedHotTopic.signal}）、品牌/商品切角、內容主軸、開場 hook、正文與 CTA。`;
+    const b = brandId ?? 2957;
+    navigate(`${selectedContentRoute.route}?b=${b}&topic=${encodeURIComponent(topic)}`);
+  };
 
   const runListeningTask = async (task: TaskCard) => {
     if (!task.taskKey || !brandId || !runListeningMut) return;
@@ -531,6 +619,76 @@ export default function DataWorkspacePage() {
                 </section>
               ))}
             </div>
+          )}
+
+
+
+          {!isPerformance && active.id === "hot_topics" && (
+            <section style={{ border: "1px solid #f9a8d4", borderRadius: 24, background: "linear-gradient(135deg,#fff 0%,#fdf2f8 100%)", padding: 20, marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: "#DB2777" }}>AI Topic → Content Task</div>
+                  <h3 style={{ margin: "6px 0", fontSize: 21, color: "#111827" }}>選話題、選產品，再直接進內容任務</h3>
+                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>AI 先整理近期可跟的市場話題；使用者選定品牌或商品，再選 Facebook、Instagram、TikTok、EDM 或 PR 任務，系統會把 brief 帶進內容產出頁。</p>
+                </div>
+                <button onClick={launchHotTopicTask} style={{ border: 0, borderRadius: 999, background: "#DB2777", color: "#fff", padding: "11px 16px", fontSize: 13, fontWeight: 850, cursor: "pointer", whiteSpace: "nowrap" }}>進入內容任務</button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.9fr 0.9fr", gap: 14 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 850, color: "#111827", marginBottom: 8 }}>1. AI 找到的熱門話題</div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {hotTopics.map((topic) => {
+                      const selected = selectedHotTopic.id === topic.id;
+                      return (
+                        <button key={topic.id} onClick={() => setSelectedHotTopicId(topic.id)} style={{ textAlign: "left", border: `1px solid ${selected ? "#DB2777" : "#f3f4f6"}`, background: selected ? "#fdf2f8" : "#fff", borderRadius: 16, padding: 12, cursor: "pointer" }}>
+                          <div style={{ fontSize: 13, fontWeight: 850, color: "#111827" }}>{topic.title}</div>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: "#DB2777", marginTop: 3 }}>{topic.signal}</div>
+                          <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.45, marginTop: 4 }}>{topic.whyNow}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 850, color: "#111827", marginBottom: 8 }}>2. 搭配品牌或商品</div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {hotTopicEntities.map((entity) => {
+                      const selected = selectedHotEntity.id === entity.id;
+                      return (
+                        <button key={entity.id} onClick={() => setSelectedHotEntityId(entity.id)} style={{ textAlign: "left", border: `1px solid ${selected ? "#DB2777" : "#f3f4f6"}`, background: selected ? "#fdf2f8" : "#fff", borderRadius: 14, padding: 10, cursor: "pointer" }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 850, color: "#111827" }}>{entity.label}</div>
+                          <div style={{ fontSize: 11.5, color: "#6b7280", lineHeight: 1.4, marginTop: 3 }}>{entity.detail}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 850, color: "#111827", marginBottom: 8 }}>3. 內容任務型態</div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {contentTaskRoutes.map((route) => {
+                      const selected = selectedContentRoute.id === route.id;
+                      return (
+                        <button key={route.id} onClick={() => setSelectedContentRouteId(route.id)} style={{ textAlign: "left", border: `1px solid ${selected ? "#DB2777" : "#f3f4f6"}`, background: selected ? "#fdf2f8" : "#fff", borderRadius: 14, padding: 10, cursor: "pointer" }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 850, color: "#111827" }}>{route.label}</div>
+                          <div style={{ fontSize: 11.5, color: "#6b7280", lineHeight: 1.4, marginTop: 3 }}>{route.output}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16, borderRadius: 18, background: "#fff", border: "1px solid #fce7f3", padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 850, color: "#111827", marginBottom: 6 }}>即將帶入內容任務的 brief</div>
+                <p style={{ margin: 0, color: "#4b5563", fontSize: 13, lineHeight: 1.6 }}>
+                  {selectedHotTopic.title} × {selectedHotEntity.label} → {selectedContentRoute.label}。{selectedHotTopic.angle}；需要包含市場訊號、品牌/商品切角、開場 hook、正文與 CTA。
+                </p>
+              </div>
+            </section>
           )}
 
           {!isPerformance && active.id === "listening" && !brandId && (
