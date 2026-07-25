@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createBundleSocialClient } from "./bundleSocial";
+import { createBundleSocialClient, isBundleMissingTeamError } from "./bundleSocial";
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
 
@@ -29,6 +29,20 @@ function stubFetch(responses: Array<{ status?: number; body: unknown }>) {
 function client(stub: { fetchImpl: typeof fetch }) {
   return createBundleSocialClient({ apiKey: "pk_test_123", fetchImpl: stub.fetchImpl });
 }
+
+describe("isBundleMissingTeamError", () => {
+  it("recognises a team that was deleted outside OnBrand", () => {
+    expect(isBundleMissingTeamError(new Error("bundle.social 404: No team found"))).toBe(true);
+    expect(isBundleMissingTeamError(new Error("bundle.social 404: no team found"))).toBe(true);
+  });
+
+  it("does not swallow unrelated failures", () => {
+    expect(isBundleMissingTeamError(new Error("bundle.social 500: boom"))).toBe(false);
+    expect(isBundleMissingTeamError(new Error("bundle.social 404: No upload found"))).toBe(false);
+    expect(isBundleMissingTeamError("not an error")).toBe(false);
+    expect(isBundleMissingTeamError(undefined)).toBe(false);
+  });
+});
 
 describe("createBundleSocialClient", () => {
   it("creates a team through the documented endpoint with the API key header", async () => {

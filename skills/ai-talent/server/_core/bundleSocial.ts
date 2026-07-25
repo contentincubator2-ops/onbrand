@@ -30,6 +30,18 @@ export type BundleSocialClientConfig = {
   fetchImpl?: typeof fetch;
 };
 
+/**
+ * True when bundle.social says the team is gone.
+ *
+ * Teams can be deleted from the bundle.social dashboard, which leaves
+ * brands.bundleTeamId pointing at nothing. Callers use this to drop the stale
+ * binding and recreate the team instead of dead-ending the user.
+ */
+export function isBundleMissingTeamError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /\b404\b/.test(error.message) && /no team found/i.test(error.message);
+}
+
 /** Pull the human-readable part out of an error body without leaking the whole payload. */
 function extractMessage(body: string): string {
   try {

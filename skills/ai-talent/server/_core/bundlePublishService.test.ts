@@ -99,6 +99,16 @@ describe("publishViaBundleSocial", () => {
     )).rejects.toThrow(/Page token expired/);
   });
 
+  it("asks the user to reconnect when the team was deleted outside OnBrand", async () => {
+    const d = deps();
+    d.createPost.mockRejectedValue(new Error("bundle.social 404: No team found"));
+
+    await expect(publishViaBundleSocial(
+      { brandId: 2958, platform: "facebook", caption: "hi", referenceKey: "onbrand-5", now: NOW },
+      d,
+    )).rejects.toThrow(/尚未連接|重新連接/);
+  });
+
   it("still succeeds when the platform returns no permalink", async () => {
     const d = deps({ post: { id: "post_4", status: "SCHEDULED" } });
 

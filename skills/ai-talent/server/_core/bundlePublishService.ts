@@ -1,4 +1,5 @@
 import { buildBundlePostPayload, toBundlePlatform } from "./bundlePublish";
+import { isBundleMissingTeamError } from "./bundleSocial";
 import type { BundlePost, BundleSocialClient } from "./bundleSocial";
 
 export type BundlePublishResult = {
@@ -73,7 +74,17 @@ export async function publishViaBundleSocial(
     referenceKey: input.referenceKey,
   });
 
-  const post = await deps.client.createPost(payload);
+  let post: BundlePost;
+  try {
+    post = await deps.client.createPost(payload);
+  } catch (e) {
+    // The team was deleted in the bundle.social dashboard. Reconnecting rebuilds
+    // it, so point the user there instead of showing a raw 404.
+    if (isBundleMissingTeamError(e)) {
+      throw new Error("此品牌的 bundle.social 工作區已不存在，請重新連接此平台。");
+    }
+    throw e;
+  }
 
   const failure = platformError(post, platform);
   if (failure) throw new Error(failure);

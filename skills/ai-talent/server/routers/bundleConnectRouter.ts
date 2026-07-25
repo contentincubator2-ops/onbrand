@@ -12,7 +12,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { assertBrandAccess } from "../_core/brandAuth";
-import { createBundleSocialClient } from "../_core/bundleSocial";
+import { createBundleSocialClient, isBundleMissingTeamError } from "../_core/bundleSocial";
 import { toBundlePlatform } from "../_core/bundlePublish";
 import { getPublishProvider } from "../_core/publishProvider";
 
@@ -78,34 +78,47 @@ export const bundleConnectRouter = router({
       const brand = (rows as any[])[0];
       if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "品牌不存在" });
 
-      let teamId: string | null = brand.bundleTeamId ?? null;
-      if (!teamId) {
-        // bundle.social caps team names at 80 chars.
-        const name = `OnBrand #${input.brandId} ${brand.name ?? ""}`.trim().slice(0, 80);
+      // bundle.social caps team names at 80 chars.
+      const teamName = `OnBrand #${input.brandId} ${brand.name ?? ""}`.trim().slice(0, 80);
+
+      async function createAndStoreTeam(): Promise<string> {
         try {
-          const team = await client.createTeam(name);
-          teamId = team.id;
+          const team = await client.createTeam(teamName);
+          await localPool.execute(
+            `UPDATE brands SET bundleTeamId = ?, bundleConnectedAt = NULL WHERE id = ?`,
+            [team.id, input.brandId],
+          );
+          return team.id;
         } catch (e: any) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: `建立 bundle.social 工作區失敗：${String(e?.message ?? e).slice(0, 200)}`,
           });
         }
-        await localPool.execute(
-          `UPDATE brands SET bundleTeamId = ? WHERE id = ?`,
-          [teamId, input.brandId],
-        );
       }
 
-      try {
-        const link = await client.createPortalLink({
+      async function portalLinkFor(teamId: string) {
+        return client.createPortalLink({
           teamId,
           socialAccountTypes: [platform],
           redirectUrl: input.redirectUrl,
           expiresIn: PORTAL_EXPIRY_MINUTES,
         });
-        return { url: link.url, teamId };
+      }
+
+      let teamId: string = brand.bundleTeamId ?? await createAndStoreTeam();
+
+      try {
+        return { url: (await portalLinkFor(teamId)).url, teamId };
       } catch (e: any) {
+        // A team deleted in the bundle.social dashboard leaves a stale
+        // bundleTeamId behind. Without this recovery the user is stuck: every
+        // reconnect attempt reuses the dead id and 404s again.
+        if (isBundleMissingTeamError(e)) {
+          console.warn(`[bundleConnect] brand ${input.brandId}: team ${teamId} is gone, recreating`);
+          teamId = await createAndStoreTeam();
+          return { url: (await portalLinkFor(teamId)).url, teamId };
+        }
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `取得連接連結失敗：${String(e?.message ?? e).slice(0, 200)}`,
