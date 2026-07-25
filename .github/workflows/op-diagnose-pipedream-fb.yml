@@ -22,6 +22,10 @@ on:
         description: "Optional Facebook Page ID to probe directly"
         required: false
         type: string
+      publish_poc:
+        description: "Type PUBLISH to run one Facebook publish PoC (action first, proxy fallback)"
+        required: false
+        type: string
 
 jobs:
   diagnose:
@@ -280,7 +284,119 @@ jobs:
           done
           echo ""
 
-          echo "──── 5. List accounts with ?app=facebook_pages filter (OLD code behavior) ────"
+          echo "──── 5. Optional publish PoC ────"
+          if [ "${{ github.event.inputs.publish_poc }}" = "PUBLISH" ]; then
+            if [ -z "$FB_PAGE_ID" ]; then
+              echo "❌ publish_poc requires page_id (or a saved Page ID for brand-{id})"
+              exit 1
+            fi
+
+            ACCOUNT_ID=$(python3 -c "
+          import json
+          d = json.load(open('/tmp/pd_all.json'))
+          accs = d if isinstance(d, list) else (d.get('data') or [])
+          for account in accs:
+              app = account.get('app')
+              slug = app.get('name_slug') if isinstance(app, dict) else app
+              if slug in ('facebook_pages', 'facebook', 'facebook_oauth2'):
+                  print(account.get('id', ''))
+                  break
+          " 2>/dev/null || echo "")
+            if [ -z "$ACCOUNT_ID" ]; then
+              echo "❌ No connected Facebook account is available for the PoC"
+              exit 1
+            fi
+
+            TEST_MESSAGE="OnBrand × Pipedream Facebook 發布 PoC（技術測試，可忽略）— $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            export EXTERNAL_USER ACCOUNT_ID FB_PAGE_ID TEST_MESSAGE
+            ACTION_PAYLOAD=$(python3 -c "
+          import json, os
+          print(json.dumps({
+              'external_user_id': os.environ['EXTERNAL_USER'],
+              'id': 'facebook_pages-create-post',
+              'configured_props': {
+                  'facebookPages': {'authProvisionId': os.environ['ACCOUNT_ID']},
+                  'page': os.environ['FB_PAGE_ID'],
+                  'message': os.environ['TEST_MESSAGE'],
+              },
+          }, ensure_ascii=False))
+          ")
+
+            echo "  A. Pipedream prebuilt action: facebook_pages-create-post"
+            ACTION_HTTP=$(curl -s -o /tmp/pd_fb_action.json -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -H "X-PD-Environment: $PD_ENV" \
+              -H "x-pd-project-id: $PIPEDREAM_PROJECT_ID" \
+              -d "$ACTION_PAYLOAD" \
+              "https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/actions/run")
+            ACTION_SUMMARY=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_fb_action.json'))
+              ret = d.get('ret') or {}
+              if isinstance(ret, dict) and ret.get('id'):
+                  print(f\"success post_id={ret['id']}\")
+              elif d.get('error'):
+                  error = d['error']
+                  print(f\"error_name={error.get('name','?')} message={error.get('message', error)}\")
+              else:
+                  print('no post ID returned')
+          except Exception:
+              print('invalid response')
+          " 2>/dev/null || echo "invalid response")
+            echo "    HTTP=${ACTION_HTTP} ${ACTION_SUMMARY}"
+            ACTION_SUCCESS=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_fb_action.json'))
+              ret = d.get('ret') or {}
+              print('1' if isinstance(ret, dict) and ret.get('id') else '0')
+          except Exception:
+              print('0')
+          " 2>/dev/null || echo "0")
+
+            if [ "$ACTION_SUCCESS" = "1" ]; then
+              echo "  ✅ Action succeeded; skipping proxy fallback to avoid a duplicate post."
+            else
+              echo "  B. Connect API Proxy: POST /${FB_PAGE_ID}/feed"
+              PROXY_TARGET="https://graph.facebook.com/v25.0/${FB_PAGE_ID}/feed"
+              PROXY_B64=$(printf '%s' "$PROXY_TARGET" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              PROXY_PAYLOAD=$(python3 -c "
+          import json, os
+          print(json.dumps({'message': os.environ['TEST_MESSAGE']}, ensure_ascii=False))
+          ")
+              PROXY_HTTP=$(curl -s -o /tmp/pd_fb_proxy_post.json -w "%{http_code}" \
+                -X POST \
+                -H "Authorization: Bearer $ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "X-PD-Environment: $PD_ENV" \
+                -H "x-pd-project-id: $PIPEDREAM_PROJECT_ID" \
+                -d "$PROXY_PAYLOAD" \
+                "https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/proxy/${PROXY_B64}?external_user_id=${EXTERNAL_USER}&account_id=${ACCOUNT_ID}")
+              PROXY_SUMMARY=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_fb_proxy_post.json'))
+              if d.get('id'):
+                  print(f\"success post_id={d['id']}\")
+              elif d.get('error'):
+                  error = d['error']
+                  print(f\"error_code={error.get('code','?')} message={error.get('message', error)}\")
+              else:
+                  print('no post ID returned')
+          except Exception:
+              print('invalid response')
+          " 2>/dev/null || echo "invalid response")
+              echo "    HTTP=${PROXY_HTTP} ${PROXY_SUMMARY}"
+            fi
+          else
+            echo "  Skipped. Enter publish_poc=PUBLISH to run the external write test."
+          fi
+          echo ""
+
+          echo "──── 6. List accounts with ?app=facebook_pages filter (OLD code behavior) ────"
           HTTP=$(curl -s -o /tmp/pd_fb.json -w "%{http_code}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "X-PD-Environment: $PD_ENV" \
@@ -296,7 +412,7 @@ jobs:
           echo "  Accounts with app=facebook_pages filter: $FB_COUNT"
           echo ""
 
-          echo "──── 6. DB check — brands.fbPageId column ────"
+          echo "──── 7. DB check — brands.fbPageId column ────"
 
           COL=$($MYSQL -e "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='brands' AND COLUMN_NAME='fbPageId'" 2>/dev/null || echo "")
           if [ -n "$COL" ]; then
