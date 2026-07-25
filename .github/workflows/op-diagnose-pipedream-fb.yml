@@ -170,23 +170,37 @@ jobs:
               echo "    saved_page_from_me_accounts=${FB_PAGE_ID} ${PAGE_LIST_SUMMARY}"
 
               if [ -n "$PAGE_TOKEN" ]; then
-                PERMISSIONS_HTTP=$(curl -s -G -o "/tmp/fb_page_permissions_${ACCOUNT_ID}.json" -w "%{http_code}" \
-                  --data-urlencode "access_token=${PAGE_TOKEN}" \
-                  "https://graph.facebook.com/v25.0/me/permissions")
-                PERMISSIONS_SUMMARY=$(python3 -c "
+                for PROBE in identity page feed; do
+                  case "$PROBE" in
+                    identity)
+                      PROBE_URL="https://graph.facebook.com/v25.0/me?fields=id,name"
+                      ;;
+                    page)
+                      PROBE_URL="https://graph.facebook.com/v25.0/${FB_PAGE_ID}?fields=id,name"
+                      ;;
+                    feed)
+                      PROBE_URL="https://graph.facebook.com/v25.0/${FB_PAGE_ID}/feed?fields=id,message&limit=1"
+                      ;;
+                  esac
+                  PROBE_HTTP=$(curl -s -G -o "/tmp/fb_page_probe_${PROBE}_${ACCOUNT_ID}.json" -w "%{http_code}" \
+                    --data-urlencode "access_token=${PAGE_TOKEN}" \
+                    "$PROBE_URL")
+                  PROBE_SUMMARY=$(python3 -c "
           import json
           try:
-              d = json.load(open('/tmp/fb_page_permissions_${ACCOUNT_ID}.json'))
+              d = json.load(open('/tmp/fb_page_probe_${PROBE}_${ACCOUNT_ID}.json'))
               if d.get('error'):
-                  print(f\"error={d['error'].get('message', d['error'])}\")
+                  error = d['error']
+                  print(f\"error_code={error.get('code','?')} error_subcode={error.get('error_subcode','?')} message={error.get('message', error)}\")
+              elif '${PROBE}' == 'feed':
+                  print(f\"posts_read={len(d.get('data') or [])}\")
               else:
-                  granted = sorted(p.get('permission','?') for p in d.get('data') or [] if p.get('status') == 'granted')
-                  declined = sorted(p.get('permission','?') for p in d.get('data') or [] if p.get('status') != 'granted')
-                  print(f\"granted={granted} declined={declined}\")
+                  print(f\"id={d.get('id','?')} name={d.get('name','?')}\")
           except Exception:
               print('invalid response')
           " 2>/dev/null || echo "invalid response")
-                echo "    page_token_permissions HTTP=${PERMISSIONS_HTTP} ${PERMISSIONS_SUMMARY}"
+                  echo "    page_token_${PROBE} HTTP=${PROBE_HTTP} ${PROBE_SUMMARY}"
+                done
               fi
 
               PAGE_TARGET="https://graph.facebook.com/v25.0/${FB_PAGE_ID}?fields=id,name,access_token"
