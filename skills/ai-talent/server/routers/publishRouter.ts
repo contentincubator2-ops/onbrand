@@ -33,10 +33,11 @@ import {
   prioritizePipedreamAccounts,
 } from "../_core/pipedreamAccounts";
 import {
+  assessPipedreamFacebookPageAccess,
   findPipedreamFacebookPage,
-  mergePipedreamFacebookPages,
   probePipedreamFacebookAccounts,
 } from "../_core/pipedreamFacebook";
+import { getPipedreamOAuthAppId } from "../_core/pipedreamOAuth";
 
 const ENV = process.env;
 
@@ -182,6 +183,7 @@ export const publishRouter = router({
       const clientSecret = process.env.PIPEDREAM_CLIENT_SECRET;
       const projectId    = process.env.PIPEDREAM_PROJECT_ID;
       const pdEnv        = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
+      const oauthAppId   = getPipedreamOAuthAppId("facebook");
 
       if (!clientId || !clientSecret || !projectId) {
         console.error("[publish.getFacebookConnectUrl] missing env: PIPEDREAM_CLIENT_ID / CLIENT_SECRET / PROJECT_ID");
@@ -251,14 +253,21 @@ export const publishRouter = router({
         if (!u.searchParams.has("token") && data.token) {
           u.searchParams.set("token", data.token);
         }
+        if (oauthAppId) {
+          u.searchParams.set("oauthAppId", oauthAppId);
+        }
         connectUrl = u.toString();
       } catch {
-        connectUrl = `https://pipedream.com/_static/connect.html?token=${data.token}&app=facebook_pages`;
+        const oauthAppQuery = oauthAppId
+          ? `&oauthAppId=${encodeURIComponent(oauthAppId)}`
+          : "";
+        connectUrl = `https://pipedream.com/_static/connect.html?token=${data.token}&app=facebook_pages${oauthAppQuery}`;
       }
       return {
         token: data.token,
         connectUrl,
         expiresAt: data.expires_at ?? null,
+        oauthAppId: oauthAppId ?? null,
       };
     }),
 
@@ -364,19 +373,16 @@ export const publishRouter = router({
 
       // Step 3: call Facebook through every matching Pipedream Connect account.
       //
-      // This project uses Pipedream's managed Facebook OAuth client. Pipedream
-      // intentionally does not expose managed-client credentials through the
-      // Account API, so the Connect Proxy injects and refreshes each managed
-      // OAuth token. Repeated OAuth flows create duplicate account records;
-      // probing all of them prevents an older/stale account from hiding a valid
-      // Page on a newer authorization.
+      // The Connect Proxy injects and refreshes each account's OAuth token.
+      // Repeated OAuth flows may leave an older account record, so probe all
+      // matching records and accept a Page when any account has usable access.
       const probes = await probePipedreamFacebookAccounts({
         apiBase: PD,
         projectId,
         externalUserId,
         headers,
         accounts,
-        fields: ["category"],
+        fields: ["category", "access_token"],
       });
       if (probes.every((probe) => probe.error)) {
         const detail = probes.find((probe) => probe.error)?.error ?? "unknown proxy error";
@@ -385,11 +391,13 @@ export const publishRouter = router({
           message: `FB Graph API Proxy 失敗：${detail.slice(0, 200)}`,
         });
       }
-      const pages = mergePipedreamFacebookPages(probes)
+      const pages = (await assessPipedreamFacebookPageAccess(probes))
         .map((page) => ({
           id: page.id,
           name: page.name,
           category: page.category ?? "",
+          publishReady: page.publishReady ?? false,
+          permissionError: page.permissionError,
         }));
       return {
         ok: true as const,

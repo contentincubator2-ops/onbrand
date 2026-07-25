@@ -6,6 +6,8 @@ export type PipedreamFacebookPage = {
   name: string;
   category?: string;
   access_token?: string;
+  publishReady?: boolean;
+  permissionError?: string;
 };
 
 export type PipedreamFacebookAccountProbe = {
@@ -107,4 +109,69 @@ export function findPipedreamFacebookPage(
     if (page) return { account: probe.account, page };
   }
   return undefined;
+}
+
+/**
+ * Verify that at least one connected account has a Page token that Meta will
+ * actually accept for the selected Page. `/me/accounts` can succeed with only
+ * `pages_show_list`, while both reading and publishing the Page later fail with
+ * error #283. Test the real Page object up front and never expose Page tokens to
+ * the browser.
+ */
+export async function assessPipedreamFacebookPageAccess(
+  probes: PipedreamFacebookAccountProbe[],
+  fetchImpl: typeof fetch = fetch,
+): Promise<PipedreamFacebookPage[]> {
+  const candidatesByPage = new Map<string, PipedreamFacebookPage[]>();
+  for (const probe of probes) {
+    for (const page of probe.pages) {
+      const candidates = candidatesByPage.get(page.id) ?? [];
+      candidates.push(page);
+      candidatesByPage.set(page.id, candidates);
+    }
+  }
+
+  return Promise.all([...candidatesByPage.values()].map(async (candidates) => {
+    const base = candidates[0]!;
+    let permissionError = "找不到粉專 Page access token";
+
+    for (const candidate of candidates) {
+      if (!candidate.access_token) continue;
+      try {
+        const response = await fetchImpl(
+          `https://graph.facebook.com/v25.0/${encodeURIComponent(candidate.id)}?fields=id,name`,
+          {
+            headers: { Authorization: `Bearer ${candidate.access_token}` },
+            signal: AbortSignal.timeout(15_000),
+          },
+        );
+        if (response.ok) {
+          return {
+            id: base.id,
+            name: base.name,
+            category: base.category,
+            publishReady: true,
+          };
+        }
+
+        const body = await response.text();
+        try {
+          const parsed = JSON.parse(body) as { error?: { message?: string } };
+          permissionError = parsed.error?.message ?? body.slice(0, 200);
+        } catch {
+          permissionError = body.slice(0, 200);
+        }
+      } catch (error) {
+        permissionError = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    return {
+      id: base.id,
+      name: base.name,
+      category: base.category,
+      publishReady: false,
+      permissionError: permissionError.slice(0, 200),
+    };
+  }));
 }

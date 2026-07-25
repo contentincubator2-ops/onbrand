@@ -10,6 +10,7 @@
  *   PIPEDREAM_CLIENT_SECRET
  *   PIPEDREAM_PROJECT_ID
  *   PIPEDREAM_PROJECT_ENV   (optional, defaults to "production")
+ *   PIPEDREAM_FACEBOOK_OAUTH_APP_ID (required for Facebook publishing)
  *
  * Pipedream "app" names:
  *   facebook_pages, instagram_business, linkedin, youtube
@@ -20,6 +21,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { assertBrandAccess } from "../_core/brandAuth";
 import { getPipedreamConnectTokenUrl } from "../_core/pipedreamConnect";
+import { getPipedreamOAuthAppId } from "../_core/pipedreamOAuth";
 
 // Pipedream Connect REST endpoint for issuing user tokens
 const PLATFORM_APP: Record<string, string> = {
@@ -122,6 +124,7 @@ export const platformConnectRouter = router({
 
       const externalUserId = `sowork-brand-${input.brandId}`;
       const appSlug = PLATFORM_APP[input.platform]!;
+      const oauthAppId = getPipedreamOAuthAppId(input.platform);
       const projectId = process.env.PIPEDREAM_PROJECT_ID ?? "";
       const env = process.env.PIPEDREAM_PROJECT_ENV ?? "production";
 
@@ -134,6 +137,7 @@ export const platformConnectRouter = router({
         projectId,
         env: env as "production" | "development",
         connectLinkUrl: connect_link_url ?? "",
+        oauthAppId: oauthAppId ?? null,
       };
     }),
 });

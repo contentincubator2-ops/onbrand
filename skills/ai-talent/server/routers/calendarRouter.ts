@@ -403,6 +403,34 @@ export const calendarRouter = router({
         }
         const pageToken = page.access_token;
 
+        // Validate the real Page token before attempting a write. Meta may let
+        // `/me/accounts` list a Page with pages_show_list while later rejecting
+        // Page reads and posts with #283.
+        const accessRes = await fetch(
+          `https://graph.facebook.com/v25.0/${encodeURIComponent(pageId)}?fields=id,name`,
+          {
+            headers: { Authorization: `Bearer ${pageToken}` },
+            signal: AbortSignal.timeout(15_000),
+          },
+        );
+        if (!accessRes.ok) {
+          const accessText = await accessRes.text();
+          let accessMessage = accessText.slice(0, 300);
+          try {
+            accessMessage = JSON.parse(accessText)?.error?.message ?? accessMessage;
+          } catch { /* keep raw */ }
+          if (/pages_read_engagement|#283/i.test(accessMessage)) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Facebook 授權只能列出粉專，缺少讀取／發布權限。請重新連接 Facebook；若仍失敗，請聯絡客服更新 Meta 授權應用程式。",
+            });
+          }
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Facebook 粉專權限驗證失敗：${accessMessage}`,
+          });
+        }
+
         // Step 5: POST to FB Graph API
         const fbRes = await fetch(
           `https://graph.facebook.com/v25.0/${pageId}/feed`,

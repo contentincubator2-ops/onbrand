@@ -433,7 +433,13 @@ export default function RunPage() {
   const [fbOauthDone, setFbOauthDone] = useState(false);
   const [fbOauthPending, setFbOauthPending] = useState(false);
   const [fbPagePickerOpen, setFbPagePickerOpen] = useState(false);
-  const [fbPages, setFbPages] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [fbPages, setFbPages] = useState<Array<{
+    id: string;
+    name: string;
+    category: string;
+    publishReady?: boolean;
+    permissionError?: string;
+  }>>([]);
   /** Local override for variants — applied after save, mockup updates live. */
   const [overrides, setOverrides] = useState<Record<number, { caption: string }>>({});
   /** AI chat history per variant. */
@@ -607,7 +613,14 @@ export default function RunPage() {
   // and the SDK module (on hover/focus/mount) so the click handler can
   // call connectAccount with NO awaits in front of it → no popup block.
   const pdSdkRef = React.useRef<any>(null);
-  const pdTokenRef = React.useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string; connectLinkUrl: string }>>({});
+  const pdTokenRef = React.useRef<Record<string, {
+    token: string;
+    expiresAt: number;
+    appSlug: string;
+    env: string;
+    connectLinkUrl: string;
+    oauthAppId: string | null;
+  }>>({});
   const pdPrefetchingRef = React.useRef<Record<string, boolean>>({});
   const PLATFORM_LABEL: Record<string, string> = {
     facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube",
@@ -639,6 +652,7 @@ export default function RunPage() {
           appSlug: tk.appSlug,
           env: tk.env ?? "production",
           connectLinkUrl: tk.connectLinkUrl ?? "",
+          oauthAppId: tk.oauthAppId ?? null,
         };
       }
     } catch { /* surfaced on click if still cold */ } finally {
@@ -675,6 +689,7 @@ export default function RunPage() {
       });
       pd.connectAccount({
         app: tk.appSlug,
+        oauthAppId: tk.oauthAppId ?? undefined,
         onSuccess: () => {
           showToastGlobal(
             lang === "en"
@@ -791,6 +806,7 @@ export default function RunPage() {
         pd.connectAccount({
           token: r.token,
           app: "facebook_pages",
+          oauthAppId: r.oauthAppId ?? undefined,
           onSuccess: async () => {
             setFbOauthPending(false);
             setFbOauthDone(true);
@@ -802,8 +818,10 @@ export default function RunPage() {
                   brandId: fbBrandId,
                   waitForPropagation: false,
                 });
-                if ((pages?.pages?.length ?? 0) > 0) {
-                  setFbPages(pages!.pages);
+                const readyPages = (pages?.pages ?? [])
+                  .filter((page: any) => page.publishReady !== false);
+                if (readyPages.length > 0) {
+                  setFbPages(readyPages);
                   setFbPagePickerOpen(true);
                   return;
                 }

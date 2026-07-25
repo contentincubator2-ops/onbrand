@@ -188,8 +188,18 @@ export default function CalendarPage() {
   // Pipedream opens its OAuth popup inside connectAccount(). Keep both the SDK
   // and one-time Connect token warm so the actual button click can call it
   // synchronously while the browser's user activation is still valid.
-  type FacebookConnectToken = { token: string; expiresAt: number };
-  type FacebookPage = { id: string; name: string; category: string };
+  type FacebookConnectToken = {
+    token: string;
+    expiresAt: number;
+    oauthAppId: string | null;
+  };
+  type FacebookPage = {
+    id: string;
+    name: string;
+    category: string;
+    publishReady?: boolean;
+    permissionError?: string;
+  };
   type FacebookPagesCache = {
     pages: FacebookPage[];
     connectedAccountCount: number;
@@ -236,6 +246,7 @@ export default function CalendarPage() {
           expiresAt: response.expiresAt
             ? new Date(response.expiresAt).getTime()
             : Date.now() + 300_000,
+          oauthAppId: response.oauthAppId ?? null,
         };
       }
       if (existing) {
@@ -252,8 +263,10 @@ export default function CalendarPage() {
 
   const connectFacebookFromCalendar = React.useCallback((calBrandId: number) => {
     const pageCache = pdFacebookPagesRef.current[calBrandId];
-    if ((pageCache?.pages.length ?? 0) > 0) {
-      setFbPages(pageCache!.pages);
+    const publishablePages = (pageCache?.pages ?? [])
+      .filter((page) => page.publishReady !== false);
+    if (publishablePages.length > 0) {
+      setFbPages(publishablePages);
       setFbPickerBrandId(calBrandId);
       return;
     }
@@ -277,13 +290,18 @@ export default function CalendarPage() {
       return;
     }
 
-    // A Pipedream account already exists, but it currently exposes no managed
-    // Pages. Opening Connect again would only create another duplicate account
-    // record and repeat the same loop.
-    if (pageCache.connectedAccountCount > 0) {
+    // Do not repeat the managed Pipedream OAuth loop: its Meta app can list
+    // Pages but lacks pages_read_engagement / pages_manage_posts. Once a custom
+    // OAuth app is configured, allow one replacement authorization.
+    if (pageCache.connectedAccountCount > 0 && !cached.oauthAppId) {
+      const hasVisibleButUnpublishablePage = pageCache.pages.length > 0;
       alert(lang === "en"
-        ? "Facebook is authorized, but this account does not expose any managed Pages. Check your Page access in Meta Business Settings, then try again."
-        : "Facebook 已授權，但此帳號目前沒有可管理的粉專。請先到 Meta 商業設定確認粉專存取權，再重試。");
+        ? hasVisibleButUnpublishablePage
+          ? "Facebook is connected, but the authorization only allows listing Pages and cannot publish. Please contact support to enable the approved Meta OAuth app."
+          : "Facebook is authorized, but this account does not expose any managed Pages. Check your Page access in Meta Business Settings, then try again."
+        : hasVisibleButUnpublishablePage
+          ? "Facebook 已連接，但目前授權只能列出粉專，沒有讀取／發布權限。請聯絡客服啟用核准的 Meta OAuth 應用程式。"
+          : "Facebook 已授權，但此帳號目前沒有可管理的粉專。請先到 Meta 商業設定確認粉專存取權，再重試。");
       return;
     }
 
@@ -298,10 +316,13 @@ export default function CalendarPage() {
     pd.connectAccount({
       token: cached.token,
       app: "facebook_pages",
+      oauthAppId: cached.oauthAppId ?? undefined,
       onSuccess: async () => {
         delete pdFacebookTokensRef.current[calBrandId];
         delete pdFacebookPagesRef.current[calBrandId];
         // Poll getFacebookPages with backoff — Pipedream may take 5-20s to propagate
+        let lastPages: FacebookPage[] = [];
+        let lastConnectedAccountCount = 1;
         for (let i = 0; i < 10; i++) {
           await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
           try {
@@ -309,26 +330,30 @@ export default function CalendarPage() {
               brandId: calBrandId,
               waitForPropagation: false,
             });
-            if ((pages?.pages?.length ?? 0) > 0) {
-              pdFacebookPagesRef.current[calBrandId] = {
-                pages: pages!.pages,
-                connectedAccountCount: pages?.connectedAccountCount ?? 1,
-                checkedAt: Date.now(),
-              };
-              setFbPages(pages!.pages);
+            lastPages = pages?.pages ?? [];
+            lastConnectedAccountCount = pages?.connectedAccountCount ?? 1;
+            const readyPages = lastPages
+              .filter((page: FacebookPage) => page.publishReady !== false);
+            pdFacebookPagesRef.current[calBrandId] = {
+              pages: lastPages,
+              connectedAccountCount: lastConnectedAccountCount,
+              checkedAt: Date.now(),
+            };
+            if (readyPages.length > 0) {
+              setFbPages(readyPages);
               setFbPickerBrandId(calBrandId);
               return;
             }
           } catch { /* keep retrying */ }
         }
         pdFacebookPagesRef.current[calBrandId] = {
-          pages: [],
-          connectedAccountCount: 1,
+          pages: lastPages,
+          connectedAccountCount: lastConnectedAccountCount,
           checkedAt: Date.now(),
         };
         alert(lang === "en"
-          ? "Facebook is authorized, but no managed Pages were returned. Check your Page access in Meta Business Settings."
-          : "Facebook 已授權，但沒有取得可管理的粉專。請到 Meta 商業設定確認粉專存取權。");
+          ? "Facebook authorization completed, but Meta still did not grant Page read / publish permissions. Check the custom OAuth app permissions and reconnect."
+          : "Facebook 授權完成，但 Meta 仍未授予粉專讀取／發布權限。請檢查自訂 OAuth 應用程式權限後重新連接。");
       },
       onError: (err: any) => {
         delete pdFacebookTokensRef.current[calBrandId];

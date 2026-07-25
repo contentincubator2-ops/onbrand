@@ -616,14 +616,27 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // ── Pre-fetched token cache ────────────────────────────────────────────
   // Tokens are pre-fetched on mount so connectAccount() can start instantly
   // without waiting for a round-trip when the user clicks the button.
-  type TokenCache = { token: string; connectLinkUrl: string; appSlug: string; env: string; expiresAt: number };
+  type TokenCache = {
+    token: string;
+    connectLinkUrl: string;
+    appSlug: string;
+    env: string;
+    expiresAt: number;
+    oauthAppId: string | null;
+  };
   const pdTokensRef = useRef<Record<string, TokenCache>>({});
 
   // ── Local state ───────────────────────────────────────────────────────
   const [pendingPlatform, setPendingPlatform]   = useState<string | null>(null);
   /** Platform currently being verified post-OAuth (polling Pipedream) */
   const [verifyingPlatform, setVerifyingPlatform] = useState<string | null>(null);
-  const [fbPages, setFbPages]                   = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [fbPages, setFbPages] = useState<Array<{
+    id: string;
+    name: string;
+    category: string;
+    publishReady?: boolean;
+    permissionError?: string;
+  }>>([]);
   const [fbPickerOpen, setFbPickerOpen]         = useState(false);
 
   const fbStatus    = fbStatusQ?.data;
@@ -649,6 +662,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
           appSlug: "facebook_pages",
           env: "production",
           expiresAt: r.expiresAt ? new Date(r.expiresAt).getTime() : Date.now() + 300_000,
+          oauthAppId: r.oauthAppId ?? null,
         };
       }
     } catch { /* silent — will fetch fresh on click */ }
@@ -663,6 +677,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
             appSlug: r.appSlug ?? key,
             env: r.env ?? "production",
             expiresAt: r.expiresAt ? new Date(r.expiresAt).getTime() : Date.now() + 300_000,
+            oauthAppId: r.oauthAppId ?? null,
           };
         }
       } catch { /* silent */ }
@@ -693,19 +708,28 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         const nowConnected = !!(result?.data as any)?.connected?.[platformKey];
         if (nowConnected || i === MAX - 1) {
           if (platformKey === "facebook") {
+            let foundPublishablePage = false;
             for (let fbTry = 0; fbTry < 5; fbTry++) {
               try {
                 const pages = await fbPagesM?.mutateAsync?.({
                   brandId,
                   waitForPropagation: false,
                 });
-                if ((pages?.pages?.length ?? 0) > 0) {
-                  setFbPages(pages!.pages);
+                const readyPages = (pages?.pages ?? [])
+                  .filter((page: any) => page.publishReady !== false);
+                if (readyPages.length > 0) {
+                  setFbPages(readyPages);
                   setFbPickerOpen(true);
+                  foundPublishablePage = true;
                   break;
                 }
               } catch { /* keep retrying */ }
               if (fbTry < 4) await new Promise<void>(r => setTimeout(r, 2000));
+            }
+            if (!foundPublishablePage) {
+              alert(en
+                ? "Facebook connected, but Meta did not grant Page read / publish permissions. Check the custom OAuth app and reconnect."
+                : "Facebook 已連接，但 Meta 未授予粉專讀取／發布權限。請檢查自訂 OAuth 應用程式後重新連接。");
             }
           }
           fbStatusQ?.refetch?.();
@@ -738,12 +762,16 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
       // 1. Get a fresh token (or use valid cached one)
       let token: string | null = null;
       const tk = pdTokensRef.current[platform.key];
+      let oauthAppId: string | null = tk?.oauthAppId ?? null;
       if (tk?.token && tk.expiresAt - Date.now() > 30_000) {
         token = tk.token;
       } else {
         try {
           const r = await getConnectTkM?.mutateAsync?.({ platform: platform.key as any, brandId });
-          if (r?.token) token = r.token;
+          if (r?.token) {
+            token = r.token;
+            oauthAppId = r.oauthAppId ?? null;
+          }
         } catch { /* fall through */ }
       }
 
@@ -771,6 +799,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         pd.connectAccount({
           token,
           app: appSlug,
+          oauthAppId: oauthAppId ?? undefined,
           onSuccess: () => {
             // OAuth completed — start polling for registration
             setPendingPlatform(null);

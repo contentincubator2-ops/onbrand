@@ -201,7 +201,14 @@ export function IntakeChat({
   // and the SDK module (on hover/focus/mount) so the click handler can
   // call connectAccount with NO awaits in front of it → no popup block.
   const pdSdkRef = useRef<any>(null);
-  const pdTokenRef = useRef<Record<string, { token: string; expiresAt: number; appSlug: string; env: string; connectLinkUrl: string }>>({});
+  const pdTokenRef = useRef<Record<string, {
+    token: string;
+    expiresAt: number;
+    appSlug: string;
+    env: string;
+    connectLinkUrl: string;
+    oauthAppId: string | null;
+  }>>({});
   const pdPrefetchingRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -228,6 +235,7 @@ export function IntakeChat({
           appSlug: tk.appSlug,
           env: tk.env ?? "production",
           connectLinkUrl: tk.connectLinkUrl ?? "",
+          oauthAppId: tk.oauthAppId ?? null,
         };
       }
     } catch {
@@ -258,6 +266,7 @@ export function IntakeChat({
       });
       pd.connectAccount({
         app: tk.appSlug,
+        oauthAppId: tk.oauthAppId ?? undefined,
         onSuccess: (res: any) => {
           setPlatformName(PLATFORM_LABEL[platform] ?? res?.id ?? platform);
           setPlatformAuthorized(true);
