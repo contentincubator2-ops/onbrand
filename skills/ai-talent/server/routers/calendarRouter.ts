@@ -24,6 +24,9 @@ import { assertBrandOwner } from "../_core/brandAuth";
 import {
   buildPipedreamAccountsUrl,
 } from "../_core/pipedreamConnect";
+import { getPublishProvider } from "../_core/publishProvider";
+import { createBundleSocialClient } from "../_core/bundleSocial";
+import { publishViaBundleSocial } from "../_core/bundlePublishService";
 
 const CONTENT_TYPES = [
   "fb-content",
@@ -359,8 +362,62 @@ export const calendarRouter = router({
       let permalink: string | null = null;
       let postId: string | null = null;
 
+      // ── bundle.social: opt in per platform via PUBLISH_PROVIDER_<PLATFORM> ─
+      // Pipedream's managed Meta app cannot publish (see
+      // docs/facebook-publish-provider-evaluation-2026-07-25.md). This branch
+      // routes a platform to bundle.social without touching the paths below.
+      if (getPublishProvider(platform) === "bundle") {
+        const apiKey = process.env.BUNDLE_SOCIAL_API_KEY;
+        if (!apiKey) {
+          console.error("[calendar.publish] missing env: BUNDLE_SOCIAL_API_KEY");
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "發布服務尚未啟用，請聯絡 sowork@sowork.ai。",
+          });
+        }
+
+        let bundleImageUrl: string | null = null;
+        try {
+          const parsed = JSON.parse(row.outputContent);
+          const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
+          const v = variants[row.variantIndex ?? 0] ?? {};
+          bundleImageUrl = v.imageUrl ?? v.image?.url ?? null;
+        } catch { /* no image */ }
+
+        try {
+          const result = await publishViaBundleSocial(
+            {
+              brandId: row.brandId,
+              platform,
+              caption,
+              imageUrl: bundleImageUrl,
+              referenceKey: `onbrand-${row.id}`,
+            },
+            {
+              client: createBundleSocialClient({ apiKey }),
+              getBundleTeamId: async (brandId) => {
+                const [teamRows]: any = await localPool.execute(
+                  `SELECT bundleTeamId FROM brands WHERE id = ? LIMIT 1`,
+                  [brandId],
+                );
+                return (teamRows as any[])[0]?.bundleTeamId ?? null;
+              },
+            },
+          );
+          postId = result.postId;
+          permalink = result.permalink;
+        } catch (e: any) {
+          const message = e?.message ?? "bundle.social 發布失敗";
+          // "尚未連接" / "尚未支援" are user-fixable states, not server faults.
+          const userActionable = message.includes("尚未");
+          throw new TRPCError({
+            code: userActionable ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
+            message,
+          });
+        }
+
       // ── Facebook: publish directly via Pipedream Connect OAuth ──────────
-      if (platform === "facebook") {
+      } else if (platform === "facebook") {
         if (!row.brand_fb_page_id) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",

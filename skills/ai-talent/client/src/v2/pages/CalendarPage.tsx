@@ -185,6 +185,13 @@ export default function CalendarPage() {
   const [fbPages, setFbPages] = useState<Array<{ id: string; name: string; category: string }>>([]);
   const [fbPickerBrandId, setFbPickerBrandId] = useState<number | null>(null);
 
+  // bundle.social connect path. Which backend owns Facebook is decided by the
+  // server (PUBLISH_PROVIDER_FACEBOOK); the browser just follows.
+  const bundleProvidersQ    = (trpc as any).bundleConnect?.getProviders?.useQuery?.();
+  const bundleConnectUrlMut = (trpc as any).bundleConnect?.getConnectUrl?.useMutation?.();
+  const bundleStatusMut     = (trpc as any).bundleConnect?.getConnectionStatus?.useMutation?.();
+  const usesBundleForFacebook = bundleProvidersQ?.data?.facebook === "bundle";
+
   // Pipedream opens its OAuth popup inside connectAccount(). Keep both the SDK
   // and one-time Connect token warm so the actual button click can call it
   // synchronously while the browser's user activation is still valid.
@@ -209,6 +216,8 @@ export default function CalendarPage() {
   const pdFacebookTokensRef = useRef<Record<number, FacebookConnectToken>>({});
   const pdFacebookPagesRef = useRef<Record<number, FacebookPagesCache | undefined>>({});
   const pdFacebookPrefetchingRef = useRef<Record<number, boolean>>({});
+  // Portal links expire, so cache one per brand and mint a fresh one after use.
+  const bundleConnectUrlRef = useRef<Record<number, string | undefined>>({});
 
   useEffect(() => {
     import("@pipedream/sdk/browser")
@@ -218,6 +227,24 @@ export default function CalendarPage() {
 
   const prefetchFacebookConnect = React.useCallback(async (calBrandId: number) => {
     if (pdFacebookPrefetchingRef.current[calBrandId]) return;
+
+    // bundle.social: warm a portal URL so the click can call window.open()
+    // synchronously and keep the browser's user activation (no popup block).
+    if (usesBundleForFacebook) {
+      if (bundleConnectUrlRef.current[calBrandId]) return;
+      pdFacebookPrefetchingRef.current[calBrandId] = true;
+      try {
+        const r = await bundleConnectUrlMut?.mutateAsync?.({
+          brandId: calBrandId,
+          platform: "facebook",
+          redirectUrl: window.location.href,
+        });
+        if (r?.url) bundleConnectUrlRef.current[calBrandId] = r.url;
+      } finally {
+        pdFacebookPrefetchingRef.current[calBrandId] = false;
+      }
+      return;
+    }
     const cached = pdFacebookTokensRef.current[calBrandId];
     const pageCache = pdFacebookPagesRef.current[calBrandId];
     const pagesChecked = !!pageCache && Date.now() - pageCache.checkedAt < 10_000;
@@ -259,9 +286,47 @@ export default function CalendarPage() {
     } finally {
       pdFacebookPrefetchingRef.current[calBrandId] = false;
     }
-  }, [fbConnectUrlMut, fbPagesMut]);
+  }, [fbConnectUrlMut, fbPagesMut, usesBundleForFacebook, bundleConnectUrlMut]);
 
   const connectFacebookFromCalendar = React.useCallback((calBrandId: number) => {
+    // bundle.social hosts the whole OAuth + Page-picking UI, so there is no
+    // local page picker on this path — open the portal and poll for the result.
+    if (usesBundleForFacebook) {
+      const url = bundleConnectUrlRef.current[calBrandId];
+      if (!url) {
+        void prefetchFacebookConnect(calBrandId).catch((err: any) => {
+          alert(err?.message ?? String(err));
+        });
+        alert(lang === "en"
+          ? "Preparing the Facebook connect link — please try again in a moment."
+          : "正在準備 Facebook 連接連結，請稍候 1–2 秒再點一次。");
+        return;
+      }
+      // Portal links are single-use; drop it so the next click mints a fresh one.
+      delete bundleConnectUrlRef.current[calBrandId];
+      window.open(url, "_blank", "noopener");
+
+      void (async () => {
+        for (let i = 0; i < 20; i++) {
+          await new Promise<void>((res) => setTimeout(res, 3000));
+          try {
+            const s = await bundleStatusMut?.mutateAsync?.({
+              brandId: calBrandId,
+              platform: "facebook",
+            });
+            if (s?.connected) {
+              rangeQ?.refetch?.();
+              alert(lang === "en"
+                ? `Facebook connected${s.accountName ? `: ${s.accountName}` : ""}.`
+                : `Facebook 已連接${s.accountName ? `：${s.accountName}` : ""}。`);
+              return;
+            }
+          } catch { /* keep polling until the loop ends */ }
+        }
+      })();
+      return;
+    }
+
     const pageCache = pdFacebookPagesRef.current[calBrandId];
     const publishablePages = (pageCache?.pages ?? [])
       .filter((page) => page.publishReady !== false);
@@ -367,7 +432,7 @@ export default function CalendarPage() {
         }
       },
     });
-  }, [lang, fbPagesMut, prefetchFacebookConnect]);
+  }, [lang, fbPagesMut, prefetchFacebookConnect, usesBundleForFacebook, bundleStatusMut, rangeQ]);
 
   // Platform picker modal state
   const [pickerDate, setPickerDate] = useState<Date | null>(null);

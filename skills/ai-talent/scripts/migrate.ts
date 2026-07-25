@@ -2365,6 +2365,28 @@ async function main() {
       console.log("[migrate] brands.brand_colors: already exists, skipped");
     }
 
+    // ─── bundle.social publishing binding ─────────────────────────────────
+    // 2026-07-25: Pipedream's managed Meta app cannot publish (see
+    // docs/facebook-publish-provider-evaluation-2026-07-25.md). bundle.social
+    // maps one team per brand. The existing fbPageId / fbPageName /
+    // fbConnectedAt columns stay untouched so the Pipedream path still works
+    // and PUBLISH_PROVIDER can be switched back at any time.
+    for (const col of [
+      { name: "bundleTeamId",      type: "VARCHAR(64) NULL" },
+      { name: "bundleConnectedAt", type: "DATETIME NULL" },
+    ]) {
+      const [r]: any = await conn.execute(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brands' AND COLUMN_NAME = ?
+      `, [col.name]);
+      if ((r as any[]).length === 0) {
+        await conn.execute(`ALTER TABLE brands ADD COLUMN \`${col.name}\` ${col.type}`);
+        console.log(`[migrate] brands.${col.name}: added`);
+      } else {
+        console.log(`[migrate] brands.${col.name}: already exists, skipped`);
+      }
+    }
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

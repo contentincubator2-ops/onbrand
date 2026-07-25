@@ -626,6 +626,17 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   };
   const pdTokensRef = useRef<Record<string, TokenCache>>({});
 
+  // ── bundle.social connect path ─────────────────────────────────────────
+  // Which platforms use bundle.social is decided server-side by
+  // PUBLISH_PROVIDER_<PLATFORM>; this component just follows what it reports.
+  const bundleProvidersQ    = (trpc as any).bundleConnect?.getProviders?.useQuery?.();
+  const bundleConnectUrlMut = (trpc as any).bundleConnect?.getConnectUrl?.useMutation?.();
+  const bundleStatusMut     = (trpc as any).bundleConnect?.getConnectionStatus?.useMutation?.();
+  /** Portal links are single-use, so cache one per platform and refresh after use. */
+  const bundleUrlRef = useRef<Record<string, string | undefined>>({});
+  const [bundleConnectedMap, setBundleConnectedMap] = useState<Record<string, boolean>>({});
+  const usesBundle = (key: string) => bundleProvidersQ?.data?.[key] === "bundle";
+
   // ── Local state ───────────────────────────────────────────────────────
   const [pendingPlatform, setPendingPlatform]   = useState<string | null>(null);
   /** Platform currently being verified post-OAuth (polling Pipedream) */
@@ -652,8 +663,28 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // so we never store or depend on connectLinkUrl.
   const prefetchTokens = useCallback(async () => {
     if (!brandId) return;
+
+    // bundle.social platforms: warm a portal URL (so the click can call
+    // window.open synchronously) and read back the current connection state,
+    // which lives in bundle.social rather than in brands.fbPageId.
+    for (const key of ["facebook", "instagram", "linkedin"] as const) {
+      if (!usesBundle(key)) continue;
+      try {
+        const r = await bundleConnectUrlMut?.mutateAsync?.({
+          brandId,
+          platform: key,
+          redirectUrl: window.location.href,
+        });
+        if (r?.url) bundleUrlRef.current[key] = r.url;
+      } catch { /* silent — retried on click */ }
+      try {
+        const s = await bundleStatusMut?.mutateAsync?.({ brandId, platform: key });
+        setBundleConnectedMap((m) => ({ ...m, [key]: !!s?.connected }));
+      } catch { /* silent */ }
+    }
+
     // Facebook — uses publish.getFacebookConnectUrl (has server-side validation)
-    try {
+    if (!usesBundle("facebook")) try {
       const r = await fbConnectUrlM?.mutateAsync?.({ brandId });
       if (r?.token) {
         pdTokensRef.current["facebook"] = {
@@ -666,8 +697,9 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         };
       }
     } catch { /* silent — will fetch fresh on click */ }
-    // Instagram / LinkedIn / YouTube
+    // Instagram / LinkedIn / YouTube — only those still on the Pipedream path
     for (const key of ["instagram", "linkedin", "youtube"] as const) {
+      if (usesBundle(key)) continue;
       try {
         const r = await getConnectTkM?.mutateAsync?.({ platform: key, brandId });
         if (r?.token) {
@@ -746,6 +778,42 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // will throw "Must be inside iframe". The official SDK handles this correctly.
   function connectWithSDK(platform: PlatformCfg) {
     if (!brandId) { alert(en ? "Please save the brand first." : "請先儲存品牌。"); return; }
+
+    // bundle.social hosts OAuth and channel picking itself — open its portal in
+    // a new tab. window.open must run synchronously here or the browser blocks
+    // it, so the URL has to come from the warm cache.
+    if (usesBundle(platform.key)) {
+      const url = bundleUrlRef.current[platform.key];
+      if (!url) {
+        void prefetchTokens();
+        alert(en
+          ? "Preparing authorization — please try again in a moment."
+          : "正在準備授權，請稍候 1-2 秒再試一次。");
+        return;
+      }
+      delete bundleUrlRef.current[platform.key];
+      window.open(url, "_blank", "noopener");
+      setVerifyingPlatform(platform.key);
+
+      void (async () => {
+        try {
+          for (let i = 0; i < 20; i++) {
+            await new Promise<void>((res) => setTimeout(res, 3000));
+            try {
+              const s = await bundleStatusMut?.mutateAsync?.({ brandId, platform: platform.key as any });
+              if (s?.connected) {
+                setBundleConnectedMap((m) => ({ ...m, [platform.key]: true }));
+                void prefetchTokens();
+                return;
+              }
+            } catch { /* keep polling */ }
+          }
+        } finally {
+          setVerifyingPlatform(null);
+        }
+      })();
+      return;
+    }
 
     // Pipedream app slugs
     const PD_APP_SLUG: Record<string, string> = {
@@ -854,7 +922,11 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         {PLATFORMS.map((p) => {
           const pdConnected = !!connectedMap[p.key];
           // For Facebook, "connected" also means brand has a page binding
-          const fullyConnected = p.key === "facebook" ? fbConnected : pdConnected;
+          // On the bundle.social path the connection lives in bundle.social,
+          // not in brands.fbPageId / Pipedream, so read it from its own map.
+          const fullyConnected = usesBundle(p.key)
+            ? !!bundleConnectedMap[p.key]
+            : p.key === "facebook" ? fbConnected : pdConnected;
           const isPending   = pendingPlatform   === p.key;
           const isVerifying = verifyingPlatform === p.key;
           const connectedAccount = connectedMap[p.key];

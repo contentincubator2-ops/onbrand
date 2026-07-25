@@ -612,6 +612,11 @@ export default function RunPage() {
   // + `await import(sdk)` BEFORE connectAccount. Fix: PREFETCH the token
   // and the SDK module (on hover/focus/mount) so the click handler can
   // call connectAccount with NO awaits in front of it → no popup block.
+  // bundle.social connect path — which platforms use it is decided server-side.
+  const bundleProvidersQ    = (trpc as any).bundleConnect?.getProviders?.useQuery?.();
+  const bundleConnectUrlMut = (trpc as any).bundleConnect?.getConnectUrl?.useMutation?.();
+  const bundleUrlRef = React.useRef<Record<string, string | undefined>>({});
+
   const pdSdkRef = React.useRef<any>(null);
   const pdTokenRef = React.useRef<Record<string, {
     token: string;
@@ -665,6 +670,39 @@ export default function RunPage() {
   // user to tap again (never attempt a popup that will be blocked).
   const openPipedreamConnect = (platform: "facebook" | "instagram" | "linkedin" | "youtube") => {
     if (pipedreamBusy) return;
+
+    // bundle.social path: a hosted portal in a new tab, no Pipedream SDK.
+    // YouTube is never routed here — getProviders only covers fb/ig/li.
+    if (bundleProvidersQ?.data?.[platform] === "bundle") {
+      const brandId = data?.mission?.brandId ?? data?.brand?.id ?? 0;
+      if (!brandId) return;
+      const url = bundleUrlRef.current[platform];
+      if (!url) {
+        void bundleConnectUrlMut?.mutateAsync?.({
+          brandId,
+          platform,
+          redirectUrl: window.location.href,
+        }).then((r: any) => {
+          if (r?.url) bundleUrlRef.current[platform] = r.url;
+        }).catch(() => { /* retried on next tap */ });
+        showToastGlobal(
+          lang === "en"
+            ? "Preparing authorization — please tap again in a moment."
+            : "正在準備授權，請稍候 1-2 秒再點一次"
+        );
+        return;
+      }
+      // Portal links are single-use.
+      delete bundleUrlRef.current[platform];
+      window.open(url, "_blank", "noopener");
+      showToastGlobal(
+        lang === "en"
+          ? "Complete the authorization in the new tab, then return here."
+          : "請在新分頁完成授權後回到此頁"
+      );
+      return;
+    }
+
     const tk = pdTokenRef.current[platform];
     const Ctor = pdSdkRef.current;
     if (!Ctor || !tk || tk.expiresAt - Date.now() < 30_000) {

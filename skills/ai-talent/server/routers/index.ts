@@ -10,6 +10,7 @@ import { outputRouter } from "./outputRouter";
 import { squadTemplateRouter } from "./squadTemplateRouter";
 import { brandBrainRouter } from "./brandBrainRouter";
 import { calendarRouter } from "./calendarRouter";
+import { bundleConnectRouter } from "./bundleConnectRouter";
 import { imageRouter } from "./imageRouter";
 import { projectSyncRouter } from "./projectSyncRouter";
 import { quickTaskRouter } from "./quickTaskRouter";
@@ -67,6 +68,7 @@ export const appRouter = router({
   squad:         squadTemplateRouter,
   brandBrain:    brandBrainRouter,
   calendar:      calendarRouter,
+  bundleConnect: bundleConnectRouter,
   image:         imageRouter,
   projectSync:   projectSyncRouter,
   quickTask:     quickTaskRouter,
