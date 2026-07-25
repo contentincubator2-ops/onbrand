@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import {
+  getPipedreamAccounts,
   getPipedreamAppSlug,
   type PipedreamAccountSummary,
 } from "../_core/pipedreamAccounts";
@@ -673,8 +674,7 @@ async function _pdGetOAuthToken(
     const t = await accsRes.text();
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream 帳號列表失敗：${t.slice(0, 200)}` });
   }
-  const accsData = (await accsRes.json()) as { data?: PipedreamAccountSummary[] };
-  const acc = (accsData.data ?? []).find(a => {
+  const acc = getPipedreamAccounts(await accsRes.json()).find(a => {
     const slug = getPipedreamAppSlug(a.app);
     return slug ? slugSet.has(slug) : false;
   });
@@ -757,9 +757,8 @@ async function _pdGetAccountContext(
     const text = await accountsRes.text();
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream 帳號列表失敗：${text.slice(0, 200)}` });
   }
-  const body = (await accountsRes.json()) as { data?: PipedreamAccountSummary[] };
   const slugSet = new Set(appSlugs);
-  const account = (body.data ?? []).find(candidate => {
+  const account = getPipedreamAccounts(await accountsRes.json()).find(candidate => {
     const slug = getPipedreamAppSlug(candidate.app);
     return slug ? slugSet.has(slug) : false;
   });

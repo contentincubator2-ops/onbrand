@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { getPipedreamAppSlug } from "./pipedreamAccounts";
+import {
+  getPipedreamAccounts,
+  getPipedreamAppSlug,
+} from "./pipedreamAccounts";
+
+describe("getPipedreamAccounts", () => {
+  const account = {
+    id: "apn_test",
+    name: "Test account",
+    app: { name_slug: "facebook_pages" },
+  };
+
+  it("reads the current top-level array response", () => {
+    expect(getPipedreamAccounts([account])).toEqual([account]);
+  });
+
+  it("keeps compatibility with the legacy data envelope", () => {
+    expect(getPipedreamAccounts({ data: [account] })).toEqual([account]);
+  });
+
+  it("ignores malformed response values and account entries", () => {
+    expect(getPipedreamAccounts({ data: null })).toEqual([]);
+    expect(getPipedreamAccounts([null, {}, { id: 123 }, account])).toEqual([account]);
+  });
+});
 
 describe("getPipedreamAppSlug", () => {
   it("reads the current Pipedream Accounts API object shape", () => {

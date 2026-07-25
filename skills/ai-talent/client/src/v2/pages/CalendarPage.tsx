@@ -278,7 +278,10 @@ export default function CalendarPage() {
         for (let i = 0; i < 10; i++) {
           await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
           try {
-            const pages = await fbPagesMut?.mutateAsync?.({ brandId: calBrandId });
+            const pages = await fbPagesMut?.mutateAsync?.({
+              brandId: calBrandId,
+              waitForPropagation: false,
+            });
             if ((pages?.pages?.length ?? 0) > 0) {
               pdFacebookPagesRef.current[calBrandId] = pages!.pages;
               setFbPages(pages!.pages);

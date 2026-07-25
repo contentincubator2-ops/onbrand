@@ -695,7 +695,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
           if (platformKey === "facebook") {
             for (let fbTry = 0; fbTry < 5; fbTry++) {
               try {
-                const pages = await fbPagesM?.mutateAsync?.({ brandId });
+                const pages = await fbPagesM?.mutateAsync?.({
+                  brandId,
+                  waitForPropagation: false,
+                });
                 if ((pages?.pages?.length ?? 0) > 0) {
                   setFbPages(pages!.pages);
                   setFbPickerOpen(true);
