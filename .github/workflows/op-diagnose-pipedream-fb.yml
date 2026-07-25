@@ -33,6 +33,16 @@ jobs:
           USER_ID="${{ github.event.inputs.user_id }}"
           EXTERNAL_USER="sowork-${USER_ID}"
           PD_ENV="${PIPEDREAM_PROJECT_ENV:-production}"
+          BRAND_ID=""
+          if [[ "$USER_ID" =~ ^brand-([0-9]+)$ ]]; then
+            BRAND_ID="${BASH_REMATCH[1]}"
+          fi
+          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
+          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -N -s --silent"
+          FB_PAGE_ID=""
+          if [ -n "$BRAND_ID" ]; then
+            FB_PAGE_ID=$($MYSQL -e "SELECT COALESCE(fbPageId, '') FROM brands WHERE id = $BRAND_ID LIMIT 1" 2>/dev/null || echo "")
+          fi
 
           echo "════════════════════════════════════════════════════"
           echo "  Target: ${EXTERNAL_USER}  (env: ${PD_ENV})"
@@ -132,6 +142,28 @@ jobs:
           " 2>/dev/null || echo "invalid response")
             echo "  • account=${ACCOUNT_ID} HTTP=${HTTP} ${SUMMARY}"
 
+            if [ -n "$FB_PAGE_ID" ]; then
+              PAGE_TARGET="https://graph.facebook.com/v25.0/${FB_PAGE_ID}?fields=id,name,access_token"
+              PAGE_B64=$(printf '%s' "$PAGE_TARGET" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              PAGE_HTTP=$(curl -s -o "/tmp/pd_page_${ACCOUNT_ID}.json" -w "%{http_code}" \
+                -H "Authorization: Bearer $ACCESS_TOKEN" \
+                -H "X-PD-Environment: $PD_ENV" \
+                -H "x-pd-project-id: $PIPEDREAM_PROJECT_ID" \
+                "https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/proxy/${PAGE_B64}?external_user_id=${EXTERNAL_USER}&account_id=${ACCOUNT_ID}")
+              PAGE_SUMMARY=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_page_${ACCOUNT_ID}.json'))
+              if d.get('error'):
+                  print(f\"error={d['error'].get('message', d['error'])}\")
+              else:
+                  print(f\"id={d.get('id','?')} name={d.get('name','?')} has_page_token={bool(d.get('access_token'))}\")
+          except Exception:
+              print('invalid response')
+          " 2>/dev/null || echo "invalid response")
+              echo "    saved_page=${FB_PAGE_ID} HTTP=${PAGE_HTTP} ${PAGE_SUMMARY}"
+            fi
+
             BUSINESS_TARGET="https://graph.facebook.com/v25.0/me/businesses?fields=id,name&limit=50"
             BUSINESS_B64=$(printf '%s' "$BUSINESS_TARGET" | base64 -w0 | tr '+/' '-_' | tr -d '=')
             BUSINESS_HTTP=$(curl -s -o "/tmp/pd_businesses_${ACCOUNT_ID}.json" -w "%{http_code}" \
@@ -205,14 +237,16 @@ jobs:
           echo ""
 
           echo "──── 6. DB check — brands.fbPageId column ────"
-          export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
-          MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -N -s --silent"
 
           COL=$($MYSQL -e "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='brands' AND COLUMN_NAME='fbPageId'" 2>/dev/null || echo "")
           if [ -n "$COL" ]; then
             echo "  ✅ brands.fbPageId column exists"
             # Show existing FB bindings for this user
-            $MYSQL -e "SELECT id, name, fbPageId, fbPageName, fbConnectedAt FROM brands WHERE userId = $USER_ID ORDER BY id" 2>/dev/null || true
+            if [ -n "$BRAND_ID" ]; then
+              $MYSQL -e "SELECT id, name, fbPageId, fbPageName, fbConnectedAt FROM brands WHERE id = $BRAND_ID" 2>/dev/null || true
+            elif [[ "$USER_ID" =~ ^[0-9]+$ ]]; then
+              $MYSQL -e "SELECT id, name, fbPageId, fbPageName, fbConnectedAt FROM brands WHERE userId = $USER_ID ORDER BY id" 2>/dev/null || true
+            fi
           else
             echo "  ❌ brands.fbPageId column MISSING — run op-migrate workflow!"
           fi
