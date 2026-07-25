@@ -16,6 +16,7 @@ import { quickTaskRouter } from "./quickTaskRouter";
 import { entityRouter } from "./entityRouter";
 import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
 import { pipelineRouter } from "./pipelineRouter";
+import { marketIntelRouter } from "./marketIntelRouter";
 import { mediaRouter } from "./mediaRouter";
 import { taskCatalogRouter } from "./taskCatalogRouter";
 import { platformConnectRouter } from "./platformConnectRouter";
@@ -74,6 +75,7 @@ export const appRouter = router({
   event:         eventRouter,
   scope:         scopeRouter,
   pipeline:      pipelineRouter,
+  marketIntel:   marketIntelRouter,
   media:         mediaRouter,
   taskCatalog:   taskCatalogRouter,
   platformConnect: platformConnectRouter,

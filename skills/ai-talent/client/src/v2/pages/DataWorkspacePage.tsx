@@ -6,11 +6,12 @@
  * changes functions based on the selected mode.
  */
 import React from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import {
-  Activity, BarChart3, Database, Globe2, LineChart, Megaphone,
-  MousePointerClick, Search, ShoppingBag, Sparkles, Target, TrendingUp,
+  Activity, BarChart3, Database, ExternalLink, Globe2, LineChart, Megaphone,
+  MousePointerClick, Play, Search, ShoppingBag, Sparkles, Target, TrendingUp,
 } from "lucide-react";
+import { trpc } from "../../lib/trpc";
 
 const ALLOWED_EMAIL = "sowork@sowork.tw";
 
@@ -31,13 +32,26 @@ type AgentRef = {
   title: string;
 };
 
+// 2026-07-25 (CJ「輿情監測比較像教學，缺乏實際數據」): taskKey present =
+// wired to a real live-search call (marketIntelRouter.runListeningTask).
+// Only the 3 listening cards have one — everything else stays exactly as
+// the hand-curated Iris Girls demo designed it.
 type TaskCard = {
   title: string;
   agent: AgentRef;
   skill: string;
   data: string;
   output: string;
+  taskKey?: "listening.topic_buckets" | "listening.verbatims" | "listening.crisis_scan";
 };
+
+interface LiveRunResult {
+  ok: boolean;
+  generatedAt?: string;
+  query?: string;
+  items?: Array<{ title: string; source: string; excerpt: string; url?: string }>;
+  message?: string;
+}
 
 type Evidence = {
   label: string;
@@ -129,9 +143,9 @@ const marketTasks: Record<string, TaskCard[]> = {
     { title: "內容題材建議", agent: AGENTS.content, skill: "social-listening-reporting", data: "甜美穿搭、蝴蝶結、蕾絲、百褶裙、韓系清新", output: "可轉成 FB/IG/SEO 的任務" },
   ],
   listening: [
-    { title: "輿情主題分流", agent: AGENTS.social, skill: "social-listening-reporting", data: "公開搜尋 snippet + 女裝社群常見決策語境", output: "價格、版型、質感、場合四大討論軸" },
-    { title: "社群原話需求萃取", agent: AGENTS.threads, skill: "social-listening-excel-summary", data: "Dcard/PTT/Threads search targets", output: "要補抓的原話欄位與內容角度" },
-    { title: "危機與機會分流", agent: AGENTS.qa, skill: "news-alert-triage", data: "退換貨、尺寸、色差、材質敏感詞", output: "回應 / 放大 / 觀察分級" },
+    { title: "輿情主題分流", agent: AGENTS.social, skill: "social-listening-reporting", data: "公開搜尋 snippet + 女裝社群常見決策語境", output: "價格、版型、質感、場合四大討論軸", taskKey: "listening.topic_buckets" },
+    { title: "社群原話需求萃取", agent: AGENTS.threads, skill: "social-listening-excel-summary", data: "Dcard/PTT/Threads search targets", output: "要補抓的原話欄位與內容角度", taskKey: "listening.verbatims" },
+    { title: "危機與機會分流", agent: AGENTS.qa, skill: "news-alert-triage", data: "退換貨、尺寸、色差、材質敏感詞", output: "回應 / 放大 / 觀察分級", taskKey: "listening.crisis_scan" },
   ],
   keywords: [
     { title: "關鍵字需求分群", agent: AGENTS.seo, skill: "source-backed-competitive-evidence", data: "Iris Girls 商品名 + 競品 meta description", output: "品類詞、風格詞、場景詞、品牌比較詞" },
@@ -398,12 +412,37 @@ function AgentLine({ agent }: { agent: AgentRef }) {
 export default function DataWorkspacePage() {
   const loc = useLocation();
   const { sourceId } = useParams<{ sourceId?: string }>();
+  const [searchParams] = useSearchParams();
   const mode: Mode = loc.pathname.startsWith("/market-intel") ? "market" : "performance";
   const { email, loading } = useCurrentUserEmail();
   const sources = mode === "performance" ? performanceSources : marketSources;
   const tasksBySource = mode === "performance" ? performanceTasks : marketTasks;
   const validSourceIds = React.useMemo(() => new Set(sources.map(s => s.id)), [sources]);
   const activeSource = sourceId && validSourceIds.has(sourceId) ? sourceId : "overview";
+
+  // 2026-07-25 (CJ「輿情監測比較像教學，缺乏實際數據」): the 3 listening
+  // task cards can now fire a real live web-search (see marketIntelRouter
+  // .runListeningTask) scoped to whatever brand the URL's ?b= points at.
+  // Everything else on this page (Iris Girls demo blocks) is untouched.
+  const brandId = Number(searchParams.get("b") ?? 0) || null;
+  const runListeningMut = (trpc as any).marketIntel?.runListeningTask?.useMutation?.() ?? null;
+  const [liveResults, setLiveResults] = React.useState<Record<string, LiveRunResult>>({});
+  const [runningKey, setRunningKey] = React.useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
+
+  const runListeningTask = async (task: TaskCard) => {
+    if (!task.taskKey || !brandId || !runListeningMut) return;
+    setRunningKey(task.taskKey);
+    setSelectedKey(task.taskKey);
+    try {
+      const res: LiveRunResult = await runListeningMut.mutateAsync({ brandId, taskKey: task.taskKey });
+      setLiveResults((r) => ({ ...r, [task.taskKey!]: res }));
+    } catch (e: any) {
+      setLiveResults((r) => ({ ...r, [task.taskKey!]: { ok: false, message: e?.message ?? String(e) } }));
+    } finally {
+      setRunningKey(null);
+    }
+  };
 
   if (loading) {
     return <div style={{ padding: 28, color: "#9ca3af", fontSize: 13 }}>載入資料工作區…</div>;
@@ -499,25 +538,98 @@ export default function DataWorkspacePage() {
             </div>
           )}
 
+          {!isPerformance && active.id === "listening" && !brandId && (
+            <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 16, padding: 14, marginBottom: 14, fontSize: 13, color: "#92400e" }}>
+              網址缺少 ?b=品牌ID，無法執行即時查詢（目前是 https://onbrand.sowork.ai/market-intel/listening?b=2957 這樣的網址才能點擊查詢）。
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-            {cards.map((task) => (
-              <article key={task.title} style={{ border: "1px solid #e5e7eb", borderRadius: 22, background: "#fff", padding: 18, minHeight: 230, display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: active.color, background: `${active.color}12`, padding: "4px 8px", borderRadius: 999 }}>AGENT TASK</span>
-                  <LineChart size={16} color="#9ca3af" />
-                </div>
-                <h3 style={{ margin: "14px 0 8px", fontSize: 17, lineHeight: 1.3, fontWeight: 850, color: "#111827" }}>{task.title}</h3>
-                <p style={{ margin: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}><b>Agent：</b><AgentLine agent={task.agent} /></p>
-                <p style={{ margin: "8px 0 0", fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}><b>Skill：</b>{task.skill}</p>
-                <p style={{ margin: "6px 0 0", fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}><b>Data：</b>{task.data}</p>
-                <div style={{ marginTop: "auto", paddingTop: 14, fontSize: 13, fontWeight: 700, color: "#111827" }}>{task.output}</div>
-              </article>
-            ))}
+            {cards.map((task) => {
+              const isWired = !!task.taskKey;
+              const isRunning = runningKey === task.taskKey;
+              const hasResult = task.taskKey ? !!liveResults[task.taskKey] : false;
+              const isSelected = isWired && task.taskKey === selectedKey;
+              return (
+                <article
+                  key={task.title}
+                  onClick={isWired && brandId ? () => runListeningTask(task) : undefined}
+                  style={{
+                    border: `1px solid ${isSelected ? active.color : "#e5e7eb"}`,
+                    borderRadius: 22, background: "#fff", padding: 18, minHeight: 230,
+                    display: "flex", flexDirection: "column",
+                    cursor: isWired && brandId ? "pointer" : "default",
+                    boxShadow: isSelected ? `0 0 0 3px ${active.color}18` : "none",
+                    transition: "border-color 0.15s, box-shadow 0.15s",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: active.color, background: `${active.color}12`, padding: "4px 8px", borderRadius: 999 }}>AGENT TASK</span>
+                    {isWired ? (
+                      isRunning
+                        ? <span style={{ fontSize: 11, fontWeight: 700, color: active.color }}>查詢中…</span>
+                        : <Play size={16} color={active.color} />
+                    ) : (
+                      <LineChart size={16} color="#9ca3af" />
+                    )}
+                  </div>
+                  <h3 style={{ margin: "14px 0 8px", fontSize: 17, lineHeight: 1.3, fontWeight: 850, color: "#111827" }}>{task.title}</h3>
+                  <p style={{ margin: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}><b>Agent：</b><AgentLine agent={task.agent} /></p>
+                  <p style={{ margin: "8px 0 0", fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}><b>Skill：</b>{task.skill}</p>
+                  <p style={{ margin: "6px 0 0", fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}><b>Data：</b>{task.data}</p>
+                  <div style={{ marginTop: "auto", paddingTop: 14, fontSize: 13, fontWeight: 700, color: "#111827" }}>{task.output}</div>
+                  {isWired && (
+                    <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: hasResult ? "#059669" : active.color }}>
+                      {isRunning ? "即時搜尋中…" : hasResult ? "✓ 已有真實結果 — 點擊重新查詢" : "▶ 點擊執行即時查詢（真實公開資料）"}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </div>
         </main>
 
-        <aside style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 18, position: "sticky", top: 84 }}>
+        <aside style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 18, position: "sticky", top: 84, maxHeight: "calc(100vh - 110px)", overflowY: "auto" }}>
           <div style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9ca3af" }}>Evidence Panel</div>
+
+          {selectedKey && liveResults[selectedKey] && (
+            <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "2px solid #f3f4f6" }}>
+              <div style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.14em", textTransform: "uppercase", color: "#DC2626", marginTop: 10 }}>即時搜尋結果</div>
+              <h3 style={{ margin: "6px 0 4px", fontSize: 16, fontWeight: 850, color: "#111827" }}>
+                {cards.find((c) => c.taskKey === selectedKey)?.title}
+              </h3>
+              {liveResults[selectedKey].generatedAt && (
+                <p style={{ margin: "0 0 10px", fontSize: 11, color: "#9ca3af" }}>
+                  {new Date(liveResults[selectedKey].generatedAt!).toLocaleString("zh-TW")} · 查詢字：{liveResults[selectedKey].query}
+                </p>
+              )}
+              {!liveResults[selectedKey].ok ? (
+                <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 12, padding: 12, fontSize: 13, color: "#991b1b" }}>
+                  {liveResults[selectedKey].message}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {liveResults[selectedKey].items!.map((item, i) => (
+                    <div key={i} style={{ border: "1px solid #f0f0ef", borderRadius: 14, padding: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", lineHeight: 1.4 }}>{item.title}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                        {item.source}
+                        {item.url && (
+                          <a href={item.url} target="_blank" rel="noreferrer" style={{ color: active.color, display: "inline-flex", alignItems: "center" }}>
+                            <ExternalLink size={11} />
+                          </a>
+                        )}
+                      </div>
+                      {item.excerpt && (
+                        <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "#4b5563", lineHeight: 1.55 }}>{item.excerpt}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <h3 style={{ margin: "8px 0 10px", fontSize: 18, fontWeight: 850, color: "#111827" }}>{isPerformance ? "資料串接狀態" : "本頁採用資料"}</h3>
           {(isPerformance
             ? ["Meta Ads API / 報表匯入", "Google Ads / GA4", "Shopline Open API", "跨平台整合歸因表"]
