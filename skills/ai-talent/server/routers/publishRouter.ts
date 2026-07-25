@@ -24,6 +24,10 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { assertBrandAccess } from "../_core/brandAuth";
 import { getPipedreamConnectTokenUrl } from "../_core/pipedreamConnect";
+import {
+  getPipedreamAppSlug,
+  type PipedreamAccountSummary,
+} from "../_core/pipedreamAccounts";
 
 const ENV = process.env;
 
@@ -309,7 +313,7 @@ export const publishRouter = router({
       // to propagate the OAuth callback after the user completes the popup.
       const allAccountsUrl = `${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`;
       const FB_SLUGS = new Set(["facebook_pages", "facebook", "facebook_oauth2"]);
-      let accounts: Array<{ id: string; name?: string; app?: string }> = [];
+      let accounts: PipedreamAccountSummary[] = [];
       const RETRIES = [0, 2000, 3000, 4000]; // ms to wait before each attempt
       for (let attempt = 0; attempt < RETRIES.length; attempt++) {
         if (RETRIES[attempt]! > 0) {
@@ -320,16 +324,19 @@ export const publishRouter = router({
           const t = await accountsRes.text();
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得已連接的帳號：${t.slice(0, 200)}` });
         }
-        const accountsData = (await accountsRes.json()) as { data?: Array<{ id: string; name?: string; app?: string }> };
+        const accountsData = (await accountsRes.json()) as { data?: PipedreamAccountSummary[] };
         const allAccounts = accountsData.data ?? [];
         // Filter for known Facebook app slugs
-        accounts = allAccounts.filter(a => a.app && FB_SLUGS.has(a.app));
+        accounts = allAccounts.filter(a => {
+          const slug = getPipedreamAppSlug(a.app);
+          return slug ? FB_SLUGS.has(slug) : false;
+        });
         if (accounts.length === 0 && allAccounts.length > 0) {
           // Log which apps ARE connected — helps diagnose slug mismatches
           console.log(
             `[publish.getFacebookPages] attempt=${attempt} user=${externalUserId}`,
             `has ${allAccounts.length} account(s) but none matched FB slugs.`,
-            `Connected app slugs: ${allAccounts.map(a => a.app ?? "?").join(", ")}`,
+            `Connected app slugs: ${allAccounts.map(a => getPipedreamAppSlug(a.app) ?? "?").join(", ")}`,
           );
         }
         if (accounts.length > 0) break; // found — stop retrying
@@ -439,7 +446,7 @@ export const publishRouter = router({
         { headers: pdHeaders, signal: AbortSignal.timeout(10_000) },
       );
       if (!accsRes.ok) return { connected: {} as Record<string, { accountId: string; name?: string }> };
-      const body = (await accsRes.json()) as { data?: Array<{ app?: string; id: string; name?: string }> };
+      const body = (await accsRes.json()) as { data?: PipedreamAccountSummary[] };
       const accounts = body.data ?? [];
 
       // Map Pipedream app slug → our platform key.
@@ -464,11 +471,12 @@ export const publishRouter = router({
       };
       const connected: Record<string, { accountId: string; name?: string }> = {};
       // 2026-05-30 diagnostic: log raw app slugs so we can verify APP_KEY mapping
-      const rawApps = accounts.map((a: any) => a.app ?? "(null)");
+      const rawApps = accounts.map(a => getPipedreamAppSlug(a.app) ?? "(null)");
       console.log(`[getConnectedPlatforms] brandId=${input.brandId} externalUserId=${externalUserId} accounts=${accounts.length} apps=[${rawApps.join(",")}]`);
       for (const acc of accounts) {
-        if (acc.app && APP_KEY[acc.app]) {
-          connected[APP_KEY[acc.app]!] = { accountId: acc.id, name: acc.name };
+        const slug = getPipedreamAppSlug(acc.app);
+        if (slug && APP_KEY[slug]) {
+          connected[APP_KEY[slug]!] = { accountId: acc.id, name: acc.name };
         }
       }
       console.log(`[getConnectedPlatforms] mapped keys: [${Object.keys(connected).join(",")}]`);
@@ -548,8 +556,11 @@ export const publishRouter = router({
 
       const accsRes = await fetch(`${PD}/connect/${projectId}/users/${externalUserId}/accounts?limit=50`, { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });
       if (!accsRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 Pipedream 帳號" });
-      const accsData = (await accsRes.json()) as { data?: Array<{ id: string; app?: string }> };
-      const fbAcc = (accsData.data ?? []).find(a => a.app && FB_SLUGS.has(a.app));
+      const accsData = (await accsRes.json()) as { data?: PipedreamAccountSummary[] };
+      const fbAcc = (accsData.data ?? []).find(a => {
+        const slug = getPipedreamAppSlug(a.app);
+        return slug ? FB_SLUGS.has(slug) : false;
+      });
       if (!fbAcc) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "找不到 Facebook 授權，請重新連接。" });
 
       const credRes = await fetch(`${PD}/connect/${projectId}/accounts/${fbAcc.id}?include_credentials=1`, { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });

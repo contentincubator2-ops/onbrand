@@ -7,6 +7,10 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import {
+  getPipedreamAppSlug,
+  type PipedreamAccountSummary,
+} from "../_core/pipedreamAccounts";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
@@ -654,8 +658,11 @@ async function _pdGetOAuthToken(
     const t = await accsRes.text();
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Pipedream 帳號列表失敗：${t.slice(0, 200)}` });
   }
-  const accsData = (await accsRes.json()) as { data?: Array<{ id: string; app?: string }> };
-  const acc = (accsData.data ?? []).find(a => a.app && slugSet.has(a.app));
+  const accsData = (await accsRes.json()) as { data?: PipedreamAccountSummary[] };
+  const acc = (accsData.data ?? []).find(a => {
+    const slug = getPipedreamAppSlug(a.app);
+    return slug ? slugSet.has(slug) : false;
+  });
   if (!acc) {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
