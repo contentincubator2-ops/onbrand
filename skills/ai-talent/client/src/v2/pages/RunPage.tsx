@@ -798,7 +798,10 @@ export default function RunPage() {
             for (let i = 0; i < 10; i++) {
               await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
               try {
-                const pages = await fbPagesMutRef.current?.mutateAsync?.({ brandId: fbBrandId });
+                const pages = await fbPagesMutRef.current?.mutateAsync?.({
+                  brandId: fbBrandId,
+                  waitForPropagation: false,
+                });
                 if ((pages?.pages?.length ?? 0) > 0) {
                   setFbPages(pages!.pages);
                   setFbPagePickerOpen(true);

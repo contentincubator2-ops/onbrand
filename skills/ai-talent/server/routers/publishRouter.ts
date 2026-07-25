@@ -29,8 +29,8 @@ import {
   getPipedreamConnectTokenUrl,
 } from "../_core/pipedreamConnect";
 import {
+  getPipedreamAccounts,
   getPipedreamAppSlug,
-  type PipedreamAccountSummary,
 } from "../_core/pipedreamAccounts";
 
 const ENV = process.env;
@@ -319,7 +319,7 @@ export const publishRouter = router({
       // to propagate the OAuth callback after the user completes the popup.
       const allAccountsUrl = buildPipedreamAccountsUrl(PD, projectId, externalUserId);
       const FB_SLUGS = new Set(["facebook_pages", "facebook", "facebook_oauth2"]);
-      let accounts: PipedreamAccountSummary[] = [];
+      let accounts: ReturnType<typeof getPipedreamAccounts> = [];
       const RETRIES = input.waitForPropagation
         ? [0, 2000, 3000, 4000] // ms to wait before each attempt
         : [0];
@@ -332,8 +332,7 @@ export const publishRouter = router({
           const t = await accountsRes.text();
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `無法取得已連接的帳號：${t.slice(0, 200)}` });
         }
-        const accountsData = (await accountsRes.json()) as { data?: PipedreamAccountSummary[] };
-        const allAccounts = accountsData.data ?? [];
+        const allAccounts = getPipedreamAccounts(await accountsRes.json());
         // Filter for known Facebook app slugs
         accounts = allAccounts.filter(a => {
           const slug = getPipedreamAppSlug(a.app);
@@ -445,8 +444,7 @@ export const publishRouter = router({
         { headers: pdHeaders, signal: AbortSignal.timeout(10_000) },
       );
       if (!accsRes.ok) return { connected: {} as Record<string, { accountId: string; name?: string }> };
-      const body = (await accsRes.json()) as { data?: PipedreamAccountSummary[] };
-      const accounts = body.data ?? [];
+      const accounts = getPipedreamAccounts(await accsRes.json());
 
       // Map Pipedream app slug → our platform key.
       // Pipedream may register an account under different slug variants
@@ -555,8 +553,7 @@ export const publishRouter = router({
 
       const accsRes = await fetch(buildPipedreamAccountsUrl(PD, projectId, externalUserId), { headers: pdHeaders, signal: AbortSignal.timeout(15_000) });
       if (!accsRes.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "無法取得 Pipedream 帳號" });
-      const accsData = (await accsRes.json()) as { data?: PipedreamAccountSummary[] };
-      const fbAcc = (accsData.data ?? []).find(a => {
+      const fbAcc = getPipedreamAccounts(await accsRes.json()).find(a => {
         const slug = getPipedreamAppSlug(a.app);
         return slug ? FB_SLUGS.has(slug) : false;
       });

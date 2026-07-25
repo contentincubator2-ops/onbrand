@@ -82,7 +82,7 @@ jobs:
           TOTAL=$(python3 -c "
           import json
           d = json.load(open('/tmp/pd_all.json'))
-          accs = d.get('data') or []
+          accs = d if isinstance(d, list) else (d.get('data') or [])
           print(len(accs))
           " 2>/dev/null || echo "0")
           echo "  Total connected accounts: $TOTAL"
@@ -90,12 +90,14 @@ jobs:
           python3 -c "
           import json
           d = json.load(open('/tmp/pd_all.json'))
-          accs = d.get('data') or []
+          accs = d if isinstance(d, list) else (d.get('data') or [])
           if not accs:
               print('  ⚠️  No accounts found at all — user has not completed any OAuth')
           else:
               for a in accs:
-                  print(f\"  • app={a.get('app','?'):30s}  id={a.get('id','?'):20s}  name={a.get('name','?')}\")
+                  app = a.get('app', '?')
+                  slug = app.get('name_slug', '?') if isinstance(app, dict) else app
+                  print(f\"  • app={slug:30s}  id={a.get('id','?'):20s}  name={a.get('name','?')}\")
           " 2>/dev/null || true
           echo ""
 
@@ -109,7 +111,8 @@ jobs:
           FB_COUNT=$(python3 -c "
           import json
           d = json.load(open('/tmp/pd_fb.json'))
-          print(len(d.get('data') or []))
+          accs = d if isinstance(d, list) else (d.get('data') or [])
+          print(len(accs))
           " 2>/dev/null || echo "0")
           echo "  Accounts with app=facebook_pages filter: $FB_COUNT"
           echo ""
