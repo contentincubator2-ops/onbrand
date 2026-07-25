@@ -116,7 +116,9 @@ jobs:
           echo ""
 
           echo "──── 4. Probe managed Pages through every Facebook account ────"
-          TARGET_URL="https://graph.facebook.com/v25.0/me/accounts?fields=id,name&limit=50"
+          # Match the production publish path exactly. Keep Page tokens only in
+          # runner-local temp files and print safe booleans / permission names.
+          TARGET_URL="https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,tasks&limit=50"
           TARGET_B64=$(printf '%s' "$TARGET_URL" | base64 -w0 | tr '+/' '-_' | tr -d '=')
           python3 -c "
           import json
@@ -147,6 +149,46 @@ jobs:
             echo "  • account=${ACCOUNT_ID} HTTP=${HTTP} ${SUMMARY}"
 
             if [ -n "$FB_PAGE_ID" ]; then
+              PAGE_TOKEN=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_pages_${ACCOUNT_ID}.json'))
+              page = next((p for p in d.get('data') or [] if str(p.get('id')) == '${FB_PAGE_ID}'), {})
+              print(page.get('access_token') or '')
+          except Exception:
+              print('')
+          " 2>/dev/null || echo "")
+              PAGE_LIST_SUMMARY=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/pd_pages_${ACCOUNT_ID}.json'))
+              page = next((p for p in d.get('data') or [] if str(p.get('id')) == '${FB_PAGE_ID}'), {})
+              print(f\"listed={bool(page)} has_page_token={bool(page.get('access_token'))} tasks={page.get('tasks') or []}\")
+          except Exception:
+              print('invalid response')
+          " 2>/dev/null || echo "invalid response")
+              echo "    saved_page_from_me_accounts=${FB_PAGE_ID} ${PAGE_LIST_SUMMARY}"
+
+              if [ -n "$PAGE_TOKEN" ]; then
+                PERMISSIONS_HTTP=$(curl -s -G -o "/tmp/fb_page_permissions_${ACCOUNT_ID}.json" -w "%{http_code}" \
+                  --data-urlencode "access_token=${PAGE_TOKEN}" \
+                  "https://graph.facebook.com/v25.0/me/permissions")
+                PERMISSIONS_SUMMARY=$(python3 -c "
+          import json
+          try:
+              d = json.load(open('/tmp/fb_page_permissions_${ACCOUNT_ID}.json'))
+              if d.get('error'):
+                  print(f\"error={d['error'].get('message', d['error'])}\")
+              else:
+                  granted = sorted(p.get('permission','?') for p in d.get('data') or [] if p.get('status') == 'granted')
+                  declined = sorted(p.get('permission','?') for p in d.get('data') or [] if p.get('status') != 'granted')
+                  print(f\"granted={granted} declined={declined}\")
+          except Exception:
+              print('invalid response')
+          " 2>/dev/null || echo "invalid response")
+                echo "    page_token_permissions HTTP=${PERMISSIONS_HTTP} ${PERMISSIONS_SUMMARY}"
+              fi
+
               PAGE_TARGET="https://graph.facebook.com/v25.0/${FB_PAGE_ID}?fields=id,name,access_token"
               PAGE_B64=$(printf '%s' "$PAGE_TARGET" | base64 -w0 | tr '+/' '-_' | tr -d '=')
               PAGE_HTTP=$(curl -s -o "/tmp/pd_page_${ACCOUNT_ID}.json" -w "%{http_code}" \
