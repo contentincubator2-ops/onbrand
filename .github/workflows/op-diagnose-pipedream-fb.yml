@@ -18,6 +18,10 @@ on:
         description: "OnBrand user ID (integer from users table)"
         required: true
         type: string
+      page_id:
+        description: "Optional Facebook Page ID to probe directly"
+        required: false
+        type: string
 
 jobs:
   diagnose:
@@ -39,8 +43,8 @@ jobs:
           fi
           export MYSQL_PWD="${LOCAL_DB_PASSWORD}"
           MYSQL="mysql -h ${LOCAL_DB_HOST:-localhost} -u ${LOCAL_DB_USER:-mos_user} ${LOCAL_DB_NAME:-mos_db} -N -s --silent"
-          FB_PAGE_ID=""
-          if [ -n "$BRAND_ID" ]; then
+          FB_PAGE_ID="${{ github.event.inputs.page_id }}"
+          if [ -z "$FB_PAGE_ID" ] && [ -n "$BRAND_ID" ]; then
             FB_PAGE_ID=$($MYSQL -e "SELECT COALESCE(fbPageId, '') FROM brands WHERE id = $BRAND_ID LIMIT 1" 2>/dev/null || echo "")
           fi
 
