@@ -143,6 +143,9 @@ jobs:
           import json
           try:
               d = json.load(open('/tmp/pd_businesses_${ACCOUNT_ID}.json'))
+              if d.get('error'):
+                  print(f\"error={d['error'].get('message', d['error'])}\")
+                  raise SystemExit
               businesses = d.get('data') or []
               names = ', '.join(f\"{b.get('name','?')} ({b.get('id','?')})\" for b in businesses)
               print(f\"businesses={len(businesses)} [{names}]\")
