@@ -81,7 +81,7 @@ const performanceSources: Source[] = [
 
 const marketSources: Source[] = [
   { id: "overview", label: "市場總覽", short: "總覽", icon: <TrendingUp size={18} />, color: "#111827", desc: "從 Iris Girls 資料與公開來源定義競品、需求與機會" },
-  { id: "listening", label: "輿情監測", short: "輿情", icon: <Activity size={18} />, color: "#DC2626", desc: "把討論切成價格、版型、甜美風格、通路信任四類訊號" },
+  { id: "listening", label: "輿情監測", short: "輿情", icon: <Activity size={18} />, color: "#DC2626", desc: "把討論切成價格、版型、質感、場合四類訊號，並監測退換貨等危機字詞" },
   { id: "keywords", label: "關鍵字分析", short: "KW", icon: <Search size={18} />, color: "#2563EB", desc: "產品資料 → 品類詞 / 風格詞 / 場景詞 / 高意圖詞" },
   { id: "geo", label: "GEO / SEO", short: "GEO", icon: <Globe2 size={18} />, color: "#059669", desc: "AI 搜尋與一般搜尋需要引用的品牌證據缺口" },
   { id: "competitors", label: "競品情報", short: "競品", icon: <Database size={18} />, color: "#9333EA", desc: "用 social listening 儀表板檢查溫柔、自然、質感三個溝通點在競品間是否被市場認定" },
@@ -190,12 +190,48 @@ const irisMarketDesign: Record<string, PageDesign> = {
     ],
   },
   listening: {
-    hypothesis: "Iris Girls 的社群量級目前明顯小於直接競品；輿情頁要以『社群 footprint 差距 + 話題桶』呈現，而不是只列正負情緒。",
-    actions: ["用 IG follower/post footprint 做競品社群量級圖", "把 OpView/Meltwater mentions 接到同一頁的 Volume/Sentiment row", "先監測甜美穿搭、蝴蝶結、蕾絲、百褶裙、小香風五組 query"],
+    hypothesis: "輿情頁原本只放了 IG 粉絲數對比（跟競品情報頁重複），沒有兌現『價格/版型/質感/場合』四類訊號桶、原話萃取、危機分流三個任務卡承諾的內容。調整後補上訊號桶查詢設計與危機分級表，IG 量級圖保留作為『解讀聲量時的基礎量級』背景（品牌小 = mentions 少是常態，不是危機）。",
+    actions: ["把四類訊號桶的 query pack 接進 OpView/Meltwater topic pool", "危機分級表接上即時通知（P0 within 1hr 回覆）", "先監測甜美穿搭、蝴蝶結、蕾絲、百褶裙、小香風五組 query"],
     blocks: [
       {
-        headline: "公開 Instagram footprint：Iris Girls 與競品有 100x 以上量級差",
-        summary: "我實際抓取 Instagram 公開 profile meta：Iris Girls @iris_girls 為 1,765 followers / 1,682 posts；AIR SPACE 385K followers、PAZZO 303K、Mercci22 223K、IRIS GARDEN 33K。這個頁面適合做成橫向 bar chart，讓使用者一眼看到品牌社群基礎差距。",
+        headline: "四類訊號桶：把『甜美女裝』討論拆成消費者實際決策的四個問題",
+        summary: "女裝購買決策訪談與社群觀察一致指出，消費者在下單前後討論集中在四類問題：買不買得起（價格）、穿起來準不準（版型）、料子好不好（質感）、什麼場合能穿（場合）。與其空泛監測『甜美』『Iris Girls』單一品牌詞，不如監測這四類問題 × 品牌/商品詞的共同出現量，才會抓到真正影響轉換的訊號，而不是空洞的聲量數字。",
+        metrics: [
+          { label: "價格", value: "訊號桶 01", note: "query: 貴嗎/cp值/划算/退換貨運費/折扣碼" },
+          { label: "版型", value: "訊號桶 02", note: "query: 顯瘦/版型準嗎/尺寸偏大偏小/身高體重穿起來" },
+          { label: "質感/場合", value: "訊號桶 03+04", note: "質感：材質/會透嗎/縮水；場合：上班穿/約會/日常好搭" },
+        ],
+        bullets: [
+          "每個訊號桶要抓：討論量、正負向、代表原話、最常見的疑慮句型。",
+          "『版型』桶特別重要——女裝退換貨主因通常是版型疑慮，也是台灣消費者下單前最常搜尋的問題。",
+          "四桶都應該對到一個內容或商品頁任務：價格桶弱 → 補優惠/划算感內容；版型桶弱 → 補模特身高體重對照表。",
+        ],
+        evidence: [
+          { label: "Monitoring design", source: "social-listening-reporting + 女裝購買決策常見問題", note: "四類訊號桶依「購買前疑慮 → 購買後討論」常見決策順序設計，非品牌自訂。" },
+          { label: "Frontend source status", source: "connector-pending", note: "query pack 已設計完成；OpView/Meltwater 接入後，討論量/情緒/原話會直接填入此版型。" },
+        ],
+      },
+      {
+        headline: "危機與機會分流表：不是所有負面留言都要用同一個速度處理",
+        summary: "退換貨、尺寸、色差、材質這幾類負評若累積不處理會變成信任危機；但單一客訴不代表系統性問題。分流表把敏感詞事件分成三級，避免『看到負評就緊張』或『放著不管釀成大事』兩個極端。",
+        metrics: [
+          { label: "P0 立即回應", value: "1hr 內", note: "色差/瑕疵/尺寸大量誤差 + 24hr 內 ≥3 則同類負評" },
+          { label: "P1 主動放大", value: "24hr 內", note: "單則具體版型/材質好評，適合轉發或引用做素材" },
+          { label: "P2 持續觀察", value: "週報彙整", note: "零星個別意見、非系統性、暫不需公開回應" },
+        ],
+        bullets: [
+          "分級依據是『同類事件在短時間內的重複次數』，不是單則貼文的情緒強度。",
+          "P0 事件要有 SOP：客服私訊回應範本 + 若涉及退換貨政策要同步電商/客服團隊。",
+          "P1 好評放大是輿情頁常被忽略的一半——不是只防守，也要主動收集『版型準』『質感好』的原話做成素材。",
+        ],
+        evidence: [
+          { label: "Monitoring design", source: "news-alert-triage 分級邏輯", note: "以事件重複頻率而非單則情緒強度分級，降低誤判率。" },
+          { label: "Frontend source status", source: "connector-pending", note: "分級門檻已定義；OpView/Meltwater mentions 接入後可自動判級並通知。" },
+        ],
+      },
+      {
+        headline: "背景參考：公開 Instagram footprint（解讀聲量時的基礎量級）",
+        summary: "上面兩個訊號桶接上真實 mentions 後，數字要對照這個基礎量級才有意義——Iris Girls 社群基礎小，討論量原本就會遠低於競品，不能直接拿絕對數字比較。我實際抓取 Instagram 公開 profile meta：Iris Girls @iris_girls 為 1,765 followers / 1,682 posts；AIR SPACE 385K followers、PAZZO 303K、Mercci22 223K、IRIS GARDEN 33K。",
         metrics: [
           { label: "Iris Girls", value: "1.8K", note: "IG followers｜1,682 posts" },
           { label: "AIR SPACE", value: "385K", note: "IG followers｜5,518 posts" },
