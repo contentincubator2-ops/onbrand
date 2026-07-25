@@ -42,6 +42,20 @@ export function isBundleMissingTeamError(error: unknown): boolean {
   return /\b404\b/.test(error.message) && /no team found/i.test(error.message);
 }
 
+/**
+ * True when bundle.social says the platform is not linked for this team.
+ *
+ * Two different 400s mean the same thing to the user — "you have not connected
+ * this platform yet": reading an account the team never linked, and posting to
+ * a team whose platform has no account. Neither is a server fault.
+ */
+export function isBundleNotConnectedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (!/\b400\b/.test(error.message)) return false;
+  return /does not have a .* account/i.test(error.message)
+    || /no social accounts selected/i.test(error.message);
+}
+
 /** Pull the human-readable part out of an error body without leaking the whole payload. */
 function extractMessage(body: string): string {
   try {
@@ -118,9 +132,16 @@ export function createBundleSocialClient({
       type: BundlePlatform;
     }): Promise<BundleSocialAccount | null> {
       const query = new URLSearchParams({ teamId: input.teamId, type: input.type });
-      return request<BundleSocialAccount>(`/api/v1/social-account/by-type?${query}`, {
-        nullOn404: true,
-      });
+      try {
+        return await request<BundleSocialAccount>(`/api/v1/social-account/by-type?${query}`, {
+          nullOn404: true,
+        });
+      } catch (e) {
+        // A team that exists but has never linked this platform answers 400,
+        // not 404. That is "not connected", not a failure worth surfacing.
+        if (isBundleNotConnectedError(e)) return null;
+        throw e;
+      }
     },
 
     async uploadFromUrl(input: { teamId: string; url: string }): Promise<{ id: string }> {

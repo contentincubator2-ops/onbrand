@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createBundleSocialClient, isBundleMissingTeamError } from "./bundleSocial";
+import {
+  createBundleSocialClient,
+  isBundleMissingTeamError,
+  isBundleNotConnectedError,
+} from "./bundleSocial";
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
 
@@ -41,6 +45,23 @@ describe("isBundleMissingTeamError", () => {
     expect(isBundleMissingTeamError(new Error("bundle.social 404: No upload found"))).toBe(false);
     expect(isBundleMissingTeamError("not an error")).toBe(false);
     expect(isBundleMissingTeamError(undefined)).toBe(false);
+  });
+});
+
+describe("isBundleNotConnectedError", () => {
+  it("recognises the 400s bundle.social returns when the platform is not linked", () => {
+    expect(isBundleNotConnectedError(
+      new Error("bundle.social 400: Team does not have a Facebook account"),
+    )).toBe(true);
+    expect(isBundleNotConnectedError(
+      new Error("bundle.social 400: No social accounts selected"),
+    )).toBe(true);
+  });
+
+  it("does not swallow other 400s or server faults", () => {
+    expect(isBundleNotConnectedError(new Error("bundle.social 400: Invalid payload"))).toBe(false);
+    expect(isBundleNotConnectedError(new Error("bundle.social 500: boom"))).toBe(false);
+    expect(isBundleNotConnectedError("nope")).toBe(false);
   });
 });
 
@@ -91,6 +112,16 @@ describe("createBundleSocialClient", () => {
 
   it("treats a missing connection as null rather than an error", async () => {
     const stub = stubFetch([{ status: 404, body: { message: "not found" } }]);
+
+    await expect(
+      client(stub).getSocialAccount({ teamId: "team_abc", type: "FACEBOOK" }),
+    ).resolves.toBeNull();
+  });
+
+  it("treats an existing team with no linked platform as null, not a failure", async () => {
+    const stub = stubFetch([
+      { status: 400, body: { message: "Team does not have a Facebook account" } },
+    ]);
 
     await expect(
       client(stub).getSocialAccount({ teamId: "team_abc", type: "FACEBOOK" }),

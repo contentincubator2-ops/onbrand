@@ -109,6 +109,16 @@ describe("publishViaBundleSocial", () => {
     )).rejects.toThrow(/尚未連接|重新連接/);
   });
 
+  it("asks the user to connect when the team has no linked social account", async () => {
+    const d = deps();
+    d.createPost.mockRejectedValue(new Error("bundle.social 400: No social accounts selected"));
+
+    await expect(publishViaBundleSocial(
+      { brandId: 2958, platform: "facebook", caption: "hi", referenceKey: "onbrand-6", now: NOW },
+      d,
+    )).rejects.toThrow(/尚未連接|重新連接/);
+  });
+
   it("still succeeds when the platform returns no permalink", async () => {
     const d = deps({ post: { id: "post_4", status: "SCHEDULED" } });
 

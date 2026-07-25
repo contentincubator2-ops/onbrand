@@ -1,5 +1,5 @@
 import { buildBundlePostPayload, toBundlePlatform } from "./bundlePublish";
-import { isBundleMissingTeamError } from "./bundleSocial";
+import { isBundleMissingTeamError, isBundleNotConnectedError } from "./bundleSocial";
 import type { BundlePost, BundleSocialClient } from "./bundleSocial";
 
 export type BundlePublishResult = {
@@ -82,6 +82,11 @@ export async function publishViaBundleSocial(
     // it, so point the user there instead of showing a raw 404.
     if (isBundleMissingTeamError(e)) {
       throw new Error("此品牌的 bundle.social 工作區已不存在，請重新連接此平台。");
+    }
+    // Team exists but the platform was never linked (or the connect flow was
+    // abandoned half-way). Send the user back to the connect button.
+    if (isBundleNotConnectedError(e)) {
+      throw new Error("此品牌尚未完成此平台的連接授權，請重新連接。");
     }
     throw e;
   }
