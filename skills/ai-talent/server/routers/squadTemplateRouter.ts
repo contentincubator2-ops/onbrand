@@ -2818,17 +2818,29 @@ ${input.question}`;
         return "";
       };
 
+      // 2026-07-26 (CJ「自動填寫出現伺服器太忙碌」): none of the provider
+      // calls had a timeout — one hung provider pushed the whole cascade
+      // past nginx's 60s upstream cap, which returns an HTML error page the
+      // client surfaces as 伺服器忙碌. Per-provider budgets keep the worst
+      // case (10+10+8+8+12 = 48s) safely under the proxy limit; a timed-out
+      // provider just falls through to the next one.
+      const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+        Promise.race([
+          p,
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`${label} timeout ${ms}ms`)), ms)),
+        ]);
+
       // ── 0. Vertex AI Grounding (Google Search via Vertex AI) ──────────────
       // Best quality: uses GOOGLE_APPLICATION_CREDENTIALS (service account) or
       // GOOGLE_VERTEX_TOKEN env var. Falls through silently if neither is set.
       const hasVertexCreds = !!(process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLE_VERTEX_TOKEN);
       if (hasVertexCreds) {
         try {
-          const answer = await invokeVertexGrounding({
+          const answer = await withTimeout(invokeVertexGrounding({
             query: `用繁體中文，簡短回答（1-3句）：${q}`,
             system: "你是行銷數據研究員。只回傳答案本身，不要前言。",
             maxOutputTokens: 300,
-          });
+          }), 10_000, "vertex");
           if (answer.trim()) {
             console.log("[briefSearch] Vertex Grounding OK:", q.slice(0, 60));
             return { result: answer.trim() };
@@ -2853,6 +2865,7 @@ ${input.question}`;
                 tools: [{ google_search: {} }],
                 generationConfig: { maxOutputTokens: 300 },
               }),
+              signal: AbortSignal.timeout(10_000),
             }
           );
           if (res.ok) {
@@ -2884,6 +2897,7 @@ ${input.question}`;
               search_depth:   "basic",
               max_results:    3,
             }),
+            signal: AbortSignal.timeout(8_000),
           });
           if (res.ok) {
             const data = await res.json() as any;
@@ -2906,6 +2920,7 @@ ${input.question}`;
       try {
         const jinaRes = await fetch(`https://s.jina.ai/${encodeURIComponent(q)}`, {
           headers: { "Accept": "application/json", "X-Return-Format": "text" },
+          signal: AbortSignal.timeout(8_000),
         });
         if (jinaRes.ok) {
           const text = await jinaRes.text();
@@ -2921,14 +2936,14 @@ ${input.question}`;
 
       // ── 4. Azure AI Foundry (LLM fallback, training data only) ───────────
       try {
-        const res = await (invokeLLM as any)({
+        const res = await withTimeout((invokeLLM as any)({
           provider: "azure-foundry",
           messages: [
             { role: "system", content: "你是行銷數據研究員。根據訓練知識，用繁體中文給出簡短摘要（1-3句）。只回傳內容。注意：非即時資料。" },
             { role: "user", content: q },
           ],
           maxTokens: 300,
-        } as any);
+        } as any), 12_000, "azure-foundry");
         const answer = extractText((res as any)?.choices?.[0]?.message?.content);
         if (answer) {
           console.log("[briefSearch] Azure Foundry fallback OK:", q.slice(0, 60));
