@@ -2,8 +2,8 @@
  * AdminSupportPage — internal-only inbox for support tickets opened from
  * the Mia chat drawer. Layer 3 of the 4-layer support architecture.
  *
- * Route: /admin/support  (gated server-side via isAdminUser allowlist —
- * userId 199 OR @sowork.{tw,ai} email)
+ * Route: /admin/support (gated server-side via the shared adminProcedure —
+ * users.role='admin' OR @sowork.{tw,ai} email)
  *
  * Left rail: ticket list filtered by status.
  * Right pane: ticket details + conversation history + reply + tag/resolve.

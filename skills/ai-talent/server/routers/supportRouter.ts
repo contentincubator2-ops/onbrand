@@ -16,7 +16,7 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import { callModel } from "../_core/multiModelRouter";
 
@@ -621,16 +621,13 @@ export const supportRouter = router({
     }),
 
   // ── Admin ────────────────────────────────────────────────────────────────
-  // CJ's user id is 199 (cjwang@sowork.tw). Hardcoded admin allowlist for
-  // simplicity — formal admin role can be added later.
-  adminListTickets: protectedProcedure
+  // Use the shared DB-backed admin gate so cookie sessions (whose JWT does
+  // not carry email) still recognize role='admin' and @sowork.tw/.ai users.
+  adminListTickets: adminProcedure
     .input(z.object({
       status: z.enum(["open", "in_progress", "resolved", "all"]).default("all"),
     }).optional())
-    .query(async ({ ctx, input }) => {
-      if (!isAdminUser(ctx.user!.id, ctx.user!.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "admin only" });
-      }
+    .query(async ({ input }) => {
       const status = input?.status ?? "all";
       const where = status === "all" ? "1=1" : "status = ?";
       const params = status === "all" ? [] : [status];
@@ -651,12 +648,9 @@ export const supportRouter = router({
       }));
     }),
 
-  adminGetTicket: protectedProcedure
+  adminGetTicket: adminProcedure
     .input(z.object({ ticketId: z.number().int().positive() }))
-    .query(async ({ ctx, input }) => {
-      if (!isAdminUser(ctx.user!.id, ctx.user!.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "admin only" });
-      }
+    .query(async ({ input }) => {
       const [rows]: any = await localPool.execute(
         `SELECT * FROM support_tickets WHERE id = ? LIMIT 1`,
         [input.ticketId],
@@ -680,15 +674,12 @@ export const supportRouter = router({
       };
     }),
 
-  adminReply: protectedProcedure
+  adminReply: adminProcedure
     .input(z.object({
       ticketId: z.number().int().positive(),
       content: z.string().min(1).max(2000),
     }))
-    .mutation(async ({ ctx, input }) => {
-      if (!isAdminUser(ctx.user!.id, ctx.user!.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "admin only" });
-      }
+    .mutation(async ({ input }) => {
       const [rows]: any = await localPool.execute(
         `SELECT conversationId FROM support_tickets WHERE id = ? LIMIT 1`,
         [input.ticketId],
@@ -707,7 +698,7 @@ export const supportRouter = router({
       return { ok: true };
     }),
 
-  adminUpdateTicket: protectedProcedure
+  adminUpdateTicket: adminProcedure
     .input(z.object({
       ticketId: z.number().int().positive(),
       status: z.enum(["open", "in_progress", "resolved"]).optional(),
@@ -715,10 +706,7 @@ export const supportRouter = router({
       priority: z.enum(["low", "normal", "high"]).optional(),
       adminNotes: z.string().max(2000).optional(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      if (!isAdminUser(ctx.user!.id, ctx.user!.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "admin only" });
-      }
+    .mutation(async ({ input }) => {
       const fields: string[] = [];
       const params: any[] = [];
       if (input.status)     { fields.push("status = ?");     params.push(input.status); }
@@ -909,11 +897,4 @@ export async function pushSystemSupportMessage(userId: number, content: string):
   } catch (e) {
     console.error("[support] pushSystemSupportMessage failed:", e);
   }
-}
-
-// Admin = CJ (userId 199) or any sowork.tw email. Trivial allowlist.
-export function isAdminUser(userId: number, email?: string | null): boolean {
-  if (userId === 199) return true;
-  if (email && /@sowork\.(tw|ai)$/i.test(email)) return true;
-  return false;
 }
