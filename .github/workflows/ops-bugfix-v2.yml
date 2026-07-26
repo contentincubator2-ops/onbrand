@@ -90,15 +90,13 @@ jobs:
           fi
           git add -A
           SUM=$(head -c 1200 /tmp/fix_summary.txt 2>/dev/null || echo "Automated fix attempt.")
-          git commit -m "fix(bug ${{ github.event.inputs.bug_id }}): ${{ steps.bug.outputs.title }}
-
-Auto-proposed. HUMAN REVIEW REQUIRED before merge.
-
-$SUM"
+          # NOTE: keep every line of this block indented — a column-0 line
+          # terminates the YAML literal block and invalidates the workflow.
+          git commit -m "fix(bug ${{ github.event.inputs.bug_id }}): ${{ steps.bug.outputs.title }}" \
+            -m "Auto-proposed. HUMAN REVIEW REQUIRED before merge." \
+            -m "$SUM"
           git push origin "$BRANCH"
           gh pr create --base main --head "$BRANCH" \
             --title "fix(bug ${{ github.event.inputs.bug_id }}): ${{ steps.bug.outputs.title }}" \
-            --body "Auto-fix for bug #${{ github.event.inputs.bug_id }}. Review diff carefully.
-
-$SUM" || echo "PR create failed"
+            --body "$(printf 'Auto-fix for bug #%s. Review diff carefully.\n\n%s' "${{ github.event.inputs.bug_id }}" "$SUM")" || echo "PR create failed"
           echo "PR opened from $BRANCH"

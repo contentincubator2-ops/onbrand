@@ -60,14 +60,14 @@ jobs:
           fi
           git add -A
           SUM=$(head -c 1000 /tmp/fix_summary.txt 2>/dev/null || echo "Automated fix.")
-          git commit -m "fix: bug #${BID} ${TITLE}
-
-Auto-proposed. HUMAN REVIEW REQUIRED before merge.
-
-${SUM}"
+          # NOTE: multi-line strings must NOT dedent to column 0 inside this
+          # YAML literal block — that ends the block and breaks the whole
+          # workflow file (GitHub then refuses workflow_dispatch with a 422).
+          # Use repeated -m flags / printf instead of embedded newlines.
+          git commit -m "fix: bug #${BID} ${TITLE}" \
+            -m "Auto-proposed. HUMAN REVIEW REQUIRED before merge." \
+            -m "${SUM}"
           git push origin "$BR"
           gh pr create --base main --head "$BR" \
             --title "fix: bug #${BID} ${TITLE}" \
-            --body "Auto-fix for bug #${BID}. Review diff before merging.
-
-${SUM}" || echo "PR create failed"
+            --body "$(printf 'Auto-fix for bug #%s. Review diff before merging.\n\n%s' "$BID" "$SUM")" || echo "PR create failed"
