@@ -1,0 +1,48 @@
+name: "Admin — Comp all sowork.tw/sowork.ai team accounts (enterprise)"
+
+# 2026-07-26 (CJ「sowork.tw 結尾的信箱，應該都是無限使用」— sowork@sowork.tw
+# 還跳訂閱到期): upgrade EVERY @sowork.tw / @sowork.ai user to permanent
+# enterprise. Idempotent — re-run whenever a new teammate registers.
+# Covers the raw-DB plan reads (preflightCostCheck / pointsService) that
+# the loadUserPlan domain override can't reach.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  comp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upgrade sowork domain accounts
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+            COND="email REGEXP '@sowork\\\\.(tw|ai)$'"
+
+            echo "===== BEFORE ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive
+               FROM users WHERE $COND;"
+
+            echo "===== APPLY ====="
+            Q "UPDATE users
+                 SET planCode='enterprise', planStatus='active', planEndsAt=NULL,
+                     isActive=1, hasUnlimitedCredits=1
+               WHERE $COND;"
+            Q "UPDATE workspaces
+                 SET planCode='enterprise', planStatus='active'
+               WHERE ownerUserId IN (SELECT id FROM users WHERE $COND);"
+
+            echo "===== AFTER ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive, hasUnlimitedCredits
+               FROM users WHERE $COND;"
+            echo "✓ all sowork domain accounts → enterprise (permanent)"
+            exit 0

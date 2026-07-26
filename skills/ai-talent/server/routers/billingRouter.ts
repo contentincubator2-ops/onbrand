@@ -30,7 +30,7 @@ async function loadUserPlan(userId: number): Promise<{
 }> {
   const { default: localPool } = await import("../localDb");
   const [rows]: any = await localPool.execute(
-    `SELECT planCode, planStatus, planEndsAt, isActive,
+    `SELECT email, planCode, planStatus, planEndsAt, isActive,
             IFNULL(earlyBird, 0) AS earlyBird,
             lockedPriceTwdMonthly,
             IFNULL(billingCountry, 'TW') AS billingCountry
@@ -38,6 +38,24 @@ async function loadUserPlan(userId: number): Promise<{
     [userId],
   );
   const r = (rows as any[])[0];
+  // 2026-07-26 (CJ「sowork.tw 結尾的信箱，應該都是無限使用」— sowork@
+  // sowork.tw 竟跳出訂閱已到期): internal team domain = permanent
+  // enterprise, regardless of what the row says. Same domain policy as
+  // brand.create's quota bypass (2026-07-07). The DB rows are also
+  // upgraded via admin-comp-sowork-team.yml, but this guard means a
+  // freshly registered teammate never sees a trial/expired banner.
+  const isSoworkTeam = typeof r?.email === "string" && /@sowork\.(tw|ai)$/i.test(r.email);
+  if (isSoworkTeam) {
+    return {
+      planCode: "enterprise" as PlanCode,
+      planStatus: "active",
+      planEndsAt: null,
+      isActive: true,
+      earlyBird: Number(r?.earlyBird ?? 0),
+      lockedPriceTwdMonthly: r?.lockedPriceTwdMonthly ?? null,
+      billingCountry: r?.billingCountry ?? "TW",
+    };
+  }
   return {
     planCode: (r?.planCode ?? "trial") as PlanCode,
     planStatus: r?.planStatus ?? "trial",
