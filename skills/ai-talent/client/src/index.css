@@ -73,9 +73,12 @@ body {
 
 /* Mobile responsive */
 @media (max-width: 767px) {
-  body {
-    overflow: hidden;
-  }
+  /* 2026-07-26 (CJ「手機版頁面沒有辦法往下滑」): body { overflow: hidden }
+     used to live here, left over from the old full-screen chat layout that
+     scrolled inside .messages-area. Every current page scrolls the document
+     itself (ShellLayout is min-h-screen), so this froze vertical scrolling on
+     every page ≤767px — /run/:id was still interactive but could not be
+     pulled down. Body must stay scrollable; overlays own their own scroll. */
 
   /* Chat messages area needs bottom padding for tab bar */
   .messages-area {
