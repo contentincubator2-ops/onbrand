@@ -25,14 +25,18 @@ jobs:
             Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
 
             echo "===== all error_log rows, last 20 minutes (any source) ====="
-            Q "SELECT id, ts, level, source, route, userId, LEFT(message,200) AS msg
+            Q "SELECT id, createdAt, level, source, route, userId, LEFT(message,200) AS msg
                  FROM error_log
-                WHERE ts > NOW() - INTERVAL 20 MINUTE
+                WHERE createdAt > NOW() - INTERVAL 20 MINUTE
                 ORDER BY id DESC LIMIT 40;"
 
             echo ""
+            echo "===== positioning_jobs columns ====="
+            Q "SHOW COLUMNS FROM positioning_jobs;"
+
+            echo ""
             echo "===== positioning_jobs status in last 20 minutes ====="
-            Q "SELECT id, entityKind, entityId, status, currentStep, error, startedAt, finishedAt
+            Q "SELECT id, entityKind, entityId, status, startedAt, finishedAt
                  FROM positioning_jobs
                 WHERE startedAt > NOW() - INTERVAL 20 MINUTE
                 ORDER BY id DESC LIMIT 10;"
