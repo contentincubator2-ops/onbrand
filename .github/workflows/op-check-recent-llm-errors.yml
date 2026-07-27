@@ -1,0 +1,38 @@
+name: "Op — Check most recent LLM-related error_log entries (read-only)"
+
+# 2026-07-27 (CJ「我剛剛執行定位的時候，瞬間跳出來 all llm model failed」):
+# pull the last 15 minutes of error_log broadly (not filtered to a narrow
+# message pattern like op-diagnose-llm-degradation.yml) so we catch the
+# exact transient error the user saw, even if the wording differs slightly.
+
+on: { workflow_dispatch: {} }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query error_log for last 15 minutes
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== all error_log rows, last 20 minutes (any source) ====="
+            Q "SELECT id, ts, level, source, route, userId, LEFT(message,200) AS msg
+                 FROM error_log
+                WHERE ts > NOW() - INTERVAL 20 MINUTE
+                ORDER BY id DESC LIMIT 40;"
+
+            echo ""
+            echo "===== positioning_jobs status in last 20 minutes ====="
+            Q "SELECT id, entityKind, entityId, status, currentStep, error, startedAt, finishedAt
+                 FROM positioning_jobs
+                WHERE startedAt > NOW() - INTERVAL 20 MINUTE
+                ORDER BY id DESC LIMIT 10;"
