@@ -194,6 +194,16 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
   // so 3000-token outputs (text_strategic) need ~35-40s end-to-end.
   // 25s was too aggressive — caused systematic timeout on real workloads.
   const perProviderCap = 45_000;
+  // 2026-07-27 (CJ「all llm model failed」on a positioning run): with a 55s
+  // total budget, letting Anthropic run all the way to the 45s cap left
+  // <10s for azure-foundry — not enough for a real cross-region round trip,
+  // so a single Anthropic timeout reliably took the whole cascade down with
+  // it (confirmed in error_log: 3 back-to-back "anthropic timeout |
+  // azure-foundry timeout" failures, azure-openai/openrouter never even
+  // got a turn). Anthropic keeps a smaller cap so its timeout still leaves
+  // a real window for the next provider. Can't just raise the total budget
+  // instead — nginx's upstream timeout is ~60s (see budgetMs doc above).
+  const anthropicCap = 28_000;
 
   const remainingBudget = () => Math.max(0, budgetMs - (Date.now() - startedAt));
 
@@ -201,13 +211,14 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
     provider: Provider,
     keyLabel: string,
     fn: (timeoutMs: number) => Promise<string>,
+    cap: number = perProviderCap,
   ): Promise<string | null> => {
     const remaining = remainingBudget();
     if (remaining < 2000) {
       attempts.push({ provider, key: keyLabel, ok: false, durationMs: 0, error: "skipped: budget exhausted" });
       return null;
     }
-    const perProviderTimeout = Math.min(args.timeoutMs ?? perProviderCap, perProviderCap, remaining);
+    const perProviderTimeout = Math.min(args.timeoutMs ?? cap, cap, remaining);
     const t0 = Date.now();
     try {
       const text = await fn(perProviderTimeout);
@@ -228,6 +239,7 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
       for (let i = 0; i < ANTHROPIC_KEYS.length; i++) {
         const text = await tryProvider("anthropic", `key-${i + 1}`, (t) =>
           callAnthropic(ANTHROPIC_KEYS[i]!, { ...args, timeoutMs: t }),
+          anthropicCap,
         );
         if (text) return { text, attempts };
         // Backup keys help against auth/billing failures, NOT timeouts.

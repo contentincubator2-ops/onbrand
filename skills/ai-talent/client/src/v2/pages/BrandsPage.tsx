@@ -2414,8 +2414,20 @@ export default function BrandsPage() {
         onClose={() => setAddModal({ open: false, tab: addModal.tab })}
         onCreated={(kind, id) => {
           if (kind === "brand") { setBrandId(id); setScope({ brandId: id, productId: null, eventId: null }); }
-          else if (kind === "product") goToEntity("product", id);
-          else if (kind === "event") goToEntity("event", id);
+          // 2026-07-27 (CJ「新增產品後，突然跑到一個奇怪頁面」): goToEntity(kind, id)
+          // drills straight into the new product/event's own near-empty
+          // sub-workspace page — disorienting right after creation, when
+          // there's nothing there yet. Land back on the list instead (clear
+          // any stale p/e so a leftover single-item view doesn't win) so the
+          // user can see the new card and kick off positioning from there.
+          else if (kind === "product" || kind === "event") {
+            void id;
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.set("cat", kind === "product" ? "products" : "events");
+            nextParams.delete("p");
+            nextParams.delete("e");
+            setSearchParams(nextParams, { replace: true });
+          }
         }}
       />
     </main>
