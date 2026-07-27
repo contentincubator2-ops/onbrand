@@ -1400,6 +1400,44 @@ function safeOutputTypeForPostType(
   }
 }
 
+// 2026-07-27 (CJ「七日工作台，合成圖也套用真實產品圖片」): the manual
+// RunPage 改圖 panel already composites the real product photo via Nano
+// Banana (see MediaGenFlow.tsx「📦 使用真實產品圖」+ mediaRouter media.generate).
+// The 七日工作台 orchestra never had an equivalent — genOneImage always
+// text-to-image'd an AI-imagined product. When a run is scoped to a
+// specific product (args.productId set), fetch that product's real photo
+// once per run so every variant's image composites the actual product
+// instead of hallucinating one. Mirrors mediaRouter.listProductImages'
+// positioning-JSON lookup (kept file-local — no tRPC round trip needed
+// server-side).
+async function loadProductImageUrl(brandId?: number | null, productId?: number | null): Promise<string | null> {
+  if (!brandId || !productId) return null;
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning FROM products WHERE id = ? AND brandId = ? LIMIT 1`,
+      [productId, brandId],
+    );
+    let p: any = (rows as any[])?.[0]?.positioning;
+    if (!p) return null;
+    if (typeof p === "string") p = JSON.parse(p);
+    const candidates = [
+      p?.imageUrl, p?.image,
+      p?._interim?.imageUrl, p?._interim?.image,
+      Array.isArray(p?.images) ? p.images[0] : null,
+      Array.isArray(p?._interim?.images) ? p._interim.images[0] : null,
+      Array.isArray(p?._assets?.photos)
+        ? (typeof p._assets.photos[0] === "string" ? p._assets.photos[0] : p._assets.photos[0]?.url)
+        : null,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && /^https?:\/\//.test(c)) return c;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Single image gen with per-image timeout ─────────────────────────────
 
 /* 2026-07-16 (CJ「七日發布台的是標準，不應該被更改，是其他任務要對齊七日
@@ -1411,7 +1449,13 @@ function safeOutputTypeForPostType(
  * available (empty variant / failure placeholder), the Chinese style text is
  * fed to the same converter instead — identical pipeline either way. */
 async function genOneImage(
-  args: { content: string; style: string | null; platform?: string; palette?: Array<{ hex: string; role: string }> },
+  args: {
+    content: string; style: string | null; platform?: string; palette?: Array<{ hex: string; role: string }>;
+    /** 2026-07-27 (CJ「合成圖也套用真實產品圖片」): real product photo URL —
+     *  when set, routes to Nano Banana subject-reference compositing instead
+     *  of text-to-image, mirroring the manual RunPage「使用真實產品圖」panel. */
+    subjectImageUrl?: string | null;
+  },
   config: OrchestraConfig,
 ): Promise<OrchestraVariant["image"]> {
   const prompt = args.style ?? ""; // returned as `style` — what the UI shows
@@ -1439,21 +1483,49 @@ async function genOneImage(
     // text-free background. Append a dominant NO-TEXT directive to the positive
     // prompt (imagen-4 has no negative_prompt field) AND pass a real
     // negative_prompt (honoured by the flux-schnell fallback + SDXL/Ideogram).
-    const promptNoText =
-      modelPrompt +
-      "\n\nABSOLUTELY NO TEXT: render zero written characters — no text, letters, " +
-      "words, numbers, Chinese/Japanese/Korean characters, titles, headlines, " +
-      "captions, labels, badges, signage, logos, watermarks or typography anywhere. " +
-      "Leave any title area as empty visual space; text is added later on a separate layer.";
+    // 2026-07-27 (CJ「鏡子裡的她，跟實際的髮型或頭的轉向不同」): mirror /
+    // reflective-surface compositions are a well-known failure mode for
+    // every text-to-image model — they cannot keep a reflection physically
+    // consistent with the subject's actual pose. Rather than trying to
+    // prompt our way to a correct reflection (unreliable), avoid the
+    // composition entirely — same philosophy as the NO-TEXT policy: route
+    // around what models can't do, don't ship the broken result.
+    const noMirrorLine =
+      "Do NOT include a mirror, reflective surface, reflection, or any shot " +
+      "composed as \"person looking at their own reflection\" — reflections " +
+      "never stay physically consistent with the subject's actual pose/hair/" +
+      "head angle. Show the subject directly instead.";
+    const subjectMode = !!args.subjectImageUrl;
+    const promptNoText = subjectMode
+      // 2026-07-25 product-faithful gen: the blanket NO-TEXT rule would strip
+      // the product's own label — use the fidelity guard instead (label
+      // letter-perfect, no OTHER generated text). Mirrors imageGen.ts's
+      // PRODUCT_FAITHFUL_PROMPT_BLOCK so both paths hold the same bar.
+      ? modelPrompt +
+        "\n\nPRODUCT FIDELITY — the attached image is the REAL product; reproduce it " +
+        "EXACTLY as shown (identical shape, proportions, materials, colors, and every " +
+        "printed label/logo/text on the product itself must stay letter-perfect and " +
+        "unaltered). Do NOT redraw, restyle, re-color or re-label the product. Place it " +
+        "naturally into the scene: matching light direction, correct perspective and " +
+        "scale, realistic contact shadows — it must look photographed in place, never " +
+        "pasted on. Apart from the product's own printed label, add no other text, " +
+        "captions, watermarks or typography anywhere.\n\n" + noMirrorLine
+      : modelPrompt +
+        "\n\nABSOLUTELY NO TEXT: render zero written characters — no text, letters, " +
+        "words, numbers, Chinese/Japanese/Korean characters, titles, headlines, " +
+        "captions, labels, badges, signage, logos, watermarks or typography anywhere. " +
+        "Leave any title area as empty visual space; text is added later on a separate layer.\n\n" +
+        noMirrorLine;
     const opts = {
       prompt: promptNoText,
       aspectRatio: aspect,
       quality: "high" as const,
+      ...(args.subjectImageUrl ? { imageUrl: args.subjectImageUrl } : {}),
       negativePrompt:
         "text, letters, words, numbers, chinese characters, japanese characters, " +
         "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
         "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
-        "fake characters, writing",
+        "fake characters, writing, mirror, reflection, reflective surface",
     };
     const tryModel = async (modelId: string, label: string, capMs: number) =>
       Promise.race([
@@ -1474,14 +1546,23 @@ async function genOneImage(
     // model (e.g. YT → gpt-image-2 for clean 16:9 backgrounds). gpt-image-2 is
     // slower than imagen-4, so give the override a wider cap. Flux Schnell
     // stays the reliability fallback either way.
-    const primaryModel = config.imageModelOverride ?? "google/imagen-4-default";
-    const primaryCapMs = config.imageModelOverride ? 35_000 : IMAGEN_CAP_MS;
+    // 2026-07-27: subjectMode always routes through Nano Banana (image-edit,
+    // not text-to-image) — it's the only model here that takes a subject
+    // reference photo.
+    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "google/imagen-4-default");
+    const primaryCapMs = subjectMode ? 35_000 : (config.imageModelOverride ? 35_000 : IMAGEN_CAP_MS);
     let r;
     try {
       r = await tryModel(primaryModel, primaryModel, primaryCapMs);
       if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
-    } catch {
-      // fall back to the fast, content-permissive, proven Flux tier
+    } catch (e: any) {
+      // 2026-07-25 product-faithful gen policy (imageGen.ts): a hallucinated
+      // product is worse than a failed run — do NOT fall back to text-to-image
+      // when a real product photo was requested, it would silently ship a
+      // fake product. Non-product runs keep the proven Flux Schnell fallback.
+      if (subjectMode) {
+        return { style: prompt, url: null, status: "failed", errorMsg: String(e?.message ?? e) };
+      }
       r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
     }
     if (r.status === "ready" && r.url) {
@@ -2138,11 +2219,17 @@ export async function runOrchestra(args: {
     // 2026-07-19: brand palette loaded once per run → injected into every
     // image brief so generated visuals carry the brand color scheme.
     const brandPalette = await loadBrandPaletteHexes(args.brandId);
+    // 2026-07-27 (CJ「合成圖也套用真實產品圖片」): when this run is scoped
+    // to a specific product, fetch its real photo once so every variant's
+    // image composites the actual product — same fidelity bar as the manual
+    // RunPage「使用真實產品圖」panel. Brand-level (no productId) runs are
+    // unaffected — there's no single product to anchor to.
+    const subjectImageUrl = willRender ? await loadProductImageUrl(args.brandId, args.productId) : null;
     const images: OrchestraVariant["image"][] = willRender && briefs.length
       ? await Promise.all(briefs.map((b, i) =>
           // Theater standard: prompt derives from the variant's CAPTION;
           // the Chinese brief is display-only (style).
-          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform, palette: brandPalette }, args.config)))
+          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform, palette: brandPalette, subjectImageUrl }, args.config)))
       : briefs.length
         ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
         : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));

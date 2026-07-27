@@ -159,14 +159,17 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       // 2026-07-25: product-subject mode uses PRODUCT_FAITHFUL_PROMPT_BLOCK
       // instead — the real product's own label must remain letter-perfect,
       // so the blanket text-suppression negative is NOT sent.
-      const { NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT, PRODUCT_FAITHFUL_PROMPT_BLOCK } = await import("../_core/imageGen");
+      const {
+        NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT, PRODUCT_FAITHFUL_PROMPT_BLOCK,
+        NO_MIRROR_PROMPT_BLOCK, NO_MIRROR_NEGATIVE_PROMPT,
+      } = await import("../_core/imageGen");
       const isImage = input.kind === "image";
       const isProductSubject = isImage && input.subjectMode === "product" && !!input.imageUrl;
       const opts: GenOptions = {
         prompt: isProductSubject
-          ? `${input.promptEn}\n\n${PRODUCT_FAITHFUL_PROMPT_BLOCK}`
-          : isImage ? `${input.promptEn}\n\n${NO_TEXT_PROMPT_BLOCK}` : input.promptEn,
-        negativePrompt: isImage && !isProductSubject ? NO_TEXT_NEGATIVE_PROMPT : undefined,
+          ? `${input.promptEn}\n\n${PRODUCT_FAITHFUL_PROMPT_BLOCK}\n\n${NO_MIRROR_PROMPT_BLOCK}`
+          : isImage ? `${input.promptEn}\n\n${NO_TEXT_PROMPT_BLOCK}\n\n${NO_MIRROR_PROMPT_BLOCK}` : input.promptEn,
+        negativePrompt: !isImage ? undefined : isProductSubject ? NO_MIRROR_NEGATIVE_PROMPT : NO_TEXT_NEGATIVE_PROMPT,
         aspectRatio: input.aspectRatio,
         size: input.size,
         imageUrl: input.imageUrl,

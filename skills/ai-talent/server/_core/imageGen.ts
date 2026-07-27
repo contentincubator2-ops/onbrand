@@ -57,11 +57,33 @@ export const PRODUCT_FAITHFUL_PROMPT_BLOCK =
   "product's own printed label, do NOT add any other text, captions, " +
   "watermarks, badges or typography anywhere in the image.";
 
+/**
+ * 2026-07-27 (CJ「鏡子裡的她，跟實際的髮型或頭的轉向不同」): mirror /
+ * reflective-surface compositions are a well-known failure mode for every
+ * text-to-image model — the reflection never stays physically consistent
+ * with the subject's actual pose/hair/head angle. Same philosophy as
+ * NO_TEXT_PROMPT_BLOCK: route around what models structurally can't do
+ * right rather than trying to prompt our way to a correct reflection.
+ */
+export const NO_MIRROR_PROMPT_BLOCK =
+  "Do NOT include a mirror, reflective surface, reflection, or any shot " +
+  "composed as \"person looking at their own reflection\" — reflections " +
+  "never stay physically consistent with the subject's actual pose/hair/" +
+  "head angle. Show the subject directly instead.";
+
 export const NO_TEXT_NEGATIVE_PROMPT =
   "text, letters, words, numbers, chinese characters, japanese characters, " +
   "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
   "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
-  "fake characters, writing, packaging text, product label text";
+  "fake characters, writing, packaging text, product label text, mirror, " +
+  "reflection, reflective surface";
+
+/**
+ * Mirror-only negative prompt for product-subject mode, where the blanket
+ * NO_TEXT_NEGATIVE_PROMPT can't be used (it would fight the real product
+ * label's text). See NO_MIRROR_PROMPT_BLOCK.
+ */
+export const NO_MIRROR_NEGATIVE_PROMPT = "mirror, reflection, reflective surface";
 
 // 2026-05-12 (CJ「改圖要給用戶選 model」): user-facing model IDs.
 // "auto" = use IMAGE_GEN_PROVIDER_PRIMARY env (currently openai).
@@ -174,11 +196,15 @@ function buildPrompt(input: ImageGenInput): string {
   if (input.subjectImageUrl) {
     lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK);
     lines.push("");
+    lines.push(NO_MIRROR_PROMPT_BLOCK);
+    lines.push("");
     lines.push(
       "Rendering: editorial product photography, natural light, realistic contact shadows, clean composition, no watermarks."
     );
   } else {
     lines.push(NO_TEXT_PROMPT_BLOCK);
+    lines.push("");
+    lines.push(NO_MIRROR_PROMPT_BLOCK);
     lines.push("");
     lines.push(
       "Rendering: editorial photography, natural light, clean composition, no text, no watermarks."
