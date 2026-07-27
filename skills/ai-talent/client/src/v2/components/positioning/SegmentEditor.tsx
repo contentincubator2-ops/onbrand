@@ -248,5 +248,135 @@ function FieldRenderer({
       </div>
     );
   }
+  if (field.type === "needsGroups") {
+    const cols = field.columns ?? [];
+    const blankNeed = Object.fromEntries(cols.map((c) => [c.key, ""]));
+    const groups: any[] = migrateNeedsGroups(value);
+
+    const setGroups = (next: any[]) => onChange(next);
+    const setGroup = (i: number, next: any) => {
+      const nextGroups = [...groups]; nextGroups[i] = next; setGroups(nextGroups);
+    };
+
+    return (
+      <div className="flex flex-col gap-3">
+        <label className="text-tiny text-default-500">{field.label}</label>
+        {groups.map((group, gi) => {
+          const needs: any[] = Array.isArray(group.needs) ? group.needs : [];
+          return (
+            <div key={gi} className="border border-divider rounded-md p-3 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  size="sm" radius="md" variant="bordered"
+                  placeholder="族群名稱（例如：主受眾、次受眾、既有顧客…）"
+                  value={group.name ?? ""}
+                  onValueChange={(s) => setGroup(gi, { ...group, name: s })}
+                  className="flex-1"
+                />
+                <Button
+                  isIconOnly size="sm" variant="light"
+                  onPress={() => setGroups(groups.filter((_, j) => j !== gi))}
+                  aria-label="移除族群"
+                >
+                  <FontAwesomeIcon icon={faXmark} className="text-default-400" />
+                </Button>
+              </div>
+              <div className="border border-divider rounded-md overflow-x-auto">
+                <table className="w-full text-small">
+                  <thead className="bg-default-50">
+                    <tr>
+                      {cols.map((c) => (
+                        <th key={c.key} className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">
+                          {c.label}
+                        </th>
+                      ))}
+                      <th className="w-10 border-b border-divider" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {needs.map((row, ri) => (
+                      <tr key={ri} className="border-t border-divider">
+                        {cols.map((c) => (
+                          <td key={c.key} className="px-2 py-1.5 align-top">
+                            {c.type === "number" ? (
+                              <Input
+                                size="sm" type="number" variant="bordered" radius="sm"
+                                value={row[c.key] != null ? String(row[c.key]) : ""}
+                                onValueChange={(s) => {
+                                  const nextNeeds = [...needs];
+                                  nextNeeds[ri] = { ...row, [c.key]: s === "" ? null : Number(s) };
+                                  setGroup(gi, { ...group, needs: nextNeeds });
+                                }}
+                              />
+                            ) : (
+                              <Input
+                                size="sm" variant="bordered" radius="sm"
+                                value={row[c.key] ?? ""}
+                                onValueChange={(s) => {
+                                  const nextNeeds = [...needs];
+                                  nextNeeds[ri] = { ...row, [c.key]: s };
+                                  setGroup(gi, { ...group, needs: nextNeeds });
+                                }}
+                              />
+                            )}
+                          </td>
+                        ))}
+                        <td className="px-1 py-1.5">
+                          <Button
+                            isIconOnly size="sm" variant="light"
+                            onPress={() => setGroup(gi, { ...group, needs: needs.filter((_, j) => j !== ri) })}
+                            aria-label="移除需求"
+                          >
+                            <FontAwesomeIcon icon={faXmark} className="text-default-400" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Button
+                size="sm" variant="light" radius="md"
+                startContent={<FontAwesomeIcon icon={faPlus} className="text-tiny" />}
+                onPress={() => setGroup(gi, { ...group, needs: [...needs, blankNeed] })}
+                className="self-start"
+              >
+                新增一項需求
+              </Button>
+            </div>
+          );
+        })}
+        <Button
+          size="sm" variant="bordered" radius="md"
+          startContent={<FontAwesomeIcon icon={faPlus} className="text-tiny" />}
+          onPress={() => setGroups([...groups, { name: "", needs: [] }])}
+          className="self-start"
+        >
+          新增族群
+        </Button>
+      </div>
+    );
+  }
   return null;
+}
+
+/**
+ * Back-compat: older brands stored `matrix` as a flat
+ * [{dim, primary, fan, weight}] comparing two hardcoded columns
+ * ("主受眾分數" vs "粉絲分數") — see project_positioning_schema_canonical
+ * memory. Up-converts that shape into two named groups so existing data
+ * keeps showing instead of going blank.
+ */
+function migrateNeedsGroups(value: any): any[] {
+  if (Array.isArray(value) && value.every((g) => g && typeof g === "object" && ("needs" in g || "name" in g))) {
+    return value;
+  }
+  const rows: any[] = Array.isArray(value) ? value : [];
+  if (rows.length === 0) return [];
+  const isOldShape = rows.some((r) => r && ("primary" in r || "fan" in r));
+  if (!isOldShape) return [];
+  return [
+    { name: "主受眾", needs: rows.map((r) => ({ dim: r.dim ?? "", score: r.primary ?? null, weight: r.weight ?? "" })) },
+    { name: "次受眾", needs: rows.map((r) => ({ dim: r.dim ?? "", score: r.fan ?? null, weight: r.weight ?? "" })) },
+  ];
 }

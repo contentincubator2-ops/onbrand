@@ -173,8 +173,8 @@ export function buildBrandPositioningSteps(opts: { lang?: string; outputLanguage
       run: async (c) => ({
         audience: await callJSON(c, "audience", sys,
           `${brandCtx(c)}\n\n定義此品牌的目標受眾。若上文提供【官方確認客群】，primary 與 secondary 都必須以該客群為錨點向下深化——展開其生活場景、心理動機、情感需求、痛點、偏好管道與購買關鍵時刻（MOT），不可發明不同輪廓的受眾。輸出 JSON，鍵名固定如下：
-{"primary":"主受眾完整敘事（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道，150-300字）","secondary":"次受眾敘事（80-150字）","matrix":[{"dim":"情感需求維度","primary":主受眾分數1-10,"fan":粉絲分數1-10,"weight":"★★★★★"}]}
-matrix 至少 5 個維度。`,
+{"primary":"主受眾完整敘事（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道，150-300字）","secondary":"次受眾敘事（80-150字）","matrix":[{"name":"族群名稱（例如 主受眾 / 次受眾，可依實際情況命名）","needs":[{"dim":"情感或功能需求維度","score":需求強度1-10,"weight":"★★★★★"}]}]}
+matrix 至少包含 primary 與 secondary 兩個族群，每個族群的 needs 至少 5 個維度（情感需求與功能需求都要涵蓋）。`,
           { primary: "", secondary: "", matrix: [] }, 1500),
       }),
     },

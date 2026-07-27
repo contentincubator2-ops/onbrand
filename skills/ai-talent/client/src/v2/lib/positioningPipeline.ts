@@ -259,15 +259,30 @@ conclusion 結構：primary 主受眾敘事 + secondary 次受眾敘事。請把
 - overallFunctionalNeed / overallEmotionalNeed = 該族群的平均
 - marketSize / purchasingPower / growthPotential 1-10
 
-用 audience.matrix 陣列結構輸出（dim, primary 主受眾分數, fan 第二族群分數, weight 重要性 ★）。請至少列出 5-8 個關鍵情緒維度。`,
+用 audience.matrix 陣列結構輸出——每個族群一個物件（name 族群名稱, needs 該族群的需求列表，每項含 dim / score 1-10 / weight 重要性 ★）。族群數量對應 Step 6/7 實際列出的 TA 數量（不限 2 個），每個族群的 needs 至少列出 5-8 個關鍵情緒與功能維度。`,
     mockThinking: "為每個 TA 對情緒元素的需求強度打分（1-10）…",
     mockConclusion: {
       matrix: [
-        { dim: "（mock）真實",     primary: 10, fan: 10, weight: "★★★★★" },
-        { dim: "（mock）歸屬感",   primary: 10, fan: 10, weight: "★★★★★" },
-        { dim: "（mock）成就感",   primary: 10, fan:  7, weight: "★★★★★" },
-        { dim: "（mock）賦能",     primary: 10, fan:  9, weight: "★★★★★" },
-        { dim: "（mock）身份認同", primary: 10, fan: 10, weight: "★★★★★" },
+        {
+          name: "（mock）主受眾",
+          needs: [
+            { dim: "（mock）真實",     score: 10, weight: "★★★★★" },
+            { dim: "（mock）歸屬感",   score: 10, weight: "★★★★★" },
+            { dim: "（mock）成就感",   score: 10, weight: "★★★★★" },
+            { dim: "（mock）賦能",     score: 10, weight: "★★★★★" },
+            { dim: "（mock）身份認同", score: 10, weight: "★★★★★" },
+          ],
+        },
+        {
+          name: "（mock）次受眾",
+          needs: [
+            { dim: "（mock）真實",     score: 10, weight: "★★★★★" },
+            { dim: "（mock）歸屬感",   score: 10, weight: "★★★★★" },
+            { dim: "（mock）成就感",   score:  7, weight: "★★★★★" },
+            { dim: "（mock）賦能",     score:  9, weight: "★★★★★" },
+            { dim: "（mock）身份認同", score: 10, weight: "★★★★★" },
+          ],
+        },
       ],
     },
   },

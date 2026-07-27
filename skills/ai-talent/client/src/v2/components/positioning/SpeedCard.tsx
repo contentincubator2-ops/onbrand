@@ -26,6 +26,25 @@ interface SpeedCardProps {
 
 const dash = <span className="text-default-400">—</span>;
 
+/**
+ * `audience.matrix` is either the current shape (named groups, each with an
+ * addable needs list) or the legacy flat [{dim, primary, fan, weight}] shape
+ * from before the 族群可新增 redesign — see SegmentEditor.tsx's
+ * migrateNeedsGroups for the editable-side counterpart of this migration.
+ */
+function migrateNeedsGroupsForDisplay(value: any): any[] {
+  if (!Array.isArray(value) || value.length === 0) return [];
+  if (value.every((g) => g && typeof g === "object" && ("needs" in g || "name" in g))) {
+    return value;
+  }
+  const isOldShape = value.some((r) => r && ("primary" in r || "fan" in r));
+  if (!isOldShape) return [];
+  return [
+    { name: "主受眾", needs: value.map((r: any) => ({ dim: r.dim ?? "", score: r.primary ?? null, weight: r.weight ?? "" })) },
+    { name: "次受眾", needs: value.map((r: any) => ({ dim: r.dim ?? "", score: r.fan ?? null, weight: r.weight ?? "" })) },
+  ];
+}
+
 export default function SpeedCard({ scopeMode, scopeName, data }: SpeedCardProps) {
   const { lang } = useLang();
   if (scopeMode === "brand")   return <BrandSpeedCard   scopeName={scopeName} data={data} en={lang === "en"} />;
@@ -42,7 +61,7 @@ function BrandSpeedCard({ scopeName, data, en }: { scopeName: string; data: any;
   const layers: any[] = Array.isArray(origin?.belief5Layers) ? origin.belief5Layers : [];
   const direct: any[] = Array.isArray(competition?.direct) ? competition.direct : [];
   const indirect: any[] = Array.isArray(competition?.indirect) ? competition.indirect : [];
-  const audienceMatrix: any[] = Array.isArray(audience?.matrix) ? audience.matrix : [];
+  const needsGroups: any[] = migrateNeedsGroupsForDisplay(audience?.matrix);
 
   return (
     <div className="flex flex-col gap-4">
@@ -132,32 +151,39 @@ function BrandSpeedCard({ scopeName, data, en }: { scopeName: string; data: any;
                   <p className="text-small text-default-700 leading-relaxed whitespace-pre-wrap">{audience.secondary}</p>
                 </div>
               )}
-              {audienceMatrix.length > 0 && (
+              {needsGroups.length > 0 && (
                 <>
                   <Divider />
-                  <p className="text-small font-medium">{en ? "Emotional need scoring matrix" : "情感需求評分矩陣"}</p>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-small">
-                      <thead className="bg-default-50">
-                        <tr>
-                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Need dimension" : "需求維度"}</th>
-                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Primary" : "主受眾"}</th>
-                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Fans" : "粉絲"}</th>
-                          <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Weight" : "重要性"}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {audienceMatrix.map((row: any, i: number) => (
-                          <tr key={i} className="border-t border-divider">
-                            <td className="px-3 py-2">{row.dim ?? "—"}</td>
-                            <td className="px-3 py-2">{row.primary ?? "—"}</td>
-                            <td className="px-3 py-2">{row.fan ?? "—"}</td>
-                            <td className="px-3 py-2 text-warning">{row.weight ?? "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <p className="text-small font-medium">{en ? "Needs by segment" : "各族群情感 / 功能需求"}</p>
+                  {needsGroups.map((group: any, gi: number) => {
+                    const needs: any[] = Array.isArray(group?.needs) ? group.needs : [];
+                    if (needs.length === 0) return null;
+                    return (
+                      <div key={gi} className="flex flex-col gap-2">
+                        <Chip size="sm" variant="flat" className="self-start">{group?.name || (en ? "Segment" : "族群")}</Chip>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-small">
+                            <thead className="bg-default-50">
+                              <tr>
+                                <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Need dimension" : "需求維度"}</th>
+                                <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Score" : "強度"}</th>
+                                <th className="text-left px-3 py-2 text-tiny font-medium text-default-600 border-b border-divider">{en ? "Weight" : "重要性"}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {needs.map((row: any, i: number) => (
+                                <tr key={i} className="border-t border-divider">
+                                  <td className="px-3 py-2">{row.dim ?? "—"}</td>
+                                  <td className="px-3 py-2">{row.score ?? "—"}</td>
+                                  <td className="px-3 py-2 text-warning">{row.weight ?? "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </>
               )}
             </>

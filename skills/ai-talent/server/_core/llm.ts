@@ -271,7 +271,7 @@ const PROVIDER_CONFIG: Record<
   },
   // Google Vertex AI — OpenAI-compatible endpoint (uses service account)
   "google-vertex": {
-    baseUrl:      "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/ecommerce-483415/locations/us-central1/endpoints/openapi",
+    baseUrl:      "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/onbrand-498107/locations/us-central1/endpoints/openapi",
     defaultModel: "google/gemini-2.5-flash",
     getKey:       () => "service-account", // sentinel: token fetched dynamically
   },
@@ -465,9 +465,9 @@ async function getGoogleServiceAccountToken(scope = "https://www.googleapis.com/
 //   GOOGLE_VERTEX_TOKEN             — pre-issued Bearer token (CI / manual)
 //
 // Project defaults to GOOGLE_VERTEX_PROJECT_ID env var, then the built-in
-// project (ecommerce-483415).  Region defaults to us-central1.
+// project (onbrand-498107).  Region defaults to us-central1.
 
-const VERTEX_PROJECT = process.env.GOOGLE_VERTEX_PROJECT_ID ?? "ecommerce-483415";
+const VERTEX_PROJECT = process.env.GOOGLE_VERTEX_PROJECT_ID ?? "onbrand-498107";
 const VERTEX_REGION  = process.env.GOOGLE_VERTEX_REGION    ?? "us-central1";
 
 export async function invokeVertexGrounding(opts: {
@@ -483,7 +483,7 @@ export async function invokeVertexGrounding(opts: {
   }
   if (!token) throw new Error("Vertex AI: no credentials (set GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_VERTEX_TOKEN)");
 
-  const model = opts.model ?? "gemini-2.0-flash";
+  const model = opts.model ?? "gemini-2.5-flash";
   const url = `https://${VERTEX_REGION}-aiplatform.googleapis.com/v1beta1/projects/${VERTEX_PROJECT}/locations/${VERTEX_REGION}/publishers/google/models/${model}:generateContent`;
 
   const body: any = {

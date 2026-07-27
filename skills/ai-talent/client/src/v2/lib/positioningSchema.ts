@@ -8,15 +8,19 @@
  * Field types supported:
  *   text       — single-line input
  *   textarea   — multi-line textarea
- *   array      — string[] (each item rendered as removable chip-input row)
- *   tableRows  — array of objects with named columns
- *   number     — numeric input (used for scores)
+ *   array       — string[] (each item rendered as removable chip-input row)
+ *   tableRows   — array of objects with named columns
+ *   number      — numeric input (used for scores)
+ *   needsGroups — array of named groups (e.g. audience segments), each with
+ *                 its own addable tableRows-style needs list. `columns`
+ *                 describes the inner needs table; the number of groups AND
+ *                 the number of needs per group are both open-ended.
  *
  * Stored in DB as JSON keyed by segment.id under
  *   brands.positioning / products.positioning / events.positioning.
  */
 
-export type FieldType = "text" | "textarea" | "array" | "tableRows" | "number";
+export type FieldType = "text" | "textarea" | "array" | "tableRows" | "number" | "needsGroups";
 
 export interface FieldSpec {
   key: string;
@@ -142,11 +146,10 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
     fields: [
       { key: "primary",   label: "主受眾（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道）", type: "textarea" },
       { key: "secondary", label: "次受眾",                                                  type: "textarea" },
-      { key: "matrix",    label: "情感需求評分矩陣", type: "tableRows", columns: [
-        { key: "dim",     label: "需求維度",      type: "text" },
-        { key: "primary", label: "主受眾分數",    type: "number" },
-        { key: "fan",     label: "粉絲分數",      type: "number" },
-        { key: "weight",  label: "重要性 (★)",    type: "text" },
+      { key: "matrix",    label: "各族群情感 / 功能需求", type: "needsGroups", columns: [
+        { key: "dim",     label: "需求維度（情感或功能）", type: "text" },
+        { key: "score",   label: "需求強度 (1-10)",        type: "number" },
+        { key: "weight",  label: "重要性 (★)",             type: "text" },
       ]},
     ],
   },

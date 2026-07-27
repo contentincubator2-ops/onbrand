@@ -1,0 +1,37 @@
+name: "Op — Probe llmRouter.callLLM full cascade"
+
+# 2026-07-26 (CJ「現顯示 all llm model failed」): callLLM (llmRouter.ts) is
+# a SEPARATE implementation from invokeLLM (llm.ts) — op-probe-anthropic.yml
+# only exercises invokeLLM. This probe calls callLLM directly and dumps
+# every provider's attempt (ok/error) so we see exactly which providers are
+# actually failing right now, not just Anthropic.
+
+on: { workflow_dispatch: {} }
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 2
+    steps:
+      - run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          node --import tsx -e "
+            import('./server/_core/llmRouter.ts').then(async ({ callLLM }) => {
+              const t0 = Date.now();
+              try {
+                const r = await callLLM({
+                  system: '你是測試助理。',
+                  user: '用繁體中文回一句「測試成功」四個字，不要其他內容。',
+                  maxTokens: 50,
+                });
+                console.log('CALLLLM OK in', Date.now()-t0, 'ms');
+                console.log('text:', JSON.stringify(String(r.text).slice(0,80)));
+                console.log('attempts:', JSON.stringify(r.attempts, null, 2));
+                process.exit(0);
+              } catch (e) {
+                console.error('CALLLLM FAILED:', String(e?.message ?? e).slice(0, 2000));
+                process.exit(1);
+              }
+            }).catch(e => { console.error('IMPORT FAILED:', e); process.exit(1); });
+          "
