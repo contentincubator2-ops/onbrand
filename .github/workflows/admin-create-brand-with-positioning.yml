@@ -74,10 +74,12 @@ jobs:
                 const [ins] = await conn.execute(
                   \`INSERT INTO brands
                     (userId, createdBy, slug, name, website, industry, targetAudience,
-                     soworkAnalysis, targetCountry, outputLanguage, dataSource, isDefault, createdAt, updatedAt)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', 0, NOW(3), NOW(3))\`,
+                     soworkAnalysis, targetCountry, outputLanguage, dataSource, isDefault,
+                     positioningStatus, createdAt, updatedAt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', 0, ?, NOW(3), NOW(3))\`,
                   [userId, userId, slug, b.name, b.website ?? null, b.industry ?? null, b.targetAudience ?? null,
-                   soworkAnalysis, b.targetCountry ?? null, b.outputLanguage ?? null],
+                   soworkAnalysis, b.targetCountry ?? null, b.outputLanguage ?? null,
+                   payload.positioningStatus || 'in_progress'],
                 );
                 const brandId = ins.insertId;
 
