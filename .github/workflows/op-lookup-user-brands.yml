@@ -30,9 +30,15 @@ jobs:
             Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
             E=$(printf "%s" "$LOOKUP_EMAIL" | sed "s/'/''/g")
 
-            echo "===== user ====="
+            echo "===== user (exact match) ====="
             Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive, createdAt
                  FROM users WHERE email='$E';"
+
+            echo "===== user (fuzzy match, domain/local part) ====="
+            Q "SELECT id, email, planCode, planStatus, isActive, createdAt
+                 FROM users WHERE email LIKE CONCAT('%', SUBSTRING_INDEX('$E','@',1), '%')
+                    OR email LIKE CONCAT('%', SUBSTRING_INDEX('$E','@',-1), '%')
+                 LIMIT 20;"
 
             echo "===== brands owned ====="
             Q "SELECT id, name, slug, targetCountry, outputLanguage, createdAt
