@@ -23,6 +23,7 @@ import { taskCatalogRouter } from "./taskCatalogRouter";
 import { platformConnectRouter } from "./platformConnectRouter";
 import { theaterRouter } from "./theaterRouter";
 import { positioningJobsRouter } from "./positioningJobsRouter";
+import { workbenchRouter } from "./workbenchRouter";
 import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
 import { publishRouter } from "./publishRouter";
 import { billingRouter } from "./billingRouter";
@@ -83,6 +84,7 @@ export const appRouter = router({
   platformConnect: platformConnectRouter,
   theater:         theaterRouter,
   positioningJobs: positioningJobsRouter,
+  workbench: workbenchRouter,
   brandKnowledge:  brandKnowledgeRouter,
   publish:         publishRouter,
   billing:         billingRouter,

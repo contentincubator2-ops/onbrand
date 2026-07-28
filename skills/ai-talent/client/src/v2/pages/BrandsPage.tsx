@@ -38,6 +38,7 @@ import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
+import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
@@ -1918,12 +1919,23 @@ export default function BrandsPage() {
                   {/* 品牌工具 grid — hidden while running/paused; shown when idle
                       (user hasn't started yet) or done (results ready). */}
                   {(pipeline.status === "idle" || pipeline.status === "done") && (
-                    <PositioningGrid
-                      scopeMode={scopeMode}
-                      segments={segments}
-                      onSelect={setSection}
-                      segmentData={positioningSegmentData}
-                    />
+                    <>
+                      {/* 2026-07-28 (CJ「開工」策略工作台 P1): 受眾×競爭組×優勢
+                          三錨點 → 四區看板＋標語推導鏈；brand scope only. */}
+                      {scopeMode === "brand" && activeBrandIdForLocks ? (
+                        <StrategyWorkbench
+                          brandId={activeBrandIdForLocks}
+                          positioning={positioningSegmentData}
+                          lang={lang}
+                        />
+                      ) : null}
+                      <PositioningGrid
+                        scopeMode={scopeMode}
+                        segments={segments}
+                        onSelect={setSection}
+                        segmentData={positioningSegmentData}
+                      />
+                    </>
                   )}
                 </div>
               ) : (
