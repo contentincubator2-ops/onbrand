@@ -625,10 +625,21 @@ export default function BrandsPage() {
     : urlCat === "events" ? "events"
     : urlCat === "tools" ? "tools"
     : "positioning";
+  // 2026-07-28 (CJ「選活動定位卡片，跑回品牌定位頁面」): this built its
+  // next params from the `searchParams` closure instead of the functional
+  // updater form. Callers like BrandEntityGrid's onOpen fire
+  // goToEntity("event", id) immediately followed by setCategory("positioning")
+  // in the same handler — goToEntity uses the safe functional form so its
+  // `e=<id>` write always lands on the latest state, but this stale-closure
+  // version clobbered it with a snapshot from BEFORE that write, dropping
+  // `e` and silently falling back to brand-level positioning. Functional
+  // form fixes it for every caller, not just this one site.
   const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools") => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("cat", next);
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams((prev) => {
+      const nextParams = new URLSearchParams(prev);
+      nextParams.set("cat", next);
+      return nextParams;
+    }, { replace: true });
   };
 
   // Products + events for brand tabs — must be after `category` is declared (TDZ guard)
