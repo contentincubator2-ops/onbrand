@@ -18,7 +18,11 @@ jobs:
           echo ""
           echo "── what nginx is actually serving ──"
           curl -sk -o /tmp/served.html http://localhost/ 2>&1
-          grep -oE 'index-[A-Za-z0-9_-]+\.(js|css)' /tmp/served.html
+          # 2026-07-28: grep finding nothing must NOT fail the step — the
+          # step's exit code is the LAST command's status even under set +e,
+          # and a redirect body (no bundle ref) aborted the whole fix here.
+          grep -oE 'index-[A-Za-z0-9_-]+\.(js|css)' /tmp/served.html || echo "(no bundle ref in localhost response — likely https redirect body)"
+          exit 0
 
       - name: Rebuild client fresh
         run: |
