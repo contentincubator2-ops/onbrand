@@ -1,0 +1,39 @@
+name: "Op — Look up a user by email + their brands (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "User email to look up"
+        required: true
+        type: string
+
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query users + brands
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          LOOKUP_EMAIL: ${{ inputs.email }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: LOOKUP_EMAIL
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+            E=$(printf "%s" "$LOOKUP_EMAIL" | sed "s/'/''/g")
+
+            echo "===== user ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive, createdAt
+                 FROM users WHERE email='$E';"
+
+            echo "===== brands owned ====="
+            Q "SELECT id, name, slug, targetCountry, outputLanguage, createdAt
+                 FROM brands WHERE userId=(SELECT id FROM users WHERE email='$E');"
