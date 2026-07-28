@@ -1,0 +1,81 @@
+name: "Admin — Create an event with a supplied positioning book"
+
+# 2026-07-28 (CJ「幫忙新增到他的活動定位當中」): mirrors event.upsert's
+# INSERT shape, writes the full EVENT_SEGMENTS positioning JSON in one
+# shot, and links the event to its related product via both the legacy
+# events.productId column and the event_products join table.
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_email:
+        description: "Owner's email"
+        required: true
+        type: string
+      payload_b64:
+        description: "Base64 JSON: { event: {name,slug,startAt,endAt,productId}, positioning: {...} }"
+        required: true
+        type: string
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create event + write positioning
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          USER_EMAIL: ${{ inputs.user_email }}
+          PAYLOAD_B64: ${{ inputs.payload_b64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: USER_EMAIL,PAYLOAD_B64
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            node --import tsx -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const raw = Buffer.from(process.env.PAYLOAD_B64, 'base64').toString('utf8');
+                const payload = JSON.parse(raw);
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+                const [uRows] = await conn.execute('SELECT id FROM users WHERE email = ? LIMIT 1', [process.env.USER_EMAIL]);
+                const userId = uRows[0]?.id;
+                if (!userId) { console.error('NO SUCH USER:', process.env.USER_EMAIL); process.exit(1); }
+
+                const e = payload.event;
+                let brandId = null;
+                if (e.productId) {
+                  const [pRows] = await conn.execute('SELECT brandId FROM products WHERE id = ? LIMIT 1', [e.productId]);
+                  brandId = pRows[0]?.brandId ?? null;
+                }
+
+                const [ins] = await conn.execute(
+                  \`INSERT INTO events (userId, brandId, productId, slug, name, startAt, endAt, positioning, createdAt, updatedAt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))\`,
+                  [userId, brandId, e.productId ?? null, e.slug, e.name, e.startAt ?? null, e.endAt ?? null, JSON.stringify(payload.positioning)],
+                );
+                const eventId = ins.insertId;
+
+                if (e.productId) {
+                  await conn.execute(
+                    'INSERT IGNORE INTO event_products (eventId, productId) VALUES (?, ?)',
+                    [eventId, e.productId],
+                  );
+                }
+
+                console.log('EVENT_CREATED id=' + eventId + ' brandId=' + brandId + ' userId=' + userId);
+                const [check] = await conn.execute('SELECT id, name, brandId, productId, startAt, endAt, JSON_LENGTH(positioning) as segCount FROM events WHERE id = ?', [eventId]);
+                console.log(JSON.stringify(check[0]));
+                await conn.end();
+              })().catch(e => { console.error('FAILED:', e); process.exit(1); });
+            "
