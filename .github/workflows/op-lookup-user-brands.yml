@@ -43,3 +43,6 @@ jobs:
             echo "===== brands owned ====="
             Q "SELECT id, name, slug, targetCountry, outputLanguage, createdAt
                  FROM brands WHERE userId=(SELECT id FROM users WHERE email='$E');"
+
+            echo "===== brands table columns ====="
+            Q "SHOW COLUMNS FROM brands;"
