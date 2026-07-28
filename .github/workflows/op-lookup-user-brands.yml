@@ -46,3 +46,9 @@ jobs:
 
             echo "===== brands table columns ====="
             Q "SHOW COLUMNS FROM brands;"
+
+            echo "===== events table columns ====="
+            Q "SHOW COLUMNS FROM events;"
+
+            echo "===== event_products table columns ====="
+            Q "SHOW COLUMNS FROM event_products;"
