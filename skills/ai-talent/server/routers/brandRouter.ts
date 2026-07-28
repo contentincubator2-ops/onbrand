@@ -374,6 +374,114 @@ export const brandRouter = router({
     }),
 
   /**
+   * 2026-07-28 (CJ「視覺頁沒有全自動填寫按鈕」): the 視覺 tab's asset
+   * cards (BrandAssetEditor) were manual-only by design — no LLM auto-fill
+   * existed at all, unlike 定位's per-segment pipeline. This adds AI-
+   * suggested drafts for the fields that are genuinely text/style
+   * guidance (not real assets the AI can't originate — logo/photos/
+   * templates stay manual). Only fills keys that are currently EMPTY —
+   * never overwrites a real value the user (or a prior run) already put
+   * in. Every generated value is tagged `aiSuggested: true` so the UI can
+   * flag it as a draft pending confirmation, not a finalized asset.
+   */
+  autoFillVisualAssets: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT positioning FROM brands WHERE id = ? LIMIT 1`,
+        [input.brandId],
+      );
+      let positioning: any = rows[0]?.positioning ?? {};
+      if (typeof positioning === "string") {
+        try { positioning = JSON.parse(positioning || "{}"); } catch { positioning = {}; }
+      }
+      const assets: Record<string, any> = positioning._assets ?? {};
+
+      const FILLABLE = ["guidelines", "imagery_style", "icon_style", "chart_style", "layout_rules", "fonts", "colors"] as const;
+      const isEmpty = (v: any) => {
+        if (!v || typeof v !== "object") return true;
+        if (typeof v.text === "string" && v.text.trim()) return false;
+        if (Array.isArray(v.list) && v.list.length > 0) return false;
+        if (typeof v.zhPrimary === "string" && v.zhPrimary.trim()) return false;
+        return true;
+      };
+      const toFill = FILLABLE.filter((k) => isEmpty(assets[k]));
+      if (toFill.length === 0) {
+        return { ok: true as const, filled: [] as string[], skipped: FILLABLE as unknown as string[] };
+      }
+
+      const voice = positioning.voice ?? {};
+      const values = positioning.values ?? {};
+      const goldenCircle = positioning.goldenCircle ?? {};
+      const briefCtx = [
+        goldenCircle.why ? `WHY: ${goldenCircle.why}` : "",
+        Array.isArray(values.items) ? `核心價值觀: ${values.items.map((v: any) => v?.label).filter(Boolean).join("、")}` : "",
+        Array.isArray(voice.archetypes) ? `人格原型: ${voice.archetypes.join("、")}` : "",
+        Array.isArray(voice.tone) ? `語調關鍵詞: ${voice.tone.join("、")}` : "",
+      ].filter(Boolean).join("\n");
+
+      const FIELD_SHAPES: Record<string, string> = {
+        guidelines:    `"guidelines":{"text":"視覺使用規範建議（100-200字）"}`,
+        imagery_style: `"imagery_style":{"text":"攝影調性/構圖/色溫建議（80-150字）"}`,
+        icon_style:    `"icon_style":{"text":"圖示風格建議（Line/Solid/Duotone，50-100字）"}`,
+        chart_style:   `"chart_style":{"text":"資料視覺化配色與樣式建議（50-100字）"}`,
+        layout_rules:  `"layout_rules":{"text":"留白/對齊/標題層級建議（80-150字）"}`,
+        fonts:         `"fonts":{"zhPrimary":"中文字型建議","enPrimary":"英文字型建議","serifDisplay":"標題襯線字建議（可選，無則空字串）","mono":"","guidelines":"字型使用建議（50-100字）"}`,
+        colors:        `"colors":{"list":[{"name":"色票名稱","hex":"#XXXXXX","role":"primary/secondary/accent 等"}]}（至少 3 筆）`,
+      };
+      const shapeLines = toFill.map((k) => FIELD_SHAPES[k]).join(",\n");
+
+      const r = await invokeLLM({
+        provider: "anthropic",
+        messages: [
+          {
+            role: "system",
+            content: "你是品牌視覺顧問，根據品牌定位提出視覺風格建議草案，作為給品牌方參考的「AI 建議起點」，不是正式定案。只輸出純 JSON，不要其他文字或 markdown 圍欄。",
+          },
+          {
+            role: "user",
+            content: `品牌定位摘要：\n${briefCtx || "（尚無足夠定位資料，請依一般兒童/消費品牌慣例給合理建議）"}\n\n` +
+              `請只針對以下欄位提出建議，鍵名與格式固定如下（只回傳這幾個鍵，不要多也不要少）：\n{\n${shapeLines}\n}`,
+          },
+        ],
+        maxTokens: 1200,
+      });
+      const content = r.choices?.[0]?.message?.content;
+      const text = typeof content === "string" ? content : "";
+      let generated: any = {};
+      try {
+        const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+        generated = JSON.parse((m ? m[1]! : text).trim());
+      } catch {
+        const start = text.indexOf("{");
+        const end = text.lastIndexOf("}");
+        if (start >= 0 && end > start) {
+          try { generated = JSON.parse(text.slice(start, end + 1)); } catch { generated = {}; }
+        }
+      }
+
+      const nextAssets = { ...assets };
+      const filled: string[] = [];
+      for (const key of toFill) {
+        if (generated[key]) {
+          nextAssets[key] = { ...generated[key], aiSuggested: true };
+          filled.push(key);
+        }
+      }
+      if (filled.length > 0) {
+        const nextPositioning = { ...positioning, _assets: nextAssets };
+        await localPool.execute(
+          `UPDATE brands SET positioning = ? WHERE id = ?`,
+          [JSON.stringify(nextPositioning), input.brandId],
+        );
+      }
+      const skipped = FILLABLE.filter((k) => !filled.includes(k));
+      return { ok: true as const, filled, skipped };
+    }),
+
+  /**
    * Update brand's external connections — website + per-platform URLs.
    * Called from the 連結 tile on Brand workspace.
    *

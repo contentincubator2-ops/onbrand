@@ -1182,6 +1182,42 @@ export default function BrandsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode, targetId, hasAnyPositioningContent, pipeline.status]);
 
+  // 2026-07-28 (CJ「視覺頁沒有全自動填寫按鈕」): one-shot LLM draft for the
+  // visual tab's text/style asset cards (視覺規範/圖像風格/圖示風格/圖表
+  // 風格/排版規範/字型/色票建議). Server only fills genuinely-empty keys
+  // and tags results `aiSuggested: true` — safe to press again later
+  // (no-ops on anything already filled).
+  const autoFillVisualMut = (trpc as any).brand?.autoFillVisualAssets?.useMutation?.();
+  const [visualAutoFillBusy, setVisualAutoFillBusy] = useState(false);
+  const [visualAutoFillNote, setVisualAutoFillNote] = useState<string | null>(null);
+  const ASSET_LABEL_ZH: Record<string, string> = {
+    guidelines: "視覺規範", imagery_style: "圖像風格", icon_style: "圖示風格",
+    chart_style: "圖表風格", layout_rules: "排版規範", fonts: "字型建議", colors: "色票建議",
+  };
+  const ASSET_LABEL_EN: Record<string, string> = {
+    guidelines: "Guidelines", imagery_style: "Imagery style", icon_style: "Icon style",
+    chart_style: "Chart style", layout_rules: "Layout rules", fonts: "Fonts", colors: "Colors",
+  };
+  const runVisualAutoFill = async () => {
+    if (!activeBrandIdForLocks || !autoFillVisualMut) return;
+    setVisualAutoFillBusy(true);
+    setVisualAutoFillNote(null);
+    try {
+      const res = await autoFillVisualMut.mutateAsync({ brandId: activeBrandIdForLocks });
+      const labels = (res?.filled ?? []).map((k: string) => (lang === "en" ? ASSET_LABEL_EN[k] : ASSET_LABEL_ZH[k]) ?? k);
+      setVisualAutoFillNote(
+        labels.length > 0
+          ? (lang === "en" ? `AI drafted: ${labels.join(", ")} — review and edit each card.` : `已為你草擬：${labels.join("、")} — 請逐一確認並調整。`)
+          : (lang === "en" ? "Everything fillable already has content — nothing to draft." : "可自動填寫的欄位都已經有內容了，沒有需要草擬的項目。")
+      );
+      utils?.scope?.active?.invalidate?.();
+    } catch (e: any) {
+      setVisualAutoFillNote(lang === "en" ? `Failed: ${e?.message ?? e}` : `失敗：${e?.message ?? e}`);
+    } finally {
+      setVisualAutoFillBusy(false);
+    }
+  };
+
   const runSegmentAutoFill = (segmentId: string) => {
     if (scopeMode === "none" || pipelineSteps.length === 0) return;
     const targetIdx = pipelineSteps.findIndex((s) => s.segmentId === segmentId);
@@ -1238,13 +1274,15 @@ export default function BrandsPage() {
     copy:   hasAnyAsset(COPY_KEYS_FOR_COMPLETION),
     visual: hasAnyAsset(VISUAL_KEYS_FOR_COMPLETION),
   };
-  // Action handler for the primary button — 文字/視覺 just navigate to
-  // the first asset card; 定位 fires the real pipeline.
+  // Action handler for the primary button — 文字 just navigates to the
+  // first asset card (still fully manual); 定位 fires the real pipeline;
+  // 視覺 now fires the AI draft pass (2026-07-28) and stays on the grid so
+  // the result note + freshly-filled cards are visible immediately.
   const handleTabAction = (tab: "positioning" | "copy" | "visual") => {
     if (tabLocks[tab]) return; // locked guard (safety; button also disabled)
     if (tab === "positioning") { startPipeline(); return; }
     if (tab === "copy")        { setSection("asset:voice"); return; }
-    if (tab === "visual")      { setSection("asset:logo");  return; }
+    if (tab === "visual")      { void runVisualAutoFill(); return; }
   };
 
   return (
@@ -1970,10 +2008,12 @@ export default function BrandsPage() {
                   label={lang === "en" ? "Visual" : "視覺"}
                   locked={!!tabLocks.visual}
                   hasContent={tabHasContent.visual}
+                  busy={visualAutoFillBusy}
                   statusText={
-                    tabHasContent.visual
-                      ? (lang === "en" ? "Some visual assets ready — keep filling or start over from the first one" : "已有部分視覺資產 — 可繼續補完，或重新從第一張開始")
-                      : (lang === "en" ? "Empty — hit start to walk through from logo on" : "尚未填寫 — 按下開始，從標誌設定起逐步完成")
+                    visualAutoFillNote
+                      ?? (tabHasContent.visual
+                        ? (lang === "en" ? "Some visual assets ready — hit redo to AI-draft anything still empty" : "已有部分視覺資產 — 按下重新，AI 會幫還沒填的欄位草擬建議")
+                        : (lang === "en" ? "Empty — hit start for an AI-drafted starting point (logo/photos still need your real assets)" : "尚未填寫 — 按下開始，AI 會草擬視覺規範/風格/字型/色票建議（Logo、照片仍需你提供真實素材）"))
                   }
                   subText={lang === "en" ? "Logo / colors / fonts / imagery / guidelines / library" : "標誌 / 顏色 / 字型 / 圖像風格 / 視覺規範 / 素材庫"}
                   onAction={() => handleTabAction("visual")}
@@ -2447,7 +2487,7 @@ export default function BrandsPage() {
  */
 function TabActionBar({
   tab, label, locked, hasContent, statusText, subText,
-  pipelineStatus, onPause, onResume, onSkip, onStop, onAction,
+  pipelineStatus, onPause, onResume, onSkip, onStop, onAction, busy,
 }: {
   tab: "positioning" | "copy" | "visual";
   label: string;
@@ -2461,6 +2501,10 @@ function TabActionBar({
   onSkip?: () => void;
   onStop?: () => void;
   onAction: () => void;
+  /** Non-pipeline tabs (visual/copy) don't have a running/paused pipeline
+   *  state — `busy` covers a one-shot mutation in flight (e.g. visual
+   *  auto-fill) so the button still shows a loading state. */
+  busy?: boolean;
 }) {
   const { lang } = useLang();
   const isRunning = pipelineStatus === "running";
@@ -2476,7 +2520,7 @@ function TabActionBar({
           <p style={{ fontSize: 14, fontWeight: 600, color: "#18181B", margin: 0 }}>
             {locked
               ? (lang === "en" ? `${label} is locked — unlock to edit` : `${label}已鎖定 — 解鎖才能編輯`)
-              : isRunning
+              : isRunning || busy
                 ? (lang === "en" ? "Analyzing…" : "正在分析中…")
                 : statusText}
           </p>
@@ -2507,9 +2551,11 @@ function TabActionBar({
           {(!isRunning && !isPaused) && (
             <Button
               size="lg"
-              isDisabled={locked}
+              isDisabled={locked || busy}
+              isLoading={busy}
               onPress={onAction}
               startContent={
+                busy ? undefined :
                 locked ? <LucideLock size={15} strokeWidth={2} /> :
                 hasContent ? <LucideRotate size={15} strokeWidth={2} /> :
                 <LucidePlay size={15} strokeWidth={2} />
@@ -2523,9 +2569,11 @@ function TabActionBar({
             >
               {locked
                 ? (lang === "en" ? "Locked" : "已鎖定")
-                : hasContent
-                  ? (lang === "en" ? `Redo ${label.toLowerCase()}` : `重新${label}`)
-                  : (lang === "en" ? `Start ${label.toLowerCase()}` : `開始${label}`)}
+                : busy
+                  ? (lang === "en" ? "Generating…" : "生成中…")
+                  : hasContent
+                    ? (lang === "en" ? `Redo ${label.toLowerCase()}` : `重新${label}`)
+                    : (lang === "en" ? `Start ${label.toLowerCase()}` : `開始${label}`)}
             </Button>
           )}
         </div>
@@ -3769,12 +3817,16 @@ function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; br
 
   const timerRef = React.useRef<any>(null);
   const onChange = (next: any) => {
-    setDraft(next);
+    // Once the user touches an AI-drafted field, it's no longer a pending
+    // suggestion — drop the badge flag so it reads as confirmed content.
+    const { aiSuggested: _drop, ...cleaned } = next ?? {};
+    void _drop;
+    setDraft(cleaned);
     if (!saveMutation) return;
     setSaveState("saving");
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      const nextAssets = { ...(positioning._assets ?? {}), [assetKey]: next };
+      const nextAssets = { ...(positioning._assets ?? {}), [assetKey]: cleaned };
       const nextPositioning = { ...positioning, _assets: nextAssets };
       saveMutation.mutate({ kind: "brand", id: brandId, positioning: nextPositioning });
     }, 800);

@@ -85,6 +85,13 @@ export default function BrandAssetEditor({ assetKey, value, onChange, readOnly =
             <FontAwesomeIcon icon={meta.icon} className="text-tiny mr-1" />
             {readOnly ? (en ? "Locked · read-only" : "已鎖定 · 唯讀") : "ASSET"}
           </Chip>
+          {!!v?.aiSuggested && !readOnly && (
+            <Tooltip content={en ? "AI-drafted starting point — review and edit, not a final decision" : "AI 草擬的起點建議 — 請確認並調整，不是最終定案"}>
+              <Chip size="sm" variant="flat" color="secondary" className="shrink-0">
+                {en ? "AI draft" : "AI 建議"}
+              </Chip>
+            </Tooltip>
+          )}
           <div className="min-w-0">
             <h3 className="text-medium font-semibold truncate">{meta.title}</h3>
             <p className="text-tiny text-default-500 truncate">
