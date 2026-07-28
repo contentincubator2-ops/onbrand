@@ -59,3 +59,6 @@ jobs:
             echo "===== product 178 positioning.core + positioning.value (sanity check) ====="
             Q "SELECT JSON_EXTRACT(positioning,'\$.core') AS core FROM products WHERE id=178\G"
             Q "SELECT JSON_EXTRACT(positioning,'\$.value') AS val FROM products WHERE id=178\G"
+
+            echo "===== product 176 full row (auto-discovered — investigate) ====="
+            Q "SELECT id, brandId, name, slug, positioning, createdAt FROM products WHERE id=176\G"
