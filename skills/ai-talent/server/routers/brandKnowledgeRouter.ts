@@ -318,6 +318,11 @@ export const brandKnowledgeRouter = router({
       const langLine = mkt.isZhTW
         ? "繁體中文"
         : `產出的指令內容必須明確要求「所有貼文 / 配圖文字一律使用 ${mkt.outputLanguage}（品牌目標市場語言）」，指令本身也用 ${mkt.outputLanguage} 撰寫`;
+      // 2026-07-28 (CJ「人設的部分不符合我們的要求，對於人設的字數要求等」，
+      // AskUserQuestion 確認規格): 文字指令改為固定兩段結構 ——
+      //   【人設】400-600 字精簡人設（獨立成段，非一句話角色定位）
+      //   【平台寫作指令】口吻 / 結構 / 長度 / 禁忌（維持精簡）
+      // 人設必須從品牌定位（黃金圈 / 語氣 / 受眾）長出來，不可與定位矛盾。
       const sys = `你是品牌文案顧問，${langLine}。
 任務：為這個品牌產出在 ${label} 平台寫貼文 / 配圖時可以直接 inject 給 LLM 的 system prompt。
 ${hasReal
@@ -325,9 +330,13 @@ ${hasReal
   : "目前沒抓到品牌的官網 / 社群實際內容，請根據品牌名 + 描述 + 產業常識合理推斷，直接寫指令草稿，不要回拒或留空。"
 }
 
+文字指令必須是以下兩段固定結構（兩段之間空一行）：
+【人設】400-600 字的完整人設，寫給要扮演這個角色的 LLM：這位 ${label} 內容操盤手是誰（姓名可虛構）、專業背景與資歷、性格與說話習慣（含口頭禪或標誌性表達 1-2 個）、對這個品牌與其受眾的理解、寫作時的價值觀與堅持。人設必須從下方品牌定位（黃金圈 / 品牌語氣 / 目標受眾）自然長出來，不可與定位矛盾；字數不足 400 字或超過 600 字都算不合格。
+【平台寫作指令】120-200 字：${label} 貼文的口吻、結構、長度、要避免的、要強調的。
+
 輸出 JSON：
 {
-  "text": "<完整可貼上的文字指令；80-200 字；說明 ${label} 該怎麼寫貼文：口吻、結構、長度、要避免的、要強調的>",
+  "text": "<上述兩段結構的完整文字指令，含【人設】與【平台寫作指令】標題>",
   "image": "<完整可貼上的圖片指令；80-200 字；說明 ${label} 配圖風格：構圖、色調、字幅、品牌元素、可用 / 不可用素材類型>"
 }
 直接輸出 JSON，第一字元就是 {。
@@ -339,9 +348,11 @@ ${brandPrefix}${real.context}${knowledgeBlock}`;
               { role: "system", content: sys },
               { role: "user", content: `平台：${label}` },
             ],
-            maxTokens: 1500,
+            // 2026-07-28: 400-600 字人設 + 平台指令 + 圖片指令 ≈ 1600-2200
+            // tokens of CJK — 1500 truncated the JSON mid-string.
+            maxTokens: 2600,
           }),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 30_000)),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 40_000)),
         ]);
         const raw = r.choices[0]?.message?.content;
         const text = typeof raw === "string" ? raw : "";
