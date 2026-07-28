@@ -1,0 +1,47 @@
+name: "Admin — Delete a product by id (destructive, use with care)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      product_id:
+        description: "Product id to delete"
+        required: true
+        type: string
+      confirm_name_contains:
+        description: "Safety check: substring that must appear in the product's name"
+        required: true
+        type: string
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete product (name-substring guarded)
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PRODUCT_ID: ${{ inputs.product_id }}
+          CONFIRM_SUBSTR: ${{ inputs.confirm_name_contains }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: PRODUCT_ID,CONFIRM_SUBSTR
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -N -e "$1"; }
+
+            NAME=$(Q "SELECT name FROM products WHERE id=${PRODUCT_ID}")
+            echo "Target product #$PRODUCT_ID name: $NAME"
+            case "$NAME" in
+              *"$CONFIRM_SUBSTR"*) echo "Name matches guard, proceeding." ;;
+              *) echo "❌ Guard mismatch — name does not contain '$CONFIRM_SUBSTR'. Aborting, nothing deleted."; exit 1 ;;
+            esac
+
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e "DELETE FROM products WHERE id=${PRODUCT_ID} LIMIT 1"
+            echo "Deleted product #$PRODUCT_ID"
+            REMAIN=$(Q "SELECT COUNT(*) FROM products WHERE id=${PRODUCT_ID}")
+            echo "Remaining rows with that id: $REMAIN"
