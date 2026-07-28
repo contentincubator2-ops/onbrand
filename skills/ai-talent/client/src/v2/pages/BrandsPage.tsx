@@ -2437,8 +2437,25 @@ export default function BrandsPage() {
                 lang={lang}
                 onAdd={() => setAddModal({ open: true, tab: "event" })}
                 onOpen={(id) => {
-                  goToEntity("event", id);
-                  setCategory("positioning");
+                  // 2026-07-28 (CJ「選活動定位卡片，跑回品牌定位頁面」follow-up):
+                  // the previous setCategory fix (functional-updater form)
+                  // still wasn't enough — react-router-dom's setSearchParams
+                  // recomputes its updater against the `searchParams` value
+                  // captured in THIS render's closure, not a truly queued
+                  // "latest" state the way React's own useState setter works.
+                  // Two separate setSearchParams calls in the same
+                  // synchronous handler (goToEntity, then setCategory) both
+                  // read that same pre-call snapshot, so the second call's
+                  // result always overwrites the first's — dropping `e`
+                  // every time. Single combined call is the only fix that
+                  // actually lands both changes atomically.
+                  setSearchParams((prev) => {
+                    const sp = new URLSearchParams(prev);
+                    sp.delete("p");
+                    sp.set("e", String(id));
+                    sp.set("cat", "positioning");
+                    return sp;
+                  }, { replace: true });
                 }}
                 onDelete={(id) => evRemoveMut?.mutate?.({ id })}
                 onPosition={(id) => kickReposition("event", id, brandEventsList?.find((p: any) => p.id === id)?.name)}
