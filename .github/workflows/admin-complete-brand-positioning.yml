@@ -1,0 +1,121 @@
+name: "Admin — Complete a brand's positioning + basic info (deep merge)"
+
+# 2026-07-28 (CJ「先填寫好品牌定位每一個欄位」): fills remaining gaps in an
+# already-created brand's positioning JSON. Deep-merges nested objects
+# (tagline, audience, voice, differentiation) so previously hand-authored
+# content survives — only genuinely empty leaves get filled. Top-level
+# empty segments (competition, trends, taglineScore) are set outright.
+# Also writes basic-info + visual columns.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand id to update"
+        required: true
+        type: string
+      payload_b64:
+        description: "Base64 JSON: { basicInfo: {...}, positioningPatch: {...} }"
+        required: true
+        type: string
+
+jobs:
+  complete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deep-merge positioning + write basic info
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+          PAYLOAD_B64: ${{ inputs.payload_b64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: BRAND_ID,PAYLOAD_B64
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            node --import tsx -e "
+              const mysql = require('mysql2/promise');
+
+              function deepMerge(base, patch) {
+                if (Array.isArray(patch)) return patch;
+                if (patch && typeof patch === 'object') {
+                  const out = (base && typeof base === 'object' && !Array.isArray(base)) ? { ...base } : {};
+                  for (const [k, v] of Object.entries(patch)) {
+                    out[k] = deepMerge(out[k], v);
+                  }
+                  return out;
+                }
+                return patch;
+              }
+
+              (async () => {
+                const brandId = Number(process.env.BRAND_ID);
+                const raw = Buffer.from(process.env.PAYLOAD_B64, 'base64').toString('utf8');
+                const payload = JSON.parse(raw);
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+
+                const [rows] = await conn.execute('SELECT positioning FROM brands WHERE id = ? LIMIT 1', [brandId]);
+                if (!rows[0]) { console.error('NO SUCH BRAND:', brandId); process.exit(1); }
+                let current = rows[0].positioning;
+                if (typeof current === 'string') current = JSON.parse(current || '{}');
+                const merged = deepMerge(current || {}, payload.positioningPatch || {});
+
+                const bi = payload.basicInfo || {};
+                await conn.execute(
+                  \`UPDATE brands SET
+                     positioning = ?,
+                     website = COALESCE(?, website),
+                     socialLinks = COALESCE(?, socialLinks),
+                     description = COALESCE(?, description),
+                     tagline = COALESCE(?, tagline),
+                     brandVoice = COALESCE(?, brandVoice),
+                     valueProposition = COALESCE(?, valueProposition),
+                     audienceA = COALESCE(?, audienceA),
+                     audienceB = COALESCE(?, audienceB),
+                     emotionalDiff = COALESCE(?, emotionalDiff),
+                     functionalDiff = COALESCE(?, functionalDiff),
+                     primaryColor = COALESCE(?, primaryColor),
+                     secondaryColor = COALESCE(?, secondaryColor),
+                     accentColor = COALESCE(?, accentColor),
+                     fontFamily = COALESCE(?, fontFamily),
+                     visualGuidelines = COALESCE(?, visualGuidelines),
+                     positioningStatus = 'completed'
+                   WHERE id = ?\`,
+                  [
+                    JSON.stringify(merged),
+                    bi.website ?? null,
+                    bi.socialLinks ? JSON.stringify(bi.socialLinks) : null,
+                    bi.description ?? null,
+                    bi.tagline ?? null,
+                    bi.brandVoice ?? null,
+                    bi.valueProposition ?? null,
+                    bi.audienceA ?? null,
+                    bi.audienceB ?? null,
+                    bi.emotionalDiff ?? null,
+                    bi.functionalDiff ?? null,
+                    bi.primaryColor ?? null,
+                    bi.secondaryColor ?? null,
+                    bi.accentColor ?? null,
+                    bi.fontFamily ?? null,
+                    bi.visualGuidelines ?? null,
+                    brandId,
+                  ],
+                );
+
+                console.log('UPDATED brandId=' + brandId);
+                const [check] = await conn.execute('SELECT id, name, positioningStatus, JSON_LENGTH(positioning) as segCount, website, primaryColor FROM brands WHERE id = ?', [brandId]);
+                console.log(JSON.stringify(check[0]));
+                await conn.end();
+              })().catch(e => { console.error('FAILED:', e); process.exit(1); });
+            "
