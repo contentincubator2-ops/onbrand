@@ -43,6 +43,9 @@ export default function StrategyWorkbench({
   const en = lang === "en";
   const utils = (trpc as any).useUtils?.();
   const deriveMut = (trpc as any).workbench?.derive?.useMutation?.();
+  const digMut = (trpc as any).workbench?.digSpot?.useMutation?.();
+  const applyMut = (trpc as any).workbench?.applyScenario?.useMutation?.();
+  const [digging, setDigging] = useState<number | null>(null);
 
   const aud = positioning?.audience ?? {};
   const compRows: any[] = Array.isArray(positioning?.competition?.direct) ? positioning.competition.direct : [];
@@ -71,14 +74,41 @@ export default function StrategyWorkbench({
   }, [diff.functional, diff.emotional, diff.summary, en]);
 
   const scenarios: any[] = Array.isArray(positioning?._workbench?.scenarios) ? positioning._workbench.scenarios : [];
+  const appliedId: string | null = positioning?._workbench?.appliedId ?? null;
   const [activeName, setActiveName] = useState<string | null>(null);
-  const active = scenarios.find((s) => s?.name === (activeName ?? "")) ?? scenarios[scenarios.length - 1] ?? null;
+  const active = scenarios.find((s) => s?.name === (activeName ?? "")) ??
+    (activeName ? null : scenarios[scenarios.length - 1] ?? null);
 
   const [selAudience, setSelAudience] = useState<string>("primary");
   const [selComp, setSelComp] = useState<Set<string>>(() => new Set(competitorChips.slice(0, 2).map((c) => c.key)));
   const [selAdv, setSelAdv] = useState<Set<string>>(() => new Set(advantageChips.map((c) => c.key)));
   const [drill, setDrill] = useState<{ kind: "audience" | "competitor"; key: string } | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+
+  // P2: switching to a stored scenario restores its slot selection so the
+  // slots always show what THIS scenario was derived from.
+  const restoreSelection = (scn: any) => {
+    const sel = scn?.selection;
+    if (!sel) return;
+    const audKey = audienceChips.find((c) => c.value === sel.audience)?.key;
+    if (audKey) setSelAudience(audKey);
+    if (Array.isArray(sel.competitors)) {
+      const keys = competitorChips.filter((c) => sel.competitors.includes(c.value)).map((c) => c.key);
+      if (keys.length > 0) setSelComp(new Set(keys));
+    }
+    if (Array.isArray(sel.advantages)) {
+      const keys = advantageChips.filter((c) => sel.advantages.some((a: string) => c.value.startsWith(a.slice(0, 30)))).map((c) => c.key);
+      if (keys.length > 0) setSelAdv(new Set(keys));
+    }
+  };
+  const nextScenarioName = () => {
+    const letters = "ABCDEFGH";
+    for (const ch of letters) {
+      const name = `情境 ${ch}`;
+      if (!scenarios.some((s) => s?.name === name)) return name;
+    }
+    return `情境 ${letters[scenarios.length % letters.length]}`;
+  };
 
   // 資料還不足（受眾或競品段未完成）→ 不佔版面
   if (audienceChips.length === 0 || competitorChips.length === 0) return null;
@@ -97,7 +127,7 @@ export default function StrategyWorkbench({
       showToastGlobal(en ? "Pick at least one competitor and one advantage" : "請至少選一個競爭者與一個優勢");
       return;
     }
-    const name = active?.name ?? "情境 A";
+    const name = activeName ?? active?.name ?? "情境 A";
     deriveMut?.mutate?.(
       { brandId, scenarioName: name, selection: { audience: audienceText.slice(0, 600), competitors, advantages } },
       {
@@ -116,7 +146,11 @@ export default function StrategyWorkbench({
   };
 
   const derived = active?.derived as undefined | {
-    spots: Array<{ lane: string; title: string; need: string; gap: string; ours: string; tagline?: { zh: string; en?: string } }>;
+    spots: Array<{
+      lane: string; title: string; need: string; gap: string; ours: string;
+      tagline?: { zh: string; en?: string };
+      dig?: { scenes?: Array<{ scene: string; mot: string }>; contentAngles?: string[]; risks?: string[] };
+    }>;
     stakes: Array<{ title: string; note?: string }>;
     rivalTurf: Array<{ title: string; note?: string }>;
     vanity: Array<{ title: string; note?: string }>;
@@ -154,6 +188,30 @@ export default function StrategyWorkbench({
       </div>
       {collapsed ? null : (
       <div style={{ padding: "0 18px 16px" }}>
+        {/* P2 情境分頁 */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+          {scenarios.map((s) => (
+            <span key={s.id}
+                  onClick={() => { setActiveName(s.name); restoreSelection(s); }}
+                  style={{
+                    fontSize: 11.5, fontWeight: 700, padding: "4px 13px", borderRadius: 8, cursor: "pointer",
+                    border: `1.5px solid ${active?.id === s.id ? "#2A2630" : "#D9D5CD"}`,
+                    background: active?.id === s.id ? "#2A2630" : "#fff",
+                    color: active?.id === s.id ? "#fff" : "#6E6878",
+                  }}>
+              {s.name}{appliedId === s.id ? (en ? " · applied" : " · 已套用") : ""}
+            </span>
+          ))}
+          <span onClick={() => setActiveName(nextScenarioName())}
+                style={{ fontSize: 11.5, fontWeight: 700, padding: "4px 13px", borderRadius: 8, cursor: "pointer", border: "1.5px dashed #C9C4BC", color: "#A8A29E", background: "transparent" }}>
+            ＋ {en ? "New scenario" : "新情境"}
+          </span>
+          {activeName && !scenarios.some((s) => s.name === activeName) && (
+            <span style={{ fontSize: 11, color: "#8A8494", alignSelf: "center" }}>
+              {en ? `“${activeName}” — pick anchors and derive` : `「${activeName}」尚未推導——選好錨點按「重新推導」`}
+            </span>
+          )}
+        </div>
         {/* 輸入槽 */}
         <div style={{ background: "#fff", border: "1px solid #E5E1DA", borderRadius: 12, padding: "10px 14px 12px", marginBottom: 14 }}>
           {[
@@ -250,6 +308,67 @@ export default function StrategyWorkbench({
                           {en ? "current tagline origin" : "現行標語來源"}
                         </span>
                       )}
+                    </div>
+                  )}
+                  {/* P2 spot actions: 深挖 / 套用此標語 */}
+                  <div style={{ display: "flex", gap: 7, marginTop: 8 }}>
+                    <span style={{ ...S.act, background: "#2A2630", borderColor: "#2A2630", color: "#fff", opacity: digging === i ? .6 : 1 }}
+                          onClick={() => {
+                            if (digging !== null || !active?.id) return;
+                            setDigging(i);
+                            digMut?.mutate?.({ brandId, scenarioId: active.id, spotIndex: i }, {
+                              onSuccess: (r: any) => {
+                                setDigging(null);
+                                if (r?.ok) { showToastGlobal(en ? "Deep-dive ready" : "✓ 深挖完成", "success"); utils?.scope?.active?.invalidate?.(); }
+                                else showToastGlobal(r?.error ?? (en ? "Deep-dive failed" : "深挖失敗，請再試一次"));
+                              },
+                              onError: () => { setDigging(null); showToastGlobal(en ? "Deep-dive failed" : "深挖失敗，請再試一次"); },
+                            });
+                          }}>
+                      <Ic d={IC.search} />{digging === i ? (en ? "Digging…" : "深挖中…") : (en ? "Deep-dive" : "深挖此點")}
+                    </span>
+                    {s.tagline?.zh && (() => { const tagZh = s.tagline!.zh; return (
+                      <span style={S.act}
+                            onClick={() => {
+                              if (!active?.id) return;
+                              if (!window.confirm(en
+                                ? `Apply this scenario?\n· audience anchor ← selected audience\n· main tagline ←「${tagZh}」`
+                                : `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· 主標語 ←「${tagZh}」\n之後所有文案任務與定位重跑都以此為準。`)) return;
+                              applyMut?.mutate?.({ brandId, scenarioId: active.id, taglineSpotIndex: i }, {
+                                onSuccess: (r: any) => {
+                                  if (r?.ok) { showToastGlobal(en ? "Applied as official positioning" : "✓ 已套用為正式定位", "success"); utils?.scope?.active?.invalidate?.(); }
+                                  else showToastGlobal(r?.error ?? (en ? "Apply failed" : "套用失敗"));
+                                },
+                                onError: () => showToastGlobal(en ? "Apply failed" : "套用失敗"),
+                              });
+                            }}>
+                        {en ? "Apply + set tagline" : "套用定位＋設此標語"}
+                      </span>
+                    ); })()}
+                  </div>
+                  {/* P2 dig accordion */}
+                  {s.dig && (
+                    <div style={{ marginTop: 8, background: "#FBF7F4", borderRadius: 9, padding: "9px 12px", fontSize: 11.5, color: "#4A4552" }}>
+                      {Array.isArray(s.dig.scenes) && s.dig.scenes.length > 0 && (<>
+                        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>{en ? "SCENES & MOT" : "場景與關鍵時刻"}</div>
+                        <ul style={{ margin: "3px 0 7px", paddingLeft: 16 }}>
+                          {s.dig.scenes.map((sc: any, j: number) => <li key={j} style={{ margin: "2px 0" }}>{sc.scene} — <b>{sc.mot}</b></li>)}
+                        </ul>
+                      </>)}
+                      {Array.isArray(s.dig.contentAngles) && s.dig.contentAngles.length > 0 && (<>
+                        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>{en ? "CONTENT ANGLES (task-ready)" : "內容角度（可直接當任務題目）"}</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "4px 0 7px" }}>
+                          {s.dig.contentAngles.map((a: string, j: number) => (
+                            <span key={j} style={{ fontSize: 11, border: "1px solid #D9D5CD", borderRadius: 999, padding: "2px 10px", background: "#fff" }}>{a}</span>
+                          ))}
+                        </div>
+                      </>)}
+                      {Array.isArray(s.dig.risks) && s.dig.risks.length > 0 && (<>
+                        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>{en ? "RISKS" : "風險與對手反應"}</div>
+                        <ul style={{ margin: "3px 0 0", paddingLeft: 16 }}>
+                          {s.dig.risks.map((rk: string, j: number) => <li key={j} style={{ margin: "2px 0" }}>{rk}</li>)}
+                        </ul>
+                      </>)}
                     </div>
                   )}
                 </div>
