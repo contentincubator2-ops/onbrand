@@ -52,3 +52,6 @@ jobs:
 
             echo "===== event_products table columns ====="
             Q "SHOW COLUMNS FROM event_products;"
+
+            echo "===== products for this user ====="
+            Q "SELECT id, brandId, name, slug, createdAt FROM products WHERE userId=(SELECT id FROM users WHERE email='$E') ORDER BY id;"
