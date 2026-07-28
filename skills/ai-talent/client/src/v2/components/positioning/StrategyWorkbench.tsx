@@ -12,6 +12,7 @@
  * P2 情境比較／套用回寫、深挖此點在後續 phase。
  */
 import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 
@@ -41,6 +42,7 @@ export default function StrategyWorkbench({
   lang: "zh-TW" | "en";
 }) {
   const en = lang === "en";
+  const navigate = useNavigate();
   const utils = (trpc as any).useUtils?.();
   const deriveMut = (trpc as any).workbench?.derive?.useMutation?.();
   const digMut = (trpc as any).workbench?.digSpot?.useMutation?.();
@@ -356,10 +358,17 @@ export default function StrategyWorkbench({
                         </ul>
                       </>)}
                       {Array.isArray(s.dig.contentAngles) && s.dig.contentAngles.length > 0 && (<>
-                        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>{en ? "CONTENT ANGLES (task-ready)" : "內容角度（可直接當任務題目）"}</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>
+                          {en ? "CONTENT ANGLES — click to open as a task topic" : "內容角度（點一下 → 帶著題目開任務）"}
+                        </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "4px 0 7px" }}>
                           {s.dig.contentAngles.map((a: string, j: number) => (
-                            <span key={j} style={{ fontSize: 11, border: "1px solid #D9D5CD", borderRadius: 999, padding: "2px 10px", background: "#fff" }}>{a}</span>
+                            <span key={j}
+                                  onClick={() => navigate(`/tasks/fb?b=${brandId}&topic=${encodeURIComponent(a)}`)}
+                                  title={en ? "Open the task wall with this topic prefilled" : "帶著這個題目前往任務牆，點任一任務即自動填入"}
+                                  style={{ fontSize: 11, border: "1px solid #2A2630", borderRadius: 999, padding: "2px 10px", background: "#fff", cursor: "pointer", fontWeight: 600 }}>
+                              {a} ↗
+                            </span>
                           ))}
                         </div>
                       </>)}

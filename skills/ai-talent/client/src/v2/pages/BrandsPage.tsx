@@ -2700,6 +2700,44 @@ function PositioningGrid({
     "7": { zh: "市場趨勢", en: "Market trends" },
     "8": { zh: "品牌個性", en: "Brand personality" },
   };
+  // 2026-07-28 (CJ「定位的呈現沒有邏輯性…看起來沒有策略感」→ mockup 定案):
+  // brand scope reorders into a four-act STRATEGY NARRATIVE — research →
+  // synthesis → expression → tools — each act titled by the question it
+  // answers. Display numbers follow the acts (data/segment ids untouched);
+  // the tools group moves to the END (they're positioning OUTPUTS, not the
+  // opening). Product/event keep the original num-prefix grouping.
+  const BRAND_ACTS: Array<{ label: { zh: string; en: string }; q: { zh: string; en: string }; ids: string[] }> = [
+    { label: { zh: "第一幕・市場研究", en: "Act 1 · Market research" },
+      q: { zh: "她缺什麼？—— 定位不是從「我是誰」開始，是從「她缺什麼」開始。", en: "What does she lack? Positioning starts with her, not us." },
+      ids: ["audience"] },
+    { label: { zh: "第二幕・競爭研究", en: "Act 2 · Competitive research" },
+      q: { zh: "誰已經在滿足她？缺口在哪？—— 看完這幕，白空間自然浮現。", en: "Who serves her already — and where are the gaps?" },
+      ids: ["competition", "trends"] },
+    { label: { zh: "第三幕・自我探索", en: "Act 3 · Self discovery" },
+      q: { zh: "憑什麼是我們？—— 起源與價值觀是填補缺口的資格證明。", en: "Why us? Origin and values are our proof of qualification." },
+      ids: ["origin", "values"] },
+    { label: { zh: "第四幕・策略結晶", en: "Act 4 · Strategy" },
+      q: { zh: "所以，我們是誰 —— 差異化與 WHY 是前三幕研究的結論，不是開場白。", en: "So, who we are — the conclusion of the research, not a slogan." },
+      ids: ["differentiation", "goldenCircle"] },
+    { label: { zh: "第五幕・表達系統", en: "Act 5 · Expression" },
+      q: { zh: "用一句話、一種聲音說出來 —— 標語與語氣把策略變成日常可執行的文字。", en: "Say it in one line, one voice." },
+      ids: ["tagline", "taglineScore", "voice"] },
+  ];
+  const brandActGroups = React.useMemo(() => {
+    if (scopeMode !== "brand") return null;
+    const byId = new Map(segments.map((s) => [s.id, s]));
+    return BRAND_ACTS
+      .map((act, ai) => ({
+        label: lang === "en" ? act.label.en : act.label.zh,
+        intro: lang === "en" ? act.q.en : act.q.zh,
+        segs: act.ids
+          .map((id, i) => ({ spec: byId.get(id), num: `${ai + 1}.${i + 1}` }))
+          .filter((x): x is { spec: NonNullable<typeof x.spec>; num: string } => !!x.spec),
+      }))
+      .filter((g) => g.segs.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segments, lang, scopeMode]);
+
   // Derive groups from segment num prefix
   const groupedSegs = React.useMemo(() => {
     const map = new Map<string, { label: string; prefix: string; segs: typeof segments }>();
@@ -2743,11 +2781,18 @@ function PositioningGrid({
   // the left edge instead of decorative tints.
   const BG_CYCLE = ["#FFFFFF"];
 
-  return (
-    <div style={{ padding: "8px 0 24px", display: "flex", flexDirection: "column", gap: 36 }}>
-      {/* ── 工具群組 ── */}
+  // Tools block — for brand scope it renders LAST (positioning outputs);
+  // other scopes keep it first (unchanged behaviour).
+  const toolsBlock = (
       <div>
-        <SectionLabel label={lang === "en" ? "Brand tools" : "品牌工具"} />
+        <SectionLabel
+          label={scopeMode === "brand"
+            ? (lang === "en" ? "Weaponized tools" : "武器化工具")
+            : (lang === "en" ? "Brand tools" : "品牌工具")}
+          intro={scopeMode === "brand"
+            ? (lang === "en" ? "The positioning, packaged for daily use — cheat sheet and AI prompt library." : "把定位變成武器 —— 速查卡與 AI 指令庫是前五幕的輸出物，日常產文案時被引用。")
+            : undefined}
+        />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
           {(() => {
             // 速查卡：把品牌定位精華（tagline / golden-circle why / differentiation）
@@ -2780,9 +2825,51 @@ function PositioningGrid({
           })()}
         </div>
       </div>
+  );
 
-      {/* ── Segment groups ── */}
-      {groupedSegs.map((group, gi) => (
+  const segFilled = (sid: string) => {
+    const v = segmentData?.[sid];
+    if (v == null) return false;
+    if (typeof v === "string") return v.trim().length > 0;
+    if (typeof v === "object") return Object.values(v).some(x => x != null && (typeof x !== "string" || x.trim()));
+    return true;
+  };
+
+  return (
+    <div style={{ padding: "8px 0 24px", display: "flex", flexDirection: "column", gap: 36 }}>
+      {scopeMode !== "brand" && toolsBlock}
+
+      {/* ── Brand scope: four-act strategy narrative ── */}
+      {brandActGroups && brandActGroups.map((group) => (
+        <div key={group.label}>
+          <SectionLabel
+            label={group.label}
+            counter={`${group.segs.filter(({ spec }) => segFilled(spec.id)).length} / ${group.segs.length}`}
+            intro={group.intro}
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            {group.segs.map(({ spec: s, num }) => {
+              const segVal = segmentData?.[s.id];
+              const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal, lang);
+              return (
+                <AssetCard
+                  key={s.id}
+                  label={`${num} ${lang === "en" ? (s.titleEn ?? s.title) : s.title}`}
+                  icon={ICONS[s.id] ?? faBookOpen}
+                  bg="#FFFFFF"
+                  onClick={() => onSelect(`seg:${s.id}`)}
+                  preview={preview}
+                  hasContent={hasContent}
+                  rationale={lang === "en" ? (s.rationaleEn ?? s.rationale) : s.rationale}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* ── Segment groups (product / event — unchanged) ── */}
+      {!brandActGroups && groupedSegs.map((group, gi) => (
         <div key={group.label}>
           <SectionLabel
             label={group.label}
@@ -2815,6 +2902,10 @@ function PositioningGrid({
           </div>
         </div>
       ))}
+
+      {/* Brand scope: tools land at the END — they're the positioning's
+          outputs, the natural finale of the narrative. */}
+      {scopeMode === "brand" && toolsBlock}
 
       {/* 2026-05-11 (CJ 4A discipline): removed gradient purple FAB.
           New tasks are launched via top-bar / hero, not a decorative

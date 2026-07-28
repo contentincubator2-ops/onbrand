@@ -641,6 +641,22 @@ function PlatformTaskPageInner() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // 2026-07-28 (CJ 策略工作台「內容角度→一鍵開任務」): the workbench's
+  // dig chips deep-link here with ?topic=<角度>. Capture once, strip the
+  // param, show a banner; the next task the user opens gets the topic
+  // prefilled as its primary answer (strategy → copy in one line).
+  const [strategyTopic, setStrategyTopic] = useState<string | null>(null);
+  useEffect(() => {
+    const t = searchParams.get("topic");
+    if (t && t.trim()) {
+      setStrategyTopic(t.trim().slice(0, 200));
+      const next = new URLSearchParams(searchParams);
+      next.delete("topic");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const brandId = (ctx?.brandId as number | null) ?? null;
   const brandName = useMemo(() => {
     const list = (ctx?.brands as any[]) ?? [];
@@ -1163,6 +1179,8 @@ function PlatformTaskPageInner() {
       const r = resolveDerive(brandCtx, derive);
       if (r && (derive.mode === "auto" || derive.mode === "confirm")) prefill = r.text;
     }
+    // 策略工作台帶入的題目優先於 derive 預填（用戶剛從策略點過來，意圖明確）
+    if (strategyTopic) prefill = strategyTopic;
     setPrimaryAnswer(prefill);
     setErrorMsg(null);
     setLatencyMs(null);
@@ -1744,6 +1762,25 @@ function PlatformTaskPageInner() {
           </div>
           {/* 2026-07-20 (CJ): failed catalog fetch is now visible + retryable
               instead of a silent 0/0. */}
+          {strategyTopic && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+              border: "1.5px solid #2A2630", background: "#F7F6F3", borderRadius: 12,
+              padding: "10px 16px", marginBottom: 14, fontSize: 13,
+            }}>
+              <span>
+                <b>{lang === "en" ? "Strategy topic loaded: " : "策略題目已帶入："}</b>
+                「{strategyTopic}」
+                <span style={{ color: "#8A8494", marginLeft: 8, fontSize: 12 }}>
+                  {lang === "en" ? "Open any task — it autofills." : "點任一任務卡，題目會自動填入"}
+                </span>
+              </span>
+              <button onClick={() => setStrategyTopic(null)}
+                      style={{ border: "none", background: "none", color: "#8A8494", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                {lang === "en" ? "Clear" : "清除"}
+              </button>
+            </div>
+          )}
           {catalogFailed && (
             <div className="mt-3 flex items-center gap-3 rounded-lg border border-warning-300 bg-warning-50 px-3 py-2 max-w-xl mx-auto">
               <p className="text-tiny text-warning-800 flex-1 text-left">
