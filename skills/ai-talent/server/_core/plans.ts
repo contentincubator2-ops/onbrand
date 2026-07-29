@@ -493,11 +493,18 @@ export function getEffectivePrice(
 
 /**
  * Should new sign-ups today get the early-bird flag?
- * Controlled by env ONBRAND_PROMO_ACTIVE. Defaults to true (i.e. promo
- * active) until CJ flips it off.
+ * Controlled by env ONBRAND_PROMO_ACTIVE.
+ *
+ * 2026-07-29 (bug found — pricing page showed NT$2,250 standard while
+ * Stripe checkout charged NT$750 early-bird): the offer was declared
+ * closed on 2026-07-15 ("取消早鳥優惠，只呈現原價" — see PLANS comments),
+ * but this default was left at ACTIVE, and ONBRAND_PROMO_ACTIVE was never
+ * set on the VM. Every signup for 14 days kept getting grandfathered.
+ * Defaults to INACTIVE now — fail closed, matching the already-decided
+ * pricing. Flip the env var back on if CJ ever reopens the promo.
  */
 export function isPromoActiveForNewSignups(): boolean {
-  const v = (process.env.ONBRAND_PROMO_ACTIVE ?? "1").toLowerCase();
+  const v = (process.env.ONBRAND_PROMO_ACTIVE ?? "0").toLowerCase();
   return v === "1" || v === "true" || v === "yes";
 }
 
