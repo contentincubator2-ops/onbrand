@@ -1,0 +1,27 @@
+name: "Ops — Read brand tagline + positioning.tagline (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        required: true
+        type: string
+
+jobs:
+  read:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Read tagline fields
+        run: |
+          set +e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          BID="${{ github.event.inputs.brandId }}"
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, name, tagline, updatedAt FROM brands WHERE id=$BID\G"
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT JSON_PRETTY(JSON_EXTRACT(positioning,'\$.tagline')) AS tagline_seg FROM brands WHERE id=$BID\G"
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT JSON_PRETTY(JSON_EXTRACT(positioning,'\$._workbench.scenarios')) AS scenarios FROM brands WHERE id=$BID\G" | head -80
+          exit 0
