@@ -32,7 +32,11 @@ const IC = {
   close:  "M6 6l12 12|M18 6L6 18",
 };
 
-type Chip = { key: string; label: string; value: string; drill?: "audience" | "competitor" };
+type Chip = {
+  key: string; label: string; value: string; drill?: "audience" | "competitor";
+  /** 自訂研究產物（受眾 alternates 的痛點/需求等），下鑽面板用 */
+  extra?: { pains?: string[]; needs?: string[]; note?: string };
+};
 
 export default function StrategyWorkbench({
   brandId, eventId, positioning, lang,
@@ -109,9 +113,19 @@ export default function StrategyWorkbench({
     if (out.length === 0 && bookTa) {
       out.push({ key: "book", label: en ? "Positioning-book audience" : "定位書受眾", value: bookTa, drill: "audience" });
     }
+    // 2026-07-29 (CJ「讓用戶可以新增…AI 再針對該新增的部分進行研究」):
+    // user-added audiences live in audience.alternates（researchItem 產物）。
+    const alts: any[] = Array.isArray(aud.alternates) ? aud.alternates : [];
+    alts.forEach((a, i) => out.push({
+      key: `alt${i}`,
+      label: String(a?.label ?? (en ? `Custom ${i + 1}` : `自訂受眾 ${i + 1}`)),
+      value: String(a?.narrative ?? a?.label ?? ""),
+      drill: "audience",
+      extra: { pains: a?.pains ?? [], needs: a?.needs ?? [], note: en ? "user-added · AI researched" : "用戶新增・AI 已研究" },
+    }));
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aud.primary, aud.secondary, brandQ?.data?.targetAudience, en]);
+  }, [aud.primary, aud.secondary, aud.alternates, brandQ?.data?.targetAudience, en]);
 
   const competitorChips: Chip[] = useMemo(
     () => compRows.map((c: any, i: number) => ({
@@ -125,8 +139,58 @@ export default function StrategyWorkbench({
     if (diff.functional) out.push({ key: "functional", label: en ? "Functional edge" : "功能差異化", value: String(diff.functional) });
     if (diff.emotional) out.push({ key: "emotional", label: en ? "Emotional edge" : "情感差異化", value: String(diff.emotional) });
     if (diff.summary && out.length === 0) out.push({ key: "summary", label: en ? "Differentiation" : "差異化總結", value: String(diff.summary) });
+    // 用戶新增優勢（researchItem 產物）— differentiation.custom
+    const custom: any[] = Array.isArray(diff.custom) ? diff.custom : [];
+    custom.forEach((a, i) => out.push({
+      key: `cust${i}`,
+      label: String(a?.label ?? (en ? `Custom ${i + 1}` : `自訂優勢 ${i + 1}`)),
+      value: String(a?.statement ?? a?.label ?? ""),
+    }));
     return out;
-  }, [diff.functional, diff.emotional, diff.summary, en]);
+  }, [diff.functional, diff.emotional, diff.summary, diff.custom, en]);
+
+  // 2026-07-29: ＋新增 → AI 研究 → 落地 canonical 研究資料
+  const researchMut = (trpc as any).workbench?.researchItem?.useMutation?.();
+  const [adding, setAdding] = useState<null | "audience" | "competitor" | "advantage">(null);
+  const [addText, setAddText] = useState("");
+  const submitResearch = (kind: "audience" | "competitor" | "advantage") => {
+    const v = addText.trim();
+    if (v.length < 2) return;
+    researchMut?.mutate?.({ ...scopeArgs, kind, value: v.slice(0, 160) }, {
+      onSuccess: (r: any) => {
+        if (r?.ok) {
+          showToastGlobal(en ? "✓ Researched and added" : "✓ AI 已完成研究並加入選項（可點入查看）", "success");
+          setAdding(null); setAddText("");
+          utils?.scope?.active?.invalidate?.();
+        } else showToastGlobal(r?.error ?? (en ? "Research failed" : "研究失敗，請再試一次"));
+      },
+      onError: () => showToastGlobal(en ? "Research failed" : "研究失敗，請再試一次"),
+    });
+  };
+  const AddControl = ({ kind, placeholder }: { kind: "audience" | "competitor" | "advantage"; placeholder: string }) => (
+    adding === kind ? (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <input
+          autoFocus
+          value={addText}
+          onChange={(e) => setAddText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submitResearch(kind); if (e.key === "Escape") { setAdding(null); setAddText(""); } }}
+          placeholder={placeholder}
+          disabled={researchMut?.isPending}
+          style={{ fontSize: 12, padding: "4px 12px", borderRadius: 999, border: "1.5px solid #2A2630", outline: "none", width: 200, background: "#fff" }}
+        />
+        <span onClick={() => submitResearch(kind)}
+              style={{ fontSize: 11.5, fontWeight: 800, background: researchMut?.isPending ? "#8A8494" : "#2A2630", color: "#fff", borderRadius: 8, padding: "4px 12px", cursor: researchMut?.isPending ? "wait" : "pointer", whiteSpace: "nowrap" }}>
+          {researchMut?.isPending ? (en ? "Researching…" : "AI 研究中…") : (en ? "Research" : "AI 研究")}
+        </span>
+      </span>
+    ) : (
+      <span onClick={() => { setAdding(kind); setAddText(""); }}
+            style={{ fontSize: 12, fontWeight: 600, padding: "4px 13px", borderRadius: 999, border: "1.5px dashed #C9C4BC", color: "#A8A29E", background: "transparent", cursor: "pointer" }}>
+        ＋ {en ? "Add" : "新增"}
+      </span>
+    )
+  );
 
   const scenarios: any[] = Array.isArray(positioning?._workbench?.scenarios) ? positioning._workbench.scenarios : [];
   const appliedId: string | null = positioning?._workbench?.appliedId ?? null;
@@ -325,6 +389,7 @@ export default function StrategyWorkbench({
                     </span>
                   </span>
                 ))}
+                <AddControl kind="audience" placeholder={en ? "e.g. dads of preschoolers" : "例：幼兒園孩子的爸爸"} />
               </div>
             )},
             { icon: IC.target, label: en ? "Competitor set" : "競爭組合", hint: en ? "multi-select" : "可多選；點名稱可查競品研究", body: (
@@ -336,6 +401,7 @@ export default function StrategyWorkbench({
                           style={{ marginLeft: 6, fontSize: 10.5, opacity: .8, borderBottom: "1px dotted currentColor" }}>↗</span>
                   </span>
                 ))}
+                <AddControl kind="competitor" placeholder={en ? "competitor name" : "例：小牛頓有聲書"} />
               </div>
             )},
             { icon: IC.gem, label: en ? "Lead advantages" : "主打優勢", hint: en ? "from differentiation" : "取自差異化資產", body: (
@@ -345,6 +411,7 @@ export default function StrategyWorkbench({
                     {selAdv.has(c.key) ? "✓ " : ""}{c.label}・{c.value.slice(0, 16)}…
                   </span>
                 ))}
+                <AddControl kind="advantage" placeholder={en ? "e.g. real dad's voice" : "例：真實爸爸親聲錄製"} />
               </div>
             )},
           ].map((row, i) => (
@@ -543,19 +610,28 @@ export default function StrategyWorkbench({
             <span onClick={() => setDrill(null)} style={{ cursor: "pointer", color: "#A8A29E" }}><Ic d={IC.close} /></span>
           </div>
           <div style={{ padding: "12px 16px 16px", fontSize: 12.5, color: "#4A4552" }}>
-            {drill.kind === "audience" ? (
+            {drill.kind === "audience" ? (() => {
+              // 自訂受眾（alternates）帶自己的痛點/需求；canonical 受眾用全域段
+              const dx = drillAudience?.extra;
+              const dPains: any[] = dx?.pains?.length ? dx.pains : (Array.isArray(aud.pains) ? aud.pains : []);
+              const dNeeds: any[] = dx?.needs?.length ? dx.needs : (Array.isArray(aud.needs) ? aud.needs : []);
+              const showMatrix = !dx && Array.isArray(aud.matrix) && aud.matrix.length > 0;
+              return (
               <>
+                {dx?.note && (
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#8A8494", marginBottom: 6 }}>{dx.note}</div>
+                )}
                 <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", marginBottom: 4 }}>{en ? "NARRATIVE" : "完整敘事"}</div>
                 <p style={{ lineHeight: 1.75 }}>{drillAudience?.value}</p>
-                {Array.isArray(aud.pains) && aud.pains.length > 0 && (<>
+                {dPains.length > 0 && (<>
                   <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", margin: "12px 0 4px" }}>{en ? "PAINS" : "痛點"}</div>
-                  <ul style={{ paddingLeft: 18 }}>{aud.pains.map((p: any, i: number) => <li key={i}>{String(p)}</li>)}</ul>
+                  <ul style={{ paddingLeft: 18 }}>{dPains.map((p: any, i: number) => <li key={i}>{String(p)}</li>)}</ul>
                 </>)}
-                {Array.isArray(aud.needs) && aud.needs.length > 0 && (<>
+                {dNeeds.length > 0 && (<>
                   <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", margin: "12px 0 4px" }}>{en ? "NEEDS" : "需求"}</div>
-                  <ul style={{ paddingLeft: 18 }}>{aud.needs.map((p: any, i: number) => <li key={i}>{String(p)}</li>)}</ul>
+                  <ul style={{ paddingLeft: 18 }}>{dNeeds.map((p: any, i: number) => <li key={i}>{String(p)}</li>)}</ul>
                 </>)}
-                {Array.isArray(aud.matrix) && aud.matrix.length > 0 && (<>
+                {showMatrix && (<>
                   <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", margin: "12px 0 4px" }}>{en ? "EMOTIONAL MATRIX" : "情感需求矩陣"}</div>
                   <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}>
                     <tbody>
@@ -570,7 +646,8 @@ export default function StrategyWorkbench({
                   </table>
                 </>)}
               </>
-            ) : drillComp ? (
+              );
+            })() : drillComp ? (
               <>
                 {[
                   [en ? "POSITION" : "市場地位", drillComp.position],

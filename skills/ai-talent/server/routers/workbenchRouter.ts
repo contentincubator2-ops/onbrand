@@ -192,6 +192,7 @@ ${officialGroundText}
 
 【定位書錨點 — 最重要規則】
 spots[0] 必須是${officialLabel}本身：把上方${scope.entityKind === "event" ? "SMP／核心訊息" : "差異化總結／黃金圈 WHY／現行標語"}所承載的正式定位，忠實改寫成 need←gap←ours 因果鏈——不可加入正式定位沒有的新主張，不可稀釋或改向，並標 "official": true。
+spots[0] 的 tagline.zh 必須是「現行${scope.entityKind === "event" ? "SMP" : "標語"}」原文，一字不改（只有延伸 spots 才產生新標語候選）。
 其餘 spots 才是依本輪錨點推導的延伸機會（"official": false），且不可與正式定位矛盾。
 
 輸出 JSON 結構：
@@ -245,6 +246,18 @@ spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 �
         derived.spots.unshift(off!);
       } else if (offIdx === -1) {
         (derived.spots[0] as any).official = true;
+      }
+      // 2026-07-29 (CJ「標語『從聽覺，啟程探索』應該要出現在定位的甜蜜點
+      // 當中」): the official spot carries the OFFICIAL tagline VERBATIM —
+      // enforced in code, not just prompt. Extension spots keep their
+      // generated candidates.
+      if (typeof curTagline === "string" && curTagline.trim()) {
+        (derived.spots[0] as any).tagline = {
+          zh: curTagline.trim(),
+          ...(scope.entityKind === "brand" && brandPos.tagline?.enTagline
+            ? { en: String(brandPos.tagline.enTagline) } : {}),
+        };
+        derived.currentTaglineSpot = derived.spots[0]!.title;
       }
 
       // Persist scenario (replace same-name, append otherwise)
@@ -504,5 +517,105 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
       });
 
       return { ok: true as const, applied, cascade: true as const, cascadeSteps: steps.length };
+    }),
+
+  /** 2026-07-29 (CJ「要讓用戶可以新增競爭組合、目標受眾、或主打優勢。然後
+   *  AI 可再針對該新增的部分，進行研究」): user adds a custom anchor by
+   *  name/description → one LLM call researches it grounded on the brand's
+   *  book → the result lands in the CANONICAL research data, so it becomes
+   *  a normal drillable chip and future derivations can use it:
+   *    competitor → brand positioning.competition.direct（品牌層，活動繼承）
+   *    audience   → scoped positioning.audience.alternates[]
+   *    advantage  → brand positioning.differentiation.custom[] */
+  researchItem: protectedProcedure
+    .input(z.object({
+      ...scopeSchema,
+      kind: z.enum(["audience", "competitor", "advantage"]),
+      value: z.string().min(2).max(160),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const scope = toScope(input);
+      const loaded = await loadScopedPositioning(scope, userId);
+      if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
+      const brandLoaded = scope.entityKind === "event"
+        ? await loadBrandPositioning(scope.brandId, userId)
+        : loaded;
+      const brandPos = brandLoaded?.pos ?? {};
+      const brandName = brandLoaded?.name ?? loaded.name;
+      const diff = brandPos.differentiation ?? {};
+      const ground =
+        `品牌：${brandName}\n` +
+        `差異化總結：${String(diff.summary ?? "").slice(0, 200)}\n` +
+        `黃金圈 WHY：${String(brandPos.goldenCircle?.why ?? "").slice(0, 200)}\n` +
+        `現行標語：${String(brandPos.tagline?.zhTagline ?? "")}\n` +
+        `既有主受眾：${String(brandPos.audience?.primary ?? "").slice(0, 300)}`;
+      const { invokeLLM } = await import("../_core/llm");
+      const SYS = "你是品牌策略研究員，繁體中文。只輸出 JSON，第一字元就是 {。研究必須以品牌定位書資料為基準，不可與之矛盾。";
+      const prompts: Record<string, { user: string; maxTokens: number }> = {
+        competitor: {
+          user: `${ground}\n\n用戶新增了一個競爭者：「${input.value}」。請研究它並輸出競品攻防列。若你對這個名字沒有把握，就依名稱與品類常識合理推斷並在 position 註明「（推斷）」。輸出 JSON：\n{"name":"${input.value}","position":"市場地位（≤40字）","tone":"品牌調性（≤20字）","weakness":"弱點＝我們的機會（≤40字）","ourEdge":"我方差異點（引用品牌定位書優勢，≤40字）"}`,
+          maxTokens: 900,
+        },
+        audience: {
+          user: `${ground}\n\n用戶新增了一個目標受眾：「${input.value}」。請以品牌定位書為基準，深化為可用的受眾研究。輸出 JSON：\n{"label":"受眾名稱（≤12字）","narrative":"完整敘事（人口/心理/場景/管道，120-250字）","pains":["痛點1","痛點2","痛點3"],"needs":["需求1","需求2","需求3"]}`,
+          maxTokens: 1200,
+        },
+        advantage: {
+          user: `${ground}\n\n用戶新增了一個主打優勢：「${input.value}」。請把它磨成可用於推導的優勢資產。輸出 JSON：\n{"label":"優勢名稱（≤12字）","statement":"優勢完整表述（60-120字）","evidence":"支撐證據／為什麼可信（≤60字）"}`,
+          maxTokens: 900,
+        },
+      };
+      const p = prompts[input.kind]!;
+      const r = await Promise.race([
+        invokeLLM({ messages: [{ role: "system", content: SYS }, { role: "user", content: p.user }], maxTokens: p.maxTokens }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 30_000)),
+      ]);
+      const raw = r.choices[0]?.message?.content;
+      const text = typeof raw === "string" ? raw : "";
+      try {
+        const inTok = r.usage?.prompt_tokens ?? 0;
+        const outTok = r.usage?.completion_tokens ?? 0;
+        await localPool.execute(
+          `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [userId, scope.entityKind, scope.entityId, `workbench_research:${input.kind}`,
+           r.model || "anthropic/claude-haiku-4-5", inTok, outTok, (inTok * 1.0 + outTok * 5.0) / 1_000_000],
+        );
+      } catch { /* non-fatal */ }
+      const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jt = m ? m[1]!.trim() : text.trim();
+      let item: any = null;
+      try { item = JSON.parse(jt); } catch {
+        const s = jt.indexOf("{");
+        if (s >= 0) { try { item = JSON.parse(jt.slice(s)); } catch {} }
+      }
+      if (!item) return { ok: false as const, error: "研究結果解析失敗，請再試一次" };
+
+      if (input.kind === "competitor") {
+        const bPos = brandLoaded!.pos ?? {};
+        const comp = (bPos.competition && typeof bPos.competition === "object") ? bPos.competition : {};
+        const direct: any[] = Array.isArray(comp.direct) ? comp.direct : [];
+        if (!direct.some((c) => String(c?.name ?? "") === String(item.name ?? input.value))) {
+          direct.push({ name: item.name ?? input.value, position: item.position ?? "", tone: item.tone ?? "", weakness: item.weakness ?? "", ourEdge: item.ourEdge ?? "" });
+        }
+        bPos.competition = { ...comp, direct: direct.slice(-12) };
+        await saveScopedPositioning({ entityKind: "brand", entityId: scope.brandId, brandId: scope.brandId }, userId, bPos);
+      } else if (input.kind === "audience") {
+        const pos = loaded.pos ?? {};
+        const audSeg = (pos.audience && typeof pos.audience === "object") ? pos.audience : {};
+        const alternates: any[] = Array.isArray(audSeg.alternates) ? audSeg.alternates : [];
+        alternates.push({ label: item.label ?? input.value, narrative: item.narrative ?? "", pains: item.pains ?? [], needs: item.needs ?? [] });
+        pos.audience = { ...audSeg, alternates: alternates.slice(-5) };
+        await saveScopedPositioning(scope, userId, pos);
+      } else {
+        const bPos = brandLoaded!.pos ?? {};
+        const d = (bPos.differentiation && typeof bPos.differentiation === "object") ? bPos.differentiation : {};
+        const custom: any[] = Array.isArray(d.custom) ? d.custom : [];
+        custom.push({ label: item.label ?? input.value, statement: item.statement ?? "", evidence: item.evidence ?? "" });
+        bPos.differentiation = { ...d, custom: custom.slice(-6) };
+        await saveScopedPositioning({ entityKind: "brand", entityId: scope.brandId, brandId: scope.brandId }, userId, bPos);
+      }
+      return { ok: true as const, kind: input.kind, item };
     }),
 });
