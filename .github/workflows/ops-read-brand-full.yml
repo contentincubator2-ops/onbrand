@@ -1,0 +1,49 @@
+name: "Ops — Read full brand state (positioning keys, products, events)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        required: true
+        type: string
+
+jobs:
+  read:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Read brand state
+        run: |
+          set +e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+          BID="${{ github.event.inputs.brandId }}"
+
+          echo "===== brand row ====="
+          Q "SELECT id, name, industry, tagline, website, targetAudience, positioningStatus, updatedAt FROM brands WHERE id=$BID\G"
+
+          echo "===== positioning top-level keys ====="
+          Q "SELECT JSON_KEYS(positioning) AS keys FROM brands WHERE id=$BID\G"
+
+          echo "===== description (grounding text) ====="
+          Q "SELECT LEFT(description, 2000) AS description FROM brands WHERE id=$BID\G"
+
+          echo "===== brand_colors ====="
+          Q "SELECT LEFT(brand_colors, 800) AS colors FROM brands WHERE id=$BID\G"
+
+          echo "===== _aiPrompts platforms present ====="
+          Q "SELECT JSON_KEYS(JSON_EXTRACT(positioning,'\$._aiPrompts')) AS platforms FROM brands WHERE id=$BID\G"
+
+          echo "===== products ====="
+          Q "SELECT id, name FROM products WHERE brandId=$BID ORDER BY id;"
+
+          echo "===== events ====="
+          Q "SELECT id, name, positioningStatus, createdAt, updatedAt FROM events WHERE brandId=$BID ORDER BY id;"
+
+          echo "===== differentiation summary ====="
+          Q "SELECT LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.differentiation.summary')),300) AS diff FROM brands WHERE id=$BID\G"
+
+          echo "===== audience primary ====="
+          Q "SELECT LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.audience.primary')),400) AS aud FROM brands WHERE id=$BID\G"
+          exit 0
