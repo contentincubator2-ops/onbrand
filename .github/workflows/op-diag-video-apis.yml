@@ -1,0 +1,101 @@
+name: "Op — Diagnose video APIs (Veo model names + Kling lip_sync params)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      origin_task_id:
+        description: "Existing Kling i2v task id to lip-sync against"
+        required: true
+        default: "4a653ac7-bab4-43c5-958d-218d34bb0a2d"
+        type: string
+      audio_url:
+        description: "Public audio URL to try as local_dubbing_url"
+        required: false
+        default: "https://onbrand.sowork.ai/static/covers/media-sample-1785331188393-c7gh9.wav"
+        type: string
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Probe APIs
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          ORIGIN_TASK_ID: ${{ inputs.origin_task_id }}
+          AUDIO_URL: ${{ inputs.audio_url }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          envs: ORIGIN_TASK_ID,AUDIO_URL
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+
+            cat > tmp-diag.ts <<'SCRIPT_EOF'
+            const PIAPI_KEY = process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY ?? "";
+            const GEMINI_KEY = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
+            const ORIGIN = process.env.ORIGIN_TASK_ID ?? "";
+            const AUDIO = process.env.AUDIO_URL ?? "";
+            const PIAPI_BASE = "https://api.piapi.ai/api/v1";
+
+            (async () => {
+              console.log("=========== A: Gemini models supporting video ===========");
+              const lr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_KEY}&pageSize=200`);
+              const lj: any = await lr.json();
+              const models = (lj?.models ?? []) as any[];
+              console.log("total models:", models.length);
+              for (const m of models) {
+                const n = String(m.name ?? "");
+                if (/veo|video/i.test(n)) {
+                  console.log(`  ${n}  methods=${JSON.stringify(m.supportedGenerationMethods ?? [])}`);
+                }
+              }
+              console.log("--- also listing any model with predictLongRunning ---");
+              for (const m of models) {
+                if ((m.supportedGenerationMethods ?? []).includes("predictLongRunning")) {
+                  console.log(`  ${m.name}`);
+                }
+              }
+
+              console.log("");
+              console.log("=========== B: audio URL reachability ===========");
+              const ah = await fetch(AUDIO, { method: "HEAD" });
+              console.log(`HEAD ${AUDIO} -> ${ah.status} type=${ah.headers.get("content-type")} len=${ah.headers.get("content-length")}`);
+
+              console.log("");
+              console.log("=========== C: kling lip_sync variants ===========");
+              const variants: Array<{ tag: string; input: any }> = [
+                { tag: "origin+local_dubbing(wav)", input: { origin_task_id: ORIGIN, local_dubbing_url: AUDIO, tts_text: "", tts_speed: 1 } },
+                { tag: "origin+tts_text(zh)", input: { origin_task_id: ORIGIN, tts_text: "不是手機、不是電視，是爸爸的聲音。", tts_timbre: "genshin_vindi2", tts_speed: 1 } },
+                { tag: "origin only", input: { origin_task_id: ORIGIN } },
+              ];
+              for (const v of variants) {
+                try {
+                  const r = await fetch(`${PIAPI_BASE}/task`, {
+                    method: "POST",
+                    headers: { "x-api-key": PIAPI_KEY, "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: "kling", task_type: "lip_sync", input: v.input }),
+                  });
+                  const t = await r.text();
+                  console.log(`[${v.tag}] HTTP ${r.status}`);
+                  console.log(`   FULL: ${t}`);
+                } catch (e: any) {
+                  console.log(`[${v.tag}] EXCEPTION ${e?.message}`);
+                }
+              }
+              process.exit(0);
+            })().catch((e) => { console.error("DIAG FAILED:", e?.message ?? e); process.exit(1); });
+            SCRIPT_EOF
+
+            set -a
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            set +a
+            export ORIGIN_TASK_ID AUDIO_URL
+
+            node --import tsx tmp-diag.ts
+            RC=$?
+            rm -f tmp-diag.ts
+            exit $RC
