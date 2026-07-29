@@ -298,96 +298,9 @@ export const brandKnowledgeRouter = router({
       platform: z.enum(["facebook", "instagram", "youtube", "threads", "tiktok", "linkedin", "email", "press"]),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userId = ctx.user!.id;
-      const [brandPrefix, real, knowledgeBlock] = await Promise.all([
-        buildBrandPrefix(input.brandId).catch(() => ""),
-        getBrandRealContent(input.brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
-        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
-      ]);
-      const labelMap: Record<string, string> = {
-        facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", threads: "Threads",
-        tiktok: "TikTok", linkedin: "LinkedIn", email: "EDM 電子報", press: "新聞稿",
-      };
-      const label = labelMap[input.platform] ?? input.platform;
-      const hasReal = real.hasContent;
-      // 2026-07-18 多市場 (P2): generated per-platform system prompts must
-      // themselves command the brand's market language, or every downstream
-      // caption inherits a zh-TW instruction.
-      const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
-      const mkt = await getBrandMarket(input.brandId).catch(() => DEFAULT_BRAND_MARKET);
-      const langLine = mkt.isZhTW
-        ? "繁體中文"
-        : `產出的指令內容必須明確要求「所有貼文 / 配圖文字一律使用 ${mkt.outputLanguage}（品牌目標市場語言）」，指令本身也用 ${mkt.outputLanguage} 撰寫`;
-      // 2026-07-28 (CJ「人設的部分不符合我們的要求，對於人設的字數要求等」，
-      // AskUserQuestion 確認規格): 文字指令改為固定兩段結構 ——
-      //   【人設】400-600 字精簡人設（獨立成段，非一句話角色定位）
-      //   【平台寫作指令】口吻 / 結構 / 長度 / 禁忌（維持精簡）
-      // 人設必須從品牌定位（黃金圈 / 語氣 / 受眾）長出來，不可與定位矛盾。
-      const sys = `你是品牌文案顧問，${langLine}。
-任務：為這個品牌產出在 ${label} 平台寫貼文 / 配圖時可以直接 inject 給 LLM 的 system prompt。
-${hasReal
-  ? "下方有品牌官網 / 社群實際內容 — 以該內容推斷產業 / 受眾 / 語氣。"
-  : "目前沒抓到品牌的官網 / 社群實際內容，請根據品牌名 + 描述 + 產業常識合理推斷，直接寫指令草稿，不要回拒或留空。"
-}
-
-文字指令必須是以下兩段固定結構（兩段之間空一行）：
-【人設】400-600 字的完整人設，寫給要扮演這個角色的 LLM：這位 ${label} 內容操盤手是誰（姓名可虛構）、專業背景與資歷、性格與說話習慣（含口頭禪或標誌性表達 1-2 個）、對這個品牌與其受眾的理解、寫作時的價值觀與堅持。人設必須從下方品牌定位（黃金圈 / 品牌語氣 / 目標受眾）自然長出來，不可與定位矛盾；字數不足 400 字或超過 600 字都算不合格。
-【平台寫作指令】120-200 字：${label} 貼文的口吻、結構、長度、要避免的、要強調的。
-
-輸出 JSON：
-{
-  "text": "<上述兩段結構的完整文字指令，含【人設】與【平台寫作指令】標題>",
-  "image": "<完整可貼上的圖片指令；80-200 字；說明 ${label} 配圖風格：構圖、色調、字幅、品牌元素、可用 / 不可用素材類型>"
-}
-直接輸出 JSON，第一字元就是 {。
-${brandPrefix}${real.context}${knowledgeBlock}`;
-      try {
-        const r = await Promise.race([
-          invokeLLM({
-            messages: [
-              { role: "system", content: sys },
-              { role: "user", content: `平台：${label}` },
-            ],
-            // 2026-07-28: 400-600 字人設 + 平台指令 + 圖片指令 ≈ 1600-2200
-            // tokens of CJK — 1500 truncated the JSON mid-string.
-            maxTokens: 2600,
-          }),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 40_000)),
-        ]);
-        const raw = r.choices[0]?.message?.content;
-        const text = typeof raw === "string" ? raw : "";
-        const inTok = r.usage?.prompt_tokens ?? 0;
-        const outTok = r.usage?.completion_tokens ?? 0;
-        try {
-          await localPool.execute(
-            `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
-                  VALUES (?, 'brand', ?, ?, ?, ?, ?, ?)`,
-            [userId, input.brandId, `ai_prompt:${input.platform}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
-             (inTok * 1.0 + outTok * 5.0) / 1_000_000],
-          );
-        } catch {/* non-fatal */}
-        // Reuse extractJSON from suggestOne path — inline lite version here
-        const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-        const jsonText = m ? m[1]!.trim() : text.trim();
-        let parsed: any = null;
-        try { parsed = JSON.parse(jsonText); } catch {
-          const start = jsonText.indexOf("{");
-          if (start >= 0) {
-            try { parsed = JSON.parse(jsonText.slice(start)); } catch {}
-          }
-        }
-        if (!parsed) return { ok: false as const, error: "JSON parse failed" };
-        return {
-          ok: true as const,
-          value: {
-            text:  String(parsed.text  ?? "").slice(0, 4000),
-            image: String(parsed.image ?? "").slice(0, 4000),
-          },
-          hasRealContent: real.hasContent,
-        };
-      } catch (e: any) {
-        return { ok: false as const, error: String(e?.message ?? e) };
-      }
+      // 2026-07-28 (CJ 級聯重生): body extracted to generateAiPromptForPlatform
+      // so workbench applyScenario can regenerate all 8 platforms server-side.
+      return await generateAiPromptForPlatform(input.brandId, ctx.user!.id, input.platform);
     }),
 
   /**
@@ -480,5 +393,102 @@ export async function loadBrandKnowledgeForPrompt(
     return `\n\n【品牌知識庫（user-uploaded reference）— 產出時請參考語氣 / 結構 / 案例】\n${blocks.join("\n")}`;
   } catch {
     return "";
+  }
+}
+
+/**
+ * AI 指令庫 per-platform generator — extracted from the suggestAIPrompts
+ * mutation (2026-07-28) so the strategy-workbench applyScenario cascade can
+ * regenerate all 8 platforms server-side after a scenario is applied.
+ * 文字指令 = 【人設】400-600 字 + 【平台寫作指令】120-200 字 (CJ spec).
+ */
+export async function generateAiPromptForPlatform(
+  brandId: number,
+  userId: number,
+  platform: "facebook" | "instagram" | "youtube" | "threads" | "tiktok" | "linkedin" | "email" | "press",
+): Promise<
+  | { ok: true; value: { text: string; image: string }; hasRealContent: boolean }
+  | { ok: false; error: string }
+> {
+  const [brandPrefix, real, knowledgeBlock] = await Promise.all([
+    buildBrandPrefix(brandId).catch(() => ""),
+    getBrandRealContent(brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
+    loadBrandKnowledgeForPrompt(brandId).catch(() => ""),
+  ]);
+  const labelMap: Record<string, string> = {
+    facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", threads: "Threads",
+    tiktok: "TikTok", linkedin: "LinkedIn", email: "EDM 電子報", press: "新聞稿",
+  };
+  const label = labelMap[platform] ?? platform;
+  const hasReal = real.hasContent;
+  // 2026-07-18 多市場 (P2): generated per-platform system prompts must
+  // themselves command the brand's market language.
+  const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
+  const mkt = await getBrandMarket(brandId).catch(() => DEFAULT_BRAND_MARKET);
+  const langLine = mkt.isZhTW
+    ? "繁體中文"
+    : `產出的指令內容必須明確要求「所有貼文 / 配圖文字一律使用 ${mkt.outputLanguage}（品牌目標市場語言）」，指令本身也用 ${mkt.outputLanguage} 撰寫`;
+  const sys = `你是品牌文案顧問，${langLine}。
+任務：為這個品牌產出在 ${label} 平台寫貼文 / 配圖時可以直接 inject 給 LLM 的 system prompt。
+${hasReal
+  ? "下方有品牌官網 / 社群實際內容 — 以該內容推斷產業 / 受眾 / 語氣。"
+  : "目前沒抓到品牌的官網 / 社群實際內容，請根據品牌名 + 描述 + 產業常識合理推斷，直接寫指令草稿，不要回拒或留空。"
+}
+
+文字指令必須是以下兩段固定結構（兩段之間空一行）：
+【人設】400-600 字的完整人設，寫給要扮演這個角色的 LLM：這位 ${label} 內容操盤手是誰（姓名可虛構）、專業背景與資歷、性格與說話習慣（含口頭禪或標誌性表達 1-2 個）、對這個品牌與其受眾的理解、寫作時的價值觀與堅持。人設必須從下方品牌定位（黃金圈 / 品牌語氣 / 目標受眾）自然長出來，不可與定位矛盾；字數不足 400 字或超過 600 字都算不合格。
+【平台寫作指令】120-200 字：${label} 貼文的口吻、結構、長度、要避免的、要強調的。
+
+輸出 JSON：
+{
+  "text": "<上述兩段結構的完整文字指令，含【人設】與【平台寫作指令】標題>",
+  "image": "<完整可貼上的圖片指令；80-200 字；說明 ${label} 配圖風格：構圖、色調、字幅、品牌元素、可用 / 不可用素材類型>"
+}
+直接輸出 JSON，第一字元就是 {。
+${brandPrefix}${real.context}${knowledgeBlock}`;
+  try {
+    const r = await Promise.race([
+      invokeLLM({
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: `平台：${label}` },
+        ],
+        // 400-600 字人設 + 平台指令 + 圖片指令 ≈ 1600-2200 tokens of CJK.
+        maxTokens: 2600,
+      }),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 40_000)),
+    ]);
+    const raw = r.choices[0]?.message?.content;
+    const text = typeof raw === "string" ? raw : "";
+    const inTok = r.usage?.prompt_tokens ?? 0;
+    const outTok = r.usage?.completion_tokens ?? 0;
+    try {
+      await localPool.execute(
+        `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+              VALUES (?, 'brand', ?, ?, ?, ?, ?, ?)`,
+        [userId, brandId, `ai_prompt:${platform}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
+         (inTok * 1.0 + outTok * 5.0) / 1_000_000],
+      );
+    } catch {/* non-fatal */}
+    const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonText = m ? m[1]!.trim() : text.trim();
+    let parsed: any = null;
+    try { parsed = JSON.parse(jsonText); } catch {
+      const start = jsonText.indexOf("{");
+      if (start >= 0) {
+        try { parsed = JSON.parse(jsonText.slice(start)); } catch {}
+      }
+    }
+    if (!parsed) return { ok: false as const, error: "JSON parse failed" };
+    return {
+      ok: true as const,
+      value: {
+        text:  String(parsed.text  ?? "").slice(0, 4000),
+        image: String(parsed.image ?? "").slice(0, 4000),
+      },
+      hasRealContent: real.hasContent,
+    };
+  } catch (e: any) {
+    return { ok: false as const, error: String(e?.message ?? e) };
   }
 }
