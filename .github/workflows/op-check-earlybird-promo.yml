@@ -1,0 +1,43 @@
+name: "Op — Check early-bird promo env + affected users (read-only)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query promo env + earlyBird users
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            echo "===== ONBRAND_PROMO_ACTIVE env var (VM app .env) ====="
+            grep -i "ONBRAND_PROMO_ACTIVE" /opt/onbrand/app/skills/ai-talent/.env || echo "(not set — code defaults to ACTIVE)"
+
+            echo "===== pm2 env (actual running process env, may differ from .env file) ====="
+            pm2 env onbrand 2>/dev/null | grep -i "ONBRAND_PROMO_ACTIVE" || echo "(not set in running process env either)"
+
+            echo "===== users with earlyBird=1, signed up on/after 2026-07-15 (offer was supposed to be closed) ====="
+            Q "SELECT id, email, planCode, planStatus, earlyBird, lockedPriceTwdMonthly, createdAt
+                 FROM users WHERE earlyBird=1 AND createdAt >= '2026-07-15'
+                 ORDER BY createdAt DESC LIMIT 100;"
+
+            echo "===== count of earlyBird=1 users total vs after cutoff ====="
+            Q "SELECT
+                 (SELECT COUNT(*) FROM users WHERE earlyBird=1) AS earlyBird_total,
+                 (SELECT COUNT(*) FROM users WHERE earlyBird=1 AND createdAt >= '2026-07-15') AS earlyBird_after_cutoff;"
+
+            echo "===== recent 'pending'/'paid' invoices at amount 750 or 25 (TWD/USD earlybird price) since 2026-07-15 ====="
+            Q "SELECT id, userId, planCode, amount, currency, billingCycle, status, createdAt
+                 FROM invoices WHERE amount IN (750, 25) AND createdAt >= '2026-07-15'
+                 ORDER BY createdAt DESC LIMIT 50;"
