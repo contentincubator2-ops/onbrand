@@ -116,23 +116,20 @@ jobs:
               console.log("--- ground material ---\n" + ground);
 
               console.log("=========== STEP 2: LLM script (this is the P0 fix, proven) ===========");
-              const sys = `你是 TikTok 短影音編劇，繁體中文台灣用語。產出一支「品牌代言人對鏡頭說話」的 20-25 秒口播影片腳本。只輸出 JSON，第一字元就是 {。
-
-規則：
-- 這是一個真人代言人對著鏡頭講話，全程同一個人，沒有換場。
-- 前 1.5 秒必須抓住人，不要用「大家好」「今天要跟大家分享」這種開場。
-- 口播總長 90-110 個中文字（約 22 秒）。
-- 必須貼合下面的品牌定位，不可發明定位書沒有的主張。
-- spokespersonPrompt 用英文描述這個代言人的外觀（給 AI 生圖用），必須是正面、直視鏡頭、清晰臉部的直式人像。
-
-輸出 JSON：
-{
-  "hook": "前 1.5 秒的第一句（≤15字）",
-  "fullVO": "完整口播稿（含 hook，90-110字，這段會直接被唸出來，不要有任何標記或括號）",
-  "subtitleLines": ["字幕行（每行 6-12 字）"],
-  "spokespersonPrompt": "English description of the on-camera presenter"
-}
-subtitleLines 6-9 行，合起來要等於 fullVO 的內容。`;
+              const sys = [
+                "你是 TikTok 短影音編劇，繁體中文台灣用語。產出一支「品牌代言人對鏡頭說話」的 20-25 秒口播影片腳本。只輸出 JSON，第一字元就是 {。",
+                "",
+                "規則：",
+                "- 這是一個真人代言人對著鏡頭講話，全程同一個人，沒有換場。",
+                "- 前 1.5 秒必須抓住人，不要用「大家好」「今天要跟大家分享」這種開場。",
+                "- 口播總長 90-110 個中文字（約 22 秒）。",
+                "- 必須貼合下面的品牌定位，不可發明定位書沒有的主張。",
+                "- spokespersonPrompt 用英文描述這個代言人的外觀（給 AI 生圖用），必須是正面、直視鏡頭、清晰臉部的直式人像。",
+                "",
+                "輸出 JSON：",
+                '{"hook":"前 1.5 秒的第一句（≤15字）","fullVO":"完整口播稿（含 hook，90-110字，這段會直接被唸出來，不要有任何標記或括號）","subtitleLines":["字幕行（每行 6-12 字）"],"spokespersonPrompt":"English description of the on-camera presenter"}',
+                "subtitleLines 6-9 行，合起來要等於 fullVO 的內容。",
+              ].join("\n");
 
               const userMsg = TOPIC
                 ? `${ground}\n\n這次要講的題目：${TOPIC}`
