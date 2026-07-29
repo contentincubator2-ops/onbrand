@@ -353,6 +353,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "1",
     title: "戰略 Brief（intake 自動填寫）",
     agent: "intake-agent",
+    rationale: "先定調這次活動在品牌旅程中的角色——是升維、切入新市場、建立認知還是衝轉換，角色不同，後面每個創意與媒體決策的判準都不同。",
+    rationaleEn: "Name this campaign's role in the brand's journey first — brand-building, new-market entry, awareness, or conversion. The role changes every judgment call that follows.",
     fields: [
       { key: "eventType",       label: "活動類型（brand / growth / conversion / hybrid）", type: "text" },
       { key: "roleThisRound",   label: "本次角色（品牌升維 / 新市場切入 / 認知建立 / 轉換衝刺）", type: "text" },
@@ -366,6 +368,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "2",
     title: "背景與問題",
     agent: "business-diagnostician",
+    rationale: "行銷解法救不了診斷錯的病——先把商業現況、市場認知落差與根本原因說清楚，避免創意跳過診斷直接開跑，打到錯的靶。",
+    rationaleEn: "A marketing fix can't cure a misdiagnosed problem — nail the business reality, the perception gap, and the root cause before creative starts, or you'll hit the wrong target well.",
     fields: [
       { key: "businessBackground", label: "商業背景（公司 / 品牌目前狀態）", type: "textarea" },
       { key: "marketingStatus",    label: "當前行銷現況（被市場怎麼認知）", type: "textarea" },
@@ -379,6 +383,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "3",
     title: "目標受眾",
     agent: "audience-strategist",
+    rationale: "活動受眾不是重新發明的人——鎖定品牌既有受眾裡「這次特別要對誰說話」的核心洞察，創意才有一個具體的人在聽，而不是對空氣喊話。",
+    rationaleEn: "Campaign audiences aren't invented from scratch — pin down who, within the brand's existing audience, this round is really speaking to. Creative needs a specific listener, not a crowd.",
     fields: [
       { key: "primaryAudience",   label: "核心受眾（人群輪廓 / 行為特徵 / 心理洞察）", type: "textarea" },
       { key: "secondaryAudience", label: "次要受眾",                                  type: "textarea" },
@@ -391,6 +397,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "4",
     title: "活動目標（三層）",
     agent: "campaign-objectives",
+    rationale: "商業、行銷、用戶行為三層目標要分開寫——只顧商業目標容易流於空泛的營收數字，只顧用戶行為又見樹不見林，三層對齊才知道這次活動算不算贏。",
+    rationaleEn: "Business, marketing, and user-action goals need separate lines — business-only goals go vague, action-only goals miss the forest for the trees. All three aligned is how you know if this campaign actually won.",
     fields: [
       { key: "businessGoal",  label: "商業目標（Business）",        type: "textarea" },
       { key: "marketingGoal", label: "行銷目標（Marketing / Brand）", type: "textarea" },
@@ -404,6 +412,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "5",
     title: "獎項匹配（DB-RAG）",
     agent: "award-matcher",
+    rationale: "站在得獎案例的肩膀上——找到方法論相近的得獎作品，讓創意有可驗證的參考座標，不是團隊憑空發想、自己說服自己。",
+    rationaleEn: "Stand on the shoulders of award-winning work — find campaigns with a similar methodology so creative has a verifiable reference point, not just the team convincing itself.",
     fields: [
       { key: "selectedAwards", label: "推薦子獎項", type: "tableRows", columns: [
         { key: "name",         label: "完整名稱",     type: "text" },
@@ -419,6 +429,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "6",
     title: "單一核心命題（SMP）",
     agent: "smp-architect",
+    rationale: "SMP 是整場活動最高指導原則——一句話定生死，後面所有創意、訊息、素材都要能回答「這句話」，答不了的就是跑題。",
+    rationaleEn: "The SMP is the campaign's highest governing principle — one line that everything else must answer to. If a piece of creative can't trace back to it, it's off-brief.",
     fields: [
       { key: "singleMindedProposition", label: "SMP（一句話）",          type: "textarea" },
       { key: "rationale",               label: "為什麼是這句（200 字內）", type: "textarea" },
@@ -430,6 +442,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "7",
     title: "訊息架構",
     agent: "messaging-architect",
+    rationale: "核心訊息要有支撐點與證據——沒有 proof 的 claim 只是空話，消費者不會信；案例、數據、真實用戶故事才讓訊息站得住腳。",
+    rationaleEn: "A core message needs support and proof — a claim with nothing behind it is just noise. Cases, data, and real user stories are what make it believable.",
     fields: [
       { key: "coreMessage",      label: "核心訊息（Core Message）",        type: "textarea" },
       { key: "supportingPoints", label: "支撐訊息（3-5 條）",              type: "array" },
@@ -442,6 +456,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "8",
     title: "創意概念",
     agent: "creative-architect",
+    rationale: "大創意要能被一句話講完、也要能被一個比喻記住——測試標準是：說給一個沒有背景的人聽，他隔天還記不記得住。",
+    rationaleEn: "A big idea must fit in one sentence and stick as one metaphor — the test is whether a stranger, hearing it once, still remembers it the next day.",
     fields: [
       { key: "creativeTheme",   label: "創意主題（活動 big idea）",        type: "textarea" },
       { key: "coreMetaphor",    label: "核心比喻（市場/事件對應為何 metaphor）", type: "textarea" },
@@ -477,6 +493,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "10",
     title: "內容與管道策略",
     agent: "channel-architect",
+    rationale: "管道不是均分預算——每個階段該用什麼管道、什麼內容型態，要對應受眾當下的意識階段與情緒狀態，用錯階段等於對牛彈琴。",
+    rationaleEn: "Channel budget isn't split evenly — each stage's channel and content type must match the audience's actual awareness level and emotional state, or the message lands on deaf ears.",
     fields: [
       { key: "phases", label: "階段 + 管道 + 內容型態", type: "tableRows", columns: [
         { key: "stage",        label: "階段",         type: "text" },
@@ -492,6 +510,8 @@ export const EVENT_SEGMENTS: SegmentSpec[] = [
     num: "11",
     title: "用戶旅程",
     agent: "journey-architect",
+    rationale: "五步驟的 Awareness → Conversion 旅程是用來抓斷點——每一步的情緒與接觸點沒接上，用戶就會在中途流失，旅程圖就是抓漏工具。",
+    rationaleEn: "The 5-step Awareness→Conversion arc exists to catch drop-off points — wherever a step's emotion and touchpoint don't connect, users leak out. The journey map is a leak detector.",
     fields: [
       { key: "journey", label: "旅程（每步：情緒 / 接觸點 / 期望反應）", type: "tableRows", columns: [
         { key: "step",       label: "步驟",     type: "text" },
