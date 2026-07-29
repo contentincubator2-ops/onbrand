@@ -1,0 +1,32 @@
+name: "Ops — Read user + their brands (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        required: true
+        type: string
+
+jobs:
+  read:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    env:
+      EMAIL: ${{ github.event.inputs.email }}
+    steps:
+      - name: Read user + brands
+        run: |
+          set +e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          E=$(printf "%s" "$EMAIL" | sed "s/'/''/g")
+
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, email, planCode, createdAt FROM users WHERE email='$E';"
+          echo "===== brands for this user ====="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT b.id, b.name, b.tagline, b.updatedAt
+               FROM brands b
+               JOIN users u ON u.id = b.userId
+              WHERE u.email='$E';"
+          exit 0
