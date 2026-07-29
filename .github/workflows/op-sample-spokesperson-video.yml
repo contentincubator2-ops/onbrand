@@ -1,4 +1,4 @@
-name: "Op — Build ONE sample spokesperson TikTok video (Hedra + ElevenLabs)"
+name: "Op — Build ONE sample spokesperson TikTok video (2 paths, compare quality)"
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ on:
 jobs:
   sample:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Generate sample spokesperson video on VM
         uses: appleboy/ssh-action@v1.0.3
@@ -27,7 +27,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 22m
+          command_timeout: 27m
           envs: SAMPLE_BRAND_ID,SAMPLE_TOPIC
           script: |
             set -e
@@ -44,9 +44,6 @@ jobs:
             const BRAND_ID = Number(process.env.SAMPLE_BRAND_ID ?? 2964);
             const TOPIC = (process.env.SAMPLE_TOPIC ?? "").trim();
             const PIAPI_KEY = process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY ?? "";
-            const EL_KEY = process.env.ELEVENLABS_API_KEY ?? "";
-            const OPENAI_KEY = process.env.OPENAI_API_KEY ?? "";
-            const MINIMAX_KEY = process.env.HAILUO_API_KEY ?? process.env.MINIMAX_API_KEY ?? "";
             const GEMINI_KEY = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
             const PIAPI_BASE = "https://api.piapi.ai/api/v1";
 
@@ -67,38 +64,49 @@ jobs:
                 body: JSON.stringify({ model, task_type, input }),
               });
               const t = await r.text();
-              console.log(`[piapi submit ${model}/${task_type}] HTTP ${r.status}: ${t.slice(0, 600)}`);
-              if (!r.ok) throw new Error(`piapi submit ${r.status}`);
+              console.log(`[submit ${model}/${task_type}] HTTP ${r.status}: ${t.slice(0, 400)}`);
+              if (!r.ok) throw new Error(`piapi submit ${r.status}: ${t.slice(0, 300)}`);
               const d = JSON.parse(t);
               const id = d?.data?.task_id ?? d?.task_id;
               if (!id) throw new Error(`no task_id: ${t.slice(0, 300)}`);
               return id;
             }
-            async function piapiPoll(taskId: string, maxMs: number): Promise<any> {
+            async function piapiPoll(taskId: string, maxMs: number, tag: string): Promise<any> {
               const start = Date.now();
               while (Date.now() - start < maxMs) {
-                await new Promise((r) => setTimeout(r, 10_000));
+                await new Promise((r) => setTimeout(r, 12_000));
                 const r = await fetch(`${PIAPI_BASE}/task/${taskId}`, { headers: { "x-api-key": PIAPI_KEY } });
                 const d: any = await r.json();
                 const st = d?.data?.status ?? d?.status;
-                console.log(`  poll ${taskId}: ${st} (${Math.round((Date.now() - start) / 1000)}s)`);
+                console.log(`  [${tag}] ${st} (${Math.round((Date.now() - start) / 1000)}s)`);
                 if (st === "completed" || st === "success") return d?.data ?? d;
-                if (st === "failed" || st === "error") {
-                  throw new Error(`task failed: ${JSON.stringify(d).slice(0, 500)}`);
-                }
+                if (st === "failed" || st === "error") throw new Error(`${tag} failed: ${JSON.stringify(d).slice(0, 400)}`);
               }
-              throw new Error(`poll timeout ${taskId}`);
+              throw new Error(`${tag} poll timeout`);
+            }
+            function pcmToWav(pcm: Buffer, sampleRate = 24000, channels = 1, bits = 16): Buffer {
+              const hdr = Buffer.alloc(44);
+              hdr.write("RIFF", 0);
+              hdr.writeUInt32LE(36 + pcm.length, 4);
+              hdr.write("WAVE", 8);
+              hdr.write("fmt ", 12);
+              hdr.writeUInt32LE(16, 16);
+              hdr.writeUInt16LE(1, 20);
+              hdr.writeUInt16LE(channels, 22);
+              hdr.writeUInt32LE(sampleRate, 24);
+              hdr.writeUInt32LE((sampleRate * channels * bits) / 8, 28);
+              hdr.writeUInt16LE((channels * bits) / 8, 32);
+              hdr.writeUInt16LE(bits, 34);
+              hdr.write("data", 36);
+              hdr.writeUInt32LE(pcm.length, 40);
+              return Buffer.concat([hdr, pcm]);
             }
 
             (async () => {
               console.log("=========== STEP 0: keys ===========");
               console.log("PIAPI_KEY:", PIAPI_KEY ? "present" : "MISSING");
-              console.log("ELEVENLABS_API_KEY:", EL_KEY ? "present" : "MISSING");
-              console.log("OPENAI_API_KEY:", OPENAI_KEY ? "present" : "MISSING");
-              console.log("HAILUO/MINIMAX_API_KEY:", MINIMAX_KEY ? "present" : "MISSING");
               console.log("GEMINI_API_KEY:", GEMINI_KEY ? "present" : "MISSING");
-              if (!PIAPI_KEY) throw new Error("PIAPI_KEY missing — cannot generate image or video");
-              if (!EL_KEY && !OPENAI_KEY && !GEMINI_KEY) throw new Error("no TTS provider available");
+              if (!PIAPI_KEY || !GEMINI_KEY) throw new Error("required keys missing");
 
               console.log("=========== STEP 1: brand positioning ===========");
               const [rows]: any = await localPool.execute(
@@ -120,176 +128,159 @@ jobs:
                 `差異化：${String(pos?.differentiation?.summary ?? "").slice(0, 300)}`,
                 `黃金圈 WHY：${String(pos?.goldenCircle?.why ?? "").slice(0, 300)}`,
               ].join("\n");
-              console.log("--- ground material ---\n" + ground);
 
-              console.log("=========== STEP 2: LLM script (this is the P0 fix, proven) ===========");
+              console.log("=========== STEP 2: LLM script (the P0 fix) ===========");
               const sys = [
-                "你是 TikTok 短影音編劇，繁體中文台灣用語。產出一支「品牌代言人對鏡頭說話」的 20-25 秒口播影片腳本。只輸出 JSON，第一字元就是 {。",
+                "你是 TikTok 短影音編劇，繁體中文台灣用語。產出一支「品牌代言人對鏡頭說話」的短影音腳本。只輸出 JSON，第一字元就是 {。",
                 "",
                 "規則：",
-                "- 這是一個真人代言人對著鏡頭講話，全程同一個人，沒有換場。",
-                "- 前 1.5 秒必須抓住人，不要用「大家好」「今天要跟大家分享」這種開場。",
-                "- 口播總長 90-110 個中文字（約 22 秒）。",
+                "- 全片只有一個人對鏡頭講話，沒有換場。",
+                "- 第一句就要抓住人，不要用「大家好」「今天要跟大家分享」這種開場。",
+                "- shortVO 必須是 38-45 個中文字（唸出來約 9-10 秒）。這是完整可獨立成立的一支廣告：一句鉤子 + 一句價值 + 品牌名。",
                 "- 必須貼合下面的品牌定位，不可發明定位書沒有的主張。",
-                "- spokespersonPrompt 用英文描述這個代言人的外觀（給 AI 生圖用），必須是正面、直視鏡頭、清晰臉部的直式人像。",
+                "- spokespersonPrompt 用英文描述代言人外觀（給 AI 生圖用）：正面、直視鏡頭、清晰臉部、直式人像。",
                 "",
                 "輸出 JSON：",
-                '{"hook":"前 1.5 秒的第一句（≤15字）","fullVO":"完整口播稿（含 hook，90-110字，這段會直接被唸出來，不要有任何標記或括號）","subtitleLines":["字幕行（每行 6-12 字）"],"spokespersonPrompt":"English description of the on-camera presenter"}',
-                "subtitleLines 6-9 行，合起來要等於 fullVO 的內容。",
+                '{"hook":"第一句（≤15字）","shortVO":"38-45字的完整口播稿，會被直接唸出來，不要有任何標記、括號或旁白說明","subtitleLines":["字幕行（每行6-12字）"],"spokespersonPrompt":"English description of the on-camera presenter"}',
+                "subtitleLines 4-6 行，合起來等於 shortVO。",
               ].join("\n");
 
-              const userMsg = TOPIC
-                ? `${ground}\n\n這次要講的題目：${TOPIC}`
-                : `${ground}\n\n請自己從定位裡挑一個最適合 TikTok 的切角。`;
-
+              const userMsg = TOPIC ? `${ground}\n\n這次要講的題目：${TOPIC}` : `${ground}\n\n請自己從定位裡挑一個最適合 TikTok 的切角。`;
               const llm = await invokeLLM({
                 messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-                maxTokens: 1200,
+                maxTokens: 1000,
               });
-              const raw = llm.choices[0]?.message?.content ?? "";
-              const m = String(raw).match(/```(?:json)?\s*([\s\S]*?)```/);
-              const jt = m ? m[1]!.trim() : String(raw).trim();
+              const raw = String(llm.choices[0]?.message?.content ?? "");
+              const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+              const jt = m ? m[1]!.trim() : raw.trim();
               let script: any;
-              try { script = JSON.parse(jt); } catch {
-                const s = jt.indexOf("{");
-                script = JSON.parse(jt.slice(s));
-              }
-              console.log("--- generated script ---");
+              try { script = JSON.parse(jt); } catch { script = JSON.parse(jt.slice(jt.indexOf("{"))); }
               console.log(JSON.stringify(script, null, 2));
-              if (!script?.fullVO) throw new Error("script parse failed");
+              if (!script?.shortVO) throw new Error("script parse failed");
+              console.log("VO length (chars):", String(script.shortVO).length);
 
-              console.log("=========== STEP 3: spokesperson image (Flux, synthetic person) ===========");
-              const imgTaskId = await piapiSubmit("Qubico/flux1-dev", "txt2img", {
-                prompt: `${script.spokespersonPrompt}. Vertical portrait, facing camera directly, centered face, natural warm lighting, shallow depth of field, photorealistic, shot on 50mm, clean simple background, no text, no watermark`.slice(0, 800),
-                negative_prompt: "text, watermark, logo, caption, subtitles, letters, multiple people, side profile, looking away, blurry face, distorted face, extra fingers",
+              console.log("=========== STEP 3: spokesperson portrait (Flux, synthetic) ===========");
+              const imgTask = await piapiSubmit("Qubico/flux1-dev", "txt2img", {
+                prompt: `${script.spokespersonPrompt}. Vertical portrait, facing camera directly, centered face, mouth clearly visible, natural warm lighting, photorealistic, 50mm, clean simple background, no text, no watermark`.slice(0, 800),
+                negative_prompt: "text, watermark, logo, caption, subtitles, letters, multiple people, side profile, looking away, blurry face, distorted face, hands covering face",
                 width: 768,
                 height: 1344,
               });
-              const imgData = await piapiPoll(imgTaskId, 5 * 60_000);
-              const rawImgUrl = imgData?.output?.image_url ?? imgData?.output?.image_urls?.[0] ?? imgData?.output?.url;
-              if (!rawImgUrl) throw new Error(`no image url: ${JSON.stringify(imgData).slice(0, 500)}`);
-              const imageUrl = await rehost(rawImgUrl, "png");
-              console.log("SPOKESPERSON IMAGE:", imageUrl);
+              const imgData = await piapiPoll(imgTask, 6 * 60_000, "flux");
+              const rawImg = imgData?.output?.image_url ?? imgData?.output?.image_urls?.[0] ?? imgData?.output?.url;
+              if (!rawImg) throw new Error(`no image url: ${JSON.stringify(imgData).slice(0, 400)}`);
+              const imageUrl = await rehost(rawImg, "png");
+              console.log("PORTRAIT:", imageUrl);
 
-              console.log("=========== STEP 4/5: TTS ===========");
-              let audioBuf: Buffer | null = null;
-              let ttsProvider = "";
-              let audioExt = "mp3";
+              console.log("=========== STEP 4: Gemini TTS ===========");
+              const gres = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${GEMINI_KEY}`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: `請用溫暖、真誠、像爸爸在跟孩子說話的語氣，念出這段話：\n\n${script.shortVO}` }] }],
+                    generationConfig: {
+                      responseModalities: ["AUDIO"],
+                      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } } },
+                    },
+                  }),
+                },
+              );
+              if (!gres.ok) throw new Error(`Gemini TTS ${gres.status}: ${(await gres.text()).slice(0, 300)}`);
+              const gjson: any = await gres.json();
+              const b64 = gjson?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+              if (!b64) throw new Error(`Gemini TTS no audio: ${JSON.stringify(gjson).slice(0, 300)}`);
+              const audioUrl = saveBuf(pcmToWav(Buffer.from(b64, "base64")), "wav");
+              console.log("VOICEOVER:", audioUrl);
 
-              if (EL_KEY) {
-                try {
-                  const vres = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": EL_KEY } });
-                  const vjson: any = await vres.json();
-                  const voices = (vjson?.voices ?? []).map((v: any) => ({ id: v.voice_id, name: v.name }));
-                  console.log("elevenlabs voices:", JSON.stringify(voices.slice(0, 20)));
-                  const pref = voices.find((v: any) => /rachel|sarah|charlotte|alice|lily/i.test(v.name)) ?? voices[0];
-                  const voiceId = pref?.id ?? "21m00Tcm4TlvDq8ikWAM";
-                  console.log("using elevenlabs voice:", pref?.name, voiceId);
-                  const tts = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-                    method: "POST",
-                    headers: { "xi-api-key": EL_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
-                    body: JSON.stringify({
-                      text: script.fullVO,
-                      model_id: "eleven_multilingual_v2",
-                      voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.3 },
-                    }),
-                  });
-                  if (!tts.ok) throw new Error(`${tts.status}: ${(await tts.text()).slice(0, 200)}`);
-                  audioBuf = Buffer.from(await tts.arrayBuffer());
-                  ttsProvider = "elevenlabs/eleven_multilingual_v2";
-                } catch (e: any) {
-                  console.warn("elevenlabs failed, falling back:", e?.message ?? e);
-                }
-              }
+              console.log("=========== STEP 5: two paths in parallel ===========");
 
-              if (!audioBuf && OPENAI_KEY) {
-                try {
-                  const tts = await fetch("https://api.openai.com/v1/audio/speech", {
-                    method: "POST",
-                    headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      model: "gpt-4o-mini-tts",
-                      voice: "onyx",
-                      input: script.fullVO,
-                      instructions: "Speak in warm, natural Taiwanese Mandarin (zh-TW). Gentle father tone, conversational, not a news anchor. Moderate pace.",
-                      response_format: "mp3",
-                    }),
-                  });
-                  if (!tts.ok) throw new Error(`${tts.status}: ${(await tts.text()).slice(0, 200)}`);
-                  audioBuf = Buffer.from(await tts.arrayBuffer());
-                  ttsProvider = "openai/gpt-4o-mini-tts (onyx)";
-                } catch (e: any) {
-                  console.warn("openai tts failed, falling back:", e?.message ?? e);
-                }
-              }
+              const pathA = (async () => {
+                const i2v = await piapiSubmit("kling", "video_generation", {
+                  prompt: "The person is talking to the camera, speaking naturally with clear mouth movement, subtle head motion, warm sincere expression. Static camera, no scene change.",
+                  negative_prompt: "text, subtitles, watermark, scene change, multiple people",
+                  image_url: imageUrl,
+                  duration: 10,
+                  aspect_ratio: "9:16",
+                  version: "1.6",
+                  mode: "std",
+                });
+                const i2vData = await piapiPoll(i2v, 12 * 60_000, "kling-i2v");
+                const baseVid = i2vData?.output?.video_url ?? i2vData?.output?.url;
+                console.log("  [A] base video:", baseVid);
 
-              if (!audioBuf && GEMINI_KEY) {
-                // Gemini TTS returns raw 24kHz mono 16-bit PCM — wrap in a WAV header.
-                const gres = await fetch(
-                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${GEMINI_KEY}`,
+                const ls = await piapiSubmit("kling", "lip_sync", {
+                  origin_task_id: i2v,
+                  local_dubbing_url: audioUrl,
+                  tts_text: "",
+                  tts_speed: 1,
+                });
+                const lsData = await piapiPoll(ls, 10 * 60_000, "kling-lipsync");
+                const outVid = lsData?.output?.video_url ?? lsData?.output?.url;
+                if (!outVid) throw new Error(`no lipsync url: ${JSON.stringify(lsData).slice(0, 400)}`);
+                return await rehost(outVid, "mp4");
+              })();
+
+              const pathB = (async () => {
+                const veoPrompt = [
+                  `A warm, sincere Taiwanese father in his early 30s speaks directly to the camera in a cozy home at night.`,
+                  `Vertical 9:16 framing, medium close-up, soft warm lamp light, shallow depth of field, photorealistic.`,
+                  `He says in Traditional Chinese Mandarin (Taiwan accent): "${script.shortVO}"`,
+                  `Natural lip movement synced to his speech, gentle expression, subtle head movement. Static camera.`,
+                  `No subtitles, no on-screen text, no captions, no watermark.`,
+                ].join(" ");
+                const vres = await fetch(
+                  `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-001:predictLongRunning?key=${GEMINI_KEY}`,
                   {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                      contents: [{ parts: [{ text: `請用溫暖、真誠、像爸爸在跟孩子說話的語氣，念出這段話：\n\n${script.fullVO}` }] }],
-                      generationConfig: {
-                        responseModalities: ["AUDIO"],
-                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } } },
-                      },
+                      instances: [{ prompt: veoPrompt }],
+                      parameters: { aspectRatio: "9:16" },
                     }),
                   },
                 );
-                if (!gres.ok) throw new Error(`Gemini TTS ${gres.status}: ${(await gres.text()).slice(0, 400)}`);
-                const gjson: any = await gres.json();
-                const b64 = gjson?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if (!b64) throw new Error(`Gemini TTS no audio: ${JSON.stringify(gjson).slice(0, 400)}`);
-                const pcm = Buffer.from(b64, "base64");
-                const sampleRate = 24000, channels = 1, bits = 16;
-                const hdr = Buffer.alloc(44);
-                hdr.write("RIFF", 0);
-                hdr.writeUInt32LE(36 + pcm.length, 4);
-                hdr.write("WAVE", 8);
-                hdr.write("fmt ", 12);
-                hdr.writeUInt32LE(16, 16);
-                hdr.writeUInt16LE(1, 20);
-                hdr.writeUInt16LE(channels, 22);
-                hdr.writeUInt32LE(sampleRate, 24);
-                hdr.writeUInt32LE(sampleRate * channels * bits / 8, 28);
-                hdr.writeUInt16LE(channels * bits / 8, 32);
-                hdr.writeUInt16LE(bits, 34);
-                hdr.write("data", 36);
-                hdr.writeUInt32LE(pcm.length, 40);
-                audioBuf = Buffer.concat([hdr, pcm]);
-                ttsProvider = "google/gemini-2.5-flash-tts (Charon)";
-                audioExt = "wav";
-              }
+                if (!vres.ok) throw new Error(`Veo submit ${vres.status}: ${(await vres.text()).slice(0, 300)}`);
+                const opName = (await vres.json() as any)?.name;
+                console.log("  [B] veo op:", opName);
+                const start = Date.now();
+                while (Date.now() - start < 12 * 60_000) {
+                  await new Promise((r) => setTimeout(r, 15_000));
+                  const pr = await fetch(`https://generativelanguage.googleapis.com/v1beta/${opName}?key=${GEMINI_KEY}`);
+                  const pd: any = await pr.json();
+                  console.log(`  [veo] done=${!!pd?.done} (${Math.round((Date.now() - start) / 1000)}s)`);
+                  if (pd?.error) throw new Error(`Veo error: ${JSON.stringify(pd.error).slice(0, 300)}`);
+                  if (pd?.done) {
+                    const uri =
+                      pd?.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri ??
+                      pd?.response?.generatedSamples?.[0]?.video?.uri ??
+                      pd?.response?.videos?.[0]?.uri;
+                    if (!uri) throw new Error(`Veo no uri: ${JSON.stringify(pd).slice(0, 500)}`);
+                    const dl = await fetch(`${uri}${uri.includes("?") ? "&" : "?"}key=${GEMINI_KEY}`);
+                    if (!dl.ok) throw new Error(`Veo download ${dl.status}`);
+                    return saveBuf(Buffer.from(await dl.arrayBuffer()), "mp4");
+                  }
+                }
+                throw new Error("Veo timeout");
+              })();
 
-              if (!audioBuf) throw new Error("all TTS providers failed");
-              const audioUrl = saveBuf(audioBuf, audioExt);
-              console.log("TTS provider:", ttsProvider);
-              console.log("VOICEOVER:", audioUrl);
-
-              console.log("=========== STEP 6: Hedra Character-3 lip-sync ===========");
-              const vidTaskId = await piapiSubmit("hedra", "character", {
-                image_url: imageUrl,
-                audio_url: audioUrl,
-                prompt: "Warm, natural delivery to camera. Subtle head movement, genuine expression, slight smile.",
-                aspect_ratio: "9:16",
-              });
-              const vidData = await piapiPoll(vidTaskId, 12 * 60_000);
-              const rawVid = vidData?.output?.video_url ?? vidData?.output?.url;
-              if (!rawVid) throw new Error(`no video url: ${JSON.stringify(vidData).slice(0, 600)}`);
-              const videoUrl = await rehost(rawVid, "mp4");
+              const [ra, rb] = await Promise.allSettled([pathA, pathB]);
 
               console.log("");
               console.log("############################################");
-              console.log("SAMPLE VIDEO READY");
-              console.log("  brand    :", brand.name);
-              console.log("  hook     :", script.hook);
-              console.log("  VO       :", script.fullVO);
-              console.log("  image    :", imageUrl);
-              console.log("  audio    :", audioUrl);
-              console.log("  >>> VIDEO:", videoUrl);
+              console.log("SAMPLE RESULTS —", brand.name);
+              console.log("  hook  :", script.hook);
+              console.log("  VO    :", script.shortVO);
+              console.log("  字幕  :", JSON.stringify(script.subtitleLines));
+              console.log("  portrait:", imageUrl);
+              console.log("  audio   :", audioUrl);
+              console.log("");
+              console.log("  PATH A (Flux portrait + Kling i2v + Kling lip_sync, our own TTS):");
+              console.log("   ", ra.status === "fulfilled" ? ra.value : `FAILED — ${(ra as any).reason?.message}`);
+              console.log("");
+              console.log("  PATH B (Veo 3, native synced dialogue, one shot):");
+              console.log("   ", rb.status === "fulfilled" ? rb.value : `FAILED — ${(rb as any).reason?.message}`);
               console.log("############################################");
               process.exit(0);
             })().catch((e) => {
