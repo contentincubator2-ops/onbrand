@@ -546,6 +546,31 @@ export default function BrandsPage() {
     : scope?.brandId ? "brand"
     : (brandId ? "brand" : "none"); // legacy fallback
 
+  // 2026-07-29 (「穩定了」— generalize Strategy Workbench to events): the
+  // workbench's chip-derivation logic expects brand-shaped keys (audience.
+  // primary/secondary, competition.direct, differentiation). Events store
+  // audience under primaryAudience/secondaryAudience and have no competition/
+  // differentiation segments of their own — so when scope is on an event we
+  // build a translated + merged view for the workbench only: event's own
+  // audience (remapped) + the PARENT BRAND's competition/differentiation
+  // borrowed read-only for grounding. positioningSegmentData itself (used by
+  // PositioningGrid / AssetCard) stays untouched — this merge is workbench-only.
+  const workbenchPositioning: Record<string, any> = React.useMemo(() => {
+    if (scopeMode !== "event") return positioningSegmentData;
+    const evAud = positioningSegmentData?.audience ?? {};
+    const brandPos = (_sa?.brand?.positioning ?? {}) as Record<string, any>;
+    return {
+      ...positioningSegmentData,
+      audience: {
+        primary: [evAud.primaryAudience, evAud.keyInsight].filter(Boolean).join("\n"),
+        secondary: evAud.secondaryAudience ?? "",
+      },
+      competition: brandPos.competition ?? {},
+      differentiation: brandPos.differentiation ?? {},
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeMode, positioningSegmentData, _sa?.brand?.positioning]);
+
   // Pull product/event details when those scopes are active
   const productQuery = (trpc as any).product?.get?.useQuery
     ? (trpc as any).product.get.useQuery(
@@ -1932,11 +1957,16 @@ export default function BrandsPage() {
                   {(pipeline.status === "idle" || pipeline.status === "done") && (
                     <>
                       {/* 2026-07-28 (CJ「開工」策略工作台 P1): 受眾×競爭組×優勢
-                          三錨點 → 四區看板＋標語推導鏈；brand scope only. */}
-                      {scopeMode === "brand" && activeBrandIdForLocks ? (
+                          三錨點 → 四區看板＋標語推導鏈。
+                          2026-07-29 (「穩定了」): generalized to event scope —
+                          scenarios persist on the event's own positioning;
+                          competition/differentiation ground material is
+                          borrowed read-only from the parent brand. */}
+                      {(scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks ? (
                         <StrategyWorkbench
                           brandId={activeBrandIdForLocks}
-                          positioning={positioningSegmentData}
+                          eventId={scopeMode === "event" ? (scope?.eventId ?? null) : null}
+                          positioning={workbenchPositioning}
                           lang={lang}
                         />
                       ) : null}

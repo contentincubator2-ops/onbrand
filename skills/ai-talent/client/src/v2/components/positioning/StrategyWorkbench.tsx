@@ -35,13 +35,21 @@ const IC = {
 type Chip = { key: string; label: string; value: string; drill?: "audience" | "competitor" };
 
 export default function StrategyWorkbench({
-  brandId, positioning, lang,
+  brandId, eventId, positioning, lang,
 }: {
   brandId: number;
+  /** 2026-07-29 (「穩定了」— generalize workbench to events): when set, the
+   *  workbench operates on the EVENT's own positioning (scenarios persist
+   *  on events.positioning._workbench, not the brand's). `brandId` stays
+   *  required even in event scope — it's the parent brand the server
+   *  borrows competition/differentiation ground material from. */
+  eventId?: number | null;
   positioning: Record<string, any>;
   lang: "zh-TW" | "en";
 }) {
   const en = lang === "en";
+  const isEvent = !!eventId;
+  const scopeArgs = isEvent ? { brandId, eventId: eventId! } : { brandId };
   const navigate = useNavigate();
   const utils = (trpc as any).useUtils?.();
   const deriveMut = (trpc as any).workbench?.derive?.useMutation?.();
@@ -49,12 +57,13 @@ export default function StrategyWorkbench({
   const applyMut = (trpc as any).workbench?.applyScenario?.useMutation?.();
   const [digging, setDigging] = useState<number | null>(null);
   // 2026-07-29 (CJ「品牌工具、黃金圈等應該跟著策略工作台變動」): apply now
-  // cascades — 差異化/黃金圈/語氣/標語評分/AI 指令庫 regenerate as a
-  // positioning job; poll it so the user sees progress and the page below
-  // refreshes when the downstream is consistent with the applied scenario.
+  // cascades — brand: 差異化/黃金圈/語氣/標語評分/AI 指令庫；event: 訊息架構/
+  // 創意概念 — regenerate as a positioning job; poll it so the user sees
+  // progress and the page below refreshes when the downstream is consistent
+  // with the applied scenario.
   const [cascading, setCascading] = useState(false);
   const cascadeQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
-    { entityKind: "brand", entityIds: [brandId] },
+    { entityKind: isEvent ? "event" : "brand", entityIds: [isEvent ? eventId! : brandId] },
     { enabled: cascading, refetchInterval: 4000 },
   );
   React.useEffect(() => {
@@ -87,7 +96,7 @@ export default function StrategyWorkbench({
   const audSegmentEmpty = !aud.primary && !aud.secondary;
   const brandQ = (trpc as any).brand?.get?.useQuery?.(
     { id: brandId },
-    { enabled: !!brandId && audSegmentEmpty, refetchOnWindowFocus: false },
+    { enabled: !isEvent && !!brandId && audSegmentEmpty, refetchOnWindowFocus: false },
   );
   const audienceChips: Chip[] = useMemo(() => {
     const out: Chip[] = [];
@@ -196,7 +205,7 @@ export default function StrategyWorkbench({
     }
     const name = activeName ?? active?.name ?? "情境 A";
     deriveMut?.mutate?.(
-      { brandId, scenarioName: name, selection: { audience: audienceText.slice(0, 600), competitors, advantages } },
+      { ...scopeArgs, scenarioName: name, selection: { audience: audienceText.slice(0, 600), competitors, advantages } },
       {
         onSuccess: (r: any) => {
           if (r?.ok) {
@@ -395,23 +404,23 @@ export default function StrategyWorkbench({
                   </div>
                   {s.tagline?.zh && (
                     <div style={{ marginTop: 7, paddingTop: 7, borderTop: "1px dashed #F0DFD6", display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: "#8A8494" }}>{en ? "TAGLINE FROM THIS SPOT" : "此點長出的標語"}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: "#8A8494" }}>{en ? (isEvent ? "SMP FROM THIS SPOT" : "TAGLINE FROM THIS SPOT") : (isEvent ? "此點長出的 SMP" : "此點長出的標語")}</span>
                       <span style={{ fontWeight: 800, fontSize: 14 }}>{s.tagline.zh}</span>
                       {s.tagline.en && <span style={{ fontSize: 11, color: "#8A8494", fontStyle: "italic" }}>{s.tagline.en}</span>}
                       {derived.currentTaglineSpot && derived.currentTaglineSpot === s.title && (
                         <span style={{ fontSize: 9.5, fontWeight: 800, background: "#2A2630", color: "#fff", borderRadius: 5, padding: "1px 7px" }}>
-                          {en ? "current tagline origin" : "現行標語來源"}
+                          {en ? (isEvent ? "current SMP origin" : "current tagline origin") : (isEvent ? "現行 SMP 來源" : "現行標語來源")}
                         </span>
                       )}
                     </div>
                   )}
-                  {/* P2 spot actions: 深挖 / 套用此標語 */}
+                  {/* P2 spot actions: 深挖 / 套用此標語(SMP) */}
                   <div style={{ display: "flex", gap: 7, marginTop: 8 }}>
                     <span style={{ ...S.act, background: "#2A2630", borderColor: "#2A2630", color: "#fff", opacity: digging === i ? .6 : 1 }}
                           onClick={() => {
                             if (digging !== null || !active?.id) return;
                             setDigging(i);
-                            digMut?.mutate?.({ brandId, scenarioId: active.id, spotIndex: i }, {
+                            digMut?.mutate?.({ ...scopeArgs, scenarioId: active.id, spotIndex: i }, {
                               onSuccess: (r: any) => {
                                 setDigging(null);
                                 if (r?.ok) { showToastGlobal(en ? "Deep-dive ready" : "✓ 深挖完成", "success"); utils?.scope?.active?.invalidate?.(); }
@@ -426,13 +435,20 @@ export default function StrategyWorkbench({
                       <span style={S.act}
                             onClick={() => {
                               if (!active?.id) return;
-                              if (!window.confirm(en
-                                ? `Apply this scenario?\n· audience anchor ← selected audience\n· main tagline ←「${tagZh}」\n· downstream regenerates (differentiation / golden circle / voice / tagline score / AI prompts ×8), ~1-2 min`
-                                : `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· 主標語 ←「${tagZh}」\n· 下游同步重生：差異化、黃金圈、語氣、標語評分、AI 指令庫（8 平台人設），約 1-2 分鐘\n之後所有文案任務與定位重跑都以此為準。`)) return;
-                              applyMut?.mutate?.({ brandId, scenarioId: active.id, taglineSpotIndex: i }, {
+                              const confirmMsg = en
+                                ? (isEvent
+                                    ? `Apply this scenario?\n· audience anchor ← selected audience\n· SMP ←「${tagZh}」\n· downstream regenerates (messaging / creative), ~1-2 min`
+                                    : `Apply this scenario?\n· audience anchor ← selected audience\n· main tagline ←「${tagZh}」\n· downstream regenerates (differentiation / golden circle / voice / tagline score / AI prompts ×8), ~1-2 min`)
+                                : (isEvent
+                                    ? `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· SMP ←「${tagZh}」\n· 下游同步重生：訊息架構、創意概念，約 1-2 分鐘\n之後所有文案任務都以此為準。`
+                                    : `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· 主標語 ←「${tagZh}」\n· 下游同步重生：差異化、黃金圈、語氣、標語評分、AI 指令庫（8 平台人設），約 1-2 分鐘\n之後所有文案任務與定位重跑都以此為準。`);
+                              if (!window.confirm(confirmMsg)) return;
+                              applyMut?.mutate?.({ ...scopeArgs, scenarioId: active.id, taglineSpotIndex: i }, {
                                 onSuccess: (r: any) => {
                                   if (r?.ok) {
-                                    showToastGlobal(en ? "Applied — downstream regenerating…" : "✓ 已套用——下游（差異化／黃金圈／語氣／AI 指令庫）重生中…", "success");
+                                    showToastGlobal(en
+                                      ? "Applied — downstream regenerating…"
+                                      : (isEvent ? "✓ 已套用——下游（訊息架構／創意概念）重生中…" : "✓ 已套用——下游（差異化／黃金圈／語氣／AI 指令庫）重生中…"), "success");
                                     if (r.cascade) setCascading(true);
                                     utils?.scope?.active?.invalidate?.();
                                   }
@@ -441,7 +457,7 @@ export default function StrategyWorkbench({
                                 onError: () => showToastGlobal(en ? "Apply failed" : "套用失敗"),
                               });
                             }}>
-                        {en ? "Apply + set tagline" : "套用定位＋設此標語"}
+                        {en ? (isEvent ? "Apply + set SMP" : "Apply + set tagline") : (isEvent ? "套用定位＋設此 SMP" : "套用定位＋設此標語")}
                       </span>
                     ); })()}
                   </div>
@@ -461,7 +477,7 @@ export default function StrategyWorkbench({
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "4px 0 7px" }}>
                           {s.dig.contentAngles.map((a: string, j: number) => (
                             <span key={j}
-                                  onClick={() => navigate(`/tasks/fb?b=${brandId}&topic=${encodeURIComponent(a)}`)}
+                                  onClick={() => navigate(`/tasks/fb?b=${brandId}${isEvent ? `&e=${eventId}` : ""}&topic=${encodeURIComponent(a)}`)}
                                   title={en ? "Open the task wall with this topic prefilled" : "帶著這個題目前往任務牆，點任一任務即自動填入"}
                                   style={{ fontSize: 11, border: "1px solid #2A2630", borderRadius: 999, padding: "2px 10px", background: "#fff", cursor: "pointer", fontWeight: 600 }}>
                               {a} ↗

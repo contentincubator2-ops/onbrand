@@ -81,70 +81,126 @@ async function loadBrandPositioning(brandId: number, userId: number): Promise<{ 
   return { name: brand.name, pos: pos ?? {} };
 }
 
+async function loadEventPositioning(eventId: number, brandId: number, userId: number): Promise<{ name: string; pos: any } | null> {
+  const [rows]: any = await localPool.execute(
+    `SELECT name, positioning FROM events WHERE id = ? AND brandId = ? AND userId = ? LIMIT 1`,
+    [eventId, brandId, userId],
+  );
+  const ev = (rows as any[])[0];
+  if (!ev) return null;
+  let pos: any = ev.positioning;
+  if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
+  return { name: ev.name, pos: pos ?? {} };
+}
+
+/** 2026-07-29 (「穩定了」— generalize workbench to events): a scenario can
+ *  live on a brand OR on an event. `entityId` is the row that owns the
+ *  scenario/scoreboard (brand.positioning._workbench or event.positioning._workbench).
+ *  Events have no competition/differentiation/goldenCircle segments of their
+ *  own, so when scoped to an event we still borrow those from the PARENT
+ *  brand (brandId) as read-only ground material — never write back to it. */
+type Scope = { entityKind: "brand" | "event"; entityId: number; brandId: number };
+
+async function loadScopedPositioning(scope: Scope, userId: number): Promise<{ name: string; pos: any } | null> {
+  return scope.entityKind === "event"
+    ? loadEventPositioning(scope.entityId, scope.brandId, userId)
+    : loadBrandPositioning(scope.entityId, userId);
+}
+async function saveScopedPositioning(scope: Scope, userId: number, pos: any): Promise<void> {
+  const table = scope.entityKind === "event" ? "events" : "brands";
+  await localPool.execute(
+    `UPDATE ${table} SET positioning = ? WHERE id = ? AND userId = ?`,
+    [JSON.stringify(pos), scope.entityId, userId],
+  );
+}
+
 const selectionSchema = z.object({
   audience: z.string().min(1).max(600),
   competitors: z.array(z.string().min(1).max(80)).min(1).max(8),
   advantages: z.array(z.string().min(1).max(200)).min(1).max(6),
 });
 
+const scopeSchema = {
+  brandId: z.number().int().positive(),
+  eventId: z.number().int().positive().optional().nullable(),
+};
+function toScope(input: { brandId: number; eventId?: number | null }): Scope {
+  return input.eventId
+    ? { entityKind: "event", entityId: input.eventId, brandId: input.brandId }
+    : { entityKind: "brand", entityId: input.brandId, brandId: input.brandId };
+}
+
 export const workbenchRouter = router({
   derive: protectedProcedure
     .input(z.object({
-      brandId: z.number().int().positive(),
+      ...scopeSchema,
       scenarioName: z.string().min(1).max(40).default("情境 A"),
       selection: selectionSchema,
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const [rows]: any = await localPool.execute(
-        `SELECT name, positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
-        [input.brandId, userId],
-      );
-      const brand = (rows as any[])[0];
-      if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "brand not found" });
-      let pos: any = brand.positioning;
-      if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
-      pos = pos ?? {};
+      const scope = toScope(input);
+      const loaded = await loadScopedPositioning(scope, userId);
+      if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
+      const { name: entityName, pos } = loaded;
 
-      // Ground material: only the segments the derivation needs, trimmed.
+      // Ground material differs by scope:
+      //  - brand: audience/competition/differentiation/goldenCircle/tagline
+      //    all live on the brand's own positioning.
+      //  - event: audience/SMP/creative live on the event's own positioning;
+      //    competition/differentiation are borrowed (read-only) from the
+      //    parent brand, since events don't do their own competitive analysis.
+      const brandPos = scope.entityKind === "event"
+        ? (await loadBrandPositioning(scope.brandId, userId))?.pos ?? {}
+        : pos;
       const aud = pos.audience ?? {};
-      const compRows: any[] = Array.isArray(pos.competition?.direct) ? pos.competition.direct : [];
+      const audPrimary = scope.entityKind === "event"
+        ? [aud.primaryAudience, aud.keyInsight].filter(Boolean).join("\n")
+        : String(aud.primary ?? "");
+      const audSecondary = scope.entityKind === "event" ? String(aud.secondaryAudience ?? "") : "";
+      const compRows: any[] = Array.isArray(brandPos.competition?.direct) ? brandPos.competition.direct : [];
       const pickedComp = compRows.filter((c) =>
         input.selection.competitors.some((n) => String(c?.name ?? "").includes(n) || n.includes(String(c?.name ?? ""))));
       const compBlock = (pickedComp.length > 0 ? pickedComp : compRows.slice(0, 4))
         .map((c) => `- ${c.name}：地位=${c.position ?? "?"}｜調性=${c.tone ?? "?"}｜弱點=${c.weakness ?? "?"}｜我方差異=${c.ourEdge ?? "?"}`)
         .join("\n");
-      const diff = pos.differentiation ?? {};
-      const gc = pos.goldenCircle ?? {};
-      const curTagline = pos.tagline?.zhTagline ?? "";
+      const diff = brandPos.differentiation ?? {};
 
-      const sys = `你是品牌策略顧問，繁體中文。任務：依「消費者想要 × 所選競爭者無法滿足 × 所選優勢能提供」的交集邏輯，產出四區策略看板。只輸出 JSON，第一字元就是 {。
+      // "Official positioning" ground text — what spots[0] must restate:
+      //  - brand: differentiation summary + goldenCircle WHY + current tagline
+      //  - event: SMP (single-minded proposition) + core message/creative
+      const officialGroundText = scope.entityKind === "event"
+        ? `SMP（單一核心命題）：${String(pos.smp?.singleMindedProposition ?? "").slice(0, 300)}\n核心訊息：${String(pos.messaging?.coreMessage ?? "").slice(0, 200)}\n創意核心轉譯：${String(pos.creative?.coreTranslation ?? "").slice(0, 200)}`
+        : `差異化：情感=${String(diff.emotional ?? "").slice(0, 200)}｜功能=${String(diff.functional ?? "").slice(0, 200)}｜總結=${String(diff.summary ?? "").slice(0, 200)}\n黃金圈 WHY：${String(brandPos.goldenCircle?.why ?? "").slice(0, 200)}\n現行標語：${brandPos.tagline?.zhTagline || "（無）"}`;
+      const curTagline = scope.entityKind === "event"
+        ? (pos.smp?.singleMindedProposition ?? "")
+        : (brandPos.tagline?.zhTagline ?? "");
+      const officialLabel = scope.entityKind === "event" ? "活動「現有 SMP／核心訊息」" : "品牌「現有正式定位」";
+
+      const sys = `你是${scope.entityKind === "event" ? "活動" : "品牌"}策略顧問，繁體中文。任務：依「消費者想要 × 所選競爭者無法滿足 × 所選優勢能提供」的交集邏輯，產出四區策略看板。只輸出 JSON，第一字元就是 {。
 
 【本輪錨點 — 不可偏離】
 受眾錨點（所有需求必須屬於這個受眾）：${input.selection.audience}
 競爭組（缺口只能來自這幾家）：${input.selection.competitors.join("、")}
 主打優勢（ours 只能從這裡選用）：${input.selection.advantages.join("、")}
 
-【品牌研究資料】
-受眾主敘事：${String(aud.primary ?? "").slice(0, 500)}
-受眾痛點/需求：${JSON.stringify(aud.pains ?? [])} ${JSON.stringify(aud.needs ?? [])}
-競品攻防：
+【${scope.entityKind === "event" ? "活動" : "品牌"}研究資料】
+受眾主敘事：${audPrimary.slice(0, 500)}${audSecondary ? `\n次受眾：${audSecondary.slice(0, 200)}` : ""}
+${scope.entityKind === "brand" ? `受眾痛點/需求：${JSON.stringify(aud.pains ?? [])} ${JSON.stringify(aud.needs ?? [])}\n` : ""}競品攻防：
 ${compBlock}
-差異化：情感=${String(diff.emotional ?? "").slice(0, 200)}｜功能=${String(diff.functional ?? "").slice(0, 200)}｜總結=${String(diff.summary ?? "").slice(0, 200)}
-黃金圈 WHY：${String(gc.why ?? "").slice(0, 200)}
-現行標語：${curTagline || "（無）"}
+${officialGroundText}
 
 【定位書錨點 — 最重要規則】
-spots[0] 必須是品牌「現有正式定位」本身：把上方差異化總結／黃金圈 WHY／現行標語所承載的正式定位，忠實改寫成 need←gap←ours 因果鏈——不可加入正式定位沒有的新主張，不可稀釋或改向，並標 "official": true。
+spots[0] 必須是${officialLabel}本身：把上方${scope.entityKind === "event" ? "SMP／核心訊息" : "差異化總結／黃金圈 WHY／現行標語"}所承載的正式定位，忠實改寫成 need←gap←ours 因果鏈——不可加入正式定位沒有的新主張，不可稀釋或改向，並標 "official": true。
 其餘 spots 才是依本輪錨點推導的延伸機會（"official": false），且不可與正式定位矛盾。
 
 輸出 JSON 結構：
 {
-  "spots": [ { "lane": "emotion|function", "title": "甜蜜點名稱（≤14字）", "need": "她要什麼（≤30字）", "gap": "所選競爭者的具體缺口（點名品牌，≤40字）", "ours": "我們憑什麼（引用所選優勢，≤40字）", "official": true|false, "tagline": { "zh": "從這個點長出的標語（≤14字）", "en": "英文版" } } ],
+  "spots": [ { "lane": "emotion|function", "title": "甜蜜點名稱（≤14字）", "need": "她要什麼（≤30字）", "gap": "所選競爭者的具體缺口（點名品牌，≤40字）", "ours": "我們憑什麼（引用所選優勢，≤40字）", "official": true|false, "tagline": { "zh": "從這個點長出的${scope.entityKind === "event" ? "SMP／一句話主張" : "標語"}（≤14字）", "en": "英文版" } } ],
   "stakes": [ { "title": "基本籌碼（她要・對手也有）", "note": "≤24字說明" } ],
   "rivalTurf": [ { "title": "對手地盤（她要・我們不跟）", "note": "為何不跟 ≤24字" } ],
   "vanity": [ { "title": "自嗨區（我們想講・她無感）", "note": "轉化建議 ≤24字" } ],
-  "currentTaglineSpot": "現行標語最接近哪個 spot 的 title；無法對應則 null"
+  "currentTaglineSpot": "現行${scope.entityKind === "event" ? "SMP" : "標語"}最接近哪個 spot 的 title；無法對應則 null"
 }
 spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 個。每個 spot 的 need/gap/ours 必須構成可唸出來的因果鏈。`;
 
@@ -153,7 +209,7 @@ spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 �
         invokeLLM({
           messages: [
             { role: "system", content: sys },
-            { role: "user", content: `品牌：${brand.name}。請產出四區策略看板。` },
+            { role: "user", content: `${scope.entityKind === "event" ? "活動" : "品牌"}：${entityName}。請產出四區策略看板。` },
           ],
           maxTokens: 2800,
         }),
@@ -166,8 +222,8 @@ spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 �
         const outTok = r.usage?.completion_tokens ?? 0;
         await localPool.execute(
           `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
-                VALUES (?, 'brand', ?, 'workbench_derive', ?, ?, ?, ?)`,
-          [userId, input.brandId, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
+                VALUES (?, ?, ?, 'workbench_derive', ?, ?, ?, ?)`,
+          [userId, scope.entityKind, scope.entityId, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
            (inTok * 1.0 + outTok * 5.0) / 1_000_000],
         );
       } catch { /* non-fatal */ }
@@ -204,10 +260,7 @@ spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 �
       const idx = scenarios.findIndex((s) => s?.name === input.scenarioName);
       if (idx >= 0) scenarios[idx] = scenario; else scenarios.push(scenario);
       pos._workbench = { ...(pos._workbench ?? {}), scenarios: scenarios.slice(-8), activeId: scenario.id };
-      await localPool.execute(
-        `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
-        [JSON.stringify(pos), input.brandId, userId],
-      );
+      await saveScopedPositioning(scope, userId, pos);
       return { ok: true as const, scenario };
     }),
 
@@ -216,21 +269,22 @@ spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 �
    *  the scenario keeps the dig. */
   digSpot: protectedProcedure
     .input(z.object({
-      brandId: z.number().int().positive(),
+      ...scopeSchema,
       scenarioId: z.string().min(1).max(40),
       spotIndex: z.number().int().min(0).max(7),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const loaded = await loadBrandPositioning(input.brandId, userId);
-      if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: "brand not found" });
+      const scope = toScope(input);
+      const loaded = await loadScopedPositioning(scope, userId);
+      if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
       const { name, pos } = loaded;
       const scenarios: any[] = Array.isArray(pos._workbench?.scenarios) ? pos._workbench.scenarios : [];
       const scn = scenarios.find((s) => s?.id === input.scenarioId);
       const spot = scn?.derived?.spots?.[input.spotIndex];
       if (!spot) return { ok: false as const, error: "找不到這個甜蜜點，請先重新推導" };
 
-      const sys = `你是品牌策略顧問，繁體中文。針對單一「甜蜜點」往下深挖。只輸出 JSON，第一字元就是 {。
+      const sys = `你是${scope.entityKind === "event" ? "活動" : "品牌"}策略顧問，繁體中文。針對單一「甜蜜點」往下深挖。只輸出 JSON，第一字元就是 {。
 
 【甜蜜點】${spot.title}
 推導鏈：${spot.need} ←（對手缺口）${spot.gap} ←（我方能力）${spot.ours}
@@ -266,10 +320,7 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
       }
       if (!dig || !Array.isArray(dig.contentAngles)) return { ok: false as const, error: "深挖結果解析失敗，請再試一次" };
       spot.dig = dig;
-      await localPool.execute(
-        `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
-        [JSON.stringify(pos), input.brandId, userId],
-      );
+      await saveScopedPositioning(scope, userId, pos);
       return { ok: true as const, dig };
     }),
 
@@ -280,15 +331,17 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
    *  - _workbench.appliedId 記錄已套用情境 */
   applyScenario: protectedProcedure
     .input(z.object({
-      brandId: z.number().int().positive(),
+      ...scopeSchema,
       scenarioId: z.string().min(1).max(40),
       taglineSpotIndex: z.number().int().min(0).max(7).optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const loaded = await loadBrandPositioning(input.brandId, userId);
-      if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: "brand not found" });
-      const { name: brandName, pos } = loaded;
+      const scope = toScope(input);
+      const isEvent = scope.entityKind === "event";
+      const loaded = await loadScopedPositioning(scope, userId);
+      if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
+      const { name: entityName, pos } = loaded;
       const scenarios: any[] = Array.isArray(pos._workbench?.scenarios) ? pos._workbench.scenarios : [];
       const scn = scenarios.find((s) => s?.id === input.scenarioId);
       if (!scn?.derived) return { ok: false as const, error: "找不到情境，請先推導" };
@@ -303,15 +356,31 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
         if (spot?.tagline?.zh) {
           tagZh = String(spot.tagline.zh);
           tagEn = spot.tagline.en ? String(spot.tagline.en) : null;
-          pos.tagline = { ...(pos.tagline ?? {}), zhTagline: tagZh, ...(tagEn ? { enTagline: tagEn } : {}) };
-          applied.push(`主標語 ←「${tagZh}」（甜蜜點：${spot.title}）`);
+          if (isEvent) {
+            // Event's tagline-equivalent anchor is the SMP.
+            pos.smp = { ...(pos.smp ?? {}), singleMindedProposition: tagZh };
+            applied.push(`SMP ←「${tagZh}」（甜蜜點：${spot.title}）`);
+          } else {
+            pos.tagline = { ...(pos.tagline ?? {}), zhTagline: tagZh, ...(tagEn ? { enTagline: tagEn } : {}) };
+            applied.push(`主標語 ←「${tagZh}」（甜蜜點：${spot.title}）`);
+          }
         }
       }
+      // Lock the applied audience anchor into the entity's own audience
+      // segment for events (brands additionally get a flat targetAudience
+      // column that other readers use).
+      if (audienceText && isEvent) {
+        pos.audience = { ...(pos.audience ?? {}), primaryAudience: audienceText.slice(0, 600) };
+      }
       pos._workbench = { ...(pos._workbench ?? {}), appliedId: scn.id };
-      await localPool.execute(
-        `UPDATE brands SET positioning = ?${audienceText ? ", targetAudience = ?" : ""}${tagZh ? ", tagline = ?" : ""} WHERE id = ? AND userId = ?`,
-        [JSON.stringify(pos), ...(audienceText ? [audienceText.slice(0, 600)] : []), ...(tagZh ? [tagZh] : []), input.brandId, userId],
-      );
+      if (isEvent) {
+        await saveScopedPositioning(scope, userId, pos);
+      } else {
+        await localPool.execute(
+          `UPDATE brands SET positioning = ?${audienceText ? ", targetAudience = ?" : ""}${tagZh ? ", tagline = ?" : ""} WHERE id = ? AND userId = ?`,
+          [JSON.stringify(pos), ...(audienceText ? [audienceText.slice(0, 600)] : []), ...(tagZh ? [tagZh] : []), scope.entityId, userId],
+        );
+      }
       if (audienceText) applied.unshift("受眾錨點 ← 本情境所選受眾（之後所有推導與文案鎖定此客群）");
 
       // ── 2026-07-29 (CJ「當然要跟著重生。品牌工具、黃金圈等等，應該要跟著
@@ -332,11 +401,32 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
         `主打優勢：${(scn.selection?.advantages ?? []).join("、")}\n` +
         `甜蜜點：\n` +
         spots.map((s: any, i: number) => `${i + 1}. ${s.title}｜她要=${s.need}｜對手缺口=${s.gap}｜我們=${s.ours}`).join("\n") +
-        (tagZh ? `\n主標語：${tagZh}${tagEn ? `（${tagEn}）` : ""}` : "");
-      const SYS = "你是品牌策略顧問，繁體中文。只輸出 JSON，第一字元就是 {。";
-      const brandIdForSteps = input.brandId;
+        (tagZh ? `\n${isEvent ? "SMP" : "主標語"}：${tagZh}${tagEn ? `（${tagEn}）` : ""}` : "");
+      const SYS = `你是${isEvent ? "活動" : "品牌"}策略顧問，繁體中文。只輸出 JSON，第一字元就是 {。`;
+      const entityIdForSteps = scope.entityId;
 
-      const steps: PositioningStep[] = [
+      const steps: PositioningStep[] = isEvent ? [
+        {
+          id: "messaging", label: "訊息架構（依情境重生）", deps: [],
+          run: async (c) => {
+            const msg = await stepJSON(c, "messaging", SYS,
+              `${scenarioBlock}\n\n依此情境重寫活動訊息架構。輸出 JSON：\n{"coreMessage":"核心訊息（80-150字）","supportingPoints":["支撐訊息1","支撐訊息2","支撐訊息3"],"proofs":["證據/案例/數據1","證據2"]}`, 1200);
+            if (!msg?.coreMessage) throw new Error("messaging parse failed");
+            return { messaging: msg };
+          },
+        },
+        {
+          id: "creative", label: "創意概念（依情境重生）", deps: [],
+          run: async (c) => {
+            const cur = await loadEventPositioning(entityIdForSteps, scope.brandId, userId);
+            const smp = String(cur?.pos?.smp?.singleMindedProposition ?? tagZh ?? "").slice(0, 200);
+            const cr = await stepJSON(c, "creative", SYS,
+              `${scenarioBlock}\n\nSMP（不可矛盾）：${smp}\n\n依此情境重寫創意概念——大創意須能被一句話講完、一個比喻記住。輸出 JSON：\n{"creativeTheme":"創意主題/big idea（≤60字）","coreMetaphor":"核心比喻（≤60字）","coreTranslation":"核心轉譯一句話 hook（≤30字）"}`, 1200);
+            if (!cr?.creativeTheme) throw new Error("creative parse failed");
+            return { creative: cr };
+          },
+        },
+      ] : [
         {
           id: "differentiation", label: "差異化戰略（依情境重生）", deps: [],
           run: async (c) => {
@@ -349,7 +439,7 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
         {
           id: "goldenCircle", label: "品牌黃金圈（依情境重生）", deps: [],
           run: async (c) => {
-            const cur = await loadBrandPositioning(brandIdForSteps, userId);
+            const cur = await loadBrandPositioning(entityIdForSteps, userId);
             const origin = String(cur?.pos?.origin?.story ?? "").slice(0, 300);
             const values = JSON.stringify(cur?.pos?.values?.items ?? []).slice(0, 300);
             const g = await stepJSON(c, "goldenCircle", SYS,
@@ -385,19 +475,19 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
             const generated: Record<string, { text: string; image: string }> = {};
             for (const p of platforms) {
               try {
-                const r = await generateAiPromptForPlatform(brandIdForSteps, userId, p);
+                const r = await generateAiPromptForPlatform(entityIdForSteps, userId, p);
                 if (r.ok) generated[p] = r.value;
               } catch { /* per-platform best effort */ }
             }
             if (Object.keys(generated).length === 0) throw new Error("aiPrompts: all platforms failed");
             // read-modify-write —mergePositioning 是整鍵覆蓋，_aiPrompts 需保留
             // 未成功平台的既有值。
-            const cur = await loadBrandPositioning(brandIdForSteps, userId);
+            const cur = await loadBrandPositioning(entityIdForSteps, userId);
             const merged = { ...(cur?.pos?._aiPrompts ?? {}), ...generated };
             const nextPos = { ...(cur?.pos ?? {}), _aiPrompts: merged };
             await localPool.execute(
               `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
-              [JSON.stringify(nextPos), brandIdForSteps, userId],
+              [JSON.stringify(nextPos), entityIdForSteps, userId],
             );
             return {};
           },
@@ -406,9 +496,9 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
 
       startPositioningJob({
         userId,
-        entityKind: "brand",
-        entityId: input.brandId,
-        brandName,
+        entityKind: scope.entityKind,
+        entityId: scope.entityId,
+        brandName: entityName,
         description: scenarioBlock,
         steps,
       });
