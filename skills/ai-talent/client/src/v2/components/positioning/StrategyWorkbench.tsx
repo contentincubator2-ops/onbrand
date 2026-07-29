@@ -138,8 +138,16 @@ export default function StrategyWorkbench({
     return `情境 ${letters[scenarios.length % letters.length]}`;
   };
 
-  // 資料還不足（受眾或競品段未完成）→ 不佔版面
-  if (audienceChips.length === 0 || competitorChips.length === 0) return null;
+  // 2026-07-29 (CJ「策略工作台消失了，應該要補回來」— 媽爹講故事帳號):
+  // the old null-gate hid the ENTIRE workbench whenever audience or
+  // competition segments were missing/legacy-shaped — silently, so the
+  // new presentation looked "gone". The workbench is the page's decision
+  // layer: always render on brand scope, and when research is missing,
+  // SAY which piece and point at the fix (跑下方對應段落 / 重新校對).
+  const missingResearch: string[] = [];
+  if (audienceChips.length === 0) missingResearch.push(en ? "Audience research" : "目標受眾");
+  if (competitorChips.length === 0) missingResearch.push(en ? "Competitive landscape" : "競爭格局分析");
+  if (advantageChips.length === 0) missingResearch.push(en ? "Differentiation" : "品牌差異化戰略");
 
   const toggle = (set: Set<string>, key: string, min = 1) => {
     const next = new Set(set);
@@ -148,6 +156,12 @@ export default function StrategyWorkbench({
   };
 
   const runDerive = () => {
+    if (missingResearch.length > 0) {
+      showToastGlobal(en
+        ? `Research missing: ${missingResearch.join(" / ")} — run positioning below first`
+        : `還缺研究資料：${missingResearch.join("／")}——先到下方段落補齊或按「重新校對」`);
+      return;
+    }
     const audienceText = audienceChips.find((c) => c.key === selAudience)?.value ?? audienceChips[0]!.value;
     const competitors = competitorChips.filter((c) => selComp.has(c.key)).map((c) => c.value);
     const advantages = advantageChips.filter((c) => selAdv.has(c.key)).map((c) => c.value.slice(0, 200));
@@ -221,6 +235,24 @@ export default function StrategyWorkbench({
       </div>
       {collapsed ? null : (
       <div style={{ padding: "0 18px 16px" }}>
+        {/* 缺研究資料 → 明確指路，不再無聲隱藏 */}
+        {missingResearch.length > 0 && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+            border: "1.5px dashed #C9C4BC", borderRadius: 12, background: "#FCFBF9",
+            padding: "10px 14px", marginBottom: 12, fontSize: 12.5,
+          }}>
+            <b>{en ? "Research needed before deriving:" : "推導前還缺這些研究資料："}</b>
+            {missingResearch.map((m) => (
+              <span key={m} style={{ border: "1.5px solid #2A2630", borderRadius: 999, padding: "2px 12px", fontWeight: 700, fontSize: 11.5 }}>{m}</span>
+            ))}
+            <span style={{ color: "#8A8494", fontSize: 11.5 }}>
+              {en
+                ? "Fill them in the acts below, or hit re-calibrate to run the positioning pipeline."
+                : "到下方對應段落補齊，或在品牌設定按「重新校對」讓 AI 定位管線補跑——完成後這裡就能選錨點推導。"}
+            </span>
+          </div>
+        )}
         {/* P2 情境分頁 */}
         <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
           {scenarios.map((s) => (
