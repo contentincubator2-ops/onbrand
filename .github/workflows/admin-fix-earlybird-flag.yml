@@ -1,0 +1,49 @@
+name: "Admin — Clear earlyBird flag for a user (fixes NT$750 vs NT$2,250 checkout mismatch)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: "users.id to correct"
+        required: true
+        type: string
+      confirm_email_contains:
+        description: "Safety check: substring that must appear in the user's email"
+        required: true
+        type: string
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clear earlyBird flag (email-guarded)
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          USER_ID: ${{ inputs.user_id }}
+          CONFIRM_SUBSTR: ${{ inputs.confirm_email_contains }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: USER_ID,CONFIRM_SUBSTR
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -N -e "$1"; }
+
+            EMAIL=$(Q "SELECT email FROM users WHERE id=${USER_ID}")
+            echo "Target user #$USER_ID email: $EMAIL"
+            case "$EMAIL" in
+              *"$CONFIRM_SUBSTR"*) echo "Guard matched, proceeding." ;;
+              *) echo "❌ Guard mismatch — email does not contain '$CONFIRM_SUBSTR'. Aborting."; exit 1 ;;
+            esac
+
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e "UPDATE users SET earlyBird=0 WHERE id=${USER_ID} LIMIT 1"
+            echo "Cleared earlyBird for user #$USER_ID"
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e "SELECT id, email, earlyBird FROM users WHERE id=${USER_ID}"
+
+            echo "===== pending invoices for this user (informational — no charge happened yet on 'pending' rows) ====="
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e "SELECT id, planCode, amount, currency, status, createdAt FROM invoices WHERE userId=${USER_ID} ORDER BY id DESC LIMIT 10"
