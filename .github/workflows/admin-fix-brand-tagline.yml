@@ -1,0 +1,54 @@
+name: "Admin — Fix brand tagline (restore book anchor)"
+
+# 2026-07-29 (CJ 媽爹講故事「我看到的標語，仍然不是從聽覺，啟程探索」):
+# the workbench's 套用定位＋設此標語 action had overwritten this brand's
+# canonical tagline with an AI-generated extension-spot tagline, and the
+# TRUE positioning-book tagline had no protected home — restore it and set
+# positioning._bookTagline (new immutable anchor the workbench's official
+# spot now reads from, never touched by future applies).
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        required: true
+        type: string
+      zhTagline:
+        required: true
+        type: string
+
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    env:
+      ZH: ${{ github.event.inputs.zhTagline }}
+    steps:
+      - name: Restore tagline + set book anchor
+        run: |
+          set +e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+          BID="${{ github.event.inputs.brandId }}"
+          TL=$(printf "%s" "$ZH" | sed "s/'/''/g")
+
+          echo "===== BEFORE ====="
+          Q "SELECT id, name, tagline FROM brands WHERE id=$BID\G"
+          Q "SELECT JSON_EXTRACT(positioning,'\$.tagline.zhTagline') AS zh, JSON_EXTRACT(positioning,'\$._bookTagline') AS anchor FROM brands WHERE id=$BID\G"
+
+          echo "===== APPLY ====="
+          Q "UPDATE brands SET tagline='$TL' WHERE id=$BID;"
+          Q "UPDATE brands
+               SET positioning = JSON_SET(
+                     COALESCE(positioning, '{}'),
+                     '\$.tagline.zhTagline', '$TL',
+                     '\$._bookTagline', JSON_OBJECT('zh', '$TL')
+                   )
+             WHERE id=$BID;"
+
+          echo "===== AFTER ====="
+          Q "SELECT id, name, tagline FROM brands WHERE id=$BID\G"
+          Q "SELECT JSON_EXTRACT(positioning,'\$.tagline.zhTagline') AS zh, JSON_EXTRACT(positioning,'\$._bookTagline') AS anchor FROM brands WHERE id=$BID\G"
+          echo "✓ tagline restored + book anchor set for brand $BID"
+          exit 0

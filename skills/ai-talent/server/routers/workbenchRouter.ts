@@ -169,12 +169,28 @@ export const workbenchRouter = router({
       // "Official positioning" ground text — what spots[0] must restate:
       //  - brand: differentiation summary + goldenCircle WHY + current tagline
       //  - event: SMP (single-minded proposition) + core message/creative
+      // 2026-07-29 (CJ「我看到的標語，仍然不是從聽覺，啟程探索」— root cause:
+      // 套用定位＋設此標語 had overwritten brandPos.tagline.zhTagline with an
+      // AI-generated extension-spot tagline, so the NEXT derive's official
+      // spot silently inherited the wrong (AI) tagline instead of the true
+      // book tagline — the book's real line had no protected home. Fix:
+      // brand.positioning._bookTagline is an ANCHOR captured once and never
+      // touched by apply — spots[0] always reads it, bootstrap-capturing the
+      // current tagline the first time a brand derives (so old brands don't
+      // break), but afterwards immune to apply's tagline swaps.
+      const bookTaglineAnchor: string =
+        scope.entityKind === "brand"
+          ? (typeof brandPos._bookTagline?.zh === "string" && brandPos._bookTagline.zh.trim()
+              ? brandPos._bookTagline.zh.trim()
+              : String(brandPos.tagline?.zhTagline ?? "").trim())
+          : "";
+
       const officialGroundText = scope.entityKind === "event"
         ? `SMP（單一核心命題）：${String(pos.smp?.singleMindedProposition ?? "").slice(0, 300)}\n核心訊息：${String(pos.messaging?.coreMessage ?? "").slice(0, 200)}\n創意核心轉譯：${String(pos.creative?.coreTranslation ?? "").slice(0, 200)}`
-        : `差異化：情感=${String(diff.emotional ?? "").slice(0, 200)}｜功能=${String(diff.functional ?? "").slice(0, 200)}｜總結=${String(diff.summary ?? "").slice(0, 200)}\n黃金圈 WHY：${String(brandPos.goldenCircle?.why ?? "").slice(0, 200)}\n現行標語：${brandPos.tagline?.zhTagline || "（無）"}`;
+        : `差異化：情感=${String(diff.emotional ?? "").slice(0, 200)}｜功能=${String(diff.functional ?? "").slice(0, 200)}｜總結=${String(diff.summary ?? "").slice(0, 200)}\n黃金圈 WHY：${String(brandPos.goldenCircle?.why ?? "").slice(0, 200)}\n品牌定位書標語（不可變錨點）：${bookTaglineAnchor || "（無）"}`;
       const curTagline = scope.entityKind === "event"
         ? (pos.smp?.singleMindedProposition ?? "")
-        : (brandPos.tagline?.zhTagline ?? "");
+        : bookTaglineAnchor;
       const officialLabel = scope.entityKind === "event" ? "活動「現有 SMP／核心訊息」" : "品牌「現有正式定位」";
 
       const sys = `你是${scope.entityKind === "event" ? "活動" : "品牌"}策略顧問，繁體中文。任務：依「消費者想要 × 所選競爭者無法滿足 × 所選優勢能提供」的交集邏輯，產出四區策略看板。只輸出 JSON，第一字元就是 {。
@@ -258,6 +274,14 @@ spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 �
             ? { en: String(brandPos.tagline.enTagline) } : {}),
         };
         derived.currentTaglineSpot = derived.spots[0]!.title;
+      }
+
+      // Bootstrap the book-tagline anchor on first derive for a brand that
+      // doesn't have one yet — captures whatever's current AS the anchor so
+      // it stops drifting on future applies. (pos === brandPos for brand
+      // scope, so this persists correctly.)
+      if (scope.entityKind === "brand" && !(typeof brandPos._bookTagline?.zh === "string" && brandPos._bookTagline.zh.trim()) && bookTaglineAnchor) {
+        pos._bookTagline = { zh: bookTaglineAnchor, ...(brandPos.tagline?.enTagline ? { en: String(brandPos.tagline.enTagline) } : {}) };
       }
 
       // Persist scenario (replace same-name, append otherwise)
