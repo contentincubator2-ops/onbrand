@@ -47,6 +47,7 @@ jobs:
             const EL_KEY = process.env.ELEVENLABS_API_KEY ?? "";
             const OPENAI_KEY = process.env.OPENAI_API_KEY ?? "";
             const MINIMAX_KEY = process.env.HAILUO_API_KEY ?? process.env.MINIMAX_API_KEY ?? "";
+            const GEMINI_KEY = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
             const PIAPI_BASE = "https://api.piapi.ai/api/v1";
 
             function saveBuf(buf: Buffer, ext: string): string {
@@ -95,8 +96,9 @@ jobs:
               console.log("ELEVENLABS_API_KEY:", EL_KEY ? "present" : "MISSING");
               console.log("OPENAI_API_KEY:", OPENAI_KEY ? "present" : "MISSING");
               console.log("HAILUO/MINIMAX_API_KEY:", MINIMAX_KEY ? "present" : "MISSING");
+              console.log("GEMINI_API_KEY:", GEMINI_KEY ? "present" : "MISSING");
               if (!PIAPI_KEY) throw new Error("PIAPI_KEY missing — cannot generate image or video");
-              if (!EL_KEY && !OPENAI_KEY) throw new Error("no TTS provider available (need ELEVENLABS_API_KEY or OPENAI_API_KEY)");
+              if (!EL_KEY && !OPENAI_KEY && !GEMINI_KEY) throw new Error("no TTS provider available");
 
               console.log("=========== STEP 1: brand positioning ===========");
               const [rows]: any = await localPool.execute(
@@ -172,6 +174,7 @@ jobs:
               console.log("=========== STEP 4/5: TTS ===========");
               let audioBuf: Buffer | null = null;
               let ttsProvider = "";
+              let audioExt = "mp3";
 
               if (EL_KEY) {
                 try {
@@ -200,24 +203,69 @@ jobs:
               }
 
               if (!audioBuf && OPENAI_KEY) {
-                const tts = await fetch("https://api.openai.com/v1/audio/speech", {
-                  method: "POST",
-                  headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    model: "gpt-4o-mini-tts",
-                    voice: "shimmer",
-                    input: script.fullVO,
-                    instructions: "Speak in warm, natural Taiwanese Mandarin (zh-TW). Friendly mother tone, conversational, not a news anchor. Moderate pace.",
-                    response_format: "mp3",
-                  }),
-                });
-                if (!tts.ok) throw new Error(`OpenAI TTS ${tts.status}: ${(await tts.text()).slice(0, 300)}`);
-                audioBuf = Buffer.from(await tts.arrayBuffer());
-                ttsProvider = "openai/gpt-4o-mini-tts (shimmer)";
+                try {
+                  const tts = await fetch("https://api.openai.com/v1/audio/speech", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      model: "gpt-4o-mini-tts",
+                      voice: "onyx",
+                      input: script.fullVO,
+                      instructions: "Speak in warm, natural Taiwanese Mandarin (zh-TW). Gentle father tone, conversational, not a news anchor. Moderate pace.",
+                      response_format: "mp3",
+                    }),
+                  });
+                  if (!tts.ok) throw new Error(`${tts.status}: ${(await tts.text()).slice(0, 200)}`);
+                  audioBuf = Buffer.from(await tts.arrayBuffer());
+                  ttsProvider = "openai/gpt-4o-mini-tts (onyx)";
+                } catch (e: any) {
+                  console.warn("openai tts failed, falling back:", e?.message ?? e);
+                }
+              }
+
+              if (!audioBuf && GEMINI_KEY) {
+                // Gemini TTS returns raw 24kHz mono 16-bit PCM — wrap in a WAV header.
+                const gres = await fetch(
+                  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${GEMINI_KEY}`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: `請用溫暖、真誠、像爸爸在跟孩子說話的語氣，念出這段話：\n\n${script.fullVO}` }] }],
+                      generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } } },
+                      },
+                    }),
+                  },
+                );
+                if (!gres.ok) throw new Error(`Gemini TTS ${gres.status}: ${(await gres.text()).slice(0, 400)}`);
+                const gjson: any = await gres.json();
+                const b64 = gjson?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                if (!b64) throw new Error(`Gemini TTS no audio: ${JSON.stringify(gjson).slice(0, 400)}`);
+                const pcm = Buffer.from(b64, "base64");
+                const sampleRate = 24000, channels = 1, bits = 16;
+                const hdr = Buffer.alloc(44);
+                hdr.write("RIFF", 0);
+                hdr.writeUInt32LE(36 + pcm.length, 4);
+                hdr.write("WAVE", 8);
+                hdr.write("fmt ", 12);
+                hdr.writeUInt32LE(16, 16);
+                hdr.writeUInt16LE(1, 20);
+                hdr.writeUInt16LE(channels, 22);
+                hdr.writeUInt32LE(sampleRate, 24);
+                hdr.writeUInt32LE(sampleRate * channels * bits / 8, 28);
+                hdr.writeUInt16LE(channels * bits / 8, 32);
+                hdr.writeUInt16LE(bits, 34);
+                hdr.write("data", 36);
+                hdr.writeUInt32LE(pcm.length, 40);
+                audioBuf = Buffer.concat([hdr, pcm]);
+                ttsProvider = "google/gemini-2.5-flash-tts (Charon)";
+                audioExt = "wav";
               }
 
               if (!audioBuf) throw new Error("all TTS providers failed");
-              const audioUrl = saveBuf(audioBuf, "mp3");
+              const audioUrl = saveBuf(audioBuf, audioExt);
               console.log("TTS provider:", ttsProvider);
               console.log("VOICEOVER:", audioUrl);
 
