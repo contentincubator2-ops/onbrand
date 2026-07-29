@@ -196,6 +196,9 @@ jobs:
 
               console.log("=========== STEP 5: two paths in parallel ===========");
 
+              // PATH A: portrait → Kling i2v. The lip_sync step is BLOCKED by our
+              // PiAPI plan tier ("Free Plan users cannot create lip_sync task"),
+              // so we ship the un-synced base video to show motion quality only.
               const pathA = (async () => {
                 const i2v = await piapiSubmit("kling", "video_generation", {
                   prompt: "The person is talking to the camera, speaking naturally with clear mouth movement, subtle head motion, warm sincere expression. Static camera, no scene change.",
@@ -208,18 +211,8 @@ jobs:
                 });
                 const i2vData = await piapiPoll(i2v, 12 * 60_000, "kling-i2v");
                 const baseVid = i2vData?.output?.video_url ?? i2vData?.output?.url;
-                console.log("  [A] base video:", baseVid);
-
-                const ls = await piapiSubmit("kling", "lip_sync", {
-                  origin_task_id: i2v,
-                  local_dubbing_url: audioUrl,
-                  tts_text: "",
-                  tts_speed: 1,
-                });
-                const lsData = await piapiPoll(ls, 10 * 60_000, "kling-lipsync");
-                const outVid = lsData?.output?.video_url ?? lsData?.output?.url;
-                if (!outVid) throw new Error(`no lipsync url: ${JSON.stringify(lsData).slice(0, 400)}`);
-                return await rehost(outVid, "mp4");
+                if (!baseVid) throw new Error(`no i2v url: ${JSON.stringify(i2vData).slice(0, 400)}`);
+                return await rehost(baseVid, "mp4");
               })();
 
               const pathB = (async () => {
@@ -231,7 +224,7 @@ jobs:
                   `No subtitles, no on-screen text, no captions, no watermark.`,
                 ].join(" ");
                 const vres = await fetch(
-                  `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-001:predictLongRunning?key=${GEMINI_KEY}`,
+                  `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning?key=${GEMINI_KEY}`,
                   {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -252,10 +245,13 @@ jobs:
                   console.log(`  [veo] done=${!!pd?.done} (${Math.round((Date.now() - start) / 1000)}s)`);
                   if (pd?.error) throw new Error(`Veo error: ${JSON.stringify(pd.error).slice(0, 300)}`);
                   if (pd?.done) {
+                    console.log("  [veo] raw response:", JSON.stringify(pd?.response ?? pd).slice(0, 900));
                     const uri =
                       pd?.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri ??
                       pd?.response?.generatedSamples?.[0]?.video?.uri ??
-                      pd?.response?.videos?.[0]?.uri;
+                      pd?.response?.videos?.[0]?.uri ??
+                      pd?.response?.generateVideoResponse?.generatedVideos?.[0]?.video?.uri ??
+                      pd?.response?.generatedVideos?.[0]?.video?.uri;
                     if (!uri) throw new Error(`Veo no uri: ${JSON.stringify(pd).slice(0, 500)}`);
                     const dl = await fetch(`${uri}${uri.includes("?") ? "&" : "?"}key=${GEMINI_KEY}`);
                     if (!dl.ok) throw new Error(`Veo download ${dl.status}`);
@@ -276,10 +272,10 @@ jobs:
               console.log("  portrait:", imageUrl);
               console.log("  audio   :", audioUrl);
               console.log("");
-              console.log("  PATH A (Flux portrait + Kling i2v + Kling lip_sync, our own TTS):");
+              console.log("  PATH A (Flux portrait + Kling i2v — NO lip-sync, plan-blocked):");
               console.log("   ", ra.status === "fulfilled" ? ra.value : `FAILED — ${(ra as any).reason?.message}`);
               console.log("");
-              console.log("  PATH B (Veo 3, native synced dialogue, one shot):");
+              console.log("  PATH B (Veo 3.1, native synced dialogue, one shot):");
               console.log("   ", rb.status === "fulfilled" ? rb.value : `FAILED — ${(rb as any).reason?.message}`);
               console.log("############################################");
               process.exit(0);

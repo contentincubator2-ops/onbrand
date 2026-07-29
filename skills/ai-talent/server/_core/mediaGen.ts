@@ -341,7 +341,11 @@ async function pollHailuoVideo(taskId: string): Promise<GenResult> {
 async function submitVeo3(opts: GenOptions, fast = false): Promise<GenResult> {
   const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
   if (!key) throw new Error("GEMINI_API_KEY missing");
-  const model = fast ? "veo-3.0-fast-generate-001" : "veo-3.0-generate-001";
+  // 2026-07-29: veo-3.0-*-001 404s ("not found for API version v1beta") — the
+  // 3.0 ids were retired. Verified live against ListModels: the only models
+  // exposing predictLongRunning are veo-3.1-{generate,fast-generate,
+  // lite-generate}-preview. Veo was therefore broken for every caller.
+  const model = fast ? "veo-3.1-fast-generate-preview" : "veo-3.1-generate-preview";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predictLongRunning?key=${key}`;
   const resp = await fetch(url, {
     method: "POST",
