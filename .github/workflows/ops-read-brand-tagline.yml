@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       brandId:
-        required: true
+        required: false
+        type: string
+      brandNameLike:
+        required: false
         type: string
 
 jobs:
@@ -12,16 +15,30 @@ jobs:
     runs-on: [self-hosted, linux, vm-onbrand]
     steps:
       - name: Read tagline fields
+        env:
+          NAME_LIKE: ${{ github.event.inputs.brandNameLike }}
         run: |
           set +e
           source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
           H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
           P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
           BID="${{ github.event.inputs.brandId }}"
+
+          if [ -n "$NAME_LIKE" ]; then
+            echo "===== search by name ====="
+            mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+              "SELECT id, name, tagline, updatedAt, userId FROM brands WHERE name LIKE CONCAT('%', '$NAME_LIKE', '%');"
+          fi
+          if [ -z "$BID" ]; then
+            BID=$(mysql -h"$H" -u"$U" -p"$P" "$D" -N -e \
+              "SELECT id FROM brands WHERE name LIKE CONCAT('%', '$NAME_LIKE', '%') ORDER BY updatedAt DESC LIMIT 1")
+          fi
+          echo "using brandId=$BID"
+
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
             "SELECT id, name, tagline, updatedAt FROM brands WHERE id=$BID\G"
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
             "SELECT JSON_PRETTY(JSON_EXTRACT(positioning,'\$.tagline')) AS tagline_seg FROM brands WHERE id=$BID\G"
           mysql -h"$H" -u"$U" -p"$P" "$D" -e \
-            "SELECT JSON_PRETTY(JSON_EXTRACT(positioning,'\$._workbench.scenarios')) AS scenarios FROM brands WHERE id=$BID\G" | head -80
+            "SELECT JSON_PRETTY(JSON_EXTRACT(positioning,'\$._workbench.scenarios')) AS scenarios FROM brands WHERE id=$BID\G" | head -120
           exit 0
