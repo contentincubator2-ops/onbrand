@@ -45,6 +45,8 @@ jobs:
             const TOPIC = (process.env.SAMPLE_TOPIC ?? "").trim();
             const PIAPI_KEY = process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY ?? "";
             const EL_KEY = process.env.ELEVENLABS_API_KEY ?? "";
+            const OPENAI_KEY = process.env.OPENAI_API_KEY ?? "";
+            const MINIMAX_KEY = process.env.HAILUO_API_KEY ?? process.env.MINIMAX_API_KEY ?? "";
             const PIAPI_BASE = "https://api.piapi.ai/api/v1";
 
             function saveBuf(buf: Buffer, ext: string): string {
@@ -91,7 +93,10 @@ jobs:
               console.log("=========== STEP 0: keys ===========");
               console.log("PIAPI_KEY:", PIAPI_KEY ? "present" : "MISSING");
               console.log("ELEVENLABS_API_KEY:", EL_KEY ? "present" : "MISSING");
-              if (!PIAPI_KEY || !EL_KEY) throw new Error("required keys missing");
+              console.log("OPENAI_API_KEY:", OPENAI_KEY ? "present" : "MISSING");
+              console.log("HAILUO/MINIMAX_API_KEY:", MINIMAX_KEY ? "present" : "MISSING");
+              if (!PIAPI_KEY) throw new Error("PIAPI_KEY missing — cannot generate image or video");
+              if (!EL_KEY && !OPENAI_KEY) throw new Error("no TTS provider available (need ELEVENLABS_API_KEY or OPENAI_API_KEY)");
 
               console.log("=========== STEP 1: brand positioning ===========");
               const [rows]: any = await localPool.execute(
@@ -164,27 +169,56 @@ jobs:
               const imageUrl = await rehost(rawImgUrl, "png");
               console.log("SPOKESPERSON IMAGE:", imageUrl);
 
-              console.log("=========== STEP 4: ElevenLabs voices (pick a zh-capable one) ===========");
-              const vres = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": EL_KEY } });
-              const vjson: any = await vres.json();
-              const voices = (vjson?.voices ?? []).map((v: any) => ({ id: v.voice_id, name: v.name, labels: v.labels }));
-              console.log("available voices:", JSON.stringify(voices.slice(0, 25), null, 2));
-              const preferred = voices.find((v: any) => /rachel|sarah|charlotte|alice|lily/i.test(v.name)) ?? voices[0];
-              const voiceId = preferred?.id ?? "21m00Tcm4TlvDq8ikWAM";
-              console.log("using voice:", preferred?.name, voiceId);
+              console.log("=========== STEP 4/5: TTS ===========");
+              let audioBuf: Buffer | null = null;
+              let ttsProvider = "";
 
-              console.log("=========== STEP 5: TTS ===========");
-              const tts = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-                method: "POST",
-                headers: { "xi-api-key": EL_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
-                body: JSON.stringify({
-                  text: script.fullVO,
-                  model_id: "eleven_multilingual_v2",
-                  voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.3 },
-                }),
-              });
-              if (!tts.ok) throw new Error(`TTS ${tts.status}: ${(await tts.text()).slice(0, 300)}`);
-              const audioUrl = saveBuf(Buffer.from(await tts.arrayBuffer()), "mp3");
+              if (EL_KEY) {
+                try {
+                  const vres = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": EL_KEY } });
+                  const vjson: any = await vres.json();
+                  const voices = (vjson?.voices ?? []).map((v: any) => ({ id: v.voice_id, name: v.name }));
+                  console.log("elevenlabs voices:", JSON.stringify(voices.slice(0, 20)));
+                  const pref = voices.find((v: any) => /rachel|sarah|charlotte|alice|lily/i.test(v.name)) ?? voices[0];
+                  const voiceId = pref?.id ?? "21m00Tcm4TlvDq8ikWAM";
+                  console.log("using elevenlabs voice:", pref?.name, voiceId);
+                  const tts = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+                    method: "POST",
+                    headers: { "xi-api-key": EL_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
+                    body: JSON.stringify({
+                      text: script.fullVO,
+                      model_id: "eleven_multilingual_v2",
+                      voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.3 },
+                    }),
+                  });
+                  if (!tts.ok) throw new Error(`${tts.status}: ${(await tts.text()).slice(0, 200)}`);
+                  audioBuf = Buffer.from(await tts.arrayBuffer());
+                  ttsProvider = "elevenlabs/eleven_multilingual_v2";
+                } catch (e: any) {
+                  console.warn("elevenlabs failed, falling back:", e?.message ?? e);
+                }
+              }
+
+              if (!audioBuf && OPENAI_KEY) {
+                const tts = await fetch("https://api.openai.com/v1/audio/speech", {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    model: "gpt-4o-mini-tts",
+                    voice: "shimmer",
+                    input: script.fullVO,
+                    instructions: "Speak in warm, natural Taiwanese Mandarin (zh-TW). Friendly mother tone, conversational, not a news anchor. Moderate pace.",
+                    response_format: "mp3",
+                  }),
+                });
+                if (!tts.ok) throw new Error(`OpenAI TTS ${tts.status}: ${(await tts.text()).slice(0, 300)}`);
+                audioBuf = Buffer.from(await tts.arrayBuffer());
+                ttsProvider = "openai/gpt-4o-mini-tts (shimmer)";
+              }
+
+              if (!audioBuf) throw new Error("all TTS providers failed");
+              const audioUrl = saveBuf(audioBuf, "mp3");
+              console.log("TTS provider:", ttsProvider);
               console.log("VOICEOVER:", audioUrl);
 
               console.log("=========== STEP 6: Hedra Character-3 lip-sync ===========");
