@@ -10,10 +10,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "full = 建品牌資產+6活動；season-patch = 只補10週年雙Logo規則；voice-patch = 用真實貼文修正語氣+重生FB/IG指令"
+        description: "full = 建品牌資產+6活動；season-patch = 補10週年雙Logo規則；voice-patch = 用真實貼文修正語氣+重生FB/IG指令；voice-rules = 附加強制規則(emoji數/引號/時間格式)"
         type: choice
         default: "full"
-        options: ["full", "season-patch", "voice-patch"]
+        options: ["full", "season-patch", "voice-patch", "voice-rules"]
 
 jobs:
   build:
@@ -29,6 +29,8 @@ jobs:
             npx tsx scripts/admin-patch-pokemongo-season.ts
           elif [ "${{ github.event.inputs.mode }}" = "voice-patch" ]; then
             npx tsx scripts/admin-patch-pokemongo-voice.ts
+          elif [ "${{ github.event.inputs.mode }}" = "voice-rules" ]; then
+            npx tsx scripts/admin-patch-pokemongo-voice-rules.ts
           else
             npx tsx scripts/admin-build-pokemongo.ts
           fi
