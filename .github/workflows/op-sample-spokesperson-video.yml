@@ -1,0 +1,230 @@
+name: "Op — Build ONE sample spokesperson TikTok video (Hedra + ElevenLabs)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand id to build the sample for (2964 = 媽爹講故事)"
+        required: true
+        default: "2964"
+        type: string
+      topic:
+        description: "TikTok topic / angle (leave blank to let AI pick from positioning)"
+        required: false
+        type: string
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Generate sample spokesperson video on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          SAMPLE_BRAND_ID: ${{ inputs.brand_id }}
+          SAMPLE_TOPIC: ${{ inputs.topic }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 22m
+          envs: SAMPLE_BRAND_ID,SAMPLE_TOPIC
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+
+            cat > tmp-sample-video.ts <<'SCRIPT_EOF'
+            import { writeFileSync } from "fs";
+            import { join } from "path";
+            import localPool from "./server/localDb";
+            import { invokeLLM } from "./server/_core/llm";
+
+            const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
+            const PUBLIC_BASE = "https://onbrand.sowork.ai";
+            const BRAND_ID = Number(process.env.SAMPLE_BRAND_ID ?? 2964);
+            const TOPIC = (process.env.SAMPLE_TOPIC ?? "").trim();
+            const PIAPI_KEY = process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY ?? "";
+            const EL_KEY = process.env.ELEVENLABS_API_KEY ?? "";
+            const PIAPI_BASE = "https://api.piapi.ai/api/v1";
+
+            function saveBuf(buf: Buffer, ext: string): string {
+              const id = `sample-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+              writeFileSync(join(COVERS_DIR, `media-${id}.${ext}`), buf);
+              return `${PUBLIC_BASE}/static/covers/media-${id}.${ext}`;
+            }
+            async function rehost(url: string, ext: string): Promise<string> {
+              const r = await fetch(url);
+              if (!r.ok) throw new Error(`rehost ${r.status}`);
+              return saveBuf(Buffer.from(await r.arrayBuffer()), ext);
+            }
+            async function piapiSubmit(model: string, task_type: string, input: any): Promise<string> {
+              const r = await fetch(`${PIAPI_BASE}/task`, {
+                method: "POST",
+                headers: { "x-api-key": PIAPI_KEY, "Content-Type": "application/json" },
+                body: JSON.stringify({ model, task_type, input }),
+              });
+              const t = await r.text();
+              console.log(`[piapi submit ${model}/${task_type}] HTTP ${r.status}: ${t.slice(0, 600)}`);
+              if (!r.ok) throw new Error(`piapi submit ${r.status}`);
+              const d = JSON.parse(t);
+              const id = d?.data?.task_id ?? d?.task_id;
+              if (!id) throw new Error(`no task_id: ${t.slice(0, 300)}`);
+              return id;
+            }
+            async function piapiPoll(taskId: string, maxMs: number): Promise<any> {
+              const start = Date.now();
+              while (Date.now() - start < maxMs) {
+                await new Promise((r) => setTimeout(r, 10_000));
+                const r = await fetch(`${PIAPI_BASE}/task/${taskId}`, { headers: { "x-api-key": PIAPI_KEY } });
+                const d: any = await r.json();
+                const st = d?.data?.status ?? d?.status;
+                console.log(`  poll ${taskId}: ${st} (${Math.round((Date.now() - start) / 1000)}s)`);
+                if (st === "completed" || st === "success") return d?.data ?? d;
+                if (st === "failed" || st === "error") {
+                  throw new Error(`task failed: ${JSON.stringify(d).slice(0, 500)}`);
+                }
+              }
+              throw new Error(`poll timeout ${taskId}`);
+            }
+
+            (async () => {
+              console.log("=========== STEP 0: keys ===========");
+              console.log("PIAPI_KEY:", PIAPI_KEY ? "present" : "MISSING");
+              console.log("ELEVENLABS_API_KEY:", EL_KEY ? "present" : "MISSING");
+              if (!PIAPI_KEY || !EL_KEY) throw new Error("required keys missing");
+
+              console.log("=========== STEP 1: brand positioning ===========");
+              const [rows]: any = await localPool.execute(
+                "SELECT name, industry, targetAudience, tagline, positioning FROM brands WHERE id = ? LIMIT 1",
+                [BRAND_ID],
+              );
+              const brand = (rows as any[])[0];
+              if (!brand) throw new Error(`brand ${BRAND_ID} not found`);
+              let pos: any = brand.positioning;
+              if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
+              pos = pos ?? {};
+              console.log("brand:", brand.name, "| tagline:", brand.tagline);
+
+              const ground = [
+                `品牌：${brand.name}`,
+                `產業：${brand.industry ?? ""}`,
+                `標語：${brand.tagline ?? pos?.tagline?.zhTagline ?? ""}`,
+                `主受眾：${String(pos?.audience?.primary ?? brand.targetAudience ?? "").slice(0, 400)}`,
+                `差異化：${String(pos?.differentiation?.summary ?? "").slice(0, 300)}`,
+                `黃金圈 WHY：${String(pos?.goldenCircle?.why ?? "").slice(0, 300)}`,
+              ].join("\n");
+              console.log("--- ground material ---\n" + ground);
+
+              console.log("=========== STEP 2: LLM script (this is the P0 fix, proven) ===========");
+              const sys = `你是 TikTok 短影音編劇，繁體中文台灣用語。產出一支「品牌代言人對鏡頭說話」的 20-25 秒口播影片腳本。只輸出 JSON，第一字元就是 {。
+
+規則：
+- 這是一個真人代言人對著鏡頭講話，全程同一個人，沒有換場。
+- 前 1.5 秒必須抓住人，不要用「大家好」「今天要跟大家分享」這種開場。
+- 口播總長 90-110 個中文字（約 22 秒）。
+- 必須貼合下面的品牌定位，不可發明定位書沒有的主張。
+- spokespersonPrompt 用英文描述這個代言人的外觀（給 AI 生圖用），必須是正面、直視鏡頭、清晰臉部的直式人像。
+
+輸出 JSON：
+{
+  "hook": "前 1.5 秒的第一句（≤15字）",
+  "fullVO": "完整口播稿（含 hook，90-110字，這段會直接被唸出來，不要有任何標記或括號）",
+  "subtitleLines": ["字幕行（每行 6-12 字）"],
+  "spokespersonPrompt": "English description of the on-camera presenter"
+}
+subtitleLines 6-9 行，合起來要等於 fullVO 的內容。`;
+
+              const userMsg = TOPIC
+                ? `${ground}\n\n這次要講的題目：${TOPIC}`
+                : `${ground}\n\n請自己從定位裡挑一個最適合 TikTok 的切角。`;
+
+              const llm = await invokeLLM({
+                messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+                maxTokens: 1200,
+              });
+              const raw = llm.choices[0]?.message?.content ?? "";
+              const m = String(raw).match(/```(?:json)?\s*([\s\S]*?)```/);
+              const jt = m ? m[1]!.trim() : String(raw).trim();
+              let script: any;
+              try { script = JSON.parse(jt); } catch {
+                const s = jt.indexOf("{");
+                script = JSON.parse(jt.slice(s));
+              }
+              console.log("--- generated script ---");
+              console.log(JSON.stringify(script, null, 2));
+              if (!script?.fullVO) throw new Error("script parse failed");
+
+              console.log("=========== STEP 3: spokesperson image (Flux, synthetic person) ===========");
+              const imgTaskId = await piapiSubmit("Qubico/flux1-dev", "txt2img", {
+                prompt: `${script.spokespersonPrompt}. Vertical portrait, facing camera directly, centered face, natural warm lighting, shallow depth of field, photorealistic, shot on 50mm, clean simple background, no text, no watermark`.slice(0, 800),
+                negative_prompt: "text, watermark, logo, caption, subtitles, letters, multiple people, side profile, looking away, blurry face, distorted face, extra fingers",
+                width: 768,
+                height: 1344,
+              });
+              const imgData = await piapiPoll(imgTaskId, 5 * 60_000);
+              const rawImgUrl = imgData?.output?.image_url ?? imgData?.output?.image_urls?.[0] ?? imgData?.output?.url;
+              if (!rawImgUrl) throw new Error(`no image url: ${JSON.stringify(imgData).slice(0, 500)}`);
+              const imageUrl = await rehost(rawImgUrl, "png");
+              console.log("SPOKESPERSON IMAGE:", imageUrl);
+
+              console.log("=========== STEP 4: ElevenLabs voices (pick a zh-capable one) ===========");
+              const vres = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": EL_KEY } });
+              const vjson: any = await vres.json();
+              const voices = (vjson?.voices ?? []).map((v: any) => ({ id: v.voice_id, name: v.name, labels: v.labels }));
+              console.log("available voices:", JSON.stringify(voices.slice(0, 25), null, 2));
+              const preferred = voices.find((v: any) => /rachel|sarah|charlotte|alice|lily/i.test(v.name)) ?? voices[0];
+              const voiceId = preferred?.id ?? "21m00Tcm4TlvDq8ikWAM";
+              console.log("using voice:", preferred?.name, voiceId);
+
+              console.log("=========== STEP 5: TTS ===========");
+              const tts = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+                method: "POST",
+                headers: { "xi-api-key": EL_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
+                body: JSON.stringify({
+                  text: script.fullVO,
+                  model_id: "eleven_multilingual_v2",
+                  voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.3 },
+                }),
+              });
+              if (!tts.ok) throw new Error(`TTS ${tts.status}: ${(await tts.text()).slice(0, 300)}`);
+              const audioUrl = saveBuf(Buffer.from(await tts.arrayBuffer()), "mp3");
+              console.log("VOICEOVER:", audioUrl);
+
+              console.log("=========== STEP 6: Hedra Character-3 lip-sync ===========");
+              const vidTaskId = await piapiSubmit("hedra", "character", {
+                image_url: imageUrl,
+                audio_url: audioUrl,
+                prompt: "Warm, natural delivery to camera. Subtle head movement, genuine expression, slight smile.",
+                aspect_ratio: "9:16",
+              });
+              const vidData = await piapiPoll(vidTaskId, 12 * 60_000);
+              const rawVid = vidData?.output?.video_url ?? vidData?.output?.url;
+              if (!rawVid) throw new Error(`no video url: ${JSON.stringify(vidData).slice(0, 600)}`);
+              const videoUrl = await rehost(rawVid, "mp4");
+
+              console.log("");
+              console.log("############################################");
+              console.log("SAMPLE VIDEO READY");
+              console.log("  brand    :", brand.name);
+              console.log("  hook     :", script.hook);
+              console.log("  VO       :", script.fullVO);
+              console.log("  image    :", imageUrl);
+              console.log("  audio    :", audioUrl);
+              console.log("  >>> VIDEO:", videoUrl);
+              console.log("############################################");
+              process.exit(0);
+            })().catch((e) => {
+              console.error("SAMPLE FAILED:", e?.message ?? e);
+              process.exit(1);
+            });
+            SCRIPT_EOF
+
+            set -a
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            set +a
+            export SAMPLE_BRAND_ID SAMPLE_TOPIC
+
+            node --import tsx tmp-sample-video.ts
+            RC=$?
+            rm -f tmp-sample-video.ts
+            exit $RC
