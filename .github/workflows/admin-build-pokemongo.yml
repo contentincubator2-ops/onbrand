@@ -8,6 +8,12 @@ name: "Admin — Build Pokémon GO brand assets (lucas.lai@sowork.tw)"
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "full = 建品牌資產+6活動；season-patch = 只補10週年雙Logo規則"
+        type: choice
+        default: "full"
+        options: ["full", "season-patch"]
 
 jobs:
   build:
@@ -19,4 +25,8 @@ jobs:
           set -e
           cd /opt/onbrand/app/skills/ai-talent
           set -a; source .env; set +a
-          npx tsx scripts/admin-build-pokemongo.ts
+          if [ "${{ github.event.inputs.mode }}" = "season-patch" ]; then
+            npx tsx scripts/admin-patch-pokemongo-season.ts
+          else
+            npx tsx scripts/admin-build-pokemongo.ts
+          fi
