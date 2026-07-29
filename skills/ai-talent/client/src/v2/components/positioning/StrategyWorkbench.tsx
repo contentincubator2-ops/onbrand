@@ -79,12 +79,30 @@ export default function StrategyWorkbench({
   const compRows: any[] = Array.isArray(positioning?.competition?.direct) ? positioning.competition.direct : [];
   const diff = positioning?.differentiation ?? {};
 
+  // 2026-07-29 (CJ「按重新推導說我缺目標族群——系統應該直接抓定位書的內容
+  // 定義目標族群」): canonical audience segment missing ≠ no audience. Fall
+  // back through the positioning book's own definitions: legacy string
+  // shape → brands.targetAudience column (定位書欄位, brand.get already
+  // derives it from segment/interim when the column is empty).
+  const audSegmentEmpty = !aud.primary && !aud.secondary;
+  const brandQ = (trpc as any).brand?.get?.useQuery?.(
+    { id: brandId },
+    { enabled: !!brandId && audSegmentEmpty, refetchOnWindowFocus: false },
+  );
   const audienceChips: Chip[] = useMemo(() => {
     const out: Chip[] = [];
     if (aud.primary) out.push({ key: "primary", label: en ? "Primary audience" : "主受眾", value: String(aud.primary), drill: "audience" });
     if (aud.secondary) out.push({ key: "secondary", label: en ? "Secondary audience" : "次受眾", value: String(aud.secondary), drill: "audience" });
+    if (out.length === 0 && typeof positioning?.audience === "string" && positioning.audience.trim()) {
+      out.push({ key: "primary", label: en ? "Audience" : "受眾", value: positioning.audience.trim(), drill: "audience" });
+    }
+    const bookTa = typeof brandQ?.data?.targetAudience === "string" ? brandQ.data.targetAudience.trim() : "";
+    if (out.length === 0 && bookTa) {
+      out.push({ key: "book", label: en ? "Positioning-book audience" : "定位書受眾", value: bookTa, drill: "audience" });
+    }
     return out;
-  }, [aud.primary, aud.secondary, en]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aud.primary, aud.secondary, brandQ?.data?.targetAudience, en]);
 
   const competitorChips: Chip[] = useMemo(
     () => compRows.map((c: any, i: number) => ({
@@ -108,6 +126,13 @@ export default function StrategyWorkbench({
     (activeName ? null : scenarios[scenarios.length - 1] ?? null);
 
   const [selAudience, setSelAudience] = useState<string>("primary");
+  // fallback chip（如「定位書受眾」）出現時，選取狀態跟著落到既有的第一顆
+  React.useEffect(() => {
+    if (audienceChips.length > 0 && !audienceChips.some((c) => c.key === selAudience)) {
+      setSelAudience(audienceChips[0]!.key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audienceChips.map((c) => c.key).join(",")]);
   const [selComp, setSelComp] = useState<Set<string>>(() => new Set(competitorChips.slice(0, 2).map((c) => c.key)));
   const [selAdv, setSelAdv] = useState<Set<string>>(() => new Set(advantageChips.map((c) => c.key)));
   const [drill, setDrill] = useState<{ kind: "audience" | "competitor"; key: string } | null>(null);

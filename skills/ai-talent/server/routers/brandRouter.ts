@@ -222,6 +222,12 @@ export const brandRouter = router({
         if (!b.positioningSummary) {
           b.positioningSummary = fb(diff.summary, gc.why, interim.positioningSummary, interim.positioning) || b.positioningSummary;
         }
+        // 2026-07-29 (CJ「系統應該要直接抓取品牌定位書的內容，定義目標族群」):
+        // targetAudience joins the read-time fallback family — canonical
+        // audience segment first, interim pulse second.
+        if (!b.targetAudience) {
+          b.targetAudience = fb(p.audience?.primary, interim.audience, interim.targetAudience) || b.targetAudience;
+        }
       } catch { /* display fallback only — never block the read */ }
       return b;
     }),
