@@ -1,0 +1,53 @@
+name: "Ops — Verify Pokémon GO brand build (read-only, full report)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Verify
+        run: |
+          set +e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+          BID=2869
+
+          echo "===== 1. brand row ====="
+          Q "SELECT id, name, tagline FROM brands WHERE id=$BID\G"
+
+          echo "===== 2. description length + season note present? ====="
+          Q "SELECT CHAR_LENGTH(description) AS description_chars,
+                    description LIKE '%Forever Forward%' AS has_season_note,
+                    description LIKE '%不可繪製%' AS has_ip_rule
+             FROM brands WHERE id=$BID\G"
+
+          echo "===== 3. brand_colors swatches ====="
+          Q "SELECT JSON_PRETTY(brand_colors) AS colors FROM brands WHERE id=$BID\G"
+
+          echo "===== 4. AI 指令庫 — facebook + instagram present + preview ====="
+          Q "SELECT JSON_EXTRACT(positioning,'\$._aiPrompts.facebook') IS NOT NULL AS has_fb,
+                    JSON_EXTRACT(positioning,'\$._aiPrompts.instagram') IS NOT NULL AS has_ig
+             FROM brands WHERE id=$BID\G"
+          Q "SELECT LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$._aiPrompts.facebook.text')),300) AS fb_text_preview FROM brands WHERE id=$BID\G"
+          Q "SELECT LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$._aiPrompts.facebook.image')),300) AS fb_image_preview FROM brands WHERE id=$BID\G"
+
+          echo "===== 5. all events under this brand ====="
+          Q "SELECT id, name, startAt, endAt FROM events WHERE brandId=$BID ORDER BY startAt;"
+
+          echo "===== 6. each event: positioning segment count + season-badge patched? ====="
+          Q "SELECT id, name,
+                    JSON_LENGTH(JSON_KEYS(positioning)) AS segment_keys,
+                    JSON_CONTAINS(JSON_EXTRACT(positioning,'\$.guidelines.mustHaveElements'), JSON_QUOTE('placeholder')) AS _unused,
+                    (JSON_EXTRACT(positioning,'\$.guidelines.mustHaveElements') LIKE '%Forever Forward%') AS season_badge_patched
+             FROM events WHERE brandId=$BID ORDER BY startAt\G"
+
+          echo "===== 7. sample: one event's SMP + guidelines (proof of real content) ====="
+          Q "SELECT name,
+                    LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.smp.singleMindedProposition')),300) AS smp,
+                    LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$.guidelines.mustHaveElements')),500) AS must_haves
+             FROM events WHERE brandId=$BID AND id=24\G"
+          exit 0
