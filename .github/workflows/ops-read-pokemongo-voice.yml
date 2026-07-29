@@ -1,0 +1,25 @@
+name: "Ops — Read Pokémon GO voice prompt (full text, read-only)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  read:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Read
+        run: |
+          set +e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+          BID=2869
+          echo "===== full facebook text prompt ====="
+          Q "SELECT JSON_UNQUOTE(JSON_EXTRACT(positioning,'\$._aiPrompts.facebook.text')) AS t FROM brands WHERE id=$BID\G"
+          echo "===== description voice line ====="
+          Q "SELECT description LIKE '%訓練家，%開頭%' AS has_opener_rule,
+                    description LIKE '%「」%' AS has_quote_rule,
+                    description LIKE '%台灣時間%' AS has_time_format
+             FROM brands WHERE id=$BID\G"
+          exit 0
