@@ -352,8 +352,13 @@ export default function StrategyWorkbench({
               <div style={{ fontSize: 10.5, color: "#8A8494", marginBottom: 9 }}>{en ? "All copy firepower goes here" : "文案與活動的火力集中區"}</div>
               {derived.spots.map((s, i) => (
                 <div key={i} style={{ ...S.zoneCard, borderLeft: "4px solid #E8542F" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".1em", color: "#E8542F" }}>
-                    SPOT {i + 1} · {s.lane === "function" ? (en ? "FUNCTION" : "功能") : (en ? "EMOTION" : "情感")}
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".1em", color: "#E8542F", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>SPOT {i + 1} · {s.lane === "function" ? (en ? "FUNCTION" : "功能") : (en ? "EMOTION" : "情感")}</span>
+                    {(s as any).official && (
+                      <span style={{ background: "#2A2630", color: "#fff", borderRadius: 5, padding: "1px 8px", letterSpacing: ".06em" }}>
+                        {en ? "FROM POSITIONING BOOK" : "定位書原點"}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontWeight: 800, fontSize: 13.5, margin: "2px 0 3px" }}>{s.title}</div>
                   <div style={{ fontSize: 11.5, color: "#6E6878", lineHeight: 1.65 }}>

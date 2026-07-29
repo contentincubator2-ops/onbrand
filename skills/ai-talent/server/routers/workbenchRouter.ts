@@ -50,6 +50,10 @@ export type WorkbenchSpot = {
   gap: string;
   ours: string;
   tagline?: { zh: string; en?: string };
+  /** 2026-07-29 (CJ「其中一個甜蜜點，必須要是定位書的內容」): true =
+   *  this spot IS the brand's existing official positioning restated as a
+   *  need←gap←ours chain — never an AI invention. Always spots[0]. */
+  official?: boolean;
 };
 export type WorkbenchDerived = {
   spots: WorkbenchSpot[];
@@ -130,9 +134,13 @@ ${compBlock}
 黃金圈 WHY：${String(gc.why ?? "").slice(0, 200)}
 現行標語：${curTagline || "（無）"}
 
+【定位書錨點 — 最重要規則】
+spots[0] 必須是品牌「現有正式定位」本身：把上方差異化總結／黃金圈 WHY／現行標語所承載的正式定位，忠實改寫成 need←gap←ours 因果鏈——不可加入正式定位沒有的新主張，不可稀釋或改向，並標 "official": true。
+其餘 spots 才是依本輪錨點推導的延伸機會（"official": false），且不可與正式定位矛盾。
+
 輸出 JSON 結構：
 {
-  "spots": [ { "lane": "emotion|function", "title": "甜蜜點名稱（≤14字）", "need": "她要什麼（≤30字）", "gap": "所選競爭者的具體缺口（點名品牌，≤40字）", "ours": "我們憑什麼（引用所選優勢，≤40字）", "tagline": { "zh": "從這個點長出的標語（≤14字）", "en": "英文版" } } ],
+  "spots": [ { "lane": "emotion|function", "title": "甜蜜點名稱（≤14字）", "need": "她要什麼（≤30字）", "gap": "所選競爭者的具體缺口（點名品牌，≤40字）", "ours": "我們憑什麼（引用所選優勢，≤40字）", "official": true|false, "tagline": { "zh": "從這個點長出的標語（≤14字）", "en": "英文版" } } ],
   "stakes": [ { "title": "基本籌碼（她要・對手也有）", "note": "≤24字說明" } ],
   "rivalTurf": [ { "title": "對手地盤（她要・我們不跟）", "note": "為何不跟 ≤24字" } ],
   "vanity": [ { "title": "自嗨區（我們想講・她無感）", "note": "轉化建議 ≤24字" } ],
@@ -173,6 +181,14 @@ spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 �
       }
       if (!derived || !Array.isArray(derived.spots) || derived.spots.length === 0) {
         return { ok: false as const, error: "推導結果解析失敗，請再試一次" };
+      }
+      // 定位書錨點保險：official spot 必須存在且排第一（LLM 漏標時補標）。
+      const offIdx = derived.spots.findIndex((s: any) => s?.official === true);
+      if (offIdx > 0) {
+        const [off] = derived.spots.splice(offIdx, 1);
+        derived.spots.unshift(off!);
+      } else if (offIdx === -1) {
+        (derived.spots[0] as any).official = true;
       }
 
       // Persist scenario (replace same-name, append otherwise)
