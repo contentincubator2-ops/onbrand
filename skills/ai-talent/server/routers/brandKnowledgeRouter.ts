@@ -265,6 +265,105 @@ export const brandKnowledgeRouter = router({
     }),
 
   /**
+   * 既有語調鎖定 (Voice Lock) — 2026-07-29 (CJ「像 Pokémon GO 這樣的客戶，
+   * 習慣用自己的語調溝通…我應該如何識別出它適合的語調，其實是用它原來
+   * 溝通的語調」→「通用」).
+   *
+   * 識別訊號：品牌已有活躍、有實際成效的既有陣地（讚/留言/分享不是零）—
+   * 這代表既有語調已被市場驗證，不該被 AI 泛用人設覆蓋。使用者貼上幾篇
+   * 真實高成效貼文，AI 只萃取「可驗證、可量化」的規則（開頭稱呼、標點
+   * 慣例、emoji 密度與語意對應、固定格式等）——不是語氣印象詞，且明確
+   * 禁止發明樣本中沒出現的習慣。鎖定後，generateAiPromptForPlatform 對
+   * 這個品牌的「每一次」未來生成都會強制（code-level，非僅提示詞）帶上
+   * 這層規則，不會被下一次 AI 協助填 洗掉。
+   */
+  extractVoiceLock: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      samplePosts: z.array(z.string().min(5).max(2000)).min(2).max(10),
+      sourceNote: z.string().max(80).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const sys = `你是品牌語調稽核員，繁體中文。任務：從使用者貼上的「真實貼文範例」中，萃取可驗證、可量化的寫作規則——不是語氣印象詞，是可以逐字檢查是否遵守的具體規則。只輸出 JSON，第一字元就是 {。
+
+嚴格規則：
+- 只記錄在多篇範例中重複出現、可驗證的模式：開頭稱呼、標點慣例、emoji 數量與語意對應、固定格式（時間／數字寫法）、稱謂用詞、句子長度節奏等。
+- 樣本中只出現一次、無法判斷是否為固定習慣的細節，不要當作規則寫出。
+- 絕對不可自行發明範例中沒有出現的修辭習慣、口頭禪或句型——這是本任務最容易犯的錯誤，切記不要腦補。
+- 若樣本數量不足以判斷某個維度，該維度就不要下結論，不要用少數樣本強行歸納。
+- 「活潑」「溫暖」「親切」這類不可驗證的抽象形容詞不算規則，不要輸出。
+
+輸出 JSON：
+{"rules": ["規則1（具體、可驗證、可執行，≤50字）", "規則2", ...], "sourceSummary": "一句話總結樣本來源與萃取基礎（≤40字）"}
+rules 3-8 條。`;
+      const samplesBlock = input.samplePosts
+        .map((p, i) => `【範例 ${i + 1}】\n${p.trim()}`)
+        .join("\n\n");
+      const { invokeLLM } = await import("../_core/llm");
+      const r = await Promise.race([
+        invokeLLM({
+          messages: [
+            { role: "system", content: sys },
+            { role: "user", content: samplesBlock },
+          ],
+          maxTokens: 1200,
+        }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 30_000)),
+      ]);
+      const raw = r.choices[0]?.message?.content;
+      const text = typeof raw === "string" ? raw : "";
+      try {
+        const inTok = r.usage?.prompt_tokens ?? 0;
+        const outTok = r.usage?.completion_tokens ?? 0;
+        await localPool.execute(
+          `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+                VALUES (?, 'brand', ?, 'voice_lock_extract', ?, ?, ?, ?)`,
+          [userId, input.brandId, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
+           (inTok * 1.0 + outTok * 5.0) / 1_000_000],
+        );
+      } catch { /* non-fatal */ }
+      const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jsonText = m ? m[1]!.trim() : text.trim();
+      let parsed: any = null;
+      try { parsed = JSON.parse(jsonText); } catch {
+        const s = jsonText.indexOf("{");
+        if (s >= 0) { try { parsed = JSON.parse(jsonText.slice(s)); } catch {} }
+      }
+      if (!parsed || !Array.isArray(parsed.rules) || parsed.rules.length === 0) {
+        return { ok: false as const, error: "萃取失敗，請確認貼的是真實貼文原文，再試一次" };
+      }
+      const lock = {
+        rules: parsed.rules.map((r: any) => String(r)).slice(0, 8),
+        sourceSummary: String(parsed.sourceSummary ?? input.sourceNote ?? `依 ${input.samplePosts.length} 篇真實貼文歸納`),
+        sampleCount: input.samplePosts.length,
+        lockedAt: new Date().toISOString(),
+      };
+      const [posRows]: any = await localPool.execute(`SELECT positioning FROM brands WHERE id = ? AND userId = ?`, [input.brandId, userId]);
+      if ((posRows as any[]).length === 0) return { ok: false as const, error: "brand not found" };
+      let pos: any = posRows[0].positioning;
+      if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
+      pos = pos ?? {};
+      pos._voiceLock = lock;
+      await localPool.execute(`UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`, [JSON.stringify(pos), input.brandId, userId]);
+      return { ok: true as const, lock };
+    }),
+
+  clearVoiceLock: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const [posRows]: any = await localPool.execute(`SELECT positioning FROM brands WHERE id = ? AND userId = ?`, [input.brandId, userId]);
+      if ((posRows as any[]).length === 0) return { ok: false as const, error: "brand not found" };
+      let pos: any = posRows[0].positioning;
+      if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
+      pos = pos ?? {};
+      delete pos._voiceLock;
+      await localPool.execute(`UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`, [JSON.stringify(pos), input.brandId, userId]);
+      return { ok: true as const };
+    }),
+
+  /**
    * AI 協助填寫 (single field) — kept for backward-compat with old per-card
    * buttons. Now grounded in brand's real public content (FB / website).
    */
@@ -402,6 +501,31 @@ export async function loadBrandKnowledgeForPrompt(
  * regenerate all 8 platforms server-side after a scenario is applied.
  * 文字指令 = 【人設】400-600 字 + 【平台寫作指令】120-200 字 (CJ spec).
  */
+/** 2026-07-29 (CJ「像 Pokémon GO 這樣的客戶…如何識別出它適合的語調，其實是
+ *  用它原來溝通的語調」→「通用」): shape persisted at positioning._voiceLock.
+ *  Populated by extractVoiceLock from user-pasted real posts. Once present,
+ *  generateAiPromptForPlatform ALWAYS deterministically appends these rules
+ *  verbatim to the generated text prompt (code-level guarantee, not just a
+ *  prompt instruction the LLM might dilute — this is the generalized,
+ *  reusable version of the one-off fix applied to Pokémon GO 2026-07-29). */
+export type VoiceLock = { rules: string[]; sourceSummary: string; sampleCount: number; lockedAt: string };
+
+async function loadVoiceLock(brandId: number): Promise<VoiceLock | null> {
+  try {
+    const [rows]: any = await localPool.execute(`SELECT positioning FROM brands WHERE id = ? LIMIT 1`, [brandId]);
+    let pos: any = rows[0]?.positioning;
+    if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = null; } }
+    const lock = pos?._voiceLock;
+    return (lock && Array.isArray(lock.rules) && lock.rules.length > 0) ? lock as VoiceLock : null;
+  } catch { return null; }
+}
+
+function voiceLockBlock(lock: VoiceLock | null): string {
+  if (!lock) return "";
+  return `\n\n【真實觀察規則 — 務必遵守，優先於上方人設風格描述】\n(${lock.sourceSummary})\n` +
+    lock.rules.map((r) => `- ${r}`).join("\n");
+}
+
 export async function generateAiPromptForPlatform(
   brandId: number,
   userId: number,
@@ -410,10 +534,11 @@ export async function generateAiPromptForPlatform(
   | { ok: true; value: { text: string; image: string }; hasRealContent: boolean }
   | { ok: false; error: string }
 > {
-  const [brandPrefix, real, knowledgeBlock] = await Promise.all([
+  const [brandPrefix, real, knowledgeBlock, voiceLock] = await Promise.all([
     buildBrandPrefix(brandId).catch(() => ""),
     getBrandRealContent(brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
     loadBrandKnowledgeForPrompt(brandId).catch(() => ""),
+    loadVoiceLock(brandId),
   ]);
   const labelMap: Record<string, string> = {
     facebook: "Facebook", instagram: "Instagram", youtube: "YouTube", threads: "Threads",
@@ -447,7 +572,7 @@ ${hasReal
   "image": "<完整可貼上的圖片指令；80-200 字；說明 ${label} 配圖風格：構圖、色調、字幅、品牌元素、可用 / 不可用素材類型>"
 }
 直接輸出 JSON，第一字元就是 {。
-${brandPrefix}${real.context}${knowledgeBlock}`;
+${brandPrefix}${real.context}${knowledgeBlock}${voiceLockBlock(voiceLock)}`;
   try {
     const r = await Promise.race([
       invokeLLM({
@@ -482,10 +607,17 @@ ${brandPrefix}${real.context}${knowledgeBlock}`;
       }
     }
     if (!parsed) return { ok: false as const, error: "JSON parse failed" };
+    // 2026-07-29: deterministic guarantee — a prompt instruction alone is
+    // probabilistic (this is exactly how Pokémon GO's rules got diluted the
+    // first time). If a voice lock exists, its rules are ALWAYS appended
+    // verbatim to the generated text, in code, regardless of what the LLM did.
+    const lockedText = voiceLock
+      ? `${String(parsed.text ?? "").slice(0, 3400)}${voiceLockBlock(voiceLock)}`
+      : String(parsed.text ?? "");
     return {
       ok: true as const,
       value: {
-        text:  String(parsed.text  ?? "").slice(0, 4000),
+        text:  lockedText.slice(0, 4000),
         image: String(parsed.image ?? "").slice(0, 4000),
       },
       hasRealContent: real.hasContent,

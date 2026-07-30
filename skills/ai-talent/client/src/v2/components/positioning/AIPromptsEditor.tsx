@@ -65,6 +65,11 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
     onSuccess: () => utils.scope?.active?.invalidate?.(),
   });
   const suggestAIPromptsMut = (trpc as any).brandKnowledge?.suggestAIPrompts?.useMutation?.();
+  const extractVoiceLockMut = (trpc as any).brandKnowledge?.extractVoiceLock?.useMutation?.();
+  const clearVoiceLockMut = (trpc as any).brandKnowledge?.clearVoiceLock?.useMutation?.();
+  const voiceLock: { rules: string[]; sourceSummary: string; sampleCount: number; lockedAt: string } | undefined = positioning._voiceLock;
+  const [voiceLockOpen, setVoiceLockOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
 
   const persist = (next: Record<string, PromptValue>) => {
     if (!saveMut || !brandId) return;
@@ -126,6 +131,98 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
               : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。所有任務與七日發布台在該平台跑任務時會自動套用。"}
           </p>
         </div>
+      </div>
+
+      {/* 2026-07-29 (CJ「像 Pokémon GO 這樣的客戶，習慣用自己的語調溝通…
+          如何識別出它適合的語調，其實是用它原來溝通的語調」→「通用」):
+          既有語調鎖定 — brand-wide, sits above the per-platform tabs since
+          the locked rules apply to every platform's generation. */}
+      <div className="mb-6 rounded-2xl border" style={{ borderColor: voiceLock ? "#7C3AED" : "#E5E7EB", background: voiceLock ? "#FAF5FF" : "#FAFAF9" }}>
+        <button
+          onClick={() => setVoiceLockOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">{voiceLock ? "🔒" : "🔓"}</span>
+            <span className="text-sm font-semibold text-default-900">
+              {en ? "Existing voice lock" : "既有語調鎖定"}
+            </span>
+            {voiceLock ? (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: "#7C3AED", color: "#fff" }}>
+                {en ? `${voiceLock.rules.length} rules locked` : `已鎖定 ${voiceLock.rules.length} 條規則`}
+              </span>
+            ) : (
+              <span className="text-[10px] text-default-400">
+                {en ? "optional — for brands with a proven existing tone" : "選填——適合已有成效驗證語調的品牌"}
+              </span>
+            )}
+          </div>
+          <span className="text-default-400 text-xs">{voiceLockOpen ? "▾" : "▸"}</span>
+        </button>
+        {voiceLockOpen && (
+          <div className="px-4 pb-4">
+            <p className="text-xs text-default-500 mb-3">
+              {en
+                ? "If this brand already has an active, proven-effective presence (real engagement, not zero), paste 2–10 real posts below. AI extracts only verifiable, quantifiable rules (opening address, emoji density, punctuation habits, fixed formats) — never invented flourishes — and locks them in. Every future AI-generated prompt for this brand carries these rules verbatim, permanently."
+                : "如果這個品牌已有活躍、有實際成效的既有陣地（真實互動，不是從零開始），貼上 2–10 篇真實貼文。AI 只萃取可驗證、可量化的規則（開頭稱呼、emoji 密度、標點慣例、固定格式）——絕不發明沒出現過的修辭——並永久鎖定。之後每一次 AI 產生這個品牌的指令都會強制帶上這些規則。"}
+            </p>
+            {voiceLock && (
+              <div className="mb-3 rounded-xl border border-violet-200 bg-white p-3">
+                <p className="text-[11px] text-default-400 mb-1.5">{voiceLock.sourceSummary}</p>
+                <ul className="space-y-1">
+                  {voiceLock.rules.map((r, i) => (
+                    <li key={i} className="text-xs text-default-700 flex gap-1.5">
+                      <span className="text-violet-500 shrink-0">•</span>{r}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => {
+                    if (!brandId) return;
+                    clearVoiceLockMut?.mutate?.({ brandId }, { onSuccess: () => utils.scope?.active?.invalidate?.() });
+                  }}
+                  disabled={clearVoiceLockMut?.isPending}
+                  className="mt-2.5 text-[11px] font-medium text-default-400 hover:text-danger-500 transition"
+                >
+                  {clearVoiceLockMut?.isPending ? "…" : (en ? "Clear lock" : "清除鎖定")}
+                </button>
+              </div>
+            )}
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder={en
+                ? "Paste 2-10 real posts, one per paragraph (blank line between each)…"
+                : "貼上 2–10 篇真實貼文原文，每篇一段（段落間空行分隔）…"}
+              rows={6}
+              className="w-full text-xs border border-default-200 rounded-xl p-3 resize-y focus:outline-none focus:border-violet-400"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-[11px] text-default-400">
+                {pasteText.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean).length} {en ? "posts detected" : "篇偵測到"}
+              </span>
+              <button
+                onClick={() => {
+                  if (!brandId) return;
+                  const posts = pasteText.split(/\n\s*\n/).map((s) => s.trim()).filter((s) => s.length >= 5);
+                  if (posts.length < 2) { alert(en ? "Paste at least 2 real posts" : "至少貼上 2 篇真實貼文"); return; }
+                  extractVoiceLockMut?.mutate?.({ brandId, samplePosts: posts.slice(0, 10) }, {
+                    onSuccess: (r: any) => {
+                      if (r?.ok) { setPasteText(""); utils.scope?.active?.invalidate?.(); }
+                      else alert(r?.error ?? (en ? "Extraction failed" : "萃取失敗，請再試一次"));
+                    },
+                    onError: () => alert(en ? "Extraction failed" : "萃取失敗，請再試一次"),
+                  });
+                }}
+                disabled={extractVoiceLockMut?.isPending}
+                className="text-xs font-semibold px-4 py-1.5 rounded-full text-white transition"
+                style={{ background: extractVoiceLockMut?.isPending ? "#A78BFA" : "#7C3AED" }}
+              >
+                {extractVoiceLockMut?.isPending ? (en ? "Analyzing…" : "分析中…") : (en ? "🔒 Analyze & lock" : "🔒 分析並鎖定")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Platform tab strip */}
