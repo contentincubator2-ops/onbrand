@@ -1,0 +1,93 @@
+name: "Op — Verify the exact price Stripe checkout will charge a user (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: "users.id to verify (1238976 = marketing@momdadstory.com)"
+        required: true
+        default: "1238976"
+        type: string
+      plan_code:
+        description: "Plan code"
+        required: true
+        default: "drop_starter"
+        type: string
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute effective price via the real server code path
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          VERIFY_USER_ID: ${{ inputs.user_id }}
+          VERIFY_PLAN: ${{ inputs.plan_code }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          envs: VERIFY_USER_ID,VERIFY_PLAN
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+
+            cat > tmp-verify-price.ts <<'SCRIPT_EOF'
+            import localPool from "./server/localDb";
+            import { getPlan, getEffectivePrice, toStripeUnitAmount, isPromoActiveForNewSignups } from "./server/_core/plans";
+
+            const UID = Number(process.env.VERIFY_USER_ID);
+            const PLAN = process.env.VERIFY_PLAN ?? "drop_starter";
+
+            (async () => {
+              const [rows]: any = await localPool.execute(
+                "SELECT id, email, planCode, planStatus, IFNULL(earlyBird,0) AS earlyBird, lockedPriceTwdMonthly, currency FROM users WHERE id = ? LIMIT 1",
+                [UID],
+              );
+              const u = (rows as any[])[0];
+              if (!u) throw new Error("user not found");
+              console.log("=========== USER ===========");
+              console.log(JSON.stringify(u, null, 2));
+
+              console.log("=========== PROMO DEFAULT (affects NEW signups only) ===========");
+              console.log("ONBRAND_PROMO_ACTIVE env:", process.env.ONBRAND_PROMO_ACTIVE ?? "(unset)");
+              console.log("isPromoActiveForNewSignups():", isPromoActiveForNewSignups());
+
+              const { getUserCurrency } = await import("./server/_core/currency").catch(() => ({ getUserCurrency: null as any }));
+              let resolvedCurrency: any = null;
+              if (getUserCurrency) {
+                try { resolvedCurrency = await getUserCurrency(UID); } catch (e: any) { console.log("getUserCurrency failed:", e?.message); }
+              }
+              console.log("resolved currency:", resolvedCurrency ?? "(helper not found — testing both)");
+
+              const { getUsdToTwd } = await import("./server/_core/fx");
+              const rate = await getUsdToTwd();
+              console.log("usdToTwd rate:", rate);
+
+              for (const cur of (resolvedCurrency ? [resolvedCurrency] : ["TWD", "USD"])) {
+                const eff = getEffectivePrice(getPlan(PLAN as any), {
+                  earlyBird: Number(u.earlyBird),
+                  lockedPriceTwdMonthly: u.lockedPriceTwdMonthly,
+                  currency: cur as any,
+                  usdToTwd: rate,
+                });
+                console.log(`=========== EFFECTIVE PRICE (${cur}) ===========`);
+                console.log(JSON.stringify(eff, null, 2));
+                console.log(`  monthly  -> stripe unit_amount = ${toStripeUnitAmount(eff.monthly, cur as any)}`);
+                console.log(`  annually -> stripe unit_amount = ${toStripeUnitAmount(eff.annually, cur as any)}`);
+                console.log(`  >>> USER WILL SEE AT CHECKOUT: ${cur} ${eff.monthly} / month`);
+              }
+              process.exit(0);
+            })().catch((e) => { console.error("VERIFY FAILED:", e?.message ?? e); process.exit(1); });
+            SCRIPT_EOF
+
+            set -a
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            set +a
+            export VERIFY_USER_ID VERIFY_PLAN
+
+            node --import tsx tmp-verify-price.ts
+            RC=$?
+            rm -f tmp-verify-price.ts
+            exit $RC
