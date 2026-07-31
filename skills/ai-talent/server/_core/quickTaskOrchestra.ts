@@ -1606,11 +1606,27 @@ async function genOneImage(
 const VIDEO_POLL_MS = 10_000;
 const VIDEO_MAX_WAIT_MS = 6 * 60_000;
 
+/**
+ * 2026-07-29 (probe caught this): mediaGen saves renders locally and returns
+ * a RELATIVE url ("/static/covers/media-img-….png"). Kling fetches the image
+ * over the public internet, so a relative path fails submit with
+ *   "invalid image_url: malformed url: missing scheme".
+ * Product photos coming from loadProductImageUrl are already absolute (it
+ * filters on /^https?:\/\//), so only freshly-rendered stills need this.
+ */
+function absoluteMediaUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = (process.env.PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://onbrand.sowork.ai")
+    .replace(/\/+$/, "");
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 async function genOneVideo(
   args: { imageUrl: string; caption: string; motionHint?: string },
   config: OrchestraConfig,
 ): Promise<NonNullable<OrchestraVariant["video"]>> {
   const poster = args.imageUrl;
+  const sourceUrl = absoluteMediaUrl(args.imageUrl);
   const modelId = config.videoModel ?? "piapi/kling-v1-6-i2v";
   try {
     const motion =
@@ -1626,7 +1642,7 @@ async function genOneVideo(
 
     const submit = await dispatchGenerate(modelId, {
       prompt: prompt.slice(0, 800),
-      imageUrl: args.imageUrl,
+      imageUrl: sourceUrl,
       aspectRatio: (config.aspectRatio === "1.91:1" ? "16:9" : config.aspectRatio) as any,
       durationSec: config.videoDurationSec ?? 5,
       videoNegativePrompt:
