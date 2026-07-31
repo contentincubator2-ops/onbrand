@@ -516,6 +516,25 @@ export interface OrchestraConfig {
    * (best prompt adherence for clean, text-free 16:9 backgrounds).
    */
   imageModelOverride?: string;
+  /**
+   * 2026-07-29 (CJ「模仿 TikTok 產品影片類型」Tier 1): animate each rendered
+   * image into a short vertical clip (image-to-video). Tier 1 formats are
+   * deliberately FACELESS (product hero / ASMR / before-after) because
+   * lip-sync is unavailable — see mediaGen PIAPI_MAP notes. Requires
+   * runImageGen=true: the video's first frame IS the generated image, so
+   * real-product fidelity (Nano Banana subject compositing) carries through.
+   *
+   * Kling i2v takes ~150s per clip, which EXCEEDS every sync tier budget —
+   * video tasks must run through the async (onCheckpoint) path so the user
+   * gets captions immediately and clips land in the same row later.
+   */
+  runVideoGen?: boolean;
+  /** i2v model id. Default piapi/kling-v1-6-i2v. */
+  videoModel?: string;
+  /** Clip length in seconds (Kling accepts 5 or 10). Default 5. */
+  videoDurationSec?: 5 | 10;
+  /** English camera/motion direction appended to the i2v prompt. */
+  videoMotionHint?: string;
   variantLabels: string[];
   /** Caption length range hint (chars, lower bound) for prompt + UI badge */
   captionMinChars: number;

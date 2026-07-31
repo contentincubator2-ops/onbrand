@@ -71,6 +71,12 @@ export interface GenOptions {
   quality?: "low" | "medium" | "high";
   /** Brand id — used for filename + audit. */
   brandId?: number | null;
+  /** 2026-07-29: clip length for video models (Kling accepts 5 or 10).
+   *  Previously hardcoded to 5 in every buildInput, so 10s clips were
+   *  impossible. Ignored by image models. */
+  durationSec?: 5 | 10;
+  /** Negative motion/content hint for video models that support it. */
+  videoNegativePrompt?: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -496,10 +502,11 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
     buildInput: (o) => ({
       prompt: o.prompt,
       image_url: o.imageUrl,            // i2v requires source image
-      duration: 5,
+      duration: o.durationSec ?? 5,
       aspect_ratio: o.aspectRatio ?? "16:9",
       version: "1.6",
       mode: "std",
+      ...(o.videoNegativePrompt ? { negative_prompt: o.videoNegativePrompt } : {}),
     }),
   },
   "piapi/runway-gen-4": {

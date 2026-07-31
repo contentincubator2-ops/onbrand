@@ -15,7 +15,7 @@
  * Cost ~$0.017 / orchestra (1 LLM call ×2 + Flux Schnell ×5 @ $0.003).
  */
 import { callModel, type ModelProvider } from "./multiModelRouter";
-import { dispatchGenerate } from "./mediaGen";
+import { dispatchGenerate, checkJob } from "./mediaGen";
 import { captionToVisualBrief, loadBrandPaletteHexes } from "./visualBrief";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
@@ -90,6 +90,18 @@ export interface OrchestraVariant {
     style: string | null;
     url: string | null;
     status: "ready" | "failed" | "skipped" | "timeout";
+    errorMsg?: string;
+  };
+  /**
+   * 2026-07-29 Tier-1 TikTok video formats: the variant's image animated
+   * into a short vertical clip. `posterUrl` is the still it was animated
+   * from, so the UI can show a poster frame while the clip loads (and
+   * still has something to render if the clip failed).
+   */
+  video?: {
+    url: string | null;
+    posterUrl: string | null;
+    status: "ready" | "failed" | "skipped" | "timeout" | "pending";
     errorMsg?: string;
   };
   /**
@@ -1575,6 +1587,88 @@ async function genOneImage(
   }
 }
 
+// ── Single image-to-video with polling ──────────────────────────────────
+//
+// 2026-07-29 (CJ「模仿 TikTok 產品影片類型」Tier 1). Animates an already-
+// rendered still into a short vertical clip. Deliberately image-to-video,
+// never text-to-video, for three reasons:
+//   1. The still already went through the full brand pipeline (palette,
+//      NO-TEXT guard, and — when the run is product-scoped — real-product
+//      Nano Banana compositing). t2v would throw all of that away and
+//      hallucinate a different product every clip.
+//   2. Tier 1 formats are FACELESS by design. Lip-sync is unavailable
+//      (PiAPI plan blocks kling lip_sync; the Hedra entry is broken), so
+//      any format needing a talking mouth is out of scope here.
+//   3. One still → one clip keeps the subject identical across variants.
+//
+// Kling i2v measured ~150s for a 10s clip, so this NEVER fits a sync tier
+// budget — callers must use the async (onCheckpoint) path.
+const VIDEO_POLL_MS = 10_000;
+const VIDEO_MAX_WAIT_MS = 6 * 60_000;
+
+async function genOneVideo(
+  args: { imageUrl: string; caption: string; motionHint?: string },
+  config: OrchestraConfig,
+): Promise<NonNullable<OrchestraVariant["video"]>> {
+  const poster = args.imageUrl;
+  const modelId = config.videoModel ?? "piapi/kling-v1-6-i2v";
+  try {
+    const motion =
+      args.motionHint?.trim() ||
+      "Slow, smooth cinematic camera push-in on the product. Subtle natural " +
+      "movement only. Keep the product identical to the source frame.";
+    // The product must not morph mid-clip — that's the single most common
+    // i2v failure and it silently ships a wrong-looking product.
+    const prompt =
+      `${motion} Hold the subject's shape, colors, materials and any printed ` +
+      `label exactly as in the source image. Static, stable framing. No text ` +
+      `or captions appear on screen.`;
+
+    const submit = await dispatchGenerate(modelId, {
+      prompt: prompt.slice(0, 800),
+      imageUrl: args.imageUrl,
+      aspectRatio: (config.aspectRatio === "1.91:1" ? "16:9" : config.aspectRatio) as any,
+      durationSec: config.videoDurationSec ?? 5,
+      videoNegativePrompt:
+        "text, letters, captions, subtitles, watermark, logo overlay, " +
+        "morphing product, shape change, extra objects appearing, scene cut, " +
+        "camera shake, distorted proportions",
+    } as any);
+
+    if (submit.status === "ready" && submit.url) {
+      return { url: submit.url, posterUrl: poster, status: "ready" };
+    }
+    if (submit.status === "failed" || !submit.taskId) {
+      return {
+        url: null, posterUrl: poster, status: "failed",
+        errorMsg: submit.errorMsg ?? `${modelId} submit returned no taskId`,
+      };
+    }
+
+    const taskId = submit.taskId;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < VIDEO_MAX_WAIT_MS) {
+      await new Promise((r) => setTimeout(r, VIDEO_POLL_MS));
+      const r = await checkJob(modelId, taskId);
+      if (r.status === "ready" && r.url) {
+        return { url: r.url, posterUrl: poster, status: "ready" };
+      }
+      if (r.status === "failed") {
+        return {
+          url: null, posterUrl: poster, status: "failed",
+          errorMsg: r.errorMsg ?? `${modelId} reported failure`,
+        };
+      }
+    }
+    return {
+      url: null, posterUrl: poster, status: "timeout",
+      errorMsg: `${modelId} exceeded ${VIDEO_MAX_WAIT_MS / 1000}s`,
+    };
+  } catch (e: any) {
+    return { url: null, posterUrl: poster, status: "failed", errorMsg: String(e?.message ?? e) };
+  }
+}
+
 // ── Main entry ───────────────────────────────────────────────────────────
 
 export async function runOrchestra(args: {
@@ -1643,7 +1737,17 @@ export async function runOrchestra(args: {
       },
     };
   }
-  const tierBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "99s" ? HARD_BUDGET_99S : HARD_BUDGET_MS;
+  // 2026-07-29 Tier-1 video: Kling i2v measures ~150s for a single 10s clip,
+  // which alone equals the LARGEST sync budget — with the normal race the run
+  // would always be killed mid-render and ship status:"timeout" clips. Video
+  // tasks therefore get a much larger ceiling. This is only safe because the
+  // user is NOT waiting on it: video tasks run through the async onCheckpoint
+  // path (captions return in ~30-40s, clips land in the same mission_outputs
+  // row later). The ceiling still exists so a hung provider can't leak a
+  // forever-pending job.
+  const VIDEO_BUDGET_MS = 8 * 60_000;
+  const baseBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "99s" ? HARD_BUDGET_99S : HARD_BUDGET_MS;
+  const tierBudget = args.config.runVideoGen ? VIDEO_BUDGET_MS : baseBudget;
 
   const startedAt = Date.now();
   const stages: OrchestraStage[] = [];
@@ -2210,7 +2314,10 @@ export async function runOrchestra(args: {
     // 30s tier: runImageGen=false → briefs are written but no Flux call.
     // The carousel renders style direction text in the mockup image slot;
     // user clicks "用此風格生圖" per variant to opt into MediaGenFlow.
-    const willRender = args.config.runImageGen && args.config.images > 0;
+    // 2026-07-29: a video task's clip is its still animated, so video always
+    // implies rendering the still — otherwise runVideoGen would silently
+    // produce nothing (every image "skipped" → every clip skipped).
+    const willRender = (args.config.runImageGen || !!args.config.runVideoGen) && args.config.images > 0;
     const stGen = willRender
       ? stage("gen", `Flux Schnell ×${args.config.images} 平行生圖`)
       : null;
@@ -2244,6 +2351,46 @@ export async function runOrchestra(args: {
     for (const img of images) {
       if ((img.status === "failed" || img.status === "timeout") && img.errorMsg) {
         errors.push(`image(${img.status}): ${String(img.errorMsg).slice(0, 200)}`);
+      }
+    }
+
+    // ── Stage 3.4: image → video (Tier-1 TikTok formats) ───────────────
+    // Only runs when the task opts in via runVideoGen. Each ready image is
+    // animated into its own clip, in parallel. A variant whose image failed
+    // is skipped rather than falling back to text-to-video — same policy as
+    // product-faithful image gen: a hallucinated product is worse than no
+    // clip, and t2v cannot see the source product at all.
+    const wantVideo = !!args.config.runVideoGen;
+    let videos: Array<NonNullable<OrchestraVariant["video"]>> | null = null;
+    if (wantVideo) {
+      const readyCount = images.filter((im) => im.status === "ready" && im.url).length;
+      const stVid = stage("video", `Kling i2v ×${readyCount} 平行生影片`);
+      videos = await Promise.all(
+        images.map((im, i) =>
+          im.status === "ready" && im.url
+            ? genOneVideo(
+                {
+                  imageUrl: im.url,
+                  caption: captions[i]?.caption ?? "",
+                  motionHint: args.config.videoMotionHint,
+                },
+                args.config,
+              )
+            : Promise.resolve<NonNullable<OrchestraVariant["video"]>>({
+                url: null,
+                posterUrl: im.url ?? null,
+                status: "skipped",
+                errorMsg: "no source image to animate",
+              }),
+        ),
+      );
+      const okVid = videos.filter((v) => v.status === "ready").length;
+      stVid.status = okVid > 0 ? "done" : "failed";
+      stVid.completedAt = Date.now() - startedAt;
+      for (const v of videos) {
+        if ((v.status === "failed" || v.status === "timeout") && v.errorMsg) {
+          errors.push(`video(${v.status}): ${String(v.errorMsg).slice(0, 200)}`);
+        }
       }
     }
 
@@ -2335,6 +2482,9 @@ export async function runOrchestra(args: {
         // Actual failures (both Imagen + Flux returned errors) already push
         // an explicit {status:"failed"} into images[i] above.
         image: images[i] ?? { style: briefs[i] ?? null, url: null, status: "skipped" },
+        // Tier-1 video formats only — undefined for every existing task, so
+        // no current mockup changes behaviour.
+        ...(videos ? { video: videos[i] ?? { url: null, posterUrl: null, status: "skipped" as const } } : {}),
       });
     }
 
