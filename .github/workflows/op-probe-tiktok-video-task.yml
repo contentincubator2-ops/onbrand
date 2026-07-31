@@ -1,0 +1,45 @@
+name: "Op — Probe a Tier-1 TikTok video task end-to-end"
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "Task id"
+        required: true
+        default: "tt-30-product-hero"
+        type: choice
+        options:
+          - tt-30-product-hero
+          - tt-30-product-asmr
+          - tt-30-text-hook-card
+          - tt-30-before-after
+      task_input:
+        description: "Topic input"
+        required: true
+        default: "媽爹講故事年卡：台灣真實爸爸親聲錄製的兒童有聲故事，無螢幕陪孩子入睡"
+        type: string
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Run orchestra probe on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          TASK_INPUT: ${{ inputs.task_input }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 22m
+          envs: TASK_ID,TASK_INPUT
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a
+            source .env 2>/dev/null || true
+            set +a
+            export TASK_ID TASK_INPUT
+            node --import tsx scripts/probe-orchestra.ts

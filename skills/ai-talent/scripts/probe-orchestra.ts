@@ -90,6 +90,18 @@ import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/_core/qu
       (v.image?.style ? ` · style="${v.image.style.slice(0, 60)}…"` : "") +
       (v.caption ? `\n      preview: ${v.caption.slice(0, 80).replace(/\n/g, " ")}…` : ""),
     );
+    if (v.image?.url) console.log(`      image[${v.image.status}]: ${v.image.url}`);
+    else if (v.image?.status && v.image.status !== "skipped") {
+      console.log(`      image[${v.image.status}]: ${v.image.errorMsg ?? "no url"}`);
+    }
+    // Tier-1 video formats — undefined for every non-video task.
+    if (v.video) {
+      console.log(
+        v.video.url
+          ? `      VIDEO[${v.video.status}]: ${v.video.url}`
+          : `      VIDEO[${v.video.status}]: ${v.video.errorMsg ?? "no url"}`,
+      );
+    }
   }
 
   console.log(`\n=== ${pass} pass / ${fail} fail ===`);

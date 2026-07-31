@@ -184,6 +184,100 @@ ${TT_SUFFIX}`,
     preferredModel: "qwen", maxTokens: 500,
     outputDefaults: { platform: "tiktok", post_type: "live" },
   },
+
+  // ── Tier 1 影片任務卡（2026-07-29 CJ「模仿 TikTok 產品影片類型」）─────
+  //
+  // 這四張是全站第一批「真的會產出影片」的任務卡，不是只給腳本。
+  // 共同設計原則：全部 FACELESS（畫面上沒有人在講話）。
+  // 原因是技術邊界而不是偏好 —— 對嘴目前不可用（PiAPI 方案擋掉 kling
+  // lip_sync、Hedra 註冊項是壞的），所以任何需要「嘴巴對上聲音」的格式
+  // （UGC 見證、創辦人直述、反應影片）都不在 Tier 1，留給 Tier 3。
+  //
+  // 影片來源一律是「這張卡自己生的靜圖 → Kling i2v」，因此當任務 scope
+  // 在某個產品上時，Nano Banana 的真實產品合成會一路帶到影片第一格，
+  // 產品是真的而不是 AI 幻想出來的。
+  {
+    id: "tt-30-product-hero",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Product Hero Clip (vertical video)", zh: "產品主視覺短片（直式影片）" },
+    description: { en: "Real vertical clip — product hero shot", zh: "真的會產出直式影片・產品主視覺" },
+    agent_id: 180167,
+    skill_slug: "tiktok-content",
+    primary_question: "要主打哪個產品？它最想被看見的一點是什麼？",
+    primary_input: { key: "topic", placeholder: "例：無螢幕兒童有聲故事年卡 / 主打睡前陪伴", type: "textarea" },
+    inputs: [{ key: "topic", label: "產品 + 主打賣點", type: "textarea", required: true }],
+    systemPrompt: `產出 TikTok 產品短片的貼文文案（會搭配一支直式產品短片）。每變體 1 種切角。
+規則：
+- 第一句就是鉤子，前 1.5 秒要抓住人。
+- 文案在描述「這個產品在畫面上看起來是什麼樣子、為什麼值得停下來看」。
+- 不要寫成規格表，要寫成一個畫面。
+- 60-120 字。
+${TT_SUFFIX}`,
+    preferredModel: "qwen", maxTokens: 600,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-product-asmr",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Product ASMR Clip", zh: "產品 ASMR 短片" },
+    description: { en: "Real vertical clip — macro texture, no voiceover", zh: "真的會產出直式影片・材質特寫免口播" },
+    agent_id: 30011,
+    skill_slug: "short-video-script",
+    primary_question: "要拍哪個產品的質感 / 觸感？",
+    primary_input: { key: "topic", placeholder: "例：故事書封面紙質 / 開盒瞬間", type: "textarea" },
+    inputs: [{ key: "topic", label: "產品 + 想強調的質感", type: "textarea", required: true }],
+    systemPrompt: `產出 TikTok ASMR 產品短片的貼文文案。每變體 1 種切角。
+規則：
+- ASMR 影片沒有口播，文案要補上「聲音的想像」（例：紙頁翻動的沙沙聲）。
+- 描述觸感、材質、光線，讓人有想伸手摸的感覺。
+- 短、慢、有節奏感。40-90 字。
+${TT_SUFFIX}`,
+    preferredModel: "qwen", maxTokens: 500,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-text-hook-card",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Text Hook Card (trending audio)", zh: "字卡鉤子短片（搭熱門音樂）" },
+    description: { en: "Real vertical clip — clean bg for text overlay", zh: "真的會產出直式影片・乾淨底圖疊字" },
+    agent_id: 60033,
+    skill_slug: "short-video-script",
+    primary_question: "想讓觀眾看到的那一句話是什麼？",
+    primary_input: { key: "topic", placeholder: "例：別再用手機哄睡了", type: "textarea" },
+    inputs: [{ key: "topic", label: "主張 / 想講的一句話", type: "textarea", required: true }],
+    systemPrompt: `產出 TikTok 字卡型短片的文案（畫面是乾淨底圖 + 疊字，搭熱門音樂）。每變體 1 種語氣。
+規則：
+- 第一行就是要被做成大字卡的那句話，≤14 字，要夠嗆或夠有共鳴。
+- 後面 2-4 行是逐句展開，每行 ≤14 字（會做成逐句出現的字卡）。
+- 每行獨立成立，不要跨行斷句。
+${TT_SUFFIX}`,
+    preferredModel: "qwen", maxTokens: 500,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-before-after",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Before / After Clip", zh: "Before / After 對比短片" },
+    description: { en: "Real vertical clip — problem-to-solution reveal", zh: "真的會產出直式影片・痛點到解方" },
+    agent_id: 60031,
+    skill_slug: "short-video-script",
+    primary_question: "用了之後，什麼事情變得不一樣了？",
+    primary_input: { key: "topic", placeholder: "例：睡前battle 40 分鐘 → 聽故事 10 分鐘睡著", type: "textarea" },
+    inputs: [{ key: "topic", label: "使用前的狀況 → 使用後的改變", type: "textarea", required: true }],
+    systemPrompt: `產出 TikTok Before/After 對比短片的文案。每變體 1 種切角。
+規則：
+- 先把「之前有多痛」寫具體（有畫面、有時間、有情緒），不要抽象。
+- 再寫「之後」，改變要可被看見，不要用「變得更好」這種空話。
+- 不要誇大成療效或保證，只描述真實可發生的日常改變。
+- 60-120 字。
+${TT_SUFFIX}`,
+    preferredModel: "qwen", maxTokens: 600,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
 ];
 
 const ANNA_ID      = 180165; // Anna Tseng (主場)
@@ -200,6 +294,55 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "tt-30-trend-remix":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產業共鳴版", "反差版", "教育型"], captionMinChars: 80, captionMaxChars: 300 },
   "tt-30-comment-reply":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["同感式", "幽默式", "反問式"], captionMinChars: 30, captionMaxChars: 80 },
   "tt-30-live-opening":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: TT_DIR_GRANT, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4, variantLabels: ["懸念", "互動", "直球"], captionMinChars: 100, captionMaxChars: 300 },
+
+  // ── Tier 1 影片卡 ────────────────────────────────────────────────────
+  // 這四張是全站唯一 runVideoGen=true 的設定。三個刻意的選擇：
+  //
+  // variants/images = 2（其他卡都是 3）：每個 variant 要跑一支 Kling i2v，
+  //   實測一支 ~150 秒且要真金白銀。2 支平行 ≈ 一樣的牆鐘時間但成本砍
+  //   三分之一。少而好，不是多而濫。
+  // runImageGen=true：影片的第一格就是這張靜圖，靜圖必須真的算出來。
+  // imageQualitySteps 提高到 8：這張圖會被放大成整支影片的基底，
+  //   draft 品質的圖會讓整支片看起來很糟。
+  "tt-30-product-hero": {
+    variants: 2, images: 2, runImageGen: true, imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
+    variantLabels: ["質感特寫", "情境使用"], captionMinChars: 60, captionMaxChars: 120,
+    runVideoGen: true, videoDurationSec: 10,
+    videoMotionHint:
+      "Slow cinematic push-in on the product with gentle parallax. Soft light " +
+      "drifts across the surface. The product stays perfectly still and intact.",
+  },
+  "tt-30-product-asmr": {
+    variants: 2, images: 2, runImageGen: true, imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
+    variantLabels: ["材質特寫", "開箱瞬間"], captionMinChars: 40, captionMaxChars: 90,
+    runVideoGen: true, videoDurationSec: 5,
+    videoMotionHint:
+      "Extreme macro close-up. Very slow drift across the product surface, " +
+      "emphasising texture and tactile detail. Shallow depth of field, minimal motion.",
+  },
+  "tt-30-text-hook-card": {
+    variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_YUNA,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
+    variantLabels: ["直球", "共鳴"], captionMinChars: 30, captionMaxChars: 120,
+    runVideoGen: true, videoDurationSec: 5,
+    // 這支的畫面是「給字卡當底」的，所以刻意要求幾乎不動、構圖留白 ——
+    // 疊字是之後在 output 層做的（模型畫不出正確中文字，見 NO-TEXT 政策）。
+    videoMotionHint:
+      "Very subtle slow zoom on a clean, uncluttered background with generous " +
+      "empty space in the upper third. Almost no motion — this is a backdrop " +
+      "for text that is overlaid later. Nothing enters or leaves the frame.",
+  },
+  "tt-30-before-after": {
+    variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_GRANT,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
+    variantLabels: ["日常痛點", "改變後"], captionMinChars: 60, captionMaxChars: 120,
+    runVideoGen: true, videoDurationSec: 5,
+    videoMotionHint:
+      "One continuous shot that slowly reveals the improved, calmer state. " +
+      "Steady camera, no hard cut, no scene change.",
+  },
 };
 
 export function getTTOrchestraConfig(taskId: string): OrchestraConfig | null {

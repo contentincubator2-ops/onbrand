@@ -2120,7 +2120,7 @@ export const quickTaskRouter = router({
           throw new Error(`Missing required input: ${f.key} (${f.label})`);
         }
       }
-      return runOrchestra({
+      const orchestraArgs = {
         template,
         config,
         inputs: input.inputs,
@@ -2128,7 +2128,60 @@ export const quickTaskRouter = router({
         productId: input.productId ?? null,
         eventId: input.eventId ?? null,
         userId,
-      });
+      };
+
+      // 2026-07-29 (Tier-1 TikTok video formats): a video task renders clips
+      // via Kling i2v at ~150s each — far past nginx's 150s upstream, so the
+      // sync path below would always 504 even though the job kept running.
+      // Video tasks therefore use the SAME async checkpoint pattern as the
+      // 60s/99s endpoints: return captions + stills at the checkpoint (~30-40s)
+      // and let clips land in the same mission_outputs row afterwards.
+      //
+      // Gated strictly on config.runVideoGen so every existing 30s task keeps
+      // its current fully-synchronous behaviour untouched.
+      if (config.runVideoGen) {
+        let resolvePartial!: (p: any) => void;
+        let rejectPartial!: (e: any) => void;
+        const partialPromise = new Promise<any>((resolve, reject) => {
+          resolvePartial = resolve;
+          rejectPartial = reject;
+        });
+        let checkpointFired = false;
+        let capturedOutputId: number | null = null;
+
+        runOrchestra({
+          ...orchestraArgs,
+          onCheckpoint: (partial) => {
+            checkpointFired = true;
+            capturedOutputId = (partial as any).outputId ?? null;
+            resolvePartial(partial);
+          },
+        })
+          .then((full) => {
+            if (!checkpointFired) resolvePartial(full);
+          })
+          .catch(async (err) => {
+            console.error("[runOrchestra video tail] failed:", (err as Error)?.message);
+            if (checkpointFired && capturedOutputId) {
+              try {
+                const { finaliseTaskRun } = await import("../_core/recordTaskRun");
+                await finaliseTaskRun({
+                  outputId: capturedOutputId,
+                  progress: "failed",
+                  progressDetail: String((err as Error)?.message ?? err).slice(0, 1000),
+                });
+              } catch (e) {
+                console.error("[runOrchestra video tail] finalise failed:", (e as Error)?.message);
+              }
+            } else if (!checkpointFired) {
+              rejectPartial(err);
+            }
+          });
+
+        return await partialPromise;
+      }
+
+      return runOrchestra(orchestraArgs);
     }),
 
   /**
