@@ -1622,33 +1622,44 @@ function absoluteMediaUrl(url: string): string {
 }
 
 async function genOneVideo(
-  args: { imageUrl: string; caption: string; motionHint?: string },
+  args: { imageUrl: string; caption: string; motionHint?: string; tailImageUrl?: string | null },
   config: OrchestraConfig,
 ): Promise<NonNullable<OrchestraVariant["video"]>> {
   const poster = args.imageUrl;
   const sourceUrl = absoluteMediaUrl(args.imageUrl);
+  const tailUrl = args.tailImageUrl ? absoluteMediaUrl(args.tailImageUrl) : null;
   const modelId = config.videoModel ?? "piapi/kling-v1-6-i2v";
   try {
     const motion =
       args.motionHint?.trim() ||
       "Slow, smooth cinematic camera push-in on the product. Subtle natural " +
       "movement only. Keep the product identical to the source frame.";
-    // The product must not morph mid-clip — that's the single most common
-    // i2v failure and it silently ships a wrong-looking product.
-    const prompt =
-      `${motion} Hold the subject's shape, colors, materials and any printed ` +
-      `label exactly as in the source image. Static, stable framing. No text ` +
-      `or captions appear on screen.`;
+    // Two different jobs, so two different prompts:
+    //  - no tail frame → the subject must NOT change; morphing is the most
+    //    common i2v failure and silently ships a wrong-looking product.
+    //  - tail frame → the whole point IS to change, so "hold everything
+    //    identical" would fight the interpolation. Only the product itself
+    //    is pinned; the surrounding state is allowed to transform.
+    const prompt = tailUrl
+      ? `${motion} Transition smoothly and continuously from the first frame's ` +
+        `state to the final frame's state in a single unbroken shot. The change ` +
+        `should feel natural and gradual, never a hard cut. Any product visible ` +
+        `keeps its exact shape, colors and printed label throughout. No text or ` +
+        `captions appear on screen.`
+      : `${motion} Hold the subject's shape, colors, materials and any printed ` +
+        `label exactly as in the source image. Static, stable framing. No text ` +
+        `or captions appear on screen.`;
 
     const submit = await dispatchGenerate(modelId, {
       prompt: prompt.slice(0, 800),
       imageUrl: sourceUrl,
+      ...(tailUrl ? { imageTailUrl: tailUrl } : {}),
       aspectRatio: (config.aspectRatio === "1.91:1" ? "16:9" : config.aspectRatio) as any,
       durationSec: config.videoDurationSec ?? 5,
       videoNegativePrompt:
         "text, letters, captions, subtitles, watermark, logo overlay, " +
-        "morphing product, shape change, extra objects appearing, scene cut, " +
-        "camera shake, distorted proportions",
+        (tailUrl ? "" : "morphing product, shape change, extra objects appearing, ") +
+        "scene cut, camera shake, distorted proportions",
     } as any);
 
     if (submit.status === "ready" && submit.url) {
@@ -2381,6 +2392,35 @@ export async function runOrchestra(args: {
     if (wantVideo) {
       const readyCount = images.filter((im) => im.status === "ready" && im.url).length;
       const stVid = stage("video", `Kling i2v ×${readyCount} 平行生影片`);
+
+      // Before/after cards need a SECOND still — the same scene in its
+      // "after" state — to hand Kling as the end frame. Reuses genOneImage so
+      // the tail frame goes through the identical model/brand/product-fidelity
+      // path as the head frame; only the caption gains a state directive.
+      let tailImages: Array<OrchestraVariant["image"] | null> | null = null;
+      if (args.config.videoTailHint) {
+        const stTail = stage("video-tail", `結束格 ×${readyCount} 生圖`);
+        tailImages = await Promise.all(
+          images.map((im, i) =>
+            im.status === "ready" && im.url
+              ? genOneImage(
+                  {
+                    content: `${captions[i]?.caption ?? ""}\n\n【這一格的畫面狀態】${args.config.videoTailHint}`,
+                    style: briefs[i] ?? null,
+                    platform: taskPlatform,
+                    palette: brandPalette,
+                    subjectImageUrl,
+                  },
+                  args.config,
+                )
+              : Promise.resolve(null),
+          ),
+        );
+        const okTail = tailImages.filter((t) => t?.status === "ready").length;
+        stTail.status = okTail > 0 ? "done" : "failed";
+        stTail.completedAt = Date.now() - startedAt;
+      }
+
       videos = await Promise.all(
         images.map((im, i) =>
           im.status === "ready" && im.url
@@ -2389,6 +2429,9 @@ export async function runOrchestra(args: {
                   imageUrl: im.url,
                   caption: captions[i]?.caption ?? "",
                   motionHint: args.config.videoMotionHint,
+                  // A failed tail still degrades to a normal single-state clip
+                  // rather than failing the whole variant.
+                  tailImageUrl: tailImages?.[i]?.status === "ready" ? tailImages[i]!.url : null,
                 },
                 args.config,
               )

@@ -334,14 +334,21 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
       "empty space in the upper third. Almost no motion — this is a backdrop " +
       "for text that is overlaid later. Nothing enters or leaves the frame.",
   },
+  // 2026-07-29 修正：這張卡原本是壞的 —— 一張靜圖 + 一句 motion prompt
+  // 只能呈現「一個狀態」，所以產出的片根本沒有對比，卻叫 before/after。
+  // 改用 Kling 的 image_tail_url：頭格＝使用前，尾格＝使用後（由
+  // videoTailHint 生第二張圖），模型在同一顆連續鏡頭裡內插過去。
+  // variantLabels 也跟著改 —— 兩個變體是兩種「切角」，不是前後兩半。
   "tt-30-before-after": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_GRANT,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    variantLabels: ["日常痛點", "改變後"], captionMinChars: 60, captionMaxChars: 120,
+    variantLabels: ["睡前場景", "日常場景"], captionMinChars: 60, captionMaxChars: 120,
     runVideoGen: true, videoDurationSec: 5,
     videoMotionHint:
-      "One continuous shot that slowly reveals the improved, calmer state. " +
-      "Steady camera, no hard cut, no scene change.",
+      "One continuous shot, steady camera, no hard cut and no scene change.",
+    videoTailHint:
+      "同一個場景、同一個機位，但呈現「使用之後」的狀態：緊繃與混亂被平靜取代，" +
+      "光線更柔和、空間更整齊、人物神情放鬆。不要換場景、不要換人、不要出現文字。",
   },
 };
 

@@ -77,6 +77,10 @@ export interface GenOptions {
   durationSec?: 5 | 10;
   /** Negative motion/content hint for video models that support it. */
   videoNegativePrompt?: string;
+  /** 2026-07-29: i2v END frame (Kling `image_tail_url`). With imageUrl as the
+   *  start frame, the model interpolates start → end in ONE continuous shot.
+   *  This is what makes a real before/after possible without compositing. */
+  imageTailUrl?: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -501,11 +505,12 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
     sync: false,
     buildInput: (o) => ({
       prompt: o.prompt,
-      image_url: o.imageUrl,            // i2v requires source image
+      image_url: o.imageUrl,            // i2v start frame
       duration: o.durationSec ?? 5,
       aspect_ratio: o.aspectRatio ?? "16:9",
       version: "1.6",
       mode: "std",
+      ...(o.imageTailUrl ? { image_tail_url: o.imageTailUrl } : {}),
       ...(o.videoNegativePrompt ? { negative_prompt: o.videoNegativePrompt } : {}),
     }),
   },

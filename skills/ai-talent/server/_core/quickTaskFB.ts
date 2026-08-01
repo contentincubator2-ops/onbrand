@@ -535,6 +535,18 @@ export interface OrchestraConfig {
   videoDurationSec?: 5 | 10;
   /** English camera/motion direction appended to the i2v prompt. */
   videoMotionHint?: string;
+  /**
+   * 2026-07-29: makes a REAL before/after possible. When set, the orchestra
+   * renders a SECOND still per variant — the same scene in its "after" state,
+   * described by this hint — and feeds it to Kling as the end frame
+   * (image_tail_url). The model then interpolates before → after in one
+   * continuous shot.
+   *
+   * Without this, a single still animated by a single motion prompt can only
+   * ever show ONE state, so a "before/after" card silently shipped a clip
+   * that never actually contrasted anything.
+   */
+  videoTailHint?: string;
   variantLabels: string[];
   /** Caption length range hint (chars, lower bound) for prompt + UI badge */
   captionMinChars: number;
