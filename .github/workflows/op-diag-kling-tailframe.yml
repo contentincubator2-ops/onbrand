@@ -1,0 +1,92 @@
+name: "Op — Diagnose Kling image_tail_url (version/mode matrix)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      head_url:
+        description: "Start frame URL"
+        required: true
+        default: "https://onbrand.sowork.ai/static/covers/media-img-1785585236860-6erl5.png"
+        type: string
+      tail_url:
+        description: "End frame URL"
+        required: true
+        default: "https://onbrand.sowork.ai/static/covers/media-img-1785585266995-ih8an.png"
+        type: string
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Try tail-frame submit across versions/modes
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          HEAD_URL: ${{ inputs.head_url }}
+          TAIL_URL: ${{ inputs.tail_url }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          envs: HEAD_URL,TAIL_URL
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+
+            cat > tmp-diag-tail.ts <<'SCRIPT_EOF'
+            const KEY = process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY ?? "";
+            const HEAD = process.env.HEAD_URL!;
+            const TAIL = process.env.TAIL_URL!;
+            const BASE = "https://api.piapi.ai/api/v1";
+
+            async function tryOne(tag: string, input: any) {
+              const r = await fetch(`${BASE}/task`, {
+                method: "POST",
+                headers: { "x-api-key": KEY, "Content-Type": "application/json" },
+                body: JSON.stringify({ model: "kling", task_type: "video_generation", input }),
+              });
+              const t = await r.text();
+              let msg = t;
+              try {
+                const j = JSON.parse(t);
+                msg = j?.data?.error?.message || j?.message || t;
+              } catch { /* keep raw */ }
+              console.log(`[${tag}] HTTP ${r.status} :: ${String(msg).slice(0, 300)}`);
+            }
+
+            (async () => {
+              console.log("HEAD:", HEAD);
+              console.log("TAIL:", TAIL);
+              const base = {
+                prompt: "Smooth continuous transition from the first frame to the final frame.",
+                image_url: HEAD,
+                duration: 5,
+                aspect_ratio: "9:16",
+              };
+              console.log("\n=== control: NO tail frame (should succeed) ===");
+              await tryOne("v1.6/std no-tail", { ...base, version: "1.6", mode: "std" });
+
+              console.log("\n=== with tail frame, across versions/modes ===");
+              for (const version of ["1.5", "1.6", "2.1", "2.5", "2.6"]) {
+                for (const mode of ["std", "pro"]) {
+                  await tryOne(`v${version}/${mode} +tail`, {
+                    ...base, image_tail_url: TAIL, version, mode,
+                  });
+                }
+              }
+              console.log("\n=== with tail frame, no version/mode (provider defaults) ===");
+              await tryOne("default +tail", { ...base, image_tail_url: TAIL });
+              process.exit(0);
+            })().catch((e) => { console.error("DIAG FAILED:", e?.message ?? e); process.exit(1); });
+            SCRIPT_EOF
+
+            set -a
+            source .env 2>/dev/null || true
+            set +a
+            export HEAD_URL TAIL_URL
+
+            node --import tsx tmp-diag-tail.ts
+            RC=$?
+            rm -f tmp-diag-tail.ts
+            exit $RC
