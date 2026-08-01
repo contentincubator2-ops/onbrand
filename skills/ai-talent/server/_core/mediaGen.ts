@@ -509,7 +509,12 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
       duration: o.durationSec ?? 5,
       aspect_ratio: o.aspectRatio ?? "16:9",
       version: "1.6",
-      mode: "std",
+      // 2026-07-29 (verified against a version×mode matrix): image_tail_url is
+      // rejected with "failed to validate input" in std mode on EVERY version
+      // (1.5/1.6/2.1/2.5/2.6) and accepted in pro mode on every version. So a
+      // tail frame forces pro. Pro costs more than std — that's the price of
+      // a real before/after, and it only applies to tail-frame clips.
+      mode: o.imageTailUrl ? "pro" : "std",
       ...(o.imageTailUrl ? { image_tail_url: o.imageTailUrl } : {}),
       ...(o.videoNegativePrompt ? { negative_prompt: o.videoNegativePrompt } : {}),
     }),
