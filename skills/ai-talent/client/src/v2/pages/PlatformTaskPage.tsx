@@ -379,44 +379,46 @@ const LI_TASK_FORMAT_MAP: Record<string, LIActiveFormat> = {
 };
 
 // ── Format category config (YT) ─────────────────────────────────────────────
+// 2026-08-01 (CJ「參考 HeyGen 重新設計 YT 分類」): 舊分類是按「輸出格式」
+// 切（縮圖/Community/互動…），跟用戶心裡「我現在有什麼素材」的順序不一致。
+// 新分類改按 HeyGen 的成熟度階梯排：純文案（已有影片/腳本，只要文字）→
+// 腳本（從零寫可拍的腳本）→ 分鏡圖（腳本拆成逐鏡頭示意圖）→ 影片（AI 真的
+// 生成會動的素材）。系列/策略維持獨立分類，因為那些是跨多個階梯的整包產出。
 type YTActiveFormat =
-  | "all" | "影片 / 腳本" | "SEO / 元資料" | "Shorts"
-  | "縮圖" | "Community" | "互動 / 工具" | "系列 / 策略";
+  | "all" | "純文案" | "腳本" | "分鏡圖" | "影片" | "系列 / 策略";
 
 const YT_FORMAT_TABS: { id: YTActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",          label: "全部",         labelEn: "All"                  },
-  { id: "影片 / 腳本",  label: "影片 / 腳本",  labelEn: "Video & Scripts"      },
-  { id: "SEO / 元資料", label: "SEO / 元資料", labelEn: "SEO & Metadata"       },
-  { id: "Shorts",       label: "Shorts",       labelEn: "Shorts"               },
-  { id: "縮圖",         label: "縮圖",         labelEn: "Thumbnails"           },
-  { id: "Community",    label: "Community",    labelEn: "Community"            },
-  { id: "互動 / 工具",  label: "互動 / 工具",  labelEn: "Engagement & Tools"   },
-  { id: "系列 / 策略",  label: "系列 / 策略",  labelEn: "Series & Strategy"    },
+  { id: "all",         label: "全部",        labelEn: "All"               },
+  { id: "純文案",      label: "純文案",      labelEn: "Pure Copy"         },
+  { id: "腳本",        label: "腳本",        labelEn: "Script"            },
+  { id: "分鏡圖",      label: "分鏡圖",      labelEn: "Storyboard"        },
+  { id: "影片",        label: "影片 ⭐",      labelEn: "Video ⭐"           },
+  { id: "系列 / 策略", label: "系列 / 策略", labelEn: "Series & Strategy" },
 ];
 
 const YT_TASK_FORMAT_MAP: Record<string, YTActiveFormat> = {
-  // 影片 / 腳本
-  "yt-30-opening-hook":      "影片 / 腳本",
-  "yt-30-end-cta":           "影片 / 腳本",
-  "yt-60-video-package":     "影片 / 腳本",
-  "yt-60-viral-rewrite":     "影片 / 腳本",
-  // SEO / 元資料
-  "yt-30-title-strategies":  "SEO / 元資料",
-  "yt-30-description-seo":   "SEO / 元資料",
-  "yt-30-chapter-timeline":  "SEO / 元資料",
-  // Shorts
-  "yt-30-shorts-script":     "Shorts",
-  "yt-60-shorts-script":     "Shorts",
-  // 縮圖
-  "yt-30-thumbnail-text":    "縮圖",
-  "yt-60-thumbnail-suite":   "縮圖",
-  // Community
-  "yt-30-community-post":    "Community",
-  "yt-60-community-post":    "Community",
-  // 互動 / 工具
-  "yt-30-comment-reply":     "互動 / 工具",
-  "yt-30-pinned-comment":    "互動 / 工具",
-  // 系列 / 策略
+  // 純文案 — 已有影片/主題，只需要文字（標題/說明/留言/社群貼文）
+  "yt-30-title-strategies":  "純文案",
+  "yt-30-thumbnail-text":    "純文案",
+  "yt-30-description-seo":   "純文案",
+  "yt-30-chapter-timeline":  "純文案",
+  "yt-30-comment-reply":     "純文案",
+  "yt-30-pinned-comment":    "純文案",
+  "yt-30-community-post":    "純文案",
+  "yt-60-video-package":     "純文案",
+  "yt-60-community-post":    "純文案",
+  // 腳本 — 從零規劃可拍攝的腳本（口播/字幕/鏡頭指示）
+  "yt-30-shorts-script":     "腳本",
+  "yt-30-opening-hook":      "腳本",
+  "yt-30-end-cta":           "腳本",
+  "yt-60-shorts-script":     "腳本",
+  "yt-60-viral-rewrite":     "腳本",
+  // 分鏡圖 — 腳本拆成逐格 AI 示意圖（縮圖包也算：同一套靜圖引擎產出多格視覺）
+  "yt-60-thumbnail-suite":   "分鏡圖",
+  "yt-60-storyboard":        "分鏡圖",
+  // 影片 — AI 真的生成會動的素材（image-to-video）
+  "yt-30-shorts-clip":       "影片",
+  // 系列 / 策略 — 跨階梯的整包產出
   "yt-60-series-3ep":        "系列 / 策略",
   "yt-99-series-6ep":        "系列 / 策略",
   "yt-99-quarterly-strategy":"系列 / 策略",

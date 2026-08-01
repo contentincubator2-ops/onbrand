@@ -109,6 +109,36 @@ ${YT_TONE}`,
     preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "youtube", post_type: "video" },
   },
+  // 2026-08-01 (CJ「參考 HeyGen 重新設計 YT 分類」分鏡圖層): 腳本→畫面之間
+  // 缺一格。純文字腳本沒有畫面感，真的生影片又太貴太重 — 分鏡圖用既有的
+  // runImageGen 靜圖引擎（跟縮圖包同一套機制），把腳本拆成 5 格會動的畫面
+  // 推進，成本等同一個縮圖包，但拿到的是可以直接給拍攝或給影片素材參考的
+  // 逐鏡頭視覺。
+  {
+    id: "yt-60-storyboard",
+    tier: "60s", postType: "storyboard",
+    label: { en: "YT Video Storyboard (Shot-by-Shot)", zh: "YT 影片分鏡圖（逐鏡頭）" },
+    description: { en: "Script broken into 5 shots, each with an AI still frame + camera direction", zh: "腳本拆成 5 個鏡頭，每格配 AI 示意圖 + 運鏡指示" },
+    agent_id: 210220, // Yu-Cheng Chang — Senior Motion Graphics Designer (YT 主場)
+    skill_slug: "youtube-content",
+    primary_question: "貼上腳本，或描述影片主題",
+    primary_input: { key: "topic_or_script", placeholder: "貼上已有的腳本，或描述影片主題讓 AI 從頭規劃", type: "textarea" },
+    inputs: [{ key: "topic_or_script", label: "腳本或影片主題", type: "textarea", required: true }],
+    systemPrompt: `產出 YT 影片分鏡圖（storyboard）。把用戶提供的腳本或主題拆成 5 個鏡頭 —
+這是同一支片的 5 格分鏡，依序推進（開場→建立→核心→高潮→收尾），不是 5 個互不相關的版本。
+
+caption 結構（每格鏡頭）：
+[鏡頭時長] 例：3-5 秒
+[畫面] 1 句具體描述這格要拍什麼（給生圖 AI 當依據：主體、動作、背景、光線，越具體越好）
+[口白／字幕] 這格搭配的口白或螢幕字幕（20-40 字）
+[運鏡] 推軌 / 手持 / 固定 / 特寫 等 1 個鏡頭語言
+
+鏡頭之間要有畫面連貫性（同一場景 / 同一主體的推進），不要 5 格各自獨立無關。
+${YT_TONE}
+image_style_direction.summary 給這一格畫面的視覺風格（構圖、色調、光線，會直接拿去生成這格畫面）。`,
+    preferredModel: "qwen", maxTokens: 900,
+    outputDefaults: { platform: "youtube", post_type: "storyboard" },
+  },
 ];
 
 const NINA_FALLBACK = NINA; // 主場 video-package
@@ -170,6 +200,14 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     strategistAgentId: 180158, // Oliver Fang — Social Media Analytics Specialist (1697 char)
     specialtyAgentId: 180591, // Samantha Anderson — General Counsel (2199 char)
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
+  },
+  // 2026-08-01: variants 在這裡代表「5 格鏡頭」而非 5 個互斥版本 — 跟其他
+  // yt-60 任務語意不同，但沿用同一顆 runImageGen 引擎最划算（不需要新機制）。
+  "yt-60-storyboard": {
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_REINA,
+    aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
+    variantLabels: ["鏡頭 1 開場", "鏡頭 2 建立", "鏡頭 3 核心", "鏡頭 4 高潮", "鏡頭 5 收尾"],
+    captionMinChars: 60, captionMaxChars: 150,
   },
 };
 

@@ -281,6 +281,32 @@ YT Community 受眾比一般 IG 投入 — 可以用比較深度的內容（不�
     maxTokens: 600,
     outputDefaults: { platform: "youtube", post_type: "community" },
   },
+  // 2026-08-01 (CJ「參考 HeyGen 重新設計 YT 分類」影片層): YT 第一個真的會動
+  // 的任務。跟 TikTok 的 tt-30-product-hero 系列同一套 Kling i2v 機制，刻意
+  // 選「乾淨開場畫面」而非「產品主視覺」— 不是每個 OnBrand 品牌都是電商，
+  // 但每個 YT Shorts 都需要一個能抓住前 1-2 秒的開場畫面，泛用性最高。
+  {
+    id: "yt-30-shorts-clip",
+    tier: "30s",
+    postType: "shorts",
+    label: { en: "YT Shorts Opening Clip (Real Video) ⭐", zh: "YT Shorts 開場動態片段（真的會動）⭐" },
+    description: { en: "AI renders an actual moving vertical clip for your Short's opening — not a script, a usable video asset", zh: "AI 直接生成一支會動的直式短片，不是腳本文字，是可以直接用的開場素材" },
+    agent_id: 60030, // Boyu Hsu — YouTube Short Video Scriptwriter（同 yt-30-shorts-script，畫面人設延續）
+    skill_slug: "youtube-shorts-automation",
+    primary_question: "這支 Shorts 的開場畫面想呈現什麼？",
+    primary_input: { key: "scene_desc", placeholder: "例：產品在自然光下的質感特寫 / 手沖咖啡的蒸氣瞬間", type: "textarea" },
+    inputs: [{ key: "scene_desc", label: "開場畫面描述", type: "textarea", required: true }],
+    systemPrompt: `產出 YT Shorts 開場片段的貼文文案（會搭配一支真的會動的直式短片）。每變體 1 種切角。
+規則：
+- 第一句就是鉤子，前 1-2 秒要抓住人（Shorts 演算法看開頭留存率）。
+- 文案要描述「畫面本身」而不是規格條列 — 讓人一看就知道會看到什麼動態。
+- 60-120 字。
+${YT_TONE_SUFFIX}
+image_style_direction.summary 給這支片開場畫面的視覺風格（構圖、光線、主體，會直接拿去生成第一格畫面）。`,
+    preferredModel: "qwen",
+    maxTokens: 600,
+    outputDefaults: { platform: "youtube", post_type: "shorts" },
+  },
 ];
 
 // ─── Plan B Orchestra config ────────────────────────────────────────────────
@@ -351,6 +377,19 @@ export const YT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
     variantLabels: ["純文字觀點", "民調型", "預告倒數型"],
     captionMinChars: 100, captionMaxChars: 400,
+  },
+  // 2026-08-01: YT 第一個 runVideoGen=true 的設定，複製 tt-30-product-hero
+  // 那一組已驗證的紀律 — variants/images=2（其他卡是 3），imageQualitySteps
+  // 拉到 8（會被放大成整支影片的第一格，draft 品質會讓全片看起來很糟）。
+  "yt-30-shorts-clip": {
+    variants: 2, images: 2, runImageGen: true, imageDirectorId: YT_DIR_IRIS,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
+    variantLabels: ["質感特寫", "情境動態"], captionMinChars: 60, captionMaxChars: 120,
+    runVideoGen: true, videoDurationSec: 5,
+    videoMotionHint:
+      "Slow cinematic push-in with gentle parallax, soft light drifting across " +
+      "the frame. Steady camera, minimal motion — built to hold attention in " +
+      "the first 1-2 seconds of a Short.",
   },
 };
 
