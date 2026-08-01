@@ -1604,7 +1604,12 @@ async function genOneImage(
 // Kling i2v measured ~150s for a 10s clip, so this NEVER fits a sync tier
 // budget — callers must use the async (onCheckpoint) path.
 const VIDEO_POLL_MS = 10_000;
+// std-mode i2v measured ~150s. Tail-frame clips are forced to pro mode (std
+// rejects image_tail_url) and pro is materially slower — a probe saw one
+// variant finish while the other blew past 360s. Give tail-frame renders a
+// much wider ceiling; plain clips keep the tighter one.
 const VIDEO_MAX_WAIT_MS = 6 * 60_000;
+const VIDEO_MAX_WAIT_TAIL_MS = 11 * 60_000;
 
 /**
  * 2026-07-29 (probe caught this): mediaGen saves renders locally and returns
@@ -1674,7 +1679,8 @@ async function genOneVideo(
 
     const taskId = submit.taskId;
     const startedAt = Date.now();
-    while (Date.now() - startedAt < VIDEO_MAX_WAIT_MS) {
+    const maxWaitMs = tailUrl ? VIDEO_MAX_WAIT_TAIL_MS : VIDEO_MAX_WAIT_MS;
+    while (Date.now() - startedAt < maxWaitMs) {
       await new Promise((r) => setTimeout(r, VIDEO_POLL_MS));
       const r = await checkJob(modelId, taskId);
       if (r.status === "ready" && r.url) {
@@ -1689,7 +1695,7 @@ async function genOneVideo(
     }
     return {
       url: null, posterUrl: poster, status: "timeout",
-      errorMsg: `${modelId} exceeded ${VIDEO_MAX_WAIT_MS / 1000}s`,
+      errorMsg: `${modelId} exceeded ${maxWaitMs / 1000}s${tailUrl ? " (tail-frame/pro)" : ""}`,
     };
   } catch (e: any) {
     return { url: null, posterUrl: poster, status: "failed", errorMsg: String(e?.message ?? e) };
@@ -1772,7 +1778,10 @@ export async function runOrchestra(args: {
   // path (captions return in ~30-40s, clips land in the same mission_outputs
   // row later). The ceiling still exists so a hung provider can't leak a
   // forever-pending job.
-  const VIDEO_BUDGET_MS = 8 * 60_000;
+  // Must exceed the slowest per-clip ceiling (tail-frame/pro = 11 min) plus
+  // the caption/still stages, or the outer race would kill a render that was
+  // about to land — which is exactly how a probe lost one variant at 360s.
+  const VIDEO_BUDGET_MS = (args.config.videoTailHint ? 15 : 8) * 60_000;
   const baseBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "99s" ? HARD_BUDGET_99S : HARD_BUDGET_MS;
   const tierBudget = args.config.runVideoGen ? VIDEO_BUDGET_MS : baseBudget;
 
