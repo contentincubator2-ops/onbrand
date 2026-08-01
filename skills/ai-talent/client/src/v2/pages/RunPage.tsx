@@ -96,6 +96,10 @@ interface VariantData {
   imageStyle?: string;
   imageUrl?: string | null;
   imageStatus?: string;
+  // 2026-07-29 Tier-1 TikTok 影片卡 — 非影片任務一律 undefined
+  videoUrl?: string | null;
+  videoStatus?: string;
+  videoPosterUrl?: string | null;
   qa?: any;
   extras?: any;
   // 2026-05-18 (CJ): carousel / album — N cards, each its own image
@@ -1045,6 +1049,8 @@ export default function RunPage() {
       // as "等待 AI 生成" because imageUrl was always undefined.
       return raw.map((v: any) => {
         const img = v.image ?? {};
+        // Same nested→flat normalize as image, for the Tier-1 video clip.
+        const vid = v.video ?? {};
         return {
           label: v.label,
           caption: sanitizeCaption(v.caption),
@@ -1052,6 +1058,9 @@ export default function RunPage() {
           imageUrl: v.imageUrl ?? img.url ?? null,
           imageStatus: v.imageStatus ?? img.status ?? undefined,
           imageStyle: v.imageStyle ?? img.style ?? undefined,
+          videoUrl: v.videoUrl ?? vid.url ?? null,
+          videoStatus: v.videoStatus ?? vid.status ?? undefined,
+          videoPosterUrl: v.videoPosterUrl ?? vid.posterUrl ?? null,
           qa: v.qa,
           extras: v.extras,
           cards: Array.isArray(v.cards) ? v.cards : undefined,
@@ -1829,6 +1838,9 @@ export default function RunPage() {
                 liveImageStyle={slide.imageStyle}
                 liveImageUrl={slide.imageUrl ?? undefined}
                 liveImageStatus={slide.imageStatus as any}
+                liveVideoUrl={slide.videoUrl ?? undefined}
+                liveVideoStatus={slide.videoStatus as any}
+                liveVideoPoster={slide.videoPosterUrl ?? undefined}
                 liveCards={slide.cards as any}
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
                 onGenerateImage={() => { manualImageRef.current = true; setMode("image"); }}
@@ -1841,21 +1853,30 @@ export default function RunPage() {
                 download ICON floating over the mockup (top-right), instead
                 of a separate button below. fetch→blob forces a real save
                 (cross-origin PiAPI/storage); falls back to a new tab. */}
-            {slide?.imageUrl && slide?.imageStatus === "ready" && (
+            {/* 2026-07-29: on a Tier-1 video task the deliverable is the mp4,
+                not the still — prefer the clip when one rendered. */}
+            {((slide?.videoUrl && slide?.videoStatus === "ready") ||
+              (slide?.imageUrl && slide?.imageStatus === "ready")) && (() => {
+              const isVideo = !!(slide?.videoUrl && slide?.videoStatus === "ready");
+              const dlUrl = (isVideo ? slide!.videoUrl : slide!.imageUrl) as string;
+              const dlLabel = isVideo
+                ? (lang === "en" ? "Download video" : "下載影片")
+                : (lang === "en" ? "Download image" : "下載圖片");
+              return (
               <button
-                title={lang === "en" ? "Download image" : "下載圖片"}
-                aria-label={lang === "en" ? "Download image" : "下載圖片"}
+                title={dlLabel}
+                aria-label={dlLabel}
                 onClick={async () => {
-                  const url = slide.imageUrl as string;
+                  const url = dlUrl;
                   try {
                     const res = await fetch(url, { mode: "cors" });
                     const blob = await res.blob();
                     const obj = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = obj;
-                    const safe = (data?.title ?? "image").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
-                    const ext = (blob.type.split("/")[1] || "png").split("+")[0];
-                    a.download = `${safe || "image"}.${ext}`;
+                    const safe = (data?.title ?? (isVideo ? "video" : "image")).replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
+                    const ext = (blob.type.split("/")[1] || (isVideo ? "mp4" : "png")).split("+")[0];
+                    a.download = `${safe || (isVideo ? "video" : "image")}.${ext}`;
                     a.click();
                     URL.revokeObjectURL(obj);
                   } catch {
@@ -1871,7 +1892,8 @@ export default function RunPage() {
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
               </button>
-            )}
+              );
+            })()}
           </div>
           {/* 2026-05-17 (CJ「可以讓用戶編輯後直接下載」): speech script
               download. Uses the current (edited) caption + the same

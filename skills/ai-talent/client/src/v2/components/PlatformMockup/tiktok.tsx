@@ -15,7 +15,7 @@ import { type MockupFields, MockupHeader, dicebear, ImageGenSlot } from "./share
 
 /* ─────────────── TT For-You ─────────────── */
 
-export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
+export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, liveVideoUrl, liveVideoStatus, liveVideoPoster, onGenerateImage }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
@@ -26,7 +26,21 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
           <span className="opacity-60">追蹤中</span>
           <span className="font-semibold border-b-2 border-white pb-1">為你推薦</span>
         </div>
-        {liveImageUrl && liveImageStatus === "ready" ? (
+        {/* 2026-07-29 Tier-1 影片卡：有真影片就直接播。loop+muted+playsInline
+            才能在行動裝置自動播（Safari/Chrome 都擋有聲自動播放），而 Tier 1
+            的片本來就無聲，所以靜音不損失任何東西。 */}
+        {liveVideoUrl && liveVideoStatus === "ready" ? (
+          <video
+            src={liveVideoUrl}
+            poster={liveVideoPoster || liveImageUrl || undefined}
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            controls
+          />
+        ) : liveImageUrl && liveImageStatus === "ready" ? (
           <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
         ) : (
           // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
@@ -39,6 +53,18 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
               dark
               videoFrame
             />
+          </div>
+        )}
+        {/* 影片還在算 / 算失敗時，畫面上是那張靜圖，不講清楚用戶會以為就這樣了 */}
+        {liveVideoStatus && liveVideoStatus !== "ready" && liveVideoStatus !== "skipped" && (
+          <div className="absolute bottom-3 left-3 z-20 bg-black/70 backdrop-blur-sm rounded-full px-2.5 py-1">
+            <span className="text-tiny text-white/90">
+              {liveVideoStatus === "pending"
+                ? "🎬 影片生成中⋯（約 2-3 分鐘）"
+                : liveVideoStatus === "timeout"
+                  ? "影片生成逾時 — 顯示靜圖"
+                  : "影片生成失敗 — 顯示靜圖"}
+            </span>
           </div>
         )}
         {liveCaption && (

@@ -62,7 +62,22 @@ import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/_core/qu
 
   const startedAt = Date.now();
   const tierEnv = (process.env.TIER as "30s" | "60s" | "99s") || "30s";
-  const result = await runOrchestra({ template, config, inputs, tier: tierEnv });
+  // 2026-07-29: optional USER_ID/BRAND_ID make the probe PERSIST to
+  // mission_outputs (recordTaskRun only writes when userId is set), so the
+  // result is openable in the real UI at /run:<outputId> instead of only
+  // existing in this log. Omit them for a pure non-persisting smoke test.
+  const userIdEnv = process.env.USER_ID ? Number(process.env.USER_ID) : undefined;
+  const brandIdEnv = process.env.BRAND_ID ? Number(process.env.BRAND_ID) : undefined;
+  const productIdEnv = process.env.PRODUCT_ID ? Number(process.env.PRODUCT_ID) : undefined;
+  const result = await runOrchestra({
+    template, config, inputs, tier: tierEnv,
+    ...(userIdEnv ? { userId: userIdEnv } : {}),
+    ...(brandIdEnv ? { brandId: brandIdEnv } : {}),
+    ...(productIdEnv ? { productId: productIdEnv } : {}),
+  });
+  if ((result as any).outputId) {
+    console.log(`  PERSISTED outputId=${(result as any).outputId} → https://onbrand.sowork.ai/run:${(result as any).outputId}`);
+  }
   console.log(`Tier: ${tierEnv}`);
   const elapsedMs = Date.now() - startedAt;
 

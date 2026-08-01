@@ -18,6 +18,16 @@ on:
         required: true
         default: "媽爹講故事年卡：台灣真實爸爸親聲錄製的兒童有聲故事，無螢幕陪孩子入睡"
         type: string
+      user_id:
+        description: "Set to PERSIST into mission_outputs (openable at /run:<id>). Blank = no persist."
+        required: false
+        default: ""
+        type: string
+      brand_id:
+        description: "Brand id (used with user_id)"
+        required: false
+        default: "2964"
+        type: string
 
 jobs:
   probe:
@@ -29,12 +39,14 @@ jobs:
         env:
           TASK_ID: ${{ inputs.task_id }}
           TASK_INPUT: ${{ inputs.task_input }}
+          USER_ID: ${{ inputs.user_id }}
+          BRAND_ID: ${{ inputs.brand_id }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 22m
-          envs: TASK_ID,TASK_INPUT
+          envs: TASK_ID,TASK_INPUT,USER_ID,BRAND_ID
           script: |
             set -e
             cd /opt/onbrand/app/skills/ai-talent
@@ -42,4 +54,8 @@ jobs:
             source .env 2>/dev/null || true
             set +a
             export TASK_ID TASK_INPUT
+            # Only export USER_ID/BRAND_ID when a userId was actually supplied —
+            # recordTaskRun keys persistence off userId, and an empty string
+            # would become NaN.
+            if [ -n "$USER_ID" ]; then export USER_ID BRAND_ID; else unset USER_ID BRAND_ID; fi
             node --import tsx scripts/probe-orchestra.ts
