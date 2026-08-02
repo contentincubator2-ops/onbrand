@@ -455,3 +455,68 @@ export function YTLive({ title, brandName, variantLabel, liveImageStyle, liveIma
     </div>
   );
 }
+
+/* ─────────────── YT Storyboard (逐鏡頭分鏡圖) ───────────────
+   2026-08-01: renders ALL shots at once as a numbered filmstrip — a
+   storyboard is one board, not a "pick your favorite" variant switcher.
+   Each frame = its own AI-rendered still + the shot's duration/visual/
+   VO/camera direction, parsed from cards[] (server splits one combined
+   script into N cards, see quickTaskOrchestra.ts callCarouselCards). */
+export function YTStoryboard({ title, brandName, variantLabel, liveCards }: MockupFields) {
+  const { lang } = useLang();
+  const frames = Array.isArray(liveCards) ? liveCards : [];
+  return (
+    <div className="w-full max-w-[640px] mx-auto">
+      <MockupHeader icon={faYoutube} label="YouTube" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+          <p className="text-small font-semibold leading-tight line-clamp-1">
+            {title || (lang === "en" ? "Storyboard" : "分鏡圖")}
+          </p>
+          <span className="text-tiny text-default-500 shrink-0 ml-2">
+            {brandName ?? (lang === "en" ? "Your Channel" : "您的頻道")}
+          </span>
+        </div>
+        {frames.length === 0 ? (
+          <div className="px-4 pb-4">
+            <Skeleton className="aspect-video w-full rounded-lg mb-2" />
+            <Skeleton className="h-2.5 w-[70%] rounded" />
+          </div>
+        ) : (
+          <div className="px-4 pb-4 space-y-3">
+            {frames.map((c, i) => (
+              <div key={i} className="border border-divider rounded-lg overflow-hidden">
+                <div className="relative aspect-video bg-default-100 flex items-center justify-center">
+                  {c.image?.url && c.image.status === "ready" ? (
+                    <img src={c.image.url} alt={c.headline} className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <Skeleton className="absolute inset-0 opacity-40" />
+                      <div className="relative z-10 text-center text-default-400 px-3">
+                        <FontAwesomeIcon icon={faImages} className="text-2xl mb-1" />
+                        <p className="text-[10px] line-clamp-3">
+                          {c.image?.status === "failed" || c.image?.status === "timeout"
+                            ? (lang === "en" ? "Frame image failed" : "此格畫面生成失敗")
+                            : c.image?.style
+                              ? c.image.style
+                              : (lang === "en" ? "Frame 16:9" : "分鏡畫面 16:9")}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  <span className="absolute top-1.5 left-1.5 bg-black/80 text-white text-tiny font-semibold px-2 py-0.5 rounded z-10">
+                    {lang === "en" ? `Shot ${i + 1}` : `鏡頭 ${i + 1}`}
+                  </span>
+                </div>
+                <div className="px-3 py-2 border-t border-divider">
+                  <p className="text-small font-semibold leading-tight">{c.headline}</p>
+                  {c.body && <p className="text-tiny text-default-500 leading-relaxed mt-0.5">{c.body}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

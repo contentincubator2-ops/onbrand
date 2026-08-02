@@ -1163,20 +1163,32 @@ async function callCarouselCards(args: {
   brandPrefix: string;
   imagePersona: string;
   aspectRatio: string;
+  kind?: "carousel" | "storyboard";
 }): Promise<Array<{ headline: string; body: string; imageBrief: string }>> {
-  const { caption, topic, n, brandPrefix, imagePersona, aspectRatio } = args;
+  const { caption, topic, n, brandPrefix, imagePersona, aspectRatio, kind = "carousel" } = args;
+  const isStoryboard = kind === "storyboard";
+  const bodyMax = isStoryboard ? 160 : 90;
   const system =
     imagePersona +
-    `你是輪播內容設計師。把下面這篇 FB 輪播貼文，拆成正好 ${n} 張卡，敘事弧：Hook → Build → Turn → Payoff → CTA。\n` +
-    `每張卡需要：\n` +
-    `- headline：≤ 14 字、強鉤、可單獨成立\n` +
-    `- body：≤ 40 字、承接 headline、口語\n` +
-    `- image：該卡的視覺方向描述（30-60 字繁中，涵蓋主體/構圖/光線/色彩/氛圍，比例 ${aspectRatio}，不疊文字、不放 logo），每張卡視覺要明顯不同\n` +
-    `嚴格規則：只根據貼文內容拆解與重組，**不可新增或捏造事實**。\n` +
+    (isStoryboard
+      ? `你是影片分鏡師。把下面這份逐鏡頭腳本，拆成正好 ${n} 格分鏡，維持原本的鏡頭順序（不要打亂、不要新增或刪減鏡頭）。\n` +
+        `每格需要：\n` +
+        `- headline：這格的簡短標籤（≤ 14 字，例："鏡頭 1・開場"）\n` +
+        `- body：這格的時長＋畫面內容＋口白/字幕＋運鏡，整合成一段（≤ 90 字）\n` +
+        `- image：這格畫面的視覺方向描述（30-60 字繁中，涵蓋主體/構圖/光線/色彩/氛圍，比例 ${aspectRatio}，不疊文字、不放 logo），要延續同一場景的推進，不要每格各自獨立無關\n` +
+        `嚴格規則：只根據原始腳本拆解與重組，**不可新增或捏造鏡頭內容**。\n`
+      : `你是輪播內容設計師。把下面這篇 FB 輪播貼文，拆成正好 ${n} 張卡，敘事弧：Hook → Build → Turn → Payoff → CTA。\n` +
+        `每張卡需要：\n` +
+        `- headline：≤ 14 字、強鉤、可單獨成立\n` +
+        `- body：≤ 40 字、承接 headline、口語\n` +
+        `- image：該卡的視覺方向描述（30-60 字繁中，涵蓋主體/構圖/光線/色彩/氛圍，比例 ${aspectRatio}，不疊文字、不放 logo），每張卡視覺要明顯不同\n` +
+        `嚴格規則：只根據貼文內容拆解與重組，**不可新增或捏造事實**。\n`) +
     `輸出嚴格 JSON 陣列，長度正好 ${n}：[{"headline":"...","body":"...","image":"..."}, ...]\n` +
     `第一個字元就是 [。不要 markdown code fence、不要前言。\n` +
     brandPrefix;
-  const userMsg = `主題：${topic}\n\n輪播貼文：\n${caption}`;
+  const userMsg = isStoryboard
+    ? `主題：${topic}\n\n逐鏡頭腳本：\n${caption}`
+    : `主題：${topic}\n\n輪播貼文：\n${caption}`;
   let attempt = 0;
   let lastErr: any = null;
   while (attempt < 2) {
@@ -1195,7 +1207,7 @@ async function callCarouselCards(args: {
       if (Array.isArray(arr) && arr.length > 0) {
         return arr.slice(0, n).map((c: any, i: number) => ({
           headline: String(c?.headline ?? c?.title ?? `卡 ${i + 1}`).trim().slice(0, 28),
-          body: String(c?.body ?? c?.desc ?? c?.text ?? "").trim().slice(0, 90),
+          body: String(c?.body ?? c?.desc ?? c?.text ?? "").trim().slice(0, bodyMax),
           imageBrief: String(c?.image ?? c?.imageBrief ?? c?.visual ?? "").trim().slice(0, 280),
         }));
       }
@@ -2584,7 +2596,13 @@ export async function runOrchestra(args: {
     const cardsN = args.config.cardsPerVariant ?? 0;
     if (cardsN > 1 && variants[0]?.caption) {
       try {
-        const topic = (args.inputs["topic"] ?? args.inputs["context"] ?? "").trim();
+        // 2026-08-01: yt-60-storyboard's primary input key is
+        // "topic_or_script", not "topic"/"context" — widen the fallback
+        // chain so the splitter still gets a topic line instead of blank.
+        const topic = (
+          args.inputs["topic"] ?? args.inputs["context"] ??
+          args.inputs["topic_or_script"] ?? args.inputs["topic_or_url"] ?? ""
+        ).trim();
         const cardSpecs = await callCarouselCards({
           caption: variants[0].caption,
           topic,
@@ -2592,6 +2610,7 @@ export async function runOrchestra(args: {
           brandPrefix,
           imagePersona: imageLoad.persona,
           aspectRatio: args.config.aspectRatio ?? "1:1",
+          kind: args.config.cardsKind ?? "carousel",
         });
         const cardImages = await Promise.all(
           cardSpecs.map((c) => genOneImage(

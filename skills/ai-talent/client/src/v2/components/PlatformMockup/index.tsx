@@ -40,7 +40,7 @@ import {
   LINativeVideo, LIAd, LIEvent,
 } from "./linkedin";
 import {
-  YTVideoCard, YTShorts, YTWatch, YTCommunity, YTPremiere, YTLive,
+  YTVideoCard, YTShorts, YTWatch, YTCommunity, YTPremiere, YTLive, YTStoryboard,
 } from "./youtube";
 import { TTForYou, TTProfile, TTCarousel, TTLive } from "./tiktok";
 import { EDMMockup, EmailNewsletterMockup, KOLEmailMockup } from "./email";
@@ -121,6 +121,7 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "youtube:community":   return <YTCommunity {...f} />;
     case "youtube:premiere":    return <YTPremiere  {...f} />;
     case "youtube:live":        return <YTLive      {...f} />;
+    case "youtube:storyboard":  return <YTStoryboard {...f} />;
 
     // ── TikTok (4) ────────────────────────────────────────────────────
     case "tiktok:foryou":    return <TTForYou   {...f} />;

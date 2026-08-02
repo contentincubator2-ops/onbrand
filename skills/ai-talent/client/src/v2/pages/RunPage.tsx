@@ -1494,6 +1494,10 @@ export default function RunPage() {
       if (/(?:^|-)ad(?:-|$)/.test(id)) return "ad";
       if (id.includes("comment")) return "comment";
       if (id.includes("pinned")) return "pinned";
+      // 2026-08-01: check BEFORE the "story" rule below — "storyboard"
+      // contains "story" as a substring and was silently misclassified
+      // as an IG/FB Stories mockup (CJ「分鏡圖的產出明顯不是分鏡圖」).
+      if (id.includes("storyboard")) return "storyboard";
       if (id.includes("story")) return "story";
       if (id.includes("reel")) return "reel";
       // 2026-05-18 (CJ「每篇一個可編輯 mockup」): calendar posts are now

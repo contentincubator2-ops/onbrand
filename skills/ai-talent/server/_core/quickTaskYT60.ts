@@ -201,13 +201,22 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     specialtyAgentId: 180591, // Samantha Anderson — General Counsel (2199 char)
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
-  // 2026-08-01: variants 在這裡代表「5 格鏡頭」而非 5 個互斥版本 — 跟其他
-  // yt-60 任務語意不同，但沿用同一顆 runImageGen 引擎最划算（不需要新機制）。
+  // 2026-08-01 (CJ「分鏡圖的產出，明顯不是分鏡圖」修正): 第一版誤用
+  // variants=5 表達「5 格鏡頭」——但 variants 在整個 orchestra 引擎裡永遠
+  // 是「互斥的替代版本」（tabs 切換、其中一個「還有 2 個可以再要」），不是
+  // 「同一個東西的必要組成部分」。UI 因此把 5 個鏡頭當成 5 個可選 tone 顯示，
+  // 完全不是分鏡圖。真正對的機制是 fb-99-carousel-5 已經驗證過的
+  // cardsPerVariant：ONE 變體 + N 張卡（各自一張圖），UI 一次全部顯示成
+  // 一個版面（見 YTStoryboard mockup component）。cardsKind:"storyboard"
+  // 讓拆卡的 LLM 用「鏡頭語言」而非輪播的 Hook→CTA 廣告文案語言拆解。
   "yt-60-storyboard": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_REINA,
+    variants: 1, images: 1, runImageGen: true, imageDirectorId: YT60_DIR_REINA,
     aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
-    variantLabels: ["鏡頭 1 開場", "鏡頭 2 建立", "鏡頭 3 核心", "鏡頭 4 高潮", "鏡頭 5 收尾"],
-    captionMinChars: 60, captionMaxChars: 150,
+    variantLabels: ["分鏡完整版"],
+    captionMinChars: 300, captionMaxChars: 1000,
+    cardsPerVariant: 5,
+    cardsKind: "storyboard",
+    holdForImages: true,
   },
 };
 
