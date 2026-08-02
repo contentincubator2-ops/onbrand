@@ -109,6 +109,18 @@ import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/_core/qu
     else if (v.image?.status && v.image.status !== "skipped") {
       console.log(`      image[${v.image.status}]: ${v.image.errorMsg ?? "no url"}`);
     }
+    // Storyboard / carousel cards — each card carries its own image, and a
+    // board with missing frames is the failure mode that matters here.
+    if (Array.isArray(v.cards) && v.cards.length > 0) {
+      const okCards = v.cards.filter((c: any) => c?.image?.status === "ready").length;
+      console.log(`      cards: ${okCards}/${v.cards.length} frames with images`);
+      v.cards.forEach((c: any, j: number) => {
+        console.log(
+          `        [${j + 1}] ${String(c?.headline ?? "").slice(0, 30)} — ` +
+          (c?.image?.url ? c.image.url : `${c?.image?.status ?? "?"}: ${c?.image?.errorMsg ?? "no url"}`),
+        );
+      });
+    }
     // Tier-1 video formats — undefined for every non-video task.
     if (v.video) {
       console.log(

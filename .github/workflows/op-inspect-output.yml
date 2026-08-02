@@ -1,0 +1,63 @@
+name: "Op — Inspect a mission_output's variants/cards (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      output_id:
+        description: "mission_outputs.id"
+        required: true
+        default: "3445"
+        type: string
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump variant + card structure
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          OUTPUT_ID: ${{ inputs.output_id }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3m
+          envs: OUTPUT_ID
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            cat > tmp-inspect.ts <<'SCRIPT_EOF'
+            import localPool from "./server/localDb";
+            (async () => {
+              const id = Number(process.env.OUTPUT_ID);
+              const [rows]: any = await localPool.execute(
+                "SELECT id, title, content, metadata FROM mission_outputs WHERE id = ? LIMIT 1", [id],
+              );
+              const row = (rows as any[])[0];
+              if (!row) throw new Error("output not found");
+              console.log("title:", row.title);
+              let parsed: any;
+              try { parsed = JSON.parse(row.content); } catch { console.log("content not JSON"); process.exit(0); }
+              const variants = Array.isArray(parsed) ? parsed : (parsed?.variants ?? []);
+              console.log("variants:", variants.length);
+              variants.forEach((v: any, i: number) => {
+                console.log(`\n[${i}] ${v.label} — caption ${String(v.caption ?? "").length} chars`);
+                console.log(`    image: ${v.image?.status} ${v.image?.url ?? ""}`);
+                if (v.video) console.log(`    video: ${v.video.status} ${v.video.url ?? ""}`);
+                const cards = Array.isArray(v.cards) ? v.cards : [];
+                console.log(`    cards: ${cards.length}`);
+                cards.forEach((c: any, j: number) => {
+                  console.log(`      [${j + 1}] "${String(c?.headline ?? "").slice(0, 34)}"`);
+                  console.log(`          body: ${String(c?.body ?? "").slice(0, 70)}`);
+                  console.log(`          img : ${c?.image?.status ?? "?"} ${c?.image?.url ?? c?.image?.errorMsg ?? ""}`);
+                });
+              });
+              process.exit(0);
+            })().catch((e) => { console.error("FAILED:", e?.message ?? e); process.exit(1); });
+            SCRIPT_EOF
+            set -a; source .env 2>/dev/null || true; set +a
+            export OUTPUT_ID
+            node --import tsx tmp-inspect.ts
+            RC=$?
+            rm -f tmp-inspect.ts
+            exit $RC
