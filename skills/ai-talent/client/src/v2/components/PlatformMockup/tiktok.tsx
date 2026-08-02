@@ -306,3 +306,86 @@ export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
     </div>
   );
 }
+
+/* ─────────────── TT Storyboard (分鏡表) ─────────────── */
+/**
+ * 2026-08-01: TikTok counterpart to YTStoryboard. Not a reuse of it —
+ * that one is aspect-video and YouTube-branded, and a vertical shot list
+ * squeezed into 16:9 frames misrepresents what will actually be shot.
+ *
+ * Frames are 9:16 and laid out as a 2-column grid: five tall verticals
+ * stacked in a single column would push the last shots far below the fold,
+ * and a storyboard is only useful when you can see the sequence at a glance.
+ */
+export function TTStoryboard({ title, brandName, variantLabel, liveCards }: MockupFields) {
+  const frames = Array.isArray(liveCards) ? liveCards : [];
+  return (
+    <div className="w-full max-w-[520px] mx-auto">
+      <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+          <p className="text-small font-semibold leading-tight line-clamp-1">
+            {title || "分鏡表"}
+          </p>
+          <span className="text-tiny text-default-500 shrink-0 ml-2">
+            {brandName ?? "你的帳號"}
+          </span>
+        </div>
+        {frames.length === 0 ? (
+          <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+            {[0, 1].map((i) => (
+              <div key={i}>
+                <Skeleton className="w-full rounded-lg mb-2" style={{ aspectRatio: "9 / 16" }} />
+                <Skeleton className="h-2.5 w-[70%] rounded" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+            {frames.map((c, i) => (
+              <div key={i} className="border border-divider rounded-lg overflow-hidden">
+                <div
+                  className="relative bg-black flex items-center justify-center"
+                  style={{ aspectRatio: "9 / 16" }}
+                >
+                  {c.image?.url && c.image.status === "ready" ? (
+                    <img
+                      src={c.image.url}
+                      alt={c.headline}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    <>
+                      <Skeleton className="absolute inset-0 opacity-40" />
+                      <div className="relative z-10 text-center text-default-400 px-2">
+                        <FontAwesomeIcon icon={faVideo} className="text-xl mb-1" />
+                        <p className="text-[10px] line-clamp-4">
+                          {c.image?.status === "failed" || c.image?.status === "timeout"
+                            ? "此格畫面生成失敗"
+                            : c.image?.style
+                              ? c.image.style
+                              : "分鏡畫面 9:16"}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  <span className="absolute top-1.5 left-1.5 bg-black/80 text-white text-tiny font-semibold px-1.5 py-0.5 rounded z-10">
+                    鏡頭 {i + 1}
+                  </span>
+                </div>
+                <div className="px-2 py-1.5 border-t border-divider">
+                  <p className="text-tiny font-semibold leading-tight line-clamp-2">{c.headline}</p>
+                  {c.body && (
+                    <p className="text-[10px] text-default-500 leading-relaxed mt-0.5 line-clamp-4">
+                      {c.body}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

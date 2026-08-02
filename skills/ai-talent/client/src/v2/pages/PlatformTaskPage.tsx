@@ -473,7 +473,8 @@ const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
   "tt-30-caption-rhythm":      "腳本",
   "tt-60-foryou-full":         "腳本",
   "tt-60-viral-rewrite":       "腳本",
-  // 分鏡表 — 待建（能力已有一半：extras.storyboard / generateStoryboardAsync）
+  // 分鏡表 — 腳本與影片之間的橋
+  "tt-30-storyboard":          "分鏡表",
   // 模擬影片 — 真的產出 mp4
   "tt-30-product-hero":        "模擬影片",
   "tt-30-product-asmr":        "模擬影片",

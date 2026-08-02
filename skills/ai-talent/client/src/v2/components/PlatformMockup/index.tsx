@@ -42,7 +42,7 @@ import {
 import {
   YTVideoCard, YTShorts, YTWatch, YTCommunity, YTPremiere, YTLive, YTStoryboard,
 } from "./youtube";
-import { TTForYou, TTProfile, TTCarousel, TTLive } from "./tiktok";
+import { TTForYou, TTProfile, TTCarousel, TTLive, TTStoryboard } from "./tiktok";
 import { EDMMockup, EmailNewsletterMockup, KOLEmailMockup } from "./email";
 import { GoogleSearchAd, GoogleDisplayAd, GooglePMax } from "./google";
 import { XTweet, XThread } from "./twitter";
@@ -123,11 +123,12 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "youtube:live":        return <YTLive      {...f} />;
     case "youtube:storyboard":  return <YTStoryboard {...f} />;
 
-    // ── TikTok (4) ────────────────────────────────────────────────────
-    case "tiktok:foryou":    return <TTForYou   {...f} />;
-    case "tiktok:profile":   return <TTProfile  {...f} />;
-    case "tiktok:carousel":  return <TTCarousel {...f} />;
-    case "tiktok:live":      return <TTLive     {...f} />;
+    // ── TikTok (5) ────────────────────────────────────────────────────
+    case "tiktok:foryou":     return <TTForYou     {...f} />;
+    case "tiktok:profile":    return <TTProfile    {...f} />;
+    case "tiktok:carousel":   return <TTCarousel   {...f} />;
+    case "tiktok:live":       return <TTLive       {...f} />;
+    case "tiktok:storyboard": return <TTStoryboard {...f} />;
 
     // ── Email / EDM (2) ───────────────────────────────────────────────
     case "email:edm":              return <EDMMockup           {...f} />;

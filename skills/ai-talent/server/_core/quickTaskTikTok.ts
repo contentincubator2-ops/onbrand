@@ -258,6 +258,34 @@ ${TT_SUFFIX}`,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
+    // 分鏡表層 —— 腳本與模擬影片之間的橋。用戶已經有腳本、還不想燒錢生片時，
+    // 先看 5 格畫面確認方向對不對。沿用 yt-60-storyboard 的 cardsKind 機制。
+    id: "tt-30-storyboard",
+    tier: "30s",
+    postType: "storyboard",
+    label: { en: "TikTok Storyboard (5 shots)", zh: "TikTok 分鏡表（5 格鏡頭）" },
+    description: { en: "Script split into 5 vertical shots, each with an AI frame", zh: "腳本拆 5 個直式鏡頭，每格配 AI 示意圖" },
+    agent_id: 180167,
+    skill_slug: "tiktok-content",
+    primary_question: "貼上你的腳本，或描述這支影片想拍什麼",
+    primary_input: { key: "topic_or_script", placeholder: "貼上已有腳本，或描述主題讓 AI 從頭規劃", type: "textarea" },
+    inputs: [{ key: "topic_or_script", label: "腳本或影片主題", type: "textarea", required: true }],
+    systemPrompt: `產出 TikTok 直式短影音的分鏡表。把用戶的腳本或主題拆成 5 個鏡頭 ——
+這是同一支片依序推進的 5 格（鉤子→鋪陳→核心→轉折→CTA），不是 5 個互不相關的版本。
+
+每格鏡頭要寫：
+[鏡頭時長] 例：0-3 秒
+[畫面] 1 句具體描述這格拍什麼（主體、動作、背景、光線，越具體越好 —— 這句會直接拿去生圖）
+[口白／字幕] 這格的口白或螢幕字幕（15-30 字）
+[運鏡] 手持 / 固定 / 特寫 / 推近 等 1 個鏡頭語言
+
+直式 9:16 構圖，主體必須放在畫面中央偏上（下方會被 TikTok UI 蓋住）。
+鏡頭之間要有連貫性（同場景、同主體的推進），不要 5 格各自獨立。
+${TT_SUFFIX}`,
+    preferredModel: "qwen", maxTokens: 900,
+    outputDefaults: { platform: "tiktok", post_type: "storyboard" },
+  },
+  {
     id: "tt-30-before-after",
     tier: "30s",
     postType: "foryou",
@@ -334,6 +362,18 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
       "empty space in the upper third. Almost no motion — this is a backdrop " +
       "for text that is overlaid later. Nothing enters or leaves the frame.",
   },
+  // 分鏡表：variants=1（分鏡是「一份」文件，不是多個版本可選），
+  // cardsPerVariant=5 讓拆分器切成 5 格、每格自己一張圖。
+  // holdForImages 確保 5 格畫面都到齊才收工 —— 缺格的分鏡表沒有意義。
+  "tt-30-storyboard": {
+    variants: 1, images: 1, runImageGen: true, imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
+    variantLabels: ["分鏡完整版"], captionMinChars: 300, captionMaxChars: 1000,
+    cardsPerVariant: 5,
+    cardsKind: "storyboard",
+    holdForImages: true,
+  },
+
   // 2026-07-29 修正：這張卡原本是壞的 —— 一張靜圖 + 一句 motion prompt
   // 只能呈現「一個狀態」，所以產出的片根本沒有對比，卻叫 before/after。
   // 改用 Kling 的 image_tail_url：頭格＝使用前，尾格＝使用後（由
