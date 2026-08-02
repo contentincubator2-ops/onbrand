@@ -426,44 +426,63 @@ const YT_TASK_FORMAT_MAP: Record<string, YTActiveFormat> = {
 };
 
 // ── Format category config (TT) ─────────────────────────────────────────────
+//
+// 2026-07-29 (CJ「重新盤點 tiktok 的任務」): the old tabs were an ad-hoc mix
+// of format (腳本 / 字幕), surface (Live / 個人頁) and mechanic (Trend / Duet),
+// so users couldn't tell what they'd actually receive from any given card.
+//
+// Replaced with a PRODUCTION-DEPTH LADDER — each rung is a legitimate place
+// to stop, and the order also happens to track cost and wait time
+// (文案 ≈ instant/free → 模擬影片 ≈ minutes and real spend), so the category
+// itself sets the right expectation before the user clicks:
+//
+//   選題 → 文案 → 腳本 → 分鏡表 → 模擬影片
+//
+// 帳號營運 sits deliberately OUTSIDE the ladder: bio / comment replies / live
+// openers aren't stages of producing one piece of content, and folding them
+// in would blur what the ladder means.
+//
+// Empty tabs are hidden automatically (see the count===0 guard at render), so
+// 分鏡表 stays invisible until its cards land.
 type TTActiveFormat =
-  | "all" | "腳本" | "字幕 / 文案" | "Trend / Duet"
-  | "Live 直播" | "個人頁" | "互動 / 工具" | "系列 / 策略";
+  | "all" | "選題" | "文案" | "腳本" | "分鏡表" | "模擬影片" | "帳號營運";
 
 const TT_FORMAT_TABS: { id: TTActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",          label: "全部",         labelEn: "All"                  },
-  { id: "腳本",         label: "腳本",         labelEn: "Scripts"              },
-  { id: "字幕 / 文案",  label: "字幕 / 文案",  labelEn: "Captions & Copy"      },
-  { id: "Trend / Duet", label: "Trend / Duet", labelEn: "Trend & Duet"         },
-  { id: "Live 直播",    label: "Live 直播",    labelEn: "Live"                 },
-  { id: "個人頁",       label: "個人頁",       labelEn: "Profile"              },
-  { id: "互動 / 工具",  label: "互動 / 工具",  labelEn: "Engagement & Tools"   },
-  { id: "系列 / 策略",  label: "系列 / 策略",  labelEn: "Series & Strategy"    },
+  { id: "all",        label: "全部",     labelEn: "All"            },
+  { id: "選題",       label: "選題",     labelEn: "Ideation"       },
+  { id: "文案",       label: "文案",     labelEn: "Copy"           },
+  { id: "腳本",       label: "腳本",     labelEn: "Scripts"        },
+  { id: "分鏡表",     label: "分鏡表",   labelEn: "Storyboard"     },
+  { id: "模擬影片",   label: "模擬影片", labelEn: "Simulated Video" },
+  { id: "帳號營運",   label: "帳號營運", labelEn: "Account Ops"    },
 ];
 
 const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
-  // 腳本
-  "tt-30-opening-hook":     "腳本",
-  "tt-30-full-script":      "腳本",
-  "tt-60-foryou-full":      "腳本",
-  // 字幕 / 文案
-  "tt-30-caption-rhythm":   "字幕 / 文案",
-  "tt-30-caption-description": "字幕 / 文案",
-  // Trend / Duet
-  "tt-30-duet-angle":       "Trend / Duet",
-  "tt-30-trend-remix":      "Trend / Duet",
-  // Live 直播
-  "tt-30-live-opening":     "Live 直播",
-  // 個人頁
-  "tt-30-bio-rewrite":      "個人頁",
-  // 互動 / 工具
-  "tt-30-comment-reply":    "互動 / 工具",
-  "tt-30-hashtag-set":      "互動 / 工具",
-  // 系列 / 策略
-  "tt-60-series-3":         "系列 / 策略",
-  "tt-60-viral-rewrite":    "系列 / 策略",
-  "tt-99-30day-foryou":     "系列 / 策略",
-  "tt-99-trend-week":       "系列 / 策略",
+  // 選題 — 還沒有內容之前，決定「要做什麼」
+  "tt-30-trend-remix":         "選題",
+  "tt-30-duet-angle":          "選題",
+  "tt-99-trend-week":          "選題",
+  "tt-99-30day-foryou":        "選題",
+  "tt-60-series-3":            "選題",
+  // 文案 — 交付物就是可直接貼上的文字
+  "tt-30-caption-description": "文案",
+  "tt-30-hashtag-set":         "文案",
+  // 腳本 — 交付物是「可以照著拍」的腳本
+  "tt-30-opening-hook":        "腳本",
+  "tt-30-full-script":         "腳本",
+  "tt-30-caption-rhythm":      "腳本",
+  "tt-60-foryou-full":         "腳本",
+  "tt-60-viral-rewrite":       "腳本",
+  // 分鏡表 — 待建（能力已有一半：extras.storyboard / generateStoryboardAsync）
+  // 模擬影片 — 真的產出 mp4
+  "tt-30-product-hero":        "模擬影片",
+  "tt-30-product-asmr":        "模擬影片",
+  "tt-30-text-hook-card":      "模擬影片",
+  "tt-30-before-after":        "模擬影片",
+  // 帳號營運 — 階梯之外，不隸屬於任何單一支內容
+  "tt-30-bio-rewrite":         "帳號營運",
+  "tt-30-comment-reply":       "帳號營運",
+  "tt-30-live-opening":        "帳號營運",
 };
 
 // ── Format category config (Email) ──────────────────────────────────────────
