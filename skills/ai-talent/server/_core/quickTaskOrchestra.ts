@@ -556,6 +556,24 @@ function timeoutPromise<T>(ms: number, label: string): Promise<T> {
   );
 }
 
+// 2026-08-02 (CJ「標題居然變成『我收到你的任務了』」): the L3 raw-text
+// fallback in extractCaption() below ships whatever the model wrote
+// verbatim once JSON parsing fails — including a chat-assistant
+// acknowledgment the model tacked on before the real content ("我收到你的
+// 任務了，以下是分鏡規劃：..."). titleFromCaption() then faithfully lifts
+// that first sentence as the mission title. The "不要前言" instructions in
+// the system prompt are a request, not a guarantee — strip the common
+// acknowledgment openers as a deterministic backstop, applied once at the
+// single choke point every caption passes through (regardless of which
+// parse layer produced it).
+const LEADING_ACK_RE =
+  /^(?:好的[，,！!。]?\s*)?(?:我(?:已)?收到(?:你|您)的(?:任務|需求|指令)了?|以下(?:是|為)(?:你|您)?(?:準備|規劃|產出)?的?|這(?:是|篇是)(?:你|您)?(?:的)?|我(?:會|將)(?:為(?:你|您))?)[^\n，,：:]{0,60}[，,：:\n]\s*/;
+
+function stripCaptionPreamble(caption: string): string {
+  const stripped = caption.replace(LEADING_ACK_RE, "").trim();
+  return stripped.length > 0 ? stripped : caption;
+}
+
 // ── Caption writer — N parallel LLM calls, one per variant ──────────────
 //
 // Design (CJ direction 2026-05-05): instead of 1 LLM call producing N JSON
@@ -993,7 +1011,7 @@ async function callOneVariant(args: {
       const parsed = tryParseJson(lastRaw);
       const out = extractCaption(lastRaw, parsed);
       if (out.caption.length > 0) {
-        return { label, caption: out.caption, hashtags: out.hashtags };
+        return { label, caption: stripCaptionPreamble(out.caption), hashtags: out.hashtags };
       }
       lastErr = new Error(`empty caption for ${label} — raw[0:200]: ${lastRaw.slice(0, 200)}`);
       console.warn(`[callOneVariant] attempt ${attempt} failed for ${label} (raw len=${lastRaw.length}): ${lastRaw.slice(0, 300)}`);
@@ -2615,7 +2633,11 @@ export async function runOrchestra(args: {
         const cardImages = await Promise.all(
           cardSpecs.map((c) => genOneImage(
             // Theater standard: each card's own text is the caption source.
-            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0], palette: brandPalette },
+            // 2026-08-02 (CJ「產品圖似乎跟他原本的不同」): this block skipped
+            // the subjectImageUrl wiring Stage 3 already does above (line
+            // ~2382) — every card was pure text-to-image, so the model
+            // invented its own product instead of compositing the real one.
+            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0], palette: brandPalette, subjectImageUrl },
             args.config,
           )),
         );
