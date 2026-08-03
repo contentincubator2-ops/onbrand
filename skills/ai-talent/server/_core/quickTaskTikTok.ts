@@ -255,20 +255,19 @@ ${TT_SUFFIX}`,
     systemPrompt: `你要產出的是「會被逐句疊在 5 秒短影音畫面上的字卡文字」，不是貼文。每變體 1 種語氣。
 
 硬性規則（違反就是失敗）：
-- 必須剛好 3-5 行。只有 1 行 = 失敗；6 行以上 = 失敗。
-- 每行 ≤12 字，全部加起來 ≤50 字。
-- **每一行必須用換行符號分開**。嚴禁用句號把幾句話連成一段 —— 連成一段就無法逐句疊字，等於作廢。
+- **必須輸出 4 行**，用換行分隔（JSON 字串內用 \\n）。1 行 = 失敗。
+- **每一行 6-12 字**。超過 12 字的行 = 失敗（一行太長，觀眾來不及讀）。
 - 第 1 行是主鉤子，要能單獨成立、夠嗆或夠有共鳴。
-- 後面每行逐句推進，每行都能單獨看懂，不要跨行斷句。
-- 只輸出這幾行字，不要編號、不要說明、不要引號。
+- 第 2-4 行逐句推進，每行都能單獨看懂，不要跨行斷句。
+- 只輸出這 4 行字，不要編號、不要說明、不要引號。
 
-輸出範例（形狀就要長這樣，逐行換行）：
-別再用手機哄睡
-他只會越滑越清醒
-換成爸爸的聲音
-10 分鐘，就睡著
+形狀長這樣（○ 代表字，**只照抄形狀，不要照抄任何內容**）：
+○○○○○○○
+○○○○○○○○○
+○○○○○○
+○○○○○○○○
 
-為什麼要這麼短：觀眾只有 5 秒，字太多會來不及讀完就滑掉。
+為什麼：這幾行會被逐句疊在 5 秒的畫面上，一行太長就讀不完，全部擠成一行就無法逐句出現。
 ${TT_SUFFIX}`,
     preferredModel: "qwen", maxTokens: 300,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
@@ -369,9 +368,9 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "tt-30-text-hook-card": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_YUNA,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    // 3-5 行 × ≤12 字 = 最多 ~50 字（含換行約 55）。上限收到 60 是硬性
-    // 護欄：prompt 講規則、這裡是不讓它超出的閘門。
-    variantLabels: ["直球", "共鳴"], captionMinChars: 20, captionMaxChars: 60,
+    // 4 行 × 6-12 字 ＋ 3 個換行 = 27-51 字。範圍設 24-60 對齊 prompt，
+    // 不要更緊 —— 上一版把總長壓到 ≤50 反而讓模型直接寫成 1 行交差。
+    variantLabels: ["直球", "共鳴"], captionMinChars: 24, captionMaxChars: 60,
     runVideoGen: true, videoDurationSec: 5,
     // 這支的畫面是「給字卡當底」的，所以刻意要求幾乎不動、構圖留白 ——
     // 疊字是之後在 output 層做的（模型畫不出正確中文字，見 NO-TEXT 政策）。
