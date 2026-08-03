@@ -118,7 +118,7 @@ export interface ImageGenInput {
   decisionId?: number;
   optionId?: number;
   prompt: string;
-  channel?: "fb" | "ig" | "linkedin" | "youtube" | "pr";
+  channel?: "fb" | "ig" | "linkedin" | "youtube" | "tiktok" | "email" | "pr";
   size?: ImageSize;
   brandContext?: BrandVisualContext;
   /** 2026-05-12: user-selected model. "auto" or undefined = env default. */
@@ -150,6 +150,10 @@ function channelSize(channel?: string): ImageSize {
       return "1536x1024"; // landscape
     case "youtube":
       return "1536x1024";
+    case "tiktok":
+      return "1024x1536"; // 9:16 vertical
+    case "email":
+      return "1536x1024"; // banner-style landscape
     case "pr":
       return "1024x1536"; // portrait
     default:

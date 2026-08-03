@@ -14,7 +14,12 @@ import { sql } from "drizzle-orm";
 import { generateImage, resolveBrandVisualContext } from "../_core/imageGen";
 import { assertBrandOwner } from "../_core/brandAuth";
 
-const channel = z.enum(["fb", "ig", "linkedin", "youtube", "pr"]);
+// 2026-08-02 (CJ「產圖失敗 invalid_enum_value tiktok」): this enum had
+// drifted out of sync with promptFromCaption's below — TikTok (and email)
+// shipped as a platform long ago but never got added here, so any TikTok
+// image-generate call 400'd on the client's `channel: "tiktok"`. Both
+// procedures now share this one list so they can't drift apart again.
+const channel = z.enum(["fb", "ig", "linkedin", "youtube", "tiktok", "email", "pr"]);
 const size = z.enum(["1024x1024", "1024x1536", "1536x1024"]);
 // 2026-05-12 (CJ「給用戶選 image model」): user-facing model picker.
 // 2026-06-15: added gpt-image-2 (OpenAI latest, now the global default).
@@ -132,7 +137,7 @@ export const imageRouter = router({
     .input(z.object({
       brandId: z.number().int().positive(),
       caption: z.string().min(1).max(6000),
-      channel: z.enum(["fb", "ig", "linkedin", "youtube", "tiktok", "email", "pr"]).optional(),
+      channel: channel.optional(),
       // 3000 chars: plain-text Nano-Banana templates can reach ~2600 chars;
       // JSON-converted templates are ~200-530 chars after nanoBananaJsonToPrompt.
       imageStyle: z.string().max(3000).optional(),
