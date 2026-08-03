@@ -248,13 +248,23 @@ ${TT_SUFFIX}`,
     primary_question: "想讓觀眾看到的那一句話是什麼？",
     primary_input: { key: "topic", placeholder: "例：別再用手機哄睡了", type: "textarea" },
     inputs: [{ key: "topic", label: "主張 / 想講的一句話", type: "textarea", required: true }],
-    systemPrompt: `產出 TikTok 字卡型短片的文案（畫面是乾淨底圖 + 疊字，搭熱門音樂）。每變體 1 種語氣。
-規則：
-- 第一行就是要被做成大字卡的那句話，≤14 字，要夠嗆或夠有共鳴。
-- 後面 2-4 行是逐句展開，每行 ≤14 字（會做成逐句出現的字卡）。
-- 每行獨立成立，不要跨行斷句。
+    // 2026-08-02 收緊：初版只限制「每行 ≤14 字」卻沒限制總行數與總字數，
+    // captionMaxChars 又放到 120，模型就寫成 9 行 105 字的完整貼文 ——
+    // 疊到 5 秒的片上觀眾根本讀不完。字卡的交付物是「會被逐句疊上畫面的
+    // 那幾行字」，不是一篇貼文，所以行數與總長都必須是硬上限。
+    systemPrompt: `你要產出的是「會被逐句疊在 5 秒短影音畫面上的字卡文字」，不是貼文。每變體 1 種語氣。
+
+硬性規則（違反就是失敗）：
+- 總共只能 3-5 行，不可更多。
+- 每行 ≤12 字。
+- 全部加起來 ≤50 字。
+- 第 1 行是主鉤子，要能單獨成立、夠嗆或夠有共鳴。
+- 後面每行逐句推進，每行都能單獨看懂，不要跨行斷句。
+- 只輸出這幾行字本身，每行一行，不要加編號、不要加說明、不要寫成段落。
+
+為什麼要這麼短：觀眾只有 5 秒，字太多會來不及讀完就滑掉。
 ${TT_SUFFIX}`,
-    preferredModel: "qwen", maxTokens: 500,
+    preferredModel: "qwen", maxTokens: 300,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
@@ -353,7 +363,9 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "tt-30-text-hook-card": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_YUNA,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    variantLabels: ["直球", "共鳴"], captionMinChars: 30, captionMaxChars: 120,
+    // 3-5 行 × ≤12 字 = 最多 ~50 字（含換行約 55）。上限收到 60 是硬性
+    // 護欄：prompt 講規則、這裡是不讓它超出的閘門。
+    variantLabels: ["直球", "共鳴"], captionMinChars: 20, captionMaxChars: 60,
     runVideoGen: true, videoDurationSec: 5,
     // 這支的畫面是「給字卡當底」的，所以刻意要求幾乎不動、構圖留白 ——
     // 疊字是之後在 output 層做的（模型畫不出正確中文字，見 NO-TEXT 政策）。
