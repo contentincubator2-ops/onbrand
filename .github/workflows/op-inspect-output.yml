@@ -41,7 +41,10 @@ jobs:
               const variants = Array.isArray(parsed) ? parsed : (parsed?.variants ?? []);
               console.log("variants:", variants.length);
               variants.forEach((v: any, i: number) => {
-                console.log(`\n[${i}] ${v.label} — caption ${String(v.caption ?? "").length} chars`);
+                const cap = String(v.caption ?? "");
+                const lines = cap.split("\n").filter((s: string) => s.trim().length > 0);
+                console.log(`\n[${i}] ${v.label} — caption ${cap.length} chars / ${lines.length} lines`);
+                lines.forEach((ln: string, k: number) => console.log(`      L${k + 1} (${ln.length}字): ${ln}`));
                 console.log(`    image: ${v.image?.status} ${v.image?.url ?? ""}`);
                 if (v.video) console.log(`    video: ${v.video.status} ${v.video.url ?? ""}`);
                 const cards = Array.isArray(v.cards) ? v.cards : [];
