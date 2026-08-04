@@ -368,9 +368,13 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "tt-30-text-hook-card": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_YUNA,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    // 4 行 × 6-12 字 ＋ 3 個換行 = 27-51 字。範圍設 24-60 對齊 prompt，
-    // 不要更緊 —— 上一版把總長壓到 ≤50 反而讓模型直接寫成 1 行交差。
-    variantLabels: ["直球", "共鳴"], captionMinChars: 24, captionMaxChars: 60,
+    // ⚠️ captionMaxChars 絕對不能設 ≤60。orchestra 的 lengthHint 有一條隱藏
+    // 耦合：captionMaxChars <= 60 會注入一段【嚴格字數 — 最高優先】，內容
+    // 明講「只能是 1 句，不分段」—— 那是為了 headline/一句話這種微任務寫的，
+    // 但它的優先級蓋過任務 prompt，會把字卡的 4 行強制壓成 1 行。
+    // 實測：120 → 3-6 行（正常）；60 → 永遠 1 行，改幾次 prompt 都沒用。
+    // 4 行 × 6-12 字 ＋ 換行 ≈ 27-51 字，設 90 留餘裕且避開 ≤60 陷阱。
+    variantLabels: ["直球", "共鳴"], captionMinChars: 24, captionMaxChars: 90,
     runVideoGen: true, videoDurationSec: 5,
     // 這支的畫面是「給字卡當底」的，所以刻意要求幾乎不動、構圖留白 ——
     // 疊字是之後在 output 層做的（模型畫不出正確中文字，見 NO-TEXT 政策）。
