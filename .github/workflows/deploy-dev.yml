@@ -67,15 +67,14 @@ jobs:
             --exclude=.git \
             --exclude='*/.env' \
             --exclude='scripts/env-provision' \
-            --exclude='*.tgz' \
-            -czf onbrand-release.tgz .
-          test -s onbrand-release.tgz
+            -czf "$RUNNER_TEMP/onbrand-release.tgz" .
+          test -s "$RUNNER_TEMP/onbrand-release.tgz"
 
       - name: Upload release artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: onbrand-dev-${{ github.sha }}
-          path: onbrand-release.tgz
+          path: ${{ runner.temp }}/onbrand-release.tgz
           if-no-files-found: error
           retention-days: 7
 
