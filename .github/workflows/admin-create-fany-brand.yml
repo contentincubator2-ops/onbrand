@@ -1,0 +1,27 @@
+name: "Admin — Create FANY brand (sowork@sowork.tw)"
+
+# 2026-08-04 (CJ「新建FANY品牌，slogan選擇是see the vibe」): one-shot brand
+# creation grounded on 1218_FANY_品牌定位方向.pptx (US-market AI smartwatch
+# for women). Script is idempotent — safe to re-run; waits in-process for
+# the positioning pipeline to finish (up to ~25 min), then locks the
+# "See the Vibe" tagline anchor.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create FANY brand + run positioning
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 35m
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env; set +a
+            npx tsx scripts/admin-create-fany-brand.ts
