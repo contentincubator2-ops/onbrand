@@ -1,5 +1,6 @@
 name: Main Source Policy
 
+# Production promotions must originate from the shared dev branch.
 on:
   pull_request:
     branches: [main]
