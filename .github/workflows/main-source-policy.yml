@@ -1,0 +1,22 @@
+name: Main Source Policy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  require-dev-source:
+    name: Require dev to main
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reject non-dev source branches
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "$HEAD_REF" != "dev" ]; then
+            echo "Only pull requests from dev may merge into main."
+            exit 1
+          fi

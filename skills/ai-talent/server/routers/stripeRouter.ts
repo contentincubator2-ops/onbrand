@@ -39,9 +39,16 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import Stripe from "stripe";
+import { isRuntimeFeatureEnabled } from "../_core/runtimeSafety";
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
+  if (!isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "此環境已停用付款功能。",
+    });
+  }
   if (_stripe) return _stripe;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) {
@@ -335,6 +342,10 @@ async function logFailedWebhook(args: {
 }
 
 export async function handleStripeWebhook(rawBody: Buffer, signature: string): Promise<{ ok: boolean; message?: string }> {
+  if (!isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
+    console.warn("[stripe.webhook] ignored because LIVE_BILLING_ENABLED=false");
+    return { ok: false, message: "billing disabled in this environment" };
+  }
   const stripe = getStripe();
   const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!whSecret) {

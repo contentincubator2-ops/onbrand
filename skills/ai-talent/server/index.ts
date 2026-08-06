@@ -49,6 +49,7 @@ import { resumeInterruptedPositioningJobs } from "./_core/positioningJobRunner";
 import { runStartupCleanup } from "./_core/startupCleanup";
 import { recoverStuckDiscoveryJobs, processNextDiscoveryJob } from "./_core/productDiscovery";
 import { computeMissionResources } from "./missionResourceComputer";
+import { getDisabledRuntimeFeatures, isRuntimeFeatureEnabled } from "./_core/runtimeSafety";
 
 const app = express();
 
@@ -147,6 +148,10 @@ app.post(
   "/api/stripe/webhook",
   express.raw({ type: "application/json", limit: "2mb" }),
   async (req, res) => {
+    if (!isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
+      res.status(503).json({ error: "billing disabled in this environment" });
+      return;
+    }
     try {
       const signature = req.header("stripe-signature") ?? "";
       const { handleStripeWebhook } = await import("./routers/stripeRouter");
@@ -483,14 +488,16 @@ app.use(
 const PORT = ENV.PORT;
 
 // P1-2: Periodic billing retry queue flush (every 60s)
-setInterval(async () => {
-  try {
-    const flushed = await flushBillingRetryQueue();
-    if (flushed > 0) console.log(`[billing] flushed ${flushed} queued records`);
-  } catch (err) {
-    console.error("[billing] flush error:", err);
-  }
-}, 60_000);
+if (isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
+  setInterval(async () => {
+    try {
+      const flushed = await flushBillingRetryQueue();
+      if (flushed > 0) console.log(`[billing] flushed ${flushed} queued records`);
+    } catch (err) {
+      console.error("[billing] flush error:", err);
+    }
+  }, 60_000);
+}
 
 // Run idempotent DB migrations on startup (uses server's own DB connection)
 async function runStartupMigrations() {
@@ -616,33 +623,45 @@ app.use((err: any, req: any, res: any, _next: any) => {
 const server = app.listen(PORT, async () => {
   console.log(`[server] sowork-enterprise listening on port ${PORT}`);
   console.log(`[server] health: http://localhost:${PORT}/health`);
-  await runStartupMigrations();
-  startOrchestratorWorker();
-  console.log("[A2A] Orchestrator Worker started");
-  startSquadLeaderWorker();
-  console.log("[A2A] Squad Leader Worker started");
-  // STAB-3: Recover any billing records persisted to disk during previous crash
-  const recovered = await loadBillingFallbackLog();
-  if (recovered > 0) {
-    console.log(`[server] recovered ${recovered} billing records from fallback log`);
+  const disabledFeatures = getDisabledRuntimeFeatures();
+  if (disabledFeatures.length > 0) {
+    console.warn(`[safety] disabled runtime features: ${disabledFeatures.join(", ")}`);
   }
-  // STAB-4: Re-queue any positioning jobs that were in-flight when pm2
-  // was last restarted (status='pending'|'running' but no process running them).
-  resumeInterruptedPositioningJobs();
-  // STAB-5: Mark stuck squad_sessions and project_sync_jobs rows as failed
-  // so users see an error + retry button instead of a frozen spinner.
-  runStartupCleanup();
-  // Backfill mission resources for existing missions (fire-and-forget)
-  backfillMissionResources();
+  await runStartupMigrations();
+  if (isRuntimeFeatureEnabled("BACKGROUND_WORKERS_ENABLED")) {
+    startOrchestratorWorker();
+    console.log("[A2A] Orchestrator Worker started");
+    startSquadLeaderWorker();
+    console.log("[A2A] Squad Leader Worker started");
+    // STAB-4: Re-queue any positioning jobs that were in-flight when pm2
+    // was last restarted (status='pending'|'running' but no process running them).
+    resumeInterruptedPositioningJobs();
+    // STAB-5: Mark stuck squad_sessions and project_sync_jobs rows as failed
+    // so users see an error + retry button instead of a frozen spinner.
+    runStartupCleanup();
 
-  // Product discovery worker — recover stuck jobs, then poll every 30s
-  await recoverStuckDiscoveryJobs();
-  setInterval(() => {
-    processNextDiscoveryJob().catch((e) => {
-      console.error("[productDiscovery] worker tick error:", e?.message ?? e);
-    });
-  }, 30_000);
-  console.log("[productDiscovery] Worker started (30s interval)");
+    // Product discovery worker — recover stuck jobs, then poll every 30s
+    await recoverStuckDiscoveryJobs();
+    setInterval(() => {
+      processNextDiscoveryJob().catch((e) => {
+        console.error("[productDiscovery] worker tick error:", e?.message ?? e);
+      });
+    }, 30_000);
+    console.log("[productDiscovery] Worker started (30s interval)");
+  }
+
+  if (isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
+    // STAB-3: Recover any billing records persisted to disk during previous crash
+    const recovered = await loadBillingFallbackLog();
+    if (recovered > 0) {
+      console.log(`[server] recovered ${recovered} billing records from fallback log`);
+    }
+  }
+
+  // Backfill mission resources for existing missions (fire-and-forget)
+  if (isRuntimeFeatureEnabled("STARTUP_BACKFILL_ENABLED")) {
+    backfillMissionResources();
+  }
 });
 
 // 2026-05-09: bump server timeouts so heavy orchestra calls (60s tier
