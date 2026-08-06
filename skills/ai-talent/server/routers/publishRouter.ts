@@ -38,15 +38,26 @@ import {
   probePipedreamFacebookAccounts,
 } from "../_core/pipedreamFacebook";
 import { getPipedreamOAuthAppId } from "../_core/pipedreamOAuth";
+import { isRuntimeFeatureEnabled } from "../_core/runtimeSafety";
 
 const ENV = process.env;
+
+const socialProcedure = protectedProcedure.use(async ({ next }) => {
+  if (!isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED")) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "此環境已停用社群連接與發布功能。",
+    });
+  }
+  return next();
+});
 
 export const publishRouter = router({
   /**
    * Publish a caption to a connected Facebook page via Pipedream.
    * Returns Pipedream's response (typically {post_id, permalink_url}).
    */
-  toFacebook: protectedProcedure
+  toFacebook: socialProcedure
     .input(z.object({
       outputId: z.number().int().positive(),
       variantIndex: z.number().int().min(0).default(0),
@@ -170,7 +181,7 @@ export const publishRouter = router({
    *
    * Pipedream Connect API ref: https://pipedream.com/docs/connect/api
    */
-  getFacebookConnectUrl: protectedProcedure
+  getFacebookConnectUrl: socialProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user.id, input.brandId);
@@ -283,7 +294,7 @@ export const publishRouter = router({
    *   3. GET /v1/connect/{projectId}/proxy/{graph-url}
    *      → list managed pages without exposing the managed OAuth credential
    */
-  getFacebookPages: protectedProcedure
+  getFacebookPages: socialProcedure
     .input(z.object({
       brandId: z.number().int().positive(),
       waitForPropagation: z.boolean().optional().default(true),
@@ -411,7 +422,7 @@ export const publishRouter = router({
    * Pipedream Connect OAuth, the frontend asks them which Page ID to use
    * (or pick from a list later) and calls this to persist.
    */
-  setBrandFacebookPage: protectedProcedure
+  setBrandFacebookPage: socialProcedure
     .input(z.object({
       brandId: z.number().int().positive(),
       fbPageId: z.string().min(1).max(64),
@@ -442,7 +453,7 @@ export const publishRouter = router({
    * Calls: GET /v1/connect/{projectId}/users/{externalUserId}/accounts?limit=50
    * Returns: { connected: { facebook?: {accountId,name}, instagram?: ..., ... } }
    */
-  getConnectedPlatforms: protectedProcedure
+  getConnectedPlatforms: socialProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .query(async ({ ctx: _ctx, input }) => {
       const clientId     = process.env.PIPEDREAM_CLIENT_ID;
@@ -514,7 +525,7 @@ export const publishRouter = router({
     }),
 
   /** Disconnect FB binding from a brand (does NOT revoke Pipedream token). */
-  unbindBrandFacebook: protectedProcedure
+  unbindBrandFacebook: socialProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
@@ -544,7 +555,7 @@ export const publishRouter = router({
    *
    * 結果：之後每次任務，AI 看到的是真實貼文範例，不是抽象描述。
    */
-  importFbPostsForDNA: protectedProcedure
+  importFbPostsForDNA: socialProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
@@ -746,7 +757,7 @@ ${postsForAnalysis}
     }),
 
   /** Read FB binding status for a brand (drives the settings UI). */
-  getBrandFacebookStatus: protectedProcedure
+  getBrandFacebookStatus: socialProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");

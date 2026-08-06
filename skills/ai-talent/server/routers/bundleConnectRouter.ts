@@ -15,11 +15,22 @@ import { assertBrandAccess } from "../_core/brandAuth";
 import { createBundleSocialClient, isBundleMissingTeamError } from "../_core/bundleSocial";
 import { toBundlePlatform } from "../_core/bundlePublish";
 import { getPublishProvider } from "../_core/publishProvider";
+import { isRuntimeFeatureEnabled } from "../_core/runtimeSafety";
 
 const PLATFORM_INPUT = z.enum(["facebook", "instagram", "linkedin"]);
 
 /** Portal links are one-shot; 30 minutes covers a user who gets interrupted. */
 const PORTAL_EXPIRY_MINUTES = 30;
+
+const socialProcedure = protectedProcedure.use(async ({ next }) => {
+  if (!isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED")) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "此環境已停用社群連接與發布功能。",
+    });
+  }
+  return next();
+});
 
 function requireClient() {
   const apiKey = process.env.BUNDLE_SOCIAL_API_KEY;
@@ -49,7 +60,7 @@ export const bundleConnectRouter = router({
    * Tell the client which backend owns a platform so it can pick the right
    * connect flow without duplicating the env logic in the browser.
    */
-  getProviders: protectedProcedure.query(async () => ({
+  getProviders: socialProcedure.query(async () => ({
     facebook:  getPublishProvider("facebook"),
     instagram: getPublishProvider("instagram"),
     linkedin:  getPublishProvider("linkedin"),
@@ -59,7 +70,7 @@ export const bundleConnectRouter = router({
    * Create (once) the brand's bundle.social team, then mint a portal URL the
    * browser opens in a new tab.
    */
-  getConnectUrl: protectedProcedure
+  getConnectUrl: socialProcedure
     .input(z.object({
       brandId: z.number().int().positive(),
       platform: PLATFORM_INPUT,
@@ -130,7 +141,7 @@ export const bundleConnectRouter = router({
    * Poll after the user returns from the portal. Stamps bundleConnectedAt on
    * the first successful check so the UI can show when the link was made.
    */
-  getConnectionStatus: protectedProcedure
+  getConnectionStatus: socialProcedure
     .input(z.object({
       brandId: z.number().int().positive(),
       platform: PLATFORM_INPUT,

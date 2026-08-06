@@ -10,6 +10,7 @@
  */
 
 import sgMail from "@sendgrid/mail";
+import { isRuntimeFeatureEnabled } from "../_core/runtimeSafety";
 
 type EmailData = {
   to: string;
@@ -72,6 +73,11 @@ function maskEmail(addr: string): string {
 }
 
 export async function sendEmail(data: EmailData): Promise<void> {
+  if (!isRuntimeFeatureEnabled("OUTBOUND_EMAIL_ENABLED")) {
+    console.warn(`[email] Suppressed by OUTBOUND_EMAIL_ENABLED=false for ${maskEmail(data.to)}`);
+    throw new Error("Outbound email is disabled in this environment");
+  }
+
   const fromAddr = process.env.EMAIL_FROM || "noreply@sowork.ai";
   const provider = detectProvider();
 

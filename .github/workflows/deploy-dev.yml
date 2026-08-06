@@ -1,0 +1,173 @@
+name: CI / Deploy Dev
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: onbrand-dev-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      DB_HOST: localhost
+      DB_USER: test
+      DB_PASSWORD: test
+      DB_NAME: test
+      LOCAL_DB_HOST: localhost
+      LOCAL_DB_PORT: "3306"
+      LOCAL_DB_USER: test
+      LOCAL_DB_PASSWORD: test
+      LOCAL_DB_NAME: test
+      JWT_SECRET: ci-test-secret-at-least-32-chars-long
+      NODE_ENV: test
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            skills/ai-talent/package-lock.json
+            skills/ai-talent/client/package-lock.json
+
+      - name: Install server dependencies from lockfile
+        run: npm ci --legacy-peer-deps --prefix skills/ai-talent
+
+      - name: Install client dependencies from lockfile
+        run: npm ci --legacy-peer-deps --prefix skills/ai-talent/client
+
+      - name: Type check server
+        run: npm run lint --prefix skills/ai-talent
+
+      - name: Type check client
+        run: cd skills/ai-talent/client && npx tsc --noEmit
+
+      - name: Test server
+        run: npm test --prefix skills/ai-talent
+
+      - name: Build frontend
+        run: npm run build --prefix skills/ai-talent/client -- --outDir ../public --emptyOutDir
+
+      - name: Remove client build dependencies
+        run: rm -rf skills/ai-talent/client/node_modules
+
+      - name: Package tested release
+        run: |
+          tar \
+            --exclude=.git \
+            --exclude='*/.env' \
+            --exclude='scripts/env-provision' \
+            -czf "$RUNNER_TEMP/onbrand-release.tgz" .
+          test -s "$RUNNER_TEMP/onbrand-release.tgz"
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: onbrand-dev-${{ github.sha }}
+          path: ${{ runner.temp }}/onbrand-release.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-24.04
+    environment: dev
+    steps:
+      - name: Download tested release
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: onbrand-dev-${{ github.sha }}
+
+      - name: Configure dev SSH identity
+        env:
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_HOST_KEY: ${{ secrets.VM_SSH_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > ~/.ssh/onbrand-dev
+          chmod 600 ~/.ssh/onbrand-dev
+          printf '%s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload release to dev VM
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          scp -i ~/.ssh/onbrand-dev \
+            onbrand-release.tgz \
+            "$VM_USER@$VM_HOST:/tmp/onbrand-release-${GITHUB_SHA}.tgz"
+
+      - name: Activate release with health-check rollback
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" \
+            "RELEASE_SHA='${GITHUB_SHA}' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          app_root=/opt/onbrand
+          release="$app_root/releases/$RELEASE_SHA"
+          current="$app_root/current"
+          archive="/tmp/onbrand-release-$RELEASE_SHA.tgz"
+
+          test -f "$app_root/shared/.env"
+          test -s "$archive"
+          mkdir -p "$release"
+          tar -xzf "$archive" -C "$release"
+          rm -f "$archive"
+
+          ai="$release/skills/ai-talent"
+          test -x "$ai/node_modules/.bin/tsx"
+          test -f "$ai/public/index.html"
+
+          ln -sfn "$app_root/shared/.env" "$ai/.env"
+          mkdir -p "$app_root/shared/storage/boardroom-exports"
+          rm -rf "$ai/storage"
+          ln -s "$app_root/shared/storage" "$ai/storage"
+          rm -rf "$ai/public/static/covers"
+          ln -s "$app_root/shared/covers" "$ai/public/static/covers"
+
+          cd "$ai"
+          ./node_modules/.bin/tsx scripts/migrate.ts
+
+          previous="$(readlink -f "$current" 2>/dev/null || true)"
+          sudo ln -sfn "$release" "$current"
+
+          pm2 delete onbrand-dev >/dev/null 2>&1 || true
+          NODE_ENV=production PORT=3101 TRUST_PROXY=1 \
+            pm2 start "$current/skills/ai-talent/node_modules/.bin/tsx" \
+              --name onbrand-dev \
+              --cwd "$current/skills/ai-talent" \
+              --update-env \
+              -- server/index.ts
+
+          if ! timeout 60 bash -c 'until curl --fail --silent --show-error http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
+            pm2 delete onbrand-dev >/dev/null 2>&1 || true
+            if [ -n "$previous" ] && [ -d "$previous" ]; then
+              sudo ln -sfn "$previous" "$current"
+              NODE_ENV=production PORT=3101 TRUST_PROXY=1 \
+                pm2 start "$current/skills/ai-talent/node_modules/.bin/tsx" \
+                  --name onbrand-dev \
+                  --cwd "$current/skills/ai-talent" \
+                  --update-env \
+                  -- server/index.ts
+            fi
+            exit 1
+          fi
+
+          pm2 save --force
+          echo "deployed $RELEASE_SHA"
+          REMOTE

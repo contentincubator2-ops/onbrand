@@ -22,6 +22,17 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { assertBrandAccess } from "../_core/brandAuth";
 import { getPipedreamConnectTokenUrl } from "../_core/pipedreamConnect";
 import { getPipedreamOAuthAppId } from "../_core/pipedreamOAuth";
+import { isRuntimeFeatureEnabled } from "../_core/runtimeSafety";
+
+const socialProcedure = protectedProcedure.use(async ({ next }) => {
+  if (!isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED")) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "此環境已停用社群連接與發布功能。",
+    });
+  }
+  return next();
+});
 
 // Pipedream Connect REST endpoint for issuing user tokens
 const PLATFORM_APP: Record<string, string> = {
@@ -114,7 +125,7 @@ export const platformConnectRouter = router({
    *   projectId  — Pipedream project ID (needed by browser SDK)
    *   env        — "production" | "development"
    */
-  getConnectToken: protectedProcedure
+  getConnectToken: socialProcedure
     .input(z.object({
       platform: z.enum(["facebook", "instagram", "linkedin", "youtube"]),
       brandId:  z.number().int().positive(),

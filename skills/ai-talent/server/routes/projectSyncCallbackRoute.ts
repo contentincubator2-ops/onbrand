@@ -28,10 +28,15 @@
 import express from "express";
 import { sql } from "drizzle-orm";
 import { getDb } from "../db";
+import { isRuntimeFeatureEnabled } from "../_core/runtimeSafety";
 
 export const projectSyncCallbackRouter = express.Router();
 
 projectSyncCallbackRouter.post("/callback", express.json({ limit: "10mb" }), async (req, res) => {
+  if (!isRuntimeFeatureEnabled("PROJECT_SYNC_ENABLED")) {
+    console.warn("[projectSyncCallback] ignored because PROJECT_SYNC_ENABLED=false");
+    return res.status(503).json({ error: "project sync disabled in this environment" });
+  }
   try {
     const jobId = Number(req.query.jobId ?? req.body?.jobId);
     if (!jobId) return res.status(400).json({ error: "missing jobId" });
