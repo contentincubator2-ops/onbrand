@@ -18,7 +18,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import {
   LISTENING_TASK_KEYS, loadBrandCtx, fetchScopeMentions,
-  ensureMentionsTable, upsertMention, type ListeningTaskKey,
+  ensureMentionsTable, upsertMention, SOURCE_TYPES, type ListeningTaskKey,
 } from "../_core/listeningScopes";
 
 export const marketIntelRouter = router({
@@ -29,13 +29,15 @@ export const marketIntelRouter = router({
     .input(z.object({
       brandId: z.number().int().positive(),
       taskKey: z.enum(LISTENING_TASK_KEYS),
+      // Recency window (days) — freshness filter; default per-scope in fetchScopeMentions.
+      days: z.number().int().min(1).max(730).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       const brand = await loadBrandCtx(input.brandId, userId);
       if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "brand not found" });
 
-      const res = await fetchScopeMentions(brand, input.taskKey);
+      const res = await fetchScopeMentions(brand, input.taskKey, input.days);
       if (!res.ok) {
         return { ok: false as const, message: res.message };
       }
@@ -65,6 +67,9 @@ export const marketIntelRouter = router({
     .input(z.object({
       brandId: z.number().int().positive(),
       scope: z.enum(LISTENING_TASK_KEYS).optional(),
+      sourceType: z.enum(["news", "fanpage", "blog", "forum", "threads", "youtube", "web"]).optional(),
+      // Time filter: only mentions first captured within the last N days.
+      sinceDays: z.number().int().min(1).max(730).optional(),
       limit: z.number().int().min(1).max(200).default(60),
     }))
     .query(async ({ ctx, input }) => {
@@ -76,11 +81,16 @@ export const marketIntelRouter = router({
         await ensureMentionsTable();
       } catch { /* table may already exist / race — reads below still work */ }
 
-      const where = input.scope ? "brandId = ? AND scope = ?" : "brandId = ?";
-      const params: any[] = input.scope ? [input.brandId, input.scope] : [input.brandId];
+      const conds: string[] = ["brandId = ?"];
+      const params: any[] = [input.brandId];
+      if (input.scope) { conds.push("scope = ?"); params.push(input.scope); }
+      if (input.sourceType) { conds.push("sourceType = ?"); params.push(input.sourceType); }
+      if (input.sinceDays) { conds.push("firstSeenAt >= (NOW() - INTERVAL ? DAY)"); params.push(input.sinceDays); }
+      const where = conds.join(" AND ");
+
       const [rows]: any = await localPool.execute(
-        `SELECT scope, title, source, url, excerpt, sentiment,
-                firstSeenAt, lastSeenAt, seenCount
+        `SELECT scope, title, source, url, excerpt, sourceType, sentiment,
+                firstSeenAt, lastSeenAt, seenCount, publishedAt
            FROM listening_mentions
           WHERE ${where}
           ORDER BY firstSeenAt DESC
@@ -89,15 +99,28 @@ export const marketIntelRouter = router({
       );
       const items = rows as Array<{ scope: ListeningTaskKey } & Record<string, any>>;
 
-      // Per-scope counts so the UI can show a 累積聲量 badge without a 2nd call.
+      // Per-scope counts (累積聲量 badge) — respect the same time filter.
+      const scopeWhere = input.sinceDays ? "brandId = ? AND firstSeenAt >= (NOW() - INTERVAL ? DAY)" : "brandId = ?";
+      const scopeParams = input.sinceDays ? [input.brandId, input.sinceDays] : [input.brandId];
       const [countRows]: any = await localPool.execute(
         `SELECT scope, COUNT(*) AS n, MAX(lastSeenAt) AS latest
-           FROM listening_mentions WHERE brandId = ? GROUP BY scope`,
-        [input.brandId],
+           FROM listening_mentions WHERE ${scopeWhere} GROUP BY scope`,
+        scopeParams,
       );
       const counts: Record<string, { n: number; latest: string | null }> = {};
       for (const r of countRows as any[]) counts[r.scope] = { n: Number(r.n), latest: r.latest ?? null };
 
-      return { ok: true as const, items, counts };
+      // Source-mix breakdown (OpView 來源分布) — same time filter.
+      const [srcRows]: any = await localPool.execute(
+        `SELECT COALESCE(sourceType,'web') AS sourceType, COUNT(*) AS n
+           FROM listening_mentions WHERE ${scopeWhere} GROUP BY COALESCE(sourceType,'web')`,
+        scopeParams,
+      );
+      const sourceMix: Record<string, number> = {};
+      for (const t of SOURCE_TYPES) sourceMix[t] = 0;
+      sourceMix.web = 0;
+      for (const r of srcRows as any[]) sourceMix[r.sourceType] = Number(r.n);
+
+      return { ok: true as const, items, counts, sourceMix };
     }),
 });

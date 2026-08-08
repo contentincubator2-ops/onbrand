@@ -49,9 +49,30 @@ interface LiveRunResult {
   ok: boolean;
   generatedAt?: string;
   query?: string;
-  items?: Array<{ title: string; source: string; excerpt: string; url?: string }>;
+  items?: Array<{ title: string; source: string; excerpt: string; url?: string; sourceType?: string; publishedAt?: string }>;
   message?: string;
 }
+
+// OpView-style source buckets (label + chip color), mirrors listeningScopes.ts.
+const SOURCE_TYPE_META: Record<string, { label: string; color: string }> = {
+  news:    { label: "新聞",     color: "#DC2626" },
+  fanpage: { label: "粉絲團",   color: "#1877F2" },
+  blog:    { label: "部落格",   color: "#059669" },
+  forum:   { label: "討論區",   color: "#EA580C" },
+  threads: { label: "Threads",  color: "#111827" },
+  youtube: { label: "YouTube",  color: "#FF0000" },
+  web:     { label: "網站",     color: "#6b7280" },
+};
+const sourceMeta = (t?: string) => SOURCE_TYPE_META[t ?? "web"] ?? SOURCE_TYPE_META.web;
+
+// Time-window options for the freshness filter (資料看起來很舊 → let users scope recency).
+const TIME_WINDOWS: Array<{ days: number; label: string }> = [
+  { days: 7, label: "近 7 天" },
+  { days: 30, label: "近 30 天" },
+  { days: 90, label: "近 3 個月" },
+  { days: 180, label: "近半年" },
+  { days: 365, label: "近一年" },
+];
 
 type Evidence = {
   label: string;
@@ -524,6 +545,7 @@ export default function DataWorkspacePage() {
   const [liveResults, setLiveResults] = React.useState<Record<string, LiveRunResult>>({});
   const [runningKey, setRunningKey] = React.useState<string | null>(null);
   const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
+  const [windowDays, setWindowDays] = React.useState(30); // 輿情 freshness filter
   const [selectedHotTopicId, setSelectedHotTopicId] = React.useState(hotTopics[0].id);
   const [selectedHotEntityId, setSelectedHotEntityId] = React.useState(hotTopicEntities[0].id);
   const [selectedContentRouteId, setSelectedContentRouteId] = React.useState(contentTaskRoutes[0].id);
@@ -551,7 +573,7 @@ export default function DataWorkspacePage() {
     setRunningKey(task.taskKey);
     setSelectedKey(task.taskKey);
     try {
-      const res: LiveRunResult = await runListeningMut.mutateAsync({ brandId, taskKey: task.taskKey });
+      const res: LiveRunResult = await runListeningMut.mutateAsync({ brandId, taskKey: task.taskKey, days: windowDays });
       setLiveResults((r) => ({ ...r, [task.taskKey!]: res }));
     } catch (e: any) {
       setLiveResults((r) => ({ ...r, [task.taskKey!]: { ok: false, message: e?.message ?? String(e) } }));
@@ -566,7 +588,7 @@ export default function DataWorkspacePage() {
     setRunningKey(taskKey);
     setSelectedKey(taskKey);
     try {
-      const res: LiveRunResult = await runListeningMut.mutateAsync({ brandId, taskKey });
+      const res: LiveRunResult = await runListeningMut.mutateAsync({ brandId, taskKey, days: windowDays });
       setLiveResults((r) => ({ ...r, [taskKey]: res }));
     } catch (e: any) {
       setLiveResults((r) => ({ ...r, [taskKey]: { ok: false, message: e?.message ?? String(e) } }));
@@ -642,6 +664,31 @@ export default function DataWorkspacePage() {
                   網址缺少 <b>?b=品牌ID</b>，四個區塊的即時查詢會停用。範例：<code>/market-intel/listening?b=2957</code>
                 </div>
               )}
+              {/* 時間篩選 + 來源類型圖例 (OpView 來源分布) */}
+              <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", padding: "12px 14px" }}>
+                <span style={{ fontSize: 12, fontWeight: 850, color: "#111827" }}>時間範圍</span>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {TIME_WINDOWS.map((w) => {
+                    const on = windowDays === w.days;
+                    return (
+                      <button key={w.days} onClick={() => setWindowDays(w.days)} style={{ border: `1px solid ${on ? "#111827" : "#e5e7eb"}`, background: on ? "#111827" : "#fff", color: on ? "#fff" : "#374151", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{w.label}</button>
+                    );
+                  })}
+                </div>
+                <span style={{ width: 1, height: 20, background: "#e5e7eb", margin: "0 4px" }} />
+                <span style={{ fontSize: 12, fontWeight: 850, color: "#111827" }}>來源</span>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["news", "fanpage", "blog", "forum", "threads", "youtube"].map((t) => {
+                    const m = sourceMeta(t);
+                    return (
+                      <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: m.color }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: m.color, display: "inline-block" }} /> {m.label}
+                      </span>
+                    );
+                  })}
+                </div>
+                <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>時間範圍改變後，重新點各區塊的即時查詢即可套用</span>
+              </div>
               {listeningScopes.map((scope) => {
                 const res = liveResults[scope.taskKey];
                 const running = runningKey === scope.taskKey;
@@ -666,8 +713,14 @@ export default function DataWorkspacePage() {
                         {!res.ok ? (
                           <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 12, padding: 12, fontSize: 12.5, color: "#991b1b", lineHeight: 1.5 }}>{res.message}</div>
                         ) : (
-                          res.items!.map((item, i) => (
+                          res.items!.map((item, i) => {
+                            const m = sourceMeta(item.sourceType);
+                            return (
                             <div key={i} style={{ border: "1px solid #f0f0ef", borderRadius: 14, padding: 12 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 10, fontWeight: 800, color: m.color, background: `${m.color}14`, padding: "2px 7px", borderRadius: 999 }}>{m.label}</span>
+                                {item.publishedAt && <span style={{ fontSize: 10.5, color: "#9ca3af" }}>{String(item.publishedAt).slice(0, 10)}</span>}
+                              </div>
                               <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", lineHeight: 1.4 }}>{item.title}</div>
                               <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
                                 {item.source}
@@ -678,7 +731,8 @@ export default function DataWorkspacePage() {
                                 <button onClick={() => writeFromHotspot(item.title)} style={{ marginTop: 10, border: `1px solid ${scope.color}`, borderRadius: 999, background: `${scope.color}0f`, color: scope.color, padding: "6px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>✍ 寫成貼文（蹭這個熱點）</button>
                               )}
                             </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     )}

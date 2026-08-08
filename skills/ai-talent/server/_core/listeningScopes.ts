@@ -35,7 +35,34 @@ export const INGEST_SCOPES: ListeningTaskKey[] = [
   "listening.competitors",
 ];
 
-export interface RunResultItem { title: string; source: string; excerpt: string; url?: string }
+/** OpView-style source buckets. `web` = uncategorised fallback. */
+export type SourceType = "news" | "fanpage" | "blog" | "forum" | "threads" | "youtube" | "web";
+
+export const SOURCE_TYPE_LABELS: Record<SourceType, string> = {
+  news: "新聞", fanpage: "粉絲團", blog: "部落格", forum: "討論區",
+  threads: "Threads", youtube: "YouTube", web: "網站",
+};
+
+/** The 6 source types we actively try to cover (OpView parity), + web catch-all. */
+export const SOURCE_TYPES: SourceType[] = ["news", "fanpage", "blog", "forum", "threads", "youtube"];
+
+const DOMAIN_RULES: Array<[SourceType, RegExp]> = [
+  ["youtube", /(?:^|\.)youtube\.com|youtu\.be/i],
+  ["threads", /(?:^|\.)threads\.net/i],
+  ["fanpage", /(?:^|\.)facebook\.com|(?:^|\.)fb\.com|instagram\.com/i],
+  ["forum", /ptt\.cc|dcard\.tw|mobile01\.com|komica|meteor\.today|(?:^|\.)reddit\.com|backpackers|babyhome|mymkc|gamer\.com\.tw|eyny/i],
+  ["blog", /pixnet\.net|痞客邦|blogspot\.|wordpress\.|medium\.com|xuite|方格子|vocus\.cc|matters\.town|hpspace|blog\./i],
+  ["news", /udn\.com|ettoday\.net|chinatimes\.com|setn\.com|ltn\.com\.tw|tvbs\.com|nownews|storm\.mg|cna\.com\.tw|businessweekly|gvm\.com|technews|inside\.com\.tw|managertoday|bnext|marieclaire|elle\.|vogue|beauty321|edh\.tw|commonhealth|heho\.|ftvnews|ctee\.com|mirrormedia|nextapple|newtalk|thenewslens|自由時報|聯合報|中時|三立|東森/i],
+];
+
+/** Classify a result into an OpView source bucket from its URL/source. */
+export function classifySource(url?: string, source?: string): SourceType {
+  const hay = `${url ?? ""} ${source ?? ""}`.toLowerCase();
+  for (const [type, re] of DOMAIN_RULES) if (re.test(hay)) return type;
+  return "web";
+}
+
+export interface RunResultItem { title: string; source: string; excerpt: string; url?: string; sourceType: SourceType; publishedAt?: string }
 
 export interface BrandCtx {
   id: number;
@@ -103,6 +130,9 @@ export function buildKeywords(taskKey: ListeningTaskKey, brand: BrandCtx): strin
   const brandName = brand.name;
   const cat = brand.industry?.trim() || brandName;
   const rgn = brand.isTaiwan ? " 台灣" : "";
+  // Source-diverse terms nudge the SINGLE search per scope to surface across
+  // 討論區 / 部落格 / YouTube / 新聞 / 粉絲團 — OpView-style coverage without
+  // multiplying fetch calls. classifySource() then buckets each result.
   switch (taskKey) {
     case "listening.topic_buckets":
       return [`${brandName} 版型 尺寸 準不準${rgn}`, `${brandName} 材質 質感 評價${rgn}`, `${brandName} 划算 cp值 貴嗎${rgn}`];
@@ -111,14 +141,14 @@ export function buildKeywords(taskKey: ListeningTaskKey, brand: BrandCtx): strin
     case "listening.crisis_scan":
       return [`${brandName} 退換貨 客訴${rgn}`, `${brandName} 色差 瑕疵 材質問題${rgn}`];
     case "listening.market_hotspots":
-      return [`${cat} 熱門 話題 趨勢${rgn}`, `${cat} 爆紅 討論度${rgn}`, `${cat} 最新 流行 2026${rgn}`];
+      return [`${cat} 熱門 話題 趨勢${rgn}`, `${cat} 爆紅 dcard ptt 討論`, `${cat} youtube 開箱 評測`, `${cat} 最新 新聞${rgn}`];
     case "listening.industry_talk":
-      return [`${cat} 推薦 ptt dcard`, `${cat} 怎麼選 比較${rgn}`, `${cat} 心得 討論${rgn}`];
+      return [`${cat} 推薦 ptt dcard`, `${cat} 部落格 心得${rgn}`, `${cat} youtube 評測`, `${cat} 怎麼選 比較 新聞${rgn}`];
     case "listening.own_brand":
-      return [`${brandName} 評價 心得${rgn}`, `${brandName} 開箱 推薦${rgn}`, `${brandName} 好用嗎 值得${rgn}`];
+      return [`${brandName} 評價 心得${rgn}`, `${brandName} dcard ptt 討論`, `${brandName} 開箱 部落格`, `${brandName} youtube 評測`, `${brandName} 新聞${rgn}`];
     case "listening.competitors": {
       const comps = brand.competitors.length ? brand.competitors : [cat];
-      return comps.slice(0, 4).map((c) => `${c} 評價 vs ${brandName}${rgn}`);
+      return comps.slice(0, 4).map((c) => `${c} 評價 vs ${brandName} dcard ptt${rgn}`);
     }
   }
 }
@@ -136,11 +166,18 @@ export interface ScopeFetchResult {
   message?: string;
 }
 
-/** Run ONE scope's live web search and return cleaned, junk-filtered items.
- *  Shared by the live tRPC path and the accumulating ingestion job. */
-export async function fetchScopeMentions(brand: BrandCtx, taskKey: ListeningTaskKey): Promise<ScopeFetchResult> {
+/** Run ONE scope's live web search and return cleaned, junk-filtered items
+ *  (each tagged with its OpView source type). Shared by the live tRPC path
+ *  and the accumulating ingestion job. `daysOverride` lets the user pick a
+ *  recency window (freshness filter). */
+export async function fetchScopeMentions(
+  brand: BrandCtx,
+  taskKey: ListeningTaskKey,
+  daysOverride?: number,
+): Promise<ScopeFetchResult> {
   const keywords = buildKeywords(taskKey, brand);
   const query = keywords.join(" / ");
+  const days = daysOverride && daysOverride > 0 ? daysOverride : daysFor(taskKey);
   const { perplexityScout } = await import("./scouts/perplexityScout");
   const SCOUT_TIMEOUT_MS = 15_000;
 
@@ -153,8 +190,8 @@ export async function fetchScopeMentions(brand: BrandCtx, taskKey: ListeningTask
         keywords,
         competitors: taskKey === "listening.competitors" ? brand.competitors : [],
         industryTags: brand.industry ? [brand.industry] : [],
-        days: daysFor(taskKey),
-        limit: 6,
+        days,
+        limit: 8,
         loadCred: async () => null,
       } as any),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), SCOUT_TIMEOUT_MS)),
@@ -170,9 +207,11 @@ export async function fetchScopeMentions(brand: BrandCtx, taskKey: ListeningTask
         source: it.source,
         excerpt: cleanText(it.content ?? "").slice(0, 280),
         url: it.url,
+        sourceType: classifySource(it.url, it.source),
+        publishedAt: typeof it.publishedAt === "string" ? it.publishedAt : undefined,
       }))
       .filter((it) => hasRealText(it.title))
-      .slice(0, 6);
+      .slice(0, 8);
 
     if (mapped.length === 0) {
       return { ok: false, query, items: [], message: "即時搜尋有回應，但內容無法解析成可讀結果（來源多為圖檔/JS 片段）。" };
@@ -197,7 +236,9 @@ export function mentionHash(s: string): string {
   return (h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")).slice(0, 16);
 }
 
-/** Idempotent: create the accumulating mentions table if it doesn't exist. */
+/** Idempotent: create the accumulating mentions table if it doesn't exist,
+ *  and add later columns to a pre-existing table (guarded — MySQL lacks
+ *  ADD COLUMN IF NOT EXISTS on older versions). */
 export async function ensureMentionsTable(): Promise<void> {
   await localPool.execute(`
     CREATE TABLE IF NOT EXISTS listening_mentions (
@@ -209,6 +250,7 @@ export async function ensureMentionsTable(): Promise<void> {
       source VARCHAR(255) NULL,
       url VARCHAR(1024) NULL,
       excerpt TEXT NULL,
+      sourceType VARCHAR(24) NULL,
       sentiment VARCHAR(16) NULL,
       publishedAt VARCHAR(40) NULL,
       firstSeenAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -216,9 +258,20 @@ export async function ensureMentionsTable(): Promise<void> {
       seenCount INT NOT NULL DEFAULT 1,
       UNIQUE KEY uniq_brand_scope_url (brandId, scope, urlHash),
       KEY idx_brand_scope (brandId, scope),
-      KEY idx_first_seen (firstSeenAt)
+      KEY idx_first_seen (firstSeenAt),
+      KEY idx_source_type (sourceType)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Backfill column on a table created before sourceType existed (Phase-1 rows).
+  try {
+    const [cols]: any = await localPool.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'listening_mentions' AND COLUMN_NAME = 'sourceType'`,
+    );
+    if (!(cols as any[]).length) {
+      await localPool.execute(`ALTER TABLE listening_mentions ADD COLUMN sourceType VARCHAR(24) NULL, ADD KEY idx_source_type (sourceType)`);
+    }
+  } catch { /* non-fatal: table already current, or concurrent ALTER */ }
 }
 
 /** Upsert one mention. New rows return "new"; already-seen rows bump
@@ -227,14 +280,19 @@ export async function ensureMentionsTable(): Promise<void> {
 export async function upsertMention(brandId: number, scope: ListeningTaskKey, item: RunResultItem): Promise<"new" | "updated"> {
   const hash = mentionHash(item.url || item.title);
   const [res]: any = await localPool.execute(
-    `INSERT INTO listening_mentions (brandId, scope, urlHash, title, source, url, excerpt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO listening_mentions (brandId, scope, urlHash, title, source, url, excerpt, sourceType, publishedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        lastSeenAt = CURRENT_TIMESTAMP,
        seenCount = seenCount + 1,
        title = VALUES(title),
-       excerpt = VALUES(excerpt)`,
-    [brandId, scope, hash, item.title.slice(0, 512), (item.source ?? "").slice(0, 255), (item.url ?? "").slice(0, 1024), item.excerpt.slice(0, 2000)],
+       excerpt = VALUES(excerpt),
+       sourceType = VALUES(sourceType)`,
+    [
+      brandId, scope, hash, item.title.slice(0, 512), (item.source ?? "").slice(0, 255),
+      (item.url ?? "").slice(0, 1024), item.excerpt.slice(0, 2000),
+      item.sourceType ?? "web", item.publishedAt ?? null,
+    ],
   );
   // mysql2 affectedRows: 1 = inserted, 2 = updated (ON DUPLICATE KEY UPDATE).
   return (res?.affectedRows ?? 1) >= 2 ? "updated" : "new";
