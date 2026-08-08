@@ -658,7 +658,7 @@ export default function DataWorkspacePage() {
           </div>
 
           {!isPerformance && active.id === "listening" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 14, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, marginBottom: 14 }}>
               {!brandId && (
                 <div style={{ gridColumn: "1 / -1", border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 16, padding: 14, fontSize: 13, color: "#92400e" }}>
                   網址缺少 <b>?b=品牌ID</b>，四個區塊的即時查詢會停用。範例：<code>/market-intel/listening?b=2957</code>
@@ -692,52 +692,65 @@ export default function DataWorkspacePage() {
               {listeningScopes.map((scope) => {
                 const res = liveResults[scope.taskKey];
                 const running = runningKey === scope.taskKey;
+                const runAt = res?.generatedAt ? new Date(res.generatedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
                 return (
-                  <section key={scope.taskKey} style={{ border: `1px solid ${res ? scope.color : "#e5e7eb"}`, borderRadius: 22, background: "#fff", padding: 18, display: "flex", flexDirection: "column", boxShadow: selectedKey === scope.taskKey ? `0 0 0 3px ${scope.color}18` : "none" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 12, background: scope.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>{scope.icon}</div>
-                      <div style={{ minWidth: 0 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 850, color: "#111827" }}>{scope.title}</h3>
-                        <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#6b7280", lineHeight: 1.45 }}>{scope.purpose}</p>
+                  <section key={scope.taskKey} style={{ border: "1px solid #e5e7eb", borderRadius: 18, background: "#fff", overflow: "hidden", boxShadow: selectedKey === scope.taskKey ? `0 0 0 3px ${scope.color}14` : "none" }}>
+                    {/* Section header — OpView/Meltwater style: identity left, action right, accent bar */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderBottom: "1px solid #f1f1f0", borderLeft: `4px solid ${scope.color}` }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 10, background: scope.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>{scope.icon}</div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 850, color: "#111827" }}>{scope.title}</h3>
+                          {res?.ok && <span style={{ fontSize: 12, fontWeight: 800, color: scope.color }}>{res.items!.length} 則</span>}
+                          {runAt && <span style={{ fontSize: 11, color: "#9ca3af" }}>· 擷取於 {runAt}</span>}
+                        </div>
+                        <p style={{ margin: "2px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>{scope.purpose}</p>
                       </div>
+                      <button
+                        onClick={() => runScope(scope.taskKey)}
+                        disabled={!brandId || running}
+                        style={{ flex: "0 0 auto", border: 0, borderRadius: 999, background: brandId ? scope.color : "#e5e7eb", color: brandId ? "#fff" : "#9ca3af", padding: "8px 16px", fontSize: 13, fontWeight: 800, cursor: brandId && !running ? "pointer" : "default", whiteSpace: "nowrap" }}
+                      >
+                        {running ? "查詢中…" : res ? "重新查詢" : "▶ 即時查詢"}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => runScope(scope.taskKey)}
-                      disabled={!brandId || running}
-                      style={{ marginTop: 14, alignSelf: "flex-start", border: 0, borderRadius: 999, background: brandId ? scope.color : "#e5e7eb", color: brandId ? "#fff" : "#9ca3af", padding: "9px 16px", fontSize: 13, fontWeight: 800, cursor: brandId && !running ? "pointer" : "default" }}
-                    >
-                      {running ? "查詢中…" : res ? "重新即時查詢" : "▶ 即時查詢（真實公開資料）"}
-                    </button>
-                    {res && (
-                      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-                        {!res.ok ? (
-                          <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 12, padding: 12, fontSize: 12.5, color: "#991b1b", lineHeight: 1.5 }}>{res.message}</div>
-                        ) : (
-                          res.items!.map((item, i) => {
-                            const m = sourceMeta(item.sourceType);
-                            return (
-                            <div key={i} style={{ border: "1px solid #f0f0ef", borderRadius: 14, padding: 12 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                                <span style={{ fontSize: 10, fontWeight: 800, color: m.color, background: `${m.color}14`, padding: "2px 7px", borderRadius: 999 }}>{m.label}</span>
-                                {item.publishedAt && <span style={{ fontSize: 10.5, color: "#9ca3af" }}>{String(item.publishedAt).slice(0, 10)}</span>}
+
+                    {/* Mention feed — one full-width row per item, date always shown */}
+                    {res?.ok ? (
+                      <div>
+                        {res.items!.map((item, i) => {
+                          const m = sourceMeta(item.sourceType);
+                          const dateStr = item.publishedAt ? String(item.publishedAt).slice(0, 10) : null;
+                          return (
+                            <div key={i} style={{ display: "flex", gap: 12, padding: "13px 18px", borderTop: i === 0 ? "none" : "1px solid #f4f4f3" }}>
+                              {/* left: source-type chip */}
+                              <span style={{ flex: "0 0 auto", fontSize: 10, fontWeight: 800, color: "#fff", background: m.color, padding: "3px 8px", borderRadius: 6, height: "fit-content", marginTop: 2 }}>{m.label}</span>
+                              {/* right: content */}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#9ca3af", marginBottom: 3, flexWrap: "wrap" }}>
+                                  <span style={{ fontWeight: 700, color: "#6b7280" }}>{item.source}</span>
+                                  <span>·</span>
+                                  <span title={dateStr ? "發布時間" : "來源未提供發布時間，顯示擷取時間"}>
+                                    🕓 {dateStr ? `${dateStr} 發布` : (runAt ? `${runAt} 擷取` : "時間不明")}
+                                  </span>
+                                  {item.url && <a href={item.url} target="_blank" rel="noreferrer" style={{ color: scope.color, display: "inline-flex", alignItems: "center", gap: 2 }}>原文 <ExternalLink size={10} /></a>}
+                                </div>
+                                <div style={{ fontSize: 14, fontWeight: 800, color: "#111827", lineHeight: 1.4 }}>{item.title}</div>
+                                {item.excerpt && <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#4b5563", lineHeight: 1.55 }}>{item.excerpt}</p>}
+                                {scope.writeCta && (
+                                  <button onClick={() => writeFromHotspot(item.title)} style={{ marginTop: 9, border: `1px solid ${scope.color}`, borderRadius: 999, background: `${scope.color}0f`, color: scope.color, padding: "5px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>✍ 寫成貼文（蹭這個熱點）</button>
+                                )}
                               </div>
-                              <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", lineHeight: 1.4 }}>{item.title}</div>
-                              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
-                                {item.source}
-                                {item.url && <a href={item.url} target="_blank" rel="noreferrer" style={{ color: scope.color, display: "inline-flex", alignItems: "center" }}><ExternalLink size={11} /></a>}
-                              </div>
-                              {item.excerpt && <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "#4b5563", lineHeight: 1.55 }}>{item.excerpt}</p>}
-                              {scope.writeCta && (
-                                <button onClick={() => writeFromHotspot(item.title)} style={{ marginTop: 10, border: `1px solid ${scope.color}`, borderRadius: 999, background: `${scope.color}0f`, color: scope.color, padding: "6px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>✍ 寫成貼文（蹭這個熱點）</button>
-                              )}
                             </div>
-                            );
-                          })
-                        )}
+                          );
+                        })}
                       </div>
-                    )}
-                    {!res && !running && (
-                      <p style={{ margin: "12px 0 0", fontSize: 12, color: "#9ca3af", lineHeight: 1.5 }}>點「即時查詢」抓取這個範圍的真實公開討論，結果會列在下方（附來源連結）。</p>
+                    ) : res && !res.ok ? (
+                      <div style={{ margin: 18, border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 12, padding: 12, fontSize: 12.5, color: "#991b1b", lineHeight: 1.5 }}>{res.message}</div>
+                    ) : (
+                      <p style={{ margin: 0, padding: "16px 18px", fontSize: 12.5, color: "#9ca3af", lineHeight: 1.5 }}>
+                        {running ? "即時搜尋中…" : "點右上「即時查詢」抓取這個範圍近期的真實公開討論，每則會顯示來源類型與發布時間。"}
+                      </p>
                     )}
                   </section>
                 );
