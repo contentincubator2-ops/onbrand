@@ -166,8 +166,34 @@ export interface ScopeFetchResult {
   message?: string;
 }
 
-/** Resolve an article's PUBLISH date (not our capture time) from the
- *  provider field → URL date pattern → newest year mentioned in text.
+const EN_MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
+/** Pull every plausible full date out of free text — numeric (2021-12-14),
+ *  Chinese (2021年12月14日 / 2021年12月), and English/PTT (Dec 14 2021 /
+ *  14 Dec 2021). Publish dates are usually written in the post body/excerpt
+ *  even when the search provider gives no structured date. */
+function parseDatesFromText(text: string): Date[] {
+  const out: Date[] = [];
+  const push = (y: number, mo: number, d: number) => {
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      const dt = new Date(Date.UTC(y, mo - 1, d));
+      if (!isNaN(+dt)) out.push(dt);
+    }
+  };
+  for (const x of text.matchAll(/(20\d\d)[-/.](\d{1,2})[-/.](\d{1,2})/g)) push(Number(x[1]), Number(x[2]), Number(x[3]));
+  for (const x of text.matchAll(/(20\d\d)\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g)) push(Number(x[1]), Number(x[2]), Number(x[3]));
+  for (const x of text.matchAll(/(20\d\d)\s*年\s*(\d{1,2})\s*月(?!\s*\d{1,2}\s*日)/g)) push(Number(x[1]), Number(x[2]), 1);
+  for (const x of text.matchAll(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+(20\d\d)/gi)) push(Number(x[3]), EN_MONTHS[(x[1] ?? "").toLowerCase()] ?? 0, Number(x[2]));
+  for (const x of text.matchAll(/\b(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(20\d\d)/gi)) push(Number(x[3]), EN_MONTHS[(x[2] ?? "").toLowerCase()] ?? 0, Number(x[1]));
+  // PTT / ctime line: "Tue Dec 14 14:00:36 2021" (time sits between day and year).
+  for (const x of text.matchAll(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})\s+\d{1,2}:\d{2}(?::\d{2})?\s+(20\d\d)/gi)) push(Number(x[3]), EN_MONTHS[(x[1] ?? "").toLowerCase()] ?? 0, Number(x[2]));
+  return out;
+}
+
+/** Resolve an article's PUBLISH date (not our capture time): provider field →
+ *  URL date → full date parsed from the post text → newest year mentioned.
  *  Returns iso (YYYY-MM-DD) when a real date is known, plus a `year` signal
  *  used to catch stale items (e.g. a 2018 news piece) even without a full date. */
 export function resolvePublish(item: { publishedAt?: string; url?: string; title?: string; excerpt?: string }): { iso: string | null; year: number | null } {
@@ -187,8 +213,17 @@ export function resolvePublish(item: { publishedAt?: string; url?: string; title
     const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
     if (!isNaN(+dt) && plausible(dt)) return { iso: isoOf(dt), year: dt.getUTCFullYear() };
   }
-  // 3) newest year mentioned in title/excerpt/url — staleness signal only
-  const hay = `${item.title ?? ""} ${item.excerpt ?? ""} ${url}`;
+  // 3) full date written in the post text (PTT 時間行 / 部落格日期 / 新聞日期).
+  //    Take the NEWEST plausible date — that's the publish date, not older
+  //    dates the article happens to reference.
+  const text = `${item.title ?? ""} ${item.excerpt ?? ""}`;
+  const dates = parseDatesFromText(text).filter(plausible);
+  if (dates.length) {
+    const newest = new Date(Math.max(...dates.map((d) => +d)));
+    return { iso: isoOf(newest), year: newest.getUTCFullYear() };
+  }
+  // 4) year-only signal (staleness catch when no full date is written)
+  const hay = `${text} ${url}`;
   const years = Array.from(hay.matchAll(/(20\d\d)\s*年?/g)).map((x) => Number(x[1])).filter((y) => y >= 2000 && y <= nowY + 1);
   return { iso: null, year: years.length ? Math.max(...years) : null };
 }
