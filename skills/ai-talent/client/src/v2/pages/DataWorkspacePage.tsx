@@ -532,6 +532,14 @@ export default function DataWorkspacePage() {
   const selectedHotEntity = hotTopicEntities.find(e => e.id === selectedHotEntityId) ?? hotTopicEntities[0];
   const selectedContentRoute = contentTaskRoutes.find(r => r.id === selectedContentRouteId) ?? contentTaskRoutes[0];
 
+  // 2026-08-06 (CJ「右上是小安素，表格卻還是 iris」): header must reflect the
+  // actually-selected brand (?b=), not the hardcoded Iris Girls demo strings.
+  const brandInfoQ = (trpc as any).brand?.get?.useQuery?.(
+    brandId ? { id: brandId } : (undefined as any),
+    { enabled: !!brandId },
+  ) ?? { data: null };
+  const activeBrandName: string = brandInfoQ?.data?.name ?? "";
+
   const launchHotTopicTask = () => {
     const topic = `${selectedHotTopic.title}｜${selectedHotEntity.label}：${selectedHotTopic.angle}。請產出${selectedContentRoute.label}，重點包含市場訊號（${selectedHotTopic.signal}）、品牌/商品切角、內容主軸、開場 hook、正文與 CTA。`;
     const b = brandId ?? 2957;
@@ -597,10 +605,10 @@ export default function DataWorkspacePage() {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9ca3af" }}>
-            {isPerformance ? "Performance Agents" : "Market Intelligence Agents · Iris Girls Demo"}
+            {isPerformance ? "Performance Agents" : "Market Intelligence Agents"}
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 850, color: "#111827" }}>
-            {isPerformance ? "成效儀表板" : `Iris Girls｜${active.label}`}
+            {isPerformance ? "成效儀表板" : `${activeBrandName || "（尚未選擇品牌）"}｜${active.label}`}
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6b7280", maxWidth: 760 }}>
             {isPerformance ? "左側平台列已切換成 Meta、Google、GA、Shopline 等成效資料源。" : active.desc}
@@ -609,8 +617,8 @@ export default function DataWorkspacePage() {
         {!isPerformance && (
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "10px 12px", background: "#fff", minWidth: 220 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase" }}>Source Brand</div>
-            <div style={{ fontSize: 14, fontWeight: 850, color: "#111827", marginTop: 3 }}>Iris Girls · brands#2957</div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>products#144–155 · public web checked</div>
+            <div style={{ fontSize: 14, fontWeight: 850, color: "#111827", marginTop: 3 }}>{activeBrandName || "（未選品牌）"}{brandId ? ` · brands#${brandId}` : ""}</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>即時公開網路資料查詢</div>
           </div>
         )}
       </div>

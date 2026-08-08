@@ -40,12 +40,17 @@ type ListeningTaskKey = typeof LISTENING_TASK_KEYS[number];
 
 interface RunResultItem { title: string; source: string; excerpt: string; url?: string }
 
-async function loadBrand(
-  brandId: number,
-  userId: number,
-): Promise<{ name: string; industry: string | null; competitors: string[] } | null> {
+interface BrandCtx {
+  name: string;
+  industry: string | null;
+  competitors: string[];
+  /** true when the brand's market is Taiwan → bias search to zh-TW / TW sources. */
+  isTaiwan: boolean;
+}
+
+async function loadBrand(brandId: number, userId: number): Promise<BrandCtx | null> {
   const [rows]: any = await localPool.execute(
-    `SELECT name, industry, soworkAnalysis, positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+    `SELECT name, industry, soworkAnalysis, positioning, targetCountry, outputLanguage FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
     [brandId, userId],
   );
   const row = (rows as any[])[0];
@@ -65,39 +70,66 @@ async function loadBrand(
     new Set([...fromSa, ...fromPos].map((c) => String(c).trim()).filter(Boolean)),
   ).slice(0, 6);
 
-  return { name: String(row.name ?? ""), industry: row.industry ?? null, competitors };
+  // Default to Taiwan unless the brand is explicitly a non-TW market — this
+  // product is TW-first, and an unscoped Chinese query pulls in mainland
+  // (Baidu, 简体) sources for TW brands like 亞培小安素.
+  const tc = String(row.targetCountry ?? "").toUpperCase();
+  const ol = String(row.outputLanguage ?? "").toLowerCase();
+  const isTaiwan = tc ? tc === "TW" : (ol ? ol.startsWith("zh") : true);
+
+  return { name: String(row.name ?? ""), industry: row.industry ?? null, competitors, isTaiwan };
+}
+
+/** Strip HTML/SVG/URL-encoded markup that leaks into scraped snippets
+ *  (e.g. a favicon's `<path d="M16…"/>` showing up as the excerpt). */
+function cleanText(s: string): string {
+  let t = String(s ?? "");
+  try { if (/%[0-9a-fA-F]{2}/.test(t)) t = decodeURIComponent(t); } catch { /* keep raw */ }
+  t = t
+    .replace(/<[^>]*>/g, " ")                    // HTML/SVG tags
+    .replace(/\b(?:d|fill|viewBox|xmlns|stroke)\s*=\s*['"][^'"]*['"]/gi, " ") // SVG attrs
+    .replace(/[Mm][\s\d.,-]{12,}/g, " ")         // bare SVG path coordinate runs
+    .replace(/url\(#[^)]*\)/gi, " ")             // svg url(#gradient) refs
+    .replace(/\s+/g, " ")
+    .trim();
+  return t;
+}
+
+/** A cleaned string is real content only if it still has CJK or a word. */
+function hasRealText(s: string): boolean {
+  return /[一-鿿]/.test(s) || /[A-Za-z]{3,}/.test(s);
 }
 
 /** Query-pack per listening task. The 4 scope-based keys (2026-08-06) map
  *  onto the 四區塊 IA: market hotspots → industry talk → own brand →
  *  competitors. Legacy keys keep their original brand-scoped packs. */
-function buildKeywords(
-  taskKey: ListeningTaskKey,
-  brand: { name: string; industry: string | null; competitors: string[] },
-): string[] {
+function buildKeywords(taskKey: ListeningTaskKey, brand: BrandCtx): string[] {
   const brandName = brand.name;
   const cat = brand.industry?.trim() || brandName;
+  // Region qualifier biases web search toward the brand's actual market —
+  // for TW brands this keeps 亞培小安素 results on 丁丁藥局/Dcard/PTT rather
+  // than 百度百科. ptt/dcard are already TW-only forums so they don't need it.
+  const rgn = brand.isTaiwan ? " 台灣" : "";
   switch (taskKey) {
     // ── legacy brand-scoped ──
     case "listening.topic_buckets":
-      return [`${brandName} 版型 尺寸 準不準`, `${brandName} 材質 質感 評價`, `${brandName} 划算 cp值 貴嗎`];
+      return [`${brandName} 版型 尺寸 準不準${rgn}`, `${brandName} 材質 質感 評價${rgn}`, `${brandName} 划算 cp值 貴嗎${rgn}`];
     case "listening.verbatims":
-      return [`${brandName} 開箱 心得 評價`, `${brandName} 穿搭 好穿嗎`];
+      return [`${brandName} 開箱 心得 評價${rgn}`, `${brandName} 穿搭 好穿嗎${rgn}`];
     case "listening.crisis_scan":
-      return [`${brandName} 退換貨 客訴`, `${brandName} 色差 瑕疵 材質問題`];
+      return [`${brandName} 退換貨 客訴${rgn}`, `${brandName} 色差 瑕疵 材質問題${rgn}`];
     // ── 四區塊 ──
     case "listening.market_hotspots":
       // Broad, time-sensitive trending signals to ride — NOT brand-locked.
-      return [`${cat} 熱門 話題 趨勢`, `${cat} 爆紅 討論度`, `${cat} 最新 流行 2026`];
+      return [`${cat} 熱門 話題 趨勢${rgn}`, `${cat} 爆紅 討論度${rgn}`, `${cat} 最新 流行 2026${rgn}`];
     case "listening.industry_talk":
       // Category-level discussion the brand competes inside.
-      return [`${cat} 推薦 ptt dcard`, `${cat} 怎麼選 比較`, `${cat} 心得 討論`];
+      return [`${cat} 推薦 ptt dcard`, `${cat} 怎麼選 比較${rgn}`, `${cat} 心得 討論${rgn}`];
     case "listening.own_brand":
-      return [`${brandName} 評價 心得`, `${brandName} 開箱 推薦`, `${brandName} 好用嗎 值得`];
+      return [`${brandName} 評價 心得${rgn}`, `${brandName} 開箱 推薦${rgn}`, `${brandName} 好用嗎 值得${rgn}`];
     case "listening.competitors": {
       const comps = brand.competitors.length ? brand.competitors : [cat];
-      // Pair each competitor with a review/compare intent; cap query count.
-      return comps.slice(0, 4).map((c) => `${c} 評價 vs ${brandName}`);
+      return comps.slice(0, 4).map((c) => `${c} 評價 vs ${brandName}${rgn}`);
     }
   }
 }
@@ -149,12 +181,23 @@ export const marketIntelRouter = router({
           };
         }
 
-        const mapped: RunResultItem[] = items.slice(0, 6).map((it) => ({
-          title: it.title,
-          source: it.source,
-          excerpt: (it.content ?? "").slice(0, 280),
-          url: it.url,
-        }));
+        const mapped: RunResultItem[] = items
+          .map((it) => ({
+            title: cleanText(it.title),
+            source: it.source,
+            excerpt: cleanText(it.content ?? "").slice(0, 280),
+            url: it.url,
+          }))
+          // Drop items whose title is pure markup junk after cleaning.
+          .filter((it) => hasRealText(it.title))
+          .slice(0, 6);
+
+        if (mapped.length === 0) {
+          return {
+            ok: false as const,
+            message: "即時搜尋有回應，但內容無法解析成可讀結果（來源多為圖檔/JS 片段）。請重試或換一個查詢範圍。",
+          };
+        }
         return {
           ok: true as const,
           generatedAt: new Date().toISOString(),
