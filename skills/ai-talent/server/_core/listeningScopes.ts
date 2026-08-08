@@ -166,6 +166,33 @@ export interface ScopeFetchResult {
   message?: string;
 }
 
+/** Resolve an article's PUBLISH date (not our capture time) from the
+ *  provider field → URL date pattern → newest year mentioned in text.
+ *  Returns iso (YYYY-MM-DD) when a real date is known, plus a `year` signal
+ *  used to catch stale items (e.g. a 2018 news piece) even without a full date. */
+export function resolvePublish(item: { publishedAt?: string; url?: string; title?: string; excerpt?: string }): { iso: string | null; year: number | null } {
+  const nowY = new Date().getUTCFullYear();
+  const plausible = (dt: Date) => { const y = dt.getUTCFullYear(); return y >= 2000 && y <= nowY + 1; };
+  const isoOf = (dt: Date) => dt.toISOString().slice(0, 10);
+
+  // 1) provider-supplied date
+  if (item.publishedAt) {
+    const dt = new Date(item.publishedAt);
+    if (!isNaN(+dt) && plausible(dt)) return { iso: isoOf(dt), year: dt.getUTCFullYear() };
+  }
+  // 2) date embedded in the URL (/2024/03/15/, -20240315-, 2024-03-15)
+  const url = item.url ?? "";
+  const m = url.match(/(20\d\d)[-/_](\d{1,2})[-/_](\d{1,2})/) || url.match(/(20\d\d)(\d{2})(\d{2})/);
+  if (m) {
+    const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    if (!isNaN(+dt) && plausible(dt)) return { iso: isoOf(dt), year: dt.getUTCFullYear() };
+  }
+  // 3) newest year mentioned in title/excerpt/url — staleness signal only
+  const hay = `${item.title ?? ""} ${item.excerpt ?? ""} ${url}`;
+  const years = Array.from(hay.matchAll(/(20\d\d)\s*年?/g)).map((x) => Number(x[1])).filter((y) => y >= 2000 && y <= nowY + 1);
+  return { iso: null, year: years.length ? Math.max(...years) : null };
+}
+
 /** Run ONE scope's live web search and return cleaned, junk-filtered items
  *  (each tagged with its OpView source type). Shared by the live tRPC path
  *  and the accumulating ingestion job. `daysOverride` lets the user pick a
@@ -201,6 +228,8 @@ export async function fetchScopeMentions(
       return { ok: false, query, items: [], message: "即時搜尋沒有找到相關的公開討論（可能是聲量太少，或當下 API 無結果）。" };
     }
 
+    const cutoff = new Date(Date.now() - days * 86_400_000);
+    const cutoffYear = cutoff.getUTCFullYear();
     const mapped: RunResultItem[] = items
       .map((it: any) => ({
         title: cleanText(it.title),
@@ -211,10 +240,22 @@ export async function fetchScopeMentions(
         publishedAt: typeof it.publishedAt === "string" ? it.publishedAt : undefined,
       }))
       .filter((it) => hasRealText(it.title))
+      // Recency by PUBLISH date (CJ「2018年的根本不應該出現」): the time window
+      // filters on the ARTICLE's publish date, not our capture time. Resolve
+      // the real publish date; drop anything older than the window. Undated
+      // items with a stale year signal (e.g. "2018年…出包") are also dropped;
+      // truly undated items are kept (can't prove old) and show 發布日不明.
+      .filter((it) => {
+        const { iso, year } = resolvePublish(it);
+        it.publishedAt = iso ?? undefined;
+        if (iso) return new Date(iso) >= cutoff;
+        if (year && year < cutoffYear) return false;
+        return true;
+      })
       .slice(0, 8);
 
     if (mapped.length === 0) {
-      return { ok: false, query, items: [], message: "即時搜尋有回應，但內容無法解析成可讀結果（來源多為圖檔/JS 片段）。" };
+      return { ok: false, query, items: [], message: "此時間範圍內沒有找到有效的公開討論（較舊或無法判定發布日的結果已濾除）。可試著把時間範圍放寬。" };
     }
     return { ok: true, query, items: mapped };
   } catch (e: any) {

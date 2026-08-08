@@ -81,11 +81,16 @@ export const marketIntelRouter = router({
         await ensureMentionsTable();
       } catch { /* table may already exist / race — reads below still work */ }
 
+      // Recency filters on the ARTICLE publish date (falls back to capture
+      // date only when the source gave no publish date) — CJ「以發布時間為條件」.
+      const PUB_DATE = "COALESCE(publishedAt, DATE_FORMAT(firstSeenAt,'%Y-%m-%d'))";
+      const dateCond = `${PUB_DATE} >= DATE_FORMAT(NOW() - INTERVAL ? DAY, '%Y-%m-%d')`;
+
       const conds: string[] = ["brandId = ?"];
       const params: any[] = [input.brandId];
       if (input.scope) { conds.push("scope = ?"); params.push(input.scope); }
       if (input.sourceType) { conds.push("sourceType = ?"); params.push(input.sourceType); }
-      if (input.sinceDays) { conds.push("firstSeenAt >= (NOW() - INTERVAL ? DAY)"); params.push(input.sinceDays); }
+      if (input.sinceDays) { conds.push(dateCond); params.push(input.sinceDays); }
       const where = conds.join(" AND ");
 
       const [rows]: any = await localPool.execute(
@@ -99,8 +104,8 @@ export const marketIntelRouter = router({
       );
       const items = rows as Array<{ scope: ListeningTaskKey } & Record<string, any>>;
 
-      // Per-scope counts (累積聲量 badge) — respect the same time filter.
-      const scopeWhere = input.sinceDays ? "brandId = ? AND firstSeenAt >= (NOW() - INTERVAL ? DAY)" : "brandId = ?";
+      // Per-scope counts (累積聲量 badge) — respect the same publish-date filter.
+      const scopeWhere = input.sinceDays ? `brandId = ? AND ${dateCond}` : "brandId = ?";
       const scopeParams = input.sinceDays ? [input.brandId, input.sinceDays] : [input.brandId];
       const [countRows]: any = await localPool.execute(
         `SELECT scope, COUNT(*) AS n, MAX(lastSeenAt) AS latest

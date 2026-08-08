@@ -730,8 +730,8 @@ export default function DataWorkspacePage() {
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#9ca3af", marginBottom: 3, flexWrap: "wrap" }}>
                                   <span style={{ fontWeight: 700, color: "#6b7280" }}>{item.source}</span>
                                   <span>·</span>
-                                  <span title={dateStr ? "發布時間" : "來源未提供發布時間，顯示擷取時間"}>
-                                    🕓 {dateStr ? `${dateStr} 發布` : (runAt ? `${runAt} 擷取` : "時間不明")}
+                                  <span title={dateStr ? "文章發布日期" : "來源未提供發布日期"} style={{ color: dateStr ? "#6b7280" : "#c0392b" }}>
+                                    🕓 {dateStr ? `${dateStr} 發布` : "發布日不明"}
                                   </span>
                                   {item.url && <a href={item.url} target="_blank" rel="noreferrer" style={{ color: scope.color, display: "inline-flex", alignItems: "center", gap: 2 }}>原文 <ExternalLink size={10} /></a>}
                                 </div>
