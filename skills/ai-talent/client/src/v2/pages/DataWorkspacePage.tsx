@@ -453,6 +453,31 @@ const contentTaskRoutes: ContentTaskRoute[] = [
   { id: "pr", label: "PR / 新聞稿", route: "/tasks/pr", output: "品牌故事、活動稿與媒體素材" },
 ];
 
+// 2026-08-06 (CJ「輿情數據四區塊」): the 輿情監測 view is organised by
+// AUDIENCE SCOPE, widest→narrowest: 市場熱點（蹭熱度）→ 產業討論 → 自己 →
+// 競爭者. Each block fires a live web-search (marketIntelRouter.runListeningTask)
+// with a differently-scoped query pack; block 1 also offers a one-click
+// "寫成貼文" that carries the hotspot into a content task.
+type ListeningScopeKey =
+  | "listening.market_hotspots" | "listening.industry_talk"
+  | "listening.own_brand" | "listening.competitors";
+
+type ListeningScope = {
+  taskKey: ListeningScopeKey;
+  title: string;
+  purpose: string;
+  color: string;
+  icon: React.ReactNode;
+  writeCta?: boolean;
+};
+
+const listeningScopes: ListeningScope[] = [
+  { taskKey: "listening.market_hotspots", title: "市場熱點", purpose: "市場現在正在瘋什麼 — 挑一個蹭熱度，直接寫成貼文", color: "#DB2777", icon: <TrendingUp size={18} />, writeCta: true },
+  { taskKey: "listening.industry_talk", title: "產業討論", purpose: "你的品類 / 產業正被怎麼討論、怎麼被比較", color: "#2563EB", icon: <Activity size={18} /> },
+  { taskKey: "listening.own_brand", title: "自己", purpose: "大家怎麼談你的品牌 — 評價、心得、開箱", color: "#111827", icon: <Megaphone size={18} /> },
+  { taskKey: "listening.competitors", title: "競爭者", purpose: "競爭對手的聲量與評價，以及你被拿來怎麼比", color: "#9333EA", icon: <Database size={18} /> },
+];
+
 function useCurrentUserEmail() {
   const [email, setEmail] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -527,6 +552,28 @@ export default function DataWorkspacePage() {
     }
   };
 
+  // 2026-08-06: fire one scope block's live search (四區塊 輿情 redesign).
+  const runScope = async (taskKey: string) => {
+    if (!brandId || !runListeningMut) return;
+    setRunningKey(taskKey);
+    setSelectedKey(taskKey);
+    try {
+      const res: LiveRunResult = await runListeningMut.mutateAsync({ brandId, taskKey });
+      setLiveResults((r) => ({ ...r, [taskKey]: res }));
+    } catch (e: any) {
+      setLiveResults((r) => ({ ...r, [taskKey]: { ok: false, message: e?.message ?? String(e) } }));
+    } finally {
+      setRunningKey(null);
+    }
+  };
+
+  // Block 1「市場熱點」: carry a hotspot straight into a content task (蹭熱度).
+  const writeFromHotspot = (headline: string) => {
+    const topic = `蹭熱度：${headline}。請結合本品牌，把這個市場熱點寫成一篇貼文：說明為什麼現在值得跟、品牌切入角度、開場 hook、正文與 CTA。`;
+    const b = brandId ?? 2957;
+    navigate(`/tasks/fb?b=${b}&topic=${encodeURIComponent(topic)}`);
+  };
+
   if (loading) {
     return <div style={{ padding: 28, color: "#9ca3af", fontSize: 13 }}>載入資料工作區…</div>;
   }
@@ -580,7 +627,63 @@ export default function DataWorkspacePage() {
             </div>
           </div>
 
-          {marketPage && (
+          {!isPerformance && active.id === "listening" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 14, marginBottom: 14 }}>
+              {!brandId && (
+                <div style={{ gridColumn: "1 / -1", border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 16, padding: 14, fontSize: 13, color: "#92400e" }}>
+                  網址缺少 <b>?b=品牌ID</b>，四個區塊的即時查詢會停用。範例：<code>/market-intel/listening?b=2957</code>
+                </div>
+              )}
+              {listeningScopes.map((scope) => {
+                const res = liveResults[scope.taskKey];
+                const running = runningKey === scope.taskKey;
+                return (
+                  <section key={scope.taskKey} style={{ border: `1px solid ${res ? scope.color : "#e5e7eb"}`, borderRadius: 22, background: "#fff", padding: 18, display: "flex", flexDirection: "column", boxShadow: selectedKey === scope.taskKey ? `0 0 0 3px ${scope.color}18` : "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 12, background: scope.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>{scope.icon}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 850, color: "#111827" }}>{scope.title}</h3>
+                        <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#6b7280", lineHeight: 1.45 }}>{scope.purpose}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => runScope(scope.taskKey)}
+                      disabled={!brandId || running}
+                      style={{ marginTop: 14, alignSelf: "flex-start", border: 0, borderRadius: 999, background: brandId ? scope.color : "#e5e7eb", color: brandId ? "#fff" : "#9ca3af", padding: "9px 16px", fontSize: 13, fontWeight: 800, cursor: brandId && !running ? "pointer" : "default" }}
+                    >
+                      {running ? "查詢中…" : res ? "重新即時查詢" : "▶ 即時查詢（真實公開資料）"}
+                    </button>
+                    {res && (
+                      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                        {!res.ok ? (
+                          <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 12, padding: 12, fontSize: 12.5, color: "#991b1b", lineHeight: 1.5 }}>{res.message}</div>
+                        ) : (
+                          res.items!.map((item, i) => (
+                            <div key={i} style={{ border: "1px solid #f0f0ef", borderRadius: 14, padding: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", lineHeight: 1.4 }}>{item.title}</div>
+                              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                                {item.source}
+                                {item.url && <a href={item.url} target="_blank" rel="noreferrer" style={{ color: scope.color, display: "inline-flex", alignItems: "center" }}><ExternalLink size={11} /></a>}
+                              </div>
+                              {item.excerpt && <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "#4b5563", lineHeight: 1.55 }}>{item.excerpt}</p>}
+                              {scope.writeCta && (
+                                <button onClick={() => writeFromHotspot(item.title)} style={{ marginTop: 10, border: `1px solid ${scope.color}`, borderRadius: 999, background: `${scope.color}0f`, color: scope.color, padding: "6px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>✍ 寫成貼文（蹭這個熱點）</button>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                    {!res && !running && (
+                      <p style={{ margin: "12px 0 0", fontSize: 12, color: "#9ca3af", lineHeight: 1.5 }}>點「即時查詢」抓取這個範圍的真實公開討論，結果會列在下方（附來源連結）。</p>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          )}
+
+          {marketPage && active.id !== "listening" && (
             <div style={{ display: "grid", gap: 14, marginBottom: 14 }}>
               {marketPage.blocks.map((block) => (
                 <section key={block.headline} style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 20 }}>
@@ -691,12 +794,7 @@ export default function DataWorkspacePage() {
             </section>
           )}
 
-          {!isPerformance && active.id === "listening" && !brandId && (
-            <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 16, padding: 14, marginBottom: 14, fontSize: 13, color: "#92400e" }}>
-              網址缺少 ?b=品牌ID，無法執行即時查詢（目前是 https://onbrand.sowork.ai/market-intel/listening?b=2957 這樣的網址才能點擊查詢）。
-            </div>
-          )}
-
+          {active.id !== "listening" && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
             {cards.map((task) => {
               const isWired = !!task.taskKey;
@@ -740,6 +838,7 @@ export default function DataWorkspacePage() {
               );
             })}
           </div>
+          )}
         </main>
 
         <aside style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 18, position: "sticky", top: 84, maxHeight: "calc(100vh - 110px)", overflowY: "auto" }}>
