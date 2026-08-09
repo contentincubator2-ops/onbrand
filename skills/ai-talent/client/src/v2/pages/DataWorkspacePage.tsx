@@ -116,7 +116,12 @@ const performanceSources: Source[] = [
 
 const marketSources: Source[] = [
   { id: "overview", label: "市場總覽", short: "總覽", icon: <TrendingUp size={18} />, color: "#111827", desc: "從 Iris Girls 資料與公開來源定義競品、需求與機會" },
-  { id: "listening", label: "輿情監測", short: "輿情", icon: <Activity size={18} />, color: "#DC2626", desc: "品牌聲量、情緒風險、議題高峰、來源平台與內容機會；純競品監測保留在競品情報" },
+  // 2026-08-09 (CJ「輿情四個功能獨立成個別頁面」): the 4 listening scopes are
+  // now their own left-rail pages (OpView-style), not 4 blocks on one page.
+  { id: "listen_hotspots", label: "市場熱點", short: "熱點", icon: <TrendingUp size={18} />, color: "#DB2777", desc: "市場現在正在瘋什麼 — 挑一個蹭熱度，直接寫成貼文" },
+  { id: "listen_industry", label: "產業討論", short: "產業", icon: <Activity size={18} />, color: "#2563EB", desc: "你的品類 / 產業正被怎麼討論、怎麼被比較" },
+  { id: "listen_own", label: "品牌聲量", short: "自己", icon: <Megaphone size={18} />, color: "#111827", desc: "大家怎麼談你的品牌 — 評價、心得、開箱" },
+  { id: "listen_competitor", label: "競品聲量", short: "競品聲", icon: <Target size={18} />, color: "#9333EA", desc: "競爭對手的聲量與評價，以及你被拿來怎麼比" },
   { id: "keywords", label: "關鍵字分析", short: "KW", icon: <Search size={18} />, color: "#2563EB", desc: "產品資料 → 品類詞 / 風格詞 / 場景詞 / 高意圖詞" },
   { id: "hot_topics", label: "AI 熱門話題", short: "話題", icon: <Sparkles size={18} />, color: "#DB2777", desc: "AI 從市場與社群訊號找熱門話題，選定產品/品牌與內容型態後，直接進入內容任務" },
   { id: "geo", label: "GEO / SEO", short: "GEO", icon: <Globe2 size={18} />, color: "#059669", desc: "AI 搜尋與一般搜尋需要引用的品牌證據缺口" },
@@ -499,6 +504,14 @@ const listeningScopes: ListeningScope[] = [
   { taskKey: "listening.competitors", title: "競爭者", purpose: "競爭對手的聲量與評價，以及你被拿來怎麼比", color: "#9333EA", icon: <Database size={18} /> },
 ];
 
+// 2026-08-09: each listening scope is now its own left-rail source id (page).
+const SOURCE_TO_SCOPE: Record<string, ListeningScopeKey> = {
+  listen_hotspots: "listening.market_hotspots",
+  listen_industry: "listening.industry_talk",
+  listen_own: "listening.own_brand",
+  listen_competitor: "listening.competitors",
+};
+
 function useCurrentUserEmail() {
   const [email, setEmail] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -620,7 +633,11 @@ export default function DataWorkspacePage() {
   const active = sources.find(s => s.id === activeSource) ?? sources[0];
   const cards = tasksBySource[active.id] ?? [];
   const isPerformance = mode === "performance";
-  const marketPage = !isPerformance ? irisMarketDesign[active.id] ?? irisMarketDesign.overview : null;
+  // A listening-scope page (市場熱點/產業討論/品牌聲量/競品聲量) renders its own
+  // single live-search feed — never the hand-curated irisMarketDesign blocks.
+  const listeningScopeKey = SOURCE_TO_SCOPE[active.id];
+  const isListeningScope = !!listeningScopeKey;
+  const marketPage = (!isPerformance && !isListeningScope) ? (irisMarketDesign[active.id] ?? irisMarketDesign.overview) : null;
 
   return (
     <div style={{ padding: "20px 24px 80px", maxWidth: 1320, margin: "0 auto" }}>
@@ -657,11 +674,11 @@ export default function DataWorkspacePage() {
             </div>
           </div>
 
-          {!isPerformance && active.id === "listening" && (
+          {!isPerformance && isListeningScope && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, marginBottom: 14 }}>
               {!brandId && (
                 <div style={{ gridColumn: "1 / -1", border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 16, padding: 14, fontSize: 13, color: "#92400e" }}>
-                  網址缺少 <b>?b=品牌ID</b>，四個區塊的即時查詢會停用。範例：<code>/market-intel/listening?b=2957</code>
+                  網址缺少 <b>?b=品牌ID</b>，即時查詢會停用。範例：<code>/market-intel/{active.id}?b=2957</code>
                 </div>
               )}
               {/* 時間篩選 + 來源類型圖例 (OpView 來源分布) */}
@@ -689,7 +706,7 @@ export default function DataWorkspacePage() {
                 </div>
                 <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>時間範圍改變後，重新點各區塊的即時查詢即可套用</span>
               </div>
-              {listeningScopes.map((scope) => {
+              {listeningScopes.filter((s) => s.taskKey === listeningScopeKey).map((scope) => {
                 const res = liveResults[scope.taskKey];
                 const running = runningKey === scope.taskKey;
                 const runAt = res?.generatedAt ? new Date(res.generatedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
@@ -758,7 +775,7 @@ export default function DataWorkspacePage() {
             </div>
           )}
 
-          {marketPage && active.id !== "listening" && (
+          {marketPage && !isListeningScope && (
             <div style={{ display: "grid", gap: 14, marginBottom: 14 }}>
               {marketPage.blocks.map((block) => (
                 <section key={block.headline} style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 20 }}>
@@ -869,7 +886,7 @@ export default function DataWorkspacePage() {
             </section>
           )}
 
-          {active.id !== "listening" && (
+          {!isListeningScope && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
             {cards.map((task) => {
               const isWired = !!task.taskKey;

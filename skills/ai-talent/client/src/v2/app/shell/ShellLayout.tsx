@@ -43,6 +43,7 @@ import {
   faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
   faEnvelope, faBullhorn, faChartLine, faDatabase,
+  faFire, faComments,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -99,7 +100,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   if (isPrivate && currentPath?.startsWith("/market-intel")) {
     return [
       { to: "/market-intel/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/market-intel/overview", tooltip: en ? "Market overview" : "市場總覽" },
-      { to: "/market-intel/listening", label: en ? "Listening" : "輿情", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/market-intel/listening", tooltip: en ? "Social listening" : "輿情監測" },
+      { to: "/market-intel/listen_hotspots", label: en ? "Hotspots" : "市場熱點", icon: <FontAwesomeIcon icon={faFire} />, matchPrefix: "/market-intel/listen_hotspots", tooltip: en ? "Market hotspots" : "市場熱點（蹭熱度）" },
+      { to: "/market-intel/listen_industry", label: en ? "Industry" : "產業討論", icon: <FontAwesomeIcon icon={faComments} />, matchPrefix: "/market-intel/listen_industry", tooltip: en ? "Industry discussion" : "產業討論" },
+      { to: "/market-intel/listen_own", label: en ? "Our Buzz" : "品牌聲量", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/market-intel/listen_own", tooltip: en ? "Our brand buzz" : "自己的品牌聲量" },
+      { to: "/market-intel/listen_competitor", label: en ? "Rivals" : "競品聲量", icon: <FontAwesomeIcon icon={faTrophy} />, matchPrefix: "/market-intel/listen_competitor", tooltip: en ? "Competitor buzz" : "競爭者聲量" },
       { to: "/market-intel/keywords", label: en ? "Keywords" : "關鍵字", icon: <FontAwesomeIcon icon={faMagnifyingGlass} />, matchPrefix: "/market-intel/keywords", tooltip: en ? "Keyword analysis" : "關鍵字分析" },
       { to: "/market-intel/geo", label: "GEO", icon: <FontAwesomeIcon icon={faTrademark} />, matchPrefix: "/market-intel/geo", tooltip: en ? "GEO / SEO visibility" : "GEO / SEO 可見度" },
       { to: "/market-intel/competitors", label: en ? "Competitors" : "競品", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/market-intel/competitors", tooltip: en ? "Competitor intelligence" : "競品情報" },
