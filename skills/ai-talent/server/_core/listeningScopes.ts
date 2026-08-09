@@ -338,6 +338,48 @@ export async function collectGdelt(query: string, isTaiwan: boolean, days: numbe
   } catch { return []; }
 }
 
+/** Social-mention discovery via Google SERP (Tier B, CJ-approved POC 2026-08).
+ *  Google indexes public FB/IG/TikTok/Threads posts, so a domain-scoped SERP
+ *  query surfaces cross-platform SOCIAL mentions WITHOUT each platform's API —
+ *  this is the gap vs OpView's licensed social feed, at a fraction of the cost.
+ *  Provider: Serper.dev (cheap, 2,500 free credits). Env-keyed SERPER_API_KEY;
+ *  returns [] without a key so the pipeline is UNCHANGED until CJ enables it.
+ *  Swap providers by editing the endpoint + response mapping only. */
+export const SOCIAL_SITES = ["instagram.com", "facebook.com", "tiktok.com", "threads.net"];
+export async function collectSocialSerp(query: string, isTaiwan: boolean, days: number, limit = 20): Promise<RunResultItem[]> {
+  const key = (process.env.SERPER_API_KEY ?? "").trim();
+  if (!key || !query.trim()) return [];
+  const q = `${query} (${SOCIAL_SITES.map((s) => `site:${s}`).join(" OR ")})`;
+  const tbs = days <= 7 ? "qdr:w" : days <= 31 ? "qdr:m" : "qdr:y";   // Serper recency filter
+  try {
+    const res = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      signal: AbortSignal.timeout(12_000),
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        q, tbs, num: Math.min(Math.max(limit, 10), 40),
+        gl: isTaiwan ? "tw" : "us", hl: isTaiwan ? "zh-tw" : "en",
+      }),
+    });
+    if (!res.ok) return [];
+    const json: any = await res.json();
+    const organic: any[] = json?.organic ?? [];
+    return organic.map((o) => {
+      const url = typeof o?.link === "string" ? o.link : undefined;
+      let host = "social";
+      try { if (url) host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* keep default */ }
+      return {
+        title: String(o?.title ?? ""),
+        source: host,
+        excerpt: String(o?.snippet ?? "").slice(0, 280),
+        url,
+        sourceType: classifySource(url, String(o?.title ?? "")),
+        publishedAt: typeof o?.date === "string" ? o.date : undefined,   // absolute dates normalize via resolvePublish; relative ones fall back
+      } as RunResultItem;
+    }).filter((x) => x.title && x.url);
+  } catch { return []; }
+}
+
 /** YouTube Data API v3 search — official, structured publishedAt. Needs a key
  *  (YOUTUBE_API_KEY, else the shared Google key). Returns [] when no key / API
  *  disabled, so the pipeline degrades gracefully. */
@@ -557,7 +599,7 @@ export async function fetchScopeMentions(
   try {
     const { perplexityScout } = await import("./scouts/perplexityScout");
     const terms = collectorTermsFor(taskKey, brand);
-    const [pplxItems, siteItems, newsItems, gdeltItems, ytItems, pttItems] = await Promise.all([
+    const [pplxItems, siteItems, newsItems, gdeltItems, serpItems, ytItems, pttItems] = await Promise.all([
       Promise.race([
         perplexityScout.fetch({
           brandId: brand.id, brandName: brand.name, industry: brand.industry ?? undefined,
@@ -570,6 +612,7 @@ export async function fetchScopeMentions(
       collectSiteRss(terms).catch(() => []),                                 // per-site RSS (direct)
       collectGoogleNewsRss(collectorQ, brand.isTaiwan).catch(() => []),      // Google News RSS (complement)
       collectGdelt(collectorQ, brand.isTaiwan, days, Math.max(limit * 3, 40)).catch(() => []), // GDELT global news (free, high-volume)
+      collectSocialSerp(collectorQ, brand.isTaiwan, days, Math.max(limit * 2, 20)).catch(() => []), // SERP social (Tier B, key-gated FB/IG/TikTok/Threads)
       collectYouTube(collectorQ, days, brand.isTaiwan).catch(() => []),      // YouTube Data API
       collectPtt(terms[0] ?? brand.name, brand).catch(() => []),             // PTT 討論區
     ]);
@@ -585,7 +628,7 @@ export async function fetchScopeMentions(
         });
       }
     }
-    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(gdeltItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]));
+    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(gdeltItems as RunResultItem[]), ...(serpItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]));
 
     // Unified pass: drop junk titles, resolve the PUBLISH date, filter by
     // publish-date recency (CJ「2018年的根本不應該出現」), dedup by url/title.
