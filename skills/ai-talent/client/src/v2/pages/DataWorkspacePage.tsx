@@ -45,13 +45,23 @@ type TaskCard = {
   taskKey?: "listening.topic_buckets" | "listening.verbatims" | "listening.crisis_scan";
 };
 
+type Sentiment = "positive" | "negative" | "neutral";
 interface LiveRunResult {
   ok: boolean;
   generatedAt?: string;
   query?: string;
-  items?: Array<{ title: string; source: string; excerpt: string; url?: string; sourceType?: string; publishedAt?: string }>;
+  items?: Array<{ title: string; source: string; excerpt: string; url?: string; sourceType?: string; publishedAt?: string; sentiment?: Sentiment }>;
+  sentimentMix?: Record<Sentiment, number>;
+  wordCloud?: Array<{ term: string; weight: number }>;
   message?: string;
 }
+
+// 情緒色票 (OpView 內容分析: 正面/負面/中立).
+const SENTIMENT_META: Record<Sentiment, { label: string; color: string }> = {
+  positive: { label: "正面", color: "#059669" },
+  negative: { label: "負面", color: "#DC2626" },
+  neutral:  { label: "中立", color: "#9ca3af" },
+};
 
 // OpView-style source buckets (label + chip color), mirrors listeningScopes.ts.
 const SOURCE_TYPE_META: Record<string, { label: string; color: string }> = {
@@ -575,6 +585,13 @@ export default function DataWorkspacePage() {
   ) ?? { data: null };
   const activeBrandName: string = brandInfoQ?.data?.name ?? "";
 
+  // Phase 3: 聲量趨勢 from the accumulating store, scoped to the active page.
+  const hookScopeKey = SOURCE_TO_SCOPE[activeSource];
+  const trendQ = (trpc as any).marketIntel?.getMentionTrend?.useQuery?.(
+    brandId && hookScopeKey ? { brandId, scope: hookScopeKey, days: windowDays } : (undefined as any),
+    { enabled: !!brandId && !!hookScopeKey },
+  ) ?? { data: null, refetch: () => {} };
+
   const launchHotTopicTask = () => {
     const topic = `${selectedHotTopic.title}｜${selectedHotEntity.label}：${selectedHotTopic.angle}。請產出${selectedContentRoute.label}，重點包含市場訊號（${selectedHotTopic.signal}）、品牌/商品切角、內容主軸、開場 hook、正文與 CTA。`;
     const b = brandId ?? 2957;
@@ -603,6 +620,7 @@ export default function DataWorkspacePage() {
     try {
       const res: LiveRunResult = await runListeningMut.mutateAsync({ brandId, taskKey, days: windowDays });
       setLiveResults((r) => ({ ...r, [taskKey]: res }));
+      trendQ?.refetch?.(); // live run just wrote to the store — refresh the trend
     } catch (e: any) {
       setLiveResults((r) => ({ ...r, [taskKey]: { ok: false, message: e?.message ?? String(e) } }));
     } finally {
@@ -706,6 +724,45 @@ export default function DataWorkspacePage() {
                 </div>
                 <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>時間範圍改變後，重新點各區塊的即時查詢即可套用</span>
               </div>
+
+              {/* Phase 3 — 聲量趨勢 (依發布日，來自累積庫) */}
+              {(() => {
+                const trend = trendQ?.data?.ok ? trendQ.data as { series: Array<{ day: string; mentions: number; volume: number; pos: number; neg: number }>; totalMentions: number } : null;
+                return (
+                  <div style={{ gridColumn: "1 / -1", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", padding: "14px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 850, color: "#111827" }}>聲量趨勢</span>
+                      <span style={{ fontSize: 11, color: "#9ca3af" }}>依發布日累積 · 近 {windowDays} 天{trend?.totalMentions ? ` · 共 ${trend.totalMentions} 則` : ""}</span>
+                    </div>
+                    {trend && trend.series.length > 0 ? (() => {
+                      const s = trend.series;
+                      const max = Math.max(...s.map((d) => d.mentions), 1);
+                      const W = 900, H = 84, gap = 2, n = s.length;
+                      const bw = Math.max(2, (W - (n - 1) * gap) / n);
+                      return (
+                        <>
+                          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 96, display: "block" }}>
+                            {s.map((d, i) => {
+                              const h = Math.round((d.mentions / max) * (H - 4));
+                              const net = d.pos - d.neg;
+                              const col = net > 0 ? "#059669" : net < 0 ? "#DC2626" : "#3b82f6";
+                              return <rect key={d.day} x={i * (bw + gap)} y={H - h} width={bw} height={h} rx={1} fill={col} opacity={0.85}><title>{`${d.day}｜${d.mentions} 則（正 ${d.pos} / 負 ${d.neg}）`}</title></rect>;
+                            })}
+                          </svg>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>
+                            <span>{s[0]?.day}</span><span>{s[s.length - 1]?.day}</span>
+                          </div>
+                        </>
+                      );
+                    })() : (
+                      <div style={{ fontSize: 12.5, color: "#9ca3af", lineHeight: 1.6, padding: "4px 0" }}>
+                        尚未累積足夠的歷史數據。每點一次「即時查詢」都會寫入累積庫；等<b>每日累積任務</b>上線後（需 dev→main + 排程）走勢會自動變長。
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {listeningScopes.filter((s) => s.taskKey === listeningScopeKey).map((scope) => {
                 const res = liveResults[scope.taskKey];
                 const running = runningKey === scope.taskKey;
@@ -732,6 +789,50 @@ export default function DataWorkspacePage() {
                       </button>
                     </div>
 
+                    {/* Phase 2 — 內容分析: 情緒分佈 + 文字雲 (OpView-style) */}
+                    {res?.ok && res.items && res.items.length > 0 && (
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,0.85fr) minmax(0,1.15fr)", gap: 18, padding: "14px 18px", borderBottom: "1px solid #f1f1f0", background: "#fcfcfb" }}>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>情緒分析</div>
+                          {(() => {
+                            const mix = res.sentimentMix ?? { positive: 0, negative: 0, neutral: 0 };
+                            const total = mix.positive + mix.negative + mix.neutral || 1;
+                            const order: Sentiment[] = ["positive", "neutral", "negative"];
+                            return (
+                              <>
+                                <div style={{ display: "flex", height: 12, borderRadius: 999, overflow: "hidden", background: "#f1f1f0" }}>
+                                  {order.map((s) => { const pct = (mix[s] / total) * 100; return pct > 0 ? <div key={s} title={`${SENTIMENT_META[s].label} ${mix[s]}`} style={{ width: `${pct}%`, background: SENTIMENT_META[s].color }} /> : null; })}
+                                </div>
+                                <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
+                                  {order.map((s) => (
+                                    <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#374151" }}>
+                                      <span style={{ width: 9, height: 9, borderRadius: "50%", background: SENTIMENT_META[s].color }} />
+                                      {SENTIMENT_META[s].label} <b style={{ color: "#111827" }}>{mix[s]}</b>
+                                      <span style={{ color: "#9ca3af" }}>({Math.round((mix[s] / total) * 100)}%)</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>熱門關鍵詞</div>
+                          {res.wordCloud && res.wordCloud.length > 0 ? (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 10px", alignItems: "baseline" }}>
+                              {(() => {
+                                const max = res.wordCloud[0]?.weight || 1;
+                                return res.wordCloud.slice(0, 24).map((w) => {
+                                  const scale = w.weight / max;
+                                  return <span key={w.term} title={`出現 ${w.weight} 次`} style={{ fontSize: 12 + Math.round(scale * 12), fontWeight: 600 + Math.round(scale * 3) * 100, color: scale > 0.6 ? scope.color : "#4b5563", lineHeight: 1.1 }}>{w.term}</span>;
+                                });
+                              })()}
+                            </div>
+                          ) : <div style={{ fontSize: 12, color: "#9ca3af" }}>關鍵詞不足（資料量再多一些會更準）</div>}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Mention feed — one full-width row per item, date always shown */}
                     {res?.ok ? (
                       <div>
@@ -750,6 +851,11 @@ export default function DataWorkspacePage() {
                                   <span title={dateStr ? "文章發布日期" : "來源未提供發布日期"} style={{ color: dateStr ? "#6b7280" : "#c0392b" }}>
                                     🕓 {dateStr ? `${dateStr} 發布` : "發布日不明"}
                                   </span>
+                                  {item.sentiment && (
+                                    <span title="情緒判定" style={{ display: "inline-flex", alignItems: "center", gap: 3, color: SENTIMENT_META[item.sentiment].color, fontWeight: 700 }}>
+                                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: SENTIMENT_META[item.sentiment].color }} /> {SENTIMENT_META[item.sentiment].label}
+                                    </span>
+                                  )}
                                   {item.url && <a href={item.url} target="_blank" rel="noreferrer" style={{ color: scope.color, display: "inline-flex", alignItems: "center", gap: 2 }}>原文 <ExternalLink size={10} /></a>}
                                 </div>
                                 <div style={{ fontSize: 14, fontWeight: 800, color: "#111827", lineHeight: 1.4 }}>{item.title}</div>

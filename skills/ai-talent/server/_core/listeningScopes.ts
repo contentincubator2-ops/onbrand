@@ -616,6 +616,69 @@ export async function fetchScopeMentions(
   }
 }
 
+// ── Phase 2: sentiment + word cloud (OpView 內容分析) ──────────────────────
+// Zero-cost, deterministic lexicon sentiment — enough for a 正/負/中 breakdown
+// bar. Kept off any LLM to stay free during private preview; an LLM pass can
+// upgrade accuracy later. Chinese terms are 2+ chars (single chars like 差/貴/
+// 好/推 are too ambiguous as substrings); English matches whole tokens only.
+export type Sentiment = "positive" | "negative" | "neutral";
+
+const POS_ZH = ["讚","推薦","大推","激推","喜歡","優惠","划算","好吃","美味","值得","滿意","驚豔","優質","超值","必買","回購","好用","開心","期待","熱賣","暢銷","首選","高品質","好評","心動","cp值","cp 值","超讚","超推","很棒","不錯","實用","貼心"];
+const NEG_ZH = ["難吃","地雷","踩雷","很雷","失望","退貨","客訴","抱怨","瑕疵","過期","下架","回收","危害","危機","醜聞","爭議","抵制","拒買","難用","不推","後悔","詐騙","黑心","缺貨","漲價","投訴","糾紛","負評","翻車","太貴","踩坑","很爛","超雷","很差","超貴","難用"];
+const ZH_NEG_PREFIX = ["不","沒","別","毫無","無法","不太","不會"];
+const POS_EN = new Set(["love","loved","great","best","excellent","amazing","recommend","recommended","perfect","awesome","favorite","favourite","delicious","worth","quality","popular","praise","fantastic","wonderful","superb"]);
+const NEG_EN = new Set(["hate","hated","bad","worst","terrible","awful","disappointing","disappointed","avoid","scam","recall","recalled","lawsuit","controversy","boycott","complaint","defect","defective","refund","crisis","fail","failed","poor","overpriced"]);
+
+/** Rough 正/負/中 label from title+excerpt. Best-effort, never throws. */
+export function scoreSentiment(text?: string): Sentiment {
+  const low = String(text ?? "").toLowerCase();
+  if (!low.trim()) return "neutral";
+  let pos = 0, neg = 0;
+  for (const w of POS_ZH) {
+    let i = low.indexOf(w);
+    while (i !== -1) {
+      const pre = low.slice(Math.max(0, i - 2), i);
+      if (ZH_NEG_PREFIX.some((n) => pre.includes(n))) neg++; else pos++;   // 不+推薦 → 負
+      i = low.indexOf(w, i + w.length);
+    }
+  }
+  for (const w of NEG_ZH) { let i = low.indexOf(w); while (i !== -1) { neg++; i = low.indexOf(w, i + w.length); } }
+  for (const tok of low.split(/[^a-z0-9']+/)) { if (POS_EN.has(tok)) pos++; else if (NEG_EN.has(tok)) neg++; }
+  if (pos === 0 && neg === 0) return "neutral";
+  return pos > neg ? "positive" : neg > pos ? "negative" : "neutral";
+}
+
+const CLOUD_STOP_ZH = new Set(["的","了","是","在","我","有","和","就","不","人","都","也","很","到","說","要","去","你","會","著","沒","看","好","自己","這","那","什麼","可以","但是","如果","因為","所以","還有","一個","我們","他們","現在","已經","不是","這個","那個","可能","知道","一直","出來","時候","為了","以及","還是","真的","覺得","然後","不過","以後","一樣","開始"]);
+const CLOUD_STOP_EN = new Set(["the","and","for","are","was","with","that","this","its","from","has","have","will","not","but","you","your","our","their","they","she","him","her","who","what","when","which","been","were","would","could","should","about","into","than","then","them","also","more","most","some","such","only","just","how","why","new"]);
+
+/** Frequency word-cloud terms from a text corpus. English whole-words + Chinese
+ *  2/3-grams (no segmentation dependency). Returns [{term, weight}] desc. */
+export function buildWordCloud(texts: string[], limit = 40): Array<{ term: string; weight: number }> {
+  const freq = new Map<string, number>();
+  const bump = (k: string) => freq.set(k, (freq.get(k) ?? 0) + 1);
+  for (const raw of texts) {
+    const t = String(raw ?? "");
+    for (const w of t.toLowerCase().split(/[^a-z0-9]+/)) {
+      if (w.length < 3 || CLOUD_STOP_EN.has(w) || /^\d+$/.test(w)) continue;
+      bump(w);
+    }
+    for (const run of t.match(/[一-鿿]{2,}/g) ?? []) {
+      for (let n = 2; n <= 3; n++) {
+        for (let i = 0; i + n <= run.length; i++) {
+          const g = run.slice(i, i + n);
+          if (CLOUD_STOP_ZH.has(g)) continue;
+          bump(g);
+        }
+      }
+    }
+  }
+  return [...freq.entries()]
+    .filter(([, n]) => n >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([term, weight]) => ({ term, weight }));
+}
+
 // ── Accumulating store (Phase 1) ──────────────────────────────────────────
 
 /** Stable 16-char hash for dedup (url when present, else title). */
@@ -673,19 +736,21 @@ export async function ensureMentionsTable(): Promise<void> {
  *  one-off search into an accumulating, trend-able dataset. */
 export async function upsertMention(brandId: number, scope: ListeningTaskKey, item: RunResultItem): Promise<"new" | "updated"> {
   const hash = mentionHash(item.url || item.title);
+  const sentiment = scoreSentiment(`${item.title} ${item.excerpt}`);   // Phase 2: 正/負/中
   const [res]: any = await localPool.execute(
-    `INSERT INTO listening_mentions (brandId, scope, urlHash, title, source, url, excerpt, sourceType, publishedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO listening_mentions (brandId, scope, urlHash, title, source, url, excerpt, sourceType, sentiment, publishedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        lastSeenAt = CURRENT_TIMESTAMP,
        seenCount = seenCount + 1,
        title = VALUES(title),
        excerpt = VALUES(excerpt),
-       sourceType = VALUES(sourceType)`,
+       sourceType = VALUES(sourceType),
+       sentiment = VALUES(sentiment)`,
     [
       brandId, scope, hash, item.title.slice(0, 512), (item.source ?? "").slice(0, 255),
       (item.url ?? "").slice(0, 1024), item.excerpt.slice(0, 2000),
-      item.sourceType ?? "web", item.publishedAt ?? null,
+      item.sourceType ?? "web", sentiment, item.publishedAt ?? null,
     ],
   );
   // mysql2 affectedRows: 1 = inserted, 2 = updated (ON DUPLICATE KEY UPDATE).

@@ -18,7 +18,8 @@ import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import {
   LISTENING_TASK_KEYS, loadBrandCtx, fetchScopeMentions,
-  ensureMentionsTable, upsertMention, SOURCE_TYPES, type ListeningTaskKey,
+  ensureMentionsTable, upsertMention, SOURCE_TYPES,
+  scoreSentiment, buildWordCloud, type ListeningTaskKey, type Sentiment,
 } from "../_core/listeningScopes";
 
 export const marketIntelRouter = router({
@@ -53,11 +54,21 @@ export const marketIntelRouter = router({
         console.warn("[marketIntel] mention store write failed (non-fatal):", (e as Error).message);
       }
 
+      // Phase 2: attach 正/負/中 sentiment per item + a breakdown & word cloud
+      // of THIS result set, so the live view shows OpView-style 內容分析 at once
+      // (no dependency on the store being populated yet).
+      const analyzed = res.items.map((it) => ({ ...it, sentiment: scoreSentiment(`${it.title} ${it.excerpt}`) }));
+      const sentimentMix: Record<Sentiment, number> = { positive: 0, negative: 0, neutral: 0 };
+      for (const a of analyzed) sentimentMix[a.sentiment]++;
+      const wordCloud = buildWordCloud(res.items.map((it) => `${it.title} ${it.excerpt}`), 30);
+
       return {
         ok: true as const,
         generatedAt: new Date().toISOString(),
         query: res.query,
-        items: res.items,
+        items: analyzed,
+        sentimentMix,
+        wordCloud,
       };
     }),
 
@@ -126,6 +137,74 @@ export const marketIntelRouter = router({
       sourceMix.web = 0;
       for (const r of srcRows as any[]) sourceMix[r.sourceType] = Number(r.n);
 
-      return { ok: true as const, items, counts, sourceMix };
+      // ── Phase 2: sentiment breakdown + word cloud (OpView 內容分析). Computed
+      // over a representative corpus matching the SAME filters as `items` (incl.
+      // scope when the page is a single scope) so the panels reflect the view.
+      const corpusConds: string[] = ["brandId = ?"];
+      const corpusParams: any[] = [input.brandId];
+      if (input.scope) { corpusConds.push("scope = ?"); corpusParams.push(input.scope); }
+      if (input.sinceDays) { corpusConds.push(dateCond); corpusParams.push(input.sinceDays); }
+      const [corpusRows]: any = await localPool.execute(
+        `SELECT title, excerpt, sentiment FROM listening_mentions
+          WHERE ${corpusConds.join(" AND ")} ORDER BY firstSeenAt DESC LIMIT 500`,
+        corpusParams,
+      );
+      const sentimentMix: Record<Sentiment, number> = { positive: 0, negative: 0, neutral: 0 };
+      const cloudTexts: string[] = [];
+      for (const r of corpusRows as any[]) {
+        const s: Sentiment = (r.sentiment as Sentiment) || scoreSentiment(`${r.title} ${r.excerpt ?? ""}`);
+        if (s === "positive" || s === "negative" || s === "neutral") sentimentMix[s]++;
+        cloudTexts.push(`${r.title} ${r.excerpt ?? ""}`);
+      }
+      const wordCloud = buildWordCloud(cloudTexts, 40);
+
+      return { ok: true as const, items, counts, sourceMix, sentimentMix, wordCloud };
+    }),
+
+  /** Phase 3: daily 聲量趨勢 from the accumulating store. Bucketed by the
+   *  ARTICLE publish date (COALESCE → capture date) so a trend appears even
+   *  from a single ingest, and grows richer as the daily job accumulates.
+   *  `volume` = Σ seenCount (repeat exposure), `mentions` = distinct items. */
+  getMentionTrend: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      scope: z.enum(LISTENING_TASK_KEYS).optional(),
+      days: z.number().int().min(7).max(365).default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const brand = await loadBrandCtx(input.brandId, ctx.user!.id);
+      if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "brand not found" });
+      try { await ensureMentionsTable(); } catch { /* first-run race — read still works */ }
+
+      const PUB_DATE = "COALESCE(publishedAt, DATE_FORMAT(firstSeenAt,'%Y-%m-%d'))";
+      const conds: string[] = ["brandId = ?"];
+      const params: any[] = [input.brandId];
+      if (input.scope) { conds.push("scope = ?"); params.push(input.scope); }
+      conds.push(`${PUB_DATE} >= DATE_FORMAT(NOW() - INTERVAL ? DAY, '%Y-%m-%d')`);
+      params.push(input.days);
+
+      const [rows]: any = await localPool.execute(
+        `SELECT LEFT(${PUB_DATE}, 10) AS day,
+                COUNT(*) AS mentions,
+                SUM(seenCount) AS volume,
+                SUM(sentiment = 'positive') AS pos,
+                SUM(sentiment = 'negative') AS neg
+           FROM listening_mentions
+          WHERE ${conds.join(" AND ")}
+          GROUP BY day
+          ORDER BY day ASC`,
+        params,
+      );
+      const series = (rows as any[])
+        .filter((r) => r.day)
+        .map((r) => ({
+          day: String(r.day),
+          mentions: Number(r.mentions),
+          volume: Number(r.volume ?? r.mentions),
+          pos: Number(r.pos ?? 0),
+          neg: Number(r.neg ?? 0),
+        }));
+      const totalMentions = series.reduce((a, b) => a + b.mentions, 0);
+      return { ok: true as const, series, totalMentions };
     }),
 });
