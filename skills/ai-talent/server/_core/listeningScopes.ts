@@ -363,16 +363,38 @@ export async function collectGdelt(query: string, isTaiwan: boolean, days: numbe
   } catch { return []; }
 }
 
-/** Social-mention DISCOVERY via Google SERP (Tier B, CJ-approved POC 2026-08).
+const IG_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+/** Publish date straight from a social post URL — free, deterministic, no fetch.
+ *  TikTok video id: high 32 bits = unix seconds. Instagram / Threads shortcode:
+ *  Meta media-id (base64), high bits >>23 + epoch = unix ms. Facebook post URLs
+ *  carry NO timestamp (pfbid/opaque) → null (FB stays undatable for free).
+ *  Verified 2026-08-09: TikTok 6718…173→2019-07-27, IG Bl-fX8gA1nf→2018-08-02,
+ *  Threads DEJveCChMLO→2024-12-29. */
+export function resolveSocialDate(url?: string): string | null {
+  const u = String(url ?? "");
+  const okYear = (ms: number) => { const y = new Date(ms).getUTCFullYear(); return y >= 2011 && y <= new Date().getUTCFullYear() + 1; };
+  let m = u.match(/\/video\/(\d{6,25})/) || u.match(/[?&]item_id=(\d{6,25})/);   // TikTok
+  if (m) { try { const s = Number(BigInt(m[1]!) >> 32n); if (s > 1_400_000_000 && s < 2_000_000_000) return new Date(s * 1000).toISOString().slice(0, 10); } catch { /* not decodable */ } }
+  m = u.match(/(?:instagram\.com\/(?:p|reel|reels|tv)|threads\.net\/[^/]+\/post)\/([A-Za-z0-9_-]+)/);   // IG / Threads
+  if (m) {
+    try {
+      let id = 0n;
+      for (const ch of m[1]!) { const v = IG_ALPHA.indexOf(ch); if (v < 0) return null; id = id * 64n + BigInt(v); }
+      const ms = Number((id >> 23n) + 1314220021721n);
+      if (okYear(ms)) return new Date(ms).toISOString().slice(0, 10);
+    } catch { /* not decodable */ }
+  }
+  return null;
+}
+
+/** Social-mention collector via Google SERP (Tier B, CJ-approved 2026-08).
  *  Google indexes public FB/IG/TikTok/Threads posts, so a domain-scoped SERP
  *  query surfaces cross-platform social mentions WITHOUT each platform's API.
  *
- *  ⚠️ POC FINDING (verified 2026-08-09): SERP returns social results WITHOUT a
- *  publish date ("(no date)"), and Google's `tbs=qdr:*` recency filter is
- *  unreliable for site:facebook.com — so these items are DISCOVERY-only and
- *  are NOT safe for the recency-strict live feed (they'd be dropped as undated,
- *  which is why this collector is used by the POC harness, not fetchScopeMentions).
- *  Turning it into a dated source needs a per-post date-extraction step.
+ *  SERP itself returns social results WITHOUT a date, so we recover the publish
+ *  date from the URL via resolveSocialDate() — works for TikTok/IG/Threads.
+ *  ⚠️ Facebook URLs carry no timestamp → those items stay undated and get
+ *  dropped by the recency-strict feed (FB needs Graph API / paid unlocker to date).
  *
  *  Dual-provider: SerpApi (SERPAPI_API_KEY, GET) or Serper.dev (SERPER_API_KEY,
  *  POST). Returns [] without a key. */
@@ -412,9 +434,13 @@ export async function collectSocialSerp(query: string, isTaiwan: boolean, days: 
         excerpt: String(o.snippet ?? "").slice(0, 280),
         url,
         sourceType: classifySource(url, String(o.title ?? "")),
-        publishedAt: typeof o.date === "string" ? o.date : undefined,
+        // ONLY the URL-decoded date is trustworthy for social. We deliberately
+        // do NOT fall back to SERP/text dates — FB post text often contains promo
+        // dates (e.g. 活動 2026/7/1) that resolvePublish would misread as the
+        // publish date. So FB (undatable) yields no date and is filtered out.
+        publishedAt: resolveSocialDate(url) ?? undefined,
       } as RunResultItem;
-    }).filter((x) => x.title && x.url);
+    }).filter((x) => x.title && x.url && x.publishedAt);   // keep only URL-datable (TikTok/IG/Threads); drop FB
   } catch { return []; }
 }
 
@@ -636,7 +662,10 @@ export async function fetchScopeMentions(
   try {
     const { perplexityScout } = await import("./scouts/perplexityScout");
     const terms = collectorTermsFor(taskKey, brand);
-    const [pplxItems, siteItems, newsItems, gdeltItems, ytItems, pttItems] = await Promise.all([
+    // SERP social costs a key credit (250/mo) — only run it on the 聲量 scopes
+    // (own_brand / competitors) where social mentions matter, not news scopes.
+    const socialScope = taskKey === "listening.own_brand" || taskKey === "listening.competitors";
+    const [pplxItems, siteItems, newsItems, gdeltItems, ytItems, pttItems, serpItems] = await Promise.all([
       Promise.race([
         perplexityScout.fetch({
           brandId: brand.id, brandName: brand.name, industry: brand.industry ?? undefined,
@@ -651,6 +680,7 @@ export async function fetchScopeMentions(
       collectGdelt(collectorQ, brand.isTaiwan, days, Math.max(limit * 3, 40)).catch(() => []), // GDELT global news (free, high-volume)
       collectYouTube(collectorQ, days, brand.isTaiwan).catch(() => []),      // YouTube Data API
       collectPtt(terms[0] ?? brand.name, brand).catch(() => []),             // PTT 討論區
+      socialScope ? collectSocialSerp(collectorQ, brand.isTaiwan, days, 20).catch(() => []) : Promise.resolve([] as RunResultItem[]), // SERP social (key-gated, URL-dated)
     ]);
 
     const raw: RunResultItem[] = [];
@@ -664,7 +694,7 @@ export async function fetchScopeMentions(
         });
       }
     }
-    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(gdeltItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]));
+    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(gdeltItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]), ...(serpItems as RunResultItem[]));
 
     // Unified pass: drop junk titles, resolve the PUBLISH date, filter by
     // publish-date recency (CJ「2018年的根本不應該出現」), dedup by url/title.
