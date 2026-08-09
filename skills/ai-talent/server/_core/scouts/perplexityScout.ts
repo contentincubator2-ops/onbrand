@@ -105,11 +105,17 @@ async function fetchViaGemini(ctx: ScoutContext): Promise<IntelItem[]> {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: userMsg }] }],
     tools: [{ google_search: {} }],
-    generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2400 },
+    // NB: google_search grounding is INCOMPATIBLE with responseMimeType:json
+    // ("Tool use with a response mime type: 'application/json' is unsupported").
+    // Grounding returns JSON inside a ```json fence; parseItems strips it.
+    // thinkingBudget:0 — 2.5-flash thinks by default and ate the token budget,
+    // truncating the JSON ("Unterminated string"); disable it for this extraction.
+    generationConfig: { maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
   };
 
+  // gemini-2.0-flash was retired (404); gemini-2.5-flash is the current GA flash.
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
   );
   if (!res.ok) throw new Error(`Gemini ${res.status}`);
