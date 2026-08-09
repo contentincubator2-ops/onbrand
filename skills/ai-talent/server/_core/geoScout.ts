@@ -145,7 +145,12 @@ export async function runGeoScan(brand: BrandCtx, engines: GeoEngine[] = ["gemin
 
   const ok = results.filter((r) => r.ok);
   if (!ok.length) {
-    return { ok: false, brandName: brand.name, generatedAt: new Date().toISOString(), results, summary: emptySummary(prompts.length), message: "AI 引擎查詢失敗（請確認金鑰）。" };
+    const errs = [...new Set(results.map((r) => r.error).filter(Boolean))];
+    const noKey = errs.some((e) => /no gemini key/i.test(String(e)));
+    const detail = noKey
+      ? "伺服器缺少 GEMINI_API_KEY（或 GOOGLE_AI_API_KEY）環境變數 — 請在執行環境的 .env 補上。"
+      : (errs.join("；") || "未知錯誤");
+    return { ok: false, brandName: brand.name, generatedAt: new Date().toISOString(), results, summary: emptySummary(prompts.length), message: `AI 引擎查詢失敗：${detail}` };
   }
 
   const appeared = ok.filter((r) => r.brandPresent).length;
