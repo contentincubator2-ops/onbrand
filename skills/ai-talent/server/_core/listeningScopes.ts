@@ -196,13 +196,38 @@ function parseDatesFromText(text: string): Date[] {
  *  URL date → full date parsed from the post text → newest year mentioned.
  *  Returns iso (YYYY-MM-DD) when a real date is known, plus a `year` signal
  *  used to catch stale items (e.g. a 2018 news piece) even without a full date. */
+/** Parse a RELATIVE date string (SERP/social often gives these) into a Date.
+ *  Handles en ("3 days ago", "1 hour ago") + zh ("3 天前", "2 週前", "1 個月前",
+ *  "剛剛"). Returns null if not a relative form. */
+export function parseRelativeDate(s?: string): Date | null {
+  const t = String(s ?? "").trim().toLowerCase();
+  if (!t) return null;
+  if (/^(just now|yesterday|剛剛|剛才|方才|今天|昨天)$/.test(t)) {
+    return new Date(Date.now() - (/(yesterday|昨天)/.test(t) ? 86_400_000 : 0));
+  }
+  const m = t.match(/(\d+)\s*(minute|min|hour|hr|day|week|month|year)s?\s+ago/) ||
+            t.match(/(\d+)\s*(分鐘|分|小時|時|天|日|週|周|個月|月|年)前/);
+  if (!m) return null;
+  const n = Number(m[1] ?? "0"); const u = m[2] ?? "";
+  let ms = 0;
+  if (/min|分/.test(u)) ms = n * 60_000;
+  else if (/hour|hr|小時|時/.test(u)) ms = n * 3_600_000;
+  else if (/day|天|日/.test(u)) ms = n * 86_400_000;
+  else if (/week|週|周/.test(u)) ms = n * 7 * 86_400_000;
+  else if (/month|個月|月/.test(u)) ms = n * 30 * 86_400_000;
+  else if (/year|年/.test(u)) ms = n * 365 * 86_400_000;
+  return new Date(Date.now() - ms);
+}
+
 export function resolvePublish(item: { publishedAt?: string; url?: string; title?: string; excerpt?: string }): { iso: string | null; year: number | null } {
   const nowY = new Date().getUTCFullYear();
   const plausible = (dt: Date) => { const y = dt.getUTCFullYear(); return y >= 2000 && y <= nowY + 1; };
   const isoOf = (dt: Date) => dt.toISOString().slice(0, 10);
 
-  // 1) provider-supplied date
+  // 1) provider-supplied date — relative form first ("3 天前"), then absolute
   if (item.publishedAt) {
+    const rel = parseRelativeDate(item.publishedAt);
+    if (rel && plausible(rel)) return { iso: isoOf(rel), year: rel.getUTCFullYear() };
     const dt = new Date(item.publishedAt);
     if (!isNaN(+dt) && plausible(dt)) return { iso: isoOf(dt), year: dt.getUTCFullYear() };
   }
@@ -338,43 +363,56 @@ export async function collectGdelt(query: string, isTaiwan: boolean, days: numbe
   } catch { return []; }
 }
 
-/** Social-mention discovery via Google SERP (Tier B, CJ-approved POC 2026-08).
+/** Social-mention DISCOVERY via Google SERP (Tier B, CJ-approved POC 2026-08).
  *  Google indexes public FB/IG/TikTok/Threads posts, so a domain-scoped SERP
- *  query surfaces cross-platform SOCIAL mentions WITHOUT each platform's API —
- *  this is the gap vs OpView's licensed social feed, at a fraction of the cost.
- *  Provider: Serper.dev (cheap, 2,500 free credits). Env-keyed SERPER_API_KEY;
- *  returns [] without a key so the pipeline is UNCHANGED until CJ enables it.
- *  Swap providers by editing the endpoint + response mapping only. */
+ *  query surfaces cross-platform social mentions WITHOUT each platform's API.
+ *
+ *  ⚠️ POC FINDING (verified 2026-08-09): SERP returns social results WITHOUT a
+ *  publish date ("(no date)"), and Google's `tbs=qdr:*` recency filter is
+ *  unreliable for site:facebook.com — so these items are DISCOVERY-only and
+ *  are NOT safe for the recency-strict live feed (they'd be dropped as undated,
+ *  which is why this collector is used by the POC harness, not fetchScopeMentions).
+ *  Turning it into a dated source needs a per-post date-extraction step.
+ *
+ *  Dual-provider: SerpApi (SERPAPI_API_KEY, GET) or Serper.dev (SERPER_API_KEY,
+ *  POST). Returns [] without a key. */
 export const SOCIAL_SITES = ["instagram.com", "facebook.com", "tiktok.com", "threads.net"];
 export async function collectSocialSerp(query: string, isTaiwan: boolean, days: number, limit = 20): Promise<RunResultItem[]> {
-  const key = (process.env.SERPER_API_KEY ?? "").trim();
-  if (!key || !query.trim()) return [];
+  const serpapiKey = (process.env.SERPAPI_API_KEY ?? "").trim();
+  const serperKey = (process.env.SERPER_API_KEY ?? "").trim();
+  if (!query.trim() || (!serpapiKey && !serperKey)) return [];
   const q = `${query} (${SOCIAL_SITES.map((s) => `site:${s}`).join(" OR ")})`;
-  const tbs = days <= 7 ? "qdr:w" : days <= 31 ? "qdr:m" : "qdr:y";   // Serper recency filter
+  const tbs = days <= 7 ? "qdr:w" : days <= 31 ? "qdr:m" : "qdr:y";
+  const num = Math.min(Math.max(limit, 10), 20);
   try {
-    const res = await fetch("https://google.serper.dev/search", {
-      method: "POST",
-      signal: AbortSignal.timeout(12_000),
-      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        q, tbs, num: Math.min(Math.max(limit, 10), 40),
-        gl: isTaiwan ? "tw" : "us", hl: isTaiwan ? "zh-tw" : "en",
-      }),
-    });
-    if (!res.ok) return [];
-    const json: any = await res.json();
-    const organic: any[] = json?.organic ?? [];
+    let organic: Array<{ title?: string; link?: string; snippet?: string; date?: string }> = [];
+    if (serpapiKey) {
+      const qs = new URLSearchParams({ engine: "google", api_key: serpapiKey, q, tbs, num: String(num), gl: isTaiwan ? "tw" : "us", hl: isTaiwan ? "zh-tw" : "en" });
+      const res = await fetch(`https://serpapi.com/search.json?${qs.toString()}`, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) return [];
+      const json: any = await res.json();
+      organic = (json?.organic_results ?? []).map((o: any) => ({ title: o?.title, link: o?.link, snippet: o?.snippet, date: o?.date }));
+    } else {
+      const res = await fetch("https://google.serper.dev/search", {
+        method: "POST", signal: AbortSignal.timeout(12_000),
+        headers: { "X-API-KEY": serperKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ q, tbs, num, gl: isTaiwan ? "tw" : "us", hl: isTaiwan ? "zh-tw" : "en" }),
+      });
+      if (!res.ok) return [];
+      const json: any = await res.json();
+      organic = (json?.organic ?? []).map((o: any) => ({ title: o?.title, link: o?.link, snippet: o?.snippet, date: o?.date }));
+    }
     return organic.map((o) => {
-      const url = typeof o?.link === "string" ? o.link : undefined;
+      const url = typeof o.link === "string" ? o.link : undefined;
       let host = "social";
       try { if (url) host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* keep default */ }
       return {
-        title: String(o?.title ?? ""),
+        title: String(o.title ?? ""),
         source: host,
-        excerpt: String(o?.snippet ?? "").slice(0, 280),
+        excerpt: String(o.snippet ?? "").slice(0, 280),
         url,
-        sourceType: classifySource(url, String(o?.title ?? "")),
-        publishedAt: typeof o?.date === "string" ? o.date : undefined,   // absolute dates normalize via resolvePublish; relative ones fall back
+        sourceType: classifySource(url, String(o.title ?? "")),
+        publishedAt: typeof o.date === "string" ? o.date : undefined,
       } as RunResultItem;
     }).filter((x) => x.title && x.url);
   } catch { return []; }
@@ -592,14 +630,13 @@ export async function fetchScopeMentions(
   const query = keywords.join(" / ");
   const days = daysOverride && daysOverride > 0 ? daysOverride : daysFor(taskKey);
   const cutoff = new Date(Date.now() - days * 86_400_000);
-  const cutoffYear = cutoff.getUTCFullYear();
   const collectorQ = collectorQueryFor(taskKey, brand);
   const SCOUT_TIMEOUT_MS = 15_000;
 
   try {
     const { perplexityScout } = await import("./scouts/perplexityScout");
     const terms = collectorTermsFor(taskKey, brand);
-    const [pplxItems, siteItems, newsItems, gdeltItems, serpItems, ytItems, pttItems] = await Promise.all([
+    const [pplxItems, siteItems, newsItems, gdeltItems, ytItems, pttItems] = await Promise.all([
       Promise.race([
         perplexityScout.fetch({
           brandId: brand.id, brandName: brand.name, industry: brand.industry ?? undefined,
@@ -612,7 +649,6 @@ export async function fetchScopeMentions(
       collectSiteRss(terms).catch(() => []),                                 // per-site RSS (direct)
       collectGoogleNewsRss(collectorQ, brand.isTaiwan).catch(() => []),      // Google News RSS (complement)
       collectGdelt(collectorQ, brand.isTaiwan, days, Math.max(limit * 3, 40)).catch(() => []), // GDELT global news (free, high-volume)
-      collectSocialSerp(collectorQ, brand.isTaiwan, days, Math.max(limit * 2, 20)).catch(() => []), // SERP social (Tier B, key-gated FB/IG/TikTok/Threads)
       collectYouTube(collectorQ, days, brand.isTaiwan).catch(() => []),      // YouTube Data API
       collectPtt(terms[0] ?? brand.name, brand).catch(() => []),             // PTT 討論區
     ]);
@@ -628,7 +664,7 @@ export async function fetchScopeMentions(
         });
       }
     }
-    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(gdeltItems as RunResultItem[]), ...(serpItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]));
+    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(gdeltItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]));
 
     // Unified pass: drop junk titles, resolve the PUBLISH date, filter by
     // publish-date recency (CJ「2018年的根本不應該出現」), dedup by url/title.
@@ -637,10 +673,13 @@ export async function fetchScopeMentions(
     const out: RunResultItem[] = [];
     for (const it of raw) {
       if (!hasRealText(it.title)) continue;
-      const { iso, year } = resolvePublish(it);
-      it.publishedAt = iso ?? undefined;
-      if (iso) { if (new Date(iso) < cutoff) continue; }
-      else if (year && year < cutoffYear) continue;
+      // Recency TRUST (CJ「時效性問題始終沒解決」): every shown item must have a
+      // resolvable publish date INSIDE the window. Undated items are dropped —
+      // that's where old evergreen pages leaked in (e.g. a 2022 article on top).
+      const { iso } = resolvePublish(it);
+      if (!iso) continue;                      // no confident date → drop
+      if (new Date(iso) < cutoff) continue;    // dated but older than window → drop
+      it.publishedAt = iso;
       const key = mentionHash(it.url || it.title);
       if (seen.has(key)) continue;
       seen.add(key);

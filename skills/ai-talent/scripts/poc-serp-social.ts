@@ -7,10 +7,13 @@
  * production path; it prints per-platform hit counts so we can decide whether
  * to turn collectSocialSerp on in the daily ingest.
  *
- * No account/payment is created by this repo — get a FREE key (2,500 credits)
- * at https://serper.dev, then:
- *   SERPER_API_KEY=xxxx npx tsx scripts/poc-serp-social.ts --brand=2957
- *   SERPER_API_KEY=xxxx npx tsx scripts/poc-serp-social.ts --brand=2957 --days=90
+ * ⚠️ POC FINDING (2026-08-09): SERP surfaces real FB/IG mentions but WITHOUT a
+ * publish date, so they are DISCOVERY-only — this harness MEASURES that volume;
+ * the collector is intentionally NOT in the recency-strict live feed.
+ *
+ * No account/payment is created by this repo — use a FREE key, then:
+ *   SERPAPI_API_KEY=xxxx  npx tsx scripts/poc-serp-social.ts --brand=2957   # serpapi.com (250/mo free)
+ *   SERPER_API_KEY=xxxx   npx tsx scripts/poc-serp-social.ts --brand=2957   # serper.dev (alt)
  */
 import * as dotenv from "dotenv";
 dotenv.config();
@@ -23,9 +26,9 @@ function argVal(flag: string): string | null {
 }
 
 async function main() {
-  if (!process.env.SERPER_API_KEY) {
-    console.error("✗ 需要 SERPER_API_KEY。免費申請（2,500 credits）：https://serper.dev");
-    console.error("  用法：SERPER_API_KEY=xxxx npx tsx scripts/poc-serp-social.ts --brand=2957 [--days=30]");
+  if (!process.env.SERPAPI_API_KEY && !process.env.SERPER_API_KEY) {
+    console.error("✗ 需要 SERPAPI_API_KEY（serpapi.com，250/月免費）或 SERPER_API_KEY（serper.dev）。");
+    console.error("  用法：SERPAPI_API_KEY=xxxx npx tsx scripts/poc-serp-social.ts --brand=2957 [--days=30]");
     process.exit(1);
   }
   const brandId = Number(argVal("--brand") ?? "2957");
@@ -62,7 +65,8 @@ async function main() {
   console.log(`=== 總計 ${total} 則社群提及 ===`);
   console.log("平台分布:", platforms.map((p) => `${p.replace(".com", "").replace(".net", "")}:${grand[p]}`).join("  "));
   console.log(`\n→ 這是免費層（GDELT/RSS/PTT/YouTube）抓不到的社群量。× 每日累積 × 品牌數 = 常態化用量與成本預估。`);
-  console.log(`  Serper 計價約 $0.30–1 / 1,000 查詢；每品牌每天約 ${queries.length}×4 scope ≈ ${queries.length * 4} 次查詢。`);
+  console.log(`  ⚠️ 社群結果多半「無發布日期」→ 僅適合發現，尚不能進入時效嚴格的動態流（需加抓取取日期）。`);
+  console.log(`  SerpApi 免費 250/月；付費約 $75/月起(5,000 查詢)。每品牌每天約 ${queries.length}×4 scope ≈ ${queries.length * 4} 次查詢。`);
   process.exit(0);
 }
 
