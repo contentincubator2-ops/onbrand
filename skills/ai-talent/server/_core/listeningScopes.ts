@@ -399,48 +399,115 @@ export function resolveSocialDate(url?: string): string | null {
  *  Dual-provider: SerpApi (SERPAPI_API_KEY, GET) or Serper.dev (SERPER_API_KEY,
  *  POST). Returns [] without a key. */
 export const SOCIAL_SITES = ["instagram.com", "facebook.com", "tiktok.com", "threads.net"];
-export async function collectSocialSerp(query: string, isTaiwan: boolean, days: number, limit = 20): Promise<RunResultItem[]> {
+
+/** Low-level Google SERP (dual-provider): SerpApi (SERPAPI_API_KEY, GET) or
+ *  Serper.dev (SERPER_API_KEY, POST). Returns raw organic {title,link,snippet}. */
+async function serpSearch(q: string, isTaiwan: boolean, opts: { num?: number; tbs?: string } = {}): Promise<Array<{ title?: string; link?: string; snippet?: string }>> {
   const serpapiKey = (process.env.SERPAPI_API_KEY ?? "").trim();
   const serperKey = (process.env.SERPER_API_KEY ?? "").trim();
-  if (!query.trim() || (!serpapiKey && !serperKey)) return [];
-  const q = `${query} (${SOCIAL_SITES.map((s) => `site:${s}`).join(" OR ")})`;
-  const tbs = days <= 7 ? "qdr:w" : days <= 31 ? "qdr:m" : "qdr:y";
-  const num = Math.min(Math.max(limit, 10), 20);
+  if (!q.trim() || (!serpapiKey && !serperKey)) return [];
+  const num = Math.min(Math.max(opts.num ?? 20, 10), 20);
   try {
-    let organic: Array<{ title?: string; link?: string; snippet?: string; date?: string }> = [];
     if (serpapiKey) {
-      const qs = new URLSearchParams({ engine: "google", api_key: serpapiKey, q, tbs, num: String(num), gl: isTaiwan ? "tw" : "us", hl: isTaiwan ? "zh-tw" : "en" });
+      const qs = new URLSearchParams({ engine: "google", api_key: serpapiKey, q, num: String(num), gl: isTaiwan ? "tw" : "us", hl: isTaiwan ? "zh-tw" : "en" });
+      if (opts.tbs) qs.set("tbs", opts.tbs);
       const res = await fetch(`https://serpapi.com/search.json?${qs.toString()}`, { signal: AbortSignal.timeout(15_000) });
       if (!res.ok) return [];
-      const json: any = await res.json();
-      organic = (json?.organic_results ?? []).map((o: any) => ({ title: o?.title, link: o?.link, snippet: o?.snippet, date: o?.date }));
-    } else {
-      const res = await fetch("https://google.serper.dev/search", {
-        method: "POST", signal: AbortSignal.timeout(12_000),
-        headers: { "X-API-KEY": serperKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ q, tbs, num, gl: isTaiwan ? "tw" : "us", hl: isTaiwan ? "zh-tw" : "en" }),
-      });
-      if (!res.ok) return [];
-      const json: any = await res.json();
-      organic = (json?.organic ?? []).map((o: any) => ({ title: o?.title, link: o?.link, snippet: o?.snippet, date: o?.date }));
+      const j: any = await res.json();
+      return (j?.organic_results ?? []).map((o: any) => ({ title: o?.title, link: o?.link, snippet: o?.snippet }));
     }
-    return organic.map((o) => {
-      const url = typeof o.link === "string" ? o.link : undefined;
-      let host = "social";
-      try { if (url) host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* keep default */ }
-      return {
-        title: String(o.title ?? ""),
-        source: host,
-        excerpt: String(o.snippet ?? "").slice(0, 280),
-        url,
-        sourceType: classifySource(url, String(o.title ?? "")),
-        // ONLY the URL-decoded date is trustworthy for social. We deliberately
-        // do NOT fall back to SERP/text dates — FB post text often contains promo
-        // dates (e.g. 活動 2026/7/1) that resolvePublish would misread as the
-        // publish date. So FB (undatable) yields no date and is filtered out.
-        publishedAt: resolveSocialDate(url) ?? undefined,
-      } as RunResultItem;
-    }).filter((x) => x.title && x.url && x.publishedAt);   // keep only URL-datable (TikTok/IG/Threads); drop FB
+    const body: any = { q, num, gl: isTaiwan ? "tw" : "us", hl: isTaiwan ? "zh-tw" : "en" };
+    if (opts.tbs) body.tbs = opts.tbs;
+    const res = await fetch("https://google.serper.dev/search", { method: "POST", signal: AbortSignal.timeout(12_000), headers: { "X-API-KEY": serperKey, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) return [];
+    const j: any = await res.json();
+    return (j?.organic ?? []).map((o: any) => ({ title: o?.title, link: o?.link, snippet: o?.snippet }));
+  } catch { return []; }
+}
+
+export async function collectSocialSerp(query: string, isTaiwan: boolean, days: number, limit = 20): Promise<RunResultItem[]> {
+  if (!query.trim()) return [];
+  const q = `${query} (${SOCIAL_SITES.map((s) => `site:${s}`).join(" OR ")})`;
+  const tbs = days <= 7 ? "qdr:w" : days <= 31 ? "qdr:m" : "qdr:y";
+  const organic = await serpSearch(q, isTaiwan, { num: Math.min(Math.max(limit, 10), 20), tbs });
+  return organic.map((o) => {
+    const url = typeof o.link === "string" ? o.link : undefined;
+    let host = "social";
+    try { if (url) host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* keep default */ }
+    return {
+      title: String(o.title ?? ""),
+      source: host,
+      excerpt: String(o.snippet ?? "").slice(0, 280),
+      url,
+      sourceType: classifySource(url, String(o.title ?? "")),
+      // ONLY the URL-decoded date is trustworthy for social — FB post text has
+      // promo dates the parser would misread. FB (null) → dropped here; it gets
+      // real dates via collectFacebookApify (paid) in the ingest path instead.
+      publishedAt: resolveSocialDate(url) ?? undefined,
+    } as RunResultItem;
+  }).filter((x) => x.title && x.url && x.publishedAt);   // keep only URL-datable (TikTok/IG/Threads)
+}
+
+/** Normalise a FB post/group URL to its scrapeable PAGE root (the Apify actor
+ *  takes page URLs, not post URLs). */
+function fbPageRoot(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!/(?:^|\.)facebook\.com$/i.test(u.hostname)) return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    const first = parts[0];
+    if (!first) return null;
+    if (first === "groups" && parts[1]) return `https://www.facebook.com/groups/${parts[1]}`;
+    if (first.toLowerCase() === "profile.php") { const id = u.searchParams.get("id"); return id ? `https://www.facebook.com/profile.php?id=${id}` : null; }
+    return `https://www.facebook.com/${first}`;
+  } catch { return null; }
+}
+
+const APIFY_FB_ACTOR = "apify~facebook-posts-scraper";
+/** Facebook dating via Apify FB Posts Scraper (Tier B PAID, CJ-approved 2026-08).
+ *  FB is the one social platform with no free date (no URL timestamp). SERP finds
+ *  FB pages mentioning the term; the Apify actor returns those pages' recent posts
+ *  WITH real ISO dates (`time`), filtered to `onlyPostsNewerThan` = window, then
+ *  to posts whose text matches the term. SLOW (tens of seconds) + costs ~US$2 /
+ *  1,000 posts → INGEST-ONLY, never the live path. Needs APIFY_TOKEN + a SERP key;
+ *  returns [] without either. ⚠️ Built to Apify's documented API; verify live with
+ *  scripts/poc-fb-apify.ts before enabling in the daily ingest. */
+export async function collectFacebookApify(query: string, isTaiwan: boolean, days: number, limit = 15): Promise<RunResultItem[]> {
+  const token = (process.env.APIFY_TOKEN ?? "").trim();
+  if (!token || !query.trim()) return [];
+  // 1) discover FB pages/groups that mention the term (reuse SERP)
+  const hits = await serpSearch(`${query} site:facebook.com`, isTaiwan, { num: 20 });
+  const pages = Array.from(new Set(hits.map((h) => fbPageRoot(String(h.link ?? ""))).filter((x): x is string => !!x))).slice(0, 5);
+  if (!pages.length) return [];
+  // 2) scrape those pages' recent posts (dated) via the Apify actor (sync run)
+  const cutoffISO = new Date(Date.now() - Math.min(Math.max(days, 1), 365) * 86_400_000).toISOString().slice(0, 10);
+  try {
+    const res = await fetch(`https://api.apify.com/v2/acts/${APIFY_FB_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`, {
+      method: "POST", signal: AbortSignal.timeout(180_000),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startUrls: pages.map((url) => ({ url })), resultsLimit: Math.min(Math.max(limit, 10), 50), onlyPostsNewerThan: cutoffISO }),
+    });
+    if (!res.ok) return [];
+    const items: any[] = await res.json();
+    const terms = query.split(/\s+OR\s+/i).map((t) => t.replace(/"/g, "").trim().toLowerCase()).filter(Boolean);
+    const out: RunResultItem[] = [];
+    for (const it of items) {
+      const text = String(it?.text ?? "").trim();
+      if (!text) continue;
+      if (terms.length && !terms.some((t) => text.toLowerCase().includes(t))) continue;   // relevance
+      const iso = typeof it?.time === "string" ? it.time.slice(0, 10)
+        : typeof it?.timestamp === "number" ? new Date(it.timestamp * 1000).toISOString().slice(0, 10)
+        : undefined;
+      out.push({
+        title: text.slice(0, 120),
+        source: String(it?.pageName ?? "Facebook"),
+        excerpt: text.slice(0, 280),
+        url: typeof it?.url === "string" ? it.url : undefined,
+        sourceType: "fanpage",
+        publishedAt: iso,
+      });
+    }
+    return out;
   } catch { return []; }
 }
 
