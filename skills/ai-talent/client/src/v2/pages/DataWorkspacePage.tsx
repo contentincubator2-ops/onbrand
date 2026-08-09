@@ -134,7 +134,7 @@ const marketSources: Source[] = [
   { id: "listen_competitor", label: "競品聲量", short: "競品聲", icon: <Target size={18} />, color: "#9333EA", desc: "競爭對手的聲量與評價，以及你被拿來怎麼比" },
   { id: "keywords", label: "關鍵字分析", short: "KW", icon: <Search size={18} />, color: "#2563EB", desc: "產品資料 → 品類詞 / 風格詞 / 場景詞 / 高意圖詞" },
   { id: "hot_topics", label: "AI 熱門話題", short: "話題", icon: <Sparkles size={18} />, color: "#DB2777", desc: "AI 從市場與社群訊號找熱門話題，選定產品/品牌與內容型態後，直接進入內容任務" },
-  { id: "geo", label: "GEO / SEO", short: "GEO", icon: <Globe2 size={18} />, color: "#059669", desc: "AI 搜尋與一般搜尋需要引用的品牌證據缺口" },
+  { id: "geo", label: "AI 能見度 (GEO)", short: "GEO", icon: <Globe2 size={18} />, color: "#059669", desc: "你的品牌與競品在 AI（Gemini 等）答案中的出現率、聲量佔比、情緒與被引用來源" },
   { id: "competitors", label: "競品情報", short: "競品", icon: <Database size={18} />, color: "#9333EA", desc: "用 social listening 儀表板檢查溫柔、自然、質感三個溝通點在競品間是否被市場認定" },
   { id: "opportunity", label: "機會診斷", short: "機會", icon: <Sparkles size={18} />, color: "#EA580C", desc: "把市場情報轉成內容、SEO、廣告與商品頁任務" },
 ];
@@ -592,6 +592,18 @@ export default function DataWorkspacePage() {
     { enabled: !!brandId && !!hookScopeKey },
   ) ?? { data: null, refetch: () => {} };
 
+  // GEO (AI 能見度): live scan of how the brand shows up in AI engine answers.
+  const runGeoMut = (trpc as any).geo?.runScan?.useMutation?.() ?? null;
+  const [geoScan, setGeoScan] = React.useState<any>(null);
+  const [geoRunning, setGeoRunning] = React.useState(false);
+  const runGeo = async () => {
+    if (!brandId || !runGeoMut) return;
+    setGeoRunning(true);
+    try { setGeoScan(await runGeoMut.mutateAsync({ brandId })); }
+    catch (e: any) { setGeoScan({ ok: false, message: e?.message ?? String(e) }); }
+    finally { setGeoRunning(false); }
+  };
+
   const launchHotTopicTask = () => {
     const topic = `${selectedHotTopic.title}｜${selectedHotEntity.label}：${selectedHotTopic.angle}。請產出${selectedContentRoute.label}，重點包含市場訊號（${selectedHotTopic.signal}）、品牌/商品切角、內容主軸、開場 hook、正文與 CTA。`;
     const b = brandId ?? 2957;
@@ -655,7 +667,8 @@ export default function DataWorkspacePage() {
   // single live-search feed — never the hand-curated irisMarketDesign blocks.
   const listeningScopeKey = SOURCE_TO_SCOPE[active.id];
   const isListeningScope = !!listeningScopeKey;
-  const marketPage = (!isPerformance && !isListeningScope) ? (irisMarketDesign[active.id] ?? irisMarketDesign.overview) : null;
+  const isGeo = !isPerformance && active.id === "geo";
+  const marketPage = (!isPerformance && !isListeningScope && !isGeo) ? (irisMarketDesign[active.id] ?? irisMarketDesign.overview) : null;
 
   return (
     <div style={{ padding: "20px 24px 80px", maxWidth: 1320, margin: "0 auto" }}>
@@ -878,6 +891,120 @@ export default function DataWorkspacePage() {
                   </section>
                 );
               })}
+            </div>
+          )}
+
+          {isGeo && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", padding: "14px 16px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 850, color: "#111827" }}>AI 能見度掃描（GEO）</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>用 AI（Gemini + Google 搜尋）問品類／品牌／比較題，看 <b>{activeBrandName || "品牌"}</b> 有沒有出現、被怎麼描述、AI 引用了哪些來源。</div>
+                </div>
+                <button onClick={runGeo} disabled={!brandId || geoRunning} style={{ border: 0, borderRadius: 999, background: brandId ? active.color : "#e5e7eb", color: brandId ? "#fff" : "#9ca3af", padding: "9px 18px", fontSize: 13, fontWeight: 800, cursor: brandId && !geoRunning ? "pointer" : "default", whiteSpace: "nowrap" }}>
+                  {geoRunning ? "掃描中…（約 15 秒）" : geoScan ? "重新掃描" : "▶ 執行掃描"}
+                </button>
+              </div>
+
+              {!brandId && (
+                <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 16, padding: 14, fontSize: 13, color: "#92400e", marginBottom: 14 }}>
+                  網址缺少 <b>?b=品牌ID</b>，無法掃描。範例：<code>/market-intel/geo?b=2957</code>
+                </div>
+              )}
+              {geoScan && geoScan.ok === false && (
+                <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 12, padding: 12, fontSize: 12.5, color: "#991b1b", marginBottom: 14 }}>{geoScan.message ?? "掃描失敗"}</div>
+              )}
+
+              {geoScan && geoScan.ok && (() => {
+                const s = geoScan.summary;
+                const sov = (Object.entries(s.shareOfVoice) as Array<[string, number]>).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+                const sovMax = Math.max(...sov.map((e) => e[1]), 1);
+                const sm = s.sentimentMix; const smTotal = (sm.positive + sm.negative + sm.neutral) || 1;
+                const card: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", padding: "14px 16px" };
+                const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 };
+                const ord: Sentiment[] = ["positive", "neutral", "negative"];
+                return (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 12, marginBottom: 14 }}>
+                      <div style={card}>
+                        <div style={lbl}>AI 出現率</div>
+                        <div style={{ fontSize: 32, fontWeight: 900, color: active.color, lineHeight: 1 }}>{Math.round(s.appearanceRate * 100)}%</div>
+                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{s.appeared}/{s.prompts} 個 AI 問答有出現</div>
+                      </div>
+                      <div style={card}>
+                        <div style={lbl}>AI 描述情緒</div>
+                        <div style={{ display: "flex", height: 12, borderRadius: 999, overflow: "hidden", background: "#f1f1f0" }}>
+                          {ord.map((k) => { const pct = (sm[k] / smTotal) * 100; return pct > 0 ? <div key={k} title={`${SENTIMENT_META[k].label} ${sm[k]}`} style={{ width: `${pct}%`, background: SENTIMENT_META[k].color }} /> : null; })}
+                        </div>
+                        <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap", fontSize: 12, color: "#374151" }}>
+                          {ord.map((k) => <span key={k}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: SENTIMENT_META[k].color, marginRight: 4 }} />{SENTIMENT_META[k].label} <b>{sm[k]}</b></span>)}
+                        </div>
+                      </div>
+                      <div style={card}>
+                        <div style={lbl}>引擎</div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "#111827" }}>Gemini · Google 搜尋</div>
+                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>{new Date(geoScan.generatedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 掃描</div>
+                      </div>
+                    </div>
+
+                    <div style={{ ...card, marginBottom: 14 }}>
+                      <div style={lbl}>AI 聲量佔比（{activeBrandName || "你"} vs 競品）</div>
+                      {sov.map(([name, n]) => {
+                        const isBrand = name === geoScan.brandName;
+                        return (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                            <span style={{ width: 92, fontSize: 12.5, fontWeight: isBrand ? 850 : 600, color: isBrand ? "#111827" : "#6b7280", flex: "0 0 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                            <span style={{ flex: 1, height: 14, background: "#f1f1f0", borderRadius: 999, overflow: "hidden" }}>
+                              <span style={{ display: "block", height: "100%", width: `${(n / sovMax) * 100}%`, background: isBrand ? active.color : "#c7c4bd" }} />
+                            </span>
+                            <span style={{ width: 24, textAlign: "right", fontSize: 12.5, fontWeight: 800, color: "#111827" }}>{n}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {s.topCitations.length > 0 && (
+                      <div style={{ ...card, marginBottom: 14 }}>
+                        <div style={lbl}>AI 最常引用的來源（想影響 AI 答案，先影響這些）</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {s.topCitations.map((c: any, i: number) => (
+                            <a key={i} href={c.url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid #e5e7eb", borderRadius: 999, padding: "5px 11px", fontSize: 12, color: "#374151", textDecoration: "none" }}>
+                              {c.title || "來源"} <span style={{ fontWeight: 800, color: active.color }}>×{c.count}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {geoScan.results.filter((r: any) => r.ok).map((r: any, i: number) => {
+                        const se = SENTIMENT_META[r.sentiment as Sentiment];
+                        return (
+                          <div key={i} style={card}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                              <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: "#6b7280", padding: "2px 8px", borderRadius: 6 }}>{r.prompt.label}</span>
+                              <span style={{ fontSize: 12.5, fontWeight: 850, color: r.brandPresent ? active.color : "#c0392b" }}>{r.brandPresent ? `✓ 有出現${r.brandRank ? `（第 ${r.brandRank} 個被提到）` : ""}` : "✕ 未出現"}</span>
+                              {r.brandPresent && <span style={{ fontSize: 12, fontWeight: 700, color: se.color }}><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: se.color, marginRight: 4 }} />{se.label}</span>}
+                              {r.citations.length > 0 && <span style={{ fontSize: 11, color: "#9ca3af" }}>· 引用 {r.citations.length} 筆</span>}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4 }}>問：{r.prompt.text}</div>
+                            <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{String(r.answer).replace(/\s+/g, " ").slice(0, 260)}…</p>
+                            {r.competitorsPresent.length > 0 && (
+                              <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>同時被提到：{r.competitorsPresent.map((c: string) => <span key={c} style={{ display: "inline-block", background: "#f3f4f6", borderRadius: 6, padding: "2px 7px", marginRight: 5, color: "#374151" }}>{c}</span>)}</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+
+              {!geoScan && !geoRunning && brandId && (
+                <div style={{ border: "1px dashed #d1d5db", borderRadius: 16, padding: "22px 18px", fontSize: 13, color: "#6b7280", lineHeight: 1.7, textAlign: "center" }}>
+                  點「執行掃描」，AI 會回答幾個關於你品類與品牌的問題，我們即時分析：<b>出現率</b>、<b>AI 聲量佔比</b>、<b>情緒</b>、<b>被引用的來源</b>。
+                </div>
+              )}
             </div>
           )}
 

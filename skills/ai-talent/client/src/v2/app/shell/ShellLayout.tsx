@@ -105,7 +105,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       { to: "/market-intel/listen_own", label: en ? "Our Buzz" : "品牌聲量", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/market-intel/listen_own", tooltip: en ? "Our brand buzz" : "自己的品牌聲量" },
       { to: "/market-intel/listen_competitor", label: en ? "Rivals" : "競品聲量", icon: <FontAwesomeIcon icon={faTrophy} />, matchPrefix: "/market-intel/listen_competitor", tooltip: en ? "Competitor buzz" : "競爭者聲量" },
       { to: "/market-intel/keywords", label: en ? "Keywords" : "關鍵字", icon: <FontAwesomeIcon icon={faMagnifyingGlass} />, matchPrefix: "/market-intel/keywords", tooltip: en ? "Keyword analysis" : "關鍵字分析" },
-      { to: "/market-intel/geo", label: "GEO", icon: <FontAwesomeIcon icon={faTrademark} />, matchPrefix: "/market-intel/geo", tooltip: en ? "GEO / SEO visibility" : "GEO / SEO 可見度" },
+      { to: "/market-intel/geo", label: "GEO", icon: <FontAwesomeIcon icon={faTrademark} />, matchPrefix: "/market-intel/geo", tooltip: en ? "AI visibility (GEO): appearance, share-of-voice, sentiment, cited sources" : "AI 能見度 (GEO)：出現率、聲量佔比、情緒、被引用來源" },
       { to: "/market-intel/competitors", label: en ? "Competitors" : "競品", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/market-intel/competitors", tooltip: en ? "Competitor intelligence" : "競品情報" },
       { to: "/market-intel/opportunity", label: en ? "Opportunity" : "機會", icon: <FontAwesomeIcon icon={faBrain} />, matchPrefix: "/market-intel/opportunity", tooltip: en ? "Opportunity diagnosis" : "機會診斷" },
     ];
