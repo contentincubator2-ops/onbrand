@@ -228,10 +228,186 @@ export function resolvePublish(item: { publishedAt?: string; url?: string; title
   return { iso: null, year: years.length ? Math.max(...years) : null };
 }
 
-/** Run ONE scope's live web search and return cleaned, junk-filtered items
- *  (each tagged with its OpView source type). Shared by the live tRPC path
- *  and the accumulating ingestion job. `daysOverride` lets the user pick a
- *  recency window (freshness filter). */
+// ── High-precision collectors (Phase 1: RSS + YouTube Data API) ────────────
+// Unlike SERP grounding, these return a RELIABLE publish date (RSS pubDate /
+// YT publishedAt) — the accuracy upgrade CJ asked for. Best-effort: any
+// failure returns [] so the broad SERP path still ships.
+
+function decodeXml(s: string): string {
+  return String(s ?? "")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(Number(d)); } catch { return ""; } })
+    .replace(/&amp;/g, "&")
+    .trim();
+}
+function pickTag(seg: string, tag: string): string {
+  const m = seg.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
+  return m ? decodeXml(m[1] ?? "") : "";
+}
+
+/** Google News RSS keyword search — free, no auth, structured pubDate. The
+ *  best-precision path for 新聞 (also surfaces many 部落格). */
+export async function collectGoogleNewsRss(query: string, isTaiwan: boolean, limit = 12): Promise<RunResultItem[]> {
+  if (!query.trim()) return [];
+  const hl = isTaiwan ? "zh-TW" : "en-US";
+  const gl = isTaiwan ? "TW" : "US";
+  const ceid = isTaiwan ? "TW:zh-Hant" : "US:en";
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000), headers: { "user-agent": "Mozilla/5.0 (compatible; OnBrandListening/1.0)" } });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const out: RunResultItem[] = [];
+    for (const block of xml.split(/<item>/i).slice(1)) {
+      const seg = block.split(/<\/item>/i)[0] ?? "";
+      const rawTitle = pickTag(seg, "title");
+      if (!rawTitle) continue;
+      const source = pickTag(seg, "source");
+      const link = pickTag(seg, "link");
+      const pub = pickTag(seg, "pubDate");
+      // Google News titles read "Headline - Source" — strip the source tail.
+      const title = source && rawTitle.endsWith(` - ${source}`) ? rawTitle.slice(0, -(source.length + 3)) : rawTitle;
+      out.push({
+        title, source: source || "Google News", excerpt: "", url: link || undefined,
+        sourceType: "news",
+        publishedAt: pub && !isNaN(+new Date(pub)) ? new Date(pub).toISOString() : undefined,
+      });
+      if (out.length >= limit) break;
+    }
+    return out;
+  } catch { return []; }
+}
+
+/** YouTube Data API v3 search — official, structured publishedAt. Needs a key
+ *  (YOUTUBE_API_KEY, else the shared Google key). Returns [] when no key / API
+ *  disabled, so the pipeline degrades gracefully. */
+export async function collectYouTube(query: string, days: number, isTaiwan: boolean, limit = 8): Promise<RunResultItem[]> {
+  const key = (process.env.YOUTUBE_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? "").trim();
+  if (!key || !query.trim()) return [];
+  const params = new URLSearchParams({
+    part: "snippet", type: "video", order: "date", maxResults: String(limit),
+    q: query, publishedAfter: new Date(Date.now() - days * 86_400_000).toISOString(), key,
+  });
+  if (isTaiwan) { params.set("relevanceLanguage", "zh-Hant"); params.set("regionCode", "TW"); }
+  try {
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return [];
+    const json: any = await res.json();
+    const items: any[] = json?.items ?? [];
+    return items.map((it) => ({
+      title: String(it?.snippet?.title ?? ""),
+      source: String(it?.snippet?.channelTitle ?? "YouTube"),
+      excerpt: String(it?.snippet?.description ?? "").slice(0, 280),
+      url: it?.id?.videoId ? `https://www.youtube.com/watch?v=${it.id.videoId}` : undefined,
+      sourceType: "youtube" as SourceType,
+      publishedAt: typeof it?.snippet?.publishedAt === "string" ? it.snippet.publishedAt : undefined,
+    })).filter((x) => x.title);
+  } catch { return []; }
+}
+
+/** Primary keyword for the query-based collectors (Google News / YouTube). */
+function collectorQueryFor(taskKey: ListeningTaskKey, brand: BrandCtx): string {
+  const cat = brand.industry?.trim() || brand.name;
+  switch (taskKey) {
+    case "listening.competitors":
+      return brand.competitors.slice(0, 3).join(" OR ") || brand.name;
+    case "listening.market_hotspots":
+    case "listening.industry_talk":
+      return cat;
+    default:
+      return brand.name;
+  }
+}
+
+/** Terms to match against per-site RSS items (the site feeds aren't
+ *  keyword-searchable, so we pull each feed and filter locally). */
+function collectorTermsFor(taskKey: ListeningTaskKey, brand: BrandCtx): string[] {
+  switch (taskKey) {
+    case "listening.competitors":
+      return brand.competitors.length ? brand.competitors : [brand.name];
+    case "listening.market_hotspots":
+    case "listening.industry_talk":
+      return [brand.industry?.trim() || brand.name];
+    default:
+      return [brand.name];
+  }
+}
+
+// ── Per-site RSS (CJ「獨立蒐集每一個來源網站的RSS，再嘗試 Google RSS」) ─────
+// A controlled registry of major TW news / tech-media RSS feeds we pull
+// DIRECTLY (not via the Google aggregator), then filter by the scope's terms.
+// Direct feeds give us source control + reliable pubDate; Google News RSS
+// (above) complements by keyword-searching sites this list misses.
+// Verified live 2026-08-09 (probed per-feed; 404/403 ones like 中時/風傳媒/
+// 數位時代/TVBS have dropped or gated public RSS — Google News RSS below
+// keyword-searches those instead).
+const TW_FEEDS: Array<{ name: string; url: string; type: SourceType }> = [
+  { name: "自由時報",   url: "https://news.ltn.com.tw/rss/all.xml",              type: "news" },
+  { name: "ETtoday",    url: "https://feeds.feedburner.com/ettoday/realtime",    type: "news" },
+  { name: "Yahoo新聞",  url: "https://tw.news.yahoo.com/rss/",                   type: "news" },
+  { name: "新頭殼",     url: "https://newtalk.tw/rss/all",                       type: "news" },
+  { name: "中央社",     url: "https://feeds.feedburner.com/rsscna/finance",      type: "news" },
+  { name: "聯合新聞網", url: "https://udn.com/rssfeed/news/2/6638",              type: "news" },
+  { name: "科技新報",   url: "https://technews.tw/feed/",                        type: "blog" },
+  { name: "INSIDE",     url: "https://www.inside.com.tw/feed/rss",               type: "blog" },
+];
+
+// 10-min in-process cache so an ingestion run (4 scopes × N brands) fetches
+// each feed once, not once per scope.
+const _feedCache = new Map<string, { at: number; xml: string }>();
+async function fetchFeedXml(url: string): Promise<string> {
+  const c = _feedCache.get(url);
+  if (c && Date.now() - c.at < 10 * 60_000) return c.xml;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: { "user-agent": "Mozilla/5.0 (compatible; OnBrandListening/1.0)" } });
+  if (!res.ok) throw new Error(`feed ${res.status}`);
+  const xml = await res.text();
+  _feedCache.set(url, { at: Date.now(), xml });
+  return xml;
+}
+
+/** Generic RSS 2.0 <item> / Atom <entry> parser. */
+function parseFeedItems(xml: string, sourceType: SourceType, sourceName: string, limit: number): RunResultItem[] {
+  const out: RunResultItem[] = [];
+  const isAtom = /<entry[\s>]/i.test(xml) && !/<item[\s>]/i.test(xml);
+  const tag = isAtom ? "entry" : "item";
+  for (const block of xml.split(new RegExp(`<${tag}[\\s>]`, "i")).slice(1)) {
+    const seg = block.split(new RegExp(`</${tag}>`, "i"))[0] ?? "";
+    const title = pickTag(seg, "title");
+    if (!title) continue;
+    let link = pickTag(seg, "link");
+    if (!link) { const m = seg.match(/<link[^>]*href=["']([^"']+)["']/i); if (m) link = m[1] ?? ""; }
+    const pub = pickTag(seg, "pubDate") || pickTag(seg, "published") || pickTag(seg, "updated") || pickTag(seg, "dc:date");
+    const desc = pickTag(seg, "description") || pickTag(seg, "summary") || pickTag(seg, "content");
+    out.push({
+      title, source: sourceName, excerpt: cleanText(desc).slice(0, 280), url: link || undefined,
+      sourceType,
+      publishedAt: pub && !isNaN(+new Date(pub)) ? new Date(pub).toISOString() : undefined,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** Pull each TW source feed directly and keep items mentioning a term. */
+export async function collectSiteRss(terms: string[], perFeedLimit = 40): Promise<RunResultItem[]> {
+  const t = terms.map((x) => x.toLowerCase().trim()).filter(Boolean);
+  if (!t.length) return [];
+  const per = await Promise.all(TW_FEEDS.map(async (f) => {
+    try {
+      const xml = await fetchFeedXml(f.url);
+      return parseFeedItems(xml, f.type, f.name, perFeedLimit)
+        .filter((it) => { const hay = `${it.title} ${it.excerpt}`.toLowerCase(); return t.some((term) => hay.includes(term)); });
+    } catch { return []; }
+  }));
+  return per.flat();
+}
+
+/** Run ONE scope's collection: broad SERP grounding + high-precision
+ *  structured collectors (RSS + YouTube), merged, publish-date-filtered and
+ *  deduped. Shared by the live tRPC path and the accumulating ingestion job.
+ *  `daysOverride` lets the user pick a recency window (freshness filter). */
 export async function fetchScopeMentions(
   brand: BrandCtx,
   taskKey: ListeningTaskKey,
@@ -240,59 +416,65 @@ export async function fetchScopeMentions(
   const keywords = buildKeywords(taskKey, brand);
   const query = keywords.join(" / ");
   const days = daysOverride && daysOverride > 0 ? daysOverride : daysFor(taskKey);
-  const { perplexityScout } = await import("./scouts/perplexityScout");
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const cutoffYear = cutoff.getUTCFullYear();
+  const collectorQ = collectorQueryFor(taskKey, brand);
   const SCOUT_TIMEOUT_MS = 15_000;
 
   try {
-    const items = await Promise.race([
-      perplexityScout.fetch({
-        brandId: brand.id,
-        brandName: brand.name,
-        industry: brand.industry ?? undefined,
-        keywords,
-        competitors: taskKey === "listening.competitors" ? brand.competitors : [],
-        industryTags: brand.industry ? [brand.industry] : [],
-        days,
-        limit: 8,
-        loadCred: async () => null,
-      } as any),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), SCOUT_TIMEOUT_MS)),
+    const { perplexityScout } = await import("./scouts/perplexityScout");
+    const [pplxItems, siteItems, newsItems, ytItems] = await Promise.all([
+      Promise.race([
+        perplexityScout.fetch({
+          brandId: brand.id, brandName: brand.name, industry: brand.industry ?? undefined,
+          keywords, competitors: taskKey === "listening.competitors" ? brand.competitors : [],
+          industryTags: brand.industry ? [brand.industry] : [],
+          days, limit: 8, loadCred: async () => null,
+        } as any),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), SCOUT_TIMEOUT_MS)),
+      ]).catch(() => null),
+      collectSiteRss(collectorTermsFor(taskKey, brand)).catch(() => []),   // per-site RSS (direct)
+      collectGoogleNewsRss(collectorQ, brand.isTaiwan).catch(() => []),      // Google News RSS (complement)
+      collectYouTube(collectorQ, days, brand.isTaiwan).catch(() => []),      // YouTube Data API
     ]);
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return { ok: false, query, items: [], message: "即時搜尋沒有找到相關的公開討論（可能是聲量太少，或當下 API 無結果）。" };
+    const raw: RunResultItem[] = [];
+    if (Array.isArray(pplxItems)) {
+      for (const it of pplxItems as any[]) {
+        raw.push({
+          title: cleanText(it.title), source: it.source,
+          excerpt: cleanText(it.content ?? "").slice(0, 280), url: it.url,
+          sourceType: classifySource(it.url, it.source),
+          publishedAt: typeof it.publishedAt === "string" ? it.publishedAt : undefined,
+        });
+      }
     }
+    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(ytItems as RunResultItem[]));
 
-    const cutoff = new Date(Date.now() - days * 86_400_000);
-    const cutoffYear = cutoff.getUTCFullYear();
-    const mapped: RunResultItem[] = items
-      .map((it: any) => ({
-        title: cleanText(it.title),
-        source: it.source,
-        excerpt: cleanText(it.content ?? "").slice(0, 280),
-        url: it.url,
-        sourceType: classifySource(it.url, it.source),
-        publishedAt: typeof it.publishedAt === "string" ? it.publishedAt : undefined,
-      }))
-      .filter((it) => hasRealText(it.title))
-      // Recency by PUBLISH date (CJ「2018年的根本不應該出現」): the time window
-      // filters on the ARTICLE's publish date, not our capture time. Resolve
-      // the real publish date; drop anything older than the window. Undated
-      // items with a stale year signal (e.g. "2018年…出包") are also dropped;
-      // truly undated items are kept (can't prove old) and show 發布日不明.
-      .filter((it) => {
-        const { iso, year } = resolvePublish(it);
-        it.publishedAt = iso ?? undefined;
-        if (iso) return new Date(iso) >= cutoff;
-        if (year && year < cutoffYear) return false;
-        return true;
-      })
-      .slice(0, 8);
+    // Unified pass: drop junk titles, resolve the PUBLISH date, filter by
+    // publish-date recency (CJ「2018年的根本不應該出現」), dedup by url/title.
+    // The structured collectors carry reliable dates so they pass precisely.
+    const seen = new Set<string>();
+    const out: RunResultItem[] = [];
+    for (const it of raw) {
+      if (!hasRealText(it.title)) continue;
+      const { iso, year } = resolvePublish(it);
+      it.publishedAt = iso ?? undefined;
+      if (iso) { if (new Date(iso) < cutoff) continue; }
+      else if (year && year < cutoffYear) continue;
+      const key = mentionHash(it.url || it.title);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(it);
+    }
+    // Dated items first (newest → oldest); undated fall to the end.
+    out.sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
+    const final = out.slice(0, 12);
 
-    if (mapped.length === 0) {
+    if (final.length === 0) {
       return { ok: false, query, items: [], message: "此時間範圍內沒有找到有效的公開討論（較舊或無法判定發布日的結果已濾除）。可試著把時間範圍放寬。" };
     }
-    return { ok: true, query, items: mapped };
+    return { ok: true, query, items: final };
   } catch (e: any) {
     return { ok: false, query, items: [], message: `即時搜尋失敗：${String(e?.message ?? e).slice(0, 150)}` };
   }
