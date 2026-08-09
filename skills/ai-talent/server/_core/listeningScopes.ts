@@ -280,6 +280,64 @@ export async function collectGoogleNewsRss(query: string, isTaiwan: boolean, lim
   } catch { return []; }
 }
 
+/** GDELT DOC 2.0 API — free, NO key, full-text search across the global news
+ *  web in 65 machine-translated languages (incl. 繁中), rolling ~3-month
+ *  window, refreshed every 15 min. This is the biggest free lever toward
+ *  OpView-scale 新聞 volume: it reaches thousands of outlets our hand-picked
+ *  TW_FEEDS + Google News RSS miss. Best-effort: any failure returns []. */
+export async function collectGdelt(query: string, isTaiwan: boolean, days: number, limit = 25): Promise<RunResultItem[]> {
+  if (!query.trim()) return [];
+  // Quote multi-word terms so GDELT reads them as phrases; preserve OR groups.
+  const q = query
+    .split(/\s+OR\s+/i)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => (/\s/.test(t) && !/^".*"$/.test(t) ? `"${t}"` : t))
+    .join(" OR ");
+  // Locale bias: TW brands → Taiwan sources; else → English coverage.
+  // (GDELT wants the full language NAME — `sourcelang:english`, not `eng`.)
+  const locale = isTaiwan ? " sourcecountry:TW" : " sourcelang:english";
+  // DOC API only covers a rolling ~3-month window — cap the range at 90 days.
+  const spanMs = Math.min(Math.max(days, 1), 90) * 86_400_000;
+  const stamp = (d: Date) => d.toISOString().replace(/[-:T]/g, "").replace(/\.\d{3}Z$/, "");
+  const params = new URLSearchParams({
+    query: `${q}${locale}`,
+    mode: "ArtList", format: "json", sort: "datedesc",
+    maxrecords: String(Math.min(Math.max(limit, 1), 250)),
+    startdatetime: stamp(new Date(Date.now() - spanMs)),
+    enddatetime: stamp(new Date()),
+  });
+  try {
+    const res = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?${params.toString()}`, {
+      signal: AbortSignal.timeout(12_000),
+      headers: { "user-agent": "Mozilla/5.0 (compatible; OnBrandListening/1.0)" },
+    });
+    if (!res.ok) return [];
+    const text = await res.text();
+    if (!text.trim().startsWith("{")) return [];   // GDELT returns plain text on a malformed query
+    const json: any = JSON.parse(text);
+    const articles: any[] = json?.articles ?? [];
+    return articles.map((a) => {
+      const sd = String(a?.seendate ?? "");
+      const m = sd.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+      const iso = m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z` : undefined;
+      const url = typeof a?.url === "string" ? a.url : undefined;
+      const domain = String(a?.domain ?? "");
+      // GDELT is a NEWS index — default unknown domains to 新聞 (not the web
+      // catch-all), but keep a more specific bucket when the domain matches.
+      const st = classifySource(url, domain);
+      return {
+        title: String(a?.title ?? ""),
+        source: domain || "GDELT",
+        excerpt: "",
+        url,
+        sourceType: (st === "web" ? "news" : st) as SourceType,
+        publishedAt: iso,
+      } as RunResultItem;
+    }).filter((x) => x.title);
+  } catch { return []; }
+}
+
 /** YouTube Data API v3 search — official, structured publishedAt. Needs a key
  *  (YOUTUBE_API_KEY, else the shared Google key). Returns [] when no key / API
  *  disabled, so the pipeline degrades gracefully. */
@@ -486,6 +544,7 @@ export async function fetchScopeMentions(
   brand: BrandCtx,
   taskKey: ListeningTaskKey,
   daysOverride?: number,
+  limit = 12,
 ): Promise<ScopeFetchResult> {
   const keywords = buildKeywords(taskKey, brand);
   const query = keywords.join(" / ");
@@ -498,7 +557,7 @@ export async function fetchScopeMentions(
   try {
     const { perplexityScout } = await import("./scouts/perplexityScout");
     const terms = collectorTermsFor(taskKey, brand);
-    const [pplxItems, siteItems, newsItems, ytItems, pttItems] = await Promise.all([
+    const [pplxItems, siteItems, newsItems, gdeltItems, ytItems, pttItems] = await Promise.all([
       Promise.race([
         perplexityScout.fetch({
           brandId: brand.id, brandName: brand.name, industry: brand.industry ?? undefined,
@@ -510,6 +569,7 @@ export async function fetchScopeMentions(
       ]).catch(() => null),
       collectSiteRss(terms).catch(() => []),                                 // per-site RSS (direct)
       collectGoogleNewsRss(collectorQ, brand.isTaiwan).catch(() => []),      // Google News RSS (complement)
+      collectGdelt(collectorQ, brand.isTaiwan, days, Math.max(limit * 3, 40)).catch(() => []), // GDELT global news (free, high-volume)
       collectYouTube(collectorQ, days, brand.isTaiwan).catch(() => []),      // YouTube Data API
       collectPtt(terms[0] ?? brand.name, brand).catch(() => []),             // PTT 討論區
     ]);
@@ -525,7 +585,7 @@ export async function fetchScopeMentions(
         });
       }
     }
-    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]));
+    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(gdeltItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]));
 
     // Unified pass: drop junk titles, resolve the PUBLISH date, filter by
     // publish-date recency (CJ「2018年的根本不應該出現」), dedup by url/title.
@@ -545,7 +605,7 @@ export async function fetchScopeMentions(
     }
     // Dated items first (newest → oldest); undated fall to the end.
     out.sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
-    const final = out.slice(0, 12);
+    const final = out.slice(0, limit);
 
     if (final.length === 0) {
       return { ok: false, query, items: [], message: "此時間範圍內沒有找到有效的公開討論（較舊或無法判定發布日的結果已濾除）。可試著把時間範圍放寬。" };

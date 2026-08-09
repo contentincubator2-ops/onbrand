@@ -71,7 +71,9 @@ async function main() {
 
     for (const scope of INGEST_SCOPES) {
       try {
-        const res = await fetchScopeMentions(brand, scope);
+        // Ingestion banks VOLUME (limit 60) — GDELT + all collectors — so the
+        // store accumulates a real corpus; the live UI path keeps the tight 12.
+        const res = await fetchScopeMentions(brand, scope, undefined, 60);
         if (!res.ok) {
           console.log(`  ${scope}: — ${res.message ?? "no results"}`);
           continue;
@@ -87,7 +89,7 @@ async function main() {
         totalErr++;
         console.warn(`  ${scope}: ERROR ${String(e?.message ?? e).slice(0, 160)}`);
       }
-      await sleep(1200); // gentle pacing between scope searches (cost/rate)
+      await sleep(7000); // pace between scopes — GDELT enforces ~1 req/5s per IP
     }
   }
 
