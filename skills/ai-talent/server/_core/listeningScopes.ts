@@ -404,6 +404,80 @@ export async function collectSiteRss(terms: string[], perFeedLimit = 40): Promis
   return per.flat();
 }
 
+// ── PTT collector (Step 2) ─────────────────────────────────────────────────
+// PTT has no global search (search is per-board), so we search a small set of
+// high-traffic + industry-matched boards. Public, no login; over18 cookie
+// bypasses the age gate. Date comes from the search list's M/DD (year inferred
+// — search is newest-first); the full ctime lives on the article page but we
+// avoid a fetch-per-article. sourceType = forum.
+const PTT_BASE = "https://www.ptt.cc";
+const PTT_INDUSTRY_BOARDS: Array<{ match: RegExp; boards: string[] }> = [
+  { match: /食|餐|飲|食品|snack|food|nutrition|營養|奶|保健|飲料/i, boards: ["Food", "cookclub"] },
+  { match: /美妝|保養|化妝|beauty|skincare|cosmetic|服飾|時尚|fashion|女裝|穿搭|clothes/i, boards: ["BeautySalon", "MakeUp"] },
+  { match: /手機|3c|電子|科技|tech|gadget|watch|穿戴|smart|wearable/i, boards: ["MobileComm", "PC_Shopping"] },
+  { match: /母嬰|嬰|兒童|寶寶|baby|kids|parent|親子|婦幼/i, boards: ["BabyMother"] },
+  { match: /遊戲|game|gaming|寶可夢|pokemon|手遊/i, boards: ["C_Chat", "MobileComm"] },
+];
+function pttBoardsFor(brand: BrandCtx): string[] {
+  const boards = new Set<string>(["Lifeismoney", "e-shopping"]); // general consumer/shopping
+  const hay = `${brand.industry ?? ""} ${brand.name}`.toLowerCase();
+  for (const r of PTT_INDUSTRY_BOARDS) if (r.match.test(hay)) r.boards.forEach((b) => boards.add(b));
+  return Array.from(boards).slice(0, 4);
+}
+
+function parsePttSearch(html: string, board: string, limit: number): RunResultItem[] {
+  const items: RunResultItem[] = [];
+  const now = Date.now();
+  for (const block of html.split(/<div class="r-ent">/i).slice(1)) {
+    const seg = block.split(/<div class="r-list-sep">/i)[0] ?? block;
+    const a = seg.match(/<div class="title">[\s\S]*?<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!a) continue; // deleted post / no link
+    const href = a[1] ?? "";
+    const title = decodeXml((a[2] ?? "").replace(/<[^>]*>/g, "")).trim();
+    if (!title) continue;
+    const push = (seg.match(/<div class="nrec">[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i)?.[1] ?? "").replace(/<[^>]*>/g, "").trim();
+    const author = (seg.match(/<div class="author">([\s\S]*?)<\/div>/i)?.[1] ?? "").trim();
+    const dateRaw = (seg.match(/<div class="date">([\s\S]*?)<\/div>/i)?.[1] ?? "").trim();
+    let publishedAt: string | undefined;
+    const dm = dateRaw.match(/(\d{1,2})\/(\d{1,2})/);
+    if (dm) {
+      const mo = Number(dm[1]), d = Number(dm[2]);
+      let y = new Date().getUTCFullYear();
+      // Newest-first list: an M/DD dated in the future must be last year.
+      if (Date.UTC(y, mo - 1, d) > now + 2 * 86_400_000) y -= 1;
+      const dt = new Date(Date.UTC(y, mo - 1, d));
+      if (!isNaN(+dt)) publishedAt = dt.toISOString();
+    }
+    items.push({
+      title,
+      source: `PTT ${board}${push ? ` · 推${push}` : ""}`,
+      excerpt: author ? `作者 ${author}` : "",
+      url: href.startsWith("http") ? href : `${PTT_BASE}${href}`,
+      sourceType: "forum",
+      publishedAt,
+    });
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
+/** Search a small set of PTT boards for a term (TW only). */
+export async function collectPtt(term: string, brand: BrandCtx, perBoardLimit = 10): Promise<RunResultItem[]> {
+  if (!brand.isTaiwan || !term.trim()) return [];
+  const boards = pttBoardsFor(brand);
+  const per = await Promise.all(boards.map(async (board) => {
+    try {
+      const res = await fetch(`${PTT_BASE}/bbs/${board}/search?q=${encodeURIComponent(term)}`, {
+        signal: AbortSignal.timeout(9_000),
+        headers: { "user-agent": "Mozilla/5.0 (compatible; OnBrandListening/1.0)", cookie: "over18=1" },
+      });
+      if (!res.ok) return [];
+      return parsePttSearch(await res.text(), board, perBoardLimit);
+    } catch { return []; }
+  }));
+  return per.flat();
+}
+
 /** Run ONE scope's collection: broad SERP grounding + high-precision
  *  structured collectors (RSS + YouTube), merged, publish-date-filtered and
  *  deduped. Shared by the live tRPC path and the accumulating ingestion job.
@@ -423,7 +497,8 @@ export async function fetchScopeMentions(
 
   try {
     const { perplexityScout } = await import("./scouts/perplexityScout");
-    const [pplxItems, siteItems, newsItems, ytItems] = await Promise.all([
+    const terms = collectorTermsFor(taskKey, brand);
+    const [pplxItems, siteItems, newsItems, ytItems, pttItems] = await Promise.all([
       Promise.race([
         perplexityScout.fetch({
           brandId: brand.id, brandName: brand.name, industry: brand.industry ?? undefined,
@@ -433,9 +508,10 @@ export async function fetchScopeMentions(
         } as any),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), SCOUT_TIMEOUT_MS)),
       ]).catch(() => null),
-      collectSiteRss(collectorTermsFor(taskKey, brand)).catch(() => []),   // per-site RSS (direct)
+      collectSiteRss(terms).catch(() => []),                                 // per-site RSS (direct)
       collectGoogleNewsRss(collectorQ, brand.isTaiwan).catch(() => []),      // Google News RSS (complement)
       collectYouTube(collectorQ, days, brand.isTaiwan).catch(() => []),      // YouTube Data API
+      collectPtt(terms[0] ?? brand.name, brand).catch(() => []),             // PTT 討論區
     ]);
 
     const raw: RunResultItem[] = [];
@@ -449,7 +525,7 @@ export async function fetchScopeMentions(
         });
       }
     }
-    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(ytItems as RunResultItem[]));
+    raw.push(...(siteItems as RunResultItem[]), ...(newsItems as RunResultItem[]), ...(ytItems as RunResultItem[]), ...(pttItems as RunResultItem[]));
 
     // Unified pass: drop junk titles, resolve the PUBLISH date, filter by
     // publish-date recency (CJ「2018年的根本不應該出現」), dedup by url/title.
