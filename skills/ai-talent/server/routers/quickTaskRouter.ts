@@ -864,6 +864,14 @@ import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "
 import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../_core/quickTask100";
 import { ALL_99S_SQUADS } from "../_core/quickTask100Squads";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
+import {
+  applyIgStrategyPublicBoundary,
+  buildIgStrategyPublicPromptRules,
+  getIgStrategyExecutionSlug,
+  getIgStrategyPublicPolicy,
+  getIgStrategyPublicSectionLabel,
+  getIgStrategyRecordOverrides,
+} from "../_core/igStrategyPublicOutput";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
 import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
@@ -1703,9 +1711,13 @@ export const quickTaskRouter = router({
       // new "fb-99-…" slugs, but the production `squads` table may still
       // hold the legacy "fb-100-…" slug (no DB migration). Match BOTH so
       // the lookup resolves regardless of which form the row has.
-      const sqSlugNew = normalizeTaskId(input.squadSlug);
+      const sqSlugNew = getIgStrategyExecutionSlug(input.squadSlug);
       const sqSlugLegacy = legacyTaskId(sqSlugNew);
       const sqSlugs = sqSlugLegacy ? [sqSlugNew, sqSlugLegacy] : [sqSlugNew];
+      // Only five catalogued IG strategy reports get the public-output
+      // boundary. Every unlisted squad keeps the legacy prompt, variants and
+      // persistence fields unchanged.
+      const strategyPublicPolicy = getIgStrategyPublicPolicy(sqSlugNew);
       const [sqRows]: any = await localPool.execute(
         `SELECT id, slug, name, agents, steps, methodology, lead_agent_id
            FROM squads WHERE slug IN (${sqSlugs.map(() => "?").join(",")}) AND is_active = 1 LIMIT 1`,
@@ -1727,6 +1739,7 @@ export const quickTaskRouter = router({
       // whether the zh-TW deterministic sanitizer may run on step output.
       const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
       const brandMarket = await getBrandMarket(input.brandId).catch(() => DEFAULT_BRAND_MARKET);
+      const strategyRecordOverrides = getIgStrategyRecordOverrides(sqSlugNew, brandMarket.isZhTW);
 
       // 3. Inject 100s scout data (real-time festivals/trending/news)
       let scoutBlock = "";
@@ -1779,7 +1792,10 @@ export const quickTaskRouter = router({
         const step = stepsRaw[i];
         const stageStart = Date.now() - startedAt;
         const stageKey = `step${i + 1}`;
-        const stageLabel = step.name ?? step.title ?? `Step ${i + 1}`;
+        const internalStageLabel = step.name ?? step.title ?? `Step ${i + 1}`;
+        const publicStageLabel = strategyPublicPolicy
+          ? getIgStrategyPublicSectionLabel(sqSlugNew, i, brandMarket.isZhTW)!
+          : internalStageLabel;
         const aid = Number(step.assignedAgentId);
         const a = agentMap[aid];
         const agentName = a?.name ?? step.assignedAgentName ?? "Squad Agent";
@@ -1805,7 +1821,16 @@ export const quickTaskRouter = router({
           ? `▸ 全文禁句尾與句中驚嘆號（! 與 ！都禁）；禁 emoji；繁體台灣用語（用「管道」非「渠道」，不得簡體字）。\n▸ 禁業配 / 空洞套語：「強大功能」「突破性的功能」「期待你的回音」「期待聽到你的想法」「非常期待與你合作」「讓我們一起創造」「一起創造美好的合作」「管理品牌形象」「在這個數位時代」「更加精彩」「非常契合」等一律不准出現。沉穩、真誠、務實的守護者語氣，5 個 step 語氣必須一致。`
           : `▸ 全文一律使用 ${brandMarket.outputLanguage}（品牌目標市場語言）撰寫，不得混入中文。\n▸ 語氣沉穩、真誠、務實，5 個 step 語氣必須一致；避免浮誇銷售腔、空洞套語與 PR 腔。`;
         const VOICE_GUARD = `\n══════════════════════════════════════════\n【文字衛生與交付物保真 — 違反直接不合格，輸出前逐句自查】\n══════════════════════════════════════════\n${voiceLangRules}\n▸ 收尾用一個對方會想回的具體問句，不要 PR 套語。\n▸ **交付物必須對得上本 step 的名稱與功能，不是每個 step 都寫一封邀約信**：\n  ・名稱含「Brief / 資料包」＝給 KOL 看的品牌資料文件（條列：品牌背景、目標受眾、合作規格、報酬與時程方向、使用方式），**不是邀請信**。\n  ・名稱含「報價回應 / 議價」＝在「KOL 已回覆報價」情境下你方的回信（含可接受 / 需調整兩種談法），**不是群發邀約**。\n  ・名稱含「追蹤 / follow-up」＝未回覆時的短追蹤（不催促，給新切入點）。\n  ・名稱含「感謝 / 結案」＝內容上線後的感謝＋成效回饋詢問＋長期關係。\n  ・名稱含「邀請 / 開場 / 主信」＝完整可寄出的邀約信。\n══════════════════════════════════════════`;
-        const system = `${persona}\nSquad「${squad.name}」步驟「${stageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}\n步驟說明：${step.description ?? ""}\n預期產出：${step.outputType ?? step.outputKind ?? "(未指定)"}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合上方「交付物保真」對「${stageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
+        const publicOutputRules = strategyPublicPolicy
+          ? buildIgStrategyPublicPromptRules(publicStageLabel, brandMarket.isZhTW)
+          : "";
+        const promptHeader = strategyPublicPolicy
+          ? `你負責策略報告章節「${publicStageLabel}」。\n內部參考方法：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}`
+          : `Squad「${squad.name}」步驟「${internalStageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}`;
+        const expectedOutput = strategyPublicPolicy
+          ? publicStageLabel
+          : step.outputType ?? step.outputKind ?? "(未指定)";
+        const system = `${persona}\n${promptHeader}\n步驟說明：${step.description ?? ""}\n預期產出：${expectedOutput}${ZERO_TOLERANCE}${VOICE_GUARD}${publicOutputRules}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合上方「交付物保真」對「${publicStageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
 
         const userMsg = [
           `【任務主題】${input.topic || "(未指定)"}`,
@@ -1836,25 +1861,42 @@ export const quickTaskRouter = router({
               if (latinPunctLang(brandMarket.outputLanguage)) text = normalizeLatinPunct(text);
             }
           } catch { /* fail-safe: keep raw text */ }
-          prevOutputs.push(`【${stageLabel}】${text.slice(0, 800)}`);
-          variants.push({
-            label: stageLabel,
+          const privateTerms = strategyPublicPolicy ? [
+            { value: squad.name, replacement: { zh: "策略團隊", en: "strategy team" } },
+            {
+              value: typeof squad.methodology === "string" ? squad.methodology : squad.methodology?.author,
+              replacement: { zh: "策略方法", en: "strategy approach" },
+            },
+            { value: a?.name ?? step.assignedAgentName, replacement: { zh: "策略團隊", en: "strategy team" } },
+            { value: a?.title, replacement: { zh: "策略團隊", en: "strategy team" } },
+            { value: a?.specialty, replacement: { zh: "策略方法", en: "strategy approach" } },
+            { value: a?.methodology, replacement: { zh: "策略方法", en: "strategy approach" } },
+          ] : undefined;
+          const variant = applyIgStrategyPublicBoundary(sqSlugNew, {
+            label: internalStageLabel,
             caption: text,
             hashtags: [],
             image: { style: null, url: null, status: "skipped" },
             agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+          }, {
+            stepIndex: i,
+            steps: stepsRaw,
+            isZhTW: brandMarket.isZhTW,
+            privateTerms,
           });
-          stages.push({ key: stageKey, label: stageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
+          prevOutputs.push(`【${variant.label}】${variant.caption.slice(0, 800)}`);
+          variants.push(variant);
+          stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
         } catch (e: any) {
-          errors.push(`step ${i+1} (${stageLabel}): ${e?.message ?? e}`);
+          errors.push(`step ${i+1} (${publicStageLabel}): ${e?.message ?? e}`);
           variants.push({
-            label: stageLabel,
+            label: publicStageLabel,
             caption: "",
             hashtags: [],
             image: { style: null, url: null, status: "failed" },
             agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
           });
-          stages.push({ key: stageKey, label: stageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
+          stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
         }
       }
 
@@ -1887,17 +1929,21 @@ export const quickTaskRouter = router({
           const persisted = await recordTaskRun({
             userId,
             brandId: input.brandId ?? null,
-            workspace: "facebook", // squad 100s default — could be inferred from squad
-            taskId: input.squadSlug,
-            taskLabel: squad.name ?? input.squadSlug,
+            workspace: strategyRecordOverrides?.workspace ?? "facebook",
+            platform: strategyRecordOverrides?.platform,
+            outputType: strategyRecordOverrides?.outputType,
+            taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
+            taskLabel: strategyRecordOverrides?.taskLabel ?? squad.name ?? input.squadSlug,
             tier: "99s",
-            title: (await import("../_core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
+            title: strategyRecordOverrides?.taskLabel
+              ?? (await import("../_core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
             content: JSON.stringify(variants, null, 2),
             metadata: {
               latencyMs: Date.now() - startedAt,
               squadSlug: input.squadSlug,
               variantCount: variants.length,
               inputs: { topic: input.topic ?? "" },
+              presentation: strategyRecordOverrides?.presentation,
             },
           });
           outputId = persisted.outputId;
@@ -1908,7 +1954,7 @@ export const quickTaskRouter = router({
       }
 
       return {
-        taskId: input.squadSlug,
+        taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
         totalLatencyMs: Date.now() - startedAt,
         fetchedUrl: null,
         captionAgent,

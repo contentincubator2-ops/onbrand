@@ -40,6 +40,7 @@ import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
+import { getStrategyPresentationMockup } from "../lib/strategyPresentation";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
@@ -1409,6 +1410,12 @@ export default function RunPage() {
     // but a legacy "fb-100-…" id reaching here from any other path must
     // still resolve to the renamed mockup/prefix logic. Inline + idempotent.
     const taskId = (data?.mission?.taskId ?? "").replace(/^([a-z]+)-100-/, "$1-99-");
+
+    // Server-owned metadata flag: only the five catalogued IG strategy
+    // reports use this presentation. Check before task-id substring routing
+    // so visual-story/live-first/document cannot be mistaken for post mockups.
+    const strategyReportMockup = getStrategyPresentationMockup(data?.metadata);
+    if (strategyReportMockup) return strategyReportMockup as any;
 
     // 2026-05-18 (CJ「改成用 word 形式，不要 ppt」): these FB squads are
     // strategy plans / reports / playbooks, NOT postable social content

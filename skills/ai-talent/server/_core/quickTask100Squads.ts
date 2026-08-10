@@ -21,6 +21,15 @@
  * marked as Phase 2 work in their description).
  */
 
+export interface SquadPublicOutputPolicy {
+  /** Server-owned presentation mode. The client cannot opt arbitrary tasks in. */
+  presentation: "strategy-report";
+  /** Customer-facing section labels in DB step order. */
+  sectionLabels: Array<{ en: string; zh: string }>;
+  /** Method/author aliases used only for generation and never exposed in report copy. */
+  privateAliases?: string[];
+}
+
 export interface SquadIndexEntry {
   /** Stable task id surfaced in listFB / clicked by user */
   id: string;
@@ -41,6 +50,8 @@ export interface SquadIndexEntry {
   primary_question?: string;
   /** Override the generic intake input config. */
   primary_input?: { key: string; placeholder: string; type: "textarea" | "text" };
+  /** Optional public-output boundary. Unlisted squads retain their legacy output byte-for-byte. */
+  publicOutput?: SquadPublicOutputPolicy;
 }
 
 // ─── FB 100s squads (11 — slugs verified to exist in DB 2026-05-06) ────
@@ -206,6 +217,16 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       placeholder: "例：幫餐廳老闆學拍菜單照、幫健身新手不踩雷、幫 SOHO 族管理時間",
       type: "textarea",
     },
+    publicOutput: {
+      presentation: "strategy-report",
+      privateAliases: ["Youtility", "Jay Baer", "Baer"],
+      sectionLabels: [
+        { en: "Audience Needs and Content Opportunities", zh: "受眾問題與內容機會" },
+        { en: "Useful Content Ideas", zh: "實用內容提案" },
+        { en: "Information Design Direction", zh: "資訊視覺方向" },
+        { en: "Sharing and Engagement Plan", zh: "分享與互動規劃" },
+      ],
+    },
   },
   {
     id: "ig-99-visual-story",
@@ -219,6 +240,17 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       key: "topic",
       placeholder: "例：目前太雜亂，想走極簡日系奶油色系，參考 @xxx 的構圖方式",
       type: "textarea",
+    },
+    publicOutput: {
+      presentation: "strategy-report",
+      privateAliases: ["Chris Do", "The Futur"],
+      sectionLabels: [
+        { en: "Brand Visual Language", zh: "品牌視覺語言" },
+        { en: "Brand Story Direction", zh: "品牌故事主軸" },
+        { en: "Weekly Visual Content", zh: "每週視覺內容" },
+        { en: "Caption Copy", zh: "貼文文案" },
+        { en: "Consistency Review", zh: "一致性檢核" },
+      ],
     },
   },
   {
@@ -234,6 +266,15 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       placeholder: "例：每週四晚上 8 點直播 45 分鐘，分享品牌經營心得，目的是建立信任感",
       type: "textarea",
     },
+    publicOutput: {
+      presentation: "strategy-report",
+      privateAliases: ["Live-First", "Brian Fanzo"],
+      sectionLabels: [
+        { en: "Live Series Plan", zh: "直播系列規劃" },
+        { en: "Live Session Script", zh: "直播腳本" },
+        { en: "Post-Live Content Repurposing", zh: "直播後內容再製" },
+      ],
+    },
   },
   {
     id: "ig-99-document",
@@ -248,6 +289,15 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       placeholder: "例：設計師接案日常、產品從打樣到出貨的過程、客戶見面 / 工作室環境",
       type: "textarea",
     },
+    publicOutput: {
+      presentation: "strategy-report",
+      privateAliases: ["GaryVee", "Gary Vee", "Gary Vaynerchuk", "Document Don't Create"],
+      sectionLabels: [
+        { en: "Daily Documentation Plan", zh: "日常紀錄規劃" },
+        { en: "Capture and Storytelling Guide", zh: "拍攝與敘事引導" },
+        { en: "Multi-Format Content Repurposing", zh: "多格式內容再製" },
+      ],
+    },
   },
   {
     id: "ig-99-radical-transparency",
@@ -261,6 +311,16 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       key: "topic",
       placeholder: "例：第一年虧損差點收掉、改配方失敗的過程、曾被客戶退單的經驗",
       type: "textarea",
+    },
+    publicOutput: {
+      presentation: "strategy-report",
+      privateAliases: ["Rachel Hollis", "Radical Transparency"],
+      sectionLabels: [
+        { en: "Authentic Story Sources", zh: "真實故事素材" },
+        { en: "Storytelling Script", zh: "敘事腳本" },
+        { en: "Visual System", zh: "視覺系統" },
+        { en: "Values-Led Community Content", zh: "價值觀社群內容" },
+      ],
     },
   },
   {
