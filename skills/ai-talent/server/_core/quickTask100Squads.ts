@@ -24,6 +24,8 @@
 export interface SquadPublicOutputPolicy {
   /** Server-owned presentation mode. The client cannot opt arbitrary tasks in. */
   presentation: "strategy-report";
+  /** Stable fallback number used when a locale has no semantic task label. */
+  reportNumber: number;
   /** Customer-facing section labels in DB step order. */
   sectionLabels: Array<{ en: string; zh: string }>;
   /** Method/author aliases used only for generation and never exposed in report copy. */
@@ -219,6 +221,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     },
     publicOutput: {
       presentation: "strategy-report",
+      reportNumber: 1,
       privateAliases: ["Youtility", "Jay Baer", "Baer"],
       sectionLabels: [
         { en: "Audience Needs and Content Opportunities", zh: "受眾問題與內容機會" },
@@ -243,6 +246,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     },
     publicOutput: {
       presentation: "strategy-report",
+      reportNumber: 2,
       privateAliases: ["Chris Do", "The Futur"],
       sectionLabels: [
         { en: "Brand Visual Language", zh: "品牌視覺語言" },
@@ -268,6 +272,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     },
     publicOutput: {
       presentation: "strategy-report",
+      reportNumber: 3,
       privateAliases: ["Live-First", "Brian Fanzo"],
       sectionLabels: [
         { en: "Live Series Plan", zh: "直播系列規劃" },
@@ -291,6 +296,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     },
     publicOutput: {
       presentation: "strategy-report",
+      reportNumber: 4,
       privateAliases: ["GaryVee", "Gary Vee", "Gary Vaynerchuk", "Document Don't Create"],
       sectionLabels: [
         { en: "Daily Documentation Plan", zh: "日常紀錄規劃" },
@@ -314,6 +320,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
     },
     publicOutput: {
       presentation: "strategy-report",
+      reportNumber: 5,
       privateAliases: ["Rachel Hollis", "Radical Transparency"],
       sectionLabels: [
         { en: "Authentic Story Sources", zh: "真實故事素材" },

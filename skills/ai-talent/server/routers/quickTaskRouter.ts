@@ -1739,7 +1739,7 @@ export const quickTaskRouter = router({
       // whether the zh-TW deterministic sanitizer may run on step output.
       const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
       const brandMarket = await getBrandMarket(input.brandId).catch(() => DEFAULT_BRAND_MARKET);
-      const strategyRecordOverrides = getIgStrategyRecordOverrides(sqSlugNew, brandMarket.isZhTW);
+      const strategyRecordOverrides = getIgStrategyRecordOverrides(sqSlugNew, brandMarket.outputLanguage);
 
       // 3. Inject 100s scout data (real-time festivals/trending/news)
       let scoutBlock = "";
@@ -1794,7 +1794,7 @@ export const quickTaskRouter = router({
         const stageKey = `step${i + 1}`;
         const internalStageLabel = step.name ?? step.title ?? `Step ${i + 1}`;
         const publicStageLabel = strategyPublicPolicy
-          ? getIgStrategyPublicSectionLabel(sqSlugNew, i, brandMarket.isZhTW)!
+          ? getIgStrategyPublicSectionLabel(sqSlugNew, i, brandMarket.outputLanguage)!
           : internalStageLabel;
         const aid = Number(step.assignedAgentId);
         const a = agentMap[aid];
@@ -1822,7 +1822,7 @@ export const quickTaskRouter = router({
           : `▸ 全文一律使用 ${brandMarket.outputLanguage}（品牌目標市場語言）撰寫，不得混入中文。\n▸ 語氣沉穩、真誠、務實，5 個 step 語氣必須一致；避免浮誇銷售腔、空洞套語與 PR 腔。`;
         const VOICE_GUARD = `\n══════════════════════════════════════════\n【文字衛生與交付物保真 — 違反直接不合格，輸出前逐句自查】\n══════════════════════════════════════════\n${voiceLangRules}\n▸ 收尾用一個對方會想回的具體問句，不要 PR 套語。\n▸ **交付物必須對得上本 step 的名稱與功能，不是每個 step 都寫一封邀約信**：\n  ・名稱含「Brief / 資料包」＝給 KOL 看的品牌資料文件（條列：品牌背景、目標受眾、合作規格、報酬與時程方向、使用方式），**不是邀請信**。\n  ・名稱含「報價回應 / 議價」＝在「KOL 已回覆報價」情境下你方的回信（含可接受 / 需調整兩種談法），**不是群發邀約**。\n  ・名稱含「追蹤 / follow-up」＝未回覆時的短追蹤（不催促，給新切入點）。\n  ・名稱含「感謝 / 結案」＝內容上線後的感謝＋成效回饋詢問＋長期關係。\n  ・名稱含「邀請 / 開場 / 主信」＝完整可寄出的邀約信。\n══════════════════════════════════════════`;
         const publicOutputRules = strategyPublicPolicy
-          ? buildIgStrategyPublicPromptRules(publicStageLabel, brandMarket.isZhTW)
+          ? buildIgStrategyPublicPromptRules(publicStageLabel, brandMarket.outputLanguage)
           : "";
         const promptHeader = strategyPublicPolicy
           ? `你負責策略報告章節「${publicStageLabel}」。\n內部參考方法：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}`
@@ -1881,7 +1881,7 @@ export const quickTaskRouter = router({
           }, {
             stepIndex: i,
             steps: stepsRaw,
-            isZhTW: brandMarket.isZhTW,
+            outputLanguage: brandMarket.outputLanguage,
             privateTerms,
           });
           prevOutputs.push(`【${variant.label}】${variant.caption.slice(0, 800)}`);
@@ -1889,13 +1889,17 @@ export const quickTaskRouter = router({
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
         } catch (e: any) {
           errors.push(`step ${i+1} (${publicStageLabel}): ${e?.message ?? e}`);
-          variants.push({
-            label: publicStageLabel,
+          variants.push(applyIgStrategyPublicBoundary(sqSlugNew, {
+            label: internalStageLabel,
             caption: "",
             hashtags: [],
             image: { style: null, url: null, status: "failed" },
             agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
-          });
+          }, {
+            stepIndex: i,
+            steps: stepsRaw,
+            outputLanguage: brandMarket.outputLanguage,
+          }));
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
         }
       }

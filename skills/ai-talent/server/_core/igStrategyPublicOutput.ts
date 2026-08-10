@@ -15,7 +15,7 @@ export interface StrategyStepDescriptor {
 export interface StrategyPublicVariant {
   label: string;
   caption: string;
-  [key: string]: unknown;
+  agent?: unknown;
 }
 
 export interface StrategyPrivateTerm {
@@ -35,6 +35,66 @@ export interface IgStrategyRecordOverrides {
   platform: "instagram";
   outputType: "report";
   presentation: "strategy-report";
+}
+
+interface GenericStrategyLocaleCopy {
+  reportTitle: string;
+  sectionPrefix: string;
+}
+
+/**
+ * Safe deterministic labels for the output languages exposed by onboarding.
+ * Semantic per-squad labels currently exist in zh-TW/en; other languages use
+ * a localized generic report/section label instead of leaking an English one.
+ */
+const GENERIC_STRATEGY_LOCALE_COPY: Record<string, GenericStrategyLocaleCopy> = {
+  "zh-cn": { reportTitle: "Instagram 策略报告", sectionPrefix: "策略章节" },
+  ja: { reportTitle: "Instagram 戦略レポート", sectionPrefix: "戦略セクション" },
+  ko: { reportTitle: "Instagram 전략 보고서", sectionPrefix: "전략 섹션" },
+  th: { reportTitle: "รายงานกลยุทธ์ Instagram", sectionPrefix: "ส่วนกลยุทธ์" },
+  vi: { reportTitle: "Báo cáo chiến lược Instagram", sectionPrefix: "Phần chiến lược" },
+  id: { reportTitle: "Laporan Strategi Instagram", sectionPrefix: "Bagian strategi" },
+  ms: { reportTitle: "Laporan Strategi Instagram", sectionPrefix: "Bahagian strategi" },
+  de: { reportTitle: "Instagram-Strategiebericht", sectionPrefix: "Strategieabschnitt" },
+  fr: { reportTitle: "Rapport stratégique Instagram", sectionPrefix: "Section stratégique" },
+  es: { reportTitle: "Informe de estrategia de Instagram", sectionPrefix: "Sección estratégica" },
+  pt: { reportTitle: "Relatório de estratégia do Instagram", sectionPrefix: "Seção estratégica" },
+  it: { reportTitle: "Report strategico Instagram", sectionPrefix: "Sezione strategica" },
+  ru: { reportTitle: "Стратегический отчёт Instagram", sectionPrefix: "Раздел стратегии" },
+  ar: { reportTitle: "تقرير استراتيجية إنستغرام", sectionPrefix: "قسم الاستراتيجية" },
+  hi: { reportTitle: "Instagram रणनीति रिपोर्ट", sectionPrefix: "रणनीति अनुभाग" },
+  bn: { reportTitle: "Instagram কৌশল প্রতিবেদন", sectionPrefix: "কৌশল বিভাগ" },
+  ur: { reportTitle: "Instagram حکمتِ عملی رپورٹ", sectionPrefix: "حکمتِ عملی کا حصہ" },
+};
+
+function normalizedOutputLanguage(outputLanguage?: string | null): string {
+  return (outputLanguage?.trim() || "zh-TW").replace(/_/g, "-").toLowerCase();
+}
+
+function isEnglishOutput(outputLanguage?: string | null): boolean {
+  return normalizedOutputLanguage(outputLanguage).split("-")[0] === "en";
+}
+
+function isTraditionalChineseOutput(outputLanguage?: string | null): boolean {
+  const language = normalizedOutputLanguage(outputLanguage);
+  return language === "zh"
+    || language === "zh-tw"
+    || language === "zh-hant"
+    || language.startsWith("zh-hant-")
+    || language === "zh-hk"
+    || language === "zh-mo";
+}
+
+function genericLocaleCopy(outputLanguage?: string | null): GenericStrategyLocaleCopy | null {
+  const language = normalizedOutputLanguage(outputLanguage);
+  const baseLanguage = language.split("-")[0] ?? "";
+  return GENERIC_STRATEGY_LOCALE_COPY[language]
+    ?? GENERIC_STRATEGY_LOCALE_COPY[baseLanguage]
+    ?? null;
+}
+
+function neutralSectionLabel(stepIndex: number): string {
+  return `§${stepIndex + 1}`;
 }
 
 const resolvedPolicies: ResolvedIgStrategyPublicPolicy[] = ALL_99S_SQUADS
@@ -58,20 +118,31 @@ export function getIgStrategyExecutionSlug(idOrSlug: string): string {
   return getIgStrategyPublicPolicy(idOrSlug)?.entry.squad_slug ?? normalizeTaskId(idOrSlug);
 }
 
-function publicTaskLabel(entry: SquadIndexEntry, isZhTW: boolean): string {
-  return typeof entry.label === "string" ? entry.label : (isZhTW ? entry.label.zh : entry.label.en);
+function publicTaskLabel(
+  entry: SquadIndexEntry,
+  policy: SquadPublicOutputPolicy,
+  outputLanguage: string,
+): string {
+  if (typeof entry.label === "string") return entry.label;
+  if (isTraditionalChineseOutput(outputLanguage)) return entry.label.zh;
+  if (isEnglishOutput(outputLanguage)) return entry.label.en;
+  const reportNumber = policy.reportNumber;
+  const generic = genericLocaleCopy(outputLanguage);
+  return generic
+    ? `${generic.reportTitle} · ${reportNumber}`
+    : `Instagram · §${reportNumber}`;
 }
 
 /** Persistence fields are server-owned so other squads cannot opt themselves into report mode. */
 export function getIgStrategyRecordOverrides(
   idOrSlug: string,
-  isZhTW = true,
+  outputLanguage = "zh-TW",
 ): IgStrategyRecordOverrides | null {
   const resolved = getIgStrategyPublicPolicy(idOrSlug);
   if (!resolved) return null;
   return {
     taskId: resolved.entry.id,
-    taskLabel: publicTaskLabel(resolved.entry, isZhTW),
+    taskLabel: publicTaskLabel(resolved.entry, resolved.policy, outputLanguage),
     workspace: "instagram",
     platform: "instagram",
     outputType: "report",
@@ -86,20 +157,25 @@ function textValue(value: unknown): string | null {
 function publicSectionLabel(
   policy: SquadPublicOutputPolicy,
   stepIndex: number,
-  isZhTW: boolean,
+  outputLanguage: string,
 ): string {
   const localized = policy.sectionLabels[stepIndex];
-  if (localized) return isZhTW ? localized.zh : localized.en;
-  return isZhTW ? `策略章節 ${stepIndex + 1}` : `Strategy Section ${stepIndex + 1}`;
+  if (localized && isTraditionalChineseOutput(outputLanguage)) return localized.zh;
+  if (localized && isEnglishOutput(outputLanguage)) return localized.en;
+  if (isTraditionalChineseOutput(outputLanguage)) return `策略章節 ${stepIndex + 1}`;
+  if (isEnglishOutput(outputLanguage)) return `Strategy Section ${stepIndex + 1}`;
+  const generic = genericLocaleCopy(outputLanguage);
+  if (generic) return `${generic.sectionPrefix} ${stepIndex + 1}`;
+  return neutralSectionLabel(stepIndex);
 }
 
 export function getIgStrategyPublicSectionLabel(
   idOrSlug: string,
   stepIndex: number,
-  isZhTW: boolean,
+  outputLanguage = "zh-TW",
 ): string | null {
   const resolved = getIgStrategyPublicPolicy(idOrSlug);
-  return resolved ? publicSectionLabel(resolved.policy, stepIndex, isZhTW) : null;
+  return resolved ? publicSectionLabel(resolved.policy, stepIndex, outputLanguage) : null;
 }
 
 function replaceExact(text: string, privateTerm: string | null, publicTerm: string): string {
@@ -137,22 +213,76 @@ function normalizeReportedAudienceMix(text: string): string {
     .join("");
 }
 
-const INTERNAL_MARKER = /\b(?:squads?|agents?|steps?|owners?)\b|\b(?:output\s*[_-]?\s*(?:types?|kinds?))\b|\b(?:prompt|model|database\s+key)\s*(?:[:：=「])|\b(?:the\s+)?model\s+(?:recommends?|suggests?|generated?|created?)\b|\b(?:this\s+)?prompt\s+(?:generated?|created?|produced?)\b|(?:負責人|提示詞|模型|資料庫鍵值)\s*(?:[:：=「])|(?:我是\s*|身為你的\s*|I\s*(?:am|'m|’m)\s+|As your\s+)[^\n。.!?]{0,80}(?:策略顧問|策略師|strategist|consultant)/i;
+const INTERNAL_LINE_PREFIX = String.raw`(?:^|\n)[^\S\r\n]*(?:(?:#{1,6}|[-*+>]|[0-9]+[.)])[^\S\r\n]*)*`;
+const SYSTEM_PREFACE_PREFIX = String.raw`^[^\S\r\n]*(?:(?:#{1,6}|[-*+>]|[0-9]+[.)])[^\S\r\n]*)*`;
+const INTERNAL_EMPHASIS_CLOSE = String.raw`(?:\*\*|__)?`;
+const INTERNAL_FIELD_SUFFIX = String.raw`[^\S\r\n]*(?:[:：=「])`;
+const INTERNAL_MODEL_TOKEN = String.raw`(?:(?:(?:AI|LLM|language|system)[^\S\r\n]+)?model|(?:系統|語言)?模型)`;
+const INTERNAL_PROMPT_TOKEN = String.raw`(?:(?:system[^\S\r\n]+)?prompt|(?:系統)?提示詞)`;
+const INTERNAL_DATABASE_KEY_TOKEN = String.raw`(?:database[^\S\r\n]+key|database_key|databaseKey|db[^\S\r\n]+key|資料庫鍵值)`;
+const INTERNAL_NARRATIVE_VERBS = String.raw`(?:recommends?|suggests?|generated?|created?|produced?)`;
 
-function sanitizeSystemPrefaces(text: string, isZhTW: boolean): string {
-  const sectionWord = isZhTW ? "章節" : "Section";
-  const sectionSeparator = isZhTW ? "：" : ":";
-  const deliverableWord = isZhTW ? "交付項目" : "deliverable";
+const INTERNAL_MARKER = new RegExp([
+  String.raw`\b(?:squads?|agents?|steps?|owners?)\b`,
+  String.raw`\b(?:output\s*[_-]?\s*(?:types?|kinds?))\b`,
+  String.raw`\b(?:database[^\S\r\n]+key|database_key|databaseKey|db[^\S\r\n]+key)${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}`,
+  String.raw`資料庫鍵值${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}`,
+  `${INTERNAL_LINE_PREFIX}${INTERNAL_MODEL_TOKEN}${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}`,
+  `${INTERNAL_LINE_PREFIX}${INTERNAL_PROMPT_TOKEN}${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}`,
+  String.raw`\b(?:the|this)[^\S\r\n]+model${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}`,
+  String.raw`\b(?:AI|LLM|language|system)[^\S\r\n]+model(?:${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}|[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\b)`,
+  String.raw`\bsystem[^\S\r\n]+prompt(?:${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}|[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\b)`,
+  String.raw`\b(?:the|this)[^\S\r\n]+model[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\b`,
+  `${INTERNAL_LINE_PREFIX}${INTERNAL_MODEL_TOKEN}[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\\b`,
+  String.raw`\b(?:the|this)[^\S\r\n]+prompt[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\b`,
+  `${INTERNAL_LINE_PREFIX}${INTERNAL_PROMPT_TOKEN}[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\\b`,
+  String.raw`負責人\s*(?:[:：=「])`,
+  String.raw`(?:我是\s*|身為你的\s*|I\s*(?:am|'m|’m)\s+|As your\s+)[^\n。.!?]{0,80}(?:策略顧問|策略師|strategist|consultant)`,
+].join("|"), "i");
+
+const SYSTEM_PREFACE_LINE = new RegExp(
+  `${SYSTEM_PREFACE_PREFIX}(?:`
+    + String.raw`(?:the[^\S\r\n]+)?(?:squad|agent|strategy[^\S\r\n]+team)[^\S\r\n]+(?:prepared|generated|created)`
+    + String.raw`|(?:the|this)[^\S\r\n]+model[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\b`
+    + String.raw`|(?:the|this)[^\S\r\n]+prompt[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\b`
+    + String.raw`|(?:the|this)[^\S\r\n]+model${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}`
+    + String.raw`|(?:(?:the|this|our)[^\S\r\n]+)?(?:AI|LLM|language|system)[^\S\r\n]+model(?:${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}|[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\b)`
+    + String.raw`|(?:(?:the|this|our)[^\S\r\n]+)?system[^\S\r\n]+prompt(?:${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}|[^\S\r\n]+${INTERNAL_NARRATIVE_VERBS}\b)`
+    + `|${INTERNAL_MODEL_TOKEN}(?:${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}|[^\\S\\r\\n]+${INTERNAL_NARRATIVE_VERBS}\\b)`
+    + `|${INTERNAL_PROMPT_TOKEN}(?:${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}|[^\\S\\r\\n]+${INTERNAL_NARRATIVE_VERBS}\\b)`
+    + `|${INTERNAL_DATABASE_KEY_TOKEN}${INTERNAL_EMPHASIS_CLOSE}${INTERNAL_FIELD_SUFFIX}`
+    + String.raw`|(?:squad|agent|owner|負責人)\s*(?:[:：=「]|$)`
+    + String.raw`|(?:我是\s*|身為你的\s*|I\s*(?:am|'m|’m)\s+|As your\s+)[^\n。.!?]{0,80}(?:策略顧問|策略師|strategist|consultant)`
+    + ")",
+  "i",
+);
+
+function sanitizeSystemPrefaces(text: string, outputLanguage: string): string {
+  const isZh = isTraditionalChineseOutput(outputLanguage);
+  const isEnglish = isEnglishOutput(outputLanguage);
+  const sectionSeparator = isZh ? "：" : ":";
+  const deliverableWord = isZh ? "交付項目" : isEnglish ? "deliverable" : "";
   const normalized = text
     .split("\n")
-    .filter((line) => !/^\s*(?:#{1,6}\s*)?(?:(?:the\s+)?(?:squad|agent|strategy team)\s+(?:prepared|generated|created)|(?:the\s+)?model\s+(?:recommends?|suggests?|generated?|created?)|(?:this\s+)?prompt\s+(?:generated?|created?|produced?)|(?:我是\s*|身為你的\s*|I\s*(?:am|'m|’m)\s+|As your\s+)[^\n。.!?]{0,80}(?:策略顧問|策略師|strategist|consultant)|(?:squad|agent|owner|prompt|model|database\s+key|負責人|提示詞|模型|資料庫鍵值)\s*(?:[:：=「]|$))/i.test(line))
+    .filter((line) => !SYSTEM_PREFACE_LINE.test(line))
     .join("\n")
     .replace(/(?:^|\n)\s*(?:我是\s*|身為你的\s*|I\s*(?:am|'m|’m)\s+|As your\s+)[^\n。.!?]{0,80}(?:策略顧問|策略師|strategist|consultant)[^\n。.!?]*[。.!]?/gi, "\n")
-    .replace(/(?:^|\n)\s*(?:internal\s+)?step\s*(\d+)\s*[:：-]?/gi, (_match, n) => `\n${sectionWord} ${n}${sectionSeparator}`)
+    .replace(/(?:^|\n)\s*(?:internal\s+)?step\s*(\d+)\s*[:：-]?/gi, (_match, n) => {
+      const stepIndex = Math.max(0, Number(n) - 1);
+      const generic = genericLocaleCopy(outputLanguage);
+      const sectionLabel = isZh
+        ? `章節 ${n}`
+        : isEnglish
+          ? `Section ${n}`
+          : generic
+            ? `${generic.sectionPrefix} ${n}`
+            : neutralSectionLabel(stepIndex);
+      return `\n${sectionLabel}${sectionSeparator}`;
+    })
     .replace(/\boutput\s*[_-]?\s*(?:types?|kinds?)\b/gi, deliverableWord)
     .replace(/(?:以下是(?:本(?:步驟|階段))?(?:的)?產出|here(?:'s| is) (?:the )?output)\s*[:：]?\s*/gi, "")
     .replace(/(?:^|\n)\s*(?:我是\s*|I am\s+)(?:the\s+)?(?:策略團隊|strategy team)[^\n。.!?]*[。.!]?/gi, "\n");
-  if (isZhTW) {
+  if (isZh) {
     return normalized
       .replace(/下一個\s+step\b\s*/gi, "下一個章節")
       .replace(/\b(?:squads?|agents?)\b/gi, "策略團隊")
@@ -160,13 +290,18 @@ function sanitizeSystemPrefaces(text: string, isZhTW: boolean): string {
       .replace(/\bowners?\b/gi, "執行角色")
       .replace(/負責人/g, "執行角色");
   }
-  return normalized
-    .replace(/\bnext\s+step\b\s*/gi, "next section ")
-    .replace(/\bsquads?\b/gi, (word) => /s$/i.test(word) ? "strategy teams" : "strategy team")
-    .replace(/\bagents?\b/gi, (word) => /s$/i.test(word) ? "strategy teams" : "strategy team")
-    .replace(/\bsteps?\b/gi, (word) => /s$/i.test(word) ? "actions" : "action")
-    .replace(/\bowners?\b/gi, (word) => /s$/i.test(word) ? "responsible roles" : "responsible role")
-    .replace(/負責人/g, "responsible role");
+  if (isEnglish) {
+    return normalized
+      .replace(/\bnext\s+step\b\s*/gi, "next section ")
+      .replace(/\bsquads?\b/gi, (word) => /s$/i.test(word) ? "strategy teams" : "strategy team")
+      .replace(/\bagents?\b/gi, (word) => /s$/i.test(word) ? "strategy teams" : "strategy team")
+      .replace(/\bsteps?\b/gi, (word) => /s$/i.test(word) ? "actions" : "action")
+      .replace(/\bowners?\b/gi, (word) => /s$/i.test(word) ? "responsible roles" : "responsible role")
+      .replace(/負責人/g, "responsible role");
+  }
+  // Unknown/non-English locales are validate-only. Do not inject English
+  // cleanup words into otherwise localized customer-facing copy.
+  return normalized;
 }
 
 export function findIgStrategyInternalLeaks(
@@ -192,21 +327,23 @@ export function applyIgStrategyPublicBoundary<T extends StrategyPublicVariant>(
   context: {
     stepIndex: number;
     steps: readonly StrategyStepDescriptor[];
-    isZhTW?: boolean;
+    outputLanguage?: string;
     privateTerms?: readonly StrategyPrivateTerm[];
   },
-): T {
+): T | Omit<T, "agent"> {
   const resolved = getIgStrategyPublicPolicy(idOrSlug);
   if (!resolved) return variant;
 
-  const isZhTW = context.isZhTW ?? true;
-  const label = publicSectionLabel(resolved.policy, context.stepIndex, isZhTW);
+  const outputLanguage = context.outputLanguage ?? "zh-TW";
+  const isZh = isTraditionalChineseOutput(outputLanguage);
+  const isEnglish = isEnglishOutput(outputLanguage);
+  const label = publicSectionLabel(resolved.policy, context.stepIndex, outputLanguage);
   let caption = variant.caption;
 
   // Replace every known step name/key from this run, not only the current one:
   // downstream steps receive upstream artifacts and can repeat their private key.
   context.steps.forEach((step, index) => {
-    const replacement = publicSectionLabel(resolved.policy, index, isZhTW);
+    const replacement = publicSectionLabel(resolved.policy, index, outputLanguage);
     caption = replaceExact(caption, textValue(step.name), replacement);
     caption = replaceExact(caption, textValue(step.title), replacement);
     caption = replaceExact(caption, textValue(step.outputType), replacement);
@@ -219,37 +356,49 @@ export function applyIgStrategyPublicBoundary<T extends StrategyPublicVariant>(
     replacement: { zh: "策略方法", en: "strategy approach" },
   }));
   const privateTerms = [...(context.privateTerms ?? []), ...strategyAliasTerms];
-  for (const term of privateTerms) {
-    caption = replacePrivateTerm(
-      caption,
-      textValue(term.value),
-      isZhTW ? term.replacement.zh : term.replacement.en,
-    );
+  if (isZh || isEnglish) {
+    for (const term of privateTerms) {
+      caption = replacePrivateTerm(
+        caption,
+        textValue(term.value),
+        isZh ? term.replacement.zh : term.replacement.en,
+      );
+    }
   }
 
-  const deliverablePrefix = isZhTW ? "交付項目：" : "Deliverable: ";
+  const deliverablePrefix = isZh ? "交付項目：" : isEnglish ? "Deliverable: " : "";
   caption = caption
     .replace(/\b(?:outputType|output_type|outputKind|output_kind)\s*[:=：]\s*/gi, deliverablePrefix)
     .replace(/\s*條目已建置\s*[:：]?\s*/g, "：")
     .replace(/[：:]\s*[：:]+/g, "：");
-  caption = sanitizeSystemPrefaces(caption, isZhTW);
-  caption = normalizeReportedAudienceMix(caption).trim();
+  caption = sanitizeSystemPrefaces(caption, outputLanguage);
+  caption = (isZh ? normalizeReportedAudienceMix(caption) : caption).trim();
 
   if (findIgStrategyInternalLeaks(caption, privateTerms).length > 0) {
     throw new Error("strategy public output validation failed");
   }
 
-  return { ...variant, label, caption };
+  // Agent identity is execution metadata, not part of the customer-facing
+  // report content persisted in mission_outputs.content.
+  const { agent: _privateAgent, ...publicVariant } = variant;
+  return { ...publicVariant, label, caption };
 }
 
-export function buildIgStrategyPublicPromptRules(sectionLabel: string, isZhTW = true): string {
-  if (!isZhTW) {
+export function buildIgStrategyPublicPromptRules(
+  sectionLabel: string,
+  outputLanguage = "zh-TW",
+): string {
+  if (!isTraditionalChineseOutput(outputLanguage)) {
+    const visibleLanguageRule = isEnglishOutput(outputLanguage)
+      ? "Write every customer-visible word and heading in English."
+      : `Write every customer-visible word and heading in ${outputLanguage}; do not mix in English labels.`;
     return `
 [PUBLIC STRATEGY REPORT OUTPUT RULES — HIGHEST PRIORITY]
 This is the customer-facing strategy report section “${sectionLabel}”.
+▸ ${visibleLanguageRule}
 ▸ Return only publishable strategy content. Never expose or explain internal workflow.
 ▸ Never output Squad, step, agent, owner, outputType, outputKind, database keys, model, or prompt details.
-▸ Refer to the target audience as “the audience” and address the reader consistently as “you”.
+▸ Use neutral, idiomatic audience terms in the output language and address the reader consistently in that same language.
 ▸ Use methodology only for internal reasoning. Never use its name or a code variable as a heading, section name, or data status.
 ▸ Start with the content. Do not add system-style prefaces such as “I am…”, “created”, or “here is the output”.`;
   }

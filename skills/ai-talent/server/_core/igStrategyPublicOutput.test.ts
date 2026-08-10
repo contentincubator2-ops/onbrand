@@ -62,12 +62,16 @@ describe("IG strategy public-output policy", () => {
       label: "utility_content_posts",
       caption: "她 / 妳 outputType: utility_content_posts",
       hashtags: [],
+      agent: { id: 17, name: "Internal Agent", avatarUrl: "/private/avatar.png" },
     };
 
-    expect(applyIgStrategyPublicBoundary("ig-hormozi-save-worthy", input, {
+    const output = applyIgStrategyPublicBoundary("ig-hormozi-save-worthy", input, {
       stepIndex: 0,
       steps: YOUTILITY_STEPS,
-    })).toBe(input);
+    });
+
+    expect(output).toBe(input);
+    expect((output as typeof input).agent).toBe(input.agent);
   });
 
   it("keeps non-target execution slugs on the legacy normalization path", () => {
@@ -76,13 +80,13 @@ describe("IG strategy public-output policy", () => {
   });
 
   it("uses localized public labels without mixing Chinese into English output", () => {
-    expect(getIgStrategyPublicSectionLabel("ig-99-youtility", 0, true)).toBe("受眾問題與內容機會");
-    expect(getIgStrategyPublicSectionLabel("ig-99-youtility", 0, false)).toBe("Audience Needs and Content Opportunities");
+    expect(getIgStrategyPublicSectionLabel("ig-99-youtility", 0, "zh-TW")).toBe("受眾問題與內容機會");
+    expect(getIgStrategyPublicSectionLabel("ig-99-youtility", 0, "en-US")).toBe("Audience Needs and Content Opportunities");
 
     const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
       label: "Youtility 內容地圖",
       caption: "outputType: youtility_content_map\nutility_content_posts follows next.",
-    }, { stepIndex: 0, steps: YOUTILITY_STEPS, isZhTW: false });
+    }, { stepIndex: 0, steps: YOUTILITY_STEPS, outputLanguage: "en-US" });
 
     expect(output.label).toBe("Audience Needs and Content Opportunities");
     expect(output.caption).toBe([
@@ -90,6 +94,37 @@ describe("IG strategy public-output policy", () => {
       "Useful Content Ideas follows next.",
     ].join("\n"));
     expect(output.caption).not.toMatch(/[\u3400-\u9fff]/u);
+  });
+
+  it.each([
+    ["ja-JP", "戦略セクション 1", "Instagram 戦略レポート · 1"],
+    ["fr-FR", "Section stratégique 1", "Rapport stratégique Instagram · 1"],
+    ["zh-CN", "策略章节 1", "Instagram 策略报告 · 1"],
+  ])("uses safe labels for the actual output language %s", (outputLanguage, sectionLabel, taskLabel) => {
+    expect(getIgStrategyPublicSectionLabel("ig-99-youtility", 0, outputLanguage)).toBe(sectionLabel);
+    expect(getIgStrategyRecordOverrides("ig-baer-youtility", outputLanguage)?.taskLabel).toBe(taskLabel);
+
+    const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
+      label: "Youtility 內容地圖",
+      caption: "outputType: youtility_content_map",
+    }, { stepIndex: 0, steps: YOUTILITY_STEPS, outputLanguage });
+
+    expect(output.label).toBe(sectionLabel);
+    expect(output.caption).toBe(sectionLabel);
+    expect(output.caption).not.toMatch(/Strategy Section|Deliverable/i);
+  });
+
+  it("uses a language-neutral label when no safe localization is available", () => {
+    expect(getIgStrategyPublicSectionLabel("ig-99-youtility", 0, "tlh")).toBe("§1");
+    expect(getIgStrategyRecordOverrides("ig-baer-youtility", "tlh")?.taskLabel).toBe("Instagram · §1");
+  });
+
+  it("keeps generic localized task titles distinct across strategy reports", () => {
+    const youtility = getIgStrategyRecordOverrides("ig-baer-youtility", "ja-JP")?.taskLabel;
+    const visualStory = getIgStrategyRecordOverrides("ig-chrisdo-visual-story", "ja-JP")?.taskLabel;
+
+    expect(youtility).toBe("Instagram 戦略レポート · 1");
+    expect(visualStory).toBe("Instagram 戦略レポート · 2");
   });
 
   it("replaces internal step names and output keys with public section labels", () => {
@@ -102,6 +137,7 @@ describe("IG strategy public-output policy", () => {
       ].join("\n"),
       hashtags: [],
       image: { status: "skipped" },
+      agent: { id: 17, name: "Internal Agent", avatarUrl: "/private/avatar.png" },
     };
 
     const output = applyIgStrategyPublicBoundary("ig-baer-youtility", input, {
@@ -117,6 +153,23 @@ describe("IG strategy public-output policy", () => {
     expect(output.caption).not.toContain("`受眾問題與內容機會`");
     expect(output.hashtags).toBe(input.hashtags);
     expect(output.image).toBe(input.image);
+    expect(Object.prototype.hasOwnProperty.call(output, "agent")).toBe(false);
+    expect(JSON.stringify(output)).not.toContain("Internal Agent");
+  });
+
+  it("removes agent metadata from failed target variants too", () => {
+    const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
+      label: "Youtility 內容地圖",
+      caption: "",
+      image: { status: "failed" },
+      agent: { id: 17, name: "Internal Agent", title: "Internal Role" },
+    }, { stepIndex: 0, steps: YOUTILITY_STEPS });
+
+    expect(output).toEqual({
+      label: "受眾問題與內容機會",
+      caption: "",
+      image: { status: "failed" },
+    });
   });
 
   it.each([
@@ -209,6 +262,96 @@ describe("IG strategy public-output policy", () => {
     }, { stepIndex: 0, steps: YOUTILITY_STEPS })).toThrow("strategy public output validation failed");
   });
 
+  it.each([
+    "Business model: subscription",
+    "Content model: hub-and-spoke",
+    "Revenue model = recurring subscription",
+    "## Business model: subscription",
+    "The business model: subscription",
+    "The business model recommends subscriptions.",
+    "Our content model suggests three pillars.",
+    "A revenue model generated from recurring sales.",
+    "Writing prompt: describe the audience",
+    "Customer prompt: tell your story",
+    "商業模型：訂閱制",
+    "## 內容模型：教育、案例、互動",
+    "model-driven content",
+  ])("does not treat a customer-facing model phrase as internal metadata: %s", (caption) => {
+    expect(findIgStrategyInternalLeaks(caption)).toEqual([]);
+  });
+
+  it.each([
+    "Model: qwen-plus",
+    "  Model：qwen-plus",
+    "## Model: qwen-plus",
+    "- Model: qwen-plus",
+    "* Model：qwen-plus",
+    "> Model: qwen-plus",
+    "1. Model: qwen-plus",
+    "AI model: qwen-plus",
+    "System model: qwen-plus",
+    "Language model: qwen-plus",
+    "The model: qwen-plus",
+    "This model: qwen-plus",
+    "The AI model: qwen-plus",
+    "Our AI model: qwen-plus",
+    "**Model**: qwen-plus",
+    "Intro\nPrompt=hidden instructions",
+    "- Prompt: hidden instructions",
+    "System prompt: hidden instructions",
+    "The system prompt: hidden instructions",
+    "Our system prompt: hidden instructions",
+    "The system prompt generated the result.",
+    "Database key: secret_key",
+    "database_key: secret_key",
+    "databaseKey: secret_key",
+    "db key: secret_key",
+    "模型：qwen-plus",
+    "提示詞：hidden",
+    "The model recommends this direction.",
+    "This prompt generated the plan.",
+  ])("still detects a system model or prompt marker: %s", (caption) => {
+    expect(findIgStrategyInternalLeaks(caption)).toContain("internal-marker");
+  });
+
+  it("keeps legitimate business and content model headings in public reports", () => {
+    const caption = [
+      "Business model: subscription",
+      "Content model: hub-and-spoke",
+      "The business model recommends subscriptions.",
+      "Our content model suggests three pillars.",
+    ].join("\n");
+    const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
+      label: "Youtility 內容地圖",
+      caption,
+    }, { stepIndex: 0, steps: YOUTILITY_STEPS, outputLanguage: "en-US" });
+
+    expect(output.caption).toBe(caption);
+  });
+
+  it("removes list-prefixed model metadata before publishing", () => {
+    const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
+      label: "Youtility 內容地圖",
+      caption: "- Model: qwen-plus\nPublishable strategy content.",
+    }, { stepIndex: 0, steps: YOUTILITY_STEPS, outputLanguage: "en-US" });
+
+    expect(output.caption).toBe("Publishable strategy content.");
+    expect(findIgStrategyInternalLeaks(output.caption)).toEqual([]);
+  });
+
+  it.each([
+    "The system prompt: hidden instructions\nPublishable strategy content.",
+    "- **Model**: qwen-plus\nPublishable strategy content.",
+  ])("removes unambiguous system metadata before publishing", (caption) => {
+    const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
+      label: "Youtility 內容地圖",
+      caption,
+    }, { stepIndex: 0, steps: YOUTILITY_STEPS, outputLanguage: "en-US" });
+
+    expect(output.caption).toBe("Publishable strategy content.");
+    expect(findIgStrategyInternalLeaks(output.caption)).toEqual([]);
+  });
+
   it("removes common narrative forms of agent, step, and self-introduction leaks", () => {
     const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
       label: "Youtility 內容地圖",
@@ -273,13 +416,13 @@ describe("IG strategy public-output policy", () => {
       presentation: "strategy-report",
     });
     expect(getIgStrategyRecordOverrides("ig-hormozi-save-worthy")).toBeNull();
-    expect(getIgStrategyRecordOverrides("ig-fanzo-live-first", false)?.taskLabel)
+    expect(getIgStrategyRecordOverrides("ig-fanzo-live-first", "en-US")?.taskLabel)
       .toBe("IG × Live-First Strategy");
   });
 
   it("builds an explicit no-leak and neutral-perspective prompt contract", () => {
     const prompt = buildIgStrategyPublicPromptRules("直播系列規劃");
-    const englishPrompt = buildIgStrategyPublicPromptRules("Live Series Plan", false);
+    const englishPrompt = buildIgStrategyPublicPromptRules("Live Series Plan", "en-US");
 
     expect(prompt).toContain("直播系列規劃");
     expect(prompt).toContain("直接給客戶看的策略報告");
