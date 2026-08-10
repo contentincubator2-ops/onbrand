@@ -43,6 +43,9 @@ on:
 jobs:
   import:
     runs-on: ubuntu-latest
+    # environment: dev → secrets.VM_HOST/VM_USER/VM_SSH_PRIVATE_KEY resolve to the
+    # DEV VM (where deploy-dev ships /opt/onbrand/current), not prod.
+    environment: dev
     steps:
       - name: Import listening export on the VM
         uses: appleboy/ssh-action@v1.0.3
