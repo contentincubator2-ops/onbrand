@@ -1,0 +1,54 @@
+name: "Admin — Import social-listening export into listening_mentions"
+
+# Loads a normalised social-listening export (e.g. an OpView xlsx run through
+# scripts/opview-xlsx-to-json.py, committed under scripts/imports/) into the
+# accumulating store for a brand/scope, so it shows on the 品牌聲量 / 競品聲量
+# pages. Idempotent — upsertMention dedups by URL hash, safe to re-run.
+# Default: IRIS (2956) 品牌聲量 from scripts/imports/iris-listening.json, on DEV.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: "Brand id (IRIS = 2956)"
+        type: string
+        default: "2956"
+      scope:
+        description: "Listening scope to import into"
+        type: choice
+        default: "listening.own_brand"
+        options:
+          - "listening.own_brand"
+          - "listening.competitors"
+          - "listening.industry_talk"
+          - "listening.market_hotspots"
+      file:
+        description: "Normalised JSON path (relative to skills/ai-talent)"
+        type: string
+        default: "scripts/imports/iris-listening.json"
+      appRoot:
+        description: "Which deployment to import into (current = dev, app = prod)"
+        type: choice
+        default: "current"
+        options: ["current", "app"]
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import listening export on the VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /opt/onbrand/${{ github.event.inputs.appRoot }}/skills/ai-talent
+            test -f "${{ github.event.inputs.file }}" || { echo "missing file: ${{ github.event.inputs.file }} — has dev been deployed with this fixture?"; exit 1; }
+            set -a; source .env; set +a
+            npx tsx scripts/import-listening-json.ts \
+              --brand=${{ github.event.inputs.brandId }} \
+              --scope=${{ github.event.inputs.scope }} \
+              --file=${{ github.event.inputs.file }}
