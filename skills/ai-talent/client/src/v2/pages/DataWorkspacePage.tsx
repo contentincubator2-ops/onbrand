@@ -592,6 +592,18 @@ export default function DataWorkspacePage() {
     { enabled: !!brandId && !!hookScopeKey },
   ) ?? { data: null, refetch: () => {} };
 
+  // Accumulating store (imported OpView exports / daily ingest) for the active
+  // listening scope — seed it into the feed so it shows without a live run.
+  const storedQ = (trpc as any).marketIntel?.getStoredMentions?.useQuery?.(
+    brandId && hookScopeKey ? { brandId, scope: hookScopeKey, limit: 60 } : (undefined as any),
+    { enabled: !!brandId && !!hookScopeKey },
+  ) ?? { data: null };
+  React.useEffect(() => {
+    const d = storedQ?.data;
+    if (!d?.ok || !hookScopeKey || !Array.isArray(d.items) || d.items.length === 0) return;
+    setLiveResults((r) => r[hookScopeKey] ? r : ({ ...r, [hookScopeKey]: { ok: true, items: d.items, sentimentMix: d.sentimentMix, wordCloud: d.wordCloud, generatedAt: undefined } }));
+  }, [storedQ?.data, hookScopeKey]);
+
   // GEO (AI 能見度): live scan of how the brand shows up in AI engine answers.
   const runGeoMut = (trpc as any).geo?.runScan?.useMutation?.() ?? null;
   const [geoScan, setGeoScan] = React.useState<any>(null);

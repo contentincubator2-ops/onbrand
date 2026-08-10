@@ -913,9 +913,11 @@ export async function ensureMentionsTable(): Promise<void> {
 /** Upsert one mention. New rows return "new"; already-seen rows bump
  *  lastSeenAt + seenCount and return "updated" — this is what turns
  *  one-off search into an accumulating, trend-able dataset. */
-export async function upsertMention(brandId: number, scope: ListeningTaskKey, item: RunResultItem): Promise<"new" | "updated"> {
+export async function upsertMention(brandId: number, scope: ListeningTaskKey, item: RunResultItem, sentimentOverride?: Sentiment): Promise<"new" | "updated"> {
   const hash = mentionHash(item.url || item.title);
-  const sentiment = scoreSentiment(`${item.title} ${item.excerpt}`);   // Phase 2: 正/負/中
+  // Prefer a source-provided label (e.g. OpView 情緒 on an imported export);
+  // fall back to our zero-cost lexicon (Phase 2 正/負/中).
+  const sentiment = sentimentOverride ?? scoreSentiment(`${item.title} ${item.excerpt}`);
   const [res]: any = await localPool.execute(
     `INSERT INTO listening_mentions (brandId, scope, urlHash, title, source, url, excerpt, sourceType, sentiment, publishedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
