@@ -191,23 +191,30 @@ function replacePrivateTerm(text: string, privateTerm: string | null, publicTerm
 }
 
 function normalizeReportedAudienceMix(text: string): string {
-  // Only normalize the unambiguous gendered second person first. If a
-  // paragraph still mixes third/second person, rewrite only when an audience
-  // noun provides a clear antecedent; otherwise fail closed below.
-  const neutralSecondPerson = text
-    .replace(/妳們/g, "你們")
-    .replace(/妳/g, "你");
-  const hasSecondPerson = /你/.test(neutralSecondPerson);
-  return neutralSecondPerson
+  // The prompt chooses one reader address from explicit audience context.
+  // Keep that choice intact here; deterministic replacement of 妳 → 你 would
+  // erase a valid audience-aware decision. This boundary only rejects mixed
+  // choices and normalizes an audience-analysis "她" when its antecedent is
+  // unambiguous.
+  const addressForms = new Set(text.match(/妳們|你們|您|妳|你/g) ?? []);
+  if (addressForms.size > 1) {
+    throw new Error("strategy public audience address validation failed");
+  }
+
+  const hasDirectAddress = addressForms.size === 1;
+  return text
     .split(/(\n{2,})/)
     .map((paragraph) => {
-      if (!/[她]/.test(paragraph) || !hasSecondPerson) return paragraph;
-      if (/(?:受眾|客群|粉絲|追蹤者|消費者|顧客|讀者)/.test(paragraph)) {
-        return paragraph.replace(/她們/g, "這群受眾").replace(/她/g, "受眾");
-      }
+      if (!/[她]/.test(paragraph)) return paragraph;
+      // Preserve a genuine third-person subject even when the same paragraph
+      // also mentions the audience (for example, a founder telling her story).
       if (/(?:創辦人|案例主角|受訪者|女性客戶|團隊成員)[^\n。！？]{0,40}她/.test(paragraph)) {
         return paragraph;
       }
+      if (/(?:受眾|客群|粉絲|追蹤者|消費者|顧客|讀者)/.test(paragraph)) {
+        return paragraph.replace(/她們/g, "這群受眾").replace(/她/g, "受眾");
+      }
+      if (!hasDirectAddress) return paragraph;
       throw new Error("strategy public perspective validation failed");
     })
     .join("");
@@ -407,7 +414,9 @@ This is the customer-facing strategy report section “${sectionLabel}”.
 這是直接給客戶看的策略報告章節「${sectionLabel}」。
 ▸ 只輸出可直接閱讀的策略內容，不得輸出或解釋內部工作流程。
 ▸ 不得輸出 Squad、step、agent、負責人、outputType、outputKind、資料庫鍵值、模型或 prompt。
-▸ 談目標客群時使用「受眾」；直接稱呼讀者時只使用中性的「你」，不得混用「她／妳」。
+▸ 先依「任務主題」與注入的目標受眾、溝通情境、品牌語氣，在「您／你／妳／你們／妳們」中選擇最合適的一種讀者稱呼；只在心中判定，不得輸出判定過程。
+▸ 選擇原則：明確女性受眾才可用「妳／妳們」，正式專業關係使用「您」，一般個人溝通使用「你」；只有明確對群體共同喊話時才用複數。不得只憑產品品類或刻板印象推測性別，資料不足時使用中性的「你」。
+▸ 選定後，直接稱呼讀者時全文只用該一種稱呼，不得混用其他稱呼。談受眾輪廓而非直接對話時使用「受眾」；「她／她們」只能指向文中另一位有明確先行詞的人物，不得代稱正在溝通的讀者。
 ▸ 方法論只作內部思考，不得把方法論名稱或程式變數當標題、章節名或資料狀態。
 ▸ 直接從內容開始，不要寫「我是…」「已建置」「以下是產出」等系統式前言。`;
 }

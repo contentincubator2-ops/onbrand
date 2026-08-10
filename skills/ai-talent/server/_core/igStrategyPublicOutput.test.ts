@@ -202,14 +202,52 @@ describe("IG strategy public-output policy", () => {
     expect(thirdPerson.caption).toBe("創辦人分享她的實際經驗，你可以從中挑一個主題。");
   });
 
-  it("rewrites mixed audience pronouns when the antecedent is explicit", () => {
+  it("keeps the audience-aware address while rewriting an explicit audience antecedent", () => {
     const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
       label: "實用工具型內容創作",
       caption: "粉絲正在找範本，她們希望立刻套用，妳可以提供下載版本。",
     }, { stepIndex: 1, steps: YOUTILITY_STEPS });
 
-    expect(output.caption).toBe("粉絲正在找範本，這群受眾希望立刻套用，你可以提供下載版本。");
-    expect(output.caption).not.toMatch(/[她妳]/);
+    expect(output.caption).toBe("粉絲正在找範本，這群受眾希望立刻套用，妳可以提供下載版本。");
+    expect(output.caption).not.toContain("她");
+  });
+
+  it.each([
+    ["您", "如果您重視專業建議，可以先整理目前的需求。"],
+    ["你", "如果你正在建立品牌，可以先整理目前的需求。"],
+    ["妳", "如果妳正在建立女性社群，可以先整理目前的需求。"],
+    ["你們", "如果你們正在共同建立團隊，可以先整理目前的需求。"],
+    ["妳們", "如果妳們正在共同建立女性社群，可以先整理目前的需求。"],
+  ])("preserves the single audience address %s selected for the report", (_address, caption) => {
+    const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
+      label: "實用工具型內容創作",
+      caption,
+    }, { stepIndex: 1, steps: YOUTILITY_STEPS });
+
+    expect(output.caption).toBe(caption);
+  });
+
+  it.each([
+    "你可以先閱讀，妳也可以下載範本。",
+    "您可以先閱讀，你也可以下載範本。",
+    "你們可以先閱讀，你也可以下載範本。",
+    "妳們可以先閱讀，妳也可以下載範本。",
+  ])("fails closed when direct reader address forms are mixed: %s", (caption) => {
+    expect(() => applyIgStrategyPublicBoundary("ig-baer-youtility", {
+      label: "實用工具型內容創作",
+      caption,
+    }, { stepIndex: 1, steps: YOUTILITY_STEPS }))
+      .toThrow("strategy public audience address validation failed");
+  });
+
+  it("does not rewrite a real third-person subject just because the paragraph mentions an audience", () => {
+    const caption = "創辦人分享她的故事，粉絲可以看見真實過程，妳也能從中找到靈感。";
+    const output = applyIgStrategyPublicBoundary("ig-baer-youtility", {
+      label: "實用工具型內容創作",
+      caption,
+    }, { stepIndex: 1, steps: YOUTILITY_STEPS });
+
+    expect(output.caption).toBe(caption);
   });
 
   it("removes dynamic private terms and system-style prefaces", () => {
@@ -420,7 +458,7 @@ describe("IG strategy public-output policy", () => {
       .toBe("IG × Live-First Strategy");
   });
 
-  it("builds an explicit no-leak and neutral-perspective prompt contract", () => {
+  it("builds an explicit no-leak and audience-aware address prompt contract", () => {
     const prompt = buildIgStrategyPublicPromptRules("直播系列規劃");
     const englishPrompt = buildIgStrategyPublicPromptRules("Live Series Plan", "en-US");
 
@@ -429,7 +467,11 @@ describe("IG strategy public-output policy", () => {
     expect(prompt).toContain("不得輸出");
     expect(prompt).toContain("outputType");
     expect(prompt).toContain("受眾");
-    expect(prompt).toContain("你");
+    expect(prompt).toContain("您／你／妳／你們／妳們");
+    expect(prompt).toContain("目標受眾、溝通情境、品牌語氣");
+    expect(prompt).toContain("不得只憑產品品類或刻板印象推測性別");
+    expect(prompt).toContain("資料不足時使用中性的「你」");
+    expect(prompt).toContain("全文只用該一種稱呼");
     expect(englishPrompt).toContain("customer-facing strategy report");
     expect(englishPrompt).toContain("Live Series Plan");
     expect(englishPrompt).not.toMatch(/[\u3400-\u9fff]/u);
