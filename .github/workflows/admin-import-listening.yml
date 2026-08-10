@@ -7,6 +7,14 @@ name: "Admin — Import social-listening export into listening_mentions"
 # Default: IRIS (2956) 品牌聲量 from scripts/imports/iris-listening.json, on DEV.
 
 on:
+  # Auto-import when the IRIS fixture changes on dev (workflow_dispatch needs the
+  # file on the default branch, which this isn't yet — so a path-scoped push runs
+  # it here without touching prod). Uses the defaults below on push.
+  push:
+    branches: [dev]
+    paths:
+      - "skills/ai-talent/scripts/imports/iris-listening.json"
+      - ".github/workflows/admin-import-listening.yml"
   workflow_dispatch:
     inputs:
       brandId:
@@ -45,10 +53,12 @@ jobs:
           command_timeout: 15m
           script: |
             set -e
-            cd /opt/onbrand/${{ github.event.inputs.appRoot }}/skills/ai-talent
-            test -f "${{ github.event.inputs.file }}" || { echo "missing file: ${{ github.event.inputs.file }} — has dev been deployed with this fixture?"; exit 1; }
+            BRAND="${{ github.event.inputs.brandId }}"; BRAND="${BRAND:-2956}"
+            SCOPE="${{ github.event.inputs.scope }}"; SCOPE="${SCOPE:-listening.own_brand}"
+            FILE="${{ github.event.inputs.file }}"; FILE="${FILE:-scripts/imports/iris-listening.json}"
+            ROOT="${{ github.event.inputs.appRoot }}"; ROOT="${ROOT:-current}"
+            cd "/opt/onbrand/$ROOT/skills/ai-talent"
+            test -f "$FILE" || { echo "missing file: $FILE — has dev been deployed with this fixture?"; exit 1; }
             set -a; source .env; set +a
-            npx tsx scripts/import-listening-json.ts \
-              --brand=${{ github.event.inputs.brandId }} \
-              --scope=${{ github.event.inputs.scope }} \
-              --file=${{ github.event.inputs.file }}
+            echo "importing $FILE → brand $BRAND / $SCOPE (from /opt/onbrand/$ROOT)"
+            npx tsx scripts/import-listening-json.ts --brand="$BRAND" --scope="$SCOPE" --file="$FILE"
