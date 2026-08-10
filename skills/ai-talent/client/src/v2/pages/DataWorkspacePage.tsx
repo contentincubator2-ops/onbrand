@@ -593,16 +593,12 @@ export default function DataWorkspacePage() {
   ) ?? { data: null, refetch: () => {} };
 
   // Accumulating store (imported OpView exports / daily ingest) for the active
-  // listening scope — seed it into the feed so it shows without a live run.
+  // listening scope, filtered by the SAME time window as the trend so the feed
+  // count and 聲量趨勢 agree and the 時間範圍 buttons actually refilter.
   const storedQ = (trpc as any).marketIntel?.getStoredMentions?.useQuery?.(
-    brandId && hookScopeKey ? { brandId, scope: hookScopeKey, limit: 60 } : (undefined as any),
+    brandId && hookScopeKey ? { brandId, scope: hookScopeKey, sinceDays: windowDays, limit: 200 } : (undefined as any),
     { enabled: !!brandId && !!hookScopeKey },
   ) ?? { data: null };
-  React.useEffect(() => {
-    const d = storedQ?.data;
-    if (!d?.ok || !hookScopeKey || !Array.isArray(d.items) || d.items.length === 0) return;
-    setLiveResults((r) => r[hookScopeKey] ? r : ({ ...r, [hookScopeKey]: { ok: true, items: d.items, sentimentMix: d.sentimentMix, wordCloud: d.wordCloud, generatedAt: undefined } }));
-  }, [storedQ?.data, hookScopeKey]);
 
   // GEO (AI 能見度): live scan of how the brand shows up in AI engine answers.
   const runGeoMut = (trpc as any).geo?.runScan?.useMutation?.() ?? null;
@@ -789,7 +785,13 @@ export default function DataWorkspacePage() {
               })()}
 
               {listeningScopes.filter((s) => s.taskKey === listeningScopeKey).map((scope) => {
-                const res = liveResults[scope.taskKey];
+                // Feed = the accumulating store (window-filtered) by default; a
+                // live 即時查詢 overrides it for this scope.
+                const sd = storedQ?.data;
+                const storedRes: LiveRunResult | undefined = (sd?.ok && Array.isArray(sd.items) && sd.items.length)
+                  ? { ok: true, items: sd.items, sentimentMix: sd.sentimentMix, wordCloud: sd.wordCloud }
+                  : undefined;
+                const res = liveResults[scope.taskKey] ?? storedRes;
                 const running = runningKey === scope.taskKey;
                 const runAt = res?.generatedAt ? new Date(res.generatedAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
                 return (

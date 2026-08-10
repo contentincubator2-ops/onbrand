@@ -836,13 +836,13 @@ export function buildWordCloud(texts: string[], limit = 40): Array<{ term: strin
   const freq = new Map<string, number>();
   const bump = (k: string) => freq.set(k, (freq.get(k) ?? 0) + 1);
   for (const raw of texts) {
-    const t = String(raw ?? "");
-    for (const w of t.toLowerCase().split(/[^a-z0-9]+/)) {
+    const t = String(raw ?? "").replace(/https?:\/\/\S+/gi, " ").toLowerCase();
+    for (const w of t.split(/[^a-z0-9]+/)) {
       if (w.length < 3 || CLOUD_STOP_EN.has(w) || /^\d+$/.test(w)) continue;
       bump(w);
     }
     for (const run of t.match(/[一-鿿]{2,}/g) ?? []) {
-      for (let n = 2; n <= 3; n++) {
+      for (let n = 2; n <= 4; n++) {
         for (let i = 0; i + n <= run.length; i++) {
           const g = run.slice(i, i + n);
           if (CLOUD_STOP_ZH.has(g)) continue;
@@ -851,11 +851,18 @@ export function buildWordCloud(texts: string[], limit = 40): Array<{ term: strin
       }
     }
   }
-  return [...freq.entries()]
-    .filter(([, n]) => n >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([term, weight]) => ({ term, weight }));
+  // Collapse overlapping n-grams (快閃/閃特/快閃特/閃特賣 → keep the longest
+  // frequent phrase): process longest→shortest, drop a term that is a substring
+  // of an already-kept longer term unless it's markedly more frequent (i.e. also
+  // occurs on its own).
+  const cand = [...freq.entries()].filter(([, n]) => n >= 2)
+    .sort((a, b) => (b[0].length - a[0].length) || (b[1] - a[1]));
+  const kept: Array<{ term: string; weight: number }> = [];
+  for (const [term, weight] of cand) {
+    if (kept.some((k) => k.term.includes(term) && weight <= k.weight * 1.6)) continue;
+    kept.push({ term, weight });
+  }
+  return kept.sort((a, b) => b.weight - a.weight).slice(0, limit);
 }
 
 // ── Accumulating store (Phase 1) ──────────────────────────────────────────
@@ -913,8 +920,10 @@ export async function ensureMentionsTable(): Promise<void> {
 /** Upsert one mention. New rows return "new"; already-seen rows bump
  *  lastSeenAt + seenCount and return "updated" — this is what turns
  *  one-off search into an accumulating, trend-able dataset. */
-export async function upsertMention(brandId: number, scope: ListeningTaskKey, item: RunResultItem, sentimentOverride?: Sentiment): Promise<"new" | "updated"> {
-  const hash = mentionHash(item.url || item.title);
+export async function upsertMention(brandId: number, scope: ListeningTaskKey, item: RunResultItem, sentimentOverride?: Sentiment, dedupKey?: string): Promise<"new" | "updated"> {
+  // dedupKey (e.g. an OpView 文章識別碼) lets us dedup items that carry no URL
+  // without collapsing distinct posts that happen to share a title.
+  const hash = mentionHash(dedupKey || item.url || item.title);
   // Prefer a source-provided label (e.g. OpView 情緒 on an imported export);
   // fall back to our zero-cost lexicon (Phase 2 正/負/中).
   const sentiment = sentimentOverride ?? scoreSentiment(`${item.title} ${item.excerpt}`);

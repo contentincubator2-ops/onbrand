@@ -26,19 +26,20 @@ function argVal(flag: string): string | null {
   return hit ? hit.split("=")[1]! : null;
 }
 
-interface Row { publishedAt?: string; sourceType?: string; source?: string; sentiment?: string; title?: string; excerpt?: string; url?: string; }
+interface Row { publishedAt?: string; sourceType?: string; source?: string; sentiment?: string; title?: string; excerpt?: string; url?: string; articleId?: string; }
 
 async function main() {
   const dry = process.argv.includes("--dry-run");
   const file = argVal("--file");
-  const scope = (argVal("--scope") ?? "listening.own_brand") as ListeningTaskKey;
-  const brandId = Number(argVal("--brand") ?? "0");
   if (!file) { console.error("✗ --file=<normalised .json> required"); process.exit(1); }
-  if (!LISTENING_TASK_KEYS.includes(scope)) { console.error(`✗ bad --scope; one of ${LISTENING_TASK_KEYS.join(", ")}`); process.exit(1); }
-  if (!dry && !(brandId > 0)) { console.error("✗ --brand=<id> required (or use --dry-run)"); process.exit(1); }
-
   const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
   const rows: Row[] = Array.isArray(parsed) ? parsed : (parsed.rows ?? []);
+  // brand/scope: CLI flag wins, else the fixture's self-described values.
+  const scope = (argVal("--scope") ?? parsed.scope ?? "listening.own_brand") as ListeningTaskKey;
+  const brandId = Number(argVal("--brand") ?? parsed.brandId ?? "0");
+  if (!LISTENING_TASK_KEYS.includes(scope)) { console.error(`✗ bad scope '${scope}'; one of ${LISTENING_TASK_KEYS.join(", ")}`); process.exit(1); }
+  if (!dry && !(brandId > 0)) { console.error("✗ brand id required (--brand or fixture brandId; or use --dry-run)"); process.exit(1); }
+
   const okSent = new Set(["positive", "negative", "neutral"]);
   const items = rows
     .filter((r) => (r.title || r.excerpt) && r.publishedAt)
@@ -52,6 +53,9 @@ async function main() {
         publishedAt: r.publishedAt,
       } as RunResultItem,
       sentiment: (okSent.has(String(r.sentiment)) ? r.sentiment : undefined) as Sentiment | undefined,
+      // dedup by article id ONLY when the export carries no URL (URL-bearing
+      // exports keep post-level dedup by URL; url-less ones use article id).
+      dedupKey: (!r.url && r.articleId) ? `opview:${r.articleId}` : undefined,
     }));
 
   console.log(`[import] file=${file} rows=${rows.length} → importable=${items.length} scope=${scope}${dry ? " (DRY RUN)" : ` brand=${brandId}`}`);
@@ -67,8 +71,8 @@ async function main() {
 
   await ensureMentionsTable();
   let neu = 0, upd = 0;
-  for (const { item, sentiment } of items) {
-    const r = await upsertMention(brandId, scope, item, sentiment);
+  for (const { item, sentiment, dedupKey } of items) {
+    const r = await upsertMention(brandId, scope, item, sentiment, dedupKey);
     if (r === "new") neu++; else upd++;
   }
   console.log(`[import] done → ${neu} new, ${upd} updated into listening_mentions (brand ${brandId}, ${scope})`);

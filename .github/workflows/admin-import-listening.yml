@@ -13,7 +13,7 @@ on:
   push:
     branches: [dev]
     paths:
-      - "skills/ai-talent/scripts/imports/iris-listening.json"
+      - "skills/ai-talent/scripts/imports/**"
       - ".github/workflows/admin-import-listening.yml"
   workflow_dispatch:
     inputs:
@@ -53,15 +53,22 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 15m
+          command_timeout: 20m
           script: |
             set -e
-            BRAND="${{ github.event.inputs.brandId }}"; BRAND="${BRAND:-2956}"
-            SCOPE="${{ github.event.inputs.scope }}"; SCOPE="${SCOPE:-listening.own_brand}"
-            FILE="${{ github.event.inputs.file }}"; FILE="${FILE:-scripts/imports/iris-listening.json}"
             ROOT="${{ github.event.inputs.appRoot }}"; ROOT="${ROOT:-current}"
             cd "/opt/onbrand/$ROOT/skills/ai-talent"
-            test -f "$FILE" || { echo "missing file: $FILE — has dev been deployed with this fixture?"; exit 1; }
             set -a; source .env; set +a
-            echo "importing $FILE → brand $BRAND / $SCOPE (from /opt/onbrand/$ROOT)"
-            npx tsx scripts/import-listening-json.ts --brand="$BRAND" --scope="$SCOPE" --file="$FILE"
+            FILE_IN="${{ github.event.inputs.file }}"
+            if [ -n "$FILE_IN" ]; then
+              # manual dispatch: single file (+ optional brand/scope overrides)
+              ARGS="--file=$FILE_IN"
+              [ -n "${{ github.event.inputs.brandId }}" ] && ARGS="$ARGS --brand=${{ github.event.inputs.brandId }}"
+              [ -n "${{ github.event.inputs.scope }}" ] && ARGS="$ARGS --scope=${{ github.event.inputs.scope }}"
+              echo "importing $FILE_IN"; npx tsx scripts/import-listening-json.ts $ARGS
+            else
+              # push: import every fixture (each carries its own brandId + scope)
+              for f in scripts/imports/*.json; do
+                echo "== importing $f =="; npx tsx scripts/import-listening-json.ts --file="$f"
+              done
+            fi
