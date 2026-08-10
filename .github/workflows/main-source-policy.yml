@@ -1,6 +1,8 @@
 name: Main Source Policy
 
-# Production promotions must originate from the shared dev branch.
+# Production promotions may originate from the shared dev branch or an
+# explicitly named release/hotfix branch. Review and CI requirements remain
+# enforced separately by the main branch rules.
 on:
   pull_request:
     branches: [main]
@@ -9,15 +11,20 @@ permissions:
   contents: read
 
 jobs:
-  require-dev-source:
-    name: Require dev to main
+  validate-source:
+    name: Validate main source
     runs-on: ubuntu-24.04
     steps:
-      - name: Reject non-dev source branches
+      - name: Reject unsupported source branches
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
-          if [ "$HEAD_REF" != "dev" ]; then
-            echo "Only pull requests from dev may merge into main."
-            exit 1
-          fi
+          case "$HEAD_REF" in
+            dev|release/*|hotfix/*)
+              echo "Allowed source branch: $HEAD_REF"
+              ;;
+            *)
+              echo "Only dev, release/*, or hotfix/* pull requests may merge into main."
+              exit 1
+              ;;
+          esac
