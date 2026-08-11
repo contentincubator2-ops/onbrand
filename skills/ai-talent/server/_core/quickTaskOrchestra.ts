@@ -477,6 +477,61 @@ export function voiceSanitizeZhTW(s: string): string {
 }
 
 /**
+ * C3 residual (bug checklist 2026-08「fb-60-link-full 遇到不相關網址時，AI
+ * 正確識別內容不符，卻用英文回覆，而非全站慣用的繁體中文」): none of the
+ * gates above catch this — voiceSanitizeZhTW / the IG S2T map only clean up
+ * STYLE within already-Chinese text; neither fires when the writer LLM
+ * replies in an entirely different language (which happens when it gets
+ * confused by off-brand, English-language source content, e.g. a mismatched
+ * URL). This is a site-wide invariant, not scoped to one task family — a
+ * zh-TW brand's caption must actually BE zh-TW.
+ *
+ * Deterministic, cheap heuristic: strip URLs/hashtags/@handles (legitimately
+ * often Latin regardless of caption language), then compare CJK ideographs
+ * to Latin letters in what's left. A normal zh-TW caption is CJK-DOMINANT
+ * even with an English brand name or loanword mixed in — flag only when CJK
+ * is a small minority, i.e. the caption is essentially written in English.
+ * `meaningful < 15` guards short/emoji-only captions where the sample is too
+ * small to judge (avoids false positives).
+ */
+export function looksNonChineseForZhTWBrand(text: string): boolean {
+  if (!text || !text.trim()) return false;
+  const stripped = text
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/#\S+/g, " ")
+    .replace(/@\S+/g, " ");
+  const cjk = (stripped.match(/[一-鿿㐀-䶿]/g) ?? []).length;
+  const latin = (stripped.match(/[A-Za-z]/g) ?? []).length;
+  const meaningful = cjk + latin;
+  if (meaningful < 15) return false;
+  return cjk / meaningful < 0.15;
+}
+
+/** One re-ask, in Chinese, asking the model to rewrite (not literally
+ *  re-translate) the caption into 繁體中文 while preserving tone/structure/
+ *  length. Fail-safe: any error returns the original caption unchanged
+ *  rather than throwing — a wrong-language caption is still better than a
+ *  crashed task run. */
+async function reaskInZhTW(caption: string): Promise<string> {
+  try {
+    const { invokeLLM } = await import("./llm");
+    const r: any = await invokeLLM({
+      provider: "anthropic",
+      messages: [{
+        role: "user",
+        content:
+          `以下貼文文案目前是英文，但這個品牌帳號全站慣用「繁體中文（台灣用語）」。請將整段文案改寫成道地的繁體中文版本，保留原本的語氣、資訊重點、CTA、hashtag 結構與大致長度，不要逐字直譯生硬中文，也不要加任何前言或說明，只輸出改寫後的文案本身：\n\n${caption}`,
+      }],
+      maxTokens: 800,
+    });
+    const out = String(r?.content ?? r?.text ?? "").trim();
+    return out || caption;
+  } catch {
+    return caption;
+  }
+}
+
+/**
  * 2026-07-18 (CJ 多市場實測): the writer LLM occasionally slips CJK
  * punctuation into non-CJK output because the prompt scaffolding is
  * Chinese (observed: "part of the Lumen Coffee crew。" in an EN email).
@@ -2300,6 +2355,19 @@ export async function runOrchestra(args: {
         if (!v?.caption) continue;
         v.caption = v.caption.replace(/[么这个们时应说让优体关实现发内数据网资讯构习众签动钩击门问题]/g,
           (c: string) => S2T[c] ?? c);
+      }
+    }
+
+    // ── zh-TW 語言守門 (2026-08-11, C3 殘留「fb-60-link-full 用英文回覆」) ──
+    // Unlike the style gates above (scoped to TikTok/YT/KOL/IG body tasks),
+    // this applies to EVERY task for a zh-TW brand — it's a site-wide
+    // language invariant, not a task-family style rule. Deterministic check
+    // runs on every caption (cheap); the LLM re-ask only fires on an actual
+    // violation, which should be rare.
+    if (brandMarket.isZhTW && Array.isArray(captions) && captions.length) {
+      for (const v of captions) {
+        if (!v?.caption || !looksNonChineseForZhTWBrand(v.caption)) continue;
+        v.caption = await reaskInZhTW(v.caption);
       }
     }
 
