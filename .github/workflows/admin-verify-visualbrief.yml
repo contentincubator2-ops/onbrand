@@ -1,0 +1,66 @@
+name: "Admin — Verify visual-brief brand strip (C2) on dev"
+
+# Runs the DEPLOYED captionToVisualBrief (skills/ai-talent/server/_core/
+# visualBrief.ts) on the dev VM with a real LLM call, against captions that
+# name a brand (小安素) and a competitor (Adidas) — the two C2 bugs where the
+# model baked a fake wordmark (「Nutrion」) or a rival logo (NIKE) onto the
+# image. Asserts the generated English brief carries NO brand/competitor name.
+# Prints the full briefs so the result is eyeballable, not just a boolean.
+#
+# workflow_dispatch needs the file on the default branch (main); this lives on
+# dev, so a path-scoped push runs it here without touching prod.
+on:
+  push:
+    branches: [dev]
+    paths: [".github/workflows/admin-verify-visualbrief.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Verify deployed captionToVisualBrief on the dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env; set +a
+            echo "=== deployed release ==="
+            basename "$(readlink -f /opt/onbrand/current)" 2>/dev/null || echo "(sha unknown)"
+            echo "=== running deployed captionToVisualBrief (live LLM) ==="
+            node --import tsx -e '
+            const guard = setTimeout(() => { console.error("timeout importing/running"); process.exit(3); }, 240000);
+            import("./server/_core/visualBrief").then(async (m) => {
+              const fn = m.captionToVisualBrief;
+              if (typeof fn !== "function") { console.error("captionToVisualBrief NOT exported"); clearTimeout(guard); process.exit(2); }
+              const cases = [
+                { name: "C2 own-brand name (小安素→Nutrion)", caption: "小安素幫助你補充每日營養，一瓶就有滿滿蛋白質，忙碌也能顧健康。", bad: ["小安素", "nutrion"] },
+                { name: "C2 competitor (Adidas→NIKE logo)",   caption: "這雙鞋比 Adidas 更適合跑步，輕量又透氣，實測一整天不悶腳。",       bad: ["adidas", "nike"] },
+              ];
+              let fail = 0;
+              for (const c of cases) {
+                let brief = "";
+                try { brief = await fn({ caption: c.caption, platform: "ig" }); }
+                catch (e) { console.log("FAIL  " + c.name + " (LLM error: " + (e && e.message ? e.message : e) + ")"); fail++; continue; }
+                const low = String(brief).toLowerCase();
+                const leaks = c.bad.filter((b) => low.includes(b.toLowerCase()));
+                const mentionsLogo = /\blogo\b/.test(low) && !/no (visible |brand )?logo|logo-free|without (a )?logo|unlabeled/.test(low);
+                const ok = leaks.length === 0 && !mentionsLogo;
+                if (!ok) fail++;
+                console.log((ok ? "PASS  " : "FAIL  ") + c.name);
+                console.log("      brief: " + JSON.stringify(brief));
+                if (leaks.length) console.log("      leaked brand/competitor: " + JSON.stringify(leaks));
+                if (mentionsLogo) console.log("      brief still asks for a logo");
+              }
+              console.log("----");
+              console.log(fail === 0 ? "ALL PASS — deployed C2 brand/logo strip verified on dev" : (fail + " CASE(S) FAILED"));
+              clearTimeout(guard);
+              process.exit(fail === 0 ? 0 : 1);
+            }).catch((e) => { clearTimeout(guard); console.error("import/run error:", e && e.message ? e.message : e); process.exit(2); });
+            '
