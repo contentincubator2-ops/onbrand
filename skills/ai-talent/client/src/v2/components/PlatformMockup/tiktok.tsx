@@ -51,7 +51,13 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
               onGenerate={onGenerateImage}
               aspectClass="w-full h-full"
               dark
-              videoFrame
+              // 2026-08-11 (bug checklist C2): tt-30-product-hero/asmr/text-hook-card/
+              // before-after DO produce a clip (runVideoGen:true) — the still is just a
+              // poster while Kling renders. Showing「本任務不產出影片檔」here flatly
+              // contradicts the task. Only claim "no video file" for genuine layout-
+              // preview mockups (liveVideoStatus undefined); for video tasks the
+              //「🎬 影片生成中⋯」note below tells the truth.
+              videoFrame={!liveVideoStatus}
             />
           </div>
         )}
