@@ -12,6 +12,7 @@ import {
   MousePointerClick, Play, Search, ShoppingBag, Sparkles, Target, TrendingUp,
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
+import PerformanceDashboard from "../components/performance/PerformanceDashboard";
 
 const ALLOWED_EMAIL = "sowork@sowork.tw";
 
@@ -88,7 +89,8 @@ const performanceSources: Source[] = [
   { id: "overview", label: "整合總覽", short: "總覽", icon: <BarChart3 size={18} />, color: "#111827", desc: "跨平台預算、成效、異常與老闆版摘要" },
   { id: "meta", label: "Meta", short: "Meta", icon: <Megaphone size={18} />, color: "#1877F2", desc: "Facebook / Instagram 廣告活動、受眾與素材" },
   { id: "google", label: "Google", short: "GAds", icon: <Search size={18} />, color: "#4285F4", desc: "Search / Display / PMax / YouTube Ads" },
-  { id: "shopline", label: "Shopline", short: "Shop", icon: <ShoppingBag size={18} />, color: "#00A870", desc: "商品銷售、轉換漏斗、客單價與回購" },
+  { id: "shopline", label: "SHOPLINE", short: "Shop", icon: <ShoppingBag size={18} />, color: "#00A870", desc: "商品銷售、轉換漏斗、客單價與回購" },
+  { id: "91app", label: "91APP", short: "91", icon: <ShoppingBag size={18} />, color: "#E4002B", desc: "訂單、會員分層、回購與線上門市分流" },
   { id: "ga", label: "GA / 官網", short: "GA", icon: <MousePointerClick size={18} />, color: "#F59E0B", desc: "流量來源、Landing page、路徑與轉換問題" },
   { id: "attribution", label: "整合歸因", short: "歸因", icon: <Target size={18} />, color: "#7C3AED", desc: "跨平台比較、預算重分配與 Campaign ROI" },
 ];
@@ -556,7 +558,9 @@ export default function DataWorkspacePage() {
             {isPerformance ? "成效儀表板" : `Iris Girls｜${active.label}`}
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6b7280", maxWidth: 760 }}>
-            {isPerformance ? "左側平台列已切換成 Meta、Google、GA、Shopline 等成效資料源。" : active.desc}
+            {isPerformance
+              ? "Meta、Google Ads、SHOPLINE、91APP、GA4 —— 廣告花費與電商訂單收在同一頁，並按內容鎖定的族群拆開看。"
+              : active.desc}
           </p>
         </div>
         {!isPerformance && (
@@ -579,6 +583,16 @@ export default function DataWorkspacePage() {
               </div>
             </div>
           </div>
+
+          {/* 2026-08-11: the performance workspace previously showed only agent
+              task cards — no numbers at all. This renders the dashboard (on
+              mock data, clearly banner-flagged) so we can settle the layout
+              and the questions it should answer before paying for connectors. */}
+          {isPerformance && (
+            <div style={{ marginBottom: 14 }}>
+              <PerformanceDashboard />
+            </div>
+          )}
 
           {marketPage && (
             <div style={{ display: "grid", gap: 14, marginBottom: 14 }}>
