@@ -1,0 +1,128 @@
+name: "Admin (DEV) — Create a brand and RUN the real positioning pipeline"
+
+# DEV counterpart of admin-create-brand-run-positioning.yml.
+#
+# The two environments are NOT interchangeable:
+#   prod : /opt/onbrand/app          · pm2 onbrand      · repo-level secrets
+#   dev  : /opt/onbrand/current      · pm2 onbrand-dev  · `dev` environment secrets
+#
+# `environment: dev` is what swaps the SSH target, so this can never
+# accidentally write to production the way a path-only change could.
+# It also prints the resolved DB host/name (non-secret) up front, so the
+# log itself proves which database was touched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_email:
+        description: "Owner's email (must exist in the DEV database)"
+        required: true
+        type: string
+      brand_b64:
+        description: "base64 of the brand JSON payload"
+        required: true
+        type: string
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 30
+    steps:
+      - name: Create brand + run positioning on the DEV VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          USER_EMAIL: ${{ inputs.user_email }}
+          BRAND_B64: ${{ inputs.brand_b64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 28m
+          envs: USER_EMAIL,BRAND_B64
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+
+            echo "=== target check (must be the DEV database) ==="
+            echo "host: $(hostname)"
+            echo "app : $(readlink -f /opt/onbrand/current)"
+            echo "db  : ${LOCAL_DB_NAME:-mos_db} @ ${LOCAL_DB_HOST:-127.0.0.1}"
+            pm2 list 2>/dev/null | grep -E "onbrand" || true
+            echo "=============================================="
+
+            node --import tsx -e "
+              const mysql = require('mysql2/promise');
+              Promise.all([
+                import('./server/_core/positioningJobRunner.ts'),
+                import('./server/_core/positioningSteps.ts'),
+              ]).then(async ([jobRunner, stepsMod]) => {
+                const { startPositioningJob } = jobRunner;
+                const { buildBrandPositioningSteps } = stepsMod;
+
+                const b = JSON.parse(Buffer.from(process.env.BRAND_B64, 'base64').toString('utf8'));
+
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+
+                const [uRows] = await conn.execute('SELECT id FROM users WHERE email = ? LIMIT 1', [process.env.USER_EMAIL]);
+                const userId = uRows[0]?.id;
+                if (!userId) { console.error('NO SUCH USER IN DEV DB:', process.env.USER_EMAIL); process.exit(1); }
+
+                const [dupe] = await conn.execute('SELECT id FROM brands WHERE userId = ? AND name = ? LIMIT 1', [userId, b.name]);
+                if (dupe[0]) { console.error('BRAND ALREADY EXISTS id=' + dupe[0].id + ' — aborting to avoid a duplicate'); process.exit(1); }
+
+                const slug = (b.slugBase || 'brand') + '-' + Math.random().toString(36).slice(2, 7);
+                const [ins] = await conn.execute(
+                  'INSERT INTO brands (userId, createdBy, slug, name, website, industry, targetAudience, targetCountry, outputLanguage, dataSource, isDefault, positioningStatus, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, \"manual\", 0, \"in_progress\", NOW(), NOW())',
+                  [userId, userId, slug, b.name, b.website || null, b.industry || null, b.targetAudience || null, b.targetCountry || null, b.outputLanguage || null],
+                );
+                const brandId = ins.insertId;
+                await conn.execute('INSERT INTO brand_members (brandId, userId, role, addedBy) VALUES (?, ?, \"owner\", ?)', [brandId, userId, userId]);
+                console.log('BRAND_CREATED id=' + brandId + ' slug=' + slug + ' userId=' + userId);
+
+                const steps = buildBrandPositioningSteps({ lang: 'zh-TW', outputLanguage: b.outputLanguage || 'zh-TW' });
+                console.log('PIPELINE steps=' + steps.length);
+                startPositioningJob({
+                  userId, entityKind: 'brand', entityId: brandId,
+                  brandName: b.name, industry: b.industry || '',
+                  description: b.description, steps,
+                });
+
+                const deadline = Date.now() + 24 * 60 * 1000;
+                while (Date.now() < deadline) {
+                  const [rows] = await conn.execute(
+                    'SELECT status, currentStep, totalSteps FROM positioning_jobs WHERE entityKind=\"brand\" AND entityId=? ORDER BY id DESC LIMIT 1',
+                    [brandId],
+                  );
+                  const s = rows[0] || { status: 'pending' };
+                  console.log('POLL ' + JSON.stringify(s));
+                  if (s.status === 'done' || s.status === 'failed') break;
+                  await new Promise((res) => setTimeout(res, 10000));
+                }
+
+                const [final] = await conn.execute('SELECT id, name, slug, positioningStatus, JSON_LENGTH(positioning) AS segCount FROM brands WHERE id = ?', [brandId]);
+                console.log('FINAL ' + JSON.stringify(final[0]));
+                // Per-segment emptiness check. The pipeline's callJSON ships an
+                // empty default when a step's LLM call or JSON parse fails, and
+                // the job still reports done — so 'done' alone does not mean the
+                // content is there. Surface blanks instead of hiding them.
+                const [seg] = await conn.execute(
+                  'SELECT JSON_UNQUOTE(JSON_EXTRACT(positioning, \"\$.audience.primary\")) AS aud, JSON_UNQUOTE(JSON_EXTRACT(positioning, \"\$.differentiation.summary\")) AS diff, JSON_UNQUOTE(JSON_EXTRACT(positioning, \"\$.tagline.zhTagline\")) AS tag, JSON_UNQUOTE(JSON_EXTRACT(positioning, \"\$.goldenCircle.why\")) AS why FROM brands WHERE id = ?',
+                  [brandId],
+                );
+                const r = seg[0] || {};
+                for (const k of ['aud', 'diff', 'tag', 'why']) {
+                  const v = (r[k] == null || r[k] === 'null') ? '' : String(r[k]);
+                  console.log('SEGCHECK ' + k + ' len=' + v.length + (v.length === 0 ? '  <== EMPTY' : '  ' + v.slice(0, 60)));
+                }
+                console.log('URL https://dev.onbrand.sowork.ai/brands/edit?b=' + brandId + '&cat=positioning');
+                process.exit(0);
+              }).catch((e) => { console.error('FAILED:', e && e.message || e); process.exit(1); });
+            "
