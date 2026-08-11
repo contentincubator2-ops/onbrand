@@ -319,18 +319,25 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
 
   // 3. Album 4 張 — strategist: Grace Wu
+  // 2026-08-11 (bug checklist C2「應產出4張一致風格圖片，但實際僅產出1張」):
+  // was variants:5/images:5 → 5 SEPARATE posts each with 1 image, so an
+  // "album" only ever showed one photo. An album is ONE post with 4 photos —
+  // that's the cardsPerVariant mechanism proven by fb-99-carousel-5: one
+  // variant + N cards, each with its own image, held until all are ready.
   "fb-60-album-4": {
-    variants: 5,
-    images: 5,
+    variants: 1,
+    images: 1,
     runImageGen: true,
     imageDirectorId: FB60_DIR_REINA,
     aspectRatio: "1:1",
     fluxSize: "square_hd",
     imageQualitySteps: 4,
-    variantLabels: ["紀錄式", "情感式", "幕後式", "對比式", "里程碑式"],
+    variantLabels: ["相簿版"],
     captionMinChars: 200,
     captionMaxChars: 300,
     strategistAgentId: 180006, // Grace Wu — Brand Storyteller
+    cardsPerVariant: 4,
+    holdForImages: true,
     extras: {
       replyTemplates: 5, postingTime: true, followupPost: true,
       narrativeArc: true,

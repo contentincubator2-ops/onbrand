@@ -330,8 +330,22 @@ export function FBPinned(props: MockupFields) {
 }
 
 /* ─────────────── FB Album (multi-image grid) ─────────────── */
-export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveHashtags, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
+export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImageStyle, liveImageDesc, liveHashtags, liveImageStatus, liveImageUrl, liveCards, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
+  // 2026-08-11 (bug checklist C2「應產出4張一致風格圖片，但實際僅產出1張」):
+  // cells 2-4 used to be hardcoded skeleton placeholders, so an album never
+  // showed more than the one hero image. When the orchestra produced real
+  // per-card images (liveCards, via cardsPerVariant), render ALL of them.
+  // Legacy fallback (single hero + skeletons) kept for any path without cards.
+  type Cell = { url: string | null; status: string | null; style: string | null };
+  const hasCards = Array.isArray(liveCards) && liveCards.length > 0;
+  const cells: Cell[] = hasCards
+    ? liveCards!.slice(0, 4).map((c) => ({ url: c.image?.url ?? null, status: c.image?.status ?? null, style: c.image?.style ?? null }))
+    : [
+        { url: liveImageUrl ?? null, status: liveImageStatus ?? null, style: liveImageStyle || liveImageDesc || null },
+        ...Array.from({ length: 3 }, () => ({ url: null, status: null, style: null } as Cell)),
+      ];
+  const photoCount = cells.length;
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label="Facebook Album" variantLabel={variantLabel} />
@@ -339,7 +353,7 @@ export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImage
         <div className="px-4 py-3 flex items-center gap-3">
           <User
             name={<span className="text-small font-semibold">{brandName ?? "Your Brand"}</span>}
-            description={<span className="text-tiny text-default-500">{lang === "en" ? "Added 4 photos · just now" : "新增了 4 張相片 · 剛剛"}</span>}
+            description={<span className="text-tiny text-default-500">{lang === "en" ? `Added ${photoCount} photos · just now` : `新增了 ${photoCount} 張相片 · 剛剛`}</span>}
             avatarProps={{ src: dicebear(brandName ?? "brand"), size: "md", isBordered: true, color: "primary" }}
           />
         </div>
@@ -352,30 +366,38 @@ export function FBAlbum({ title, brandName, variantLabel, liveCaption, liveImage
             </p>
           )}
         </div>
-        {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot — hero cell
-            only; small cells stay plain skeletons (no dead 點此生成 text) */}
+        {/* Each album photo renders its own real image; a not-yet-ready cell
+            shows its brief / failed state. The first cell stays a clickable
+            ImageGenSlot ONLY in the legacy (no-cards) path. */}
         <div className="grid grid-cols-2 gap-0.5 bg-default-200">
-          <div className="aspect-square bg-default-100 relative overflow-hidden">
-            {liveImageUrl && liveImageStatus === "ready" ? (
-              <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            ) : (
-              <div className="absolute inset-0">
-                <ImageGenSlot
-                  brief={liveImageStyle || liveImageDesc}
-                  status={liveImageStatus}
-                  onGenerate={onGenerateImage}
-                  aspectClass="w-full h-full"
-                />
-              </div>
-            )}
-          </div>
-          {[1, 2, 3].map(i => (
-            <div key={i} className="aspect-square bg-default-100 flex items-center justify-center text-default-400 relative">
-              <Skeleton className="absolute inset-0" />
-              <div className="text-center relative z-10 p-2">
-                <FontAwesomeIcon icon={faImages} className="text-2xl text-default-400" />
-                <p className="text-[10px] mt-1 text-default-500">{lang === "en" ? `Image ${i + 1}` : `圖 ${i + 1}`}</p>
-              </div>
+          {cells.map((cell, i) => (
+            <div key={i} className="aspect-square bg-default-100 relative overflow-hidden">
+              {cell.url && cell.status === "ready" ? (
+                <img src={cell.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              ) : !hasCards && i === 0 ? (
+                <div className="absolute inset-0">
+                  <ImageGenSlot
+                    brief={cell.style}
+                    status={cell.status as MockupFields["liveImageStatus"]}
+                    onGenerate={onGenerateImage}
+                    aspectClass="w-full h-full"
+                  />
+                </div>
+              ) : (
+                <>
+                  <Skeleton className="absolute inset-0" />
+                  <div className="text-center relative z-10 p-2 flex flex-col items-center justify-center h-full">
+                    <FontAwesomeIcon icon={faImages} className="text-2xl text-default-400" />
+                    <p className="text-[10px] mt-1 text-default-500 line-clamp-3">
+                      {cell.status === "failed" || cell.status === "timeout"
+                        ? (lang === "en" ? "Image failed" : "此圖生成失敗")
+                        : cell.style
+                          ? cell.style
+                          : (lang === "en" ? `Image ${i + 1}` : `圖 ${i + 1}`)}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
