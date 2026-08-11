@@ -509,36 +509,44 @@ export function looksNonChineseForZhTWBrand(text: string): boolean {
 
 /** One re-ask, in Chinese, asking the model to rewrite (not literally
  *  re-translate) the caption into 繁體中文 while preserving tone/structure/
- *  length. Fail-safe: any error returns the original caption unchanged
- *  rather than throwing — a wrong-language caption is still better than a
- *  crashed task run. */
+ *  length. Fail-safe: any error, or an empty completion after one retry,
+ *  returns the original caption unchanged rather than throwing — a
+ *  wrong-language caption is still better than a crashed task run.
+ *  2026-08-11: on-dev verification observed occasional empty completions
+ *  from invokeLLM on the very first call (cold-start flakiness) — retry
+ *  once before giving up, since a guard that silently no-ops on a flaky
+ *  response defeats its own purpose. */
 async function reaskInZhTW(caption: string): Promise<string> {
-  try {
-    const { invokeLLM } = await import("./llm");
-    const r = await invokeLLM({
-      provider: "anthropic",
-      messages: [{
-        role: "user",
-        content:
-          `以下貼文文案目前是英文，但這個品牌帳號全站慣用「繁體中文（台灣用語）」。請將整段文案改寫成道地的繁體中文版本，保留原本的語氣、資訊重點、CTA、hashtag 結構與大致長度，不要逐字直譯生硬中文，也不要加任何前言或說明，只輸出改寫後的文案本身：\n\n${caption}`,
-      }],
-      maxTokens: 800,
-    });
+  const { invokeLLM } = await import("./llm");
+  const extractText = (r: any): string => {
     // InvokeResult carries the text at choices[0].message.content — NOT a
     // top-level .content/.text (that shape doesn't exist on InvokeResult;
     // see llm.ts). message.content can also be a content-part array.
     const raw = r?.choices?.[0]?.message?.content;
-    const out = (
+    return (
       typeof raw === "string"
         ? raw
         : Array.isArray(raw)
           ? raw.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("")
           : ""
     ).trim();
-    return out || caption;
-  } catch {
-    return caption;
+  };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await invokeLLM({
+        provider: "anthropic",
+        messages: [{
+          role: "user",
+          content:
+            `以下貼文文案目前是英文，但這個品牌帳號全站慣用「繁體中文（台灣用語）」。請將整段文案改寫成道地的繁體中文版本，保留原本的語氣、資訊重點、CTA、hashtag 結構與大致長度，不要逐字直譯生硬中文，也不要加任何前言或說明，只輸出改寫後的文案本身：\n\n${caption}`,
+        }],
+        maxTokens: 800,
+      });
+      const out = extractText(r);
+      if (out) return out;
+    } catch { /* fall through to retry / final fail-safe */ }
   }
+  return caption;
 }
 
 /**
