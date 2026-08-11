@@ -331,49 +331,71 @@ export default function ProjectsPage() {
           2026-08-11 (CJ「專案要能按族群、產品區分」). Each row renders only
           when there's more than one thing to slice by — a single chip is a
           label, not a filter, and an empty row reads as broken. */}
-      {(audienceFacets.length > 1 || productFacets.length > 1) && (
+      {scopedRows.length > 0 && (
         <div className="max-w-[1100px] mx-auto px-6 mb-6 flex flex-col gap-2">
-          {audienceFacets.length > 1 && (
-            <FacetRow
-              label={lang === "en" ? "Audience" : "族群"}
-              hint={lang === "en" ? "from the strategy workbench" : "來自策略工作台的甜蜜點"}
-            >
-              <FacetChip
-                active={activeAudience === "all"}
-                onClick={() => setActiveAudience("all")}
-                text={`${lang === "en" ? "All" : "全部"} · ${scopedRows.length}`}
-              />
-              {audienceFacets.map((a) => (
+          {/* 2026-08-11 revision: these rows used to hide themselves unless
+              there were 2+ values to slice by. That made the whole feature
+              invisible — existing work predates audience tagging, so both rows
+              vanished and it looked like nothing had shipped. Now the row
+              always renders and, when empty, says WHY and how to populate it.
+              An explained empty state beats a missing control. */}
+          <FacetRow
+            label={lang === "en" ? "Audience" : "族群"}
+            hint={lang === "en" ? "from the strategy workbench" : "來自策略工作台的甜蜜點"}
+          >
+            {audienceFacets.length === 0 ? (
+              <span className="text-[11px] text-default-400">
+                {lang === "en"
+                  ? "No tagged runs yet — open a task from a sweet spot in the strategy workbench to tag it."
+                  : "尚無標記 — 從策略工作台的甜蜜點點「內容角度」開任務，產出就會記住寫給哪個族群"}
+              </span>
+            ) : (
+              <>
                 <FacetChip
-                  key={a.label}
-                  active={activeAudience === a.label}
-                  onClick={() => setActiveAudience(a.label)}
-                  // Anchors run long (up to 600 chars); the chip shows a
-                  // readable head and the full text lives in the tooltip.
-                  text={`${a.label.length > 18 ? `${a.label.slice(0, 18)}…` : a.label} · ${a.count}`}
-                  title={a.label}
+                  active={activeAudience === "all"}
+                  onClick={() => setActiveAudience("all")}
+                  text={`${lang === "en" ? "All" : "全部"} · ${scopedRows.length}`}
                 />
-              ))}
-            </FacetRow>
-          )}
-          {productFacets.length > 1 && (
-            <FacetRow label={lang === "en" ? "Product" : "產品"}>
-              <FacetChip
-                active={activeProduct === "all"}
-                onClick={() => setActiveProduct("all")}
-                text={`${lang === "en" ? "All" : "全部"} · ${scopedRows.length}`}
-              />
-              {productFacets.map((p) => (
+                {audienceFacets.map((a) => (
+                  <FacetChip
+                    key={a.label}
+                    active={activeAudience === a.label}
+                    onClick={() => setActiveAudience(a.label)}
+                    // Anchors run long (up to 600 chars); the chip shows a
+                    // readable head and the full text lives in the tooltip.
+                    text={`${a.label.length > 18 ? `${a.label.slice(0, 18)}…` : a.label} · ${a.count}`}
+                    title={a.label}
+                  />
+                ))}
+              </>
+            )}
+          </FacetRow>
+          <FacetRow label={lang === "en" ? "Product" : "產品"}>
+            {productFacets.length === 0 ? (
+              <span className="text-[11px] text-default-400">
+                {lang === "en"
+                  ? "No product-scoped runs yet — pick a product in the task modal."
+                  : "尚無產品範圍的產出 — 在任務視窗選擇產品後，產出就會歸到該產品"}
+              </span>
+            ) : (
+              <>
                 <FacetChip
-                  key={p.id}
-                  active={activeProduct === p.id}
-                  onClick={() => setActiveProduct(p.id)}
-                  text={`${p.name} · ${p.count}`}
-                  title={p.name}
+                  active={activeProduct === "all"}
+                  onClick={() => setActiveProduct("all")}
+                  text={`${lang === "en" ? "All" : "全部"} · ${scopedRows.length}`}
                 />
-              ))}
-            </FacetRow>
-          )}
+                {productFacets.map((p) => (
+                  <FacetChip
+                    key={p.id}
+                    active={activeProduct === p.id}
+                    onClick={() => setActiveProduct(p.id)}
+                    text={`${p.name} · ${p.count}`}
+                    title={p.name}
+                  />
+                ))}
+              </>
+            )}
+          </FacetRow>
         </div>
       )}
 
@@ -425,6 +447,11 @@ export default function ProjectsPage() {
 /* ─────────────────────── ProjectCard ─────────────────────── */
 function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick: () => void; lang: "zh-TW" | "en" }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // A stored thumbnail URL that 404s must fall back to the coloured tile
+  // rather than leaving an empty grey box. Reset when the URL changes so a
+  // recycled card doesn't inherit the previous row's failure.
+  const [thumbFailed, setThumbFailed] = useState(false);
+  useEffect(() => { setThumbFailed(false); }, [mission.thumbnailUrl]);
   // 2026-05-14 (CJ「專案名稱要可以編輯」): inline rename mode + optimistic UI.
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState<string>(mission.title ?? "");
@@ -514,17 +541,22 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
       className="group relative rounded-xl bg-white border border-default-100 hover:shadow-md hover:border-default-300 transition overflow-hidden cursor-pointer"
       onClick={editing ? undefined : onClick}
     >
-      {/* Thumbnail (or coloured fallback) */}
+      {/* Thumbnail (or coloured fallback).
+          2026-08-11 (CJ「每一個任務，應該都可以出現縮圖才對」): the old onError
+          just did style.display='none', which left a bare grey #F4F4F5 box —
+          no icon, no title, nothing. A whole grid of those reads as broken.
+          Failing over to the same coloured platform tile we use when there's
+          no thumbnail at all means a card always shows SOMETHING. */}
       <div
         className="relative aspect-[4/3] flex items-center justify-center overflow-hidden"
-        style={{ background: mission.thumbnailUrl ? "#F4F4F5" : `${tone}14` }}
+        style={{ background: mission.thumbnailUrl && !thumbFailed ? "#F4F4F5" : `${tone}14` }}
       >
-        {mission.thumbnailUrl ? (
+        {mission.thumbnailUrl && !thumbFailed ? (
           <img
             src={mission.thumbnailUrl}
             alt={mission.title ?? "project"}
             className="w-full h-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            onError={() => setThumbFailed(true)}
           />
         ) : (
           <FontAwesomeIcon icon={icon} style={{ color: tone, fontSize: 36, opacity: 0.55 }} />
