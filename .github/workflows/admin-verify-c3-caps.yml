@@ -1,0 +1,66 @@
+name: "Admin — Verify C3 English-capitalization on dev"
+
+# Runs the DEPLOYED capitalizeEnglishLead (theaterRouter.ts) on the dev VM
+# against English-leading captions styled like each of the 6 reported
+# "選擇平台" rows (Facebook/Instagram/YouTube/Threads/LINE/Blog長文), plus
+# quoted/bracket-led, Chinese-led, and emoji-led controls that must stay
+# untouched. Read-only; imports the built function only.
+#
+# workflow_dispatch needs the file on the default branch (main); this lives
+# on dev, so a path-scoped push runs it here without touching prod.
+on:
+  push:
+    branches: [dev]
+    paths: [".github/workflows/admin-verify-c3-caps.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Verify deployed capitalizeEnglishLead on the dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env; set +a
+            echo "=== deployed release ==="
+            basename "$(readlink -f /opt/onbrand/current)" 2>/dev/null || echo "(sha unknown)"
+            echo "=== running deployed-capitalizeEnglishLead verification ==="
+            node --import tsx -e '
+            const guard = setTimeout(() => { console.error("timeout importing/running"); process.exit(3); }, 60000);
+            import("./server/routers/theaterRouter").then((m) => {
+              clearTimeout(guard);
+              const fn = m.capitalizeEnglishLead;
+              if (typeof fn !== "function") { console.error("capitalizeEnglishLead NOT exported on deployed build"); process.exit(2); }
+              const cases = [
+                { name: "Facebook", input: "just dropped our new lineup — check it out.", wantLead: "J" },
+                { name: "Instagram", input: "new drop just landed. link in bio.", wantLead: "N" },
+                { name: "YouTube", input: "watch how we made this in 60 seconds.", wantLead: "W" },
+                { name: "Threads", input: "hot take: this changes everything.", wantLead: "H" },
+                { name: "LINE", input: "limited time offer for our LINE friends!", wantLead: "L" },
+                { name: "Blog長文", input: "why we rebuilt our product from scratch this year.", wantLead: "W" },
+                { name: "quoted-lead (control)", input: "\"best decision we made all year.\"", wantLead: "\"B" },
+                { name: "Chinese-led (must NOT change)", input: "今天想跟你分享這款保養品。", wantLead: "今" },
+                { name: "emoji-led (must NOT change)", input: "🔥 hot deal today only", wantLead: "🔥" },
+              ];
+              let fail = 0;
+              for (const c of cases) {
+                const out = fn(c.input);
+                const ok = out.startsWith(c.wantLead);
+                if (!ok) fail++;
+                console.log((ok ? "PASS  " : "FAIL  ") + c.name);
+                console.log("      in:  " + JSON.stringify(c.input));
+                console.log("      out: " + JSON.stringify(out));
+              }
+              console.log("----");
+              console.log(fail === 0 ? "ALL PASS — deployed C3 capitalize verified on dev" : (fail + " CASE(S) FAILED"));
+              process.exit(fail === 0 ? 0 : 1);
+            }).catch((e) => { clearTimeout(guard); console.error("import/run error:", e && e.message ? e.message : e); process.exit(2); });
+            '
