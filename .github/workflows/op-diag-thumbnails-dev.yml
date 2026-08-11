@@ -1,0 +1,101 @@
+name: "Op — Diagnose missing project thumbnails on DEV (read-only)"
+
+# 2026-08-11. Dev counterpart of op-diag-thumbnails.yml.
+#
+# Suspected cause, which this confirms or rules out:
+#   deploy-dev.yml serves images from a symlink:
+#       public/static/covers -> /opt/onbrand/shared/covers
+#   but mediaGen writes to:
+#       process.env.COVERS_DIR ?? "/opt/onbrand/covers"
+#
+# If dev's shared/.env doesn't set COVERS_DIR to the shared path, every image
+# generated on dev lands in a directory nothing serves → every thumbnail 404s.
+# Prod is unaffected by that particular split because it has no such symlink.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand id on DEV (2972 = 懶得煮的Tom老闆)"
+        required: true
+        default: "2972"
+        type: string
+
+jobs:
+  diag:
+    runs-on: ubuntu-24.04
+    environment: dev
+    steps:
+      - name: Inspect thumbnails on the DEV VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          envs: BRAND_ID
+          script: |
+            set +e
+            AI=/opt/onbrand/current/skills/ai-talent
+            source "$AI/.env" 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -N -B -e "$1"; }
+
+            echo "host: $(hostname)"
+            echo
+            echo "=== the suspected split ==="
+            echo "COVERS_DIR in dev .env : ${COVERS_DIR:-(unset -> mediaGen defaults to /opt/onbrand/covers)}"
+            WRITE_DIR="${COVERS_DIR:-/opt/onbrand/covers}"
+            echo "images are WRITTEN to  : $WRITE_DIR   ($(ls -1 "$WRITE_DIR" 2>/dev/null | wc -l) files)"
+            PUB="$AI/public/static/covers"
+            if [ -L "$PUB" ]; then
+              SERVED=$(readlink -f "$PUB")
+              echo "images are SERVED from : $SERVED   ($(ls -1 "$SERVED" 2>/dev/null | wc -l) files)  [symlink]"
+            elif [ -d "$PUB" ]; then
+              SERVED="$PUB"
+              echo "images are SERVED from : $SERVED   ($(ls -1 "$SERVED" 2>/dev/null | wc -l) files)  [real dir]"
+            else
+              SERVED=""
+              echo "images are SERVED from : MISSING"
+            fi
+            if [ -n "$SERVED" ] && [ "$(readlink -f "$WRITE_DIR")" != "$(readlink -f "$SERVED")" ]; then
+              echo ">>> MISMATCH: written and served directories are different. Every generated image 404s."
+            else
+              echo ">>> paths agree."
+            fi
+            echo
+
+            echo "=== recent outputs for brand $BRAND_ID ==="
+            Q "SELECT o.id, IFNULL(JSON_UNQUOTE(JSON_EXTRACT(o.metadata,'\$.thumbnailUrl')),'NULL')
+                 FROM mission_outputs o JOIN missions m ON m.id = o.missionId
+                WHERE m.brandId = ${BRAND_ID} ORDER BY o.id DESC LIMIT 8" |
+            while IFS=$'\t' read -r OID TURL; do
+              [ -z "$OID" ] && continue
+              if [ "$TURL" = "NULL" ]; then
+                echo "output $OID : thumbnailUrl = NULL"
+                continue
+              fi
+              BASE=$(basename "$TURL")
+              W="$WRITE_DIR/$BASE"; S="$SERVED/$BASE"
+              echo "output $OID : $TURL"
+              echo "    in write dir : $([ -f "$W" ] && echo yes || echo NO)"
+              echo "    in serve dir : $([ -n "$SERVED" ] && [ -f "$S" ] && echo yes || echo NO)"
+            done
+
+            echo
+            echo "=== HTTP check (newest non-null) ==="
+            ONE=$(Q "SELECT JSON_UNQUOTE(JSON_EXTRACT(o.metadata,'\$.thumbnailUrl'))
+                       FROM mission_outputs o JOIN missions m ON m.id = o.missionId
+                      WHERE m.brandId = ${BRAND_ID}
+                        AND JSON_EXTRACT(o.metadata,'\$.thumbnailUrl') IS NOT NULL
+                      ORDER BY o.id DESC LIMIT 1")
+            if [ -n "$ONE" ] && [ "$ONE" != "NULL" ]; then
+              echo "url: $ONE"
+              curl -s -o /dev/null -w "  app  :3101 status=%{http_code}\n" "http://127.0.0.1:3101$ONE"
+              curl -s -o /dev/null -w "  public     status=%{http_code}\n" "https://dev.onbrand.sowork.ai$ONE"
+            else
+              echo "(no non-null thumbnail found)"
+            fi
