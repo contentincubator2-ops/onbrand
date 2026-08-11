@@ -1797,8 +1797,22 @@ export async function runOrchestra(args: {
   // 60s/100s bumps variants 3 → 5 but task config typically only has 3
   // variantLabels. Pad with extra labels so each new variant has a usable
   //口吻 instead of "版本 4" fallback.
+  //
+  // 2026-08-11 (bug checklist C2「應產出4張，實際1張」): this bump used to
+  // apply UNCONDITIONALLY — it silently overwrote a `cardsPerVariant`
+  // config's deliberate variants:1 back to 5, forcing the task to write 5
+  // FULL alternate variants (caption + Stage-3 image each) before ever
+  // reaching the cards stage that Stage 3.6 needs `variants[0].caption` for.
+  // For fb-60-album-4 that turned "1 post + 4 cards" into "5 posts + maybe
+  // cards if there's still budget left" — and was the direct cause of a
+  // "hard 130s budget exceeded" failure in an on-dev verification run (5x
+  // the LLM/image work before Stage 3.6 even starts). A cardsPerVariant
+  // config already fully specifies its own shape (ONE variant + N cards)
+  // and its own variantLabels/extras — same exemption philosophy as the
+  // router's "isPack" clamp skip in quickTaskRouter's central 60s rule.
+  const isCardsConfig = (args.config.cardsPerVariant ?? 0) > 1;
   const tier: OrchestraTier = args.tier ?? "30s";
-  if (tier === "60s" || tier === "99s") {
+  if ((tier === "60s" || tier === "99s") && !isCardsConfig) {
     const baseLabels = args.config.variantLabels;
     const extraLabels = ["進階版", "替代版", "極簡版", "完整版"]; // generic fallbacks
     const scaledLabels = baseLabels.length >= 5
