@@ -73,7 +73,13 @@ export const missionRouter = router({
                mo.version AS outputVersion,
                mo.platform AS outputPlatform,
                mo.outputType AS outputType,
-               JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.thumbnailUrl')) AS outputThumbUrl,
+               -- 2026-08-11 (CJ「每一個任務，應該都可以出現縮圖才對」): MySQL's
+               -- JSON_UNQUOTE(JSON_EXTRACT(x,'$.k')) returns the 4-char STRING
+               -- 'null' when the stored value is JSON null — and that string is
+               -- truthy in JS. The client then rendered <img src="null">, which
+               -- 404s and left a blank grey card. NULLIF turns it back into a
+               -- real SQL NULL so the coloured placeholder shows instead.
+               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.thumbnailUrl')), 'null') AS outputThumbUrl,
                m.output_image_url AS outputImageUrl,
                m.cover_image_url  AS coverImageUrl,
                b.name AS brandName,
@@ -88,8 +94,11 @@ export const missionRouter = router({
                -- quickTaskRouter.resolveAudienceTag). NULL for anything not
                -- started from a strategy-workbench sweet spot, which is most
                -- historical work — the /projects filter must tolerate that.
-               JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.audienceTag.audience'))  AS audienceLabel,
-               JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.audienceTag.spotTitle')) AS sweetSpotTitle,
+               -- Same 'null'-string trap: untagged runs store audienceTag as
+               -- JSON null, which would otherwise surface as a facet chip
+               -- literally labelled "null".
+               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.audienceTag.audience')),  'null') AS audienceLabel,
+               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.audienceTag.spotTitle')), 'null') AS sweetSpotTitle,
                p.name AS scopeProductName
           FROM missions m
           LEFT JOIN mission_outputs mo ON mo.missionId = m.id
