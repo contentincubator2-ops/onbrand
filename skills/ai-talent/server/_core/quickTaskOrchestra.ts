@@ -574,6 +574,27 @@ function stripCaptionPreamble(caption: string): string {
   return stripped.length > 0 ? stripped : caption;
 }
 
+// C1 (bug checklist 2026-08): internal artifacts must NEVER reach public copy.
+// The caption writer sometimes surfaces (a) image visual-direction briefs
+// (「視覺方向：…」/「圖片指令：…」) when a task pairs copy+image, (b) internal
+// snake_case plan keys (live_strategy_plan / authentic_story_bank / viral_source),
+// or (c) code tokens ([Headline / Primary / CTA]). Strip them at the single
+// caption choke point. If a variant is PURE leak (nothing real left), return
+// empty so the writer retries for real copy — shipping the leak is worse.
+const DRAFT_LINE_RE = /^[ \t]*(視覺方向|圖片指令|配圖建議|配圖|繪圖指令|image\s*prompt|imageprompt|visual\s*direction)[ \t]*[:：][^\n]*$/gim;
+const INTERNAL_KEY_RE = /\b(live_strategy_plan|content_documentation_plan|authentic_story_bank|viral_source|save_worthy_plan|radical_transparency_plan|live_first_plan|document(?:ary)?_plan|youtility_plan)\b/gi;
+const CODE_TOKEN_RE = /\[\s*(?:Headline|Primary(?:\s*Text)?|CTA|Description|Hook|Body)\s*(?:\/\s*(?:Headline|Primary(?:\s*Text)?|CTA|Description|Hook|Body)\s*)*\]/gi;
+function sanitizeCaption(caption: string): string {
+  const cleaned = caption
+    .replace(DRAFT_LINE_RE, "")
+    .replace(INTERNAL_KEY_RE, "")
+    .replace(CODE_TOKEN_RE, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return cleaned; // may be "" for a pure-leak variant → caller retries
+}
+
 // ── Caption writer — N parallel LLM calls, one per variant ──────────────
 //
 // Design (CJ direction 2026-05-05): instead of 1 LLM call producing N JSON
@@ -1011,7 +1032,7 @@ async function callOneVariant(args: {
       const parsed = tryParseJson(lastRaw);
       const out = extractCaption(lastRaw, parsed);
       if (out.caption.length > 0) {
-        return { label, caption: stripCaptionPreamble(out.caption), hashtags: out.hashtags };
+        return { label, caption: sanitizeCaption(stripCaptionPreamble(out.caption)), hashtags: out.hashtags };
       }
       lastErr = new Error(`empty caption for ${label} — raw[0:200]: ${lastRaw.slice(0, 200)}`);
       console.warn(`[callOneVariant] attempt ${attempt} failed for ${label} (raw len=${lastRaw.length}): ${lastRaw.slice(0, 300)}`);
