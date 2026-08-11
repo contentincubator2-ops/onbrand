@@ -71,6 +71,7 @@ export default function ImageSlotFlow({
   const [directions, setDirections] = useState<Direction[]>([]);
   const [pickedDir, setPickedDir] = useState<Direction | null>(null);
   const [promptEn, setPromptEn] = useState("");
+  const [summaryZh, setSummaryZh] = useState("");
   const [pickedModel, setPickedModel] = useState<MediaModel | null>(null);
   const [genResult, setGenResult] = useState<ImageSlotFlowResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -126,6 +127,7 @@ export default function ImageSlotFlow({
     setPickedDir(d);
     setPhase("prompt_edit");
     setErr(null);
+    setSummaryZh("");
     if (!craftMutation) {
       setPromptEn(`${d.composition}. ${d.mood}. ${d.palette}. Style: ${d.styleRef}.`);
       return;
@@ -136,6 +138,16 @@ export default function ImageSlotFlow({
         modelId: kind === "video" ? "piapi/kling-v2-master" : "openai/gpt-image-1",
       });
       setPromptEn(String(res?.promptEn ?? ""));
+      // 2026-08-11 (bug checklist C3 殘留「要求中文改圖指令，但還是給英文」):
+      // this field is INTENTIONALLY English (image models need it) — the
+      // real bug was that it looked like a generic, editable instruction
+      // with no language cue, so users kept retyping Chinese into it and
+      // it kept getting silently overwritten on every direction re-pick.
+      // Surface the zh-TW summary craftPrompt already returns (mirrors
+      // MediaGenFlow.tsx's PromptPhase, which already does this correctly)
+      // so users get a Chinese-readable explanation without us pretending
+      // the editable field itself can be Chinese.
+      setSummaryZh(String(res?.summaryZh ?? ""));
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     }
@@ -236,7 +248,7 @@ export default function ImageSlotFlow({
             </Button>
             <Button
               size="sm" variant="light" className="text-tiny h-6 px-2 text-default-500"
-              onPress={() => { setPickedDir(null); setPromptEn(""); setPhase("prompt_edit"); }}
+              onPress={() => { setPickedDir(null); setPromptEn(""); setSummaryZh(""); setPhase("prompt_edit"); }}
             >
               自訂指令 →
             </Button>
@@ -286,7 +298,7 @@ export default function ImageSlotFlow({
         <div className="shrink-0 flex items-center justify-between px-2.5 py-1.5 border-b border-divider bg-default-50/80">
           <div className="flex items-center gap-1.5">
             <FontAwesomeIcon icon={faWandSparkles} className="text-primary text-tiny" />
-            <span className="text-tiny font-semibold text-default-700">指令 + 模型</span>
+            <span className="text-tiny font-semibold text-default-700">AI 指令（英文）+ 模型</span>
           </div>
           <Button
             size="sm" variant="light" className="text-tiny h-6 px-2 text-default-500"
@@ -327,6 +339,9 @@ export default function ImageSlotFlow({
               <FontAwesomeIcon icon={copied ? faCheck : faCopy} className="text-tiny" />
             </button>
           </div>
+          {summaryZh && (
+            <p className="text-tiny text-default-500 leading-relaxed">中文摘要：{summaryZh}</p>
+          )}
 
           {err && <p className="text-tiny text-danger leading-snug">{err}</p>}
 
