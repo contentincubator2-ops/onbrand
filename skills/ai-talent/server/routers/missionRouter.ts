@@ -84,10 +84,19 @@ export const missionRouter = router({
                s.hero_image_url AS squadHeroImageUrl,
                s.mockup_images  AS squadMockupImages,
                CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')) AS UNSIGNED) AS scopeProductId,
-               CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.eventId'))   AS UNSIGNED) AS scopeEventId
+               CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.eventId'))   AS UNSIGNED) AS scopeEventId,
+               -- 2026-08-11: audience attribution written at run time (see
+               -- quickTaskRouter.resolveAudienceTag). NULL for anything not
+               -- started from a strategy-workbench sweet spot, which is most
+               -- historical work — the /projects filter must tolerate that.
+               JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.audienceTag.audience'))  AS audienceLabel,
+               JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.audienceTag.spotTitle')) AS sweetSpotTitle,
+               p.name AS scopeProductName
           FROM missions m
           LEFT JOIN mission_outputs mo ON mo.missionId = m.id
           LEFT JOIN brands b ON b.id = m.brandId
+          LEFT JOIN products p
+                 ON p.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')) AS UNSIGNED)
           LEFT JOIN squads s ON s.slug COLLATE utf8mb4_unicode_ci
                               = m.squadSlug COLLATE utf8mb4_unicode_ci
          WHERE m.userId = ${ctx.user.id}
