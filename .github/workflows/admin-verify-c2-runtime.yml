@@ -1,0 +1,105 @@
+name: "Admin — Verify C2 runtime on dev (album cards + real-product scan)"
+
+# Two checks against the DEPLOYED dev release:
+#  A. Real-product photo scan (DB-only, free): how many products actually
+#     have a resolvable photo URL in positioning JSON — diagnoses the
+#     ig-99-visual-story / ig-60-live-suite "real product ignored" bug
+#     without guessing (wiring was already confirmed in-parity with the
+#     picker; this checks whether the DATA is even there).
+#  B. Live fb-60-album-4 orchestra run for IRIS (2956): confirms the
+#     variants:1+cardsPerVariant:4 config fix actually produces 4 cards
+#     with real images end-to-end (not just typechecks).
+#
+# workflow_dispatch needs the file on the default branch (main); this lives
+# on dev, so a path-scoped push runs it here without touching prod.
+on:
+  push:
+    branches: [dev]
+    paths: [".github/workflows/admin-verify-c2-runtime.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Verify C2 runtime on the dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env; set +a
+            echo "=== deployed release ==="
+            basename "$(readlink -f /opt/onbrand/current)" 2>/dev/null || echo "(sha unknown)"
+            echo "=== running C2 runtime verification ==="
+            node --import tsx -e '
+            const guard = setTimeout(() => { console.error("timeout"); process.exit(3); }, 300000);
+            (async () => {
+              const mysql = await import("mysql2/promise");
+              const conn = await mysql.createConnection({
+                host: process.env.LOCAL_DB_HOST, port: +(process.env.LOCAL_DB_PORT || 3306),
+                user: process.env.LOCAL_DB_USER, password: process.env.LOCAL_DB_PASSWORD,
+                database: process.env.LOCAL_DB_NAME,
+              });
+
+              // A. real-product photo scan
+              function resolveImg(pos) {
+                let p = pos;
+                if (typeof p === "string") { try { p = JSON.parse(p); } catch { return null; } }
+                if (!p) return null;
+                const candidates = [
+                  p?.imageUrl, p?.image,
+                  p?._interim?.imageUrl, p?._interim?.image,
+                  Array.isArray(p?.images) ? p.images[0] : null,
+                  Array.isArray(p?._interim?.images) ? p._interim.images[0] : null,
+                  Array.isArray(p?._assets?.photos) ? (typeof p._assets.photos[0] === "string" ? p._assets.photos[0] : p._assets.photos[0]?.url) : null,
+                ];
+                for (const c of candidates) { if (typeof c === "string" && /^https?:\/\//.test(c)) return c; }
+                return null;
+              }
+              const [products] = await conn.query("SELECT id, brandId, name, positioning FROM products LIMIT 500");
+              let withPhoto = 0; let sample = null;
+              for (const p of products) {
+                const url = resolveImg(p.positioning);
+                if (url) { withPhoto++; if (!sample) sample = { id: p.id, brandId: p.brandId, name: p.name, url }; }
+              }
+              console.log("=== A. real-product photo scan ===");
+              console.log("products scanned: " + products.length + ", with resolvable photo: " + withPhoto);
+              console.log(sample ? "sample: productId=" + sample.id + " brandId=" + sample.brandId + " name=" + JSON.stringify(sample.name) + " url=" + sample.url : "NO product in the scanned set has a resolvable photo URL");
+
+              // B. live fb-60-album-4 run for IRIS (2956)
+              const [brandRows] = await conn.query("SELECT id, userId, name FROM brands WHERE id = 2956 LIMIT 1");
+              const brand = brandRows[0];
+              await conn.end();
+              if (!brand) { console.error("brand 2956 not found"); clearTimeout(guard); process.exit(2); return; }
+
+              const { getFB60Template, getFB60OrchestraConfig } = await import("./server/_core/quickTaskFB60");
+              const { runOrchestra } = await import("./server/_core/quickTaskOrchestra");
+              const template = getFB60Template("fb-60-album-4");
+              const config = getFB60OrchestraConfig("fb-60-album-4");
+              if (!template || !config) { console.error("fb-60-album-4 template/config not found on deployed build"); clearTimeout(guard); process.exit(2); return; }
+
+              console.log("=== B. running fb-60-album-4 for brand " + brand.name + " ===");
+              const result = await runOrchestra({
+                template, config,
+                inputs: { occasion: "品牌週年慶活動幕後花絮，展現團隊精神與產品質感" },
+                brandId: brand.id, userId: brand.userId, tier: "60s",
+              });
+              const v0 = result.variants && result.variants[0];
+              console.log("variants: " + (result.variants ? result.variants.length : 0));
+              console.log("cards: " + (v0 && v0.cards ? v0.cards.length : 0));
+              ((v0 && v0.cards) || []).forEach((c, i) => console.log("  card" + i + ": status=" + (c.image && c.image.status) + " hasUrl=" + !!(c.image && c.image.url)));
+              console.log("errors: " + JSON.stringify(result.errors || []));
+              clearTimeout(guard);
+              const cards = (v0 && v0.cards) || [];
+              const readyCount = cards.filter((c) => c.image && c.image.status === "ready").length;
+              const ok = cards.length === 4 && readyCount >= 3;
+              console.log(ok ? "ALBUM_FIX: PASS (" + readyCount + "/4 cards ready)" : "ALBUM_FIX: FAIL (" + readyCount + "/" + cards.length + " cards ready)");
+              process.exit(ok ? 0 : 1);
+            })().catch((e) => { clearTimeout(guard); console.error("error:", e && e.message ? e.message : e); process.exit(2); });
+            '
