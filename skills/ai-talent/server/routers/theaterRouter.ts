@@ -30,6 +30,18 @@ import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListening
 import { buildTheaterCraftBlock } from "../_core/theaterCraftRef";
 import localPool from "../localDb";
 
+/**
+ * C3 (bug checklist 2026-08): an English post should start with a capital
+ * letter. Uppercase the leading a-z (after optional opening quote/bracket).
+ * Chinese/emoji-led captions are untouched. Exported (not inline) so an
+ * on-dev admin check can exercise the DEPLOYED function directly, same
+ * pattern as quickTaskOrchestra.sanitizeCaption for C1.
+ */
+export function capitalizeEnglishLead(caption: string): string {
+  if (!caption) return caption;
+  return caption.replace(/^(\s*(?:["「『【\[(]\s*)?)([a-z])/, (_m, lead: string, ch: string) => lead + ch.toUpperCase());
+}
+
 // Per-(brand, platform, day) scout cache. The cache key encloses the
 // YYYY-MM-DD so it auto-expires daily. Viral patterns don't shift in
 // minutes — caching avoids 6 perplexity calls every time the user
@@ -1137,12 +1149,8 @@ ${importantHint}
           const enforced = await enforceBrandRulesOnText(input.brandId, caption);
           if (enforced && enforced !== caption) caption = enforced;
         } catch { /* fail-safe: keep caption */ }
-        // C3 (bug checklist 2026-08): an English post should start with a capital
-        // letter. Uppercase the leading a-z (after optional opening quote/bracket).
-        // Chinese/emoji-led captions are untouched; applies to every platform cell.
-        if (caption) {
-          caption = caption.replace(/^(\s*(?:["「『【\[(]\s*)?)([a-z])/, (_m, lead: string, ch: string) => lead + ch.toUpperCase());
-        }
+        // C3: applies to every platform cell (input.platform is generic here).
+        if (caption) caption = capitalizeEnglishLead(caption);
         // Auto-record into mission_outputs so /projects shows this cell.
         // Non-fatal: failure here doesn't break the user-facing response.
         if (caption) {
