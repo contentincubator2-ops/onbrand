@@ -665,6 +665,28 @@ function IconBar({
     return () => document.removeEventListener("mousedown", handler);
   }, [avatarOpen]);
 
+  // 2026-08-11 (CJ「我寧願是下拉式選單，但會一直有小動畫，提醒用戶可以切換」):
+  // workspace switcher as a dropdown. A dropdown hides the other three modes,
+  // so the trigger carries a periodic nudge — without it the control reads as
+  // a static label and users never learn it's switchable.
+  const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
+  const modeRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!modeMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (modeRef.current && !modeRef.current.contains(e.target as Node))
+        setModeMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setModeMenuOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [modeMenuOpen]);
+
   return (
     <aside
       className="sowork-icon-bar"
@@ -719,51 +741,105 @@ function IconBar({
 
       {isPrivatePreview && (
         <div
-          role="tablist"
-          aria-label={isEn ? "Workspace mode" : "工作區模式"}
+          ref={modeRef}
           style={{
-            flexShrink: 0,
-            display: "flex", flexDirection: "column", gap: 3,
+            flexShrink: 0, position: "relative",
             padding: "0 3px 10px",
             borderBottom: "1px solid #f1f5f9",
             marginBottom: 8,
           }}
         >
-          {modeOptions.map((opt) => {
-            const active = activeWorkspaceMode === opt.id;
+          {/* The nudge: a slow 4s chevron bob + a one-off ring on the trigger.
+              Deliberately low-frequency — a constant animation next to the
+              nav would be noise. Honours prefers-reduced-motion. */}
+          <style>{`
+            @keyframes swNudge {
+              0%, 82%, 100% { transform: translateY(0); }
+              88%           { transform: translateY(2.5px); }
+              94%           { transform: translateY(0); }
+            }
+            @keyframes swRing {
+              0%, 82%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); }
+              88%           { box-shadow: 0 0 0 4px rgba(249,115,22,0.18); }
+            }
+            .sw-trigger { animation: swRing 4s ease-in-out infinite; }
+            .sw-chevron { animation: swNudge 4s ease-in-out infinite; }
+            @media (prefers-reduced-motion: reduce) {
+              .sw-trigger, .sw-chevron { animation: none; }
+            }
+          `}</style>
+          {(() => {
+            const cur = modeOptions.find((m) => m.id === activeWorkspaceMode) ?? modeOptions[0]!;
             return (
               <button
-                key={opt.id}
-                role="tab"
-                aria-selected={active}
-                onClick={() => onNavigate(opt.to)}
-                title={opt.tip}
+                className={modeMenuOpen ? undefined : "sw-trigger"}
+                aria-haspopup="menu"
+                aria-expanded={modeMenuOpen}
+                aria-label={isEn ? "Switch workspace" : "切換工作區"}
+                onClick={() => setModeMenuOpen((v) => !v)}
                 style={{
-                  // Icon stacked over the label: at 64px of usable width a
-                  // side-by-side icon + 2-char label leaves the text cramped,
-                  // stacking gives both room to stay legible.
                   display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", gap: 2,
-                  width: "100%", height: 44,
-                  border: "none", borderRadius: 10,
-                  background: active ? "#F97316" : "transparent",
-                  color: active ? "#fff" : "#6b7280",
-                  cursor: "pointer", transition: "all 0.15s ease",
+                  alignItems: "center", justifyContent: "center", gap: 1,
+                  width: "100%", height: 50,
+                  border: "none", borderRadius: 12,
+                  background: "#F97316", color: "#fff",
+                  cursor: "pointer", transition: "filter 0.15s ease",
                 }}
-                onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.background = "#f3f4f6";
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.background = "transparent";
-                }}
+                onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(1.07)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.filter = "none"; }}
               >
-                <FontAwesomeIcon icon={opt.icon} style={{ fontSize: 15 }} />
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.02em", lineHeight: 1 }}>
-                  {opt.label}
+                <FontAwesomeIcon icon={cur.icon} style={{ fontSize: 15 }} />
+                <span style={{ display: "flex", alignItems: "center", gap: 3, lineHeight: 1 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.02em" }}>{cur.label}</span>
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    className={modeMenuOpen ? undefined : "sw-chevron"}
+                    style={{ fontSize: 7 }}
+                  />
                 </span>
               </button>
             );
-          })}
+          })()}
+
+          {modeMenuOpen && (
+            <div
+              role="menu"
+              style={{
+                // Opens to the RIGHT of the rail — a 70px-wide menu couldn't
+                // show full labels, which is the whole point of the dropdown.
+                position: "absolute", left: "100%", top: 0, marginLeft: 8,
+                width: 172, background: "#fff", borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                boxShadow: "0 12px 32px rgba(0,0,0,0.14), 0 4px 8px rgba(0,0,0,0.04)",
+                padding: 6, zIndex: 60,
+              }}
+            >
+              {modeOptions.map((opt) => {
+                const active = activeWorkspaceMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    role="menuitem"
+                    onClick={() => { setModeMenuOpen(false); onNavigate(opt.to); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      width: "100%", padding: "9px 10px",
+                      border: "none", borderRadius: 8, textAlign: "left",
+                      background: active ? "#FFF7ED" : "transparent",
+                      color: active ? "#C2410C" : "#374151",
+                      cursor: "pointer", transition: "background 0.12s ease",
+                    }}
+                    onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
+                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <FontAwesomeIcon icon={opt.icon} style={{ fontSize: 14, width: 16 }} />
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: active ? 800 : 600 }}>{opt.label}</span>
+                    {active && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 11 }} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
