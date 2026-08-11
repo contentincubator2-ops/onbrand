@@ -60,7 +60,6 @@ jobs:
               const wrongLangCaption = "This link does not appear to be related to your brand. Please share a URL that connects to your products, services, or brand story so we can craft the right post for you.";
               const reask = m.reaskInZhTW;
               if (typeof reask !== "function") { console.error("reaskInZhTW NOT exported on deployed build"); clearTimeout(guard); process.exit(2); }
-              console.log("DEBUG reaskInZhTW source: " + reask.toString().replace(/\n/g, " | ").slice(0, 1500));
               const rewritten = await reask(wrongLangCaption);
               const stillFlagged = detect(rewritten);
               console.log("before: " + JSON.stringify(wrongLangCaption));
