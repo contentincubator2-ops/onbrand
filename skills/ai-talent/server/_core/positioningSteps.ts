@@ -60,6 +60,26 @@ function safeJSON<T>(text: string, fallback: T): T {
   return fallback;
 }
 
+/**
+ * 2026-08-11: does this parsed segment actually carry anything a human would
+ * read? Every fallback shape in this file is an all-empty skeleton
+ * ({ primary: "", matrix: [] } and friends) — none of them is a meaningful
+ * default, they exist only so a parse failure doesn't crash. So "no strings
+ * and no populated arrays anywhere" is indistinguishable from failure, and
+ * must be treated as one.
+ *
+ * Numbers and booleans alone don't count: taglineScore's skeleton is
+ * { rows: [], total: 0 }, and a real score always carries text in rows[].
+ */
+export function hasContent(v: unknown): boolean {
+  if (v == null) return false;
+  if (typeof v === "string") return v.trim().length > 0;
+  if (typeof v === "number" || typeof v === "boolean") return false;
+  if (Array.isArray(v)) return v.some(hasContent);
+  if (typeof v === "object") return Object.values(v as Record<string, unknown>).some(hasContent);
+  return false;
+}
+
 // 2026-07-19 (CJ「競品分析 7/17-18 突然變不精準」post-mortem): the LLM
 // chain silently degraded to gpt-4.1 for two days (Anthropic credits ran
 // out) and nobody noticed until output quality complaints came in.
@@ -96,7 +116,36 @@ async function callJSON(ctx: StepContext, stepId: string, system: string, user: 
   const outTok = r.usage?.completion_tokens ?? 0;
   await ctx.recordUsage(`positioning_step:${stepId}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok, costFor(inTok, outTok));
   void warnIfDegradedModel(r.model || "", stepId);
-  return safeJSON(text, fallback);
+
+  // 2026-08-11 (heytom-market onboarding: job reported done 10/10 with an
+  // entirely blank 目標受眾): this used to `return safeJSON(text, fallback)`,
+  // which swallowed both failure modes — unparseable output and an empty
+  // object — by writing the empty skeleton and reporting success.
+  //
+  // That silently bypassed the runner's own safety net. positioningJobRunner
+  // already retries a throwing step 5 times with backoff and marks the job
+  // failed if it never recovers; returning a fallback meant that machinery
+  // never engaged. A blank segment then reaches the customer looking like a
+  // finished deliverable, which is worse than an honest failure.
+  //
+  // Throwing hands control back to the retry loop. `fallback` is still used —
+  // spread underneath the parsed object so expected keys always exist — it
+  // just can no longer stand in for a result.
+  const PARSE_FAILED = Symbol("parse-failed");
+  const parsed = safeJSON<any>(text, PARSE_FAILED as any);
+  if (parsed === (PARSE_FAILED as any)) {
+    throw new Error(
+      `positioning step "${stepId}" returned unparseable output ` +
+      `(model=${r.model || "?"}, ${text.length} chars): ${text.slice(0, 200)}`,
+    );
+  }
+  if (!hasContent(parsed)) {
+    throw new Error(
+      `positioning step "${stepId}" parsed but produced no content ` +
+      `(model=${r.model || "?"}) — refusing to write a blank segment`,
+    );
+  }
+  return { ...(fallback as any), ...parsed };
 }
 
 
