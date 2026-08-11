@@ -5,6 +5,13 @@ import { getDb } from "../db";
 import { missionOutputs } from "../../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { normalizeTaskId, normalizeTier } from "../_core/tierCompat";
+import {
+  contentSelectorFields,
+  outputItemCaption,
+  requirePlanningConfirmation,
+  resolveOutputContent,
+  updateOutputContent,
+} from "../_core/outputContentEnvelope";
 
 /** Escape HTML special characters to prevent stored XSS in previewHtml */
 function escapeHtml(s: string): string {
@@ -70,7 +77,7 @@ export const outputRouter = router({
   emailToTeam: protectedProcedure
     .input(z.object({
       id: z.number(),
-      variantIndex: z.number().min(0),
+      ...contentSelectorFields,
       recipients: z.array(z.string().email()).min(1).max(10),
       note: z.string().max(2000).optional(),
     }))
@@ -87,13 +94,9 @@ export const outputRouter = router({
         [input.id, ctx.user.id],
       );
       const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
-      if (!row) throw new Error("Output not found");
-      let caption = "";
-      try {
-        const parsed = JSON.parse(row.content);
-        const arrSrc = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-        caption = arrSrc[input.variantIndex]?.caption ?? "";
-      } catch { caption = row.content; }
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
+      const selected = resolveOutputContent(row.content, input);
+      const caption = outputItemCaption(selected.item);
 
       const { sendEmail } = await import("../auth/emailService");
       const subject = `[${row.brandName ?? "Marketing-OS"}] ${row.missionTitle ?? row.title ?? "貼文 review"}`;
@@ -138,7 +141,8 @@ export const outputRouter = router({
   scheduleIcs: protectedProcedure
     .input(z.object({
       id: z.number(),
-      variantIndex: z.number().min(0),
+      ...contentSelectorFields,
+      confirmPlanningContent: z.boolean().optional(),
       scheduledAt: z.string(), // ISO8601
       durationMinutes: z.number().min(5).max(480).default(30),
     }))
@@ -155,19 +159,16 @@ export const outputRouter = router({
         [input.id, ctx.user.id],
       );
       const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
-      if (!row) throw new Error("Output not found");
-      let caption = "";
-      try {
-        const parsed = JSON.parse(row.content);
-        const arrSrc = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-        caption = arrSrc[input.variantIndex]?.caption ?? "";
-      } catch { caption = row.content; }
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
+      const selected = resolveOutputContent(row.content, input);
+      requirePlanningConfirmation(selected, input.confirmPlanningContent, "schedule");
+      const caption = outputItemCaption(selected.item);
 
       const start = new Date(input.scheduledAt);
       const end = new Date(start.getTime() + input.durationMinutes * 60_000);
       const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
       const escape = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
-      const uid = `output-${input.id}-${input.variantIndex}@sowork.ai`;
+      const uid = `output-${input.id}-${selected.kind}-${selected.index}@sowork.ai`;
       const summary = `📤 發布：${row.brandName ?? ""} · ${row.missionTitle ?? "貼文"}`;
       const ics = [
         "BEGIN:VCALENDAR",
@@ -202,7 +203,7 @@ export const outputRouter = router({
   updateVariantCaption: protectedProcedure
     .input(z.object({
       id: z.number(),
-      variantIndex: z.number().min(0),
+      ...contentSelectorFields,
       caption: z.string().max(8000),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -216,21 +217,18 @@ export const outputRouter = router({
         [input.id, ctx.user.id],
       );
       const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
-      if (!row) throw new Error("Output not found");
-      let parsed: any;
-      try { parsed = JSON.parse(row.content); }
-      catch { parsed = [{ label: "主版本", caption: row.content }]; }
-      const arrSrc = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-      if (input.variantIndex >= arrSrc.length) throw new Error("Variant index out of range");
-      arrSrc[input.variantIndex] = { ...arrSrc[input.variantIndex], caption: input.caption };
-      const newContent = Array.isArray(parsed)
-        ? JSON.stringify(arrSrc, null, 2)
-        : JSON.stringify({ ...parsed, variants: arrSrc }, null, 2);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
+      const updated = updateOutputContent(row.content, input, (item) => ({ ...item, caption: input.caption }));
       await localPool.execute(
         `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
-        [newContent, input.id],
+        [updated.content, input.id],
       );
-      return { ok: true, variantIndex: input.variantIndex };
+      return {
+        ok: true,
+        variantIndex: input.variantIndex,
+        contentKind: updated.resolved.kind,
+        contentIndex: updated.resolved.index,
+      };
     }),
 
   /**
@@ -241,7 +239,7 @@ export const outputRouter = router({
   updateVariantImage: protectedProcedure
     .input(z.object({
       id: z.number(),
-      variantIndex: z.number().min(0),
+      ...contentSelectorFields,
       // 2026-05-10: accept either http(s) URL OR data: URL (b64 inline
       // image from OpenAI gpt-image-1 which doesn't return a URL).
       // max bumped from 2000 → 10MB since base64 expands ~33%.
@@ -274,24 +272,23 @@ export const outputRouter = router({
         [input.id, ctx.user.id],
       );
       const row = (rows as any[])[0];
-      if (!row) throw new Error("Output not found");
-      let parsed: any;
-      try { parsed = JSON.parse(row.content); }
-      catch { parsed = [{ label: "主版本", caption: row.content }]; }
-      const arr = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-      if (input.variantIndex >= arr.length) throw new Error("variant index out of range");
-      arr[input.variantIndex] = {
-        ...arr[input.variantIndex],
-        image: { ...(arr[input.variantIndex].image ?? {}), url: input.imageUrl, status: "ready", style: input.style ?? arr[input.variantIndex].image?.style ?? null },
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
+      const updated = updateOutputContent(row.content, input, (item) => ({
+        ...item,
+        image: { ...(item.image ?? {}), url: input.imageUrl, status: "ready", style: input.style ?? item.image?.style ?? null },
         imageUrl: input.imageUrl,
         imageStatus: "ready",
-      };
-      const newContent = Array.isArray(parsed) ? JSON.stringify(arr, null, 2) : JSON.stringify({ ...parsed, variants: arr }, null, 2);
+      }));
       await localPool.execute(
         `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
-        [newContent, input.id],
+        [updated.content, input.id],
       );
-      return { ok: true, variantIndex: input.variantIndex };
+      return {
+        ok: true,
+        variantIndex: input.variantIndex,
+        contentKind: updated.resolved.kind,
+        contentIndex: updated.resolved.index,
+      };
     }),
 
   /**

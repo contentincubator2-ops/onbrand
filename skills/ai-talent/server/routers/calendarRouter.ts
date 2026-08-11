@@ -27,6 +27,14 @@ import {
 import { getPublishProvider } from "../_core/publishProvider";
 import { createBundleSocialClient } from "../_core/bundleSocial";
 import { publishViaBundleSocial } from "../_core/bundlePublishService";
+import {
+  contentSelectorFields,
+  outputItemCaption,
+  outputItemImageUrl,
+  requirePlanningConfirmation,
+  resolveOutputContent,
+  resolveStoredContentSelector,
+} from "../_core/outputContentEnvelope";
 
 const CONTENT_TYPES = [
   "fb-content",
@@ -147,10 +155,11 @@ export const calendarRouter = router({
       if (input.workspaceId) params.push(input.workspaceId);
 
       const [scheduled]: any = await localPool.execute(
-        `SELECT sp.id, sp.outputId, sp.variantIndex, sp.platform,
+        `SELECT sp.id, sp.outputId, sp.variantIndex, sp.contentKind, sp.contentIndex, sp.platform,
                 sp.scheduledAt, sp.status, sp.publishedAt, sp.externalUrl,
                 sp.brandId, b.name AS brandName,
-                o.content AS outputContent, m.title AS missionTitle
+                o.content AS outputContent, o.metadata AS outputMetadata,
+                m.title AS missionTitle, m.squadSlug AS missionSquadSlug
          FROM scheduled_posts sp
          LEFT JOIN brands b ON b.id = sp.brandId
          LEFT JOIN mission_outputs o ON o.id = sp.outputId
@@ -182,19 +191,30 @@ export const calendarRouter = router({
       );
 
       const items = [
-        ...(scheduled as any[]).map((s) => ({
-          kind: "scheduled" as const,
-          id: s.id,
-          outputId: s.outputId,
-          at: s.scheduledAt,
-          platform: s.platform,
-          status: s.status,
-          brandId: s.brandId,
-          brandName: s.brandName,
-          missionTitle: s.missionTitle,
-          externalUrl: s.externalUrl,
-          preview: extractCaption(s.outputContent, s.variantIndex),
-        })),
+        ...(scheduled as any[]).map((s) => {
+          const selector = resolveStoredContentSelector({
+            variantIndex: s.variantIndex,
+            contentKind: s.contentKind,
+            contentIndex: s.contentIndex,
+            outputMetadata: s.outputMetadata,
+            missionSquadSlug: s.missionSquadSlug,
+          });
+          return {
+            kind: "scheduled" as const,
+            id: s.id,
+            outputId: s.outputId,
+            at: s.scheduledAt,
+            platform: s.platform,
+            status: s.status,
+            brandId: s.brandId,
+            brandName: s.brandName,
+            missionTitle: s.missionTitle,
+            externalUrl: s.externalUrl,
+            contentKind: selector.contentKind ?? null,
+            contentIndex: selector.contentIndex ?? null,
+            preview: extractCaption(s.outputContent, selector),
+          };
+        }),
         ...(published as any[]).map((p) => ({
           kind: "published" as const,
           id: p.id,
@@ -206,7 +226,7 @@ export const calendarRouter = router({
           brandName: p.brandName,
           missionTitle: p.missionTitle,
           externalUrl: null,
-          preview: extractCaption(p.content, 0),
+          preview: extractCaption(p.content, { variantIndex: 0 }),
         })),
       ];
       return items;
@@ -215,14 +235,15 @@ export const calendarRouter = router({
   schedule: protectedProcedure
     .input(z.object({
       outputId: z.number().int().positive(),
-      variantIndex: z.number().int().min(0).default(0),
+      ...contentSelectorFields,
+      confirmPlanningContent: z.boolean().optional(),
       scheduledAt: z.string(),
       platform: z.string().min(1).max(24),
     }))
     .mutation(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
       const [rows]: any = await localPool.execute(
-        `SELECT m.userId, m.brandId, b.workspaceId
+        `SELECT m.userId, m.brandId, b.workspaceId, o.content
          FROM mission_outputs o
          JOIN missions m ON m.id = o.missionId
          LEFT JOIN brands b ON b.id = m.brandId
@@ -233,18 +254,27 @@ export const calendarRouter = router({
       if (!row || row.userId !== ctx.user.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
       }
+      const selected = resolveOutputContent(row.content, input);
+      requirePlanningConfirmation(selected, input.confirmPlanningContent, "schedule");
       const at = new Date(input.scheduledAt);
       if (isNaN(at.getTime()) || at.getTime() < Date.now() - 60_000) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "scheduledAt 必須是未來時間" });
       }
       const [r]: any = await localPool.execute(
         `INSERT INTO scheduled_posts
-           (userId, workspaceId, brandId, outputId, variantIndex, platform, scheduledAt, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+           (userId, workspaceId, brandId, outputId, variantIndex, contentKind, contentIndex,
+            planningConfirmed, platform, scheduledAt, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
         [ctx.user.id, row.workspaceId ?? null, row.brandId ?? null,
-         input.outputId, input.variantIndex, input.platform, at],
+         input.outputId, input.variantIndex, selected.storageKind, selected.storageIndex,
+         selected.kind === "planning" ? 1 : 0, input.platform, at],
       );
-      return { ok: true, id: (r as any).insertId as number };
+      return {
+        ok: true,
+        id: (r as any).insertId as number,
+        contentKind: selected.kind,
+        contentIndex: selected.index,
+      };
     }),
 
   reschedule: protectedProcedure
@@ -312,18 +342,24 @@ export const calendarRouter = router({
    * Other platforms: falls back to PIPEDREAM_*_PUBLISH_WEBHOOK if set.
    */
   publish: protectedProcedure
-    .input(z.object({ id: z.number().int().positive() }))
+    .input(z.object({
+      id: z.number().int().positive(),
+      confirmPlanningContent: z.boolean().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
 
       // Load scheduled_post + verify ownership
       const [rows]: any = await localPool.execute(
-        `SELECT sp.id, sp.outputId, sp.variantIndex, sp.platform, sp.status, sp.brandId,
-                o.content AS outputContent,
+        `SELECT sp.id, sp.outputId, sp.variantIndex, sp.contentKind, sp.contentIndex,
+                sp.planningConfirmed, sp.platform, sp.status, sp.brandId,
+                o.content AS outputContent, o.metadata AS outputMetadata,
+                m.squadSlug AS missionSquadSlug,
                 b.fbPageId AS brand_fb_page_id, b.fbPageName AS brand_fb_page_name,
                 b.name AS brandName
          FROM scheduled_posts sp
          LEFT JOIN mission_outputs o ON o.id = sp.outputId
+         LEFT JOIN missions m ON m.id = o.missionId
          LEFT JOIN brands b ON b.id = sp.brandId
          WHERE sp.id = ? AND sp.userId = ? LIMIT 1`,
         [input.id, ctx.user.id],
@@ -345,15 +381,32 @@ export const calendarRouter = router({
         platformRaw === "pr" ? "press" :
         platformRaw;
 
-      // Extract caption
-      let caption = "";
-      try {
-        const parsed = JSON.parse(row.outputContent);
-        const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-        caption = variants[row.variantIndex ?? 0]?.caption ?? "";
-      } catch {
-        caption = String(row.outputContent ?? "");
+      const selected = resolveOutputContent(
+        row.outputContent,
+        resolveStoredContentSelector({
+          variantIndex: row.variantIndex,
+          contentKind: row.contentKind,
+          contentIndex: row.contentIndex,
+          outputMetadata: row.outputMetadata,
+          missionSquadSlug: row.missionSquadSlug,
+        }),
+      );
+      requirePlanningConfirmation(
+        selected,
+        Number(row.planningConfirmed ?? 0) === 1 || input.confirmPlanningContent === true,
+        "publish",
+      );
+      if (
+        selected.kind === "planning" &&
+        input.confirmPlanningContent === true &&
+        Number(row.planningConfirmed ?? 0) !== 1
+      ) {
+        await localPool.execute(
+          `UPDATE scheduled_posts SET planningConfirmed = 1 WHERE id = ? AND userId = ?`,
+          [input.id, ctx.user.id],
+        );
       }
+      const caption = outputItemCaption(selected.item);
       if (!caption.trim()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文沒有文字內容可發布" });
       }
@@ -376,13 +429,7 @@ export const calendarRouter = router({
           });
         }
 
-        let bundleImageUrl: string | null = null;
-        try {
-          const parsed = JSON.parse(row.outputContent);
-          const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-          const v = variants[row.variantIndex ?? 0] ?? {};
-          bundleImageUrl = v.imageUrl ?? v.image?.url ?? null;
-        } catch { /* no image */ }
+        const bundleImageUrl = outputItemImageUrl(selected.item);
 
         try {
           const result = await publishViaBundleSocial(
@@ -563,13 +610,7 @@ export const calendarRouter = router({
         // ── Instagram: direct publish via Pipedream Connect OAuth ───────────
         // Instagram Business requires an image — text-only posts not supported.
         // Extract imageUrl from post content if available.
-        let imageUrl: string | null = null;
-        try {
-          const parsed = JSON.parse(row.outputContent);
-          const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-          const v = variants[row.variantIndex ?? 0] ?? {};
-          imageUrl = v.imageUrl ?? v.image?.url ?? null;
-        } catch { /* no image */ }
+        const imageUrl = outputItemImageUrl(selected.item);
 
         if (!imageUrl) {
           throw new TRPCError({
@@ -863,15 +904,14 @@ async function _pdGetAccountContext(
   return { accounts, apiBase, projectId, externalUserId, headers };
 }
 
-function extractCaption(content: any, variantIndex: number): string {
+function extractCaption(
+  content: any,
+  selector: { variantIndex: number; contentKind?: "planning" | "public"; contentIndex?: number },
+): string {
   if (!content) return "";
   try {
-    const parsed = typeof content === "string" ? JSON.parse(content) : content;
-    const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-    const v = variants[variantIndex] ?? variants[0];
-    const cap = v?.caption ?? v?.text ?? "";
-    return String(cap).slice(0, 120);
+    return outputItemCaption(resolveOutputContent(content, selector).item).slice(0, 120);
   } catch {
-    return String(content).slice(0, 120);
+    return "";
   }
 }

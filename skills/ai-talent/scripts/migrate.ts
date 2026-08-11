@@ -1938,6 +1938,9 @@ async function main() {
         brandId        INT          NULL,
         outputId       BIGINT       NOT NULL,
         variantIndex   INT          NOT NULL DEFAULT 0,
+        contentKind    VARCHAR(16)  NULL,
+        contentIndex   INT          NULL,
+        planningConfirmed TINYINT(1) NOT NULL DEFAULT 0,
         platform       VARCHAR(24)  NOT NULL,
         scheduledAt    DATETIME(3)  NOT NULL,
         status         VARCHAR(12)  NOT NULL DEFAULT 'pending',
@@ -1956,6 +1959,33 @@ async function main() {
         INDEX idx_sp_brand (brandId, scheduledAt),
         INDEX idx_sp_output (outputId)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await ensureCol("scheduled_posts", "contentKind", "VARCHAR(16) NULL AFTER variantIndex");
+    await ensureCol("scheduled_posts", "contentIndex", "INT NULL AFTER contentKind");
+    await ensureCol("scheduled_posts", "planningConfirmed", "TINYINT(1) NOT NULL DEFAULT 0 AFTER contentIndex");
+    // PR #56 stored the five IG strategy reports as legacy arrays. Any rows
+    // scheduled before selector columns existed are planning content, not a
+    // publishable post. Backfill only the exact allowlisted task IDs/slugs.
+    await conn.execute(`
+      UPDATE scheduled_posts sp
+      JOIN mission_outputs o ON o.id = sp.outputId
+      LEFT JOIN missions m ON m.id = o.missionId
+      SET sp.contentKind = 'planning',
+          sp.contentIndex = sp.variantIndex,
+          sp.planningConfirmed = 0
+      WHERE sp.contentKind IS NULL
+        AND JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.presentation')) = 'strategy-report'
+        AND COALESCE(
+          JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')),
+          JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.squadSlug')),
+          m.squadSlug
+        ) IN (
+          'ig-99-youtility', 'ig-baer-youtility',
+          'ig-99-visual-story', 'ig-chrisdo-visual-story',
+          'ig-99-live-first', 'ig-fanzo-live-first',
+          'ig-99-document', 'ig-garyvee-document',
+          'ig-99-radical-transparency', 'ig-hollis-radical-transparency'
+        )
     `);
     console.log("[migrate] scheduled_posts: OK");
 
@@ -2148,6 +2178,75 @@ async function main() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log("[migrate] bug_reports: OK");
+
+    // Private raw strategy artifacts. There is deliberately no public API for
+    // this table: mission_outputs contains sanitized planning DTOs and final
+    // publishable IG DTOs, never these raw rows.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS strategy_internal_step_artifacts (
+        id            INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        runId         CHAR(36)     NOT NULL,
+        userId        INT          NOT NULL,
+        brandId       INT          NULL,
+        missionId     INT          NOT NULL,
+        outputId      INT          NOT NULL,
+        taskId        VARCHAR(64)  NOT NULL,
+        squadSlug     VARCHAR(96)  NOT NULL,
+        stepOrder     INT          NOT NULL,
+        status        ENUM('done','failed') NOT NULL,
+        internalLabel VARCHAR(255) NOT NULL,
+        outputType    VARCHAR(128) NULL,
+        outputKind    VARCHAR(128) NULL,
+        agentId       INT          NULL,
+        agentName     VARCHAR(255) NULL,
+        rawContent    LONGTEXT     NOT NULL,
+        errorCode     VARCHAR(64)  NULL,
+        latencyMs     INT          NOT NULL DEFAULT 0,
+        expiresAt     DATETIME(3)  NOT NULL,
+        createdAt     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_strategy_artifact_run_step (runId, stepOrder),
+        KEY idx_strategy_artifact_mission (missionId),
+        KEY idx_strategy_artifact_output (outputId, stepOrder),
+        KEY idx_strategy_artifact_user_created (userId, createdAt),
+        KEY idx_strategy_artifact_expiry (expiresAt),
+        CONSTRAINT fk_strategy_artifact_mission
+          FOREIGN KEY (missionId) REFERENCES missions(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    const [strategyArtifactFkRows] = await conn.execute(`
+      SELECT kcu.CONSTRAINT_NAME, rc.DELETE_RULE
+      FROM information_schema.KEY_COLUMN_USAGE kcu
+      JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+        ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+       AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+       AND rc.TABLE_NAME = kcu.TABLE_NAME
+      WHERE kcu.TABLE_SCHEMA = DATABASE()
+        AND kcu.TABLE_NAME = 'strategy_internal_step_artifacts'
+        AND kcu.COLUMN_NAME = 'missionId'
+        AND kcu.REFERENCED_TABLE_NAME = 'missions'
+    `) as any;
+    if ((strategyArtifactFkRows as any[]).length === 0) {
+      const [orphanRows] = await conn.execute(`
+        SELECT COUNT(*) AS orphanCount
+        FROM strategy_internal_step_artifacts a
+        LEFT JOIN missions m ON m.id = a.missionId
+        WHERE m.id IS NULL
+      `) as any;
+      const orphanCount = Number((orphanRows as any[])[0]?.orphanCount ?? 0);
+      if (orphanCount > 0) {
+        throw new Error(
+          `strategy_internal_step_artifacts has ${orphanCount} orphan row(s); refusing to add cascade constraint`,
+        );
+      }
+      await conn.execute(`
+        ALTER TABLE strategy_internal_step_artifacts
+          ADD CONSTRAINT fk_strategy_artifact_mission
+          FOREIGN KEY (missionId) REFERENCES missions(id) ON DELETE CASCADE
+      `);
+    } else if ((strategyArtifactFkRows as any[]).some((row) => row.DELETE_RULE !== "CASCADE")) {
+      throw new Error("strategy_internal_step_artifacts mission foreign key must use ON DELETE CASCADE");
+    }
+    console.log("[migrate] strategy_internal_step_artifacts: OK");
 
     // 2026-05-16 (CJ「schema 跟 migrate 不同步，抓出孤兒表」):
     // op-schema-audit found 8 schema.ts tables absent in prod. 3 are

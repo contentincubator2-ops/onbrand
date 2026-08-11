@@ -39,6 +39,12 @@ import {
 } from "../_core/pipedreamFacebook";
 import { getPipedreamOAuthAppId } from "../_core/pipedreamOAuth";
 import { isRuntimeFeatureEnabled } from "../_core/runtimeSafety";
+import {
+  contentSelectorFields,
+  outputItemCaption,
+  requirePlanningConfirmation,
+  resolveOutputContent,
+} from "../_core/outputContentEnvelope";
 
 const ENV = process.env;
 
@@ -60,7 +66,8 @@ export const publishRouter = router({
   toFacebook: socialProcedure
     .input(z.object({
       outputId: z.number().int().positive(),
-      variantIndex: z.number().int().min(0).default(0),
+      ...contentSelectorFields,
+      confirmPlanningContent: z.boolean().optional(),
       pageId: z.string().min(1).max(64).optional(), // FB Page ID; optional if Pipedream workflow defaults
     }))
     .mutation(async ({ ctx, input }) => {
@@ -92,16 +99,11 @@ export const publishRouter = router({
       const row = (rows as any[])[0];
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "output 不存在或無權限" });
 
-      let caption = "";
-      try {
-        const parsed = JSON.parse(row.content);
-        const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-        caption = variants[input.variantIndex]?.caption ?? "";
-      } catch {
-        caption = String(row.content ?? "");
-      }
+      const selected = resolveOutputContent(row.content, input);
+      requirePlanningConfirmation(selected, input.confirmPlanningContent, "publish");
+      const caption = outputItemCaption(selected.item);
       if (!caption.trim()) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "此 variant 沒有 caption 可發布" });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此內容沒有 caption 可發布" });
       }
 
       // 2026-05-11 (multi-tenant): page_id MUST come from this brand's
@@ -129,6 +131,8 @@ export const publishRouter = router({
           secret: secret ?? null,
           outputId: input.outputId,
           variantIndex: input.variantIndex,
+          contentKind: selected.kind,
+          contentIndex: selected.index,
           brandId: row.brandId,
           userId: ctx.user.id,
           fbPageName: row.brand_fb_page_name ?? null,

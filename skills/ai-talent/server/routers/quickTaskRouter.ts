@@ -17,11 +17,18 @@
  * Provider 容錯：preferred 失敗 → forge fallback（同 v2）
  */
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callModel, type ModelProvider } from "../_core/multiModelRouter";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { ContentKindSchema } from "../_core/outputContentEnvelope";
+import {
+  assertGenericRegenerationAllowed,
+  replaceRegeneratedContent,
+  selectRegenerationTarget,
+} from "../_core/quickTaskRegenerateContent";
 
 type FieldDef = {
   key: string;
@@ -865,13 +872,23 @@ import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../_core/qui
 import { ALL_99S_SQUADS } from "../_core/quickTask100Squads";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import {
-  applyIgStrategyPublicBoundary,
-  buildIgStrategyPublicPromptRules,
   getIgStrategyExecutionSlug,
   getIgStrategyPublicPolicy,
-  getIgStrategyPublicSectionLabel,
   getIgStrategyRecordOverrides,
+  buildIgStrategyPrivateTerms,
+  findIgStrategyInternalLeaks,
+  redactIgStrategySynthesisContext,
+  sanitizeIgStrategyPublicCaption,
 } from "../_core/igStrategyPublicOutput";
+import {
+  assertPrivateStrategyArtifactsReady,
+  assertRedactedStrategyContextReady,
+  buildIgStrategyPublicSlots,
+  buildIgStrategySynthesisMessages,
+  parseIgStrategyPublicVariants,
+  type IgStrategyPrivateArtifact,
+} from "../_core/igStrategyPublicSynthesis";
+import { snapshot as llmCircuitSnapshot } from "../_core/llmCircuitBreaker";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
 import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
@@ -1693,10 +1710,9 @@ export const quickTaskRouter = router({
       }
     }),
 
-  // 100s squad auto-run — sequentially executes all steps of a real squad
-  // inline (no /picker redirect, no DB mission). Returns OrchestraResult-shaped
-  // variants[] where each variant = one step's output, so the existing
-  // OutputCarousel UI renders it the same as 30s/60s.
+  // 99s squad auto-run. Legacy squads still expose one variant per step.
+  // The five explicitly catalogued IG strategy tasks instead keep every step
+  // private and run a final public-content synthesis into publishable IG slots.
   runSquadAuto: protectedProcedure
     .input(z.object({
       squadSlug: z.string().min(1).max(80),
@@ -1714,8 +1730,8 @@ export const quickTaskRouter = router({
       const sqSlugNew = getIgStrategyExecutionSlug(input.squadSlug);
       const sqSlugLegacy = legacyTaskId(sqSlugNew);
       const sqSlugs = sqSlugLegacy ? [sqSlugNew, sqSlugLegacy] : [sqSlugNew];
-      // Only five catalogued IG strategy reports get the public-output
-      // boundary. Every unlisted squad keeps the legacy prompt, variants and
+      // Only five catalogued IG strategy tasks get the private-artifact +
+      // final-public-synthesis boundary. Every unlisted squad keeps its variants and
       // persistence fields unchanged.
       const strategyPublicPolicy = getIgStrategyPublicPolicy(sqSlugNew);
       const [sqRows]: any = await localPool.execute(
@@ -1765,12 +1781,16 @@ export const quickTaskRouter = router({
         }
       } catch { /* non-fatal */ }
 
-      // 4. Run each step in sequence — collect outputs as variants
-      const { callModel } = await import("../_core/multiModelRouter");
+      // 4. Run each step in sequence. For the five targets these are private
+      // reasoning artifacts; legacy squads still collect them as variants.
+      const { callModel, callModelStrict } = await import("../_core/multiModelRouter");
       const variants: any[] = [];
       const errors: string[] = [];
       const stages: any[] = [];
       const prevOutputs: string[] = [];
+      const planningArtifacts: any[] = [];
+      const privateArtifacts: IgStrategyPrivateArtifact[] = [];
+      const privateRunId = strategyPublicPolicy ? randomUUID() : null;
 
       // Resolve all unique step agent IDs in one query
       const agentIds = Array.from(new Set(stepsRaw
@@ -1794,7 +1814,7 @@ export const quickTaskRouter = router({
         const stageKey = `step${i + 1}`;
         const internalStageLabel = step.name ?? step.title ?? `Step ${i + 1}`;
         const publicStageLabel = strategyPublicPolicy
-          ? getIgStrategyPublicSectionLabel(sqSlugNew, i, brandMarket.outputLanguage)!
+          ? (brandMarket.isZhTW ? `內容分析 ${i + 1}` : `Content analysis ${i + 1}`)
           : internalStageLabel;
         const aid = Number(step.assignedAgentId);
         const a = agentMap[aid];
@@ -1821,16 +1841,13 @@ export const quickTaskRouter = router({
           ? `▸ 全文禁句尾與句中驚嘆號（! 與 ！都禁）；禁 emoji；繁體台灣用語（用「管道」非「渠道」，不得簡體字）。\n▸ 禁業配 / 空洞套語：「強大功能」「突破性的功能」「期待你的回音」「期待聽到你的想法」「非常期待與你合作」「讓我們一起創造」「一起創造美好的合作」「管理品牌形象」「在這個數位時代」「更加精彩」「非常契合」等一律不准出現。沉穩、真誠、務實的守護者語氣，5 個 step 語氣必須一致。`
           : `▸ 全文一律使用 ${brandMarket.outputLanguage}（品牌目標市場語言）撰寫，不得混入中文。\n▸ 語氣沉穩、真誠、務實，5 個 step 語氣必須一致；避免浮誇銷售腔、空洞套語與 PR 腔。`;
         const VOICE_GUARD = `\n══════════════════════════════════════════\n【文字衛生與交付物保真 — 違反直接不合格，輸出前逐句自查】\n══════════════════════════════════════════\n${voiceLangRules}\n▸ 收尾用一個對方會想回的具體問句，不要 PR 套語。\n▸ **交付物必須對得上本 step 的名稱與功能，不是每個 step 都寫一封邀約信**：\n  ・名稱含「Brief / 資料包」＝給 KOL 看的品牌資料文件（條列：品牌背景、目標受眾、合作規格、報酬與時程方向、使用方式），**不是邀請信**。\n  ・名稱含「報價回應 / 議價」＝在「KOL 已回覆報價」情境下你方的回信（含可接受 / 需調整兩種談法），**不是群發邀約**。\n  ・名稱含「追蹤 / follow-up」＝未回覆時的短追蹤（不催促，給新切入點）。\n  ・名稱含「感謝 / 結案」＝內容上線後的感謝＋成效回饋詢問＋長期關係。\n  ・名稱含「邀請 / 開場 / 主信」＝完整可寄出的邀約信。\n══════════════════════════════════════════`;
-        const publicOutputRules = strategyPublicPolicy
-          ? buildIgStrategyPublicPromptRules(publicStageLabel, brandMarket.outputLanguage)
-          : "";
         const promptHeader = strategyPublicPolicy
-          ? `你負責策略報告章節「${publicStageLabel}」。\n內部參考方法：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}`
+          ? `【伺服器內部分析，不是公開成品】\nSquad「${squad.name}」步驟「${internalStageLabel}」。\n內部方法：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}。完整保留分析細節，供最後的公開內容編輯階段使用。`
           : `Squad「${squad.name}」步驟「${internalStageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}`;
         const expectedOutput = strategyPublicPolicy
-          ? publicStageLabel
+          ? step.outputType ?? step.outputKind ?? internalStageLabel
           : step.outputType ?? step.outputKind ?? "(未指定)";
-        const system = `${persona}\n${promptHeader}\n步驟說明：${step.description ?? ""}\n預期產出：${expectedOutput}${ZERO_TOLERANCE}${VOICE_GUARD}${publicOutputRules}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合上方「交付物保真」對「${publicStageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
+        const system = `${persona}\n${promptHeader}\n步驟說明：${step.description ?? ""}\n預期產出：${expectedOutput}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合「${internalStageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
 
         const userMsg = [
           `【任務主題】${input.topic || "(未指定)"}`,
@@ -1845,7 +1862,8 @@ export const quickTaskRouter = router({
             callModel([{ role: "system", content: system }, { role: "user", content: userMsg }], undefined, "qwen"),
             new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`step ${i+1} timeout`)), 25_000)),
           ]);
-          let text = (r.content ?? "").trim();
+          const rawText = (r.content ?? "").trim();
+          let text = rawText;
           // 2026-05-19 (CJ 驗收 v#3): deterministic 文字衛生 backstop on
           // squad-step output — guaranteed, independent of model adherence.
           try {
@@ -1861,52 +1879,252 @@ export const quickTaskRouter = router({
               if (latinPunctLang(brandMarket.outputLanguage)) text = normalizeLatinPunct(text);
             }
           } catch { /* fail-safe: keep raw text */ }
-          const privateTerms = strategyPublicPolicy ? [
-            { value: squad.name, replacement: { zh: "策略團隊", en: "strategy team" } },
-            {
-              value: typeof squad.methodology === "string" ? squad.methodology : squad.methodology?.author,
-              replacement: { zh: "策略方法", en: "strategy approach" },
-            },
-            { value: a?.name ?? step.assignedAgentName, replacement: { zh: "策略團隊", en: "strategy team" } },
-            { value: a?.title, replacement: { zh: "策略團隊", en: "strategy team" } },
-            { value: a?.specialty, replacement: { zh: "策略方法", en: "strategy approach" } },
-            { value: a?.methodology, replacement: { zh: "策略方法", en: "strategy approach" } },
-          ] : undefined;
-          const variant = applyIgStrategyPublicBoundary(sqSlugNew, {
-            label: internalStageLabel,
-            caption: text,
-            hashtags: [],
-            image: { style: null, url: null, status: "skipped" },
-            agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
-          }, {
-            stepIndex: i,
-            steps: stepsRaw,
-            outputLanguage: brandMarket.outputLanguage,
-            privateTerms,
-          });
-          prevOutputs.push(`【${variant.label}】${variant.caption.slice(0, 800)}`);
-          variants.push(variant);
+          if (strategyPublicPolicy) {
+            const privateTerms = [
+              { value: squad.name, replacement: { zh: "策略團隊", en: "strategy team" } },
+              { value: a?.name ?? step.assignedAgentName, replacement: { zh: "策略團隊", en: "strategy team" } },
+              { value: a?.title, replacement: { zh: "策略團隊", en: "strategy team" } },
+              { value: a?.specialty, replacement: { zh: "內容方法", en: "content approach" } },
+              { value: a?.methodology, replacement: { zh: "內容方法", en: "content approach" } },
+            ];
+            privateArtifacts.push({
+              stepOrder: i + 1,
+              status: "done",
+              internalLabel: String(internalStageLabel),
+              outputType: typeof step.outputType === "string" ? step.outputType : null,
+              outputKind: typeof step.outputKind === "string" ? step.outputKind : null,
+              agentId: Number.isFinite(aid) && aid > 0 ? aid : null,
+              agentName: a?.name ?? step.assignedAgentName ?? null,
+              rawContent: rawText,
+              errorCode: null,
+              latencyMs: Date.now() - startedAt - stageStart,
+            });
+            const planningCaption = redactIgStrategySynthesisContext(
+              sqSlugNew,
+              text,
+              { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
+            );
+            planningArtifacts.push({
+              id: `planning-${i + 1}`,
+              label: String(internalStageLabel),
+              caption: planningCaption || (brandMarket.isZhTW ? "此策略內容已完成。" : "This planning artifact is complete."),
+              hashtags: [],
+              image: { style: null, url: null, status: "skipped" },
+            });
+            // Downstream private analysis consumes the full private result,
+            // never the sanitized public DTO.
+            prevOutputs.push(`【${internalStageLabel}】${text.slice(0, 8_000)}`);
+          } else {
+            const variant = {
+              label: internalStageLabel,
+              caption: text,
+              hashtags: [],
+              image: { style: null, url: null, status: "skipped" },
+              agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+            };
+            prevOutputs.push(`【${variant.label}】${variant.caption.slice(0, 800)}`);
+            variants.push(variant);
+          }
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
         } catch (e: any) {
           errors.push(`step ${i+1} (${publicStageLabel}): ${e?.message ?? e}`);
-          variants.push(applyIgStrategyPublicBoundary(sqSlugNew, {
-            label: internalStageLabel,
-            caption: "",
-            hashtags: [],
-            image: { style: null, url: null, status: "failed" },
-            agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
-          }, {
-            stepIndex: i,
-            steps: stepsRaw,
-            outputLanguage: brandMarket.outputLanguage,
-          }));
+          if (strategyPublicPolicy) {
+            privateArtifacts.push({
+              stepOrder: i + 1,
+              status: "failed",
+              internalLabel: String(internalStageLabel),
+              outputType: typeof step.outputType === "string" ? step.outputType : null,
+              outputKind: typeof step.outputKind === "string" ? step.outputKind : null,
+              agentId: Number.isFinite(aid) && aid > 0 ? aid : null,
+              agentName: a?.name ?? step.assignedAgentName ?? null,
+              rawContent: "",
+              errorCode: /timeout/i.test(String(e?.message ?? e)) ? "step_timeout" : "step_failed",
+              latencyMs: Date.now() - startedAt - stageStart,
+            });
+            planningArtifacts.push({
+              id: `planning-${i + 1}`,
+              label: String(internalStageLabel),
+              caption: "",
+              hashtags: [],
+              image: { style: null, url: null, status: "failed" },
+            });
+          } else {
+            variants.push({
+              label: internalStageLabel,
+              caption: "",
+              hashtags: [],
+              image: { style: null, url: null, status: "failed" },
+              agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+            });
+          }
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
         }
       }
 
-      // 5. Look up squad lead for captionAgent slot
+      // 5. After every private planning step has finished, synthesize the
+      // server-owned public slots. Per user authorization, Qwen receives only
+      // de-identified planning conclusions, brand context and task input.
+      if (strategyPublicPolicy) {
+        const synthesisStartedAt = Date.now() - startedAt;
+        try {
+          assertPrivateStrategyArtifactsReady(privateArtifacts, stepsRaw.length);
+          const slots = buildIgStrategyPublicSlots(sqSlugNew, input.topic, brandMarket.outputLanguage);
+          if (!slots?.length) throw new Error("no public deliverable slots configured");
+          const privateTerms = buildIgStrategyPrivateTerms({
+            squadName: squad.name,
+            methodology: typeof squad.methodology === "string"
+              ? squad.methodology
+              : squad.methodology?.author,
+            steps: stepsRaw,
+            artifactAgentNames: privateArtifacts.map((artifact) => artifact.agentName),
+            agents: Object.values(agentMap),
+          });
+          const strategyContext = privateArtifacts.map((artifact) => redactIgStrategySynthesisContext(
+              sqSlugNew,
+              artifact.rawContent,
+              { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
+            ));
+          assertRedactedStrategyContextReady(strategyContext, stepsRaw.length);
+          const safeTopic = redactIgStrategySynthesisContext(
+            sqSlugNew,
+            input.topic,
+            { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
+          );
+          const safeBrandContext = redactIgStrategySynthesisContext(
+            sqSlugNew,
+            brandPrefix,
+            { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
+          );
+          const qwenUserPayload = [safeTopic, safeBrandContext, ...strategyContext].filter(Boolean).join("\n\n");
+          if (findIgStrategyInternalLeaks(qwenUserPayload, privateTerms).length > 0) {
+            throw new Error("Qwen synthesis payload failed private-term validation");
+          }
+          const { getBrandRuleAssetsWithStatus } = await import("../_core/brandContext");
+          const brandRuleLoad = await getBrandRuleAssetsWithStatus(input.brandId);
+          if (input.brandId && !brandRuleLoad.loaded) {
+            throw new Error("brand rules could not be loaded for public synthesis");
+          }
+          const brandRules = brandRuleLoad.rules;
+          const redactBrandRule = (value: string) => redactIgStrategySynthesisContext(
+            sqSlugNew,
+            value,
+            { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
+          );
+          const qwenBrandRules = {
+            banned: brandRules.banned.map(redactBrandRule).filter(Boolean),
+            subs: brandRules.subs
+              .map((pair) => ({ from: redactBrandRule(pair.from), to: redactBrandRule(pair.to) }))
+              .filter((pair) => pair.from && pair.to),
+            preferred: brandRules.preferred.map(redactBrandRule).filter(Boolean),
+          };
+          if (findIgStrategyInternalLeaks(JSON.stringify(qwenBrandRules), privateTerms).length > 0) {
+            throw new Error("Qwen brand rules failed private-term validation");
+          }
+          // Fixed-30 campaigns cannot reliably fit complete captions in one
+          // model response. Fan out immutable server slots in bounded batches;
+          // every call remains pinned to Qwen and the final order is restored.
+          const slotBatches = Array.from(
+            { length: Math.ceil(slots.length / 10) },
+            (_, batchIndex) => slots.slice(batchIndex * 10, (batchIndex + 1) * 10),
+          );
+          const synthesisAbort = new AbortController();
+          const synthesisTimeout = setTimeout(() => synthesisAbort.abort(), 55_000);
+          const publicBatches: Array<ReturnType<typeof parseIgStrategyPublicVariants>> = new Array(slotBatches.length);
+          let nextBatchIndex = 0;
+          const executeBatch = async (batchIndex: number) => {
+            const slotBatch = slotBatches[batchIndex]!;
+            const messages = buildIgStrategySynthesisMessages({
+              idOrSlug: sqSlugNew,
+              topic: safeTopic,
+              brandContext: safeBrandContext,
+              outputLanguage: brandMarket.outputLanguage,
+              slots: slotBatch,
+              strategyContext,
+              brandRules: qwenBrandRules,
+            });
+            const result = await callModelStrict(messages, "qwen", undefined, {
+              signal: synthesisAbort.signal,
+            });
+            publicBatches[batchIndex] = parseIgStrategyPublicVariants({
+              idOrSlug: sqSlugNew,
+              modelText: result.content ?? "",
+              outputLanguage: brandMarket.outputLanguage,
+              slots: slotBatch,
+              steps: stepsRaw,
+              privateTerms,
+              brandRules,
+            });
+          };
+          const runBatchWorker = async () => {
+            while (nextBatchIndex < slotBatches.length) {
+              const batchIndex = nextBatchIndex;
+              nextBatchIndex += 1;
+              await executeBatch(batchIndex);
+            }
+          };
+          try {
+            // A HALF_OPEN provider admits exactly one recovery probe. Avoid
+            // launching sibling batches that would reject and abort that probe.
+            const qwenCircuit = llmCircuitSnapshot().find((entry) => entry.provider === "qwen");
+            if (qwenCircuit && qwenCircuit.state !== "CLOSED" && slotBatches.length > 0) {
+              await executeBatch(0);
+              nextBatchIndex = 1;
+            }
+            await Promise.all(Array.from(
+              { length: Math.min(3, Math.max(0, slotBatches.length - nextBatchIndex)) },
+              () => runBatchWorker(),
+            ));
+          } catch (error) {
+            if (synthesisAbort.signal.aborted) throw new Error("public synthesis timeout");
+            throw error;
+          } finally {
+            clearTimeout(synthesisTimeout);
+            if (!synthesisAbort.signal.aborted) synthesisAbort.abort();
+          }
+          const publicResults = publicBatches.flat();
+          // A batch may independently choose a valid address form; validate
+          // the complete campaign again so all posts use one audience voice.
+          sanitizeIgStrategyPublicCaption(
+            sqSlugNew,
+            publicResults.flatMap((variant) => [
+              variant.caption,
+              ...variant.hashtags,
+              variant.image.style ?? "",
+            ]).filter(Boolean).join("\n"),
+            { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
+          );
+          variants.push(...publicResults);
+          stages.splice(0, stages.length, {
+            key: "public-synthesis",
+            label: brandMarket.isZhTW ? "對外貼文" : "Public posts",
+            startedAt: synthesisStartedAt,
+            completedAt: Date.now() - startedAt,
+            status: "done",
+          });
+          errors.splice(0, errors.length);
+        } catch (e) {
+          console.warn("[runSquadAuto] target public synthesis failed", {
+            taskId: strategyRecordOverrides?.taskId,
+            message: (e as Error).message,
+          });
+          variants.splice(0, variants.length);
+          stages.splice(0, stages.length, {
+            key: "public-synthesis",
+            label: brandMarket.isZhTW ? "對外貼文" : "Public posts",
+            startedAt: synthesisStartedAt,
+            completedAt: Date.now() - startedAt,
+            status: "failed",
+          });
+          errors.splice(0, errors.length, brandMarket.isZhTW
+            ? "對外貼文產生失敗，請重試。"
+            : "Public post generation failed. Please retry.");
+        }
+      }
+
+      // 6. Look up squad lead for the legacy captionAgent slot. Target tasks
+      // never return an internal agent identity.
       let captionAgent: any = null;
-      if (squad.lead_agent_id) {
+      if (!strategyPublicPolicy && squad.lead_agent_id) {
         const lead = agentMap[squad.lead_agent_id];
         if (lead) captionAgent = { id: squad.lead_agent_id, name: lead.name, title: lead.title, avatarUrl: lead.avatarUrl };
         else {
@@ -1921,15 +2139,41 @@ export const quickTaskRouter = router({
         }
       }
 
-      const ok = variants.some((v) => v.caption.length > 0);
+      let ok = variants.some((v) => v.caption.length > 0);
 
       // 2026-05-09 (CJ Phase 2): persist squad runs too so client can
       // navigate to /run/:outputId (consistent with orchestra path).
       let outputId: number | null = null;
       let missionId: number | null = null;
-      if (ok) {
+      const shouldPersist = strategyPublicPolicy
+        ? planningArtifacts.some((artifact) => artifact.caption.length > 0)
+        : ok;
+      if (shouldPersist) {
         try {
           const { recordTaskRun } = await import("../_core/recordTaskRun");
+          const content = strategyPublicPolicy
+            ? JSON.stringify({
+                schemaVersion: 2,
+                contentModel: "ig-strategy-bundle",
+                planningArtifacts,
+                publicVariants: variants,
+              }, null, 2)
+            : JSON.stringify(variants, null, 2);
+          const metadata = strategyPublicPolicy
+            ? {
+                latencyMs: Date.now() - startedAt,
+                contentModel: "ig-strategy-bundle",
+                planningCount: planningArtifacts.length,
+                publicVariantCount: variants.length,
+                publicFormats: [...new Set(variants.map((variant) => variant.format))],
+                inputs: { topic: input.topic ?? "" },
+              }
+            : {
+                latencyMs: Date.now() - startedAt,
+                squadSlug: input.squadSlug,
+                variantCount: variants.length,
+                inputs: { topic: input.topic ?? "" },
+              };
           const persisted = await recordTaskRun({
             userId,
             brandId: input.brandId ?? null,
@@ -1941,19 +2185,28 @@ export const quickTaskRouter = router({
             tier: "99s",
             title: strategyRecordOverrides?.taskLabel
               ?? (await import("../_core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
-            content: JSON.stringify(variants, null, 2),
-            metadata: {
-              latencyMs: Date.now() - startedAt,
-              squadSlug: input.squadSlug,
-              variantCount: variants.length,
-              inputs: { topic: input.topic ?? "" },
-              presentation: strategyRecordOverrides?.presentation,
-            },
+            content,
+            metadata,
+            privateStrategyArtifacts: strategyPublicPolicy && privateRunId
+              ? { runId: privateRunId, squadSlug: sqSlugNew, rows: privateArtifacts }
+              : undefined,
           });
           outputId = persisted.outputId;
           missionId = persisted.missionId;
+          if (strategyPublicPolicy && !outputId) {
+            ok = false;
+            errors.splice(0, errors.length, brandMarket.isZhTW
+              ? "內容儲存失敗，請重試。"
+              : "Content storage failed. Please retry.");
+          }
         } catch (e) {
           console.warn("[runSquadAuto] recordTaskRun failed:", (e as Error).message);
+          if (strategyPublicPolicy) {
+            ok = false;
+            errors.splice(0, errors.length, brandMarket.isZhTW
+              ? "內容儲存失敗，請重試。"
+              : "Content storage failed. Please retry.");
+          }
         }
       }
 
@@ -1964,6 +2217,7 @@ export const quickTaskRouter = router({
         captionAgent,
         imageAgent: null,
         variants,
+        planningArtifacts: strategyPublicPolicy ? planningArtifacts : undefined,
         stages,
         ok,
         errors,
@@ -2244,7 +2498,11 @@ export const quickTaskRouter = router({
   regenerateVariant: protectedProcedure
     .input(z.object({
       outputId: z.number().int().positive(),
+      // Keep the legacy contract strict: variantIndex was required before
+      // strategy bundles existed, so omitting it must not silently target 0.
       variantIndex: z.number().int().min(0),
+      contentKind: ContentKindSchema.optional(),
+      contentIndex: z.number().int().min(0).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -2261,6 +2519,15 @@ export const quickTaskRouter = router({
       );
       const row = (rows as any[])[0];
       if (!row) throw new Error("output not found or no permission");
+
+      // The generic orchestra regenerator cannot preserve the server-owned
+      // public slot contract (format/id) or re-run the IG strategy redaction
+      // boundary. Fail closed instead of allowing a regenerated item to leak
+      // planning internals or corrupt an IG strategy bundle. Those bundles
+      // remain editable through the selector-aware caption rewrite flows.
+      const target = selectRegenerationTarget(row.content, input);
+      assertGenericRegenerationAllowed(target, input);
+
       const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
       let taskId: string = row.taskId ?? "";
       const inputs = md.inputs ?? {};
@@ -2315,11 +2582,7 @@ export const quickTaskRouter = router({
 
       // Override config to produce ONE variant only — use the same label
       // as the slot we're replacing, so the regenerated voice matches.
-      const existingVariants: any[] = (() => {
-        try { const p = JSON.parse(row.content); return Array.isArray(p) ? p : (p.variants ?? []); }
-        catch { return []; }
-      })();
-      const targetLabel = existingVariants[input.variantIndex]?.label ?? fullConfig.variantLabels[input.variantIndex] ?? `版本 ${input.variantIndex + 1}`;
+      const targetLabel = target.item?.label ?? fullConfig.variantLabels[target.index] ?? `版本 ${target.index + 1}`;
       const singleConfig = { ...fullConfig, variants: 1, images: 0, runImageGen: false, variantLabels: [targetLabel] };
 
       const taskTier: "30s" | "60s" | "99s" =
@@ -2337,11 +2600,13 @@ export const quickTaskRouter = router({
       const archived = Array.isArray(md.archivedVariants) ? md.archivedVariants : [];
       archived.push({
         archivedAt: new Date().toISOString(),
-        index: input.variantIndex,
-        variant: existingVariants[input.variantIndex],
+        index: target.index,
+        variant: target.item,
+        ...(input.contentKind !== undefined
+          ? { contentKind: target.kind, contentIndex: target.index }
+          : {}),
       });
-      existingVariants[input.variantIndex] = newVariant;
-      const newContent = JSON.stringify(existingVariants, null, 2);
+      const newContent = replaceRegeneratedContent(row.content, input, newVariant, target);
       const newMetadata = JSON.stringify({ ...md, archivedVariants: archived, lastRegenAt: new Date().toISOString() });
 
       await localPool.execute(
@@ -2349,7 +2614,14 @@ export const quickTaskRouter = router({
         [newContent, newMetadata, input.outputId],
       );
 
-      return { ok: true, variantIndex: input.variantIndex, newCaption: newVariant.caption };
+      return {
+        ok: true,
+        variantIndex: input.variantIndex,
+        newCaption: newVariant.caption,
+        ...(input.contentKind !== undefined
+          ? { contentKind: target.kind, contentIndex: target.index }
+          : {}),
+      };
     }),
 
   runQuick: protectedProcedure

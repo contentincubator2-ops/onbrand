@@ -41,6 +41,20 @@ import { showToastGlobal } from "../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import { getStrategyPresentationMockup } from "../lib/strategyPresentation";
+import {
+  getIgPublicVariantMockup,
+  getIgPublicVariantImageSize,
+  getMutationLocatorSelectionKey,
+  getPlanningPublishWarning,
+  getPlanningConfirmationPayload,
+  getRunContentMutationLocator,
+  getRunContentSelectionKey,
+  isEmptyStrategyPublicSelection,
+  resolveRunContent,
+  shouldApplyMutationPreview,
+  type RunContentKind,
+  type RunContentMutationLocator,
+} from "../lib/strategyContentEnvelope";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
@@ -91,7 +105,9 @@ const REWRITE_AGENTS: Array<{
 ];
 
 interface VariantData {
+  id?: string;
   label: string;
+  format?: "feed" | "carousel" | "reel" | "story" | "live";
   caption: string;
   hashtags?: string[];
   imageStyle?: string;
@@ -120,6 +136,27 @@ function sanitizeCaption(s: unknown): string {
   t = t.replace(/\\r\\n|\\n|\\r/g, "\n").replace(/\\t/g, " ");
   t = t.replace(/\n{3,}/g, "\n\n").trim();
   return t;
+}
+
+function normalizeVariantData(v: any): VariantData {
+  const img = v?.image ?? {};
+  const vid = v?.video ?? {};
+  return {
+    id: typeof v?.id === "string" ? v.id : undefined,
+    label: v?.label,
+    format: ["feed", "carousel", "reel", "story", "live"].includes(v?.format) ? v.format : undefined,
+    caption: sanitizeCaption(v?.caption),
+    hashtags: v?.hashtags ?? [],
+    imageUrl: v?.imageUrl ?? img.url ?? null,
+    imageStatus: v?.imageStatus ?? img.status ?? undefined,
+    imageStyle: v?.imageStyle ?? img.style ?? undefined,
+    videoUrl: v?.videoUrl ?? vid.url ?? null,
+    videoStatus: v?.videoStatus ?? vid.status ?? undefined,
+    videoPosterUrl: v?.videoPosterUrl ?? vid.posterUrl ?? null,
+    qa: v?.qa,
+    extras: v?.extras,
+    cards: Array.isArray(v?.cards) ? v.cards : undefined,
+  };
 }
 
 /* 2026-05-17 (CJ「把得獎工藝依據展示在前台」): per-task craft reference.
@@ -319,6 +356,7 @@ export default function RunPage() {
   );
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const [activeContentKind, setActiveContentKind] = useState<RunContentKind>("legacy");
 
   // ── Mia contextual nudges for RunPage ────────────────────────────────
   // Fires when output first loads: tells user what they can do right now
@@ -422,6 +460,7 @@ export default function RunPage() {
     setEditText(null);
     setMode("chat");
     setActiveIdx(0);
+    setActiveContentKind("legacy");
     setRevealCount(REVEAL_STEP);
     setOverrides({});
     setChatPrompt("");
@@ -446,15 +485,20 @@ export default function RunPage() {
     permissionError?: string;
   }>>([]);
   /** Local override for variants — applied after save, mockup updates live. */
-  const [overrides, setOverrides] = useState<Record<number, { caption: string }>>({});
+  const [overrides, setOverrides] = useState<Record<string, { caption: string }>>({});
   /** AI chat history per variant. */
   const [chatHistory, setChatHistory] = useState<Array<{ role: "user"|"assistant"; content: string }>>([]);
-  const [aiPreview, setAiPreview] = useState<string | null>(null);
+  const [aiPreview, setAiPreview] = useState<{ text: string; locator: RunContentMutationLocator } | null>(null);
   // 2026-07-07 (CJ): rewrite-agent picker — persona name in flight + preview
   const [rewriteBusy, setRewriteBusy] = useState<string | null>(null);
-  const [rewritePreview, setRewritePreview] = useState<{ agent: string; text: string } | null>(null);
+  const [rewritePreview, setRewritePreview] = useState<{
+    agent: string;
+    text: string;
+    locator: RunContentMutationLocator;
+  } | null>(null);
   /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
+  const imageMutationTargetRef = useRef<{ locator: RunContentMutationLocator; style: string } | null>(null);
   /** 2026-07-07 (CJ): user-editable thumbnail title text overlaid on the (now
    *  text-free) AI thumbnail. Seeded from the variant title/caption, editable
    *  in the right panel; passed to the YT mockup as overlayTitle. */
@@ -814,23 +858,6 @@ export default function RunPage() {
     },
   }) ?? { mutateAsync: async () => {}, isPending: false };
 
-  // Called when user clicks "排程發布" on a specific platform row.
-  // `rowPlatform` = the p.key of the row the user clicked ("facebook","instagram",…).
-  // Schedules the current output to calendar, then user publishes from CalendarPage.
-  const handleScheduleToCalendar = React.useCallback(async (rowPlatform: string) => {
-    if (!confirm(lang === "en"
-      ? `Add to Calendar as ${rowPlatform}? You can then publish from the Calendar page.`
-      : `加入日曆（${rowPlatform}）？可在日曆頁面選擇時間並發布。`)) return;
-
-    await scheduleToCalMut?.mutateAsync?.({
-      outputId: id,
-      variantIndex: activeIdx,
-      platform: rowPlatform,
-      scheduledAt: new Date().toISOString(),
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang, id, activeIdx]);
-
   // Uses Pipedream SDK iframe — window.open popup throws "Must be inside iframe"
   const connectFacebookViaUrl = () => {
     (async () => {
@@ -953,7 +980,13 @@ export default function RunPage() {
             imageSrc = `data:image/png;base64,${r.b64}`;
           }
           if (imageSrc && updateImageMut) {
-            updateImageMut.mutate({ id, variantIndex: activeIdx, imageUrl: imageSrc, style: imagePrompt.slice(0, 480) });
+            const target = imageMutationTargetRef.current;
+            if (!target) {
+              showToastGlobal(lang === "en" ? "Image target was lost — please try again" : "找不到原本的圖片位置，請重試");
+              return;
+            }
+            updateImageMut.mutate({ id, ...target.locator, imageUrl: imageSrc, style: target.style });
+            imageMutationTargetRef.current = null;
             showToastGlobal(lang === "en" ? "Image ready ✓" : "已產圖 ✓");
           } else {
             // 2026-05-12: server should TRPCError on failure now; this branch
@@ -970,6 +1003,7 @@ export default function RunPage() {
           }
         },
         onError: (e: any) => {
+          imageMutationTargetRef.current = null;
           const detail = sanitizeProviderErrorForToast(e?.message ?? e);
           showToastGlobal(lang === "en" ? `Image failed: ${detail}` : `產圖失敗：${detail}`);
         },
@@ -1037,39 +1071,116 @@ export default function RunPage() {
     return d.toISOString().slice(0, 10);
   });
 
-  const variants: VariantData[] = useMemo(() => {
-    if (!data) return [];
+  const resolvedContent = useMemo(() => {
+    if (!data) return resolveRunContent<VariantData>([], null);
     try {
       const parsed = JSON.parse(data.content);
-      const raw: any[] = Array.isArray(parsed) ? parsed : (parsed?.variants ?? []);
-      // 2026-05-14 (CJ「圖片還是跑很久」根因): orchestra persists nested
-      //   { image: { url, status, style, errorMsg } }
-      // but the VariantData interface + mockup expect FLAT
-      //   { imageUrl, imageStatus, imageStyle }.
-      // Without this normalize, even a successfully-generated image showed
-      // as "等待 AI 生成" because imageUrl was always undefined.
-      return raw.map((v: any) => {
-        const img = v.image ?? {};
-        // Same nested→flat normalize as image, for the Tier-1 video clip.
-        const vid = v.video ?? {};
-        return {
-          label: v.label,
-          caption: sanitizeCaption(v.caption),
-          hashtags: v.hashtags ?? [],
-          imageUrl: v.imageUrl ?? img.url ?? null,
-          imageStatus: v.imageStatus ?? img.status ?? undefined,
-          imageStyle: v.imageStyle ?? img.style ?? undefined,
-          videoUrl: v.videoUrl ?? vid.url ?? null,
-          videoStatus: v.videoStatus ?? vid.status ?? undefined,
-          videoPosterUrl: v.videoPosterUrl ?? vid.posterUrl ?? null,
-          qa: v.qa,
-          extras: v.extras,
-          cards: Array.isArray(v.cards) ? v.cards : undefined,
-        } as VariantData;
-      });
-    } catch { /* ignore */ }
-    return [{ label: lang === "en" ? "Main version" : "主版本", caption: sanitizeCaption(data.content || "") }];
-  }, [data]);
+      return resolveRunContent<any>(parsed, data?.mission?.taskId ?? null, data?.metadata);
+    } catch {
+      return resolveRunContent<any>([
+        { label: lang === "en" ? "Main version" : "主版本", caption: sanitizeCaption(data.content || "") },
+      ], data?.mission?.taskId ?? null, data?.metadata);
+    }
+  }, [data, lang]);
+
+  const planningVariants = useMemo(
+    () => resolvedContent.planningArtifacts.map(normalizeVariantData),
+    [resolvedContent],
+  );
+  const publicVariants = useMemo(
+    () => resolvedContent.publicVariants.map(normalizeVariantData),
+    [resolvedContent],
+  );
+  const legacyVariants = useMemo(
+    () => resolvedContent.legacyVariants.map(normalizeVariantData),
+    [resolvedContent],
+  );
+  const isStrategyEnvelope = resolvedContent.isStrategyEnvelope;
+
+  const selectedContentKind: RunContentKind = isStrategyEnvelope
+    ? activeContentKind === "legacy"
+      ? (publicVariants.length > 0 ? "publicVariants" : "planningArtifacts")
+      : activeContentKind
+    : "legacy";
+  const variants: VariantData[] = selectedContentKind === "publicVariants"
+    ? publicVariants
+    : selectedContentKind === "planningArtifacts"
+      ? planningVariants
+      : legacyVariants;
+  const isEmptyPublicSelection = isEmptyStrategyPublicSelection(
+    isStrategyEnvelope,
+    selectedContentKind,
+    publicVariants.length,
+  );
+  const activeSelectionKey = getRunContentSelectionKey(selectedContentKind, activeIdx);
+  const activeSelectionKeyRef = useRef(activeSelectionKey);
+
+  useEffect(() => {
+    activeSelectionKeyRef.current = activeSelectionKey;
+  }, [activeSelectionKey]);
+
+  useEffect(() => {
+    if (!isStrategyEnvelope) {
+      if (activeContentKind !== "legacy") {
+        setActiveContentKind("legacy");
+        setActiveIdx(0);
+      }
+      return;
+    }
+    if (activeContentKind === "legacy") {
+      setActiveContentKind(publicVariants.length > 0 ? "publicVariants" : "planningArtifacts");
+      setActiveIdx(0);
+    }
+  }, [isStrategyEnvelope, activeContentKind, publicVariants.length]);
+
+  const selectContent = React.useCallback((contentKind: RunContentKind, index: number) => {
+    setActiveContentKind(contentKind);
+    setActiveIdx(index);
+    setEditText(null);
+    setChatPrompt("");
+    setChatHistory([]);
+    setAiPreview(null);
+    setRewritePreview(null);
+  }, []);
+
+  const rerunOriginalTask = React.useCallback(() => {
+    const taskId = data?.mission?.taskId;
+    if (!taskId) {
+      showToastGlobal(lang === "en" ? "Original task ID not found" : "找不到原任務 ID");
+      return;
+    }
+    const ws = String(data?.mission?.workspace ?? "").toLowerCase();
+    const slug =
+      ws.includes("instagram") ? "ig" :
+      ws.includes("linkedin")  ? "li" :
+      ws.includes("youtube")   ? "yt" :
+      ws.includes("tiktok")    ? "tt" :
+      ws.includes("email")     ? "email" :
+      (ws.includes("press") || ws.includes("pr")) ? "pr" :
+      "fb";
+    navigate(`/tasks/${slug}?rerun=${id}`);
+  }, [data?.mission?.taskId, data?.mission?.workspace, id, lang, navigate]);
+
+  // Captures both the envelope collection and its local index. Legacy payloads
+  // omit contentKind, preserving the pre-envelope mutation contract exactly.
+  const handleScheduleToCalendar = React.useCallback(async (rowPlatform: string) => {
+    const planningWarning = getPlanningPublishWarning(
+      selectedContentKind,
+      "schedule",
+      lang === "en" ? "en" : "zh",
+    );
+    if (!confirm(planningWarning ?? (lang === "en"
+      ? `Add to Calendar as ${rowPlatform}? You can then publish from the Calendar page.`
+      : `加入日曆（${rowPlatform}）？可在日曆頁面選擇時間並發布。`))) return;
+
+    await scheduleToCalMut?.mutateAsync?.({
+      outputId: id,
+      ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+      ...getPlanningConfirmationPayload(selectedContentKind),
+      platform: rowPlatform,
+      scheduledAt: new Date().toISOString(),
+    });
+  }, [lang, id, activeIdx, selectedContentKind, scheduleToCalMut]);
 
   // 2026-07-20 (CJ「FB 短貼文的『改圖』應隱藏但仍顯示、點了也不會生圖」):
   // text-only tasks (every variant image status "skipped", no url) have
@@ -1107,14 +1218,14 @@ export default function RunPage() {
   // variant (title or first caption line), once per (id, activeIdx) so a user's
   // edits aren't clobbered on re-render. Only meaningful for YT thumbnail tasks.
   React.useEffect(() => {
-    const seedKey = `${id}:${activeIdx}`;
+    const seedKey = `${id}:${selectedContentKind}:${activeIdx}`;
     if (overlaySeededRef.current === seedKey) return;
     overlaySeededRef.current = seedKey;
     const cap = variants[activeIdx]?.caption ?? "";
     const seed = (data?.title?.trim() || cap.split("\n").map((l) => l.trim()).find(Boolean) || "").slice(0, 60);
     setOverlayTitle(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, activeIdx, variants]);
+  }, [id, activeIdx, selectedContentKind, variants]);
 
   // Compute per-variant post dates for multi-day series tasks.
   // Countdown: anchor = event date, posts go Day5…Day1 (earliest to latest).
@@ -1138,6 +1249,13 @@ export default function RunPage() {
   // (Defined here, after schedMode / schedPlatform / scheduleAt / variants are
   //  all in scope — was above them before which caused TS2448 TDZ errors.)
   const handleScheduleConfirm = React.useCallback(async () => {
+    const planningWarning = getPlanningPublishWarning(
+      selectedContentKind,
+      schedMode === "publish" ? "publish" : "schedule",
+      lang === "en" ? "en" : "zh",
+    );
+    if (planningWarning && !confirm(planningWarning)) return;
+
     const _tid = (data as any)?.mission?.taskId ?? "";
     const _pfxMap: Record<string, string> = {
       fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
@@ -1200,7 +1318,8 @@ export default function RunPage() {
           if (!d) continue;
           await scheduleToCalMut?.mutateAsync?.({
             outputId: id,
-            variantIndex: i,
+            ...getRunContentMutationLocator(selectedContentKind, i),
+            ...getPlanningConfirmationPayload(selectedContentKind),
             platform: _platform,
             scheduledAt: d.toISOString(),
           });
@@ -1217,14 +1336,16 @@ export default function RunPage() {
     const _scheduledAt = new Date(scheduleAt).toISOString();
     if (schedMode === "ics") {
       scheduleMut.mutate({
-        id, variantIndex: activeIdx,
+        id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+        ...getPlanningConfirmationPayload(selectedContentKind),
         scheduledAt: _scheduledAt,
         durationMinutes: 30,
       }, {
         onSuccess: () => {
           setScheduleDialogOpen(false);
           scheduleToCalMut?.mutateAsync?.({
-            outputId: id, variantIndex: activeIdx,
+            outputId: id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+            ...getPlanningConfirmationPayload(selectedContentKind),
             platform: _platform, scheduledAt: _scheduledAt,
           }).catch(() => {/* non-fatal */});
         },
@@ -1232,7 +1353,8 @@ export default function RunPage() {
     } else {
       try {
         await scheduleToCalMut?.mutateAsync?.({
-          outputId: id, variantIndex: activeIdx,
+          outputId: id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+          ...getPlanningConfirmationPayload(selectedContentKind),
           platform: _platform, scheduledAt: _scheduledAt,
         });
         setScheduleDialogOpen(false);
@@ -1242,7 +1364,7 @@ export default function RunPage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schedMode, schedPlatform, scheduleAt, seriesAnchorDate, id, activeIdx, data, variants, postDates, isMultiDayTask, scheduleMut, scheduleToCalMut, navigate, lang]);
+  }, [schedMode, schedPlatform, scheduleAt, seriesAnchorDate, id, activeIdx, selectedContentKind, data, variants, postDates, isMultiDayTask, scheduleMut, scheduleToCalMut, navigate, lang]);
 
   // ── Bulk .ics export (calendar-type tasks only) ──────────────────────────
   const handleBulkIcsExport = React.useCallback(() => {
@@ -1298,9 +1420,9 @@ export default function RunPage() {
     const safeIdx = Math.min(Math.max(0, activeIdx), variants.length - 1);
     const base = variants[safeIdx];
     if (!base) return base;
-    const ov = overrides[safeIdx];
+    const ov = overrides[getRunContentSelectionKey(selectedContentKind, safeIdx)];
     return ov ? { ...base, caption: ov.caption } : base;
-  }, [variants, activeIdx, overrides]);
+  }, [variants, activeIdx, overrides, selectedContentKind]);
 
   // 2026-07-17 (CJ「文案偶爾很短、沒講重點，推測系統不穩」— seen on
   // fb-30-ad-headline / link-desc): those are COMPONENT tasks — the
@@ -1414,7 +1536,7 @@ export default function RunPage() {
     // Server-owned metadata flag: only the five catalogued IG strategy
     // reports use this presentation. Check before task-id substring routing
     // so visual-story/live-first/document cannot be mistaken for post mockups.
-    const strategyReportMockup = getStrategyPresentationMockup(data?.metadata);
+    const strategyReportMockup = getStrategyPresentationMockup(data?.metadata, taskId);
     if (strategyReportMockup) return strategyReportMockup as any;
 
     // 2026-05-18 (CJ「改成用 word 形式，不要 ppt」): these FB squads are
@@ -1562,6 +1684,8 @@ export default function RunPage() {
   // task-level one. Tone labels (真誠版 / 事實式…) match no platform
   // keyword → base variant kept, so this is safe globally.
   const effectiveVariant: MockupVariant = useMemo(() => {
+    const publicVariantMockup = getIgPublicVariantMockup(selectedContentKind, slide?.format);
+    if (publicVariantMockup) return publicVariantMockup;
     const lbl = String(slide?.label ?? "");
     const v = (platform: string, format: string): MockupVariant =>
       ({ platform: platform as any, format: format as any, label: `${platform}:${format}` });
@@ -1604,7 +1728,7 @@ export default function RunPage() {
     if (/instagram|\bIG\b/i.test(lbl)) return v("instagram", "feed");
     if (/\bLINE\b/i.test(lbl)) return v("line", "broadcast");
     return mockupVariant;
-  }, [mockupVariant, slide?.label, data?.mission?.taskId]);
+  }, [mockupVariant, slide?.label, slide?.format, selectedContentKind, data?.mission?.taskId]);
 
   if (!id || isNaN(id)) {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;
@@ -1756,7 +1880,59 @@ export default function RunPage() {
       </div>
 
       {/* ─── Variant pills (horizontal) ─────────────────────────────── */}
-      {variants.length > 1 && (() => {
+      {isStrategyEnvelope ? (
+        <div className="mb-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] text-default-500 mr-1">
+              {lang === "en" ? "Strategy:" : "策略："}
+            </span>
+            {planningVariants.map((v, i) => (
+              <button
+                key={v.id ?? `planning-${i}`}
+                onClick={() => selectContent("planningArtifacts", i)}
+                className={`px-3 py-1 rounded-full text-tiny transition border ${
+                  selectedContentKind === "planningArtifacts" && i === activeIdx
+                    ? "bg-secondary text-white border-secondary"
+                    : "bg-white text-default-700 border-default-200 hover:border-secondary"
+                }`}
+              >
+                {v.label || (lang === "en" ? `Plan ${i + 1}` : `策略 ${i + 1}`)}
+              </button>
+            ))}
+            <button
+              onClick={() => selectContent("publicVariants", 0)}
+              className={`px-3 py-1 rounded-full text-tiny font-semibold transition border ${
+                selectedContentKind === "publicVariants"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-primary-50 text-primary-700 border-primary-200 hover:border-primary"
+              }`}
+            >
+              {lang === "en" ? "Public posts" : "對外貼文"}
+              {publicVariants.length > 0 ? ` (${publicVariants.length})` : ""}
+            </button>
+          </div>
+          {selectedContentKind === "publicVariants" && publicVariants.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l-2 border-primary-100">
+              <span className="text-[10px] text-default-400 mr-1">
+                {lang === "en" ? "Posts:" : "貼文："}
+              </span>
+              {publicVariants.map((v, i) => (
+                <button
+                  key={v.id ?? `public-${i}`}
+                  onClick={() => selectContent("publicVariants", i)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] transition border ${
+                    i === activeIdx
+                      ? "bg-primary text-white border-primary"
+                      : "bg-white text-default-600 border-default-200 hover:border-primary"
+                  }`}
+                >
+                  {v.label || (lang === "en" ? `Post ${i + 1}` : `貼文 ${i + 1}`)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : variants.length > 1 && (() => {
         // Pool mode: >4 variants → progressive reveal (headline pool).
         // ≤4 → show all (normal multi-variant task, unchanged behavior).
         const pool = variants.length > 4;
@@ -1818,6 +1994,21 @@ export default function RunPage() {
                       {lang === "en"
                         ? "Copy is done — images are rendering. The full post (copy + image) will appear here automatically (~30-60s)."
                         : "文案已完成，圖片生成中。完整貼文（文案＋圖片）會在這裡自動顯示（約 30-60 秒）"}
+                    </p>
+                  </div>
+                );
+              }
+              if (isStrategyEnvelope && selectedContentKind === "publicVariants" && publicVariants.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+                    <div className="w-12 h-12 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center text-xl">↻</div>
+                    <p className="text-small font-semibold text-default-800">
+                      {lang === "en" ? "Public posts haven't been generated" : "尚未產生對外貼文"}
+                    </p>
+                    <p className="text-tiny text-default-500 max-w-sm leading-relaxed">
+                      {lang === "en"
+                        ? "This run has no publish-ready posts yet. Re-run the task to generate Instagram posts while keeping the planning tabs above."
+                        : "這次產出尚未完成可直接發布的貼文。請重跑此任務，系統會保留上方策略內容，並另外產生 Instagram 貼文。"}
                     </p>
                   </div>
                 );
@@ -2098,6 +2289,32 @@ export default function RunPage() {
             CJ direction 2026-05-09: 'toolbar 一道右方對話窗上面，當用戶選擇
             不同按鍵，在顯示出該功能' — toolbar is the tab bar for the panel */}
         <aside className="space-y-3 sticky top-2 self-start">
+          {isEmptyPublicSelection ? (
+            <Card>
+              <CardBody className="space-y-3 p-4">
+                <p className="text-small font-semibold">
+                  {lang === "en" ? "No public post to edit yet" : "目前沒有可操作的對外貼文"}
+                </p>
+                <p className="text-[11px] text-default-500 leading-relaxed">
+                  {lang === "en"
+                    ? "Re-run the task to create publish-ready posts, or switch back to a planning tab."
+                    : "請重跑任務產生可發布貼文，或切回上方策略頁籤查看規劃內容。"}
+                </p>
+                <Button color="primary" fullWidth onPress={rerunOriginalTask}>
+                  {lang === "en" ? "Re-run task" : "重跑此任務"}
+                </Button>
+                {planningVariants.length > 0 && (
+                  <Button variant="flat" fullWidth onPress={() => selectContent("planningArtifacts", 0)}>
+                    {lang === "en" ? "View planning" : "查看策略內容"}
+                  </Button>
+                )}
+                <Button variant="light" fullWidth onPress={() => navigate("/projects")}>
+                  {lang === "en" ? "Back to Projects" : "返回專案"}
+                </Button>
+              </CardBody>
+            </Card>
+          ) : (
+          <>
           {/* Toolbar — clicking a button switches mode + the panel below
               expands to show that tool. */}
           <div className="bg-white rounded-xl border border-default-200 shadow-sm">
@@ -2141,7 +2358,9 @@ export default function RunPage() {
                 </button>
               </Tooltip>
               <Divider />
-              <ToolbarBtn icon={Wand2}         label={lang === "en" ? "Rewrite this" : "重生這段"}       active={mode==="regen"}    onClick={() => setMode("regen")} />
+              {!isStrategyEnvelope && (
+                <ToolbarBtn icon={Wand2} label={lang === "en" ? "Rewrite this" : "重生這段"} active={mode==="regen"} onClick={() => setMode("regen")} />
+              )}
               {/* 2026-07-07 (CJ「參數儀表板客戶看不懂 → 換成選不同 agent 重寫」) */}
               <ToolbarBtn icon={LucideUsers}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
               <Divider />
@@ -2156,26 +2375,7 @@ export default function RunPage() {
               <Divider />
               <Tooltip content={lang === "en" ? "Re-run task" : "重跑同任務"} placement="bottom">
                 <button
-                  onClick={() => {
-                    const taskId = data.mission?.taskId;
-                    if (!taskId) { showToastGlobal(lang === "en" ? "Original task ID not found" : "找不到原任務 ID"); return; }
-                    // 2026-07-07 (CJ「重跑同任務 404」): tier routes (/30s
-                    // /60s /99s) were removed 2026-05-27 when tasks went
-                    // platform-first — this still navigated to /${tier} and
-                    // landed on the 404 page. Map the mission's workspace to
-                    // the /tasks/:platform slug instead; PlatformTaskPage
-                    // already understands ?rerun=<outputId>.
-                    const ws = String(data.mission?.workspace ?? "").toLowerCase();
-                    const slug =
-                      ws.includes("instagram") ? "ig" :
-                      ws.includes("linkedin")  ? "li" :
-                      ws.includes("youtube")   ? "yt" :
-                      ws.includes("tiktok")    ? "tt" :
-                      ws.includes("email")     ? "email" :
-                      (ws.includes("press") || ws.includes("pr")) ? "pr" :
-                      "fb";
-                    navigate(`/tasks/${slug}?rerun=${id}`);
-                  }}
+                  onClick={rerunOriginalTask}
                   className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
                   aria-label={lang === "en" ? "Re-run" : "重跑"}
                 >
@@ -2222,13 +2422,14 @@ export default function RunPage() {
                   {aiPreview && (
                     <div className="text-[11px] bg-secondary-50 border border-secondary-200 rounded-lg p-2 space-y-1.5">
                       <p className="font-semibold text-secondary-700">{lang === "en" ? "AI rewrite preview" : "AI 改寫預覽"}</p>
-                      <p className="whitespace-pre-wrap leading-relaxed text-default-800 max-h-32 overflow-y-auto">{aiPreview}</p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-default-800 max-h-32 overflow-y-auto">{aiPreview.text}</p>
                       <div className="flex gap-1.5 pt-1">
                         <Button size="sm" color="secondary"
                           isDisabled={updateMut.isPending}
                           onPress={() => {
-                            setOverrides(o => ({ ...o, [activeIdx]: { caption: aiPreview } }));
-                            updateMut.mutate({ id, variantIndex: activeIdx, caption: aiPreview });
+                            const key = getMutationLocatorSelectionKey(aiPreview.locator);
+                            setOverrides(o => ({ ...o, [key]: { caption: aiPreview.text } }));
+                            updateMut.mutate({ id, ...aiPreview.locator, caption: aiPreview.text });
                             setAiPreview(null);
                           }}
                         >{lang === "en" ? "Use it" : "採用"}</Button>
@@ -2242,6 +2443,7 @@ export default function RunPage() {
                     isLoading={refineMut?.isPending}
                     onPress={async () => {
                       if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return; }
+                      const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
                       try {
                         const r = await refineMut.mutateAsync({
                           currentCaption: slide?.caption ?? "",
@@ -2250,13 +2452,15 @@ export default function RunPage() {
                           history: chatHistory,
                         });
                         if (r.ok) {
-                          setChatHistory(h => [
-                            ...h,
-                            { role: "user", content: chatPrompt },
-                            { role: "assistant", content: r.explanation || (lang === "en" ? "(rewritten)" : "(已改寫)") },
-                          ]);
-                          setAiPreview(r.rewritten);
-                          setChatPrompt("");
+                          if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
+                            setChatHistory(h => [
+                              ...h,
+                              { role: "user", content: chatPrompt },
+                              { role: "assistant", content: r.explanation || (lang === "en" ? "(rewritten)" : "(已改寫)") },
+                            ]);
+                            setAiPreview({ text: r.rewritten, locator });
+                            setChatPrompt("");
+                          }
                         } else {
                           showToastGlobal(
                             lang === "en"
@@ -2287,7 +2491,7 @@ export default function RunPage() {
                       const v = e.target.value;
                       setEditText(v);
                       // Live preview in mockup
-                      setOverrides(o => ({ ...o, [activeIdx]: { caption: v } }));
+                      setOverrides(o => ({ ...o, [activeSelectionKey]: { caption: v } }));
                     }}
                     minRows={10}
                   />
@@ -2298,7 +2502,7 @@ export default function RunPage() {
                       isLoading={updateMut.isPending}
                       onPress={() => {
                         if (editText == null) return;
-                        updateMut.mutate({ id, variantIndex: activeIdx, caption: editText });
+                        updateMut.mutate({ id, ...getRunContentMutationLocator(selectedContentKind, activeIdx), caption: editText });
                       }}
                     >{t("run_save_btn")}</Button>
                     <Button
@@ -2306,7 +2510,7 @@ export default function RunPage() {
                       isDisabled={editText == null}
                       onPress={() => {
                         setEditText(null);
-                        setOverrides(o => { const n = { ...o }; delete n[activeIdx]; return n; });
+                        setOverrides(o => { const n = { ...o }; delete n[activeSelectionKey]; return n; });
                       }}
                     >{t("run_revert")}</Button>
                   </div>
@@ -2386,6 +2590,7 @@ export default function RunPage() {
                             undefined
                           ) as any,
                           imageStyle: variants[activeIdx]?.imageStyle ?? undefined,
+                          size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
                         });
                       }}
                     >
@@ -2493,6 +2698,7 @@ export default function RunPage() {
                                     caption: activeCaption,
                                     channel: channelVal,
                                     imageStyle: styleHint,
+                                    size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
                                   });
                                   showToastGlobal(
                                     lang === "en"
@@ -2602,6 +2808,10 @@ export default function RunPage() {
                         );
                         return;
                       }
+                      imageMutationTargetRef.current = {
+                        locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
+                        style: imagePrompt.slice(0, 480),
+                      };
                       imageGenMut.mutate({
                         brandId: data.brand.id,
                         prompt: imagePrompt,
@@ -2615,6 +2825,7 @@ export default function RunPage() {
                           "fb"
                         ) as any,
                         modelChoice: imageModel as any,
+                        size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
                         ...(realProductMode ? { subjectImageUrl: pickedRunProduct!.imageUrl } : {}),
                       });
                     }}
@@ -2861,7 +3072,7 @@ export default function RunPage() {
                   </>
                 );
               })()}
-              {mode === "regen" && (
+              {mode === "regen" && !isStrategyEnvelope && (
                 <>
                   <p className="text-tiny font-semibold">{lang === "en" ? "Rewrite this version" : "重生這段文案"}</p>
                   <p className="text-[11px] text-default-500 leading-relaxed">
@@ -2875,7 +3086,7 @@ export default function RunPage() {
                     isLoading={regenMut.isPending}
                     isDisabled={regenMut.isPending}
                     onPress={() => {
-                      regenMut.mutate({ outputId: id, variantIndex: activeIdx });
+                      regenMut.mutate({ outputId: id, ...getRunContentMutationLocator(selectedContentKind, activeIdx) });
                     }}
                   >
                     {regenMut.isPending
@@ -2913,6 +3124,7 @@ export default function RunPage() {
                           if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return; }
                           const caption = slide?.caption ?? "";
                           if (!caption.trim()) { showToastGlobal(lang === "en" ? "This version has no caption yet" : "這個版本還沒有文案可以重寫"); return; }
+                          const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
                           setRewriteBusy(a.name);
                           try {
                             const r = await refineMut.mutateAsync({
@@ -2923,7 +3135,9 @@ export default function RunPage() {
                               brandId: data.mission?.brandId ?? undefined,
                             });
                             if (r.ok) {
-                              setRewritePreview({ agent: a.name, text: r.rewritten });
+                              if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
+                                setRewritePreview({ agent: a.name, text: r.rewritten, locator });
+                              }
                             } else {
                               showToastGlobal(
                                 lang === "en"
@@ -2968,8 +3182,9 @@ export default function RunPage() {
                         <Button size="sm" color="secondary"
                           isDisabled={updateMut.isPending}
                           onPress={() => {
-                            setOverrides(o => ({ ...o, [activeIdx]: { caption: rewritePreview.text } }));
-                            updateMut.mutate({ id, variantIndex: activeIdx, caption: rewritePreview.text });
+                            const key = getMutationLocatorSelectionKey(rewritePreview.locator);
+                            setOverrides(o => ({ ...o, [key]: { caption: rewritePreview.text } }));
+                            updateMut.mutate({ id, ...rewritePreview.locator, caption: rewritePreview.text });
                             setRewritePreview(null);
                           }}
                         >{lang === "en" ? "Use it" : "採用"}</Button>
@@ -3075,6 +3290,8 @@ export default function RunPage() {
 
             </CardBody>
           </Card>
+          </>
+          )}
         </aside>
       </div>
 
@@ -3110,7 +3327,7 @@ export default function RunPage() {
                 const recipients = emailRecipients.split(",").map(s => s.trim()).filter(Boolean);
                 if (recipients.length === 0) return;
                 emailMut.mutate({
-                  id, variantIndex: activeIdx,
+                  id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
                   recipients, note: emailNote || undefined,
                 }, {
                   onSuccess: () => setEmailDialogOpen(false),
