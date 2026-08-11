@@ -582,7 +582,12 @@ function stripCaptionPreamble(caption: string): string {
 // caption choke point. If a variant is PURE leak (nothing real left), return
 // empty so the writer retries for real copy — shipping the leak is worse.
 const DRAFT_LINE_RE = /^[ \t]*(視覺方向|圖片指令|配圖建議|配圖|繪圖指令|image\s*prompt|imageprompt|visual\s*direction)[ \t]*[:：][^\n]*$/gim;
-const INTERNAL_KEY_RE = /\b(live_strategy_plan|content_documentation_plan|authentic_story_bank|viral_source|save_worthy_plan|radical_transparency_plan|live_first_plan|document(?:ary)?_plan|youtility_plan)\b/gi;
+// Any multi-word snake_case token is an internal output/plan key (the strategy
+// squads use dozens: content_documentation_plan, authentic_story_bank,
+// vulnerability_content_scripts, repurposed_content_set, viral_source, …) and is
+// never legit in public copy. The surrounding lookarounds protect URLs / emails /
+// filenames (slash / dot / @ / word-char neighbours are left alone).
+const INTERNAL_KEY_RE = /(?<![\/\w.@])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![\/\w.@])/g;
 const CODE_TOKEN_RE = /\[\s*(?:Headline|Primary(?:\s*Text)?|CTA|Description|Hook|Body)\s*(?:\/\s*(?:Headline|Primary(?:\s*Text)?|CTA|Description|Hook|Body)\s*)*\]/gi;
 function sanitizeCaption(caption: string): string {
   const cleaned = caption
