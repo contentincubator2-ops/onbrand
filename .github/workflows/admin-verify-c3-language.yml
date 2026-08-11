@@ -71,7 +71,8 @@ jobs:
                   "以下貼文文案目前是英文，但這個品牌帳號全站慣用「繁體中文（台灣用語）」。請將整段文案改寫成道地的繁體中文版本，保留原本的語氣、資訊重點、CTA、hashtag 結構與大致長度，不要逐字直譯生硬中文，也不要加任何前言或說明，只輸出改寫後的文案本身：\n\n" + wrongLangCaption }],
                 maxTokens: 800,
               });
-              const rewritten = String((r && (r.content || r.text)) || "").trim();
+              const raw = r && r.choices && r.choices[0] && r.choices[0].message && r.choices[0].message.content;
+              const rewritten = String(typeof raw === "string" ? raw : (Array.isArray(raw) ? raw.map((p) => (typeof p === "string" ? p : (p && p.text) || "")).join("") : "")).trim();
               const stillFlagged = detect(rewritten);
               console.log("before: " + JSON.stringify(wrongLangCaption));
               console.log("before flagged: " + detect(wrongLangCaption));

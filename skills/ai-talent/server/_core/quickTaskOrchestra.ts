@@ -515,7 +515,7 @@ export function looksNonChineseForZhTWBrand(text: string): boolean {
 async function reaskInZhTW(caption: string): Promise<string> {
   try {
     const { invokeLLM } = await import("./llm");
-    const r: any = await invokeLLM({
+    const r = await invokeLLM({
       provider: "anthropic",
       messages: [{
         role: "user",
@@ -524,7 +524,17 @@ async function reaskInZhTW(caption: string): Promise<string> {
       }],
       maxTokens: 800,
     });
-    const out = String(r?.content ?? r?.text ?? "").trim();
+    // InvokeResult carries the text at choices[0].message.content — NOT a
+    // top-level .content/.text (that shape doesn't exist on InvokeResult;
+    // see llm.ts). message.content can also be a content-part array.
+    const raw = r?.choices?.[0]?.message?.content;
+    const out = (
+      typeof raw === "string"
+        ? raw
+        : Array.isArray(raw)
+          ? raw.map((p: any) => (typeof p === "string" ? p : p?.text ?? "")).join("")
+          : ""
+    ).trim();
     return out || caption;
   } catch {
     return caption;
