@@ -589,7 +589,7 @@ const DRAFT_LINE_RE = /^[ \t]*(視覺方向|圖片指令|配圖建議|配圖|繪
 // filenames (slash / dot / @ / word-char neighbours are left alone).
 const INTERNAL_KEY_RE = /(?<![\/\w.@])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![\/\w.@])/g;
 const CODE_TOKEN_RE = /\[\s*(?:Headline|Primary(?:\s*Text)?|CTA|Description|Hook|Body)\s*(?:\/\s*(?:Headline|Primary(?:\s*Text)?|CTA|Description|Hook|Body)\s*)*\]/gi;
-function sanitizeCaption(caption: string): string {
+export function sanitizeCaption(caption: string): string {
   const cleaned = caption
     .replace(DRAFT_LINE_RE, "")
     .replace(INTERNAL_KEY_RE, "")
