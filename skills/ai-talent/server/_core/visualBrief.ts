@@ -71,7 +71,13 @@ export async function captionToVisualBrief(args: {
         {
           role: "system",
           content:
-            "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic, brand-friendly, no text in image, no logos. " +
+            "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic, brand-friendly. " +
+            // 2026-08-11 (bug checklist C2 — 小安素→「Nutrion」烤字 / Adidas 貼文→NIKE logo):
+            // image models cannot render a real wordmark, so when the brief names a
+            // brand/competitor they invent a fake romanized label or a rival's logo.
+            // Forbid ALL proper-noun brand references so nothing pressures the model to
+            // draw a mark — the real title/logo is overlaid later on an editable layer.
+            "CRITICAL — the generated image must contain NO text and NO logos: your brief MUST NOT name or reference ANY brand, product name, company, or competitor, and MUST NOT transliterate, romanize, or invent an English brand name (never turn a Chinese brand like 小安素 into a made-up wordmark such as \"Nutrion\"). Describe the subject only by its generic product category and physical form, as a clean UNLABELED design — e.g. \"a nutritional supplement drink in a plain unlabeled bottle\", \"a pair of athletic running shoes with no visible logo\". Never depict any real or invented logo, wordmark, emblem, brand name, or packaging text. " +
             "If brand colors are provided, make them the scene's dominant color palette (props, backdrop, lighting accents) while keeping the scene natural. Output only the brief.",
         },
         {

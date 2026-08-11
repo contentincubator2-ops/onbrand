@@ -23,6 +23,7 @@ import { resolveAgentId } from "../_core/agentAssignments";
 import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
 import { captionToVisualBrief, loadBrandPaletteHexes } from "../_core/visualBrief";
+import { NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT } from "../_core/imageGen";
 import { withUserLLMSlot } from "../_core/userLLMSemaphore";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -1311,6 +1312,17 @@ ${cleaned}
           palette: await loadBrandPaletteHexes(input.brandId),
         });
       }
+      // 2026-08-11 (bug checklist C2): theater sent the brief RAW — no NO-TEXT
+      // block and no negative prompt (unlike genOneImage) — so a brand/competitor
+      // name that slipped into the brief got baked on as a fake wordmark/logo
+      // (小安素→「Nutrion」, Adidas→NIKE). Append the same NO-TEXT guard the
+      // orchestra uses so gpt-image/imagen (which ignore negative_prompt) still
+      // get the directive, and pass NO_TEXT_NEGATIVE_PROMPT for flux/SDXL. The
+      // auto-brief gets the positive block; a user's customPrompt is left as
+      // typed but still backed by the negative prompt.
+      const imagePrompt = input.customPrompt?.trim()
+        ? brief
+        : `${brief}\n\n${NO_TEXT_PROMPT_BLOCK}`;
       // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back
       // to openai/gpt-image-1 when PIAPI_KEY is absent so Theater images
       // still work when only OPENAI_API_KEY is configured.
@@ -1321,7 +1333,7 @@ ${cleaned}
         if (primaryModel === "openai/gpt-image-1" || !(process.env.OPENAI_API_KEY ?? "")) return null;
         try {
           console.warn(`[theater.generateImage] ${primaryModel} failed, falling back to openai/gpt-image-1`);
-          const r2 = await dispatchGenerate("openai/gpt-image-1", { prompt: brief, aspectRatio: aspect as any, brandId: input.brandId });
+          const r2 = await dispatchGenerate("openai/gpt-image-1", { prompt: imagePrompt, aspectRatio: aspect as any, brandId: input.brandId, negativePrompt: NO_TEXT_NEGATIVE_PROMPT } as any);
           if (r2.status === "ready" && r2.url) return { ok: true as const, imageUrl: r2.url, brief };
         } catch (e2) {
           console.error(`[theater.generateImage] openai fallback also failed:`, e2);
@@ -1330,10 +1342,11 @@ ${cleaned}
       };
       try {
         const r = await dispatchGenerate(primaryModel, {
-          prompt: brief,
+          prompt: imagePrompt,
           aspectRatio: aspect as any,
           brandId: input.brandId,
-        });
+          negativePrompt: NO_TEXT_NEGATIVE_PROMPT,
+        } as any);
         if (r.status === "ready" && r.url) {
           return { ok: true as const, imageUrl: r.url, brief };
         }
