@@ -1,0 +1,55 @@
+name: "DEV — Tail app logs (read-only)"
+
+# Dev-branch only. workflow_dispatch is unavailable off the default branch,
+# so this is driven the same way the dev onboarding job is: touch a trigger
+# file and push. Single-purpose on purpose — it only reads logs.
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "ops/dev-logs/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-tail-logs
+  cancel-in-progress: true
+
+jobs:
+  tail:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 8
+    steps:
+      - name: Tail onbrand-dev logs
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set +e
+            echo "host: $(hostname)  release: $(readlink -f /opt/onbrand/current)"
+
+            echo ""
+            echo "═══════ pm2 processes ═══════"
+            pm2 list 2>/dev/null | grep -E "onbrand" || true
+
+            echo ""
+            echo "═══════ last 120 error lines ═══════"
+            pm2 logs onbrand-dev --err --lines 120 --nostream 2>/dev/null | tail -120
+
+            echo ""
+            echo "═══════ zod / BAD_REQUEST / invalid_type hits (last 400 lines) ═══════"
+            pm2 logs onbrand-dev --lines 400 --nostream 2>/dev/null \
+              | grep -iE "invalid_type|BAD_REQUEST|ZodError|Required|input validation" \
+              | tail -40
+
+            echo ""
+            echo "═══════ tRPC procedure names near those errors ═══════"
+            pm2 logs onbrand-dev --lines 400 --nostream 2>/dev/null \
+              | grep -iE "trpc|procedure|✖|❌" \
+              | tail -30
