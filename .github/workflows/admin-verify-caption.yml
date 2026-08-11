@@ -1,0 +1,65 @@
+name: "Admin — Verify caption strip (C1) on dev"
+
+# Runs the DEPLOYED sanitizeCaption (skills/ai-talent/server/_core/
+# quickTaskOrchestra.ts) on the dev VM against the exact strings the bug
+# checklist flagged as leaks — internal draft lines (視覺方向…), internal
+# snake_case plan keys (primary_text / content_map…), and [Headline/Primary/
+# CTA] code tokens — proving the fix is live end-to-end on the real release,
+# not just in a local unit test. Read-only; imports the built function only.
+#
+# workflow_dispatch needs the file on the default branch (main); this lives on
+# dev, so a path-scoped push runs it here without touching prod.
+on:
+  push:
+    branches: [dev]
+    paths: [".github/workflows/admin-verify-caption.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # environment: dev → secrets resolve to the DEV VM (/opt/onbrand/current).
+    environment: dev
+    steps:
+      - name: Verify deployed sanitizeCaption on the dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env; set +a
+            echo "=== deployed release ==="
+            basename "$(readlink -f /opt/onbrand/current)" 2>/dev/null || echo "(sha unknown)"
+            echo "=== running deployed-sanitizeCaption verification ==="
+            node --import tsx -e '
+            const guard = setTimeout(() => { console.error("timeout importing/running"); process.exit(3); }, 90000);
+            import("./server/_core/quickTaskOrchestra").then((m) => {
+              clearTimeout(guard);
+              const sanitize = m.sanitizeCaption;
+              if (typeof sanitize !== "function") { console.error("sanitizeCaption NOT exported on deployed build"); process.exit(2); }
+              const cases = [
+                { name: "C1 draft line (視覺方向)",        input: "今天想跟你分享這款保養品的溫和配方\n視覺方向：柔和自然光，產品置中特寫", bad: ["視覺方向"] },
+                { name: "C1 internal snake_case keys",     input: "早安！新的一週給自己一點溫柔\nprimary_text: 買一送一\ncontent_map: 週一到週五的靈感", bad: ["primary_text", "content_map"] },
+                { name: "C1 [Headline/Primary/CTA] tokens", input: "[Headline] 限時七折 [Primary Text] 把握機會 [CTA] 立即選購", bad: ["[Headline]", "[Primary Text]", "[CTA]"] },
+                { name: "clean caption survives",           input: "週末的陽光剛剛好，適合來一杯手沖咖啡", bad: [] },
+              ];
+              let fail = 0;
+              for (const c of cases) {
+                const out = sanitize(c.input);
+                const leaks = c.bad.filter((b) => out.includes(b));
+                const emptied = c.bad.length === 0 && out.trim().length === 0;
+                const ok = leaks.length === 0 && !emptied;
+                if (!ok) fail++;
+                console.log((ok ? "PASS  " : "FAIL  ") + c.name);
+                console.log("      out: " + JSON.stringify(out));
+                if (leaks.length) console.log("      leaked: " + JSON.stringify(leaks));
+              }
+              console.log("----");
+              console.log(fail === 0 ? "ALL PASS — deployed C1 strip verified on dev" : (fail + " CASE(S) FAILED"));
+              process.exit(fail === 0 ? 0 : 1);
+            }).catch((e) => { clearTimeout(guard); console.error("import/run error:", e && e.message ? e.message : e); process.exit(2); });
+            '
