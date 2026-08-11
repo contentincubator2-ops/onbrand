@@ -126,18 +126,25 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   // Brand/product/event scope ids are injected by the nav click handler, so
   // these `to` values deliberately carry only `cat`.
   if (isPrivate && currentPath?.startsWith("/brands")) {
+    // 2026-08-11 (CJ「前三個分別是品牌、產品、活動，接下去才是文字、視覺、
+    // 工具、基本資料」): ordered by what the entry IS, not alphabetically.
+    // The first three are the three positioning SCOPES — 品牌 / 產品 / 活動 —
+    // i.e. "which thing am I positioning". Everything after is brand-level
+    // ASSET that supports whichever scope is active. Grouping them this way
+    // means the rail's top block mirrors the scope selector rather than
+    // interleaving scopes with assets.
     return [
-      { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Positioning" : "定位", icon: <FontAwesomeIcon icon={faBrain} />,
-        tooltip: en ? "Positioning — the locked brand constitution" : "定位 — 鎖定的品牌憲法" },
-      { to: "/brands/edit?cat=copy", catKey: "copy", label: en ? "Copy" : "文字", icon: <FontAwesomeIcon icon={faFont} />,
-        tooltip: en ? "Voice, terms, CTA and hook libraries" : "語氣 / 用詞 / CTA / 鉤子庫" },
-      { to: "/brands/edit?cat=visual", catKey: "visual", label: en ? "Visual" : "視覺", icon: <FontAwesomeIcon icon={faPaintBrush} />,
-        tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
+      { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Brand" : "品牌", icon: <FontAwesomeIcon icon={faBrain} />,
+        tooltip: en ? "Brand positioning — the locked constitution" : "品牌定位 — 鎖定的品牌憲法" },
       { to: "/brands/edit?cat=products", catKey: "products", label: en ? "Products" : "產品", icon: <FontAwesomeIcon icon={faBoxOpen} />,
         tooltip: en ? "Product cards & positioning" : "產品卡片與定位" },
       { to: "/brands/edit?cat=events", catKey: "events", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faCalendarDays} />,
         tooltip: en ? "Campaign cards & positioning" : "活動卡片與定位" },
-      { to: "/brands/edit?cat=tools", catKey: "tools", label: en ? "Brand tools" : "品牌工具", icon: <FontAwesomeIcon icon={faBookBookmark} />,
+      { to: "/brands/edit?cat=copy", catKey: "copy", label: en ? "Copy" : "文字", icon: <FontAwesomeIcon icon={faFont} />,
+        tooltip: en ? "Voice, terms, CTA and hook libraries" : "語氣 / 用詞 / CTA / 鉤子庫" },
+      { to: "/brands/edit?cat=visual", catKey: "visual", label: en ? "Visual" : "視覺", icon: <FontAwesomeIcon icon={faPaintBrush} />,
+        tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
+      { to: "/brands/edit?cat=tools", catKey: "tools", label: en ? "Tools" : "工具", icon: <FontAwesomeIcon icon={faBookBookmark} />,
         tooltip: en ? "Knowledge base / AI prompt library" : "知識庫 / AI 指令庫" },
       { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
         tooltip: en ? "Name / industry / market" : "名稱 / 產業 / 市場" },

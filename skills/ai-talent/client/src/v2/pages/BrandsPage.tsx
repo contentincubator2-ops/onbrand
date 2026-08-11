@@ -120,6 +120,25 @@ export default function BrandsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlProductId = Number(searchParams.get("p")) || null;
   const urlEventId = Number(searchParams.get("e")) || null;
+
+  // 2026-08-11: the 策略 rail (ShellLayout) lists this page's seven sections
+  // for private preview, which makes the in-page tile strip a duplicate of the
+  // same control. Same gate as the rail so the two can't disagree — if this
+  // ever drifts from ShellLayout's check, a user gets either two switchers or
+  // none. Follows DataWorkspacePage's existing /api/auth/me pattern.
+  const [isPrivatePreview, setIsPrivatePreview] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/auth/me", { method: "POST", credentials: "include" });
+        const d = r.ok ? await r.json() : null;
+        const email = String(d?.user?.email ?? "").toLowerCase();
+        if (!cancelled) setIsPrivatePreview(email === "sowork@sowork.tw");
+      } catch { /* default false — tiles stay visible, never strands the user */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const scope = React.useMemo(
     () => ({
       brandId: globalScope?.brandId ?? brandId ?? null,
@@ -1469,7 +1488,14 @@ export default function BrandsPage() {
               tagline preview lived in the bar redundantly. Kept the import
               available for any debug page that wants to surface it. */}
 
-          {/* Tab tiles — 7 consistent tiles in one scrollable row */}
+          {/* Tab tiles — 7 consistent tiles in one scrollable row.
+              2026-08-11 (CJ「左側已經有品牌、文字、活動等 rail tray，中間就不需要
+              重複了」): under the 策略 workspace the left rail already lists these
+              exact seven sections, so rendering them again here is a duplicate
+              control for the same state. Hidden for private preview only —
+              everyone else has no rail, and hiding it for them would leave no
+              way to change section at all. */}
+          {!isPrivatePreview && (
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-2 min-w-max mx-auto px-2">
               {(() => {
@@ -1556,6 +1582,7 @@ export default function BrandsPage() {
               })}
             </div>
           </div>
+          )}
 
           {/* Kicker row — BRAND WORKSPACE pill + action chips (試寫 / 定案) */}
           <KickerRow
