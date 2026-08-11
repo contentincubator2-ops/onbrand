@@ -676,6 +676,55 @@ function fillTemplate(tpl: string, inputs: Record<string, string | number | unde
 // uses the same source of truth + same 1-min cache.
 import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
 
+/**
+ * 2026-08-11: turn a workbench spot reference into the audience label stored
+ * alongside the produced content.
+ *
+ * The client sends only { scenarioId, spotIndex }; the labels are read here
+ * from the brand's own positioning._workbench so they always match the
+ * scenario that actually produced them, and so a long audience anchor never
+ * has to travel through a URL.
+ *
+ * Best-effort by design: attribution is a nice-to-have on top of the content,
+ * never a reason to fail someone's task. Any miss (no ref, brand gone,
+ * scenario deleted, index out of range) simply yields an untagged run.
+ */
+async function resolveAudienceTag(
+  userId: number,
+  brandId: number | undefined,
+  spotRef: { scenarioId: string; spotIndex: number } | null | undefined,
+): Promise<{ audience: string; spotTitle: string | null; scenarioId: string; spotIndex: number } | null> {
+  if (!spotRef || !brandId) return null;
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+      [brandId, userId],
+    );
+    let pos: any = (rows as any[])[0]?.positioning;
+    if (!pos) return null;
+    if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { return null; } }
+
+    const scenarios: any[] = Array.isArray(pos?._workbench?.scenarios) ? pos._workbench.scenarios : [];
+    const scn = scenarios.find((s) => s?.id === spotRef.scenarioId);
+    if (!scn) return null;
+
+    const audience = String(scn?.selection?.audience ?? "").trim();
+    if (!audience) return null;
+    const spot = scn?.derived?.spots?.[spotRef.spotIndex];
+
+    return {
+      audience: audience.slice(0, 600),
+      spotTitle: spot?.title ? String(spot.title).slice(0, 120) : null,
+      scenarioId: spotRef.scenarioId,
+      spotIndex: spotRef.spotIndex,
+    };
+  } catch (e) {
+    console.warn("[resolveAudienceTag] non-fatal:", (e as Error)?.message);
+    return null;
+  }
+}
+
 // ── English labels for all 30s/60s tasks ────────────────────────────────────
 // Primary display locale is zh-TW; this map supplies the EN equivalent used
 // when the UI language is switched to English. KOL tasks already use the
@@ -1372,6 +1421,11 @@ export const quickTaskRouter = router({
       // the backend is still working. Same async-checkpoint pattern as
       // runOrchestra99 fixes this: return after captions+briefs (~30s),
       // run image gen + extras + QA in background, UI polls until done.
+      // 2026-08-11: workbench sweet-spot reference for audience attribution.
+      spotRef: z.object({
+        scenarioId: z.string().min(1).max(40),
+        spotIndex: z.number().int().min(0).max(7),
+      }).optional().nullable(),
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1440,7 +1494,8 @@ export const quickTaskRouter = router({
         };
       }
 
-      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" as const };
+      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" as const,
+        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef) };
 
       if (!input.asyncMode) {
         return runOrchestra(baseArgs);
@@ -2241,6 +2296,11 @@ export const quickTaskRouter = router({
       // 'caption_ready'. The full orchestra continues in background and
       // UPDATEs the same mission_outputs row. Frontend polls
       // output.getById until progress='done' or 'failed'.
+      // 2026-08-11: workbench sweet-spot reference for audience attribution.
+      spotRef: z.object({
+        scenarioId: z.string().min(1).max(40),
+        spotIndex: z.number().int().min(0).max(7),
+      }).optional().nullable(),
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2298,7 +2358,8 @@ export const quickTaskRouter = router({
         }
       }
 
-      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const };
+      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const,
+        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef) };
 
       if (!input.asyncMode) {
         // Legacy sync path — fully await, return final result.
@@ -2370,6 +2431,14 @@ export const quickTaskRouter = router({
         // 2026-05-11 (CJ「product / event 也要 narrow LLM context」): scope.
         productId: z.number().optional().nullable(),
         eventId: z.number().optional().nullable(),
+        // 2026-08-11: where in the strategy workbench this piece came from.
+        // Only the reference travels — the labels are resolved server-side
+        // from the stored scenario so they can't drift, and the URL that
+        // carries this stays short.
+        spotRef: z.object({
+          scenarioId: z.string().min(1).max(40),
+          spotIndex: z.number().int().min(0).max(7),
+        }).optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -2432,6 +2501,7 @@ export const quickTaskRouter = router({
         productId: input.productId ?? null,
         eventId: input.eventId ?? null,
         userId,
+        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
       };
 
       // 2026-07-29 (Tier-1 TikTok video formats): a video task renders clips

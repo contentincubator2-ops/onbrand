@@ -1749,6 +1749,22 @@ export async function runOrchestra(args: {
   /** Tier override — 60s/100s scale variants + add QA stage. Default 30s. */
   tier?: OrchestraTier;
   /**
+   * 2026-08-11: which audience segment / sweet spot this piece was written
+   * for. Resolved by the caller from the brand's stored strategy scenario, so
+   * the labels can't drift from the scenario they came from.
+   *
+   * This is the anchor the whole performance story hangs on: without it a
+   * published post can be measured, but not attributed to an audience — and
+   * "which 族群 is worth more content" is the question the 成效 workspace
+   * exists to answer. Absent for tasks started outside the workbench.
+   */
+  audienceTag?: {
+    audience: string;
+    spotTitle?: string | null;
+    scenarioId?: string | null;
+    spotIndex?: number | null;
+  } | null;
+  /**
    * 2026-05-14 (CJ「先回 caption + brief、image 跟 QA 變 async polling」):
    * Optional checkpoint — fires AFTER captions + briefs are assembled but
    * BEFORE image gen / extras / QA. Caller can persist this partial result,
@@ -2356,6 +2372,8 @@ export async function runOrchestra(args: {
               ok: true,
               variantCount: partialVariants.length,
               inputs: args.inputs ?? {},
+              // 2026-08-11: audience attribution anchor — see args.audienceTag.
+              audienceTag: args.audienceTag ?? null,
               productId: args.productId ?? null,
               eventId: args.eventId ?? null,
             },
@@ -2884,6 +2902,8 @@ export async function runOrchestra(args: {
           // navigate back to the task with the user's prior answers
           // pre-filled (no need to re-type 主問題 input).
           inputs: args.inputs ?? {},
+          // 2026-08-11: audience attribution anchor — see args.audienceTag.
+          audienceTag: args.audienceTag ?? null,
           // 2026-05-11 (CJ): persist scope so /projects can filter
           // missions by product/event and /run page can re-apply scope.
           productId: args.productId ?? null,

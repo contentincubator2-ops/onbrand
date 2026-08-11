@@ -1017,6 +1017,27 @@ function PlatformTaskPageInner() {
     setSearchParams(next, { replace: true });
   }, [searchParams]);
 
+  // 2026-08-11: ?sid=<scenarioId>&si=<spotIndex> — which strategy-workbench
+  // sweet spot this task was opened from. Held in a ref rather than state
+  // because the params are stripped from the URL immediately (same as topic)
+  // but the value must survive until the user actually presses run, which can
+  // be several interactions later. Only the reference is kept; the server
+  // resolves the audience labels from the stored scenario.
+  const spotRefRef = React.useRef<{ scenarioId: string; spotIndex: number } | null>(null);
+  useEffect(() => {
+    const sid = searchParams.get("sid");
+    const si = searchParams.get("si");
+    if (!sid || si == null) return;
+    const idx = Number(si);
+    if (Number.isInteger(idx) && idx >= 0) {
+      spotRefRef.current = { scenarioId: sid, spotIndex: idx };
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("sid");
+    next.delete("si");
+    setSearchParams(next, { replace: true });
+  }, [searchParams]);
+
   // ── Platform inference (matches QuickTask30sPage logic) ──────────────────
   const inferPlatform = (task: FBTaskCard): string =>
     task.platform ??
@@ -1357,6 +1378,9 @@ function PlatformTaskPageInner() {
           brandId: brandId ?? undefined,
           productId: taskProductId,
           eventId: taskEventId,
+          // Null when the task wasn't opened from a workbench sweet spot —
+          // the run just goes untagged, it never blocks.
+          spotRef: spotRefRef.current,
         });
         if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
 
