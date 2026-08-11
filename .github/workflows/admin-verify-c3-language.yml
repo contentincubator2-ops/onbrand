@@ -56,23 +56,11 @@ jobs:
                 console.log((ok ? "PASS  " : "FAIL  ") + c.name + " (flagged=" + got + ", want=" + c.wantFlag + ")");
               }
 
-              console.log("=== B. live LLM re-ask ===");
+              console.log("=== B. live LLM re-ask (calling the DEPLOYED reaskInZhTW directly, incl. its own retry) ===");
               const wrongLangCaption = "This link does not appear to be related to your brand. Please share a URL that connects to your products, services, or brand story so we can craft the right post for you.";
-              const mod = await import("./server/_core/llm"); // sanity: confirm module resolvable
-              void mod;
-              // reaskInZhTW is not exported (internal) — exercise it via a tiny
-              // inline re-implementation call is not possible, so call it through
-              // the exported detect() to confirm input classification, then invoke
-              // the real LLM the same way reaskInZhTW does to prove the rewrite path works.
-              const { invokeLLM } = await import("./server/_core/llm");
-              const r = await invokeLLM({
-                provider: "anthropic",
-                messages: [{ role: "user", content:
-                  "以下貼文文案目前是英文，但這個品牌帳號全站慣用「繁體中文（台灣用語）」。請將整段文案改寫成道地的繁體中文版本，保留原本的語氣、資訊重點、CTA、hashtag 結構與大致長度，不要逐字直譯生硬中文，也不要加任何前言或說明，只輸出改寫後的文案本身：\n\n" + wrongLangCaption }],
-                maxTokens: 800,
-              });
-              const raw = r && r.choices && r.choices[0] && r.choices[0].message && r.choices[0].message.content;
-              const rewritten = String(typeof raw === "string" ? raw : (Array.isArray(raw) ? raw.map((p) => (typeof p === "string" ? p : (p && p.text) || "")).join("") : "")).trim();
+              const reask = m.reaskInZhTW;
+              if (typeof reask !== "function") { console.error("reaskInZhTW NOT exported on deployed build"); clearTimeout(guard); process.exit(2); }
+              const rewritten = await reask(wrongLangCaption);
               const stillFlagged = detect(rewritten);
               console.log("before: " + JSON.stringify(wrongLangCaption));
               console.log("before flagged: " + detect(wrongLangCaption));

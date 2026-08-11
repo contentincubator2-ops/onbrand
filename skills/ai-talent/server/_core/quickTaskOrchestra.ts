@@ -516,7 +516,7 @@ export function looksNonChineseForZhTWBrand(text: string): boolean {
  *  from invokeLLM on the very first call (cold-start flakiness) — retry
  *  once before giving up, since a guard that silently no-ops on a flaky
  *  response defeats its own purpose. */
-async function reaskInZhTW(caption: string): Promise<string> {
+export async function reaskInZhTW(caption: string): Promise<string> {
   const { invokeLLM } = await import("./llm");
   const extractText = (r: any): string => {
     // InvokeResult carries the text at choices[0].message.content — NOT a
