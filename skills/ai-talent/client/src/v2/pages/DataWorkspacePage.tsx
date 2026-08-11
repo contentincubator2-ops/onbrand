@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import PerformanceDashboard from "../components/performance/PerformanceDashboard";
+import MarketDashboard from "../components/market/MarketDashboard";
 
 const ALLOWED_EMAIL = "sowork@sowork.tw";
 
@@ -725,6 +726,14 @@ export default function DataWorkspacePage() {
               Sits above the agent task cards, which stay as the "what can I
               run next" layer. */}
           {isPerformance && <PerformanceDashboard sourceId={active.id} />}
+
+          {/* 2026-08-11 (CJ「接下去，模擬市場數據」): simulated 市場 layer for
+              懶得煮. Rendered ABOVE the existing content, never replacing it —
+              the four 輿情 pages run real live queries and GEO has a real scan,
+              and swapping those for mock data would delete working features.
+              The static pages (總覽 / 關鍵字 / 競品 / 機會) still carry IRIS 女裝
+              copy, so a simulated-but-on-brand layer is strictly better there. */}
+          {!isPerformance && <MarketDashboard sourceId={active.id} />}
 
           {!isPerformance && isListeningScope && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, marginBottom: 14 }}>
