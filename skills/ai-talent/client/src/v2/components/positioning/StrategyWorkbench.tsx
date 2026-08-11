@@ -544,7 +544,16 @@ export default function StrategyWorkbench({
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "4px 0 7px" }}>
                           {s.dig.contentAngles.map((a: string, j: number) => (
                             <span key={j}
-                                  onClick={() => navigate(`/tasks/fb?b=${brandId}${isEvent ? `&e=${eventId}` : ""}&topic=${encodeURIComponent(a)}`)}
+                                  // 2026-08-11: carry WHICH spot this angle came
+                                  // from (sid/si), so the produced content can be
+                                  // attributed to an audience later. Only the
+                                  // reference travels — the server resolves the
+                                  // labels from the stored scenario.
+                                  onClick={() => navigate(
+                                    `/tasks/fb?b=${brandId}${isEvent ? `&e=${eventId}` : ""}` +
+                                    `&topic=${encodeURIComponent(a)}` +
+                                    (active?.id ? `&sid=${encodeURIComponent(active.id)}&si=${i}` : ""),
+                                  )}
                                   title={en ? "Open the task wall with this topic prefilled" : "帶著這個題目前往任務牆，點任一任務即自動填入"}
                                   style={{ fontSize: 11, border: "1px solid #2A2630", borderRadius: 999, padding: "2px 10px", background: "#fff", cursor: "pointer", fontWeight: 600 }}>
                               {a} ↗
