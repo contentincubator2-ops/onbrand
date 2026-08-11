@@ -160,21 +160,40 @@ export const publishRouter = router({
       let pipedreamResult: any = text;
       try { pipedreamResult = JSON.parse(text); } catch { /* keep as text */ }
 
-      // Mark output as published in DB
+      const postId = pipedreamResult?.post_id ?? pipedreamResult?.id ?? null;
+      const permalink = pipedreamResult?.permalink_url ?? pipedreamResult?.permalink ?? null;
+
+      // Mark output as published in DB.
+      // 2026-08-11: postId/permalink are now PERSISTED, not just returned to
+      // the browser. Facebook hands us the post id on every successful publish
+      // and we were discarding it — so nothing published through this path
+      // could ever have its performance read back. Insights APIs are keyed by
+      // post id, and there is no way to recover it later, so each publish that
+      // didn't record one is permanently unmeasurable.
+      //
+      // Stored in metadata rather than a new column: this is the publish-now
+      // path, which has no scheduled_posts row to hang externalPostId on, and
+      // metadata is already the JSON bag this table uses for run details.
       try {
         await localPool.execute(
-          `UPDATE mission_outputs SET status = 'published', publishedAt = NOW(), updatedAt = NOW() WHERE id = ?`,
-          [input.outputId],
+          `UPDATE mission_outputs
+              SET status = 'published', publishedAt = NOW(), updatedAt = NOW(),
+                  metadata = JSON_MERGE_PATCH(COALESCE(metadata, JSON_OBJECT()), CAST(? AS JSON))
+            WHERE id = ?`,
+          [
+            JSON.stringify({
+              publish: { platform: "facebook", postId, permalink, publishedAt: new Date().toISOString() },
+            }),
+            input.outputId,
+          ],
         );
-      } catch { /* non-fatal */ }
+      } catch (e) {
+        // Non-fatal for the user's publish, but log it: a silent failure here
+        // is exactly how we lose the measurement anchor again.
+        console.error("[publish.toFacebook] failed to persist publish metadata:", (e as Error)?.message);
+      }
 
-      return {
-        ok: true,
-        latencyMs,
-        pipedreamResult,
-        postId: pipedreamResult?.post_id ?? pipedreamResult?.id ?? null,
-        permalink: pipedreamResult?.permalink_url ?? pipedreamResult?.permalink ?? null,
-      };
+      return { ok: true, latencyMs, pipedreamResult, postId, permalink };
     }),
 
   /**

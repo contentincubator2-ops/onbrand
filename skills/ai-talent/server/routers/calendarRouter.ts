@@ -723,11 +723,21 @@ export const calendarRouter = router({
 
       const latencyMs = Date.now() - t0;
 
-      // Mark scheduled_post as published
+      // Mark scheduled_post as published.
+      // 2026-08-11: externalPostId is now persisted too. The column has existed
+      // since the table was created but nothing ever wrote it — only the
+      // permalink was kept. Platform insights APIs are keyed by POST ID (a
+      // permalink can't be passed to Graph API), so without this every post we
+      // publish is permanently unmeasurable. This is not recoverable after the
+      // fact: if we don't record the id at publish time, that post's metrics
+      // are gone for good.
       try {
         await localPool.execute(
-          `UPDATE scheduled_posts SET status = 'published', publishedAt = NOW(3), externalUrl = ? WHERE id = ?`,
-          [permalink, input.id],
+          `UPDATE scheduled_posts
+              SET status = 'published', publishedAt = NOW(3),
+                  externalUrl = ?, externalPostId = ?
+            WHERE id = ?`,
+          [permalink, postId, input.id],
         );
       } catch (e) { console.error("[calendar.publish] update scheduled_posts failed:", e); }
 
@@ -735,8 +745,11 @@ export const calendarRouter = router({
       if (row.outputId) {
         try {
           await localPool.execute(
-            `UPDATE mission_outputs SET status = 'published', publishedAt = NOW(), updatedAt = NOW() WHERE id = ?`,
-            [row.outputId],
+            `UPDATE mission_outputs
+                SET status = 'published', publishedAt = NOW(), updatedAt = NOW(),
+                    metadata = JSON_MERGE_PATCH(COALESCE(metadata, JSON_OBJECT()), CAST(? AS JSON))
+              WHERE id = ?`,
+            [JSON.stringify({ publish: { platform, postId, permalink, publishedAt: new Date().toISOString() } }), row.outputId],
           );
         } catch (e) { console.error("[calendar.publish] update mission_outputs failed:", e); }
       }
