@@ -58,6 +58,8 @@ export type ToolChoice =
 // DEBT-1: Add provider + model params for multi-provider routing
 export type InvokeParams = {
   messages: Message[];
+  /** Optional caller-owned cancellation boundary for long-running requests. */
+  signal?: AbortSignal;
   // Note: "openrouter" is deprecated — at runtime it's silently routed to LLM_DEFAULT_PROVIDER.
   provider?: "forge" | "openai" | "zhipu" | "qwen" | "perplexity" | "google" | "cohere" | "openrouter" | "anthropic" | "azure-foundry" | "azure-position" | "azure-claude" | "azure-northcentral" | "azure-canada" | "google-vertex" | "gemini" | "gemma" | "ollama" | "hermes";
   model?: string;
@@ -679,8 +681,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // provider just becomes tier-1 in the chain. The rest of the default
   // chain rescues if the pinned provider fails.
   //
-  // Exception: callers that REALLY want no fallback (e.g. probes) can pass
-  // provider="anthropic-only" or set ?noFallback (not implemented yet).
+  // Callers with a single-provider authorization boundary must use
+  // invokeLLMSingleProvider instead of entering this cascade.
 
   const defaultChain = getFallbackChain();
   // Build the effective chain: pinned-first (if any), then the rest
@@ -763,6 +765,37 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
   }
   throw new Error(`All LLM providers failed. Tried: ${errors.join(" | ").slice(0, 800)}`);
+}
+
+/**
+ * Invoke exactly the requested provider once. This is the privacy boundary for
+ * payloads whose owner authorized one destination only; it must never enter
+ * the normal provider cascade.
+ */
+export async function invokeLLMSingleProvider(params: InvokeParams): Promise<InvokeResult> {
+  const provider = resolveProvider(params.provider as any);
+  const config = PROVIDER_CONFIG[provider];
+  if (!config || !config.getKey()) throw new Error("LLM provider not configured");
+
+  const { shouldAttempt, recordOutcome } = await import("./llmCircuitBreaker");
+  if (!shouldAttempt(provider)) {
+    throw new Error(`LLM provider ${provider} is temporarily unavailable`);
+  }
+  try {
+    const out = await invokeLLMOnce({ ...params, provider: provider as any });
+    const text = out?.choices?.[0]?.message?.content;
+    if (typeof text !== "string" || !text.trim()) {
+      throw new Error("LLM provider returned empty content");
+    }
+    if (looksLikeChainOfThought(text)) {
+      throw new Error("LLM provider returned unsafe reasoning content");
+    }
+    recordOutcome(provider, true);
+    return out;
+  } catch (error) {
+    recordOutcome(provider, false);
+    throw error;
+  }
 }
 
 async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
@@ -954,6 +987,7 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
 
   const response = await fetch(apiUrl, {
     method: "POST",
+    signal: params.signal,
     headers: {
       "content-type": "application/json",
       ...authHeaders,

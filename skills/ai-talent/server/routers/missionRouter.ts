@@ -12,6 +12,7 @@ import { getDb } from "../db";
 import { missions, missionTaskUnits } from "../../drizzle/schema";
 import { eq, and, desc, or, isNull, sql } from "drizzle-orm";
 import { computeMissionResources } from "../missionResourceComputer";
+import { isMissingTableError } from "../_core/mysqlErrors";
 
 export const missionRouter = router({
   // List missions for a workspace
@@ -413,6 +414,14 @@ export const missionRouter = router({
       catch { /* table may not exist yet */ }
       try { await db.execute(sql`DELETE FROM mission_step_progress WHERE mission_id = ${input.id}`); }
       catch { /* table may not exist yet */ }
+      try {
+        await db.execute(sql`DELETE FROM strategy_internal_step_artifacts WHERE missionId = ${input.id}`);
+      } catch (error) {
+        // Older environments may not have received the new private table yet.
+        // Any other error must abort mission deletion so sensitive raw rows
+        // cannot be orphaned by a transient database failure.
+        if (!isMissingTableError(error)) throw error;
+      }
       await db.delete(missions)
         .where(and(eq(missions.id, input.id), eq(missions.userId, ctx.user.id)));
       return { success: true };

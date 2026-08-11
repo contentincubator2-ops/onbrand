@@ -138,6 +138,7 @@ export const imageRouter = router({
       brandId: z.number().int().positive(),
       caption: z.string().min(1).max(6000),
       channel: channel.optional(),
+      size: size.optional(),
       // 3000 chars: plain-text Nano-Banana templates can reach ~2600 chars;
       // JSON-converted templates are ~200-530 chars after nanoBananaJsonToPrompt.
       imageStyle: z.string().max(3000).optional(),
@@ -159,6 +160,8 @@ export const imageRouter = router({
       ].filter(Boolean).join("\n");
 
       const channelHint =
+        input.channel === "ig" && input.size === "1024x1536"
+                                  ? "Instagram Story, Reel, or Live creative (portrait 9:16)" :
         input.channel === "ig"        ? "Instagram feed post (square 1:1)"     :
         input.channel === "fb"        ? "Facebook post (landscape 4:3)"        :
         input.channel === "linkedin"  ? "LinkedIn post (landscape 16:9)"       :

@@ -23,6 +23,42 @@ export interface StrategyPrivateTerm {
   replacement: { en: string; zh: string };
 }
 
+export function buildIgStrategyPrivateTerms(args: {
+  squadName?: unknown;
+  methodology?: unknown;
+  steps?: ReadonlyArray<{ assignedAgentName?: unknown }>;
+  artifactAgentNames?: readonly unknown[];
+  agents?: ReadonlyArray<{
+    name?: unknown;
+    title?: unknown;
+    specialty?: unknown;
+    methodology?: unknown;
+  }>;
+}): StrategyPrivateTerm[] {
+  const terms: StrategyPrivateTerm[] = [];
+  const seen = new Set<string>();
+  const add = (value: unknown, replacement: StrategyPrivateTerm["replacement"]) => {
+    if (typeof value !== "string" || !value.trim()) return;
+    const key = value.trim().toLocaleLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    terms.push({ value: value.trim(), replacement });
+  };
+  const team = { zh: "內容團隊", en: "content team" };
+  const method = { zh: "內容方法", en: "content approach" };
+  add(args.squadName, team);
+  add(args.methodology, method);
+  for (const step of args.steps ?? []) add(step.assignedAgentName, team);
+  for (const name of args.artifactAgentNames ?? []) add(name, team);
+  for (const agent of args.agents ?? []) {
+    add(agent.name, team);
+    add(agent.title, team);
+    add(agent.specialty, method);
+    add(agent.methodology, method);
+  }
+  return terms;
+}
+
 export interface ResolvedIgStrategyPublicPolicy {
   entry: SquadIndexEntry;
   policy: SquadPublicOutputPolicy;
@@ -33,8 +69,7 @@ export interface IgStrategyRecordOverrides {
   taskLabel: string;
   workspace: "instagram";
   platform: "instagram";
-  outputType: "report";
-  presentation: "strategy-report";
+  outputType: "post";
 }
 
 interface GenericStrategyLocaleCopy {
@@ -99,7 +134,7 @@ function neutralSectionLabel(stepIndex: number): string {
 
 const resolvedPolicies: ResolvedIgStrategyPublicPolicy[] = ALL_99S_SQUADS
   .filter((entry): entry is SquadIndexEntry & { publicOutput: SquadPublicOutputPolicy } =>
-    entry.platform === "instagram" && entry.publicOutput?.presentation === "strategy-report")
+    entry.platform === "instagram" && entry.publicOutput?.presentation === "ig-public-bundle")
   .map((entry) => ({ entry, policy: entry.publicOutput }));
 
 const policyById = new Map<string, ResolvedIgStrategyPublicPolicy>();
@@ -119,18 +154,15 @@ export function getIgStrategyExecutionSlug(idOrSlug: string): string {
 }
 
 function publicTaskLabel(
-  entry: SquadIndexEntry,
+  _entry: SquadIndexEntry,
   policy: SquadPublicOutputPolicy,
   outputLanguage: string,
 ): string {
-  if (typeof entry.label === "string") return entry.label;
-  if (isTraditionalChineseOutput(outputLanguage)) return entry.label.zh;
-  if (isEnglishOutput(outputLanguage)) return entry.label.en;
-  const reportNumber = policy.reportNumber;
-  const generic = genericLocaleCopy(outputLanguage);
-  return generic
-    ? `${generic.reportTitle} · ${reportNumber}`
-    : `Instagram · §${reportNumber}`;
+  if (isTraditionalChineseOutput(outputLanguage)) return policy.publicTitle.zh;
+  if (isEnglishOutput(outputLanguage)) return policy.publicTitle.en;
+  // No semantic translation is configured for other locales yet. A neutral
+  // platform title is safer than reviving the old "strategy report" label.
+  return "Instagram Content Deliverables";
 }
 
 /** Persistence fields are server-owned so other squads cannot opt themselves into report mode. */
@@ -145,8 +177,7 @@ export function getIgStrategyRecordOverrides(
     taskLabel: publicTaskLabel(resolved.entry, resolved.policy, outputLanguage),
     workspace: "instagram",
     platform: "instagram",
-    outputType: "report",
-    presentation: "strategy-report",
+    outputType: "post",
   };
 }
 
@@ -155,15 +186,12 @@ function textValue(value: unknown): string | null {
 }
 
 function publicSectionLabel(
-  policy: SquadPublicOutputPolicy,
+  _policy: SquadPublicOutputPolicy,
   stepIndex: number,
   outputLanguage: string,
 ): string {
-  const localized = policy.sectionLabels[stepIndex];
-  if (localized && isTraditionalChineseOutput(outputLanguage)) return localized.zh;
-  if (localized && isEnglishOutput(outputLanguage)) return localized.en;
-  if (isTraditionalChineseOutput(outputLanguage)) return `策略章節 ${stepIndex + 1}`;
-  if (isEnglishOutput(outputLanguage)) return `Strategy Section ${stepIndex + 1}`;
+  if (isTraditionalChineseOutput(outputLanguage)) return `內容分析 ${stepIndex + 1}`;
+  if (isEnglishOutput(outputLanguage)) return `Content Analysis ${stepIndex + 1}`;
   const generic = genericLocaleCopy(outputLanguage);
   if (generic) return `${generic.sectionPrefix} ${stepIndex + 1}`;
   return neutralSectionLabel(stepIndex);
@@ -183,11 +211,36 @@ function replaceExact(text: string, privateTerm: string | null, publicTerm: stri
   return text.split(privateTerm).join(publicTerm);
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Dynamic Latin identities often reappear as hashtags or style tokens with
+ * separators removed. Enable compact matching only for two-or-more Latin
+ * tokens with a sufficiently long fingerprint, avoiding short-name matches
+ * such as `Li Na` → `#Lina`.
+ */
+function compactPrivateTermPattern(privateTerm: string): string | null {
+  const tokens = privateTerm.trim().split(/[\s._'’\-]+/).filter(Boolean);
+  if (
+    tokens.length < 2 ||
+    tokens.some((token) => !/^[A-Za-z0-9]+$/.test(token) || !/[A-Za-z]/.test(token)) ||
+    tokens.join("").length < 7
+  ) return null;
+  const body = tokens.map(escapeRegex).join(String.raw`[\s._'’\-]*`);
+  return String.raw`(^|[^A-Za-z0-9])${body}(?=$|[^A-Za-z0-9])`;
+}
+
 function replacePrivateTerm(text: string, privateTerm: string | null, publicTerm: string): string {
   if (!privateTerm || privateTerm === publicTerm) return text;
   if (!/[a-z]/i.test(privateTerm)) return replaceExact(text, privateTerm, publicTerm);
-  const escaped = privateTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return text.replace(new RegExp(escaped, "gi"), publicTerm);
+  let next = text.replace(new RegExp(escapeRegex(privateTerm), "gi"), () => publicTerm);
+  const compactPattern = compactPrivateTermPattern(privateTerm);
+  if (compactPattern) {
+    next = next.replace(new RegExp(compactPattern, "gi"), (_match, prefix: string) => `${prefix}${publicTerm}`);
+  }
+  return next;
 }
 
 function normalizeReportedAudienceMix(text: string): string {
@@ -214,7 +267,6 @@ function normalizeReportedAudienceMix(text: string): string {
       if (/(?:受眾|客群|粉絲|追蹤者|消費者|顧客|讀者)/.test(paragraph)) {
         return paragraph.replace(/她們/g, "這群受眾").replace(/她/g, "受眾");
       }
-      if (!hasDirectAddress) return paragraph;
       throw new Error("strategy public perspective validation failed");
     })
     .join("");
@@ -319,9 +371,122 @@ export function findIgStrategyInternalLeaks(
   if (INTERNAL_MARKER.test(text)) leaks.push("internal-marker");
   for (const term of privateTerms) {
     const value = textValue(term.value);
-    if (value && text.toLocaleLowerCase().includes(value.toLocaleLowerCase())) leaks.push("private-term");
+    if (!value) continue;
+    const exactHit = text.toLocaleLowerCase().includes(value.toLocaleLowerCase());
+    const compactPattern = compactPrivateTermPattern(value);
+    const compactHit = compactPattern ? new RegExp(compactPattern, "i").test(text) : false;
+    if (exactHit || compactHit) leaks.push("private-term");
   }
   return [...new Set(leaks)];
+}
+
+/**
+ * Final customer-facing caption boundary. The synthesis model receives only
+ * redacted conclusions, and its output is still untrusted until this
+ * deterministic validator removes known private terms and rejects anything
+ * that looks like execution metadata.
+ */
+export function sanitizeIgStrategyPublicCaption(
+  idOrSlug: string,
+  rawCaption: string,
+  context: {
+    steps: readonly StrategyStepDescriptor[];
+    outputLanguage?: string;
+    privateTerms?: readonly StrategyPrivateTerm[];
+  },
+): string {
+  const resolved = getIgStrategyPublicPolicy(idOrSlug);
+  if (!resolved) return rawCaption;
+
+  const outputLanguage = context.outputLanguage ?? "zh-TW";
+  const isZh = isTraditionalChineseOutput(outputLanguage);
+  const isEnglish = isEnglishOutput(outputLanguage);
+  const publicTerm = isZh ? "內容" : isEnglish ? "content" : "§";
+  let caption = rawCaption;
+
+  for (const step of context.steps) {
+    caption = replacePrivateTerm(caption, textValue(step.name), publicTerm);
+    caption = replacePrivateTerm(caption, textValue(step.title), publicTerm);
+    caption = replacePrivateTerm(caption, textValue(step.outputType), publicTerm);
+    caption = replacePrivateTerm(caption, textValue(step.outputKind), publicTerm);
+  }
+
+  const aliasTerms: StrategyPrivateTerm[] = (resolved.policy.privateAliases ?? []).map((value) => ({
+    value,
+    replacement: { zh: "內容方法", en: "content approach" },
+  }));
+  const privateTerms = [...(context.privateTerms ?? []), ...aliasTerms];
+  if (isZh || isEnglish) {
+    for (const term of privateTerms) {
+      caption = replacePrivateTerm(
+        caption,
+        textValue(term.value),
+        isZh ? term.replacement.zh : term.replacement.en,
+      );
+    }
+  }
+
+  const deliverablePrefix = isZh ? "內容：" : isEnglish ? "Content: " : "";
+  caption = caption
+    .replace(/\b(?:outputType|output_type|outputKind|output_kind)\s*[:=：]\s*/gi, deliverablePrefix)
+    .replace(/\s*條目已建置\s*[:：]?\s*/g, "：")
+    .replace(/[：:]\s*[：:]+/g, "：");
+  caption = sanitizeSystemPrefaces(caption, outputLanguage);
+  caption = (isZh ? normalizeReportedAudienceMix(caption) : caption).trim();
+
+  if (!caption || findIgStrategyInternalLeaks(caption, privateTerms).length > 0) {
+    throw new Error("strategy public output validation failed");
+  }
+  return caption;
+}
+
+/**
+ * Redact execution metadata before private analysis conclusions are supplied
+ * to the final model. The unredacted artifact remains only in the private DB
+ * table; the external model receives content conclusions without names/keys.
+ */
+export function redactIgStrategySynthesisContext(
+  idOrSlug: string,
+  rawText: string,
+  context: {
+    steps: readonly StrategyStepDescriptor[];
+    outputLanguage?: string;
+    privateTerms?: readonly StrategyPrivateTerm[];
+  },
+): string {
+  const resolved = getIgStrategyPublicPolicy(idOrSlug);
+  if (!resolved) return rawText;
+  const outputLanguage = context.outputLanguage ?? "zh-TW";
+  const isZh = isTraditionalChineseOutput(outputLanguage);
+  const isEnglish = isEnglishOutput(outputLanguage);
+  const publicTerm = isZh ? "內容" : isEnglish ? "content" : "§";
+  let text = rawText;
+  for (const step of context.steps) {
+    text = replacePrivateTerm(text, textValue(step.name), publicTerm);
+    text = replacePrivateTerm(text, textValue(step.title), publicTerm);
+    text = replacePrivateTerm(text, textValue(step.outputType), publicTerm);
+    text = replacePrivateTerm(text, textValue(step.outputKind), publicTerm);
+  }
+  const privateTerms = [
+    ...(context.privateTerms ?? []),
+    ...(resolved.policy.privateAliases ?? []).map((value) => ({
+      value,
+      replacement: { zh: "內容方法", en: "content approach" },
+    })),
+  ];
+  if (isZh || isEnglish) {
+    for (const term of privateTerms) {
+      text = replacePrivateTerm(
+        text,
+        textValue(term.value),
+        isZh ? term.replacement.zh : term.replacement.en,
+      );
+    }
+  }
+  text = sanitizeSystemPrefaces(text, outputLanguage)
+    .replace(/\b(?:outputType|output_type|outputKind|output_kind)\s*[:=：]\s*/gi, "")
+    .trim();
+  return findIgStrategyInternalLeaks(text, privateTerms).length === 0 ? text : "";
 }
 
 /**
@@ -342,48 +507,8 @@ export function applyIgStrategyPublicBoundary<T extends StrategyPublicVariant>(
   if (!resolved) return variant;
 
   const outputLanguage = context.outputLanguage ?? "zh-TW";
-  const isZh = isTraditionalChineseOutput(outputLanguage);
-  const isEnglish = isEnglishOutput(outputLanguage);
   const label = publicSectionLabel(resolved.policy, context.stepIndex, outputLanguage);
-  let caption = variant.caption;
-
-  // Replace every known step name/key from this run, not only the current one:
-  // downstream steps receive upstream artifacts and can repeat their private key.
-  context.steps.forEach((step, index) => {
-    const replacement = publicSectionLabel(resolved.policy, index, outputLanguage);
-    caption = replaceExact(caption, textValue(step.name), replacement);
-    caption = replaceExact(caption, textValue(step.title), replacement);
-    caption = replaceExact(caption, textValue(step.outputType), replacement);
-    caption = replaceExact(caption, textValue(step.outputKind), replacement);
-    caption = caption.split(`\`${replacement}\``).join(replacement);
-  });
-
-  const strategyAliasTerms: StrategyPrivateTerm[] = (resolved.policy.privateAliases ?? []).map((value) => ({
-    value,
-    replacement: { zh: "策略方法", en: "strategy approach" },
-  }));
-  const privateTerms = [...(context.privateTerms ?? []), ...strategyAliasTerms];
-  if (isZh || isEnglish) {
-    for (const term of privateTerms) {
-      caption = replacePrivateTerm(
-        caption,
-        textValue(term.value),
-        isZh ? term.replacement.zh : term.replacement.en,
-      );
-    }
-  }
-
-  const deliverablePrefix = isZh ? "交付項目：" : isEnglish ? "Deliverable: " : "";
-  caption = caption
-    .replace(/\b(?:outputType|output_type|outputKind|output_kind)\s*[:=：]\s*/gi, deliverablePrefix)
-    .replace(/\s*條目已建置\s*[:：]?\s*/g, "：")
-    .replace(/[：:]\s*[：:]+/g, "：");
-  caption = sanitizeSystemPrefaces(caption, outputLanguage);
-  caption = (isZh ? normalizeReportedAudienceMix(caption) : caption).trim();
-
-  if (findIgStrategyInternalLeaks(caption, privateTerms).length > 0) {
-    throw new Error("strategy public output validation failed");
-  }
+  const caption = sanitizeIgStrategyPublicCaption(idOrSlug, variant.caption, context);
 
   // Agent identity is execution metadata, not part of the customer-facing
   // report content persisted in mission_outputs.content.
@@ -392,7 +517,7 @@ export function applyIgStrategyPublicBoundary<T extends StrategyPublicVariant>(
 }
 
 export function buildIgStrategyPublicPromptRules(
-  sectionLabel: string,
+  _sectionLabel: string,
   outputLanguage = "zh-TW",
 ): string {
   if (!isTraditionalChineseOutput(outputLanguage)) {
@@ -400,8 +525,8 @@ export function buildIgStrategyPublicPromptRules(
       ? "Write every customer-visible word and heading in English."
       : `Write every customer-visible word and heading in ${outputLanguage}; do not mix in English labels.`;
     return `
-[PUBLIC STRATEGY REPORT OUTPUT RULES — HIGHEST PRIORITY]
-This is the customer-facing strategy report section “${sectionLabel}”.
+[PUBLIC INSTAGRAM CONTENT RULES — HIGHEST PRIORITY]
+This is finished Instagram content intended for publishing.
 ▸ ${visibleLanguageRule}
 ▸ Return only publishable strategy content. Never expose or explain internal workflow.
 ▸ Never output Squad, step, agent, owner, outputType, outputKind, database keys, model, or prompt details.
@@ -410,9 +535,9 @@ This is the customer-facing strategy report section “${sectionLabel}”.
 ▸ Start with the content. Do not add system-style prefaces such as “I am…”, “created”, or “here is the output”.`;
   }
   return `
-【公開策略報告輸出規則 — 最高優先】
-這是直接給客戶看的策略報告章節「${sectionLabel}」。
-▸ 只輸出可直接閱讀的策略內容，不得輸出或解釋內部工作流程。
+【公開 IG 成品輸出規則 — 最高優先】
+這是要直接對受眾發布的 Instagram 內容成品，不是策略報告。
+▸ 只輸出可直接發布的貼文內容，不得輸出、摘要或解釋內部策略與工作流程。
 ▸ 不得輸出 Squad、step、agent、負責人、outputType、outputKind、資料庫鍵值、模型或 prompt。
 ▸ 先依「任務主題」與注入的目標受眾、溝通情境、品牌語氣，在「您／你／妳／你們／妳們」中選擇最合適的一種讀者稱呼；只在心中判定，不得輸出判定過程。
 ▸ 選擇原則：明確女性受眾才可用「妳／妳們」，正式專業關係使用「您」，一般個人溝通使用「你」；只有明確對群體共同喊話時才用複數。不得只憑產品品類或刻板印象推測性別，資料不足時使用中性的「你」。

@@ -1,6 +1,8 @@
 import {
   boolean,
+  bigint,
   int,
+  index,
   tinyint,
   mysqlEnum,
   mysqlTable,
@@ -845,6 +847,75 @@ export const missionOutputs = mysqlTable("mission_outputs", {
 });
 export type MissionOutput = typeof missionOutputs.$inferSelect;
 export type InsertMissionOutput = typeof missionOutputs.$inferInsert;
+
+/**
+ * Calendar queue rows. The raw-SQL calendar/publish workers are the runtime
+ * consumers, but keeping this mapping aligned with migrate.ts prevents the
+ * selector columns for planning/public content from drifting out of schema.
+ */
+export const scheduledPosts = mysqlTable("scheduled_posts", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  workspaceId: int("workspaceId"),
+  brandId: int("brandId"),
+  outputId: bigint("outputId", { mode: "number" }).notNull(),
+  variantIndex: int("variantIndex").default(0).notNull(),
+  contentKind: varchar("contentKind", { length: 16 }),
+  contentIndex: int("contentIndex"),
+  planningConfirmed: tinyint("planningConfirmed").default(0).notNull(),
+  platform: varchar("platform", { length: 24 }).notNull(),
+  scheduledAt: datetime("scheduledAt", { fsp: 3 }).notNull(),
+  status: varchar("status", { length: 12 }).default("pending").notNull(),
+  publishedAt: datetime("publishedAt", { fsp: 3 }),
+  externalPostId: varchar("externalPostId", { length: 120 }),
+  externalUrl: varchar("externalUrl", { length: 500 }),
+  attempts: int("attempts").default(0).notNull(),
+  lastError: text("lastError"),
+  cancelledAt: datetime("cancelledAt", { fsp: 3 }),
+  cancelledBy: int("cancelledBy"),
+  createdAt: datetime("createdAt", { fsp: 3 })
+    .default(sql`CURRENT_TIMESTAMP(3)`).notNull(),
+  updatedAt: datetime("updatedAt", { fsp: 3 })
+    .default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()).notNull(),
+}, (table) => [
+  index("idx_sp_due").on(table.status, table.scheduledAt),
+  index("idx_sp_user").on(table.userId, table.scheduledAt),
+  index("idx_sp_workspace").on(table.workspaceId, table.scheduledAt),
+  index("idx_sp_brand").on(table.brandId, table.scheduledAt),
+  index("idx_sp_output").on(table.outputId),
+]);
+export type ScheduledPost = typeof scheduledPosts.$inferSelect;
+export type InsertScheduledPost = typeof scheduledPosts.$inferInsert;
+
+/**
+ * Private execution artifacts for the five IG strategy-to-public-content
+ * tasks. This table intentionally has no tRPC/REST reader; public clients
+ * receive only sanitized planning DTOs and final public variants.
+ */
+export const strategyInternalStepArtifacts = mysqlTable("strategy_internal_step_artifacts", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: varchar("runId", { length: 36 }).notNull(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  missionId: int("missionId").notNull().references(() => missions.id, { onDelete: "cascade" }),
+  outputId: int("outputId").notNull(),
+  taskId: varchar("taskId", { length: 64 }).notNull(),
+  squadSlug: varchar("squadSlug", { length: 96 }).notNull(),
+  stepOrder: int("stepOrder").notNull(),
+  status: mysqlEnum("status", ["done", "failed"]).notNull(),
+  internalLabel: varchar("internalLabel", { length: 255 }).notNull(),
+  outputType: varchar("outputType", { length: 128 }),
+  outputKind: varchar("outputKind", { length: 128 }),
+  agentId: int("agentId"),
+  agentName: varchar("agentName", { length: 255 }),
+  rawContent: longtext("rawContent").notNull(),
+  errorCode: varchar("errorCode", { length: 64 }),
+  latencyMs: int("latencyMs").notNull(),
+  expiresAt: datetime("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type StrategyInternalStepArtifact = typeof strategyInternalStepArtifacts.$inferSelect;
+export type InsertStrategyInternalStepArtifact = typeof strategyInternalStepArtifacts.$inferInsert;
 
 export const missionKnowledgeFiles = mysqlTable("mission_knowledge_files", {
   id: int("id").autoincrement().primaryKey(),

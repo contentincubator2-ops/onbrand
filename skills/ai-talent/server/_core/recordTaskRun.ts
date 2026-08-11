@@ -105,6 +105,26 @@ interface RecordArgs {
    * Defaults to 'done' for the existing single-write callers.
    */
   progress?: "caption_ready" | "done" | "failed";
+  /**
+   * Private server-only artifacts. When present, the public output and these
+   * rows are committed atomically. Never copy this payload into metadata/DLQ.
+   */
+  privateStrategyArtifacts?: {
+    runId: string;
+    squadSlug: string;
+    rows: Array<{
+      stepOrder: number;
+      status: "done" | "failed";
+      internalLabel: string;
+      outputType: string | null;
+      outputKind: string | null;
+      agentId: number | null;
+      agentName: string | null;
+      rawContent: string;
+      errorCode: string | null;
+      latencyMs: number;
+    }>;
+  };
 }
 
 /**
@@ -186,6 +206,8 @@ const WORKSPACE_TO_PLATFORM: Record<string, Platform> = {
 
 /** Find an existing mission for this (user, brand, workspace, task) tuple,
  *  or create a new one. Returns missionId. */
+type SqlExecutor = { execute: (sql: string, params?: any[]) => Promise<any> };
+
 async function ensureMission(args: {
   userId: number;
   brandId: number | null;
@@ -193,7 +215,7 @@ async function ensureMission(args: {
   taskId: string;
   taskLabel: string;
   tier: string;
-}): Promise<number | null> {
+}, executor: SqlExecutor = localPool): Promise<number | null> {
   try {
     // Look up by description tag (we store taskId in description as
     // "[task:<taskId>]" since missions has no taskId column). Falls
@@ -208,7 +230,7 @@ async function ensureMission(args: {
     const tag = `[task:${newId}]`;
     const legacyTag = legacyId ? `[task:${legacyId}]` : tag;
     const tagsDiffer = legacyTag !== tag;
-    const [rows]: any = await localPool.execute(
+    const [rows]: any = await executor.execute(
       `SELECT id FROM missions
         WHERE userId = ?
           AND ${args.brandId ? "brandId = ?" : "brandId IS NULL"}
@@ -225,7 +247,7 @@ async function ensureMission(args: {
     // Create new mission. status enum is (inactive/active/completed/archived) —
     // 2026-05-09 fix: was 'pending' which isn't in the enum → Data truncated
     // → ensureMission silently failed → no outputId → /run navigation broke.
-    const [r]: any = await localPool.execute(
+    const [r]: any = await executor.execute(
       `INSERT INTO missions
          (userId, brandId, workspace, title, description, status, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, 'active', NOW(), NOW())`,
@@ -258,7 +280,14 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
     taskId: normalizeTaskId(rawArgs.taskId),
     tier: normalizeTier(rawArgs.tier) as RecordArgs["tier"],
   };
+  let tx: Awaited<ReturnType<typeof localPool.getConnection>> | null = null;
+  let executor: SqlExecutor = localPool;
   try {
+    if (args.privateStrategyArtifacts) {
+      tx = await localPool.getConnection();
+      executor = tx;
+      await tx.beginTransaction();
+    }
     const displayTier = args.tier;
     const missionId = await ensureMission({
       userId: args.userId,
@@ -267,17 +296,18 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
       taskId: args.taskId,
       taskLabel: args.taskLabel,
       tier: displayTier as any,
-    });
+    }, executor);
     if (!missionId) {
       // ensureMission failed (already logged inside). Last resort: DLQ
       // so the data isn't lost when admin fixes whatever schema/auth
       // problem is blocking the missions INSERT.
       appendDLQ(args, null, "ensure_mission_failed");
+      if (tx) await tx.rollback();
       return { missionId: null, outputId: null };
     }
 
     // Bump version: count existing outputs for this mission
-    const [vRows]: any = await localPool.execute(
+    const [vRows]: any = await executor.execute(
       `SELECT COUNT(*) AS n FROM mission_outputs WHERE missionId = ?`,
       [missionId],
     );
@@ -357,7 +387,7 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
     const progress = args.progress ?? "done";
     for (const a of attempts) {
       try {
-        [oRes] = await localPool.execute(
+        [oRes] = await executor.execute(
           `INSERT INTO mission_outputs
              (missionId, platform, outputType, title, content, metadata, status, version, progress, createdAt, updatedAt)
            VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, NOW(), NOW())`,
@@ -397,14 +427,48 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
       appendDLQ(args, missionId, "all_tiers_failed", lastError?.code);
       // The mission row still exists; LEFT JOIN in listAllForUser will
       // surface it as an orphan card so the user knows the task ran.
+      if (tx) await tx.rollback();
       return { missionId, outputId: null };
     }
     const outputId = Number(oRes?.insertId ?? 0);
 
+    if (args.privateStrategyArtifacts) {
+      const privateRun = args.privateStrategyArtifacts;
+      if (!/^[0-9a-f-]{36}$/i.test(privateRun.runId)) {
+        throw new Error("invalid private strategy artifact run id");
+      }
+      for (const row of privateRun.rows) {
+        if (row.rawContent.length > 200_000) {
+          throw new Error(`private strategy artifact step ${row.stepOrder} exceeds 200KB`);
+        }
+        await executor.execute(
+          `INSERT INTO strategy_internal_step_artifacts
+             (runId, userId, brandId, missionId, outputId, taskId, squadSlug,
+              stepOrder, status, internalLabel, outputType, outputKind, agentId,
+              agentName, rawContent, errorCode, latencyMs, expiresAt, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                   DATE_ADD(NOW(3), INTERVAL 90 DAY), NOW(3))`,
+          [
+            privateRun.runId, args.userId, args.brandId, missionId, outputId,
+            args.taskId, privateRun.squadSlug, row.stepOrder, row.status,
+            row.internalLabel, row.outputType, row.outputKind, row.agentId,
+            row.agentName, row.rawContent, row.errorCode, row.latencyMs,
+          ],
+        );
+      }
+      // Opportunistic bounded-retention cleanup. This table has no public
+      // reader and raw artifacts must not live indefinitely.
+      await executor.execute(
+        `DELETE FROM strategy_internal_step_artifacts WHERE expiresAt < NOW(3) LIMIT 500`,
+      );
+    }
+
     // Touch mission's updatedAt so /projects sorts it to top
     try {
-      await localPool.execute(`UPDATE missions SET updatedAt = NOW() WHERE id = ?`, [missionId]);
+      await executor.execute(`UPDATE missions SET updatedAt = NOW() WHERE id = ?`, [missionId]);
     } catch {/* non-fatal */}
+
+    if (tx) await tx.commit();
 
     // 2026-05-10: fire-and-forget achievement evaluator + reward grant.
     // Fresh unlocks + reward grants bubble up next time client polls
@@ -418,6 +482,9 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
 
     return { missionId, outputId: outputId || null };
   } catch (e: any) {
+    if (tx) {
+      try { await tx.rollback(); } catch {}
+    }
     console.error("[recordTaskRun] unexpected failure", {
       userId: args.userId,
       brandId: args.brandId,
@@ -431,5 +498,7 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
     });
     appendDLQ(args, null, "unexpected_exception", e?.code);
     return { missionId: null, outputId: null };
+  } finally {
+    tx?.release();
   }
 }

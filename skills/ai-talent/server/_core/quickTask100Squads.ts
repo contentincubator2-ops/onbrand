@@ -21,14 +21,48 @@
  * marked as Phase 2 work in their description).
  */
 
+export type IgPublicFormat = "feed" | "carousel" | "reel" | "story" | "live";
+
+export type IgPublicDeliverableRule =
+  | {
+      id: string;
+      kind: "fixed";
+      format: IgPublicFormat;
+      count: number;
+      label: { en: string; zh: string };
+      instruction: { en: string; zh: string };
+    }
+  | {
+      id: string;
+      kind: "per-input-item";
+      format: IgPublicFormat;
+      inputKind: "live-session" | "documented-asset" | "authentic-story";
+      defaultItems: number;
+      maxItems: number;
+      multiplier: number;
+      label: { en: string; zh: string };
+      instruction: { en: string; zh: string };
+    }
+  | {
+      id: string;
+      kind: "allocated-bundle";
+      formats: IgPublicFormat[];
+      inputKind: "live-session";
+      defaultItems: number;
+      maxItems: number;
+      perItemCount: number;
+      label: { en: string; zh: string };
+      instruction: { en: string; zh: string };
+    };
+
 export interface SquadPublicOutputPolicy {
-  /** Server-owned presentation mode. The client cannot opt arbitrary tasks in. */
-  presentation: "strategy-report";
-  /** Stable fallback number used when a locale has no semantic task label. */
-  reportNumber: number;
-  /** Customer-facing section labels in DB step order. */
-  sectionLabels: Array<{ en: string; zh: string }>;
-  /** Method/author aliases used only for generation and never exposed in report copy. */
+  /** Server-owned public contract. Private squad steps never become variants. */
+  presentation: "ig-public-bundle";
+  /** Methodology-free title used for mission/output cards. */
+  publicTitle: { en: string; zh: string };
+  /** Publishable IG deliverables, independent from the private step count. */
+  deliverables: IgPublicDeliverableRule[];
+  /** Method/author aliases used only for private reasoning and never exposed. */
   privateAliases?: string[];
 }
 
@@ -220,14 +254,18 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       type: "textarea",
     },
     publicOutput: {
-      presentation: "strategy-report",
-      reportNumber: 1,
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Useful Content Deliverables", zh: "IG 實用內容成品" },
       privateAliases: ["Youtility", "Jay Baer", "Baer"],
-      sectionLabels: [
-        { en: "Audience Needs and Content Opportunities", zh: "受眾問題與內容機會" },
-        { en: "Useful Content Ideas", zh: "實用內容提案" },
-        { en: "Information Design Direction", zh: "資訊視覺方向" },
-        { en: "Sharing and Engagement Plan", zh: "分享與互動規劃" },
+      deliverables: [
+        {
+          id: "useful-feed", kind: "fixed", format: "feed", count: 30,
+          label: { en: "Useful Post", zh: "實用貼文" },
+          instruction: {
+            en: "One complete, useful Instagram feed post that helps without selling.",
+            zh: "一篇完整、可直接發布的 IG Feed 實用貼文；提供具體幫助，不推銷。",
+          },
+        },
       ],
     },
   },
@@ -245,15 +283,18 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       type: "textarea",
     },
     publicOutput: {
-      presentation: "strategy-report",
-      reportNumber: 2,
-      privateAliases: ["Chris Do", "The Futur"],
-      sectionLabels: [
-        { en: "Brand Visual Language", zh: "品牌視覺語言" },
-        { en: "Brand Story Direction", zh: "品牌故事主軸" },
-        { en: "Weekly Visual Content", zh: "每週視覺內容" },
-        { en: "Caption Copy", zh: "貼文文案" },
-        { en: "Consistency Review", zh: "一致性檢核" },
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Visual Story Deliverables", zh: "IG 視覺敘事內容成品" },
+      privateAliases: ["Chris Do", "ChrisDo", "The Futur", "TheFutur"],
+      deliverables: [
+        {
+          id: "visual-feed", kind: "fixed", format: "feed", count: 30,
+          label: { en: "Visual Story Post", zh: "視覺敘事貼文" },
+          instruction: {
+            en: "One complete Instagram feed post with a consistent visual direction and publishable caption.",
+            zh: "一篇完整、可直接發布的 IG Feed 貼文，包含一致的視覺方向與成品文案。",
+          },
+        },
       ],
     },
   },
@@ -271,13 +312,38 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       type: "textarea",
     },
     publicOutput: {
-      presentation: "strategy-report",
-      reportNumber: 3,
-      privateAliases: ["Live-First", "Brian Fanzo"],
-      sectionLabels: [
-        { en: "Live Series Plan", zh: "直播系列規劃" },
-        { en: "Live Session Script", zh: "直播腳本" },
-        { en: "Post-Live Content Repurposing", zh: "直播後內容再製" },
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Live Content Deliverables", zh: "IG 直播內容成品" },
+      privateAliases: ["Live-First", "LiveFirst", "Brian Fanzo", "BrianFanzo"],
+      deliverables: [
+        {
+          id: "live-session", kind: "per-input-item", format: "live",
+          inputKind: "live-session", defaultItems: 1, maxItems: 4, multiplier: 1,
+          label: { en: "Live Session", zh: "直播場次" },
+          instruction: {
+            en: "A complete audience-facing Instagram Live run-of-show and host script.",
+            zh: "一份面向觀眾、可直接使用的 IG Live 流程與主持腳本。",
+          },
+        },
+        {
+          id: "live-teaser", kind: "per-input-item", format: "story",
+          inputKind: "live-session", defaultItems: 1, maxItems: 4, multiplier: 1,
+          label: { en: "Live Teaser", zh: "直播預告" },
+          instruction: {
+            en: "A publishable Instagram Story teaser for the corresponding live session.",
+            zh: "一則可直接發布、對應該場直播的 IG Story 預告。",
+          },
+        },
+        {
+          id: "post-live", kind: "allocated-bundle",
+          formats: ["reel", "story", "carousel"], inputKind: "live-session",
+          defaultItems: 1, maxItems: 4, perItemCount: 10,
+          label: { en: "Post-Live Content", zh: "直播後內容" },
+          instruction: {
+            en: "A standalone publishable derivative from the live session, adapted to the assigned format.",
+            zh: "一則由直播內容延伸、依指定格式改寫且可獨立發布的成品。",
+          },
+        },
       ],
     },
   },
@@ -295,14 +361,21 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       type: "textarea",
     },
     publicOutput: {
-      presentation: "strategy-report",
-      reportNumber: 4,
-      privateAliases: ["GaryVee", "Gary Vee", "Gary Vaynerchuk", "Document Don't Create"],
-      sectionLabels: [
-        { en: "Daily Documentation Plan", zh: "日常紀錄規劃" },
-        { en: "Capture and Storytelling Guide", zh: "拍攝與敘事引導" },
-        { en: "Multi-Format Content Repurposing", zh: "多格式內容再製" },
-      ],
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Documentary Content Deliverables", zh: "IG 紀實內容成品" },
+      privateAliases: ["GaryVee", "Gary Vee", "Gary Vaynerchuk", "GaryVaynerchuk", "Document Don't Create", "DocumentDontCreate"],
+      deliverables: (["feed", "reel", "story", "carousel"] as const).map((format) => ({
+        id: `document-${format}`, kind: "per-input-item" as const, format,
+        inputKind: "documented-asset" as const, defaultItems: 1, maxItems: 5, multiplier: 1,
+        label: {
+          en: `Documentary ${format[0]!.toUpperCase()}${format.slice(1)}`,
+          zh: `紀實${format === "feed" ? "貼文" : format === "reel" ? "短影音" : format === "story" ? "限時動態" : "輪播"}`,
+        },
+        instruction: {
+          en: `A complete, publishable ${format} created from one documented real-world asset or scene.`,
+          zh: `由一個真實紀錄素材或場景改寫而成、可直接發布的 ${format} 成品。`,
+        },
+      })),
     },
   },
   {
@@ -319,14 +392,19 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       type: "textarea",
     },
     publicOutput: {
-      presentation: "strategy-report",
-      reportNumber: 5,
-      privateAliases: ["Rachel Hollis", "Radical Transparency"],
-      sectionLabels: [
-        { en: "Authentic Story Sources", zh: "真實故事素材" },
-        { en: "Storytelling Script", zh: "敘事腳本" },
-        { en: "Visual System", zh: "視覺系統" },
-        { en: "Values-Led Community Content", zh: "價值觀社群內容" },
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Authentic Story Deliverables", zh: "IG 真實故事內容成品" },
+      privateAliases: ["Rachel Hollis", "RachelHollis", "Radical Transparency", "RadicalTransparency"],
+      deliverables: [
+        {
+          id: "authentic-story", kind: "per-input-item", format: "feed",
+          inputKind: "authentic-story", defaultItems: 1, maxItems: 5, multiplier: 1,
+          label: { en: "Authentic Story", zh: "真實故事貼文" },
+          instruction: {
+            en: "One complete, publishable Instagram feed post based only on a story the user agreed to share.",
+            zh: "一篇只根據使用者同意公開的真實故事撰寫、可直接發布的 IG Feed 貼文。",
+          },
+        },
       ],
     },
   },
