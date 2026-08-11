@@ -638,11 +638,19 @@ function IconBar({
         : currentPath.startsWith("/brands")
           ? "strategy"
           : "content";
+  // 2026-08-11 (CJ「這四格要大的好識別，現在並列在一起字都很小」): four
+  // single-char pills sharing a 64px capsule left ~15px each — unreadable.
+  // Now a vertical stack: each cell gets the full rail width, an icon and a
+  // real two-character label.
   const modeOptions = [
-    { id: "market" as const, label: "市", to: "/market-intel/overview", tip: isEn ? "Market" : "市場" },
-    { id: "strategy" as const, label: "策", to: "/brands", tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" },
-    { id: "content" as const, label: "內", to: "/tasks/fb", tip: isEn ? "Content" : "內容" },
-    { id: "performance" as const, label: "成", to: "/performance/overview", tip: isEn ? "Performance" : "成效" },
+    { id: "market" as const, label: isEn ? "Market" : "市場", icon: faMagnifyingGlass, to: "/market-intel/overview",
+      tip: isEn ? "Market intelligence" : "市場情報" },
+    { id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands",
+      tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" },
+    { id: "content" as const, label: isEn ? "Content" : "內容", icon: faWandMagicSparkles, to: "/tasks/fb",
+      tip: isEn ? "Content production" : "內容產出" },
+    { id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview",
+      tip: isEn ? "Performance" : "成效數據" },
   ];
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
@@ -710,40 +718,52 @@ function IconBar({
       </div>
 
       {isPrivatePreview && (
-        <div style={{ flexShrink: 0, display: "flex", justifyContent: "center", padding: "0 0 10px" }}>
-          <div
-            role="tablist"
-            aria-label={isEn ? "Workspace mode" : "工作區模式"}
-            style={{
-              // 4 modes now (was 3) — widened so each pill keeps the same
-              // hit area inside the 70px rail rather than being squeezed.
-              width: 64, height: 24, borderRadius: 12,
-              border: "1.5px solid #e5e7eb", background: "#f9fafb",
-              display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
-              padding: 2, gap: 1,
-            }}
-          >
-            {modeOptions.map((opt) => {
-              const active = activeWorkspaceMode === opt.id;
-              return (
-                <Tooltip key={opt.id} content={opt.tip} placement="right">
-                  <button
-                    onClick={() => onNavigate(opt.to)}
-                    aria-label={opt.tip}
-                    style={{
-                      border: "none", borderRadius: 9, padding: 0,
-                      background: active ? "#F97316" : "transparent",
-                      color: active ? "#fff" : "#9ca3af",
-                      fontSize: 9, fontWeight: 850, lineHeight: "18px",
-                      cursor: "pointer", transition: "all 0.15s ease",
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                </Tooltip>
-              );
-            })}
-          </div>
+        <div
+          role="tablist"
+          aria-label={isEn ? "Workspace mode" : "工作區模式"}
+          style={{
+            flexShrink: 0,
+            display: "flex", flexDirection: "column", gap: 3,
+            padding: "0 3px 10px",
+            borderBottom: "1px solid #f1f5f9",
+            marginBottom: 8,
+          }}
+        >
+          {modeOptions.map((opt) => {
+            const active = activeWorkspaceMode === opt.id;
+            return (
+              <button
+                key={opt.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => onNavigate(opt.to)}
+                title={opt.tip}
+                style={{
+                  // Icon stacked over the label: at 64px of usable width a
+                  // side-by-side icon + 2-char label leaves the text cramped,
+                  // stacking gives both room to stay legible.
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", gap: 2,
+                  width: "100%", height: 44,
+                  border: "none", borderRadius: 10,
+                  background: active ? "#F97316" : "transparent",
+                  color: active ? "#fff" : "#6b7280",
+                  cursor: "pointer", transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) e.currentTarget.style.background = "#f3f4f6";
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <FontAwesomeIcon icon={opt.icon} style={{ fontSize: 15 }} />
+                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.02em", lineHeight: 1 }}>
+                  {opt.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -755,7 +775,14 @@ function IconBar({
           as horizontal hierarchy bar (BrandHierarchyPill in main layout) */}
 
       {/* Nav icons */}
-      <nav style={{ flex: 1, overflowY: "hidden", overflowX: "hidden", padding: "0 3px" }}>
+      {/* 2026-08-11: overflowY was "hidden" — fine when the mode switcher was a
+          24px capsule, but the stacked switcher takes ~190px and would then
+          silently clip the last nav icons off the bottom with no way to reach
+          them. "auto" keeps every item reachable on short viewports.
+          scrollbarWidth:none hides the bar so the 70px rail stays clean. */}
+      <nav
+        style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px", scrollbarWidth: "none" }}
+      >
         {NAV_ITEMS.map((item) => {
           // 2026-05-12 (CJ「按了連結還是顯示為品牌區」): pick the MOST SPECIFIC
           // matching item. If another nav item has a longer matching prefix,
