@@ -1136,6 +1136,12 @@ ${importantHint}
           const enforced = await enforceBrandRulesOnText(input.brandId, caption);
           if (enforced && enforced !== caption) caption = enforced;
         } catch { /* fail-safe: keep caption */ }
+        // C3 (bug checklist 2026-08): an English post should start with a capital
+        // letter. Uppercase the leading a-z (after optional opening quote/bracket).
+        // Chinese/emoji-led captions are untouched; applies to every platform cell.
+        if (caption) {
+          caption = caption.replace(/^(\s*(?:["「『【\[(]\s*)?)([a-z])/, (_m, lead: string, ch: string) => lead + ch.toUpperCase());
+        }
         // Auto-record into mission_outputs so /projects shows this cell.
         // Non-fatal: failure here doesn't break the user-facing response.
         if (caption) {
