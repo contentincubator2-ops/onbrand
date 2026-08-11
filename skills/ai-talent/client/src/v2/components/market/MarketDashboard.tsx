@@ -18,6 +18,10 @@ import {
   mAggregate, netSentiment, sov, kwScore, fmtInt, fmtPct, fmtSigned,
   OWN_BRAND, type MFilter, type MTotals,
 } from "./marketMockData";
+import {
+  AI_MODELS, SCOPES, FINDINGS, GEO_MATRIX, VERIFY_LABEL,
+  modelHitRate, modelAvgRank, type VerifyState,
+} from "./aiObsMockData";
 
 const C = {
   border: "#eceff3", sub: "#9ca3af", text: "#111827", mute: "#6b7280",
@@ -413,21 +417,246 @@ function Listening({ scope, lens }: { scope: string; lens: MLens }) {
   );
 }
 
+/* ══════════════════════ 純 AI 觀測 mode ══════════════════════
+ * A deliberately different interface, not a restyled version of the paid one.
+ * AI has no population, so it cannot honestly produce 聲量 / SOV / trends —
+ * any absolute number here would be invented. The atom is therefore a FINDING:
+ * what was asserted, by which models, and whether we could verify it.
+ *
+ * The two things that separate this from just asking ChatGPT yourself are the
+ * two things the UI leads with: 核實狀態 and 限定範圍.
+ */
+
+function VerifyBadge({ v }: { v: VerifyState }) {
+  const m = {
+    verified:   { bg: C.goodBg, fg: C.good, icon: "✓" },
+    partial:    { bg: C.warnBg, fg: "#b45309", icon: "◐" },
+    unverified: { bg: C.badBg,  fg: C.bad, icon: "✕" },
+  }[v];
+  return (
+    <span style={{ background: m.bg, color: m.fg, fontSize: 10, fontWeight: 800,
+                   padding: "3px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>
+      {m.icon} {VERIFY_LABEL[v]}
+    </span>
+  );
+}
+
+function ModelChips({ ids }: { ids: string[] }) {
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {AI_MODELS.map((m) => {
+        const on = ids.includes(m.id);
+        return (
+          <span key={m.id} title={m.label}
+            style={{
+              width: 20, height: 20, borderRadius: 6, fontSize: 9, fontWeight: 850,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              background: on ? C.text : "#f3f4f6", color: on ? "#fff" : "#d1d5db",
+            }}>{m.short}</span>
+        );
+      })}
+    </div>
+  );
+}
+
+function AiObservation({ sourceId }: { sourceId: string }) {
+  const [scope, setScope] = React.useState<string>("today");
+  const [onlyVerified, setOnlyVerified] = React.useState(false);
+  const sc = SCOPES.find((s) => s.id === scope)!;
+
+  let items = FINDINGS.filter((f) => f.scopes.includes(scope));
+  if (onlyVerified) items = items.filter((f) => f.verify === "verified");
+  // Most-agreed first — cross-model agreement is the only confidence signal
+  // available without a population to count.
+  items = [...items].sort((a, b) => b.models.length - a.models.length);
+
+  const verified = FINDINGS.filter((f) => f.scopes.includes(scope) && f.verify === "verified").length;
+  const total = FINDINGS.filter((f) => f.scopes.includes(scope)).length;
+
+  return (
+    <>
+      <div style={{ ...card, padding: "14px 16px", display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <Select label="觀測範圍" value={scope} onChange={setScope}
+                options={SCOPES.map((s) => ({ id: s.id, label: s.label }))} />
+        <div style={{ fontSize: 11, color: C.sub, paddingBottom: 8 }}>{sc.note}</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, paddingBottom: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={onlyVerified} onChange={(e) => setOnlyVerified(e.target.checked)} />
+          只看已核實
+        </label>
+        <div style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.bad,
+                      background: C.badBg, border: "1px solid #FECACA", borderRadius: 6, padding: "5px 9px" }}>⚠ 模擬資料</div>
+      </div>
+
+      <div style={{ ...card, background: "#fafafa" }}>
+        <div style={{ fontSize: 12, lineHeight: 1.8 }}>
+          <b>這一頁跟你自己去問 AI 的差別</b><br />
+          ① <b>限定範圍</b>：只採計 <b>{sc.label}（{sc.note}）</b>內的觀測，不是模型憑印象回答。<br />
+          ② <b>逐條核實</b>：{total} 筆發現中 <b>{verified} 筆</b>比對得到可指認的原文，其餘明確標示為部分／無法核實 —— 不會把推測混進事實。<br />
+          ③ <b>跨模型比對</b>：{AI_MODELS.length} 個模型各問一次，只有一個模型說的會被降權，不會單一模型幻覺就當結論。
+        </div>
+      </div>
+
+      <Card title={`AI 觀測發現 · ${sc.label}`}
+            sub="依「幾個模型同時提到」排序 — 沒有母體就沒有聲量數字，跨模型一致度是這裡唯一誠實的信心指標">
+        {items.length === 0 && <div style={{ fontSize: 12, color: C.sub }}>此範圍內沒有符合條件的發現。</div>}
+        {items.map((f) => (
+          <div key={f.id} style={{ borderTop: `1px solid ${C.border}`, padding: "14px 0" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, background: "#f3f4f6", color: C.mute,
+                             padding: "3px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>{f.topic}</span>
+              <VerifyBadge v={f.verify} />
+              <span style={{ fontSize: 10, color: C.sub, fontWeight: 700 }}>
+                強度 {f.strength === "high" ? "高" : f.strength === "mid" ? "中" : "低"}
+              </span>
+              <div style={{ marginLeft: "auto" }}>
+                <ModelChips ids={f.models} />
+              </div>
+            </div>
+            <div style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 6 }}>{f.claim}</div>
+            <div style={{ fontSize: 11, color: C.mute }}>
+              {f.models.length}/{AI_MODELS.length} 個模型提到
+              {f.brands.length > 0 && <> · 涉及 {f.brands.join("、")}</>}
+              {f.sourceNote && <> · {f.sourceNote}</>}
+              {f.source && <> · <a href={f.source} target="_blank" rel="noreferrer" style={{ color: "#2563eb" }}>來源</a></>}
+            </div>
+          </div>
+        ))}
+        <Note>
+          <b>沒有「聲量 N 則」這種數字，是刻意的。</b>AI 沒有母體 —— 任何絕對數字都是編的，
+          拿去對客戶報告會出事。要絕對值請切到「付費數據庫」版。
+        </Note>
+      </Card>
+
+      {sourceId === "geo" && <GeoMultiModel />}
+    </>
+  );
+}
+
+/* GEO is always live-at-this-moment, and every model answers differently —
+   so the unit of analysis is the model × question grid, not a single score. */
+function GeoMultiModel() {
+  return (
+    <>
+      <Card title="GEO · 各 AI 模型當下的回答" sub="同一個問題同時問 5 個模型，看誰會提到我們、排第幾、引用什麼">
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 660 }}>
+            <thead><tr>
+              <th style={{ ...th, minWidth: 168 }}>使用者問 AI 的問題</th>
+              {AI_MODELS.map((m) => <th key={m.id} style={{ ...th, textAlign: "center" }}>{m.label}</th>)}
+            </tr></thead>
+            <tbody>
+              {GEO_MATRIX.map((q) => (
+                <tr key={q.q}>
+                  <td style={{ ...td, fontWeight: 700 }}>{q.q}</td>
+                  {AI_MODELS.map((m) => {
+                    const c = q.cells.find((x) => x.model === m.id)!;
+                    return (
+                      <td key={m.id} style={{ ...td, textAlign: "center", padding: 4 }}>
+                        {c.hit ? (
+                          <div title={c.cited ? `引用：${c.cited}` : undefined}
+                               style={{ background: c.sentiment === "pos" ? C.goodBg : "#f3f4f6",
+                                        color: c.sentiment === "pos" ? C.good : C.mute,
+                                        borderRadius: 7, padding: "7px 4px", lineHeight: 1.3 }}>
+                            <div style={{ fontSize: 13, fontWeight: 850 }}>#{c.rank}</div>
+                            <div style={{ fontSize: 9 }}>{c.cited ?? "—"}</div>
+                          </div>
+                        ) : (
+                          <div style={{ background: C.badBg, color: C.bad, borderRadius: 7,
+                                        padding: "7px 4px", fontSize: 11, fontWeight: 800 }}>未提及</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card title="各模型命中率" sub="同一個品牌，在不同 AI 上的能見度差很多 —— 優化對象不該一視同仁">
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>
+            <th style={th}>模型</th><th style={{ ...th, textAlign: "right" }}>命中</th>
+            <th style={{ ...th, textAlign: "right" }}>命中率</th><th style={{ ...th, textAlign: "right" }}>平均排名</th>
+          </tr></thead>
+          <tbody>{AI_MODELS.map((m) => {
+            const r = modelHitRate(m.id); const ar = modelAvgRank(m.id);
+            return (
+              <tr key={m.id}>
+                <td style={{ ...td, fontWeight: 700 }}>{m.label}</td>
+                <td style={tdR}>{r.hits}/{r.total}</td>
+                <td style={{ ...tdR, fontWeight: 800, color: r.rate >= 0.6 ? C.good : r.rate <= 0.2 ? C.bad : C.mute }}>
+                  {fmtPct(r.rate, 0)}
+                </td>
+                <td style={tdR}>{ar ? `#${ar.toFixed(1)}` : "—"}</td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+        <Note>
+          <b>Perplexity 命中率最高、Copilot 最低。</b>Perplexity 會即時抓網頁並引用官網，
+          Copilot 較依賴既有索引 —— 所以要提升 Copilot 的能見度，靠的是被更多第三方網站提及，
+          不是改自己的官網。<b>同一個 GEO 問題，對不同模型的解法不一樣。</b>
+        </Note>
+        <Note tone="bad">
+          「冷凍調理包 哪個好吃」<b>5 個模型全部未提及</b> —— 這是最明確的內容缺口，
+          而且是高購買意圖的問題。
+        </Note>
+      </Card>
+    </>
+  );
+}
+
 /* ─────────────────────── Shell ─────────────────────── */
+
+type Mode = "db" | "ai";
 
 export default function MarketDashboard({ sourceId }: { sourceId: string }) {
   const [lens, setLens] = React.useState<MLens>(DEFAULT);
+  const [mode, setMode] = React.useState<Mode>("db");
   const listening = ["listen_hotspots", "listen_industry", "listen_own", "listen_competitor"].includes(sourceId);
+
   return (
     <div style={{ marginBottom: 28 }}>
-      <Bar lens={lens} setLens={setLens} />
-      {sourceId === "overview"     && <Overview lens={lens} setLens={setLens} />}
-      {listening                   && <Listening scope={sourceId} lens={lens} />}
-      {sourceId === "keywords"     && <Keywords />}
-      {sourceId === "geo"          && <Geo />}
-      {sourceId === "competitors"  && <Overview lens={lens} setLens={setLens} />}
-      {sourceId === "opportunity"  && <Opportunity />}
-      {sourceId === "hot_topics"   && <Hotspots />}
+      {/* Mode switch — the two are different products, not two skins. Paid DB
+          answers "how much"; AI answers "what is being said, and can we back
+          it up". Mixing them into one view is how AI guesses get mistaken for
+          measured figures. */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+        {([
+          { id: "db" as const, label: "付費數據庫", note: "有母體、可追蹤趨勢、可稽核" },
+          { id: "ai" as const, label: "純 AI 觀測", note: "無母體、逐條核實、可限定範圍" },
+        ]).map((m) => {
+          const on = mode === m.id;
+          return (
+            <button key={m.id} onClick={() => setMode(m.id)}
+              style={{
+                border: `1px solid ${on ? C.text : C.border}`, background: on ? C.text : "#fff",
+                color: on ? "#fff" : C.mute, borderRadius: 10, padding: "8px 14px",
+                cursor: "pointer", textAlign: "left", lineHeight: 1.3,
+              }}>
+              <div style={{ fontSize: 12, fontWeight: 800 }}>{m.label}</div>
+              <div style={{ fontSize: 10, opacity: on ? .8 : .7 }}>{m.note}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {mode === "ai" ? (
+        <AiObservation sourceId={sourceId} />
+      ) : (
+        <>
+          <Bar lens={lens} setLens={setLens} />
+          {sourceId === "overview"     && <Overview lens={lens} setLens={setLens} />}
+          {listening                   && <Listening scope={sourceId} lens={lens} />}
+          {sourceId === "keywords"     && <Keywords />}
+          {sourceId === "geo"          && <Geo />}
+          {sourceId === "competitors"  && <Overview lens={lens} setLens={setLens} />}
+          {sourceId === "opportunity"  && <Opportunity />}
+          {sourceId === "hot_topics"   && <Hotspots />}
+        </>
+      )}
     </div>
   );
 }
