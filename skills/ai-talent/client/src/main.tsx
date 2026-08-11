@@ -64,6 +64,37 @@ function shouldSilentSkip(err: any): boolean {
 function formatErr(err: any): string {
   return String(err?.message ?? err?.shape?.message ?? err ?? "未知錯誤").slice(0, 240);
 }
+
+/**
+ * 2026-08-11: the toast used to print only err.message. For a zod input
+ * failure that message is the raw issues array — e.g.
+ *   [{ "code":"invalid_type","expected":"object","received":"undefined",
+ *      "path":[],"message":"Required" }]
+ * which says a procedure got no input but never says WHICH procedure, so the
+ * report is undiagnosable. tRPC's react-query key is
+ * [["router","procedure"], {...}], so the name is right there — prefix it.
+ */
+function procOf(query: any): string {
+  const head = query?.queryKey?.[0];
+  return Array.isArray(head) ? head.join(".") : "";
+}
+
+/** Turn a zod issues payload into something a human can act on. */
+function friendlyErr(err: any, proc: string): string {
+  const raw = formatErr(err);
+  const where = proc ? `${proc} — ` : "";
+  try {
+    const issues = JSON.parse(err?.message ?? "");
+    if (Array.isArray(issues) && issues.length > 0) {
+      const parts = issues.slice(0, 3).map((i: any) => {
+        const path = Array.isArray(i.path) && i.path.length ? i.path.join(".") : "(整個輸入)";
+        return `${path}: ${i.message}${i.received ? `（收到 ${i.received}）` : ""}`;
+      });
+      return `${where}參數錯誤 · ${parts.join("；")}`;
+    }
+  } catch { /* not a zod payload — fall through */ }
+  return `${where}${raw}`;
+}
 const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (err: any, _vars, _ctx, mutation) => {
@@ -91,7 +122,10 @@ const queryClient = new QueryClient({
       // real, the user-initiated action will surface its own error UI.
       const msg = String(err?.message ?? "");
       if (/\b50[234]\b|伺服器忙碌|ECONNRESET|fetch failed|Network error/.test(msg)) return;
-      showToastGlobal(`載入失敗：${formatErr(err)}`, "error");
+      showToastGlobal(`載入失敗：${friendlyErr(err, procOf(query))}`, "error");
+      // Full context to the console — the toast is length-capped, and a zod
+      // failure is far easier to fix with the input that caused it.
+      console.error("[query error]", procOf(query), { error: err, input: (query as any)?.queryKey?.[1]?.input });
     },
   }),
 });
