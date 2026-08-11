@@ -120,6 +120,12 @@ export default function ProjectsPage() {
   }, [shellBrandId]);
   // createOpen state removed 2026-05-14 along with CreateMissionModal.
 
+  // 2026-08-11 (CJ「專案要能按族群、產品區分」): in-page filters, separate
+  // from the shell's global scope. The shell narrows everything at once;
+  // these let you slice the project list without changing global context.
+  const [activeAudience, setActiveAudience] = useState<string | "all">("all");
+  const [activeProduct, setActiveProduct] = useState<number | "all">("all");
+
   // Filter
   const filtered = useMemo(() => {
     let r = rows;
@@ -135,6 +141,12 @@ export default function ProjectsPage() {
     if (shellEventId) {
       r = r.filter((m) => (m as any).scopeEventId === shellEventId);
     }
+    if (activeAudience !== "all") {
+      r = r.filter((m) => ((m as any).audienceLabel ?? null) === activeAudience);
+    }
+    if (activeProduct !== "all") {
+      r = r.filter((m) => ((m as any).scopeProductId ?? null) === activeProduct);
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       r = r.filter((m) =>
@@ -144,7 +156,44 @@ export default function ProjectsPage() {
       );
     }
     return r;
-  }, [rows, activeBrandId, search, shellProductId, shellEventId]);
+  }, [rows, activeBrandId, search, shellProductId, shellEventId, activeAudience, activeProduct]);
+
+  /**
+   * Audience / product facets, counted against everything the brand filter
+   * already allows — so the counts match what clicking would actually show.
+   *
+   * Audience is only present on runs started from a strategy-workbench sweet
+   * spot, so most historical work has none. The facet row hides itself when
+   * there's nothing to slice by, rather than showing a lone 未標記 chip that
+   * looks like something is broken.
+   */
+  const scopedRows = useMemo(
+    () => rows.filter((m) => !!m.id && (activeBrandId === "all" || m.brandId === activeBrandId)),
+    [rows, activeBrandId],
+  );
+  const audienceFacets = useMemo(() => {
+    const counts = new Map<string, number>();
+    scopedRows.forEach((m) => {
+      const a = (m as any).audienceLabel;
+      if (a) counts.set(a, (counts.get(a) ?? 0) + 1);
+    });
+    return [...counts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [scopedRows]);
+  const productFacets = useMemo(() => {
+    const counts = new Map<number, { name: string; count: number }>();
+    scopedRows.forEach((m) => {
+      const id = (m as any).scopeProductId;
+      if (!id) return;
+      const name = (m as any).scopeProductName || `#${id}`;
+      const prev = counts.get(id);
+      counts.set(id, { name, count: (prev?.count ?? 0) + 1 });
+    });
+    return [...counts.entries()]
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => b.count - a.count);
+  }, [scopedRows]);
 
   // Brand chips with counts
   const brandsWithCount = useMemo(() => {
@@ -275,6 +324,56 @@ export default function ProjectsPage() {
                 );
               })}
           </div>
+        </div>
+      )}
+
+      {/* ─── Audience / product facets ───────────────────────────────────
+          2026-08-11 (CJ「專案要能按族群、產品區分」). Each row renders only
+          when there's more than one thing to slice by — a single chip is a
+          label, not a filter, and an empty row reads as broken. */}
+      {(audienceFacets.length > 1 || productFacets.length > 1) && (
+        <div className="max-w-[1100px] mx-auto px-6 mb-6 flex flex-col gap-2">
+          {audienceFacets.length > 1 && (
+            <FacetRow
+              label={lang === "en" ? "Audience" : "族群"}
+              hint={lang === "en" ? "from the strategy workbench" : "來自策略工作台的甜蜜點"}
+            >
+              <FacetChip
+                active={activeAudience === "all"}
+                onClick={() => setActiveAudience("all")}
+                text={`${lang === "en" ? "All" : "全部"} · ${scopedRows.length}`}
+              />
+              {audienceFacets.map((a) => (
+                <FacetChip
+                  key={a.label}
+                  active={activeAudience === a.label}
+                  onClick={() => setActiveAudience(a.label)}
+                  // Anchors run long (up to 600 chars); the chip shows a
+                  // readable head and the full text lives in the tooltip.
+                  text={`${a.label.length > 18 ? `${a.label.slice(0, 18)}…` : a.label} · ${a.count}`}
+                  title={a.label}
+                />
+              ))}
+            </FacetRow>
+          )}
+          {productFacets.length > 1 && (
+            <FacetRow label={lang === "en" ? "Product" : "產品"}>
+              <FacetChip
+                active={activeProduct === "all"}
+                onClick={() => setActiveProduct("all")}
+                text={`${lang === "en" ? "All" : "全部"} · ${scopedRows.length}`}
+              />
+              {productFacets.map((p) => (
+                <FacetChip
+                  key={p.id}
+                  active={activeProduct === p.id}
+                  onClick={() => setActiveProduct(p.id)}
+                  text={`${p.name} · ${p.count}`}
+                  title={p.name}
+                />
+              ))}
+            </FacetRow>
+          )}
         </div>
       )}
 
@@ -588,5 +687,38 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
         </>
       )}
     </div>
+  );
+}
+
+/* ─── Facet filter primitives (2026-08-11) ─────────────────────────────────
+   Kept visually identical to the brand chips above so the three filter rows
+   read as one control group rather than three different mechanisms. */
+function FacetRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[11px] font-semibold text-default-400 uppercase tracking-wider shrink-0">
+        {label}
+      </span>
+      {hint && <span className="text-[11px] text-default-300 shrink-0">{hint}</span>}
+      {children}
+    </div>
+  );
+}
+
+function FacetChip({
+  active, onClick, text, title,
+}: { active: boolean; onClick: () => void; text: string; title?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
+        active
+          ? "bg-default-900 text-white border-default-900"
+          : "bg-white text-default-700 border-default-200 hover:border-default-400"
+      }`}
+    >
+      {text}
+    </button>
   );
 }
