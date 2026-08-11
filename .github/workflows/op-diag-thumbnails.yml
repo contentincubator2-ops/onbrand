@@ -1,0 +1,106 @@
+name: "Op — Diagnose missing project thumbnails (read-only)"
+
+# 2026-08-11 (CJ「每一個任務，應該都可以出現縮圖才對」).
+#
+# /projects showed a grid of blank grey cards. The card only paints that
+# neutral grey when a thumbnailUrl EXISTS and the <img> fails — the
+# no-thumbnail path paints a per-platform tint — so the stored URLs are
+# resolving to nothing.
+#
+# This separates the three possible causes, which need different fixes:
+#   (a) metadata.thumbnailUrl is NULL      → nothing was ever generated
+#   (b) URL present, file missing on disk  → generated then lost (deploy? cleanup?)
+#   (c) URL present, file on disk, 404 over HTTP → serving/path problem
+#
+# Read-only: SELECTs, `test -f`, and a HEAD request.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand id to inspect recent outputs for (2973 = 懶得煮的Tom老闆)"
+        required: true
+        default: "2973"
+        type: string
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect thumbnails
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          envs: BRAND_ID
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -N -B -e "$1"; }
+
+            COVERS_DIR="${COVERS_DIR:-/opt/onbrand/covers}"
+            echo "=== environment ==="
+            echo "covers dir      : $COVERS_DIR"
+            echo "exists          : $([ -d "$COVERS_DIR" ] && echo yes || echo NO)"
+            echo "file count      : $(ls -1 "$COVERS_DIR" 2>/dev/null | wc -l)"
+            echo "newest 3        :"; ls -1t "$COVERS_DIR" 2>/dev/null | head -3
+            echo
+            echo "=== how the app serves /static/covers ==="
+            PUB=/opt/onbrand/app/skills/ai-talent/public/static/covers
+            echo "public path     : $PUB"
+            if [ -L "$PUB" ]; then
+              echo "type            : symlink -> $(readlink -f "$PUB")"
+            elif [ -d "$PUB" ]; then
+              echo "type            : real directory ($(ls -1 "$PUB" | wc -l) files)"
+            else
+              echo "type            : MISSING  <== nothing serves /static/covers"
+            fi
+            echo
+
+            echo "=== recent outputs for brand $BRAND_ID ==="
+            ROWS=$(Q "SELECT o.id, IFNULL(JSON_UNQUOTE(JSON_EXTRACT(o.metadata,'\$.thumbnailUrl')),'NULL')
+                        FROM mission_outputs o
+                        JOIN missions m ON m.id = o.missionId
+                       WHERE m.brandId = ${BRAND_ID}
+                       ORDER BY o.id DESC LIMIT 10")
+            if [ -z "$ROWS" ]; then echo "(no outputs found)"; fi
+
+            NULLS=0; MISSING=0; PRESENT=0
+            echo "$ROWS" | while IFS=$'\t' read -r OID TURL; do
+              [ -z "$OID" ] && continue
+              if [ "$TURL" = "NULL" ]; then
+                echo "output $OID : thumbnailUrl = NULL  (nothing generated — card should show the tinted platform tile)"
+                continue
+              fi
+              BASE=$(basename "$TURL")
+              FILE="$COVERS_DIR/$BASE"
+              if [ -f "$FILE" ]; then
+                echo "output $OID : url=$TURL  FILE OK ($(stat -c%s "$FILE" 2>/dev/null) bytes)"
+              else
+                echo "output $OID : url=$TURL  <== FILE MISSING at $FILE"
+              fi
+            done
+
+            echo
+            echo "=== HTTP check on the newest non-null thumbnail ==="
+            ONE=$(Q "SELECT JSON_UNQUOTE(JSON_EXTRACT(o.metadata,'\$.thumbnailUrl'))
+                       FROM mission_outputs o
+                       JOIN missions m ON m.id = o.missionId
+                      WHERE m.brandId = ${BRAND_ID}
+                        AND JSON_EXTRACT(o.metadata,'\$.thumbnailUrl') IS NOT NULL
+                      ORDER BY o.id DESC LIMIT 1")
+            if [ -n "$ONE" ] && [ "$ONE" != "NULL" ]; then
+              echo "url: $ONE"
+              echo "-- local (through the app on :3101) --"
+              curl -s -o /dev/null -w "  status=%{http_code} type=%{content_type} size=%{size_download}\n" "http://127.0.0.1:3101$ONE"
+              echo "-- public (through nginx) --"
+              curl -s -o /dev/null -w "  status=%{http_code} type=%{content_type} size=%{size_download}\n" "https://onbrand.sowork.ai$ONE"
+            else
+              echo "(no non-null thumbnail to test — cause is (a): nothing was generated)"
+            fi
