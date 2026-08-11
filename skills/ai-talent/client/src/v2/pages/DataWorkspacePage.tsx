@@ -12,6 +12,7 @@ import {
   MousePointerClick, Play, Search, ShoppingBag, Sparkles, Target, TrendingUp,
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
+import PerformanceDashboard from "../components/performance/PerformanceDashboard";
 
 const ALLOWED_EMAIL = "sowork@sowork.tw";
 
@@ -688,8 +689,11 @@ export default function DataWorkspacePage() {
           <h1 style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 850, color: "#111827" }}>
             {isPerformance ? "成效儀表板" : `${activeBrandName || "（尚未選擇品牌）"}｜${active.label}`}
           </h1>
+          {/* 2026-08-11: was a generic "左側平台列已切換成…" blurb for every
+              performance page. Now each source's own desc, which actually says
+              what the page shows. */}
           <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6b7280", maxWidth: 760 }}>
-            {isPerformance ? "左側平台列已切換成 Meta、Google、GA、Shopline 等成效資料源。" : active.desc}
+            {active.desc}
           </p>
         </div>
         {!isPerformance && (
@@ -712,6 +716,15 @@ export default function DataWorkspacePage() {
               </div>
             </div>
           </div>
+
+          {/* 2026-08-11 (CJ「六頁用假資料實作到 DEV」): the 成效 pages were a
+              list of "what an agent could analyse" with no numbers on them.
+              This renders the actual dashboards on simulated data — shared
+              filter bar (觀察區間 / 比較區間 / TA / 訴求 / 產品別) plus the
+              TA × 訴求 matrix that answers which pairing performs best.
+              Sits above the agent task cards, which stay as the "what can I
+              run next" layer. */}
+          {isPerformance && <PerformanceDashboard sourceId={active.id} />}
 
           {!isPerformance && isListeningScope && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, marginBottom: 14 }}>
