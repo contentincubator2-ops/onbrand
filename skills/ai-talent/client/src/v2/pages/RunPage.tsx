@@ -1492,8 +1492,21 @@ export default function RunPage() {
       // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"
       // inside words like "lead-paragraph" / "broadcast".
       if (/(?:^|-)ad(?:-|$)/.test(id)) return "ad";
-      if (id.includes("comment")) return "comment";
-      if (id.includes("pinned")) return "pinned";
+      // 2026-08-11 (bug checklist C4「僅顯示製作中佔位訊息」): the "comment"
+      // mockup (FBComment) only exists for Facebook — inferMockup.ts's
+      // FORMAT_RULES already scopes this keyword to platforms:["facebook"],
+      // but this SEPARATE taskId-prefix inference didn't, so ig-30-comment-
+      // reply / tt-30-comment-reply resolved to instagram:comment /
+      // tiktok:comment — neither has a mockup case → fell through to the
+      // "coming soon" placeholder even though the reply caption existed.
+      // Scope it the same way so those tasks fall through to their real,
+      // better-fitting rules below (ig- → default "feed", tt- → "foryou").
+      if (id.startsWith("fb-") && id.includes("comment")) return "comment";
+      // "pinned" mockup (FBPinned) is also Facebook-only — same bug shape as
+      // "comment" above. yt-30-pinned-comment was falling through to it
+      // (after the comment-scoping fix) with no youtube:pinned case →
+      // placeholder again. Scope it too so it reaches its real yt- rule.
+      if (id.startsWith("fb-") && id.includes("pinned")) return "pinned";
       // 2026-08-01: check BEFORE the "story" rule below — "storyboard"
       // contains "story" as a substring and was silently misclassified
       // as an IG/FB Stories mockup (CJ「分鏡圖的產出明顯不是分鏡圖」).

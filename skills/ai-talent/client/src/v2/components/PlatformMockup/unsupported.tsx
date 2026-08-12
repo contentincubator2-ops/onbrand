@@ -24,7 +24,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import type { MockupVariant, Platform } from "../../lib/inferMockup";
 import type { MockupFields } from "./shared";
-import { MockupHeader } from "./shared";
+import { MockupHeader, MarkdownText } from "./shared";
 
 const PLATFORM_ICON: Record<Platform, any> = {
   instagram:    faInstagram,
@@ -71,10 +71,19 @@ interface Props extends MockupFields {
 }
 
 export function UnsupportedVariantPlaceholder({
-  variant, steps, variantLabel,
+  variant, steps, variantLabel, liveCaption, liveHashtags,
 }: Props) {
   const icon = PLATFORM_ICON[variant.platform];
   const label = PLATFORM_LABEL[variant.platform];
+  // 2026-08-11 (bug checklist C4「僅顯示製作中佔位訊息，未產出實際回覆內容」):
+  // this card used to show ONLY the "coming soon" notice — even though the
+  // task had already generated a real caption/reply, {...f} passes it in as
+  // liveCaption, this component just never rendered it. The disclaimer text
+  // below ALREADY claims "下列是...預期會產出的內容" (below is the content
+  // this will produce) — that promise only held for squad step lists, never
+  // for the actual generated text. Show it when present so a missing
+  // MOCKUP never reads as missing CONTENT.
+  const hasCaption = !!liveCaption?.trim();
 
   return (
     <div className="w-full max-w-[480px] mx-auto">
@@ -99,10 +108,28 @@ export function UnsupportedVariantPlaceholder({
             <p className="text-tiny tracking-wider uppercase text-default-500 mb-1">{label}</p>
             <h2 className="text-xl font-semibold tracking-tight">{variant.label}</h2>
             <p className="text-small text-default-500 mt-2 max-w-[380px]">
-              此格式的精準預覽正在製作中。下列是這個 squad 預期會產出的內容 —
-              功能本身不受影響。
+              {hasCaption
+                ? "此格式的精準預覽正在製作中，但內容已經產出——如下所示。"
+                : "此格式的精準預覽正在製作中。下列是這個 squad 預期會產出的內容 — 功能本身不受影響。"}
             </p>
           </div>
+
+          {hasCaption && (
+            <>
+              <Divider className="w-full" />
+              <div className="w-full text-left rounded-medium bg-default-50 border border-divider p-3">
+                <p className="text-tiny tracking-wider uppercase text-default-500 font-medium mb-2">
+                  實際產出內容
+                </p>
+                <MarkdownText content={liveCaption as string} />
+                {liveHashtags && liveHashtags.length > 0 && (
+                  <p className="text-tiny text-primary-500 mt-2">
+                    {liveHashtags.map((t) => `#${t.replace(/^#/, "")}`).join(" ")}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           {steps && steps.length > 0 && (
             <>
