@@ -910,13 +910,21 @@ ${platformAsks}
 ${allRules.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
         : "";
 
-      // Phase 3b: products + photo tags injected as soft context.
-      // Writer can naturally weave product names / use available photo
-      // types in visual descriptions; not strictly enforced.
+      // 2026-08-12 (bug checklist C8「已勾選『春悅大地』產品，但七篇貼文皆無
+      // 出現春悅大地」): was "soft context — not strictly enforced" (see old
+      // comment below), so across 7 independent parallel calls the writer
+      // could reasonably choose to never name a specific product by its
+      // exact string. When the user explicitly selected a product for THIS
+      // run, that's a promise the post features it — make it mandatory,
+      // same "強制執行" convention already used for rulesInstruction/
+      // hookInstruction/ctaInstruction below, not a suggestion the model can
+      // skip. (Day-specific single-product targeting across multiple
+      // selected products — vs. every day seeing the full flat list — is a
+      // separate, tracked client-side scheduling gap.)
       const materialsInstruction = (input.products?.length ?? 0) > 0 || (input.photoTags?.length ?? 0) > 0
-        ? `\n【可運用素材】${
+        ? `\n【本次強調的產品/素材 — 強制遵守】${
             (input.products?.length ?? 0) > 0
-              ? `\n產品：${input.products!.map((p) => `${p.name}（${p.usp}${p.launchDate ? `; ${p.launchDate} 上市` : ""}）`).join("、")}`
+              ? `\n產品：${input.products!.map((p) => `${p.name}（${p.usp}${p.launchDate ? `; ${p.launchDate} 上市` : ""}）`).join("、")}\n這篇貼文的內文必須逐字明確提到至少一個產品的「確切名稱」（例如上面的「${input.products![0]?.name ?? ""}」），不能只寫模糊的產品類別或只帶到 USP 卻不點名——使用者選了這個產品就是要它被指名出現，這不是可以省略的軟性建議。`
               : ""
           }${
             (input.photoTags?.length ?? 0) > 0
