@@ -249,7 +249,10 @@ direct 2-3 個、indirect 1-2 個；每個欄位精簡一句，控制總長度�
           `${brandCtx(c)}\n\n分析此品牌所處的市場趨勢與機會。輸出 JSON，鍵名固定如下：
 {"favorable":[{"name":"有利趨勢標題","body":"60-120字說明"}],"risks":[{"name":"風險標題","body":"60-120字應對方向"}]}
 favorable 3-4 個，risks 2-3 個。`,
-          { favorable: [], risks: [] }, 1200),
+          // 2026-08-12: caught by the new truncation logging on the very first
+          // run after it shipped — this was silently emptying too. Asks for up
+          // to 7 items × 60-120字 of Chinese, which cannot fit 1200 tokens.
+          { favorable: [], risks: [] }, 2600, ["favorable"]),
       }),
     },
     {
