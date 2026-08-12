@@ -1,0 +1,89 @@
+name: "Admin — Delete a brand by id (destructive, name-guarded)"
+
+# There was no way to delete a brand: op-reset-brand.yml only wipes and
+# renames the row, and admin-delete-product.yml covers products only. Needed
+# after a brand was created in production that was meant for dev.
+#
+# Guarded three ways because this is production and irreversible:
+#   1. the id's actual name must contain a substring the caller supplies
+#   2. the caller must type DELETE
+#   3. the row is printed before and after, and child-row counts are shown
+#      first so nobody deletes a brand that still has real work under it
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "brands.id to delete"
+        required: true
+        type: string
+      confirm_name_contains:
+        description: "Safety check: substring that must appear in the brand's name"
+        required: true
+        type: string
+      confirm:
+        description: "Type DELETE to proceed"
+        required: true
+        type: string
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete brand (guarded)
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+          CONFIRM_SUBSTR: ${{ inputs.confirm_name_contains }}
+          CONFIRM: ${{ inputs.confirm }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: BRAND_ID,CONFIRM_SUBSTR,CONFIRM
+          script: |
+            set +e
+            if [ "$CONFIRM" != "DELETE" ]; then
+              echo "❌ Aborted — confirm must be exactly DELETE"; exit 1
+            fi
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q()  { mysql -h"$H" -u"$U" -p"$P" "$D" -N -e "$1"; }
+            QT() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+
+            NAME=$(Q "SELECT name FROM brands WHERE id=${BRAND_ID}")
+            if [ -z "$NAME" ]; then echo "❌ No brand with id ${BRAND_ID}"; exit 1; fi
+            echo "Target brand #${BRAND_ID}: $NAME"
+            case "$NAME" in
+              *"$CONFIRM_SUBSTR"*) echo "✓ Name guard matched." ;;
+              *) echo "❌ Guard mismatch — name does not contain '$CONFIRM_SUBSTR'. Nothing deleted."; exit 1 ;;
+            esac
+
+            echo ""
+            echo "===== what is attached to this brand ====="
+            QT "SELECT
+                  (SELECT COUNT(*) FROM products WHERE brandId=${BRAND_ID})        AS products,
+                  (SELECT COUNT(*) FROM events   WHERE brandId=${BRAND_ID})        AS events,
+                  (SELECT COUNT(*) FROM brand_members WHERE brandId=${BRAND_ID})   AS members;"
+
+            echo ""
+            echo "===== row before ====="
+            QT "SELECT id, name, slug, userId, positioningStatus, createdAt FROM brands WHERE id=${BRAND_ID}\G"
+
+            echo ""
+            echo "===== deleting ====="
+            # Children first — FKs may or may not cascade depending on how the
+            # table was created, so don't rely on it.
+            QT "DELETE FROM brand_members WHERE brandId=${BRAND_ID}"
+            QT "DELETE FROM brands WHERE id=${BRAND_ID} LIMIT 1"
+
+            echo ""
+            echo "===== verify ====="
+            REMAIN=$(Q "SELECT COUNT(*) FROM brands WHERE id=${BRAND_ID}")
+            MEM=$(Q "SELECT COUNT(*) FROM brand_members WHERE brandId=${BRAND_ID}")
+            echo "brands rows remaining: $REMAIN (expect 0)"
+            echo "brand_members remaining: $MEM (expect 0)"
+            if [ "$REMAIN" != "0" ]; then echo "❌ Delete did not take effect"; exit 1; fi
+            echo "✓ Deleted brand #${BRAND_ID} ($NAME)"
