@@ -1866,6 +1866,47 @@ export default function RunPage() {
               </>
               ) : null;
             })()}
+            {/* 2026-08-12 (bug checklist C7「任務承諾之留言模板/發文時段/24h
+                跟進未見於輸出」): the backend has generated these (Stage 3.5
+                in quickTaskOrchestra) and the client was already capturing
+                them into slide.extras — just never rendering them anywhere.
+                Confirmed via grep: zero references to replyTemplates/
+                postingTime/followupPost in the entire PlatformMockup tree. */}
+            {slide?.extras && (slide.extras.postingTime || slide.extras.replyTemplates?.length > 0 || slide.extras.followupPost) && (
+              <div className="mx-4 mt-3 space-y-2">
+                {slide.extras.postingTime && (
+                  <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
+                    <p className="text-tiny font-semibold text-default-700 mb-1">
+                      ⏰ {lang === "en" ? "Suggested posting time" : "建議發文時段"}
+                    </p>
+                    <p className="text-tiny text-default-600">{slide.extras.postingTime}</p>
+                  </div>
+                )}
+                {Array.isArray(slide.extras.replyTemplates) && slide.extras.replyTemplates.length > 0 && (
+                  <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
+                    <p className="text-tiny font-semibold text-default-700 mb-1.5">
+                      💬 {lang === "en" ? "Suggested reply templates" : "建議留言模板"}
+                    </p>
+                    <div className="space-y-1.5">
+                      {slide.extras.replyTemplates.map((r: { userSays: string; yourReply: string }, i: number) => (
+                        <div key={i} className="text-tiny">
+                          <p className="text-default-500">🗨️ {r.userSays}</p>
+                          <p className="text-default-700 pl-4">↳ {r.yourReply}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {slide.extras.followupPost && (
+                  <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
+                    <p className="text-tiny font-semibold text-default-700 mb-1">
+                      🔁 {lang === "en" ? "24h follow-up post" : "24 小時後續貼文"}
+                    </p>
+                    <p className="text-tiny text-default-600 whitespace-pre-line">{slide.extras.followupPost}</p>
+                  </div>
+                )}
+              </div>
+            )}
             {/* 2026-05-18 (CJ「下載圖示出現在圖片某個地方就好」): a small
                 download ICON floating over the mockup (top-right), instead
                 of a separate button below. fetch→blob forces a real save
