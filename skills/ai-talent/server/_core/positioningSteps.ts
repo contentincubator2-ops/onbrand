@@ -82,7 +82,25 @@ async function warnIfDegradedModel(model: string, stepId: string): Promise<void>
   } catch { /* non-fatal */ }
 }
 
-async function callJSON(ctx: StepContext, stepId: string, system: string, user: string, fallback: any, maxTokens = 1500): Promise<any> {
+/**
+ * @param required Keys that MUST come back non-empty. When given and the model
+ *   didn't deliver them, this throws instead of returning the fallback.
+ *
+ * 2026-08-12 (CJ「目標受眾是空的」— reproduced on both prod brand 2973 and dev
+ * brand 2972): the runner already retries each step 5× with backoff, but that
+ * only triggers on a THROW. safeJSON quietly returned the empty fallback on a
+ * truncated/unparseable response, so the step "succeeded" with blank content,
+ * the retry never engaged, and the job still reported done 10/10. The segment
+ * then renders as 尚未填寫 with nothing anywhere saying why.
+ *
+ * So: always log when the fallback is used, and let a caller declare which
+ * fields make the result worthless — those now fail loudly and get the retries
+ * that were always meant to cover this.
+ */
+async function callJSON(
+  ctx: StepContext, stepId: string, system: string, user: string,
+  fallback: any, maxTokens = 1500, required?: string[],
+): Promise<any> {
   const r = await invokeLLM({
     messages: [
       { role: "system", content: system },
@@ -96,7 +114,33 @@ async function callJSON(ctx: StepContext, stepId: string, system: string, user: 
   const outTok = r.usage?.completion_tokens ?? 0;
   await ctx.recordUsage(`positioning_step:${stepId}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok, costFor(inTok, outTok));
   void warnIfDegradedModel(r.model || "", stepId);
-  return safeJSON(text, fallback);
+
+  const SENTINEL = Symbol("parse-failed");
+  const parsed = safeJSON<any>(text, SENTINEL as any);
+
+  if (parsed === (SENTINEL as any)) {
+    // outTok at/near the cap is the signature of truncation rather than a
+    // malformed answer — worth distinguishing when reading logs.
+    const truncated = outTok >= maxTokens - 8;
+    console.warn(
+      `[positioning:${stepId}] JSON parse FAILED` +
+      `${truncated ? ` (looks truncated: ${outTok}/${maxTokens} output tokens — raise maxTokens)` : ""}` +
+      ` · model=${r.model} · raw[0:240]=${text.slice(0, 240).replace(/\s+/g, " ")}`,
+    );
+    if (required?.length) throw new Error(`${stepId}: JSON parse failed${truncated ? " (truncated)" : ""}`);
+    return fallback;
+  }
+
+  if (required?.length) {
+    const isEmpty = (v: any) =>
+      v == null || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
+    const missing = required.filter((k) => isEmpty(parsed?.[k]));
+    if (missing.length > 0) {
+      console.warn(`[positioning:${stepId}] parsed OK but required field(s) empty: ${missing.join(", ")} · model=${r.model}`);
+      throw new Error(`${stepId}: empty required field(s) — ${missing.join(", ")}`);
+    }
+  }
+  return parsed;
 }
 
 
@@ -175,7 +219,13 @@ export function buildBrandPositioningSteps(opts: { lang?: string; outputLanguage
           `${brandCtx(c)}\n\n定義此品牌的目標受眾。若上文提供【官方確認客群】，primary 與 secondary 都必須以該客群為錨點向下深化——展開其生活場景、心理動機、情感需求、痛點、偏好管道與購買關鍵時刻（MOT），不可發明不同輪廓的受眾。輸出 JSON，鍵名固定如下：
 {"primary":"主受眾完整敘事（人口統計 / 心理 / 情感需求 / 痛點 / 偏好管道，150-300字）","secondary":"次受眾敘事（80-150字）","matrix":[{"name":"族群名稱（例如 主受眾 / 次受眾，可依實際情況命名）","needs":[{"dim":"情感或功能需求維度","score":需求強度1-10,"weight":"★★★★★"}]}]}
 matrix 至少包含 primary 與 secondary 兩個族群，每個族群的 needs 至少 5 個維度（情感需求與功能需求都要涵蓋）。`,
-          { primary: "", secondary: "", matrix: [] }, 1500),
+          // 2026-08-12: was 1500, which this prompt cannot fit. It asks for
+          // 150-300字 + 80-150字 of Chinese prose PLUS a matrix of 2 groups ×
+          // ≥5 needs — CJK runs well over one token per character, so the JSON
+          // was being cut mid-string and silently became an empty segment on
+          // every brand. `primary` is required: an audience segment with no
+          // primary audience is worthless, and 差異化 depends on this step.
+          { primary: "", secondary: "", matrix: [] }, 3200, ["primary"]),
       }),
     },
     {
