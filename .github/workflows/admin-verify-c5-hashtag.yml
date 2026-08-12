@@ -1,0 +1,78 @@
+name: "Admin — Verify C5 fb-30-hashtag-set on dev"
+
+# Live fb-30-hashtag-set run for IRIS (2956) on the deployed dev release —
+# confirms the caption is now an actual hashtag list (many # occurrences),
+# not a generic FB post with zero hashtags (the reported bug).
+#
+# workflow_dispatch needs the file on the default branch (main); this lives
+# on dev, so a path-scoped push runs it here without touching prod.
+on:
+  push:
+    branches: [dev]
+    paths: [".github/workflows/admin-verify-c5-hashtag.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Verify fb-30-hashtag-set on the dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env; set +a
+            echo "=== deployed release ==="
+            basename "$(readlink -f /opt/onbrand/current)" 2>/dev/null || echo "(sha unknown)"
+            echo "=== running fb-30-hashtag-set for IRIS ==="
+            node --import tsx -e '
+            const guard = setTimeout(() => { console.error("timeout"); process.exit(3); }, 120000);
+            (async () => {
+              const mysql = await import("mysql2/promise");
+              const conn = await mysql.createConnection({
+                host: process.env.LOCAL_DB_HOST, port: +(process.env.LOCAL_DB_PORT || 3306),
+                user: process.env.LOCAL_DB_USER, password: process.env.LOCAL_DB_PASSWORD,
+                database: process.env.LOCAL_DB_NAME,
+              });
+              const [brandRows] = await conn.query("SELECT id, userId, name FROM brands WHERE id = 2956 LIMIT 1");
+              const brand = brandRows[0];
+              await conn.end();
+              if (!brand) { console.error("brand 2956 not found"); clearTimeout(guard); process.exit(2); return; }
+
+              const { FB_30S_TASKS, getOrchestraConfig } = await import("./server/_core/quickTaskFB");
+              const { runOrchestra } = await import("./server/_core/quickTaskOrchestra");
+              const template = FB_30S_TASKS.find((t) => t.id === "fb-30-hashtag-set");
+              const config = getOrchestraConfig("fb-30-hashtag-set");
+              if (!template || !config) { console.error("fb-30-hashtag-set template/config not found on deployed build"); clearTimeout(guard); process.exit(2); return; }
+
+              console.log("=== running for brand " + brand.name + " ===");
+              const result = await runOrchestra({
+                template, config,
+                inputs: { topic: "手沖咖啡豆訂閱制" },
+                brandId: brand.id, userId: brand.userId, tier: "30s",
+              });
+              clearTimeout(guard);
+              const variants = result.variants || [];
+              console.log("variants: " + variants.length);
+              let fail = 0;
+              for (const v of variants) {
+                const cap = v.caption || "";
+                const hashCount = (cap.match(/#[^\s#]+/g) || []).length;
+                const looksLikeNormalPost = cap.length > 80 && hashCount < 5;
+                const ok = hashCount >= 8 && !looksLikeNormalPost;
+                if (!ok) fail++;
+                console.log((ok ? "PASS  " : "FAIL  ") + v.label + " — #count=" + hashCount + " len=" + cap.length);
+                console.log("      caption: " + JSON.stringify(cap.slice(0, 300)));
+              }
+              console.log("errors: " + JSON.stringify(result.errors || []));
+              console.log("----");
+              console.log(fail === 0 && variants.length > 0 ? "ALL PASS — fb-30-hashtag-set produces real hashtags on dev" : (fail + " CASE(S) FAILED"));
+              process.exit(fail === 0 && variants.length > 0 ? 0 : 1);
+            })().catch((e) => { clearTimeout(guard); console.error("error:", e && e.message ? e.message : e); process.exit(2); });
+            '
