@@ -442,9 +442,17 @@ output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"�
     inputs: [
       { key: "topic", label: "貼文主題 / 產業", type: "textarea", required: true },
     ],
+    // 2026-08-12 (bug checklist C5「應產出10-15個分層hashtag，但實際產出一般
+    // 貼文文案，完全沒有任何hashtag」): the old prompt asked for a SEPARATE
+    // hashtags[] array + a one-sentence caption — a two-field split the model
+    // unreliably followed, often defaulting to writing a normal FB post into
+    // caption instead. ig-30-hashtag-set / tt-30-hashtag-set never had this
+    // bug because they use a simpler, proven design: caption directly LISTS
+    // the hashtags. Align FB to that same working pattern instead of relying
+    // on the fragile split.
     systemPrompt: `產出 10-15 個 FB 適用的 hashtag（FB 不像 IG，不要 #海，但仍可加）。
 分層：① 3-5 個品牌/核心 ② 3-5 個產業中型 ③ 3-5 個長尾或活動性。
-output: hashtags 陣列（不要含 # 前綴），caption 放 1 句使用建議。`,
+caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分隔，依三個分層換行並各加一句簡短說明，不要寫成一般貼文文案）。`,
     preferredModel: "qwen",
     maxTokens: 250,
     outputDefaults: { platform: "facebook", post_type: "feed" },
