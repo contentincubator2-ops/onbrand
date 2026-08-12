@@ -581,16 +581,28 @@ export default function DataWorkspacePage() {
 
   // 2026-08-06 (CJ「右上是小安素，表格卻還是 iris」): header must reflect the
   // actually-selected brand (?b=), not the hardcoded Iris Girls demo strings.
+  // Same latent shape as the two below — a disabled query registered with an
+  // undefined input is a zod crash waiting for the next invalidation.
   const brandInfoQ = (trpc as any).brand?.get?.useQuery?.(
-    brandId ? { id: brandId } : (undefined as any),
+    { id: brandId ?? 0 },
     { enabled: !!brandId },
   ) ?? { data: null };
   const activeBrandName: string = brandInfoQ?.data?.name ?? "";
 
   // Phase 3: 聲量趨勢 from the accumulating store, scoped to the active page.
   const hookScopeKey = SOURCE_TO_SCOPE[activeSource];
+  // 2026-08-12 (CJ 回報「載入失敗：invalid_type … path: []」on 成效頁): these
+  // used to pass `undefined` as the input whenever the guard failed. `enabled`
+  // stops the initial fetch, but the query is still REGISTERED in the cache
+  // keyed on that undefined input — so any broad invalidate/refetch replays it
+  // and the server receives no input at all, which is exactly the root-path
+  // zod error ("expected object, received undefined"). It surfaced on pages
+  // where these are disabled, which is the tell.
+  // Always send a well-formed object; `enabled` still prevents the pointless
+  // request, and a stray refetch now returns empty instead of throwing.
+  const safeScope = hookScopeKey ?? "listening.own_brand";
   const trendQ = (trpc as any).marketIntel?.getMentionTrend?.useQuery?.(
-    brandId && hookScopeKey ? { brandId, scope: hookScopeKey, days: windowDays } : (undefined as any),
+    { brandId: brandId ?? 0, scope: safeScope, days: windowDays },
     { enabled: !!brandId && !!hookScopeKey },
   ) ?? { data: null, refetch: () => {} };
 
@@ -598,7 +610,7 @@ export default function DataWorkspacePage() {
   // listening scope, filtered by the SAME time window as the trend so the feed
   // count and 聲量趨勢 agree and the 時間範圍 buttons actually refilter.
   const storedQ = (trpc as any).marketIntel?.getStoredMentions?.useQuery?.(
-    brandId && hookScopeKey ? { brandId, scope: hookScopeKey, sinceDays: windowDays, limit: 200 } : (undefined as any),
+    { brandId: brandId ?? 0, scope: safeScope, sinceDays: windowDays, limit: 200 },
     { enabled: !!brandId && !!hookScopeKey },
   ) ?? { data: null };
 
