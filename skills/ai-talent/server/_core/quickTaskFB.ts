@@ -452,7 +452,8 @@ output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"�
     // on the fragile split.
     systemPrompt: `產出 10-15 個 FB 適用的 hashtag（FB 不像 IG，不要 #海，但仍可加）。
 分層：① 3-5 個品牌/核心 ② 3-5 個產業中型 ③ 3-5 個長尾或活動性。
-caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分隔，依三個分層換行並各加一句簡短說明，不要寫成一般貼文文案）。`,
+caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分隔，依三個分層換行並各加一句簡短說明）。
+【嚴格格式】caption 每一行只能是「# 開頭的標籤 + 空格分隔」或分層說明短句，絕對不要寫成一段抒情、敘事或行銷文案（例如不要寫「每個早晨都值得一杯好咖啡…」這種完整段落）——這個任務的產出就是標籤本身，不是貼文。`,
     preferredModel: "qwen",
     maxTokens: 250,
     outputDefaults: { platform: "facebook", post_type: "feed" },
