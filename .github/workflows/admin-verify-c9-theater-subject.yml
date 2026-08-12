@@ -1,0 +1,58 @@
+name: "Admin — Verify C9 theater subject-image compositing on dev"
+
+# Verifies the exact mechanism theater.generateImage's new subjectMode
+# branch relies on: dispatchGenerate("google/nano-banana", {prompt,
+# imageUrl, aspectRatio, brandId}) with a REAL product photo URL (from the
+# earlier C2 real-product data scan: productId=58 brandId=2938). Confirms
+# it returns a ready composited image, proving the fix's core call works —
+# the surrounding theaterRouter.ts code is simple, typechecked glue.
+#
+# workflow_dispatch needs the file on the default branch (main); this lives
+# on dev, so a path-scoped push runs it here without touching prod.
+on:
+  push:
+    branches: [dev]
+    paths: [".github/workflows/admin-verify-c9-theater-subject.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Verify Nano Banana subject compositing on the dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env; set +a
+            echo "=== deployed release ==="
+            basename "$(readlink -f /opt/onbrand/current)" 2>/dev/null || echo "(sha unknown)"
+            echo "=== testing the exact call theater.generateImage's subjectMode makes ==="
+            node --import tsx -e '
+            const guard = setTimeout(() => { console.error("timeout"); process.exit(3); }, 90000);
+            (async () => {
+              const { dispatchGenerate } = await import("./server/_core/mediaGen");
+              const { PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_PROMPT_BLOCK } = await import("./server/_core/imageGen");
+              const brief = "A close-up product photo on a clean wooden table, soft natural light, warm inviting mood.";
+              const prompt = brief + "\n\n" + PRODUCT_FAITHFUL_PROMPT_BLOCK + "\n\n" + NO_MIRROR_PROMPT_BLOCK;
+              const subjectImageUrl = "https://www.laurel.com.tw/upload/2025/11/20251104153531898.png";
+              console.log("=== calling dispatchGenerate(google/nano-banana) with real product photo ===");
+              const r = await dispatchGenerate("google/nano-banana", {
+                prompt, imageUrl: subjectImageUrl, aspectRatio: "1:1", brandId: 2938,
+              });
+              clearTimeout(guard);
+              console.log("status: " + r.status);
+              console.log("url: " + (r.url || "(none)"));
+              console.log("errorMsg: " + (r.errorMsg || "(none)"));
+              const ok = r.status === "ready" && !!r.url;
+              console.log("----");
+              console.log(ok ? "PASS — Nano Banana subject compositing works on dev" : "FAIL");
+              process.exit(ok ? 0 : 1);
+            })().catch((e) => { clearTimeout(guard); console.error("error:", e && e.message ? e.message : e); process.exit(2); });
+            '
