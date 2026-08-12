@@ -1,0 +1,58 @@
+name: "Admin — Verify C8 mandatory product-name instruction on dev"
+
+# Tests the exact new materialsInstruction wording (copied verbatim from the
+# deployed theaterRouter.ts) with a live LLM call: given a selected product
+# ("春悅大地"), does the writer now explicitly name it in the caption? This
+# is the real question the bug reported — the OLD wording was "soft context,
+# not strictly enforced" per the code's own prior comment.
+#
+# workflow_dispatch needs the file on the default branch (main); this lives
+# on dev, so a path-scoped push runs it here without touching prod.
+on:
+  push:
+    branches: [dev]
+    paths: [".github/workflows/admin-verify-c8-product-name.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Verify mandatory product-name instruction on the dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 4m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env; set +a
+            echo "=== deployed release ==="
+            basename "$(readlink -f /opt/onbrand/current)" 2>/dev/null || echo "(sha unknown)"
+            echo "=== running live LLM check with the deployed materialsInstruction wording ==="
+            node --import tsx -e '
+            const guard = setTimeout(() => { console.error("timeout"); process.exit(3); }, 60000);
+            (async () => {
+              const { invokeLLM } = await import("./server/_core/llm");
+              const productName = "春悅大地";
+              const materialsInstruction =
+                "\n【本次強調的產品/素材 — 強制遵守】" +
+                "\n產品：" + productName + "（低脂高纖，長輩也能安心吃; 2026-09-01 上市）" +
+                "\n這篇貼文的內文必須逐字明確提到至少一個產品的「確切名稱」（例如上面的「" + productName + "」），不能只寫模糊的產品類別或只帶到 USP 卻不點名——使用者選了這個產品就是要它被指名出現，這不是可以省略的軟性建議。";
+              const system = "你是台灣品牌的 FB 文案寫手，用繁體中文寫一篇 100-150 字的貼文。" + materialsInstruction;
+              const user = "日期：2026-09-05（週五）\n本篇要溝通的 USP：「秋季新品上市」\n請直接寫貼文本身，不要前言。";
+              const r = await invokeLLM({ provider: "anthropic", messages: [{ role: "system", content: system }, { role: "user", content: user }], maxTokens: 400 });
+              clearTimeout(guard);
+              const raw = r?.choices?.[0]?.message?.content;
+              const caption = (typeof raw === "string" ? raw : Array.isArray(raw) ? raw.map((p) => (typeof p === "string" ? p : (p && p.text) || "")).join("") : "").trim();
+              console.log("caption: " + JSON.stringify(caption));
+              const ok = caption.includes(productName);
+              console.log("contains \"" + productName + "\": " + ok);
+              console.log("----");
+              console.log(ok ? "PASS — deployed instruction wording makes the model name the product" : "FAIL — product name still missing");
+              process.exit(ok ? 0 : 1);
+            })().catch((e) => { clearTimeout(guard); console.error("error:", e && e.message ? e.message : e); process.exit(2); });
+            '
