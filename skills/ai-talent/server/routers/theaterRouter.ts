@@ -23,7 +23,7 @@ import { resolveAgentId } from "../_core/agentAssignments";
 import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
 import { captionToVisualBrief, loadBrandPaletteHexes } from "../_core/visualBrief";
-import { NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT } from "../_core/imageGen";
+import { NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT, PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_PROMPT_BLOCK } from "../_core/imageGen";
 import { withUserLLMSlot } from "../_core/userLLMSemaphore";
 import { dispatchGenerate } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
@@ -1295,6 +1295,14 @@ ${cleaned}
       brandTagline: z.string().nullable().optional(),
       /** User-supplied prompt override — skips the LLM brief synthesis step. */
       customPrompt: z.string().max(1000).optional(),
+      /** 2026-08-12 (bug checklist C9「加入素材，但產圖卻沒看到加入的素材」):
+       *  when the caller has a real product/material photo (Theater's 加入
+       *  素材 flow), composite it faithfully instead of hallucinating a new
+       *  product — same policy as imageGen.ts / genOneImage. Previously this
+       *  endpoint had NO parameter for a reference photo at all, so an
+       *  uploaded material could never reach image generation regardless of
+       *  what the client did. */
+      subjectImageUrl: z.string().url().optional(),
     }))
     .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
       const aspect = input.platform === "youtube" ? "16:9"
@@ -1328,9 +1336,38 @@ ${cleaned}
       // get the directive, and pass NO_TEXT_NEGATIVE_PROMPT for flux/SDXL. The
       // auto-brief gets the positive block; a user's customPrompt is left as
       // typed but still backed by the negative prompt.
+      // 2026-08-12 (C9): subjectMode swaps the blanket NO-TEXT rule for the
+      // product-fidelity guard (it would otherwise strip the real product's
+      // own printed label) — mirrors imageGen.ts / genOneImage exactly.
+      const subjectMode = !!input.subjectImageUrl;
       const imagePrompt = input.customPrompt?.trim()
         ? brief
-        : `${brief}\n\n${NO_TEXT_PROMPT_BLOCK}`;
+        : subjectMode
+          ? `${brief}\n\n${PRODUCT_FAITHFUL_PROMPT_BLOCK}\n\n${NO_MIRROR_PROMPT_BLOCK}`
+          : `${brief}\n\n${NO_TEXT_PROMPT_BLOCK}`;
+
+      // 2026-08-12 (C9): product-faithful gen policy (same as imageGen.ts) —
+      // a hallucinated product is worse than a failed run, so subject mode
+      // routes ONLY through Nano Banana with no fallback to text-to-image
+      // providers (they can't see the real product and would invent one).
+      if (subjectMode) {
+        try {
+          const r = await dispatchGenerate("google/nano-banana", {
+            prompt: imagePrompt,
+            imageUrl: input.subjectImageUrl,
+            aspectRatio: aspect as any,
+            brandId: input.brandId,
+          } as any);
+          if (r.status === "ready" && r.url) {
+            return { ok: true as const, imageUrl: r.url, brief };
+          }
+          return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `nano-banana ${r.status}` };
+        } catch (e: any) {
+          console.error(`[theater.generateImage] nano-banana threw:`, e?.message ?? e);
+          return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
+        }
+      }
+
       // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back
       // to openai/gpt-image-1 when PIAPI_KEY is absent so Theater images
       // still work when only OPENAI_API_KEY is configured.
