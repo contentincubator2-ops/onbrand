@@ -1,0 +1,77 @@
+name: "Admin — Verify C7 extras (reply/posting-time/followup) on dev"
+
+# Live fb-60-single-full run for IRIS (2956) on the deployed dev release —
+# confirms Stage 3.5 actually populates variant.extras with real reply
+# templates / posting time / 24h followup, proving the data the new
+# RunPage display renders is genuine (the reported bug was these existing
+# but never being SHOWN — this checks the data side of that fix).
+#
+# workflow_dispatch needs the file on the default branch (main); this lives
+# on dev, so a path-scoped push runs it here without touching prod.
+on:
+  push:
+    branches: [dev]
+    paths: [".github/workflows/admin-verify-c7-extras.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Verify fb-60-single-full extras on the dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 6m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env; set +a
+            echo "=== deployed release ==="
+            basename "$(readlink -f /opt/onbrand/current)" 2>/dev/null || echo "(sha unknown)"
+            echo "=== running fb-60-single-full for IRIS ==="
+            node --import tsx -e '
+            const guard = setTimeout(() => { console.error("timeout"); process.exit(3); }, 180000);
+            (async () => {
+              const mysql = await import("mysql2/promise");
+              const conn = await mysql.createConnection({
+                host: process.env.LOCAL_DB_HOST, port: +(process.env.LOCAL_DB_PORT || 3306),
+                user: process.env.LOCAL_DB_USER, password: process.env.LOCAL_DB_PASSWORD,
+                database: process.env.LOCAL_DB_NAME,
+              });
+              const [brandRows] = await conn.query("SELECT id, userId, name FROM brands WHERE id = 2956 LIMIT 1");
+              const brand = brandRows[0];
+              await conn.end();
+              if (!brand) { console.error("brand 2956 not found"); clearTimeout(guard); process.exit(2); return; }
+
+              const { FB_60S_TASKS_V2, getFB60OrchestraConfig } = await import("./server/_core/quickTaskFB60");
+              const { runOrchestra } = await import("./server/_core/quickTaskOrchestra");
+              const template = FB_60S_TASKS_V2.find((t) => t.id === "fb-60-single-full");
+              const config = getFB60OrchestraConfig("fb-60-single-full");
+              if (!template || !config) { console.error("fb-60-single-full template/config not found"); clearTimeout(guard); process.exit(2); return; }
+
+              console.log("=== running for brand " + brand.name + " ===");
+              const result = await runOrchestra({
+                template, config,
+                inputs: { occasion: "秋季新品發表", topic: "秋季新品發表" },
+                brandId: brand.id, userId: brand.userId, tier: "60s",
+              });
+              clearTimeout(guard);
+              const v0 = (result.variants || [])[0];
+              const extras = v0 && v0.extras;
+              console.log("variants: " + (result.variants || []).length);
+              console.log("extras present: " + JSON.stringify(!!extras));
+              console.log("postingTime: " + JSON.stringify(extras && extras.postingTime));
+              console.log("replyTemplates count: " + ((extras && extras.replyTemplates) || []).length);
+              console.log("replyTemplates sample: " + JSON.stringify((extras && extras.replyTemplates && extras.replyTemplates[0]) || null));
+              console.log("followupPost: " + JSON.stringify(extras && extras.followupPost));
+              console.log("errors: " + JSON.stringify(result.errors || []));
+              const ok = !!(extras && extras.postingTime && (extras.replyTemplates || []).length > 0 && extras.followupPost);
+              console.log("----");
+              console.log(ok ? "PASS — extras (all 3) genuinely populated by the deployed backend" : "FAIL — extras missing/incomplete");
+              process.exit(ok ? 0 : 1);
+            })().catch((e) => { clearTimeout(guard); console.error("error:", e && e.message ? e.message : e); process.exit(2); });
+            '
