@@ -76,7 +76,12 @@ jobs:
           name: onbrand-dev-${{ github.sha }}
           path: ${{ runner.temp }}/onbrand-release.tgz
           if-no-files-found: error
-          retention-days: 7
+          # 2026-08-13: 7 天讓 dev 部署撞上 Actions 儲存配額 —— 每個 release 包
+          # 約 81MB，一天約 11 次部署，7 天就累積到 6.1GB 而 upload 開始整個失敗
+          # （build 全綠但 Upload release artifact 掛掉，deploy job 直接不跑）。
+          # 這個 artifact 的唯一用途是同一個 workflow 內 build → deploy 的交接，
+          # 幾分鐘就用完了，留 2 天已經遠超所需。
+          retention-days: 2
 
   deploy:
     needs: build
