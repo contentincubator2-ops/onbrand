@@ -28,6 +28,18 @@ jobs:
             set -a; source .env 2>/dev/null; set +a
             echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
             echo "db=${LOCAL_DB_NAME:-mos_db}@${LOCAL_DB_HOST:-127.0.0.1}"
+            # The .env on disk is not necessarily what the RUNNING process uses —
+            # pm2 keeps the env from when it was started. Compare them, or a probe
+            # can prove a row exists in a database the app never reads.
+            echo "--- running process ---"
+            pm2 jlist 2>/dev/null | node -e "
+              let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
+                try{ for(const p of JSON.parse(s)){
+                  const e=p.pm2_env||{};
+                  console.log(p.name, 'status='+e.status,
+                    'DB='+(e.env&&e.env.LOCAL_DB_NAME||'?')+'@'+(e.env&&e.env.LOCAL_DB_HOST||'?'),
+                    'cwd='+(e.pm_cwd||'?'), 'uptime='+new Date(e.pm_uptime||0).toISOString());
+                }}catch(err){console.log('pm2 parse failed',err.message)}});" || true
             node --import tsx -e "
               const mysql = require('mysql2/promise');
               (async () => {
@@ -51,6 +63,13 @@ jobs:
                 for (const r of w) console.log('  ', JSON.stringify(r));
                 const [m] = await c.execute('SELECT brandId, userId, role FROM brand_members WHERE brandId = 2975');
                 console.log('MEMBERS_2975', JSON.stringify(m));
+                // Run the EXACT query the brand picker uses (brand.listByMember).
+                // The row existing is not the same as the API returning it.
+                const [lbm] = await c.execute(
+                  'SELECT b.id, b.name, b.createdAt, bm.role FROM brands b INNER JOIN brand_members bm ON bm.brandId = b.id WHERE bm.userId = ? ORDER BY b.createdAt DESC LIMIT 6',
+                  [uid]);
+                console.log('LISTBYMEMBER_TOP6 n=' + lbm.length);
+                for (const r of lbm) console.log('   LBM ' + JSON.stringify(r));
                 // Columns the brand list might filter on — a NULL/0 here is the
                 // usual reason a row exists but never renders.
                 const [cols] = await c.execute(\"SHOW COLUMNS FROM brands\");
