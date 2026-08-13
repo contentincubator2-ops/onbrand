@@ -8,11 +8,12 @@
 import React from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Activity, BarChart3, Database, ExternalLink, Globe2, LineChart, Megaphone,
+  Activity, BarChart3, Database, ExternalLink, FileText, Globe2, LineChart, Megaphone,
   MousePointerClick, Play, Search, ShoppingBag, Sparkles, Target, TrendingUp,
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import PerformanceDashboard from "../components/performance/PerformanceDashboard";
+import FanpageMonthlyReport from "../components/performance/FanpageMonthlyReport";
 import MarketDashboard from "../components/market/MarketDashboard";
 
 const ALLOWED_EMAIL = "sowork@sowork.tw";
@@ -124,6 +125,9 @@ const performanceSources: Source[] = [
   { id: "shopline", label: "Shopline", short: "Shop", icon: <ShoppingBag size={18} />, color: "#00A870", desc: "商品銷售、轉換漏斗、客單價與回購" },
   { id: "ga", label: "GA / 官網", short: "GA", icon: <MousePointerClick size={18} />, color: "#F59E0B", desc: "流量來源、Landing page、路徑與轉換問題" },
   { id: "attribution", label: "整合歸因", short: "歸因", icon: <Target size={18} />, color: "#7C3AED", desc: "跨平台比較、預算重分配與 Campaign ROI" },
+  // 2026-08-13 (CJ「將這份報告設定在成效報告當中，新的任務 tray，稱為粉絲團月報」):
+  // 不刻儀表板 —— 使用者上傳自己在用的月報版型，系統跨月比對出可自動填的欄位。
+  { id: "fanpage_monthly", label: "粉絲團月報", short: "月報", icon: <FileText size={18} />, color: "#0F766E", desc: "上傳你自己的月報版型，系統比對多個月份找出可自動填的欄位，並回報版型體檢結果" },
 ];
 
 const marketSources: Source[] = [
@@ -737,7 +741,10 @@ export default function DataWorkspacePage() {
               TA × 訴求 matrix that answers which pairing performs best.
               Sits above the agent task cards, which stay as the "what can I
               run next" layer. */}
-          {isPerformance && <PerformanceDashboard sourceId={active.id} />}
+          {/* 粉絲團月報有自己的流程（上傳版型 → 跨月解析 → 體檢報告），不是
+              PerformanceDashboard 那種模擬儀表板，所以整頁換掉而不是疊加。 */}
+          {isPerformance && active.id === "fanpage_monthly" && <FanpageMonthlyReport />}
+          {isPerformance && active.id !== "fanpage_monthly" && <PerformanceDashboard sourceId={active.id} />}
 
           {/* 2026-08-11 (CJ「接下去，模擬市場數據」): simulated 市場 layer for
               懶得煮. Rendered ABOVE the existing content, never replacing it —
