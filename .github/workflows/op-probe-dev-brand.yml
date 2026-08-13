@@ -1,0 +1,60 @@
+name: Ops (DEV) — probe a brand's visibility (read-only)
+
+# Why a separate workflow: `environment: dev` is what swaps the SSH target to the
+# DEV VM. A prod-targeted probe would read the wrong database and "prove" the
+# wrong thing. Path-scoped push so it runs from a feature branch without going
+# anywhere near main (ci.yml deploys prod on any push to main).
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-brand.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 5
+    steps:
+      - name: Read-only look at the DEV database
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 4m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
+            echo "db=${LOCAL_DB_NAME:-mos_db}@${LOCAL_DB_HOST:-127.0.0.1}"
+            node --import tsx -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const c = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+                const [u] = await c.execute('SELECT id, email FROM users WHERE email = ?', ['sowork@sowork.tw']);
+                console.log('USER', JSON.stringify(u[0] || null));
+                if (!u[0]) return process.exit(0);
+                const uid = u[0].id;
+                const [b] = await c.execute(
+                  'SELECT id, name, slug, userId, createdBy, isDefault, positioningStatus, createdAt FROM brands WHERE userId = ? ORDER BY id DESC LIMIT 12', [uid]);
+                console.log('BRANDS_OF_USER n=' + b.length);
+                for (const r of b) console.log('  ', JSON.stringify(r));
+                const [w] = await c.execute('SELECT id, name, userId, createdBy FROM brands WHERE name = ?', ['五感十築']);
+                console.log('BY_NAME n=' + w.length);
+                for (const r of w) console.log('  ', JSON.stringify(r));
+                const [m] = await c.execute('SELECT brandId, userId, role FROM brand_members WHERE brandId = 2975');
+                console.log('MEMBERS_2975', JSON.stringify(m));
+                // Columns the brand list might filter on — a NULL/0 here is the
+                // usual reason a row exists but never renders.
+                const [cols] = await c.execute(\"SHOW COLUMNS FROM brands\");
+                console.log('BRAND_COLUMNS', cols.map(x => x.Field).join(','));
+                await c.end();
+              })().catch(e => { console.error('FAILED', e && e.message || e); process.exit(1); });
+            "
