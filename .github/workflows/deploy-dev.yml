@@ -13,8 +13,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 2026-08-13: build 和 deploy 原本是兩個 job，靠一個 81MB 的 artifact 交接，
+  # 結果撞上 Actions 儲存配額 —— build 全綠但 upload 失敗，deploy 根本不跑，
+  # 而且配額用量 GitHub 每 6–12 小時才重算，刪掉舊檔也不會立刻恢復。
+  # 兩個 job 本來就都跑在 ubuntu-24.04 上，合併之後 tarball 直接留在 runner
+  # 磁碟上，不必經過 GitHub 儲存，這個故障模式就永久消失。
+  # （dev environment 沒有 protection_rules 也沒有 branch policy，所以把
+  #  environment: dev 提到整個 job 不會多 gate 到 build。）
   build:
     runs-on: ubuntu-24.04
+    environment: dev
     env:
       DB_HOST: localhost
       DB_USER: test
@@ -70,31 +78,9 @@ jobs:
             -czf "$RUNNER_TEMP/onbrand-release.tgz" .
           test -s "$RUNNER_TEMP/onbrand-release.tgz"
 
-      - name: Upload release artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: onbrand-dev-${{ github.sha }}
-          path: ${{ runner.temp }}/onbrand-release.tgz
-          if-no-files-found: error
-          # 2026-08-13: 7 天讓 dev 部署撞上 Actions 儲存配額 —— 每個 release 包
-          # 約 81MB，一天約 11 次部署，7 天就累積到 6.1GB 而 upload 開始整個失敗
-          # （build 全綠但 Upload release artifact 掛掉，deploy job 直接不跑）。
-          # 這個 artifact 的唯一用途是同一個 workflow 內 build → deploy 的交接，
-          # 幾分鐘就用完了，留 2 天已經遠超所需。
-          retention-days: 2
-
-  deploy:
-    needs: build
-    if: github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-24.04
-    environment: dev
-    steps:
-      - name: Download tested release
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: onbrand-dev-${{ github.sha }}
-
+      # ── deploy（只有 dev 分支才跑；PR 只到上面的 build/test 為止）────────
       - name: Configure dev SSH identity
+        if: github.ref == 'refs/heads/dev'
         env:
           VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           VM_SSH_HOST_KEY: ${{ secrets.VM_SSH_HOST_KEY }}
@@ -106,15 +92,19 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
 
       - name: Upload release to dev VM
+        if: github.ref == 'refs/heads/dev'
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
         run: |
+          # 合併 job 之後 tarball 還在 RUNNER_TEMP，不再是 download-artifact
+          # 放到工作目錄的那一份。
           scp -i ~/.ssh/onbrand-dev \
-            onbrand-release.tgz \
+            "$RUNNER_TEMP/onbrand-release.tgz" \
             "$VM_USER@$VM_HOST:/tmp/onbrand-release-${GITHUB_SHA}.tgz"
 
       - name: Activate release with health-check rollback
+        if: github.ref == 'refs/heads/dev'
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
