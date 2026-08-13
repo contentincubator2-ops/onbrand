@@ -45,47 +45,47 @@ jobs:
           # pm2 dump is a JSON array of process configs; each has a .pm2_env.env block
           # We use python to parse it since jq may not be available
           python3 - "$PM2_DUMP" "$MOS" << 'PYEOF'
-import json, sys, os
+          import json, sys, os
 
-dump_path = sys.argv[1]
-out_path  = sys.argv[2]
+          dump_path = sys.argv[1]
+          out_path  = sys.argv[2]
 
-with open(dump_path) as f:
-    data = json.load(f)
+          with open(dump_path) as f:
+              data = json.load(f)
 
-# Find the onbrand process
-proc = None
-for p in data:
-    name = p.get("name", "") or p.get("pm2_env", {}).get("name", "")
-    if name == "onbrand":
-        proc = p
-        break
+          # Find the onbrand process
+          proc = None
+          for p in data:
+              name = p.get("name", "") or p.get("pm2_env", {}).get("name", "")
+              if name == "onbrand":
+                  proc = p
+                  break
 
-if not proc:
-    print("❌ 'onbrand' process not found in dump. Available:", [p.get("name") for p in data])
-    sys.exit(1)
+          if not proc:
+              print("❌ 'onbrand' process not found in dump. Available:", [p.get("name") for p in data])
+              sys.exit(1)
 
-env = proc.get("pm2_env", {}).get("env", {})
-print(f"Found {len(env)} env vars in pm2 dump for 'onbrand'")
+          env = proc.get("pm2_env", {}).get("env", {})
+          print(f"Found {len(env)} env vars in pm2 dump for 'onbrand'")
 
-# Skip pm2 internal variables
-SKIP = {"NODE_APP_INSTANCE", "PM2_HOME", "PM2_JSON_PROCESSING", "restart_delay",
-        "pm_exec_path", "pm_cwd", "exec_mode", "instances", "pmx", "automation",
-        "status", "pm_uptime", "created_at", "unstable_restarts", "restart_time",
-        "pm_id", "versioning", "node_version"}
+          # Skip pm2 internal variables
+          SKIP = {"NODE_APP_INSTANCE", "PM2_HOME", "PM2_JSON_PROCESSING", "restart_delay",
+                  "pm_exec_path", "pm_cwd", "exec_mode", "instances", "pmx", "automation",
+                  "status", "pm_uptime", "created_at", "unstable_restarts", "restart_time",
+                  "pm_id", "versioning", "node_version"}
 
-lines = []
-for k, v in env.items():
-    if k in SKIP or k.startswith("pm_") or k.startswith("_"):
-        continue
-    lines.append(f"{k}={v}")
+          lines = []
+          for k, v in env.items():
+              if k in SKIP or k.startswith("pm_") or k.startswith("_"):
+                  continue
+              lines.append(f"{k}={v}")
 
-os.makedirs(os.path.dirname(out_path), exist_ok=True)
-with open(out_path, "w") as f:
-    f.write("\n".join(lines) + "\n")
+          os.makedirs(os.path.dirname(out_path), exist_ok=True)
+          with open(out_path, "w") as f:
+              f.write("\n".join(lines) + "\n")
 
-print(f"✓ Wrote {len(lines)} vars to {out_path}")
-PYEOF
+          print(f"✓ Wrote {len(lines)} vars to {out_path}")
+          PYEOF
 
           echo ""
           echo "=== .env written — first 5 keys (values masked) ==="
