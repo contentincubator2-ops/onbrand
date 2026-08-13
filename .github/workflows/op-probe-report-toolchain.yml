@@ -1,0 +1,82 @@
+name: Ops — probe AI-Reporting toolchain on prod VM (read-only)
+
+# Path-scoped push trigger so this can run from a branch WITHOUT touching main
+# (ci.yml deploys on any push to main — we don't want a redeploy just to probe).
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-report-toolchain.yml'
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: python runtime
+        run: |
+          set +e
+          echo "--- interpreters ---"
+          for c in python3 python python3.11 python3.12; do
+            p=$(command -v $c 2>/dev/null)
+            [ -n "$p" ] && echo "$c -> $p ($($c --version 2>&1))"
+          done
+          echo "--- pip ---"
+          command -v pip3 >/dev/null && pip3 --version || echo "pip3: MISSING"
+
+      - name: report libraries (the ones the fill engine needs)
+        run: |
+          set +e
+          for m in pptx docx openpyxl lxml PIL; do
+            python3 -c "import $m; print('$m OK', getattr($m,'__version__','?'))" 2>/dev/null \
+              || echo "$m MISSING"
+          done
+
+      - name: pdf renderer (PPTX -> PDF without Office)
+        run: |
+          set +e
+          for c in soffice libreoffice unoconv; do
+            p=$(command -v $c 2>/dev/null)
+            if [ -n "$p" ]; then echo "$c -> $p"; else echo "$c: MISSING"; fi
+          done
+
+      - name: is /api/export/pptx actually wired up?
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          echo "--- route registration ---"
+          grep -rn "exportRouter\|/api/export" server/index.ts | head -5
+          echo "--- what the route shells out to ---"
+          grep -n "execFile\|python" server/routes/exportRoute.ts | head -10
+
+      - name: live smoke test of the pptx path (unauthenticated -> expect 401, proves route exists)
+        run: |
+          set +e
+          code=$(curl -s -o /tmp/exp.out -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"title":"probe","content":"## a\nb"}' \
+            http://127.0.0.1:3101/api/export/pptx)
+          echo "HTTP $code"
+          echo "body: $(head -c 200 /tmp/exp.out)"
+          if [ "$code" = "404" ]; then echo "VERDICT: route NOT mounted"; fi
+          if [ "$code" = "401" ]; then echo "VERDICT: route mounted (auth required, as expected)"; fi
+
+      - name: can python-pptx actually round-trip a file here?
+        run: |
+          set +e
+          python3 - <<'PY' 2>&1 || echo "VERDICT: python-pptx round-trip NOT possible on this VM"
+          from pptx import Presentation
+          from pptx.util import Inches
+          p = Presentation()
+          s = p.slides.add_slide(p.slide_layouts[0])
+          s.shapes.title.text = "probe"
+          p.save("/tmp/_probe.pptx")
+          p2 = Presentation("/tmp/_probe.pptx")
+          print("round-trip OK, slides =", len(p2.slides.__iter__.__self__._sldIdLst))
+          PY
+
+      - name: headroom (80MB decks are memory-hungry)
+        run: |
+          free -m | head -2
+          df -h /opt /tmp | tail -2
+          node -v
