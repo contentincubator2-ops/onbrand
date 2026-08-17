@@ -37,6 +37,7 @@ import { missionSquadRouter } from "./routes/missionSquadRoute";
 import { projectSyncCallbackRouter } from "./routes/projectSyncCallbackRoute";
 import { squadSearchRouter } from "./routers/squadSearchRouter";
 import { entitySearchRouter } from "./routers/entitySearchRouter";
+import { manusRouter } from "./routers/manusRouter";
 import { intakeRouter } from "./routers/intakeRouter";
 import { missionStepStreamRouter } from "./routes/missionStepStreamRoute";
 import { publicAgentsRoute } from "./routes/publicAgentsRoute";
@@ -364,6 +365,7 @@ app.use("/api/missions", missionSquadRouter);
 app.use("/api/project-sync", projectSyncCallbackRouter);
 app.use("/api/squads/search", squadSearchRouter);
 app.use("/api/entity/search", entitySearchRouter);
+app.use("/api/manus", manusRouter);
 app.use("/api/intake", intakeRouter);
 app.use("/api/missions", missionStepStreamRouter);
 
