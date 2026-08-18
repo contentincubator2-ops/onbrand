@@ -34,9 +34,11 @@ jobs:
       - name: Install client dependencies
         run: npm install --prefix skills/ai-talent/client
       - name: Type check — server
-        run: npm run lint --prefix skills/ai-talent
+        run: npm run typecheck --prefix skills/ai-talent
       - name: Type check — client
         run: cd skills/ai-talent/client && npx tsc --noEmit
+      - name: Boundary guard — client/server
+        run: ./scripts/check-client-server-boundary.sh
       - name: Run tests
         run: npm run test --prefix skills/ai-talent
 
