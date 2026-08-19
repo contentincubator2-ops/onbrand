@@ -585,7 +585,7 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
             </p>
           </div>
         )}
-        <div className="px-4 py-2 flex items-center justify-between text-default-500 text-tiny">
+        <div className={`px-4 py-2 flex items-center justify-between text-default-500 text-tiny ${isComponent ? "" : "border-t border-divider"}`}>
           <span>👍❤️🎉 12K</span>
           <span className="text-default-400">{lang === "en" ? "Comments · Shares" : "留言 · 分享"}</span>
         </div>
