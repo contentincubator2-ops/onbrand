@@ -40,6 +40,88 @@ export interface IgStrategyPublicVariant {
   image: { style: string | null; url: null; status: "skipped" };
 }
 
+interface RunSynthesisBatchesArgs {
+  batchIndexes: readonly number[];
+  concurrency: number;
+  deadlineAt: number;
+  perAttemptTimeoutMs: number;
+  executeBatch: (batchIndex: number, signal: AbortSignal) => Promise<void>;
+  now?: () => number;
+}
+
+/** Run each batch at most twice without allowing retries beyond the campaign deadline. */
+export async function runSynthesisBatchesWithDeadline({
+  batchIndexes,
+  concurrency,
+  deadlineAt,
+  perAttemptTimeoutMs,
+  executeBatch,
+  now = Date.now,
+}: RunSynthesisBatchesArgs): Promise<void> {
+  let nextIndex = 0;
+  let stopped = false;
+  let hasFatalError = false;
+  let fatalError: unknown;
+  const activeControllers = new Set<AbortController>();
+
+  const abortActive = () => {
+    for (const controller of activeControllers) controller.abort();
+  };
+
+  const executeWithRetry = async (batchIndex: number) => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (stopped) throw lastError ?? new Error("public synthesis stopped");
+      const remainingMs = deadlineAt - now();
+      if (remainingMs <= 0) throw new Error("public synthesis timeout");
+
+      const controller = new AbortController();
+      activeControllers.add(controller);
+      const timeout = setTimeout(
+        () => controller.abort(),
+        Math.min(perAttemptTimeoutMs, remainingMs),
+      );
+      try {
+        await executeBatch(batchIndex, controller.signal);
+        if (now() > deadlineAt) throw new Error("public synthesis timeout");
+        return;
+      } catch (error) {
+        lastError = error;
+      } finally {
+        clearTimeout(timeout);
+        activeControllers.delete(controller);
+        if (!controller.signal.aborted) controller.abort();
+      }
+
+      if (deadlineAt - now() <= 0) throw new Error("public synthesis timeout");
+    }
+    throw lastError;
+  };
+
+  const worker = async () => {
+    while (!stopped && nextIndex < batchIndexes.length) {
+      const batchIndex = batchIndexes[nextIndex]!;
+      nextIndex += 1;
+      try {
+        await executeWithRetry(batchIndex);
+      } catch (error) {
+        if (!hasFatalError) {
+          hasFatalError = true;
+          fatalError = error;
+        }
+        stopped = true;
+        abortActive();
+      }
+    }
+  };
+
+  await Promise.all(Array.from(
+    { length: Math.min(Math.max(1, concurrency), batchIndexes.length) },
+    () => worker(),
+  ));
+  if (hasFatalError) throw fatalError;
+}
+
 export function assertPrivateStrategyArtifactsReady(
   artifacts: readonly IgStrategyPrivateArtifact[],
   expectedCount: number,

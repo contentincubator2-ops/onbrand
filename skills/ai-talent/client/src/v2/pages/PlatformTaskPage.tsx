@@ -1351,13 +1351,26 @@ function PlatformTaskPageInner() {
           });
           if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
           if ((r as any).outputId) {
+            const hasAnyPublicCaption = ((r as any).variants ?? [])
+              .some((variant: any) => (variant?.caption ?? "").trim().length > 0);
+            if ((r as any).ok === false || !hasAnyPublicCaption) {
+              showToastGlobal(lang === "en"
+                ? "Public posts weren't generated. Only internal drafts are available right now; you can regenerate them."
+                : "公開貼文未產生，目前只有內部草稿，可重新產生。");
+            }
             closeTask();
             navigate(`/run/${(r as any).outputId}`);
             return;
           }
-          setErrorMsg(lang === "en"
-            ? "Squad ran but the output ID didn't come back. Try again or contact support."
-            : "Squad 執行成功但 outputId 未回傳，請重試或回報。");
+          const squadErrors = Array.isArray((r as any).errors) ? (r as any).errors : [];
+          const errorPreview = squadErrors.slice(0, 2).join(" · ").slice(0, 200);
+          setErrorMsg(errorPreview
+            ? (lang === "en"
+                ? `The squad couldn't produce an output. Detail: ${errorPreview}`
+                : `Squad 無法產出內容。詳情：${errorPreview}`)
+            : (lang === "en"
+                ? "The squad couldn't produce an output. Try again or contact support."
+                : "Squad 無法產出內容，請重試或回報。"));
           return;
         }
         setErrorMsg(lang === "en" ? "Squad auto-run isn't available right now." : "Squad 自動執行 mutation 暫不可用");
