@@ -2080,10 +2080,11 @@ export const quickTaskRouter = router({
           // Fixed-30 campaigns cannot reliably fit complete captions in one
           // model response. Fan out immutable server slots in bounded batches;
           // every call remains pinned to Qwen and the final order is restored.
-          // At three workers, six batches take two 18s waves (36s); even a
-          // serialized HALF_OPEN probe plus two waves is 54s. Retries consume
-          // only whatever remains before the unchanged 55s campaign deadline.
-          const synthesisBatchTimeoutMs = 18_000;
+          // At three workers, six batches take two 26s waves (52s). A serialized
+          // HALF_OPEN probe can use up to 26s, so all remaining attempts share
+          // at most 29s; retries and attempt timers are clamped to the unchanged
+          // 55s campaign deadline.
+          const synthesisBatchTimeoutMs = 26_000;
           const synthesisDeadlineAt = Date.now() + 55_000;
           const slotBatches = Array.from(
             { length: Math.ceil(slots.length / 5) },
@@ -2114,31 +2115,27 @@ export const quickTaskRouter = router({
               brandRules,
             });
           };
-          try {
-            // A HALF_OPEN provider admits exactly one recovery probe. Avoid
-            // launching sibling batches that would reject and abort that probe.
-            const qwenCircuit = llmCircuitSnapshot().find((entry) => entry.provider === "qwen");
-            let firstParallelBatch = 0;
-            if (qwenCircuit && qwenCircuit.state !== "CLOSED" && slotBatches.length > 0) {
-              await runSynthesisBatchesWithDeadline({
-                batchIndexes: [0],
-                concurrency: 1,
-                deadlineAt: synthesisDeadlineAt,
-                perAttemptTimeoutMs: synthesisBatchTimeoutMs,
-                executeBatch,
-              });
-              firstParallelBatch = 1;
-            }
+          // A HALF_OPEN provider admits exactly one recovery probe. Avoid
+          // launching sibling batches that would reject and abort that probe.
+          const qwenCircuit = llmCircuitSnapshot().find((entry) => entry.provider === "qwen");
+          let firstParallelBatch = 0;
+          if (qwenCircuit && qwenCircuit.state !== "CLOSED" && slotBatches.length > 0) {
             await runSynthesisBatchesWithDeadline({
-              batchIndexes: slotBatches.map((_, index) => index).slice(firstParallelBatch),
-              concurrency: 3,
+              batchIndexes: [0],
+              concurrency: 1,
               deadlineAt: synthesisDeadlineAt,
               perAttemptTimeoutMs: synthesisBatchTimeoutMs,
               executeBatch,
             });
-          } catch (error) {
-            throw error;
+            firstParallelBatch = 1;
           }
+          await runSynthesisBatchesWithDeadline({
+            batchIndexes: slotBatches.map((_, index) => index).slice(firstParallelBatch),
+            concurrency: 3,
+            deadlineAt: synthesisDeadlineAt,
+            perAttemptTimeoutMs: synthesisBatchTimeoutMs,
+            executeBatch,
+          });
           const publicResults = publicBatches.flat();
           // A batch may independently choose a valid address form; validate
           // the complete campaign again so all posts use one audience voice.
