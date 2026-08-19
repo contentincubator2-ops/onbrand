@@ -936,6 +936,7 @@ import {
   buildIgStrategyPublicSlots,
   buildIgStrategySynthesisMessages,
   parseIgStrategyPublicVariants,
+  runSynthesisBatchesWithDeadline,
   type IgStrategyPrivateArtifact,
 } from "../_core/igStrategyPublicSynthesis";
 import { snapshot as llmCircuitSnapshot } from "../_core/llmCircuitBreaker";
@@ -2079,15 +2080,17 @@ export const quickTaskRouter = router({
           // Fixed-30 campaigns cannot reliably fit complete captions in one
           // model response. Fan out immutable server slots in bounded batches;
           // every call remains pinned to Qwen and the final order is restored.
+          // At three workers, six batches take two 18s waves (36s); even a
+          // serialized HALF_OPEN probe plus two waves is 54s. Retries consume
+          // only whatever remains before the unchanged 55s campaign deadline.
+          const synthesisBatchTimeoutMs = 18_000;
+          const synthesisDeadlineAt = Date.now() + 55_000;
           const slotBatches = Array.from(
-            { length: Math.ceil(slots.length / 10) },
-            (_, batchIndex) => slots.slice(batchIndex * 10, (batchIndex + 1) * 10),
+            { length: Math.ceil(slots.length / 5) },
+            (_, batchIndex) => slots.slice(batchIndex * 5, (batchIndex + 1) * 5),
           );
-          const synthesisAbort = new AbortController();
-          const synthesisTimeout = setTimeout(() => synthesisAbort.abort(), 55_000);
           const publicBatches: Array<ReturnType<typeof parseIgStrategyPublicVariants>> = new Array(slotBatches.length);
-          let nextBatchIndex = 0;
-          const executeBatch = async (batchIndex: number) => {
+          const executeBatch = async (batchIndex: number, signal: AbortSignal) => {
             const slotBatch = slotBatches[batchIndex]!;
             const messages = buildIgStrategySynthesisMessages({
               idOrSlug: sqSlugNew,
@@ -2099,7 +2102,7 @@ export const quickTaskRouter = router({
               brandRules: qwenBrandRules,
             });
             const result = await callModelStrict(messages, "qwen", undefined, {
-              signal: synthesisAbort.signal,
+              signal,
             });
             publicBatches[batchIndex] = parseIgStrategyPublicVariants({
               idOrSlug: sqSlugNew,
@@ -2111,31 +2114,30 @@ export const quickTaskRouter = router({
               brandRules,
             });
           };
-          const runBatchWorker = async () => {
-            while (nextBatchIndex < slotBatches.length) {
-              const batchIndex = nextBatchIndex;
-              nextBatchIndex += 1;
-              await executeBatch(batchIndex);
-            }
-          };
           try {
             // A HALF_OPEN provider admits exactly one recovery probe. Avoid
             // launching sibling batches that would reject and abort that probe.
             const qwenCircuit = llmCircuitSnapshot().find((entry) => entry.provider === "qwen");
+            let firstParallelBatch = 0;
             if (qwenCircuit && qwenCircuit.state !== "CLOSED" && slotBatches.length > 0) {
-              await executeBatch(0);
-              nextBatchIndex = 1;
+              await runSynthesisBatchesWithDeadline({
+                batchIndexes: [0],
+                concurrency: 1,
+                deadlineAt: synthesisDeadlineAt,
+                perAttemptTimeoutMs: synthesisBatchTimeoutMs,
+                executeBatch,
+              });
+              firstParallelBatch = 1;
             }
-            await Promise.all(Array.from(
-              { length: Math.min(3, Math.max(0, slotBatches.length - nextBatchIndex)) },
-              () => runBatchWorker(),
-            ));
+            await runSynthesisBatchesWithDeadline({
+              batchIndexes: slotBatches.map((_, index) => index).slice(firstParallelBatch),
+              concurrency: 3,
+              deadlineAt: synthesisDeadlineAt,
+              perAttemptTimeoutMs: synthesisBatchTimeoutMs,
+              executeBatch,
+            });
           } catch (error) {
-            if (synthesisAbort.signal.aborted) throw new Error("public synthesis timeout");
             throw error;
-          } finally {
-            clearTimeout(synthesisTimeout);
-            if (!synthesisAbort.signal.aborted) synthesisAbort.abort();
           }
           const publicResults = publicBatches.flat();
           // A batch may independently choose a valid address form; validate

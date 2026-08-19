@@ -5,6 +5,7 @@ import {
   buildIgStrategyPublicSlots,
   buildIgStrategySynthesisMessages,
   parseIgStrategyPublicVariants,
+  runSynthesisBatchesWithDeadline,
   type IgStrategyPublicSlot,
 } from "./igStrategyPublicSynthesis";
 import {
@@ -25,6 +26,42 @@ const PRIVATE_STEPS: StrategyStepDescriptor[] = [
   { name: "Live 直播策略規劃", outputType: "live_strategy_plan" },
   { name: "直播後內容再製", outputKind: "post_live_content_set" },
 ];
+
+describe("IG public synthesis batch scheduling", () => {
+  it("retries one failed batch once and succeeds", async () => {
+    let calls = 0;
+    await runSynthesisBatchesWithDeadline({
+      batchIndexes: [0],
+      concurrency: 1,
+      deadlineAt: 1_000,
+      perAttemptTimeoutMs: 100,
+      now: () => 0,
+      executeBatch: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("incomplete JSON");
+      },
+    });
+    expect(calls).toBe(2);
+  });
+
+  it("does not retry after the overall deadline is exhausted", async () => {
+    let now = 0;
+    let calls = 0;
+    await expect(runSynthesisBatchesWithDeadline({
+      batchIndexes: [0],
+      concurrency: 1,
+      deadlineAt: 100,
+      perAttemptTimeoutMs: 100,
+      now: () => now,
+      executeBatch: async () => {
+        calls += 1;
+        now = 100;
+        throw new Error("timed out");
+      },
+    })).rejects.toThrow("public synthesis timeout");
+    expect(calls).toBe(1);
+  });
+});
 
 function formatCounts(slots: readonly IgStrategyPublicSlot[]) {
   return slots.reduce<Record<string, number>>((counts, slot) => {
