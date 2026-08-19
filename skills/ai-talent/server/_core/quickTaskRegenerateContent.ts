@@ -90,3 +90,24 @@ export function replaceRegeneratedContent(
   variants[target.index] = nextItem;
   return JSON.stringify(variants, null, 2);
 }
+
+/**
+ * regenerateVariant only regenerates copy (`images: 0`). Keep the visual that
+ * is still shown beside that copy, including the persisted model prompt. A
+ * later explicit image regeneration replaces both together.
+ */
+export function preserveExistingVariantImage(
+  nextItem: Record<string, any>,
+  currentItem: Record<string, any> | undefined,
+): Record<string, any> {
+  if (!currentItem) return nextItem;
+  const preserved = { ...nextItem };
+  if (currentItem.image && typeof currentItem.image === "object") {
+    preserved.image = { ...currentItem.image };
+  }
+  // Some non-orchestra/legacy variants store the same visual fields flat.
+  for (const key of ["imageUrl", "imageStatus", "imageStyle", "imagePrompt"] as const) {
+    if (currentItem[key] !== undefined) preserved[key] = currentItem[key];
+  }
+  return preserved;
+}
