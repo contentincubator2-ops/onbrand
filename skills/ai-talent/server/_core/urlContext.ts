@@ -42,6 +42,9 @@ export interface UrlSummary {
   description: string | null;
   h1: string | null;
   body_excerpt: string;
+  /** Whether body_excerpt contains actual article/page copy rather than a
+   * login wall, JavaScript shell, or an insufficiently small extraction. */
+  body_usable: boolean;
   fetched_chars: number;
   /** OG card metadata — used by FBLinkCard mockup to render the link preview
    * exactly as Facebook would (so user sees what the OG-rendered post looks
@@ -53,6 +56,27 @@ export interface UrlSummary {
     site_name: string | null;
     domain: string;
   };
+}
+
+const LOGIN_REQUIRED_HOSTS = new Set([
+  "facebook.com",
+  "instagram.com",
+  "x.com",
+  "twitter.com",
+  "threads.net",
+  "linkedin.com",
+]);
+
+const LOGIN_OR_JS_SHELL_RE =
+  /you must log in|log into facebook|javascript is required|enable javascript|請先登入/i;
+
+function isLoginRequiredHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
+    return [...LOGIN_REQUIRED_HOSTS].some((domain) => host === domain || host.endsWith(`.${domain}`));
+  } catch {
+    return false;
+  }
 }
 
 const TRAIL_RE = /[).,，。、；：!?！？'"]+$/;
@@ -166,6 +190,13 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
 
     const fullText = htmlToText(html);
     const excerpt = fullText.slice(0, MAX_BODY_CHARS);
+    const effectiveTextLength = fullText.replace(/\s/g, "").length;
+    const effectiveUrl = res.url || url;
+    const bodyUsable =
+      !isLoginRequiredHost(url) &&
+      !isLoginRequiredHost(effectiveUrl) &&
+      effectiveTextLength >= 200 &&
+      !LOGIN_OR_JS_SHELL_RE.test(fullText);
 
     return {
       url,
@@ -173,6 +204,7 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
       description: description?.slice(0, 600) ?? null,
       h1: h1?.slice(0, 280) ?? null,
       body_excerpt: excerpt,
+      body_usable: bodyUsable,
       fetched_chars: fullText.length,
       og: {
         image: ogImage,
@@ -193,8 +225,15 @@ export function formatUrlSummaryForPrompt(s: UrlSummary): string {
   const parts: string[] = [`【已抓取參考連結】${s.url}`];
   if (s.title)       parts.push(`標題：${s.title}`);
   if (s.description) parts.push(`描述：${s.description}`);
-  if (s.h1)          parts.push(`H1：${s.h1}`);
-  if (s.body_excerpt) parts.push(`內文摘錄（前 ${s.body_excerpt.length} 字）：\n${s.body_excerpt}`);
+  if (s.body_usable === false) {
+    if (s.og.title && s.og.title !== s.title) parts.push(`OG 標題：${s.og.title}`);
+    if (s.og.description && s.og.description !== s.description) parts.push(`OG 描述：${s.og.description}`);
+    if (s.og.site_name) parts.push(`OG 網站：${s.og.site_name}`);
+    parts.push("只取得連結卡片摘要，未取得正文：請依標題與描述推論主題撰寫，不要臆造未出現的細節。");
+  } else {
+    if (s.h1)          parts.push(`H1：${s.h1}`);
+    if (s.body_excerpt) parts.push(`內文摘錄（前 ${s.body_excerpt.length} 字）：\n${s.body_excerpt}`);
+  }
   parts.push(`【務必基於以上連結內容生成 — 不要寫通用模板，要呼應這篇內容的具體訊息、故事、品牌獨特之處】`);
   return parts.join("\n");
 }
