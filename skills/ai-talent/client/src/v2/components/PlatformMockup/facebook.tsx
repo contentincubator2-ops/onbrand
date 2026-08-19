@@ -17,7 +17,7 @@ import {
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
   faChevronRight, faArrowRight, faThumbtack,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption, ImageGenSlot } from "./shared";
+import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption, ImageGenSlot, SHOW_IMAGE_STYLE_OVERLAY } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── FB Feed ─────────────── */
@@ -138,7 +138,10 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 className="w-full h-auto object-contain"
                 style={{ maxHeight: 560 }}
               />
-              {liveImageStyle && (
+              {/* 2026-08-19: hidden behind SHOW_IMAGE_STYLE_OVERLAY — the
+                  Chinese style text never produced this image. Flip the flag
+                  in shared.tsx to restore. */}
+              {SHOW_IMAGE_STYLE_OVERLAY && liveImageStyle && (
                 <div className="absolute bottom-2 left-2 right-2 bg-black/55 backdrop-blur-sm rounded px-2 py-1">
                   <p className="text-[10px] text-white/90 line-clamp-2">{liveImageStyle}</p>
                 </div>
