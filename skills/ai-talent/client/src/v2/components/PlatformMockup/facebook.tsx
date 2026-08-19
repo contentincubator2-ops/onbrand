@@ -520,10 +520,7 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
               ? "Primary text — not part of this task (run “FB Ad Primary Text ×5”)"
               : "主文案區 · 非本任務產出（可用「FB 廣告 Primary Text 5 種」任務產生）"} lines={3} />
           ) : (
-            <>
-              <p className="text-small font-medium leading-relaxed whitespace-pre-wrap">{adText}</p>
-              <p className="text-tiny text-default-500 mt-1">{lang === "en" ? "Shop now — 10% off, limited time →" : "立即購買，限時 9 折優惠 →"}</p>
-            </>
+            <p className="text-small font-medium leading-relaxed whitespace-pre-wrap">{adText}</p>
           )}
         </div>
         {showImage && (
@@ -552,35 +549,35 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
             </div>
           )
         )}
-        {/* CTA bar (FB ad signature) — component tasks render their
-            deliverable in its REAL slot here, highlighted */}
-        <div className="px-4 py-2.5 bg-default-100 border-y border-divider flex items-center justify-between">
-          <div className="min-w-0 flex-1">
-            <p className="text-tiny text-default-500 uppercase tracking-wider">YOUR-BRAND.COM</p>
-            {componentSlot === "headline" ? (
-              // 2026-07-20 (CJ QA): line-clamp guards the layout even if a
-              // non-compliant over-long caption slips past server validation.
-              <p className="text-small font-semibold rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-0.5 whitespace-pre-wrap line-clamp-2">
-                {deliverableTag}{adText}
-              </p>
-            ) : isComponent ? (
-              <div className="mt-0.5"><GhostSlot label={lang === "en" ? "Headline — not part of this task" : "廣告標題 · 非本任務產出"} lines={1} /></div>
-            ) : (
-              <p className="text-small font-semibold truncate">{lang === "en" ? "Shop now · Limited offer" : "立即購買 · 限時優惠"}</p>
-            )}
-            {componentSlot === "description" && (
-              <p className="text-tiny text-default-600 rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-1 whitespace-pre-wrap line-clamp-3">
-                {deliverableTag}{adText}
-              </p>
-            )}
+        {/* CTA bar is only meaningful for component tasks, whose deliverable
+            renders in its real ad slot here, highlighted. */}
+        {isComponent && (
+          <div className="px-4 py-2.5 bg-default-100 border-y border-divider flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-tiny text-default-500 uppercase tracking-wider">YOUR-BRAND.COM</p>
+              {componentSlot === "headline" ? (
+                // 2026-07-20 (CJ QA): line-clamp guards the layout even if a
+                // non-compliant over-long caption slips past server validation.
+                <p className="text-small font-semibold rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-0.5 whitespace-pre-wrap line-clamp-2">
+                  {deliverableTag}{adText}
+                </p>
+              ) : (
+                <div className="mt-0.5"><GhostSlot label={lang === "en" ? "Headline — not part of this task" : "廣告標題 · 非本任務產出"} lines={1} /></div>
+              )}
+              {componentSlot === "description" && (
+                <p className="text-tiny text-default-600 rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-1 whitespace-pre-wrap line-clamp-3">
+                  {deliverableTag}{adText}
+                </p>
+              )}
+            </div>
+            <Button
+              color="default" size="sm" radius="md"
+              className={`font-semibold ml-2 shrink-0 ${componentSlot === "cta" ? "bg-secondary-100 ring-2 ring-secondary-300" : "bg-default-200"}`}
+            >
+              {ctaBtnText}
+            </Button>
           </div>
-          <Button
-            color="default" size="sm" radius="md"
-            className={`font-semibold ml-2 shrink-0 ${componentSlot === "cta" ? "bg-secondary-100 ring-2 ring-secondary-300" : "bg-default-200"}`}
-          >
-            {ctaBtnText}
-          </Button>
-        </div>
+        )}
         {componentSlot === "cta" && (
           <div className="px-4 py-2 border-b border-divider">
             <p className="text-tiny text-default-700 rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-1 whitespace-pre-wrap">
