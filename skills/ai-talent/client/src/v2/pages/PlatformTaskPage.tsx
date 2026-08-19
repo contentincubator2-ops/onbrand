@@ -1453,9 +1453,16 @@ function PlatformTaskPageInner() {
 
   // ── Progress / countdown ──────────────────────────────────────────────────
   const activeTierForProgress = activeTask ? effectiveTier(activeTask) : "30s";
+  // 2026-08-19: squad campaigns are the slow outlier. They run the whole
+  // quickTask.runSquadAuto pipeline inside one request — 5 planning steps in
+  // sequence plus a 30-post synthesis, measured worst case ~196s. A 100s ring
+  // hits 100% while there is still a minute and a half to go, which reads as
+  // "stuck" and gets the user clicking 開始做 again. Only the squad branch is
+  // widened; every other 99s task keeps its existing 100s pacing.
   const expectedSec =
     activeTierForProgress === "60s" ? 90 :
     activeTask && HOLD_FOR_IMAGES.has(activeTask.id) ? 90 :
+    activeTask?.kind === "squad" ? 200 :
     activeTierForProgress === "99s" ? 100 : 30;
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 

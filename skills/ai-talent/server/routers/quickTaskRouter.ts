@@ -19,7 +19,7 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, singleFlightPerUser } from "../_core/trpc";
 import { callModel, type ModelProvider } from "../_core/multiModelRouter";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
@@ -1005,6 +1005,11 @@ function buildPriorContext(
 
 /* ──────────────────────────── ROUTER ───────────────────────────────────── */
 
+const runSquadAutoSingleFlight = singleFlightPerUser({
+  key: "quickTask.runSquadAuto",
+  message: "這個企劃還在產生中，完成後才能再開一個。",
+});
+
 export const quickTaskRouter = router({
   list: protectedProcedure.query(() => {
     return Object.values(TASKS).map((t) => ({
@@ -1771,6 +1776,12 @@ export const quickTaskRouter = router({
   // The five explicitly catalogued IG strategy tasks instead keep every step
   // private and run a final public-content synthesis into publishable IG slots.
   runSquadAuto: protectedProcedure
+    // 2026-08-19: one runSquadAuto per user at a time. The pipeline below is
+    // ~3 minutes of synchronous work; without this, a user who thinks the
+    // progress ring is stuck can stack several of them on the single Node
+    // fork. See singleFlightPerUser in _core/trpc.ts for why this returns
+    // CONFLICT (409 JSON) rather than anything the client reads as a 502.
+    .use(runSquadAutoSingleFlight)
     .input(z.object({
       squadSlug: z.string().min(1).max(80),
       topic:     z.string().max(2000).default(""),

@@ -154,6 +154,53 @@ export const protectedProcedure = t.procedure
   });
 
 /**
+ * 2026-08-19 — single-flight guard, one in-flight call per user.
+ *
+ * Motivation: quickTask.runSquadAuto runs a ~3-minute pipeline synchronously
+ * inside the HTTP request. The client's progress ring is calibrated for 100s,
+ * so a user who is still waiting at 100s reads it as stuck and clicks again.
+ * Each extra click starts another full pipeline on the same single-fork Node
+ * process, and the per-step Promise.race timeout does not cancel the upstream
+ * provider call, so abandoned work keeps consuming memory and provider quota.
+ *
+ * Guard is process-local, which is sufficient today: production runs one
+ * PM2 fork (`pm2 start tsx --name onbrand`, ci.yml). If this ever becomes
+ * cluster mode or multi-VM, this must move to Redis SET NX + TTL.
+ *
+ * CONFLICT is deliberate: it maps to HTTP 409 with a JSON tRPC envelope, so
+ * `authAwareFetch` in client/src/lib/trpc.ts leaves it alone (it only rewrites
+ * NON-JSON gateway errors into the synthetic "伺服器忙碌" 502 message). The
+ * user therefore sees the real reason, not a fake server error. CONFLICT is
+ * also already on errorLoggerMiddleware's expected list, so it does not
+ * pollute error_log.
+ */
+export function singleFlightPerUser(opts: { key: string; message: string }) {
+  const inFlight = new Set<number>();
+  return t.middleware(async ({ ctx, next }) => {
+    const userId = ctx.user?.id;
+    // Unauthenticated calls are rejected by protectedProcedure anyway; not
+    // holding a slot for them keeps this guard free of a null-key bucket.
+    if (!userId) return next();
+
+    if (inFlight.has(userId)) {
+      console.warn(`[singleFlight] rejected duplicate ${opts.key} for user ${userId}`);
+      throw new TRPCError({ code: "CONFLICT", message: opts.message });
+    }
+
+    inFlight.add(userId);
+    try {
+      return await next();
+    } finally {
+      // Every exit path releases: success, TRPCError, provider throw. A
+      // client disconnect does NOT release early — the handler keeps running
+      // because nothing propagates cancellation into it yet, and releasing
+      // here would let a reconnecting tab stack a second pipeline.
+      inFlight.delete(userId);
+    }
+  });
+}
+
+/**
  * 2026-05-11 — adminProcedure: gated by users.role = 'admin'. Used by
  * the error-tracking dashboard + future admin tools.
  */

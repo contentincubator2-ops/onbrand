@@ -1,0 +1,93 @@
+name: Ops — Set nginx /trpc proxy timeout
+
+# 2026-08-19: IG 99s squad tasks 502'd because Node's server.timeout (140s)
+# killed the socket before quickTask.runSquadAuto finished (~196s worst case).
+# nginx surfaced that as "upstream prematurely closed connection" → 502.
+#
+# Node is being raised to 220s, so nginx's 180s read timeout would become the
+# next thing to fire (as a 504). This raises it just above Node's, and stays
+# below Azure's default 4-minute L4 idle timeout.
+#
+# Unlike admin-nginx-tune-onbrand-v2.yml this does NOT restore a .bak first
+# and does NOT rewrite location blocks — it only substitutes the timeout
+# numbers already present, so nothing else in the file can move. Backups are
+# written OUTSIDE sites-enabled on purpose: nginx loads every file in that
+# directory, which is why `nginx -t` currently warns about conflicting server
+# names for drop/onbrand/marketing-os (the existing marketing-os.bak.* copies
+# are being parsed as live config).
+
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "New proxy_read_timeout / proxy_send_timeout, e.g. 230"
+        type: string
+        default: "230"
+      apply:
+        description: "Uncheck for a dry run (show the diff, change nothing)"
+        type: boolean
+        default: false
+
+jobs:
+  set-timeout:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Substitute timeout values
+        run: |
+          set -e
+          SITE=$(readlink -f /etc/nginx/sites-enabled/marketing-os)
+          SEC='${{ inputs.seconds }}'
+          case "$SEC" in ''|*[!0-9]*) echo "seconds must be a plain integer"; exit 1;; esac
+
+          echo "===== target: $SITE ====="
+          echo "-- current values --"
+          sudo grep -nE "proxy_(read|send)_timeout" "$SITE" || echo "(none found)"
+          sudo grep -qE "proxy_read_timeout" "$SITE" || { echo "no proxy_read_timeout to substitute"; exit 1; }
+
+          echo ""
+          echo "-- after substitution would be --"
+          sudo sed -E "s/(proxy_read_timeout[[:space:]]+)[0-9]+s;/\1${SEC}s;/g; s/(proxy_send_timeout[[:space:]]+)[0-9]+s;/\1${SEC}s;/g" "$SITE" | grep -nE "proxy_(read|send)_timeout"
+
+          if [ "${{ inputs.apply }}" != "true" ]; then
+            echo ""
+            echo "DRY RUN -- nothing changed. Re-run with apply checked."
+            exit 0
+          fi
+
+          # Backup outside sites-enabled so nginx never parses it.
+          sudo mkdir -p /etc/nginx/backups
+          BAK="/etc/nginx/backups/marketing-os.$(date +%s)"
+          sudo cp "$SITE" "$BAK"
+          echo ""
+          echo "backup -> $BAK"
+
+          sudo sed -i -E "s/(proxy_read_timeout[[:space:]]+)[0-9]+s;/\1${SEC}s;/g; s/(proxy_send_timeout[[:space:]]+)[0-9]+s;/\1${SEC}s;/g" "$SITE"
+
+          echo ""
+          echo "-- nginx -t --"
+          if ! sudo nginx -t; then
+            echo "config test FAILED -- restoring $BAK"
+            sudo cp "$BAK" "$SITE"
+            sudo nginx -t
+            exit 1
+          fi
+          sudo systemctl reload nginx
+          echo "reloaded."
+
+      - name: Verify loaded config + smoke
+        if: ${{ inputs.apply == true }}
+        run: |
+          set +e
+          echo "===== timeouts now loaded for the onbrand/drop vhost ====="
+          sudo nginx -T 2>/dev/null | awk '/server_name .*onbrand\.sowork\.ai/,/^}/' | grep -nE "location |proxy_(read|send|connect)_timeout"
+          echo ""
+          echo "===== external health ====="
+          for i in 1 2 3 4 5; do
+            code=$(curl -sk -o /dev/null -w "%{http_code}" https://onbrand.sowork.ai/health 2>/dev/null)
+            echo "try $i: $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 2
+          done
+          echo "health check did not return 200"
+          exit 1
