@@ -17,6 +17,7 @@
 
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
+import { fetchImageBuffer } from "./imageFetch";
 
 const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
@@ -179,10 +180,8 @@ async function genNanoBanana(opts: GenOptions): Promise<GenResult> {
 
   const parts: any[] = [];
   if (opts.imageUrl) {
-    const imgResp = await fetch(opts.imageUrl, { signal: AbortSignal.timeout(30_000) });
-    if (!imgResp.ok) throw new Error(`subject image download ${imgResp.status}`);
-    const mime = imgResp.headers.get("content-type")?.split(";")[0] || "image/jpeg";
-    const b64 = Buffer.from(await imgResp.arrayBuffer()).toString("base64");
+    const { buffer, mime } = await fetchImageBuffer(opts.imageUrl, { timeoutMs: 30_000 });
+    const b64 = buffer.toString("base64");
     parts.push({ inline_data: { mime_type: mime, data: b64 } });
   }
   // Aspect-ratio hint goes in-prompt — flash-image has no size parameter.

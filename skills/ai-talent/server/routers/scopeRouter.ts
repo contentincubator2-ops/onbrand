@@ -21,6 +21,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import { callLLM } from "../_core/llmRouter";
 import { assertUrlSafe } from "../_core/urlGuard";
+import { fetchImageBuffer } from "../_core/imageFetch";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function safeJson(s: any): any {
@@ -103,6 +104,44 @@ export const productRouter = router({
         [userId, input.brandId ?? null, input.slug, input.name, positioningJson],
       );
       return { id: Number(r?.insertId ?? 0) };
+    }),
+
+  /** Replace only the canonical product image URL, preserving positioning. */
+  updateImageUrl: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      imageUrl: z.string().url().refine((url) => url.startsWith("https://"), {
+        message: "圖片網址必須以 https:// 開頭",
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const product = await row<{ id: number }>(
+        `SELECT id FROM products WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.id, userId],
+      );
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個產品" });
+
+      try {
+        await assertUrlSafe(input.imageUrl);
+        await fetchImageBuffer(input.imageUrl, { timeoutMs: 10_000 });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: message.startsWith("產品圖片連結已失效")
+            ? message
+            : "產品圖片連結已失效：請確認網址可公開存取且直接指向圖片",
+        });
+      }
+
+      await localPool.execute(
+        `UPDATE products
+            SET positioning = JSON_SET(COALESCE(positioning, JSON_OBJECT()), '$.imageUrl', ?)
+          WHERE id = ? AND userId = ?`,
+        [input.imageUrl, input.id, userId],
+      );
+      return { ok: true as const, imageUrl: input.imageUrl };
     }),
 
   remove: protectedProcedure

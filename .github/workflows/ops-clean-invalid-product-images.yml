@@ -1,0 +1,100 @@
+name: "Ops — Clean invalid product image URLs"
+
+# Audits positioning.imageUrl for one brand. The default is deliberately
+# read-only; production rows change only when the operator selects apply=true.
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: "Brand ID"
+        required: true
+        type: string
+      apply:
+        description: "Actually remove invalid positioning.imageUrl values"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  clean:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Audit and optionally clear invalid product images
+        env:
+          BRAND_ID: ${{ inputs.brandId }}
+          APPLY_CHANGES: ${{ inputs.apply }}
+        run: |
+          set -eu
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"
+          U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-}"
+          D="${LOCAL_DB_NAME:-mos_db}"
+
+          # workflow_dispatch inputs are strings. Only this integer may enter SQL.
+          BID=$(printf '%d' "$BRAND_ID" 2>/dev/null) || { echo "brandId must be a number"; exit 1; }
+          q() { mysql -h"$H" -u"$U" -p"$P" "$D" "$@"; }
+
+          echo "Mode: $([ "$APPLY_CHANGES" = "true" ] && echo APPLY || echo DRY-RUN)"
+          echo "Brand: $BID"
+          echo
+
+          ROWS=$(q -N -B -e "
+            SELECT id, JSON_UNQUOTE(JSON_EXTRACT(positioning, '\$.imageUrl'))
+            FROM products
+            WHERE brandId = $BID
+              AND JSON_TYPE(JSON_EXTRACT(positioning, '\$.imageUrl')) = 'STRING'
+            ORDER BY id;")
+
+          if [ -z "$ROWS" ]; then
+            echo "No positioning.imageUrl values found."
+            exit 0
+          fi
+
+          INVALID_IDS=""
+          printf '%-10s %-7s %-24s %s\n' "productId" "status" "content-type" "final URL"
+          while IFS="$(printf '\t')" read -r PRODUCT_ID IMAGE_URL; do
+            [ -n "$PRODUCT_ID" ] && [ -n "$IMAGE_URL" ] && [ "$IMAGE_URL" != "NULL" ] || continue
+            PID=$(printf '%d' "$PRODUCT_ID" 2>/dev/null) || { echo "Skipping invalid product id: $PRODUCT_ID"; continue; }
+            PROBE=$(curl -sS -L -o /dev/null --max-time 15 --max-redirs 5 \
+              -w '%{http_code}\t%{content_type}\t%{url_effective}' "$IMAGE_URL" 2>/dev/null) \
+              || PROBE=$(printf '000\t\t%s' "$IMAGE_URL")
+            IFS="$(printf '\t')" read -r STATUS CONTENT_TYPE FINAL_URL <<EOF
+          $PROBE
+          EOF
+            case "$STATUS:$CONTENT_TYPE" in
+              2??:image/svg+xml*) VALID=false ;;
+              2??:image/*) VALID=true ;;
+              *) VALID=false ;;
+            esac
+            printf '%-10s %-7s %-24s %s\n' "$PID" "$STATUS" "${CONTENT_TYPE:-(none)}" "$FINAL_URL"
+            if [ "$VALID" = "false" ]; then
+              INVALID_IDS="$INVALID_IDS $PID"
+              echo "  INVALID source: $IMAGE_URL"
+            fi
+          done <<EOF
+          $ROWS
+          EOF
+
+          if [ -z "$INVALID_IDS" ]; then
+            echo
+            echo "All product image URLs are usable raster images."
+            exit 0
+          fi
+
+          echo
+          echo "Invalid product IDs:$INVALID_IDS"
+          if [ "$APPLY_CHANGES" != "true" ]; then
+            echo "DRY-RUN only: no rows changed. Re-run with apply=true to clear these URLs."
+            exit 0
+          fi
+
+          for PRODUCT_ID in $INVALID_IDS; do
+            PID=$(printf '%d' "$PRODUCT_ID" 2>/dev/null) || { echo "Invalid product id: $PRODUCT_ID"; exit 1; }
+            q -e "
+              UPDATE products
+              SET positioning = JSON_REMOVE(positioning, '\$.imageUrl')
+              WHERE id = $PID AND brandId = $BID;"
+            echo "Cleared products.id=$PID positioning.imageUrl"
+          done
+          echo "Done. The user can now run Re-scan to discover replacement images."
