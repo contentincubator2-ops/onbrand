@@ -1778,7 +1778,8 @@ export const quickTaskRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const startedAt = Date.now();
+      const routeStartedAt = Date.now();
+      const startedAt = routeStartedAt;
       // 1. Load squad + agents + steps.
       // 100s→99s rename compat: the in-code squad index was renamed to the
       // new "fb-99-…" slugs, but the production `squads` table may still
@@ -1848,6 +1849,9 @@ export const quickTaskRouter = router({
       const planningArtifacts: any[] = [];
       const privateArtifacts: IgStrategyPrivateArtifact[] = [];
       const privateRunId = strategyPublicPolicy ? randomUUID() : null;
+      const strategyStepRouting = strategyPublicPolicy
+        ? await import("../_core/strategyPublicStepRouting")
+        : null;
 
       // Resolve all unique step agent IDs in one query
       const agentIds = Array.from(new Set(stepsRaw
@@ -1867,6 +1871,7 @@ export const quickTaskRouter = router({
 
       for (let i = 0; i < stepsRaw.length; i++) {
         const step = stepsRaw[i];
+        const stepStartedAt = Date.now();
         const stageStart = Date.now() - startedAt;
         const stageKey = `step${i + 1}`;
         const internalStageLabel = step.name ?? step.title ?? `Step ${i + 1}`;
@@ -1914,11 +1919,44 @@ export const quickTaskRouter = router({
           `\n請執行此步驟。`,
         ].filter(Boolean).join("\n");
 
+        let stepProvider: "anthropic" | "openai" | "qwen" = "qwen";
+        let stepAttempt: 1 | 2 = 1;
+        let stepStatus: "done" | "failed" = "failed";
+        let stepErrorCode: string | null = null;
         try {
-          const r = await Promise.race([
-            callModel([{ role: "system", content: system }, { role: "user", content: userMsg }], undefined, "qwen"),
-            new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`step ${i+1} timeout`)), 25_000)),
-          ]);
+          const messages = [{ role: "system" as const, content: system }, { role: "user" as const, content: userMsg }];
+          let r: Awaited<ReturnType<typeof callModel>>;
+          if (strategyPublicPolicy && strategyStepRouting) {
+            // Same authorized-provider weighting as quickTaskOrchestra.ts:210-236.
+            // Both providers are explicitly authorized to receive full brand context.
+            const selectedProvider = strategyStepRouting.selectAuthorizedStrategyProvider(Math.random());
+            stepProvider = selectedProvider;
+            // TODO: callModel/callModelStrict cannot reliably cancel this route-local
+            // deadline. In particular llm.ts's Anthropic branch does not pass a signal
+            // (unlike OpenAI), so a timed-out Anthropic call can remain a ghost request.
+            // Fixing that requires shared LLM changes and is intentionally outside PR 1.
+            const routed = await strategyStepRouting.runAuthorizedStrategyStep({
+              selectedProvider,
+              deadlineAt: stepStartedAt + 25_000,
+              execute: (provider) => callModelStrict(messages, provider),
+            });
+            stepProvider = routed.provider;
+            stepAttempt = routed.attempt;
+            stepErrorCode = routed.errorCode;
+            if (!routed.ok) {
+              throw Object.assign(routed.error, {
+                strategyErrorCode: routed.errorCode,
+                strategyProvider: routed.provider,
+                strategyAttempt: routed.attempt,
+              });
+            }
+            r = routed.value;
+          } else {
+            r = await Promise.race([
+              callModel(messages, undefined, "qwen"),
+              new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`step ${i+1} timeout`)), 25_000)),
+            ]);
+          }
           const rawText = (r.content ?? "").trim();
           let text = rawText;
           // 2026-05-19 (CJ 驗收 v#3): deterministic 文字衛生 backstop on
@@ -1983,7 +2021,12 @@ export const quickTaskRouter = router({
             variants.push(variant);
           }
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
+          stepStatus = "done";
         } catch (e: any) {
+          stepProvider = e?.strategyProvider ?? stepProvider;
+          stepAttempt = e?.strategyAttempt ?? stepAttempt;
+          stepErrorCode = e?.strategyErrorCode
+            ?? (/timeout|deadline/i.test(String(e?.message ?? e)) ? "step_timeout" : "step_failed");
           errors.push(`step ${i+1} (${publicStageLabel}): ${e?.message ?? e}`);
           if (strategyPublicPolicy) {
             privateArtifacts.push({
@@ -1995,7 +2038,7 @@ export const quickTaskRouter = router({
               agentId: Number.isFinite(aid) && aid > 0 ? aid : null,
               agentName: a?.name ?? step.assignedAgentName ?? null,
               rawContent: "",
-              errorCode: /timeout/i.test(String(e?.message ?? e)) ? "step_timeout" : "step_failed",
+              errorCode: stepErrorCode,
               latencyMs: Date.now() - startedAt - stageStart,
             });
             planningArtifacts.push({
@@ -2015,6 +2058,18 @@ export const quickTaskRouter = router({
             });
           }
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
+        } finally {
+          if (strategyPublicPolicy) {
+            console.info("[runSquadAuto] step", {
+              taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
+              stepOrder: i + 1,
+              provider: stepProvider,
+              attempt: stepAttempt,
+              latencyMs: Date.now() - stepStartedAt,
+              status: stepStatus,
+              errorCode: stepErrorCode,
+            });
+          }
         }
       }
 
@@ -2023,7 +2078,31 @@ export const quickTaskRouter = router({
       // de-identified planning conclusions, brand context and task input.
       if (strategyPublicPolicy) {
         const synthesisStartedAt = Date.now() - startedAt;
-        try {
+        // server.timeout is 140s. Stop this route at 125s so persistence,
+        // serialization, and the HTTP response retain roughly 15s of headroom.
+        // Synthesis itself still owns its unchanged 55s deadline.
+        // This intentionally means synthesis starts only when route elapsed time
+        // is <=70s (125s - 55s). For a four-step task after a full 12s scout,
+        // the steps have at most ~58s total (~14.5s each), before subtracting DB
+        // and brand-context overhead. Slower runs safely degrade to persisted
+        // planning instead of a cut socket; the durable fix is background synthesis.
+        const hasSynthesisBudget = strategyStepRouting!.hasStrategySynthesisBudget({
+          routeStartedAt,
+          now: Date.now(),
+        });
+        if (!hasSynthesisBudget) {
+          variants.splice(0, variants.length);
+          stages.splice(0, stages.length, {
+            key: "public-synthesis",
+            label: brandMarket.isZhTW ? "對外貼文" : "Public posts",
+            startedAt: synthesisStartedAt,
+            completedAt: Date.now() - startedAt,
+            status: "failed",
+          });
+          errors.unshift(brandMarket.isZhTW
+            ? "時間預算不足，公開貼文尚未產生；已保留內容規劃，可重新產生公開貼文。"
+            : "The public posts were not generated within the time budget; planning was saved and the public posts can be regenerated.");
+        } else try {
           assertPrivateStrategyArtifactsReady(privateArtifacts, stepsRaw.length);
           const slots = buildIgStrategyPublicSlots(sqSlugNew, input.topic, brandMarket.outputLanguage);
           if (!slots?.length) throw new Error("no public deliverable slots configured");
@@ -2156,7 +2235,6 @@ export const quickTaskRouter = router({
             completedAt: Date.now() - startedAt,
             status: "done",
           });
-          errors.splice(0, errors.length);
         } catch (e) {
           console.warn("[runSquadAuto] target public synthesis failed", {
             taskId: strategyRecordOverrides?.taskId,
@@ -2170,7 +2248,7 @@ export const quickTaskRouter = router({
             completedAt: Date.now() - startedAt,
             status: "failed",
           });
-          errors.splice(0, errors.length, brandMarket.isZhTW
+          errors.unshift(brandMarket.isZhTW
             ? "對外貼文產生失敗，請重試。"
             : "Public post generation failed. Please retry.");
         }
@@ -2250,7 +2328,7 @@ export const quickTaskRouter = router({
           missionId = persisted.missionId;
           if (strategyPublicPolicy && !outputId) {
             ok = false;
-            errors.splice(0, errors.length, brandMarket.isZhTW
+            errors.unshift(brandMarket.isZhTW
               ? "內容儲存失敗，請重試。"
               : "Content storage failed. Please retry.");
           }
@@ -2258,7 +2336,7 @@ export const quickTaskRouter = router({
           console.warn("[runSquadAuto] recordTaskRun failed:", (e as Error).message);
           if (strategyPublicPolicy) {
             ok = false;
-            errors.splice(0, errors.length, brandMarket.isZhTW
+            errors.unshift(brandMarket.isZhTW
               ? "內容儲存失敗，請重試。"
               : "Content storage failed. Please retry.");
           }
