@@ -1923,13 +1923,17 @@ export const quickTaskRouter = router({
         let stepAttempt: 1 | 2 = 1;
         let stepStatus: "done" | "failed" = "failed";
         let stepErrorCode: string | null = null;
+        let attempt1Provider: "anthropic" | "openai" | null = null;
+        let attempt1Error: string | null = null;
+        let attempt2Provider: "anthropic" | "openai" | null = null;
+        let attempt2Error: string | null = null;
         try {
           const messages = [{ role: "system" as const, content: system }, { role: "user" as const, content: userMsg }];
           let r: Awaited<ReturnType<typeof callModel>>;
           if (strategyPublicPolicy && strategyStepRouting) {
             // Both providers are explicitly authorized to receive full brand
             // context. Anthropic is primary; OpenAI remains the fallback.
-            const selectedProvider = strategyStepRouting.selectAuthorizedStrategyProvider(Math.random());
+            const selectedProvider = strategyStepRouting.getPrimaryAuthorizedStrategyProvider();
             stepProvider = selectedProvider;
             // Background synthesis no longer consumes the HTTP budget, but a
             // new 25s planning step must still fit inside the 125s route guard.
@@ -1956,6 +1960,10 @@ export const quickTaskRouter = router({
             stepProvider = routed.provider;
             stepAttempt = routed.attempt;
             stepErrorCode = routed.errorCode;
+            attempt1Provider = routed.attempt1Provider;
+            attempt1Error = routed.attempt1Error;
+            attempt2Provider = routed.attempt2Provider;
+            attempt2Error = routed.attempt2Error;
             if (!routed.ok) {
               throw Object.assign(routed.error, {
                 strategyErrorCode: routed.errorCode,
@@ -2081,6 +2089,10 @@ export const quickTaskRouter = router({
               latencyMs: Date.now() - stepStartedAt,
               status: stepStatus,
               errorCode: stepErrorCode,
+              attempt1Provider,
+              attempt1Error,
+              attempt2Provider,
+              attempt2Error,
             });
           }
         }
