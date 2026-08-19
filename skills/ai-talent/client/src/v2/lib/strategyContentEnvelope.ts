@@ -177,6 +177,48 @@ export function getIgPublicVariantMockup(
   };
 }
 
+/**
+ * Select the presentation override owned by an IG strategy envelope.
+ * Planning artifacts are internal, multi-section analysis documents rather
+ * than social posts. `research-doc` is the existing mockup built for 99s
+ * strategy tabs and renders Markdown sections without any image affordance.
+ * Non-envelope runs deliberately receive no override, preserving RunPage's
+ * legacy mockup inference byte-for-byte.
+ */
+export function getStrategySelectionMockup(
+  isStrategyEnvelope: boolean,
+  contentKind: RunContentKind,
+  format: unknown,
+): MockupVariant | null {
+  if (!isStrategyEnvelope) return null;
+  if (contentKind === "planningArtifacts") {
+    return {
+      platform: "generic",
+      format: "research-doc" as any,
+      label: "generic:research-doc",
+    };
+  }
+  return getIgPublicVariantMockup(contentKind, format);
+}
+
+export function isStrategyPlanningSelection(
+  isStrategyEnvelope: boolean,
+  contentKind: RunContentKind,
+): boolean {
+  return isStrategyEnvelope && contentKind === "planningArtifacts";
+}
+
+/** A failed strategy step has no image job to retry; its whole output is absent. */
+export function isPlanningArtifactMissingOutput(
+  isStrategyEnvelope: boolean,
+  contentKind: RunContentKind,
+  caption: unknown,
+  imageStatus: unknown,
+): boolean {
+  if (!isStrategyPlanningSelection(isStrategyEnvelope, contentKind)) return false;
+  return typeof caption !== "string" || caption.trim().length === 0 || imageStatus === "failed";
+}
+
 export function getIgPublicVariantImageSize(
   contentKind: RunContentKind,
   format: unknown,

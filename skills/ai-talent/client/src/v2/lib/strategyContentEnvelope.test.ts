@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getIgPublicVariantMockup,
   getIgPublicVariantImageSize,
+  getStrategySelectionMockup,
   getCalendarPublishPayload,
   getPlanningPublishWarning,
   getPlanningConfirmationPayload,
@@ -9,6 +10,8 @@ import {
   getRunContentSelectionKey,
   isEmptyStrategyPublicSelection,
   isIgStrategyDeliverableTarget,
+  isPlanningArtifactMissingOutput,
+  isStrategyPlanningSelection,
   resolveRunContent,
   shouldApplyMutationPreview,
 } from "./strategyContentEnvelope";
@@ -88,6 +91,34 @@ describe("strategy content envelope", () => {
     });
     expect(getIgPublicVariantMockup("planningArtifacts", format)).toBeNull();
     expect(getIgPublicVariantMockup("legacy", format)).toBeNull();
+  });
+
+  it("renders only strategy-envelope planning tabs as internal research documents", () => {
+    expect(getStrategySelectionMockup(true, "planningArtifacts", "feed")).toEqual({
+      platform: "generic",
+      format: "research-doc",
+      label: "generic:research-doc",
+    });
+    expect(getStrategySelectionMockup(false, "planningArtifacts", "feed")).toBeNull();
+    expect(getStrategySelectionMockup(false, "legacy", "feed")).toBeNull();
+  });
+
+  it.each(["feed", "carousel", "reel", "story", "live"] as const)("keeps the strategy public %s mockup unchanged", (format) => {
+    expect(getStrategySelectionMockup(true, "publicVariants", format))
+      .toEqual(getIgPublicVariantMockup("publicVariants", format));
+  });
+
+  it("marks only empty or failed strategy planning steps as missing output", () => {
+    expect(isStrategyPlanningSelection(true, "planningArtifacts")).toBe(true);
+    expect(isStrategyPlanningSelection(true, "publicVariants")).toBe(false);
+    expect(isStrategyPlanningSelection(false, "planningArtifacts")).toBe(false);
+
+    expect(isPlanningArtifactMissingOutput(true, "planningArtifacts", "", "failed")).toBe(true);
+    expect(isPlanningArtifactMissingOutput(true, "planningArtifacts", "  ", "skipped")).toBe(true);
+    expect(isPlanningArtifactMissingOutput(true, "planningArtifacts", "完成的策略", "failed")).toBe(true);
+    expect(isPlanningArtifactMissingOutput(true, "planningArtifacts", "完成的策略", "skipped")).toBe(false);
+    expect(isPlanningArtifactMissingOutput(true, "publicVariants", "", "failed")).toBe(false);
+    expect(isPlanningArtifactMissingOutput(false, "planningArtifacts", "", "failed")).toBe(false);
   });
 
   it.each([
