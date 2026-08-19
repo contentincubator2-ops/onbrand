@@ -262,11 +262,12 @@ export const outputRouter = router({
         { message: "imageUrl must be http(s)://, data:image/ (not svg), /static/, or /assets/" },
       ),
       style: z.string().max(500).optional(),
-      /** 2026-08-19 (客戶回報「產出跟指令大相逕庭的圖」): the full prompt that
-       *  produced this image. `style` is a 480-char display excerpt; the run
-       *  page re-seeds its editable prompt box from this field, so it must be
-       *  the untruncated text that was actually sent to the model. */
-      prompt: z.string().max(4000).optional(),
+      /** Model-ready scene prompt actually used for this image. Unlike
+       *  `style`, this participates in generation and remains inspectable. */
+      // English expansion can be longer than the <=4000-char Chinese input.
+      prompt: z.string().max(8000).optional(),
+      /** Human-editable Traditional Chinese counterpart of `prompt`. */
+      promptZh: z.string().max(4000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
@@ -285,7 +286,8 @@ export const outputRouter = router({
           url: input.imageUrl,
           status: "ready",
           style: input.style ?? item.image?.style ?? null,
-          prompt: input.prompt ?? input.style ?? item.image?.prompt ?? null,
+          prompt: input.prompt ?? item.image?.prompt ?? input.style ?? null,
+          promptZh: input.promptZh ?? item.image?.promptZh ?? null,
         },
         imageUrl: input.imageUrl,
         imageStatus: "ready",

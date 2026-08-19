@@ -14,6 +14,7 @@
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { loadLineage } from "./decisionBridge";
+import { translateImagePromptToEnglish } from "./imagePromptTranslation";
 
 export type ImageProvider = "openai" | "google" | "stability" | "piapi";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
@@ -151,6 +152,8 @@ export interface ImageGenResult {
   url: string | null;
   b64: string | null;
   status: "ready" | "failed";
+  /** User scene prompt after optional CJK→English translation, before guards/context. */
+  effectivePrompt: string;
   errorMsg?: string;
 }
 
@@ -345,7 +348,9 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   if (!db) throw new Error("DB unavailable");
 
   const size = input.size ?? channelSize(input.channel);
-  const promptText = buildPrompt(input);
+  const translated = await translateImagePromptToEnglish(input.prompt);
+  const effectivePrompt = translated.prompt;
+  const promptText = buildPrompt({ ...input, prompt: effectivePrompt });
 
   // Pre-insert a pending row so we can retrieve it even if provider crashes.
   const [ins] = (await db.execute(sql`
@@ -381,15 +386,15 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
               status = 'ready', errorMsg = NULL
           WHERE id = ${id}
         `);
-        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready" };
+        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready", effectivePrompt };
       }
       const msg = redactProviderSecrets(r.errorMsg ?? "nano-banana returned no image");
       await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", errorMsg: msg };
+      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, errorMsg: msg };
     } catch (e: any) {
       const msg = redactProviderSecrets(`nano-banana: ${String(e?.message ?? e).slice(0, 400)}`).slice(0, 240);
       await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", errorMsg: msg };
+      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, errorMsg: msg };
     }
   }
 
@@ -462,7 +467,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
           status = 'ready', errorMsg = NULL
       WHERE id = ${id}
     `);
-    return { id, provider, model: out.model, url: out.url, b64: out.b64, status: "ready" };
+    return { id, provider, model: out.model, url: out.url, b64: out.b64, status: "ready", effectivePrompt };
   }
   const safeErrorMsg = redactProviderSecrets(errorMsg ?? "unknown").slice(0, 800);
   await db.execute(sql`
@@ -477,6 +482,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
     url: null,
     b64: null,
     status: "failed",
+    effectivePrompt,
     errorMsg: safeErrorMsg,
   };
 }

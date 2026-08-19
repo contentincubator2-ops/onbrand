@@ -116,6 +116,8 @@ interface VariantData {
    *  quickTaskOrchestra OrchestraVariant.image.prompt). Older runs don't
    *  have it — callers fall back to imageStyle. */
   imagePrompt?: string;
+  /** Traditional Chinese display/edit counterpart of imagePrompt. */
+  imagePromptZh?: string;
   imageUrl?: string | null;
   imageStatus?: string;
   // 2026-07-29 Tier-1 TikTok 影片卡 — 非影片任務一律 undefined
@@ -128,7 +130,7 @@ interface VariantData {
   cards?: Array<{
     headline: string;
     body: string;
-    image: { style: string | null; prompt?: string | null; url: string | null; status: string; errorMsg?: string };
+    image: { style: string | null; prompt?: string | null; promptZh?: string | null; url: string | null; status: string; errorMsg?: string };
   }>;
 }
 
@@ -156,6 +158,7 @@ function normalizeVariantData(v: any): VariantData {
     imageStatus: v?.imageStatus ?? img.status ?? undefined,
     imageStyle: v?.imageStyle ?? img.style ?? undefined,
     imagePrompt: v?.imagePrompt ?? img.prompt ?? undefined,
+    imagePromptZh: v?.imagePromptZh ?? img.promptZh ?? undefined,
     videoUrl: v?.videoUrl ?? vid.url ?? null,
     videoStatus: v?.videoStatus ?? vid.status ?? undefined,
     videoPosterUrl: v?.videoPosterUrl ?? vid.posterUrl ?? null,
@@ -502,10 +505,10 @@ export default function RunPage() {
     text: string;
     locator: RunContentMutationLocator;
   } | null>(null);
-  /** P4: image regen prompt — pre-filled from the prompt that produced the
-   *  current image (variant.imagePrompt), editable. */
+  /** P4: human-editable image instruction — prefers the Chinese counterpart
+   *  and falls back through model prompt → art direction → local template. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
-  const imageMutationTargetRef = useRef<{ locator: RunContentMutationLocator; style: string; prompt: string } | null>(null);
+  const imageMutationTargetRef = useRef<{ locator: RunContentMutationLocator; promptZh: string } | null>(null);
   /** 2026-07-07 (CJ): user-editable thumbnail title text overlaid on the (now
    *  text-free) AI thumbnail. Seeded from the variant title/caption, editable
    *  in the right panel; passed to the YT mockup as overlayTitle. */
@@ -992,7 +995,13 @@ export default function RunPage() {
               showToastGlobal(lang === "en" ? "Image target was lost — please try again" : "找不到原本的圖片位置，請重試");
               return;
             }
-            updateImageMut.mutate({ id, ...target.locator, imageUrl: imageSrc, style: target.style, prompt: target.prompt });
+            updateImageMut.mutate({
+              id,
+              ...target.locator,
+              imageUrl: imageSrc,
+              prompt: r?.effectivePrompt ?? target.promptZh,
+              promptZh: target.promptZh,
+            });
             imageMutationTargetRef.current = null;
             showToastGlobal(lang === "en" ? "Image ready ✓" : "已產圖 ✓");
           } else {
@@ -1036,8 +1045,8 @@ export default function RunPage() {
   const captionToPromptMut = (trpc as any).image?.promptFromCaption?.useMutation
     ? (trpc as any).image.promptFromCaption.useMutation({
         onSuccess: (r: any) => {
-          if (r?.prompt) {
-            setImagePrompt(r.prompt);
+          if (r?.promptZh || r?.prompt) {
+            setImagePrompt(lang === "en" ? (r.prompt || r.promptZh) : (r.promptZh || r.prompt));
             showToastGlobal(lang === "en" ? "Image prompt generated from caption ✓" : "已從文案產生圖片指令 ✓");
           }
         },
@@ -1459,15 +1468,15 @@ export default function RunPage() {
 
     if (mode === "image") {
       // 2026-08-19 (客戶回報「產出跟指令大相逕庭的圖」): this box is an
-      // editable PROMPT — whatever sits in it is sent verbatim to the image
-      // model. It used to be seeded from `imageStyle`, the agent-written
-      // Chinese 風格方向, which is display-only and never reached the model
+      // editable instruction. CJK input is transparently translated on the
+      // server before generation. It used to be seeded from `imageStyle`,
+      // the agent-written Chinese 風格方向, which is display-only and never reached the model
       // (quickTaskOrchestra.genOneImage converts the CAPTION into the real
       // brief). So the prompt on screen described one image and the picture
       // beside it came from another — every single quick-task run. Seed from
-      // the prompt that actually produced the image; fall back to the style
-      // brief only for runs generated before it was persisted.
-      const seedPrompt = slide?.imagePrompt?.trim() || slide?.imageStyle?.trim() || "";
+      // the image's equivalent Chinese prompt first, then the actual English
+      // model prompt, and only then the display-only style for older runs.
+      const seedPrompt = slide?.imagePromptZh?.trim() || slide?.imagePrompt?.trim() || slide?.imageStyle?.trim() || "";
       if (seedPrompt) {
         setImagePrompt(seedPrompt);
         return;
@@ -1495,7 +1504,7 @@ export default function RunPage() {
       setImagePrompt(seed);
       return;
     }
-  }, [mode, activeIdx, slide?.imagePrompt, slide?.imageStyle, slide?.caption]);
+  }, [mode, activeIdx, slide?.imagePromptZh, slide?.imagePrompt, slide?.imageStyle, slide?.caption]);
 
   // 2026-05-09 (CJ direction「只留一個 mockup 路徑」): 一律渲染 mockup，
   // 不再 block on missing taskId. Inference falls through 3 layers:
@@ -2525,7 +2534,7 @@ export default function RunPage() {
                       : "Step 1：先告訴我你想要什麼樣的圖（或調整現有 prompt）"}
                   </div>
                   <Textarea
-                    label={lang === "en" ? "Image prompt" : "圖片指令（prompt）"}
+                    label={lang === "en" ? "Your image instruction" : "你的圖片指令"}
                     placeholder={lang === "en"
                       ? "e.g. Sunlight on a warm wooden table, a steaming bowl of soup, soft-focus background with a homey feel"
                       : "例：陽光灑落在溫暖木桌上，一碗冒著煙的健力湯，柔焦背景帶有家庭溫度"}
@@ -2534,8 +2543,8 @@ export default function RunPage() {
                     minRows={3}
                     maxRows={6}
                     description={lang === "en"
-                      ? "We'll auto-apply your brand's colors / style / tone. The more specific you are, the closer to what you want."
-                      : "會自動帶入品牌的色彩 / 風格 / 調性脈絡。寫越具體圖越貼近你要的"}
+                      ? "Write naturally in Chinese or English. Chinese instructions are automatically translated to English before being sent to the image AI; brand colors / style / tone are also applied."
+                      : "請直接用中文描述；送給圖片 AI 前會自動翻成英文，並帶入品牌色彩 / 風格 / 調性。翻譯失敗時仍會用原指令繼續產圖。"}
                     autoFocus
                   />
                   {/* 2026-05-17 (CJ「右側欄不需要展示出圖片了」): the
@@ -2785,11 +2794,7 @@ export default function RunPage() {
                       }
                       imageMutationTargetRef.current = {
                         locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
-                        style: imagePrompt.slice(0, 480),
-                        // 2026-08-19: the full prompt, unsliced — it is what
-                        // produced the new image, so the box must show it back
-                        // verbatim on the next load (see image.prompt).
-                        prompt: imagePrompt,
+                        promptZh: imagePrompt,
                       };
                       imageGenMut.mutate({
                         brandId: data.brand.id,
@@ -3028,6 +3033,12 @@ export default function RunPage() {
                           <p className="whitespace-pre-wrap text-default-800">
                             {slide?.imageStyle || (lang === "en" ? "(This task has no image brief)" : "（這個任務沒有配圖指引）")}
                           </p>
+                          {slide?.imagePrompt && (
+                            <>
+                              <p className="font-semibold pt-1">{lang === "en" ? "Model-ready prompt used:" : "實際使用的模型指令："}</p>
+                              <p className="whitespace-pre-wrap text-default-800">{slide.imagePrompt}</p>
+                            </>
+                          )}
                         </>
                       ) : (
                         <>

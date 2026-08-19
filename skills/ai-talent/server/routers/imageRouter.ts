@@ -174,14 +174,14 @@ export const imageRouter = router({
         : "";
 
       const systemPrompt = `You are a senior commercial photography art director.
-Given a social media caption and brand context, write a concise, specific image-generation prompt in English (80–160 words).
+Given a social media caption and brand context, write one concise, specific image-generation prompt (80–160 English words), then provide a natural Traditional Chinese version for a Taiwan user. Both versions must describe exactly the same scene.
 
 Rules:
 - Describe: main subject, environment/setting, lighting, mood, camera angle/framing
 - Reflect the caption's core message visually — do NOT illustrate literally (no text in frame)
 - Use the brand's visual identity (colours, archetype, tone)
 - Do NOT mention any competitor brand names
-- Output ONLY the image prompt — no explanation, no preamble, no quotes`;
+- Output JSON only in exactly this shape: {"prompt":"English prompt","promptZh":"繁體中文版"}`;
 
       const userMsg = `Brand context:\n${brandBlock}\n\nPlatform: ${channelHint}${styleHint}\n\nCaption:\n${input.caption}`;
 
@@ -190,13 +190,23 @@ Rules:
           { role: "system", content: systemPrompt },
           { role: "user",   content: userMsg },
         ],
-        maxTokens: 250,
+        maxTokens: 500,
       });
 
       const raw = result.choices?.[0]?.message?.content ?? "";
       const text = (typeof raw === "string" ? raw : "").trim();
       if (!text) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "LLM returned empty prompt" });
-      return { prompt: text };
+      const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+      try {
+        const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+        const prompt = typeof parsed.prompt === "string" ? parsed.prompt.trim() : "";
+        const promptZh = typeof parsed.promptZh === "string" ? parsed.promptZh.trim() : "";
+        if (prompt && promptZh) return { prompt, promptZh };
+      } catch {
+        // Older/fallback providers may ignore JSON mode. Keep their useful
+        // English result instead of failing the button outright.
+      }
+      return { prompt: cleaned, promptZh: cleaned };
     }),
 
   listForDecision: protectedProcedure

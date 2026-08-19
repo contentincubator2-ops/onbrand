@@ -122,8 +122,9 @@ describe("quickTask regenerate content", () => {
   it("keeps the current image and its model prompt when only copy is regenerated", () => {
     const current = {
       caption: "old caption",
-      image: { style: "display direction", prompt: "actual visual brief", url: "https://example.com/image.png", status: "ready" },
+      image: { style: "display direction", prompt: "actual visual brief", promptZh: "實際視覺指令", url: "https://example.com/image.png", status: "ready" },
       imagePrompt: "flat compatibility prompt",
+      imagePromptZh: "平面相容中文指令",
     };
     const regenerated = {
       caption: "new caption",
@@ -134,6 +135,7 @@ describe("quickTask regenerate content", () => {
       caption: "new caption",
       image: current.image,
       imagePrompt: "flat compatibility prompt",
+      imagePromptZh: "平面相容中文指令",
     });
   });
 });

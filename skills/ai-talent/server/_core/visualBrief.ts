@@ -3,9 +3,7 @@
  *
  * 2026-07-16 (CJ「七日發布台的是標準，不應該被更改，是其他任務要對齊七日
  * 發布台的標準」): this is theater's original caption→English-brief logic
- * extracted VERBATIM — same provider (anthropic), same system prompt, same
- * maxTokens, same fallback — so theater's behavior stayed byte-for-byte
- * unchanged at extraction time, and every other task reuses the same logic
+ * originally extracted verbatim. Every image path reuses this shared logic
  * instead of inventing its own.
  *
  * 2026-08-19: the shared prompt now also receives a lightweight brand
@@ -14,8 +12,9 @@
  *
  * Contract: the image prompt is derived from the FINISHED CAPTION (not from
  * a separately-written style direction), converted into a short ENGLISH
- * brief, and sent to the image model. The Chinese 風格方向 shown in task UIs
- * is display-only and never reaches the model.
+ * brief, and sent to the image model. A semantically equivalent Traditional
+ * Chinese copy is returned for human editing; the Chinese 風格方向 remains a
+ * separate display-only field and never reaches the model.
  */
 import { invokeLLM } from "./llm";
 
@@ -83,7 +82,14 @@ export async function loadBrandIdentityForImage(
   }
 }
 
-export async function captionToVisualBrief(args: {
+export interface BilingualVisualBrief {
+  /** Model-ready English brief. This is the text sent by automatic image generation. */
+  prompt: string;
+  /** Natural Traditional Chinese rendering of the same scene, for human editing. */
+  promptZh: string;
+}
+
+export interface VisualBriefArgs {
   caption: string;
   brandTagline?: string | null;
   brandIdentity?: BrandIdentityForImage | null;
@@ -93,7 +99,38 @@ export async function captionToVisualBrief(args: {
   /** Brand palette (from loadBrandPaletteHexes) — woven into the brief as
    *  the scene's dominant color scheme so generated images stay on-brand. */
   palette?: Array<{ hex: string; role: string }>;
-}): Promise<string> {
+}
+
+function fallbackBriefs(caption: string): BilingualVisualBrief {
+  const excerpt = caption.slice(0, 120);
+  return {
+    prompt: `Photorealistic editorial scene representing: ${excerpt}`,
+    promptZh: `寫實的編輯攝影場景，呈現：${excerpt}`,
+  };
+}
+
+function parseBilingualBrief(raw: string, caption: string): BilingualVisualBrief {
+  const fallback = fallbackBriefs(caption);
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try {
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+    const prompt = typeof parsed.prompt === "string" ? parsed.prompt.trim() : "";
+    const promptZh = typeof parsed.promptZh === "string" ? parsed.promptZh.trim() : "";
+    if (prompt && promptZh) return { prompt, promptZh };
+  } catch {
+    // Compatibility with a provider that ignores the JSON-only instruction:
+    // preserve its useful English answer and synthesize only the display copy.
+    if (cleaned) return { prompt: cleaned, promptZh: fallback.promptZh };
+  }
+  return fallback;
+}
+
+/**
+ * Produce the model-ready English brief and its human-friendly Traditional
+ * Chinese equivalent in one LLM call. The two fields must describe the same
+ * shot; only `prompt` is used by the automatic image pipeline.
+ */
+export async function captionToBilingualVisualBrief(args: VisualBriefArgs): Promise<BilingualVisualBrief> {
   const identity = args.brandIdentity;
   // 2026-08-19 (#80 客訴「勾選真實產品後再產圖，出現錯誤中文字」):
   // subject mode permits only text already visible on the attached product.
@@ -120,15 +157,15 @@ export async function captionToVisualBrief(args: {
       // direct Anthropic API (Azure naming) → 404 every theater cell
       // → fallback chain → 企劃台 crawl. Let anthropic use its
       // proven default (claude-sonnet-4-6).
-      maxTokens: 180,
+      maxTokens: 360,
       messages: [
         {
           role: "system",
           content:
-            "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic and brand-friendly. " +
+            "Convert the social post caption into a 1-2 sentence visual brief for a text-to-image model. Return two semantically equivalent versions: model-ready English and natural Traditional Chinese written for a Taiwan user (not translationese). Photorealistic and brand-friendly. " +
             `${textRule}\n\n` +
             `${brandSafetyRule}\n\n` +
-            "If brand colors are provided, make them the scene's dominant color palette (props, backdrop, lighting accents) while keeping the scene natural. Output only the brief.",
+            "If brand colors are provided, make them the scene's dominant color palette (props, backdrop, lighting accents) while keeping the scene natural. Output JSON only in exactly this shape: {\"prompt\":\"English brief\",\"promptZh\":\"繁體中文版\"}.",
         },
         {
           role: "user",
@@ -136,8 +173,16 @@ export async function captionToVisualBrief(args: {
         },
       ],
     });
-    return r.choices[0]?.message?.content?.toString().trim() ?? "";
+    return parseBilingualBrief(
+      r.choices[0]?.message?.content?.toString() ?? "",
+      args.caption,
+    );
   } catch {
-    return `Photorealistic editorial scene representing: ${args.caption.slice(0, 120)}`;
+    return fallbackBriefs(args.caption);
   }
+}
+
+/** Backward-compatible English-only API used by Theater and older callers. */
+export async function captionToVisualBrief(args: VisualBriefArgs): Promise<string> {
+  return (await captionToBilingualVisualBrief(args)).prompt;
 }
