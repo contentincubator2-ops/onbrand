@@ -19,6 +19,7 @@ import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
+import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Textarea,
@@ -1351,9 +1352,20 @@ function PlatformTaskPageInner() {
           });
           if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
           if ((r as any).outputId) {
-            const hasAnyPublicCaption = ((r as any).variants ?? [])
+            const publicVariants = (r as any).variants ?? [];
+            const hasAnyPublicCaption = publicVariants
               .some((variant: any) => (variant?.caption ?? "").trim().length > 0);
-            if ((r as any).ok === false || !hasAnyPublicCaption) {
+            const strategyPublicState = getStrategyPublicGenerationState({
+              taskId: (r as any).taskId,
+              isStrategyEnvelope: Array.isArray((r as any).planningArtifacts),
+              progress: (r as any).progress,
+              publicVariantCount: publicVariants.length,
+            });
+            if (strategyPublicState === "generating") {
+              showToastGlobal(lang === "en"
+                ? "Planning is ready. Public posts are being generated in the background."
+                : "內容規劃已完成，對外貼文正在背景產生。");
+            } else if ((r as any).ok === false || !hasAnyPublicCaption) {
               showToastGlobal(lang === "en"
                 ? "Public posts weren't generated. Only internal drafts are available right now; you can regenerate them."
                 : "公開貼文未產生，目前只有內部草稿，可重新產生。");

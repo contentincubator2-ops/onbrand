@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  hasStrategySynthesisBudget,
+  hasStrategyStepBudget,
   runAuthorizedStrategyStep,
   selectAuthorizedStrategyProvider,
 } from "./strategyPublicStepRouting";
@@ -73,9 +73,9 @@ describe("strategy public step provider routing", () => {
   });
 });
 
-describe("strategy public synthesis budget", () => {
-  it("skips synthesis when the route has less than its 55-second deadline left", () => {
-    expect(hasStrategySynthesisBudget({ routeStartedAt: 1_000, now: 71_001 })).toBe(false);
-    expect(hasStrategySynthesisBudget({ routeStartedAt: 1_000, now: 71_000 })).toBe(true);
+describe("strategy step route budget", () => {
+  it("starts a step only when its full 25-second deadline fits before the 125-second route guard", () => {
+    expect(hasStrategyStepBudget({ routeStartedAt: 1_000, now: 101_000 })).toBe(true);
+    expect(hasStrategyStepBudget({ routeStartedAt: 1_000, now: 101_001 })).toBe(false);
   });
 });

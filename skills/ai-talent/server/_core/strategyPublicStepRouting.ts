@@ -49,18 +49,18 @@ export function hasStrategyFallbackBudget(
   return deadlineAt - now >= minimumFallbackMs;
 }
 
-export function hasStrategySynthesisBudget({
+export function hasStrategyStepBudget({
   routeStartedAt,
   now,
   routeLimitMs = 125_000,
-  synthesisDeadlineMs = 55_000,
+  stepDeadlineMs = 25_000,
 }: {
   routeStartedAt: number;
   now: number;
   routeLimitMs?: number;
-  synthesisDeadlineMs?: number;
+  stepDeadlineMs?: number;
 }): boolean {
-  return routeStartedAt + routeLimitMs - now >= synthesisDeadlineMs;
+  return routeStartedAt + routeLimitMs - now >= stepDeadlineMs;
 }
 
 function toError(error: unknown): Error {

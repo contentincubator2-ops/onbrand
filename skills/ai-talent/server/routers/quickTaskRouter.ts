@@ -1927,10 +1927,23 @@ export const quickTaskRouter = router({
           const messages = [{ role: "system" as const, content: system }, { role: "user" as const, content: userMsg }];
           let r: Awaited<ReturnType<typeof callModel>>;
           if (strategyPublicPolicy && strategyStepRouting) {
-            // Same authorized-provider weighting as quickTaskOrchestra.ts:210-236.
-            // Both providers are explicitly authorized to receive full brand context.
+            // Both providers are explicitly authorized to receive full brand
+            // context. Anthropic is primary; OpenAI remains the fallback.
             const selectedProvider = strategyStepRouting.selectAuthorizedStrategyProvider(Math.random());
             stepProvider = selectedProvider;
+            // Background synthesis no longer consumes the HTTP budget, but a
+            // new 25s planning step must still fit inside the 125s route guard.
+            // That leaves server.timeout's final 15s for persistence + response.
+            if (!strategyStepRouting.hasStrategyStepBudget({
+              routeStartedAt,
+              now: Date.now(),
+            })) {
+              throw Object.assign(new Error("strategy route has insufficient budget for another planning step"), {
+                strategyErrorCode: "step_route_budget",
+                strategyProvider: selectedProvider,
+                strategyAttempt: 1,
+              });
+            }
             // TODO: callModel/callModelStrict cannot reliably cancel this route-local
             // deadline. In particular llm.ts's Anthropic branch does not pass a signal
             // (unlike OpenAI), so a timed-out Anthropic call can remain a ghost request.
@@ -2073,36 +2086,11 @@ export const quickTaskRouter = router({
         }
       }
 
-      // 5. After every private planning step has finished, synthesize the
-      // server-owned public slots. Per user authorization, Qwen receives only
+      // 5. Build the background continuation now, but do not start it until
+      // the planning checkpoint has been committed and the HTTP response is
+      // ready to return. Per user authorization, Qwen receives only
       // de-identified planning conclusions, brand context and task input.
-      if (strategyPublicPolicy) {
-        const synthesisStartedAt = Date.now() - startedAt;
-        // server.timeout is 140s. Stop this route at 125s so persistence,
-        // serialization, and the HTTP response retain roughly 15s of headroom.
-        // Synthesis itself still owns its unchanged 55s deadline.
-        // This intentionally means synthesis starts only when route elapsed time
-        // is <=70s (125s - 55s). For a four-step task after a full 12s scout,
-        // the steps have at most ~58s total (~14.5s each), before subtracting DB
-        // and brand-context overhead. Slower runs safely degrade to persisted
-        // planning instead of a cut socket; the durable fix is background synthesis.
-        const hasSynthesisBudget = strategyStepRouting!.hasStrategySynthesisBudget({
-          routeStartedAt,
-          now: Date.now(),
-        });
-        if (!hasSynthesisBudget) {
-          variants.splice(0, variants.length);
-          stages.splice(0, stages.length, {
-            key: "public-synthesis",
-            label: brandMarket.isZhTW ? "對外貼文" : "Public posts",
-            startedAt: synthesisStartedAt,
-            completedAt: Date.now() - startedAt,
-            status: "failed",
-          });
-          errors.unshift(brandMarket.isZhTW
-            ? "時間預算不足，公開貼文尚未產生；已保留內容規劃，可重新產生公開貼文。"
-            : "The public posts were not generated within the time budget; planning was saved and the public posts can be regenerated.");
-        } else try {
+      const synthesizeStrategyPublicVariants = strategyPublicPolicy ? async () => {
           assertPrivateStrategyArtifactsReady(privateArtifacts, stepsRaw.length);
           const slots = buildIgStrategyPublicSlots(sqSlugNew, input.topic, brandMarket.outputLanguage);
           if (!slots?.length) throw new Error("no public deliverable slots configured");
@@ -2227,32 +2215,8 @@ export const quickTaskRouter = router({
             ]).filter(Boolean).join("\n"),
             { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
           );
-          variants.push(...publicResults);
-          stages.splice(0, stages.length, {
-            key: "public-synthesis",
-            label: brandMarket.isZhTW ? "對外貼文" : "Public posts",
-            startedAt: synthesisStartedAt,
-            completedAt: Date.now() - startedAt,
-            status: "done",
-          });
-        } catch (e) {
-          console.warn("[runSquadAuto] target public synthesis failed", {
-            taskId: strategyRecordOverrides?.taskId,
-            message: (e as Error).message,
-          });
-          variants.splice(0, variants.length);
-          stages.splice(0, stages.length, {
-            key: "public-synthesis",
-            label: brandMarket.isZhTW ? "對外貼文" : "Public posts",
-            startedAt: synthesisStartedAt,
-            completedAt: Date.now() - startedAt,
-            status: "failed",
-          });
-          errors.unshift(brandMarket.isZhTW
-            ? "對外貼文產生失敗，請重試。"
-            : "Public post generation failed. Please retry.");
-        }
-      }
+          return publicResults;
+      } : null;
 
       // 6. Look up squad lead for the legacy captionAgent slot. Target tasks
       // never return an internal agent identity.
@@ -2272,18 +2236,20 @@ export const quickTaskRouter = router({
         }
       }
 
-      let ok = variants.some((v) => v.caption.length > 0);
+      let ok = strategyPublicPolicy
+        ? planningArtifacts.some((artifact) => artifact.caption.length > 0)
+        : variants.some((v) => v.caption.length > 0);
 
       // 2026-05-09 (CJ Phase 2): persist squad runs too so client can
       // navigate to /run/:outputId (consistent with orchestra path).
       let outputId: number | null = null;
       let missionId: number | null = null;
       const shouldPersist = strategyPublicPolicy
-        ? planningArtifacts.some((artifact) => artifact.caption.length > 0)
+        ? true
         : ok;
       if (shouldPersist) {
         try {
-          const { recordTaskRun } = await import("../_core/recordTaskRun");
+          const { recordTaskRun, finaliseTaskRun } = await import("../_core/recordTaskRun");
           const content = strategyPublicPolicy
             ? JSON.stringify({
                 schemaVersion: 2,
@@ -2320,6 +2286,7 @@ export const quickTaskRouter = router({
               ?? (await import("../_core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
             content,
             metadata,
+            ...(strategyPublicPolicy ? { progress: "caption_ready" as const } : {}),
             privateStrategyArtifacts: strategyPublicPolicy && privateRunId
               ? { runId: privateRunId, squadSlug: sqSlugNew, rows: privateArtifacts }
               : undefined,
@@ -2331,6 +2298,63 @@ export const quickTaskRouter = router({
             errors.unshift(brandMarket.isZhTW
               ? "內容儲存失敗，請重試。"
               : "Content storage failed. Please retry.");
+          } else if (strategyPublicPolicy && outputId && synthesizeStrategyPublicVariants) {
+            const checkpointOutputId = outputId;
+            // setImmediate keeps the mutation response independent of even the
+            // first async brand-rule read. The output row already exists, so a
+            // refresh can poll caption_ready while this continuation runs.
+            setImmediate(() => {
+              void (async () => {
+                try {
+                  const publicResults = await synthesizeStrategyPublicVariants();
+                  const finalContent = JSON.stringify({
+                    schemaVersion: 2,
+                    contentModel: "ig-strategy-bundle",
+                    planningArtifacts,
+                    publicVariants: publicResults,
+                  }, null, 2);
+                  const finalMetadata = {
+                    ...metadata,
+                    taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
+                    tier: "99s",
+                    latencyMs: Date.now() - startedAt,
+                    publicVariantCount: publicResults.length,
+                    publicFormats: [...new Set(publicResults.map((variant) => variant.format))],
+                  };
+                  const finalised = await finaliseTaskRun({
+                    outputId: checkpointOutputId,
+                    content: finalContent,
+                    metadata: finalMetadata,
+                    progress: "done",
+                  });
+                  if (!finalised.ok) {
+                    console.warn("[runSquadAuto] target public synthesis finalise failed", {
+                      taskId: strategyRecordOverrides?.taskId,
+                      outputId: checkpointOutputId,
+                    });
+                  }
+                } catch (e) {
+                  console.warn("[runSquadAuto] target public synthesis failed", {
+                    taskId: strategyRecordOverrides?.taskId,
+                    outputId: checkpointOutputId,
+                    message: (e as Error).message,
+                  });
+                  const finalised = await finaliseTaskRun({
+                    outputId: checkpointOutputId,
+                    progress: "failed",
+                    progressDetail: brandMarket.isZhTW
+                      ? "對外貼文產生失敗，內容規劃仍可使用，請重跑一次。"
+                      : "Public post generation failed. The planning remains available; please run the task again.",
+                  });
+                  if (!finalised.ok) {
+                    console.warn("[runSquadAuto] target public synthesis failure state could not be saved", {
+                      taskId: strategyRecordOverrides?.taskId,
+                      outputId: checkpointOutputId,
+                    });
+                  }
+                }
+              })();
+            });
           }
         } catch (e) {
           console.warn("[runSquadAuto] recordTaskRun failed:", (e as Error).message);
@@ -2356,6 +2380,7 @@ export const quickTaskRouter = router({
         errors,
         outputId,
         missionId,
+        ...(strategyPublicPolicy && outputId ? { progress: "caption_ready" as const } : {}),
       };
     }),
 
