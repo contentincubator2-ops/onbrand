@@ -262,6 +262,11 @@ export const outputRouter = router({
         { message: "imageUrl must be http(s)://, data:image/ (not svg), /static/, or /assets/" },
       ),
       style: z.string().max(500).optional(),
+      /** 2026-08-19 (客戶回報「產出跟指令大相逕庭的圖」): the full prompt that
+       *  produced this image. `style` is a 480-char display excerpt; the run
+       *  page re-seeds its editable prompt box from this field, so it must be
+       *  the untruncated text that was actually sent to the model. */
+      prompt: z.string().max(4000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
@@ -275,7 +280,13 @@ export const outputRouter = router({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
       const updated = updateOutputContent(row.content, input, (item) => ({
         ...item,
-        image: { ...(item.image ?? {}), url: input.imageUrl, status: "ready", style: input.style ?? item.image?.style ?? null },
+        image: {
+          ...(item.image ?? {}),
+          url: input.imageUrl,
+          status: "ready",
+          style: input.style ?? item.image?.style ?? null,
+          prompt: input.prompt ?? input.style ?? item.image?.prompt ?? null,
+        },
         imageUrl: input.imageUrl,
         imageStatus: "ready",
       }));

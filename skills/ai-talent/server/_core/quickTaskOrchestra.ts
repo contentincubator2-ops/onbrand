@@ -89,6 +89,16 @@ export interface OrchestraVariant {
   hashtags: string[];
   image: {
     style: string | null;
+    /**
+     * 2026-08-19 (客戶回報「產出跟指令大相逕庭的圖」): the prompt that was
+     * used to drive the image model. `style` is the agent-written Chinese
+     * 風格方向 — display-only, it never reaches the model (see genOneImage).
+     * RunPage's 改配圖 panel used to pre-fill its editable prompt box from
+     * `style`, so users compared a brief the model never saw against the
+     * image and (correctly) concluded the two had nothing to do with each
+     * other. Persist the real brief so the box shows what made this image.
+     */
+    prompt?: string | null;
     url: string | null;
     status: "ready" | "failed" | "skipped" | "timeout";
     errorMsg?: string;
@@ -117,6 +127,7 @@ export interface OrchestraVariant {
     body: string;
     image: {
       style: string | null;
+      prompt?: string | null;
       url: string | null;
       status: "ready" | "failed" | "skipped" | "timeout" | "pending";
       errorMsg?: string;
@@ -1516,11 +1527,15 @@ async function genOneImage(
 ): Promise<OrchestraVariant["image"]> {
   const prompt = args.style ?? ""; // returned as `style` — what the UI shows
   const source = (args.content || args.style || "").trim();
-  if (!source) return { style: args.style, url: null, status: "skipped" };
+  if (!source) return { style: args.style, prompt: null, url: null, status: "skipped" };
+  // 2026-08-19: hoisted out of the try so every return path can persist the
+  // generated visual brief that drove the model (see image.prompt). Provider
+  // safety/fidelity guardrails are appended separately and are not UI content.
+  let modelPrompt: string | null = null;
   try {
     // 2026-07-19 (CJ「品牌顏色會被貫穿到圖片生成的指令中嗎」): brand palette
     // rides along into the shared brief converter → on-brand color schemes.
-    const modelPrompt = await captionToVisualBrief({
+    modelPrompt = await captionToVisualBrief({
       caption: source,
       platform: args.platform,
       palette: args.palette,
@@ -1552,20 +1567,14 @@ async function genOneImage(
       "never stay physically consistent with the subject's actual pose/hair/" +
       "head angle. Show the subject directly instead.";
     const subjectMode = !!args.subjectImageUrl;
+    // 2026-08-19 (客戶回報「勾選真實產品後再產圖，出現錯誤中文字」): this file
+    // used to carry its own paraphrase of the fidelity guard, so tightening
+    // imageGen's copy left this path on the old, looser wording. Import the
+    // shared constant — one guard, one place to fix it.
+    const { PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_NEGATIVE_PROMPT } =
+      await import("./imageGen");
     const promptNoText = subjectMode
-      // 2026-07-25 product-faithful gen: the blanket NO-TEXT rule would strip
-      // the product's own label — use the fidelity guard instead (label
-      // letter-perfect, no OTHER generated text). Mirrors imageGen.ts's
-      // PRODUCT_FAITHFUL_PROMPT_BLOCK so both paths hold the same bar.
-      ? modelPrompt +
-        "\n\nPRODUCT FIDELITY — the attached image is the REAL product; reproduce it " +
-        "EXACTLY as shown (identical shape, proportions, materials, colors, and every " +
-        "printed label/logo/text on the product itself must stay letter-perfect and " +
-        "unaltered). Do NOT redraw, restyle, re-color or re-label the product. Place it " +
-        "naturally into the scene: matching light direction, correct perspective and " +
-        "scale, realistic contact shadows — it must look photographed in place, never " +
-        "pasted on. Apart from the product's own printed label, add no other text, " +
-        "captions, watermarks or typography anywhere.\n\n" + noMirrorLine
+      ? modelPrompt + "\n\n" + PRODUCT_FAITHFUL_PROMPT_BLOCK + "\n\n" + noMirrorLine
       : modelPrompt +
         "\n\nABSOLUTELY NO TEXT: render zero written characters — no text, letters, " +
         "words, numbers, Chinese/Japanese/Korean characters, titles, headlines, " +
@@ -1577,11 +1586,15 @@ async function genOneImage(
       aspectRatio: aspect,
       quality: "high" as const,
       ...(args.subjectImageUrl ? { imageUrl: args.subjectImageUrl } : {}),
-      negativePrompt:
-        "text, letters, words, numbers, chinese characters, japanese characters, " +
-        "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
-        "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
-        "fake characters, writing, mirror, reflection, reflective surface",
+      // Product-subject mode can't send the blanket text-suppression negative —
+      // it would fight the real product's own printed label. Mirror-only there,
+      // matching imageGen.ts and mediaRouter.generate.
+      negativePrompt: subjectMode
+        ? NO_MIRROR_NEGATIVE_PROMPT
+        : "text, letters, words, numbers, chinese characters, japanese characters, " +
+          "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
+          "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
+          "fake characters, writing, mirror, reflection, reflective surface",
     };
     const tryModel = async (modelId: string, label: string, capMs: number) =>
       Promise.race([
@@ -1617,17 +1630,17 @@ async function genOneImage(
       // when a real product photo was requested, it would silently ship a
       // fake product. Non-product runs keep the proven Flux Schnell fallback.
       if (subjectMode) {
-        return { style: prompt, url: null, status: "failed", errorMsg: String(e?.message ?? e) };
+        return { style: prompt, prompt: modelPrompt, url: null, status: "failed", errorMsg: String(e?.message ?? e) };
       }
       r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
     }
     if (r.status === "ready" && r.url) {
-      return { style: prompt, url: r.url, status: "ready" };
+      return { style: prompt, prompt: modelPrompt, url: r.url, status: "ready" };
     }
-    return { style: prompt, url: null, status: "failed", errorMsg: r.errorMsg ?? "no url returned" };
+    return { style: prompt, prompt: modelPrompt, url: null, status: "failed", errorMsg: r.errorMsg ?? "no url returned" };
   } catch (e: any) {
     const msg = String(e?.message ?? e);
-    return { style: prompt, url: null, status: msg.includes("exceeded") ? "timeout" : "failed", errorMsg: msg };
+    return { style: prompt, prompt: modelPrompt, url: null, status: msg.includes("exceeded") ? "timeout" : "failed", errorMsg: msg };
   }
 }
 
@@ -2681,7 +2694,12 @@ export async function runOrchestra(args: {
         variants[0].cards = cardSpecs.map((c, idx) => ({
           headline: c.headline,
           body: c.body,
-          image: cardImages[idx] ?? { style: c.imageBrief, url: null, status: "failed" as const },
+          image: cardImages[idx] ?? {
+            style: c.imageBrief,
+            prompt: null,
+            url: null,
+            status: "failed" as const,
+          },
         }));
         const okCards = (variants[0].cards ?? []).filter((c) => c.image.status === "ready").length;
         if (okCards === 0) errors.push("carousel: 卡片圖全部生成失敗");

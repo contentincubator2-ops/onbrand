@@ -26,6 +26,7 @@ import { sql } from "drizzle-orm";
 import { ContentKindSchema } from "../_core/outputContentEnvelope";
 import {
   assertGenericRegenerationAllowed,
+  preserveExistingVariantImage,
   replaceRegeneratedContent,
   selectRegenerationTarget,
 } from "../_core/quickTaskRegenerateContent";
@@ -2666,6 +2667,11 @@ export const quickTaskRouter = router({
       const newVariant = r.variants?.[0];
       if (!newVariant?.caption) throw new Error("重生失敗，agent 沒回傳內容");
 
+      // This path deliberately runs with images:0, so replacing the whole
+      // variant would discard the still-current image and its persisted
+      // model prompt. Regenerating copy must not mutate the visual asset.
+      const replacementVariant = preserveExistingVariantImage(newVariant, target.item);
+
       // Replace the variant + archive the old one
       const archived = Array.isArray(md.archivedVariants) ? md.archivedVariants : [];
       archived.push({
@@ -2676,7 +2682,7 @@ export const quickTaskRouter = router({
           ? { contentKind: target.kind, contentIndex: target.index }
           : {}),
       });
-      const newContent = replaceRegeneratedContent(row.content, input, newVariant, target);
+      const newContent = replaceRegeneratedContent(row.content, input, replacementVariant, target);
       const newMetadata = JSON.stringify({ ...md, archivedVariants: archived, lastRegenAt: new Date().toISOString() });
 
       await localPool.execute(

@@ -55,6 +55,7 @@ import {
   type RunContentKind,
   type RunContentMutationLocator,
 } from "../lib/strategyContentEnvelope";
+import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
@@ -111,6 +112,10 @@ interface VariantData {
   caption: string;
   hashtags?: string[];
   imageStyle?: string;
+  /** 2026-08-19: the prompt the image model actually received (see
+   *  quickTaskOrchestra OrchestraVariant.image.prompt). Older runs don't
+   *  have it — callers fall back to imageStyle. */
+  imagePrompt?: string;
   imageUrl?: string | null;
   imageStatus?: string;
   // 2026-07-29 Tier-1 TikTok 影片卡 — 非影片任務一律 undefined
@@ -123,7 +128,7 @@ interface VariantData {
   cards?: Array<{
     headline: string;
     body: string;
-    image: { style: string | null; url: string | null; status: string; errorMsg?: string };
+    image: { style: string | null; prompt?: string | null; url: string | null; status: string; errorMsg?: string };
   }>;
 }
 
@@ -150,6 +155,7 @@ function normalizeVariantData(v: any): VariantData {
     imageUrl: v?.imageUrl ?? img.url ?? null,
     imageStatus: v?.imageStatus ?? img.status ?? undefined,
     imageStyle: v?.imageStyle ?? img.style ?? undefined,
+    imagePrompt: v?.imagePrompt ?? img.prompt ?? undefined,
     videoUrl: v?.videoUrl ?? vid.url ?? null,
     videoStatus: v?.videoStatus ?? vid.status ?? undefined,
     videoPosterUrl: v?.videoPosterUrl ?? vid.posterUrl ?? null,
@@ -496,9 +502,10 @@ export default function RunPage() {
     text: string;
     locator: RunContentMutationLocator;
   } | null>(null);
-  /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
+  /** P4: image regen prompt — pre-filled from the prompt that produced the
+   *  current image (variant.imagePrompt), editable. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
-  const imageMutationTargetRef = useRef<{ locator: RunContentMutationLocator; style: string } | null>(null);
+  const imageMutationTargetRef = useRef<{ locator: RunContentMutationLocator; style: string; prompt: string } | null>(null);
   /** 2026-07-07 (CJ): user-editable thumbnail title text overlaid on the (now
    *  text-free) AI thumbnail. Seeded from the variant title/caption, editable
    *  in the right panel; passed to the YT mockup as overlayTitle. */
@@ -985,7 +992,7 @@ export default function RunPage() {
               showToastGlobal(lang === "en" ? "Image target was lost — please try again" : "找不到原本的圖片位置，請重試");
               return;
             }
-            updateImageMut.mutate({ id, ...target.locator, imageUrl: imageSrc, style: target.style });
+            updateImageMut.mutate({ id, ...target.locator, imageUrl: imageSrc, style: target.style, prompt: target.prompt });
             imageMutationTargetRef.current = null;
             showToastGlobal(lang === "en" ? "Image ready ✓" : "已產圖 ✓");
           } else {
@@ -1268,42 +1275,22 @@ export default function RunPage() {
 
     // ── Multi-day series path ─────────────────────────────────────────────
     if (isMultiDayTask && postDates.length === variants.length && schedMode !== "publish") {
-      const esc = (s: string) => String(s ?? "")
-        .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
-        .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-
       if (schedMode === "ics") {
         // Build multi-event .ics, one per variant
         const brandName = (data as any)?.brand?.name ?? "";
-        const ev: string[] = [];
-        variants.forEach((v, i) => {
-          const d = postDates[i];
-          if (!d) return;
-          const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-          const dEnd = new Date(d); dEnd.setDate(d.getDate() + 1);
-          const ymdEnd = `${dEnd.getFullYear()}${String(dEnd.getMonth() + 1).padStart(2, "0")}${String(dEnd.getDate()).padStart(2, "0")}`;
-          const summary = (brandName ? brandName + " · " : "") + (v.label ?? `Day ${i + 1}`);
-          ev.push(
-            "BEGIN:VEVENT",
-            `UID:${id}-series-${i}@onbrand.sowork.ai`,
-            `DTSTART;VALUE=DATE:${ymd}`,
-            `DTEND;VALUE=DATE:${ymdEnd}`,
-            `SUMMARY:${esc(summary)}`,
-            `DESCRIPTION:${esc(v.caption ?? "")}`,
-            "END:VEVENT",
-          );
-        });
-        const icsStr = [
-          "BEGIN:VCALENDAR", "VERSION:2.0",
-          "PRODID:-//OnBrand//Content Calendar//ZH",
-          "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
-        ].join("\r\n");
-        const blob = new Blob([icsStr], { type: "text/calendar;charset=utf-8" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `series-${id}.ics`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const icsStr = buildAllDayIcs(
+          variants.flatMap((v, i) => {
+            const d = postDates[i];
+            if (!d) return [];
+            return [{
+              uid: `${id}-series-${i}@onbrand.sowork.ai`,
+              date: d,
+              summary: (brandName ? brandName + " · " : "") + (v.label ?? `Day ${i + 1}`),
+              description: v.caption ?? "",
+            }];
+          }),
+        );
+        downloadIcs(icsStr, `series-${id}.ics`);
         setScheduleDialogOpen(false);
         showToastGlobal(lang === "en"
           ? `Exported ${variants.length} posts — drop the .ics into your calendar`
@@ -1368,47 +1355,26 @@ export default function RunPage() {
 
   // ── Bulk .ics export (calendar-type tasks only) ──────────────────────────
   const handleBulkIcsExport = React.useCallback(() => {
-    const esc = (s: string) => String(s ?? "")
-      .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
-      .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-    const ev: string[] = [];
-    let eventCount = 0;
-    variants.forEach((v: any, i: number) => {
+    const brandName = (data as any)?.brand?.name ?? "";
+    const events = (variants as any[]).flatMap((v: any, i: number) => {
       const m = /(\d{4})\/(\d{2})\/(\d{2})/.exec(String(v.label ?? ""));
-      if (!m) return;
-      eventCount++;
-      const ymd = `${m[1]}${m[2]}${m[3]}`;
-      const next = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
-      const ymdEnd = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(next.getDate()).padStart(2, "0")}`;
+      if (!m) return [];
       const summary = String(v.label ?? "").replace(/^\d{4}\/\d{2}\/\d{2}\s*·\s*/, "");
-      ev.push(
-        "BEGIN:VEVENT",
-        `UID:${id}-${i}@onbrand.sowork.ai`,
-        `DTSTART;VALUE=DATE:${ymd}`,
-        `DTEND;VALUE=DATE:${ymdEnd}`,
-        `SUMMARY:${esc(((data as any)?.brand?.name ? (data as any).brand.name + " · " : "") + summary)}`,
-        `DESCRIPTION:${esc(v.caption ?? "")}`,
-        "END:VEVENT",
-      );
+      return [{
+        uid: `${id}-${i}@onbrand.sowork.ai`,
+        date: new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])),
+        summary: (brandName ? brandName + " · " : "") + summary,
+        description: v.caption ?? "",
+      }];
     });
-    if (ev.length === 0) {
+    if (events.length === 0) {
       showToastGlobal(lang === "en" ? "No dated posts to export" : "沒有可匯出的日期貼文");
       return;
     }
-    const ics = [
-      "BEGIN:VCALENDAR", "VERSION:2.0",
-      "PRODID:-//OnBrand//Content Calendar//ZH",
-      "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
-    ].join("\r\n");
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `content-calendar-${id}.ics`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadIcs(buildAllDayIcs(events), `content-calendar-${id}.ics`);
     showToastGlobal(lang === "en"
-      ? `Exported ${eventCount} posts — drop the .ics into your calendar`
-      : `已匯出 ${eventCount} 篇 — 拖進日曆 App 即可`);
+      ? `Exported ${events.length} posts — drop the .ics into your calendar`
+      : `已匯出 ${events.length} 篇 — 拖進日曆 App 即可`);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variants, id, data, lang]);
 
@@ -1492,9 +1458,18 @@ export default function RunPage() {
     const subject = extractSubject(cap);
 
     if (mode === "image") {
-      // Prefer existing imageStyle (the brief that produced current image)
-      if (slide?.imageStyle && slide.imageStyle.trim().length > 0) {
-        setImagePrompt(slide.imageStyle);
+      // 2026-08-19 (客戶回報「產出跟指令大相逕庭的圖」): this box is an
+      // editable PROMPT — whatever sits in it is sent verbatim to the image
+      // model. It used to be seeded from `imageStyle`, the agent-written
+      // Chinese 風格方向, which is display-only and never reached the model
+      // (quickTaskOrchestra.genOneImage converts the CAPTION into the real
+      // brief). So the prompt on screen described one image and the picture
+      // beside it came from another — every single quick-task run. Seed from
+      // the prompt that actually produced the image; fall back to the style
+      // brief only for runs generated before it was persisted.
+      const seedPrompt = slide?.imagePrompt?.trim() || slide?.imageStyle?.trim() || "";
+      if (seedPrompt) {
+        setImagePrompt(seedPrompt);
         return;
       }
       // Richer image brief: subject + lighting + composition + mood + style cue
@@ -1520,7 +1495,7 @@ export default function RunPage() {
       setImagePrompt(seed);
       return;
     }
-  }, [mode, activeIdx, slide?.imageStyle, slide?.caption]);
+  }, [mode, activeIdx, slide?.imagePrompt, slide?.imageStyle, slide?.caption]);
 
   // 2026-05-09 (CJ direction「只留一個 mockup 路徑」): 一律渲染 mockup，
   // 不再 block on missing taskId. Inference falls through 3 layers:
@@ -2811,6 +2786,10 @@ export default function RunPage() {
                       imageMutationTargetRef.current = {
                         locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
                         style: imagePrompt.slice(0, 480),
+                        // 2026-08-19: the full prompt, unsliced — it is what
+                        // produced the new image, so the box must show it back
+                        // verbatim on the next load (see image.prompt).
+                        prompt: imagePrompt,
                       };
                       imageGenMut.mutate({
                         brandId: data.brand.id,

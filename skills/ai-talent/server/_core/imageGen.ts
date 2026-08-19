@@ -53,9 +53,23 @@ export const PRODUCT_FAITHFUL_PROMPT_BLOCK =
   "NOT redraw, restyle, re-color or re-label the product. Place it naturally " +
   "into the scene: lighting direction consistent with the environment, " +
   "correct perspective and scale, realistic contact shadows and reflections " +
-  "— it must look photographed in place, never pasted on. Apart from the " +
-  "product's own printed label, do NOT add any other text, captions, " +
-  "watermarks, badges or typography anywhere in the image.";
+  "— it must look photographed in place, never pasted on. " +
+  // 2026-08-19 (客戶回報「勾選真實產品後再產圖，出現錯誤中文字」): the old
+  // wording ("apart from the product's own label, no other text") left the
+  // model room to treat the BRAND NAME as label-ish and stamp a garbled CJK
+  // watermark across the frame. State the allowance as a closed set — only
+  // glyphs visibly printed on the attached photo, copied, never invented —
+  // and name the failure modes we actually saw.
+  "TEXT — closed rule: the ONLY characters allowed anywhere in the output are " +
+  "the ones already visibly printed on the attached product photo, copied " +
+  "pixel-for-pixel. Do not invent, extend, translate, re-letter or repeat " +
+  "them. Do NOT render or repeat the brand name anywhere except where it is " +
+  "already printed on the product itself. Do not add a watermark (including " +
+  "large translucent or tiled brand marks), signage, captions, badges, stickers or " +
+  "any Chinese / Japanese / Korean characters elsewhere in the frame — not on " +
+  "the background, surfaces, props, or as an overlay. If the attached photo " +
+  "itself carries a watermark, leave it out. Every surface other than the " +
+  "product is blank.";
 
 /**
  * 2026-07-27 (CJ「鏡子裡的她，跟實際的髮型或頭的轉向不同」): mirror /
@@ -164,7 +178,18 @@ function channelSize(channel?: string): ImageSize {
 function buildPrompt(input: ImageGenInput): string {
   const bc = input.brandContext ?? {};
   const lines: string[] = [];
-  if (bc.brandName) lines.push(`Brand: ${bc.brandName}`);
+  // 2026-08-19 (客戶回報「勾選真實產品後再產圖，出現錯誤中文字」): in
+  // subject-reference mode the blanket NO-TEXT guard is deliberately relaxed
+  // so the real product's own printed label survives — which means anything
+  // else text-shaped in the prompt becomes fair game for the model to paint.
+  // The brand name is a CJK string ("小安素"), and Nano Banana duly stamped a
+  // garbled approximation of it across the frame as a watermark. The attached
+  // photo already IS this brand's product, so naming the brand adds nothing
+  // here: withhold it (and the brand-substitution paragraph below, which only
+  // exists to swap OTHER brands' products out of template scenes — impossible
+  // when the real product is the subject).
+  const nameBrandInPrompt = !input.subjectImageUrl;
+  if (bc.brandName && nameBrandInPrompt) lines.push(`Brand: ${bc.brandName}`);
   if (bc.positioning) lines.push(`Positioning: ${bc.positioning}`);
   if (bc.archetype) lines.push(`Archetype: ${bc.archetype}`);
   if (bc.voiceTone) lines.push(`Voice: ${bc.voiceTone}`);
@@ -174,7 +199,7 @@ function buildPrompt(input: ImageGenInput): string {
   // Brand override: the scene may come from a commercial-photography
   // template that references another brand's product (e.g. Coca-Cola,
   // Sprite). Instruct the model to adapt the style for this brand instead.
-  if (bc.brandName) {
+  if (bc.brandName && nameBrandInPrompt) {
     lines.push("");
     lines.push(
       `BRAND ADAPTATION: This image represents ${bc.brandName}. ` +
@@ -344,6 +369,10 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
         imageUrl: input.subjectImageUrl,
         aspectRatio: aspect as any,
         brandId: input.brandId,
+        // The blanket NO_TEXT_NEGATIVE_PROMPT can't be used here — it would
+        // fight the real product's own label. Mirror-only, matching what
+        // mediaRouter.generate already passes on this same path.
+        negativePrompt: NO_MIRROR_NEGATIVE_PROMPT,
       });
       if (r.status === "ready" && r.url) {
         await db.execute(sql`

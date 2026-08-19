@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertGenericRegenerationAllowed,
+  preserveExistingVariantImage,
   selectRegenerationTarget,
   replaceRegeneratedContent,
 } from "./quickTaskRegenerateContent";
@@ -116,5 +117,23 @@ describe("quickTask regenerate content", () => {
       variantIndex: 0,
       contentKind: "planning",
     })).toThrow("contentKind and contentIndex must be provided together");
+  });
+
+  it("keeps the current image and its model prompt when only copy is regenerated", () => {
+    const current = {
+      caption: "old caption",
+      image: { style: "display direction", prompt: "actual visual brief", url: "https://example.com/image.png", status: "ready" },
+      imagePrompt: "flat compatibility prompt",
+    };
+    const regenerated = {
+      caption: "new caption",
+      image: { style: "new direction", url: null, status: "skipped" },
+    };
+
+    expect(preserveExistingVariantImage(regenerated, current)).toEqual({
+      caption: "new caption",
+      image: current.image,
+      imagePrompt: "flat compatibility prompt",
+    });
   });
 });
