@@ -26,6 +26,7 @@ import {
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
   dicebear, handleOf, SlotContent, MarkdownText, titleEchoesCaption, ImageGenSlot,
+  SHOW_IMAGE_STYLE_OVERLAY,
 } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
@@ -77,7 +78,10 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           {liveImageUrl && liveImageStatus === "ready" ? (
             <>
               <img src={liveImageUrl} alt={liveImageStyle ?? "generated"} className="absolute inset-0 w-full h-full object-cover" />
-              {liveImageStyle && (
+              {/* 2026-08-19: hidden behind SHOW_IMAGE_STYLE_OVERLAY — the
+                  Chinese style text never produced this image. Flip the flag
+                  in shared.tsx to restore. */}
+              {SHOW_IMAGE_STYLE_OVERLAY && liveImageStyle && (
                 <div className="absolute bottom-2 left-2 right-2 bg-black/55 backdrop-blur-sm rounded px-2 py-1">
                   <p className="text-[10px] text-white/90 line-clamp-2">{liveImageStyle}</p>
                 </div>
