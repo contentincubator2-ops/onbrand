@@ -13,6 +13,10 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { generateImage, resolveBrandVisualContext } from "../_core/imageGen";
 import { assertBrandOwner } from "../_core/brandAuth";
+import {
+  parseBilingualBriefChoice,
+  recoverModelPromptFromJsonLike,
+} from "../_core/bilingualVisualBrief";
 
 // 2026-08-02 (CJ「產圖失敗 invalid_enum_value tiktok」): this enum had
 // drifted out of sync with promptFromCaption's below — TikTok (and email)
@@ -62,6 +66,14 @@ export const imageRouter = router({
     .mutation(async ({ input, ctx }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
+      const recoveredPrompt = recoverModelPromptFromJsonLike(input.prompt);
+      if (recoveredPrompt === null) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "圖片指令包含不完整的 JSON，請重新產生圖片指令後再試。",
+        });
+      }
+      const modelPrompt = recoveredPrompt ?? input.prompt;
       // 2026-05-14: per-model image point cost.
       // Flux (default) = 30 pts ≈ 30s task; gpt-image-1 premium = 100 pts;
       // Imagen/Ideogram middle = 50 pts.
@@ -86,7 +98,7 @@ export const imageRouter = router({
         brandId: input.brandId,
         decisionId: input.decisionId,
         optionId: input.optionId,
-        prompt: input.prompt,
+        prompt: modelPrompt,
         channel: input.channel,
         size: input.size,
         modelChoice: input.modelChoice,
@@ -190,23 +202,12 @@ Rules:
           { role: "system", content: systemPrompt },
           { role: "user",   content: userMsg },
         ],
-        maxTokens: 500,
+        // 160 English words (~220 tokens) plus a natural Traditional Chinese
+        // rendering (~200-350 tokens) and JSON escaping need ample headroom.
+        maxTokens: 1200,
       });
 
-      const raw = result.choices?.[0]?.message?.content ?? "";
-      const text = (typeof raw === "string" ? raw : "").trim();
-      if (!text) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "LLM returned empty prompt" });
-      const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-      try {
-        const parsed = JSON.parse(cleaned) as Record<string, unknown>;
-        const prompt = typeof parsed.prompt === "string" ? parsed.prompt.trim() : "";
-        const promptZh = typeof parsed.promptZh === "string" ? parsed.promptZh.trim() : "";
-        if (prompt && promptZh) return { prompt, promptZh };
-      } catch {
-        // Older/fallback providers may ignore JSON mode. Keep their useful
-        // English result instead of failing the button outright.
-      }
-      return { prompt: cleaned, promptZh: cleaned };
+      return parseBilingualBriefChoice(result.choices?.[0], input.caption);
     }),
 
   listForDecision: protectedProcedure

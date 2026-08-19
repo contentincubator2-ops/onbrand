@@ -17,6 +17,11 @@
  * separate display-only field and never reaches the model.
  */
 import { invokeLLM } from "./llm";
+import {
+  fallbackBilingualVisualBrief,
+  parseBilingualBriefChoice,
+  type BilingualVisualBrief,
+} from "./bilingualVisualBrief";
 
 export interface BrandIdentityForImage {
   name: string;
@@ -82,12 +87,7 @@ export async function loadBrandIdentityForImage(
   }
 }
 
-export interface BilingualVisualBrief {
-  /** Model-ready English brief. This is the text sent by automatic image generation. */
-  prompt: string;
-  /** Natural Traditional Chinese rendering of the same scene, for human editing. */
-  promptZh: string;
-}
+export type { BilingualVisualBrief } from "./bilingualVisualBrief";
 
 export interface VisualBriefArgs {
   caption: string;
@@ -99,30 +99,6 @@ export interface VisualBriefArgs {
   /** Brand palette (from loadBrandPaletteHexes) — woven into the brief as
    *  the scene's dominant color scheme so generated images stay on-brand. */
   palette?: Array<{ hex: string; role: string }>;
-}
-
-function fallbackBriefs(caption: string): BilingualVisualBrief {
-  const excerpt = caption.slice(0, 120);
-  return {
-    prompt: `Photorealistic editorial scene representing: ${excerpt}`,
-    promptZh: `寫實的編輯攝影場景，呈現：${excerpt}`,
-  };
-}
-
-function parseBilingualBrief(raw: string, caption: string): BilingualVisualBrief {
-  const fallback = fallbackBriefs(caption);
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  try {
-    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
-    const prompt = typeof parsed.prompt === "string" ? parsed.prompt.trim() : "";
-    const promptZh = typeof parsed.promptZh === "string" ? parsed.promptZh.trim() : "";
-    if (prompt && promptZh) return { prompt, promptZh };
-  } catch {
-    // Compatibility with a provider that ignores the JSON-only instruction:
-    // preserve its useful English answer and synthesize only the display copy.
-    if (cleaned) return { prompt: cleaned, promptZh: fallback.promptZh };
-  }
-  return fallback;
 }
 
 /**
@@ -157,7 +133,10 @@ export async function captionToBilingualVisualBrief(args: VisualBriefArgs): Prom
       // direct Anthropic API (Azure naming) → 404 every theater cell
       // → fallback chain → 企劃台 crawl. Let anthropic use its
       // proven default (claude-sonnet-4-6).
-      maxTokens: 360,
+      // 130 English words (~180 tokens) + ~150 CJK characters (~150-300
+      // tokens depending on tokenizer) + JSON escaping can exceed 500.
+      // 1200 leaves roughly 2x headroom for verbose providers.
+      maxTokens: 1200,
       messages: [
         {
           role: "system",
@@ -173,12 +152,9 @@ export async function captionToBilingualVisualBrief(args: VisualBriefArgs): Prom
         },
       ],
     });
-    return parseBilingualBrief(
-      r.choices[0]?.message?.content?.toString() ?? "",
-      args.caption,
-    );
+    return parseBilingualBriefChoice(r.choices[0], args.caption);
   } catch {
-    return fallbackBriefs(args.caption);
+    return fallbackBilingualVisualBrief(args.caption);
   }
 }
 
