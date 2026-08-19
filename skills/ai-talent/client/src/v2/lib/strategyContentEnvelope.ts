@@ -154,6 +154,31 @@ export function isEmptyStrategyPublicSelection(
   return isStrategyEnvelope && contentKind === "publicVariants" && publicVariantCount === 0;
 }
 
+export type StrategyPublicGenerationState = "generating" | "missing" | null;
+
+/**
+ * Distinguish an empty public tab that is still being synthesized from one
+ * whose run has settled without public posts. Both the target task id and the
+ * v2 strategy envelope are required so caption_ready semantics for every 60s
+ * and non-strategy run remain untouched.
+ */
+export function getStrategyPublicGenerationState({
+  taskId,
+  isStrategyEnvelope,
+  progress,
+  publicVariantCount,
+}: {
+  taskId?: string | null;
+  isStrategyEnvelope: boolean;
+  progress?: string | null;
+  publicVariantCount: number;
+}): StrategyPublicGenerationState {
+  if (!isIgStrategyDeliverableTarget(taskId) || !isStrategyEnvelope || publicVariantCount > 0) {
+    return null;
+  }
+  return progress === "caption_ready" ? "generating" : "missing";
+}
+
 export function getCalendarPublishPayload(
   id: number,
   storedContentKind: unknown,

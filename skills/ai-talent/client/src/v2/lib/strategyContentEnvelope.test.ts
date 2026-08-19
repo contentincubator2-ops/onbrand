@@ -6,6 +6,7 @@ import {
   getCalendarPublishPayload,
   getPlanningPublishWarning,
   getPlanningConfirmationPayload,
+  getStrategyPublicGenerationState,
   getRunContentMutationLocator,
   getRunContentSelectionKey,
   isEmptyStrategyPublicSelection,
@@ -156,6 +157,33 @@ describe("strategy content envelope", () => {
     expect(isEmptyStrategyPublicSelection(true, "planningArtifacts", 0)).toBe(false);
     expect(isEmptyStrategyPublicSelection(false, "publicVariants", 0)).toBe(false);
     expect(isEmptyStrategyPublicSelection(true, "publicVariants", 1)).toBe(false);
+  });
+
+  it("distinguishes background public synthesis from a settled empty strategy run", () => {
+    const base = {
+      taskId: "ig-99-youtility",
+      isStrategyEnvelope: true,
+      publicVariantCount: 0,
+    };
+    expect(getStrategyPublicGenerationState({ ...base, progress: "caption_ready" })).toBe("generating");
+    expect(getStrategyPublicGenerationState({ ...base, progress: "failed" })).toBe("missing");
+    expect(getStrategyPublicGenerationState({ ...base, progress: "done" })).toBe("missing");
+    expect(getStrategyPublicGenerationState({ ...base, progress: "done", publicVariantCount: 30 })).toBeNull();
+  });
+
+  it("never changes caption_ready meaning for 60s or non-strategy runs", () => {
+    expect(getStrategyPublicGenerationState({
+      taskId: "fb-60-single-full",
+      isStrategyEnvelope: false,
+      progress: "caption_ready",
+      publicVariantCount: 0,
+    })).toBeNull();
+    expect(getStrategyPublicGenerationState({
+      taskId: "ig-99-youtility",
+      isStrategyEnvelope: false,
+      progress: "caption_ready",
+      publicVariantCount: 0,
+    })).toBeNull();
   });
 
   it("sends planning confirmation only after the Calendar warning is accepted", () => {

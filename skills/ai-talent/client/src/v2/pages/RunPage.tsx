@@ -47,6 +47,7 @@ import {
   getMutationLocatorSelectionKey,
   getPlanningPublishWarning,
   getPlanningConfirmationPayload,
+  getStrategyPublicGenerationState,
   getRunContentMutationLocator,
   getRunContentSelectionKey,
   isEmptyStrategyPublicSelection,
@@ -1143,6 +1144,12 @@ export default function RunPage() {
     [resolvedContent],
   );
   const isStrategyEnvelope = resolvedContent.isStrategyEnvelope;
+  const strategyPublicGenerationState = getStrategyPublicGenerationState({
+    taskId: data?.mission?.taskId,
+    isStrategyEnvelope,
+    progress: (data as any)?.progress,
+    publicVariantCount: publicVariants.length,
+  });
 
   const selectedContentKind: RunContentKind = isStrategyEnvelope
     ? activeContentKind === "legacy"
@@ -1841,6 +1848,18 @@ export default function RunPage() {
           orchestra wrote captions early and is still working on images/QA */}
       {(() => {
         const p = (data as any)?.progress;
+        if (strategyPublicGenerationState === "generating") {
+          return (
+            <div className="mb-3 mx-1 flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-tiny text-primary-700">
+              <span className="inline-block w-3 h-3 border-2 border-primary-400 border-t-primary-700 rounded-full animate-spin" />
+              <span className="flex-1">
+                {lang === "en"
+                  ? "Planning is ready — public posts are being generated in the background. This card will refresh automatically."
+                  : "內容規劃已完成 · 對外貼文正在背景產生，這張卡會自動更新"}
+              </span>
+            </div>
+          );
+        }
         // hold-for-images tasks show their own full-card generating state
         // (the mockup is replaced) — skip the redundant slim banner.
         if (p === "caption_ready" &&
@@ -2031,16 +2050,27 @@ export default function RunPage() {
                 );
               }
               if (isStrategyEnvelope && selectedContentKind === "publicVariants" && publicVariants.length === 0) {
+                const isGeneratingPublicPosts = strategyPublicGenerationState === "generating";
                 return (
                   <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
-                    <div className="w-12 h-12 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center text-xl">↻</div>
+                    <div className="w-12 h-12 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center text-xl">
+                      {isGeneratingPublicPosts
+                        ? <span className="inline-block w-6 h-6 border-[3px] border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                        : "↻"}
+                    </div>
                     <p className="text-small font-semibold text-default-800">
-                      {lang === "en" ? "Public posts haven't been generated" : "尚未產生對外貼文"}
+                      {isGeneratingPublicPosts
+                        ? (lang === "en" ? "Generating public posts…" : "對外貼文產生中…")
+                        : (lang === "en" ? "Public posts haven't been generated" : "尚未產生對外貼文")}
                     </p>
                     <p className="text-tiny text-default-500 max-w-sm leading-relaxed">
-                      {lang === "en"
-                        ? "This run has no publish-ready posts yet. Re-run the task to generate Instagram posts while keeping the planning tabs above."
-                        : "這次產出尚未完成可直接發布的貼文。請重跑此任務，系統會保留上方策略內容，並另外產生 Instagram 貼文。"}
+                      {isGeneratingPublicPosts
+                        ? (lang === "en"
+                            ? "Planning is ready. Publish-ready Instagram posts will appear here automatically when background generation finishes."
+                            : "內容規劃已完成。背景產生結束後，可直接發布的 Instagram 貼文會自動顯示在這裡。")
+                        : (lang === "en"
+                            ? "This run has no publish-ready posts yet. Re-run the task to generate Instagram posts while keeping the planning tabs above."
+                            : "這次產出尚未完成可直接發布的貼文。請重跑此任務，系統會保留上方策略內容，並另外產生 Instagram 貼文。")}
                     </p>
                   </div>
                 );
