@@ -18,6 +18,7 @@ import { callModel, type ModelProvider } from "./multiModelRouter";
 import { dispatchGenerate, checkJob } from "./mediaGen";
 import { captionToVisualBrief, loadBrandPaletteHexes } from "./visualBrief";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
+import { detectNonDeliverable } from "./captionSanity";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "./brandContext";
@@ -598,8 +599,10 @@ async function callOneVariant(args: {
   strategistAnchor?: string;
   /** 2026-07-17 多市場: brand's master-persona market. undefined = legacy zh-TW; null = no matching master → omit block. */
   market?: MarketCode | null;
+  /** Whether final copy must be zh-TW; used by the non-deliverable gate. */
+  isZhTW: boolean;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
-  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor, market } = args;
+  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor, market, isZhTW } = args;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
   // {today} → market-appropriate date format so PR datelines / calendar
@@ -654,7 +657,10 @@ async function callOneVariant(args: {
     ? `\n【主題優先序 — 最重要】\n` +
       `本次任務的「主題」=上面 URL 抓到的內容。品牌不是主題。\n` +
       `caption 必須具體呼應 URL 內容（提到影片裡的事件、數字、名稱、人事物），不要寫通用模板，不要繞回品牌主商品。\n` +
-      `若 URL 抓到的內容跟品牌領域不相關，那就照 URL 主題寫，不要硬扯品牌。\n`
+      `即使 URL 主題與品牌領域完全無關，也必須直接以 URL 主題撰寫貼文，不要硬扯品牌。\n` +
+      `嚴禁輸出提問、澄清請求、說明、免責聲明、或任何非貼文內容。\n` +
+      `素材不足時，以標題與描述推論主題撰寫；不得臆造具體數據或事件細節。\n` +
+      `一律使用品牌目標市場語言輸出。\n`
     : "";
 
   const strategistSection = strategistAnchor
@@ -993,7 +999,7 @@ async function callOneVariant(args: {
       // 2nd attempt: append explicit reminder to user msg, lowering model
       // creativity and forcing strict JSON.
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] 上次回應沒給可解析的 caption。請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。`
+        ? `${userMsg}\n\n[REMINDER] 上次回應沒給可解析、可交付的 caption。請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清、不得說明理由、不得輸出貼文以外的任何文字；素材不足就依現有標題與描述直接寫。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -1011,10 +1017,17 @@ async function callOneVariant(args: {
       const parsed = tryParseJson(lastRaw);
       const out = extractCaption(lastRaw, parsed);
       if (out.caption.length > 0) {
-        return { label, caption: stripCaptionPreamble(out.caption), hashtags: out.hashtags };
+        const caption = stripCaptionPreamble(out.caption);
+        const sanity = detectNonDeliverable(caption, { isZhTW, structured: calendarMode });
+        if (!sanity) {
+          return { label, caption, hashtags: out.hashtags };
+        }
+        lastErr = new Error(`non-deliverable caption for ${label} (${sanity.reason}) — raw[0:200]: ${lastRaw.slice(0, 200)}`);
+        console.warn(`[callOneVariant] attempt ${attempt} rejected for ${label} (${sanity.reason}): ${lastRaw.slice(0, 300)}`);
+      } else {
+        lastErr = new Error(`empty caption for ${label} — raw[0:200]: ${lastRaw.slice(0, 200)}`);
+        console.warn(`[callOneVariant] attempt ${attempt} failed for ${label} (raw len=${lastRaw.length}): ${lastRaw.slice(0, 300)}`);
       }
-      lastErr = new Error(`empty caption for ${label} — raw[0:200]: ${lastRaw.slice(0, 200)}`);
-      console.warn(`[callOneVariant] attempt ${attempt} failed for ${label} (raw len=${lastRaw.length}): ${lastRaw.slice(0, 300)}`);
     } catch (e) {
       lastErr = e;
       console.warn(`[callOneVariant] attempt ${attempt} threw for ${label}:`, (e as Error)?.message);
@@ -1034,6 +1047,7 @@ async function callCaptionWriter(args: {
   agentAiModel?: string | null;
   strategistAnchor?: string;
   market?: MarketCode | null;
+  isZhTW: boolean;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
   // Parallel fanout — each variant in its own LLM call.
@@ -2045,6 +2059,7 @@ export async function runOrchestra(args: {
         userMsg,
         strategistAnchor: strategistAnchor || undefined,
         market: brandMarket.marketCode, // 2026-07-17 多市場
+        isZhTW: brandMarket.isZhTW,
       }).then((c) => { stCap.status = "done"; stCap.completedAt = Date.now() - startedAt; return c; }).catch((e) => {
         stCap.status = "failed";
         stCap.completedAt = Date.now() - startedAt;
@@ -2067,27 +2082,31 @@ export async function runOrchestra(args: {
         : Promise.resolve<string[]>([]),
     ]);
 
-    // ── Small-cap caption post-validation (2026-07-20) ─────────────────
+    // ── Caption post-validation ─────────────────────────────────────────
     // CJ QA:「FB 廣告 Headline 5 種：輸入籠統時 AI 回傳一大段要求澄清的
     // 文字（遠超 25 字），直接塞進廣告標題視覺區塊，破壞版型」。The
     // length rule lives in the prompt, but nothing enforced it after
-    // generation. For micro-caption tasks (captionMaxChars ≤ 60):
-    //   1. clarification-request output → blank the caption + push an
-    //      explicit error (no silent fallback, per 2026-05-28 principle)
-    //   2. multi-line/oversized output → reduce to first line, hard-cap
-    //      with … so a non-compliant answer can never break the layout.
-    if (args.config.captionMaxChars > 0 && args.config.captionMaxChars <= 60 && Array.isArray(captions)) {
-      const CLARIFY_RE = /請(再)?提供|請補充|需要更多|更多資訊|請告訴我|能否分享|請說明|資訊不足|無法(直接)?產出|我需要知道/;
-      const cap = args.config.captionMaxChars;
+    // generation. Non-deliverable content is rejected for every task. The
+    // first-line and hard-length clamps remain exclusive to micro tasks.
+    if (Array.isArray(captions)) {
       for (let vi = 0; vi < captions.length; vi++) {
         const v = captions[vi];
         if (!v?.caption) continue;
-        let c = v.caption.trim();
-        if (CLARIFY_RE.test(c)) {
-          errors.push(`caption(${v.label ?? vi + 1}): model asked for clarification instead of producing — 重生這段 to retry`);
+        const sanity = detectNonDeliverable(v.caption, {
+          isZhTW: brandMarket.isZhTW,
+          structured: !!args.config.calendarMerge,
+        });
+        if (sanity) {
+          errors.push(`caption(${v.label ?? vi + 1}): model asked for clarification instead of producing (${sanity.reason}) — 重生這段 to retry`);
           v.caption = "";
-          continue;
         }
+      }
+    }
+    if (args.config.captionMaxChars > 0 && args.config.captionMaxChars <= 60 && Array.isArray(captions)) {
+      const cap = args.config.captionMaxChars;
+      for (const v of captions) {
+        if (!v?.caption) continue;
+        let c = v.caption.trim();
         // First non-empty line only (micro tasks are single-line by spec)
         const firstLine = c.split(/\n+/).map((l) => l.trim()).find((l) => l.length > 0) ?? "";
         if (firstLine && firstLine.length < c.length) c = firstLine;
