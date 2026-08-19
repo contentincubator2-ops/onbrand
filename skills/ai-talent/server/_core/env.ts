@@ -39,6 +39,9 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY:        z.string().optional(),
   AZURE_FOUNDRY_API_KEY:    z.string().optional(),
   AZURE_FOUNDRY_PROJECT_ENDPOINT: z.string().url().optional(),
+  AZURE_POSITION_API_KEY:   z.string().optional(),
+  AZURE_POSITION_ENDPOINT:  z.string().url().optional(),
+  AZURE_POSITION_MODEL:     z.string().optional(),
   GOOGLE_VERTEX_API_KEY:    z.string().optional(),
 
   // Hermes Agent — self-hosted on VM via FastAPI wrapper

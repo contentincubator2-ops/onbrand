@@ -106,7 +106,7 @@ export function preserveExistingVariantImage(
     preserved.image = { ...currentItem.image };
   }
   // Some non-orchestra/legacy variants store the same visual fields flat.
-  for (const key of ["imageUrl", "imageStatus", "imageStyle", "imagePrompt"] as const) {
+  for (const key of ["imageUrl", "imageStatus", "imageStyle", "imagePrompt", "imagePromptZh"] as const) {
     if (currentItem[key] !== undefined) preserved[key] = currentItem[key];
   }
   return preserved;

@@ -8,7 +8,7 @@ vi.mock("./llm", () => ({
   invokeLLM: invokeLLMMock,
 }));
 
-import { captionToVisualBrief } from "./visualBrief";
+import { captionToBilingualVisualBrief, captionToVisualBrief } from "./visualBrief";
 
 const response = {
   choices: [{ message: { content: "A safe generic product scene." } }],
@@ -61,5 +61,25 @@ describe("captionToVisualBrief brand identity", () => {
     );
     expect(request.messages[1].content).toContain("Brand: (unknown)\n");
     expect(request.messages[1].content).not.toContain("小安素");
+  });
+
+  it("returns matching English and Chinese briefs from one LLM call", async () => {
+    invokeLLMMock.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({
+        prompt: "A runner ties her shoes beside a sunrise window.",
+        promptZh: "晨光窗邊，一名跑者正在綁鞋帶。",
+      }) } }],
+    });
+
+    await expect(captionToBilingualVisualBrief({
+      caption: "晨跑前的準備時刻",
+    })).resolves.toEqual({
+      prompt: "A runner ties her shoes beside a sunrise window.",
+      promptZh: "晨光窗邊，一名跑者正在綁鞋帶。",
+    });
+    expect(invokeLLMMock).toHaveBeenCalledOnce();
+    expect(invokeLLMMock.mock.calls[0][0].messages[0].content).toContain(
+      "semantically equivalent versions",
+    );
   });
 });

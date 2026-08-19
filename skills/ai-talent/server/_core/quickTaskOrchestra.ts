@@ -17,7 +17,7 @@
 import { callModel, type ModelProvider } from "./multiModelRouter";
 import { dispatchGenerate, checkJob } from "./mediaGen";
 import {
-  captionToVisualBrief,
+  captionToBilingualVisualBrief,
   loadBrandIdentityForImage,
   loadBrandPaletteHexes,
   type BrandIdentityForImage,
@@ -106,6 +106,8 @@ export interface OrchestraVariant {
      * other. Persist the real brief so the box shows what made this image.
      */
     prompt?: string | null;
+    /** Traditional Chinese equivalent shown and edited in RunPage. */
+    promptZh?: string | null;
     url: string | null;
     status: "ready" | "failed" | "skipped" | "timeout";
     errorMsg?: string;
@@ -135,6 +137,7 @@ export interface OrchestraVariant {
     image: {
       style: string | null;
       prompt?: string | null;
+      promptZh?: string | null;
       url: string | null;
       status: "ready" | "failed" | "skipped" | "timeout" | "pending";
       errorMsg?: string;
@@ -1535,22 +1538,25 @@ async function genOneImage(
 ): Promise<OrchestraVariant["image"]> {
   const prompt = args.style ?? ""; // returned as `style` — what the UI shows
   const source = (args.content || args.style || "").trim();
-  if (!source) return { style: args.style, prompt: null, url: null, status: "skipped" };
+  if (!source) return { style: args.style, prompt: null, promptZh: null, url: null, status: "skipped" };
   // 2026-08-19: hoisted out of the try so every return path can persist the
   // generated visual brief that drove the model (see image.prompt). Provider
   // safety/fidelity guardrails are appended separately and are not UI content.
   let modelPrompt: string | null = null;
+  let displayPromptZh: string | null = null;
   try {
     const subjectMode = !!args.subjectImageUrl;
     // 2026-07-19 (CJ「品牌顏色會被貫穿到圖片生成的指令中嗎」): brand palette
     // rides along into the shared brief converter → on-brand color schemes.
-    modelPrompt = await captionToVisualBrief({
+    const visualBrief = await captionToBilingualVisualBrief({
       caption: source,
       platform: args.platform,
       palette: args.palette,
       brandIdentity: args.brandIdentity,
       subjectMode,
     });
+    modelPrompt = visualBrief.prompt;
+    displayPromptZh = visualBrief.promptZh;
     // 2026-05-18 (CJ「目前的圖很不行，最好的生圖模型是什麼」): quick-task
     // images were hardcoded to piapi/flux-schnell — the fastest/lowest-
     // quality Flux tier (draft-grade, weak prompt adherence). Upgrade the
@@ -1635,17 +1641,17 @@ async function genOneImage(
       // when a real product photo was requested, it would silently ship a
       // fake product. Non-product runs keep the proven Flux Schnell fallback.
       if (subjectMode) {
-        return { style: prompt, prompt: modelPrompt, url: null, status: "failed", errorMsg: String(e?.message ?? e) };
+        return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: null, status: "failed", errorMsg: String(e?.message ?? e) };
       }
       r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
     }
     if (r.status === "ready" && r.url) {
-      return { style: prompt, prompt: modelPrompt, url: r.url, status: "ready" };
+      return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: r.url, status: "ready" };
     }
-    return { style: prompt, prompt: modelPrompt, url: null, status: "failed", errorMsg: r.errorMsg ?? "no url returned" };
+    return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: null, status: "failed", errorMsg: r.errorMsg ?? "no url returned" };
   } catch (e: any) {
     const msg = String(e?.message ?? e);
-    return { style: prompt, prompt: modelPrompt, url: null, status: msg.includes("exceeded") ? "timeout" : "failed", errorMsg: msg };
+    return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: null, status: msg.includes("exceeded") ? "timeout" : "failed", errorMsg: msg };
   }
 }
 
