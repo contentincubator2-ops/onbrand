@@ -23,6 +23,10 @@ import {
   type BrandIdentityForImage,
 } from "./visualBrief";
 import { buildImageGuardBlock } from "./imagePromptGuards";
+import {
+  PRODUCT_SUBJECT_UNAVAILABLE_ERROR,
+  resolveProductSubjectReference,
+} from "./productSubjectPolicy";
 import { probeImageUrl } from "./imageFetch";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
@@ -108,6 +112,10 @@ export interface OrchestraVariant {
     prompt?: string | null;
     /** Traditional Chinese equivalent shown and edited in RunPage. */
     promptZh?: string | null;
+    /** Actual provider model and whether the primary silently fell back. */
+    modelId?: string | null;
+    requestedModelId?: string | null;
+    fallbackUsed?: boolean;
     url: string | null;
     status: "ready" | "failed" | "skipped" | "timeout";
     errorMsg?: string;
@@ -138,6 +146,9 @@ export interface OrchestraVariant {
       style: string | null;
       prompt?: string | null;
       promptZh?: string | null;
+      modelId?: string | null;
+      requestedModelId?: string | null;
+      fallbackUsed?: boolean;
       url: string | null;
       status: "ready" | "failed" | "skipped" | "timeout" | "pending";
       errorMsg?: string;
@@ -1533,12 +1544,27 @@ async function genOneImage(
      *  when set, routes to Nano Banana subject-reference compositing instead
      *  of text-to-image, mirroring the manual RunPage「使用真實產品圖」panel. */
     subjectImageUrl?: string | null;
+    /** True when the run is product-scoped even if its stored photo is broken. */
+    subjectImageRequired?: boolean;
   },
   config: OrchestraConfig,
 ): Promise<OrchestraVariant["image"]> {
   const prompt = args.style ?? ""; // returned as `style` — what the UI shows
   const source = (args.content || args.style || "").trim();
   if (!source) return { style: args.style, prompt: null, promptZh: null, url: null, status: "skipped" };
+  if (args.subjectImageRequired && !args.subjectImageUrl) {
+    return {
+      style: args.style,
+      prompt: null,
+      promptZh: null,
+      modelId: null,
+      requestedModelId: "google/nano-banana",
+      fallbackUsed: false,
+      url: null,
+      status: "failed",
+      errorMsg: PRODUCT_SUBJECT_UNAVAILABLE_ERROR,
+    };
+  }
   // 2026-08-19: hoisted out of the try so every return path can persist the
   // generated visual brief that drove the model (see image.prompt). Provider
   // safety/fidelity guardrails are appended separately and are not UI content.
@@ -1632,6 +1658,7 @@ async function genOneImage(
     const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "google/imagen-4-default");
     const primaryCapMs = subjectMode ? 35_000 : (config.imageModelOverride ? 35_000 : IMAGEN_CAP_MS);
     let r;
+    let fallbackUsed = false;
     try {
       r = await tryModel(primaryModel, primaryModel, primaryCapMs);
       if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
@@ -1641,14 +1668,44 @@ async function genOneImage(
       // when a real product photo was requested, it would silently ship a
       // fake product. Non-product runs keep the proven Flux Schnell fallback.
       if (subjectMode) {
-        return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: null, status: "failed", errorMsg: String(e?.message ?? e) };
+        return {
+          style: prompt,
+          prompt: modelPrompt,
+          promptZh: displayPromptZh,
+          modelId: primaryModel,
+          requestedModelId: primaryModel,
+          fallbackUsed: false,
+          url: null,
+          status: "failed",
+          errorMsg: String(e?.message ?? e),
+        };
       }
+      fallbackUsed = true;
       r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
     }
     if (r.status === "ready" && r.url) {
-      return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: r.url, status: "ready" };
+      return {
+        style: prompt,
+        prompt: modelPrompt,
+        promptZh: displayPromptZh,
+        modelId: r.modelId,
+        requestedModelId: primaryModel,
+        fallbackUsed,
+        url: r.url,
+        status: "ready",
+      };
     }
-    return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: null, status: "failed", errorMsg: r.errorMsg ?? "no url returned" };
+    return {
+      style: prompt,
+      prompt: modelPrompt,
+      promptZh: displayPromptZh,
+      modelId: r.modelId,
+      requestedModelId: primaryModel,
+      fallbackUsed,
+      url: null,
+      status: "failed",
+      errorMsg: r.errorMsg ?? "no url returned",
+    };
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: null, status: msg.includes("exceeded") ? "timeout" : "failed", errorMsg: msg };
@@ -2446,7 +2503,10 @@ export async function runOrchestra(args: {
     // produce nothing (every image "skipped" → every clip skipped).
     const willRender = (args.config.runImageGen || !!args.config.runVideoGen) && args.config.images > 0;
     const stGen = willRender
-      ? stage("gen", `Flux Schnell ×${args.config.images} 平行生圖`)
+      // The primary is usually Imagen, can be GPT/Nano Banana, and may fall
+      // back to Flux. Per-image modelId records the actual provider; keep the
+      // stage label provider-neutral instead of claiming every image was Flux.
+      ? stage("gen", `平行生圖 ×${args.config.images}`)
       : null;
 
     const taskPlatform = args.template.id.split("-")[0];
@@ -2459,12 +2519,21 @@ export async function runOrchestra(args: {
     // image composites the actual product — same fidelity bar as the manual
     // RunPage「使用真實產品圖」panel. Brand-level (no productId) runs are
     // unaffected — there's no single product to anchor to.
-    const subjectImageUrl = willRender ? await loadProductImageUrl(args.brandId, args.productId) : null;
+    const loadedSubjectImageUrl = willRender ? await loadProductImageUrl(args.brandId, args.productId) : null;
+    const productSubject = resolveProductSubjectReference(args.productId, loadedSubjectImageUrl);
     const images: OrchestraVariant["image"][] = willRender && briefs.length
       ? await Promise.all(briefs.map((b, i) =>
           // Theater standard: prompt derives from the variant's CAPTION;
           // the Chinese brief is display-only (style).
-          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform, palette: brandPalette, brandIdentity, subjectImageUrl }, args.config)))
+          genOneImage({
+            content: captions[i]?.caption ?? "",
+            style: b,
+            platform: taskPlatform,
+            palette: brandPalette,
+            brandIdentity,
+            subjectImageUrl: productSubject.imageUrl,
+            subjectImageRequired: productSubject.required,
+          }, args.config)))
       : briefs.length
         ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
         : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
@@ -2511,7 +2580,8 @@ export async function runOrchestra(args: {
                     platform: taskPlatform,
                     palette: brandPalette,
                     brandIdentity,
-                    subjectImageUrl,
+                    subjectImageUrl: productSubject.imageUrl,
+                    subjectImageRequired: productSubject.required,
                   },
                   args.config,
                 )
@@ -2700,7 +2770,15 @@ export async function runOrchestra(args: {
             // the subjectImageUrl wiring Stage 3 already does above (line
             // ~2382) — every card was pure text-to-image, so the model
             // invented its own product instead of compositing the real one.
-            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0], palette: brandPalette, brandIdentity, subjectImageUrl },
+            {
+              content: `${c.headline}\n${c.body}`.trim(),
+              style: c.imageBrief,
+              platform: args.template.id.split("-")[0],
+              palette: brandPalette,
+              brandIdentity,
+              subjectImageUrl: productSubject.imageUrl,
+              subjectImageRequired: productSubject.required,
+            },
             args.config,
           )),
         );

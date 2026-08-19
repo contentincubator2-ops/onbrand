@@ -12,6 +12,7 @@ import {
   resolveOutputContent,
   updateOutputContent,
 } from "../_core/outputContentEnvelope";
+import { applyVariantImageUpdate } from "../_core/variantImageUpdate";
 
 /** Escape HTML special characters to prevent stored XSS in previewHtml */
 function escapeHtml(s: string): string {
@@ -268,6 +269,10 @@ export const outputRouter = router({
       prompt: z.string().max(8000).optional(),
       /** Human-editable Traditional Chinese counterpart of `prompt`. */
       promptZh: z.string().max(4000).optional(),
+      /** Actual provider model, plus the user's requested selection for fallback transparency. */
+      modelId: z.string().max(200).optional(),
+      requestedModelId: z.string().max(200).optional(),
+      fallbackUsed: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { default: localPool } = await import("../localDb");
@@ -279,19 +284,9 @@ export const outputRouter = router({
       );
       const row = (rows as any[])[0];
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
-      const updated = updateOutputContent(row.content, input, (item) => ({
-        ...item,
-        image: {
-          ...(item.image ?? {}),
-          url: input.imageUrl,
-          status: "ready",
-          style: input.style ?? item.image?.style ?? null,
-          prompt: input.prompt ?? item.image?.prompt ?? input.style ?? null,
-          promptZh: input.promptZh ?? item.image?.promptZh ?? null,
-        },
-        imageUrl: input.imageUrl,
-        imageStatus: "ready",
-      }));
+      const updated = updateOutputContent(row.content, input, (item) =>
+        applyVariantImageUpdate(item, input),
+      );
       await localPool.execute(
         `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
         [updated.content, input.id],

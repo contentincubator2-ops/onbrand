@@ -12,6 +12,16 @@ export function containsCjk(text: string): boolean {
 }
 
 /**
+ * The router accepts up to 4,000 characters. A fixed 1,000-token ceiling
+ * deterministically truncated long Chinese instructions, which then forced
+ * the generation path back to the untranslated input. Scale output headroom
+ * with the source while retaining the previous floor for ordinary prompts.
+ */
+export function translationMaxTokens(prompt: string): number {
+  return Math.min(6_000, Math.max(1_000, Math.ceil(prompt.length * 1.5)));
+}
+
+/**
  * Translate only user-authored CJK image instructions. Translation is an
  * optional quality layer: any provider/configuration/empty-output failure
  * returns the original prompt so image generation can continue unchanged.
@@ -26,7 +36,7 @@ export async function translateImagePromptToEnglish(prompt: string): Promise<Ima
       // invokeLLM's provider cascade keeps this working if Foundry is absent.
       provider: "azure-foundry",
       model: "gpt-4o-mini",
-      maxTokens: 1000,
+      maxTokens: translationMaxTokens(prompt),
       messages: [
         {
           role: "system",

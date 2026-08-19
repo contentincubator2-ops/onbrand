@@ -13,9 +13,10 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { generateImage, resolveBrandVisualContext } from "../_core/imageGen";
 import { assertBrandOwner } from "../_core/brandAuth";
+import { imageActionForRequest, reconcileImageCharge } from "../_core/imageBilling";
 import {
   parseBilingualBriefChoice,
-  recoverModelPromptFromJsonLike,
+  normalizeImagePromptInput,
 } from "../_core/bilingualVisualBrief";
 
 // 2026-08-02 (CJ「產圖失敗 invalid_enum_value tiktok」): this enum had
@@ -66,44 +67,53 @@ export const imageRouter = router({
     .mutation(async ({ input, ctx }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
-      const recoveredPrompt = recoverModelPromptFromJsonLike(input.prompt);
-      if (recoveredPrompt === null) {
+      const normalizedPrompt = normalizeImagePromptInput(input.prompt);
+      if (normalizedPrompt === null) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "圖片指令包含不完整的 JSON，請重新產生圖片指令後再試。",
         });
       }
-      const modelPrompt = recoveredPrompt ?? input.prompt;
+      const { modelPrompt, displayPrompt } = normalizedPrompt;
       // 2026-05-14: per-model image point cost.
       // Flux (default) = 30 pts ≈ 30s task; gpt-image-1 premium = 100 pts;
       // Imagen/Ideogram middle = 50 pts.
       const { assertPoints, deductPoints } = await import("../_core/pointsService");
-      const imageAction =
-        input.subjectImageUrl                  ? "image_imagen"   : // nano-banana ≈ Gemini tier
-        (input.modelChoice === "gpt-image-1" ||
-         input.modelChoice === "gpt-image-2")  ? "image_gpt"      :
-        input.modelChoice === "imagen-3"       ? "image_imagen"   :
-        input.modelChoice === "ideogram-v3"    ? "image_ideogram" :
-        /* default flux-schnell / flux-realism / auto */           "image_flux";
-      await assertPoints(ctx.user.id, imageAction as any);
-      await deductPoints(ctx.user.id, imageAction as any, { kind: "brand", id: input.brandId });
+      const imageAction = imageActionForRequest(input);
+      await assertPoints(ctx.user.id, imageAction);
+      await deductPoints(ctx.user.id, imageAction, { kind: "brand", id: input.brandId });
 
-      const resolved = await resolveBrandVisualContext(
-        input.brandId,
-        input.upstreamDecisionId ?? input.decisionId
-      );
-      const brandContext = { ...resolved, ...(input.overrideBrandContext ?? {}) };
+      let result;
+      try {
+        const resolved = await resolveBrandVisualContext(
+          input.brandId,
+          input.upstreamDecisionId ?? input.decisionId
+        );
+        const brandContext = { ...resolved, ...(input.overrideBrandContext ?? {}) };
 
-      const result = await generateImage({
-        brandId: input.brandId,
-        decisionId: input.decisionId,
-        optionId: input.optionId,
-        prompt: modelPrompt,
-        channel: input.channel,
-        size: input.size,
-        modelChoice: input.modelChoice,
-        subjectImageUrl: input.subjectImageUrl,
-        brandContext,
+        result = await generateImage({
+          brandId: input.brandId,
+          decisionId: input.decisionId,
+          optionId: input.optionId,
+          prompt: modelPrompt,
+          channel: input.channel,
+          size: input.size,
+          modelChoice: input.modelChoice,
+          subjectImageUrl: input.subjectImageUrl,
+          brandContext,
+        });
+      } catch (error) {
+        await reconcileImageCharge({
+          userId: ctx.user.id,
+          prepaidAction: imageAction,
+          result: { status: "failed" },
+        });
+        throw error;
+      }
+      await reconcileImageCharge({
+        userId: ctx.user.id,
+        prepaidAction: imageAction,
+        result,
       });
       // 2026-05-12: surface actual provider failures to the client.
       // Previously a failed result still returned 200 with url:null, leading
@@ -135,7 +145,7 @@ export const imageRouter = router({
             : `${friendly}\n\n[技術細節] ${raw.slice(0, 300)}`,
         });
       }
-      return result;
+      return { ...result, normalizedDisplayPrompt: displayPrompt };
     }),
 
   /**

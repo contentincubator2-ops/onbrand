@@ -57,6 +57,7 @@ import {
   type RunContentKind,
   type RunContentMutationLocator,
 } from "../lib/strategyContentEnvelope";
+import { RUN_IMAGE_MODEL_OPTIONS } from "../lib/runImageModelOptions";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
@@ -120,6 +121,9 @@ interface VariantData {
   imagePrompt?: string;
   /** Traditional Chinese display/edit counterpart of imagePrompt. */
   imagePromptZh?: string;
+  imageModelId?: string;
+  imageRequestedModelId?: string;
+  imageFallbackUsed?: boolean;
   imageUrl?: string | null;
   imageStatus?: string;
   // 2026-07-29 Tier-1 TikTok 影片卡 — 非影片任務一律 undefined
@@ -132,7 +136,17 @@ interface VariantData {
   cards?: Array<{
     headline: string;
     body: string;
-    image: { style: string | null; prompt?: string | null; promptZh?: string | null; url: string | null; status: string; errorMsg?: string };
+    image: {
+      style: string | null;
+      prompt?: string | null;
+      promptZh?: string | null;
+      modelId?: string | null;
+      requestedModelId?: string | null;
+      fallbackUsed?: boolean;
+      url: string | null;
+      status: string;
+      errorMsg?: string;
+    };
   }>;
 }
 
@@ -161,6 +175,9 @@ function normalizeVariantData(v: any): VariantData {
     imageStyle: v?.imageStyle ?? img.style ?? undefined,
     imagePrompt: v?.imagePrompt ?? img.prompt ?? undefined,
     imagePromptZh: v?.imagePromptZh ?? img.promptZh ?? undefined,
+    imageModelId: v?.imageModelId ?? img.modelId ?? undefined,
+    imageRequestedModelId: v?.imageRequestedModelId ?? img.requestedModelId ?? undefined,
+    imageFallbackUsed: v?.imageFallbackUsed ?? img.fallbackUsed ?? undefined,
     videoUrl: v?.videoUrl ?? vid.url ?? null,
     videoStatus: v?.videoStatus ?? vid.status ?? undefined,
     videoPosterUrl: v?.videoPosterUrl ?? vid.posterUrl ?? null,
@@ -1002,10 +1019,22 @@ export default function RunPage() {
               ...target.locator,
               imageUrl: imageSrc,
               prompt: r?.effectivePrompt ?? target.promptZh,
-              promptZh: target.promptZh,
+              promptZh: r?.normalizedDisplayPrompt ?? target.promptZh,
+              modelId: r?.model ?? undefined,
+              requestedModelId: r?.requestedModel ?? undefined,
+              fallbackUsed: r?.usedFallback ?? false,
             });
             imageMutationTargetRef.current = null;
-            showToastGlobal(lang === "en" ? "Image ready ✓" : "已產圖 ✓");
+            const actualModel = String(r?.model ?? "").trim();
+            const requestedModel = String(r?.requestedModel ?? "").trim();
+            const modelNote = actualModel
+              ? r?.usedFallback
+                ? (lang === "en"
+                    ? ` — used ${actualModel} fallback (requested ${requestedModel || "auto"})`
+                    : ` — 實際使用 ${actualModel} fallback（原選 ${requestedModel || "自動"}）`)
+                : (lang === "en" ? ` — ${actualModel}` : ` — 實際使用 ${actualModel}`)
+              : "";
+            showToastGlobal(lang === "en" ? `Image ready ✓${modelNote}` : `已產圖 ✓${modelNote}`);
           } else {
             // 2026-05-12: server should TRPCError on failure now; this branch
             // only reaches if a provider returned success-shaped but empty
@@ -2810,14 +2839,25 @@ export default function RunPage() {
                     disabled={realProductMode}
                     className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary disabled:opacity-50"
                   >
-                    <option value="auto">{lang === "en" ? "Auto (default)" : "自動（預設）"}</option>
-                    <option value="flux-schnell">{lang === "en" ? "Fast — Flux Schnell (5-10s)" : "快速 — Flux Schnell（5-10 秒）"}</option>
-                    <option value="gpt-image-2">{lang === "en" ? "Best — GPT Image-2 (20-30s, OpenAI latest)" : "最佳 — GPT Image-2（20-30 秒，OpenAI 最新）"}</option>
-                    <option value="gpt-image-1">{lang === "en" ? "Photo-real — GPT Image-1 (15-25s)" : "寫實 — GPT Image-1（15-25 秒）"}</option>
-                    <option value="flux-realism">{lang === "en" ? "Photographic — Flux Realism (15-30s)" : "攝影感 — Flux Realism（15-30 秒）"}</option>
-                    <option value="ideogram-v3">{lang === "en" ? "With text — Ideogram V3 (best in-image text)" : "含文字 — Ideogram V3（圖中文字最強）"}</option>
-                    <option value="imagen-3">Google Imagen 4</option>
+                    {RUN_IMAGE_MODEL_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {lang === "en" ? option.en : option.zh}
+                      </option>
+                    ))}
                   </select>
+                  {slide?.imageModelId && (
+                    <p className={`text-[10px] ${slide.imageFallbackUsed ? "text-warning-700" : "text-default-500"}`}>
+                      {lang === "en" ? "Current image model: " : "目前圖片實際模型："}
+                      <span className="font-mono">{slide.imageModelId}</span>
+                      {slide.imageFallbackUsed && (
+                        <>
+                          {lang === "en" ? " (fallback from " : "（fallback，原選 "}
+                          <span className="font-mono">{slide.imageRequestedModelId || "auto"}</span>
+                          {lang === "en" ? ")" : "）"}
+                        </>
+                      )}
+                    </p>
+                  )}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
                     {lang === "en"
                       ? "Step 4: Hit the button to make a new image (replaces the current one)"

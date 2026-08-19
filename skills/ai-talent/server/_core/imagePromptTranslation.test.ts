@@ -8,7 +8,7 @@ vi.mock("./llm", () => ({
   invokeLLM: invokeLLMMock,
 }));
 
-import { translateImagePromptToEnglish } from "./imagePromptTranslation";
+import { translateImagePromptToEnglish, translationMaxTokens } from "./imagePromptTranslation";
 
 describe("translateImagePromptToEnglish", () => {
   beforeEach(() => {
@@ -63,5 +63,17 @@ describe("translateImagePromptToEnglish", () => {
       prompt,
       translated: false,
     });
+  });
+
+  it("allocates enough output tokens for the router's longest accepted prompt", async () => {
+    const prompt = "中".repeat(4_000);
+    invokeLLMMock.mockResolvedValue({
+      choices: [{ message: { content: "translated long prompt" } }],
+    });
+
+    await translateImagePromptToEnglish(prompt);
+
+    expect(translationMaxTokens(prompt)).toBe(6_000);
+    expect(invokeLLMMock.mock.calls[0][0].maxTokens).toBe(6_000);
   });
 });
