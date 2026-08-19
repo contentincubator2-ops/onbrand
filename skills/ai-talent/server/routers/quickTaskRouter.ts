@@ -2060,7 +2060,7 @@ export const quickTaskRouter = router({
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
         } finally {
           if (strategyPublicPolicy) {
-            console.info({
+            console.info("[runSquadAuto] step", {
               taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
               stepOrder: i + 1,
               provider: stepProvider,
@@ -2081,6 +2081,11 @@ export const quickTaskRouter = router({
         // server.timeout is 140s. Stop this route at 125s so persistence,
         // serialization, and the HTTP response retain roughly 15s of headroom.
         // Synthesis itself still owns its unchanged 55s deadline.
+        // This intentionally means synthesis starts only when route elapsed time
+        // is <=70s (125s - 55s). For a four-step task after a full 12s scout,
+        // the steps have at most ~58s total (~14.5s each), before subtracting DB
+        // and brand-context overhead. Slower runs safely degrade to persisted
+        // planning instead of a cut socket; the durable fix is background synthesis.
         const hasSynthesisBudget = strategyStepRouting!.hasStrategySynthesisBudget({
           routeStartedAt,
           now: Date.now(),
@@ -2094,7 +2099,7 @@ export const quickTaskRouter = router({
             completedAt: Date.now() - startedAt,
             status: "failed",
           });
-          errors.push(brandMarket.isZhTW
+          errors.unshift(brandMarket.isZhTW
             ? "時間預算不足，公開貼文尚未產生；已保留內容規劃，可重新產生公開貼文。"
             : "The public posts were not generated within the time budget; planning was saved and the public posts can be regenerated.");
         } else try {
@@ -2243,7 +2248,7 @@ export const quickTaskRouter = router({
             completedAt: Date.now() - startedAt,
             status: "failed",
           });
-          errors.push(brandMarket.isZhTW
+          errors.unshift(brandMarket.isZhTW
             ? "對外貼文產生失敗，請重試。"
             : "Public post generation failed. Please retry.");
         }
@@ -2323,7 +2328,7 @@ export const quickTaskRouter = router({
           missionId = persisted.missionId;
           if (strategyPublicPolicy && !outputId) {
             ok = false;
-            errors.push(brandMarket.isZhTW
+            errors.unshift(brandMarket.isZhTW
               ? "內容儲存失敗，請重試。"
               : "Content storage failed. Please retry.");
           }
@@ -2331,7 +2336,7 @@ export const quickTaskRouter = router({
           console.warn("[runSquadAuto] recordTaskRun failed:", (e as Error).message);
           if (strategyPublicPolicy) {
             ok = false;
-            errors.push(brandMarket.isZhTW
+            errors.unshift(brandMarket.isZhTW
               ? "內容儲存失敗，請重試。"
               : "Content storage failed. Please retry.");
           }
