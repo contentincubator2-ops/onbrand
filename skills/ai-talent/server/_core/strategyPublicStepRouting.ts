@@ -16,11 +16,23 @@ export type StrategyStepAttemptResult<T> =
       errorCode: "step_timeout" | "step_provider_failed" | "step_all_providers_failed";
     };
 
-/** Mirrors quickTaskOrchestra's authorized-provider split: Anthropic 55%, OpenAI 45%. */
+/**
+ * Keep the authorized-provider rotation deterministic: Anthropic first and
+ * OpenAI only as its fallback.
+ *
+ * Production evidence from the four-step strategy run showed that an
+ * Anthropic-first step completed in 17,977ms, while every OpenAI-first step
+ * reached attempt 2 and then exhausted the shared 25s deadline at 25,000–
+ * 25,001ms. Anthropic is therefore viable for this workload (~18s); choosing
+ * OpenAI first only consumes the time Anthropic needs to finish.
+ *
+ * The argument stays in the public signature so existing callers and tests do
+ * not need a separate routing path; randomness no longer decides the primary.
+ */
 export function selectAuthorizedStrategyProvider(
-  randomValue: number,
+  _randomValue: number,
 ): AuthorizedStrategyProvider {
-  return randomValue < 0.55 ? "anthropic" : "openai";
+  return "anthropic";
 }
 
 export function alternateAuthorizedStrategyProvider(

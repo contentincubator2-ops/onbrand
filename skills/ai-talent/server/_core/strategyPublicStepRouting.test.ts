@@ -6,11 +6,11 @@ import {
 } from "./strategyPublicStepRouting";
 
 describe("strategy public step provider routing", () => {
-  it("keeps the 55/45 authorized-provider split", () => {
+  it("always selects Anthropic first regardless of the former weighted draw", () => {
     expect(selectAuthorizedStrategyProvider(0)).toBe("anthropic");
     expect(selectAuthorizedStrategyProvider(0.549)).toBe("anthropic");
-    expect(selectAuthorizedStrategyProvider(0.55)).toBe("openai");
-    expect(selectAuthorizedStrategyProvider(0.999)).toBe("openai");
+    expect(selectAuthorizedStrategyProvider(0.55)).toBe("anthropic");
+    expect(selectAuthorizedStrategyProvider(0.999)).toBe("anthropic");
   });
 
   it("tries the other provider when the selected provider fails with enough time left", async () => {
