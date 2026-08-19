@@ -119,6 +119,19 @@ function redactProviderSecrets(text: string): string {
     .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
 }
 
+function googleApiKeys(): string[] {
+  return Array.from(new Set([
+    ...(process.env.GEMINI_API_KEY_POOL ?? "").split(","),
+    process.env.GEMINI_API_KEY ?? "",
+    process.env.GOOGLE_AI_API_KEY ?? "",
+    process.env.GOOGLE_API_KEY ?? "",
+  ].map((value) => value.trim()).filter(Boolean)));
+}
+
+function isRetryableGoogleKeyError(text: string): boolean {
+  return /suspended|permission_denied|api[_ ]key|consumer|unauthorized|forbidden|403|429|rate.?limit|quota|resource_exhausted/i.test(text);
+}
+
 export interface BrandVisualContext {
   brandName?: string;
   positioning?: string;
@@ -154,6 +167,10 @@ export interface ImageGenResult {
   status: "ready" | "failed";
   /** User scene prompt after optional CJK→English translation, before guards/context. */
   effectivePrompt: string;
+  /** User selection before provider fallback (or nano-banana in subject mode). */
+  requestedModel: string;
+  /** True when the returned image came from a fallback, not the requested/default primary. */
+  usedFallback: boolean;
   errorMsg?: string;
 }
 
@@ -266,6 +283,7 @@ async function runOpenAI(
       size,
       n: 1,
     }),
+    signal: AbortSignal.timeout(180_000),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -273,6 +291,7 @@ async function runOpenAI(
   }
   const json: any = await res.json();
   const item = json?.data?.[0] ?? {};
+  if (!item.url && !item.b64_json) throw new Error("OpenAI image gen returned no image");
   return { url: item.url ?? null, b64: item.b64_json ?? null, model };
 }
 
@@ -280,12 +299,8 @@ async function runGoogleImagen(
   promptText: string,
   size: ImageSize
 ): Promise<{ url: string | null; b64: string | null; model: string }> {
-  const pool = (process.env.GEMINI_API_KEY_POOL ?? process.env.GEMINI_API_KEY ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!pool.length) throw new Error("GEMINI_API_KEY not set");
-  const apiKey = pool[Math.floor(Math.random() * pool.length)];
+  const keys = googleApiKeys();
+  if (!keys.length) throw new Error("GEMINI_API_KEY not set");
   // 2026-05-18 (CJ「Imagen 3 產圖失敗」): ListModels on the prod key
   // shows imagen-3.0-* is GONE (404 not_found for predict); only
   // imagen-4.0-generate-001 / -fast / -ultra remain. Default to
@@ -294,27 +309,36 @@ async function runGoogleImagen(
 
   const aspect =
     size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        instances: [{ prompt: promptText }],
-        parameters: { sampleCount: 1, aspectRatio: aspect },
-      }),
+  const errors: string[] = [];
+  for (const apiKey of keys) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instances: [{ prompt: promptText }],
+          parameters: { sampleCount: 1, aspectRatio: aspect },
+        }),
+        signal: AbortSignal.timeout(120_000),
+      }
+    );
+    if (!res.ok) {
+      const text = redactProviderSecrets(await res.text());
+      const error = `Google Imagen ${res.status}: ${text.slice(0, 300)}`;
+      errors.push(error);
+      if (isRetryableGoogleKeyError(`${res.status} ${text}`)) continue;
+      throw new Error(error);
     }
-  );
-  if (!res.ok) {
-    const text = redactProviderSecrets(await res.text());
-    throw new Error(`Google Imagen ${res.status}: ${text.slice(0, 300)}`);
+    const json: any = await res.json();
+    const b64 =
+      json?.predictions?.[0]?.bytesBase64Encoded ??
+      json?.predictions?.[0]?.image?.bytesBase64Encoded ??
+      null;
+    if (!b64) throw new Error("Google Imagen returned no image");
+    return { url: null, b64, model };
   }
-  const json: any = await res.json();
-  const b64 =
-    json?.predictions?.[0]?.bytesBase64Encoded ??
-    json?.predictions?.[0]?.image?.bytesBase64Encoded ??
-    null;
-  return { url: null, b64, model };
+  throw new Error(errors.join("\n") || "Google Imagen failed");
 }
 
 // 2026-05-12: PiAPI bridge for user-selectable image models.
@@ -386,15 +410,15 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
               status = 'ready', errorMsg = NULL
           WHERE id = ${id}
         `);
-        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready", effectivePrompt };
+        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready", effectivePrompt, requestedModel: "nano-banana", usedFallback: false };
       }
       const msg = redactProviderSecrets(r.errorMsg ?? "nano-banana returned no image");
       await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, errorMsg: msg };
+      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, requestedModel: "nano-banana", usedFallback: false, errorMsg: msg };
     } catch (e: any) {
       const msg = redactProviderSecrets(`nano-banana: ${String(e?.message ?? e).slice(0, 400)}`).slice(0, 240);
       await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, errorMsg: msg };
+      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, requestedModel: "nano-banana", usedFallback: false, errorMsg: msg };
     }
   }
 
@@ -404,6 +428,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   // 2026-05-12: model choice override. When user picks a specific model,
   // it becomes "primary" and the env default becomes "fallback".
   const choice = input.modelChoice ?? "auto";
+  const requestedModel = choice;
   let effectivePrimary: ImageProvider = primary;
   let primaryModelId: string | null = null;
   switch (choice) {
@@ -427,6 +452,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   let provider: ImageProvider = effectivePrimary;
   let out: { url: string | null; b64: string | null; model: string } | null = null;
   let errorMsg: string | undefined;
+  let usedFallback = false;
   try {
     out = await run(effectivePrimary, primaryModelId);
   } catch (e: any) {
@@ -452,6 +478,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
       try {
         out = await run(fb.p, fb.modelId);
         provider = fb.p;
+        usedFallback = true;
         break;
       } catch (e2: any) {
         errorMsg = `${errorMsg}\n${fb.p}: ${String(e2?.message ?? e2).slice(0, 200)}`;
@@ -467,7 +494,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
           status = 'ready', errorMsg = NULL
       WHERE id = ${id}
     `);
-    return { id, provider, model: out.model, url: out.url, b64: out.b64, status: "ready", effectivePrompt };
+    return { id, provider, model: out.model, url: out.url, b64: out.b64, status: "ready", effectivePrompt, requestedModel, usedFallback };
   }
   const safeErrorMsg = redactProviderSecrets(errorMsg ?? "unknown").slice(0, 800);
   await db.execute(sql`
@@ -483,6 +510,8 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
     b64: null,
     status: "failed",
     effectivePrompt,
+    requestedModel,
+    usedFallback: false,
     errorMsg: safeErrorMsg,
   };
 }

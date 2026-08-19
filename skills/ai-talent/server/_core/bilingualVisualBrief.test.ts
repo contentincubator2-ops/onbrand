@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseBilingualBrief,
   parseBilingualBriefChoice,
+  normalizeImagePromptInput,
   recoverModelPromptFromJsonLike,
 } from "./bilingualVisualBrief";
 
@@ -61,5 +62,24 @@ describe("historical polluted prompt recovery", () => {
 
   it("leaves unrelated structured image prompts alone", () => {
     expect(recoverModelPromptFromJsonLike('{"scene":"studio","lighting":"soft"}')).toBeUndefined();
+  });
+
+  it("does not persist truncated bilingual JSON back into the editable field", () => {
+    expect(normalizeImagePromptInput(
+      '{"prompt":"A moonlit barbecue.","promptZh":"月光下的烤肉',
+    )).toEqual({
+      modelPrompt: "A moonlit barbecue.",
+      displayPrompt: "A moonlit barbecue.",
+    });
+  });
+
+  it("keeps the Chinese counterpart for a complete historical response", () => {
+    expect(normalizeImagePromptInput(JSON.stringify({
+      prompt: "A moonlit barbecue.",
+      promptZh: "月光下的烤肉。",
+    }))).toEqual({
+      modelPrompt: "A moonlit barbecue.",
+      displayPrompt: "月光下的烤肉。",
+    });
   });
 });

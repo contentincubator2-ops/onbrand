@@ -41,7 +41,7 @@ function googleApiKeyPool(): string[] {
 }
 
 function isRetryableGoogleKeyError(text: string): boolean {
-  return /suspended|permission_denied|api[_ ]key|consumer|unauthorized|forbidden|403/i.test(text);
+  return /suspended|permission_denied|api[_ ]key|consumer|unauthorized|forbidden|403|429|rate.?limit|quota|resource_exhausted/i.test(text);
 }
 
 export type GenStatus = "ready" | "submitted" | "failed";
@@ -97,11 +97,25 @@ async function downloadAndSave(url: string, kind: "img" | "vid"): Promise<string
   const ext = kind === "img" ? "png" : "mp4";
   const id  = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const filePath = join(COVERS_DIR, `media-${id}.${ext}`);
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`download ${resp.status}`);
-  const buf = Buffer.from(await resp.arrayBuffer());
+  let buf: Buffer;
+  if (kind === "img") {
+    // Provider result URLs can expire into an HTML landing page just like
+    // product URLs. Validate bytes before persisting a success-shaped .png.
+    ({ buffer: buf } = await fetchImageBuffer(url, { timeoutMs: 60_000 }));
+  } else {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+    if (!resp.ok) throw new Error(`download ${resp.status}`);
+    buf = Buffer.from(await resp.arrayBuffer());
+  }
   writeFileSync(filePath, buf);
   return `${COVERS_URL_PREFIX}/media-${id}.${ext}`;
+}
+
+function sizeForAspectRatio(opts: GenOptions): NonNullable<GenOptions["size"]> {
+  if (opts.size) return opts.size;
+  if (opts.aspectRatio === "16:9" || opts.aspectRatio === "4:3") return "1536x1024";
+  if (opts.aspectRatio === "9:16" || opts.aspectRatio === "3:4") return "1024x1536";
+  return "1024x1024";
 }
 
 // ── 1. OpenAI gpt-image-1 / gpt-image-2 ──────────────────────────────────
@@ -111,10 +125,7 @@ async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-imag
   // Derive an OpenAI-supported size from the aspect ratio when an explicit
   // size isn't given (the orchestra passes aspectRatio, not size). Without
   // this a 16:9 thumbnail would default to a 1024x1024 square.
-  const size = opts.size
-    ?? (opts.aspectRatio === "16:9" ? "1536x1024"
-      : opts.aspectRatio === "9:16" ? "1024x1536"
-      : "1024x1024");
+  const size = sizeForAspectRatio(opts);
   const resp = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -152,7 +163,7 @@ async function genAzureImage2(opts: GenOptions): Promise<GenResult> {
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       prompt: opts.prompt,
-      size: opts.size ?? "1024x1024",
+      size: sizeForAspectRatio(opts),
       quality: opts.quality ?? "low",
       output_format: "png",
       n: 1,
@@ -223,29 +234,36 @@ Output aspect ratio: ${opts.aspectRatio}.` : "";
 
 // ── 3. Google Imagen 4 (current available model on the account) ──────────
 async function genImagen4(opts: GenOptions, variant: "fast" | "default" | "ultra" = "default"): Promise<GenResult> {
-  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
-  if (!key) throw new Error("GEMINI_API_KEY missing");
+  const keys = googleApiKeyPool();
+  if (!keys.length) throw new Error("GEMINI_API_KEY missing");
   const model = variant === "fast" ? "imagen-4.0-fast-generate-001"
               : variant === "ultra" ? "imagen-4.0-ultra-generate-001"
               : "imagen-4.0-generate-001";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${key}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      instances: [{ prompt: opts.prompt }],
-      parameters: { sampleCount: 1 },
-    }),
-    signal: AbortSignal.timeout(120_000),
-  });
-  if (!resp.ok) {
-    const t = redactProviderSecrets(await resp.text());
-    throw new Error(`Imagen ${resp.status}: ${t.slice(0, 200)}`);
+  const errors: string[] = [];
+  for (const key of keys) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${key}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instances: [{ prompt: opts.prompt }],
+        parameters: { sampleCount: 1, aspectRatio: opts.aspectRatio ?? "1:1" },
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!resp.ok) {
+      const t = redactProviderSecrets(await resp.text());
+      const error = `Imagen ${resp.status}: ${t.slice(0, 200)}`;
+      errors.push(error);
+      if (isRetryableGoogleKeyError(`${resp.status} ${t}`)) continue;
+      throw new Error(error);
+    }
+    const data: any = await resp.json();
+    const b64 = data?.predictions?.[0]?.bytesBase64Encoded;
+    if (!b64) throw new Error("Imagen no b64");
+    return { status: "ready", modelId: `google/imagen-4-${variant}`, url: saveB64(b64, "img") };
   }
-  const data: any = await resp.json();
-  const b64 = data?.predictions?.[0]?.bytesBase64Encoded;
-  if (!b64) throw new Error("Imagen no b64");
-  return { status: "ready", modelId: `google/imagen-4-${variant}`, url: saveB64(b64, "img") };
+  throw new Error(errors.join("\n") || "Imagen failed");
 }
 
 // ── 4. Hailuo / MiniMax image ────────────────────────────────────────────

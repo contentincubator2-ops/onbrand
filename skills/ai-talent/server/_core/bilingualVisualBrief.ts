@@ -84,3 +84,28 @@ export function recoverModelPromptFromJsonLike(raw: string): string | null | und
   }
   return null;
 }
+
+export interface NormalizedImagePromptInput {
+  modelPrompt: string;
+  displayPrompt: string;
+}
+
+/**
+ * Normalize historical bilingual-response JSON for both generation and the
+ * value persisted back into RunPage. Cleaning only the model prompt leaves
+ * the broken JSON in promptZh, so the same polluted text reappears on reload.
+ */
+export function normalizeImagePromptInput(raw: string): NormalizedImagePromptInput | null {
+  const recovered = recoverModelPromptFromJsonLike(raw);
+  if (recovered === null) return null;
+  if (recovered === undefined) return { modelPrompt: raw, displayPrompt: raw };
+
+  const cleaned = stripJsonFence(raw);
+  try {
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+    const promptZh = typeof parsed.promptZh === "string" ? parsed.promptZh.trim() : "";
+    return { modelPrompt: recovered, displayPrompt: promptZh || recovered };
+  } catch {
+    return { modelPrompt: recovered, displayPrompt: recovered };
+  }
+}
