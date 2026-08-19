@@ -16,7 +16,13 @@
  */
 import { callModel, type ModelProvider } from "./multiModelRouter";
 import { dispatchGenerate, checkJob } from "./mediaGen";
-import { captionToVisualBrief, loadBrandPaletteHexes } from "./visualBrief";
+import {
+  captionToVisualBrief,
+  loadBrandIdentityForImage,
+  loadBrandPaletteHexes,
+  type BrandIdentityForImage,
+} from "./visualBrief";
+import { buildImageGuardBlock } from "./imagePromptGuards";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
@@ -1518,6 +1524,7 @@ async function loadProductImageUrl(brandId?: number | null, productId?: number |
 async function genOneImage(
   args: {
     content: string; style: string | null; platform?: string; palette?: Array<{ hex: string; role: string }>;
+    brandIdentity?: BrandIdentityForImage | null;
     /** 2026-07-27 (CJ「合成圖也套用真實產品圖片」): real product photo URL —
      *  when set, routes to Nano Banana subject-reference compositing instead
      *  of text-to-image, mirroring the manual RunPage「使用真實產品圖」panel. */
@@ -1533,12 +1540,15 @@ async function genOneImage(
   // safety/fidelity guardrails are appended separately and are not UI content.
   let modelPrompt: string | null = null;
   try {
+    const subjectMode = !!args.subjectImageUrl;
     // 2026-07-19 (CJ「品牌顏色會被貫穿到圖片生成的指令中嗎」): brand palette
     // rides along into the shared brief converter → on-brand color schemes.
     modelPrompt = await captionToVisualBrief({
       caption: source,
       platform: args.platform,
       palette: args.palette,
+      brandIdentity: args.brandIdentity,
+      subjectMode,
     });
     // 2026-05-18 (CJ「目前的圖很不行，最好的生圖模型是什麼」): quick-task
     // images were hardcoded to piapi/flux-schnell — the fastest/lowest-
@@ -1561,26 +1571,20 @@ async function genOneImage(
     // prompt our way to a correct reflection (unreliable), avoid the
     // composition entirely — same philosophy as the NO-TEXT policy: route
     // around what models can't do, don't ship the broken result.
-    const noMirrorLine =
-      "Do NOT include a mirror, reflective surface, reflection, or any shot " +
-      "composed as \"person looking at their own reflection\" — reflections " +
-      "never stay physically consistent with the subject's actual pose/hair/" +
-      "head angle. Show the subject directly instead.";
-    const subjectMode = !!args.subjectImageUrl;
     // 2026-08-19 (客戶回報「勾選真實產品後再產圖，出現錯誤中文字」): this file
     // used to carry its own paraphrase of the fidelity guard, so tightening
     // imageGen's copy left this path on the old, looser wording. Import the
     // shared constant — one guard, one place to fix it.
-    const { PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_NEGATIVE_PROMPT } =
-      await import("./imageGen");
-    const promptNoText = subjectMode
-      ? modelPrompt + "\n\n" + PRODUCT_FAITHFUL_PROMPT_BLOCK + "\n\n" + noMirrorLine
-      : modelPrompt +
-        "\n\nABSOLUTELY NO TEXT: render zero written characters — no text, letters, " +
-        "words, numbers, Chinese/Japanese/Korean characters, titles, headlines, " +
-        "captions, labels, badges, signage, logos, watermarks or typography anywhere. " +
-        "Leave any title area as empty visual space; text is added later on a separate layer.\n\n" +
-        noMirrorLine;
+    const {
+      PRODUCT_FAITHFUL_PROMPT_BLOCK,
+      NO_MIRROR_PROMPT_BLOCK,
+      NO_MIRROR_NEGATIVE_PROMPT,
+    } = await import("./imageGen");
+    const promptNoText = `${modelPrompt}\n\n${buildImageGuardBlock({
+      subjectMode,
+      productFaithfulBlock: PRODUCT_FAITHFUL_PROMPT_BLOCK,
+      noMirrorBlock: NO_MIRROR_PROMPT_BLOCK,
+    })}`;
     const opts = {
       prompt: promptNoText,
       aspectRatio: aspect,
@@ -2442,6 +2446,7 @@ export async function runOrchestra(args: {
     // 2026-07-19: brand palette loaded once per run → injected into every
     // image brief so generated visuals carry the brand color scheme.
     const brandPalette = await loadBrandPaletteHexes(args.brandId);
+    const brandIdentity = await loadBrandIdentityForImage(args.brandId);
     // 2026-07-27 (CJ「合成圖也套用真實產品圖片」): when this run is scoped
     // to a specific product, fetch its real photo once so every variant's
     // image composites the actual product — same fidelity bar as the manual
@@ -2452,7 +2457,7 @@ export async function runOrchestra(args: {
       ? await Promise.all(briefs.map((b, i) =>
           // Theater standard: prompt derives from the variant's CAPTION;
           // the Chinese brief is display-only (style).
-          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform, palette: brandPalette, subjectImageUrl }, args.config)))
+          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform, palette: brandPalette, brandIdentity, subjectImageUrl }, args.config)))
       : briefs.length
         ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
         : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
@@ -2498,6 +2503,7 @@ export async function runOrchestra(args: {
                     style: briefs[i] ?? null,
                     platform: taskPlatform,
                     palette: brandPalette,
+                    brandIdentity,
                     subjectImageUrl,
                   },
                   args.config,
@@ -2687,7 +2693,7 @@ export async function runOrchestra(args: {
             // the subjectImageUrl wiring Stage 3 already does above (line
             // ~2382) — every card was pure text-to-image, so the model
             // invented its own product instead of compositing the real one.
-            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0], palette: brandPalette, subjectImageUrl },
+            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0], palette: brandPalette, brandIdentity, subjectImageUrl },
             args.config,
           )),
         );

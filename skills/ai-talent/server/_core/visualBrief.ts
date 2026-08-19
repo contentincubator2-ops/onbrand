@@ -4,9 +4,13 @@
  * 2026-07-16 (CJ「七日發布台的是標準，不應該被更改，是其他任務要對齊七日
  * 發布台的標準」): this is theater's original caption→English-brief logic
  * extracted VERBATIM — same provider (anthropic), same system prompt, same
- * maxTokens, same fallback — so theater's behavior is byte-for-byte
- * unchanged, and every other task reuses the exact same logic instead of
- * inventing its own.
+ * maxTokens, same fallback — so theater's behavior stayed byte-for-byte
+ * unchanged at extraction time, and every other task reuses the same logic
+ * instead of inventing its own.
+ *
+ * 2026-08-19: the shared prompt now also receives a lightweight brand
+ * identity and explicit real-world-logo safety rules. Subject-reference
+ * requests preserve the attached product's own identifiers.
  *
  * Contract: the image prompt is derived from the FINISHED CAPTION (not from
  * a separately-written style direction), converted into a short ENGLISH
@@ -14,6 +18,11 @@
  * is display-only and never reaches the model.
  */
 import { invokeLLM } from "./llm";
+
+export interface BrandIdentityForImage {
+  name: string;
+  industry: string | null;
+}
 
 /**
  * 2026-07-19 (CJ「品牌顏色會被貫穿到圖片生成的指令中嗎」— answer was no):
@@ -48,17 +57,62 @@ export async function loadBrandPaletteHexes(
   }
 }
 
+/**
+ * Load only the identity fields image prompting needs. Keep this separate from
+ * the full brand-context pipeline so image fan-out performs one lightweight
+ * lookup per run and can still proceed when the local DB is unavailable.
+ */
+export async function loadBrandIdentityForImage(
+  brandId?: number | null,
+): Promise<BrandIdentityForImage | null> {
+  if (!brandId) return null;
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT name, industry FROM brands WHERE id = ? LIMIT 1`,
+      [brandId],
+    );
+    const row = (rows as any[])[0];
+    if (!row) return null;
+    return {
+      name: String(row.name ?? "").trim(),
+      industry: row.industry == null ? null : String(row.industry).trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function captionToVisualBrief(args: {
   caption: string;
   brandTagline?: string | null;
+  brandIdentity?: BrandIdentityForImage | null;
+  /** True when the image model receives the customer's real product image. */
+  subjectMode?: boolean;
   platform?: string;
   /** Brand palette (from loadBrandPaletteHexes) — woven into the brief as
    *  the scene's dominant color scheme so generated images stay on-brand. */
   palette?: Array<{ hex: string; role: string }>;
 }): Promise<string> {
+  const identity = args.brandIdentity;
+  // 2026-08-19 (#80 客訴「勾選真實產品後再產圖，出現錯誤中文字」):
+  // subject mode permits only text already visible on the attached product.
+  // Keep text-shaped brand identity out of the model brief so Nano Banana
+  // cannot turn a Chinese brand name into invented labels or watermarks.
+  const brandLine = args.subjectMode
+    ? "(unknown)"
+    : identity
+      ? [identity.name, identity.industry].filter(Boolean).join(" — ") || "(unknown)"
+      : args.brandTagline ?? "(unknown)";
   const paletteLine = args.palette && args.palette.length > 0
     ? `\nBrand colors: ${args.palette.map((p) => `${p.hex}${p.role ? ` (${p.role})` : ""}`).join(", ")}`
     : "";
+  const brandSafetyRule = args.subjectMode
+    ? "BRAND SAFETY: Preserve the attached real product and all of its own logos, labels, wordmarks, text, colors, and signature design elements exactly as shown. Apart from those attached-product identifiers, never introduce any other real-world brand logo, wordmark, or recognizable signature design element."
+    : "BRAND SAFETY: Never include any real-world brand logo, wordmark, or recognizable signature design element, including swooshes, three-stripe motifs, branded checks, or similar identifiers. All clothing, footwear, accessories, and products must be generic, unbranded, and plain. When the caption mentions a product category, never apply the visual characteristics of that category's best-known brands.";
+  const textRule = args.subjectMode
+    ? "Apart from text already printed on the attached real product, the image must contain no text."
+    : "The image must contain no text.";
   try {
     const r = await invokeLLM({
       provider: "anthropic",
@@ -71,12 +125,14 @@ export async function captionToVisualBrief(args: {
         {
           role: "system",
           content:
-            "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic, brand-friendly, no text in image, no logos. " +
+            "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic and brand-friendly. " +
+            `${textRule}\n\n` +
+            `${brandSafetyRule}\n\n` +
             "If brand colors are provided, make them the scene's dominant color palette (props, backdrop, lighting accents) while keeping the scene natural. Output only the brief.",
         },
         {
           role: "user",
-          content: `Brand: ${args.brandTagline ?? "(unknown)"}${paletteLine}\nPlatform: ${args.platform ?? "social"}\nCaption:\n${args.caption}`,
+          content: `Brand: ${brandLine}${paletteLine}\nPlatform: ${args.platform ?? "social"}\nCaption:\n${args.caption}`,
         },
       ],
     });
