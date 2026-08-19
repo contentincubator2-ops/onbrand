@@ -81,5 +81,20 @@ describe("captionToVisualBrief brand identity", () => {
     expect(invokeLLMMock.mock.calls[0][0].messages[0].content).toContain(
       "semantically equivalent versions",
     );
+    expect(invokeLLMMock.mock.calls[0][0].maxTokens).toBe(1200);
+  });
+
+  it("falls back when the provider reports a truncated response", async () => {
+    invokeLLMMock.mockResolvedValue({
+      choices: [{
+        finish_reason: "length",
+        message: { content: '{"prompt":"complete English","promptZh":"截斷' },
+      }],
+    });
+
+    await expect(captionToBilingualVisualBrief({ caption: "完整貼文" })).resolves.toEqual({
+      prompt: "Photorealistic editorial scene representing: 完整貼文",
+      promptZh: "寫實的編輯攝影場景，呈現：完整貼文",
+    });
   });
 });
