@@ -42,14 +42,16 @@ import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import { getStrategyPresentationMockup } from "../lib/strategyPresentation";
 import {
-  getIgPublicVariantMockup,
   getIgPublicVariantImageSize,
+  getStrategySelectionMockup,
   getMutationLocatorSelectionKey,
   getPlanningPublishWarning,
   getPlanningConfirmationPayload,
   getRunContentMutationLocator,
   getRunContentSelectionKey,
   isEmptyStrategyPublicSelection,
+  isPlanningArtifactMissingOutput,
+  isStrategyPlanningSelection,
   resolveRunContent,
   shouldApplyMutationPreview,
   type RunContentKind,
@@ -1128,6 +1130,10 @@ export default function RunPage() {
     selectedContentKind,
     publicVariants.length,
   );
+  const isStrategyPlanning = isStrategyPlanningSelection(
+    isStrategyEnvelope,
+    selectedContentKind,
+  );
   const activeSelectionKey = getRunContentSelectionKey(selectedContentKind, activeIdx);
   const activeSelectionKeyRef = useRef(activeSelectionKey);
 
@@ -1150,6 +1156,10 @@ export default function RunPage() {
   }, [isStrategyEnvelope, activeContentKind, publicVariants.length]);
 
   const selectContent = React.useCallback((contentKind: RunContentKind, index: number) => {
+    if (isStrategyPlanningSelection(isStrategyEnvelope, contentKind)) {
+      setMode((currentMode) => currentMode === "image" ? "chat" : currentMode);
+      manualImageRef.current = false;
+    }
     setActiveContentKind(contentKind);
     setActiveIdx(index);
     setEditText(null);
@@ -1157,7 +1167,7 @@ export default function RunPage() {
     setChatHistory([]);
     setAiPreview(null);
     setRewritePreview(null);
-  }, []);
+  }, [isStrategyEnvelope]);
 
   const rerunOriginalTask = React.useCallback(() => {
     const taskId = data?.mission?.taskId;
@@ -1203,8 +1213,8 @@ export default function RunPage() {
   // nothing to redo — hide the 改圖 toolbar entry for them. Manual opt-in
   // image gen stays available via the mockup's 點此手動生圖.
   const hasImageSlot = useMemo(
-    () => variants.some((v) => v.imageUrl || (v.imageStatus && v.imageStatus !== "skipped")),
-    [variants],
+    () => !isStrategyPlanning && variants.some((v) => v.imageUrl || (v.imageStatus && v.imageStatus !== "skipped")),
+    [isStrategyPlanning, variants],
   );
   // 2026-07-23 (CJ IRIS QA「點此手動生圖，但我按下去以後，並沒有生圖」):
   // the fallback below used to bounce EVERY entry into image mode back to
@@ -1216,8 +1226,13 @@ export default function RunPage() {
   React.useEffect(() => { manualImageRef.current = false; }, [id]);
   // If the panel somehow lands on the (now hidden) image mode, fall back.
   React.useEffect(() => {
+    if (isStrategyPlanning && mode === "image") {
+      manualImageRef.current = false;
+      setMode("chat");
+      return;
+    }
     if (!hasImageSlot && mode === "image" && !manualImageRef.current) setMode("chat");
-  }, [hasImageSlot, mode]);
+  }, [hasImageSlot, isStrategyPlanning, mode]);
 
   // Fires when the active variant's image finishes generating. Placed here
   // (after variants declaration) so the hook can safely read variants[activeIdx].
@@ -1668,8 +1683,12 @@ export default function RunPage() {
   // task-level one. Tone labels (真誠版 / 事實式…) match no platform
   // keyword → base variant kept, so this is safe globally.
   const effectiveVariant: MockupVariant = useMemo(() => {
-    const publicVariantMockup = getIgPublicVariantMockup(selectedContentKind, slide?.format);
-    if (publicVariantMockup) return publicVariantMockup;
+    const strategySelectionMockup = getStrategySelectionMockup(
+      isStrategyEnvelope,
+      selectedContentKind,
+      slide?.format,
+    );
+    if (strategySelectionMockup) return strategySelectionMockup;
     const lbl = String(slide?.label ?? "");
     const v = (platform: string, format: string): MockupVariant =>
       ({ platform: platform as any, format: format as any, label: `${platform}:${format}` });
@@ -1712,7 +1731,7 @@ export default function RunPage() {
     if (/instagram|\bIG\b/i.test(lbl)) return v("instagram", "feed");
     if (/\bLINE\b/i.test(lbl)) return v("line", "broadcast");
     return mockupVariant;
-  }, [mockupVariant, slide?.label, slide?.format, selectedContentKind, data?.mission?.taskId]);
+  }, [mockupVariant, slide?.label, slide?.format, isStrategyEnvelope, selectedContentKind, data?.mission?.taskId]);
 
   if (!id || isNaN(id)) {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;
@@ -1997,6 +2016,29 @@ export default function RunPage() {
                   </div>
                 );
               }
+              if (isPlanningArtifactMissingOutput(
+                isStrategyEnvelope,
+                selectedContentKind,
+                slide?.caption,
+                slide?.imageStatus,
+              )) {
+                return (
+                  <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+                    <div className="w-12 h-12 rounded-full bg-warning-50 text-warning-600 flex items-center justify-center text-xl">!</div>
+                    <p className="text-small font-semibold text-default-800">
+                      {lang === "en" ? "This step produced no output" : "這個步驟沒有產出"}
+                    </p>
+                    <p className="text-tiny text-default-500 max-w-sm leading-relaxed">
+                      {lang === "en"
+                        ? "This is an incomplete strategy step, not an image-generation failure. Re-run the original task to try the full strategy workflow again."
+                        : "這是策略步驟未完成，不是圖片生成失敗。請重新執行原任務，再跑一次完整策略流程。"}
+                    </p>
+                    <Button color="primary" variant="flat" onPress={rerunOriginalTask}>
+                      {lang === "en" ? "Re-run this task" : "重新產生這個任務"}
+                    </Button>
+                  </div>
+                );
+              }
               return effectiveVariant && slide ? (
               <>
               {isComponentTask && (
@@ -2029,7 +2071,9 @@ export default function RunPage() {
                 liveVideoPoster={slide.videoPosterUrl ?? undefined}
                 liveCards={slide.cards as any}
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
-                onGenerateImage={() => { manualImageRef.current = true; setMode("image"); }}
+                onGenerateImage={isStrategyPlanning
+                  ? undefined
+                  : () => { manualImageRef.current = true; setMode("image"); }}
                 componentSlot={componentSlot}
               />
               </>
@@ -2500,7 +2544,7 @@ export default function RunPage() {
                   </div>
                 </>
               )}
-              {mode === "image" && (
+              {mode === "image" && !isStrategyPlanning && (
                 <>
                   <p className="text-tiny font-semibold">{t("run_mode_image")}</p>
                   {/* 2026-07-07 (CJ「產圖畫面有不是國字的國字」→ 圖改為無字背景，
