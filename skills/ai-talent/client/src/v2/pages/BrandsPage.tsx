@@ -2509,6 +2509,7 @@ export default function BrandsPage() {
           productId={productDetailId}
           brandId={activeBrandIdForLocks}
           onClose={() => setProductDetailId(null)}
+          onImageUpdated={() => brandProductsQ?.refetch?.()}
           onReposition={(id) => {
             setProductDetailId(null);
             kickReposition("product", id, brandProductsList?.find((p: any) => p.id === id)?.name);
@@ -5324,6 +5325,47 @@ function BrandPaletteHero({
  * Shows each entity's positioning preview (tagline / USP / audience).
  * Cards with no positioning show a placeholder state.
  * ─────────────────────────────────────────────────────────────────── */
+function ProductCardThumbnail({ imageUrl, name, en }: { imageUrl?: string; name: string; en: boolean }) {
+  const [failed, setFailed] = React.useState(false);
+  return (
+    <div
+      className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden relative"
+      style={{ aspectRatio: "4 / 3", maxHeight: 140 }}
+    >
+      {imageUrl && !failed ? (
+        <>
+          <img
+            src={imageUrl}
+            aria-hidden
+            className="absolute inset-0 w-full h-full object-cover scale-110 opacity-50"
+            style={{ filter: "blur(16px)" }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+          <img
+            src={imageUrl}
+            alt={name}
+            loading="lazy"
+            className="relative w-full h-full object-contain transition-transform group-hover:scale-105"
+            onError={() => setFailed(true)}
+          />
+        </>
+      ) : (
+        <div className={`flex flex-col items-center gap-1 px-3 text-center ${failed ? "text-amber-700" : "text-neutral-400"}`}>
+          <FontAwesomeIcon icon={faBox} className="text-2xl" />
+          <span className="text-[10px] font-semibold tracking-wide">
+            {failed
+              ? (en ? "Image link expired" : "圖片連結已失效")
+              : (en ? "No image" : "尚無圖片")}
+          </span>
+          <span className="text-[9px] opacity-80">
+            {en ? "Open this product to fix it" : "點擊查看以修正"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BrandEntityGrid({
   kind, items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
   runningIds, progressMap,
@@ -5461,49 +5503,7 @@ function BrandEntityGrid({
                     item.imageUrl,   // legacy top-level, if any writer sets it
                   ];
                   const imgUrl = imgCandidates.find((c: any) => typeof c === "string" && /^https?:\/\//.test(c)) as string | undefined;
-                  return (
-                  <div
-                    className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden relative"
-                    style={{ aspectRatio: "4 / 3", maxHeight: 140 }}
-                  >
-                    {imgUrl ? (
-                      // 2026-07-24 (CJ「圖片頭都被切一半…如何適應不同品牌官網
-                      // 圖片不一致，但又能完整呈現」): source sites ship any
-                      // aspect ratio (fashion sites = portrait model shots) and
-                      // object-cover in a 4:3 box beheads them. Universal fix:
-                      // the REAL image is object-contain (always fully visible,
-                      // any ratio), and the letterbox gap is filled by the same
-                      // image blown up + blurred as a soft backdrop — adapts to
-                      // every source site with zero per-brand tuning.
-                      <>
-                        <img
-                          src={imgUrl}
-                          aria-hidden
-                          className="absolute inset-0 w-full h-full object-cover scale-110 opacity-50"
-                          style={{ filter: "blur(16px)" }}
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                        />
-                        <img
-                          src={imgUrl}
-                          alt={item.name}
-                          loading="lazy"
-                          className="relative w-full h-full object-contain transition-transform group-hover:scale-105"
-                          onError={(e) => {
-                            // Hide broken image; parent placeholder still shows
-                            (e.currentTarget as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 text-neutral-300">
-                        <FontAwesomeIcon icon={faBox} className="text-2xl" />
-                        <span className="text-[10px] uppercase tracking-wider">
-                          {en ? "no image" : "無圖"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  );
+                  return <ProductCardThumbnail key={imgUrl ?? "none"} imageUrl={imgUrl} name={item.name} en={en} />;
                 })()}
 
                 <div className={kind === "product" ? "p-3" : "p-4"}>

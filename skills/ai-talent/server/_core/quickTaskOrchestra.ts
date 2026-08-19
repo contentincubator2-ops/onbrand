@@ -23,6 +23,7 @@ import {
   type BrandIdentityForImage,
 } from "./visualBrief";
 import { buildImageGuardBlock } from "./imagePromptGuards";
+import { probeImageUrl } from "./imageFetch";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
@@ -1503,7 +1504,7 @@ async function loadProductImageUrl(brandId?: number | null, productId?: number |
         : null,
     ];
     for (const c of candidates) {
-      if (typeof c === "string" && /^https?:\/\//.test(c)) return c;
+      if (typeof c === "string" && /^https?:\/\//.test(c) && await probeImageUrl(c, 8_000)) return c;
     }
     return null;
   } catch {

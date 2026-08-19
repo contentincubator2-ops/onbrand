@@ -33,6 +33,39 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { callLLM } from "../_core/llmRouter";
 import { dispatchGenerate, checkJob, type GenOptions } from "../_core/mediaGen";
 import localPool from "../localDb";
+import { probeImageUrl } from "../_core/imageFetch";
+
+const PRODUCT_IMAGE_CACHE_TTL_MS = 5 * 60_000;
+const PRODUCT_IMAGE_CACHE_MAX_ENTRIES = 1_000;
+const productImageProbeCache = new Map<string, { result: Promise<boolean>; expiresAt: number }>();
+
+async function probeProductImageCached(url: string): Promise<boolean> {
+  const cached = productImageProbeCache.get(url);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  if (productImageProbeCache.size >= PRODUCT_IMAGE_CACHE_MAX_ENTRIES) {
+    const now = Date.now();
+    for (const [key, entry] of productImageProbeCache) {
+      if (entry.expiresAt <= now) productImageProbeCache.delete(key);
+    }
+    if (productImageProbeCache.size >= PRODUCT_IMAGE_CACHE_MAX_ENTRIES) {
+      const oldestKey = productImageProbeCache.keys().next().value;
+      if (oldestKey) productImageProbeCache.delete(oldestKey);
+    }
+  }
+  const result = probeImageUrl(url, 5_000);
+  productImageProbeCache.set(url, { result, expiresAt: Date.now() + PRODUCT_IMAGE_CACHE_TTL_MS });
+  return result;
+}
+
+async function filterUsableProductImages<T extends { imageUrl: string }>(items: T[]): Promise<T[]> {
+  const usable: T[] = [];
+  for (let offset = 0; offset < items.length; offset += 8) {
+    const batch = items.slice(offset, offset + 8);
+    const results = await Promise.all(batch.map(async (item) => ({ item, ok: await probeProductImageCached(item.imageUrl) })));
+    usable.push(...results.filter((result) => result.ok).map((result) => result.item));
+  }
+  return usable;
+}
 
 // ── Step 1 — design direction proposal (LLM, no media gen) ───────────────
 export const mediaRouter = router({
@@ -242,7 +275,7 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
           }
         } catch { /* skip malformed rows */ }
       }
-      return { products };
+      return { products: await filterUsableProductImages(products) };
     }),
 
   /** Poll an async generation (video) by taskId. */
