@@ -215,7 +215,7 @@ export const zh = {
   // ─────────────────────────────────────────────────────────────────────────
 
   // ── Auth: Login ──────────────────────────────────────────────────────────
-  auth_login_title:        "歡迎回來",
+  auth_login_title:        "歡迎回來喔",
   auth_login_subtitle:     "登入後繼續開工",
   auth_email_label:        "電子郵件",
   auth_email_placeholder:  "you@brand.com",
