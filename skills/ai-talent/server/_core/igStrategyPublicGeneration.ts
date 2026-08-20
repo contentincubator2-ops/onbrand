@@ -88,12 +88,15 @@ export async function synthesizeIgStrategyPublicSlots(
     artifactAgentNames: args.privateArtifacts.map((artifact) => artifact.agentName),
     agents: args.agents,
   });
-  const strategyContext = usablePrivateArtifacts.map((artifact) => redactIgStrategySynthesisContext(
+  const redactedStrategyContext = usablePrivateArtifacts.map((artifact) => redactIgStrategySynthesisContext(
     args.idOrSlug,
     artifact.rawContent,
     { steps: args.steps, outputLanguage: args.outputLanguage, privateTerms },
   ));
-  assertRedactedStrategyContextReady(strategyContext, usablePrivateArtifacts.length);
+  const strategyContext = assertRedactedStrategyContextReady(
+    redactedStrategyContext,
+    args.steps.length,
+  );
   const safeTopic = redactIgStrategySynthesisContext(
     args.idOrSlug,
     args.topic,
@@ -155,6 +158,7 @@ export async function synthesizeIgStrategyPublicSlots(
       outputLanguage: args.outputLanguage,
       slots: slotBatch,
       strategyContext,
+      strategyAnalysisComplete: strategyContext.length === args.steps.length,
       brandRules: anthropicBrandRules,
     });
     const result = await callModelStrict(messages, "anthropic", undefined, { signal });

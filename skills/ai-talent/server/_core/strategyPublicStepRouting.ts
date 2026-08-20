@@ -61,6 +61,21 @@ export const STRATEGY_PERSISTENCE_BUDGET_MS = 4_000;
 export const STRATEGY_SERVER_TIMEOUT_MS = 220_000;
 export const STRATEGY_FINALIZATION_RESERVE_MS = 15_000;
 
+/**
+ * Anthropic's stop_reason is normalized by llm.ts into finish_reason, where
+ * its token cap is `max_tokens`; OpenAI-compatible providers use `length`.
+ * Keep this classifier strategy-local so other strict callers retain their
+ * existing treatment of otherwise usable partial responses.
+ */
+export function getStrategyStepFinishErrorCode(
+  finishReason: string | null | undefined,
+): "step_truncated" | null {
+  const normalized = finishReason?.trim().toLowerCase();
+  return normalized === "max_tokens" || normalized === "length"
+    ? "step_truncated"
+    : null;
+}
+
 export type StrategyRouteBudget = {
   routeLimitMs: number;
   stepDeadlineMs: number;
