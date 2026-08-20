@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   deriveStrategyRouteBudget,
   hasStrategyStepBudget,
+  planStrategyPlanning,
+  MAX_CONCURRENT_PLANNING_STEPS,
   runAnthropicStrategyStep,
   STRATEGY_SERVER_TIMEOUT_MS,
   STRATEGY_STEP_PROVIDER,
@@ -103,6 +105,81 @@ describe("strategy route budget derivation", () => {
       stepCount: 5,
       serverTimeoutMs: 220_000,
     }).fitsRouteBudget).toBe(false);
+  });
+
+  it("keeps every step in its own round while the budget allows it", () => {
+    const { waves, budget } = planStrategyPlanning({ stepCount: 4, serverTimeoutMs: 220_000 });
+    expect(waves).toEqual([[0], [1], [2], [3]]);
+    expect(budget.fitsRouteBudget).toBe(true);
+  });
+
+  it("merges only the leading steps when the budget cannot fit one round each", () => {
+    // Sequentially five steps do not fit, which is why the last one used to be
+    // refused outright and the whole public campaign lost with it.
+    expect(deriveStrategyRouteBudget({
+      stepCount: 5,
+      serverTimeoutMs: 220_000,
+    }).fitsRouteBudget).toBe(false);
+
+    const { waves, budget } = planStrategyPlanning({ stepCount: 5, serverTimeoutMs: 220_000 });
+    // The chained tail keeps its own rounds; only the two leading steps share.
+    expect(waves).toEqual([[0, 1], [2], [3], [4]]);
+    expect(budget.fitsRouteBudget).toBe(true);
+  });
+
+  it("never lets more than MAX_CONCURRENT_PLANNING_STEPS steps share a round", () => {
+    for (const stepCount of [1, 2, 3, 4, 5, 6, 8, 9, 20]) {
+      const { waves } = planStrategyPlanning({ stepCount, serverTimeoutMs: 220_000 });
+      expect(Math.max(0, ...waves.map((wave) => wave.length)))
+        .toBeLessThanOrEqual(MAX_CONCURRENT_PLANNING_STEPS);
+    }
+  });
+
+  it("merges only the leading pair, never a pair further down the chain", () => {
+    // Pairing by position deeper into the list would need a dependency graph
+    // the step list does not carry: ig-chrisdo-visual-story's visual-content
+    // and caption steps really do chain, so a [2,3] pair would hide one from
+    // the other. Anything needing more merging is reported, not guessed at.
+    for (const stepCount of [5, 6, 8, 9, 20]) {
+      const { waves } = planStrategyPlanning({ stepCount, serverTimeoutMs: 220_000 });
+      expect(waves.filter((wave) => wave.length > 1)).toEqual([[0, 1]]);
+    }
+  });
+
+  it("never drops, duplicates or reorders a step when it merges a round", () => {
+    for (const stepCount of [1, 2, 3, 4, 5, 6, 8, 9, 20]) {
+      const { waves } = planStrategyPlanning({ stepCount, serverTimeoutMs: 220_000 });
+      expect(waves.flat()).toEqual(Array.from({ length: stepCount }, (_, i) => i));
+    }
+  });
+
+  it("reports the overflow instead of merging past the cap to hide it", () => {
+    // Five steps fit once the leading pair merges. Six do not, and the plan
+    // says so — the router refuses up front rather than paying for four rounds
+    // and being turned away at the tail.
+    expect(planStrategyPlanning({ stepCount: 5, serverTimeoutMs: 220_000 }).budget.fitsRouteBudget).toBe(true);
+    for (const stepCount of [6, 9]) {
+      expect(planStrategyPlanning({ stepCount, serverTimeoutMs: 220_000 }).budget.fitsRouteBudget).toBe(false);
+    }
+  });
+
+  it("stays sequential when the route cannot even hold one step", () => {
+    // Merging here would be backwards: it would run every step at once on the
+    // tightest possible budget. The per-step admission guard refuses instead.
+    const { waves } = planStrategyPlanning({
+      stepCount: 4,
+      serverTimeoutMs: 20_000,
+      finalizationReserveMs: 15_000,
+    });
+    expect(waves).toEqual([[0], [1], [2], [3]]);
+  });
+
+  it("refuses to plan rounds against a zero-length step deadline", () => {
+    expect(() => planStrategyPlanning({
+      stepCount: 4,
+      serverTimeoutMs: 220_000,
+      stepDeadlineMs: 0,
+    })).toThrow(RangeError);
   });
 
   it("admits a step only when its complete 40-second deadline fits before the 205-second guard", () => {
