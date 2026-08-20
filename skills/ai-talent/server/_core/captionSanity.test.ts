@@ -113,6 +113,55 @@ I need clarification before proceeding: Is this URL meant for a different brand/
     });
   });
 
+  it("rejects the delayed deliberation response from the TikTok viral rewrite incident", () => {
+    const text = `我需要先看清楚你提供的連結內容。根據目前資訊，那個 TikTok 頁面的抓取資料似乎不完整，只有技術結構，沒有實際影片描述或文案內容。在這個情況下，我有兩個選項：一是直接告訴你我無法完成，二是再試著查詢。我選擇選項 2。
+
+--- 抓取結果：那個 TikTok 連結目前無法在公開環境被完整解析。根據工作原則，我不能反問，必須產出成品。我的處理方式：我將採用降級策略。`;
+
+    expect(detectNonDeliverable(text, { isZhTW: true })).toEqual({
+      bad: true,
+      reason: "clarification-zh",
+    });
+  });
+
+  it("rejects process narration even without a refusal", () => {
+    const text = "抓取結果：來源連結無法完整解析。我的處理方式：我將採用降級策略，改以現有資料產出。";
+
+    expect(detectNonDeliverable(text, { isZhTW: true })).toEqual({
+      bad: true,
+      reason: "deliberation-zh",
+    });
+  });
+
+  it("rejects an exact snake_case input key token", () => {
+    expect(
+      detectNonDeliverable("我會先分析 viral_source，再提供最後腳本。", {
+        isZhTW: true,
+        inputKeys: ["viral_source", "brand_angle"],
+      }),
+    ).toEqual({ bad: true, reason: "internal-input-key" });
+  });
+
+  it("applies the input-key leak guard to structured captions", () => {
+    expect(
+      detectNonDeliverable('[{"day":1,"caption":"請分析 viral_source"}]', {
+        isZhTW: true,
+        structured: true,
+        inputKeys: ["viral_source"],
+      }),
+    ).toEqual({ bad: true, reason: "internal-input-key" });
+  });
+
+  it.each([
+    "選項很多，結果只有一個：回到品牌最重視的原則，讓產品真正解決日常問題。",
+    "我有兩個選項：留在原地，或跨出一步。我選擇選項 2，因為改變從來不會自己發生。",
+    "viral_sources 是本季企劃名稱，不是這次任務的內部欄位。",
+  ])("accepts publishable copy near the new guardrails: %s", (text) => {
+    expect(
+      detectNonDeliverable(text, { isZhTW: true, inputKeys: ["viral_source"] }),
+    ).toBeNull();
+  });
+
   it("still rejects an English-only long caption for a zh-TW market", () => {
     const text = "Spring arrives with a fresh collection designed for slow mornings and bright afternoons. Explore breathable layers, thoughtful details, and versatile colors made to move through every part of your day. Visit our website to discover the full seasonal edit and find your new everyday favorites.";
     expect(detectNonDeliverable(text, { isZhTW: true })).toEqual({

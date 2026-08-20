@@ -176,13 +176,13 @@ ${FB_TONE_SUFFIX}
     // was hook-only + verbatim body append (body 跟 hook 常不搭、又一大坨).
     // Now output a COMPLETE post: hook + a re-structured body in the same
     // angle/tone. All facts preserved, nothing invented.
-    systemPrompt: `任務：用戶在 article_body 提供「原本要發的貼文內文（可能很亂、是一大段）」。
+    systemPrompt: `任務：用戶在「原本的貼文內容」提供要發布的內文（可能很亂、是一大段）。
 請輸出「一篇可以直接發的完整 FB 貼文」= 開場 hook ＋ 整理過的內文。
 
 每個 variant.caption = 完整貼文（不是只有 hook）：
 1. 開場 hook（1–2 句，該變體的口吻）。
 2. 緊接「重新整理過的內文」：
-   - 保留 article_body 的**所有事實、數字、名稱、論點**——不可新增、不可刪改事實、不可杜撰。
+   - 保留「原本的貼文內容」的**所有事實、數字、名稱、論點**——不可新增、不可刪改事實、不可杜撰。
    - 但**應該**重排順序、分段、刪冗詞，讓邏輯通順。
    - 內文切角與語氣要**呼應這個 hook**（hook 問什麼內文就回答什麼；hook 講反差內文就把反差講清楚）——讓「標題與原文相符」。
    - 排版易讀：短段落、必要時條列；不要一整坨。

@@ -48,7 +48,7 @@ ${FB_TONE_SUFFIX}
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會寫不同口吻的 IG 開場接上去",
     primary_input: { key: "article_body", placeholder: "貼上完整的貼文內文（hook 會接在最前面）", type: "textarea" },
     inputs: [{ key: "article_body", label: "原本的貼文內容", type: "textarea", required: true }],
-    systemPrompt: `任務：用戶提供「原本要發的 IG 貼文內文」(article_body)。
+    systemPrompt: `任務：用戶提供「原本的貼文內容」。
 你只要寫 hook（開場句），**不要重複貼用戶的原文** — orchestra 會在後端自動把原文接到你寫的 hook 後面。
 
 本則固定走「{label}」這一種（反問式＝用問句直擊讀者；數字式＝以具體數字製造張力；反差式＝用預期落差勾住注意），必須與其他變體明顯不同，嚴禁混用或寫成通用版。

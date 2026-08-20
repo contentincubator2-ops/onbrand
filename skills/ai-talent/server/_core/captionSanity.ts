@@ -18,6 +18,37 @@ const TASK_VOCABULARY_EN_RE =
 const SYSTEM_REFERENCE_RE =
   /\bsystem (?:prompt|context)\b|我的指令|依照我的指示/i;
 
+const FIRST_PERSON_BLOCKING_ZH_RE =
+  /我無法(?:直接)?(?:產出|撰寫|完成)(?:這(?:篇|則)?(?:貼文|文案|任務))?/;
+
+const OPERATOR_CONTEXT_ZH_RE =
+  /你(?:給|提供)的(?:資訊|素材|資料|內容|連結)|用戶提供|本次任務|工作原則|不能反問|素材不足|抓取(?:結果|資料|內容)|來源連結|輸出(?:格式|要求)|產出成品/i;
+
+const DELIBERATION_ZH_PATTERNS = [
+  /我(?:有|面臨).{0,12}(?:兩個|2\s*個|數個|幾個)選項/,
+  /我(?:會)?選擇.{0,12}(?:選項\s*)?[一二三四五六七八九\d]+/,
+  /(?:^|\n)\s*(?:[-—]{2,}\s*)?抓取結果\s*[：:]/m,
+  /根據(?:我的)?工作原則.{0,24}(?:不能|不得|必須)/,
+  /我的處理方式\s*[：:]/,
+  /(?:我將|我會|我只能).{0,20}(?:採用|啟用|改用)?\s*(?:降級|替代)策略/,
+  /讓我(?:先|直接)?(?:查|查詢|搜尋|分析|確認|看)/,
+  /我需要先(?:看清楚|確認|分析).{0,24}(?:你(?:給|提供)的|來源|連結|內容)/,
+  /(?:連結|來源|內容).{0,20}無法.{0,20}(?:解析|抓取|取得)/,
+] as const;
+
+const INTERNAL_INPUT_KEY_RE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/i;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsInternalInputKey(text: string, inputKeys: readonly string[]): boolean {
+  return inputKeys.some((key) => {
+    if (!INTERNAL_INPUT_KEY_RE.test(key)) return false;
+    return new RegExp(`(?:^|[^A-Za-z0-9_])${escapeRegExp(key)}(?:$|[^A-Za-z0-9_])`, "i").test(text);
+  });
+}
+
 function countMatches(text: string, re: RegExp): number {
   return text.match(re)?.length ?? 0;
 }
@@ -29,12 +60,18 @@ function countMatches(text: string, re: RegExp): number {
  */
 export function detectNonDeliverable(
   text: string,
-  opts: { isZhTW: boolean; structured?: boolean },
+  opts: { isZhTW: boolean; structured?: boolean; inputKeys?: readonly string[] },
 ): { bad: boolean; reason: string } | null {
-  if (opts.structured) return null;
-
   const value = (text ?? "").trim();
   if (!value) return null;
+
+  // Internal snake_case keys are never publishable. Keep this before the
+  // structured-output bypass: every caption must obey the same leak guard.
+  if (containsInternalInputKey(value, opts.inputKeys ?? [])) {
+    return { bad: true, reason: "internal-input-key" };
+  }
+
+  if (opts.structured) return null;
 
   const charCount = Array.from(value).length;
 
@@ -55,6 +92,29 @@ export function detectNonDeliverable(
     (charCount < 40 && zhBlockingRequestMatch?.index === 0)
   ) {
     return { bad: true, reason: "clarification-zh" };
+  }
+
+  // A delayed first-person refusal is still operator-facing even when it
+  // appears after a long preamble. Require task/operator context so normal
+  // narrative uses of 「無法完成」 remain publishable.
+  const earlyBody = Array.from(value).slice(0, 240).join("");
+  if (
+    FIRST_PERSON_BLOCKING_ZH_RE.test(earlyBody) &&
+    TASK_VOCABULARY_ZH_RE.test(earlyBody) &&
+    OPERATOR_CONTEXT_ZH_RE.test(earlyBody)
+  ) {
+    return { bad: true, reason: "clarification-zh" };
+  }
+
+  // Reject the model narrating its own deliberation/fetch workflow. Generic
+  // words such as 「選項」「結果」「原則」 are intentionally insufficient:
+  // precise first-person/process phrases and operator context must co-occur.
+  const deliberationSignalCount = DELIBERATION_ZH_PATTERNS.reduce(
+    (count, pattern) => count + (pattern.test(value) ? 1 : 0),
+    0,
+  );
+  if (deliberationSignalCount >= 2 && OPERATOR_CONTEXT_ZH_RE.test(value)) {
+    return { bad: true, reason: "deliberation-zh" };
   }
 
   if (SYSTEM_REFERENCE_RE.test(value)) {

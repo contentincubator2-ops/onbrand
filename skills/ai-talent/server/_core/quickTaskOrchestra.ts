@@ -625,6 +625,8 @@ async function callOneVariant(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  /** Actual args.inputs keys for the deterministic internal-key leak gate. */
+  inputKeys: readonly string[];
   /** Agent's aiModel field — maps to provider (qwen/Kimi/glm). null = use template.preferredModel */
   agentAiModel?: string | null;
   /** Strategist anchor (multi-post / narrativeArc tasks) — injected before user msg */
@@ -634,7 +636,7 @@ async function callOneVariant(args: {
   /** Whether final copy must be zh-TW; used by the non-deliverable gate. */
   isZhTW: boolean;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
-  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor, market, isZhTW } = args;
+  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
   // {today} → market-appropriate date format so PR datelines / calendar
@@ -812,7 +814,16 @@ async function callOneVariant(args: {
   const calendarMode = !!config.calendarMerge;
   const cleanMode = !!config.cleanPrompt && !config.calendarMerge;
   const docMode = template.outputMode === "document";
-  const system = calendarMode
+  const deliverableOnlyRule =
+    `\n\n【只輸出可交付成品 — 最高優先，違反即視為失敗】\n` +
+    `這是一鍵速產任務，使用者不會再補充。**無論資訊多不足，都必須直接產出一份完整、可用的成品**。\n` +
+    `- 禁止輸出任何審議過程、選項評估、抓取流程、處理步驟或模型內心獨白。\n` +
+    `- 禁止自述工作原則、限制、降級策略或「我的處理方式」，不得解釋理由。\n` +
+    `- 嚴禁反問或要求補充，尤其不得輸出「我需要更多資訊」「請提供」「請補充」「為了完成需要…」等句子或要求清單。\n` +
+    `- 禁止輸出輸入欄位的內部名稱（例如 snake_case 識別字）；只使用使用者看得懂的自然語言。\n` +
+    `- 來源連結抓不到內容時，直接依 URL 標題、描述與主題完成任務要求的成品；不得提及、暗示或解釋抓取失敗。\n` +
+    `caption 只能包含最終可發布文字本身。`;
+  const promptCore = calendarMode
     ? `# 角色（寫作口吻參考）\n${captionPersona}\n\n` +
       `# 任務（最高指令，必須完全遵循；只輸出 JSON 陣列，不要任何其他文字）\n` +
       filledSystemPrompt +
@@ -907,10 +918,6 @@ async function callOneVariant(args: {
     // New version: 3-step smart fallback (素材 → 場景 → 對話起手式).
     // Placeholders forbidden entirely; defensive scrub also strips them
     // post-LLM (see sanitizeCaption regex below).
-    `【絕不反問 — 最高優先，違反即視為失敗】\n` +
-    `這是一鍵速產任務，使用者不會再補充。**無論資訊多不足，都必須直接產出一份完整、可用的成品**。\n` +
-    `- 嚴禁輸出任何「我需要更多資訊」「請提供」「請補充」「為了完成需要…」之類反問或要求清單。\n` +
-    `- caption 必須是最終可發布的文字本身，不是給用戶的提問或工作說明。\n` +
     `\n【缺資訊時的處理 — 三步降級，禁用任何佔位符】\n` +
     `**絕對不准**輸出「[待補：xxx]」「[請補充：xxx]」「[填入：xxx]」「[ASSUMPTION]」這類括號標記。\n` +
     `缺具體事實（日期 / 數字 / 人名 / 連結）時，按順序降級：\n` +
@@ -924,6 +931,7 @@ async function callOneVariant(args: {
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
     brandSection +
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
+  const system = promptCore + deliverableOnlyRule;
 
   // Provider + model selection priority:
   //   1. Agent's aiModel (from JSON-assigned real-person agent) — uses both
@@ -1031,7 +1039,7 @@ async function callOneVariant(args: {
       // 2nd attempt: append explicit reminder to user msg, lowering model
       // creativity and forcing strict JSON.
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] 上次回應沒給可解析、可交付的 caption。請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清、不得說明理由、不得輸出貼文以外的任何文字；素材不足就依現有標題與描述直接寫。`
+        ? `${userMsg}\n\n[REMINDER] 上次回應沒給可解析、可交付的 caption。請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -1050,7 +1058,7 @@ async function callOneVariant(args: {
       const out = extractCaption(lastRaw, parsed);
       if (out.caption.length > 0) {
         const caption = stripCaptionPreamble(out.caption);
-        const sanity = detectNonDeliverable(caption, { isZhTW, structured: calendarMode });
+        const sanity = detectNonDeliverable(caption, { isZhTW, structured: calendarMode, inputKeys });
         if (!sanity) {
           return { label, caption, hashtags: out.hashtags };
         }
@@ -1076,6 +1084,7 @@ async function callCaptionWriter(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  inputKeys: readonly string[];
   agentAiModel?: string | null;
   strategistAnchor?: string;
   market?: MarketCode | null;
@@ -1936,9 +1945,13 @@ export async function runOrchestra(args: {
     return s;
   }
 
+  const inputLabels = new Map(
+    (args.template.inputs ?? []).map((input) => [input.key, input.label.trim()]),
+  );
+  const inputKeys = Object.keys(args.inputs);
   const userMsg =
     Object.entries(args.inputs)
-      .map(([k, v]) => `[${k}] ${v}`)
+      .map(([k, v]) => `[${inputLabels.get(k) || k}] ${v}`)
       .join("\n") || "(no extra inputs)";
 
   // 2026-05-14 (CJ「async polling」): when onCheckpoint persists a partial
@@ -2138,6 +2151,7 @@ export async function runOrchestra(args: {
         brandPrefix,
         urlContext,
         userMsg,
+        inputKeys,
         strategistAnchor: strategistAnchor || undefined,
         market: brandMarket.marketCode, // 2026-07-17 多市場
         isZhTW: brandMarket.isZhTW,
@@ -2176,9 +2190,10 @@ export async function runOrchestra(args: {
         const sanity = detectNonDeliverable(v.caption, {
           isZhTW: brandMarket.isZhTW,
           structured: !!args.config.calendarMerge,
+          inputKeys,
         });
         if (sanity) {
-          errors.push(`caption(${v.label ?? vi + 1}): model asked for clarification instead of producing (${sanity.reason}) — 重生這段 to retry`);
+          errors.push(`caption(${v.label ?? vi + 1}): model returned non-deliverable content (${sanity.reason}) — 重生這段 to retry`);
           v.caption = "";
         }
       }
