@@ -358,14 +358,25 @@ export default function ShellLayout() {
           // 2026-08-20 策略 rail: entries carry only `?cat=`; the active
           // brand/product/event ids are injected here so the rail definition
           // stays scope-free and the ScopeBar doesn't reset on navigation.
+          //
+          // 2026-08-20 (Codex review, PR #118): product/event scope must be
+          // read from the CURRENT URL, not from `scope` (useScopeState()) —
+          // that hook's productId/eventId are always null (vestigial in its
+          // returned shape; BrandsPage reads `p`/`e` directly off the URL
+          // search params instead). Using `scope` here silently dropped the
+          // active product/event and bounced the editor back to brand-level
+          // content on every strategy-rail click.
           if (to.startsWith("/brands/edit?cat=")) {
             const cat = to.split("cat=")[1]!;
             const bid = scope.brandId ?? brands[0]?.id;
+            const currentParams = new URLSearchParams(loc.search);
+            const pid = currentParams.get("p");
+            const eid = currentParams.get("e");
             const qs: string[] = [];
             if (bid) {
               qs.push(`b=${bid}`);
-              if (scope.productId) qs.push(`p=${scope.productId}`);
-              if (scope.eventId)   qs.push(`e=${scope.eventId}`);
+              if (pid) qs.push(`p=${pid}`);
+              if (eid) qs.push(`e=${eid}`);
             }
             qs.push(`cat=${cat}`);
             navigate(`/brands/edit?${qs.join("&")}`);
