@@ -926,20 +926,20 @@ import {
   getIgStrategyPublicPolicy,
   getIgStrategyRecordOverrides,
   buildIgStrategyPrivateTerms,
-  findIgStrategyInternalLeaks,
   redactIgStrategySynthesisContext,
-  sanitizeIgStrategyPublicCaption,
 } from "../_core/igStrategyPublicOutput";
 import {
-  assertPrivateStrategyArtifactsReady,
-  assertRedactedStrategyContextReady,
   buildIgStrategyPublicSlots,
-  buildIgStrategySynthesisMessages,
-  parseIgStrategyPublicVariants,
-  runSynthesisBatchesWithDeadline,
+  getRemainingStrategyPostPermission,
+  mergeIgStrategyPublicVariants,
+  splitIgStrategyPublicSlots,
   type IgStrategyPrivateArtifact,
+  type IgStrategyPublicVariant,
 } from "../_core/igStrategyPublicSynthesis";
-import { snapshot as llmCircuitSnapshot } from "../_core/llmCircuitBreaker";
+import {
+  assertIgStrategyPublicCampaignSafe,
+  synthesizeIgStrategyPublicSlots,
+} from "../_core/igStrategyPublicGeneration";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
 import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
@@ -2178,135 +2178,31 @@ export const quickTaskRouter = router({
 
       // 5. Build the background continuation now, but do not start it until
       // the planning checkpoint has been committed and the HTTP response is
-      // ready to return. Per user authorization, Qwen receives only
+      // ready to return. Per user authorization, Anthropic receives only
       // de-identified planning conclusions, brand context and task input.
       const synthesizeStrategyPublicVariants = strategyPublicPolicy ? async () => {
-          assertPrivateStrategyArtifactsReady(privateArtifacts, stepsRaw.length);
           const slots = buildIgStrategyPublicSlots(sqSlugNew, input.topic, brandMarket.outputLanguage);
           if (!slots?.length) throw new Error("no public deliverable slots configured");
-          const privateTerms = buildIgStrategyPrivateTerms({
+          const { initial } = splitIgStrategyPublicSlots(slots);
+          return synthesizeIgStrategyPublicSlots({
+            idOrSlug: sqSlugNew,
+            topic: input.topic,
+            brandContext: brandPrefix,
+            brandId: input.brandId,
+            outputLanguage: brandMarket.outputLanguage,
+            slots: initial,
+            privateArtifacts,
+            steps: stepsRaw,
             squadName: squad.name,
             methodology: typeof squad.methodology === "string"
               ? squad.methodology
               : squad.methodology?.author,
-            steps: stepsRaw,
-            artifactAgentNames: privateArtifacts.map((artifact) => artifact.agentName),
             agents: Object.values(agentMap),
           });
-          const strategyContext = privateArtifacts.map((artifact) => redactIgStrategySynthesisContext(
-              sqSlugNew,
-              artifact.rawContent,
-              { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
-            ));
-          assertRedactedStrategyContextReady(strategyContext, stepsRaw.length);
-          const safeTopic = redactIgStrategySynthesisContext(
-            sqSlugNew,
-            input.topic,
-            { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
-          );
-          const safeBrandContext = redactIgStrategySynthesisContext(
-            sqSlugNew,
-            brandPrefix,
-            { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
-          );
-          const qwenUserPayload = [safeTopic, safeBrandContext, ...strategyContext].filter(Boolean).join("\n\n");
-          if (findIgStrategyInternalLeaks(qwenUserPayload, privateTerms).length > 0) {
-            throw new Error("Qwen synthesis payload failed private-term validation");
-          }
-          const { getBrandRuleAssetsWithStatus } = await import("../_core/brandContext");
-          const brandRuleLoad = await getBrandRuleAssetsWithStatus(input.brandId);
-          if (input.brandId && !brandRuleLoad.loaded) {
-            throw new Error("brand rules could not be loaded for public synthesis");
-          }
-          const brandRules = brandRuleLoad.rules;
-          const redactBrandRule = (value: string) => redactIgStrategySynthesisContext(
-            sqSlugNew,
-            value,
-            { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
-          );
-          const qwenBrandRules = {
-            banned: brandRules.banned.map(redactBrandRule).filter(Boolean),
-            subs: brandRules.subs
-              .map((pair) => ({ from: redactBrandRule(pair.from), to: redactBrandRule(pair.to) }))
-              .filter((pair) => pair.from && pair.to),
-            preferred: brandRules.preferred.map(redactBrandRule).filter(Boolean),
-          };
-          if (findIgStrategyInternalLeaks(JSON.stringify(qwenBrandRules), privateTerms).length > 0) {
-            throw new Error("Qwen brand rules failed private-term validation");
-          }
-          // Fixed-30 campaigns cannot reliably fit complete captions in one
-          // model response. Fan out immutable server slots in bounded batches;
-          // every call remains pinned to Qwen and the final order is restored.
-          // At three workers, six batches take two 26s waves (52s). A serialized
-          // HALF_OPEN probe can use up to 26s, so all remaining attempts share
-          // at most 29s; retries and attempt timers are clamped to the unchanged
-          // 55s campaign deadline.
-          const synthesisBatchTimeoutMs = 26_000;
-          const synthesisDeadlineAt = Date.now() + 55_000;
-          const slotBatches = Array.from(
-            { length: Math.ceil(slots.length / 5) },
-            (_, batchIndex) => slots.slice(batchIndex * 5, (batchIndex + 1) * 5),
-          );
-          const publicBatches: Array<ReturnType<typeof parseIgStrategyPublicVariants>> = new Array(slotBatches.length);
-          const executeBatch = async (batchIndex: number, signal: AbortSignal) => {
-            const slotBatch = slotBatches[batchIndex]!;
-            const messages = buildIgStrategySynthesisMessages({
-              idOrSlug: sqSlugNew,
-              topic: safeTopic,
-              brandContext: safeBrandContext,
-              outputLanguage: brandMarket.outputLanguage,
-              slots: slotBatch,
-              strategyContext,
-              brandRules: qwenBrandRules,
-            });
-            const result = await callModelStrict(messages, "qwen", undefined, {
-              signal,
-            });
-            publicBatches[batchIndex] = parseIgStrategyPublicVariants({
-              idOrSlug: sqSlugNew,
-              modelText: result.content ?? "",
-              outputLanguage: brandMarket.outputLanguage,
-              slots: slotBatch,
-              steps: stepsRaw,
-              privateTerms,
-              brandRules,
-            });
-          };
-          // A HALF_OPEN provider admits exactly one recovery probe. Avoid
-          // launching sibling batches that would reject and abort that probe.
-          const qwenCircuit = llmCircuitSnapshot().find((entry) => entry.provider === "qwen");
-          let firstParallelBatch = 0;
-          if (qwenCircuit && qwenCircuit.state !== "CLOSED" && slotBatches.length > 0) {
-            await runSynthesisBatchesWithDeadline({
-              batchIndexes: [0],
-              concurrency: 1,
-              deadlineAt: synthesisDeadlineAt,
-              perAttemptTimeoutMs: synthesisBatchTimeoutMs,
-              executeBatch,
-            });
-            firstParallelBatch = 1;
-          }
-          await runSynthesisBatchesWithDeadline({
-            batchIndexes: slotBatches.map((_, index) => index).slice(firstParallelBatch),
-            concurrency: 3,
-            deadlineAt: synthesisDeadlineAt,
-            perAttemptTimeoutMs: synthesisBatchTimeoutMs,
-            executeBatch,
-          });
-          const publicResults = publicBatches.flat();
-          // A batch may independently choose a valid address form; validate
-          // the complete campaign again so all posts use one audience voice.
-          sanitizeIgStrategyPublicCaption(
-            sqSlugNew,
-            publicResults.flatMap((variant) => [
-              variant.caption,
-              ...variant.hashtags,
-              variant.image.style ?? "",
-            ]).filter(Boolean).join("\n"),
-            { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
-          );
-          return publicResults;
       } : null;
+      const strategyPublicSlotCount = strategyPublicPolicy
+        ? (buildIgStrategyPublicSlots(sqSlugNew, input.topic, brandMarket.outputLanguage)?.length ?? 0)
+        : 0;
 
       // 6. Look up squad lead for the legacy captionAgent slot. Target tasks
       // never return an internal agent identity.
@@ -2354,6 +2250,7 @@ export const quickTaskRouter = router({
                 contentModel: "ig-strategy-bundle",
                 planningCount: planningArtifacts.length,
                 publicVariantCount: variants.length,
+                publicSlotCount: strategyPublicSlotCount,
                 publicFormats: [...new Set(variants.map((variant) => variant.format))],
                 inputs: { topic: input.topic ?? "" },
               }
@@ -2472,6 +2369,228 @@ export const quickTaskRouter = router({
         missionId,
         ...(strategyPublicPolicy && outputId ? { progress: "caption_ready" as const } : {}),
       };
+    }),
+
+  generateRemainingStrategyPosts: protectedProcedure
+    .input(z.object({ outputId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const [outputRows]: any = await localPool.execute(
+        `SELECT mo.id, mo.content, mo.metadata, mo.progress, m.brandId, m.userId
+           FROM mission_outputs mo
+           JOIN missions m ON m.id = mo.missionId
+          WHERE mo.id = ? AND m.userId = ?
+          LIMIT 1`,
+        [input.outputId, userId],
+      );
+      const output = (outputRows as any[])?.[0];
+      if (!output) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
+      }
+
+      const [artifactRows]: any = await localPool.execute(
+        `SELECT runId, userId, brandId, missionId, outputId, taskId, squadSlug,
+                stepOrder, status, internalLabel, outputType, outputKind,
+                agentId, agentName, rawContent, errorCode, latencyMs
+           FROM strategy_internal_step_artifacts
+          WHERE outputId = ? AND userId = ? AND expiresAt > NOW(3)
+          ORDER BY stepOrder ASC`,
+        [input.outputId, userId],
+      );
+      const artifactRecords = (artifactRows as any[]) ?? [];
+      const artifactHead = artifactRecords[0];
+      const strategyPolicy = artifactHead
+        ? getIgStrategyPublicPolicy(String(artifactHead.squadSlug ?? artifactHead.taskId ?? ""))
+        : null;
+      const metadata = typeof output.metadata === "string"
+        ? (tryParseJson(output.metadata) ?? {})
+        : (output.metadata ?? {});
+      const parsedContent = typeof output.content === "string" ? tryParseJson(output.content) : output.content;
+      const existingPublicVariants: IgStrategyPublicVariant[] =
+        parsedContent?.schemaVersion === 2
+        && parsedContent?.contentModel === "ig-strategy-bundle"
+        && Array.isArray(parsedContent?.planningArtifacts)
+        && Array.isArray(parsedContent?.publicVariants)
+          ? parsedContent.publicVariants
+          : [];
+      const topic = typeof metadata?.inputs?.topic === "string" ? metadata.inputs.topic : "";
+
+      if (!strategyPolicy || !artifactHead) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This output is not an IG strategy bundle" });
+      }
+      const squadSlug = String(artifactHead.squadSlug);
+      const [squadRows]: any = await localPool.execute(
+        `SELECT id, slug, name, agents, steps, methodology
+           FROM squads WHERE slug = ? AND is_active = 1 LIMIT 1`,
+        [squadSlug],
+      );
+      const squad = (squadRows as any[])?.[0];
+      if (!squad) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Strategy squad is unavailable" });
+      }
+      let stepsRaw: any[] = [];
+      try { stepsRaw = typeof squad.steps === "string" ? JSON.parse(squad.steps) : squad.steps; } catch {}
+      stepsRaw = Array.isArray(stepsRaw) ? stepsRaw : [];
+
+      const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
+      const brandId = output.brandId == null ? undefined : Number(output.brandId);
+      const brandMarket = await getBrandMarket(brandId).catch(() => DEFAULT_BRAND_MARKET);
+      const slots = buildIgStrategyPublicSlots(squadSlug, topic, brandMarket.outputLanguage) ?? [];
+      const { remaining } = splitIgStrategyPublicSlots(
+        slots,
+        existingPublicVariants.map((variant) => variant.id),
+      );
+      const privateArtifacts: IgStrategyPrivateArtifact[] = artifactRecords.map((row: any) => ({
+        stepOrder: Number(row.stepOrder),
+        status: row.status,
+        internalLabel: String(row.internalLabel ?? ""),
+        outputType: typeof row.outputType === "string" ? row.outputType : null,
+        outputKind: typeof row.outputKind === "string" ? row.outputKind : null,
+        agentId: row.agentId == null ? null : Number(row.agentId),
+        agentName: typeof row.agentName === "string" ? row.agentName : null,
+        rawContent: String(row.rawContent ?? ""),
+        errorCode: typeof row.errorCode === "string" ? row.errorCode : null,
+        latencyMs: Number(row.latencyMs ?? 0),
+      }));
+      const permission = getRemainingStrategyPostPermission({
+        isOwner: Number(output.userId) === userId,
+        isStrategyOutput: !!strategyPolicy && parsedContent?.contentModel === "ig-strategy-bundle",
+        progress: String(output.progress ?? "done"),
+        remainingSlotCount: remaining.length,
+        artifactsReady: stepsRaw.length > 0
+          && privateArtifacts.length === stepsRaw.length
+          && privateArtifacts.every((artifact) => artifact.status === "done" && !!artifact.rawContent.trim()),
+      });
+      if (!permission.allowed) {
+        const code = permission.reason === "busy" ? "CONFLICT" : "PRECONDITION_FAILED";
+        throw new TRPCError({ code, message: `Cannot generate remaining strategy posts: ${permission.reason}` });
+      }
+
+      const agentIds = Array.from(new Set(stepsRaw
+        .map((step: any) => Number(step.assignedAgentId))
+        .filter((id: number) => Number.isFinite(id) && id > 0)));
+      const agentMap: Record<number, { name: string; title: string; specialty?: string; methodology?: string }> = {};
+      if (agentIds.length > 0) {
+        const [agentRows]: any = await localPool.execute(
+          `SELECT id, name, title, specialty, methodology FROM agents
+            WHERE id IN (${agentIds.map(() => "?").join(",")})`,
+          agentIds,
+        );
+        for (const agent of agentRows as any[]) agentMap[Number(agent.id)] = agent;
+      }
+      const { buildBrandPrefix } = await import("../_core/brandContext");
+      const brandPrefix = await buildBrandPrefix(brandId, null, null, "full").catch(() => "");
+
+      // The conditional update is the single-flight claim for this output.
+      // Two rapid clicks can both validate, but only one can transition the
+      // row to caption_ready; the loser receives CONFLICT and starts no work.
+      const [claimResult]: any = await localPool.execute(
+        `UPDATE mission_outputs mo
+           JOIN missions m ON m.id = mo.missionId
+            SET mo.progress = 'caption_ready', mo.progressDetail = NULL, mo.updatedAt = NOW()
+          WHERE mo.id = ? AND m.userId = ? AND mo.progress <> 'caption_ready'`,
+        [input.outputId, userId],
+      );
+      if (Number(claimResult?.affectedRows ?? 0) !== 1) {
+        throw new TRPCError({ code: "CONFLICT", message: "Strategy posts are already being generated" });
+      }
+
+      setImmediate(() => {
+        void (async () => {
+          const { finaliseTaskRun } = await import("../_core/recordTaskRun");
+          try {
+            const generated = await synthesizeIgStrategyPublicSlots({
+              idOrSlug: squadSlug,
+              topic,
+              brandContext: brandPrefix,
+              brandId,
+              outputLanguage: brandMarket.outputLanguage,
+              slots: remaining,
+              privateArtifacts,
+              steps: stepsRaw,
+              squadName: squad.name,
+              methodology: typeof squad.methodology === "string"
+                ? squad.methodology
+                : squad.methodology?.author,
+              agents: Object.values(agentMap),
+            });
+
+            // Re-read immediately before the write so edits to the initial
+            // three posts made during generation are retained.
+            const [latestRows]: any = await localPool.execute(
+              `SELECT mo.content, mo.metadata
+                 FROM mission_outputs mo
+                 JOIN missions m ON m.id = mo.missionId
+                WHERE mo.id = ? AND m.userId = ? LIMIT 1`,
+              [input.outputId, userId],
+            );
+            const latest = (latestRows as any[])?.[0];
+            if (!latest) throw new Error("strategy output ownership changed during generation");
+            const latestContent = tryParseJson(String(latest.content ?? ""));
+            if (!latestContent || !Array.isArray(latestContent.publicVariants)) {
+              throw new Error("strategy output content changed during generation");
+            }
+            const merged = mergeIgStrategyPublicVariants(
+              slots,
+              latestContent.publicVariants as IgStrategyPublicVariant[],
+              generated,
+            );
+            const privateTerms = buildIgStrategyPrivateTerms({
+              squadName: squad.name,
+              methodology: typeof squad.methodology === "string"
+                ? squad.methodology
+                : squad.methodology?.author,
+              steps: stepsRaw,
+              artifactAgentNames: privateArtifacts.map((artifact) => artifact.agentName),
+              agents: Object.values(agentMap),
+            });
+            assertIgStrategyPublicCampaignSafe({
+              idOrSlug: squadSlug,
+              variants: merged,
+              steps: stepsRaw,
+              outputLanguage: brandMarket.outputLanguage,
+              privateTerms,
+            });
+            const latestMetadata = typeof latest.metadata === "string"
+              ? (tryParseJson(latest.metadata) ?? {})
+              : (latest.metadata ?? {});
+            const finalised = await finaliseTaskRun({
+              outputId: input.outputId,
+              content: JSON.stringify({
+                schemaVersion: 2,
+                contentModel: "ig-strategy-bundle",
+                planningArtifacts: latestContent.planningArtifacts,
+                publicVariants: merged,
+              }, null, 2),
+              metadata: {
+                ...latestMetadata,
+                publicVariantCount: merged.length,
+                publicSlotCount: slots.length,
+                publicFormats: [...new Set(merged.map((variant) => variant.format))],
+              },
+              thumbnailUrl: typeof latestMetadata.thumbnailUrl === "string"
+                ? latestMetadata.thumbnailUrl
+                : null,
+              progress: "done",
+            });
+            if (!finalised.ok) throw new Error("remaining strategy posts could not be saved");
+          } catch (error) {
+            console.warn("[generateRemainingStrategyPosts] failed", {
+              outputId: input.outputId,
+              message: (error as Error).message,
+            });
+            await finaliseTaskRun({
+              outputId: input.outputId,
+              progress: "failed",
+              progressDetail: brandMarket.isZhTW
+                ? "剩餘貼文產生失敗，已產生的貼文仍可使用，請再試一次。"
+                : "Remaining post generation failed. Existing posts are still available; please try again.",
+            });
+          }
+        })();
+      });
+
+      return { ok: true, outputId: input.outputId, progress: "caption_ready" as const };
     }),
 
   // 100s tier — research-validated (scout) + video-where-applicable.

@@ -7,6 +7,8 @@ import {
   getPlanningPublishWarning,
   getPlanningConfirmationPayload,
   getStrategyPublicGenerationState,
+  getStrategyPublicTabLabel,
+  getStrategyRemainingGenerationState,
   getRunContentMutationLocator,
   getRunContentSelectionKey,
   isEmptyStrategyPublicSelection,
@@ -14,6 +16,7 @@ import {
   isPlanningArtifactMissingOutput,
   isStrategyPlanningSelection,
   resolveRunContent,
+  shouldHideStrategyPlanningTabs,
   shouldApplyMutationPreview,
 } from "./strategyContentEnvelope";
 
@@ -82,6 +85,29 @@ describe("strategy content envelope", () => {
     expect(isIgStrategyDeliverableTarget("ig-100-youtility")).toBe(true);
     expect(isIgStrategyDeliverableTarget("ig-monthly-calendar-pulizzi")).toBe(false);
     expect(isIgStrategyDeliverableTarget("unknown")).toBe(false);
+  });
+
+  it("hides planning tabs only behind both the target-id and strategy-envelope gates", () => {
+    expect(shouldHideStrategyPlanningTabs("ig-99-youtility", true)).toBe(true);
+    expect(shouldHideStrategyPlanningTabs("ig-99-youtility", false)).toBe(false);
+    expect(shouldHideStrategyPlanningTabs("fb-60-single-full", true)).toBe(false);
+  });
+
+  it("uses day-order labels only for fixed daily feed campaigns", () => {
+    const daily = { taskId: "ig-99-youtility", isStrategyEnvelope: true, format: "feed" };
+    expect(getStrategyPublicTabLabel({ ...daily, index: 0, language: "zh" })).toBe("第一天");
+    expect(getStrategyPublicTabLabel({ ...daily, index: 29, language: "zh" })).toBe("第三十天");
+    expect(getStrategyPublicTabLabel({ ...daily, index: 2, language: "en" })).toBe("Day 3");
+    expect(getStrategyPublicTabLabel({
+      taskId: "ig-99-live-first",
+      isStrategyEnvelope: true,
+      format: "live",
+      index: 0,
+      fallbackLabel: "直播場次 1",
+      language: "zh",
+    })).toBe("直播場次 1");
+    expect(getStrategyPublicTabLabel({ ...daily, isStrategyEnvelope: false, index: 0, fallbackLabel: "原標籤", language: "zh" }))
+      .toBe("原標籤");
   });
 
   it.each(["feed", "carousel", "reel", "story", "live"] as const)("restores the Instagram %s mockup for a public variant", (format) => {
@@ -183,6 +209,25 @@ describe("strategy content envelope", () => {
       isStrategyEnvelope: false,
       progress: "caption_ready",
       publicVariantCount: 0,
+    })).toBeNull();
+  });
+
+  it("offers remaining generation only for incomplete strategy bundles", () => {
+    const base = {
+      taskId: "ig-99-youtility",
+      isStrategyEnvelope: true,
+      publicVariantCount: 3,
+      publicSlotCount: 30,
+    };
+    expect(getStrategyRemainingGenerationState({ ...base, progress: "done" })).toBe("ready");
+    expect(getStrategyRemainingGenerationState({ ...base, progress: "caption_ready" })).toBe("generating");
+    expect(getStrategyRemainingGenerationState({ ...base, publicVariantCount: 30, progress: "done" })).toBeNull();
+    expect(getStrategyRemainingGenerationState({
+      taskId: "fb-60-single-full",
+      isStrategyEnvelope: false,
+      publicVariantCount: 1,
+      publicSlotCount: 3,
+      progress: "caption_ready",
     })).toBeNull();
   });
 

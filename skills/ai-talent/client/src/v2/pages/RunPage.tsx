@@ -48,6 +48,8 @@ import {
   getPlanningPublishWarning,
   getPlanningConfirmationPayload,
   getStrategyPublicGenerationState,
+  getStrategyPublicTabLabel,
+  getStrategyRemainingGenerationState,
   getRunContentMutationLocator,
   getRunContentSelectionKey,
   isEmptyStrategyPublicSelection,
@@ -55,6 +57,7 @@ import {
   isStrategyPlanningSelection,
   resolveRunContent,
   shouldApplyMutationPreview,
+  shouldHideStrategyPlanningTabs,
   type RunContentKind,
   type RunContentMutationLocator,
 } from "../lib/strategyContentEnvelope";
@@ -550,6 +553,19 @@ export default function RunPage() {
   const [scriptCopied, setScriptCopied] = useState(false);
 
   const utils = trpc.useUtils();
+  const generateRemainingStrategyPostsMut = trpc.quickTask.generateRemainingStrategyPosts.useMutation({
+    onSuccess: async () => {
+      showToastGlobal(lang === "en"
+        ? "The remaining posts are being generated in the background."
+        : "剩餘貼文正在背景產生。");
+      await utils.output.getById.invalidate({ id });
+    },
+    onError: (mutationError) => showToastGlobal(
+      lang === "en"
+        ? `Couldn't start post generation: ${mutationError.message}`
+        : `無法開始產生貼文：${mutationError.message}`,
+    ),
+  });
 
   // 2026-05-12 Phase 1: Nano-Banana prompt-template catalog (lazy on image mode).
   const templateCategoriesQ = (trpc as any).promptTemplate?.categories?.useQuery
@@ -1144,15 +1160,28 @@ export default function RunPage() {
     [resolvedContent],
   );
   const isStrategyEnvelope = resolvedContent.isStrategyEnvelope;
+  const hideStrategyPlanningTabs = shouldHideStrategyPlanningTabs(
+    data?.mission?.taskId,
+    isStrategyEnvelope,
+  );
   const strategyPublicGenerationState = getStrategyPublicGenerationState({
     taskId: data?.mission?.taskId,
     isStrategyEnvelope,
     progress: (data as any)?.progress,
     publicVariantCount: publicVariants.length,
   });
+  const strategyRemainingGenerationState = getStrategyRemainingGenerationState({
+    taskId: data?.mission?.taskId,
+    isStrategyEnvelope,
+    progress: (data as any)?.progress,
+    publicVariantCount: publicVariants.length,
+    publicSlotCount: Number((data as any)?.metadata?.publicSlotCount ?? 0),
+  });
 
   const selectedContentKind: RunContentKind = isStrategyEnvelope
-    ? activeContentKind === "legacy"
+    ? hideStrategyPlanningTabs
+      ? "publicVariants"
+      : activeContentKind === "legacy"
       ? (publicVariants.length > 0 ? "publicVariants" : "planningArtifacts")
       : activeContentKind
     : "legacy";
@@ -1161,7 +1190,7 @@ export default function RunPage() {
     : selectedContentKind === "planningArtifacts"
       ? planningVariants
       : legacyVariants;
-  const isEmptyPublicSelection = isEmptyStrategyPublicSelection(
+  const isEmptyPublicSelection = hideStrategyPlanningTabs && isEmptyStrategyPublicSelection(
     isStrategyEnvelope,
     selectedContentKind,
     publicVariants.length,
@@ -1185,11 +1214,14 @@ export default function RunPage() {
       }
       return;
     }
-    if (activeContentKind === "legacy") {
+    if (hideStrategyPlanningTabs && activeContentKind !== "publicVariants") {
+      setActiveContentKind("publicVariants");
+      setActiveIdx(0);
+    } else if (activeContentKind === "legacy") {
       setActiveContentKind(publicVariants.length > 0 ? "publicVariants" : "planningArtifacts");
       setActiveIdx(0);
     }
-  }, [isStrategyEnvelope, activeContentKind, publicVariants.length]);
+  }, [isStrategyEnvelope, hideStrategyPlanningTabs, activeContentKind, publicVariants.length]);
 
   const selectContent = React.useCallback((contentKind: RunContentKind, index: number) => {
     if (isStrategyPlanningSelection(isStrategyEnvelope, contentKind)) {
@@ -1896,6 +1928,18 @@ export default function RunPage() {
             </div>
           );
         }
+        if (strategyRemainingGenerationState === "generating") {
+          return (
+            <div className="mb-3 mx-1 flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-tiny text-primary-700">
+              <span className="inline-block w-3 h-3 border-2 border-primary-400 border-t-primary-700 rounded-full animate-spin" />
+              <span className="flex-1">
+                {lang === "en"
+                  ? "The remaining posts are being generated in the background. Existing posts remain available."
+                  : "剩餘貼文正在背景產生，已完成的貼文仍可使用。"}
+              </span>
+            </div>
+          );
+        }
         // hold-for-images tasks show their own full-card generating state
         // (the mockup is replaced) — skip the redundant slim banner.
         if (p === "caption_ready" &&
@@ -1968,6 +2012,44 @@ export default function RunPage() {
 
       {/* ─── Variant pills (horizontal) ─────────────────────────────── */}
       {isStrategyEnvelope ? (
+        hideStrategyPlanningTabs ? (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {publicVariants.map((v, i) => (
+              <button
+                key={v.id ?? `public-${i}`}
+                onClick={() => selectContent("publicVariants", i)}
+                className={`px-3 py-1 rounded-full text-tiny transition border ${
+                  i === activeIdx
+                    ? "bg-primary text-white border-primary"
+                    : "bg-white text-default-700 border-default-200 hover:border-primary"
+                }`}
+              >
+                {getStrategyPublicTabLabel({
+                  taskId: data?.mission?.taskId,
+                  isStrategyEnvelope,
+                  format: v.format,
+                  index: i,
+                  fallbackLabel: v.label,
+                  language: lang === "en" ? "en" : "zh",
+                })}
+              </button>
+            ))}
+            {strategyRemainingGenerationState && publicVariants.length > 0 && (
+              <Button
+                size="sm"
+                color="primary"
+                variant="flat"
+                isLoading={generateRemainingStrategyPostsMut.isPending || strategyRemainingGenerationState === "generating"}
+                isDisabled={strategyRemainingGenerationState === "generating"}
+                onPress={() => generateRemainingStrategyPostsMut.mutate({ outputId: id })}
+              >
+                {strategyRemainingGenerationState === "generating"
+                  ? (lang === "en" ? "Generating posts…" : "貼文產生中…")
+                  : (lang === "en" ? "Generate posts" : "產生貼文")}
+              </Button>
+            )}
+          </div>
+        ) : (
         <div className="mb-3 space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] text-default-500 mr-1">
@@ -2019,6 +2101,7 @@ export default function RunPage() {
             </div>
           )}
         </div>
+        )
       ) : variants.length > 1 && (() => {
         // Pool mode: >4 variants → progressive reveal (headline pool).
         // ≤4 → show all (normal multi-variant task, unchanged behavior).
@@ -2105,8 +2188,8 @@ export default function RunPage() {
                             ? "Planning is ready. Publish-ready Instagram posts will appear here automatically when background generation finishes."
                             : "內容規劃已完成。背景產生結束後，可直接發布的 Instagram 貼文會自動顯示在這裡。")
                         : (lang === "en"
-                            ? "This run has no publish-ready posts yet. Re-run the task to generate Instagram posts while keeping the planning tabs above."
-                            : "這次產出尚未完成可直接發布的貼文。請重跑此任務，系統會保留上方策略內容，並另外產生 Instagram 貼文。")}
+                            ? "This run has no publish-ready posts yet. Generate them here, or re-run the original task if needed."
+                            : "這次產出尚未完成可直接發布的貼文。可在此產生貼文，必要時也能重跑原任務。")}
                     </p>
                   </div>
                 );
@@ -2421,15 +2504,21 @@ export default function RunPage() {
                 </p>
                 <p className="text-[11px] text-default-500 leading-relaxed">
                   {lang === "en"
-                    ? "Re-run the task to create publish-ready posts, or switch back to a planning tab."
-                    : "請重跑任務產生可發布貼文，或切回上方策略頁籤查看規劃內容。"}
+                    ? "Generate publish-ready posts from the saved strategy analysis."
+                    : "使用已儲存的策略分析產生可直接發布的貼文。"}
                 </p>
-                <Button color="primary" fullWidth onPress={rerunOriginalTask}>
-                  {lang === "en" ? "Re-run task" : "重跑此任務"}
-                </Button>
-                {planningVariants.length > 0 && (
-                  <Button variant="flat" fullWidth onPress={() => selectContent("planningArtifacts", 0)}>
-                    {lang === "en" ? "View planning" : "查看策略內容"}
+                {strategyRemainingGenerationState === "ready" ? (
+                  <Button
+                    color="primary"
+                    fullWidth
+                    isLoading={generateRemainingStrategyPostsMut.isPending}
+                    onPress={() => generateRemainingStrategyPostsMut.mutate({ outputId: id })}
+                  >
+                    {lang === "en" ? "Generate posts" : "產生貼文"}
+                  </Button>
+                ) : strategyRemainingGenerationState !== "generating" && (
+                  <Button color="primary" fullWidth onPress={rerunOriginalTask}>
+                    {lang === "en" ? "Re-run task" : "重跑此任務"}
                   </Button>
                 )}
                 <Button variant="light" fullWidth onPress={() => navigate("/projects")}>
