@@ -483,7 +483,7 @@ export default function ShellLayout() {
             and the /99s deep-link route returns 404. Festival prep handled
             through normal task picker instead. */}
         <RouteErrorBoundary>
-          <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
+          <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope, userEmail: currentUserEmail }} />
         </RouteErrorBoundary>
         {/* 2026-05-10 global footer w/ legal links — shows on every authenticated page */}
         <footer className="mt-12 pt-6 pb-8 border-t border-neutral-200 text-center text-[11px] text-neutral-400 space-x-3">
@@ -3189,4 +3189,12 @@ export interface ShellOutletCtx {
   brandsLoaded: boolean;
   scope: ScopeState;
   setScope: (s: ScopeState) => void;
+  /** 2026-08-20 (Codex review, PR #119): the shell's own resolved
+   *  `/api/auth/me` email — child pages that need the strategy-preview
+   *  gate must read THIS instead of firing their own independent fetch.
+   *  Two separate requests can disagree (one fails transiently while the
+   *  other succeeds), leaving the rail and the in-page controls out of
+   *  sync with no way to recover short of a reload. Null while the
+   *  shell's own fetch hasn't resolved yet. */
+  userEmail: string | null;
 }
