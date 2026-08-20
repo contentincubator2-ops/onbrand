@@ -8,12 +8,15 @@ export interface ParsedAdCopy {
 const AD_COPY_MARKER = /(?:\[|【)\s*(headline|primary|cta)\s*(?:\]|】)/giu;
 
 function splitTrailingHashtags(value: string): { text: string; hashtags: string[] } {
-  const match = value.match(/(?:^|\s)((?:#[^\s#]+(?:\s+|$))+)\s*$/u);
+  const match = value.match(
+    /(^|[\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}])((?:#[^\s#]+(?:\s+|$))+)\s*$/u,
+  );
   if (!match || match.index === undefined) return { text: value.trim(), hashtags: [] };
 
   return {
-    text: value.slice(0, match.index).trim(),
-    hashtags: Array.from(match[1].matchAll(/#([^\s#]+)/gu), (hashtag) => hashtag[1]),
+    // Preserve a consumed CJK boundary; whitespace boundaries disappear via trim().
+    text: value.slice(0, match.index + match[1].length).trim(),
+    hashtags: Array.from(match[2].matchAll(/#([^\s#]+)/gu), (hashtag) => hashtag[1]),
   };
 }
 

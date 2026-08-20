@@ -39,6 +39,26 @@ describe("parseAdCopy", () => {
     expect(parseAdCopy("[CTA] Book a private tour\n\n#NewHome #OpenHouse")?.cta).toBe("Book a private tour");
     expect(parseAdCopy("[CTA] Book a private tour\n\n#NewHome #OpenHouse")?.hashtags).toEqual(["NewHome", "OpenHouse"]);
   });
+
+  it("separates trailing hashtags attached directly to a CJK CTA", () => {
+    expect(parseAdCopy(
+      "[Headline] 最後四席 [Primary] 買房這件事 [CTA] 預約實景參觀#春悅大地 #五感十築",
+    )).toEqual({
+      headline: "最後四席",
+      primary: "買房這件事",
+      cta: "預約實景參觀",
+      hashtags: ["春悅大地", "五感十築"],
+    });
+  });
+
+  it("does not treat a hash inside an English term as a hashtag", () => {
+    expect(parseAdCopy("[CTA] Learn C#")).toEqual({
+      headline: "",
+      primary: "",
+      cta: "Learn C#",
+      hashtags: [],
+    });
+  });
 });
 
 describe("shortenAdCta", () => {
