@@ -30,6 +30,11 @@ import {
   replaceRegeneratedContent,
   selectRegenerationTarget,
 } from "../_core/quickTaskRegenerateContent";
+import {
+  STRATEGY_PERSISTENCE_BUDGET_MS,
+  STRATEGY_SCOUT_BUDGET_MS,
+  STRATEGY_STEP_DEADLINE_MS,
+} from "../_core/strategyPublicStepRouting";
 
 type FieldDef = {
   key: string;
@@ -1006,9 +1011,27 @@ function buildPriorContext(
 
 /* ──────────────────────────── ROUTER ───────────────────────────────────── */
 
+// Production's largest DB-owned squad has seven planning steps. Its strictly
+// sequential wall-clock ceiling is 12s scout + (7 * 45s step deadline) + 4s
+// persistence = 331s (5m31s). A 2x safety factor covers scheduling jitter,
+// DB/context work outside those named budgets, and one full ceiling again,
+// while still guaranteeing recovery in 662s instead of leaking until PM2
+// restarts. This is intentionally independent of the 220s socket limit: a
+// disconnected handler/provider can outlive that socket, which is precisely
+// the stale-slot failure this upper bound must contain.
+const MAX_RUN_SQUAD_AUTO_PLANNING_STEPS = 7;
+const RUN_SQUAD_AUTO_SINGLE_FLIGHT_SAFETY_FACTOR = 2;
+export const RUN_SQUAD_AUTO_SINGLE_FLIGHT_TTL_MS =
+  (
+    STRATEGY_SCOUT_BUDGET_MS
+    + (MAX_RUN_SQUAD_AUTO_PLANNING_STEPS * STRATEGY_STEP_DEADLINE_MS)
+    + STRATEGY_PERSISTENCE_BUDGET_MS
+  ) * RUN_SQUAD_AUTO_SINGLE_FLIGHT_SAFETY_FACTOR;
+
 const runSquadAutoSingleFlight = singleFlightPerUser({
   key: "quickTask.runSquadAuto",
   message: "這個企劃還在產生中，完成後才能再開一個。",
+  ttlMs: RUN_SQUAD_AUTO_SINGLE_FLIGHT_TTL_MS,
 });
 
 export const quickTaskRouter = router({

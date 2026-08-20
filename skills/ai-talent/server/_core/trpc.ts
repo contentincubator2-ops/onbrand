@@ -173,29 +173,55 @@ export const protectedProcedure = t.procedure
  * user therefore sees the real reason, not a fake server error. CONFLICT is
  * also already on errorLoggerMiddleware's expected list, so it does not
  * pollute error_log.
+ *
+ * The TTL is a recovery ceiling, not an eager cancellation mechanism. A call
+ * keeps its slot normally until `finally`; only a later request can replace a
+ * generation whose owner has remained unresolved past the configured limit.
  */
-export function singleFlightPerUser(opts: { key: string; message: string }) {
-  const inFlight = new Set<number>();
+export function singleFlightPerUser(
+  opts: { key: string; message: string; ttlMs: number },
+  { now = Date.now }: { now?: () => number } = {},
+) {
+  if (!Number.isFinite(opts.ttlMs) || opts.ttlMs <= 0) {
+    throw new RangeError("single-flight TTL must be a positive finite number");
+  }
+
+  const inFlight = new Map<number, { startedAt: number; token: symbol }>();
   return t.middleware(async ({ ctx, next }) => {
     const userId = ctx.user?.id;
     // Unauthenticated calls are rejected by protectedProcedure anyway; not
     // holding a slot for them keeps this guard free of a null-key bucket.
     if (!userId) return next();
 
-    if (inFlight.has(userId)) {
-      console.warn(`[singleFlight] rejected duplicate ${opts.key} for user ${userId}`);
-      throw new TRPCError({ code: "CONFLICT", message: opts.message });
+    const startedAt = now();
+    const existing = inFlight.get(userId);
+    if (existing) {
+      const elapsedMs = startedAt - existing.startedAt;
+      if (elapsedMs < opts.ttlMs) {
+        console.warn(`[singleFlight] rejected duplicate ${opts.key} for user ${userId}`);
+        throw new TRPCError({ code: "CONFLICT", message: opts.message });
+      }
+      console.warn(
+        `[singleFlight] expired stale slot for ${opts.key} for user ${userId}; elapsedMs=${elapsedMs}`,
+      );
     }
 
-    inFlight.add(userId);
+    // A unique token makes release ownership explicit. `startedAt` alone is
+    // not safe against an ABA collision when an injected/test clock returns
+    // the same value for two generations of the same user's slot.
+    const token = Symbol(opts.key);
+    inFlight.set(userId, { startedAt, token });
     try {
       return await next();
     } finally {
-      // Every exit path releases: success, TRPCError, provider throw. A
-      // client disconnect does NOT release early — the handler keeps running
-      // because nothing propagates cancellation into it yet, and releasing
-      // here would let a reconnecting tab stack a second pipeline.
-      inFlight.delete(userId);
+      // Every resolved exit path releases: success, TRPCError, provider throw.
+      // A client disconnect does NOT release early — the handler keeps running
+      // because nothing propagates cancellation into it yet. Until the TTL is
+      // reached, this prevents a reconnecting tab from stacking a pipeline.
+      // A stale call may finish after its TTL elapsed and a newer call took
+      // over the user slot. Only the generation that owns the current token
+      // may release it; otherwise the old finally would unlock the new call.
+      if (inFlight.get(userId)?.token === token) inFlight.delete(userId);
     }
   });
 }
