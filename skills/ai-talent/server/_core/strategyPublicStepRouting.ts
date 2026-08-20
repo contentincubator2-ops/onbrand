@@ -1,5 +1,39 @@
 export const STRATEGY_STEP_PROVIDER = "anthropic" as const;
-export const STRATEGY_STEP_DEADLINE_MS = 40_000;
+/**
+ * 2026-08-20 — raised from 40s on the first real measurements.
+ *
+ * Until the deadline was lifted off 25s no planning step had ever been allowed
+ * to finish, so every recorded latency was the deadline itself and told us
+ * nothing. strategy_internal_step_artifacts now holds completions, and they
+ * land uncomfortably close to the 40s cap:
+ *
+ *   7,242  21,601  26,814  27,527  28,372  32,125
+ *   35,705  36,065  36,291  37,227  37,487  37,683   (ms, status=done)
+ *
+ * Three of those cleared by under 3s, and on 2026-08-20 04:15 an entire
+ * ig-baer-youtility run failed with all four steps at exactly 40,000ms. The cap
+ * was sitting inside the distribution, not outside it.
+ *
+ * 45s keeps the same number of rounds — floor((205s - 12s scout) / 45s) is
+ * still 4 — so no squad changes shape, and the four- and five-step squads gain
+ * headroom over the observed tail:
+ *
+ *   4 steps, 4 rounds: 12 + 4*45 = 192s   (route guard 205s, socket 220s)
+ *   5 steps, 4 rounds: 12 + 4*45 = 192s   (leading pair merges)
+ *
+ * It does not rescue ig-chrisdo-visual-story. Its seven steps have a
+ * dependency-preserving minimum of five rounds — [0,1] then [2] then [3,4]
+ * then [5] then [6] — and five rounds do not fit: 12 + 5*45 = 237s against a
+ * 205s guard. Only four rounds fit, and reaching four means merging the
+ * caption variant with its image/video siblings (which it feeds) or merging
+ * the audit step with the work it audits.
+ *
+ * Precisely: that squad has no layout whose WORST case fits. A run whose steps
+ * happen to finish quickly can still complete, because admission is checked
+ * against elapsed time rather than the worst case. It needs fewer steps or
+ * planning moved off the request — not another constant.
+ */
+export const STRATEGY_STEP_DEADLINE_MS = 45_000;
 /**
  * Ceiling on how many planning steps may share a round. Nothing cancels a
  * timed-out provider call (llm.ts's Anthropic branch passes no signal), so each
@@ -44,7 +78,7 @@ export type StrategyRouteBudget = {
  *
  *   scout + (step count * per-step deadline) + persistence
  *
- * With today's four steps that is 12s + (4 * 40s) + 4s = 176s. The admission
+ * With today's four steps that is 12s + (4 * 45s) + 4s = 196s. The admission
  * deadline is 220s - 15s = 205s, reserving about 4s for persistence and 11s
  * for response work / scheduling jitter. `hasStrategyStepBudget` applies that
  * deadline before every DB step, so a longer squad is stopped before starting
@@ -211,7 +245,7 @@ export async function runAnthropicStrategyStep<T>({
  *
  * Running one step per round makes the route's wall clock grow with whatever
  * step count the DB happens to hold, and the admission guard then refuses the
- * tail: a five-step squad needs 12s + 5*40s = 212s against a 205s guard, so
+ * tail: a five-step squad needs 12s + 5*45s = 237s against a 205s guard, so
  * its last step never starts, the private-artifact gate fails and the whole
  * public campaign is lost.
  *

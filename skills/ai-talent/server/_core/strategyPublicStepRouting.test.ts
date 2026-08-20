@@ -7,6 +7,7 @@ import {
   MAX_CONCURRENT_PLANNING_STEPS,
   runAnthropicStrategyStep,
   STRATEGY_SERVER_TIMEOUT_MS,
+  STRATEGY_STEP_DEADLINE_MS,
   STRATEGY_STEP_PROVIDER,
 } from "./strategyPublicStepRouting";
 
@@ -74,31 +75,39 @@ describe("strategy route budget derivation", () => {
   });
 
   it("derives the four-step production budget without fixing the function to four steps", () => {
+    // Expressed against the constants, not copies of them: the shape of the
+    // arithmetic is what this pins down, so re-sizing a budget does not have to
+    // come with a hunt for restated numbers.
+    const scout = 12_000;
+    const persistence = 4_000;
+    const reserve = 15_000;
+    const planning = scout + (4 * STRATEGY_STEP_DEADLINE_MS);
     expect(deriveStrategyRouteBudget({
       stepCount: 4,
       serverTimeoutMs: 220_000,
     })).toEqual({
-      routeLimitMs: 205_000,
-      stepDeadlineMs: 40_000,
-      planningWorstCaseMs: 172_000,
-      synchronousWorstCaseMs: 176_000,
-      routeHeadroomMs: 33_000,
-      serverHeadroomMs: 44_000,
+      routeLimitMs: 220_000 - reserve,
+      stepDeadlineMs: STRATEGY_STEP_DEADLINE_MS,
+      planningWorstCaseMs: planning,
+      synchronousWorstCaseMs: planning + persistence,
+      routeHeadroomMs: (220_000 - reserve) - planning,
+      serverHeadroomMs: 220_000 - (planning + persistence),
       fitsRouteBudget: true,
     });
   });
 
   it("recalculates from a variable DB step count and server upper limit", () => {
+    const planning5 = 12_000 + (5 * STRATEGY_STEP_DEADLINE_MS);
     expect(deriveStrategyRouteBudget({
       stepCount: 5,
       serverTimeoutMs: 260_000,
     })).toEqual({
       routeLimitMs: 245_000,
-      stepDeadlineMs: 40_000,
-      planningWorstCaseMs: 212_000,
-      synchronousWorstCaseMs: 216_000,
-      routeHeadroomMs: 33_000,
-      serverHeadroomMs: 44_000,
+      stepDeadlineMs: STRATEGY_STEP_DEADLINE_MS,
+      planningWorstCaseMs: planning5,
+      synchronousWorstCaseMs: planning5 + 4_000,
+      routeHeadroomMs: 245_000 - planning5,
+      serverHeadroomMs: 260_000 - (planning5 + 4_000),
       fitsRouteBudget: true,
     });
     expect(deriveStrategyRouteBudget({
@@ -182,7 +191,7 @@ describe("strategy route budget derivation", () => {
     })).toThrow(RangeError);
   });
 
-  it("admits a step only when its complete 40-second deadline fits before the 205-second guard", () => {
+  it("admits a step only when its complete deadline fits before the route guard", () => {
     expect(hasStrategyStepBudget({
       routeStartedAt: 1_000,
       now: 166_000,
