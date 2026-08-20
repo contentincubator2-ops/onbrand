@@ -70,7 +70,10 @@ export function assertIgStrategyPublicCampaignSafe(args: {
 export async function synthesizeIgStrategyPublicSlots(
   args: SynthesizeIgStrategyPublicSlotsArgs,
 ): Promise<IgStrategyPublicVariant[]> {
-  assertPrivateStrategyArtifactsReady(args.privateArtifacts, args.steps.length);
+  const usablePrivateArtifacts = assertPrivateStrategyArtifactsReady(
+    args.privateArtifacts,
+    args.steps.length,
+  );
   if (args.slots.length === 0) return [];
 
   const privateTerms = buildIgStrategyPrivateTerms({
@@ -80,12 +83,12 @@ export async function synthesizeIgStrategyPublicSlots(
     artifactAgentNames: args.privateArtifacts.map((artifact) => artifact.agentName),
     agents: args.agents,
   });
-  const strategyContext = args.privateArtifacts.map((artifact) => redactIgStrategySynthesisContext(
+  const strategyContext = usablePrivateArtifacts.map((artifact) => redactIgStrategySynthesisContext(
     args.idOrSlug,
     artifact.rawContent,
     { steps: args.steps, outputLanguage: args.outputLanguage, privateTerms },
   ));
-  assertRedactedStrategyContextReady(strategyContext, args.steps.length);
+  assertRedactedStrategyContextReady(strategyContext, usablePrivateArtifacts.length);
   const safeTopic = redactIgStrategySynthesisContext(
     args.idOrSlug,
     args.topic,

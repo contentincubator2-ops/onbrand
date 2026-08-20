@@ -931,6 +931,7 @@ import {
 import {
   buildIgStrategyPublicSlots,
   getRemainingStrategyPostPermission,
+  hasSufficientPrivateStrategyArtifacts,
   mergeIgStrategyPublicVariants,
   splitIgStrategyPublicSlots,
   type IgStrategyPrivateArtifact,
@@ -2458,8 +2459,7 @@ export const quickTaskRouter = router({
         progress: String(output.progress ?? "done"),
         remainingSlotCount: remaining.length,
         artifactsReady: stepsRaw.length > 0
-          && privateArtifacts.length === stepsRaw.length
-          && privateArtifacts.every((artifact) => artifact.status === "done" && !!artifact.rawContent.trim()),
+          && hasSufficientPrivateStrategyArtifacts(privateArtifacts, stepsRaw.length),
       });
       if (!permission.allowed) {
         const code = permission.reason === "busy" ? "CONFLICT" : "PRECONDITION_FAILED";
