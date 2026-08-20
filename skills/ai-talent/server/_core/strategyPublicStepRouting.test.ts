@@ -4,12 +4,20 @@ import {
   deriveStrategyRouteBudget,
   getStrategyStepFinishErrorCode,
   hasStrategyStepBudget,
+  isUsableTruncatedStrategyStepContent,
+  MIN_USABLE_TRUNCATED_STRATEGY_STEP_CHARS,
   planStrategyPlanning,
   MAX_CONCURRENT_PLANNING_STEPS,
   runAnthropicStrategyStep,
+  STRATEGY_STEP_BASELINE_MAX_TOKENS,
   STRATEGY_SERVER_TIMEOUT_MS,
   STRATEGY_STEP_DEADLINE_MS,
+  STRATEGY_STEP_MAX_TOKENS,
+  STRATEGY_STEP_OBSERVED_MAX_LATENCY_MS,
   STRATEGY_STEP_PROVIDER,
+  STRATEGY_STEP_TOKEN_HEADROOM_DENOMINATOR,
+  STRATEGY_STEP_TOKEN_HEADROOM_NUMERATOR,
+  STRATEGY_STEP_ZH_TW_CHAR_LIMIT,
 } from "./strategyPublicStepRouting";
 
 describe("strategy step completion", () => {
@@ -26,6 +34,33 @@ describe("strategy step completion", () => {
       expect(getStrategyStepFinishErrorCode(finishReason)).toBeNull();
     },
   );
+
+  it("keeps truncated output once it contains substantial synthesis material", () => {
+    expect(isUsableTruncatedStrategyStepContent(
+      "策".repeat(MIN_USABLE_TRUNCATED_STRATEGY_STEP_CHARS),
+    )).toBe(true);
+  });
+
+  it("rejects a truncated fragment below the substantial-material threshold", () => {
+    expect(isUsableTruncatedStrategyStepContent(
+      "策".repeat(MIN_USABLE_TRUNCATED_STRATEGY_STEP_CHARS - 1),
+    )).toBe(false);
+  });
+
+  it("derives the truncation threshold and token backstop from documented constants", () => {
+    expect(MIN_USABLE_TRUNCATED_STRATEGY_STEP_CHARS)
+      .toBe(Math.floor(STRATEGY_STEP_ZH_TW_CHAR_LIMIT / 4));
+    expect(STRATEGY_STEP_MAX_TOKENS).toBe(Math.floor(
+      STRATEGY_STEP_BASELINE_MAX_TOKENS
+        * STRATEGY_STEP_TOKEN_HEADROOM_NUMERATOR
+        / STRATEGY_STEP_TOKEN_HEADROOM_DENOMINATOR,
+    ));
+    expect(
+      STRATEGY_STEP_OBSERVED_MAX_LATENCY_MS
+        * STRATEGY_STEP_TOKEN_HEADROOM_NUMERATOR
+        / STRATEGY_STEP_TOKEN_HEADROOM_DENOMINATOR,
+    ).toBeLessThan(STRATEGY_STEP_DEADLINE_MS);
+  });
 });
 
 describe("strategy public step provider routing", () => {

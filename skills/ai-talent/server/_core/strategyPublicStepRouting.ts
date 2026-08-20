@@ -62,6 +62,39 @@ export const STRATEGY_SERVER_TIMEOUT_MS = 220_000;
 export const STRATEGY_FINALIZATION_RESERVE_MS = 15_000;
 
 /**
+ * Strategy planning asks zh-TW steps for at most 800 characters. Production
+ * nevertheless showed three repurposed-content steps reaching the old 2,048
+ * token cap in 19,667-25,749ms, because those steps have several deliverables
+ * and a soft aggregate length instruction did not stop the model first.
+ *
+ * 3,072 is the old measured cap plus 50%. Applying the same 1.5x factor to the
+ * slowest measured completion projects 38,624ms, leaving 6,376ms inside the
+ * unchanged 45s deadline. This remains a finite runaway backstop while giving
+ * the strengthened aggregate prompt room to finish instead of relying on an
+ * exact 2,048-token boundary.
+ */
+export const STRATEGY_STEP_BASELINE_MAX_TOKENS = 2_048;
+export const STRATEGY_STEP_TOKEN_HEADROOM_NUMERATOR = 3;
+export const STRATEGY_STEP_TOKEN_HEADROOM_DENOMINATOR = 2;
+export const STRATEGY_STEP_MAX_TOKENS = Math.floor(
+  STRATEGY_STEP_BASELINE_MAX_TOKENS
+    * STRATEGY_STEP_TOKEN_HEADROOM_NUMERATOR
+    / STRATEGY_STEP_TOKEN_HEADROOM_DENOMINATOR,
+);
+export const STRATEGY_STEP_OBSERVED_MAX_LATENCY_MS = 25_749;
+export const STRATEGY_STEP_ZH_TW_CHAR_LIMIT = 800;
+/**
+ * A token-limited response is useful synthesis material once it contains at
+ * least one quarter of the requested 800-character zh-TW planning envelope.
+ * That is 200 characters: enough for several concrete sentences, while still
+ * rejecting empty/tiny provider fragments. Real max-token responses are much
+ * larger; this threshold is a corruption guard, not a relaxed output target.
+ */
+export const MIN_USABLE_TRUNCATED_STRATEGY_STEP_CHARS = Math.floor(
+  STRATEGY_STEP_ZH_TW_CHAR_LIMIT / 4,
+);
+
+/**
  * Anthropic's stop_reason is normalized by llm.ts into finish_reason, where
  * its token cap is `max_tokens`; OpenAI-compatible providers use `length`.
  * Keep this classifier strategy-local so other strict callers retain their
@@ -74,6 +107,10 @@ export function getStrategyStepFinishErrorCode(
   return normalized === "max_tokens" || normalized === "length"
     ? "step_truncated"
     : null;
+}
+
+export function isUsableTruncatedStrategyStepContent(content: string): boolean {
+  return Array.from(content.trim()).length >= MIN_USABLE_TRUNCATED_STRATEGY_STEP_CHARS;
 }
 
 export type StrategyRouteBudget = {

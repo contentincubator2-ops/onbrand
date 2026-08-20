@@ -1988,8 +1988,8 @@ export const quickTaskRouter = router({
           : step.outputType ?? step.outputKind ?? "(未指定)";
         const strategyLengthLimit = strategyPublicPolicy
           ? (brandMarket.isZhTW
-              ? "篇幅上限：800 個繁體中文字。請在上限內保留完成此步驟所需的核心洞察、具體建議與可執行細節，刪除重複鋪陳。"
-              : `Length limit: 600 words in ${brandMarket.outputLanguage}. Within the limit, retain the core insights, concrete recommendations, and actionable details required to complete this step; remove repetition.`)
+              ? `【整份回覆硬上限 — 最高優先】整份回覆的所有交付物合計不得超過 ${strategyStepRouting?.STRATEGY_STEP_ZH_TW_CHAR_LIMIT ?? 800} 個繁體中文字，不是每個平台或區塊各自計算。若 step 要求多平台、多格式或多版本，必須精簡每份交付物，仍要共用這個總上限。在上限內保留核心洞察、具體建議與可執行細節，刪除重複鋪陳。`
+              : `【Whole-response hard limit — highest priority】The complete response, with every deliverable combined, must not exceed 600 words in ${brandMarket.outputLanguage}; this is not a separate allowance for each platform or section. If the step requests multiple platforms, formats, or variants, shorten each deliverable to keep their combined response within this single limit. Retain core insights, concrete recommendations, and actionable details; remove repetition.`)
           : "";
         const system = `${persona}\n${promptHeader}\n步驟說明：${step.description ?? ""}\n預期產出：${expectedOutput}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合「${internalStageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。${strategyLengthLimit ? `\n${strategyLengthLimit}` : ""}\n直接給結果，不要前言、不要 markdown 圍籬。`;
 
@@ -2048,11 +2048,9 @@ export const quickTaskRouter = router({
                 strategyStepRouting.STRATEGY_STEP_PROVIDER,
                 undefined,
                 {
-                  // 800 Han characters at a conservative 1.5 tokens/character
-                  // need about 1,200 tokens. 2,048 adds ~70% headroom for list
-                  // markers and punctuation, so the prompt's 800-character
-                  // limit acts first and this cap remains a runaway backstop.
-                  maxTokens: 2_048,
+                  // Derived from the three production truncations and their
+                  // 19,667-25,749ms latency; see the routing constant comment.
+                  maxTokens: strategyStepRouting.STRATEGY_STEP_MAX_TOKENS,
                   includeFinishReason: true,
                 },
               ),
@@ -2071,11 +2069,7 @@ export const quickTaskRouter = router({
               routed.value.finishReason,
             );
             if (finishErrorCode) {
-              throw Object.assign(new Error("strategy step output was truncated by the model token limit"), {
-                strategyErrorCode: finishErrorCode,
-                strategyProvider: routed.provider,
-                strategyAttempt: routed.attempt,
-              });
+              stepErrorCode = finishErrorCode;
             }
             r = routed.value;
           } else {
@@ -2085,6 +2079,17 @@ export const quickTaskRouter = router({
             ]);
           }
           const rawText = (r.content ?? "").trim();
+          if (
+            strategyPublicPolicy
+            && stepErrorCode === "step_truncated"
+            && !strategyStepRouting?.isUsableTruncatedStrategyStepContent(rawText)
+          ) {
+            throw Object.assign(new Error("strategy step output was truncated before producing usable material"), {
+              strategyErrorCode: stepErrorCode,
+              strategyProvider: stepProvider,
+              strategyAttempt: stepAttempt,
+            });
+          }
           let text = rawText;
           // 2026-05-19 (CJ 驗收 v#3): deterministic 文字衛生 backstop on
           // squad-step output — guaranteed, independent of model adherence.
@@ -2118,7 +2123,9 @@ export const quickTaskRouter = router({
               agentId: Number.isFinite(aid) && aid > 0 ? aid : null,
               agentName: a?.name ?? step.assignedAgentName ?? null,
               rawContent: rawText,
-              errorCode: null,
+              // A substantial partial response follows the exact same
+              // sanitizer/privacy path and remains observable as truncated.
+              errorCode: stepErrorCode,
               latencyMs: Date.now() - startedAt - stageStart,
             });
             const planningCaption = redactIgStrategySynthesisContext(
