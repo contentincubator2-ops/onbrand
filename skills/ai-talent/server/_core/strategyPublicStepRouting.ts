@@ -2,6 +2,14 @@ export const STRATEGY_STEP_PROVIDER = "anthropic" as const;
 export const STRATEGY_STEP_DEADLINE_MS = 40_000;
 export const STRATEGY_SCOUT_BUDGET_MS = 12_000;
 export const STRATEGY_PERSISTENCE_BUDGET_MS = 4_000;
+/**
+ * Keep this synchronized with the `server.timeout = ...` socket-inactivity
+ * assignment in server/index.ts's HTTP server timeout block. If this is higher
+ * than the real socket limit, the admission gate can start work that Node cuts
+ * off before persistence; if it is lower, valid DB steps are rejected early.
+ * strategyPublicStepRouting.test.ts asserts the two source values stay equal
+ * without introducing a runtime import from the server entrypoint.
+ */
 export const STRATEGY_SERVER_TIMEOUT_MS = 220_000;
 export const STRATEGY_FINALIZATION_RESERVE_MS = 15_000;
 

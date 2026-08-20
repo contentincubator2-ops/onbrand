@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   deriveStrategyRouteBudget,
   hasStrategyStepBudget,
   runAnthropicStrategyStep,
+  STRATEGY_SERVER_TIMEOUT_MS,
   STRATEGY_STEP_PROVIDER,
 } from "./strategyPublicStepRouting";
 
@@ -60,6 +62,15 @@ describe("strategy public step provider routing", () => {
 });
 
 describe("strategy route budget derivation", () => {
+  it("stays synchronized with the Node socket timeout in server/index.ts", () => {
+    const serverEntrySource = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
+    const assignment = serverEntrySource.match(/^\s*server\.timeout\s*=\s*([\d_]+)\s*;/m);
+
+    expect(assignment, "server/index.ts must keep an explicit server.timeout assignment").not.toBeNull();
+    const serverSocketTimeoutMs = Number(assignment![1].replaceAll("_", ""));
+    expect(STRATEGY_SERVER_TIMEOUT_MS).toBe(serverSocketTimeoutMs);
+  });
+
   it("derives the four-step production budget without fixing the function to four steps", () => {
     expect(deriveStrategyRouteBudget({
       stepCount: 4,
