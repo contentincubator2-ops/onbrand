@@ -23,7 +23,11 @@ on:
         required: true
         default: "drop_pro"
         type: choice
-        options: [drop_pro, drop_starter, drop_team, drop_agency, enterprise]
+        # enterprise deliberately excluded: preflightCostCheck bypasses the
+        # planEndsAt expiry check for enterprise, so a DATED enterprise grant
+        # would never be enforced. Permanent enterprise comps go through
+        # admin-set-user-permissions.yml / admin-comp-sowork-team.yml.
+        options: [drop_pro, drop_starter, drop_team, drop_agency]
       ends_at:
         description: "Expiry 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS', or 'permanent'"
         required: true
@@ -55,12 +59,20 @@ jobs:
             E=$(printf "%s" "$GRANT_EMAIL" | sed "s/'/''/g")
             PL=$(printf "%s" "$GRANT_PLAN" | sed "s/'/''/g")
 
-            # ends_at is interpolated into SQL — allow only strict formats.
+            # ends_at is interpolated into SQL — allow only strict formats,
+            # and round-trip through GNU date so impossible calendar values
+            # (2026-02-31, 25:99:99) are rejected, not coerced by MySQL.
             if [ "$GRANT_ENDS" = "permanent" ]; then
               ENDS_SQL="NULL"
             elif printf "%s" "$GRANT_ENDS" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+              if [ "$(date -d "$GRANT_ENDS" +%F 2>/dev/null)" != "$GRANT_ENDS" ]; then
+                echo "❌ ends_at is not a real calendar date: $GRANT_ENDS"; exit 1
+              fi
               ENDS_SQL="'$GRANT_ENDS 23:59:59'"
             elif printf "%s" "$GRANT_ENDS" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$'; then
+              if [ "$(date -d "$GRANT_ENDS" +'%F %T' 2>/dev/null)" != "$GRANT_ENDS" ]; then
+                echo "❌ ends_at is not a real calendar datetime: $GRANT_ENDS"; exit 1
+              fi
               ENDS_SQL="'$GRANT_ENDS'"
             else
               echo "❌ ends_at must be YYYY-MM-DD, 'YYYY-MM-DD HH:MM:SS', or 'permanent' — got: $GRANT_ENDS"
@@ -78,12 +90,22 @@ jobs:
             fi
 
             echo "===== APPLY ($PL, ends: $GRANT_ENDS) ====="
-            Q "UPDATE users
-                 SET planCode='$PL', planStatus='active', planEndsAt=$ENDS_SQL, isActive=1
-               WHERE email='$E';"
-            Q "UPDATE workspaces
-                 SET planCode='$PL', planStatus='active', planEndsAt=$ENDS_SQL
-               WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');"
+            # Single transaction: users + workspaces move together or not at
+            # all. mysql -e stops at the first failed statement and exits
+            # non-zero, so COMMIT is never reached on error (implicit rollback
+            # when the connection closes).
+            Q "START TRANSACTION;
+               UPDATE users
+                  SET planCode='$PL', planStatus='active', planEndsAt=$ENDS_SQL, isActive=1
+                WHERE email='$E';
+               UPDATE workspaces
+                  SET planCode='$PL', planStatus='active', planEndsAt=$ENDS_SQL
+                WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');
+               COMMIT;"
+            if [ $? -ne 0 ]; then
+              echo "❌ APPLY failed — transaction not committed, no partial changes."
+              exit 1
+            fi
 
             echo "===== AFTER ====="
             Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive
