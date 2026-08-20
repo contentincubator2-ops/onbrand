@@ -1863,6 +1863,15 @@ export const quickTaskRouter = router({
       const strategyStepRouting = strategyPublicPolicy
         ? await import("../_core/strategyPublicStepRouting")
         : null;
+      const strategyRouteBudget = strategyStepRouting
+        ? strategyStepRouting.deriveStrategyRouteBudget({
+            // The DB owns the number of steps. For today's four-step squads:
+            // 12s scout + (4 * 40s step) + ~4s persistence = ~176s.
+            // The admission guard is 220s - 15s finalization reserve = 205s.
+            stepCount: stepsRaw.length,
+            serverTimeoutMs: strategyStepRouting.STRATEGY_SERVER_TIMEOUT_MS,
+          })
+        : null;
 
       // Resolve all unique step agent IDs in one query
       const agentIds = Array.from(new Set(stepsRaw
@@ -1930,32 +1939,31 @@ export const quickTaskRouter = router({
           `\n請執行此步驟。`,
         ].filter(Boolean).join("\n");
 
-        let stepProvider: "anthropic" | "openai" | "qwen" = "qwen";
-        let stepAttempt: 1 | 2 = 1;
+        let stepProvider: "anthropic" | "qwen" = "qwen";
+        let stepAttempt: 1 = 1;
         let stepStatus: "done" | "failed" = "failed";
         let stepErrorCode: string | null = null;
-        let attempt1Provider: "anthropic" | "openai" | null = null;
-        let attempt1Error: string | null = null;
-        let attempt2Provider: "anthropic" | "openai" | null = null;
-        let attempt2Error: string | null = null;
         try {
           const messages = [{ role: "system" as const, content: system }, { role: "user" as const, content: userMsg }];
           let r: Awaited<ReturnType<typeof callModel>>;
-          if (strategyPublicPolicy && strategyStepRouting) {
-            // Both providers are explicitly authorized to receive full brand
-            // context. Anthropic is primary; OpenAI remains the fallback.
-            const selectedProvider = strategyStepRouting.getPrimaryAuthorizedStrategyProvider();
-            stepProvider = selectedProvider;
-            // Background synthesis no longer consumes the HTTP budget, but a
-            // new 25s planning step must still fit inside the 125s route guard.
-            // That leaves server.timeout's final 15s for persistence + response.
+          if (strategyPublicPolicy && strategyStepRouting && strategyRouteBudget) {
+            // Production shows OpenAI cannot complete this strategy workload,
+            // while the shared deadline gave a fallback no useful runtime.
+            // Let the proven Anthropic path own the complete 40-second budget.
+            stepProvider = strategyStepRouting.STRATEGY_STEP_PROVIDER;
+            // Background synthesis does not consume the HTTP budget. Before
+            // each DB-owned step, require its full 40s to fit before the 205s
+            // route guard, preserving 15s of the 220s socket limit for
+            // persistence, response work and scheduling jitter.
             if (!strategyStepRouting.hasStrategyStepBudget({
               routeStartedAt,
               now: Date.now(),
+              routeLimitMs: strategyRouteBudget.routeLimitMs,
+              stepDeadlineMs: strategyRouteBudget.stepDeadlineMs,
             })) {
               throw Object.assign(new Error("strategy route has insufficient budget for another planning step"), {
                 strategyErrorCode: "step_route_budget",
-                strategyProvider: selectedProvider,
+                strategyProvider: strategyStepRouting.STRATEGY_STEP_PROVIDER,
                 strategyAttempt: 1,
               });
             }
@@ -1963,18 +1971,13 @@ export const quickTaskRouter = router({
             // deadline. In particular llm.ts's Anthropic branch does not pass a signal
             // (unlike OpenAI), so a timed-out Anthropic call can remain a ghost request.
             // Fixing that requires shared LLM changes and is intentionally outside PR 1.
-            const routed = await strategyStepRouting.runAuthorizedStrategyStep({
-              selectedProvider,
-              deadlineAt: stepStartedAt + 25_000,
-              execute: (provider) => callModelStrict(messages, provider),
+            const routed = await strategyStepRouting.runAnthropicStrategyStep({
+              deadlineAt: stepStartedAt + strategyRouteBudget.stepDeadlineMs,
+              execute: () => callModelStrict(messages, strategyStepRouting.STRATEGY_STEP_PROVIDER),
             });
             stepProvider = routed.provider;
             stepAttempt = routed.attempt;
             stepErrorCode = routed.errorCode;
-            attempt1Provider = routed.attempt1Provider;
-            attempt1Error = routed.attempt1Error;
-            attempt2Provider = routed.attempt2Provider;
-            attempt2Error = routed.attempt2Error;
             if (!routed.ok) {
               throw Object.assign(routed.error, {
                 strategyErrorCode: routed.errorCode,
@@ -2100,10 +2103,6 @@ export const quickTaskRouter = router({
               latencyMs: Date.now() - stepStartedAt,
               status: stepStatus,
               errorCode: stepErrorCode,
-              attempt1Provider,
-              attempt1Error,
-              attempt2Provider,
-              attempt2Error,
             });
           }
         }

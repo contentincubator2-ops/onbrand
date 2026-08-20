@@ -1,116 +1,122 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
-  getPrimaryAuthorizedStrategyProvider,
+  deriveStrategyRouteBudget,
   hasStrategyStepBudget,
-  runAuthorizedStrategyStep,
-  summarizeStrategyAttemptError,
+  runAnthropicStrategyStep,
+  STRATEGY_SERVER_TIMEOUT_MS,
+  STRATEGY_STEP_PROVIDER,
 } from "./strategyPublicStepRouting";
 
 describe("strategy public step provider routing", () => {
-  it("exposes Anthropic as the fixed primary without a weighted-draw argument", () => {
-    expect(getPrimaryAuthorizedStrategyProvider()).toBe("anthropic");
-  });
+  it("gives one Anthropic attempt the full step deadline", async () => {
+    const execute = vi.fn().mockResolvedValue("anthropic result");
 
-  it("tries the other provider when the selected provider fails with enough time left", async () => {
-    const execute = vi.fn()
-      .mockRejectedValueOnce(new Error("anthropic unavailable"))
-      .mockResolvedValueOnce("openai result");
-
-    await expect(runAuthorizedStrategyStep({
-      selectedProvider: "anthropic",
-      deadlineAt: 25_000,
+    await expect(runAnthropicStrategyStep({
+      deadlineAt: 40_000,
       now: () => 0,
       execute,
-    })).resolves.toMatchObject({
+    })).resolves.toEqual({
       ok: true,
-      value: "openai result",
-      provider: "openai",
-      attempt: 2,
+      value: "anthropic result",
+      provider: STRATEGY_STEP_PROVIDER,
+      attempt: 1,
       errorCode: null,
-      attempt1Provider: "anthropic",
-      attempt1Error: "Error: unclassified provider failure",
-      attempt2Provider: "openai",
-      attempt2Error: null,
     });
-    expect(execute.mock.calls.map(([provider]) => provider)).toEqual(["anthropic", "openai"]);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("does not try the other provider when fewer than five seconds remain", async () => {
-    let now = 0;
-    const execute = vi.fn(async () => {
-      now = 20_001;
-      throw new Error("anthropic unavailable");
-    });
+  it("does not route a provider failure to a second provider", async () => {
+    const error = new Error("anthropic unavailable");
+    const execute = vi.fn().mockRejectedValue(error);
 
-    await expect(runAuthorizedStrategyStep({
-      selectedProvider: "anthropic",
-      deadlineAt: 25_000,
-      now: () => now,
+    await expect(runAnthropicStrategyStep({
+      deadlineAt: 40_000,
+      now: () => 0,
+      execute,
+    })).resolves.toEqual({
+      ok: false,
+      error,
+      provider: "anthropic",
+      attempt: 1,
+      errorCode: "step_provider_failed",
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not invoke Anthropic after the step deadline has elapsed", async () => {
+    const execute = vi.fn().mockResolvedValue("late result");
+
+    await expect(runAnthropicStrategyStep({
+      deadlineAt: 40_000,
+      now: () => 40_000,
       execute,
     })).resolves.toMatchObject({
       ok: false,
       provider: "anthropic",
       attempt: 1,
-      errorCode: "step_provider_failed",
-      attempt1Provider: "anthropic",
-      attempt1Error: "Error: unclassified provider failure",
-      attempt2Provider: null,
-      attempt2Error: null,
+      errorCode: "step_timeout",
     });
-    expect(execute).toHaveBeenCalledTimes(1);
-  });
-
-  it("reports the all-providers error code when both authorized providers fail", async () => {
-    const execute = vi.fn()
-      .mockRejectedValueOnce(new Error("anthropic unavailable"))
-      .mockRejectedValueOnce(new Error("openai unavailable"));
-
-    await expect(runAuthorizedStrategyStep({
-      selectedProvider: "anthropic",
-      deadlineAt: 25_000,
-      now: () => 0,
-      execute,
-    })).resolves.toMatchObject({
-      ok: false,
-      provider: "openai",
-      attempt: 2,
-      errorCode: "step_all_providers_failed",
-      attempt1Provider: "anthropic",
-      attempt1Error: "Error: unclassified provider failure",
-      attempt2Provider: "openai",
-      attempt2Error: "Error: unclassified provider failure",
-    });
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
-describe("strategy attempt error summaries", () => {
-  it.each([
-    "LLM provider returned empty content",
-    "LLM provider returned unsafe reasoning content",
-  ])("preserves the fixed safe diagnostic: %s", (message) => {
-    expect(summarizeStrategyAttemptError(new Error(message))).toBe(message);
+describe("strategy route budget derivation", () => {
+  it("stays synchronized with the Node socket timeout in server/index.ts", () => {
+    const serverEntrySource = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
+    const assignment = serverEntrySource.match(/^\s*server\.timeout\s*=\s*([\d_]+)\s*;/m);
+
+    expect(assignment, "server/index.ts must keep an explicit server.timeout assignment").not.toBeNull();
+    const serverSocketTimeoutMs = Number(assignment![1].replaceAll("_", ""));
+    expect(STRATEGY_SERVER_TIMEOUT_MS).toBe(serverSocketTimeoutMs);
   });
 
-  it("keeps HTTP status but strips the provider response body", () => {
-    const summary = summarizeStrategyAttemptError(new Error(
-      "LLM invoke failed: 400 Bad Request – rejected output: SECRET_BRAND_COPY",
-    ));
-    expect(summary).toBe("LLM invoke failed: HTTP 400");
-    expect(summary).not.toContain("SECRET_BRAND_COPY");
+  it("derives the four-step production budget without fixing the function to four steps", () => {
+    expect(deriveStrategyRouteBudget({
+      stepCount: 4,
+      serverTimeoutMs: 220_000,
+    })).toEqual({
+      routeLimitMs: 205_000,
+      stepDeadlineMs: 40_000,
+      planningWorstCaseMs: 172_000,
+      synchronousWorstCaseMs: 176_000,
+      routeHeadroomMs: 33_000,
+      serverHeadroomMs: 44_000,
+      fitsRouteBudget: true,
+    });
   });
 
-  it("redacts unrecognized error messages instead of logging their content", () => {
-    const summary = summarizeStrategyAttemptError(new TypeError(
-      "prompt included PRIVATE_BRAND_DATA",
-    ));
-    expect(summary).toBe("TypeError: unclassified provider failure");
-    expect(summary).not.toContain("PRIVATE_BRAND_DATA");
+  it("recalculates from a variable DB step count and server upper limit", () => {
+    expect(deriveStrategyRouteBudget({
+      stepCount: 5,
+      serverTimeoutMs: 260_000,
+    })).toEqual({
+      routeLimitMs: 245_000,
+      stepDeadlineMs: 40_000,
+      planningWorstCaseMs: 212_000,
+      synchronousWorstCaseMs: 216_000,
+      routeHeadroomMs: 33_000,
+      serverHeadroomMs: 44_000,
+      fitsRouteBudget: true,
+    });
+    expect(deriveStrategyRouteBudget({
+      stepCount: 5,
+      serverTimeoutMs: 220_000,
+    }).fitsRouteBudget).toBe(false);
   });
-});
 
-describe("strategy step route budget", () => {
-  it("starts a step only when its full 25-second deadline fits before the 125-second route guard", () => {
-    expect(hasStrategyStepBudget({ routeStartedAt: 1_000, now: 101_000 })).toBe(true);
-    expect(hasStrategyStepBudget({ routeStartedAt: 1_000, now: 101_001 })).toBe(false);
+  it("admits a step only when its complete 40-second deadline fits before the 205-second guard", () => {
+    expect(hasStrategyStepBudget({
+      routeStartedAt: 1_000,
+      now: 166_000,
+      routeLimitMs: 205_000,
+      stepDeadlineMs: 40_000,
+    })).toBe(true);
+    expect(hasStrategyStepBudget({
+      routeStartedAt: 1_000,
+      now: 166_001,
+      routeLimitMs: 205_000,
+      stepDeadlineMs: 40_000,
+    })).toBe(false);
   });
 });
