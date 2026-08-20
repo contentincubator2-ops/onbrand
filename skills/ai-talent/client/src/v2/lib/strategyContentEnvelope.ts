@@ -37,13 +37,6 @@ const TARGET_IDS = new Set([
   "ig-hollis-radical-transparency",
 ]);
 
-const DAILY_FEED_TARGET_IDS = new Set([
-  "ig-99-youtility",
-  "ig-baer-youtility",
-  "ig-99-visual-story",
-  "ig-chrisdo-visual-story",
-]);
-
 const IG_PUBLIC_FORMATS = new Set<IgPublicFormat>([
   "feed", "carousel", "reel", "story", "live",
 ]);
@@ -63,17 +56,6 @@ export function shouldHideStrategyPlanningTabs(
   return isStrategyEnvelope && isIgStrategyDeliverableTarget(taskId);
 }
 
-function chineseDayNumber(day: number): string {
-  const digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  if (day < 10) return digits[day] ?? String(day);
-  if (day === 10) return "十";
-  if (day < 20) return `十${digits[day - 10]}`;
-  if (day % 10 === 0) return `${digits[Math.floor(day / 10)]}十`;
-  if (day < 40) return `${digits[Math.floor(day / 10)]}十${digits[day % 10]}`;
-  return String(day);
-}
-
-/** Daily labels apply only to the two fixed 30-feed campaign contracts. */
 export function getStrategyPublicTabLabel(args: {
   taskId?: string | null;
   isStrategyEnvelope: boolean;
@@ -82,15 +64,8 @@ export function getStrategyPublicTabLabel(args: {
   fallbackLabel?: string | null;
   language: "en" | "zh";
 }): string {
-  const isDailyFeed = args.isStrategyEnvelope
-    && DAILY_FEED_TARGET_IDS.has(normalizeTaskId(args.taskId))
-    && args.format === "feed";
-  if (!isDailyFeed) {
-    return args.fallbackLabel
-      || (args.language === "en" ? `Post ${args.index + 1}` : `貼文 ${args.index + 1}`);
-  }
-  const day = args.index + 1;
-  return args.language === "en" ? `Day ${day}` : `第${chineseDayNumber(day)}天`;
+  return args.fallbackLabel
+    || (args.language === "en" ? `Post ${args.index + 1}` : `貼文 ${args.index + 1}`);
 }
 
 /**
@@ -199,7 +174,6 @@ export function isEmptyStrategyPublicSelection(
 }
 
 export type StrategyPublicGenerationState = "generating" | "missing" | null;
-export type StrategyRemainingGenerationState = "generating" | "ready" | null;
 
 /**
  * Distinguish an empty public tab that is still being synthesized from one
@@ -222,27 +196,6 @@ export function getStrategyPublicGenerationState({
     return null;
   }
   return progress === "caption_ready" ? "generating" : "missing";
-}
-
-export function getStrategyRemainingGenerationState({
-  taskId,
-  isStrategyEnvelope,
-  progress,
-  publicVariantCount,
-  publicSlotCount,
-}: {
-  taskId?: string | null;
-  isStrategyEnvelope: boolean;
-  progress?: string | null;
-  publicVariantCount: number;
-  publicSlotCount: number;
-}): StrategyRemainingGenerationState {
-  if (
-    !isIgStrategyDeliverableTarget(taskId)
-    || !isStrategyEnvelope
-    || publicSlotCount <= publicVariantCount
-  ) return null;
-  return progress === "caption_ready" ? "generating" : "ready";
 }
 
 export function getCalendarPublishPayload(

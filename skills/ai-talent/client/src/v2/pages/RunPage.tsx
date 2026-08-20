@@ -49,7 +49,6 @@ import {
   getPlanningConfirmationPayload,
   getStrategyPublicGenerationState,
   getStrategyPublicTabLabel,
-  getStrategyRemainingGenerationState,
   getRunContentMutationLocator,
   getRunContentSelectionKey,
   isEmptyStrategyPublicSelection,
@@ -554,19 +553,6 @@ export default function RunPage() {
   const [scriptCopied, setScriptCopied] = useState(false);
 
   const utils = trpc.useUtils();
-  const generateRemainingStrategyPostsMut = trpc.quickTask.generateRemainingStrategyPosts.useMutation({
-    onSuccess: async () => {
-      showToastGlobal(lang === "en"
-        ? "The remaining posts are being generated in the background."
-        : "剩餘貼文正在背景產生。");
-      await utils.output.getById.invalidate({ id });
-    },
-    onError: (mutationError) => showToastGlobal(
-      lang === "en"
-        ? `Couldn't start post generation: ${mutationError.message}`
-        : `無法開始產生貼文：${mutationError.message}`,
-    ),
-  });
 
   // 2026-05-12 Phase 1: Nano-Banana prompt-template catalog (lazy on image mode).
   const templateCategoriesQ = (trpc as any).promptTemplate?.categories?.useQuery
@@ -1171,14 +1157,6 @@ export default function RunPage() {
     progress: (data as any)?.progress,
     publicVariantCount: publicVariants.length,
   });
-  const strategyRemainingGenerationState = getStrategyRemainingGenerationState({
-    taskId: data?.mission?.taskId,
-    isStrategyEnvelope,
-    progress: (data as any)?.progress,
-    publicVariantCount: publicVariants.length,
-    publicSlotCount: Number((data as any)?.metadata?.publicSlotCount ?? 0),
-  });
-
   const selectedContentKind: RunContentKind = isStrategyEnvelope
     ? hideStrategyPlanningTabs
       ? "publicVariants"
@@ -1937,18 +1915,6 @@ export default function RunPage() {
             </div>
           );
         }
-        if (strategyRemainingGenerationState === "generating") {
-          return (
-            <div className="mb-3 mx-1 flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-tiny text-primary-700">
-              <span className="inline-block w-3 h-3 border-2 border-primary-400 border-t-primary-700 rounded-full animate-spin" />
-              <span className="flex-1">
-                {lang === "en"
-                  ? "The remaining posts are being generated in the background. Existing posts remain available."
-                  : "剩餘貼文正在背景產生，已完成的貼文仍可使用。"}
-              </span>
-            </div>
-          );
-        }
         // hold-for-images tasks show their own full-card generating state
         // (the mockup is replaced) — skip the redundant slim banner.
         if (p === "caption_ready" &&
@@ -2043,20 +2009,6 @@ export default function RunPage() {
                 })}
               </button>
             ))}
-            {strategyRemainingGenerationState && publicVariants.length > 0 && (
-              <Button
-                size="sm"
-                color="primary"
-                variant="flat"
-                isLoading={generateRemainingStrategyPostsMut.isPending || strategyRemainingGenerationState === "generating"}
-                isDisabled={strategyRemainingGenerationState === "generating"}
-                onPress={() => generateRemainingStrategyPostsMut.mutate({ outputId: id })}
-              >
-                {strategyRemainingGenerationState === "generating"
-                  ? (lang === "en" ? "Generating posts…" : "貼文產生中…")
-                  : (lang === "en" ? "Generate posts" : "產生貼文")}
-              </Button>
-            )}
           </div>
         ) : (
         <div className="mb-3 space-y-2">
@@ -2188,17 +2140,17 @@ export default function RunPage() {
                     </div>
                     <p className="text-small font-semibold text-default-800">
                       {isGeneratingPublicPosts
-                        ? (lang === "en" ? "Generating public posts…" : "對外貼文產生中…")
-                        : (lang === "en" ? "Public posts haven't been generated" : "尚未產生對外貼文")}
+                        ? (lang === "en" ? "Generating the public post…" : "對外貼文產生中…")
+                        : (lang === "en" ? "The public post wasn't generated" : "尚未產生對外貼文")}
                     </p>
                     <p className="text-tiny text-default-500 max-w-sm leading-relaxed">
                       {isGeneratingPublicPosts
                         ? (lang === "en"
-                            ? "Planning is ready. Publish-ready Instagram posts will appear here automatically when background generation finishes."
+                            ? "Planning is ready. The publish-ready Instagram post will appear here automatically when background generation finishes."
                             : "內容規劃已完成。背景產生結束後，可直接發布的 Instagram 貼文會自動顯示在這裡。")
                         : (lang === "en"
-                            ? "This run has no publish-ready posts yet. Generate them here, or re-run the original task if needed."
-                            : "這次產出尚未完成可直接發布的貼文。可在此產生貼文，必要時也能重跑原任務。")}
+                            ? "This run has no publish-ready post. Re-run the original task to try again."
+                            : "這次產出尚未完成可直接發布的貼文，請重跑原任務再試一次。")}
                     </p>
                   </div>
                 );
@@ -2513,23 +2465,12 @@ export default function RunPage() {
                 </p>
                 <p className="text-[11px] text-default-500 leading-relaxed">
                   {lang === "en"
-                    ? "Generate publish-ready posts from the saved strategy analysis."
-                    : "使用已儲存的策略分析產生可直接發布的貼文。"}
+                    ? "Re-run this task to generate the public post again."
+                    : "請重跑此任務，再次產生對外貼文。"}
                 </p>
-                {strategyRemainingGenerationState === "ready" ? (
-                  <Button
-                    color="primary"
-                    fullWidth
-                    isLoading={generateRemainingStrategyPostsMut.isPending}
-                    onPress={() => generateRemainingStrategyPostsMut.mutate({ outputId: id })}
-                  >
-                    {lang === "en" ? "Generate posts" : "產生貼文"}
-                  </Button>
-                ) : strategyRemainingGenerationState !== "generating" && (
-                  <Button color="primary" fullWidth onPress={rerunOriginalTask}>
-                    {lang === "en" ? "Re-run task" : "重跑此任務"}
-                  </Button>
-                )}
+                <Button color="primary" fullWidth onPress={rerunOriginalTask}>
+                  {lang === "en" ? "Re-run task" : "重跑此任務"}
+                </Button>
                 <Button variant="light" fullWidth onPress={() => navigate("/projects")}>
                   {lang === "en" ? "Back to Projects" : "返回專案"}
                 </Button>
