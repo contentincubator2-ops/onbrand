@@ -1,5 +1,19 @@
 export const STRATEGY_STEP_PROVIDER = "anthropic" as const;
 export const STRATEGY_STEP_DEADLINE_MS = 40_000;
+/**
+ * Ceiling on how many planning steps may share a round. Nothing cancels a
+ * timed-out provider call (llm.ts's Anthropic branch passes no signal), so each
+ * concurrent step that overruns leaves a ghost request; llmCircuitBreaker is
+ * process-global and opens Anthropic for every feature after three failures in
+ * a four-sample window. Two keeps that exposure close to sequential.
+ */
+export const MAX_CONCURRENT_PLANNING_STEPS = 2;
+/**
+ * How many rounds may be merged at all. One: the leading pair, whose members
+ * are the steps with the fewest upstream dependencies. Merging deeper into the
+ * list would need dependency metadata the step list does not carry.
+ */
+export const MAX_MERGED_PLANNING_ROUNDS = 1;
 export const STRATEGY_SCOUT_BUDGET_MS = 12_000;
 export const STRATEGY_PERSISTENCE_BUDGET_MS = 4_000;
 /**
@@ -39,6 +53,7 @@ export type StrategyRouteBudget = {
 export function deriveStrategyRouteBudget({
   stepCount,
   serverTimeoutMs,
+  waveCount = stepCount,
   scoutBudgetMs = STRATEGY_SCOUT_BUDGET_MS,
   stepDeadlineMs = STRATEGY_STEP_DEADLINE_MS,
   persistenceBudgetMs = STRATEGY_PERSISTENCE_BUDGET_MS,
@@ -46,6 +61,12 @@ export function deriveStrategyRouteBudget({
 }: {
   stepCount: number;
   serverTimeoutMs: number;
+  /**
+   * How many sequential rounds the planning steps actually take. Defaults to
+   * stepCount — one round per step, which is what a plain loop does. See
+   * planStrategyPlanning for when it is lower.
+   */
+  waveCount?: number;
   scoutBudgetMs?: number;
   stepDeadlineMs?: number;
   persistenceBudgetMs?: number;
@@ -69,7 +90,14 @@ export function deriveStrategyRouteBudget({
     throw new RangeError("strategy finalization reserve exceeds server timeout");
   }
 
-  const planningWorstCaseMs = scoutBudgetMs + (stepCount * stepDeadlineMs);
+  if (!Number.isInteger(waveCount) || waveCount < 0) {
+    throw new RangeError("strategy wave count must be a non-negative integer");
+  }
+  if (waveCount > stepCount) {
+    throw new RangeError("strategy wave count cannot exceed the step count");
+  }
+
+  const planningWorstCaseMs = scoutBudgetMs + (waveCount * stepDeadlineMs);
   const synchronousWorstCaseMs = planningWorstCaseMs + persistenceBudgetMs;
   const routeLimitMs = serverTimeoutMs - finalizationReserveMs;
   return {
@@ -175,4 +203,104 @@ export async function runAnthropicStrategyStep<T>({
       errorCode: /deadline|timeout/i.test(error.message) ? "step_timeout" : "step_provider_failed",
     };
   }
+}
+
+/**
+ * 2026-08-20 — how many rounds the planning steps are allowed to take, and
+ * which steps share a round.
+ *
+ * Running one step per round makes the route's wall clock grow with whatever
+ * step count the DB happens to hold, and the admission guard then refuses the
+ * tail: a five-step squad needs 12s + 5*40s = 212s against a 205s guard, so
+ * its last step never starts, the private-artifact gate fails and the whole
+ * public campaign is lost.
+ *
+ * Running everything after step 1 together fixes the arithmetic but breaks the
+ * work. ig-chrisdo-visual-story genuinely chains — the caption step writes
+ * against the visual-content step, the audit step reviews what came before —
+ * and prevOutputs feeds each step its two predecessors precisely because of
+ * that. So parallelise as little as possible: keep one step per round, and
+ * only when the budget cannot fit them all, merge the *leading* steps, which
+ * are the ones with the fewest upstream dependencies.
+ *
+ *   4 steps, 4 rounds available  -> [[0],[1],[2],[3]]    fully sequential
+ *   5 steps, 4 rounds available  -> [[0,1],[2],[3],[4]]  the leading pair merges
+ *   6 steps, 4 rounds available  -> five rounds, reported as not fitting
+ *
+ * Peak concurrency is therefore two, and only ever for the first two steps.
+ * That matters: nothing cancels a timed-out provider call
+ * (llm.ts's Anthropic branch passes no signal), so every concurrent step that
+ * overruns leaves a ghost request behind, and llmCircuitBreaker is
+ * process-global — three failures inside a four-sample window open Anthropic
+ * for every other feature too.
+ */
+export function planStrategyPlanning({
+  stepCount,
+  serverTimeoutMs,
+  scoutBudgetMs = STRATEGY_SCOUT_BUDGET_MS,
+  stepDeadlineMs = STRATEGY_STEP_DEADLINE_MS,
+  persistenceBudgetMs = STRATEGY_PERSISTENCE_BUDGET_MS,
+  finalizationReserveMs = STRATEGY_FINALIZATION_RESERVE_MS,
+}: {
+  stepCount: number;
+  serverTimeoutMs: number;
+  scoutBudgetMs?: number;
+  stepDeadlineMs?: number;
+  persistenceBudgetMs?: number;
+  finalizationReserveMs?: number;
+}): { waves: number[][]; budget: StrategyRouteBudget } {
+  if (!Number.isFinite(stepDeadlineMs) || stepDeadlineMs <= 0) {
+    throw new RangeError("strategy step deadline must be a positive number to plan rounds");
+  }
+  const shared = { scoutBudgetMs, stepDeadlineMs, persistenceBudgetMs, finalizationReserveMs };
+  // Sequential is the reference point; deriving it also validates every input.
+  const sequential = deriveStrategyRouteBudget({ stepCount, serverTimeoutMs, ...shared });
+  const sequentialWaves = Array.from({ length: stepCount }, (_, i) => [i]);
+
+  const roundsAvailable = Math.floor((sequential.routeLimitMs - scoutBudgetMs) / stepDeadlineMs);
+  // No room for even one step: keep the sequential plan so the per-step
+  // admission guard is what refuses it and says why. Merging here would be
+  // backwards — it would run everything at once on the tightest budget.
+  if (roundsAvailable < 1 || stepCount <= roundsAvailable) {
+    return {
+      waves: sequentialWaves,
+      budget: deriveStrategyRouteBudget({
+        stepCount,
+        serverTimeoutMs,
+        waveCount: sequentialWaves.length,
+        ...shared,
+      }),
+    };
+  }
+
+  // Each merged pair removes exactly one round. Merge from the front and never
+  // beyond MAX_CONCURRENT_PLANNING_STEPS, so a step is at most sharing with one
+  // sibling however many steps the DB grows to.
+  // Only the leading pair is merged. Pairing further in would need to know the
+  // dependency graph, and we do not have one: steps are an ordered list with no
+  // edges. ig-chrisdo-visual-story shows why guessing is unsafe — its visual
+  // content step and its caption step are a real chain (seed-local-squads.ts),
+  // so a positional [2,3] pair would hide the former from the latter. A squad
+  // that needs more merging than this reports fitsRouteBudget=false instead.
+  const roundsToRemove = stepCount - roundsAvailable;
+  const pairCount = Math.min(roundsToRemove, MAX_MERGED_PLANNING_ROUNDS);
+
+  const waves: number[][] = [];
+  for (let pair = 0; pair < pairCount; pair += 1) {
+    waves.push([pair * 2, (pair * 2) + 1]);
+  }
+  for (let i = pairCount * 2; i < stepCount; i += 1) waves.push([i]);
+
+  // If the cap could not remove enough rounds, the plan is returned as it is
+  // and its budget reports fitsRouteBudget=false rather than quietly running
+  // an unbounded number of steps at once.
+  return {
+    waves,
+    budget: deriveStrategyRouteBudget({
+      stepCount,
+      serverTimeoutMs,
+      waveCount: waves.length,
+      ...shared,
+    }),
+  };
 }

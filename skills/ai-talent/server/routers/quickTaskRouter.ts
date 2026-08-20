@@ -1856,22 +1856,52 @@ export const quickTaskRouter = router({
       const variants: any[] = [];
       const errors: string[] = [];
       const stages: any[] = [];
-      const prevOutputs: string[] = [];
+      // Keyed by step index, never appended. A merged round finishes in
+      // completion order, so a push-ordered list would hand a later step the
+      // wrong predecessors: with steps 1 and 2 sharing a round and step 2
+      // landing first, step 4's "last two" became step 1 + step 3 instead of
+      // step 2 + step 3 — exactly the dependency this plan exists to protect.
+      // Selecting by index reproduces the sequential reading whatever order
+      // the round settles in.
+      const stepOutputs: Array<string | undefined> = [];
       const planningArtifacts: any[] = [];
       const privateArtifacts: IgStrategyPrivateArtifact[] = [];
       const privateRunId = strategyPublicPolicy ? randomUUID() : null;
       const strategyStepRouting = strategyPublicPolicy
         ? await import("../_core/strategyPublicStepRouting")
         : null;
-      const strategyRouteBudget = strategyStepRouting
-        ? strategyStepRouting.deriveStrategyRouteBudget({
-            // The DB owns the number of steps. For today's four-step squads:
-            // 12s scout + (4 * 40s step) + ~4s persistence = ~176s.
-            // The admission guard is 220s - 15s finalization reserve = 205s.
+      // The DB owns the number of steps. Four steps stay strictly sequential:
+      // 12s scout + (4 * 40s step) + ~4s persistence = ~176s, inside the 205s
+      // admission guard (220s socket timeout - 15s finalization reserve).
+      // Five steps would need 212s, so the planner merges the two leading
+      // steps into one round and leaves 3 -> 4 -> 5 sequential, because those
+      // later steps really do read their predecessors.
+      const strategyPlanning = strategyStepRouting
+        ? strategyStepRouting.planStrategyPlanning({
             stepCount: stepsRaw.length,
             serverTimeoutMs: strategyStepRouting.STRATEGY_SERVER_TIMEOUT_MS,
           })
         : null;
+      const strategyRouteBudget = strategyPlanning?.budget ?? null;
+      // Refuse a squad the route provably cannot finish, before spending a
+      // single provider call on it. Without this the run burns every round it
+      // can afford and is then refused at the tail by the per-step admission
+      // guard, leaving planning drafts, no public posts and a bill.
+      if (strategyPlanning && !strategyPlanning.budget.fitsRouteBudget) {
+        console.warn("[runSquadAuto] strategy route cannot fit its planning steps", {
+          taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
+          stepCount: stepsRaw.length,
+          waveCount: strategyPlanning.waves.length,
+          planningWorstCaseMs: strategyPlanning.budget.planningWorstCaseMs,
+          routeLimitMs: strategyPlanning.budget.routeLimitMs,
+        });
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: brandMarket.isZhTW
+            ? "這個任務的步驟數超出單次執行的時間預算，請聯絡我們調整。"
+            : "This task has more steps than a single run can fit. Please contact support.",
+        });
+      }
 
       // Resolve all unique step agent IDs in one query
       const agentIds = Array.from(new Set(stepsRaw
@@ -1889,7 +1919,7 @@ export const quickTaskRouter = router({
         }
       }
 
-      for (let i = 0; i < stepsRaw.length; i++) {
+      const runPlanningStep = async (i: number) => {
         const step = stepsRaw[i];
         const stepStartedAt = Date.now();
         const stageStart = Date.now() - startedAt;
@@ -1931,11 +1961,19 @@ export const quickTaskRouter = router({
           : step.outputType ?? step.outputKind ?? "(未指定)";
         const system = `${persona}\n${promptHeader}\n步驟說明：${step.description ?? ""}\n預期產出：${expectedOutput}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合「${internalStageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
 
+        // Steps sharing a round cannot see each other; that is the point of
+        // capping the round size. Everything already finished before this
+        // step's index is visible, nearest two first, as in the sequential run.
+        const upstreamOutputs = stepOutputs
+          .slice(0, i)
+          .filter((value): value is string => typeof value === "string" && value.length > 0)
+          .slice(-2);
+
         const userMsg = [
           `【任務主題】${input.topic || "(未指定)"}`,
           brandPrefix ? `\n${brandPrefix}` : "",
           scoutBlock,
-          prevOutputs.length > 0 ? `\n【上游 step 已產出】\n${prevOutputs.slice(-2).join("\n\n").slice(0, 2000)}` : "",
+          upstreamOutputs.length > 0 ? `\n【上游 step 已產出】\n${upstreamOutputs.join("\n\n").slice(0, 2000)}` : "",
           `\n請執行此步驟。`,
         ].filter(Boolean).join("\n");
 
@@ -2043,7 +2081,7 @@ export const quickTaskRouter = router({
             });
             // Downstream private analysis consumes the full private result,
             // never the sanitized public DTO.
-            prevOutputs.push(`【${internalStageLabel}】${text.slice(0, 8_000)}`);
+            stepOutputs[i] = `【${internalStageLabel}】${text.slice(0, 8_000)}`;
           } else {
             const variant = {
               label: internalStageLabel,
@@ -2052,7 +2090,7 @@ export const quickTaskRouter = router({
               image: { style: null, url: null, status: "skipped" },
               agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
             };
-            prevOutputs.push(`【${variant.label}】${variant.caption.slice(0, 800)}`);
+            stepOutputs[i] = `【${variant.label}】${variant.caption.slice(0, 800)}`;
             variants.push(variant);
           }
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
@@ -2106,6 +2144,33 @@ export const quickTaskRouter = router({
             });
           }
         }
+      };
+
+      // Walk the planned rounds. Today every squad but one is a list of
+      // single-step rounds, i.e. exactly the sequential loop this replaced;
+      // only a squad the budget cannot fit gets a merged leading round.
+      const planningWaves = strategyPlanning?.waves
+        ?? stepsRaw.map((_: any, i: number) => [i]);
+      let ranAnyWaveInParallel = false;
+      for (const wave of planningWaves) {
+        if (wave.length === 1) {
+          await runPlanningStep(wave[0]!);
+        } else {
+          ranAnyWaveInParallel = true;
+          await Promise.all(wave.map((i) => runPlanningStep(i)));
+        }
+      }
+      if (ranAnyWaveInParallel) {
+        // A merged round settles in completion order, so anything the UI or
+        // the ledger reads positionally has to be put back into step order.
+        const stepIndexOf = (value: string) => {
+          const matched = /(\d+)/.exec(value);
+          return matched ? Number(matched[1]) : Number.MAX_SAFE_INTEGER;
+        };
+        privateArtifacts.sort((a, b) => a.stepOrder - b.stepOrder);
+        planningArtifacts.sort((a: any, b: any) => stepIndexOf(String(a.id)) - stepIndexOf(String(b.id)));
+        stages.sort((a: any, b: any) => stepIndexOf(String(a.key)) - stepIndexOf(String(b.key)));
+        errors.sort((a, b) => stepIndexOf(a) - stepIndexOf(b));
       }
 
       // 5. Build the background continuation now, but do not start it until
