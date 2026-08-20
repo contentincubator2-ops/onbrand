@@ -109,11 +109,20 @@ interface RunSynthesisBatchesArgs {
   concurrency: number;
   deadlineAt: number;
   perAttemptTimeoutMs: number;
-  executeBatch: (batchIndex: number, signal: AbortSignal) => Promise<void>;
+  executeBatch: (batchIndex: number, signal: AbortSignal, attempt: number) => Promise<void>;
   now?: () => number;
 }
 
-/** Run each batch at most twice without allowing retries beyond the campaign deadline. */
+export interface SynthesisBatchRunResult {
+  succeededBatchIndexes: number[];
+  failedBatchIndexes: number[];
+}
+
+/**
+ * Run each batch at most twice without allowing retries beyond the campaign
+ * deadline. A failed batch is isolated so other queued/in-flight batches can
+ * still produce usable posts; the all-failed case retains the previous throw.
+ */
 export async function runSynthesisBatchesWithDeadline({
   batchIndexes,
   concurrency,
@@ -121,39 +130,31 @@ export async function runSynthesisBatchesWithDeadline({
   perAttemptTimeoutMs,
   executeBatch,
   now = Date.now,
-}: RunSynthesisBatchesArgs): Promise<void> {
+}: RunSynthesisBatchesArgs): Promise<SynthesisBatchRunResult> {
   let nextIndex = 0;
-  let stopped = false;
-  let hasFatalError = false;
-  let fatalError: unknown;
-  const activeControllers = new Set<AbortController>();
-
-  const abortActive = () => {
-    for (const controller of activeControllers) controller.abort();
-  };
+  const succeededBatchIndexes: number[] = [];
+  const failedBatchIndexes: number[] = [];
+  let firstError: unknown;
 
   const executeWithRetry = async (batchIndex: number) => {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (stopped) throw lastError ?? new Error("public synthesis stopped");
       const remainingMs = deadlineAt - now();
       if (remainingMs <= 0) throw new Error("public synthesis timeout");
 
       const controller = new AbortController();
-      activeControllers.add(controller);
       const timeout = setTimeout(
         () => controller.abort(),
         Math.min(perAttemptTimeoutMs, remainingMs),
       );
       try {
-        await executeBatch(batchIndex, controller.signal);
+        await executeBatch(batchIndex, controller.signal, attempt + 1);
         if (now() > deadlineAt) throw new Error("public synthesis timeout");
         return;
       } catch (error) {
         lastError = error;
       } finally {
         clearTimeout(timeout);
-        activeControllers.delete(controller);
         if (!controller.signal.aborted) controller.abort();
       }
 
@@ -163,18 +164,15 @@ export async function runSynthesisBatchesWithDeadline({
   };
 
   const worker = async () => {
-    while (!stopped && nextIndex < batchIndexes.length) {
+    while (nextIndex < batchIndexes.length) {
       const batchIndex = batchIndexes[nextIndex]!;
       nextIndex += 1;
       try {
         await executeWithRetry(batchIndex);
+        succeededBatchIndexes.push(batchIndex);
       } catch (error) {
-        if (!hasFatalError) {
-          hasFatalError = true;
-          fatalError = error;
-        }
-        stopped = true;
-        abortActive();
+        firstError ??= error;
+        failedBatchIndexes.push(batchIndex);
       }
     }
   };
@@ -183,7 +181,8 @@ export async function runSynthesisBatchesWithDeadline({
     { length: Math.min(Math.max(1, concurrency), batchIndexes.length) },
     () => worker(),
   ));
-  if (hasFatalError) throw fatalError;
+  if (batchIndexes.length > 0 && succeededBatchIndexes.length === 0) throw firstError;
+  return { succeededBatchIndexes, failedBatchIndexes };
 }
 
 export function assertPrivateStrategyArtifactsReady(
