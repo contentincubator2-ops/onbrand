@@ -18,6 +18,7 @@ import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import { isStrategyPreviewEmail } from "../app/shell/ShellLayout";
 import {
   Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
@@ -109,7 +110,7 @@ interface Tile {
 
 export default function BrandsPage() {
   const { t, lang } = useLang();
-  const { brandId, setBrandId, brands, scope: globalScope, setScope } = useOutletContext<ShellOutletCtx>();
+  const { brandId, setBrandId, brands, scope: globalScope, setScope, userEmail } = useOutletContext<ShellOutletCtx>();
 
   // 2026-06-19 Phase 2 (CJ「BrandsPage 改用 URL 帶 id」): the global scope is
   // brand-only now. The specific product / event being edited comes from the
@@ -120,6 +121,16 @@ export default function BrandsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlProductId = Number(searchParams.get("p")) || null;
   const urlEventId = Number(searchParams.get("e")) || null;
+
+  // 2026-08-20: the 策略 rail (ShellLayout) lists this page's seven sections
+  // for strategy-preview accounts, which makes the in-page tile strip below
+  // a duplicate of the same control. Gate on the SAME resolved email the
+  // shell already fetched (via outlet context), not a second independent
+  // `/api/auth/me` call — two separate requests can disagree (one fails
+  // transiently while the other succeeds), leaving the rail and this tile
+  // strip out of sync with no way to recover short of a reload (Codex
+  // review, PR #119).
+  const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   const scope = React.useMemo(
     () => ({
       brandId: globalScope?.brandId ?? brandId ?? null,
@@ -1469,7 +1480,13 @@ export default function BrandsPage() {
               tagline preview lived in the bar redundantly. Kept the import
               available for any debug page that wants to surface it. */}
 
-          {/* Tab tiles — 7 consistent tiles in one scrollable row */}
+          {/* Tab tiles — 7 consistent tiles in one scrollable row.
+              2026-08-20: under the 策略 workspace the left rail already lists
+              these exact seven sections, so rendering them again here is a
+              duplicate control for the same state. Hidden for strategy-preview
+              accounts only — everyone else has no rail, and hiding it for
+              them would leave no way to change section at all. */}
+          {!isStrategyPreview && (
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-2 min-w-max mx-auto px-2">
               {(() => {
@@ -1556,6 +1573,7 @@ export default function BrandsPage() {
               })}
             </div>
           </div>
+          )}
 
           {/* Kicker row — BRAND WORKSPACE pill + action chips (試寫 / 定案) */}
           <KickerRow
