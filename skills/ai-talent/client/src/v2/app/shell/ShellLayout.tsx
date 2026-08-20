@@ -97,7 +97,11 @@ interface NavItem {
 // gates the market-intel / performance preview rails, which haven't been
 // vetted for accounts outside the sowork.tw team.
 const STRATEGY_PREVIEW_EMAILS = ["sowork@sowork.tw", "vmdirisfamily@gmail.com"];
-function isStrategyPreviewEmail(email?: string | null): boolean {
+// Exported so BrandsPage.tsx's in-page tile strip (hidden once the left rail
+// already lists the same 7 sections) can gate on the exact same check —
+// two independently-maintained copies of this list is how a user ends up
+// with either two switchers or none.
+export function isStrategyPreviewEmail(email?: string | null): boolean {
   return STRATEGY_PREVIEW_EMAILS.includes(String(email ?? "").toLowerCase());
 }
 
@@ -663,13 +667,13 @@ function IconBar({
           : "content";
   // market/performance stay gated to the sowork.tw preview group (unchanged
   // from before); 策略 additionally opens to isStrategyPreview accounts;
-  // 內容 is always available. A 2-column mini-grid reads fine at 2 items
+  // 內容 is always available. Dropdown reads fine at 2 items
   // (isStrategyPreview-only accounts) or 4 (sowork.tw).
   const modeOptions = [
-    ...(isPrivatePreview ? [{ id: "market" as const, label: "市", to: "/market-intel/overview", tip: isEn ? "Market intelligence workspace" : "市場情報工作區" }] : []),
-    ...(isStrategyPreview ? [{ id: "strategy" as const, label: "策", to: "/brands", tip: isEn ? "Strategy workspace — brand brain" : "策略工作區 — 品牌大腦" }] : []),
-    { id: "content" as const, label: "文", to: "/tasks/fb", tip: isEn ? "Content workspace" : "內容工作區" },
-    ...(isPrivatePreview ? [{ id: "performance" as const, label: "成", to: "/performance/overview", tip: isEn ? "Performance workspace" : "成效數據工作區" }] : []),
+    ...(isPrivatePreview ? [{ id: "market" as const, label: isEn ? "Market" : "市場", icon: faMagnifyingGlass, to: "/market-intel/overview", tip: isEn ? "Market intelligence" : "市場情報" }] : []),
+    ...(isStrategyPreview ? [{ id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands", tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" }] : []),
+    { id: "content" as const, label: isEn ? "Content" : "內容", icon: faWandMagicSparkles, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
+    ...(isPrivatePreview ? [{ id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview", tip: isEn ? "Performance" : "成效數據" }] : []),
   ];
   const showModeSwitcher = isPrivatePreview || isStrategyPreview;
   const [avatarOpen, setAvatarOpen] = React.useState(false);
@@ -684,6 +688,29 @@ function IconBar({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [avatarOpen]);
+
+  // 2026-08-20: workspace switcher as a dropdown, matching the dev-branch
+  // design — a static small capsule doesn't communicate that 策略 exists as
+  // a 4th (or 2nd) mode. A dropdown hides the other options, so the trigger
+  // carries a periodic nudge — without it the control reads as a static
+  // label and users never learn it's switchable.
+  const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
+  const modeRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!modeMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (modeRef.current && !modeRef.current.contains(e.target as Node))
+        setModeMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setModeMenuOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [modeMenuOpen]);
 
   return (
     <aside
@@ -738,41 +765,106 @@ function IconBar({
       </div>
 
       {showModeSwitcher && (
-        <div style={{ flexShrink: 0, display: "flex", justifyContent: "center", padding: "0 0 10px" }}>
-          <div
-            role="tablist"
-            aria-label={isEn ? "Workspace mode" : "工作區模式"}
-            style={{
-              // 2026-08-20: width scales with option count (58px @3 → wider
-              // at 4, narrower at 2) so each cell keeps roughly the same
-              // ~19px it had before 策略 was added.
-              width: modeOptions.length * 19 + 4, height: 24, borderRadius: 12,
-              border: "1.5px solid #e5e7eb", background: "#f9fafb",
-              display: "grid", gridTemplateColumns: `repeat(${modeOptions.length}, 1fr)`,
-              padding: 2, gap: 1,
-            }}
-          >
-            {modeOptions.map((opt) => {
-              const active = activeWorkspaceMode === opt.id;
-              return (
-                <Tooltip key={opt.id} content={opt.tip} placement="right">
+        <div
+          ref={modeRef}
+          style={{
+            flexShrink: 0, position: "relative",
+            padding: "0 3px 10px",
+            borderBottom: "1px solid #f1f5f9",
+            marginBottom: 8,
+          }}
+        >
+          {/* The nudge: a slow 4s chevron bob + a one-off ring on the trigger.
+              Deliberately low-frequency — a constant animation next to the
+              nav would be noise. Honours prefers-reduced-motion. */}
+          <style>{`
+            @keyframes swNudge {
+              0%, 82%, 100% { transform: translateY(0); }
+              88%           { transform: translateY(2.5px); }
+              94%           { transform: translateY(0); }
+            }
+            @keyframes swRing {
+              0%, 82%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); }
+              88%           { box-shadow: 0 0 0 4px rgba(249,115,22,0.18); }
+            }
+            .sw-trigger { animation: swRing 4s ease-in-out infinite; }
+            .sw-chevron { animation: swNudge 4s ease-in-out infinite; }
+            @media (prefers-reduced-motion: reduce) {
+              .sw-trigger, .sw-chevron { animation: none; }
+            }
+          `}</style>
+          {(() => {
+            const cur = modeOptions.find((m) => m.id === activeWorkspaceMode) ?? modeOptions[0]!;
+            return (
+              <button
+                className={modeMenuOpen ? undefined : "sw-trigger"}
+                aria-haspopup="menu"
+                aria-expanded={modeMenuOpen}
+                aria-label={isEn ? "Switch workspace" : "切換工作區"}
+                onClick={() => setModeMenuOpen((v) => !v)}
+                style={{
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", gap: 1,
+                  width: "100%", height: 50,
+                  border: "none", borderRadius: 12,
+                  background: "#F97316", color: "#fff",
+                  cursor: "pointer", transition: "filter 0.15s ease",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(1.07)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.filter = "none"; }}
+              >
+                <FontAwesomeIcon icon={cur.icon} style={{ fontSize: 15 }} />
+                <span style={{ display: "flex", alignItems: "center", gap: 3, lineHeight: 1 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.02em" }}>{cur.label}</span>
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    className={modeMenuOpen ? undefined : "sw-chevron"}
+                    style={{ fontSize: 7 }}
+                  />
+                </span>
+              </button>
+            );
+          })()}
+
+          {modeMenuOpen && (
+            <div
+              role="menu"
+              style={{
+                // Opens to the RIGHT of the rail — a 70px-wide menu couldn't
+                // show full labels, which is the whole point of the dropdown.
+                position: "absolute", left: "100%", top: 0, marginLeft: 8,
+                width: 172, background: "#fff", borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                boxShadow: "0 12px 32px rgba(0,0,0,0.14), 0 4px 8px rgba(0,0,0,0.04)",
+                padding: 6, zIndex: 60,
+              }}
+            >
+              {modeOptions.map((opt) => {
+                const active = activeWorkspaceMode === opt.id;
+                return (
                   <button
-                    onClick={() => onNavigate(opt.to)}
-                    aria-label={opt.tip}
+                    key={opt.id}
+                    role="menuitem"
+                    onClick={() => { setModeMenuOpen(false); onNavigate(opt.to); }}
                     style={{
-                      border: "none", borderRadius: 9, padding: 0,
-                      background: active ? "#F97316" : "transparent",
-                      color: active ? "#fff" : "#9ca3af",
-                      fontSize: 9, fontWeight: 850, lineHeight: "18px",
-                      cursor: "pointer", transition: "all 0.15s ease",
+                      display: "flex", alignItems: "center", gap: 10,
+                      width: "100%", padding: "9px 10px",
+                      border: "none", borderRadius: 8, textAlign: "left",
+                      background: active ? "#FFF7ED" : "transparent",
+                      color: active ? "#C2410C" : "#374151",
+                      cursor: "pointer", transition: "background 0.12s ease",
                     }}
+                    onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
+                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
                   >
-                    {opt.label}
+                    <FontAwesomeIcon icon={opt.icon} style={{ fontSize: 14, width: 16 }} />
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: active ? 800 : 600 }}>{opt.label}</span>
+                    {active && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 11 }} />}
                   </button>
-                </Tooltip>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
