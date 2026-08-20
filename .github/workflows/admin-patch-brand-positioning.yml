@@ -1,0 +1,152 @@
+name: "Admin — Patch brand positioning fields (audience / competition / advantages / tagline / lock)"
+
+# 2026-08-20 (CJ「IRIS 已有自己的品牌定位，直接填好在前台呈現，不需要再有
+# 推導過程」): competition.direct is intentionally capped to 2-3 entries by
+# the shared positioningSteps.ts prompt (kept that way — see PR discussion).
+# This workflow patches ONE brand's positioning JSON directly via JSON_SET,
+# touching only the paths supplied — it does not run the AI pipeline and
+# does not affect any other brand. It can also lock the 定位 (positioning)
+# tab so the editor shows it as finalized instead of "尚未鎖定" — same
+# effect as clicking 鎖定定位 in the UI (theaterRouter.ts lockTab), just
+# scripted: tabLocks is a column separate from positioning, so it needs its
+# own UPDATE.
+#
+# payload_b64 is base64 JSON shaped as:
+#   {
+#     "audiencePrimary"?: string,
+#     "competitionDirect"?: [{ name, position, tone, weakness, ourEdge }],
+#     "differentiationCustom"?: [{ label, statement }],
+#     "valuesItems"?: [{ label, body }],
+#     "tagline"?: { zhTagline, enTagline, type, scenes, competitorDiff, story },
+#     "lockPositioning"?: boolean
+#   }
+# Each key is optional — omit a key to leave that part alone.
+# Mirrors the exact schema StrategyWorkbench.tsx / BrandsPage.tsx already read:
+#   competitorChips  <- positioning.competition.direct
+#   advantageChips   <- positioning.differentiation.{functional,emotional,summary,custom}
+#   audienceChips    <- positioning.audience.{primary,secondary}
+#   values           <- positioning.values.items
+#   tagline          <- positioning.tagline.{zhTagline,enTagline,...}
+#   locked banner    <- brands.tabLocks.positioning (not null)
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand id to patch"
+        required: true
+        type: string
+      payload_b64:
+        description: "Base64-encoded JSON payload (see workflow comment for shape)"
+        required: true
+        type: string
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Patch positioning JSON
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+          PAYLOAD_B64: ${{ inputs.payload_b64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: BRAND_ID,PAYLOAD_B64
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            node --import tsx -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const raw = Buffer.from(process.env.PAYLOAD_B64, 'base64').toString('utf8');
+                const payload = JSON.parse(raw);
+                const brandId = Number(process.env.BRAND_ID);
+                if (!brandId) { console.error('bad brand_id'); process.exit(1); }
+
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+
+                const [before] = await conn.execute(
+                  'SELECT id, name, userId, tabLocks, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS directCount FROM brands WHERE id = ?',
+                  ['\$.competition.direct', brandId],
+                );
+                const brandRow = before[0];
+                if (!brandRow) { console.error('NO SUCH BRAND:', brandId); process.exit(1); }
+                console.log('BEFORE', JSON.stringify(brandRow));
+
+                // path -> value; isJson marks values that must be
+                // CAST(? AS JSON) (arrays/objects) vs plain scalar strings.
+                const sets = [];
+                const args = [];
+                const isJson = [];
+                function addSet(path, value, json) {
+                  sets.push(path); args.push(value); isJson.push(!!json);
+                }
+                if (payload.audiencePrimary != null) {
+                  addSet('\$.audience.primary', payload.audiencePrimary, false);
+                }
+                if (Array.isArray(payload.competitionDirect)) {
+                  addSet('\$.competition.direct', JSON.stringify(payload.competitionDirect), true);
+                }
+                if (Array.isArray(payload.differentiationCustom)) {
+                  addSet('\$.differentiation.custom', JSON.stringify(payload.differentiationCustom), true);
+                }
+                if (Array.isArray(payload.valuesItems)) {
+                  addSet('\$.values.items', JSON.stringify(payload.valuesItems), true);
+                }
+                if (payload.tagline && typeof payload.tagline === 'object') {
+                  addSet('\$.tagline', JSON.stringify(payload.tagline), true);
+                }
+
+                if (sets.length > 0) {
+                  // Interleave path/value pairs for JSON_SET. Plain string
+                  // concat (no template literals) — backticks inside this
+                  // bash-double-quoted -e script would trigger shell command
+                  // substitution.
+                  const clauses = sets.map(function (path, i) {
+                    return isJson[i] ? '?, CAST(? AS JSON)' : '?, ?';
+                  });
+                  const flatArgs = [];
+                  sets.forEach((path, i) => { flatArgs.push(path, args[i]); });
+
+                  await conn.execute(
+                    'UPDATE brands SET positioning = JSON_SET(positioning, ' + clauses.join(', ') + '), updatedAt = NOW(3) WHERE id = ?',
+                    flatArgs.concat([brandId]),
+                  );
+                  console.log('APPLIED positioning paths:', sets.join(', '));
+                } else {
+                  console.log('No positioning paths in payload — skipped positioning JSON_SET');
+                }
+
+                if (payload.lockPositioning === true) {
+                  // tabLocks is a SEPARATE column from positioning (same
+                  // shape theaterRouter.ts lockTab writes: {tab: {at, by}}).
+                  let locks = brandRow.tabLocks;
+                  if (typeof locks === 'string') { try { locks = JSON.parse(locks); } catch { locks = {}; } }
+                  locks = locks || {};
+                  locks.positioning = { at: new Date().toISOString(), by: brandRow.userId };
+                  await conn.execute(
+                    'UPDATE brands SET tabLocks = CAST(? AS JSON) WHERE id = ?',
+                    [JSON.stringify(locks), brandId],
+                  );
+                  console.log('LOCKED positioning tab, by userId', brandRow.userId);
+                }
+
+                const [after] = await conn.execute(
+                  'SELECT id, name, tabLocks, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS directCount, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS customCount, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS valuesCount, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, ?)), 200) AS audiencePreview, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, ?)), 120) AS taglinePreview FROM brands WHERE id = ?',
+                  ['\$.competition.direct', '\$.differentiation.custom', '\$.values.items', '\$.audience.primary', '\$.tagline.zhTagline', brandId],
+                );
+                console.log('AFTER', JSON.stringify(after[0]));
+                await conn.end();
+              })().catch(e => { console.error('FAILED:', e && e.message || e); process.exit(1); });
+            "
