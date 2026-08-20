@@ -68,7 +68,7 @@ jobs:
           Q() { mysql -h localhost -u mos_user mos_db -t -e "$1"; }
 
           echo "===== user 1237889 latest mission_outputs ====="
-          Q "SELECT mo.id, mo.taskId, mo.progress, mo.createdAt, mo.updatedAt
+          Q "SELECT mo.id, mo.title, mo.progress, mo.createdAt, mo.updatedAt
                FROM mission_outputs mo
                JOIN missions m ON m.id = mo.missionId
               WHERE m.userId = 1237889
