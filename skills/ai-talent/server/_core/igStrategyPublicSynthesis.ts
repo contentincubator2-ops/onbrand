@@ -40,6 +40,68 @@ export interface IgStrategyPublicVariant {
   image: { style: string | null; url: null; status: "skipped" };
 }
 
+export const INITIAL_IG_STRATEGY_PUBLIC_SLOT_COUNT = 3;
+
+/**
+ * Keep the complete server-owned contract while deciding which slots a
+ * continuation still has to synthesize. Existing public variants are never
+ * represented by blank placeholders.
+ */
+export function splitIgStrategyPublicSlots(
+  slots: readonly IgStrategyPublicSlot[],
+  existingSlotIds: readonly string[] = [],
+  initialCount = INITIAL_IG_STRATEGY_PUBLIC_SLOT_COUNT,
+): { initial: IgStrategyPublicSlot[]; remaining: IgStrategyPublicSlot[] } {
+  const existing = new Set(existingSlotIds);
+  const ungenerated = slots.filter((slot) => !existing.has(slot.slotId));
+  return existing.size === 0
+    ? {
+        initial: ungenerated.slice(0, Math.max(0, initialCount)),
+        remaining: ungenerated.slice(Math.max(0, initialCount)),
+      }
+    : { initial: [], remaining: ungenerated };
+}
+
+export type RemainingStrategyPostPermission =
+  | { allowed: true }
+  | { allowed: false; reason: "not_owner" | "not_strategy" | "busy" | "complete" | "artifacts_incomplete" };
+
+/** Pure authorization/state decision used before the atomic DB claim. */
+export function getRemainingStrategyPostPermission(args: {
+  isOwner: boolean;
+  isStrategyOutput: boolean;
+  progress: string;
+  remainingSlotCount: number;
+  artifactsReady: boolean;
+}): RemainingStrategyPostPermission {
+  if (!args.isOwner) return { allowed: false, reason: "not_owner" };
+  if (!args.isStrategyOutput) return { allowed: false, reason: "not_strategy" };
+  if (args.progress === "caption_ready") return { allowed: false, reason: "busy" };
+  if (args.remainingSlotCount <= 0) return { allowed: false, reason: "complete" };
+  if (!args.artifactsReady) return { allowed: false, reason: "artifacts_incomplete" };
+  return { allowed: true };
+}
+
+/** Restore the immutable slot order while rejecting duplicates/unknown ids. */
+export function mergeIgStrategyPublicVariants(
+  slots: readonly IgStrategyPublicSlot[],
+  existing: readonly IgStrategyPublicVariant[],
+  generated: readonly IgStrategyPublicVariant[],
+): IgStrategyPublicVariant[] {
+  const byId = new Map<string, IgStrategyPublicVariant>();
+  const validIds = new Set(slots.map((slot) => slot.slotId));
+  for (const variant of [...existing, ...generated]) {
+    if (!validIds.has(variant.id) || byId.has(variant.id)) {
+      throw new Error("strategy public variants contain duplicate or unknown slots");
+    }
+    byId.set(variant.id, variant);
+  }
+  return slots.flatMap((slot) => {
+    const variant = byId.get(slot.slotId);
+    return variant ? [variant] : [];
+  });
+}
+
 interface RunSynthesisBatchesArgs {
   batchIndexes: readonly number[];
   concurrency: number;

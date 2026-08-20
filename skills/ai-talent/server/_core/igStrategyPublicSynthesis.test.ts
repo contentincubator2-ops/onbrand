@@ -4,8 +4,11 @@ import {
   assertRedactedStrategyContextReady,
   buildIgStrategyPublicSlots,
   buildIgStrategySynthesisMessages,
+  getRemainingStrategyPostPermission,
+  mergeIgStrategyPublicVariants,
   parseIgStrategyPublicVariants,
   runSynthesisBatchesWithDeadline,
+  splitIgStrategyPublicSlots,
   type IgStrategyPublicSlot,
 } from "./igStrategyPublicSynthesis";
 import {
@@ -26,6 +29,57 @@ const PRIVATE_STEPS: StrategyStepDescriptor[] = [
   { name: "Live 直播策略規劃", outputType: "live_strategy_plan" },
   { name: "直播後內容再製", outputKind: "post_live_content_set" },
 ];
+
+describe("IG strategy phased generation", () => {
+  it("selects only the first three slots initially and all ungenerated slots later", () => {
+    const slots = buildIgStrategyPublicSlots("ig-99-youtility", "省時技巧")!;
+    const first = splitIgStrategyPublicSlots(slots);
+    expect(first.initial.map((slot) => slot.slotId)).toEqual([
+      "useful-feed-1", "useful-feed-2", "useful-feed-3",
+    ]);
+    expect(first.remaining).toHaveLength(27);
+
+    const continuation = splitIgStrategyPublicSlots(slots, first.initial.map((slot) => slot.slotId));
+    expect(continuation.initial).toEqual([]);
+    expect(continuation.remaining.map((slot) => slot.slotId)).toEqual(
+      slots.slice(3).map((slot) => slot.slotId),
+    );
+  });
+
+  it("decides remaining-post permission without weakening ownership or artifact gates", () => {
+    const base = {
+      isOwner: true,
+      isStrategyOutput: true,
+      progress: "done",
+      remainingSlotCount: 27,
+      artifactsReady: true,
+    };
+    expect(getRemainingStrategyPostPermission(base)).toEqual({ allowed: true });
+    expect(getRemainingStrategyPostPermission({ ...base, isOwner: false }))
+      .toEqual({ allowed: false, reason: "not_owner" });
+    expect(getRemainingStrategyPostPermission({ ...base, progress: "caption_ready" }))
+      .toEqual({ allowed: false, reason: "busy" });
+    expect(getRemainingStrategyPostPermission({ ...base, artifactsReady: false }))
+      .toEqual({ allowed: false, reason: "artifacts_incomplete" });
+  });
+
+  it("merges generated posts into immutable slot order without blanks", () => {
+    const slots = buildIgStrategyPublicSlots("ig-99-youtility", "省時技巧")!.slice(0, 4);
+    const variant = (id: string) => ({
+      id,
+      label: id,
+      format: "feed" as const,
+      caption: id,
+      hashtags: [],
+      image: { style: null, url: null as null, status: "skipped" as const },
+    });
+    expect(mergeIgStrategyPublicVariants(
+      slots,
+      [variant(slots[0]!.slotId), variant(slots[1]!.slotId)],
+      [variant(slots[3]!.slotId), variant(slots[2]!.slotId)],
+    ).map((item) => item.id)).toEqual(slots.map((slot) => slot.slotId));
+  });
+});
 
 describe("IG public synthesis batch scheduling", () => {
   it("retries one failed batch once and succeeds", async () => {
