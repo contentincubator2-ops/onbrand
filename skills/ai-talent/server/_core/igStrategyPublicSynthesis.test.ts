@@ -141,17 +141,57 @@ function modelJson(slots: readonly IgStrategyPublicSlot[], caption: (slot: IgStr
 }
 
 describe("IG public deliverable slot contract", () => {
-  it("starts public synthesis only after every private strategy step is complete", () => {
+  const artifact = (stepOrder: number, overrides: Partial<{
+    status: "done" | "failed";
+    rawContent: string;
+  }> = {}) => ({
+    stepOrder,
+    status: overrides.status ?? "done" as const,
+    internalLabel: `Step ${stepOrder}`,
+    outputType: null,
+    outputKind: null,
+    agentId: null,
+    agentName: null,
+    rawContent: overrides.rawContent ?? `analysis ${stepOrder}`,
+    errorCode: null,
+    latencyMs: 1,
+  });
+
+  it("synthesizes from only the four usable artifacts when one of five steps fails", () => {
+    const artifacts = [
+      artifact(1, { status: "failed", rawContent: "" }),
+      artifact(2),
+      artifact(3),
+      artifact(4),
+      artifact(5),
+    ];
+
+    const usableArtifacts = assertPrivateStrategyArtifactsReady(artifacts, 5);
+    const strategyContext = usableArtifacts.map((item) => item.rawContent);
+    expect(strategyContext).toEqual([
+      "analysis 2", "analysis 3", "analysis 4", "analysis 5",
+    ]);
+    expect(() => assertRedactedStrategyContextReady(strategyContext, 4)).not.toThrow();
+  });
+
+  it("rejects synthesis when fewer than ceil(n / 2) artifacts are usable", () => {
+    const artifacts = [
+      artifact(1, { status: "failed", rawContent: "" }),
+      artifact(2, { status: "failed", rawContent: "" }),
+      artifact(3, { status: "failed", rawContent: "" }),
+      artifact(4),
+      artifact(5),
+    ];
+    expect(() => assertPrivateStrategyArtifactsReady(artifacts, 5)).toThrow("incomplete");
+  });
+
+  it("rejects synthesis while an artifact row is missing", () => {
     const ready = [
-      { stepOrder: 1, status: "done" as const, internalLabel: "A", outputType: null, outputKind: null, agentId: null, agentName: null, rawContent: "analysis A", errorCode: null, latencyMs: 1 },
-      { stepOrder: 2, status: "done" as const, internalLabel: "B", outputType: null, outputKind: null, agentId: null, agentName: null, rawContent: "analysis B", errorCode: null, latencyMs: 1 },
+      artifact(1),
+      artifact(2),
     ];
     expect(() => assertPrivateStrategyArtifactsReady(ready, 2)).not.toThrow();
     expect(() => assertPrivateStrategyArtifactsReady(ready.slice(0, 1), 2)).toThrow("incomplete");
-    expect(() => assertPrivateStrategyArtifactsReady([
-      ready[0]!,
-      { ...ready[1]!, status: "failed", rawContent: "" },
-    ], 2)).toThrow("incomplete");
     expect(() => assertRedactedStrategyContextReady(["safe A", "safe B"], 2)).not.toThrow();
     expect(() => assertRedactedStrategyContextReady(["safe A", ""], 2)).toThrow("incomplete");
   });

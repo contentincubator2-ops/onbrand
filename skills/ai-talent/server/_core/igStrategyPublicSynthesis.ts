@@ -187,13 +187,33 @@ export async function runSynthesisBatchesWithDeadline({
 export function assertPrivateStrategyArtifactsReady(
   artifacts: readonly IgStrategyPrivateArtifact[],
   expectedCount: number,
-): void {
-  if (
-    artifacts.length !== expectedCount ||
-    artifacts.some((artifact) => artifact.status !== "done" || !artifact.rawContent.trim())
-  ) {
+): IgStrategyPrivateArtifact[] {
+  const usableArtifacts = getUsablePrivateStrategyArtifacts(artifacts);
+  if (!hasSufficientPrivateStrategyArtifacts(artifacts, expectedCount)) {
     throw new Error("private strategy analysis is incomplete");
   }
+  return usableArtifacts;
+}
+
+export function getUsablePrivateStrategyArtifacts(
+  artifacts: readonly IgStrategyPrivateArtifact[],
+): IgStrategyPrivateArtifact[] {
+  return artifacts.filter(
+    (artifact) => artifact.status === "done" && !!artifact.rawContent.trim(),
+  );
+}
+
+export function hasSufficientPrivateStrategyArtifacts(
+  artifacts: readonly IgStrategyPrivateArtifact[],
+  expectedCount: number,
+): boolean {
+  // Every step must have produced a row so synthesis cannot race an unfinished
+  // workflow. Once complete, a quorum-style floor (ceil(n / 2), and
+  // never zero) preserves enough strategy signal while tolerating isolated
+  // model timeouts instead of discarding all otherwise usable conclusions.
+  const minimumUsableCount = Math.max(1, Math.ceil(expectedCount / 2));
+  return artifacts.length === expectedCount
+    && getUsablePrivateStrategyArtifacts(artifacts).length >= minimumUsableCount;
 }
 
 export function assertRedactedStrategyContextReady(
