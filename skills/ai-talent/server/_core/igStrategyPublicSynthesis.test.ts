@@ -115,6 +115,46 @@ describe("IG public synthesis batch scheduling", () => {
     })).rejects.toThrow("public synthesis timeout");
     expect(calls).toBe(1);
   });
+
+  it("keeps successful batches when another batch exhausts its retries", async () => {
+    const calls = new Map<number, number>();
+    const generatedVariants: string[][] = [];
+    const result = await runSynthesisBatchesWithDeadline({
+      batchIndexes: [0, 1, 2],
+      concurrency: 2,
+      deadlineAt: 1_000,
+      perAttemptTimeoutMs: 100,
+      now: () => 0,
+      executeBatch: async (batchIndex) => {
+        calls.set(batchIndex, (calls.get(batchIndex) ?? 0) + 1);
+        if (batchIndex === 1) throw new Error("invalid JSON");
+        generatedVariants[batchIndex] = [`post-from-batch-${batchIndex}`];
+      },
+    });
+
+    expect(result.succeededBatchIndexes.sort()).toEqual([0, 2]);
+    expect(result.failedBatchIndexes).toEqual([1]);
+    expect(calls.get(1)).toBe(2);
+    expect(generatedVariants.flat()).toEqual(["post-from-batch-0", "post-from-batch-2"]);
+  });
+
+  it("passes the retry attempt to a truncated fake batch", async () => {
+    const attempts: number[] = [];
+    await runSynthesisBatchesWithDeadline({
+      batchIndexes: [0],
+      concurrency: 1,
+      deadlineAt: 1_000,
+      perAttemptTimeoutMs: 100,
+      now: () => 0,
+      executeBatch: async (_batchIndex, _signal, attempt) => {
+        attempts.push(attempt);
+        if (attempt === 1) {
+          throw new Error("strategy public synthesis was truncated");
+        }
+      },
+    });
+    expect(attempts).toEqual([1, 2]);
+  });
 });
 
 function formatCounts(slots: readonly IgStrategyPublicSlot[]) {

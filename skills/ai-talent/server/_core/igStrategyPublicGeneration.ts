@@ -26,6 +26,45 @@ interface StrategyAgentDescriptor {
   methodology?: unknown;
 }
 
+// Five slots can contain roughly 2,500 zh-TW caption characters plus up to 60
+// hashtags, image directions, and JSON framing. 8,192 doubles the old default
+// cap and leaves headroom for the upper end of the 1–2 tokens/character range.
+export const IG_STRATEGY_SYNTHESIS_MAX_TOKENS = 8_192;
+export const IG_STRATEGY_SYNTHESIS_BATCH_TIMEOUT_MS = 26_000;
+export const IG_STRATEGY_SYNTHESIS_MAX_ATTEMPTS = 2;
+export const IG_STRATEGY_SYNTHESIS_CONCURRENCY = 3;
+export const IG_STRATEGY_SYNTHESIS_DEADLINE_HEADROOM_MS = 3_000;
+export const IG_STRATEGY_SYNTHESIS_MIN_DEADLINE_MS = 55_000;
+
+export function isIgStrategyPublicSynthesisTruncated(
+  finishReason: string | null | undefined,
+): boolean {
+  const normalized = finishReason?.trim().toLowerCase();
+  return normalized === "max_tokens" || normalized === "length";
+}
+
+/** Worst-case finite budget: optional serial probe plus two attempts per wave. */
+export function getIgStrategyPublicSynthesisDeadlineMs(args: {
+  batchCount: number;
+  serialProbe: boolean;
+  concurrency?: number;
+  perAttemptTimeoutMs?: number;
+  maxAttempts?: number;
+}): number {
+  const concurrency = Math.max(1, args.concurrency ?? IG_STRATEGY_SYNTHESIS_CONCURRENCY);
+  const perAttemptTimeoutMs = args.perAttemptTimeoutMs
+    ?? IG_STRATEGY_SYNTHESIS_BATCH_TIMEOUT_MS;
+  const maxAttempts = Math.max(1, args.maxAttempts ?? IG_STRATEGY_SYNTHESIS_MAX_ATTEMPTS);
+  const probeBatchCount = args.serialProbe && args.batchCount > 0 ? 1 : 0;
+  const parallelBatchCount = Math.max(0, args.batchCount - probeBatchCount);
+  const waves = probeBatchCount + Math.ceil(parallelBatchCount / concurrency);
+  return Math.max(
+    IG_STRATEGY_SYNTHESIS_MIN_DEADLINE_MS,
+    waves * perAttemptTimeoutMs * maxAttempts
+      + IG_STRATEGY_SYNTHESIS_DEADLINE_HEADROOM_MS,
+  );
+}
+
 export interface SynthesizeIgStrategyPublicSlotsArgs {
   idOrSlug: string;
   topic: string;
@@ -135,66 +174,97 @@ export async function synthesizeIgStrategyPublicSlots(
     throw new Error("Anthropic brand rules failed private-term validation");
   }
 
-  const synthesisBatchTimeoutMs = 26_000;
   const slotBatches = Array.from(
     { length: Math.ceil(args.slots.length / 5) },
     (_, batchIndex) => args.slots.slice(batchIndex * 5, (batchIndex + 1) * 5),
   );
-  // Three workers complete fixed-30 campaigns in two waves (the original
-  // 55s bound). Input-derived live bundles can be larger, so give each
-  // additional wave its real attempt budget instead of making completion
-  // mathematically impossible.
-  const synthesisDeadlineAt = Date.now() + Math.max(
-    55_000,
-    Math.ceil(slotBatches.length / 3) * synthesisBatchTimeoutMs + 3_000,
-  );
+  const anthropicCircuit = llmCircuitSnapshot().find((entry) => entry.provider === "anthropic");
+  const needsSerialProbe = !!anthropicCircuit && anthropicCircuit.state !== "CLOSED";
+  const synthesisDeadlineAt = Date.now() + getIgStrategyPublicSynthesisDeadlineMs({
+    batchCount: slotBatches.length,
+    serialProbe: needsSerialProbe,
+  });
   const publicBatches: IgStrategyPublicVariant[][] = new Array(slotBatches.length);
-  const executeBatch = async (batchIndex: number, signal: AbortSignal) => {
+  const truncatedBatchIndexes = new Set<number>();
+  const executeBatch = async (batchIndex: number, signal: AbortSignal, attempt: number) => {
     const slotBatch = slotBatches[batchIndex]!;
-    const messages = buildIgStrategySynthesisMessages({
-      idOrSlug: args.idOrSlug,
-      topic: safeTopic,
-      brandContext: safeBrandContext,
-      outputLanguage: args.outputLanguage,
-      slots: slotBatch,
-      strategyContext,
-      strategyAnalysisComplete: strategyContext.length === args.steps.length,
-      brandRules: anthropicBrandRules,
-    });
-    const result = await callModelStrict(messages, "anthropic", undefined, { signal });
-    publicBatches[batchIndex] = parseIgStrategyPublicVariants({
-      idOrSlug: args.idOrSlug,
-      modelText: result.content ?? "",
-      outputLanguage: args.outputLanguage,
-      slots: slotBatch,
-      steps: args.steps,
-      privateTerms,
-      brandRules,
-    });
+    // A token-limited first response is retried as two smaller requests. This
+    // preserves the fixed slot contract while avoiding an identical request
+    // that would predictably hit the same output cap again.
+    const requestBatches = attempt > 1
+      && truncatedBatchIndexes.has(batchIndex)
+      && slotBatch.length > 1
+      ? [
+          slotBatch.slice(0, Math.ceil(slotBatch.length / 2)),
+          slotBatch.slice(Math.ceil(slotBatch.length / 2)),
+        ]
+      : [slotBatch];
+    const parsedBatches = await Promise.all(requestBatches.map(async (requestSlots) => {
+      const messages = buildIgStrategySynthesisMessages({
+        idOrSlug: args.idOrSlug,
+        topic: safeTopic,
+        brandContext: safeBrandContext,
+        outputLanguage: args.outputLanguage,
+        slots: requestSlots,
+        strategyContext,
+        strategyAnalysisComplete: strategyContext.length === args.steps.length,
+        brandRules: anthropicBrandRules,
+      });
+      const result = await callModelStrict(messages, "anthropic", undefined, {
+        signal,
+        maxTokens: IG_STRATEGY_SYNTHESIS_MAX_TOKENS,
+        includeFinishReason: true,
+      });
+      if (isIgStrategyPublicSynthesisTruncated(result.finishReason)) {
+        truncatedBatchIndexes.add(batchIndex);
+        throw new Error("strategy public synthesis was truncated");
+      }
+      return parseIgStrategyPublicVariants({
+        idOrSlug: args.idOrSlug,
+        modelText: result.content ?? "",
+        outputLanguage: args.outputLanguage,
+        slots: requestSlots,
+        steps: args.steps,
+        privateTerms,
+        brandRules,
+      });
+    }));
+    publicBatches[batchIndex] = parsedBatches.flat();
   };
 
   // A HALF_OPEN provider admits one recovery probe. Serialize that probe
   // before the remaining parallel batches so sibling calls cannot reject it.
-  const anthropicCircuit = llmCircuitSnapshot().find((entry) => entry.provider === "anthropic");
   let firstParallelBatch = 0;
-  if (anthropicCircuit && anthropicCircuit.state !== "CLOSED" && slotBatches.length > 0) {
-    await runSynthesisBatchesWithDeadline({
-      batchIndexes: [0],
-      concurrency: 1,
-      deadlineAt: synthesisDeadlineAt,
-      perAttemptTimeoutMs: synthesisBatchTimeoutMs,
-      executeBatch,
-    });
+  let firstSynthesisError: unknown;
+  if (needsSerialProbe && slotBatches.length > 0) {
+    try {
+      await runSynthesisBatchesWithDeadline({
+        batchIndexes: [0],
+        concurrency: 1,
+        deadlineAt: synthesisDeadlineAt,
+        perAttemptTimeoutMs: IG_STRATEGY_SYNTHESIS_BATCH_TIMEOUT_MS,
+        executeBatch,
+      });
+    } catch (error) {
+      firstSynthesisError = error;
+    }
     firstParallelBatch = 1;
   }
-  await runSynthesisBatchesWithDeadline({
-    batchIndexes: slotBatches.map((_, index) => index).slice(firstParallelBatch),
-    concurrency: 3,
-    deadlineAt: synthesisDeadlineAt,
-    perAttemptTimeoutMs: synthesisBatchTimeoutMs,
-    executeBatch,
-  });
+  try {
+    await runSynthesisBatchesWithDeadline({
+      batchIndexes: slotBatches.map((_, index) => index).slice(firstParallelBatch),
+      concurrency: IG_STRATEGY_SYNTHESIS_CONCURRENCY,
+      deadlineAt: synthesisDeadlineAt,
+      perAttemptTimeoutMs: IG_STRATEGY_SYNTHESIS_BATCH_TIMEOUT_MS,
+      executeBatch,
+    });
+  } catch (error) {
+    firstSynthesisError ??= error;
+  }
   const publicResults = publicBatches.flat();
+  if (publicResults.length === 0 && slotBatches.length > 0) {
+    throw firstSynthesisError ?? new Error("public synthesis produced no variants");
+  }
   assertIgStrategyPublicCampaignSafe({
     idOrSlug: args.idOrSlug,
     variants: publicResults,
