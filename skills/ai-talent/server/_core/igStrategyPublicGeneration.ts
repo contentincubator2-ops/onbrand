@@ -47,19 +47,24 @@ export function assertIgStrategyPublicCampaignSafe(args: {
   outputLanguage: string;
   privateTerms: ReturnType<typeof buildIgStrategyPrivateTerms>;
 }): void {
-  sanitizeIgStrategyPublicCaption(
-    args.idOrSlug,
-    args.variants.flatMap((variant) => [
-      variant.caption,
-      ...variant.hashtags,
-      variant.image.style ?? "",
-    ]).filter(Boolean).join("\n"),
-    {
-      steps: args.steps,
-      outputLanguage: args.outputLanguage,
-      privateTerms: args.privateTerms,
-    },
-  );
+  // Audience address and paragraph perspective are per-post rules. Keep the
+  // final leak boundary across every public field without treating separate
+  // variants (which may come from independent batches) as one caption.
+  for (const variant of args.variants) {
+    sanitizeIgStrategyPublicCaption(
+      args.idOrSlug,
+      [
+        variant.caption,
+        ...variant.hashtags,
+        variant.image.style ?? "",
+      ].filter(Boolean).join("\n"),
+      {
+        steps: args.steps,
+        outputLanguage: args.outputLanguage,
+        privateTerms: args.privateTerms,
+      },
+    );
+  }
 }
 
 /**
