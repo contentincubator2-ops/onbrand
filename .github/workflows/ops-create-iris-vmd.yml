@@ -59,6 +59,13 @@ jobs:
             const users = uRows as Array<{ id: number; email: string }>;
             if (users.length !== 1) {
               console.error(`ABORT: found ${users.length} users for ${OWNER_EMAIL} (need exactly 1)`);
+              // Probe: list similar accounts so we can tell which email the
+              // customer actually registered with (admin-owned platform).
+              const [simRows]: any = await localPool.execute(
+                `SELECT id, email, name, createdAt FROM users
+                  WHERE email LIKE '%iris%' OR email LIKE '%vmd%' OR name LIKE '%iris%'
+                  ORDER BY id DESC LIMIT 20`);
+              console.log("SIMILAR ACCOUNTS:", JSON.stringify(simRows));
               process.exit(1);
             }
             const userId = users[0].id;
