@@ -320,9 +320,11 @@ export function FBStory({ title, brandName, variantLabel, liveCaption, liveTitle
         {/* 2026-07-17 (CJ「畫面讓人混淆能不能產圖…提示詞秀在那邊不知道怎麼
             用」— screenshot was THIS component): the raw visual brief used to
             float mid-frame with no CTA. Standardized ImageGenSlot: centered
-            點此生成主圖 button + the brief as labeled supporting text. */}
+            點此生成主圖 button + the brief as labeled supporting text. Keep
+            this wrapper out of a stacking context so the CTA can rise above
+            the Story text overlay. */}
         {!hasImage && (
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0">
             <ImageGenSlot
               brief={liveImageStyle}
               status={liveImageStatus}

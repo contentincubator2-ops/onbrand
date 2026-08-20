@@ -78,7 +78,9 @@ export function ImageGenSlot({
       } ${clickable ? `cursor-pointer transition ${dark ? "hover:bg-black/40" : "hover:bg-default-200"}` : ""} ${className}`}
     >
       {clickable ? (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-tiny font-semibold shadow-sm ${
+        // Keep the actionable control above script/caption overlays. The slot
+        // root deliberately does not create its own stacking context.
+        <span className={`relative z-20 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-tiny font-semibold shadow-sm ${
           dark ? "bg-white/90 text-default-900" : "bg-white text-default-800 border border-default-300"
         }`}>
           🎨 {ctaText}
