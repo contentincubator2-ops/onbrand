@@ -34,6 +34,37 @@ describe("callModelStrict", () => {
     expect(invokeLLMMock).not.toHaveBeenCalled();
   });
 
+  it("keeps the existing request unchanged when maxTokens is omitted", async () => {
+    invokeSingleMock.mockResolvedValue(response("public content"));
+    const messages = [{ role: "user" as const, content: "safe payload" }];
+
+    await callModelStrict(messages, "qwen");
+
+    expect(invokeSingleMock).toHaveBeenCalledWith({
+      provider: "qwen",
+      model: "qwen-plus",
+      messages,
+      signal: undefined,
+    });
+  });
+
+  it("forwards an explicit maxTokens only to the authorized provider request", async () => {
+    invokeSingleMock.mockResolvedValue(response("bounded content"));
+
+    await callModelStrict(
+      [{ role: "user", content: "safe payload" }],
+      "qwen",
+      undefined,
+      { maxTokens: 1_200 },
+    );
+
+    expect(invokeSingleMock).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "qwen",
+      maxTokens: 1_200,
+    }));
+    expect(invokeLLMMock).not.toHaveBeenCalled();
+  });
+
   it("propagates a Qwen failure without entering the fallback router", async () => {
     invokeSingleMock.mockRejectedValue(new Error("qwen unavailable"));
 

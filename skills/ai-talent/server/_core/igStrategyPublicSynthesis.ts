@@ -192,7 +192,7 @@ export function assertPrivateStrategyArtifactsReady(
   if (!hasSufficientPrivateStrategyArtifacts(artifacts, expectedCount)) {
     throw new Error("private strategy analysis is incomplete");
   }
-  return usableArtifacts;
+  return usableArtifacts.sort((a, b) => a.stepOrder - b.stepOrder);
 }
 
 export function getUsablePrivateStrategyArtifacts(
@@ -207,22 +207,29 @@ export function hasSufficientPrivateStrategyArtifacts(
   artifacts: readonly IgStrategyPrivateArtifact[],
   expectedCount: number,
 ): boolean {
-  // Every step must have produced a row so synthesis cannot race an unfinished
-  // workflow. Once complete, a quorum-style floor (ceil(n / 2), and
-  // never zero) preserves enough strategy signal while tolerating isolated
-  // model timeouts instead of discarding all otherwise usable conclusions.
-  const minimumUsableCount = Math.max(1, Math.ceil(expectedCount / 2));
-  return artifacts.length === expectedCount
-    && getUsablePrivateStrategyArtifacts(artifacts).length >= minimumUsableCount;
+  const usableArtifacts = getUsablePrivateStrategyArtifacts(artifacts);
+  const stepOrders = usableArtifacts.map((artifact) => artifact.stepOrder);
+  const validUniqueStepOrders = stepOrders.every(
+    (stepOrder) => Number.isInteger(stepOrder) && stepOrder >= 1 && stepOrder <= expectedCount,
+  ) && new Set(stepOrders).size === stepOrders.length;
+  return validUniqueStepOrders
+    && usableArtifacts.length >= minimumPrivateStrategyArtifactCount(expectedCount);
+}
+
+/** A usable synthesis needs broad coverage, not merely a bare majority of tiny squads. */
+export function minimumPrivateStrategyArtifactCount(expectedCount: number): number {
+  return Math.max(3, Math.ceil(expectedCount / 2));
 }
 
 export function assertRedactedStrategyContextReady(
   contexts: readonly string[],
   expectedCount: number,
-): void {
-  if (contexts.length !== expectedCount || contexts.some((context) => !context.trim())) {
+): string[] {
+  const usableContexts = contexts.filter((context) => !!context.trim());
+  if (usableContexts.length < minimumPrivateStrategyArtifactCount(expectedCount)) {
     throw new Error("de-identified strategy analysis is incomplete");
   }
+  return usableContexts;
 }
 
 export interface IgStrategyBrandRules {
@@ -338,6 +345,7 @@ export function buildIgStrategySynthesisMessages(args: {
   slots: readonly IgStrategyPublicSlot[];
   /** Redacted analysis conclusions; never raw artifact rows or identities. */
   strategyContext: readonly string[];
+  strategyAnalysisComplete?: boolean;
   brandRules?: IgStrategyBrandRules;
 }): Array<{ role: "system" | "user"; content: string }> {
   const slotContract = args.slots.map((slot) => ({
@@ -361,6 +369,9 @@ ${JSON.stringify(slotContract)}`;
       substitutions: args.brandRules.subs,
       preferred: args.brandRules.preferred,
     })}` : "",
+    args.strategyAnalysisComplete === false
+      ? "ANALYSIS COVERAGE: Some private analysis was unavailable. Use only the supplied conclusions; do not invent the missing analysis or mention this incomplete internal status in public content."
+      : "",
     `REDACTED STRATEGY CONCLUSIONS — USE AS REASONING, DO NOT DESCRIBE THE PROCESS:\n${safeContext.join("\n\n---\n\n")}`,
   ].filter(Boolean).join("\n\n");
   return [{ role: "system", content: system }, { role: "user", content: user }];

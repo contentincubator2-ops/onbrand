@@ -157,10 +157,10 @@ describe("IG public deliverable slot contract", () => {
     latencyMs: 1,
   });
 
-  it("synthesizes from only the four usable artifacts when one of five steps fails", () => {
+  it("accepts exactly three usable artifacts for a five-step squad", () => {
     const artifacts = [
       artifact(1, { status: "failed", rawContent: "" }),
-      artifact(2),
+      artifact(2, { status: "failed", rawContent: "" }),
       artifact(3),
       artifact(4),
       artifact(5),
@@ -169,12 +169,12 @@ describe("IG public deliverable slot contract", () => {
     const usableArtifacts = assertPrivateStrategyArtifactsReady(artifacts, 5);
     const strategyContext = usableArtifacts.map((item) => item.rawContent);
     expect(strategyContext).toEqual([
-      "analysis 2", "analysis 3", "analysis 4", "analysis 5",
+      "analysis 3", "analysis 4", "analysis 5",
     ]);
-    expect(() => assertRedactedStrategyContextReady(strategyContext, 4)).not.toThrow();
+    expect(assertRedactedStrategyContextReady(strategyContext, 5)).toEqual(strategyContext);
   });
 
-  it("rejects synthesis when fewer than ceil(n / 2) artifacts are usable", () => {
+  it("rejects synthesis when fewer than three artifacts are usable", () => {
     const artifacts = [
       artifact(1, { status: "failed", rawContent: "" }),
       artifact(2, { status: "failed", rawContent: "" }),
@@ -185,15 +185,59 @@ describe("IG public deliverable slot contract", () => {
     expect(() => assertPrivateStrategyArtifactsReady(artifacts, 5)).toThrow("incomplete");
   });
 
-  it("rejects synthesis while an artifact row is missing", () => {
-    const ready = [
+  it("requires at least half when a squad has more than five steps", () => {
+    const fourOfSeven = [artifact(1), artifact(2), artifact(3), artifact(4)];
+    expect(assertPrivateStrategyArtifactsReady(fourOfSeven, 7)).toHaveLength(4);
+    expect(() => assertPrivateStrategyArtifactsReady(fourOfSeven.slice(0, 3), 7))
+      .toThrow("incomplete");
+  });
+
+  it("rejects duplicate usable step orders", () => {
+    const artifacts = [
       artifact(1),
       artifact(2),
+      artifact(2),
     ];
-    expect(() => assertPrivateStrategyArtifactsReady(ready, 2)).not.toThrow();
-    expect(() => assertPrivateStrategyArtifactsReady(ready.slice(0, 1), 2)).toThrow("incomplete");
-    expect(() => assertRedactedStrategyContextReady(["safe A", "safe B"], 2)).not.toThrow();
-    expect(() => assertRedactedStrategyContextReady(["safe A", ""], 2)).toThrow("incomplete");
+    expect(() => assertPrivateStrategyArtifactsReady(artifacts, 5)).toThrow("incomplete");
+  });
+
+  it("fails when redaction drops the usable context below the same quorum", () => {
+    const artifacts = [artifact(1), artifact(2), artifact(3, { rawContent: "DROP_ME" })];
+    const usableArtifacts = assertPrivateStrategyArtifactsReady(artifacts, 5);
+    const redacted = usableArtifacts.map((item) => redactIgStrategySynthesisContext(
+      "ig-baer-youtility",
+      item.rawContent,
+      {
+        steps: PRIVATE_STEPS,
+        privateTerms: [{
+          value: "DROP_ME",
+          replacement: { zh: "DROP_ME", en: "DROP_ME" },
+        }],
+      },
+    ));
+
+    expect(redacted).toEqual(["analysis 1", "analysis 2", ""]);
+    expect(() => assertRedactedStrategyContextReady(redacted, 5)).toThrow("incomplete");
+  });
+
+  it("never mixes failed artifact content into the redacted synthesis context", () => {
+    const artifacts = [
+      artifact(1),
+      artifact(2),
+      artifact(3),
+      artifact(4, { status: "failed", rawContent: "FAILED_PRIVATE_RAW_CONTENT" }),
+      artifact(5, { status: "failed", rawContent: "" }),
+    ];
+    const usableArtifacts = assertPrivateStrategyArtifactsReady(artifacts, 5);
+    const redacted = usableArtifacts.map((item) => redactIgStrategySynthesisContext(
+      "ig-baer-youtility",
+      item.rawContent,
+      { steps: PRIVATE_STEPS },
+    ));
+    const strategyContext = assertRedactedStrategyContextReady(redacted, 5);
+
+    expect(strategyContext).toEqual(["analysis 1", "analysis 2", "analysis 3"]);
+    expect(strategyContext.join("\n")).not.toContain("FAILED_PRIVATE_RAW_CONTENT");
   });
 
   it.each(TARGETS)("resolves identical slots for task id %s and squad slug %s", (taskId, squadSlug) => {
@@ -493,6 +537,24 @@ describe("private planning and public index separation", () => {
     expect(prompt).toContain(slots[0]!.slotId);
     expect(prompt).toContain("Do not add, remove, rename, or reorder slots");
     expect(prompt).toContain("BRAND WORD RULES");
+  });
+
+  it("tells synthesis to use partial analysis without exposing that status publicly", () => {
+    const slots = buildIgStrategyPublicSlots("ig-baer-youtility", "一個明確主題")!.slice(0, 1);
+    const messages = buildIgStrategySynthesisMessages({
+      idOrSlug: "ig-baer-youtility",
+      topic: "一個明確主題",
+      brandContext: "",
+      outputLanguage: "zh-TW",
+      slots,
+      strategyContext: ["safe one", "safe two", "safe three"],
+      strategyAnalysisComplete: false,
+    });
+    const prompt = messages.map((message) => message.content).join("\n");
+
+    expect(prompt).toContain("Some private analysis was unavailable");
+    expect(prompt).toContain("do not invent the missing analysis");
+    expect(prompt).toContain("or mention this incomplete internal status in public content");
   });
 
   it("leaves non-target planning text byte-for-byte unchanged", () => {

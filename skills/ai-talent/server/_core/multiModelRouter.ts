@@ -274,14 +274,20 @@ export async function callModelStrict(
   messages: MultiModelMessage[],
   provider: ModelProvider,
   preferredModel?: string,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; maxTokens?: number },
 ): Promise<{ content: string; provider: ModelProvider; model: string }> {
   const availability = getAvailabilityMap();
   if (!availability[provider]) {
     throw new Error(`[multiModelRouter] required provider "${provider}" is unavailable`);
   }
   const model = preferredModel ?? DEFAULT_MODELS[provider];
-  const result = await invokeLLMSingleProvider({ provider, model, messages, signal: options?.signal });
+  const result = await invokeLLMSingleProvider({
+    provider,
+    model,
+    messages,
+    signal: options?.signal,
+    ...(options?.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
+  });
   const content = result.choices[0]?.message?.content;
   if (typeof content !== "string") {
     throw new Error("[multiModelRouter] Unexpected response structure from LLM");

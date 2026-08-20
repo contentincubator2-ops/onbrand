@@ -1963,7 +1963,12 @@ export const quickTaskRouter = router({
         const expectedOutput = strategyPublicPolicy
           ? step.outputType ?? step.outputKind ?? internalStageLabel
           : step.outputType ?? step.outputKind ?? "(未指定)";
-        const system = `${persona}\n${promptHeader}\n步驟說明：${step.description ?? ""}\n預期產出：${expectedOutput}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合「${internalStageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
+        const strategyLengthLimit = strategyPublicPolicy
+          ? (brandMarket.isZhTW
+              ? "篇幅上限：800 個繁體中文字。請在上限內保留完成此步驟所需的核心洞察、具體建議與可執行細節，刪除重複鋪陳。"
+              : `Length limit: 600 words in ${brandMarket.outputLanguage}. Within the limit, retain the core insights, concrete recommendations, and actionable details required to complete this step; remove repetition.`)
+          : "";
+        const system = `${persona}\n${promptHeader}\n步驟說明：${step.description ?? ""}\n預期產出：${expectedOutput}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合「${internalStageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。${strategyLengthLimit ? `\n${strategyLengthLimit}` : ""}\n直接給結果，不要前言、不要 markdown 圍籬。`;
 
         // Steps sharing a round cannot see each other; that is the point of
         // capping the round size. Everything already finished before this
@@ -2015,7 +2020,12 @@ export const quickTaskRouter = router({
             // Fixing that requires shared LLM changes and is intentionally outside PR 1.
             const routed = await strategyStepRouting.runAnthropicStrategyStep({
               deadlineAt: stepStartedAt + strategyRouteBudget.stepDeadlineMs,
-              execute: () => callModelStrict(messages, strategyStepRouting.STRATEGY_STEP_PROVIDER),
+              execute: () => callModelStrict(
+                messages,
+                strategyStepRouting.STRATEGY_STEP_PROVIDER,
+                undefined,
+                { maxTokens: 1_200 },
+              ),
             });
             stepProvider = routed.provider;
             stepAttempt = routed.attempt;
