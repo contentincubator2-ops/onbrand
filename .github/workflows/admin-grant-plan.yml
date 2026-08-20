@@ -1,0 +1,93 @@
+name: "Admin — Grant paid plan with expiry"
+
+# 2026-08-20 (CJ: vmdirisfamily@gmail.com 已付費 OnBrand Solo 至 2027/8/31):
+# generic admin grant — set a user's paid plan with an explicit expiry,
+# unlike admin-comp-account.yml which is permanent-free (planEndsAt=NULL).
+# Mirrors the Stripe activation path (stripeRouter.ts handleCheckoutPaid):
+# users AND workspaces both get planCode / planStatus='active' / planEndsAt —
+# enforcement + the points engine read users.*, the billing UI reads
+# workspaces.*, so both must move together.
+#
+# ends_at: 'YYYY-MM-DD' (granted through end of that day), a full
+# 'YYYY-MM-DD HH:MM:SS', or 'permanent' (NULL — never expires).
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "User email (must already be registered)"
+        required: true
+        type: string
+      plan:
+        description: "Plan code to grant (drop_pro = OnBrand Solo)"
+        required: true
+        default: "drop_pro"
+        type: choice
+        options: [drop_pro, drop_starter, drop_team, drop_agency, enterprise]
+      ends_at:
+        description: "Expiry 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS', or 'permanent'"
+        required: true
+        type: string
+
+jobs:
+  grant:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Grant plan
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GRANT_EMAIL: ${{ inputs.email }}
+          GRANT_PLAN: ${{ inputs.plan }}
+          GRANT_ENDS: ${{ inputs.ends_at }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: GRANT_EMAIL,GRANT_PLAN,GRANT_ENDS
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+            # Escape single quotes for SQL safety (same as admin-comp-account)
+            E=$(printf "%s" "$GRANT_EMAIL" | sed "s/'/''/g")
+            PL=$(printf "%s" "$GRANT_PLAN" | sed "s/'/''/g")
+
+            # ends_at is interpolated into SQL — allow only strict formats.
+            if [ "$GRANT_ENDS" = "permanent" ]; then
+              ENDS_SQL="NULL"
+            elif printf "%s" "$GRANT_ENDS" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+              ENDS_SQL="'$GRANT_ENDS 23:59:59'"
+            elif printf "%s" "$GRANT_ENDS" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$'; then
+              ENDS_SQL="'$GRANT_ENDS'"
+            else
+              echo "❌ ends_at must be YYYY-MM-DD, 'YYYY-MM-DD HH:MM:SS', or 'permanent' — got: $GRANT_ENDS"
+              exit 1
+            fi
+
+            echo "===== BEFORE ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive
+               FROM users WHERE email='$E'\G"
+
+            N=$(mysql -h"$H" -u"$U" -p"$P" "$D" -N -e "SELECT COUNT(*) FROM users WHERE email='$E'")
+            if [ "$N" != "1" ]; then
+              echo "❌ Found $N users with email $GRANT_EMAIL — aborting (need exactly 1; user must register first)."
+              exit 1
+            fi
+
+            echo "===== APPLY ($PL, ends: $GRANT_ENDS) ====="
+            Q "UPDATE users
+                 SET planCode='$PL', planStatus='active', planEndsAt=$ENDS_SQL, isActive=1
+               WHERE email='$E';"
+            Q "UPDATE workspaces
+                 SET planCode='$PL', planStatus='active', planEndsAt=$ENDS_SQL
+               WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');"
+
+            echo "===== AFTER ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive
+               FROM users WHERE email='$E'\G"
+            Q "SELECT id, slug, planCode, planStatus, planEndsAt FROM workspaces
+               WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');"
+            echo "✓ $GRANT_EMAIL → $PL (ends: $GRANT_ENDS)"
