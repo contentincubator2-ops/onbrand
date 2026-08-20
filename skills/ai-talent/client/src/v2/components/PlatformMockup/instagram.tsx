@@ -663,3 +663,106 @@ export function IGAd({ title, brandName, variantLabel, liveImageStyle, liveImage
     </div>
   );
 }
+
+/* ─────────────── IG Comment reply (ig-30-comment-reply) ───────────────
+ *
+ * 2026-08-20 (CJ「IG 留言回覆（一般）出現『此格式的精準預覽正在製作中』，
+ * 而且看起來沒有產出內容」): RunPage maps any taskId containing "comment"
+ * to format "comment", so ig-30-comment-reply resolved to the key
+ * "instagram:comment" — which had no case in PlatformMockup and fell to
+ * UnsupportedVariantPlaceholder. The reply copy WAS produced; the
+ * placeholder simply never rendered it. This is the real IG comment
+ * thread chrome: the original comment on top, the brand's reply indented
+ * under it.
+ */
+export function IGComment({
+  title, brandName, brandLogoUrl, variantLabel, liveCaption, liveSourceComment,
+}: MockupFields) {
+  const { lang } = useLang();
+  const handle = handleOf(brandName ?? null);
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const userComment = (liveSourceComment ?? "").trim();
+
+  return (
+    <div className="w-full max-w-[440px] mx-auto">
+      <MockupHeader
+        icon={faInstagram}
+        label={lang === "en" ? "Instagram Reply" : "Instagram 留言回覆"}
+        variantLabel={variantLabel}
+      />
+
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        {/* IG comment sheet header */}
+        <div className="flex items-center gap-3 px-3 py-2.5 border-b border-divider">
+          <FontAwesomeIcon icon={faChevronLeft} className="text-small text-default-600" />
+          <p className="text-small font-semibold flex-1 text-center pr-4">
+            {lang === "en" ? "Comments" : "留言"}
+          </p>
+        </div>
+
+        <div className="px-3 py-3 space-y-3">
+          {/* ── The comment being answered ── */}
+          <div className="flex items-start gap-2.5">
+            <Avatar src={dicebear("ig-commenter")} className="w-8 h-8 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-small leading-snug break-words">
+                <span className="font-semibold mr-1.5">
+                  {lang === "en" ? "a_follower" : "某位粉絲"}
+                </span>
+                {userComment ? (
+                  <span className="text-default-800">{userComment}</span>
+                ) : (
+                  <span className="text-default-400">
+                    {lang === "en"
+                      ? "(the comment you pasted shows up here)"
+                      : "（你貼上的原始留言會顯示在這）"}
+                  </span>
+                )}
+              </p>
+              <div className="flex items-center gap-3 mt-1 text-tiny text-default-500">
+                <span>{lang === "en" ? "2h" : "2 小時"}</span>
+                <span>{lang === "en" ? "12 likes" : "12 個讚"}</span>
+                <span className="font-medium">{lang === "en" ? "Reply" : "回覆"}</span>
+              </div>
+            </div>
+            <FontAwesomeIcon icon={faHeart} className="text-tiny text-default-400 mt-1.5" />
+          </div>
+
+          {/* ── The produced reply ── */}
+          <div className="flex items-start gap-2.5 pl-8">
+            <Avatar src={avatarSrc} className="w-7 h-7 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-small leading-snug break-words">
+                <span className="font-semibold mr-1.5 inline-flex items-center gap-1">
+                  {handle}
+                  <FontAwesomeIcon icon={faCircleCheck} className="text-[10px] text-primary-500" />
+                </span>
+                {liveCaption
+                  ? <span className="text-default-800 whitespace-pre-wrap">{liveCaption}</span>
+                  : <Skeleton className="h-3 w-40 rounded inline-block align-middle" />}
+              </div>
+              <div className="flex items-center gap-3 mt-1 text-tiny text-default-500">
+                <span>{lang === "en" ? "Just now" : "剛剛"}</span>
+                <span className="font-medium">{lang === "en" ? "Reply" : "回覆"}</span>
+              </div>
+            </div>
+            <FontAwesomeIcon icon={faHeart} className="text-tiny text-default-400 mt-1.5" />
+          </div>
+        </div>
+
+        {/* IG comment composer */}
+        <div className="flex items-center gap-2 px-3 py-2.5 border-t border-divider">
+          <Avatar src={avatarSrc} className="w-7 h-7 shrink-0" />
+          <p className="flex-1 text-tiny text-default-400 truncate">
+            {lang === "en" ? `Reply as ${handle}…` : `以 ${handle} 的身分回覆…`}
+          </p>
+          <span className="text-tiny text-primary-500 font-semibold">
+            {lang === "en" ? "Post" : "發布"}
+          </span>
+        </div>
+      </div>
+
+      {title && <p className="text-tiny text-default-500 mt-2 text-center">{title}</p>}
+    </div>
+  );
+}

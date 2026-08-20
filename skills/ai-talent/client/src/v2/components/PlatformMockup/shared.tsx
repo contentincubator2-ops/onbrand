@@ -265,6 +265,16 @@ export interface MockupFields {
    *  "帶版型" download. */
   overlayTitle?: string;
   liveDescription?: string;
+  /**
+   * 2026-08-20 (CJ「IG 留言回覆出現『製作中』而且沒有內容」): the ORIGINAL
+   * material a reply-type task is answering — the user's own comment /
+   * review text, taken from the run's persisted metadata.inputs
+   * (RunPage.tsx). Only comment/reply mockups read it, so no other mockup
+   * changes behaviour. Kept separate from liveDescription because that
+   * field already carries model-produced sub-copy on threads / podcast /
+   * web / 小紅書 (and JSON poll options on FBPoll).
+   */
+  liveSourceComment?: string;
   liveImageDesc?: string;
   liveVideoDesc?: string;
   liveCta?: string;
