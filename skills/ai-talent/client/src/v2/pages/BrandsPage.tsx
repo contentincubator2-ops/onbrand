@@ -110,7 +110,7 @@ interface Tile {
 
 export default function BrandsPage() {
   const { t, lang } = useLang();
-  const { brandId, setBrandId, brands, scope: globalScope, setScope } = useOutletContext<ShellOutletCtx>();
+  const { brandId, setBrandId, brands, scope: globalScope, setScope, userEmail } = useOutletContext<ShellOutletCtx>();
 
   // 2026-06-19 Phase 2 (CJ「BrandsPage 改用 URL 帶 id」): the global scope is
   // brand-only now. The specific product / event being edited comes from the
@@ -124,21 +124,13 @@ export default function BrandsPage() {
 
   // 2026-08-20: the 策略 rail (ShellLayout) lists this page's seven sections
   // for strategy-preview accounts, which makes the in-page tile strip below
-  // a duplicate of the same control. Same gate as the rail (imported, not
-  // re-declared) so the two can't drift — see isStrategyPreviewEmail's
-  // comment. Follows DataWorkspacePage's existing /api/auth/me pattern.
-  const [isStrategyPreview, setIsStrategyPreview] = React.useState(false);
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch("/api/auth/me", { method: "POST", credentials: "include" });
-        const d = r.ok ? await r.json() : null;
-        if (!cancelled) setIsStrategyPreview(isStrategyPreviewEmail(d?.user?.email));
-      } catch { /* default false — tile strip stays visible, never strands the user */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // a duplicate of the same control. Gate on the SAME resolved email the
+  // shell already fetched (via outlet context), not a second independent
+  // `/api/auth/me` call — two separate requests can disagree (one fails
+  // transiently while the other succeeds), leaving the rail and this tile
+  // strip out of sync with no way to recover short of a reload (Codex
+  // review, PR #119).
+  const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   const scope = React.useMemo(
     () => ({
       brandId: globalScope?.brandId ?? brandId ?? null,
