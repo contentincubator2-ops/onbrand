@@ -176,9 +176,12 @@ export function FBPoll({ title, brandName, variantLabel, liveCaption, liveHashta
 }
 
 /* ─────────────── FB Comment Reply ─────────────── */
-export function FBComment({ title, brandName, variantLabel, liveCaption, liveDescription }: MockupFields) {
+export function FBComment({ title, brandName, variantLabel, liveCaption, liveSourceComment, liveDescription }: MockupFields) {
   const { lang } = useLang();
-  const userComment = liveDescription || (lang === "en" ? "(User's original comment goes here)" : "（用戶原始留言會顯示在這）");
+  // 2026-08-20: liveSourceComment carries the comment the user actually
+  // pasted (RunPage reads it from the run's persisted metadata.inputs), so
+  // the thread shows the real conversation instead of the grey stand-in.
+  const userComment = liveSourceComment || liveDescription || (lang === "en" ? "(User's original comment goes here)" : "（用戶原始留言會顯示在這）");
   return (
     <div className="w-full max-w-[520px] mx-auto">
       <MockupHeader icon={faFacebook} label={lang === "en" ? "Facebook Reply" : "Facebook 留言回覆"} variantLabel={variantLabel} />
@@ -272,9 +275,9 @@ export function FBGroup({ title, brandName, variantLabel, liveCaption, liveImage
 }
 
 /* ─────────────── FB Recommendation Reply ─────────────── */
-export function FBRecommendation({ title, brandName, variantLabel, liveCaption, liveDescription }: MockupFields) {
+export function FBRecommendation({ title, brandName, variantLabel, liveCaption, liveSourceComment, liveDescription }: MockupFields) {
   const { lang } = useLang();
-  const userReview = liveDescription || (lang === "en" ? "(User's review goes here)" : "（用戶評價內容會顯示在這）");
+  const userReview = liveSourceComment || liveDescription || (lang === "en" ? "(User's review goes here)" : "（用戶評價內容會顯示在這）");
   const rating = (() => {
     const m = userReview.match(/(\d)\s*星/);
     return m ? Math.min(5, Math.max(1, Number(m[1]))) : 5;

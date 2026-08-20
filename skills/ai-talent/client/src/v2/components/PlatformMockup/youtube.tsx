@@ -15,7 +15,7 @@ import {
   faVideo, faThumbsUp, faThumbsDown, faComment, faShareNodes,
   faMusic, faImages, faDownload, faBell, faScissors,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, ImageGenSlot } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── Thumbnail title overlay ───────────────
@@ -517,6 +517,92 @@ export function YTStoryboard({ title, brandName, variantLabel, liveCards }: Mock
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─────────────── YT Comment reply (yt-30-comment-reply / -pinned-comment) ──
+ *
+ * 2026-08-20: "youtube:comment" had no case in PlatformMockup, so both YT
+ * comment tasks fell to the「即將推出」placeholder and their produced copy
+ * was never shown. `pinned` renders the「已置頂」row YouTube shows above
+ * the comment list for a creator's pinned comment.
+ */
+export function YTComment({
+  title, brandName, brandLogoUrl, variantLabel, liveCaption, liveSourceComment,
+  pinned = false,
+}: MockupFields & { pinned?: boolean }) {
+  const { lang } = useLang();
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const source = (liveSourceComment ?? "").trim();
+
+  return (
+    <div className="w-full max-w-[560px] mx-auto">
+      <MockupHeader
+        icon={faYoutube}
+        label={pinned
+          ? (lang === "en" ? "YouTube Pinned Comment" : "YouTube 置頂留言")
+          : (lang === "en" ? "YouTube Reply" : "YouTube 留言回覆")}
+        variantLabel={variantLabel}
+      />
+
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        <div className="px-4 py-3 border-b border-divider text-small font-semibold">
+          {lang === "en" ? "1,204 Comments" : "1,204 則留言"}
+        </div>
+
+        <div className="px-4 py-3 space-y-4">
+          {/* Viewer comment (context for a reply; the "what we pinned above" for pinned) */}
+          {!pinned && (
+            <div className="flex items-start gap-3">
+              <Avatar src={dicebear("yt-viewer")} className="w-9 h-9 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-tiny text-default-500">
+                  @{lang === "en" ? "a_viewer" : "某位觀眾"} · {lang === "en" ? "2 hours ago" : "2 小時前"}
+                </p>
+                <p className="text-small text-default-800 leading-relaxed break-words mt-0.5">
+                  {source || (lang === "en"
+                    ? "(the comment you pasted shows up here)"
+                    : "（你貼上的原始留言會顯示在這）")}
+                </p>
+                <div className="flex items-center gap-4 mt-1.5 text-tiny text-default-500">
+                  <span><FontAwesomeIcon icon={faThumbsUp} className="mr-1" />48</span>
+                  <FontAwesomeIcon icon={faThumbsDown} />
+                  <span className="font-medium">{lang === "en" ? "Reply" : "回覆"}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* The produced comment / reply */}
+          <div className={`flex items-start gap-3 ${pinned ? "" : "pl-8"}`}>
+            <Avatar src={avatarSrc} className="w-9 h-9 shrink-0" />
+            <div className="flex-1 min-w-0">
+              {pinned && (
+                <p className="text-tiny text-default-500 mb-1">
+                  📌 {lang === "en" ? "Pinned by creator" : "由頻道發布者置頂"}
+                </p>
+              )}
+              <p className="text-tiny text-default-500">
+                <span className="bg-default-200 rounded-full px-2 py-0.5 font-medium text-default-700">
+                  {brandName || "Your Channel"}
+                </span>
+                <span className="ml-2">{lang === "en" ? "Just now" : "剛剛"}</span>
+              </p>
+              {liveCaption
+                ? <MarkdownText content={liveCaption} className="text-small text-default-800 leading-relaxed mt-1" />
+                : <Skeleton className="h-3 w-3/4 rounded mt-2" />}
+              <div className="flex items-center gap-4 mt-1.5 text-tiny text-default-500">
+                <span><FontAwesomeIcon icon={faThumbsUp} className="mr-1" />0</span>
+                <FontAwesomeIcon icon={faThumbsDown} />
+                <span className="font-medium">{lang === "en" ? "Reply" : "回覆"}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {title && <p className="text-tiny text-default-500 mt-2 text-center">{title}</p>}
     </div>
   );
 }

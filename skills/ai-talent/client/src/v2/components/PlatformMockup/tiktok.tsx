@@ -11,7 +11,8 @@ import {
   faVideo, faHeart, faComment, faShareNodes, faMusic, faPlus,
   faPlay, faLock, faShare, faGear,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, ImageGenSlot } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot } from "./shared";
+import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── TT For-You ─────────────── */
 
@@ -386,6 +387,93 @@ export function TTStoryboard({ title, brandName, variantLabel, liveCards }: Mock
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─────────────── TT Comment reply (tt-30-comment-reply) ───────────────
+ *
+ * 2026-08-20: "tiktok:comment" had no case in PlatformMockup, so
+ * tt-30-comment-reply fell to the「即將推出」placeholder instead of
+ * rendering the reply that was actually produced. TikTok's comment
+ * sheet is dark, with the creator reply carrying a「作者」badge.
+ */
+export function TTComment({
+  title, brandName, brandLogoUrl, variantLabel, liveCaption, liveSourceComment,
+}: MockupFields) {
+  const { lang } = useLang();
+  const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const source = (liveSourceComment ?? "").trim();
+
+  return (
+    <div className="w-full max-w-[420px] mx-auto">
+      <MockupHeader
+        icon={faTiktok}
+        label={lang === "en" ? "TikTok Reply" : "TikTok 留言回覆"}
+        variantLabel={variantLabel}
+      />
+
+      <div className="bg-[#121212] rounded-xl overflow-hidden shadow-lg text-white">
+        <div className="px-4 py-2.5 border-b border-white/10 text-center text-small font-semibold">
+          {lang === "en" ? "128 comments" : "128 則留言"}
+        </div>
+
+        <div className="px-4 py-3 space-y-4">
+          {/* The comment being answered */}
+          <div className="flex items-start gap-2.5">
+            <Avatar src={dicebear("tt-commenter")} className="w-8 h-8 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-tiny text-white/60">{lang === "en" ? "a_viewer" : "某位觀眾"}</p>
+              <p className="text-small text-white/90 leading-snug break-words mt-0.5">
+                {source || (lang === "en"
+                  ? "(the comment you pasted shows up here)"
+                  : "（你貼上的原始留言會顯示在這）")}
+              </p>
+              <div className="flex items-center gap-3 mt-1 text-tiny text-white/45">
+                <span>{lang === "en" ? "2h ago" : "2 小時前"}</span>
+                <span>{lang === "en" ? "Reply" : "回覆"}</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center text-white/45 text-tiny gap-0.5">
+              <FontAwesomeIcon icon={faHeart} />
+              <span>32</span>
+            </div>
+          </div>
+
+          {/* The produced reply */}
+          <div className="flex items-start gap-2.5 pl-8">
+            <Avatar src={avatarSrc} className="w-7 h-7 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-tiny text-white/60 flex items-center gap-1.5">
+                {handle}
+                <span className="bg-[#FE2C55] text-white text-[9px] px-1 rounded">
+                  {lang === "en" ? "Creator" : "作者"}
+                </span>
+              </p>
+              {liveCaption
+                ? <MarkdownText content={liveCaption} className="text-small text-white/90 leading-snug mt-0.5" />
+                : <Skeleton className="h-3 w-2/3 rounded mt-1" />}
+              <div className="flex items-center gap-3 mt-1 text-tiny text-white/45">
+                <span>{lang === "en" ? "Just now" : "剛剛"}</span>
+                <span>{lang === "en" ? "Reply" : "回覆"}</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center text-white/45 text-tiny gap-0.5">
+              <FontAwesomeIcon icon={faHeart} />
+              <span>0</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-white/10">
+          <div className="flex-1 bg-white/10 rounded-full px-3 py-1.5 text-tiny text-white/45">
+            {lang === "en" ? "Add comment…" : "新增留言…"}
+          </div>
+        </div>
+      </div>
+
+      {title && <p className="text-tiny text-default-500 mt-2 text-center">{title}</p>}
     </div>
   );
 }

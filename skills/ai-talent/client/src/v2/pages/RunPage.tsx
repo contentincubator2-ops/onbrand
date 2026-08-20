@@ -1450,6 +1450,37 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides, selectedContentKind]);
 
+  /* 2026-08-20 (CJ「IG 留言回覆（一般）… 為什麼沒有產出內容」): reply-type
+   * tasks answer something the user pasted in (用戶留言 / 評價 / 提問). The
+   * writer's own `description` field is never persisted (OrchestraVariant has
+   * no such field), so the comment mockups used to render a grey「原始留言會
+   * 顯示在這」stand-in forever. The text IS on the row though — metadata.inputs
+   * keeps every answer the user typed. Read it here and hand it to the mockup
+   * as liveSourceComment (a dedicated field: liveDescription already carries
+   * model-produced sub-copy elsewhere, e.g. FBPoll parses it as JSON).
+   * Scoped to comment/reply tasks, so no other mockup sees a new value. */
+  const sourceComment = useMemo(() => {
+    const tid = data?.mission?.taskId ?? "";
+    if (!/comment|reply|recommendation/i.test(tid)) return undefined;
+    const inputs = (data as any)?.metadata?.inputs;
+    if (!inputs || typeof inputs !== "object") return undefined;
+    // Key order = specificity. li-30-comment stores the post being answered
+    // under "context" (quickTaskLI.ts:108), everything else uses
+    // "user_comment" (quickTaskFB/IG/YT/TikTok).
+    const preferred = [
+      "user_comment", "comment", "original_comment", "customer_comment",
+      "review", "user_review", "testimonial_source", "question", "context",
+    ];
+    for (const k of preferred) {
+      const v = inputs[k];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    // Deliberately no "just take the only input" fallback: yt-30-pinned-comment
+    // asks for a video URL / topic, which is not a comment. Better to show the
+    // mockup's own hint than to caption someone else's words with a URL.
+    return undefined;
+  }, [data]);
+
   // 2026-07-17 (CJ「文案偶爾很短、沒講重點，推測系統不穩」— seen on
   // fb-30-ad-headline / link-desc): those are COMPONENT tasks — the
   // deliverable per variant is ONE short line (ad headline ≤25字 / link
@@ -1656,6 +1687,11 @@ export default function RunPage() {
       // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"
       // inside words like "lead-paragraph" / "broadcast".
       if (/(?:^|-)ad(?:-|$)/.test(id)) return "ad";
+      // 2026-08-20: a PINNED comment is still a comment — but YouTube shows
+      // it with the「由頻道發布者置頂」row, so give it its own key. Must be
+      // tested before the plain "comment" rule below (and before "pinned",
+      // which would otherwise never see it).
+      if (id.startsWith("yt-") && id.includes("pinned-comment")) return "pinned-comment";
       if (id.includes("comment")) return "comment";
       if (id.includes("pinned")) return "pinned";
       // 2026-08-01: check BEFORE the "story" rule below — "storyboard"
@@ -2121,6 +2157,7 @@ export default function RunPage() {
                 brandName={(data as any).product?.name ?? data.brand?.name ?? ""}
                 brandLogoUrl={(data as any).product?.logoUrl ?? data.brand?.logoUrl ?? null}
                 liveCaption={slide.caption}
+                liveSourceComment={sourceComment}
                 liveHashtags={slide.hashtags}
                 liveImageStyle={slide.imageStyle}
                 liveImageUrl={slide.imageUrl ?? undefined}
