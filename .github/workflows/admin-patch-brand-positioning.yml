@@ -67,8 +67,8 @@ jobs:
                 });
 
                 const [before] = await conn.execute(
-                  'SELECT id, name, JSON_LENGTH(JSON_EXTRACT(positioning, \$.competition.direct)) AS directCount FROM brands WHERE id = ?',
-                  [brandId],
+                  'SELECT id, name, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS directCount FROM brands WHERE id = ?',
+                  ['\$.competition.direct', brandId],
                 );
                 if (!before[0]) { console.error('NO SUCH BRAND:', brandId); process.exit(1); }
                 console.log('BEFORE', JSON.stringify(before[0]));
@@ -106,8 +106,8 @@ jobs:
                 );
 
                 const [after] = await conn.execute(
-                  'SELECT id, name, JSON_LENGTH(JSON_EXTRACT(positioning, \$.competition.direct)) AS directCount, JSON_LENGTH(JSON_EXTRACT(positioning, \$.differentiation.custom)) AS customCount, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, \$.audience.primary)), 200) AS audiencePreview FROM brands WHERE id = ?',
-                  [brandId],
+                  'SELECT id, name, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS directCount, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS customCount, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, ?)), 200) AS audiencePreview FROM brands WHERE id = ?',
+                  ['\$.competition.direct', '\$.differentiation.custom', '\$.audience.primary', brandId],
                 );
                 console.log('AFTER', JSON.stringify(after[0]));
                 await conn.end();
