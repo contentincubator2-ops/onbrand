@@ -2024,7 +2024,14 @@ export const quickTaskRouter = router({
                 messages,
                 strategyStepRouting.STRATEGY_STEP_PROVIDER,
                 undefined,
-                { maxTokens: 1_200 },
+                {
+                  // 800 Han characters at a conservative 1.5 tokens/character
+                  // need about 1,200 tokens. 2,048 adds ~70% headroom for list
+                  // markers and punctuation, so the prompt's 800-character
+                  // limit acts first and this cap remains a runaway backstop.
+                  maxTokens: 2_048,
+                  includeFinishReason: true,
+                },
               ),
             });
             stepProvider = routed.provider;
@@ -2033,6 +2040,16 @@ export const quickTaskRouter = router({
             if (!routed.ok) {
               throw Object.assign(routed.error, {
                 strategyErrorCode: routed.errorCode,
+                strategyProvider: routed.provider,
+                strategyAttempt: routed.attempt,
+              });
+            }
+            const finishErrorCode = strategyStepRouting.getStrategyStepFinishErrorCode(
+              routed.value.finishReason,
+            );
+            if (finishErrorCode) {
+              throw Object.assign(new Error("strategy step output was truncated by the model token limit"), {
+                strategyErrorCode: finishErrorCode,
                 strategyProvider: routed.provider,
                 strategyAttempt: routed.attempt,
               });

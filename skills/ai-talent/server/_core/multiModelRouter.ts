@@ -274,8 +274,13 @@ export async function callModelStrict(
   messages: MultiModelMessage[],
   provider: ModelProvider,
   preferredModel?: string,
-  options?: { signal?: AbortSignal; maxTokens?: number },
-): Promise<{ content: string; provider: ModelProvider; model: string }> {
+  options?: { signal?: AbortSignal; maxTokens?: number; includeFinishReason?: boolean },
+): Promise<{
+  content: string;
+  provider: ModelProvider;
+  model: string;
+  finishReason?: string | null;
+}> {
   const availability = getAvailabilityMap();
   if (!availability[provider]) {
     throw new Error(`[multiModelRouter] required provider "${provider}" is unavailable`);
@@ -292,5 +297,12 @@ export async function callModelStrict(
   if (typeof content !== "string") {
     throw new Error("[multiModelRouter] Unexpected response structure from LLM");
   }
-  return { content, provider, model };
+  return {
+    content,
+    provider,
+    model,
+    ...(options?.includeFinishReason
+      ? { finishReason: result.choices[0]?.finish_reason ?? null }
+      : {}),
+  };
 }

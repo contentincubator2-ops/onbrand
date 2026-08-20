@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   deriveStrategyRouteBudget,
+  getStrategyStepFinishErrorCode,
   hasStrategyStepBudget,
   planStrategyPlanning,
   MAX_CONCURRENT_PLANNING_STEPS,
@@ -10,6 +11,22 @@ import {
   STRATEGY_STEP_DEADLINE_MS,
   STRATEGY_STEP_PROVIDER,
 } from "./strategyPublicStepRouting";
+
+describe("strategy step completion", () => {
+  it.each(["max_tokens", "MAX_TOKENS", "length"])(
+    "classifies %s as a truncated step",
+    (finishReason) => {
+      expect(getStrategyStepFinishErrorCode(finishReason)).toBe("step_truncated");
+    },
+  );
+
+  it.each(["stop", "end_turn", null, undefined])(
+    "accepts non-truncating finish reason %s",
+    (finishReason) => {
+      expect(getStrategyStepFinishErrorCode(finishReason)).toBeNull();
+    },
+  );
+});
 
 describe("strategy public step provider routing", () => {
   it("gives one Anthropic attempt the full step deadline", async () => {

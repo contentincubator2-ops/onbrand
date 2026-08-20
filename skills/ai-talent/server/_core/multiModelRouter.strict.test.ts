@@ -17,7 +17,7 @@ vi.mock("./llm", () => ({
 import { callModel, callModelStrict } from "./multiModelRouter";
 
 const response = (content: string) => ({
-  choices: [{ message: { content } }],
+  choices: [{ message: { content }, finish_reason: "stop" }],
 });
 
 describe("callModelStrict", () => {
@@ -55,14 +55,37 @@ describe("callModelStrict", () => {
       [{ role: "user", content: "safe payload" }],
       "qwen",
       undefined,
-      { maxTokens: 1_200 },
+      { maxTokens: 2_048 },
     );
 
     expect(invokeSingleMock).toHaveBeenCalledWith(expect.objectContaining({
       provider: "qwen",
-      maxTokens: 1_200,
+      maxTokens: 2_048,
     }));
     expect(invokeLLMMock).not.toHaveBeenCalled();
+  });
+
+  it("returns finish reason only when the caller opts in", async () => {
+    invokeSingleMock.mockResolvedValue(response("bounded content"));
+
+    await expect(callModelStrict(
+      [{ role: "user", content: "safe payload" }],
+      "qwen",
+      undefined,
+      { includeFinishReason: true },
+    )).resolves.toEqual({
+      content: "bounded content",
+      provider: "qwen",
+      model: "qwen-plus",
+      finishReason: "stop",
+    });
+
+    expect(invokeSingleMock).toHaveBeenCalledWith({
+      provider: "qwen",
+      model: "qwen-plus",
+      messages: [{ role: "user", content: "safe payload" }],
+      signal: undefined,
+    });
   });
 
   it("propagates a Qwen failure without entering the fallback router", async () => {
