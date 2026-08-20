@@ -1,11 +1,190 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchUrlSummary, formatUrlSummaryForPrompt } from "./urlContext";
+import {
+  fetchUrlSummary,
+  formatUrlSummaryForPrompt,
+  hasMeaningfulUrlContent,
+  isBoilerplatePageTitle,
+} from "./urlContext";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("URL body quality", () => {
+  it("uses one explicit 200-character boundary for otherwise metadata-free pages", () => {
+    const base = {
+      title: null,
+      description: null,
+      h1: null,
+      og: { image: null, title: null, description: null, site_name: null, domain: "example.com" },
+    };
+
+    expect(hasMeaningfulUrlContent({ ...base, body_excerpt: "字".repeat(199), body_usable: true })).toBe(false);
+    expect(hasMeaningfulUrlContent({ ...base, body_excerpt: "字".repeat(200), body_usable: true })).toBe(true);
+    expect(hasMeaningfulUrlContent({ ...base, body_excerpt: "字".repeat(500), body_usable: false })).toBe(false);
+    expect(hasMeaningfulUrlContent({ ...base, title: "有標題的正常頁", body_excerpt: "", body_usable: false })).toBe(true);
+  });
+
+  it("recognizes known platform boilerplate titles without rejecting real titles", () => {
+    for (const title of [
+      "TikTok - Make Your Day",
+      "Instagram",
+      "Facebook",
+      "Log in to Facebook",
+      "Threads",
+    ]) {
+      expect(isBoilerplatePageTitle(title)).toBe(true);
+    }
+    expect(isBoilerplatePageTitle("Instagram 春季內容策略完整指南")).toBe(false);
+  });
+
+  it("rejects an empty JavaScript shell instead of returning contradictory prompt context", async () => {
+    const html = `<!doctype html><html><head><title data-rh="true"></title></head>
+      <body><script>window.__APP__ = { lots: "of JavaScript" };</script></body></html>`;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(html, {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    })));
+
+    const summary = await fetchUrlSummary("https://example.com/client-rendered-page");
+    expect(summary).toBeNull();
+  });
+
+  it("keeps a short normal page with a title and usable body", async () => {
+    const article = "這是短篇正常文章，清楚交代新品的設計理念、適用情境、材質特色與使用方式。".repeat(8);
+    const html = `<!doctype html><html><head><title>短篇新品介紹</title></head>
+      <body><main><p>${article}</p></main></body></html>`;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(html, {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    })));
+
+    const summary = await fetchUrlSummary("https://example.com/short-article");
+    expect(summary).not.toBeNull();
+    expect(summary?.title).toBe("短篇新品介紹");
+    expect(summary?.body_usable).toBe(true);
+    expect(hasMeaningfulUrlContent(summary!)).toBe(true);
+  });
+
+  it("falls back to TikTok oEmbed and exposes caption, author, music, and thumbnail as card metadata", async () => {
+    const pageHtml = `<!doctype html><html><head><title data-rh="true"></title></head><body><script>app()</script></body></html>`;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(pageHtml, {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        title: "三個讓短影音更有記憶點的拍攝技巧",
+        author_name: "Derry Yoke",
+        author_unique_id: "derryyoke",
+        thumbnail_url: "https://p16-sign.tiktokcdn.com/example.jpeg",
+        provider_name: "TikTok",
+        html: `<blockquote><a href="https://www.tiktok.com/music/example">♬ original sound - Derry Yoke</a></blockquote>`,
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const url = "https://www.tiktok.com/@derryyoke/video/7638528410200902919?is_from_webapp=1";
+    const summary = await fetchUrlSummary(url);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("https://www.tiktok.com/oembed?url=");
+    expect(fetchMock.mock.calls[1]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(summary).toMatchObject({
+      url,
+      title: "三個讓短影音更有記憶點的拍攝技巧",
+      body_excerpt: "",
+      body_usable: false,
+      fetched_chars: 0,
+      og: {
+        image: "https://p16-sign.tiktokcdn.com/example.jpeg",
+        title: "三個讓短影音更有記憶點的拍攝技巧",
+        description: "作者：Derry Yoke @derryyoke｜音樂：original sound - Derry Yoke",
+        site_name: "TikTok",
+        domain: "tiktok.com",
+      },
+    });
+    const prompt = formatUrlSummaryForPrompt(summary!);
+    expect(prompt).toContain("只取得連結卡片層級資訊");
+    expect(prompt).toContain("不足處以品牌素材補足");
+    expect(prompt).not.toContain("務必基於以上連結內容生成");
+    expect(prompt).not.toContain("內文摘錄");
+  });
+
+  it("ignores TikTok boilerplate title and hydration JSON, then merges blank-title oEmbed card data", async () => {
+    const hydration = JSON.stringify({ __UNIVERSAL_DATA_FOR_REHYDRATION__: "x".repeat(84_000) });
+    const pageHtml = `<!doctype html><html><head><title>TikTok - Make Your Day</title></head>
+      <body><div id="__UNIVERSAL_DATA_FOR_REHYDRATION__">${hydration}</div></body></html>`;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(pageHtml, {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        title: "",
+        author_name: "帥哥",
+        author_unique_id: "derryyoke",
+        thumbnail_url: "https://p16-sign.tiktokcdn.com/real-example.jpeg",
+        provider_name: "TikTok",
+        html: `<blockquote><a href="https://www.tiktok.com/music/example">♬ 原聲 - Derryyoke - 帥哥</a></blockquote>`,
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const url = "https://www.tiktok.com/@derryyoke/video/7638528410200902919?sender_device=pc";
+    const summary = await fetchUrlSummary(url);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(summary).toMatchObject({
+      url,
+      title: null,
+      body_excerpt: "",
+      body_usable: false,
+      og: {
+        image: "https://p16-sign.tiktokcdn.com/real-example.jpeg",
+        title: null,
+        description: "作者：帥哥 @derryyoke｜音樂：原聲 - Derryyoke - 帥哥",
+        site_name: "TikTok",
+        domain: "tiktok.com",
+      },
+    });
+    expect(summary!.fetched_chars).toBeGreaterThan(80_000);
+    const prompt = formatUrlSummaryForPrompt(summary!);
+    expect(prompt).not.toContain("TikTok - Make Your Day");
+    expect(prompt).not.toContain("務必基於以上連結內容生成");
+    expect(prompt).toContain("作者：帥哥 @derryyoke");
+    expect(prompt).toContain("不足處以品牌素材補足");
+  });
+
+  it("returns null when both a TikTok page shell and its oEmbed payload lack promptable text", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("<html><head><title></title></head><body><script>app()</script></body></html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        title: "",
+        author_name: "",
+        author_unique_id: "",
+        thumbnail_url: "https://p16-sign.tiktokcdn.com/only-an-image.jpeg",
+        provider_name: "TikTok",
+        html: "",
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchUrlSummary("https://www.tiktok.com/@empty/video/123")).resolves.toBeNull();
+  });
+
+  it("degrades TikTok oEmbed failures to null", async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("page blocked"))
+      .mockRejectedValueOnce(new Error("oEmbed unavailable"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchUrlSummary("https://www.tiktok.com/@creator/video/456")).resolves.toBeNull();
+  });
+
   it("keeps Facebook OG data but omits login-wall markup from prompt context", async () => {
     const html = `<!doctype html><html><head>
       <title>Facebook</title>
@@ -22,6 +201,7 @@ describe("URL body quality", () => {
 
     const summary = await fetchUrlSummary("https://www.facebook.com/example/posts/123");
     expect(summary).not.toBeNull();
+    expect(summary?.title).toBeNull();
     expect(summary?.body_usable).toBe(false);
     expect(summary?.og.title).toBe("Open-source AI models are changing research");
     expect(summary?.og.description).toBe("A practical overview of the latest open-source model research.");
@@ -29,7 +209,8 @@ describe("URL body quality", () => {
     const prompt = formatUrlSummaryForPrompt(summary!);
     expect(prompt).toContain("OG 標題：Open-source AI models are changing research");
     expect(prompt).toContain("OG 描述：A practical overview of the latest open-source model research.");
-    expect(prompt).toContain("只取得連結卡片摘要，未取得正文");
+    expect(prompt).toContain("只取得連結卡片層級資訊");
+    expect(prompt).not.toContain("務必基於以上連結內容生成");
     expect(prompt).not.toContain("technical-page-shell-marker");
     expect(prompt).not.toContain("JavaScript is required");
     expect(prompt).not.toContain("內文摘錄");
@@ -57,6 +238,7 @@ describe("URL body quality", () => {
     expect(prompt).toContain("內文摘錄");
     expect(prompt).toContain(article.slice(0, 80));
     expect(prompt).not.toContain("只取得連結卡片摘要");
+    expect(prompt).toContain("務必基於以上連結內容生成");
   });
 
   it("ignores a JavaScript warning inside noscript when the visible article body is usable", async () => {
