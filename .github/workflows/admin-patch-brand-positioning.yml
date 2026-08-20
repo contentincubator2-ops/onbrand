@@ -1,0 +1,115 @@
+name: "Admin — Patch brand positioning fields (audience / competition / advantages)"
+
+# 2026-08-20 (CJ「IRIS 競爭者只剩三個，我要客製化增加消費者、競爭者、主打優勢」):
+# competition.direct is intentionally capped to 2-3 entries by the shared
+# positioningSteps.ts prompt (kept that way — see PR discussion). This
+# workflow patches ONE brand's positioning JSON directly via JSON_SET,
+# touching only the paths supplied — it does not run the AI pipeline and
+# does not affect any other brand.
+#
+# payload_b64 is base64 JSON shaped as:
+#   {
+#     "audiencePrimary"?: string,
+#     "competitionDirect"?: [{ name, position, tone, weakness, ourEdge }],
+#     "differentiationCustom"?: [{ label, statement }]
+#   }
+# Each key is optional — omit a key to leave that part of positioning alone.
+# Mirrors the exact schema StrategyWorkbench.tsx already reads:
+#   competitorChips  <- positioning.competition.direct
+#   advantageChips   <- positioning.differentiation.{functional,emotional,summary,custom}
+#   audienceChips    <- positioning.audience.{primary,secondary}
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand id to patch"
+        required: true
+        type: string
+      payload_b64:
+        description: "Base64-encoded JSON payload (see workflow comment for shape)"
+        required: true
+        type: string
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Patch positioning JSON
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+          PAYLOAD_B64: ${{ inputs.payload_b64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: BRAND_ID,PAYLOAD_B64
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            node --import tsx -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const raw = Buffer.from(process.env.PAYLOAD_B64, 'base64').toString('utf8');
+                const payload = JSON.parse(raw);
+                const brandId = Number(process.env.BRAND_ID);
+                if (!brandId) { console.error('bad brand_id'); process.exit(1); }
+
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+
+                const [before] = await conn.execute(
+                  'SELECT id, name, JSON_LENGTH(JSON_EXTRACT(positioning, \$.competition.direct)) AS directCount FROM brands WHERE id = ?',
+                  [brandId],
+                );
+                if (!before[0]) { console.error('NO SUCH BRAND:', brandId); process.exit(1); }
+                console.log('BEFORE', JSON.stringify(before[0]));
+
+                const sets = [];
+                const args = [];
+                if (payload.audiencePrimary != null) {
+                  sets.push('\$.audience.primary'); args.push(payload.audiencePrimary);
+                }
+                if (Array.isArray(payload.competitionDirect)) {
+                  sets.push('\$.competition.direct'); args.push(JSON.stringify(payload.competitionDirect));
+                }
+                if (Array.isArray(payload.differentiationCustom)) {
+                  sets.push('\$.differentiation.custom'); args.push(JSON.stringify(payload.differentiationCustom));
+                }
+                if (sets.length === 0) { console.error('payload has no recognized keys — nothing to do'); process.exit(1); }
+
+                // Interleave path/value pairs for JSON_SET, casting array
+                // values as JSON so they land as arrays, not JSON strings.
+                // Plain string concat (no template literals) — backticks
+                // inside this bash-double-quoted -e script would trigger
+                // shell command substitution.
+                const clauses = sets.map(function (path) {
+                  if (path.endsWith('.direct') || path.endsWith('.custom')) {
+                    return '?, CAST(? AS JSON)';
+                  }
+                  return '?, ?';
+                });
+                const flatArgs = [];
+                sets.forEach((path, i) => { flatArgs.push(path, args[i]); });
+
+                await conn.execute(
+                  'UPDATE brands SET positioning = JSON_SET(positioning, ' + clauses.join(', ') + '), updatedAt = NOW(3) WHERE id = ?',
+                  flatArgs.concat([brandId]),
+                );
+
+                const [after] = await conn.execute(
+                  'SELECT id, name, JSON_LENGTH(JSON_EXTRACT(positioning, \$.competition.direct)) AS directCount, JSON_LENGTH(JSON_EXTRACT(positioning, \$.differentiation.custom)) AS customCount, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, \$.audience.primary)), 200) AS audiencePreview FROM brands WHERE id = ?',
+                  [brandId],
+                );
+                console.log('AFTER', JSON.stringify(after[0]));
+                await conn.end();
+              })().catch(e => { console.error('FAILED:', e && e.message || e); process.exit(1); });
+            "
