@@ -1,0 +1,62 @@
+name: Ops — Inspect strategy squad steps (read-only)
+
+# 2026-08-20: the seed file (scripts/seed-local-squads.ts) is NOT what
+# production runs. ig-chrisdo-visual-story has 7 steps in the DB while the seed
+# declares 5, and three rounds of route-budget arithmetic were done against the
+# wrong number before the log gave it away:
+#   [runSquadAuto] strategy route cannot fit its planning steps
+#   { taskId: 'ig-99-visual-story', stepCount: 7, ... }
+#
+# This prints what the DB actually holds for the five catalogued IG strategy
+# squads: how many steps, their order, names and declared output types. SELECT
+# only — no UPDATE, no INSERT, no DELETE, no schema change.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Step counts and per-step detail
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          Q() { mysql -h localhost -u mos_user mos_db -t -e "$1"; }
+
+          echo "===== step counts for the five IG strategy squads ====="
+          Q "SELECT slug, is_active, JSON_LENGTH(steps) AS step_count
+               FROM squads
+              WHERE slug IN ('ig-baer-youtility','ig-chrisdo-visual-story',
+                             'ig-fanzo-live-first','ig-garyvee-document',
+                             'ig-hollis-radical-transparency')
+              ORDER BY slug;"
+
+          echo ""
+          echo "===== per-step detail (order, name, outputType) ====="
+          Q "SELECT s.slug,
+                    n.i + 1                                                            AS step_order,
+                    JSON_UNQUOTE(JSON_EXTRACT(s.steps, CONCAT('\$[', n.i, '].name')))       AS step_name,
+                    JSON_UNQUOTE(JSON_EXTRACT(s.steps, CONCAT('\$[', n.i, '].outputType'))) AS output_type
+               FROM squads s
+               JOIN (SELECT 0 i UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3
+                     UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6
+                     UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) n
+                 ON n.i < JSON_LENGTH(s.steps)
+              WHERE s.slug IN ('ig-baer-youtility','ig-chrisdo-visual-story',
+                               'ig-fanzo-live-first','ig-garyvee-document',
+                               'ig-hollis-radical-transparency')
+                AND s.is_active = 1
+              ORDER BY s.slug, n.i;"
+
+          echo ""
+          echo "===== observed step latency, newest runs first ====="
+          echo "-- the first real measurements: before the deadline was raised no"
+          echo "-- step was ever allowed to finish, so 25000ms told us nothing."
+          Q "SELECT squadSlug, stepOrder, status, errorCode, latencyMs, createdAt
+               FROM strategy_internal_step_artifacts
+              ORDER BY createdAt DESC, stepOrder
+              LIMIT 40;"
