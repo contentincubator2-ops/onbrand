@@ -2307,6 +2307,10 @@ export const quickTaskRouter = router({
                 latencyMs: Date.now() - startedAt,
                 contentModel: "ig-strategy-bundle",
                 planningCount: planningArtifacts.length,
+                // Read-only client capability hint. The mutation still
+                // re-checks the private ledger before generating anything.
+                strategyArtifactsReady: stepsRaw.length > 0
+                  && hasSufficientPrivateStrategyArtifacts(privateArtifacts, stepsRaw.length),
                 publicVariantCount: variants.length,
                 publicSlotCount: strategyPublicSlotCount,
                 publicFormats: [...new Set(variants.map((variant) => variant.format))],
@@ -2379,17 +2383,24 @@ export const quickTaskRouter = router({
                     });
                   }
                 } catch (e) {
+                  const synthesisMessage = String((e as Error)?.message ?? e);
+                  const artifactsIncomplete = /(?:private|de-identified) strategy analysis is incomplete/i
+                    .test(synthesisMessage);
                   console.warn("[runSquadAuto] target public synthesis failed", {
                     taskId: strategyRecordOverrides?.taskId,
                     outputId: checkpointOutputId,
-                    message: (e as Error).message,
+                    message: synthesisMessage,
                   });
                   const finalised = await finaliseTaskRun({
                     outputId: checkpointOutputId,
                     progress: "failed",
-                    progressDetail: brandMarket.isZhTW
-                      ? "對外貼文產生失敗，內容規劃仍可使用，請重跑一次。"
-                      : "Public post generation failed. The planning remains available; please run the task again.",
+                    progressDetail: artifactsIncomplete
+                      ? (brandMarket.isZhTW
+                          ? "系統忙碌，內容分析未完整完成，請稍後重跑原任務。"
+                          : "The system is busy and the content analysis did not complete. Please re-run the original task later.")
+                      : (brandMarket.isZhTW
+                          ? "對外貼文產生失敗，內容規劃仍可使用，請再試一次產生貼文。"
+                          : "Public post generation failed. The planning remains available; please try generating posts again."),
                   });
                   if (!finalised.ok) {
                     console.warn("[runSquadAuto] target public synthesis failure state could not be saved", {

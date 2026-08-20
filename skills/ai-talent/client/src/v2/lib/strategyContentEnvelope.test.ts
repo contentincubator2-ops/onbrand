@@ -221,6 +221,8 @@ describe("strategy content envelope", () => {
     };
     expect(getStrategyRemainingGenerationState({ ...base, progress: "done" })).toBe("ready");
     expect(getStrategyRemainingGenerationState({ ...base, progress: "caption_ready" })).toBe("generating");
+    expect(getStrategyRemainingGenerationState({ ...base, progress: "failed", artifactsReady: false })).toBeNull();
+    expect(getStrategyRemainingGenerationState({ ...base, progress: "failed", artifactsReady: true })).toBe("ready");
     expect(getStrategyRemainingGenerationState({ ...base, publicVariantCount: 30, progress: "done" })).toBeNull();
     expect(getStrategyRemainingGenerationState({
       taskId: "fb-60-single-full",

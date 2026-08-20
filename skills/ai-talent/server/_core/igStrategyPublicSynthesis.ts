@@ -43,6 +43,7 @@ export interface IgStrategyPublicVariant {
 }
 
 export const INITIAL_IG_STRATEGY_PUBLIC_SLOT_COUNT = 3;
+export const IG_STRATEGY_PUBLIC_BATCH_SLOT_COUNT = 5;
 
 /**
  * Keep the complete server-owned contract while deciding which slots a
@@ -62,6 +63,27 @@ export function splitIgStrategyPublicSlots(
         remaining: ungenerated.slice(Math.max(0, initialCount)),
       }
     : { initial: [], remaining: ungenerated };
+}
+
+/**
+ * Isolate the small initial campaign so one malformed/provider-failed response
+ * cannot discard all three starter posts. Larger continuations retain the
+ * five-slot batches introduced for throughput; only a set small enough to be
+ * the initial delivery pays the extra request overhead.
+ */
+export function buildIgStrategySynthesisBatches(
+  slots: readonly IgStrategyPublicSlot[],
+): IgStrategyPublicSlot[][] {
+  if (slots.length <= INITIAL_IG_STRATEGY_PUBLIC_SLOT_COUNT) {
+    return slots.map((slot) => [slot]);
+  }
+  return Array.from(
+    { length: Math.ceil(slots.length / IG_STRATEGY_PUBLIC_BATCH_SLOT_COUNT) },
+    (_, batchIndex) => slots.slice(
+      batchIndex * IG_STRATEGY_PUBLIC_BATCH_SLOT_COUNT,
+      (batchIndex + 1) * IG_STRATEGY_PUBLIC_BATCH_SLOT_COUNT,
+    ),
+  );
 }
 
 export type RemainingStrategyPostPermission =

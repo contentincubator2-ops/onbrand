@@ -230,17 +230,21 @@ export function getStrategyRemainingGenerationState({
   progress,
   publicVariantCount,
   publicSlotCount,
+  artifactsReady,
 }: {
   taskId?: string | null;
   isStrategyEnvelope: boolean;
   progress?: string | null;
   publicVariantCount: number;
   publicSlotCount: number;
+  /** Missing on older outputs; only an explicit false removes the CTA. */
+  artifactsReady?: boolean;
 }): StrategyRemainingGenerationState {
   if (
     !isIgStrategyDeliverableTarget(taskId)
     || !isStrategyEnvelope
     || publicSlotCount <= publicVariantCount
+    || artifactsReady === false
   ) return null;
   return progress === "caption_ready" ? "generating" : "ready";
 }

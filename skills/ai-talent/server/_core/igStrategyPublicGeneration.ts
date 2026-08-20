@@ -9,6 +9,7 @@ import {
 import {
   assertPrivateStrategyArtifactsReady,
   assertRedactedStrategyContextReady,
+  buildIgStrategySynthesisBatches,
   buildIgStrategySynthesisMessages,
   parseIgStrategyPublicVariants,
   runSynthesisBatchesWithDeadline,
@@ -174,10 +175,7 @@ export async function synthesizeIgStrategyPublicSlots(
     throw new Error("Anthropic brand rules failed private-term validation");
   }
 
-  const slotBatches = Array.from(
-    { length: Math.ceil(args.slots.length / 5) },
-    (_, batchIndex) => args.slots.slice(batchIndex * 5, (batchIndex + 1) * 5),
-  );
+  const slotBatches = buildIgStrategySynthesisBatches(args.slots);
   const anthropicCircuit = llmCircuitSnapshot().find((entry) => entry.provider === "anthropic");
   const needsSerialProbe = !!anthropicCircuit && anthropicCircuit.state !== "CLOSED";
   const synthesisDeadlineAt = Date.now() + getIgStrategyPublicSynthesisDeadlineMs({

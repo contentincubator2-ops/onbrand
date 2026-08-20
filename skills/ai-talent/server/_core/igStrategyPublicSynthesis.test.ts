@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertPrivateStrategyArtifactsReady,
   assertRedactedStrategyContextReady,
+  buildIgStrategySynthesisBatches,
   buildIgStrategyPublicSlots,
   buildIgStrategySynthesisMessages,
   getRemainingStrategyPostPermission,
@@ -82,6 +83,31 @@ describe("IG strategy phased generation", () => {
 });
 
 describe("IG public synthesis batch scheduling", () => {
+  it("isolates the three initial slots and preserves a partial success", async () => {
+    const slots = buildIgStrategyPublicSlots("ig-99-live-first", "一場直播")!.slice(0, 3);
+    const batches = buildIgStrategySynthesisBatches(slots);
+    expect(batches.map((batch) => batch.map((slot) => slot.slotId))).toEqual(
+      slots.map((slot) => [slot.slotId]),
+    );
+
+    const completed: number[] = [];
+    const result = await runSynthesisBatchesWithDeadline({
+      batchIndexes: batches.map((_, index) => index),
+      concurrency: 3,
+      deadlineAt: 1_000,
+      perAttemptTimeoutMs: 100,
+      now: () => 0,
+      executeBatch: async (batchIndex) => {
+        if (batchIndex !== 1) throw new Error("provider unavailable");
+        completed.push(batchIndex);
+      },
+    });
+
+    expect(result.succeededBatchIndexes).toEqual([1]);
+    expect(result.failedBatchIndexes.sort()).toEqual([0, 2]);
+    expect(completed).toEqual([1]);
+  });
+
   it("retries one failed batch once and succeeds", async () => {
     let calls = 0;
     await runSynthesisBatchesWithDeadline({

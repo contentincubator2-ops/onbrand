@@ -1177,7 +1177,9 @@ export default function RunPage() {
     progress: (data as any)?.progress,
     publicVariantCount: publicVariants.length,
     publicSlotCount: Number((data as any)?.metadata?.publicSlotCount ?? 0),
+    artifactsReady: (data as any)?.metadata?.strategyArtifactsReady,
   });
+  const strategyArtifactsIncomplete = (data as any)?.metadata?.strategyArtifactsReady === false;
 
   const selectedContentKind: RunContentKind = isStrategyEnvelope
     ? hideStrategyPlanningTabs
@@ -2197,8 +2199,12 @@ export default function RunPage() {
                             ? "Planning is ready. Publish-ready Instagram posts will appear here automatically when background generation finishes."
                             : "內容規劃已完成。背景產生結束後，可直接發布的 Instagram 貼文會自動顯示在這裡。")
                         : (lang === "en"
-                            ? "This run has no publish-ready posts yet. Generate them here, or re-run the original task if needed."
-                            : "這次產出尚未完成可直接發布的貼文。可在此產生貼文，必要時也能重跑原任務。")}
+                            ? (strategyArtifactsIncomplete
+                                ? "The strategy analysis is incomplete. Re-run the original task before generating public posts."
+                                : "This run has no publish-ready posts yet. Generate them here, or re-run the original task if needed.")
+                            : (strategyArtifactsIncomplete
+                                ? "內容分析尚未完整完成，請先重跑原任務，再產生對外貼文。"
+                                : "這次產出尚未完成可直接發布的貼文。可在此產生貼文，必要時也能重跑原任務。"))}
                     </p>
                   </div>
                 );
@@ -2513,8 +2519,12 @@ export default function RunPage() {
                 </p>
                 <p className="text-[11px] text-default-500 leading-relaxed">
                   {lang === "en"
-                    ? "Generate publish-ready posts from the saved strategy analysis."
-                    : "使用已儲存的策略分析產生可直接發布的貼文。"}
+                    ? (strategyArtifactsIncomplete
+                        ? "The saved strategy analysis is incomplete. Re-run the original task to try again."
+                        : "Generate publish-ready posts from the saved strategy analysis.")
+                    : (strategyArtifactsIncomplete
+                        ? "已儲存的內容分析不足，請重跑原任務後再試。"
+                        : "使用已儲存的策略分析產生可直接發布的貼文。")}
                 </p>
                 {strategyRemainingGenerationState === "ready" ? (
                   <Button
