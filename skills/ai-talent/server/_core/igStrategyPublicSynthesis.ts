@@ -6,6 +6,8 @@ import {
   buildIgStrategyPublicPromptRules,
   findIgStrategyInternalLeaks,
   getIgStrategyPublicPolicy,
+  isEnglishOutput,
+  isTraditionalChineseOutput,
   sanitizeIgStrategyPublicCaption,
   type StrategyPrivateTerm,
   type StrategyStepDescriptor,
@@ -261,14 +263,15 @@ function applyBrandRulesLocally(text: string, rules?: IgStrategyBrandRules): str
   return next;
 }
 
-function isZh(outputLanguage: string): boolean {
-  const language = outputLanguage.replace(/_/g, "-").toLowerCase();
-  return language === "zh" || language === "zh-tw" || language === "zh-hant"
-    || language.startsWith("zh-hant-") || language === "zh-hk" || language === "zh-mo";
+function isLikelyLatinKeywordSlug(value: string): boolean {
+  if (/\s/u.test(value) || /[\u3400-\u9fff\uf900-\ufaff]/u.test(value)) return false;
+  const parts = value.split(/[-_]+/u);
+  return parts.length >= 3
+    && parts.every((part) => !!part && /^[\p{L}\p{N}]+$/u.test(part));
 }
 
 function localized(copy: { en: string; zh: string }, outputLanguage: string): string {
-  return isZh(outputLanguage) ? copy.zh : copy.en;
+  return isTraditionalChineseOutput(outputLanguage) ? copy.zh : copy.en;
 }
 
 function explicitLiveSessionCount(topic: string, fallback: number, max: number): number {
@@ -355,9 +358,15 @@ export function buildIgStrategySynthesisMessages(args: {
   }));
   const safeContext = args.strategyContext.filter(Boolean).map((text) => text.slice(0, 12_000));
   const visibleRules = buildIgStrategyPublicPromptRules("Instagram public deliverables", args.outputLanguage);
+  const imageStyleLanguage = isTraditionalChineseOutput(args.outputLanguage)
+    ? `Traditional Chinese (${args.outputLanguage || "zh-TW"})`
+    : isEnglishOutput(args.outputLanguage)
+      ? "English"
+      : args.outputLanguage;
   const system = `You are the final public-content editor for Instagram.${visibleRules}
 Use the private strategy material only as reasoning input. Do not summarize the strategy and do not expose its names, workflow, people, keys, or status.
 Return JSON only in this exact shape: {"variants":[{"slotId":"...","caption":"...","hashtags":["..."],"imageStyle":"..."}]}.
+For imageStyle, write in ${imageStyleLanguage}, the same output language as caption. Use one readable natural-language visual description of approximately 40–120 characters that covers the subject or scene, lighting, composition, and mood. Never use kebab-case, snake_case, or a hyphen- or underscore-joined keyword list.
 Produce exactly one item for every server-owned slot below, with the exact slotId. Do not add, remove, rename, or reorder slots. The assigned format is final.
 SERVER-OWNED SLOTS:
 ${JSON.stringify(slotContract)}`;
@@ -450,8 +459,15 @@ export function parseIgStrategyPublicVariants(args: {
           .map((tag: string) => finalizePublicField(tag))
       : [];
     const rawImageStyle = typeof raw.imageStyle === "string" ? raw.imageStyle.trim() : "";
-    const imageStyle = rawImageStyle
-      ? finalizePublicField(rawImageStyle)
+    // Do not expose an English machine slug as a Chinese-facing image prompt.
+    // Returning null is safer than inventing or mistranslating a visual brief
+    // and preserves every existing non-slug value unchanged.
+    const validImageStyle = isTraditionalChineseOutput(args.outputLanguage)
+      && isLikelyLatinKeywordSlug(rawImageStyle)
+      ? ""
+      : rawImageStyle;
+    const imageStyle = validImageStyle
+      ? finalizePublicField(validImageStyle)
       : null;
     // Enforce one audience address across the complete publishable DTO, not
     // merely within the caption. A hashtag or visual note cannot reintroduce

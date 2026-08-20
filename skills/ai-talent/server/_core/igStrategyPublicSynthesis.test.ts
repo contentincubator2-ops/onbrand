@@ -298,6 +298,39 @@ describe("IG public deliverable slot contract", () => {
 });
 
 describe("IG public synthesis parsing", () => {
+  it("drops a kebab-case imageStyle slug for Traditional Chinese output", () => {
+    const slots = buildIgStrategyPublicSlots("ig-hollis-radical-transparency", "一次失敗故事")!;
+    const payload = JSON.parse(modelJson(slots, () => "你可以誠實分享這次經驗。"));
+    payload.variants[0].imageStyle = "authentic-lifestyle-photography-warm-natural-light-family-table-scene";
+
+    const variants = parseIgStrategyPublicVariants({
+      idOrSlug: "ig-hollis-radical-transparency",
+      modelText: JSON.stringify(payload),
+      outputLanguage: "zh-TW",
+      slots,
+      steps: [],
+    });
+
+    expect(variants[0]!.image.style).toBeNull();
+  });
+
+  it("preserves a natural English imageStyle for English output", () => {
+    const slots = buildIgStrategyPublicSlots("ig-hollis-radical-transparency", "A candid failure story", "en")!;
+    const payload = JSON.parse(modelJson(slots, () => "Share the hard moment honestly and without polish."));
+    const naturalImageStyle = "A candid family table scene in warm natural light, framed at eye level with a sincere, unstaged mood.";
+    payload.variants[0].imageStyle = naturalImageStyle;
+
+    const variants = parseIgStrategyPublicVariants({
+      idOrSlug: "ig-hollis-radical-transparency",
+      modelText: JSON.stringify(payload),
+      outputLanguage: "en",
+      slots,
+      steps: [],
+    });
+
+    expect(variants[0]!.image.style).toBe(naturalImageStyle);
+  });
+
   it("parses Qwen-style fenced JSON, restores server order, and ignores model-owned format/index fields", () => {
     const slots = buildIgStrategyPublicSlots("ig-garyvee-document", "一個真實素材")!;
     const qwenText = `Qwen result follows:\n\`\`\`json\n${modelJson(slots, () => "妳可以從這次失敗說起，讓真實經驗成為下一步。")}\n\`\`\``;
@@ -501,6 +534,26 @@ describe("IG public synthesis parsing", () => {
 });
 
 describe("private planning and public index separation", () => {
+  it("requires imageStyle to match the output language and use a natural visual description", () => {
+    const slots = buildIgStrategyPublicSlots("ig-hollis-radical-transparency", "一次失敗故事")!;
+    const messages = buildIgStrategySynthesisMessages({
+      idOrSlug: "ig-hollis-radical-transparency",
+      topic: "一次失敗故事",
+      brandContext: "",
+      outputLanguage: "zh-TW",
+      slots,
+      strategyContext: ["以真實場景呈現故事。"],
+    });
+    const systemPrompt = messages[0]!.content;
+
+    expect(systemPrompt).toContain("For imageStyle");
+    expect(systemPrompt).toContain("Traditional Chinese (zh-TW)");
+    expect(systemPrompt).toContain("the same output language as caption");
+    expect(systemPrompt).toContain("subject or scene, lighting, composition, and mood");
+    expect(systemPrompt).toContain("40–120 characters");
+    expect(systemPrompt).toContain("Never use kebab-case, snake_case");
+  });
+
   it("redacts planning material before it is placed in the public synthesis prompt", () => {
     const privateTerms = [
       { value: "王小明", replacement: { zh: "內容團隊", en: "content team" } },
