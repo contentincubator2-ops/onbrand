@@ -62,6 +62,7 @@ import {
   type RunContentMutationLocator,
 } from "../lib/strategyContentEnvelope";
 import { RUN_IMAGE_MODEL_OPTIONS } from "../lib/runImageModelOptions";
+import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
@@ -1590,7 +1591,15 @@ export default function RunPage() {
       // beside it came from another — every single quick-task run. Seed from
       // the image's equivalent Chinese prompt first, then the actual English
       // model prompt, and only then the display-only style for older runs.
-      const seedPrompt = slide?.imagePromptZh?.trim() || slide?.imagePrompt?.trim() || slide?.imageStyle?.trim() || "";
+      // 2026-08-20: `imageStyle` is the last-resort, display-only fallback and
+      // is the one IG-strategy runs land on. Drop it when it is an English
+      // keyword slug so the box falls through to the Chinese caption-derived
+      // brief below instead of showing an unusable slug (see isKeywordSlug).
+      const seedPrompt = pickImagePromptSeed({
+        imagePromptZh: slide?.imagePromptZh,
+        imagePrompt: slide?.imagePrompt,
+        imageStyle: slide?.imageStyle,
+      });
       if (seedPrompt) {
         setImagePrompt(seedPrompt);
         return;

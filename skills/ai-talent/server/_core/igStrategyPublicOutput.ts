@@ -106,11 +106,11 @@ function normalizedOutputLanguage(outputLanguage?: string | null): string {
   return (outputLanguage?.trim() || "zh-TW").replace(/_/g, "-").toLowerCase();
 }
 
-function isEnglishOutput(outputLanguage?: string | null): boolean {
+export function isEnglishOutput(outputLanguage?: string | null): boolean {
   return normalizedOutputLanguage(outputLanguage).split("-")[0] === "en";
 }
 
-function isTraditionalChineseOutput(outputLanguage?: string | null): boolean {
+export function isTraditionalChineseOutput(outputLanguage?: string | null): boolean {
   const language = normalizedOutputLanguage(outputLanguage);
   return language === "zh"
     || language === "zh-tw"
