@@ -84,6 +84,21 @@ interface NavItem {
   /** 2026-05-11 — hover tooltip explaining when this tier is for.
    *  Reviewer:「30s / 60s / 99s 的差異我看不清楚」. */
   tooltip?: string;
+  /** 2026-08-20 — 策略 rail only. Those entries all live on /brands/edit and
+   *  differ only by the `cat` query param, but active-state matching runs on
+   *  pathname alone, so every one of them would light up at once. When set,
+   *  the item is active iff the current `cat` equals this value. */
+  catKey?: string;
+}
+
+// 2026-08-20: preview-gate emails for the 策略 (Strategy) workspace — 品牌
+// 大腦's tile strip promoted to a left-rail workspace. Kept separate from
+// `isPrivate` below (still sowork@sowork.tw-only) because that flag also
+// gates the market-intel / performance preview rails, which haven't been
+// vetted for accounts outside the sowork.tw team.
+const STRATEGY_PREVIEW_EMAILS = ["sowork@sowork.tw", "vmdirisfamily@gmail.com"];
+function isStrategyPreviewEmail(email?: string | null): boolean {
+  return STRATEGY_PREVIEW_EMAILS.includes(String(email ?? "").toLowerCase());
 }
 
 // 2026-05-26 (CJ「左欄改成平台優先」): replace tier-first nav (30s/60s/99s)
@@ -93,6 +108,7 @@ interface NavItem {
 function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string): NavItem[] {
   const en = lang === "en";
   const isPrivate = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
+  const isStrategyPreview = isStrategyPreviewEmail(userEmail);
 
   // In data modes, the main left rail switches meaning. The top-left mode
   // switcher chooses the workspace; this rail only shows functions inside it.
@@ -104,6 +120,37 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       { to: "/market-intel/geo", label: "GEO", icon: <FontAwesomeIcon icon={faTrademark} />, matchPrefix: "/market-intel/geo", tooltip: en ? "GEO / SEO visibility" : "GEO / SEO 可見度" },
       { to: "/market-intel/competitors", label: en ? "Competitors" : "競品", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/market-intel/competitors", tooltip: en ? "Competitor intelligence" : "競品情報" },
       { to: "/market-intel/opportunity", label: en ? "Opportunity" : "機會", icon: <FontAwesomeIcon icon={faBrain} />, matchPrefix: "/market-intel/opportunity", tooltip: en ? "Opportunity diagnosis" : "機會診斷" },
+    ];
+  }
+
+  // 2026-08-20 (CJ「參考 DEV 環境，將品牌大腦獨立成一個策略區」): 品牌大腦's
+  // own tile strip (定位 / 產品 / 活動 / 文字 / 視覺 / 工具 / 基本資料) is
+  // promoted to the left rail as the 策略 workspace. Same sections, same
+  // `cat` param, same page — only the entry point moves, so BrandsPage
+  // itself needs no change and every existing deep link still works.
+  //
+  // Brand/product/event scope ids are injected by the nav click handler, so
+  // these `to` values deliberately carry only `cat`.
+  if (isStrategyPreview && currentPath?.startsWith("/brands")) {
+    // Ordered by what the entry IS, not alphabetically: the first three are
+    // the three positioning SCOPES — 品牌 / 產品 / 活動 — i.e. "which thing
+    // am I positioning". Everything after is brand-level ASSET that supports
+    // whichever scope is active.
+    return [
+      { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Brand" : "品牌", icon: <FontAwesomeIcon icon={faBrain} />,
+        tooltip: en ? "Brand positioning — the locked constitution" : "品牌定位 — 鎖定的品牌憲法" },
+      { to: "/brands/edit?cat=products", catKey: "products", label: en ? "Products" : "產品", icon: <FontAwesomeIcon icon={faBoxOpen} />,
+        tooltip: en ? "Product cards & positioning" : "產品卡片與定位" },
+      { to: "/brands/edit?cat=events", catKey: "events", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faCalendarDays} />,
+        tooltip: en ? "Campaign cards & positioning" : "活動卡片與定位" },
+      { to: "/brands/edit?cat=copy", catKey: "copy", label: en ? "Copy" : "文字", icon: <FontAwesomeIcon icon={faFont} />,
+        tooltip: en ? "Voice, terms, CTA and hook libraries" : "語氣 / 用詞 / CTA / 鉤子庫" },
+      { to: "/brands/edit?cat=visual", catKey: "visual", label: en ? "Visual" : "視覺", icon: <FontAwesomeIcon icon={faPaintBrush} />,
+        tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
+      { to: "/brands/edit?cat=tools", catKey: "tools", label: en ? "Tools" : "工具", icon: <FontAwesomeIcon icon={faBookBookmark} />,
+        tooltip: en ? "Knowledge base / AI prompt library" : "知識庫 / AI 指令庫" },
+      { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
+        tooltip: en ? "Name / industry / market" : "名稱 / 產業 / 市場" },
     ];
   }
 
@@ -140,8 +187,15 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
       tooltip: en ? "Calendar view — all scheduled and published posts" : "月曆視圖 — 已排程 + 已發布內容" },
     { to: "/theater",   label: en ? "7-Day Publisher" : "七日發布台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
-    // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav)
-    { to: "/brands",    label: en ? "Brand Brain" : "品牌大腦", icon: <FontAwesomeIcon icon={faBrain} /> },
+    // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav).
+    // 2026-08-20: for the 策略 preview it moved OUT of this rail and became
+    // the 策略 workspace (its sections are now rail entries there), so
+    // keeping it here too would be a duplicate entry point. Everyone else
+    // has no mode switcher, so for them it must stay — removing it outright
+    // would strand 品牌大腦 with no way in.
+    ...(isStrategyPreview ? [] : [
+      { to: "/brands", label: en ? "Brand Brain" : "品牌大腦", icon: <FontAwesomeIcon icon={faBrain} /> },
+    ]),
     // 2026-05-30 (CJ「移除連結頁」): "連結" sidebar item removed entirely.
     // Social profile URLs now live in 基本資料 tab; OAuth connections in 平台授權 tab.
     // Both reachable via Brand Brain → settings gear → respective tab.
@@ -299,7 +353,24 @@ export default function ShellLayout() {
         collapsed={collapsed}
         onToggle={toggleCollapsed}
         currentPath={loc.pathname}
+        activeCat={new URLSearchParams(loc.search).get("cat")}
         onNavigate={(to) => {
+          // 2026-08-20 策略 rail: entries carry only `?cat=`; the active
+          // brand/product/event ids are injected here so the rail definition
+          // stays scope-free and the ScopeBar doesn't reset on navigation.
+          if (to.startsWith("/brands/edit?cat=")) {
+            const cat = to.split("cat=")[1]!;
+            const bid = scope.brandId ?? brands[0]?.id;
+            const qs: string[] = [];
+            if (bid) {
+              qs.push(`b=${bid}`);
+              if (scope.productId) qs.push(`p=${scope.productId}`);
+              if (scope.eventId)   qs.push(`e=${scope.eventId}`);
+            }
+            qs.push(`cat=${cat}`);
+            navigate(`/brands/edit?${qs.join("&")}`);
+            return;
+          }
           // 2026-05-16 (CJ「按下左側品牌功能時，總會先出現空白畫面」):
           // /brands (BrandsManagePage) immediately render-redirects into
           // /brands/edit when a brand is in scope — that double hop +
@@ -542,12 +613,15 @@ export default function ShellLayout() {
 ══════════════════════════════════════════════════════════════════ */
 
 function IconBar({
-  collapsed, onToggle, currentPath, onNavigate,
+  collapsed, onToggle, currentPath, activeCat, onNavigate,
   scope, setScope, onLogout, notifOpen, onNotifToggle, notifUnread, onOpenSupport, brands, userEmail,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   currentPath: string;
+  /** Current `cat` query param — the 策略 rail's entries share one pathname
+   *  and are distinguished only by this. */
+  activeCat?: string | null;
   onNavigate: (to: string) => void;
   scope: ScopeState;
   setScope: (s: ScopeState) => void;
@@ -563,16 +637,30 @@ function IconBar({
   const isEn = lang === "en";
   const NAV_ITEMS = React.useMemo(() => buildNavItems(lang, userEmail, currentPath), [lang, userEmail, currentPath]);
   const isPrivatePreview = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
-  const activeWorkspaceMode: "content" | "performance" | "market" = currentPath.startsWith("/performance")
-    ? "performance"
-    : currentPath.startsWith("/market-intel")
-      ? "market"
-      : "content";
+  const isStrategyPreview = isStrategyPreviewEmail(userEmail);
+  // 2026-08-20: 策略 added as a first-class workspace mode alongside the
+  // existing market/content/performance ones. Order follows how the work
+  // actually flows — understand the market, decide the strategy, produce
+  // the content, read the results.
+  const activeWorkspaceMode: "market" | "strategy" | "content" | "performance" =
+    currentPath.startsWith("/performance")
+      ? "performance"
+      : currentPath.startsWith("/market-intel")
+        ? "market"
+        : currentPath.startsWith("/brands")
+          ? "strategy"
+          : "content";
+  // market/performance stay gated to the sowork.tw preview group (unchanged
+  // from before); 策略 additionally opens to isStrategyPreview accounts;
+  // 內容 is always available. A 2-column mini-grid reads fine at 2 items
+  // (isStrategyPreview-only accounts) or 4 (sowork.tw).
   const modeOptions = [
+    ...(isPrivatePreview ? [{ id: "market" as const, label: "市", to: "/market-intel/overview", tip: isEn ? "Market intelligence workspace" : "市場情報工作區" }] : []),
+    ...(isStrategyPreview ? [{ id: "strategy" as const, label: "策", to: "/brands", tip: isEn ? "Strategy workspace — brand brain" : "策略工作區 — 品牌大腦" }] : []),
     { id: "content" as const, label: "文", to: "/tasks/fb", tip: isEn ? "Content workspace" : "內容工作區" },
-    { id: "performance" as const, label: "成", to: "/performance/overview", tip: isEn ? "Performance workspace" : "成效數據工作區" },
-    { id: "market" as const, label: "市", to: "/market-intel/overview", tip: isEn ? "Market intelligence workspace" : "市場情報工作區" },
+    ...(isPrivatePreview ? [{ id: "performance" as const, label: "成", to: "/performance/overview", tip: isEn ? "Performance workspace" : "成效數據工作區" }] : []),
   ];
+  const showModeSwitcher = isPrivatePreview || isStrategyPreview;
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
 
@@ -638,15 +726,18 @@ function IconBar({
         </Tooltip>
       </div>
 
-      {isPrivatePreview && (
+      {showModeSwitcher && (
         <div style={{ flexShrink: 0, display: "flex", justifyContent: "center", padding: "0 0 10px" }}>
           <div
             role="tablist"
             aria-label={isEn ? "Workspace mode" : "工作區模式"}
             style={{
-              width: 58, height: 24, borderRadius: 12,
+              // 2026-08-20: width scales with option count (58px @3 → wider
+              // at 4, narrower at 2) so each cell keeps roughly the same
+              // ~19px it had before 策略 was added.
+              width: modeOptions.length * 19 + 4, height: 24, borderRadius: 12,
               border: "1.5px solid #e5e7eb", background: "#f9fafb",
-              display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
+              display: "grid", gridTemplateColumns: `repeat(${modeOptions.length}, 1fr)`,
               padding: 2, gap: 1,
             }}
           >
@@ -682,17 +773,28 @@ function IconBar({
           as horizontal hierarchy bar (BrandHierarchyPill in main layout) */}
 
       {/* Nav icons */}
-      <nav style={{ flex: 1, overflowY: "hidden", overflowX: "hidden", padding: "0 3px" }}>
+      {/* 2026-08-20: overflowY was "hidden" — fine for the platform-tasks
+          rail, but the 策略 rail has 7 items and would silently clip the
+          last ones on short viewports with no way to reach them. "auto"
+          keeps every item reachable; scrollbarWidth:none hides the bar so
+          the 70px rail stays visually clean. */}
+      <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px", scrollbarWidth: "none" }}>
         {NAV_ITEMS.map((item) => {
           // 2026-05-12 (CJ「按了連結還是顯示為品牌區」): pick the MOST SPECIFIC
           // matching item. If another nav item has a longer matching prefix,
           // this one yields. e.g. on /brands/settings, the 連結 item (prefix
           // /brands/settings) wins over the 品牌 item (prefix /brands).
           const myPrefix = item.matchPrefix ?? item.to;
-          const myMatches =
-            item.to === "/" ? currentPath === "/" : currentPath.startsWith(myPrefix);
+          // 策略 rail: every entry shares the /brands/edit pathname, so prefix
+          // matching would light all of them at once. Those items opt out via
+          // catKey and match on the `cat` param instead. Falls back to
+          // "positioning" because /brands/edit with no cat renders 定位.
+          const isCatItem = !!item.catKey;
+          const myMatches = isCatItem
+            ? currentPath.startsWith("/brands") && (activeCat ?? "positioning") === item.catKey
+            : item.to === "/" ? currentPath === "/" : currentPath.startsWith(myPrefix);
           let beatenByMoreSpecific = false;
-          if (myMatches) {
+          if (myMatches && !isCatItem) {
             for (const other of NAV_ITEMS) {
               if (other.to === item.to) continue;
               const otherPrefix = other.matchPrefix ?? other.to;
