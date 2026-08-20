@@ -154,6 +154,14 @@ jobs:
       - name: Run (create + discovery + positioning, polls until done)
         run: |
           cd /opt/onbrand/app/skills/ai-talent
+          # ESM imports hoist above dotenv.config(), so localDb's env check
+          # fires before dotenv loads — export the .env at the shell level.
+          set -a; source .env 2>/dev/null || true; set +a
+          if [ -z "$LOCAL_DB_PASSWORD" ]; then
+            echo "::error::LOCAL_DB_PASSWORD still missing after sourcing .env"
+            ls -la .env* 2>&1 || true
+            exit 1
+          fi
           npx tsx scripts/_tmp-iris-vmd.ts
 
       - name: Cleanup temp script
