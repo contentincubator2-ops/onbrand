@@ -1883,10 +1883,19 @@ export const quickTaskRouter = router({
           })
         : null;
       const strategyRouteBudget = strategyPlanning?.budget ?? null;
-      // Refuse a squad the route provably cannot finish, before spending a
-      // single provider call on it. Without this the run burns every round it
-      // can afford and is then refused at the tail by the per-step admission
-      // guard, leaving planning drafts, no public posts and a bill.
+      // 2026-08-20: this used to throw PRECONDITION_FAILED here. That was
+      // wrong, and production proved it within the hour: ig-99-visual-story
+      // carries SEVEN steps in the DB (the seed file's five are stale), so
+      // every run was refused outright and the user got nothing at all —
+      // strictly worse than before, where the route ran until the per-step
+      // admission guard stopped it and at least persisted the planning drafts
+      // it had already paid for.
+      //
+      // An oversized squad is a configuration problem, not a request the user
+      // can fix by being told to go away. Record it loudly, then let the
+      // per-step guard do what it already does: run what fits, refuse the
+      // tail, keep the drafts. Public synthesis still fails closed on the
+      // incomplete artifacts, which is the honest outcome.
       if (strategyPlanning && !strategyPlanning.budget.fitsRouteBudget) {
         console.warn("[runSquadAuto] strategy route cannot fit its planning steps", {
           taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
@@ -1894,12 +1903,6 @@ export const quickTaskRouter = router({
           waveCount: strategyPlanning.waves.length,
           planningWorstCaseMs: strategyPlanning.budget.planningWorstCaseMs,
           routeLimitMs: strategyPlanning.budget.routeLimitMs,
-        });
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: brandMarket.isZhTW
-            ? "這個任務的步驟數超出單次執行的時間預算，請聯絡我們調整。"
-            : "This task has more steps than a single run can fit. Please contact support.",
         });
       }
 
