@@ -4,11 +4,8 @@ import {
   assertRedactedStrategyContextReady,
   buildIgStrategyPublicSlots,
   buildIgStrategySynthesisMessages,
-  getRemainingStrategyPostPermission,
-  mergeIgStrategyPublicVariants,
   parseIgStrategyPublicVariants,
   runSynthesisBatchesWithDeadline,
-  splitIgStrategyPublicSlots,
   type IgStrategyPublicSlot,
 } from "./igStrategyPublicSynthesis";
 import {
@@ -30,54 +27,11 @@ const PRIVATE_STEPS: StrategyStepDescriptor[] = [
   { name: "直播後內容再製", outputKind: "post_live_content_set" },
 ];
 
-describe("IG strategy phased generation", () => {
-  it("selects only the first three slots initially and all ungenerated slots later", () => {
-    const slots = buildIgStrategyPublicSlots("ig-99-youtility", "省時技巧")!;
-    const first = splitIgStrategyPublicSlots(slots);
-    expect(first.initial.map((slot) => slot.slotId)).toEqual([
-      "useful-feed-1", "useful-feed-2", "useful-feed-3",
-    ]);
-    expect(first.remaining).toHaveLength(27);
-
-    const continuation = splitIgStrategyPublicSlots(slots, first.initial.map((slot) => slot.slotId));
-    expect(continuation.initial).toEqual([]);
-    expect(continuation.remaining.map((slot) => slot.slotId)).toEqual(
-      slots.slice(3).map((slot) => slot.slotId),
-    );
-  });
-
-  it("decides remaining-post permission without weakening ownership or artifact gates", () => {
-    const base = {
-      isOwner: true,
-      isStrategyOutput: true,
-      progress: "done",
-      remainingSlotCount: 27,
-      artifactsReady: true,
-    };
-    expect(getRemainingStrategyPostPermission(base)).toEqual({ allowed: true });
-    expect(getRemainingStrategyPostPermission({ ...base, isOwner: false }))
-      .toEqual({ allowed: false, reason: "not_owner" });
-    expect(getRemainingStrategyPostPermission({ ...base, progress: "caption_ready" }))
-      .toEqual({ allowed: false, reason: "busy" });
-    expect(getRemainingStrategyPostPermission({ ...base, artifactsReady: false }))
-      .toEqual({ allowed: false, reason: "artifacts_incomplete" });
-  });
-
-  it("merges generated posts into immutable slot order without blanks", () => {
-    const slots = buildIgStrategyPublicSlots("ig-99-youtility", "省時技巧")!.slice(0, 4);
-    const variant = (id: string) => ({
-      id,
-      label: id,
-      format: "feed" as const,
-      caption: id,
-      hashtags: [],
-      image: { style: null, url: null as null, status: "skipped" as const },
-    });
-    expect(mergeIgStrategyPublicVariants(
-      slots,
-      [variant(slots[0]!.slotId), variant(slots[1]!.slotId)],
-      [variant(slots[3]!.slotId), variant(slots[2]!.slotId)],
-    ).map((item) => item.id)).toEqual(slots.map((slot) => slot.slotId));
+describe("IG strategy single public deliverable", () => {
+  it.each(TARGETS)("builds exactly one unnumbered public slot for %s", (taskId) => {
+    const slots = buildIgStrategyPublicSlots(taskId, "省時技巧")!;
+    expect(slots).toHaveLength(1);
+    expect(slots[0]!.label).not.toMatch(/\s1$/);
   });
 });
 
@@ -288,43 +242,16 @@ describe("IG public deliverable slot contract", () => {
   });
 
   it.each([
-    ["ig-99-youtility", 30, { feed: 30 }],
-    ["ig-99-visual-story", 30, { feed: 30 }],
-    ["ig-99-live-first", 12, { live: 1, story: 4, reel: 4, carousel: 3 }],
-    ["ig-99-document", 4, { feed: 1, reel: 1, story: 1, carousel: 1 }],
+    ["ig-99-youtility", 1, { feed: 1 }],
+    ["ig-99-visual-story", 1, { feed: 1 }],
+    ["ig-99-live-first", 1, { live: 1 }],
+    ["ig-99-document", 1, { feed: 1 }],
     ["ig-99-radical-transparency", 1, { feed: 1 }],
   ] as const)("builds the default public count/format contract for %s", (taskId, count, expectedFormats) => {
     const slots = buildIgStrategyPublicSlots(taskId, "一個明確主題")!;
     expect(slots).toHaveLength(count);
     expect(formatCounts(slots)).toEqual(expectedFormats);
     expect(new Set(slots.map((slot) => slot.slotId)).size).toBe(count);
-  });
-
-  it("derives live deliverables from an explicit session count, independent of three private steps", () => {
-    const slots = buildIgStrategyPublicSlots("ig-fanzo-live-first", "預計 2 場直播，每週一次")!;
-    expect(slots).toHaveLength(24);
-    expect(formatCounts(slots)).toEqual({ live: 2, story: 9, reel: 7, carousel: 6 });
-    expect(slots.filter((slot) => slot.slotId.startsWith("live-session-"))).toHaveLength(2);
-    expect(slots.filter((slot) => slot.slotId.startsWith("live-teaser-"))).toHaveLength(2);
-    expect(slots.filter((slot) => slot.slotId.startsWith("post-live-"))).toHaveLength(20);
-  });
-
-  it("derives one four-format bundle per documented asset", () => {
-    const slots = buildIgStrategyPublicSlots(
-      "ig-garyvee-document",
-      "規劃 3 個場景：設計師接案日常、產品打樣到出貨、客戶會議紀錄",
-    )!;
-    expect(slots).toHaveLength(12);
-    expect(formatCounts(slots)).toEqual({ feed: 3, reel: 3, story: 3, carousel: 3 });
-  });
-
-  it("derives one feed post per explicitly separated authentic story", () => {
-    const slots = buildIgStrategyPublicSlots(
-      "ig-hollis-radical-transparency",
-      "規劃 3 個故事：第一年虧損差點收掉；改配方失敗；曾被客戶退單",
-    )!;
-    expect(slots).toHaveLength(3);
-    expect(formatCounts(slots)).toEqual({ feed: 3 });
   });
 
   it.each([
@@ -556,7 +483,7 @@ describe("IG public synthesis parsing", () => {
     })).toThrow("violates brand word rules");
   });
 
-  it("fails closed on a missing, duplicate, or extra server-owned slot", () => {
+  it("fails closed on a missing, unknown, or extra server-owned slot", () => {
     const slots = buildIgStrategyPublicSlots("ig-garyvee-document", "一個素材")!;
     const valid = JSON.parse(modelJson(slots, () => "你可以記錄一個真實工作的瞬間。"));
 
@@ -565,11 +492,17 @@ describe("IG public synthesis parsing", () => {
       outputLanguage: "zh-TW", slots, steps: [],
     })).toThrow("wrong variant count");
 
-    valid.variants[1].slotId = valid.variants[0].slotId;
+    valid.variants[0].slotId = "unknown-slot";
     expect(() => parseIgStrategyPublicVariants({
       idOrSlug: "ig-garyvee-document", modelText: JSON.stringify(valid),
       outputLanguage: "zh-TW", slots, steps: [],
-    })).toThrow("invalid slot ids");
+    })).toThrow("missing document-feed-1");
+
+    valid.variants.push({ ...valid.variants[0], slotId: "extra-slot" });
+    expect(() => parseIgStrategyPublicVariants({
+      idOrSlug: "ig-garyvee-document", modelText: JSON.stringify(valid),
+      outputLanguage: "zh-TW", slots, steps: [],
+    })).toThrow("wrong variant count");
   });
 });
 

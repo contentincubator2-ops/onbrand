@@ -8,7 +8,6 @@ import {
   getPlanningConfirmationPayload,
   getStrategyPublicGenerationState,
   getStrategyPublicTabLabel,
-  getStrategyRemainingGenerationState,
   getRunContentMutationLocator,
   getRunContentSelectionKey,
   isEmptyStrategyPublicSelection,
@@ -93,11 +92,12 @@ describe("strategy content envelope", () => {
     expect(shouldHideStrategyPlanningTabs("fb-60-single-full", true)).toBe(false);
   });
 
-  it("uses day-order labels only for fixed daily feed campaigns", () => {
-    const daily = { taskId: "ig-99-youtility", isStrategyEnvelope: true, format: "feed" };
-    expect(getStrategyPublicTabLabel({ ...daily, index: 0, language: "zh" })).toBe("第一天");
-    expect(getStrategyPublicTabLabel({ ...daily, index: 29, language: "zh" })).toBe("第三十天");
-    expect(getStrategyPublicTabLabel({ ...daily, index: 2, language: "en" })).toBe("Day 3");
+  it("uses deliverable labels without deriving day-order labels", () => {
+    const strategy = { taskId: "ig-99-youtility", isStrategyEnvelope: true, format: "feed" };
+    expect(getStrategyPublicTabLabel({ ...strategy, index: 0, fallbackLabel: "實用貼文", language: "zh" }))
+      .toBe("實用貼文");
+    expect(getStrategyPublicTabLabel({ ...strategy, index: 0, fallbackLabel: "Useful Post", language: "en" }))
+      .toBe("Useful Post");
     expect(getStrategyPublicTabLabel({
       taskId: "ig-99-live-first",
       isStrategyEnvelope: true,
@@ -106,7 +106,7 @@ describe("strategy content envelope", () => {
       fallbackLabel: "直播場次 1",
       language: "zh",
     })).toBe("直播場次 1");
-    expect(getStrategyPublicTabLabel({ ...daily, isStrategyEnvelope: false, index: 0, fallbackLabel: "原標籤", language: "zh" }))
+    expect(getStrategyPublicTabLabel({ ...strategy, isStrategyEnvelope: false, index: 0, fallbackLabel: "原標籤", language: "zh" }))
       .toBe("原標籤");
   });
 
@@ -209,25 +209,6 @@ describe("strategy content envelope", () => {
       isStrategyEnvelope: false,
       progress: "caption_ready",
       publicVariantCount: 0,
-    })).toBeNull();
-  });
-
-  it("offers remaining generation only for incomplete strategy bundles", () => {
-    const base = {
-      taskId: "ig-99-youtility",
-      isStrategyEnvelope: true,
-      publicVariantCount: 3,
-      publicSlotCount: 30,
-    };
-    expect(getStrategyRemainingGenerationState({ ...base, progress: "done" })).toBe("ready");
-    expect(getStrategyRemainingGenerationState({ ...base, progress: "caption_ready" })).toBe("generating");
-    expect(getStrategyRemainingGenerationState({ ...base, publicVariantCount: 30, progress: "done" })).toBeNull();
-    expect(getStrategyRemainingGenerationState({
-      taskId: "fb-60-single-full",
-      isStrategyEnvelope: false,
-      publicVariantCount: 1,
-      publicSlotCount: 3,
-      progress: "caption_ready",
     })).toBeNull();
   });
 

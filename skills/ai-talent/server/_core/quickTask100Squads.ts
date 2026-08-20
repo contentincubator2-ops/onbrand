@@ -259,7 +259,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       privateAliases: ["Youtility", "Jay Baer", "Baer"],
       deliverables: [
         {
-          id: "useful-feed", kind: "fixed", format: "feed", count: 30,
+          id: "useful-feed", kind: "fixed", format: "feed", count: 1,
           label: { en: "Useful Post", zh: "實用貼文" },
           instruction: {
             en: "One complete, useful Instagram feed post that helps without selling.",
@@ -288,7 +288,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       privateAliases: ["Chris Do", "ChrisDo", "The Futur", "TheFutur"],
       deliverables: [
         {
-          id: "visual-feed", kind: "fixed", format: "feed", count: 30,
+          id: "visual-feed", kind: "fixed", format: "feed", count: 1,
           label: { en: "Visual Story Post", zh: "視覺敘事貼文" },
           instruction: {
             en: "One complete Instagram feed post with a consistent visual direction and publishable caption.",
@@ -317,31 +317,11 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       privateAliases: ["Live-First", "LiveFirst", "Brian Fanzo", "BrianFanzo"],
       deliverables: [
         {
-          id: "live-session", kind: "per-input-item", format: "live",
-          inputKind: "live-session", defaultItems: 1, maxItems: 4, multiplier: 1,
+          id: "live-session", kind: "fixed", format: "live", count: 1,
           label: { en: "Live Session", zh: "直播場次" },
           instruction: {
             en: "A complete audience-facing Instagram Live run-of-show and host script.",
             zh: "一份面向觀眾、可直接使用的 IG Live 流程與主持腳本。",
-          },
-        },
-        {
-          id: "live-teaser", kind: "per-input-item", format: "story",
-          inputKind: "live-session", defaultItems: 1, maxItems: 4, multiplier: 1,
-          label: { en: "Live Teaser", zh: "直播預告" },
-          instruction: {
-            en: "A publishable Instagram Story teaser for the corresponding live session.",
-            zh: "一則可直接發布、對應該場直播的 IG Story 預告。",
-          },
-        },
-        {
-          id: "post-live", kind: "allocated-bundle",
-          formats: ["reel", "story", "carousel"], inputKind: "live-session",
-          defaultItems: 1, maxItems: 4, perItemCount: 10,
-          label: { en: "Post-Live Content", zh: "直播後內容" },
-          instruction: {
-            en: "A standalone publishable derivative from the live session, adapted to the assigned format.",
-            zh: "一則由直播內容延伸、依指定格式改寫且可獨立發布的成品。",
           },
         },
       ],
@@ -364,18 +344,16 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       presentation: "ig-public-bundle",
       publicTitle: { en: "IG Documentary Content Deliverables", zh: "IG 紀實內容成品" },
       privateAliases: ["GaryVee", "Gary Vee", "Gary Vaynerchuk", "GaryVaynerchuk", "Document Don't Create", "DocumentDontCreate"],
-      deliverables: (["feed", "reel", "story", "carousel"] as const).map((format) => ({
-        id: `document-${format}`, kind: "per-input-item" as const, format,
-        inputKind: "documented-asset" as const, defaultItems: 1, maxItems: 5, multiplier: 1,
-        label: {
-          en: `Documentary ${format[0]!.toUpperCase()}${format.slice(1)}`,
-          zh: `紀實${format === "feed" ? "貼文" : format === "reel" ? "短影音" : format === "story" ? "限時動態" : "輪播"}`,
+      deliverables: [
+        {
+          id: "document-feed", kind: "fixed", format: "feed", count: 1,
+          label: { en: "Documentary Post", zh: "紀實貼文" },
+          instruction: {
+            en: "A complete, publishable feed post created from one documented real-world asset or scene.",
+            zh: "由一個真實紀錄素材或場景改寫而成、可直接發布的 feed 成品。",
+          },
         },
-        instruction: {
-          en: `A complete, publishable ${format} created from one documented real-world asset or scene.`,
-          zh: `由一個真實紀錄素材或場景改寫而成、可直接發布的 ${format} 成品。`,
-        },
-      })),
+      ],
     },
   },
   {
@@ -397,8 +375,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       privateAliases: ["Rachel Hollis", "RachelHollis", "Radical Transparency", "RadicalTransparency"],
       deliverables: [
         {
-          id: "authentic-story", kind: "per-input-item", format: "feed",
-          inputKind: "authentic-story", defaultItems: 1, maxItems: 5, multiplier: 1,
+          id: "authentic-story", kind: "fixed", format: "feed", count: 1,
           label: { en: "Authentic Story", zh: "真實故事貼文" },
           instruction: {
             en: "One complete, publishable Instagram feed post based only on a story the user agreed to share.",
