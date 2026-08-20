@@ -3132,6 +3132,12 @@ export default function RunPage() {
                 const focusedAgTitle = focusedAg?.title ?? "";
                 const stages: Array<{key: string; label: string; status: string; startedAt?: number; completedAt?: number}> = Array.isArray(md.stages) ? md.stages : [];
                 const totalMs = md.latencyMs ?? 0;
+                const fetchedUrl = typeof md.fetchedUrl === "string"
+                  ? md.fetchedUrl
+                  : (typeof md.fetchedUrl?.url === "string" ? md.fetchedUrl.url : null);
+                const unavailableUrl = typeof md.urlFetchFailure === "string"
+                  ? md.urlFetchFailure
+                  : (typeof md.urlFetchFailure?.url === "string" ? md.urlFetchFailure.url : null);
                 return (
                   <>
                     <p className="text-tiny font-semibold flex items-center gap-2">
@@ -3200,9 +3206,15 @@ export default function RunPage() {
                         </>
                       )}
                     </div>
-                    {md.fetchedUrl && (
+                    {unavailableUrl ? (
+                      <p className="text-[10px] text-warning-700" title={unavailableUrl}>
+                        ⚠️ {lang === "en"
+                          ? "This link's content could not be fetched (platform restriction). Paste the video caption or describe the topic instead."
+                          : "這個連結抓不到內容（平台限制），建議直接貼上影片文案或描述主題。"}
+                      </p>
+                    ) : fetchedUrl && (
                       <p className="text-[10px] text-default-500">
-                        🔗 {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={md.fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{md.fetchedUrl}</a>
+                        🔗 {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{fetchedUrl}</a>
                       </p>
                     )}
                     {Array.isArray(md.errors) && md.errors.length > 0 && (

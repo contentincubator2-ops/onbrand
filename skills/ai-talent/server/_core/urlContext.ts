@@ -35,6 +35,17 @@ const URL_BARE_RE = new RegExp(
 );
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_BODY_CHARS = 3000;
+const MIN_USABLE_BODY_CHARS = 200;
+const BOILERPLATE_PAGE_TITLES = new Set([
+  "tiktok",
+  "tiktok - make your day",
+  "instagram",
+  "log in • instagram",
+  "facebook",
+  "log in to facebook",
+  "facebook – log in or sign up",
+  "threads",
+]);
 
 export interface UrlSummary {
   url: string;
@@ -65,6 +76,7 @@ const LOGIN_REQUIRED_HOSTS = new Set([
   "twitter.com",
   "threads.net",
   "linkedin.com",
+  "tiktok.com",
 ]);
 
 const LOGIN_OR_JS_SHELL_RE =
@@ -74,6 +86,15 @@ function isLoginRequiredHost(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
     return [...LOGIN_REQUIRED_HOSTS].some((domain) => host === domain || host.endsWith(`.${domain}`));
+  } catch {
+    return false;
+  }
+}
+
+function isTikTokUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
+    return host === "tiktok.com" || host.endsWith(".tiktok.com");
   } catch {
     return false;
   }
@@ -128,8 +149,162 @@ function pluck(html: string, selectorPattern: RegExp): string | null {
   return m ? htmlToText(m[1] ?? m[0]).trim() || null : null;
 }
 
+/** Platform shell titles carry no topic information and must not make an
+ * otherwise empty fetch look useful. Exact matching avoids rejecting real
+ * articles that merely mention a platform in a longer title. */
+export function isBoilerplatePageTitle(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().replace(/\s+/g, " ").toLowerCase();
+  return BOILERPLATE_PAGE_TITLES.has(normalized);
+}
+
+function promptableTitle(value: string | null | undefined): string | null {
+  const normalized = textValue(value);
+  return normalized && !isBoilerplatePageTitle(normalized) ? normalized : null;
+}
+
+/** A fetch is meaningful when it contains promptable text metadata or enough
+ * real page copy to pass the same body-quality threshold used below. Keeping
+ * this check named prevents empty JS shells from masquerading as fetched
+ * context while preserving short, normal pages that carry a title/summary. */
+export function hasMeaningfulUrlContent(
+  summary: Pick<UrlSummary, "title" | "description" | "h1" | "body_excerpt" | "og">
+    & Partial<Pick<UrlSummary, "body_usable">>,
+): boolean {
+  const titles = [summary.title, summary.h1, summary.og.title];
+  if (titles.some((value) => textValue(value) && !isBoilerplatePageTitle(value))) {
+    return true;
+  }
+  const otherMetadata = [
+    summary.description,
+    summary.og.description,
+  ];
+  if (otherMetadata.some((value) => textValue(value))) {
+    return true;
+  }
+  return summary.body_usable !== false
+    && summary.body_excerpt.replace(/\s/g, "").length >= MIN_USABLE_BODY_CHARS;
+}
+
+function textValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+interface TikTokOEmbedResponse {
+  title?: unknown;
+  author_name?: unknown;
+  author_unique_id?: unknown;
+  thumbnail_url?: unknown;
+  html?: unknown;
+  provider_name?: unknown;
+}
+
+/** TikTok's public oEmbed endpoint is the only unauthenticated source that
+ * reliably exposes a video's caption, author, thumbnail, and sound metadata. */
+async function fetchTikTokOEmbed(url: string): Promise<UrlSummary | null> {
+  if (!isTikTokUrl(url)) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const endpoint = new URL("https://www.tiktok.com/oembed");
+    endpoint.searchParams.set("url", url);
+    const res = await fetch(endpoint, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; OnBrand-Bot/1.0; +https://onbrand.sowork.ai)",
+        "Accept": "application/json",
+      },
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+
+    const data = await res.json() as TikTokOEmbedResponse;
+    const title = promptableTitle(textValue(data.title));
+    const authorName = textValue(data.author_name);
+    const authorUniqueId = textValue(data.author_unique_id);
+    const author = [authorName, authorUniqueId ? `@${authorUniqueId.replace(/^@/, "")}` : null]
+      .filter(Boolean)
+      .join(" ");
+    const embedHtml = textValue(data.html);
+    const music = embedHtml
+      ? pluck(embedHtml, /<a[^>]*>\s*(♬[\s\S]*?)<\/a>/i)?.replace(/^♬\s*/, "") ?? null
+      : null;
+    const ogDescription = [
+      author ? `作者：${author}` : null,
+      music ? `音樂：${music}` : null,
+    ].filter(Boolean).join("｜") || null;
+    let domain = "tiktok.com";
+    try { domain = new URL(url).hostname.replace(/^www\./, ""); } catch { /* keep default */ }
+
+    const summary: UrlSummary = {
+      url,
+      title: title?.slice(0, 280) ?? null,
+      description: null,
+      h1: null,
+      body_excerpt: "",
+      body_usable: false,
+      fetched_chars: 0,
+      og: {
+        image: textValue(data.thumbnail_url),
+        title: title?.slice(0, 280) ?? null,
+        description: ogDescription?.slice(0, 600) ?? null,
+        site_name: textValue(data.provider_name)?.slice(0, 80) ?? "TikTok",
+        domain,
+      },
+    };
+    return summary;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function mergeTikTokSummaries(
+  htmlSummary: UrlSummary | null,
+  oEmbedSummary: UrlSummary | null,
+  url: string,
+): UrlSummary | null {
+  if (!htmlSummary && !oEmbedSummary) return null;
+
+  const htmlTitle = promptableTitle(htmlSummary?.title);
+  const htmlOgTitle = promptableTitle(htmlSummary?.og.title);
+  const oEmbedTitle = promptableTitle(oEmbedSummary?.title);
+  const oEmbedOgTitle = promptableTitle(oEmbedSummary?.og.title);
+  const summary: UrlSummary = {
+    url,
+    title: oEmbedTitle ?? htmlTitle,
+    description: oEmbedSummary?.description ?? htmlSummary?.description ?? null,
+    h1: htmlSummary?.h1 ?? null,
+    // TikTok is always card-only. Do not retain hydration JSON as an excerpt
+    // that a future caller could accidentally treat as video copy.
+    body_excerpt: "",
+    body_usable: false,
+    fetched_chars: htmlSummary?.fetched_chars ?? 0,
+    og: {
+      image: oEmbedSummary?.og.image ?? htmlSummary?.og.image ?? null,
+      title: oEmbedOgTitle ?? oEmbedTitle ?? htmlOgTitle ?? htmlTitle,
+      description: oEmbedSummary?.og.description ?? htmlSummary?.og.description ?? null,
+      site_name: oEmbedSummary?.og.site_name ?? htmlSummary?.og.site_name ?? "TikTok",
+      domain: oEmbedSummary?.og.domain ?? htmlSummary?.og.domain ?? "tiktok.com",
+    },
+  };
+  return hasMeaningfulUrlContent(summary) ? summary : null;
+}
+
 /** Fetch + extract structured page summary. Returns null on any failure. */
 export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
+  const htmlSummary = await fetchHtmlSummary(url);
+  if (isTikTokUrl(url)) {
+    const oEmbedSummary = await fetchTikTokOEmbed(url);
+    return mergeTikTokSummaries(htmlSummary, oEmbedSummary, url);
+  }
+  if (htmlSummary && hasMeaningfulUrlContent(htmlSummary)) return htmlSummary;
+  return null;
+}
+
+async function fetchHtmlSummary(url: string): Promise<UrlSummary | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -165,11 +340,11 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
     const buf = Buffer.concat(chunks.map(c => Buffer.from(c)));
     const html = buf.toString("utf-8");
 
-    const title = pluck(html, /<title[^>]*>([\s\S]*?)<\/title>/i);
+    const title = promptableTitle(pluck(html, /<title[^>]*>([\s\S]*?)<\/title>/i));
     const description =
       pluck(html, /<meta\s+name=["']description["']\s+content=["']([\s\S]*?)["']/i) ||
       pluck(html, /<meta\s+property=["']og:description["']\s+content=["']([\s\S]*?)["']/i);
-    const h1 = pluck(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    const h1 = promptableTitle(pluck(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i));
 
     // OG card extraction — these power FBLinkCard / IGLinkCard mockups so
     // users see the actual OG preview Facebook would auto-generate.
@@ -177,7 +352,7 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
       pluck(html, new RegExp(`<meta\\s+property=["']${prop}["']\\s+content=["']([\\s\\S]*?)["']`, "i")) ||
       pluck(html, new RegExp(`<meta\\s+name=["']${prop}["']\\s+content=["']([\\s\\S]*?)["']`, "i"));
     const ogImageRaw = ogMeta("og:image") || ogMeta("twitter:image") || ogMeta("twitter:image:src");
-    const ogTitle = ogMeta("og:title") || title;
+    const ogTitle = promptableTitle(ogMeta("og:title")) || title;
     const ogDescription = ogMeta("og:description") || description;
     const ogSiteName = ogMeta("og:site_name");
     let domain = "";
@@ -195,7 +370,7 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
     const bodyUsable =
       !isLoginRequiredHost(url) &&
       !isLoginRequiredHost(effectiveUrl) &&
-      effectiveTextLength >= 200 &&
+      effectiveTextLength >= MIN_USABLE_BODY_CHARS &&
       !LOGIN_OR_JS_SHELL_RE.test(fullText);
 
     return {
@@ -215,8 +390,9 @@ export async function fetchUrlSummary(url: string): Promise<UrlSummary | null> {
       },
     };
   } catch {
-    clearTimeout(timer);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -226,14 +402,15 @@ export function formatUrlSummaryForPrompt(s: UrlSummary): string {
   if (s.title)       parts.push(`標題：${s.title}`);
   if (s.description) parts.push(`描述：${s.description}`);
   if (s.body_usable === false) {
+    if (s.h1) parts.push(`H1：${s.h1}`);
     if (s.og.title && s.og.title !== s.title) parts.push(`OG 標題：${s.og.title}`);
     if (s.og.description && s.og.description !== s.description) parts.push(`OG 描述：${s.og.description}`);
     if (s.og.site_name) parts.push(`OG 網站：${s.og.site_name}`);
-    parts.push("只取得連結卡片摘要，未取得正文：請依標題與描述推論主題撰寫，不要臆造未出現的細節。");
+    parts.push("只取得連結卡片層級資訊：請據此推論主題方向，不足處以品牌素材補足；不要臆造連結或影片細節，也不要在成品中說明抓取狀況。");
   } else {
     if (s.h1)          parts.push(`H1：${s.h1}`);
     if (s.body_excerpt) parts.push(`內文摘錄（前 ${s.body_excerpt.length} 字）：\n${s.body_excerpt}`);
+    parts.push(`【務必基於以上連結內容生成 — 不要寫通用模板，要呼應這篇內容的具體訊息、故事、品牌獨特之處】`);
   }
-  parts.push(`【務必基於以上連結內容生成 — 不要寫通用模板，要呼應這篇內容的具體訊息、故事、品牌獨特之處】`);
   return parts.join("\n");
 }

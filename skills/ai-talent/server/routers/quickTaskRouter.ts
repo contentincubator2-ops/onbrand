@@ -2896,6 +2896,7 @@ export const quickTaskRouter = router({
           domain: string;
         };
       } | null = null;
+      let urlFetchFailure: { url: string; reason: "content_unavailable" } | null = null;
       for (const v of Object.values(input.inputs)) {
         if (typeof v === "string") {
           const url = findFirstUrl(v);
@@ -2909,8 +2910,10 @@ export const quickTaskRouter = router({
                 chars: summary.fetched_chars,
                 og: summary.og,
               };
+              urlFetchFailure = null;
               break; // first URL only — keep prompt budget reasonable
             }
+            urlFetchFailure ??= { url, reason: "content_unavailable" };
           }
         }
       }
@@ -2972,6 +2975,7 @@ export const quickTaskRouter = router({
         agent: agentMeta,        // {id, name, title, avatarUrl} or null
         skill_slug: template.skill_slug ?? null,
         fetchedUrl,              // {url, title, chars} or null — was a URL read?
+        urlFetchFailure,         // URL was present but yielded no promptable content
       };
     }),
 

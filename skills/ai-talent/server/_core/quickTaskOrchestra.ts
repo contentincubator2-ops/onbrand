@@ -194,6 +194,12 @@ export interface OrchestraResult {
     chars: number;
     og: UrlSummary["og"];
   } | null;
+  /** The input contained a URL, but neither the page nor a supported fallback
+   * yielded promptable content. Optional for persisted-record compatibility. */
+  urlFetchFailure?: {
+    url: string;
+    reason: "content_unavailable";
+  } | null;
   captionAgent: AgentMeta | null;
   imageAgent: AgentMeta | null;
   variants: OrchestraVariant[];
@@ -1970,6 +1976,9 @@ export async function runOrchestra(args: {
     // Otherwise fall back to generic urlContext for non-YT links.
     const inputValues = Object.values(args.inputs).filter((v): v is string => typeof v === "string");
     const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
+    const detectedUrl = ytUrlInput
+      ? findFirstUrl(ytUrlInput)
+      : inputValues.map((v) => findFirstUrl(v)).find((url): url is string => !!url) ?? null;
 
     // 100s tier: also kick off scout (viral patterns research) in parallel
     const isResearchTier = tier === "99s";
@@ -2001,14 +2010,8 @@ export async function runOrchestra(args: {
         : Promise.resolve(null),
       // Generic URL fetch only when there's a non-YT URL
       (async () => {
-        if (ytUrlInput) return null; // skip — YT path handles it
-        for (const v of inputValues) {
-          const url = findFirstUrl(v);
-          if (url) {
-            try { return await fetchUrlSummary(url); } catch { return null; }
-          }
-        }
-        return null;
+        if (ytUrlInput || !detectedUrl) return null; // skip — YT path handles it
+        try { return await fetchUrlSummary(detectedUrl); } catch { return null; }
       })(),
       // Brand context + knowledge base + REAL public content merged.
       // brandRealContent (website + social via Perplexity) is the strongest
@@ -2091,6 +2094,9 @@ export async function runOrchestra(args: {
       : urlSummary
         ? { url: urlSummary.url, title: urlSummary.title, chars: urlSummary.fetched_chars, og: urlSummary.og }
         : null;
+    const urlFetchFailure = detectedUrl && !fetchedUrl
+      ? { url: detectedUrl, reason: "content_unavailable" as const }
+      : null;
     let urlContext = ytContext
       ? "\n\n" + formatYouTubeContextForPrompt(ytContext) + "\n\n"
       : urlSummary
@@ -2433,6 +2439,7 @@ export async function runOrchestra(args: {
           taskId: args.template.id,
           totalLatencyMs: Date.now() - startedAt,
           fetchedUrl,
+          urlFetchFailure,
           captionAgent: captionLoad.meta,
           imageAgent: imageLoad.meta,
           variants: partialVariants,
@@ -2483,6 +2490,7 @@ export async function runOrchestra(args: {
               imageAgent: imageLoad.meta ?? null,
               stages: [...stages],
               fetchedUrl: fetchedUrl ?? null,
+              urlFetchFailure,
               errors: [...errors],
               ok: true,
               variantCount: partialVariants.length,
@@ -2949,6 +2957,7 @@ export async function runOrchestra(args: {
       taskId: args.template.id,
       totalLatencyMs: Date.now() - startedAt,
       fetchedUrl,
+      urlFetchFailure,
       captionAgent: captionLoad.meta,
       imageAgent: imageLoad.meta,
       variants,
@@ -3038,6 +3047,7 @@ export async function runOrchestra(args: {
           imageAgent: result.imageAgent ?? null,
           stages: result.stages ?? [],
           fetchedUrl: result.fetchedUrl ?? null,
+          urlFetchFailure: result.urlFetchFailure ?? null,
           errors: result.errors ?? [],
           ok: result.ok ?? true,
           variantCount: result.variants.length,
