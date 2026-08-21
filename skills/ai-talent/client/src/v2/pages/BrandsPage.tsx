@@ -4930,6 +4930,9 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
   async function handleSave() {
     if (!productId || !upsertM?.mutateAsync) return;
     const p = q?.data;
+    const existingPositioning = (typeof p?.positioning === "string"
+      ? safeParse(p.positioning)
+      : p?.positioning) ?? {};
     const w = website.trim();
     const summary = [usp.trim(), w ? `官方網址：${w}` : ""].filter(Boolean).join("\n");
     await upsertM.mutateAsync({
@@ -4937,9 +4940,16 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
       brandId: p?.brandId ?? undefined,
       slug: p?.slug ?? String(productId),
       name: name.trim() || (p?.name ?? "未命名產品"),
-      positioning: (usp.trim() || w || sku.trim())
-        ? { summary: summary || undefined, website: w || undefined, sku: sku.trim() || undefined }
-        : undefined,
+      // 2026-08-21: spread existing positioning so imageUrl / price /
+      // pipeline segments survive an edit. Cleared fields are sent as null
+      // (not undefined) — the server's merge drops undefined keys, so null
+      // is the only way for the user to actually clear a value.
+      positioning: {
+        ...existingPositioning,
+        summary: summary || null,
+        website: w || null,
+        sku: sku.trim() || null,
+      },
     });
     setSavedAt(Date.now());
   }
@@ -5450,12 +5460,13 @@ function BrandEntityGrid({
     const interim = p._interim ?? {};   // interim positioning from auto-discovery
     if (kind === "product") {
       return {
-        tagline:  extractField(p, "tagline", "tagline.zhTagline", "differentiation.summary")
+        tagline:  extractField(p, "tagline", "tagline.zhTagline", "core.zhTagline", "core.oneLineValueProp", "differentiation.summary")
                     || interim.tagline || "",
-        usp:      extractField(p, "usp", "differentiation.functional", "differentiation.summary")
+        usp:      extractField(p, "usp", "competition.uniqueUsp", "core.oneLineValueProp", "differentiation.functional", "differentiation.summary")
                     || interim.usp || "",
         audience: extractField(p, "audience.primary", "targetAudience")
                     || interim.targetAudience || "",
+        price: extractField(p, "price"),
       };
     } else {
       return {
@@ -5464,6 +5475,7 @@ function BrandEntityGrid({
         audience: item.startAt
           ? `${new Date(item.startAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}${item.endAt ? ` → ${new Date(item.endAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}` : ""}`
           : "",
+        price: "",
       };
     }
   };
@@ -5473,6 +5485,7 @@ function BrandEntityGrid({
     const interim = p._interim ?? {};
     return !!(
       p.tagline || p.usp || p.theme || p.differentiation?.summary ||
+      p.core?.zhTagline || p.core?.oneLineValueProp || p.competition?.uniqueUsp ||
       p.audience?.primary || p.targetAudience ||
       interim.tagline || interim.usp || interim.targetAudience
     );
@@ -5546,6 +5559,9 @@ function BrandEntityGrid({
                 <div className={kind === "product" ? "p-3" : "p-4"}>
                 {/* Name */}
                 <p className="text-sm font-semibold text-neutral-900 mb-2 truncate">{item.name}</p>
+                {kind === "product" && preview.price && (
+                  <p className="text-[10px] font-medium text-neutral-500 -mt-1 mb-2">{preview.price}</p>
+                )}
 
                 {positioned ? (
                   <div className="space-y-1.5">

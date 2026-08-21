@@ -22,6 +22,7 @@ import localPool from "../localDb";
 import { callLLM } from "../_core/llmRouter";
 import { assertUrlSafe } from "../_core/urlGuard";
 import { fetchImageBuffer } from "../_core/imageFetch";
+import { fetchProductMeta } from "../_core/productMeta";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function safeJson(s: any): any {
@@ -38,6 +39,76 @@ async function row<T = any>(sqlText: string, params: any[] = []): Promise<T | nu
 async function rows<T = any>(sqlText: string, params: any[] = []): Promise<T[]> {
   const [r]: any = await localPool.execute(sqlText, params);
   return (r as T[]) ?? [];
+}
+
+function definedPositioningPatch(value: any): Record<string, any> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, field]) => field !== undefined));
+}
+
+function formatProductPrice(price: string, currency?: string): string {
+  const trimmed = price.trim();
+  const numeric = Number(trimmed.replace(/,/g, ""));
+  const amount = Number.isFinite(numeric)
+    ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(numeric)
+    : trimmed;
+  const code = currency?.trim().toUpperCase();
+  return code === "TWD" ? `NT$${amount}` : code ? `${code} ${amount}` : amount;
+}
+
+function productMetaDescription(name: string, url: string, price?: string): string {
+  return price
+    ? `「${name}」，定價 ${price}。商品頁：${url}`
+    : `「${name}」。商品頁：${url}`;
+}
+
+/** Detached metadata fill. Each JSON_SET value is guarded in SQL so a manual
+ * edit or positioning step that lands while the fetch is in flight wins. */
+async function backfillProductMeta(args: {
+  productId: number;
+  userId: number;
+  productName: string;
+  positioning: Record<string, any>;
+}): Promise<void> {
+  const website = [args.positioning.productUrl, args.positioning.website]
+    .find((value) => typeof value === "string" && value.trim())?.trim();
+  if (!website || (args.positioning.imageUrl && args.positioning.price)) return;
+
+  try {
+    const meta = await fetchProductMeta(website);
+    const price = meta.price ? formatProductPrice(meta.price, meta.currency) : undefined;
+    const description = productMetaDescription(meta.name ?? args.productName, website, price);
+    const candidates: Array<[string, string | undefined]> = [
+      ["imageUrl", meta.imageUrl],
+      ["price", price],
+      ["productUrl", website],
+      ["description", description],
+    ];
+    const available = candidates.filter((entry): entry is [string, string] => !!entry[1]);
+    if (available.length === 0) {
+      console.warn(`[productMeta] no metadata found for product ${args.productId}: ${website}`);
+      return;
+    }
+
+    const jsonSetArgs: string[] = [];
+    const params: any[] = [];
+    for (const [key, value] of available) {
+      const path = `$.${key}`;
+      jsonSetArgs.push(
+        `'${path}', IF(JSON_EXTRACT(positioning, '${path}') IS NULL OR JSON_TYPE(JSON_EXTRACT(positioning, '${path}')) = 'NULL' OR JSON_UNQUOTE(JSON_EXTRACT(positioning, '${path}')) = '', ?, JSON_UNQUOTE(JSON_EXTRACT(positioning, '${path}')))`
+      );
+      params.push(value);
+    }
+    await localPool.execute(
+      `UPDATE products
+          SET positioning = JSON_SET(COALESCE(positioning, JSON_OBJECT()), ${jsonSetArgs.join(", ")})
+        WHERE id = ? AND userId = ?`,
+      [...params, args.productId, args.userId],
+    );
+    console.log(`[productMeta] backfilled product ${args.productId} from ${meta.source}: ${available.map(([key]) => key).join(", ")}`);
+  } catch (error) {
+    console.warn(`[productMeta] backfill failed for product ${args.productId}:`, error instanceof Error ? error.message : error);
+  }
 }
 
 // ── product router ─────────────────────────────────────────────────────────
@@ -87,23 +158,36 @@ export const productRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const positioningJson = input.positioning != null
-        ? JSON.stringify(input.positioning)
-        : null;
+      const patch = definedPositioningPatch(input.positioning);
+      let nextPositioning: Record<string, any>;
+      let productId: number;
       if (input.id) {
+        const existing = await row<{ positioning: any }>(
+          `SELECT positioning FROM products WHERE id = ? AND userId = ? LIMIT 1`,
+          [input.id, userId],
+        );
+        const oldPositioning = safeJson(existing?.positioning) ?? {};
+        nextPositioning = { ...oldPositioning, ...patch };
         await localPool.execute(
           `UPDATE products SET brandId = ?, slug = ?, name = ?, positioning = ?
             WHERE id = ? AND userId = ?`,
-          [input.brandId ?? null, input.slug, input.name, positioningJson, input.id, userId],
+          [input.brandId ?? null, input.slug, input.name, JSON.stringify(nextPositioning), input.id, userId],
         );
-        return { id: input.id };
+        productId = input.id;
+      } else {
+        nextPositioning = patch;
+        const [r]: any = await localPool.execute(
+          `INSERT INTO products (userId, brandId, slug, name, positioning)
+                VALUES (?, ?, ?, ?, ?)`,
+          [userId, input.brandId ?? null, input.slug, input.name, JSON.stringify(nextPositioning)],
+        );
+        productId = Number(r?.insertId ?? 0);
       }
-      const [r]: any = await localPool.execute(
-        `INSERT INTO products (userId, brandId, slug, name, positioning)
-              VALUES (?, ?, ?, ?, ?)`,
-        [userId, input.brandId ?? null, input.slug, input.name, positioningJson],
-      );
-      return { id: Number(r?.insertId ?? 0) };
+
+      if (productId) {
+        void backfillProductMeta({ productId, userId, productName: input.name, positioning: nextPositioning });
+      }
+      return { id: productId };
     }),
 
   /** Replace only the canonical product image URL, preserving positioning. */
