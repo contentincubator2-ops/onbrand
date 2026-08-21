@@ -91,9 +91,9 @@ jobs:
                 // recalibrate) that wrote it.
                 const [jobs] = await conn.execute(
                   'SELECT id, status, currentStep, totalSteps, startedAt, finishedAt, lastError ' +
-                  "FROM positioning_jobs WHERE entityKind = 'brand' AND entityId = ? " +
+                  'FROM positioning_jobs WHERE entityKind = ? AND entityId = ? ' +
                   'ORDER BY id DESC LIMIT 5',
-                  [brandId],
+                  ['brand', brandId],
                 );
                 console.log('RECENT JOBS', JSON.stringify(jobs));
 
