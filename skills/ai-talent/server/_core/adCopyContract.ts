@@ -165,7 +165,21 @@ export function repairAdCopy(caption: string, requestedUrl: string | null): stri
     if (!seg) return caption;
     changed = true;
   }
-  if (!requestedUrl) return changed ? joinSegments(seg) : caption;
+  if (!requestedUrl) {
+    // No landing page requested → no link may survive. Strip every URL the
+    // model invented (all segments + tail) and tidy the dangling arrows.
+    for (const key of ["headline", "primary", "cta", "tail"] as const) {
+      const urls = findAllUrls(seg[key]);
+      if (urls.length === 0) continue;
+      let text = seg[key];
+      for (const u of urls) text = text.split(u).join("");
+      seg[key] = tidyAfterUrlRemoval(text);
+      changed = true;
+    }
+    if (!seg.cta) seg.cta = DEFAULT_CTA_BUTTON;
+    if (!seg.primary) seg.primary = seg.headline;
+    return changed ? joinSegments(seg) : caption;
+  }
   if (!lastLine(seg.primary).includes(requestedUrl)) {
     seg.primary = `${seg.primary}\n${requestedUrl}`.trim();
     changed = true;
@@ -174,12 +188,26 @@ export function repairAdCopy(caption: string, requestedUrl: string | null): stri
   if (ctaUrls.length > 0) {
     let stripped = seg.cta;
     for (const u of ctaUrls) stripped = stripped.split(u).join("");
-    stripped = stripped.replace(/\s*(?:→|->|👉|:|：|\(|（)\s*$/u, "").trim();
-    seg.cta = stripped || DEFAULT_CTA_BUTTON;
+    seg.cta = tidyAfterUrlRemoval(stripped) || DEFAULT_CTA_BUTTON;
     changed = true;
   }
   if (!changed) return caption;
   return joinSegments(seg);
+}
+
+/** Remove arrows / colons / empty brackets left dangling where a URL was. */
+function tidyAfterUrlRemoval(text: string): string {
+  return text
+    .split(/\n/)
+    .map((l) =>
+      l
+        .replace(/\s*(?:→|->|👉|:|：)\s*$/u, "")
+        .replace(/[（(]\s*[)）]/gu, "")
+        .replace(/[ \t]{2,}/g, " ")
+        .trim(),
+    )
+    .filter(Boolean)
+    .join("\n");
 }
 
 function joinSegments(seg: Segments): string {

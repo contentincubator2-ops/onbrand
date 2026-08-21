@@ -159,6 +159,12 @@ describe("repairAdCopy", () => {
       "[Headline] 今年換你寵媽媽\n[Primary] 一份貼近她日常的心意。\n[CTA] 立即查看",
     );
   });
+  it("strips every fabricated URL when no landing page was requested", () => {
+    const c = "前言 www.pre.com\n[Headline] 看 https://x.com/a 這裡\n[Primary] 上 www.made-up.com 看看：\n第二行\n[CTA] www.only.com\n#tag www.tail.com";
+    const out = repairAdCopy(c, null);
+    expect(out).toBe("[Headline] 看 這裡\n[Primary] 上 看看\n第二行\n[CTA] 立即查看\n#tag");
+    expect(validateAdCopy(out, null)).toBeNull();
+  });
   it("is a no-op for compliant captions or when nothing is requested", () => {
     expect(repairAdCopy(GOOD, URL)).toBe(GOOD);
     expect(repairAdCopy("", URL)).toBe("");
