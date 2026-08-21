@@ -17,23 +17,29 @@ name: "Admin — Patch brand strategy-workbench sweet spots"
 #                                     // matching spots are dropped
 #     "dropAllOthers"?: boolean,     // true = discard every existing spot
 #                                     // that isn't in prependSpots, regardless
-#                                     // of removeMatching (2026-08-21 CJ
-#                                     // 「後面那4張舊卡整批清掉」: the old
-#                                     // spots didn't share a common substring
-#                                     // to target with removeMatching, so a
-#                                     // blanket "final state == prependSpots"
-#                                     // switch was simpler than four separate
-#                                     // needles)
-#     "prependSpots": [
+#                                     // of removeMatching
+#     "dropTitles"?: string[],       // exact-match spot.title values to drop,
+#                                     // for removing specific old spots without
+#                                     // reconstructing/resupplying the ones you
+#                                     // want to keep (2026-08-21 CJ「後面那4張
+#                                     // 舊卡整批清掉」: the 4 leftover spots
+#                                     // didn't share a common substring for
+#                                     // removeMatching, and dropAllOthers would
+#                                     // have required resupplying full
+#                                     // lane/need/gap/ours bodies for the 3
+#                                     // spots to keep, which weren't at hand —
+#                                     // an exact-title denylist needed neither)
+#     "prependSpots"?: [             // optional when only removing spots —
+#                                     // defaults to [] (nothing prepended)
 #       { "lane": "emotion"|"function", "title", "need", "gap", "ours",
 #         "tagline": { "zh", "en"? }, "official"?: boolean }
 #     ],
 #     "scenarioName"?: string        // defaults to the first scenario found,
 #                                     // or "情境 A" if none exist yet
 #   }
-# currentTaglineSpot is set to prependSpots[0].title (mirrors the same rule
-# workbenchRouter.ts's derive procedure enforces: spot 0 is the tagline
-# origin).
+# currentTaglineSpot is set to prependSpots[0].title when prependSpots is
+# non-empty (mirrors the same rule workbenchRouter.ts's derive procedure
+# enforces: spot 0 is the tagline origin); left unchanged otherwise.
 
 on:
   workflow_dispatch:
@@ -73,8 +79,14 @@ jobs:
                 const payload = JSON.parse(raw);
                 const brandId = Number(process.env.BRAND_ID);
                 if (!brandId) { console.error('bad brand_id'); process.exit(1); }
-                if (!Array.isArray(payload.prependSpots) || payload.prependSpots.length === 0) {
-                  console.error('payload.prependSpots must be a non-empty array'); process.exit(1);
+                if (payload.prependSpots !== undefined && !Array.isArray(payload.prependSpots)) {
+                  console.error('payload.prependSpots must be an array when provided'); process.exit(1);
+                }
+                const prependSpots = Array.isArray(payload.prependSpots) ? payload.prependSpots : [];
+                const hasWork = prependSpots.length > 0 || payload.removeMatching || payload.dropAllOthers === true ||
+                  (Array.isArray(payload.dropTitles) && payload.dropTitles.length > 0);
+                if (!hasWork) {
+                  console.error('payload has nothing to do: supply prependSpots, removeMatching, dropTitles, or dropAllOthers'); process.exit(1);
                 }
 
                 const conn = await mysql.createConnection({
@@ -135,19 +147,23 @@ jobs:
                 // (Codex review, PR #121).
                 const needle = String(payload.removeMatching || '');
                 const dropAllOthers = payload.dropAllOthers === true;
-                const prependTitles = new Set(payload.prependSpots.map(function (s) { return s.title; }));
+                const dropTitles = new Set(Array.isArray(payload.dropTitles) ? payload.dropTitles : []);
+                const prependTitles = new Set(prependSpots.map(function (s) { return s.title; }));
                 const kept = dropAllOthers ? [] : oldSpots.filter(function (s) {
                   const title = String((s && s.title) || '');
                   const tagline = String((s && s.tagline && s.tagline.zh) || '');
                   if (prependTitles.has(title)) return false;
+                  if (dropTitles.has(title)) return false;
                   if (needle && (title.indexOf(needle) !== -1 || tagline.indexOf(needle) !== -1)) return false;
                   return true;
                 });
                 const removedCount = oldSpots.length - kept.length;
 
-                const newSpots = payload.prependSpots.concat(kept);
+                const newSpots = prependSpots.concat(kept);
                 scn.derived.spots = newSpots;
-                scn.derived.currentTaglineSpot = payload.prependSpots[0].title;
+                if (prependSpots.length > 0) {
+                  scn.derived.currentTaglineSpot = prependSpots[0].title;
+                }
 
                 const idx = scenarios.findIndex(function (s) { return s && s.id === scn.id; });
                 if (idx >= 0) scenarios[idx] = scn; else scenarios.push(scn);
@@ -158,7 +174,7 @@ jobs:
                   [JSON.stringify(pos), brandId],
                 );
 
-                console.log('REMOVED spots matching', JSON.stringify(needle), ':', removedCount);
+                console.log('REMOVED spots total:', removedCount, '(needle:', JSON.stringify(needle), ', dropTitles:', JSON.stringify(Array.from(dropTitles)), ', dropAllOthers:', dropAllOthers, ')');
                 console.log('AFTER spots:', JSON.stringify(scn.derived.spots.map(function (s) { return { title: s.title, tagline: s.tagline && s.tagline.zh, official: !!s.official }; })));
                 console.log('AFTER currentTaglineSpot:', scn.derived.currentTaglineSpot);
                 await conn.end();
