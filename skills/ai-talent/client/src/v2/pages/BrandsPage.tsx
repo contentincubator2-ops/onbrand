@@ -40,6 +40,7 @@ import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as Bra
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
+import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
@@ -649,7 +650,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" | "persona" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -660,6 +661,7 @@ export default function BrandsPage() {
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
     : urlCat === "tools" ? "tools"
+    : urlCat === "persona" ? "persona"
     : "positioning";
   // 2026-07-28 (CJ「選活動定位卡片，跑回品牌定位頁面」): this built its
   // next params from the `searchParams` closure instead of the functional
@@ -670,7 +672,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -2364,6 +2366,13 @@ export default function BrandsPage() {
                 </p>
                 <AIPromptsEditor brandId={activeBrandIdForLocks} />
               </div>
+            </div>
+          )}
+
+          {/* ── 人設 Agent (persona) — user-created, trained persona agents ── */}
+          {derivedCategory === "persona" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <PersonaAgentPanel brandId={activeBrandIdForLocks} />
             </div>
           )}
 

@@ -25,6 +25,7 @@ import { theaterRouter } from "./theaterRouter";
 import { positioningJobsRouter } from "./positioningJobsRouter";
 import { workbenchRouter } from "./workbenchRouter";
 import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
+import { personaAgentRouter } from "./personaAgentRouter";
 import { publishRouter } from "./publishRouter";
 import { billingRouter } from "./billingRouter";
 import { opsRouter } from "./opsRouter";
@@ -86,6 +87,7 @@ export const appRouter = router({
   positioningJobs: positioningJobsRouter,
   workbench: workbenchRouter,
   brandKnowledge:  brandKnowledgeRouter,
+  personaAgent:    personaAgentRouter,
   publish:         publishRouter,
   billing:         billingRouter,
   ops:             opsRouter,

@@ -91,18 +91,23 @@ interface NavItem {
   catKey?: string;
 }
 
-// 2026-08-20: preview-gate emails for the 策略 (Strategy) workspace — 品牌
-// 大腦's tile strip promoted to a left-rail workspace. Kept separate from
-// `isPrivate` below (still sowork@sowork.tw-only) because that flag also
-// gates the market-intel / performance preview rails, which haven't been
-// vetted for accounts outside the sowork.tw team.
-const STRATEGY_PREVIEW_EMAILS = ["sowork@sowork.tw", "vmdirisfamily@gmail.com"];
+// 2026-08-20: 策略 (Strategy) workspace — 品牌大腦's tile strip promoted to
+// a left-rail workspace. Originally gated to a 2-account preview list, kept
+// separate from `isPrivate` below (still sowork@sowork.tw-only, gates the
+// market-intel / performance preview rails which haven't been vetted for
+// accounts outside the sowork.tw team).
+//
+// 2026-08-21 (CJ「所有用戶左方的mission rail上方，都改成策略和內容可切換
+// 的」): graduated from the 2-account preview to every account —
+// isStrategyPreviewEmail() now always returns true. The helper (rather than
+// inlining `true` at each of its three call sites) stays so a future
+// partial-rollout need doesn't require re-threading them again.
 // Exported so BrandsPage.tsx's in-page tile strip (hidden once the left rail
 // already lists the same 7 sections) can gate on the exact same check —
 // two independently-maintained copies of this list is how a user ends up
 // with either two switchers or none.
-export function isStrategyPreviewEmail(email?: string | null): boolean {
-  return STRATEGY_PREVIEW_EMAILS.includes(String(email ?? "").toLowerCase());
+export function isStrategyPreviewEmail(_email?: string | null): boolean {
+  return true;
 }
 
 // 2026-05-26 (CJ「左欄改成平台優先」): replace tier-first nav (30s/60s/99s)
@@ -153,6 +158,12 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
         tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
       { to: "/brands/edit?cat=tools", catKey: "tools", label: en ? "Tools" : "工具", icon: <FontAwesomeIcon icon={faBookBookmark} />,
         tooltip: en ? "Knowledge base / AI prompt library" : "知識庫 / AI 指令庫" },
+      // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
+      // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
+      // agents — trained from pasted text / article links / video links,
+      // each scoped to a subset of the 8 AI-指令庫 platforms.
+      { to: "/brands/edit?cat=persona", catKey: "persona", label: en ? "Persona" : "人設", icon: <FontAwesomeIcon icon={faMicrophone} />,
+        tooltip: en ? "Custom persona agents — train, test-draft, and scope by platform" : "自訂人設 Agent — 訓練、試寫、指定套用平台" },
       { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
         tooltip: en ? "Name / industry / market" : "名稱 / 產業 / 市場" },
     ];
