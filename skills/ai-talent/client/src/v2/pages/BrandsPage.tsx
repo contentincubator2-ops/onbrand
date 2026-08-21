@@ -1194,6 +1194,17 @@ export default function BrandsPage() {
       _autoPosFired.current = null;
       setAutoPosPhase("idle");
     }
+    // 2026-08-21 (CJ「有推導過的品牌，解鎖時不用再觸發新的推導」/「他一直
+    // 不斷地重新推導」): scopeActiveQuery hasn't necessarily resolved yet on
+    // first mount/scope-change — until it does, `fullPositioning` (and so
+    // `hasAnyPositioningContent`) falls back to `{}`, making an ALREADY-
+    // positioned brand look empty for one render. Without this guard the
+    // effect fired a full pipeline right then (fire-and-forget, so the
+    // later re-run with real data couldn't undo it) — every fresh page
+    // load/scope switch for that brand could silently re-derive and
+    // overwrite manually-finalized content. Mirrors the guard
+    // PlatformTaskPage.tsx already has for product/event scope.
+    if (scopeActiveQuery?.isLoading || !scopeActiveQuery?.data) return;
     // Guard: only fire once per (scopeMode, targetId), skip if already has content
     if (
       _autoPosFired.current === key ||
@@ -1227,8 +1238,12 @@ export default function BrandsPage() {
       // Invalidate so the strategist bar / speed card pick up the new _interim data
       utils?.scope?.active?.invalidate?.();
     })();
+    // scopeActiveQuery?.data is in deps so this re-evaluates once loading
+    // resolves — without it, a genuinely-empty brand whose
+    // hasAnyPositioningContent reads `false` both before and after load
+    // would never re-fire (React sees no dependency change).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeMode, targetId, hasAnyPositioningContent, pipeline.status]);
+  }, [scopeMode, targetId, hasAnyPositioningContent, pipeline.status, scopeActiveQuery?.isLoading, scopeActiveQuery?.data]);
 
   // 2026-07-28 (CJ「視覺頁沒有全自動填寫按鈕」): one-shot LLM draft for the
   // visual tab's text/style asset cards (視覺規範/圖像風格/圖示風格/圖表
