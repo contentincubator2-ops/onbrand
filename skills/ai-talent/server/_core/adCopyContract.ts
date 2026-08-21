@@ -46,19 +46,21 @@ const TRAILING_PUNCT_RE = /[)\]}>,.;:!?。，；：！？」』）】]+$/u;
  * spelling so validation/repair compare against what was actually typed
  * (and what the model will most naturally echo back).
  */
-function findAllUrls(text: string): string[] {
-  const out: string[] = [];
-  let rest = text;
-  for (let guard = 0; guard < 20; guard++) {
-    const url = findFirstUrl(rest);
-    if (!url) break;
-    const bare = url.replace(/^https?:\/\//i, "");
-    const literal = rest.includes(url) ? url : bare && rest.includes(bare) ? bare : null;
-    if (!literal) break;
-    out.push(literal);
-    rest = rest.slice(rest.indexOf(literal) + literal.length);
-  }
-  return out;
+function findAllUrls(text: string, depth = 0): string[] {
+  if (depth > 20 || !text) return [];
+  const url = findFirstUrl(text);
+  if (!url) return [];
+  const bare = url.replace(/^https?:\/\//i, "");
+  const literal = text.includes(url) ? url : bare && text.includes(bare) ? bare : null;
+  if (!literal) return [];
+  const idx = text.indexOf(literal);
+  // findFirstUrl prefers a scheme URL anywhere in the text over an earlier
+  // bare domain, so scan the prefix too to keep true left-to-right order.
+  return [
+    ...findAllUrls(text.slice(0, idx), depth + 1),
+    literal,
+    ...findAllUrls(text.slice(idx + literal.length), depth + 1),
+  ];
 }
 
 /** Hard rule appended to the system prompt (overrides the social scaffold). */
@@ -112,25 +114,31 @@ function splitSegments(caption: string): Segments | null {
 }
 
 /** Returns the first contract violation, or null when the caption complies. */
+/**
+ * Returns the first contract violation (with `detail` listing every
+ * violation found, so the retry reminder names all of them), or null.
+ */
 export function validateAdCopy(caption: string, requestedUrl: string | null): AdCopyIssue | null {
   const seg = splitSegments(caption);
   if (!seg) return { reason: "missing_markers", detail: "caption 缺少 [Headline]/[Primary]/[CTA] 標記" };
+  const issues: AdCopyIssue[] = [];
   if (requestedUrl) {
     if (!lastLine(seg.primary).includes(requestedUrl)) {
-      return { reason: "missing_url", detail: `[Primary] 的最後一行必須是指定網址 ${requestedUrl}` };
+      issues.push({ reason: "missing_url", detail: `[Primary] 的最後一行必須是指定網址 ${requestedUrl}` });
     }
     const ctaUrl = seg.cta.includes(requestedUrl) ? requestedUrl : findFirstUrl(seg.cta);
     if (ctaUrl) {
-      return { reason: "url_in_cta", detail: `[CTA] 只能放按鈕文字，不能放網址 ${ctaUrl}` };
+      issues.push({ reason: "url_in_cta", detail: `[CTA] 只能放按鈕文字，不能放網址 ${ctaUrl}` });
     }
   } else {
     // Whole caption (incl. any preamble before the markers / hashtag tail).
     const invented = findFirstUrl(caption);
     if (invented) {
-      return { reason: "fabricated_url", detail: `使用者沒有提供網址，不得自行加入 ${invented}` };
+      issues.push({ reason: "fabricated_url", detail: `使用者沒有提供網址，不得自行加入 ${invented}` });
     }
   }
-  return null;
+  if (issues.length === 0) return null;
+  return { reason: issues[0]!.reason, detail: issues.map((i) => i.detail).join("；") };
 }
 
 function lastLine(block: string): string {
@@ -145,16 +153,19 @@ const DEFAULT_CTA_BUTTON = "立即查看";
  * Deterministic last-resort repair: when the markers are present but the
  * requested URL is not the final line of [Primary], append it there, and
  * strip every occurrence from [CTA] (the button is at most 8 chars on the
- * mockup, so a URL there is useless). Captions without markers are returned
- * untouched — we cannot invent structure the model never produced — and a
- * fabricated URL (none requested) is left for the retry to fix, never
- * silently edited.
+ * mockup, so a URL there is useless). Captions without markers are
+ * re-segmented from plain text (see segmentsFromPlainText). A fabricated
+ * URL (none requested) is left for the retry to fix, never silently edited.
  */
 export function repairAdCopy(caption: string, requestedUrl: string | null): string {
-  if (!requestedUrl) return caption;
-  const seg = splitSegments(caption);
-  if (!seg) return caption;
+  let seg = splitSegments(caption);
   let changed = false;
+  if (!seg) {
+    seg = segmentsFromPlainText(caption);
+    if (!seg) return caption;
+    changed = true;
+  }
+  if (!requestedUrl) return changed ? joinSegments(seg) : caption;
   if (!lastLine(seg.primary).includes(requestedUrl)) {
     seg.primary = `${seg.primary}\n${requestedUrl}`.trim();
     changed = true;
@@ -168,10 +179,40 @@ export function repairAdCopy(caption: string, requestedUrl: string | null): stri
     changed = true;
   }
   if (!changed) return caption;
+  return joinSegments(seg);
+}
+
+function joinSegments(seg: Segments): string {
   return [
     `[Headline] ${seg.headline}`,
     `[Primary] ${seg.primary}`,
     `[CTA] ${seg.cta}`,
     seg.tail,
   ].filter(Boolean).join("\n");
+}
+
+/**
+ * Build the three segments from an unlabelled caption (the model ignored
+ * the markers entirely): first non-empty line → [Headline] (clipped to 25
+ * chars), the rest → [Primary], trailing hashtag lines → tail, default
+ * button text → [CTA]. Returns null for empty input.
+ */
+function segmentsFromPlainText(caption: string): Segments | null {
+  const lines = caption.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const tailLines: string[] = [];
+  while (lines.length > 1 && /^#/.test(lines[lines.length - 1] ?? "")) tailLines.unshift(lines.pop()!);
+  if (lines.length === 0) return null;
+  const first = lines.shift()!;
+  const firstChars = Array.from(first);
+  let headline = first;
+  let primaryLead = "";
+  if (firstChars.length > 25) {
+    // Long opening line: clip the headline at the first sentence break
+    // within 25 chars, keep the full line as the start of [Primary].
+    const cut = first.search(/[。！？!?，,]/u);
+    headline = cut > 0 && cut <= 25 ? first.slice(0, cut) : firstChars.slice(0, 25).join("");
+    primaryLead = first;
+  }
+  const primary = [primaryLead, ...lines].filter(Boolean).join("\n") || headline;
+  return { headline, primary, cta: DEFAULT_CTA_BUTTON, tail: tailLines.join("\n") };
 }

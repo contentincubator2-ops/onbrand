@@ -2272,8 +2272,13 @@ export async function runOrchestra(args: {
           if (!v?.caption) continue;
           const report = await enforceBrandRulesOnTextWithReport(args.brandId, v.caption);
           if (report.text && report.text !== v.caption) {
-            // A banned-word LLM rewrite can drop the landing URL; put it back.
+            // A banned-word LLM rewrite can drop the markers / landing URL;
+            // re-apply the deterministic repair and re-validate.
             v.caption = adCopyTask ? repairAdCopy(report.text, requestedUrl) : report.text;
+            if (adCopyTask) {
+              const issue = validateAdCopy(v.caption, requestedUrl);
+              if (issue) console.warn(`[orchestra] ad-copy contract unmet after brand rewrite (${v.label}): ${issue.detail}`);
+            }
           }
           if (report.bannedHits.length > 0 || report.subsApplied.length > 0) {
             brandFixes.push({

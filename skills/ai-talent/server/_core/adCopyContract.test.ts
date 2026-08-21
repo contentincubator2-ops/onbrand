@@ -34,6 +34,9 @@ describe("extractRequestedUrl", () => {
   it("finds the landing page even when a YouTube link comes first", () => {
     expect(extractRequestedUrl({ campaign: "參考 https://youtu.be/abc123def45 ，CTA 導到 www.abc.com。" })).toBe(URL);
   });
+  it("finds a bare landing page that precedes a scheme YouTube link", () => {
+    expect(extractRequestedUrl({ campaign: "導到 www.abc.com，參考 https://www.youtube.com/watch?v=abc123def45" })).toBe(URL);
+  });
   it("strips trailing punctuation glued to the URL", () => {
     expect(extractRequestedUrl({ campaign: "連結：https://abc.com/sale;" })).toBe("https://abc.com/sale");
     expect(extractRequestedUrl({ campaign: "連結 [www.abc.com]" })).toBe(URL);
@@ -87,6 +90,12 @@ describe("validateAdCopy", () => {
     const c = "[Headline] a\n[Primary] 上 www.made-up.com 看看\n[CTA] c";
     expect(validateAdCopy(c, null)?.reason).toBe("fabricated_url");
   });
+  it("lists every violation in detail", () => {
+    const c = `[Headline] a\n[Primary] b\n[CTA] 看 ${URL}`;
+    const issue = validateAdCopy(c, URL);
+    expect(issue?.reason).toBe("missing_url");
+    expect(issue?.detail).toContain("[CTA]");
+  });
   it("accepts 【】 full-width markers", () => {
     expect(validateAdCopy(`【Headline】a\n【Primary】b ${URL}\n【CTA】c`, URL)).toBeNull();
   });
@@ -125,10 +134,34 @@ describe("repairAdCopy", () => {
     const out = repairAdCopy(`[Headline] a\n[Primary] b\n[CTA] 買 → ${u}`, u);
     expect(out).toBe(`[Headline] a\n[Primary] b\n${u}\n[CTA] 買`);
   });
-  it("is a no-op for compliant captions, captions without markers, or no URL", () => {
+  it("strips a bare foreign URL that precedes a scheme requested URL in [CTA]", () => {
+    const u = "https://abc.com/x";
+    const out = repairAdCopy(`[Headline] a\n[Primary] b\n[CTA] www.other.com 看 ${u}`, u);
+    expect(out).toBe(`[Headline] a\n[Primary] b\n${u}\n[CTA] 看`);
+  });
+  it("rebuilds the three segments from an unlabelled caption (the IRIS case)", () => {
+    const plain = "聖誕節那天，我穿上這件法式藍語刺繡上衣走進家門。\n媽媽在廚房準備晚餐，抬頭看我一眼。\n#聖誕穿搭 #優雅日常";
+    const out = repairAdCopy(plain, URL);
+    expect(out).toBe(
+      "[Headline] 聖誕節那天，我穿上這件法式藍語刺繡上衣走進家門。\n" +
+      "[Primary] 媽媽在廚房準備晚餐，抬頭看我一眼。\nwww.abc.com\n" +
+      "[CTA] 立即查看\n#聖誕穿搭 #優雅日常",
+    );
+    expect(validateAdCopy(out, URL)).toBeNull();
+    // Opening line longer than 25 chars: headline clipped at the first
+    // sentence break, full line kept as the start of [Primary].
+    const long = "換季那天，你打開衣櫃愣了幾秒，不是衣服不夠穿而是不知道今年要當哪種自己。\n秋天有種魔力。";
+    expect(repairAdCopy(long, null)).toBe(
+      "[Headline] 換季那天\n[Primary] " + long + "\n[CTA] 立即查看",
+    );
+    // Short first line becomes the headline verbatim; no URL requested → none added.
+    expect(repairAdCopy("今年換你寵媽媽\n一份貼近她日常的心意。", null)).toBe(
+      "[Headline] 今年換你寵媽媽\n[Primary] 一份貼近她日常的心意。\n[CTA] 立即查看",
+    );
+  });
+  it("is a no-op for compliant captions or when nothing is requested", () => {
     expect(repairAdCopy(GOOD, URL)).toBe(GOOD);
-    const plain = "純文字貼文 #tag";
-    expect(repairAdCopy(plain, URL)).toBe(plain);
+    expect(repairAdCopy("", URL)).toBe("");
     expect(repairAdCopy("[Headline] a\n[Primary] b\n[CTA] c", null)).toBe("[Headline] a\n[Primary] b\n[CTA] c");
   });
 });
