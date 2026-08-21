@@ -30,6 +30,7 @@ import {
 import { probeImageUrl } from "./imageFetch";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
+import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "./brandContext";
@@ -641,8 +642,12 @@ async function callOneVariant(args: {
   market?: MarketCode | null;
   /** Whether final copy must be zh-TW; used by the non-deliverable gate. */
   isZhTW: boolean;
+  /** Ad-copy tasks: landing URL the user typed (deterministically extracted); null = none. */
+  requestedUrl?: string | null;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
+  const adCopy = isAdCopyTemplate(template);
+  const requestedUrl = adCopy ? (args.requestedUrl ?? null) : null;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
   // {today} → market-appropriate date format so PR datelines / calendar
@@ -937,7 +942,9 @@ async function callOneVariant(args: {
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
     brandSection +
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
-  const system = promptCore + deliverableOnlyRule;
+  // Ad-copy contract goes LAST so it is the freshest instruction and wins
+  // over the social scaffold's「不要排成結構化卡片」rule.
+  const system = promptCore + deliverableOnlyRule + (adCopy ? buildAdCopyRule(requestedUrl) : "");
 
   // Provider + model selection priority:
   //   1. Agent's aiModel (from JSON-assigned real-person agent) — uses both
@@ -1039,13 +1046,14 @@ async function callOneVariant(args: {
   let attempt = 0;
   let lastErr: any = null;
   let lastRaw = ""; // for diagnostics
+  let adCopyIssue = ""; // ad-copy contract violation from the previous attempt
   while (attempt < 2) {
     attempt++;
     try {
       // 2nd attempt: append explicit reminder to user msg, lowering model
       // creativity and forcing strict JSON.
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] 上次回應沒給可解析、可交付的 caption。請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
+        ? `${userMsg}\n\n[REMINDER] ${adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -1066,6 +1074,23 @@ async function callOneVariant(args: {
         const caption = stripCaptionPreamble(out.caption);
         const sanity = detectNonDeliverable(caption, { isZhTW, structured: calendarMode, inputKeys });
         if (!sanity) {
+          if (adCopy) {
+            const issue = validateAdCopy(caption, requestedUrl);
+            if (issue && attempt < 2) {
+              // Contract miss on the first try → one strict retry (the
+              // reminder below names the exact violation).
+              lastErr = new Error(`ad-copy contract miss for ${label} (${issue.reason}): ${issue.detail}`);
+              adCopyIssue = issue.detail;
+              console.warn(`[callOneVariant] attempt ${attempt} contract miss for ${label} (${issue.reason}): ${lastRaw.slice(0, 300)}`);
+              continue;
+            }
+            if (issue) {
+              // Last attempt: ship what we have, deterministically repaired
+              // (URL appended to [Primary]). Missing markers cannot be repaired.
+              console.warn(`[callOneVariant] ad-copy contract still unmet for ${label} (${issue.reason}) — applying repair`);
+              return { label, caption: repairAdCopy(caption, requestedUrl), hashtags: out.hashtags };
+            }
+          }
           return { label, caption, hashtags: out.hashtags };
         }
         lastErr = new Error(`non-deliverable caption for ${label} (${sanity.reason}) — raw[0:200]: ${lastRaw.slice(0, 200)}`);
@@ -1095,6 +1120,7 @@ async function callCaptionWriter(args: {
   strategistAnchor?: string;
   market?: MarketCode | null;
   isZhTW: boolean;
+  requestedUrl?: string | null;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
   // Parallel fanout — each variant in its own LLM call.
@@ -1975,8 +2001,15 @@ export async function runOrchestra(args: {
     // metadata + transcript (richer context than generic urlContext).
     // Otherwise fall back to generic urlContext for non-YT links.
     const inputValues = Object.values(args.inputs).filter((v): v is string => typeof v === "string");
-    const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
-    const detectedUrl = ytUrlInput
+    // Ad-copy tasks: a URL in the brief is the *landing page*, not the
+    // topic source — do not fetch it and never let it override the brand
+    // as「主題」. It is carried separately as requestedUrl.
+    const adCopyTask = isAdCopyTemplate(args.template);
+    const requestedUrl = adCopyTask ? extractRequestedUrl(args.inputs) : null;
+    const ytUrlInput = adCopyTask ? undefined : inputValues.find((v) => !!extractYouTubeId(v));
+    const detectedUrl = adCopyTask
+      ? null
+      : ytUrlInput
       ? findFirstUrl(ytUrlInput)
       : inputValues.map((v) => findFirstUrl(v)).find((url): url is string => !!url) ?? null;
 
@@ -2161,6 +2194,7 @@ export async function runOrchestra(args: {
         strategistAnchor: strategistAnchor || undefined,
         market: brandMarket.marketCode, // 2026-07-17 多市場
         isZhTW: brandMarket.isZhTW,
+        requestedUrl,
       }).then((c) => { stCap.status = "done"; stCap.completedAt = Date.now() - startedAt; return c; }).catch((e) => {
         stCap.status = "failed";
         stCap.completedAt = Date.now() - startedAt;
@@ -2235,7 +2269,10 @@ export async function runOrchestra(args: {
           const v = captions[vi];
           if (!v?.caption) continue;
           const report = await enforceBrandRulesOnTextWithReport(args.brandId, v.caption);
-          if (report.text && report.text !== v.caption) v.caption = report.text;
+          if (report.text && report.text !== v.caption) {
+            // A banned-word LLM rewrite can drop the landing URL; put it back.
+            v.caption = adCopyTask ? repairAdCopy(report.text, requestedUrl) : report.text;
+          }
           if (report.bannedHits.length > 0 || report.subsApplied.length > 0) {
             brandFixes.push({
               variantIndex: vi,
