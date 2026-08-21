@@ -27,20 +27,38 @@ export function isAdCopyTemplate(template: Pick<FBTaskTemplate, "systemPrompt">)
 export function extractRequestedUrl(inputs: Record<string, unknown>): string | null {
   for (const v of Object.values(inputs)) {
     if (typeof v !== "string") continue;
-    const url = findFirstUrl(v);
-    if (!url) continue;
-    // A YouTube link in an ad brief is reference *material* (the existing
-    // fetch-as-context path keeps handling it), not the landing page.
-    if (extractYouTubeId(url)) continue;
-    // findFirstUrl normalises bare domains to https://… — keep the user's
-    // literal spelling so validation/repair compare against what they
-    // typed (and what the model will most naturally echo back).
-    if (v.includes(url)) return url;
-    const bare = url.replace(/^https?:\/\//i, "");
-    if (bare && v.includes(bare)) return bare;
-    return url;
+    for (const url of findAllUrls(v)) {
+      // A YouTube link in an ad brief is reference *material* (the existing
+      // fetch-as-context path keeps handling it), not the landing page.
+      if (extractYouTubeId(url)) continue;
+      return url.replace(TRAILING_PUNCT_RE, "");
+    }
   }
   return null;
+}
+
+/** Punctuation users glue onto a pasted URL that is never part of it. */
+const TRAILING_PUNCT_RE = /[)\]}>,.;:!?。，；：！？」』）】]+$/u;
+
+/**
+ * Every URL in `text`, in order, as the user/model literally spelled it.
+ * findFirstUrl normalises bare domains to https://… — we keep the literal
+ * spelling so validation/repair compare against what was actually typed
+ * (and what the model will most naturally echo back).
+ */
+function findAllUrls(text: string): string[] {
+  const out: string[] = [];
+  let rest = text;
+  for (let guard = 0; guard < 20; guard++) {
+    const url = findFirstUrl(rest);
+    if (!url) break;
+    const bare = url.replace(/^https?:\/\//i, "");
+    const literal = rest.includes(url) ? url : bare && rest.includes(bare) ? bare : null;
+    if (!literal) break;
+    out.push(literal);
+    rest = rest.slice(rest.indexOf(literal) + literal.length);
+  }
+  return out;
 }
 
 /** Hard rule appended to the system prompt (overrides the social scaffold). */
@@ -101,11 +119,13 @@ export function validateAdCopy(caption: string, requestedUrl: string | null): Ad
     if (!lastLine(seg.primary).includes(requestedUrl)) {
       return { reason: "missing_url", detail: `[Primary] 的最後一行必須是指定網址 ${requestedUrl}` };
     }
-    if (seg.cta.includes(requestedUrl)) {
-      return { reason: "url_in_cta", detail: `[CTA] 只能放按鈕文字，不能放網址 ${requestedUrl}` };
+    const ctaUrl = seg.cta.includes(requestedUrl) ? requestedUrl : findFirstUrl(seg.cta);
+    if (ctaUrl) {
+      return { reason: "url_in_cta", detail: `[CTA] 只能放按鈕文字，不能放網址 ${ctaUrl}` };
     }
   } else {
-    const invented = findFirstUrl(seg.headline) ?? findFirstUrl(seg.primary) ?? findFirstUrl(seg.cta);
+    // Whole caption (incl. any preamble before the markers / hashtag tail).
+    const invented = findFirstUrl(caption);
     if (invented) {
       return { reason: "fabricated_url", detail: `使用者沒有提供網址，不得自行加入 ${invented}` };
     }
@@ -139,11 +159,11 @@ export function repairAdCopy(caption: string, requestedUrl: string | null): stri
     seg.primary = `${seg.primary}\n${requestedUrl}`.trim();
     changed = true;
   }
-  if (seg.cta.includes(requestedUrl)) {
-    const stripped = seg.cta
-      .split(requestedUrl).join("")
-      .replace(/\s*(?:→|->|👉|:|：|\(|（)\s*$/u, "")
-      .trim();
+  const ctaUrls = [requestedUrl, ...findAllUrls(seg.cta)].filter((u) => seg.cta.includes(u));
+  if (ctaUrls.length > 0) {
+    let stripped = seg.cta;
+    for (const u of ctaUrls) stripped = stripped.split(u).join("");
+    stripped = stripped.replace(/\s*(?:→|->|👉|:|：|\(|（)\s*$/u, "").trim();
     seg.cta = stripped || DEFAULT_CTA_BUTTON;
     changed = true;
   }

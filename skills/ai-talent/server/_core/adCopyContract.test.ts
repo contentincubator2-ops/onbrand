@@ -31,6 +31,13 @@ describe("extractRequestedUrl", () => {
   it("treats a YouTube link as material, not the landing page", () => {
     expect(extractRequestedUrl({ campaign: "參考這支 https://www.youtube.com/watch?v=abc123def45" })).toBeNull();
   });
+  it("finds the landing page even when a YouTube link comes first", () => {
+    expect(extractRequestedUrl({ campaign: "參考 https://youtu.be/abc123def45 ，CTA 導到 www.abc.com。" })).toBe(URL);
+  });
+  it("strips trailing punctuation glued to the URL", () => {
+    expect(extractRequestedUrl({ campaign: "連結：https://abc.com/sale;" })).toBe("https://abc.com/sale");
+    expect(extractRequestedUrl({ campaign: "連結 [www.abc.com]" })).toBe(URL);
+  });
   it("keeps a scheme when the user typed one", () => {
     expect(extractRequestedUrl({ campaign: "CTA: https://abc.com/sale?x=1&y=2" })).toBe("https://abc.com/sale?x=1&y=2");
   });
@@ -68,6 +75,14 @@ describe("validateAdCopy", () => {
     const c = `[Headline] a\n[Primary] b\n${URL}\n[CTA] 看看 ${URL}`;
     expect(validateAdCopy(c, URL)?.reason).toBe("url_in_cta");
   });
+  it("flags any other URL in [CTA]", () => {
+    const c = `[Headline] a\n[Primary] b\n${URL}\n[CTA] 看看 www.other.com`;
+    expect(validateAdCopy(c, URL)?.reason).toBe("url_in_cta");
+  });
+  it("flags a fabricated URL in the preamble or hashtag tail when none was requested", () => {
+    expect(validateAdCopy("見 www.x.com\n[Headline] a\n[Primary] b\n[CTA] c", null)?.reason).toBe("fabricated_url");
+    expect(validateAdCopy("[Headline] a\n[Primary] b\n[CTA] c\n#tag www.x.com", null)?.reason).toBe("fabricated_url");
+  });
   it("flags a fabricated URL when none was requested", () => {
     const c = "[Headline] a\n[Primary] 上 www.made-up.com 看看\n[CTA] c";
     expect(validateAdCopy(c, null)?.reason).toBe("fabricated_url");
@@ -94,6 +109,11 @@ describe("repairAdCopy", () => {
     const c = `[Headline] a\n[Primary] 先看 ${URL} 再說。\n最後一句話。\n[CTA] ${URL} 看看 ${URL}`;
     const out = repairAdCopy(c, URL);
     expect(out).toBe(`[Headline] a\n[Primary] 先看 ${URL} 再說。\n最後一句話。\n${URL}\n[CTA] 看看`);
+    expect(validateAdCopy(out, URL)).toBeNull();
+  });
+  it("also strips foreign URLs from [CTA]", () => {
+    const out = repairAdCopy(`[Headline] a\n[Primary] b\n${URL}\n[CTA] 看看 www.other.com`, URL);
+    expect(out).toBe(`[Headline] a\n[Primary] b\n${URL}\n[CTA] 看看`);
     expect(validateAdCopy(out, URL)).toBeNull();
   });
   it("falls back to a default button label when [CTA] was only the URL", () => {
