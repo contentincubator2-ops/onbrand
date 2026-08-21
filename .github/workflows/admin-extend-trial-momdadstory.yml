@@ -1,0 +1,139 @@
+name: Admin — Extend momdadstory trial to 2026-09-21
+
+# 2026-08-21 (CJ「你要先開啟他的帳號的使用權，我才能登入驗證，請幫我延長試用到 9/21」).
+#
+# 為什麼是 push 觸發而不是 workflow_dispatch：dispatch 只有在 workflow 檔案已經
+# 進到預設分支（main）之後才會出現在 Actions UI，而 main 一被 push 就會部署正式站。
+# 這個工作要在功能分支上就能跑，所以沿用 op-probe-dev-brand.yml 的 path-scoped
+# push 模式 —— 帳號與到期日直接寫死在檔案裡，反而留下可稽核的紀錄。
+#
+# 兩個 job 各打一個資料庫：prod（預設 SSH target）與 dev（environment: dev 會把
+# SSH target 換成 DEV VM）。帳號在哪一邊就會在哪一邊被延長，另一邊會印
+# "not found here" 然後正常結束 —— 我們無法從程式碼判斷這個客戶註冊在哪個庫，
+# 猜錯的代價是「跑了但什麼都沒發生」，兩邊都跑才不會白等一輪。
+#
+# 可重複執行（idempotent）：
+#   - planEndsAt 用 GREATEST，已經比 9/21 晚的不會被往回縮
+#   - planStatus 只在「不是 active」時才寫回 'trial'，不會把付費/comp 帳號降級
+#   - planCode 只在 NULL 時補 'trial'
+#   - isActive=1 —— 這一條同時解除「請先驗證您的電子郵件後再登入」的擋門，
+#     等於代替客戶完成 email 驗證，是這次要求「開啟使用權」的實際內容
+
+on:
+  push:
+    paths:
+      - '.github/workflows/admin-extend-trial-momdadstory.yml'
+
+jobs:
+  prod:
+    name: prod database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Extend trial (prod)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 4m
+          script: |
+            set -e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || \
+              source /opt/onbrand/current/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            E='marketing@momdadstory.com'
+            UNTIL='2026-09-21 23:59:59'
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+            N() { mysql -h"$H" -u"$U" -p"$P" "$D" -N -e "$1"; }
+
+            echo "host=$(hostname)  db=$D@$H"
+
+            CNT=$(N "SELECT COUNT(*) FROM users WHERE email='$E'")
+            if [ "${CNT:-0}" != "1" ]; then
+              echo "ℹ️  found $CNT users with $E on this database — nothing to do here."
+              exit 0
+            fi
+
+            echo "===== BEFORE ====="
+            Q "SELECT id, email, isActive, planCode, planStatus, planEndsAt, createdAt
+                 FROM users WHERE email='$E'\G"
+
+            echo "===== APPLY ====="
+            Q "UPDATE users
+                  SET isActive   = 1,
+                      planEndsAt = GREATEST(COALESCE(planEndsAt, '$UNTIL'), '$UNTIL'),
+                      planStatus = IF(planStatus='active', planStatus, 'trial'),
+                      planCode   = COALESCE(planCode, 'trial')
+                WHERE email='$E';"
+
+            # workspaces 只影響工作區清單的方案顯示，閘門本身讀 users。
+            # 失敗不擋 —— users 已經寫好，這裡只是讓畫面一致。
+            Q "UPDATE workspaces
+                  SET planStatus = IF(planStatus='active', planStatus, 'trial'),
+                      planEndsAt = GREATEST(COALESCE(planEndsAt, '$UNTIL'), '$UNTIL')
+                WHERE ownerUserId=(SELECT id FROM users WHERE email='$E')
+                  AND COALESCE(planStatus,'trial') <> 'active';" || \
+              echo "⚠️  workspaces sync skipped (non-fatal)"
+
+            echo "===== AFTER ====="
+            Q "SELECT id, email, isActive, planCode, planStatus, planEndsAt
+                 FROM users WHERE email='$E'\G"
+            echo "✓ $E usable until $UNTIL (prod)"
+
+  dev:
+    name: dev database
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 5
+    steps:
+      - name: Extend trial (dev)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 4m
+          script: |
+            set -e
+            source /opt/onbrand/current/skills/ai-talent/.env 2>/dev/null || \
+              source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            E='marketing@momdadstory.com'
+            UNTIL='2026-09-21 23:59:59'
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+            N() { mysql -h"$H" -u"$U" -p"$P" "$D" -N -e "$1"; }
+
+            echo "host=$(hostname)  db=$D@$H"
+
+            CNT=$(N "SELECT COUNT(*) FROM users WHERE email='$E'")
+            if [ "${CNT:-0}" != "1" ]; then
+              echo "ℹ️  found $CNT users with $E on this database — nothing to do here."
+              exit 0
+            fi
+
+            echo "===== BEFORE ====="
+            Q "SELECT id, email, isActive, planCode, planStatus, planEndsAt, createdAt
+                 FROM users WHERE email='$E'\G"
+
+            echo "===== APPLY ====="
+            Q "UPDATE users
+                  SET isActive   = 1,
+                      planEndsAt = GREATEST(COALESCE(planEndsAt, '$UNTIL'), '$UNTIL'),
+                      planStatus = IF(planStatus='active', planStatus, 'trial'),
+                      planCode   = COALESCE(planCode, 'trial')
+                WHERE email='$E';"
+
+            Q "UPDATE workspaces
+                  SET planStatus = IF(planStatus='active', planStatus, 'trial'),
+                      planEndsAt = GREATEST(COALESCE(planEndsAt, '$UNTIL'), '$UNTIL')
+                WHERE ownerUserId=(SELECT id FROM users WHERE email='$E')
+                  AND COALESCE(planStatus,'trial') <> 'active';" || \
+              echo "⚠️  workspaces sync skipped (non-fatal)"
+
+            echo "===== AFTER ====="
+            Q "SELECT id, email, isActive, planCode, planStatus, planEndsAt
+                 FROM users WHERE email='$E'\G"
+            echo "✓ $E usable until $UNTIL (dev)"
