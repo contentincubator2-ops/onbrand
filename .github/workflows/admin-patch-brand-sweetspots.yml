@@ -89,9 +89,20 @@ jobs:
 
                 let scn;
                 if (payload.scenarioName) {
+                  // Explicit name that doesn't match ANY existing scenario is
+                  // an error, not 'fall back to scenarios[0]' — this writes
+                  // production positioning data, so a misspelled/stale name
+                  // must fail loud rather than silently patch the wrong
+                  // scenario (Codex review, PR #121).
                   scn = scenarios.find(function (s) { return s && s.name === payload.scenarioName; });
+                  if (!scn && scenarios.length > 0) {
+                    console.error('scenarioName ' + JSON.stringify(payload.scenarioName) + ' not found among existing scenarios: ' +
+                      JSON.stringify(scenarios.map(function (s) { return s && s.name; })));
+                    process.exit(1);
+                  }
+                } else {
+                  scn = scenarios[0];
                 }
-                if (!scn) scn = scenarios[0];
                 if (!scn) {
                   scn = {
                     id: Date.now().toString(36),
@@ -107,14 +118,21 @@ jobs:
                 const oldSpots = Array.isArray(scn.derived.spots) ? scn.derived.spots : [];
                 console.log('BEFORE spots:', JSON.stringify(oldSpots.map(function (s) { return { title: s && s.title, tagline: s && s.tagline && s.tagline.zh }; })));
 
+                // Idempotent on retry: drop both the removeMatching needle
+                // AND any existing spot whose title collides with one of
+                // prependSpots — otherwise re-running this dispatch (e.g.
+                // after an SSH hiccup whose DB write actually landed) would
+                // find the needle already gone and re-prepend duplicates
+                // (Codex review, PR #121).
                 const needle = String(payload.removeMatching || '');
-                const kept = needle
-                  ? oldSpots.filter(function (s) {
-                      const title = String((s && s.title) || '');
-                      const tagline = String((s && s.tagline && s.tagline.zh) || '');
-                      return title.indexOf(needle) === -1 && tagline.indexOf(needle) === -1;
-                    })
-                  : oldSpots;
+                const prependTitles = new Set(payload.prependSpots.map(function (s) { return s.title; }));
+                const kept = oldSpots.filter(function (s) {
+                  const title = String((s && s.title) || '');
+                  const tagline = String((s && s.tagline && s.tagline.zh) || '');
+                  if (prependTitles.has(title)) return false;
+                  if (needle && (title.indexOf(needle) !== -1 || tagline.indexOf(needle) !== -1)) return false;
+                  return true;
+                });
                 const removedCount = oldSpots.length - kept.length;
 
                 const newSpots = payload.prependSpots.concat(kept);
