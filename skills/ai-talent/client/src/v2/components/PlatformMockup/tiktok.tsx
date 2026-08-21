@@ -13,12 +13,14 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot } from "./shared";
 import { useLang } from "../../../lib/i18n";
+import { getPostTitleFallback } from "../../lib/mockupTitle";
 
 /* ─────────────── TT For-You ─────────────── */
 
 export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, liveVideoUrl, liveVideoStatus, liveVideoPoster, onGenerateImage }: MockupFields) {
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const postTitleFallback = getPostTitleFallback(title, liveCaption);
   return (
     <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
@@ -89,7 +91,9 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
         </div>
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1 bg-gradient-to-t from-black/80 to-transparent">
           <p className="text-small font-semibold">@{handle}</p>
-          {title && <p className="text-small line-clamp-2">{title}</p>}
+          {postTitleFallback && (
+            <p className="text-small line-clamp-2">{postTitleFallback}</p>
+          )}
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
             <span>原創音訊 · @{handle}</span>

@@ -25,10 +25,11 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
-  dicebear, handleOf, SlotContent, MarkdownText, titleEchoesCaption, ImageGenSlot,
+  dicebear, handleOf, SlotContent, MarkdownText, ImageGenSlot,
   SHOW_IMAGE_STYLE_OVERLAY,
 } from "./shared";
 import { useLang } from "../../../lib/i18n";
+import { getPostTitleFallback } from "../../lib/mockupTitle";
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
 
@@ -46,6 +47,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
   const effectiveCaption   = captionSlot?.status === "filled" ? captionSlot.value as string : liveCaption;
   const effectiveHashtags  = hashtagSlot?.status === "filled" ? hashtagSlot.value as string[] : liveHashtags;
   const effectiveImageDesc = imageSlot?.status   === "filled" ? imageSlot.value  as string : liveImageDesc;
+  const postTitleFallback = getPostTitleFallback(title, effectiveCaption);
 
   return (
     <div className="w-full max-w-[420px] mx-auto">
@@ -133,17 +135,11 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 
         <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
-          {/* 2026-05-13 (CJ「標題還是有重複」): if title is the first
-              sentence of liveCaption, the inline title + caption body
-              shows the same sentence twice. Hide the inline title when
-              that's the case — caption already carries it. */}
-          {(() => {
-            const t = (title ?? "").trim();
-            if (!t) return null;
-            // 2026-05-14: shared ellipsis-aware dedup (was inline startsWith).
-            if (titleEchoesCaption(t, liveCaption)) return null;
-            return <span className="text-foreground">{t}</span>;
-          })()}
+          {/* A real caption is the post body; mission_outputs.title is only a
+              fallback for legacy runs whose caption is empty. */}
+          {postTitleFallback && (
+            <span className="text-foreground">{postTitleFallback}</span>
+          )}
 
           {/* Caption slot — SlotContent handles loading/filled/empty */}
           <div className="mt-1.5">
@@ -215,6 +211,7 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
   const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const postTitleFallback = getPostTitleFallback(title, liveCaption);
   const carouselCount = 9;
   return (
     <div className="w-full max-w-[420px] mx-auto">
@@ -277,15 +274,11 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
 
         <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
-          {/* 2026-05-13 (CJ「標題還是有重複」): hide inline title if it's
-              already the first sentence of liveCaption. */}
-          {(() => {
-            const t = (title ?? "").trim();
-            if (!t) return null;
-            // 2026-05-14: shared ellipsis-aware dedup (was inline startsWith).
-            if (titleEchoesCaption(t, liveCaption)) return null;
-            return <span className="text-foreground">{t}</span>;
-          })()}
+          {/* A real caption is the post body; mission_outputs.title is only a
+              fallback for legacy runs whose caption is empty. */}
+          {postTitleFallback && (
+            <span className="text-foreground">{postTitleFallback}</span>
+          )}
           {liveCaption ? (
             // 2026-05-13 (CJ「標題看起來都會不完整」): removed line-clamp
             // — IG captions can be long (2200 char cap), trimming at 5 lines
