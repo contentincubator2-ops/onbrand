@@ -44,7 +44,10 @@ export async function transcribeBuffer(
 
   const baseUrl = `${ENV.AZURE_CANADA_ENDPOINT!.replace(/\/$/, "")}/openai/v1`;
   const form = new FormData();
-  form.append("file", new Blob([buffer], { type: mimeType || "application/octet-stream" }), filename);
+  // Buffer's type (Uint8Array<ArrayBufferLike>) isn't assignable to
+  // BlobPart (wants ArrayBufferView<ArrayBuffer>) — wrapping in a fresh
+  // Uint8Array copies onto a plain, non-shared ArrayBuffer that satisfies it.
+  form.append("file", new Blob([new Uint8Array(buffer)], { type: mimeType || "application/octet-stream" }), filename);
   form.append("model", "gpt-4o-mini-transcribe");
 
   const resp = await fetch(`${baseUrl}/audio/transcriptions`, {
