@@ -1,9 +1,9 @@
-name: "Ops — IRIS(2983) round 3: scrub last drifted-competitor mentions"
-# 2026-08-21 (CJ): rounds 1-2 aligned workbench + competition + spots to the
-# official brand-book competitor set. Leftover scan found 2 stray mentions:
-#   tagline (ZARA, Other Stories) and trends (蝦皮).
-# Deep-walk those segments, print the original strings (rollback copy), and
-# substitute neutral nouns so no drifted brand names remain anywhere.
+name: "Ops — IRIS(2983) round 4: verify tagline intact, polish scrubbed prose"
+# 2026-08-21 (CJ): round-3 scrub left two awkward sentences, AND revealed a
+# concurrent UI edit (tagline.competitorDiff now references 「穿見最好的自己」
+# — someone ran tagline generation in the UI between rounds). Guard:
+#   IF zhTagline is still 優雅・精緻・女性化 → polish the two sentences
+#   ELSE → report DRIFT DETECTED and change nothing (CJ decides).
 on:
   push:
     branches: [ops/iris-vmd-edit]
@@ -14,85 +14,64 @@ jobs:
     steps:
       - name: Write one-off script
         run: |
-          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-scrub.ts <<'TSEOF'
+          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-polish.ts <<'TSEOF'
           import * as dotenv from "dotenv";
           dotenv.config();
           import localPool from "../server/localDb";
 
           const BRAND = 2983, USER = 1238991;
-          const SUBS: Array<[string, string]> = [
-            ["Monki / & Other Stories", "國際快時尚品牌"],
-            ["& Other Stories", "國際快時尚品牌"],
-            ["Other Stories", "國際快時尚品牌"],
-            ["ZARA / Mango", "快時尚品牌"],
-            ["ZARA", "快時尚品牌"],
-            ["Mango", "快時尚品牌"],
-            ["蝦皮購物", "低價電商平台"],
-            ["蝦皮", "低價電商平台"],
-            ["ILEY 伊蕾", "同業品牌"],
-            ["ILEY", "同業品牌"],
-            ["La Feta 拉菲塔", "同業品牌"],
-            ["La Feta（拉芙達）", "同業品牌"],
-            ["La Feta", "同業品牌"],
-            ["i-Select（愛衫閣）", "同業品牌"],
-            ["i-Select", "同業品牌"],
-          ];
-          const TERMS = ["ILEY", "La Feta", "拉菲塔", "拉芙達", "ZARA", "Monki", "i-Select", "愛衫閣", "蝦皮", "Mango", "Other Stories"];
-
-          function deepScrub(node: any, path: string, log: string[]): any {
-            if (typeof node === "string") {
-              if (TERMS.some((t) => node.includes(t))) {
-                log.push(`BEFORE @ ${path}: ${node.slice(0, 400)}`);
-                let out = node;
-                for (const [from, to] of SUBS) out = out.split(from).join(to);
-                out = out.replace(/(同業品牌|快時尚品牌|國際快時尚品牌|低價電商平台)(、\1)+/g, "$1");
-                log.push(`AFTER  @ ${path}: ${out.slice(0, 400)}`);
-                return out;
-              }
-              return node;
-            }
-            if (Array.isArray(node)) return node.map((v, i) => deepScrub(v, `${path}[${i}]`, log));
-            if (node && typeof node === "object") {
-              const o: any = {};
-              for (const k of Object.keys(node)) o[k] = deepScrub(node[k], `${path}.${k}`, log);
-              return o;
-            }
-            return node;
-          }
+          const ZH = "優雅・精緻・女性化";
 
           async function main() {
             const [rows]: any = await localPool.execute(
-              `SELECT positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [BRAND, USER]);
+              `SELECT positioning, tagline FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [BRAND, USER]);
             const row = (rows as any[])[0];
             if (!row) { console.error("ABORT: brand not found"); process.exit(1); }
             let pos: any = typeof row.positioning === "string" ? JSON.parse(row.positioning) : (row.positioning ?? {});
 
-            const log: string[] = [];
-            pos = deepScrub(pos, "$", log);
-            log.forEach((l) => console.log(l));
-            if (log.length === 0) { console.log("NOTHING TO SCRUB — already clean"); process.exit(0); }
+            console.log("STATE brands.tagline column:", row.tagline);
+            console.log("STATE pos.tagline.zhTagline:", pos.tagline?.zhTagline);
+            console.log("STATE _bookTagline:", JSON.stringify(pos._bookTagline));
+            console.log("STATE currentTaglineSpot:", pos._workbench?.scenarios?.[0]?.derived?.currentTaglineSpot);
+            console.log("STATE competitorDiff head:", String(pos.tagline?.competitorDiff ?? "").slice(0, 80));
+
+            const intact = pos.tagline?.zhTagline === ZH && row.tagline === ZH;
+            if (!intact) {
+              console.log("DRIFT DETECTED — tagline is no longer the finalized one; making NO changes.");
+              process.exit(0);
+            }
+
+            // Polish 1: tagline.competitorDiff — clean rewrite for the 三詞 tagline,
+            // consistent with the official brand-book competitive frame.
+            pos.tagline.competitorDiff =
+              "優雅帶專櫃競品（Master Max、五銅、TOP-DO、Half half）多以單一風格或價位帶競爭；休閒帶（GINKOO、銀穗、JOAN）訴求輕鬆百搭；快時尚與低價電商則以款多價低取勝。IRIS 用「優雅・精緻・女性化」三詞同時鎖定風格、工藝與設計語彙，形成更完整、不易被單點模仿的品牌識別。";
+            console.log("POLISHED competitorDiff");
+
+            // Polish 2: trends risk sentence — drop brand-name list entirely.
+            const risks = pos.trends?.risks;
+            if (Array.isArray(risks) && typeof risks[0]?.body === "string") {
+              risks[0].body = risks[0].body.replace(
+                /^.*?持續搶占台灣市場/,
+                "國際快時尚與低價電商平台以低價高速上新持續搶占台灣市場");
+              console.log("POLISHED trends.risks[0].body:", risks[0].body.slice(0, 120));
+            }
 
             await localPool.execute(
               `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
               [JSON.stringify(pos), BRAND, USER]);
-
-            const [after]: any = await localPool.execute(`SELECT positioning FROM brands WHERE id = ?`, [BRAND]);
-            const whole = typeof after[0].positioning === "string" ? after[0].positioning : JSON.stringify(after[0].positioning);
-            const leftovers: Record<string, number> = {};
-            for (const t of TERMS) { const n = whole.split(t).length - 1; if (n > 0) leftovers[t] = n; }
-            console.log("FINAL LEFTOVER COUNTS:", JSON.stringify(leftovers));
+            console.log("DONE — polish applied");
             process.exit(0);
           }
           main().catch((e) => { console.error("FATAL:", e); process.exit(1); });
           TSEOF
           echo "script written"
 
-      - name: Run scrub
+      - name: Run polish
         run: |
           cd /opt/onbrand/app/skills/ai-talent
           set -a; source .env 2>/dev/null || true; set +a
-          npx tsx scripts/_tmp-iris-scrub.ts
+          npx tsx scripts/_tmp-iris-polish.ts
 
       - name: Cleanup
         if: always()
-        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-scrub.ts
+        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-polish.ts
