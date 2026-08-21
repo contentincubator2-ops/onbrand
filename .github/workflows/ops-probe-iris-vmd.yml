@@ -1,0 +1,58 @@
+name: "Ops — Probe IRIS/vmdirisfamily state (read-only)"
+# 2026-08-20 (CJ): before editing the strategy workbench, find out:
+#   1. does vmdirisfamily@gmail.com exist now (customer was asked to register)?
+#   2. which brands live under that account (IRIS created? by whom?)
+#   3. where the configured workbench scenario (anchors + spots from CJ's
+#      screenshot) actually lives — customer brand or the sowork training
+#      brands (2956/2957) — so we edit the right row and never clobber
+#      manual adjustments by re-running positioning.
+on:
+  push:
+    branches: [ops/iris-vmd-probe]
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Read-only DB probe
+        run: |
+          set -a; source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true; set +a
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"; P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          echo "=== 1. customer account ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, email, name, createdAt, emailVerifiedAt IS NOT NULL AS verified
+               FROM users WHERE email='vmdirisfamily@gmail.com';" 2>/dev/null \
+          || mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, email, name, createdAt FROM users WHERE email='vmdirisfamily@gmail.com';"
+          echo "=== 2. brands under that account ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT b.id, b.name, b.userId, b.positioningStatus, b.tagline,
+                    LEFT(b.targetAudience,60) AS audience,
+                    JSON_LENGTH(JSON_EXTRACT(b.positioning,'$._workbench.scenarios')) AS nScenarios
+               FROM brands b
+               JOIN users u ON u.id=b.userId
+              WHERE u.email='vmdirisfamily@gmail.com';"
+          echo "=== 3. sowork training IRIS brands (2956/2957) ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT id, name, userId, positioningStatus, tagline,
+                    JSON_LENGTH(JSON_EXTRACT(positioning,'$._workbench.scenarios')) AS nScenarios,
+                    JSON_EXTRACT(positioning,'$._workbench.activeId') AS activeId,
+                    JSON_EXTRACT(positioning,'$._workbench.appliedId') AS appliedId
+               FROM brands WHERE id IN (2956,2957);"
+          echo "=== 4. any brand whose workbench scenario exists (IRIS name, all owners) ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" -e \
+            "SELECT b.id, b.name, b.userId, u.email,
+                    JSON_LENGTH(JSON_EXTRACT(b.positioning,'$._workbench.scenarios')) AS nScenarios
+               FROM brands b JOIN users u ON u.id=b.userId
+              WHERE b.name LIKE '%IRIS%' OR b.name LIKE '%iris%';"
+          echo "=== 5. workbench scenario detail for whichever IRIS has one (spots + selection) ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" --raw -e \
+            "SELECT b.id,
+                    JSON_PRETTY(JSON_EXTRACT(b.positioning,'$._workbench.scenarios[0].selection')) AS sel,
+                    JSON_PRETTY(JSON_EXTRACT(b.positioning,
+                      '$._workbench.scenarios[0].derived.spots[*].title')) AS spotTitles,
+                    JSON_PRETTY(JSON_EXTRACT(b.positioning,
+                      '$._workbench.scenarios[0].derived.spots[*].tagline.zh')) AS spotTaglines
+               FROM brands b
+              WHERE (b.name LIKE '%IRIS%' OR b.name LIKE '%iris%')
+                AND JSON_LENGTH(JSON_EXTRACT(b.positioning,'$._workbench.scenarios')) > 0;"
