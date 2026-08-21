@@ -38,6 +38,7 @@
  * Event   pipeline (4 steps) — even shorter, all parallel after step 1.
  */
 import localPool from "../localDb";
+import { isPositioningLocked } from "./positioningLock";
 
 export type EntityKind = "brand" | "product" | "event";
 export type JobStatus = "pending" | "running" | "done" | "failed";
@@ -168,6 +169,15 @@ async function recordUsageRow(args: {
  *  Spread-merge preserves wizard-written sibling keys: _assets,
  *  _aiPrompts, _interim, and any manually-edited segments not in this run. */
 async function mergePositioning(kind: EntityKind, id: number, userId: number, patch: Record<string, any>): Promise<void> {
+  // Defense-in-depth: even if a pipeline was already mid-flight when the
+  // user locked 定位, don't let a step that finishes afterwards overwrite
+  // it. The real guard is upstream (startPositioningJob / resumeInterrupted
+  // PositioningJobs / the router mutations skip firing locked brands at
+  // all) — this is the last line so no write path can slip through.
+  if (await isPositioningLocked(kind, id, userId)) {
+    console.warn(`[positioningJobRunner] skip merge — ${kind} ${id} positioning is locked`);
+    return;
+  }
   const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
   const col = "positioning";
   const [rows]: any = await localPool.execute(
@@ -280,6 +290,20 @@ export async function resumeInterruptedPositioningJobs(): Promise<void> {
 
       if (!name || !entityId || !userId) {
         console.warn(`[positioningJobRunner] startup: skip orphan job (no entity row) kind=${kind} entityId=${entityId}`);
+        continue;
+      }
+
+      // 2026-08-21: a job that was legitimately in-flight when the user
+      // locked 定位 mid-run must not resume after a restart and overwrite
+      // the now-finalized content. Mark it failed (not silently dropped)
+      // so it's visible instead of looking like it vanished.
+      if (await isPositioningLocked(kind, entityId, userId)) {
+        console.log(`[positioningJobRunner] startup: skip resume for locked ${kind}:${entityId}`);
+        await localPool.execute(
+          `UPDATE positioning_jobs SET status = 'failed', lastError = ?, finishedAt = NOW(3)
+            WHERE userId = ? AND entityKind = ? AND entityId = ? AND status IN ('pending','running')`,
+          ["定位已鎖定，未重新推導", userId, kind, entityId],
+        );
         continue;
       }
 
