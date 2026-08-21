@@ -1,14 +1,9 @@
-name: "Ops — IRIS(2983) round 2: official competitor set everywhere"
-# 2026-08-21 (CJ): the competitor list drifted differently on every surface
-# (workbench: ILEY/La Feta/ZARA · 定位書: i-Select/Monki/La Feta/ZARA/蝦皮).
-# Reset ALL surfaces to the official brand-book map set:
-#   優雅帶: Master Max / 五銅 / TOP-DO / (IRIS) / Half half
-#   休閒帶: 銀穗 / GINKOO / JOAN
-# Surfaces aligned: workbench selection + spot gap chains + stakes/rivalTurf
-# notes, positioning.competition, differentiation.functional. Claims stay
-# grounded in the brand-book quadrant axes (優雅↔休閒 × 價位) only.
-# BEFORE state printed first = rollback copy. Ends with a leftover-mention
-# scan across the whole positioning JSON.
+name: "Ops — IRIS(2983) round 3: scrub last drifted-competitor mentions"
+# 2026-08-21 (CJ): rounds 1-2 aligned workbench + competition + spots to the
+# official brand-book competitor set. Leftover scan found 2 stray mentions:
+#   tagline (ZARA, Other Stories) and trends (蝦皮).
+# Deep-walk those segments, print the original strings (rollback copy), and
+# substitute neutral nouns so no drifted brand names remain anywhere.
 on:
   push:
     branches: [ops/iris-vmd-edit]
@@ -19,13 +14,51 @@ jobs:
     steps:
       - name: Write one-off script
         run: |
-          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-comp-edit.ts <<'TSEOF'
+          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-scrub.ts <<'TSEOF'
           import * as dotenv from "dotenv";
           dotenv.config();
           import localPool from "../server/localDb";
 
           const BRAND = 2983, USER = 1238991;
-          const OFFICIAL = ["Master Max", "五銅", "TOP-DO", "Half half", "GINKOO", "銀穗", "JOAN"];
+          const SUBS: Array<[string, string]> = [
+            ["Monki / & Other Stories", "國際快時尚品牌"],
+            ["& Other Stories", "國際快時尚品牌"],
+            ["Other Stories", "國際快時尚品牌"],
+            ["ZARA / Mango", "快時尚品牌"],
+            ["ZARA", "快時尚品牌"],
+            ["Mango", "快時尚品牌"],
+            ["蝦皮購物", "低價電商平台"],
+            ["蝦皮", "低價電商平台"],
+            ["ILEY 伊蕾", "同業品牌"],
+            ["ILEY", "同業品牌"],
+            ["La Feta 拉菲塔", "同業品牌"],
+            ["La Feta（拉芙達）", "同業品牌"],
+            ["La Feta", "同業品牌"],
+            ["i-Select（愛衫閣）", "同業品牌"],
+            ["i-Select", "同業品牌"],
+          ];
+          const TERMS = ["ILEY", "La Feta", "拉菲塔", "拉芙達", "ZARA", "Monki", "i-Select", "愛衫閣", "蝦皮", "Mango", "Other Stories"];
+
+          function deepScrub(node: any, path: string, log: string[]): any {
+            if (typeof node === "string") {
+              if (TERMS.some((t) => node.includes(t))) {
+                log.push(`BEFORE @ ${path}: ${node.slice(0, 400)}`);
+                let out = node;
+                for (const [from, to] of SUBS) out = out.split(from).join(to);
+                out = out.replace(/(同業品牌|快時尚品牌|國際快時尚品牌|低價電商平台)(、\1)+/g, "$1");
+                log.push(`AFTER  @ ${path}: ${out.slice(0, 400)}`);
+                return out;
+              }
+              return node;
+            }
+            if (Array.isArray(node)) return node.map((v, i) => deepScrub(v, `${path}[${i}]`, log));
+            if (node && typeof node === "object") {
+              const o: any = {};
+              for (const k of Object.keys(node)) o[k] = deepScrub(node[k], `${path}.${k}`, log);
+              return o;
+            }
+            return node;
+          }
 
           async function main() {
             const [rows]: any = await localPool.execute(
@@ -34,106 +67,32 @@ jobs:
             if (!row) { console.error("ABORT: brand not found"); process.exit(1); }
             let pos: any = typeof row.positioning === "string" ? JSON.parse(row.positioning) : (row.positioning ?? {});
 
-            // ── rollback copies ──
-            console.log("BEFORE competition:", JSON.stringify(pos.competition));
-            console.log("BEFORE workbench selection.competitors:",
-              JSON.stringify(pos._workbench?.scenarios?.[0]?.selection?.competitors));
-            console.log("BEFORE stakes/rivalTurf:",
-              JSON.stringify({ s: pos._workbench?.scenarios?.[0]?.derived?.stakes, r: pos._workbench?.scenarios?.[0]?.derived?.rivalTurf }));
-            console.log("BEFORE diff.functional:", String(pos.differentiation?.functional ?? "").slice(0, 200));
-
-            const wb = pos._workbench;
-            const scn = wb?.scenarios?.find((s: any) => s?.id === wb?.activeId) ?? wb?.scenarios?.[0];
-            if (!scn?.derived?.spots) { console.error("ABORT: no scenario"); process.exit(1); }
-
-            // 1. anchor: official competitor set
-            scn.selection = { ...(scn.selection ?? {}), competitors: OFFICIAL };
-
-            // 2. spot gap chains — axis-grounded rewrites
-            const gapByTitle: Record<string, string> = {
-              "優雅・精緻・女性化":
-                "對手沒有：優雅帶的 Master Max、五銅、TOP-DO 價位更高，Half half 依定位圖優雅度較內斂；休閒帶的 GINKOO、銀穗、JOAN 走輕鬆路線——市場上沒有品牌同時鎖定「優雅×精緻×女性化」三位一體的設計語彙",
-              "優雅是她本來的語言":
-                "GINKOO、銀穗、JOAN 以休閒定位為主，難以承載「被看見的優雅」的儀式感；同優雅帶的 Master Max、五銅 價位偏高，日常入手門檻高",
-              "精緻剪裁・日常就能穿":
-                "Master Max、五銅、TOP-DO 的高價位讓日常添購有壓力；休閒帶的 GINKOO、JOAN 較難滿足正式場合所需的精緻度",
-              "換季犒賞・品味的宣言":
-                "休閒帶品牌較少經營「犒賞自己」的情感溢價敘事；高價位帶則讓換季添購成為負擔——IRIS 的中高價位優雅正落在犒賞的甜蜜區間",
-            };
-            scn.derived.spots.forEach((s: any) => { if (gapByTitle[s.title]) s.gap = gapByTitle[s.title]; });
-
-            // 3. four-zone notes
-            scn.derived.stakes = [
-              { title: "具設計感的女裝款式", note: "專櫃競品（Master Max、五銅、TOP-DO、Half half）皆提供，為市場入場基本門檻，無差異化優勢" },
-              { title: "線上購物渠道", note: "官網與電商已是專櫃品牌標配，需以服務溫度與社群深度創造差異" },
-              { title: "歐式風格視覺語言", note: "優雅帶競品亦使用歐式美學元素，需以品牌故事深度強化獨特性" },
-            ];
-            scn.derived.rivalTurf = [
-              { title: "休閒百搭・輕鬆路線", note: "GINKOO、銀穗、JOAN 的休閒定位地盤，IRIS 優雅定位不宜跟進" },
-              { title: "更高價位・經典路線", note: "Master Max、五銅 所在的高價位帶，IRIS 維持可負擔的中高價位優雅，不往上硬拚" },
-            ];
-
-            // 4. 定位書 competition segment — official set, axis-grounded
-            pos.competition = {
-              map: "依品牌手冊定位圖：IRIS 位於「優雅×中高價位」象限，是優雅軸上站位最鮮明的品牌。優雅帶（價位由高至低）：Master Max、五銅、TOP-DO、IRIS、Half half；休閒帶：銀穗、GINKOO、JOAN。核心差異化：以鳶尾花精神串聯「被看見的優雅感」，用細緻工藝與女性化設計語彙形成不易複製的品牌識別。",
-              direct: [
-                { name: "Master Max", tone: "經典穩重", position: "優雅帶最高價位的專櫃品牌（依定位圖）", weakness: "價位帶最高，日常添購門檻高", ourEdge: "IRIS 以可負擔的中高價位提供同帶優雅與每季主題故事" },
-                { name: "五銅", tone: "都會經典", position: "優雅帶中高價位專櫃品牌", weakness: "價位高於 IRIS，日常入手門檻較高", ourEdge: "IRIS 兼顧精緻工藝與價位甜蜜點，日常與場合皆可入手" },
-                { name: "TOP-DO", tone: "經典優雅", position: "優雅帶中高價位專櫃品牌", weakness: "價位較高，設計語彙偏經典", ourEdge: "IRIS 以「優雅・精緻・女性化」三位一體的設計語彙形成完整識別" },
-                { name: "Half half", tone: "簡約優雅", position: "優雅帶中價位品牌，價位帶與 IRIS 相近", weakness: "依定位圖優雅度較 IRIS 內斂", ourEdge: "IRIS 以法式鳶尾花美學與工藝敘事拉開情感厚度" },
-              ],
-              indirect: [
-                { name: "GINKOO", threat: "中—休閒定位百搭易入手，分食日常穿著預算", response: "以優雅儀式感與精緻剪裁做風格區隔，不跟休閒路線" },
-                { name: "銀穗", threat: "中—休閒帶中高價位，吸引重視質感但偏好輕鬆風格的客群", response: "凸顯法式優雅美學與女性化設計語彙的差異" },
-                { name: "JOAN", threat: "中—休閒帶品牌，款式輕鬆日常", response: "強化「辦公室與重要場合都能駕馭」的場合適配優勢" },
-              ],
-              intensity: "台灣百貨專櫃女裝市場競爭集中：優雅帶四品牌直接交鋒、休閒帶三品牌分食日常衣櫥。IRIS 以「優雅×中高價位」的清晰站位與品牌手冊定義的三詞識別維持差異。",
-            };
-
-            // 5. differentiation.functional — drop the ZARA/蝦皮 clause
-            if (typeof pos.differentiation?.functional === "string") {
-              pos.differentiation.functional = pos.differentiation.functional.replace(
-                "相較於 ZARA 的量產速食與蝦皮低價品的粗糙感",
-                "相較於休閒帶品牌的輕鬆路線與高價位帶的入手門檻");
-            }
+            const log: string[] = [];
+            pos = deepScrub(pos, "$", log);
+            log.forEach((l) => console.log(l));
+            if (log.length === 0) { console.log("NOTHING TO SCRUB — already clean"); process.exit(0); }
 
             await localPool.execute(
               `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
               [JSON.stringify(pos), BRAND, USER]);
 
-            // ── verify + leftover scan ──
-            const [after]: any = await localPool.execute(
-              `SELECT positioning FROM brands WHERE id = ?`, [BRAND]);
-            const ap: any = typeof after[0].positioning === "string" ? JSON.parse(after[0].positioning) : after[0].positioning;
-            console.log("AFTER selection.competitors:", JSON.stringify(ap._workbench?.scenarios?.[0]?.selection?.competitors));
-            console.log("AFTER competition.direct names:", JSON.stringify((ap.competition?.direct ?? []).map((d: any) => d.name)));
-            console.log("AFTER competition.indirect names:", JSON.stringify((ap.competition?.indirect ?? []).map((d: any) => d.name)));
-            console.log("AFTER spot gaps:", JSON.stringify((ap._workbench?.scenarios?.[0]?.derived?.spots ?? []).map((s: any) => s.title + " | " + String(s.gap).slice(0, 40))));
-            const whole = JSON.stringify(ap);
+            const [after]: any = await localPool.execute(`SELECT positioning FROM brands WHERE id = ?`, [BRAND]);
+            const whole = typeof after[0].positioning === "string" ? after[0].positioning : JSON.stringify(after[0].positioning);
             const leftovers: Record<string, number> = {};
-            for (const term of ["ILEY", "La Feta", "拉菲塔", "拉芙達", "ZARA", "Monki", "i-Select", "愛衫閣", "蝦皮", "Mango", "Other Stories", "NET"]) {
-              const n = whole.split(term).length - 1;
-              if (n > 0) {
-                leftovers[term] = n;
-                // locate which top-level keys still mention it
-                for (const k of Object.keys(ap)) {
-                  if (JSON.stringify(ap[k]).includes(term)) console.log(`LEFTOVER "${term}" in key: ${k}`);
-                }
-              }
-            }
-            console.log("LEFTOVER COUNTS:", JSON.stringify(leftovers));
+            for (const t of TERMS) { const n = whole.split(t).length - 1; if (n > 0) leftovers[t] = n; }
+            console.log("FINAL LEFTOVER COUNTS:", JSON.stringify(leftovers));
             process.exit(0);
           }
           main().catch((e) => { console.error("FATAL:", e); process.exit(1); });
           TSEOF
           echo "script written"
 
-      - name: Run edit
+      - name: Run scrub
         run: |
           cd /opt/onbrand/app/skills/ai-talent
           set -a; source .env 2>/dev/null || true; set +a
-          npx tsx scripts/_tmp-iris-comp-edit.ts
+          npx tsx scripts/_tmp-iris-scrub.ts
 
       - name: Cleanup
         if: always()
-        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-comp-edit.ts
+        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-scrub.ts
