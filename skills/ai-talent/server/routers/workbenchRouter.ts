@@ -20,6 +20,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import { startPositioningJob, type PositioningStep, type StepContext } from "../_core/positioningJobRunner";
+import { isPositioningLocked } from "../_core/positioningLock";
 
 /** LLM call + JSON parse for cascade steps (cost recorded via ctx). */
 async function stepJSON(ctx: StepContext, stepId: string, sys: string, user: string, maxTokens = 1500): Promise<any | null> {
@@ -130,6 +131,29 @@ function toScope(input: { brandId: number; eventId?: number | null }): Scope {
     : { entityKind: "brand", entityId: input.brandId, brandId: input.brandId };
 }
 
+const LOCK_MESSAGE = "定位已鎖定，請先在「定位」分頁解鎖";
+
+/** Blocks writes to a brand's own positioning (competition/differentiation/
+ *  _workbench/tagline/...) once 定位 is locked. Events have no lock of their
+ *  own — event-scoped writes go to the event row, not brands.positioning —
+ *  so this is a no-op for scope.entityKind === "event". */
+async function assertScopeUnlocked(scope: Scope, userId: number): Promise<void> {
+  if (scope.entityKind !== "brand") return;
+  if (await isPositioningLocked("brand", scope.entityId, userId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: LOCK_MESSAGE });
+  }
+}
+
+/** researchItem's competitor/advantage branches always write to the PARENT
+ *  brand's positioning (positioning.competition.direct /
+ *  positioning.differentiation.custom) even when scoped to an event — so
+ *  they must check the brand's lock directly rather than via scope. */
+async function assertBrandUnlocked(brandId: number, userId: number): Promise<void> {
+  if (await isPositioningLocked("brand", brandId, userId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: LOCK_MESSAGE });
+  }
+}
+
 export const workbenchRouter = router({
   derive: protectedProcedure
     .input(z.object({
@@ -140,6 +164,7 @@ export const workbenchRouter = router({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       const scope = toScope(input);
+      await assertScopeUnlocked(scope, userId);
       const loaded = await loadScopedPositioning(scope, userId);
       if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
       const { name: entityName, pos } = loaded;
@@ -376,6 +401,7 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
       const userId = ctx.user!.id;
       const scope = toScope(input);
       const isEvent = scope.entityKind === "event";
+      await assertScopeUnlocked(scope, userId);
       const loaded = await loadScopedPositioning(scope, userId);
       if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
       const { name: entityName, pos } = loaded;
@@ -517,6 +543,13 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
               } catch { /* per-platform best effort */ }
             }
             if (Object.keys(generated).length === 0) throw new Error("aiPrompts: all platforms failed");
+            // This writes via a raw UPDATE (not mergePositioning), so it
+            // needs its own lock check — a brand locked mid-cascade must
+            // not have this step land after the fact.
+            if (await isPositioningLocked("brand", entityIdForSteps, userId)) {
+              console.warn(`[workbenchRouter] skip aiPrompts write — brand ${entityIdForSteps} positioning is locked`);
+              return {};
+            }
             // read-modify-write —mergePositioning 是整鍵覆蓋，_aiPrompts 需保留
             // 未成功平台的既有值。
             const cur = await loadBrandPositioning(entityIdForSteps, userId);
@@ -560,6 +593,16 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       const scope = toScope(input);
+      // competitor/advantage always land on the PARENT brand's positioning
+      // (see write branches below) even when scoped to an event, so they
+      // check the brand's lock directly; audience writes to whichever
+      // entity is in scope, so assertScopeUnlocked (a no-op for events)
+      // covers it.
+      if (input.kind === "competitor" || input.kind === "advantage") {
+        await assertBrandUnlocked(scope.brandId, userId);
+      } else {
+        await assertScopeUnlocked(scope, userId);
+      }
       const loaded = await loadScopedPositioning(scope, userId);
       if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
       const brandLoaded = scope.entityKind === "event"

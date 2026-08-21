@@ -1986,6 +1986,10 @@ export default function BrandsPage() {
                           eventId={scopeMode === "event" ? (scope?.eventId ?? null) : null}
                           positioning={workbenchPositioning}
                           lang={lang}
+                          // 2026-08-21 (CJ「鎖定後，策略工作檯就會只留下最後
+                          // 定案的，變成下方的文字就好」): only brand scope
+                          // has a 定位 lock — events aren't lockable.
+                          locked={scopeMode === "brand" ? !!tabLocks.positioning : false}
                         />
                       ) : null}
                       <PositioningGrid

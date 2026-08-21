@@ -14,6 +14,7 @@ import { userApiKeys, missions } from "../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 import { assertBrandOwner } from "../_core/brandAuth";
+import { isPositioningLocked } from "../_core/positioningLock";
 
 // Helper to get user's API key
 async function getUserApiKey(userId: number): Promise<string> {
@@ -816,7 +817,14 @@ export const brandRouter = router({
   /**
    * 2026-05-18 (CJ「讀取錯誤時還是無法重新校對」): re-run the positioning
    * analysis from the (now corrected) website / fanpage — works even when
-   * positioning is "completed" (locked), by resetting status first.
+   * positioning is "completed" (the OLD positioningStatus lock), by
+   * resetting status first.
+   *
+   * 2026-08-21 (CJ「剛剛所訂好的競爭對手和主打優勢，突然之間就跑掉了」):
+   * that positioningStatus reset must NOT also bypass the user-facing 定位
+   * tab lock (tabLocks.positioning, set via 鎖定定位) — that lock means
+   * "this is final, don't touch it", which recalibrate previously ignored
+   * entirely. A locked brand now refuses recalibrate until unlocked.
    */
   recalibrate: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
@@ -829,6 +837,9 @@ export const brandRouter = router({
         .limit(1);
       const brand = rows[0];
       if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "brand not found" });
+      if (await isPositioningLocked("brand", input.brandId, ctx.user.id)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "定位已鎖定，請先解鎖再重新校對" });
+      }
       // unlock so the pipeline can overwrite the (wrong) understanding
       await db.update(brands).set({ positioningStatus: "in_progress" } as any)
         .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
