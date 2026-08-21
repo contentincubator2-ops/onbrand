@@ -1,9 +1,9 @@
-name: "Ops — IRIS(2983) round 4: verify tagline intact, polish scrubbed prose"
-# 2026-08-21 (CJ): round-3 scrub left two awkward sentences, AND revealed a
-# concurrent UI edit (tagline.competitorDiff now references 「穿見最好的自己」
-# — someone ran tagline generation in the UI between rounds). Guard:
-#   IF zhTagline is still 優雅・精緻・女性化 → polish the two sentences
-#   ELSE → report DRIFT DETECTED and change nothing (CJ decides).
+name: "Ops — IRIS(2983) round 5: restore finalized tagline 優雅・精緻・女性化"
+# 2026-08-21 (CJ decided): the finalized tagline is 優雅・精緻・女性化.
+# A concurrent UI tagline-generation had overwritten pos.tagline with
+# 「穿見最好的自己」. Restore the finalized tagline everywhere, with the
+# original 三詞並列宣言 story and an official-competitor-frame competitorDiff;
+# repair workbench pointers; polish the trends risk sentence. Idempotent.
 on:
   push:
     branches: [ops/iris-vmd-edit]
@@ -14,13 +14,14 @@ jobs:
     steps:
       - name: Write one-off script
         run: |
-          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-polish.ts <<'TSEOF'
+          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-final.ts <<'TSEOF'
           import * as dotenv from "dotenv";
           dotenv.config();
           import localPool from "../server/localDb";
 
           const BRAND = 2983, USER = 1238991;
           const ZH = "優雅・精緻・女性化";
+          const EN = "Elegant · Refined · Feminine";
 
           async function main() {
             const [rows]: any = await localPool.execute(
@@ -29,49 +30,88 @@ jobs:
             if (!row) { console.error("ABORT: brand not found"); process.exit(1); }
             let pos: any = typeof row.positioning === "string" ? JSON.parse(row.positioning) : (row.positioning ?? {});
 
-            console.log("STATE brands.tagline column:", row.tagline);
-            console.log("STATE pos.tagline.zhTagline:", pos.tagline?.zhTagline);
-            console.log("STATE _bookTagline:", JSON.stringify(pos._bookTagline));
-            console.log("STATE currentTaglineSpot:", pos._workbench?.scenarios?.[0]?.derived?.currentTaglineSpot);
-            console.log("STATE competitorDiff head:", String(pos.tagline?.competitorDiff ?? "").slice(0, 80));
+            console.log("BEFORE pos.tagline:", JSON.stringify(pos.tagline));
+            console.log("BEFORE currentTaglineSpot:", pos._workbench?.scenarios?.[0]?.derived?.currentTaglineSpot);
 
-            const intact = pos.tagline?.zhTagline === ZH && row.tagline === ZH;
-            if (!intact) {
-              console.log("DRIFT DETECTED — tagline is no longer the finalized one; making NO changes.");
-              process.exit(0);
+            // 1. restore the finalized tagline block (original 三詞宣言 story +
+            //    official-frame competitorDiff)
+            pos.tagline = {
+              type: "三詞並列宣言",
+              story: "IRIS 品牌名取自希臘神話彩虹女神與法國國花鳶尾花，自 1987 年創立以來，始終相信優雅不是單一動作，而是剪裁的精緻、細節的女性化語彙加總而成的整體氣質。「優雅・精緻・女性化」三詞是這份信念的濃縮：不追逐當季潮流的表面熱鬧，而專注把每一件衣裳的內在功夫做到位，讓顧客穿上後由內而外散發從容自信。",
+              scenes: ["專櫃選購決策時刻", "重要場合穿搭準備", "品牌形象傳播與社群貼文"],
+              zhTagline: ZH,
+              enTagline: EN,
+              competitorDiff: "優雅帶專櫃競品（Master Max、五銅、TOP-DO、Half half）多以單一風格或價位帶競爭；休閒帶（GINKOO、銀穗、JOAN）訴求輕鬆百搭；快時尚與低價電商則以款多價低取勝。IRIS 用「優雅・精緻・女性化」三詞同時鎖定風格、工藝與設計語彙，形成更完整、不易被單點模仿的品牌識別。",
+            };
+            pos._bookTagline = { zh: ZH, en: EN };
+
+            // 2. workbench repair — official spot must exist, be first, and be
+            //    the current-tagline source
+            const wb = pos._workbench;
+            const scn = wb?.scenarios?.find((s: any) => s?.id === wb?.activeId) ?? wb?.scenarios?.[0];
+            if (scn?.derived?.spots) {
+              console.log("SPOTS NOW:", JSON.stringify(scn.derived.spots.map((s: any) => `${s.title}|${s?.tagline?.zh}|off=${!!s.official}`)));
+              let off = scn.derived.spots.find((s: any) => s?.tagline?.zh === ZH);
+              if (!off) {
+                off = {
+                  lane: "emotion", official: true, title: ZH,
+                  need: "她要：透過穿著傳遞自我品味與生活態度——「被看見的優雅感」與「對自己好」的儀式感（消費族群錨點：心理年齡 30–40 歲都會知性女性，崇尚法式優雅與皇家經典）",
+                  gap: "對手沒有：優雅帶的 Master Max、五銅、TOP-DO 價位更高，Half half 依定位圖優雅度較內斂；休閒帶的 GINKOO、銀穗、JOAN 走輕鬆路線——市場上沒有品牌同時鎖定「優雅×精緻×女性化」三位一體的設計語彙",
+                  ours: "我們有：歐式皇家經典美學 × 細緻工藝剪裁 × 優質面料，每季主題故事驅動設計——「優雅・精緻・女性化」三位一體、不易被單點模仿的完整識別",
+                  tagline: { zh: ZH, en: EN },
+                };
+                scn.derived.spots.unshift(off);
+                console.log("RE-ADDED official spot");
+              } else {
+                scn.derived.spots.forEach((s: any) => { s.official = (s === off); });
+                const i = scn.derived.spots.indexOf(off);
+                if (i > 0) { scn.derived.spots.splice(i, 1); scn.derived.spots.unshift(off); }
+                off.title = ZH;
+              }
+              scn.derived.currentTaglineSpot = ZH;
+              pos._workbench = { ...wb, appliedId: scn.id };
             }
 
-            // Polish 1: tagline.competitorDiff — clean rewrite for the 三詞 tagline,
-            // consistent with the official brand-book competitive frame.
-            pos.tagline.competitorDiff =
-              "優雅帶專櫃競品（Master Max、五銅、TOP-DO、Half half）多以單一風格或價位帶競爭；休閒帶（GINKOO、銀穗、JOAN）訴求輕鬆百搭；快時尚與低價電商則以款多價低取勝。IRIS 用「優雅・精緻・女性化」三詞同時鎖定風格、工藝與設計語彙，形成更完整、不易被單點模仿的品牌識別。";
-            console.log("POLISHED competitorDiff");
-
-            // Polish 2: trends risk sentence — drop brand-name list entirely.
+            // 3. trends risk sentence — neutral phrasing, no brand-name list
             const risks = pos.trends?.risks;
-            if (Array.isArray(risks) && typeof risks[0]?.body === "string") {
+            if (Array.isArray(risks) && typeof risks[0]?.body === "string" && /SHEIN|H&M|Zara/i.test(risks[0].body)) {
               risks[0].body = risks[0].body.replace(
                 /^.*?持續搶占台灣市場/,
                 "國際快時尚與低價電商平台以低價高速上新持續搶占台灣市場");
-              console.log("POLISHED trends.risks[0].body:", risks[0].body.slice(0, 120));
+              console.log("POLISHED trends risk");
             }
 
             await localPool.execute(
-              `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
-              [JSON.stringify(pos), BRAND, USER]);
-            console.log("DONE — polish applied");
+              `UPDATE brands SET positioning = ?, tagline = ?, targetAudience = COALESCE(targetAudience, targetAudience) WHERE id = ? AND userId = ?`,
+              [JSON.stringify(pos), ZH, BRAND, USER]);
+
+            // ── verify ──
+            const [after]: any = await localPool.execute(
+              `SELECT tagline,
+                      JSON_EXTRACT(positioning, '$.tagline.zhTagline') AS zh,
+                      JSON_EXTRACT(positioning, '$._bookTagline.zh') AS book,
+                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].derived.currentTaglineSpot') AS cur,
+                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].derived.spots[*].tagline.zh') AS spotTags,
+                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].selection.competitors') AS comps
+                 FROM brands WHERE id = ?`, [BRAND]);
+            console.log("AFTER:", JSON.stringify((after as any[])[0], null, 2));
+            const whole = JSON.stringify(pos);
+            const terms = ["ILEY", "La Feta", "拉菲塔", "ZARA", "Monki", "i-Select", "蝦皮", "Mango", "Other Stories", "SHEIN", "H&M", "穿見最好的自己"];
+            const left: Record<string, number> = {};
+            for (const t of terms) { const n = whole.split(t).length - 1; if (n > 0) left[t] = n; }
+            console.log("FINAL LEFTOVERS:", JSON.stringify(left));
             process.exit(0);
           }
           main().catch((e) => { console.error("FATAL:", e); process.exit(1); });
           TSEOF
           echo "script written"
 
-      - name: Run polish
+      - name: Run restore
         run: |
           cd /opt/onbrand/app/skills/ai-talent
           set -a; source .env 2>/dev/null || true; set +a
-          npx tsx scripts/_tmp-iris-polish.ts
+          npx tsx scripts/_tmp-iris-final.ts
 
       - name: Cleanup
         if: always()
-        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-polish.ts
+        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-final.ts
