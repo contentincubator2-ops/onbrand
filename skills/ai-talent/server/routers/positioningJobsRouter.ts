@@ -16,6 +16,7 @@ import {
   getRecentJobCompletions,
   finalizeBrandAfterPipeline,
 } from "../_core/positioningJobRunner";
+import { isPositioningLocked } from "../_core/positioningLock";
 import {
   buildBrandPositioningSteps,
   buildProductPositioningSteps,
@@ -95,6 +96,9 @@ export const positioningJobsRouter = router({
     .mutation(async ({ ctx, input }) => {
       if (input.entityId === 0) return { ok: false as const, error: "no entity selected" };
       const userId = ctx.user!.id;
+      if (await isPositioningLocked(input.entityKind, input.entityId, userId)) {
+        return { ok: false as const, error: "定位已鎖定，請先解鎖再重新推導" };
+      }
       const ent = await loadEntity(input.entityKind, input.entityId, userId);
       if (!ent) {
         return { ok: false as const, error: `${input.entityKind} not found` };
