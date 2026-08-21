@@ -2001,17 +2001,19 @@ export async function runOrchestra(args: {
     // metadata + transcript (richer context than generic urlContext).
     // Otherwise fall back to generic urlContext for non-YT links.
     const inputValues = Object.values(args.inputs).filter((v): v is string => typeof v === "string");
-    // Ad-copy tasks: a URL in the brief is the *landing page*, not the
-    // topic source — do not fetch it and never let it override the brand
-    // as「主題」. It is carried separately as requestedUrl.
+    // Ad-copy tasks: a non-YouTube URL in the brief is the *landing page*
+    // (carried separately as requestedUrl), not the topic source — do not
+    // fetch it and never let it override the brand as「主題」. YouTube links
+    // stay reference material and keep the existing fetch path.
     const adCopyTask = isAdCopyTemplate(args.template);
     const requestedUrl = adCopyTask ? extractRequestedUrl(args.inputs) : null;
-    const ytUrlInput = adCopyTask ? undefined : inputValues.find((v) => !!extractYouTubeId(v));
-    const detectedUrl = adCopyTask
-      ? null
-      : ytUrlInput
+    const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
+    const firstUrl = ytUrlInput
       ? findFirstUrl(ytUrlInput)
       : inputValues.map((v) => findFirstUrl(v)).find((url): url is string => !!url) ?? null;
+    const isLandingUrl = (u: string | null) =>
+      !!u && !!requestedUrl && u.replace(/^https?:\/\//i, "") === requestedUrl.replace(/^https?:\/\//i, "");
+    const detectedUrl = isLandingUrl(firstUrl) ? null : firstUrl;
 
     // 100s tier: also kick off scout (viral patterns research) in parallel
     const isResearchTier = tier === "99s";

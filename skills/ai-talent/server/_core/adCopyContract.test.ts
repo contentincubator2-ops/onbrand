@@ -28,6 +28,12 @@ describe("extractRequestedUrl", () => {
   it("returns null when the brief has no URL", () => {
     expect(extractRequestedUrl({ campaign: "母親節" })).toBeNull();
   });
+  it("treats a YouTube link as material, not the landing page", () => {
+    expect(extractRequestedUrl({ campaign: "參考這支 https://www.youtube.com/watch?v=abc123def45" })).toBeNull();
+  });
+  it("keeps a scheme when the user typed one", () => {
+    expect(extractRequestedUrl({ campaign: "CTA: https://abc.com/sale?x=1&y=2" })).toBe("https://abc.com/sale?x=1&y=2");
+  });
 });
 
 describe("buildAdCopyRule", () => {
@@ -54,6 +60,18 @@ describe("validateAdCopy", () => {
     const c = "[Headline] 秋冬穿搭這樣配\n[Primary] 具體怎麼配？點下面。\n[CTA] 看完整穿搭指南 → www.abc.com";
     expect(validateAdCopy(c, URL)?.reason).toBe("missing_url");
   });
+  it("flags URL that is in [Primary] but not its last line", () => {
+    const c = `[Headline] a\n[Primary] 先看 ${URL} 再說。\n最後一句話。\n[CTA] c`;
+    expect(validateAdCopy(c, URL)?.reason).toBe("missing_url");
+  });
+  it("flags URL duplicated into [CTA]", () => {
+    const c = `[Headline] a\n[Primary] b\n${URL}\n[CTA] 看看 ${URL}`;
+    expect(validateAdCopy(c, URL)?.reason).toBe("url_in_cta");
+  });
+  it("flags a fabricated URL when none was requested", () => {
+    const c = "[Headline] a\n[Primary] 上 www.made-up.com 看看\n[CTA] c";
+    expect(validateAdCopy(c, null)?.reason).toBe("fabricated_url");
+  });
   it("accepts 【】 full-width markers", () => {
     expect(validateAdCopy(`【Headline】a\n【Primary】b ${URL}\n【CTA】c`, URL)).toBeNull();
   });
@@ -71,6 +89,21 @@ describe("repairAdCopy", () => {
   it("appends the URL when it is missing everywhere", () => {
     const out = repairAdCopy("[Headline] a\n[Primary] b\n[CTA] c", URL);
     expect(out).toBe(`[Headline] a\n[Primary] b\n${URL}\n[CTA] c`);
+  });
+  it("moves a mid-paragraph URL to the last line and strips every copy from [CTA]", () => {
+    const c = `[Headline] a\n[Primary] 先看 ${URL} 再說。\n最後一句話。\n[CTA] ${URL} 看看 ${URL}`;
+    const out = repairAdCopy(c, URL);
+    expect(out).toBe(`[Headline] a\n[Primary] 先看 ${URL} 再說。\n最後一句話。\n${URL}\n[CTA] 看看`);
+    expect(validateAdCopy(out, URL)).toBeNull();
+  });
+  it("falls back to a default button label when [CTA] was only the URL", () => {
+    const out = repairAdCopy(`[Headline] a\n[Primary] b\n${URL}\n[CTA] ${URL}`, URL);
+    expect(out).toBe(`[Headline] a\n[Primary] b\n${URL}\n[CTA] 立即查看`);
+  });
+  it("handles URLs with regex-special characters", () => {
+    const u = "https://abc.com/sale?x=1&y=(2)";
+    const out = repairAdCopy(`[Headline] a\n[Primary] b\n[CTA] 買 → ${u}`, u);
+    expect(out).toBe(`[Headline] a\n[Primary] b\n${u}\n[CTA] 買`);
   });
   it("is a no-op for compliant captions, captions without markers, or no URL", () => {
     expect(repairAdCopy(GOOD, URL)).toBe(GOOD);

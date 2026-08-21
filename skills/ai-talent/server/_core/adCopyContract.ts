@@ -10,6 +10,7 @@
 
 import type { FBTaskTemplate } from "./quickTaskFB";
 import { findFirstUrl } from "./urlContext";
+import { extractYouTubeId } from "./youtubeContext";
 
 const MARKER_RE = /(?:\[|【)\s*(headline|primary|cta)\s*(?:\]|】)/giu;
 
@@ -28,6 +29,9 @@ export function extractRequestedUrl(inputs: Record<string, unknown>): string | n
     if (typeof v !== "string") continue;
     const url = findFirstUrl(v);
     if (!url) continue;
+    // A YouTube link in an ad brief is reference *material* (the existing
+    // fetch-as-context path keeps handling it), not the landing page.
+    if (extractYouTubeId(url)) continue;
     // findFirstUrl normalises bare domains to https://… — keep the user's
     // literal spelling so validation/repair compare against what they
     // typed (and what the model will most naturally echo back).
@@ -56,7 +60,7 @@ export function buildAdCopyRule(requestedUrl: string | null): string {
 }
 
 export interface AdCopyIssue {
-  reason: "missing_markers" | "missing_url";
+  reason: "missing_markers" | "missing_url" | "url_in_cta" | "fabricated_url";
   detail: string;
 }
 
@@ -93,34 +97,55 @@ function splitSegments(caption: string): Segments | null {
 export function validateAdCopy(caption: string, requestedUrl: string | null): AdCopyIssue | null {
   const seg = splitSegments(caption);
   if (!seg) return { reason: "missing_markers", detail: "caption 缺少 [Headline]/[Primary]/[CTA] 標記" };
-  if (requestedUrl && !seg.primary.includes(requestedUrl)) {
-    return { reason: "missing_url", detail: `[Primary] 未包含指定網址 ${requestedUrl}` };
+  if (requestedUrl) {
+    if (!lastLine(seg.primary).includes(requestedUrl)) {
+      return { reason: "missing_url", detail: `[Primary] 的最後一行必須是指定網址 ${requestedUrl}` };
+    }
+    if (seg.cta.includes(requestedUrl)) {
+      return { reason: "url_in_cta", detail: `[CTA] 只能放按鈕文字，不能放網址 ${requestedUrl}` };
+    }
+  } else {
+    const invented = findFirstUrl(seg.headline) ?? findFirstUrl(seg.primary) ?? findFirstUrl(seg.cta);
+    if (invented) {
+      return { reason: "fabricated_url", detail: `使用者沒有提供網址，不得自行加入 ${invented}` };
+    }
   }
   return null;
 }
 
+function lastLine(block: string): string {
+  const lines = block.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  return lines[lines.length - 1] ?? "";
+}
+
+/** Button text used when stripping the URL leaves [CTA] empty. */
+const DEFAULT_CTA_BUTTON = "立即查看";
+
 /**
  * Deterministic last-resort repair: when the markers are present but the
- * requested URL is missing from [Primary], append it as the final line of
- * [Primary] and strip it from [CTA] (the button is at most 8 chars on the
+ * requested URL is not the final line of [Primary], append it there, and
+ * strip every occurrence from [CTA] (the button is at most 8 chars on the
  * mockup, so a URL there is useless). Captions without markers are returned
- * untouched — we cannot invent structure the model never produced.
+ * untouched — we cannot invent structure the model never produced — and a
+ * fabricated URL (none requested) is left for the retry to fix, never
+ * silently edited.
  */
 export function repairAdCopy(caption: string, requestedUrl: string | null): string {
   if (!requestedUrl) return caption;
   const seg = splitSegments(caption);
   if (!seg) return caption;
   let changed = false;
-  if (!seg.primary.includes(requestedUrl)) {
+  if (!lastLine(seg.primary).includes(requestedUrl)) {
     seg.primary = `${seg.primary}\n${requestedUrl}`.trim();
     changed = true;
   }
   if (seg.cta.includes(requestedUrl)) {
     const stripped = seg.cta
-      .replace(requestedUrl, "")
-      .replace(/\s*(?:→|->|👉|:|：)\s*$/u, "")
+      .split(requestedUrl).join("")
+      .replace(/\s*(?:→|->|👉|:|：|\(|（)\s*$/u, "")
       .trim();
-    if (stripped) { seg.cta = stripped; changed = true; }
+    seg.cta = stripped || DEFAULT_CTA_BUTTON;
+    changed = true;
   }
   if (!changed) return caption;
   return [
