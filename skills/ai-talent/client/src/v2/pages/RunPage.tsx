@@ -61,6 +61,7 @@ import {
   type RunContentMutationLocator,
 } from "../lib/strategyContentEnvelope";
 import { RUN_IMAGE_MODEL_OPTIONS } from "../lib/runImageModelOptions";
+import { findValidRunProductSelection, type RunProductImage } from "../lib/runProductSelection";
 import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { TRPCClientError } from "@trpc/client";
@@ -1004,7 +1005,7 @@ export default function RunPage() {
     String(videoStatus.status);
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
-        onSuccess: (r: any) => {
+        onSuccess: async (r: any) => {
           // 2026-05-10: image.generate returns either {url} (Flux/Leonardo) or
           // {b64} (OpenAI gpt-image-1). Normalize to a usable image source —
           // for b64 we wrap as data: URL so <img> tag renders directly.
@@ -1018,16 +1019,22 @@ export default function RunPage() {
               showToastGlobal(lang === "en" ? "Image target was lost — please try again" : "找不到原本的圖片位置，請重試");
               return;
             }
-            updateImageMut.mutate({
-              id,
-              ...target.locator,
-              imageUrl: imageSrc,
-              prompt: r?.effectivePrompt ?? target.promptZh,
-              promptZh: r?.normalizedDisplayPrompt ?? target.promptZh,
-              modelId: r?.model ?? undefined,
-              requestedModelId: r?.requestedModel ?? undefined,
-              fallbackUsed: r?.usedFallback ?? false,
-            });
+            try {
+              await updateImageMut.mutateAsync({
+                id,
+                ...target.locator,
+                imageUrl: imageSrc,
+                prompt: r?.effectivePrompt ?? target.promptZh,
+                promptZh: r?.normalizedDisplayPrompt ?? target.promptZh,
+                modelId: r?.model ?? undefined,
+                requestedModelId: r?.requestedModel ?? undefined,
+                fallbackUsed: r?.usedFallback ?? false,
+              });
+            } catch {
+              // updateImageMut.onError already shows the persistence error.
+              imageMutationTargetRef.current = null;
+              return;
+            }
             imageMutationTargetRef.current = null;
             const actualModel = String(r?.model ?? "").trim();
             const requestedModel = String(r?.requestedModel ?? "").trim();
@@ -1070,11 +1077,21 @@ export default function RunPage() {
     { brandId: data?.brand?.id ?? 0 },
     { enabled: !!data?.brand?.id, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
-  const runProductImages: Array<{ productId: number; name: string; imageUrl: string }> =
+  const runProductImages: RunProductImage[] =
     (runProductImagesQ.data as any)?.products ?? [];
   const [useRealProduct, setUseRealProduct] = React.useState(false);
-  const [pickedRunProduct, setPickedRunProduct] = React.useState<{ productId: number; name: string; imageUrl: string } | null>(null);
-  const realProductMode = useRealProduct && !!pickedRunProduct;
+  const [pickedRunProduct, setPickedRunProduct] = React.useState<RunProductImage | null>(null);
+  const validRunProduct = findValidRunProductSelection(pickedRunProduct, runProductImages);
+  const missingRealProductSelection = useRealProduct && !validRunProduct;
+  const realProductMode = useRealProduct && !!validRunProduct;
+
+  // RunPage is reused between route ids, and brand data can also change while
+  // the component stays mounted. Never carry a product photo across either
+  // boundary.
+  React.useEffect(() => {
+    setUseRealProduct(false);
+    setPickedRunProduct(null);
+  }, [id, data?.brand?.id]);
 
   // 2026-06-15: generate image prompt from the current variant's caption.
   const captionToPromptMut = (trpc as any).image?.promptFromCaption?.useMutation
@@ -2894,15 +2911,18 @@ export default function RunPage() {
                   )}
                   {/* 2026-07-25 (CJ): real-product compositing — the actual
                       IRIS/Iris Girls photo instead of an AI-imagined product. */}
-                  {runProductImages.length > 0 && (
+                  {(runProductImages.length > 0 || useRealProduct) && (
                     <div className="rounded-lg border border-default-200 bg-default-50 px-3 py-2.5 mt-2">
                       <label className="flex items-center gap-2 cursor-pointer flex-wrap">
                         <input
                           type="checkbox"
                           checked={useRealProduct}
                           onChange={(e) => {
-                            setUseRealProduct(e.target.checked);
-                            if (e.target.checked && !pickedRunProduct) setPickedRunProduct(runProductImages[0] ?? null);
+                            const checked = e.target.checked;
+                            setUseRealProduct(checked);
+                            if (checked && !findValidRunProductSelection(pickedRunProduct, runProductImages)) {
+                              setPickedRunProduct(runProductImages[0] ?? null);
+                            }
                           }}
                         />
                         <span className="text-tiny font-semibold">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
@@ -2972,13 +2992,21 @@ export default function RunPage() {
                   <Button
                     color="secondary" fullWidth
                     isLoading={imageGenMut.isPending}
-                    isDisabled={imageGenMut.isPending || !imagePrompt.trim() || !data.brand?.id}
+                    isDisabled={imageGenMut.isPending || !imagePrompt.trim() || !data.brand?.id || missingRealProductSelection}
                     onPress={() => {
                       if (!data.brand?.id) {
                         showToastGlobal(
                           lang === "en"
                             ? "This run isn't linked to a brand, can't generate"
                             : "此 run 沒有綁定品牌，無法產圖"
+                        );
+                        return;
+                      }
+                      if (useRealProduct && !validRunProduct) {
+                        showToastGlobal(
+                          lang === "en"
+                            ? "Select a product photo from this brand before generating"
+                            : "請先從目前品牌選擇有效的產品圖，再進行產圖"
                         );
                         return;
                       }
@@ -3000,7 +3028,10 @@ export default function RunPage() {
                         ) as any,
                         modelChoice: imageModel as any,
                         size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
-                        ...(realProductMode ? { subjectImageUrl: pickedRunProduct!.imageUrl } : {}),
+                        // TODO: send productId and resolve the brand-owned image
+                        // server-side. This hotfix intentionally closes the gap
+                        // with current-brand client validation only.
+                        ...(realProductMode ? { subjectImageUrl: validRunProduct!.imageUrl } : {}),
                       });
                     }}
                   >
@@ -3010,6 +3041,9 @@ export default function RunPage() {
                   </Button>
                   {!data.brand?.id && (
                     <p className="text-[10px] text-warning-700">⚠ {lang === "en" ? "This run has no brand — link a brand first" : "此 run 沒有 brand，請先綁品牌再產圖"}</p>
+                  )}
+                  {missingRealProductSelection && (
+                    <p className="text-[10px] text-warning-700">⚠ {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
                   )}
                 </>
               )}
