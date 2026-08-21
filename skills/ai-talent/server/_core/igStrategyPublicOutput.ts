@@ -244,17 +244,25 @@ function replacePrivateTerm(text: string, privateTerm: string | null, publicTerm
 }
 
 function normalizeReportedAudienceMix(text: string): string {
-  // The prompt chooses one reader address from explicit audience context.
+  // The prompt chooses one reader-address group from explicit audience context.
   // Keep that choice intact here; deterministic replacement of 妳 → 你 would
-  // erase a valid audience-aware decision. This boundary only rejects mixed
-  // choices and normalizes an audience-analysis "她" when its antecedent is
-  // unambiguous.
+  // erase a valid audience-aware decision. Singular/plural forms within the
+  // same group are compatible, while mixing feminine, generic, or honorific
+  // groups still fails closed.
   const addressForms = new Set(text.match(/妳們|你們|您|妳|你/g) ?? []);
-  if (addressForms.size > 1) {
+  const addressGroups = new Set([...addressForms].map((address) => {
+    if (address === "妳" || address === "妳們") return "feminine";
+    if (address === "你" || address === "你們") return "generic";
+    return "honorific";
+  }));
+  if (addressGroups.size > 1) {
     throw new Error("strategy public audience address validation failed");
   }
 
-  const hasDirectAddress = addressForms.size === 1;
+  // A direct reader address anywhere in the full caption establishes that the
+  // audience is being spoken to. An otherwise ambiguous 她 in another
+  // paragraph can therefore remain a third-person scene subject.
+  const hasDirectAddress = addressGroups.size === 1;
   return text
     .split(/(\n{2,})/)
     .map((paragraph) => {
@@ -267,6 +275,7 @@ function normalizeReportedAudienceMix(text: string): string {
       if (/(?:受眾|客群|粉絲|追蹤者|消費者|顧客|讀者)/.test(paragraph)) {
         return paragraph.replace(/她們/g, "這群受眾").replace(/她/g, "受眾");
       }
+      if (hasDirectAddress) return paragraph;
       throw new Error("strategy public perspective validation failed");
     })
     .join("");

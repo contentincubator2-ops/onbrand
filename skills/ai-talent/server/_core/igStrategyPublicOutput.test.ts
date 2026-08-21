@@ -195,13 +195,24 @@ describe("public caption and planning redaction boundary", () => {
   });
 
   it.each([
+    "妳可以先整理衣櫃，妳們也可以一起分享穿搭心得。",
+    "你可以先整理需求，你們也可以一起討論下一步。",
+  ])("allows singular and plural forms in the same reader-address group: %s", (caption) => {
+    expect(sanitizeIgStrategyPublicCaption("ig-baer-youtility", caption, { steps: STEPS })).toBe(caption);
+  });
+
+  it.each([
     "你可以先閱讀，妳也可以下載範本。",
     "您可以先閱讀，你也可以下載範本。",
-    "你們可以先閱讀，你也可以下載範本。",
-    "妳們可以先閱讀，妳也可以下載範本。",
   ])("rejects mixed direct-reader address: %s", (caption) => {
     expect(() => sanitizeIgStrategyPublicCaption("ig-baer-youtility", caption, { steps: STEPS }))
       .toThrow("strategy public audience address validation failed");
+  });
+
+  it("allows a third-person scene when the full caption directly addresses readers", () => {
+    const caption = "妳的衣櫃不需要再多一件將就的衣服，這種猶豫妳們一定懂。\n\n全身鏡前的她，終於看見自在又有精神的自己。";
+
+    expect(sanitizeIgStrategyPublicCaption("ig-baer-youtility", caption, { steps: STEPS })).toBe(caption);
   });
 
   it("preserves a genuine third-person woman while normalizing an audience pronoun", () => {

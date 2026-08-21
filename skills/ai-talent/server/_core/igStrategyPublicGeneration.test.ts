@@ -39,7 +39,7 @@ describe("IG strategy public campaign boundary", () => {
 
   it("still rejects mixed reader addresses inside one variant", () => {
     expect(() => assertCampaign([
-      variant("live-promo-reel-1", "你可以先預告主題，你們也可以整理問題。"),
+      variant("live-promo-reel-1", "你可以先預告主題，您也可以整理問題。"),
     ])).toThrow("strategy public audience address validation failed");
   });
 
