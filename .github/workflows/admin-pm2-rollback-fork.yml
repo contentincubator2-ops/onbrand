@@ -1,7 +1,6 @@
 name: Admin — Rollback onbrand pm2 to fork mode
 # Emergency recovery: nuke any onbrand or marketing-os pm2 process,
-# rewrite ecosystem.config.cjs to known-good fork mode + correct cwd/name,
-# then start fresh.
+# validate the repository's ecosystem.config.cjs, then start fresh.
 on: { workflow_dispatch: {} }
 jobs:
   rollback:
@@ -15,36 +14,30 @@ jobs:
           echo "── port 3101 listening? ──"
           ss -ltnp 2>/dev/null | grep :3101 || echo "nothing on 3101"
 
-      - name: Force-write correct ecosystem
+      - name: Verify repository ecosystem
         run: |
           set -e
-          cat > /opt/onbrand/app/skills/ai-talent/ecosystem.config.cjs <<'CFG'
-          module.exports = {
-            apps: [{
-              name: 'onbrand',
-              script: './node_modules/.bin/tsx',
-              args: 'server/index.ts',
-              cwd: '/opt/onbrand/app/skills/ai-talent',
-              instances: 1,
-              exec_mode: 'fork',
-              max_restarts: 10,
-              restart_delay: 5000,
-              max_memory_restart: '768M',
-              env: {
-                NODE_ENV: 'production',
-                PORT: '3101',
-                TRUST_PROXY: '1',
-              },
-              error_file: '/home/azureuser/.pm2/logs/onbrand-error.log',
-              out_file: '/home/azureuser/.pm2/logs/onbrand-out.log',
-              merge_logs: true,
-              log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-              autorestart: true,
-              watch: false,
-            }]
-          };
-          CFG
-          cat /opt/onbrand/app/skills/ai-talent/ecosystem.config.cjs
+          cd /opt/onbrand/app/skills/ai-talent
+          node <<'NODE'
+          const config = require('./ecosystem.config.cjs');
+          const apps = config.apps || [];
+          const app = apps.find((candidate) => candidate.name === 'onbrand');
+          const failures = [];
+
+          if (apps.length !== 1 || !app) failures.push('ecosystem must define only onbrand');
+          if (app?.instances !== 1) failures.push(`instances=${app?.instances}; expected 1`);
+          if (app?.exec_mode !== 'fork') failures.push(`exec_mode=${app?.exec_mode}; expected fork`);
+          if (app?.max_memory_restart !== '3G') failures.push(`max_memory_restart=${app?.max_memory_restart}; expected 3G`);
+          if (app?.node_args !== '--max-old-space-size=2048') failures.push(`node_args=${app?.node_args}; expected --max-old-space-size=2048`);
+
+          if (failures.length > 0) {
+            console.error('❌ Refusing rollback with stale or unsafe ecosystem config:');
+            failures.forEach((failure) => console.error(`  - ${failure}`));
+            process.exit(1);
+          }
+
+          console.log('✓ Repository ecosystem is the approved one-app 3G fork configuration');
+          NODE
 
       - name: Nuke + restart
         run: |
