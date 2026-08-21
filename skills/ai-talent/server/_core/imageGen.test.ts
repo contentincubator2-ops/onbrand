@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { executeMock } = vi.hoisted(() => ({
+const { dispatchGenerateMock, executeMock } = vi.hoisted(() => ({
+  dispatchGenerateMock: vi.fn(),
   executeMock: vi.fn(),
 }));
 
@@ -9,6 +10,10 @@ vi.mock("../db", () => ({
 }));
 
 vi.mock("./decisionBridge", () => ({ loadLineage: vi.fn(async () => []) }));
+
+vi.mock("./mediaGen", () => ({
+  dispatchGenerate: dispatchGenerateMock,
+}));
 
 import { generateImage } from "./imageGen";
 
@@ -24,6 +29,11 @@ describe("generateImage provider validation", () => {
     vi.stubEnv("GOOGLE_API_KEY", "");
     vi.stubEnv("IMAGE_GEN_PROVIDER_PRIMARY", "openai");
     vi.stubEnv("IMAGE_GEN_PROVIDER_FALLBACK", "google");
+    dispatchGenerateMock.mockResolvedValue({
+      status: "ready",
+      modelId: "google/nano-banana",
+      url: "/uploads/generated/product.png",
+    });
   });
 
   it("falls back instead of reporting ready when OpenAI returns no image", async () => {
@@ -78,5 +88,24 @@ describe("generateImage provider validation", () => {
 
     expect(result).toMatchObject({ status: "ready", provider: "google" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("puts product-reference arbitration before a conflicting scene prompt", async () => {
+    const conflictingScene = "A woman wearing a fitted beige shirt with black trousers";
+
+    await expect(generateImage({
+      brandId: 1,
+      prompt: conflictingScene,
+      subjectImageUrl: "https://example.com/real-brown-top.png",
+    })).resolves.toMatchObject({ status: "ready", model: "nano-banana" });
+
+    expect(dispatchGenerateMock).toHaveBeenCalledOnce();
+    const [, options] = dispatchGenerateMock.mock.calls[0]!;
+    const prompt = String(options.prompt);
+    expect(prompt).toContain("attached reference image is the sole source of truth");
+    expect(prompt).toContain("ignore that conflicting text and follow the reference image");
+    expect(prompt).toContain("Use scene text only for the environment, lighting, composition, pose, and atmosphere");
+    expect(prompt.indexOf("PRODUCT REFERENCE OVERRIDES ALL CONFLICTING TEXT"))
+      .toBeLessThan(prompt.indexOf(conflictingScene));
   });
 });

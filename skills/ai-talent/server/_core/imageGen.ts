@@ -47,6 +47,13 @@ export const NO_TEXT_PROMPT_BLOCK =
  * GENERATED text anywhere else in the frame.
  */
 export const PRODUCT_FAITHFUL_PROMPT_BLOCK =
+  "PRODUCT REFERENCE OVERRIDES ALL CONFLICTING TEXT — the attached reference " +
+  "image is the sole source of truth for the product or garment. If any scene " +
+  "text conflicts with the reference image about the product, clothing, color, " +
+  "style, cut, shape, proportions, material, pattern, details, label, or logo, " +
+  "ignore that conflicting text and follow the reference image. Use scene text " +
+  "only for the environment, lighting, composition, pose, and atmosphere; never " +
+  "replace the referenced product or garment with one described by the scene. " +
   "PRODUCT FIDELITY — the attached image is the REAL product; this is the " +
   "most important rule: reproduce the product EXACTLY as shown — identical " +
   "shape, proportions, materials, colors, and every printed label, logo and " +
@@ -198,6 +205,13 @@ function channelSize(channel?: string): ImageSize {
 function buildPrompt(input: ImageGenInput): string {
   const bc = input.brandContext ?? {};
   const lines: string[] = [];
+  // Product-reference arbitration must precede all scene/context prose. Models
+  // otherwise tend to follow a later, concrete clothing description instead of
+  // the attached customer's product photo.
+  if (input.subjectImageUrl) {
+    lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK);
+    lines.push("");
+  }
   // 2026-08-19 (客戶回報「勾選真實產品後再產圖，出現錯誤中文字」): in
   // subject-reference mode the blanket NO-TEXT guard is deliberately relaxed
   // so the real product's own printed label survives — which means anything
@@ -229,7 +243,9 @@ function buildPrompt(input: ImageGenInput): string {
     );
   }
   lines.push("");
-  lines.push("Scene:");
+  lines.push(input.subjectImageUrl
+    ? "Scene (environment, lighting, composition, pose, and atmosphere only):"
+    : "Scene:");
   lines.push(input.prompt);
   lines.push("");
   // 2026-07-07 (CJ「YT 縮圖出現不是國字的國字」): image models (Flux /
@@ -243,8 +259,6 @@ function buildPrompt(input: ImageGenInput): string {
   // blanket NO-TEXT rule would strip the product's own label — use the
   // fidelity guard instead (label letter-perfect, no OTHER generated text).
   if (input.subjectImageUrl) {
-    lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK);
-    lines.push("");
     lines.push(NO_MIRROR_PROMPT_BLOCK);
     lines.push("");
     lines.push(
@@ -403,6 +417,8 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
         // mediaRouter.generate already passes on this same path.
         negativePrompt: NO_MIRROR_NEGATIVE_PROMPT,
       });
+      // TODO: Add post-generation vision validation/retry for product fidelity;
+      // prompt arbitration reduces conflicts but cannot prove output compliance.
       if (r.status === "ready" && r.url) {
         await db.execute(sql`
           UPDATE generated_images
