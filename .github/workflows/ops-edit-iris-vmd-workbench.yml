@@ -1,0 +1,109 @@
+name: "Ops — Edit IRIS(2983) workbench: official tagline 優雅・精緻・女性化"
+# 2026-08-21 (CJ): on brand 2983 (IRIS under vmdirisfamily@gmail.com):
+#   1. remove sweet spot 在地服務・購物零斷層（懂妳的品牌，就在台灣）
+#   2. add official spot FIRST with tagline 優雅・精緻・女性化, derivation
+#      chain built from the scenario's configured anchors (audience /
+#      competitors / advantages)
+#   3. finalize (applyScenario semantics): brands.tagline + positioning
+#      .tagline + _bookTagline + targetAudience←selection.audience +
+#      _workbench.appliedId
+# BEFORE state is printed to the log first — that is the rollback copy.
+on:
+  push:
+    branches: [ops/iris-vmd-edit]
+jobs:
+  edit:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 10
+    steps:
+      - name: Write one-off script
+        run: |
+          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-wb-edit.ts <<'TSEOF'
+          import * as dotenv from "dotenv";
+          dotenv.config();
+          import localPool from "../server/localDb";
+
+          const BRAND = 2983, USER = 1238991;
+          const REMOVE_TAGLINE = "懂妳的品牌，就在台灣";
+          const REMOVE_TITLE = "在地服務・購物零斷層";
+          const ZH = "優雅・精緻・女性化";
+          const EN = "Elegant · Refined · Feminine";
+
+          async function main() {
+            const [rows]: any = await localPool.execute(
+              `SELECT positioning, tagline, targetAudience FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+              [BRAND, USER]);
+            const row = (rows as any[])[0];
+            if (!row) { console.error("ABORT: brand 2983 not found under user 1238991"); process.exit(1); }
+            let pos: any = typeof row.positioning === "string" ? JSON.parse(row.positioning) : (row.positioning ?? {});
+
+            // ── rollback copy ──
+            console.log("BEFORE brands.tagline:", row.tagline);
+            console.log("BEFORE targetAudience:", String(row.targetAudience ?? "").slice(0, 120));
+            console.log("BEFORE _workbench JSON:", JSON.stringify(pos._workbench));
+            console.log("BEFORE pos.tagline:", JSON.stringify(pos.tagline));
+            console.log("BEFORE _bookTagline:", JSON.stringify(pos._bookTagline));
+
+            const wb = pos._workbench;
+            const scn = wb?.scenarios?.find((s: any) => s?.id === wb?.activeId) ?? wb?.scenarios?.[0];
+            if (!scn?.derived?.spots) { console.error("ABORT: no workbench scenario"); process.exit(1); }
+            if (scn.derived.spots.some((s: any) => s?.tagline?.zh === ZH)) {
+              console.log("IDEMPOTENT: spot with target tagline already exists — refreshing finalize only");
+            }
+
+            // 1. remove the 在地服務 spot
+            const nBefore = scn.derived.spots.length;
+            scn.derived.spots = scn.derived.spots.filter((s: any) =>
+              !(s?.tagline?.zh === REMOVE_TAGLINE || s?.title === REMOVE_TITLE));
+            console.log(`removed ${nBefore - scn.derived.spots.length} spot(s) (${REMOVE_TITLE})`);
+
+            // 2. new official spot first — chain built from the CONFIGURED anchors
+            scn.derived.spots.forEach((s: any) => { if (s.official) s.official = false; });
+            scn.derived.spots = scn.derived.spots.filter((s: any) => s?.tagline?.zh !== ZH);
+            const newSpot = {
+              lane: "emotion",
+              official: true,
+              title: ZH,
+              need: "她要：透過穿著傳遞自我品味與生活態度——「被看見的優雅感」與「對自己好」的儀式感（消費族群錨點：心理年齡 30–40 歲都會知性女性，崇尚法式優雅與皇家經典）",
+              gap: "對手沒有：ILEY 伊蕾、La Feta 拉菲塔、ZARA 各自主打單一風格（前衛設計／輕熟休閒／快時尚量產），無法同時鎖定風格、工藝與設計語彙",
+              ours: "我們有：歐式皇家經典美學 × 細緻工藝剪裁 × 優質面料，每季主題故事驅動設計——「優雅・精緻・女性化」三位一體、不易被單點模仿的完整識別",
+              tagline: { zh: ZH, en: EN },
+            };
+            scn.derived.spots.unshift(newSpot);
+            scn.derived.currentTaglineSpot = ZH;
+
+            // 3. finalize（applyScenario semantics）
+            pos.tagline = { ...(pos.tagline ?? {}), zhTagline: ZH, enTagline: EN };
+            pos._bookTagline = { zh: ZH, en: EN };
+            pos._workbench = { ...wb, appliedId: scn.id };
+            const audience = String(scn.selection?.audience ?? "").trim().slice(0, 600);
+
+            await localPool.execute(
+              `UPDATE brands SET positioning = ?, tagline = ?${audience ? ", targetAudience = ?" : ""} WHERE id = ? AND userId = ?`,
+              [JSON.stringify(pos), ZH, ...(audience ? [audience] : []), BRAND, USER]);
+
+            // ── verify ──
+            const [after]: any = await localPool.execute(
+              `SELECT tagline, LEFT(targetAudience, 80) AS ta,
+                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].derived.spots[*].title') AS titles,
+                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].derived.spots[*].tagline.zh') AS taglines,
+                      JSON_EXTRACT(positioning, '$._workbench.appliedId') AS applied,
+                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].derived.currentTaglineSpot') AS curSpot,
+                      JSON_EXTRACT(positioning, '$.tagline.zhTagline') AS zhTagline
+                 FROM brands WHERE id = ?`, [BRAND]);
+            console.log("AFTER:", JSON.stringify((after as any[])[0], null, 2));
+            process.exit(0);
+          }
+          main().catch((e) => { console.error("FATAL:", e); process.exit(1); });
+          TSEOF
+          echo "script written"
+
+      - name: Run edit
+        run: |
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null || true; set +a
+          npx tsx scripts/_tmp-iris-wb-edit.ts
+
+      - name: Cleanup
+        if: always()
+        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-wb-edit.ts
