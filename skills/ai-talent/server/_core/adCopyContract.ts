@@ -66,7 +66,8 @@ function findAllUrls(text: string, depth = 0): string[] {
 /** Hard rule appended to the system prompt (overrides the social scaffold). */
 export function buildAdCopyRule(requestedUrl: string | null): string {
   const urlRule = requestedUrl
-    ? `- 使用者指定了落地頁網址「${requestedUrl}」：[Primary] 的**最後一行必須逐字**出現這個網址（不得改寫、縮短或換成別的網址）。` +
+    ? `- 使用者指定了落地頁網址「${requestedUrl}」：[Primary] 的**最後一行**必須是「一句行動引導 + 👉 + 網址」，` +
+      `例如「想找到妳的那件外套 👉 ${requestedUrl}」；網址必須**逐字**出現（不得改寫、縮短或換成別的網址），不要讓網址孤零零自成一行。` +
       `[CTA] 只放按鈕文字（2–8 字，例如「看穿搭指南」），**不要**把網址放進 [CTA]。\n`
     : `- 使用者沒有提供網址：**絕對不要**自行捏造任何網址或連結。\n`;
   return (
@@ -148,6 +149,8 @@ function lastLine(block: string): string {
 
 /** Button text used when stripping the URL leaves [CTA] empty. */
 const DEFAULT_CTA_BUTTON = "立即查看";
+/** Lead-in used when the repair has to append the landing URL itself. */
+const DEFAULT_URL_LEAD = "點這裡看更多";
 
 /**
  * Deterministic last-resort repair: when the markers are present but the
@@ -181,7 +184,7 @@ export function repairAdCopy(caption: string, requestedUrl: string | null): stri
     return changed ? joinSegments(seg) : caption;
   }
   if (!lastLine(seg.primary).includes(requestedUrl)) {
-    seg.primary = `${seg.primary}\n${requestedUrl}`.trim();
+    seg.primary = `${seg.primary}\n${DEFAULT_URL_LEAD} 👉 ${requestedUrl}`.trim();
     changed = true;
   }
   const ctaUrls = [requestedUrl, ...findAllUrls(seg.cta)].filter((u) => seg.cta.includes(u));

@@ -106,18 +106,18 @@ describe("repairAdCopy", () => {
     const c = "[Headline] 秋冬穿搭這樣配\n[Primary] 具體怎麼配？點下面。\n[CTA] 看完整穿搭指南 → www.abc.com\n#秋冬穿搭";
     const out = repairAdCopy(c, URL);
     expect(out).toBe(
-      "[Headline] 秋冬穿搭這樣配\n[Primary] 具體怎麼配？點下面。\nwww.abc.com\n[CTA] 看完整穿搭指南\n#秋冬穿搭",
+      "[Headline] 秋冬穿搭這樣配\n[Primary] 具體怎麼配？點下面。\n點這裡看更多 👉 www.abc.com\n[CTA] 看完整穿搭指南\n#秋冬穿搭",
     );
     expect(validateAdCopy(out, URL)).toBeNull();
   });
   it("appends the URL when it is missing everywhere", () => {
     const out = repairAdCopy("[Headline] a\n[Primary] b\n[CTA] c", URL);
-    expect(out).toBe(`[Headline] a\n[Primary] b\n${URL}\n[CTA] c`);
+    expect(out).toBe(`[Headline] a\n[Primary] b\n點這裡看更多 👉 ${URL}\n[CTA] c`);
   });
   it("moves a mid-paragraph URL to the last line and strips every copy from [CTA]", () => {
     const c = `[Headline] a\n[Primary] 先看 ${URL} 再說。\n最後一句話。\n[CTA] ${URL} 看看 ${URL}`;
     const out = repairAdCopy(c, URL);
-    expect(out).toBe(`[Headline] a\n[Primary] 先看 ${URL} 再說。\n最後一句話。\n${URL}\n[CTA] 看看`);
+    expect(out).toBe(`[Headline] a\n[Primary] 先看 ${URL} 再說。\n最後一句話。\n點這裡看更多 👉 ${URL}\n[CTA] 看看`);
     expect(validateAdCopy(out, URL)).toBeNull();
   });
   it("also strips foreign URLs from [CTA]", () => {
@@ -132,19 +132,19 @@ describe("repairAdCopy", () => {
   it("handles URLs with regex-special characters", () => {
     const u = "https://abc.com/sale?x=1&y=(2)";
     const out = repairAdCopy(`[Headline] a\n[Primary] b\n[CTA] 買 → ${u}`, u);
-    expect(out).toBe(`[Headline] a\n[Primary] b\n${u}\n[CTA] 買`);
+    expect(out).toBe(`[Headline] a\n[Primary] b\n點這裡看更多 👉 ${u}\n[CTA] 買`);
   });
   it("strips a bare foreign URL that precedes a scheme requested URL in [CTA]", () => {
     const u = "https://abc.com/x";
     const out = repairAdCopy(`[Headline] a\n[Primary] b\n[CTA] www.other.com 看 ${u}`, u);
-    expect(out).toBe(`[Headline] a\n[Primary] b\n${u}\n[CTA] 看`);
+    expect(out).toBe(`[Headline] a\n[Primary] b\n點這裡看更多 👉 ${u}\n[CTA] 看`);
   });
   it("rebuilds the three segments from an unlabelled caption (the IRIS case)", () => {
     const plain = "聖誕節那天，我穿上這件法式藍語刺繡上衣走進家門。\n媽媽在廚房準備晚餐，抬頭看我一眼。\n#聖誕穿搭 #優雅日常";
     const out = repairAdCopy(plain, URL);
     expect(out).toBe(
       "[Headline] 聖誕節那天，我穿上這件法式藍語刺繡上衣走進家門。\n" +
-      "[Primary] 媽媽在廚房準備晚餐，抬頭看我一眼。\nwww.abc.com\n" +
+      "[Primary] 媽媽在廚房準備晚餐，抬頭看我一眼。\n點這裡看更多 👉 www.abc.com\n" +
       "[CTA] 立即查看\n#聖誕穿搭 #優雅日常",
     );
     expect(validateAdCopy(out, URL)).toBeNull();
