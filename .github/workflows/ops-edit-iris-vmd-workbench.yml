@@ -1,13 +1,14 @@
-name: "Ops — Edit IRIS(2983) workbench: official tagline 優雅・精緻・女性化"
-# 2026-08-21 (CJ): on brand 2983 (IRIS under vmdirisfamily@gmail.com):
-#   1. remove sweet spot 在地服務・購物零斷層（懂妳的品牌，就在台灣）
-#   2. add official spot FIRST with tagline 優雅・精緻・女性化, derivation
-#      chain built from the scenario's configured anchors (audience /
-#      competitors / advantages)
-#   3. finalize (applyScenario semantics): brands.tagline + positioning
-#      .tagline + _bookTagline + targetAudience←selection.audience +
-#      _workbench.appliedId
-# BEFORE state is printed to the log first — that is the rollback copy.
+name: "Ops — IRIS(2983) round 2: official competitor set everywhere"
+# 2026-08-21 (CJ): the competitor list drifted differently on every surface
+# (workbench: ILEY/La Feta/ZARA · 定位書: i-Select/Monki/La Feta/ZARA/蝦皮).
+# Reset ALL surfaces to the official brand-book map set:
+#   優雅帶: Master Max / 五銅 / TOP-DO / (IRIS) / Half half
+#   休閒帶: 銀穗 / GINKOO / JOAN
+# Surfaces aligned: workbench selection + spot gap chains + stakes/rivalTurf
+# notes, positioning.competition, differentiation.functional. Claims stay
+# grounded in the brand-book quadrant axes (優雅↔休閒 × 價位) only.
+# BEFORE state printed first = rollback copy. Ends with a leftover-mention
+# scan across the whole positioning JSON.
 on:
   push:
     branches: [ops/iris-vmd-edit]
@@ -18,80 +19,109 @@ jobs:
     steps:
       - name: Write one-off script
         run: |
-          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-wb-edit.ts <<'TSEOF'
+          cat > /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-comp-edit.ts <<'TSEOF'
           import * as dotenv from "dotenv";
           dotenv.config();
           import localPool from "../server/localDb";
 
           const BRAND = 2983, USER = 1238991;
-          const REMOVE_TAGLINE = "懂妳的品牌，就在台灣";
-          const REMOVE_TITLE = "在地服務・購物零斷層";
-          const ZH = "優雅・精緻・女性化";
-          const EN = "Elegant · Refined · Feminine";
+          const OFFICIAL = ["Master Max", "五銅", "TOP-DO", "Half half", "GINKOO", "銀穗", "JOAN"];
 
           async function main() {
             const [rows]: any = await localPool.execute(
-              `SELECT positioning, tagline, targetAudience FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
-              [BRAND, USER]);
+              `SELECT positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [BRAND, USER]);
             const row = (rows as any[])[0];
-            if (!row) { console.error("ABORT: brand 2983 not found under user 1238991"); process.exit(1); }
+            if (!row) { console.error("ABORT: brand not found"); process.exit(1); }
             let pos: any = typeof row.positioning === "string" ? JSON.parse(row.positioning) : (row.positioning ?? {});
 
-            // ── rollback copy ──
-            console.log("BEFORE brands.tagline:", row.tagline);
-            console.log("BEFORE targetAudience:", String(row.targetAudience ?? "").slice(0, 120));
-            console.log("BEFORE _workbench JSON:", JSON.stringify(pos._workbench));
-            console.log("BEFORE pos.tagline:", JSON.stringify(pos.tagline));
-            console.log("BEFORE _bookTagline:", JSON.stringify(pos._bookTagline));
+            // ── rollback copies ──
+            console.log("BEFORE competition:", JSON.stringify(pos.competition));
+            console.log("BEFORE workbench selection.competitors:",
+              JSON.stringify(pos._workbench?.scenarios?.[0]?.selection?.competitors));
+            console.log("BEFORE stakes/rivalTurf:",
+              JSON.stringify({ s: pos._workbench?.scenarios?.[0]?.derived?.stakes, r: pos._workbench?.scenarios?.[0]?.derived?.rivalTurf }));
+            console.log("BEFORE diff.functional:", String(pos.differentiation?.functional ?? "").slice(0, 200));
 
             const wb = pos._workbench;
             const scn = wb?.scenarios?.find((s: any) => s?.id === wb?.activeId) ?? wb?.scenarios?.[0];
-            if (!scn?.derived?.spots) { console.error("ABORT: no workbench scenario"); process.exit(1); }
-            if (scn.derived.spots.some((s: any) => s?.tagline?.zh === ZH)) {
-              console.log("IDEMPOTENT: spot with target tagline already exists — refreshing finalize only");
+            if (!scn?.derived?.spots) { console.error("ABORT: no scenario"); process.exit(1); }
+
+            // 1. anchor: official competitor set
+            scn.selection = { ...(scn.selection ?? {}), competitors: OFFICIAL };
+
+            // 2. spot gap chains — axis-grounded rewrites
+            const gapByTitle: Record<string, string> = {
+              "優雅・精緻・女性化":
+                "對手沒有：優雅帶的 Master Max、五銅、TOP-DO 價位更高，Half half 依定位圖優雅度較內斂；休閒帶的 GINKOO、銀穗、JOAN 走輕鬆路線——市場上沒有品牌同時鎖定「優雅×精緻×女性化」三位一體的設計語彙",
+              "優雅是她本來的語言":
+                "GINKOO、銀穗、JOAN 以休閒定位為主，難以承載「被看見的優雅」的儀式感；同優雅帶的 Master Max、五銅 價位偏高，日常入手門檻高",
+              "精緻剪裁・日常就能穿":
+                "Master Max、五銅、TOP-DO 的高價位讓日常添購有壓力；休閒帶的 GINKOO、JOAN 較難滿足正式場合所需的精緻度",
+              "換季犒賞・品味的宣言":
+                "休閒帶品牌較少經營「犒賞自己」的情感溢價敘事；高價位帶則讓換季添購成為負擔——IRIS 的中高價位優雅正落在犒賞的甜蜜區間",
+            };
+            scn.derived.spots.forEach((s: any) => { if (gapByTitle[s.title]) s.gap = gapByTitle[s.title]; });
+
+            // 3. four-zone notes
+            scn.derived.stakes = [
+              { title: "具設計感的女裝款式", note: "專櫃競品（Master Max、五銅、TOP-DO、Half half）皆提供，為市場入場基本門檻，無差異化優勢" },
+              { title: "線上購物渠道", note: "官網與電商已是專櫃品牌標配，需以服務溫度與社群深度創造差異" },
+              { title: "歐式風格視覺語言", note: "優雅帶競品亦使用歐式美學元素，需以品牌故事深度強化獨特性" },
+            ];
+            scn.derived.rivalTurf = [
+              { title: "休閒百搭・輕鬆路線", note: "GINKOO、銀穗、JOAN 的休閒定位地盤，IRIS 優雅定位不宜跟進" },
+              { title: "更高價位・經典路線", note: "Master Max、五銅 所在的高價位帶，IRIS 維持可負擔的中高價位優雅，不往上硬拚" },
+            ];
+
+            // 4. 定位書 competition segment — official set, axis-grounded
+            pos.competition = {
+              map: "依品牌手冊定位圖：IRIS 位於「優雅×中高價位」象限，是優雅軸上站位最鮮明的品牌。優雅帶（價位由高至低）：Master Max、五銅、TOP-DO、IRIS、Half half；休閒帶：銀穗、GINKOO、JOAN。核心差異化：以鳶尾花精神串聯「被看見的優雅感」，用細緻工藝與女性化設計語彙形成不易複製的品牌識別。",
+              direct: [
+                { name: "Master Max", tone: "經典穩重", position: "優雅帶最高價位的專櫃品牌（依定位圖）", weakness: "價位帶最高，日常添購門檻高", ourEdge: "IRIS 以可負擔的中高價位提供同帶優雅與每季主題故事" },
+                { name: "五銅", tone: "都會經典", position: "優雅帶中高價位專櫃品牌", weakness: "價位高於 IRIS，日常入手門檻較高", ourEdge: "IRIS 兼顧精緻工藝與價位甜蜜點，日常與場合皆可入手" },
+                { name: "TOP-DO", tone: "經典優雅", position: "優雅帶中高價位專櫃品牌", weakness: "價位較高，設計語彙偏經典", ourEdge: "IRIS 以「優雅・精緻・女性化」三位一體的設計語彙形成完整識別" },
+                { name: "Half half", tone: "簡約優雅", position: "優雅帶中價位品牌，價位帶與 IRIS 相近", weakness: "依定位圖優雅度較 IRIS 內斂", ourEdge: "IRIS 以法式鳶尾花美學與工藝敘事拉開情感厚度" },
+              ],
+              indirect: [
+                { name: "GINKOO", threat: "中—休閒定位百搭易入手，分食日常穿著預算", response: "以優雅儀式感與精緻剪裁做風格區隔，不跟休閒路線" },
+                { name: "銀穗", threat: "中—休閒帶中高價位，吸引重視質感但偏好輕鬆風格的客群", response: "凸顯法式優雅美學與女性化設計語彙的差異" },
+                { name: "JOAN", threat: "中—休閒帶品牌，款式輕鬆日常", response: "強化「辦公室與重要場合都能駕馭」的場合適配優勢" },
+              ],
+              intensity: "台灣百貨專櫃女裝市場競爭集中：優雅帶四品牌直接交鋒、休閒帶三品牌分食日常衣櫥。IRIS 以「優雅×中高價位」的清晰站位與品牌手冊定義的三詞識別維持差異。",
+            };
+
+            // 5. differentiation.functional — drop the ZARA/蝦皮 clause
+            if (typeof pos.differentiation?.functional === "string") {
+              pos.differentiation.functional = pos.differentiation.functional.replace(
+                "相較於 ZARA 的量產速食與蝦皮低價品的粗糙感",
+                "相較於休閒帶品牌的輕鬆路線與高價位帶的入手門檻");
             }
 
-            // 1. remove the 在地服務 spot
-            const nBefore = scn.derived.spots.length;
-            scn.derived.spots = scn.derived.spots.filter((s: any) =>
-              !(s?.tagline?.zh === REMOVE_TAGLINE || s?.title === REMOVE_TITLE));
-            console.log(`removed ${nBefore - scn.derived.spots.length} spot(s) (${REMOVE_TITLE})`);
-
-            // 2. new official spot first — chain built from the CONFIGURED anchors
-            scn.derived.spots.forEach((s: any) => { if (s.official) s.official = false; });
-            scn.derived.spots = scn.derived.spots.filter((s: any) => s?.tagline?.zh !== ZH);
-            const newSpot = {
-              lane: "emotion",
-              official: true,
-              title: ZH,
-              need: "她要：透過穿著傳遞自我品味與生活態度——「被看見的優雅感」與「對自己好」的儀式感（消費族群錨點：心理年齡 30–40 歲都會知性女性，崇尚法式優雅與皇家經典）",
-              gap: "對手沒有：ILEY 伊蕾、La Feta 拉菲塔、ZARA 各自主打單一風格（前衛設計／輕熟休閒／快時尚量產），無法同時鎖定風格、工藝與設計語彙",
-              ours: "我們有：歐式皇家經典美學 × 細緻工藝剪裁 × 優質面料，每季主題故事驅動設計——「優雅・精緻・女性化」三位一體、不易被單點模仿的完整識別",
-              tagline: { zh: ZH, en: EN },
-            };
-            scn.derived.spots.unshift(newSpot);
-            scn.derived.currentTaglineSpot = ZH;
-
-            // 3. finalize（applyScenario semantics）
-            pos.tagline = { ...(pos.tagline ?? {}), zhTagline: ZH, enTagline: EN };
-            pos._bookTagline = { zh: ZH, en: EN };
-            pos._workbench = { ...wb, appliedId: scn.id };
-            const audience = String(scn.selection?.audience ?? "").trim().slice(0, 600);
-
             await localPool.execute(
-              `UPDATE brands SET positioning = ?, tagline = ?${audience ? ", targetAudience = ?" : ""} WHERE id = ? AND userId = ?`,
-              [JSON.stringify(pos), ZH, ...(audience ? [audience] : []), BRAND, USER]);
+              `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
+              [JSON.stringify(pos), BRAND, USER]);
 
-            // ── verify ──
+            // ── verify + leftover scan ──
             const [after]: any = await localPool.execute(
-              `SELECT tagline, LEFT(targetAudience, 80) AS ta,
-                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].derived.spots[*].title') AS titles,
-                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].derived.spots[*].tagline.zh') AS taglines,
-                      JSON_EXTRACT(positioning, '$._workbench.appliedId') AS applied,
-                      JSON_EXTRACT(positioning, '$._workbench.scenarios[0].derived.currentTaglineSpot') AS curSpot,
-                      JSON_EXTRACT(positioning, '$.tagline.zhTagline') AS zhTagline
-                 FROM brands WHERE id = ?`, [BRAND]);
-            console.log("AFTER:", JSON.stringify((after as any[])[0], null, 2));
+              `SELECT positioning FROM brands WHERE id = ?`, [BRAND]);
+            const ap: any = typeof after[0].positioning === "string" ? JSON.parse(after[0].positioning) : after[0].positioning;
+            console.log("AFTER selection.competitors:", JSON.stringify(ap._workbench?.scenarios?.[0]?.selection?.competitors));
+            console.log("AFTER competition.direct names:", JSON.stringify((ap.competition?.direct ?? []).map((d: any) => d.name)));
+            console.log("AFTER competition.indirect names:", JSON.stringify((ap.competition?.indirect ?? []).map((d: any) => d.name)));
+            console.log("AFTER spot gaps:", JSON.stringify((ap._workbench?.scenarios?.[0]?.derived?.spots ?? []).map((s: any) => s.title + " | " + String(s.gap).slice(0, 40))));
+            const whole = JSON.stringify(ap);
+            const leftovers: Record<string, number> = {};
+            for (const term of ["ILEY", "La Feta", "拉菲塔", "拉芙達", "ZARA", "Monki", "i-Select", "愛衫閣", "蝦皮", "Mango", "Other Stories", "NET"]) {
+              const n = whole.split(term).length - 1;
+              if (n > 0) {
+                leftovers[term] = n;
+                // locate which top-level keys still mention it
+                for (const k of Object.keys(ap)) {
+                  if (JSON.stringify(ap[k]).includes(term)) console.log(`LEFTOVER "${term}" in key: ${k}`);
+                }
+              }
+            }
+            console.log("LEFTOVER COUNTS:", JSON.stringify(leftovers));
             process.exit(0);
           }
           main().catch((e) => { console.error("FATAL:", e); process.exit(1); });
@@ -102,8 +132,8 @@ jobs:
         run: |
           cd /opt/onbrand/app/skills/ai-talent
           set -a; source .env 2>/dev/null || true; set +a
-          npx tsx scripts/_tmp-iris-wb-edit.ts
+          npx tsx scripts/_tmp-iris-comp-edit.ts
 
       - name: Cleanup
         if: always()
-        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-wb-edit.ts
+        run: rm -f /opt/onbrand/app/skills/ai-talent/scripts/_tmp-iris-comp-edit.ts
