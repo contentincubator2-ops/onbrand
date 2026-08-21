@@ -45,14 +45,11 @@ jobs:
                     JSON_LENGTH(JSON_EXTRACT(b.positioning,'$._workbench.scenarios')) AS nScenarios
                FROM brands b JOIN users u ON u.id=b.userId
               WHERE b.name LIKE '%IRIS%' OR b.name LIKE '%iris%';"
-          echo "=== 5. workbench scenario detail for whichever IRIS has one (spots + selection) ==="
-          mysql -h"$H" -u"$U" -p"$P" "$D" --raw -e \
-            "SELECT b.id,
-                    JSON_PRETTY(JSON_EXTRACT(b.positioning,'$._workbench.scenarios[0].selection')) AS sel,
-                    JSON_PRETTY(JSON_EXTRACT(b.positioning,
-                      '$._workbench.scenarios[0].derived.spots[*].title')) AS spotTitles,
-                    JSON_PRETTY(JSON_EXTRACT(b.positioning,
-                      '$._workbench.scenarios[0].derived.spots[*].tagline.zh')) AS spotTaglines
-               FROM brands b
-              WHERE (b.name LIKE '%IRIS%' OR b.name LIKE '%iris%')
-                AND JSON_LENGTH(JSON_EXTRACT(b.positioning,'$._workbench.scenarios')) > 0;"
+          echo "=== 5. brand 2983 full workbench scenario (the one to edit) ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" --raw -N -e \
+            "SELECT JSON_PRETTY(JSON_EXTRACT(positioning,'$._workbench')) FROM brands WHERE id=2983;"
+          echo "=== 6. brand 2983 positioning.tagline + _bookTagline ==="
+          mysql -h"$H" -u"$U" -p"$P" "$D" --raw -N -e \
+            "SELECT JSON_PRETTY(JSON_EXTRACT(positioning,'$.tagline')),
+                    JSON_PRETTY(JSON_EXTRACT(positioning,'$._bookTagline'))
+               FROM brands WHERE id=2983;"
