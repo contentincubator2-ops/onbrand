@@ -132,14 +132,56 @@ jobs:
             grep -c "gpt-image-2" "$AI/server/routers/imageRouter.ts" && echo "✓ gpt-image-2 present in imageRouter.ts" || echo "✗ gpt-image-2 MISSING from imageRouter.ts"
 
             echo "===== Restart PM2 ====="
-            TSX=$AI/node_modules/.bin/tsx
             set -a
             source "$AI/.env"
             set +a
             echo "JWT_SECRET present: $([ -n "$JWT_SECRET" ] && echo YES || echo NO)"
 
-            pm2 delete onbrand 2>/dev/null || true
-            pm2 start "$TSX" --name onbrand --cwd "$AI" --update-env -- server/index.ts
+            cd "$AI"
+            pm2 startOrReload ecosystem.config.cjs --update-env
+
+            echo "===== Verify PM2 guardrails ====="
+            PM2_JLIST="$(pm2 jlist)" node <<'NODE'
+            const processes = JSON.parse(process.env.PM2_JLIST || '[]');
+            const onbrand = processes.filter((process) => process.name === 'onbrand');
+            const failures = [];
+
+            if (onbrand.length !== 1) {
+              failures.push(`expected exactly one onbrand process, found ${onbrand.length}`);
+            }
+
+            if (onbrand.length > 0) {
+              const env = onbrand[0].pm2_env || {};
+              const nodeArgs = Array.isArray(env.node_args)
+                ? env.node_args
+                : String(env.node_args || '').trim().split(/\s+/).filter(Boolean);
+              const expectedMemory = 3 * 1024 * 1024 * 1024;
+
+              if (Number(env.max_memory_restart) !== expectedMemory) {
+                failures.push(`max_memory_restart=${env.max_memory_restart}; expected ${expectedMemory} bytes (3G)`);
+              }
+              if (nodeArgs.length !== 1 || nodeArgs[0] !== '--max-old-space-size=2048') {
+                failures.push(`node_args=${JSON.stringify(env.node_args)}; expected --max-old-space-size=2048`);
+              }
+              if (env.exec_mode !== 'fork_mode') {
+                failures.push(`exec_mode=${env.exec_mode}; expected fork_mode`);
+              }
+              if (Number(env.instances) !== 1) {
+                failures.push(`instances=${env.instances}; expected 1`);
+              }
+              if (env.status !== 'online') {
+                failures.push(`status=${env.status}; expected online`);
+              }
+            }
+
+            if (failures.length > 0) {
+              console.error('❌ PM2 guardrail verification failed:');
+              failures.forEach((failure) => console.error(`  - ${failure}`));
+              process.exit(1);
+            }
+
+            console.log('✓ onbrand: 3G RSS restart, 2048MB old-space, fork mode, one online instance');
+            NODE
             pm2 save --force
 
             echo "===== Health check ====="

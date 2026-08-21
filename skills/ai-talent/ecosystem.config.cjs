@@ -13,9 +13,10 @@ module.exports = {
     // enough headroom for moderate concurrent load.
     instances: 1,
     exec_mode: 'fork',
+    node_args: '--max-old-space-size=2048',
     max_restarts: 10,
     restart_delay: 5000,
-    max_memory_restart: '768M',
+    max_memory_restart: '3G',
     env: {
       NODE_ENV: 'production',
       SKILLS_PATH: '/home/azureuser/A2A-Marketing-Claw/skills',
