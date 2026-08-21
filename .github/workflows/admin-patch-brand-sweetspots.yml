@@ -1,0 +1,156 @@
+name: "Admin — Patch brand strategy-workbench sweet spots"
+
+# 2026-08-21 (CJ「甜蜜點的SLOGAN...移除懂你的品牌，就在台灣，改成三個優雅
+# 精緻 女性化...放在第一個」): the Sweet Spot board (StrategyWorkbench.tsx)
+# reads positioning._workbench.scenarios[].derived.spots[] — each spot has
+# its own need←gap←ours chain and a one-line tagline (workbenchRouter.ts
+# WorkbenchSpot). This workflow does a read-modify-write of the whole
+# `positioning` column in Node (not a JSON_SET path patch, like the sibling
+# admin-patch-brand-positioning.yml) because the transform is a filter +
+# prepend on an array buried inside a scenario, which is impractical to
+# express as a single SQL JSON path expression.
+#
+# payload_b64 is base64 JSON shaped as:
+#   {
+#     "removeMatching": string,      // substring match against spot.title
+#                                     // or spot.tagline.zh — case-sensitive,
+#                                     // matching spots are dropped
+#     "prependSpots": [
+#       { "lane": "emotion"|"function", "title", "need", "gap", "ours",
+#         "tagline": { "zh", "en"? }, "official"?: boolean }
+#     ],
+#     "scenarioName"?: string        // defaults to the first scenario found,
+#                                     // or "情境 A" if none exist yet
+#   }
+# currentTaglineSpot is set to prependSpots[0].title (mirrors the same rule
+# workbenchRouter.ts's derive procedure enforces: spot 0 is the tagline
+# origin).
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand id to patch"
+        required: true
+        type: string
+      payload_b64:
+        description: "Base64-encoded JSON payload (see workflow comment for shape)"
+        required: true
+        type: string
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Patch sweet spots
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+          PAYLOAD_B64: ${{ inputs.payload_b64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          envs: BRAND_ID,PAYLOAD_B64
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            node --import tsx -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const raw = Buffer.from(process.env.PAYLOAD_B64, 'base64').toString('utf8');
+                const payload = JSON.parse(raw);
+                const brandId = Number(process.env.BRAND_ID);
+                if (!brandId) { console.error('bad brand_id'); process.exit(1); }
+                if (!Array.isArray(payload.prependSpots) || payload.prependSpots.length === 0) {
+                  console.error('payload.prependSpots must be a non-empty array'); process.exit(1);
+                }
+
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+
+                const [rows] = await conn.execute('SELECT id, name, positioning FROM brands WHERE id = ?', [brandId]);
+                const brandRow = rows[0];
+                if (!brandRow) { console.error('NO SUCH BRAND:', brandId); process.exit(1); }
+                let pos = brandRow.positioning;
+                if (typeof pos === 'string') { try { pos = JSON.parse(pos); } catch { pos = {}; } }
+                pos = pos || {};
+
+                const wb = (pos._workbench && typeof pos._workbench === 'object') ? pos._workbench : { scenarios: [] };
+                const scenarios = Array.isArray(wb.scenarios) ? wb.scenarios : [];
+                console.log('BEFORE scenarioCount:', scenarios.length);
+
+                let scn;
+                if (payload.scenarioName) {
+                  // Explicit name that doesn't match ANY existing scenario is
+                  // an error, not 'fall back to scenarios[0]' — this writes
+                  // production positioning data, so a misspelled/stale name
+                  // must fail loud rather than silently patch the wrong
+                  // scenario (Codex review, PR #121).
+                  scn = scenarios.find(function (s) { return s && s.name === payload.scenarioName; });
+                  if (!scn && scenarios.length > 0) {
+                    console.error('scenarioName ' + JSON.stringify(payload.scenarioName) + ' not found among existing scenarios: ' +
+                      JSON.stringify(scenarios.map(function (s) { return s && s.name; })));
+                    process.exit(1);
+                  }
+                } else {
+                  scn = scenarios[0];
+                }
+                if (!scn) {
+                  scn = {
+                    id: Date.now().toString(36),
+                    name: payload.scenarioName || '情境 A',
+                    selection: {},
+                    derived: { spots: [], stakes: [], rivalTurf: [], vanity: [] },
+                    createdAt: new Date().toISOString(),
+                  };
+                  scenarios.push(scn);
+                  console.log('CREATED fresh scenario:', scn.name);
+                }
+                scn.derived = (scn.derived && typeof scn.derived === 'object') ? scn.derived : { spots: [], stakes: [], rivalTurf: [], vanity: [] };
+                const oldSpots = Array.isArray(scn.derived.spots) ? scn.derived.spots : [];
+                console.log('BEFORE spots:', JSON.stringify(oldSpots.map(function (s) { return { title: s && s.title, tagline: s && s.tagline && s.tagline.zh }; })));
+
+                // Idempotent on retry: drop both the removeMatching needle
+                // AND any existing spot whose title collides with one of
+                // prependSpots — otherwise re-running this dispatch (e.g.
+                // after an SSH hiccup whose DB write actually landed) would
+                // find the needle already gone and re-prepend duplicates
+                // (Codex review, PR #121).
+                const needle = String(payload.removeMatching || '');
+                const prependTitles = new Set(payload.prependSpots.map(function (s) { return s.title; }));
+                const kept = oldSpots.filter(function (s) {
+                  const title = String((s && s.title) || '');
+                  const tagline = String((s && s.tagline && s.tagline.zh) || '');
+                  if (prependTitles.has(title)) return false;
+                  if (needle && (title.indexOf(needle) !== -1 || tagline.indexOf(needle) !== -1)) return false;
+                  return true;
+                });
+                const removedCount = oldSpots.length - kept.length;
+
+                const newSpots = payload.prependSpots.concat(kept);
+                scn.derived.spots = newSpots;
+                scn.derived.currentTaglineSpot = payload.prependSpots[0].title;
+
+                const idx = scenarios.findIndex(function (s) { return s && s.id === scn.id; });
+                if (idx >= 0) scenarios[idx] = scn; else scenarios.push(scn);
+                pos._workbench = Object.assign({}, wb, { scenarios: scenarios, activeId: scn.id });
+
+                await conn.execute(
+                  'UPDATE brands SET positioning = CAST(? AS JSON), updatedAt = NOW(3) WHERE id = ?',
+                  [JSON.stringify(pos), brandId],
+                );
+
+                console.log('REMOVED spots matching', JSON.stringify(needle), ':', removedCount);
+                console.log('AFTER spots:', JSON.stringify(scn.derived.spots.map(function (s) { return { title: s.title, tagline: s.tagline && s.tagline.zh, official: !!s.official }; })));
+                console.log('AFTER currentTaglineSpot:', scn.derived.currentTaglineSpot);
+                await conn.end();
+              })().catch(e => { console.error('FAILED:', e && e.message || e); process.exit(1); });
+            "
