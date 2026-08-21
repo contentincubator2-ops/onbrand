@@ -90,9 +90,9 @@ jobs:
                 // pipeline (job row) or something else (workbench cascade,
                 // recalibrate) that wrote it.
                 const [jobs] = await conn.execute(
-                  `SELECT id, status, currentStep, totalSteps, startedAt, finishedAt, lastError
-                     FROM positioning_jobs WHERE entityKind = 'brand' AND entityId = ?
-                    ORDER BY id DESC LIMIT 5`,
+                  'SELECT id, status, currentStep, totalSteps, startedAt, finishedAt, lastError ' +
+                  "FROM positioning_jobs WHERE entityKind = 'brand' AND entityId = ? " +
+                  'ORDER BY id DESC LIMIT 5',
                   [brandId],
                 );
                 console.log('RECENT JOBS', JSON.stringify(jobs));
