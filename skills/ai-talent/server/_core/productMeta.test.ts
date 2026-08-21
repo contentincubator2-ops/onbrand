@@ -74,6 +74,18 @@ describe("fetchProductMeta", () => {
     });
   });
 
+  it("drops a zero price (call-for-price listings) instead of persisting NT$0", async () => {
+    mockHtml(`<html><head>
+      <script type="application/ld+json">{"@type":"Product","name":"電洽商品",
+        "image":"https://img.example.com/a.jpg","offers":{"@type":"Offer","price":0,"priceCurrency":"TWD"}}</script>
+      <meta property="product:price:amount" content="0">
+    </head></html>`);
+    const meta = await fetchProductMeta("https://shop.example.com/products/x");
+    expect(meta.source).toBe("jsonld");
+    expect(meta.name).toBe("電洽商品");
+    expect(meta.price).toBeUndefined();
+  });
+
   it("returns none rather than throwing and validates the requested URL", async () => {
     vi.mocked(assertUrlSafe).mockRejectedValueOnce(new Error("blocked"));
     await expect(fetchProductMeta("http://127.0.0.1/private")).resolves.toEqual({ source: "none" });

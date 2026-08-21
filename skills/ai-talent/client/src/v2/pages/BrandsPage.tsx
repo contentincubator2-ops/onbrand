@@ -4921,14 +4921,16 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
       brandId: p?.brandId ?? undefined,
       slug: p?.slug ?? String(productId),
       name: name.trim() || (p?.name ?? "未命名產品"),
-      positioning: (usp.trim() || w || sku.trim())
-        ? {
-            ...existingPositioning,
-            summary: summary || undefined,
-            website: w || undefined,
-            sku: sku.trim() || undefined,
-          }
-        : existingPositioning,
+      // 2026-08-21: spread existing positioning so imageUrl / price /
+      // pipeline segments survive an edit. Cleared fields are sent as null
+      // (not undefined) — the server's merge drops undefined keys, so null
+      // is the only way for the user to actually clear a value.
+      positioning: {
+        ...existingPositioning,
+        summary: summary || null,
+        website: w || null,
+        sku: sku.trim() || null,
+      },
     });
     setSavedAt(Date.now());
   }

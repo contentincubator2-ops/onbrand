@@ -34,9 +34,14 @@ function cleanText(value: unknown): string | undefined {
   return cleaned || undefined;
 }
 
+/** Price "0" / negative means "call for price" on Shopline-style stores —
+ *  treat it as absent rather than persisting a misleading NT$0. */
 function cleanPrice(value: unknown): string | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return cleanText(value);
+  const text = typeof value === "number" && Number.isFinite(value) ? String(value) : cleanText(value);
+  if (!text) return undefined;
+  const numeric = Number(text.replace(/,/g, ""));
+  if (Number.isFinite(numeric) && numeric <= 0) return undefined;
+  return text;
 }
 
 function normalizeImageUrl(value: unknown, pageUrl: string): string | undefined {
@@ -197,7 +202,7 @@ export async function fetchProductMeta(url: string): Promise<ProductMeta> {
     const ogFields = {
       name: og.get("og:title"),
       imageUrl: normalizeImageUrl(og.get("og:image"), page.finalUrl),
-      price: og.get("product:price:amount"),
+      price: cleanPrice(og.get("product:price:amount")),
       currency: og.get("product:price:currency"),
       description: og.get("og:description"),
     };
