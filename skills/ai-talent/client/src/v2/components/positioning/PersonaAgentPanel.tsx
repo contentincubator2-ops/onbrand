@@ -20,6 +20,7 @@ import {
   faMicrophone, faPlus, faXmark, faTrash, faWandMagicSparkles,
   faEnvelope, faNewspaper, faCopy, faCheck, faRotateRight,
 } from "@fortawesome/free-solid-svg-icons";
+import CloudFilePicker, { type CloudFileSource } from "./CloudFilePicker";
 
 const PLATFORMS: Array<{ id: string; label: string; icon: any; tone: string }> = [
   { id: "facebook",  label: "Facebook",  icon: faFacebook,  tone: "#1877F2" },
@@ -42,7 +43,7 @@ type PersonaAgent = {
   currentStep: number;
   totalSteps: number;
   lastError: string | null;
-  sources: { texts: string[]; articleUrls: string[]; videoUrls: string[] };
+  sources: { texts: string[]; articleUrls: string[]; videoUrls: string[]; cloudFiles: CloudFileSource[] };
   sourceSummary: string;
   persona: string;
   skill: string;
@@ -67,52 +68,16 @@ function ProgressBar({ current, total, en }: { current: number; total: number; e
   );
 }
 
-function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void }) {
-  const { lang } = useLang();
-  const en = lang === "en";
-  const utils = trpc.useUtils();
-  const createMut = (trpc as any).personaAgent?.create?.useMutation?.();
-
-  const [name, setName] = useState("");
-  const [texts, setTexts] = useState<string[]>([""]);
-  const [articleUrls, setArticleUrls] = useState<string[]>([""]);
-  const [videoUrls, setVideoUrls] = useState<string[]>([""]);
-  const [scope, setScope] = useState<Set<string>>(new Set());
-
-  const setAt = (list: string[], i: number, v: string) => list.map((x, idx) => (idx === i ? v : x));
-  const addRow = (setter: React.Dispatch<React.SetStateAction<string[]>>) => setter((l) => [...l, ""]);
-  const removeRow = (setter: React.Dispatch<React.SetStateAction<string[]>>, i: number) =>
-    setter((l) => (l.length <= 1 ? [""] : l.filter((_, idx) => idx !== i)));
-
-  const submit = () => {
-    const trimmedName = name.trim();
-    if (!trimmedName) { showToastGlobal(en ? "Name this agent first" : "請先為這個 Agent 命名"); return; }
-    const cleanTexts = texts.map((t) => t.trim()).filter((t) => t.length >= 5);
-    const cleanArticles = articleUrls.map((t) => t.trim()).filter(Boolean);
-    const cleanVideos = videoUrls.map((t) => t.trim()).filter(Boolean);
-    if (cleanTexts.length === 0 && cleanArticles.length === 0 && cleanVideos.length === 0) {
-      showToastGlobal(en ? "Add at least one text, article link, or video link" : "請至少提供一段文字、一個文章連結，或一個影音連結");
-      return;
-    }
-    createMut?.mutate?.(
-      { brandId, name: trimmedName, sources: { texts: cleanTexts, articleUrls: cleanArticles, videoUrls: cleanVideos }, scope: Array.from(scope) },
-      {
-        onSuccess: (r: any) => {
-          if (r?.ok) {
-            showToastGlobal(en ? "✓ Training started" : "✓ 開始訓練", "success");
-            utils.personaAgent?.list?.invalidate?.();
-            onDone();
-          } else showToastGlobal(r?.error ?? (en ? "Failed to start" : "建立失敗，請再試一次"));
-        },
-        onError: () => showToastGlobal(en ? "Failed to start" : "建立失敗，請再試一次"),
-      },
-    );
-  };
-
-  const rowInput = (
-    list: string[], setter: React.Dispatch<React.SetStateAction<string[]>>,
-    placeholder: string, multiline?: boolean,
-  ) => (
+/** Shared "list of text/link rows with add/remove" control — used by both
+ *  the initial NewAgentForm and AddSourcesPanel's "加入更多素材" follow-up. */
+function renderRowInput(
+  list: string[], setter: React.Dispatch<React.SetStateAction<string[]>>,
+  placeholder: string, en: boolean, multiline?: boolean,
+) {
+  const setAt = (l: string[], i: number, v: string) => l.map((x, idx) => (idx === i ? v : x));
+  const addRow = () => setter((l) => [...l, ""]);
+  const removeRow = (i: number) => setter((l) => (l.length <= 1 ? [""] : l.filter((_, idx) => idx !== i)));
+  return (
     <div className="space-y-2">
       {list.map((v, i) => (
         <div key={i} className="flex items-start gap-2">
@@ -132,16 +97,58 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
               className="flex-1 text-xs border border-default-200 rounded-lg px-3 py-2 focus:outline-none focus:border-orange-400"
             />
           )}
-          <button onClick={() => removeRow(setter, i)} className="mt-1 text-default-300 hover:text-danger-500 shrink-0">
+          <button onClick={() => removeRow(i)} className="mt-1 text-default-300 hover:text-danger-500 shrink-0">
             <FontAwesomeIcon icon={faXmark} style={{ fontSize: 12 }} />
           </button>
         </div>
       ))}
-      <button onClick={() => addRow(setter)} className="text-[11px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1">
+      <button onClick={addRow} className="text-[11px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1">
         <FontAwesomeIcon icon={faPlus} style={{ fontSize: 9 }} /> {en ? "Add another" : "再加一個"}
       </button>
     </div>
   );
+}
+
+function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void }) {
+  const { lang } = useLang();
+  const en = lang === "en";
+  const utils = trpc.useUtils();
+  const createMut = (trpc as any).personaAgent?.create?.useMutation?.();
+
+  const [name, setName] = useState("");
+  const [texts, setTexts] = useState<string[]>([""]);
+  const [articleUrls, setArticleUrls] = useState<string[]>([""]);
+  const [videoUrls, setVideoUrls] = useState<string[]>([""]);
+  const [cloudFiles, setCloudFiles] = useState<CloudFileSource[]>([]);
+  const [scope, setScope] = useState<Set<string>>(new Set());
+
+  const submit = () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) { showToastGlobal(en ? "Name this agent first" : "請先為這個 Agent 命名"); return; }
+    const cleanTexts = texts.map((t) => t.trim()).filter((t) => t.length >= 5);
+    const cleanArticles = articleUrls.map((t) => t.trim()).filter(Boolean);
+    const cleanVideos = videoUrls.map((t) => t.trim()).filter(Boolean);
+    if (cleanTexts.length === 0 && cleanArticles.length === 0 && cleanVideos.length === 0 && cloudFiles.length === 0) {
+      showToastGlobal(en ? "Add at least one text, article link, video link, or cloud file" : "請至少提供一段文字、一個文章連結、一個影音連結，或一個雲端檔案");
+      return;
+    }
+    createMut?.mutate?.(
+      { brandId, name: trimmedName, sources: { texts: cleanTexts, articleUrls: cleanArticles, videoUrls: cleanVideos, cloudFiles }, scope: Array.from(scope) },
+      {
+        onSuccess: (r: any) => {
+          if (r?.ok) {
+            showToastGlobal(en ? "✓ Training started" : "✓ 開始訓練", "success");
+            utils.personaAgent?.list?.invalidate?.();
+            onDone();
+          } else showToastGlobal(r?.error ?? (en ? "Failed to start" : "建立失敗，請再試一次"));
+        },
+        onError: () => showToastGlobal(en ? "Failed to start" : "建立失敗，請再試一次"),
+      },
+    );
+  };
+
+  const rowInput = (list: string[], setter: React.Dispatch<React.SetStateAction<string[]>>, placeholder: string, multiline?: boolean) =>
+    renderRowInput(list, setter, placeholder, en, multiline);
 
   return (
     <div className="rounded-2xl border border-orange-200 bg-orange-50/40 p-5 mb-6">
@@ -171,6 +178,19 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
           </label>
           {rowInput(videoUrls, setVideoUrls, "https://youtube.com/watch?v=…")}
         </div>
+      </div>
+
+      <div className="mb-4">
+        <label className="text-xs font-semibold text-default-700 mb-1.5 block">
+          {en ? "Cloud video/audio files" : "雲端影音檔案"}
+          <span className="ml-1 text-[10px] font-normal text-default-400">{en ? "(no captions needed — real speech-to-text)" : "（不需要字幕，直接語音轉文字）"}</span>
+        </label>
+        <CloudFilePicker
+          brandId={brandId}
+          sources={cloudFiles}
+          onAdd={(f) => setCloudFiles((l) => (l.some((x) => x.provider === f.provider && x.fileId === f.fileId) ? l : [...l, f]))}
+          onRemove={(key) => setCloudFiles((l) => l.filter((x) => `${x.provider}:${x.fileId}` !== key))}
+        />
       </div>
 
       <div className="mb-4">
@@ -213,6 +233,82 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
   );
 }
 
+/** 加入更多素材 — an agent isn't a one-shot snapshot; keep feeding it more
+ *  of the same person's material and it retrains from the merged set.
+ *  2026-08-21 (CJ「Delphi.ai 請直接學習它的流程」— Delphi's "Sync Your
+ *  Knowledge" step keeps evolving the Digital Mind as content is added,
+ *  rather than a single upload at creation time). */
+function AddSourcesPanel({ brandId, agentId, onDone }: { brandId: number; agentId: string; onDone: () => void }) {
+  const { lang } = useLang();
+  const en = lang === "en";
+  const utils = trpc.useUtils();
+  const addMut = (trpc as any).personaAgent?.addSources?.useMutation?.();
+
+  const [texts, setTexts] = useState<string[]>([""]);
+  const [articleUrls, setArticleUrls] = useState<string[]>([""]);
+  const [videoUrls, setVideoUrls] = useState<string[]>([""]);
+  const [cloudFiles, setCloudFiles] = useState<CloudFileSource[]>([]);
+
+  const submit = () => {
+    const cleanTexts = texts.map((t) => t.trim()).filter((t) => t.length >= 5);
+    const cleanArticles = articleUrls.map((t) => t.trim()).filter(Boolean);
+    const cleanVideos = videoUrls.map((t) => t.trim()).filter(Boolean);
+    if (cleanTexts.length === 0 && cleanArticles.length === 0 && cleanVideos.length === 0 && cloudFiles.length === 0) {
+      showToastGlobal(en ? "Add at least one new source" : "請至少提供一筆新素材");
+      return;
+    }
+    addMut?.mutate?.(
+      { brandId, id: agentId, sources: { texts: cleanTexts, articleUrls: cleanArticles, videoUrls: cleanVideos, cloudFiles } },
+      {
+        onSuccess: (r: any) => {
+          if (r?.ok) { showToastGlobal(en ? "✓ Retraining with new material" : "✓ 已加入，重新訓練中", "success"); utils.personaAgent?.list?.invalidate?.(); onDone(); }
+          else showToastGlobal(r?.error ?? (en ? "Failed to add" : "加入失敗，請再試一次"));
+        },
+        onError: () => showToastGlobal(en ? "Failed to add" : "加入失敗，請再試一次"),
+      },
+    );
+  };
+
+  return (
+    <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-3.5 space-y-3">
+      <div className="grid gap-3 md:grid-cols-3">
+        <div>
+          <label className="text-[10px] font-semibold text-default-600 mb-1 block">{en ? "Text" : "文字"}</label>
+          {renderRowInput(texts, setTexts, en ? "New text sample…" : "新的文字素材…", en, true)}
+        </div>
+        <div>
+          <label className="text-[10px] font-semibold text-default-600 mb-1 block">{en ? "Article link" : "文章連結"}</label>
+          {renderRowInput(articleUrls, setArticleUrls, "https://…", en)}
+        </div>
+        <div>
+          <label className="text-[10px] font-semibold text-default-600 mb-1 block">{en ? "Video link" : "影音連結"}</label>
+          {renderRowInput(videoUrls, setVideoUrls, "https://youtube.com/watch?v=…", en)}
+        </div>
+      </div>
+      <div>
+        <label className="text-[10px] font-semibold text-default-600 mb-1 block">{en ? "Cloud file" : "雲端檔案"}</label>
+        <CloudFilePicker
+          brandId={brandId}
+          sources={cloudFiles}
+          onAdd={(f) => setCloudFiles((l) => (l.some((x) => x.provider === f.provider && x.fileId === f.fileId) ? l : [...l, f]))}
+          onRemove={(key) => setCloudFiles((l) => l.filter((x) => `${x.provider}:${x.fileId}` !== key))}
+        />
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={onDone} className="text-[11px] font-medium text-default-500 px-3 py-1.5">{en ? "Cancel" : "取消"}</button>
+        <button
+          onClick={submit}
+          disabled={addMut?.isPending}
+          className="text-[11px] font-semibold px-3.5 py-1.5 rounded-full text-white transition"
+          style={{ background: addMut?.isPending ? "#FDBA74" : "#F97316" }}
+        >
+          {addMut?.isPending ? (en ? "Adding…" : "加入中…") : (en ? "Add & retrain" : "加入並重新訓練")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent }) {
   const { lang } = useLang();
   const en = lang === "en";
@@ -223,6 +319,7 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
   const draftMut = (trpc as any).personaAgent?.testDraft?.useMutation?.();
 
   const [expanded, setExpanded] = useState(false);
+  const [addingSources, setAddingSources] = useState(false);
   const [scope, setScope] = useState<Set<string>>(new Set(agent.scope));
   const [draftPlatform, setDraftPlatform] = useState<string>(agent.scope[0] ?? "facebook");
   const [draftTopic, setDraftTopic] = useState("");
@@ -383,6 +480,17 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
                   </div>
                 )}
               </div>
+
+              {addingSources ? (
+                <AddSourcesPanel brandId={brandId} agentId={agent.id} onDone={() => setAddingSources(false)} />
+              ) : (
+                <button
+                  onClick={() => setAddingSources(true)}
+                  className="text-[11px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1.5"
+                >
+                  <FontAwesomeIcon icon={faPlus} style={{ fontSize: 9 }} /> {en ? "Add more sources & retrain" : "加入更多素材並重新訓練"}
+                </button>
+              )}
             </div>
           )}
         </>
@@ -418,8 +526,8 @@ export default function PersonaAgentPanel({ brandId }: { brandId: number | null 
           </div>
           <p className="text-sm text-default-500">
             {en
-              ? "Train a custom agent from a specific person's real words — pasted text, article links, or YouTube links. Each agent can be scoped to specific platforms and used to draft in that voice."
-              : "用某個真實的人的文字、文章連結或 YouTube 連結，訓練出一個專屬 Agent。訓練完成後可指定應用範圍（平台），並用這個 Agent 的語氣試寫文案。"}
+              ? "Train a custom agent from a specific person's real words — pasted text, article links, YouTube links, or a Google Drive/OneDrive video/audio file. Each agent can be scoped to specific platforms, used to draft in that voice, and keeps evolving as you add more material later."
+              : "用某個真實的人的文字、文章連結、YouTube 連結，或 Google Drive／OneDrive 影音檔案，訓練出一個專屬 Agent。訓練完成後可指定應用範圍（平台）、用這個 Agent 的語氣試寫文案，之後也能持續加入更多素材讓它越來越像本人。"}
           </p>
         </div>
         {!creating && (

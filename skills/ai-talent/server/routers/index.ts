@@ -26,6 +26,7 @@ import { positioningJobsRouter } from "./positioningJobsRouter";
 import { workbenchRouter } from "./workbenchRouter";
 import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
 import { personaAgentRouter } from "./personaAgentRouter";
+import { cloudDriveRouter } from "./cloudDriveRouter";
 import { publishRouter } from "./publishRouter";
 import { billingRouter } from "./billingRouter";
 import { opsRouter } from "./opsRouter";
@@ -88,6 +89,7 @@ export const appRouter = router({
   workbench: workbenchRouter,
   brandKnowledge:  brandKnowledgeRouter,
   personaAgent:    personaAgentRouter,
+  cloudDrive:      cloudDriveRouter,
   publish:         publishRouter,
   billing:         billingRouter,
   ops:             opsRouter,

@@ -43,6 +43,12 @@ const envSchema = z.object({
   AZURE_POSITION_ENDPOINT:  z.string().url().optional(),
   AZURE_POSITION_MODEL:     z.string().optional(),
   GOOGLE_VERTEX_API_KEY:    z.string().optional(),
+  // 2026-08-21: real ASR wiring (persona-agent training for caption-less
+  // video/audio). llm.ts's PROVIDERS["azure-canada"] already templated a
+  // baseUrl off this endpoint, but read it via `(ENV as any)` — the key was
+  // never in this schema, so it always resolved to undefined until now.
+  AZURE_CANADA_API_KEY:     z.string().optional(),
+  AZURE_CANADA_ENDPOINT:    z.string().url().optional(),
 
   // Hermes Agent — self-hosted on VM via FastAPI wrapper
   // Set HERMES_API_URL=http://127.0.0.1:8765 after deploying hermes_api_server.py
@@ -68,6 +74,12 @@ const envSchema = z.object({
   META_APP_SECRET:       z.string().optional(),
   SHOPIFY_CLIENT_ID:     z.string().optional(),
   SHOPIFY_CLIENT_SECRET: z.string().optional(),
+  // 2026-08-21 (CJ「很多人，影音就是放在google drive, one drive」— persona
+  // agent cloud-file connect): native OAuth, reuses GOOGLE_CLIENT_ID/SECRET
+  // above (same Google Cloud project — just needs Drive API enabled + this
+  // redirect URI whitelisted) plus a new Microsoft Entra app registration.
+  MICROSOFT_CLIENT_ID:     z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
 
   // External services — optional
   RESEND_API_KEY:    z.string().optional(),

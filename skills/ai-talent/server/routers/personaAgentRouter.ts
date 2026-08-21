@@ -7,13 +7,19 @@
  * 顯示進度條，然後，用戶可以按不同的AGENT試寫看看品牌的文案」):
  *
  * A brand can create any number of named persona agents. Each is trained
- * from user-supplied grounding material — pasted text, article links, and
- * video links (YouTube-style transcript fetch; v1 does not accept raw
- * audio/video file uploads, per CJ's explicit scope call) — into a
+ * from user-supplied grounding material — pasted text, article links,
+ * video links (YouTube-style transcript fetch, caption-only), and now
+ * (2026-08-21, CJ「怎麼覺得還是不踏實，因為很多人，影音就是放在google drive,
+ * one drive or youtube上面」) a connected Google Drive / OneDrive video or
+ * audio file, run through real ASR (server/_core/transcription.ts) — into a
  * generated persona (who this voice is) + skill (concrete, checkable
  * writing rules), combined ≥2200 characters. Each agent is scoped to a
  * subset of the same 8 platforms brandKnowledgeRouter's AI 指令庫 already
- * uses, so "應用範圍" doesn't invent a second taxonomy.
+ * uses, so "應用範圍" doesn't invent a second taxonomy. Sources aren't a
+ * one-shot snapshot either — `addSources` lets an already-trained agent
+ * keep absorbing more material and retrain from the merged set (same idea
+ * as Delphi's "keeps evolving as you add content", CJ「Delphi.ai 請直接
+ * 學習它的流程」).
  *
  * Persisted at brands.positioning._personaAgents[] — same per-brand JSON
  * pattern as _voiceLock / _aiPrompts / _workbench. Every write here is a
@@ -29,6 +35,9 @@ import localPool from "../localDb";
 import { invokeLLM } from "../_core/llm";
 import { buildBrandPrefix } from "../_core/brandContext";
 import { assertUrlSafe } from "../_core/urlGuard";
+import { getValidAccessToken, CloudNotConnectedError, type CloudProvider } from "../_core/cloudTokens";
+import { getCloudFileMeta, downloadCloudFile } from "../_core/cloudDriveClient";
+import { transcribeBuffer, TRANSCRIBE_SIZE_LIMIT_BYTES, TranscribeTooLargeError } from "../_core/transcription";
 
 export const PERSONA_PLATFORMS = [
   "facebook", "instagram", "youtube", "threads", "tiktok", "linkedin", "email", "press",
@@ -49,7 +58,10 @@ export interface PersonaAgent {
   currentStep: number;
   totalSteps: number;
   lastError: string | null;
-  sources: { texts: string[]; articleUrls: string[]; videoUrls: string[] };
+  sources: {
+    texts: string[]; articleUrls: string[]; videoUrls: string[];
+    cloudFiles: { provider: CloudProvider; fileId: string; name: string }[];
+  };
   sourceSummary: string;
   persona: string;
   skill: string;
@@ -161,6 +173,29 @@ async function fetchVideoTranscript(rawUrl: string): Promise<{ url: string; titl
   }
 }
 
+/** Downloads a connected Drive/OneDrive file and runs it through real ASR
+ *  (gpt-4o-mini-transcribe). `tooLarge` lets the caller give a specific
+ *  "檔案過大" message instead of lumping it in with generic failures —
+ *  unlike a dead link, this is an expected, actionable outcome given the
+ *  ~24MB provider cap on a raw phone-recorded video. */
+async function fetchCloudFileTranscript(
+  userId: number, brandId: number, provider: CloudProvider, fileId: string, name: string,
+): Promise<{ url: string; title: string; text: string } | null | { tooLarge: true; name: string }> {
+  try {
+    const accessToken = await getValidAccessToken(userId, brandId, provider);
+    const meta = await getCloudFileMeta(provider, accessToken, fileId);
+    if (meta.sizeBytes > TRANSCRIBE_SIZE_LIMIT_BYTES) return { tooLarge: true, name: meta.name || name };
+    const buffer = await downloadCloudFile(provider, accessToken, fileId);
+    const text = await transcribeBuffer(buffer, meta.name || name, meta.mimeType);
+    if (!text?.trim()) return null;
+    return { url: `${provider}:${fileId}`, title: meta.name || name, text: text.slice(0, 6000) };
+  } catch (e) {
+    if (e instanceof TranscribeTooLargeError) return { tooLarge: true, name };
+    if (e instanceof CloudNotConnectedError) return null;
+    return null;
+  }
+}
+
 /**
  * Background training run — fired detached (never awaited by the caller).
  * Every step re-reads positioning fresh via updateAgent so a slow LLM call
@@ -172,22 +207,27 @@ async function runTraining(brandId: number, userId: number, agentId: string): Pr
     // fail the whole run, it's just dropped from the grounding material).
     const started = await updateAgent(brandId, userId, agentId, (a) => ({ ...a, currentStep: 1 }));
     if (!started) return; // agent was deleted before training started
-    const { texts, articleUrls, videoUrls } = started.sources;
+    const { texts, articleUrls, videoUrls, cloudFiles } = started.sources;
 
-    const [articles, videos] = await Promise.all([
+    const [articles, videos, cloudResults] = await Promise.all([
       Promise.all(articleUrls.map(fetchArticleText)),
       Promise.all(videoUrls.map(fetchVideoTranscript)),
+      Promise.all((cloudFiles ?? []).map((f) => fetchCloudFileTranscript(userId, brandId, f.provider, f.fileId, f.name))),
     ]);
     const articleBlocks = articles.filter((x): x is NonNullable<typeof x> => !!x)
       .map((a, i) => `【文章素材 ${i + 1}：${a.title}】(${a.url})\n${a.text}`);
     const videoBlocks = videos.filter((x): x is NonNullable<typeof x> => !!x)
       .map((v, i) => `【影音素材 ${i + 1}：${v.title}】(${v.url})\n${v.text}`);
+    const cloudOk = cloudResults.filter((x): x is { url: string; title: string; text: string } => !!x && !("tooLarge" in x));
+    const cloudTooLarge = cloudResults.filter((x): x is { tooLarge: true; name: string } => !!x && "tooLarge" in x);
+    const cloudBlocks = cloudOk.map((c, i) => `【雲端影音素材 ${i + 1}：${c.title}】\n${c.text}`);
     const textBlocks = texts.map((t, i) => `【文字素材 ${i + 1}】\n${t}`);
     const failedLinks = articleUrls.length - articles.filter(Boolean).length + videoUrls.length - videos.filter(Boolean).length;
-    const materials = [...textBlocks, ...articleBlocks, ...videoBlocks].join("\n\n");
+    const materials = [...textBlocks, ...articleBlocks, ...videoBlocks, ...cloudBlocks].join("\n\n");
     if (!materials.trim()) {
+      const sizeNote = cloudTooLarge.length ? `；${cloudTooLarge.length} 個雲端檔案過大無法轉錄（上限約 24MB，建議先壓縮或轉純音檔）` : "";
       await updateAgent(brandId, userId, agentId, (a) => ({
-        ...a, status: "failed", lastError: "沒有可用的素材——文字為空，且所有連結都抓取失敗（文章連結需可公開讀取；影音連結目前僅支援有逐字幕的 YouTube 連結）。",
+        ...a, status: "failed", lastError: `沒有可用的素材——文字為空，且所有連結/檔案都抓取失敗（文章連結需可公開讀取；YouTube 連結需有字幕；雲端檔案需先連接帳號且在大小上限內）${sizeNote}。`,
         updatedAt: new Date().toISOString(),
       }));
       return;
@@ -254,7 +294,9 @@ ${brandPrefix}`;
       texts.length ? `${texts.length} 段文字` : null,
       articles.filter(Boolean).length ? `${articles.filter(Boolean).length} 篇文章` : null,
       videos.filter(Boolean).length ? `${videos.filter(Boolean).length} 段影音逐字稿` : null,
+      cloudOk.length ? `${cloudOk.length} 個雲端檔案語音轉文字` : null,
       failedLinks > 0 ? `${failedLinks} 個連結抓取失敗（已略過）` : null,
+      cloudTooLarge.length ? `${cloudTooLarge.length} 個雲端檔案過大略過` : null,
     ].filter(Boolean).join("、");
     await updateAgent(brandId, userId, agentId, (a) => ({
       ...a,
@@ -274,6 +316,11 @@ const sourcesSchema = z.object({
   texts: z.array(z.string().min(5).max(20_000)).max(10).default([]),
   articleUrls: z.array(z.string().min(3).max(2000)).max(10).default([]),
   videoUrls: z.array(z.string().min(3).max(2000)).max(10).default([]),
+  cloudFiles: z.array(z.object({
+    provider: z.enum(["google_drive", "onedrive"]),
+    fileId: z.string().min(1).max(500),
+    name: z.string().max(300),
+  })).max(10).default([]),
 });
 
 export const personaAgentRouter = router({
@@ -294,8 +341,9 @@ export const personaAgentRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const hasSource = input.sources.texts.length > 0 || input.sources.articleUrls.length > 0 || input.sources.videoUrls.length > 0;
-      if (!hasSource) return { ok: false as const, error: "請至少提供一段文字、一個文章連結，或一個影音連結" };
+      const hasSource = input.sources.texts.length > 0 || input.sources.articleUrls.length > 0
+        || input.sources.videoUrls.length > 0 || input.sources.cloudFiles.length > 0;
+      if (!hasSource) return { ok: false as const, error: "請至少提供一段文字、一個文章連結、一個影音連結，或一個雲端檔案" };
       const now = new Date().toISOString();
       const agent: PersonaAgent = {
         id: `pa_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
@@ -351,6 +399,40 @@ export const personaAgentRouter = router({
       const next = await updateAgent(input.brandId, userId, input.id, (a) => ({
         ...a, status: "training", currentStep: 0, lastError: null, updatedAt: new Date().toISOString(),
       }));
+      if (!next) return { ok: false as const, error: "找不到這個人設 Agent" };
+      setImmediate(() => { runTraining(input.brandId, userId, input.id).catch(() => {}); });
+      return { ok: true as const };
+    }),
+
+  /** 加入更多素材 — a trained agent isn't a one-shot snapshot; the user can
+   *  keep feeding it more of the same person's material over time and
+   *  retrain from the merged set, same idea as Delphi's "keeps evolving as
+   *  you add content" (2026-08-21, CJ「Delphi.ai 請直接學習它的流程」). New
+   *  sources are appended, not replaced — dedupes cloud files by
+   *  provider+fileId so re-adding the same picked file is a no-op. */
+  addSources: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive(), id: z.string().min(1), sources: sourcesSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const hasNew = input.sources.texts.length > 0 || input.sources.articleUrls.length > 0
+        || input.sources.videoUrls.length > 0 || input.sources.cloudFiles.length > 0;
+      if (!hasNew) return { ok: false as const, error: "請至少提供一筆新素材" };
+      const next = await updateAgent(input.brandId, userId, input.id, (a) => {
+        const existingCloud = new Set(a.sources.cloudFiles.map((c) => `${c.provider}:${c.fileId}`));
+        return {
+          ...a,
+          sources: {
+            texts: [...a.sources.texts, ...input.sources.texts],
+            articleUrls: [...a.sources.articleUrls, ...input.sources.articleUrls],
+            videoUrls: [...a.sources.videoUrls, ...input.sources.videoUrls],
+            cloudFiles: [
+              ...a.sources.cloudFiles,
+              ...input.sources.cloudFiles.filter((c) => !existingCloud.has(`${c.provider}:${c.fileId}`)),
+            ],
+          },
+          status: "training", currentStep: 0, lastError: null, updatedAt: new Date().toISOString(),
+        };
+      });
       if (!next) return { ok: false as const, error: "找不到這個人設 Agent" };
       setImmediate(() => { runTraining(input.brandId, userId, input.id).catch(() => {}); });
       return { ok: true as const };
