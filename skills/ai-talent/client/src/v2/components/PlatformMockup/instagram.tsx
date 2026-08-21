@@ -59,7 +59,6 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 {handle}
                 <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-tiny text-default-500 truncate leading-tight">{lang === "en" ? "Original audio" : "原創音訊"}</p>
             </div>
           </div>
           <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
@@ -229,7 +228,6 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
                 {handle}
                 <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-tiny text-default-500 truncate leading-tight">{lang === "en" ? "Original audio" : "原創音訊"}</p>
             </div>
           </div>
           <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
