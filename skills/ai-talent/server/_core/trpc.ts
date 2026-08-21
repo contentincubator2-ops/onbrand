@@ -154,7 +154,7 @@ export const protectedProcedure = t.procedure
   });
 
 /**
- * 2026-08-19 — single-flight guard, one in-flight call per user.
+ * 2026-08-19 — process-local per-user concurrency guard.
  *
  * Motivation: quickTask.runSquadAuto runs a ~3-minute pipeline synchronously
  * inside the HTTP request. The client's progress ring is calibrated for 100s,
@@ -174,19 +174,27 @@ export const protectedProcedure = t.procedure
  * also already on errorLoggerMiddleware's expected list, so it does not
  * pollute error_log.
  *
- * The TTL is a recovery ceiling, not an eager cancellation mechanism. A call
- * keeps its slot normally until `finally`; only a later request can replace a
- * generation whose owner has remained unresolved past the configured limit.
+ * The TTL is a lease recovery ceiling, not an eager cancellation mechanism.
+ * A call keeps its slot normally until `finally`; only a later request can
+ * prune a generation whose owner has remained unresolved past the configured
+ * limit. Pruning does not cancel that owner, so actual concurrency may briefly
+ * exceed `maxConcurrent` while stale work finishes. Setting maxConcurrent > 1
+ * also weakens protection against repeated clicks by the same user compared
+ * with the default single-slot behavior; that tradeoff is intentional.
  */
 export function singleFlightPerUser(
-  opts: { key: string; message: string; ttlMs: number },
+  opts: { key: string; message: string; ttlMs: number; maxConcurrent?: number },
   { now = Date.now }: { now?: () => number } = {},
 ) {
   if (!Number.isFinite(opts.ttlMs) || opts.ttlMs <= 0) {
     throw new RangeError("single-flight TTL must be a positive finite number");
   }
+  const maxConcurrent = opts.maxConcurrent ?? 1;
+  if (!Number.isInteger(maxConcurrent) || maxConcurrent <= 0) {
+    throw new RangeError("single-flight maxConcurrent must be a positive integer");
+  }
 
-  const inFlight = new Map<number, { startedAt: number; token: symbol }>();
+  const inFlight = new Map<number, Map<symbol, number>>();
   return t.middleware(async ({ ctx, next }) => {
     const userId = ctx.user?.id;
     // Unauthenticated calls are rejected by protectedProcedure anyway; not
@@ -194,23 +202,30 @@ export function singleFlightPerUser(
     if (!userId) return next();
 
     const startedAt = now();
-    const existing = inFlight.get(userId);
-    if (existing) {
-      const elapsedMs = startedAt - existing.startedAt;
-      if (elapsedMs < opts.ttlMs) {
+    let bucket = inFlight.get(userId);
+    if (bucket) {
+      for (const [existingToken, existingStartedAt] of bucket) {
+        const elapsedMs = startedAt - existingStartedAt;
+        if (elapsedMs >= opts.ttlMs) {
+          bucket.delete(existingToken);
+          console.warn(
+            `[singleFlight] expired stale slot for ${opts.key} for user ${userId}; elapsedMs=${elapsedMs}`,
+          );
+        }
+      }
+      if (bucket.size >= maxConcurrent) {
         console.warn(`[singleFlight] rejected duplicate ${opts.key} for user ${userId}`);
         throw new TRPCError({ code: "CONFLICT", message: opts.message });
       }
-      console.warn(
-        `[singleFlight] expired stale slot for ${opts.key} for user ${userId}; elapsedMs=${elapsedMs}`,
-      );
+    } else {
+      bucket = new Map<symbol, number>();
+      inFlight.set(userId, bucket);
     }
 
-    // A unique token makes release ownership explicit. `startedAt` alone is
-    // not safe against an ABA collision when an injected/test clock returns
-    // the same value for two generations of the same user's slot.
+    // Every generation gets a unique token, so each finally can release only
+    // its own slot even if another generation has the same injected timestamp.
     const token = Symbol(opts.key);
-    inFlight.set(userId, { startedAt, token });
+    bucket.set(token, startedAt);
     try {
       return await next();
     } finally {
@@ -218,10 +233,14 @@ export function singleFlightPerUser(
       // A client disconnect does NOT release early — the handler keeps running
       // because nothing propagates cancellation into it yet. Until the TTL is
       // reached, this prevents a reconnecting tab from stacking a pipeline.
-      // A stale call may finish after its TTL elapsed and a newer call took
-      // over the user slot. Only the generation that owns the current token
-      // may release it; otherwise the old finally would unlock the new call.
-      if (inFlight.get(userId)?.token === token) inFlight.delete(userId);
+      // A stale call may finish after its token was pruned and a newer call
+      // took its place. Deleting only this token prevents that old finally
+      // from unlocking the replacement generation.
+      const currentBucket = inFlight.get(userId);
+      if (currentBucket) {
+        currentBucket.delete(token);
+        if (currentBucket.size === 0) inFlight.delete(userId);
+      }
     }
   });
 }

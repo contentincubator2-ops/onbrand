@@ -1021,11 +1021,13 @@ export const RUN_SQUAD_AUTO_SINGLE_FLIGHT_TTL_MS =
     + (MAX_RUN_SQUAD_AUTO_PLANNING_STEPS * STRATEGY_STEP_DEADLINE_MS)
     + STRATEGY_PERSISTENCE_BUDGET_MS
   ) * RUN_SQUAD_AUTO_SINGLE_FLIGHT_SAFETY_FACTOR;
+export const RUN_SQUAD_AUTO_MAX_CONCURRENT_PER_USER = 5;
 
 const runSquadAutoSingleFlight = singleFlightPerUser({
   key: "quickTask.runSquadAuto",
-  message: "這個企劃還在產生中，完成後才能再開一個。",
+  message: "這個帳號同時產生中的企劃已達 5 個，請等其中一個完成後再開。",
   ttlMs: RUN_SQUAD_AUTO_SINGLE_FLIGHT_TTL_MS,
+  maxConcurrent: RUN_SQUAD_AUTO_MAX_CONCURRENT_PER_USER,
 });
 
 export const quickTaskRouter = router({
@@ -1794,11 +1796,11 @@ export const quickTaskRouter = router({
   // The five explicitly catalogued IG strategy tasks instead keep every step
   // private and run a final public-content synthesis into publishable IG slots.
   runSquadAuto: protectedProcedure
-    // 2026-08-19: one runSquadAuto per user at a time. The pipeline below is
-    // ~3 minutes of synchronous work; without this, a user who thinks the
-    // progress ring is stuck can stack several of them on the single Node
-    // fork. See singleFlightPerUser in _core/trpc.ts for why this returns
-    // CONFLICT (409 JSON) rather than anything the client reads as a 502.
+    // 2026-08-21: allow up to five runSquadAuto pipelines per user at a time.
+    // The per-user ceiling still limits repeated clicks from stacking work
+    // without bound on the single Node fork. See singleFlightPerUser in
+    // _core/trpc.ts for why this returns CONFLICT (409 JSON) rather than
+    // anything the client reads as a 502.
     .use(runSquadAutoSingleFlight)
     .input(z.object({
       squadSlug: z.string().min(1).max(80),
