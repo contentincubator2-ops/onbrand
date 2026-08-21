@@ -77,12 +77,25 @@ jobs:
                 });
 
                 const [before] = await conn.execute(
-                  'SELECT id, name, userId, tabLocks, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS directCount FROM brands WHERE id = ?',
+                  'SELECT id, name, userId, tabLocks, updatedAt, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS directCount FROM brands WHERE id = ?',
                   ['\$.competition.direct', brandId],
                 );
                 const brandRow = before[0];
                 if (!brandRow) { console.error('NO SUCH BRAND:', brandId); process.exit(1); }
                 console.log('BEFORE', JSON.stringify(brandRow));
+
+                // 2026-08-21 diagnostic: recent positioning_jobs rows for this
+                // entity — lets us tell whether a drift happened before or
+                // after a given deploy timestamp, and whether it was the
+                // pipeline (job row) or something else (workbench cascade,
+                // recalibrate) that wrote it.
+                const [jobs] = await conn.execute(
+                  `SELECT id, status, currentStep, totalSteps, startedAt, finishedAt, lastError
+                     FROM positioning_jobs WHERE entityKind = 'brand' AND entityId = ?
+                    ORDER BY id DESC LIMIT 5`,
+                  [brandId],
+                );
+                console.log('RECENT JOBS', JSON.stringify(jobs));
 
                 // path -> value; isJson marks values that must be
                 // CAST(? AS JSON) (arrays/objects) vs plain scalar strings.
@@ -143,7 +156,7 @@ jobs:
                 }
 
                 const [after] = await conn.execute(
-                  'SELECT id, name, tabLocks, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS directCount, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS customCount, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS valuesCount, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, ?)), 200) AS audiencePreview, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, ?)), 120) AS taglinePreview FROM brands WHERE id = ?',
+                  'SELECT id, name, tabLocks, updatedAt, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS directCount, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS customCount, JSON_LENGTH(JSON_EXTRACT(positioning, ?)) AS valuesCount, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, ?)), 200) AS audiencePreview, LEFT(JSON_UNQUOTE(JSON_EXTRACT(positioning, ?)), 120) AS taglinePreview FROM brands WHERE id = ?',
                   ['\$.competition.direct', '\$.differentiation.custom', '\$.values.items', '\$.audience.primary', '\$.tagline.zhTagline', brandId],
                 );
                 console.log('AFTER', JSON.stringify(after[0]));
