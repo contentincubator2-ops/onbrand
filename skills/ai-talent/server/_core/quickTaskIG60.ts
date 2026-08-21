@@ -303,12 +303,20 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
+  // 2026-08-21 (CJ「說是七張卡片的輪播，但只有出現一張…七張卡片的文字合起來，
+  // 剛好講完一個故事」): was variants:5/images:5 — 那是「同一篇貼文的 5 種寫法」，
+  // 每種各一張圖，所以輪播永遠只有一張。輪播是 ONE 貼文 + 7 張卡，各自一張圖：
+  // 這就是 fb-99-carousel-5 驗證過、2026-08-11 已經套用到 fb-60-album-4 的
+  // cardsPerVariant 機制，當時漏了 IG 這一條。
+  // holdForImages：7 張卡沒全部生完就先送出去，使用者會看到一半空白的輪播。
   "ig-60-carousel-7": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_OWEN,
+    variants: 1, images: 1, runImageGen: true, imageDirectorId: IG60_DIR_OWEN,
     aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["教學式", "清單式", "故事式", "對比式", "金句式"],
+    variantLabels: ["輪播版本"],
     captionMinChars: 150, captionMaxChars: 250,
     strategistAgentId: 222308, // Hsin-Yi Wu — Email Marketing & CRM Strategist (1415 char)
+    cardsPerVariant: 7,
+    holdForImages: true,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
   },
 

@@ -401,6 +401,50 @@ export function titleEchoesCaption(title: string | null | undefined, caption: st
   return false;
 }
 
+/* ── CardTextOverlay — 壓在圖片上的中文標題 ─────────────────────────────────
+ *
+ * 2026-07 起的既定作法（見 imageGen 的 NO-TEXT 指令）：AI 生圖一律不烤字，
+ * 因為模型畫不出中文，硬要就會生出一堆假字。文字改成前端可編輯的疊層。
+ *
+ * 2026-08-21 (CJ「應該是要每張圖片上面壓文字，總共出七張，七張卡片的文字合起來
+ * 剛好講完一個故事」): 從 youtube.tsx 的 ThumbnailTextOverlay 移上來共用 ——
+ * IG 教學型輪播每張卡都要壓自己的標題，再複製一份就會變成兩份各自演化的樣式。
+ *
+ * `place` 決定文字落在哪：YouTube 縮圖壓下緣，輪播卡壓中央（IG 教學卡的慣例
+ * 是整張卡就是一句話）。containerType: inline-size 讓字級跟著卡片寬度縮放，
+ * 所以同一個元件在 420px 預覽和全寬預覽裡都合身。 */
+export function CardTextOverlay({
+  text,
+  place = "bottom",
+}: {
+  text?: string | null;
+  place?: "bottom" | "center";
+}) {
+  const t = (text ?? "").trim();
+  if (!t) return null;
+  return (
+    <div
+      className={`absolute inset-0 z-10 flex p-[6%] pointer-events-none ${
+        place === "center" ? "items-center justify-center text-center" : "items-end"
+      }`}
+      style={{ containerType: "inline-size" }}
+    >
+      <span
+        className="font-extrabold leading-tight line-clamp-4"
+        style={{
+          color: "#fff",
+          fontSize: place === "center" ? "clamp(15px, 7cqw, 40px)" : "clamp(18px, 6cqw, 44px)",
+          letterSpacing: "-0.01em",
+          textShadow:
+            "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 3px 8px rgba(0,0,0,0.55)",
+        }}
+      >
+        {t}
+      </span>
+    </div>
+  );
+}
+
 export function MockupHeader({
   icon, label, variantLabel,
 }: {
