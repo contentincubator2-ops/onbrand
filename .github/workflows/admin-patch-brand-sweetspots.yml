@@ -15,6 +15,15 @@ name: "Admin — Patch brand strategy-workbench sweet spots"
 #     "removeMatching": string,      // substring match against spot.title
 #                                     // or spot.tagline.zh — case-sensitive,
 #                                     // matching spots are dropped
+#     "dropAllOthers"?: boolean,     // true = discard every existing spot
+#                                     // that isn't in prependSpots, regardless
+#                                     // of removeMatching (2026-08-21 CJ
+#                                     // 「後面那4張舊卡整批清掉」: the old
+#                                     // spots didn't share a common substring
+#                                     // to target with removeMatching, so a
+#                                     // blanket "final state == prependSpots"
+#                                     // switch was simpler than four separate
+#                                     // needles)
 #     "prependSpots": [
 #       { "lane": "emotion"|"function", "title", "need", "gap", "ours",
 #         "tagline": { "zh", "en"? }, "official"?: boolean }
@@ -125,8 +134,9 @@ jobs:
                 // find the needle already gone and re-prepend duplicates
                 // (Codex review, PR #121).
                 const needle = String(payload.removeMatching || '');
+                const dropAllOthers = payload.dropAllOthers === true;
                 const prependTitles = new Set(payload.prependSpots.map(function (s) { return s.title; }));
-                const kept = oldSpots.filter(function (s) {
+                const kept = dropAllOthers ? [] : oldSpots.filter(function (s) {
                   const title = String((s && s.title) || '');
                   const tagline = String((s && s.tagline && s.tagline.zh) || '');
                   if (prependTitles.has(title)) return false;
