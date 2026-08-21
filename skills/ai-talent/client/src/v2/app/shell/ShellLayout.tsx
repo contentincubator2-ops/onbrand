@@ -96,7 +96,15 @@ interface NavItem {
 // `isPrivate` below (still sowork@sowork.tw-only) because that flag also
 // gates the market-intel / performance preview rails, which haven't been
 // vetted for accounts outside the sowork.tw team.
-const STRATEGY_PREVIEW_EMAILS = ["sowork@sowork.tw", "vmdirisfamily@gmail.com"];
+// 2026-08-21 (CJ「媽爹講故事的左方 mission rail 也要改成這樣，有個切換按鈕，
+// 可以切換策略和內容」): marketing@momdadstory.com added. 名單內的帳號拿到的
+// 切換器正好是「策略 + 內容」兩格 —— 市場 / 成效仍留在 isPrivate（sowork.tw）
+// 底下，那兩個工作區的頁面本身也還擋著非 sowork.tw 帳號。
+const STRATEGY_PREVIEW_EMAILS = [
+  "sowork@sowork.tw",
+  "vmdirisfamily@gmail.com",
+  "marketing@momdadstory.com",
+];
 // Exported so BrandsPage.tsx's in-page tile strip (hidden once the left rail
 // already lists the same 7 sections) can gate on the exact same check —
 // two independently-maintained copies of this list is how a user ends up
