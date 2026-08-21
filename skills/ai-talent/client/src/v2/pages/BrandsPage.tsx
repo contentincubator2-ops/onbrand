@@ -37,6 +37,9 @@ import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
+// 2026-08-21 (CJ「加一個人設的 task tray」): 客戶自建 agent + 指定套用任務。
+import PersonaEditor from "../components/positioning/PersonaEditor";
+import { hasWorkspace } from "../lib/workspaceAccess";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
 import { showToastGlobal } from "../../components/ui/Toast";
@@ -56,6 +59,7 @@ import {
   Hash as LucideHash, MessageCircle as LucideMessage,
   FileText as LucideFileText,
   IdCard as LucideIdCard, Trash2 as LucideTrash,
+  UserRound as LucideUserRound,
 } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -121,20 +125,23 @@ export default function BrandsPage() {
   const urlProductId = Number(searchParams.get("p")) || null;
   const urlEventId = Number(searchParams.get("e")) || null;
 
-  // 2026-08-11: the 策略 rail (ShellLayout) lists this page's seven sections
-  // for private preview, which makes the in-page tile strip a duplicate of the
-  // same control. Same gate as the rail so the two can't disagree — if this
-  // ever drifts from ShellLayout's check, a user gets either two switchers or
-  // none. Follows DataWorkspacePage's existing /api/auth/me pattern.
-  const [isPrivatePreview, setIsPrivatePreview] = React.useState(false);
+  // 2026-08-11: the 策略 rail (ShellLayout) lists this page's sections for any
+  // account that has the 策略 workspace, which makes the in-page tile strip a
+  // duplicate of the same control. Both sides read workspaceAccess so they
+  // can't disagree — if this drifts from ShellLayout's check, a user gets
+  // either two switchers or none.
+  // 2026-08-21: was a hardcoded sowork@sowork.tw compare; 媽爹講故事 now has
+  // 策略 + 內容 too, so the gate is "does this account have the 策略
+  // workspace", not "is this the internal account".
+  // Follows DataWorkspacePage's existing /api/auth/me pattern.
+  const [hasStrategyRail, setHasStrategyRail] = React.useState(false);
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const r = await fetch("/api/auth/me", { method: "POST", credentials: "include" });
         const d = r.ok ? await r.json() : null;
-        const email = String(d?.user?.email ?? "").toLowerCase();
-        if (!cancelled) setIsPrivatePreview(email === "sowork@sowork.tw");
+        if (!cancelled) setHasStrategyRail(hasWorkspace(d?.user?.email, "strategy"));
       } catch { /* default false — tiles stay visible, never strands the user */ }
     })();
     return () => { cancelled = true; };
@@ -657,7 +664,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" | "persona" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -668,6 +675,7 @@ export default function BrandsPage() {
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
     : urlCat === "tools" ? "tools"
+    : urlCat === "persona" ? "persona"
     : "positioning";
   // 2026-07-28 (CJ「選活動定位卡片，跑回品牌定位頁面」): this built its
   // next params from the `searchParams` closure instead of the functional
@@ -678,7 +686,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -1491,11 +1499,11 @@ export default function BrandsPage() {
           {/* Tab tiles — 7 consistent tiles in one scrollable row.
               2026-08-11 (CJ「左側已經有品牌、文字、活動等 rail tray，中間就不需要
               重複了」): under the 策略 workspace the left rail already lists these
-              exact seven sections, so rendering them again here is a duplicate
-              control for the same state. Hidden for private preview only —
-              everyone else has no rail, and hiding it for them would leave no
-              way to change section at all. */}
-          {!isPrivatePreview && (
+              exact sections, so rendering them again here is a duplicate
+              control for the same state. Hidden only for accounts that HAVE
+              the 策略 workspace — everyone else has no rail, and hiding it for
+              them would leave no way to change section at all. */}
+          {!hasStrategyRail && (
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-2 min-w-max mx-auto px-2">
               {(() => {
@@ -1530,6 +1538,11 @@ export default function BrandsPage() {
                   { v: "tools"       as const, label: lang === "en" ? "Brand tools" : "品牌工具",
                       desc: lang === "en" ? "Knowledge / AI prompts" : "知識庫 / AI 指令",
                       Icon: LucideBook,      scopes: ["brand"] },
+                  // 2026-08-21 (CJ「加一個人設的 task tray」): 客戶自建的寫手。
+                  // 放在文字之後、工具之前 —— 文字管「怎麼講」，人設管「誰在講」。
+                  { v: "persona"     as const, label: lang === "en" ? "Personas" : "人設",
+                      desc: lang === "en" ? "Your own agents & their tasks" : "自建 agent 與負責任務",
+                      Icon: LucideUserRound, scopes: ["brand"] },
                   { v: "products"    as const, label: lang === "en" ? "Products" : "產品",
                       desc: lang === "en" ? "Product cards & positioning" : "產品卡片與定位",
                       Icon: LucideRobotIcon, scopes: ["brand"] },
@@ -2354,6 +2367,13 @@ export default function BrandsPage() {
                 </p>
                 <AIPromptsEditor brandId={activeBrandIdForLocks} />
               </div>
+            </div>
+          )}
+
+          {/* ── 人設 (persona) — 客戶自建 agent + 指定套用的任務 ── */}
+          {derivedCategory === "persona" && scopeMode === "brand" && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <PersonaEditor brandId={activeBrandIdForLocks} />
             </div>
           )}
 

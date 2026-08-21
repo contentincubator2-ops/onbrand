@@ -27,6 +27,7 @@ import SupportDrawer from "../../components/SupportDrawer";
 import { useUnreadNudges, fireNudge } from "../../components/mia/miaNudges";
 import type { QueuedNudge } from "../../components/mia/miaNudges";
 import OnBrandLogo from "../../components/OnBrandLogo";
+import { hasWorkspace, hasWorkspaceSwitcher, workspaceModesFor } from "../../lib/workspaceAccess";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
@@ -43,7 +44,7 @@ import {
   faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
   faEnvelope, faBullhorn, faChartLine, faDatabase,
-  faFire, faComments, faFileLines,
+  faFire, faComments, faFileLines, faUserPen,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -98,11 +99,16 @@ interface NavItem {
 // Brand Strategy + Research Analysis removed per CJ direction; Brand Brain kept.
 function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string): NavItem[] {
   const en = lang === "en";
-  const isPrivate = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
+  // 2026-08-21 (CJ「媽爹講故事的左方 rail 也要有切換按鈕」): per-account
+  // workspace access replaces the old全有全無 sowork@sowork.tw check —— 一個
+  // 帳號可以只拿到策略 + 內容。見 lib/workspaceAccess.ts。
+  const canMarket      = hasWorkspace(userEmail, "market");
+  const canStrategy    = hasWorkspace(userEmail, "strategy");
+  const canPerformance = hasWorkspace(userEmail, "performance");
 
   // In data modes, the main left rail switches meaning. The top-left mode
   // switcher chooses the workspace; this rail only shows functions inside it.
-  if (isPrivate && currentPath?.startsWith("/market-intel")) {
+  if (canMarket && currentPath?.startsWith("/market-intel")) {
     return [
       { to: "/market-intel/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/market-intel/overview", tooltip: en ? "Market overview" : "市場總覽" },
       { to: "/market-intel/listen_hotspots", label: en ? "Hotspots" : "市場熱點", icon: <FontAwesomeIcon icon={faFire} />, matchPrefix: "/market-intel/listen_hotspots", tooltip: en ? "Market hotspots" : "市場熱點（蹭熱度）" },
@@ -125,7 +131,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   //
   // Brand/product/event scope ids are injected by the nav click handler, so
   // these `to` values deliberately carry only `cat`.
-  if (isPrivate && currentPath?.startsWith("/brands")) {
+  if (canStrategy && currentPath?.startsWith("/brands")) {
     // 2026-08-11 (CJ「前三個分別是品牌、產品、活動，接下去才是文字、視覺、
     // 工具、基本資料」): ordered by what the entry IS, not alphabetically.
     // The first three are the three positioning SCOPES — 品牌 / 產品 / 活動 —
@@ -144,6 +150,11 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
         tooltip: en ? "Voice, terms, CTA and hook libraries" : "語氣 / 用詞 / CTA / 鉤子庫" },
       { to: "/brands/edit?cat=visual", catKey: "visual", label: en ? "Visual" : "視覺", icon: <FontAwesomeIcon icon={faPaintBrush} />,
         tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
+      // 2026-08-21 (CJ「加一個人設的 task tray」): 人設 sits right after 文字 —
+      // 文字 is how the brand talks, 人設 is who is talking. Both are voice
+      // assets, so they belong next to each other rather than under 工具.
+      { to: "/brands/edit?cat=persona", catKey: "persona", label: en ? "Personas" : "人設", icon: <FontAwesomeIcon icon={faUserPen} />,
+        tooltip: en ? "Your own agents — name them, pick the tasks they write" : "自建 agent — 自己命名，指定他負責哪些任務" },
       { to: "/brands/edit?cat=tools", catKey: "tools", label: en ? "Tools" : "工具", icon: <FontAwesomeIcon icon={faBookBookmark} />,
         tooltip: en ? "Knowledge base / AI prompt library" : "知識庫 / AI 指令庫" },
       { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
@@ -151,7 +162,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     ];
   }
 
-  if (isPrivate && currentPath?.startsWith("/performance")) {
+  if (canPerformance && currentPath?.startsWith("/performance")) {
     return [
       { to: "/performance/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/overview", tooltip: en ? "Cross-platform overview" : "跨平台總覽" },
       { to: "/performance/meta", label: "Meta", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/performance/meta", tooltip: "Meta Ads" },
@@ -186,12 +197,12 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       tooltip: en ? "Calendar view — all scheduled and published posts" : "月曆視圖 — 已排程 + 已發布內容" },
     { to: "/theater",   label: en ? "7-Day Publisher" : "七日發布台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
     // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav).
-    // 2026-08-11: for private preview it moved OUT of this rail and became the
-    // 策略 workspace (its sections are now rail entries there), so keeping it
-    // here too would be a duplicate entry point. Everyone else has no mode
-    // switcher, so for them it must stay — removing it outright would strand
-    // 品牌大腦 with no way in.
-    ...(isPrivate ? [] : [
+    // 2026-08-11: for accounts with the 策略 workspace it moved OUT of this
+    // rail and became that workspace (its sections are now rail entries
+    // there), so keeping it here too would be a duplicate entry point.
+    // Everyone else has no mode switcher, so for them it must stay —
+    // removing it outright would strand 品牌大腦 with no way in.
+    ...(canStrategy ? [] : [
       { to: "/brands", label: en ? "Brand Brain" : "品牌大腦", icon: <FontAwesomeIcon icon={faBrain} /> },
     ]),
     // 2026-05-30 (CJ「移除連結頁」): "連結" sidebar item removed entirely.
@@ -634,7 +645,10 @@ function IconBar({
   const { lang, setLang } = useLang();
   const isEn = lang === "en";
   const NAV_ITEMS = React.useMemo(() => buildNavItems(lang, userEmail, currentPath), [lang, userEmail, currentPath]);
-  const isPrivatePreview = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
+  // 2026-08-21 (CJ「媽爹講故事…有個切換按鈕，可以切換策略和內容」): 切換器不再是
+  // 內部帳號限定，改由 workspaceAccess 決定這個帳號有哪幾個工作區。
+  const myModes = workspaceModesFor(userEmail);
+  const showWorkspaceSwitcher = hasWorkspaceSwitcher(userEmail);
   // 2026-08-11 (CJ「改成四個選單：市場、策略、內容、成效」): 策略 added as a
   // first-class workspace. Order follows how the work actually flows —
   // understand the market, decide the strategy, produce the content, read the
@@ -651,7 +665,7 @@ function IconBar({
   // single-char pills sharing a 64px capsule left ~15px each — unreadable.
   // Now a vertical stack: each cell gets the full rail width, an icon and a
   // real two-character label.
-  const modeOptions = [
+  const allModeOptions = [
     { id: "market" as const, label: isEn ? "Market" : "市場", icon: faMagnifyingGlass, to: "/market-intel/overview",
       tip: isEn ? "Market intelligence" : "市場情報" },
     { id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands",
@@ -661,6 +675,9 @@ function IconBar({
     { id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview",
       tip: isEn ? "Performance" : "成效數據" },
   ];
+  // 只列這個帳號真的有的工作區 —— /market-intel 與 /performance 本身另有
+  // sowork@sowork.tw 的閘門，列出來只會讓人點進「此功能目前只開放…」。
+  const modeOptions = allModeOptions.filter((m) => myModes.includes(m.id));
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
 
@@ -748,7 +765,7 @@ function IconBar({
         </Tooltip>
       </div>
 
-      {isPrivatePreview && (
+      {showWorkspaceSwitcher && modeOptions.length > 0 && (
         <div
           ref={modeRef}
           style={{

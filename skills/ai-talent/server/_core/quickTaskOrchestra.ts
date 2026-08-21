@@ -21,6 +21,7 @@ import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSumma
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "./brandContext";
+import { resolveBrandPersona, composePersonaPrompt } from "./brandPersonas";
 import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
 import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
@@ -1982,7 +1983,7 @@ export async function runOrchestra(args: {
     const resolvedStrategistId = resolveAgentId(taskId, "strategist",   args.config.strategistAgentId);
     const resolvedSpecialtyId  = resolveAgentId(taskId, "specialty",    args.config.specialtyAgentId);
 
-    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix, viralPatterns, brandMarket] = await Promise.all([
+    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix, viralPatterns, brandMarket, brandPersona] = await Promise.all([
       loadAgent(resolvedLeadId),
       loadAgent(resolvedImageDirId),
       ytUrlInput
@@ -2046,6 +2047,10 @@ export async function runOrchestra(args: {
       // 2026-07-17 多市場: brand's targetCountry/outputLanguage → master
       // persona market + zh-TW sanitizer gate. Fail-safe zh-TW default.
       getBrandMarket(args.brandId).catch(() => DEFAULT_BRAND_MARKET),
+      // 2026-08-21 (CJ「客戶自己新創 agent，決定語調的應用範圍在哪些任務」):
+      // 品牌自訂人設。命中這個任務就換掉署名的寫手 —— 同一次 prework 併發拿，
+      // 不多一趟等待。沒設定的品牌回 null，這條路完全不動。
+      resolveBrandPersona(args.brandId, taskId, taskChannel).catch(() => null),
     ]);
 
     // Record scout stage for 100s
@@ -2061,6 +2066,24 @@ export async function runOrchestra(args: {
     }
     stPre.status = "done";
     stPre.completedAt = Date.now() - startedAt;
+
+    // 2026-08-21 品牌自訂人設 — 疊在被指派 agent 之上，不是取代。
+    // 客戶要換的是「講話的人是誰」；被指派 agent 的經歷 / 方法論 / 案例是寫作
+    // 工藝，抽掉輸出品質會掉（composePersonaPrompt 明寫這條優先權）。
+    // meta 換成客戶取的名字，所以 /run 頁的署名、專案紀錄、七日發布台顯示的
+    // 都是他自己的 agent，而不是系統派的人。
+    const captionCrew = brandPersona
+      ? {
+          meta: {
+            id: captionLoad.meta?.id ?? 0,
+            name: brandPersona.name,
+            title: brandPersona.title || (captionLoad.meta?.title ?? ""),
+            avatarUrl: captionLoad.meta?.avatarUrl ?? null,
+          } as AgentMeta,
+          persona: composePersonaPrompt(brandPersona, captionLoad.persona),
+          aiModel: captionLoad.aiModel,
+        }
+      : captionLoad;
 
     // YT path takes priority — it surfaces transcript + metadata, much
     // richer than urlContext. fetchedUrl carries either YT or generic.
@@ -2126,7 +2149,7 @@ export async function runOrchestra(args: {
     }
 
     // ── Stage 2: caption + image briefs in parallel ───────────────────
-    const stCap = stage("caption", `${captionLoad.meta?.name ?? "Caption agent"} 寫 ${args.config.variants} 個變體`);
+    const stCap = stage("caption", `${captionCrew.meta?.name ?? "Caption agent"} 寫 ${args.config.variants} 個變體`);
     const stImg = args.config.imageDirectorId
       ? stage("brief", `${imageLoad.meta?.name ?? "Mandy Cheng"} 寫 ${args.config.images} 條視覺 brief`)
       : null;
@@ -2135,8 +2158,8 @@ export async function runOrchestra(args: {
       callCaptionWriter({
         template: args.template,
         config: args.config,
-        captionPersona: captionLoad.persona,
-        agentAiModel: captionLoad.aiModel, // ← drives provider selection (qwen/Kimi/glm)
+        captionPersona: captionCrew.persona,
+        agentAiModel: captionCrew.aiModel, // ← drives provider selection (qwen/Kimi/glm)
         brandPrefix,
         urlContext,
         userMsg,
@@ -2428,7 +2451,7 @@ export async function runOrchestra(args: {
           taskId: args.template.id,
           totalLatencyMs: Date.now() - startedAt,
           fetchedUrl,
-          captionAgent: captionLoad.meta,
+          captionAgent: captionCrew.meta,
           imageAgent: imageLoad.meta,
           variants: partialVariants,
           stages: [...stages],
@@ -2474,7 +2497,7 @@ export async function runOrchestra(args: {
             content: JSON.stringify(partialVariants, null, 2),
             metadata: {
               latencyMs: Date.now() - startedAt,
-              captionAgent: captionLoad.meta ?? null,
+              captionAgent: captionCrew.meta ?? null,
               imageAgent: imageLoad.meta ?? null,
               stages: [...stages],
               fetchedUrl: fetchedUrl ?? null,
@@ -2874,8 +2897,8 @@ export async function runOrchestra(args: {
           variants.map((v) =>
             Promise.race([
               runSquadLeadQA({
-                agentName: captionLoad.meta?.name ?? "caption_writer",
-                agentTitle: captionLoad.meta?.title,
+                agentName: captionCrew.meta?.name ?? "caption_writer",
+                agentTitle: captionCrew.meta?.title,
                 // 2026-05-11 — flatten { en, zh } | string label to string.
                 taskTitle: typeof args.template.label === "string"
                   ? args.template.label
@@ -2914,7 +2937,7 @@ export async function runOrchestra(args: {
       taskId: args.template.id,
       totalLatencyMs: Date.now() - startedAt,
       fetchedUrl,
-      captionAgent: captionLoad.meta,
+      captionAgent: captionCrew.meta,
       imageAgent: imageLoad.meta,
       variants,
       stages,

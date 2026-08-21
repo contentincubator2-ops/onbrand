@@ -33,6 +33,7 @@ import { loadAgentContext } from "../agentContextLoader";
 import { getSquadRequirements } from "../_core/squadRequirements";
 import { getEmbedding, cosineSimilarity } from "../_core/embedding";
 import { synthesizeAgentAsSquad, type AgentRow } from "../_core/agentSquadSynth";
+import { resolveBrandPersona } from "../_core/brandPersonas";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -2202,6 +2203,29 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
       const isStrategic = !isVisual && !isContent &&
         /swot|persona|icp|research|analysis|brand|context|interview|competitor|strategy|plan|brief|outline|framework|insight|positioning|methodology|doc|report|matrix|mapping|journey|研究|分析|策略|框架|計畫|報告|訪談|競品|定位|脈絡|洞察|矩陣|藍圖/i.test(`${ot} ${stepName}`);
 
+      // 2026-08-21 (CJ「客戶自己新創 agent，決定語調的應用範圍在哪些任務」):
+      // 品牌自訂人設。只套在「內容類」步驟 —— 研究 / 策略 / 視覺 brief 步驟的
+      // 產出是內部素材，換成客戶的社群寫手口吻會壞掉，那些步驟維持原本被指派
+      // 的專業 agent。命中時連 agent_name 一起換，專案紀錄上署名的才會是他自己
+      // 建的人（跟 orchestra 那條路一致）。
+      const squadTaskId = normalizeTaskId(input.squadSlug);
+      const squadPlatform =
+        squadTaskId.startsWith("ig-") ? "instagram"
+        : squadTaskId.startsWith("yt-") ? "youtube"
+        : squadTaskId.startsWith("tt-") ? "tiktok"
+        : squadTaskId.startsWith("li-") ? "linkedin"
+        : squadTaskId.startsWith("em-") ? "email"
+        : squadTaskId.startsWith("pr-") ? "pr"
+        : squadTaskId.startsWith("br-") ? "brand"
+        : squadTaskId.startsWith("rs-") ? "audience"
+        : squadTaskId.startsWith("kl-") ? "kol"
+        : "facebook";
+      const brandPersona = isContent
+        ? await resolveBrandPersona(scopeBrandId, squadTaskId, squadPlatform).catch(() => null)
+        : null;
+      const voiceName  = brandPersona?.name ?? agentName;
+      const voiceTitle = brandPersona ? (brandPersona.title || agentTitle) : agentTitle;
+
       // Plan step: agent reads all context and outputs an execution plan JSON.
       // Detected via explicit outputKind="plan" OR step name keywords.
       const isPlanStep = explicitKind === "plan"
@@ -2288,7 +2312,12 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
 - 如果策略已確認了具體的發文主題、日期、TA，一定要寫進 instructions`
         : `直接寫出成品內容，不要寫「我會...」這種方法論說明。`;
 
-      const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
+      const roleLine = brandPersona
+        ? `你是 ${voiceName}${voiceTitle ? `（${voiceTitle}）` : ""}。這是品牌指定由你來寫的內容。
+${brandPersona.persona.trim()}`
+        : `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。`;
+
+      const systemPrompt = `${roleLine}
 你正在執行「${stepName}」步驟。
 
 【最高優先規則】直接交付完成品本身。
@@ -2415,7 +2444,7 @@ ${quantityGuide}
         VALUES
           (${input.missionId}, ${input.stepOrder}, 'drafted',
            ${input.userInput || null}, ${output},
-           ${assignedId ?? null}, ${agentName},
+           ${assignedId ?? null}, ${voiceName},
            ${JSON.stringify(nextHistory)})
         ON DUPLICATE KEY UPDATE
           status = 'drafted',
@@ -2429,7 +2458,7 @@ ${quantityGuide}
       return {
         ok: true,
         status: "drafted" as const,
-        agentName, agentTitle, agentSkill,
+        agentName: voiceName, agentTitle: voiceTitle, agentSkill,
         stepName, stepDesc, outputType,
         output,
       };

@@ -47,6 +47,8 @@ import { strategyConsultantRouter } from "./strategyConsultantRouter";
 import { mediaCopyRouter } from "./mediaCopyRouter";
 // 2026-06-21 (CJ「按 riverflow 標準」brand DNA): auto-extracted brand color palette.
 import { brandColorsRouter } from "./brandColorsRouter";
+// 2026-08-21 (CJ「加一個人設的 task tray」): 品牌自訂人設（客戶自建 agent）。
+import { brandPersonaRouter } from "./brandPersonaRouter";
 
 // 2026-05-14: removed 28 dead routers — none of them had any v2 callers
 // after the v1 frontend deletion. See git history (commit before this)
@@ -101,6 +103,7 @@ export const appRouter = router({
   strategyConsultant:  strategyConsultantRouter,
   mediaCopy:           mediaCopyRouter,
   brandColors:         brandColorsRouter,
+  brandPersona:        brandPersonaRouter,
 });
 
 export type AppRouter = typeof appRouter;
