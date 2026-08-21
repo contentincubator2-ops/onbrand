@@ -155,6 +155,14 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     { enabled: !!productId, refetchOnWindowFocus: false },
   );
   const product: any = productQ?.data ?? null;
+  const productPositioning: ProductPositioning = (() => {
+    try {
+      return typeof product?.positioning === "string"
+        ? JSON.parse(product.positioning)
+        : (product?.positioning ?? {});
+    } catch { return {}; }
+  })();
+  const price = typeof productPositioning.price === "string" ? productPositioning.price : "";
 
   // Upsert mutation
   const upsertMut = (trpc as any).product?.upsert?.useMutation?.({
@@ -207,9 +215,11 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     // Interim positioning is stored under _interim (auto-discovery quick-pulse).
     // Full positioning overwrites these; fall back to _interim if not yet done.
     const interim = (pos._interim as any) ?? {};
-    setTagline(pos.tagline ?? interim.tagline ?? "");
-    setAudience(pos.targetAudience ?? pos.audience?.primary ?? interim.targetAudience ?? "");
-    setUsp(pos.usp ?? pos.differentiation?.functional ?? interim.usp ?? "");
+    const firstText = (...values: unknown[]) =>
+      values.find((value): value is string => typeof value === "string" && !!value.trim())?.trim() ?? "";
+    setTagline(firstText(pos.tagline, (pos as any).tagline?.zhTagline, pos.core?.zhTagline, pos.core?.oneLineValueProp, interim.tagline));
+    setAudience(firstText(pos.targetAudience, pos.audience?.primary, interim.targetAudience));
+    setUsp(firstText(pos.usp, pos.competition?.uniqueUsp, pos.core?.oneLineValueProp, pos.differentiation?.functional, interim.usp));
     setPreferred(Array.isArray(pos.preferredWords) ? pos.preferredWords : []);
     setForbidden(Array.isArray(pos.forbiddenWords) ? pos.forbiddenWords : []);
     setPeriods(Array.isArray(pos.promotionPeriods) ? pos.promotionPeriods : []);
@@ -296,7 +306,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
           {/* AI Positioning Summary */}
-          {(tagline || audience || usp) && (
+          {(tagline || audience || usp || price) && (
             <div className="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl p-4 border border-indigo-100">
               <div className="flex items-center gap-1.5 mb-3">
                 <Sparkles size={13} className="text-indigo-500" />
@@ -305,6 +315,9 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 </span>
               </div>
               <div className="grid gap-2">
+                {price && (
+                  <p className="text-xs font-medium text-neutral-500">{en ? "Price" : "價格"}：{price}</p>
+                )}
                 {tagline && (
                   <div>
                     <span className="text-[9px] font-semibold uppercase text-indigo-400 tracking-wider">

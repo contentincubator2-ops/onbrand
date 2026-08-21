@@ -197,6 +197,11 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
       await refreshLists();
       triggerPositioning("product", newId);
       onCreated?.("product", newId);
+      // Metadata enrichment is detached on the server. Refresh once more after
+      // the usual fast product-page fetch so the new card can pick up its image.
+      window.setTimeout(() => {
+        void utils.product?.list?.invalidate?.();
+      }, 2500);
       onClose();
     } catch (e: any) {
       setErrorMsg(String(e?.message ?? e));

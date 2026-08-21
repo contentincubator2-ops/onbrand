@@ -32,7 +32,7 @@ import localPool from "../localDb";
 const entityKindSchema = z.enum(["brand", "product", "event"]);
 
 async function loadEntity(kind: "brand"|"product"|"event", id: number, userId: number): Promise<{
-  name: string; industry?: string; description?: string; outputLanguage?: string;
+  name: string; industry?: string; description?: string; website?: string; outputLanguage?: string;
 } | null> {
   const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
   const [rows]: any = await localPool.execute(
@@ -56,18 +56,27 @@ async function loadEntity(kind: "brand"|"product"|"event", id: number, userId: n
   // description COLUMN — it lives inside positioning JSON ($.description,
   // written by discovery/seeding). Without it the re-run pipeline was
   // grounded on the bare name only. Fall back to the JSON value.
-  let description: string | undefined = row.description ?? undefined;
-  if (!description && row.positioning != null) {
+  let positioning: any = {};
+  if (row.positioning != null) {
     try {
-      const pos = typeof row.positioning === "string" ? JSON.parse(row.positioning) : row.positioning;
-      const d = pos?.description ?? pos?._interim?.description;
-      if (typeof d === "string" && d.trim()) description = d.trim();
+      positioning = typeof row.positioning === "string" ? JSON.parse(row.positioning) : row.positioning;
     } catch { /* non-fatal */ }
   }
+  const descriptionCandidates = kind === "product"
+    ? [positioning?.description, positioning?._interim?.description, positioning?.summary]
+    : [row.description, positioning?.description, positioning?._interim?.description];
+  const description = descriptionCandidates
+    .find((value) => typeof value === "string" && value.trim())?.trim();
+  const websiteCandidates = kind === "product"
+    ? [positioning?.productUrl, positioning?.website]
+    : [row.website];
+  const website = websiteCandidates
+    .find((value) => typeof value === "string" && value.trim())?.trim();
   return {
     name: String(row.brandName ?? row.name ?? ""),
     industry: row.industry ?? row.category ?? undefined,
     description,
+    website,
     outputLanguage,
   };
 }
@@ -104,6 +113,7 @@ export const positioningJobsRouter = router({
         brandName: ent.name,
         industry: ent.industry,
         description: ent.description,
+        website: ent.website,
         steps,
       });
       return { ok: true as const, totalSteps: steps.length };
@@ -136,6 +146,7 @@ export const positioningJobsRouter = router({
         brandName: ent.name,
         industry: ent.industry,
         description: ent.description,
+        website: ent.website,
       });
       return { ok: true as const, pulse };
     }),

@@ -112,6 +112,7 @@ export async function generateInterimPulse(args: {
   brandName: string;
   industry?: string;
   description?: string;
+  website?: string;
 }): Promise<InterimPulse> {
   // Stage 0 — fetch real website content for brand entities (best effort)
   let websiteBlock = "";
@@ -121,6 +122,20 @@ export async function generateInterimPulse(args: {
       const content = await getBrandRealContent(args.entityId);
       if (content.hasContent && content.context) {
         websiteBlock = `\n【官網 / 社群真實內容】\n${content.context.slice(0, 1500)}`;
+      }
+    } catch { /* non-fatal */ }
+  } else if (args.entityKind === "product" && args.website) {
+    try {
+      const { fetchProductMeta } = await import("./productMeta");
+      const meta = await fetchProductMeta(args.website);
+      if (meta.source !== "none") {
+        const details = [
+          meta.name ? `名稱：${meta.name}` : "",
+          meta.price ? `價格：${meta.currency ? `${meta.currency} ` : ""}${meta.price}` : "",
+          meta.description ? `說明：${meta.description}` : "",
+          `商品頁：${args.website}`,
+        ].filter(Boolean);
+        websiteBlock = `\n【商品頁資訊】\n${details.join("\n")}`;
       }
     } catch { /* non-fatal */ }
   }
