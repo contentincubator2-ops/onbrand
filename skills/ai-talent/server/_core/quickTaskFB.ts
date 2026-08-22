@@ -656,6 +656,23 @@ export interface OrchestraConfig {
    *  strict structured deliverables (e.g. newsjack 4-field format) whose
    *  format/guardrails the social scaffolding otherwise overrides. */
   cleanPrompt?: boolean;
+  /**
+   * 2026-08-22 (CJ「IG 直播配套應該是完整直播範本」): cleanPrompt's two
+   * per-variant lines were written for newsjack (「只接這一個時事/角度」+
+   * 【角度】【為什麼會被報】…四欄). A second cleanPrompt task with a
+   * different field set needs its own wording, so both lines are
+   * overridable. Omitted → newsjack defaults (unchanged behaviour).
+   */
+  cleanPromptVariantHint?: string;
+  cleanPromptCaptionSpec?: string;
+  /**
+   * 2026-08-22: the narrativeArc strategist prompt hardcoded 「FB 系列貼文
+   * （N 篇）」, which steers every downstream writer toward posts. Tasks whose
+   * deliverable is not a post series (e.g. a live run-of-show) override the
+   * noun + counting unit here. Omitted → 「FB 系列貼文」/「篇」.
+   */
+  strategistDeliverable?: string;
+  strategistUnit?: string;
 }
 
 const MANDY_ID = 220887;     // Claire Chen — Brand Visual Designer (977 char persona, was Mandy 199)

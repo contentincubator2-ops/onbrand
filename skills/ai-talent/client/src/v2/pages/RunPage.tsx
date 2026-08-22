@@ -64,6 +64,7 @@ import { RUN_IMAGE_MODEL_OPTIONS } from "../lib/runImageModelOptions";
 import { findValidRunProductSelection, type RunProductImage } from "../lib/runProductSelection";
 import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
+import { parseRunOfShow } from "../lib/runOfShow";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
@@ -260,6 +261,12 @@ const PR_CRAFT_REF: Record<string, {
 // hold the mockup and show a "generating" state, then reveal the full
 // post once images finish. Mirrors OrchestraConfig.holdForImages server-side.
 const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
+
+// 2026-08-22 (CJ「IG 直播配套應該是完整直播範本」): >4 變體預設走 pool
+// 漸進揭露（headline pool：變體是可互換的角度，先給 3 個）。但序列型任務
+// 的每個變體是「流程的一段」，藏起後半段等於把流程表切一半 —— 這類任務
+// 一次全部攤開。用明列 id 而不是關鍵字猜（見 inferMockup 的教訓）。
+const SEQUENCE_TASKS = new Set<string>(["ig-60-live-suite"]);
 
 function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
   const [open, setOpen] = React.useState(false);
@@ -1509,6 +1516,12 @@ export default function RunPage() {
     return undefined;
   }, [data]);
 
+  // 2026-08-22 (CJ「應該是指完整的直播範本」): sequence tasks deliver ONE
+  // timeline split across variants. Besides never pooling the pills, they
+  // also get the whole thing as a table under the mockup — the deliverable
+  // is the run of show, not 6 separate cards the user has to click through.
+  const isSequenceTask = SEQUENCE_TASKS.has((data as any)?.mission?.taskId ?? "");
+
   // 2026-07-17 (CJ「文案偶爾很短、沒講重點，推測系統不穩」— seen on
   // fb-30-ad-headline / link-desc): those are COMPONENT tasks — the
   // deliverable per variant is ONE short line (ad headline ≤25字 / link
@@ -2083,7 +2096,9 @@ export default function RunPage() {
       ) : variants.length > 1 && (() => {
         // Pool mode: >4 variants → progressive reveal (headline pool).
         // ≤4 → show all (normal multi-variant task, unchanged behavior).
-        const pool = variants.length > 4;
+        // Sequence tasks (每個變體是流程的一段) never pool — see SEQUENCE_TASKS.
+        const isSequence = isSequenceTask;
+        const pool = variants.length > 4 && !isSequence;
         const shown = pool ? Math.min(revealCount, variants.length) : variants.length;
         const more = variants.length - shown;
         return (
@@ -2091,6 +2106,8 @@ export default function RunPage() {
             <span className="text-[10px] text-default-500 mr-1">
               {pool
                 ? (lang === "en" ? "Headlines:" : "標題：")
+                : isSequence
+                ? (lang === "en" ? "Run of show:" : "流程：")
                 : (lang === "en" ? "Versions:" : "版本：")}
             </span>
             {variants.slice(0, shown).map((v, i) => (
@@ -2282,6 +2299,73 @@ export default function RunPage() {
               );
             })()}
           </div>
+          {/* 2026-08-22 (CJ「IG 直播配套…應該是指完整的直播範本」): the
+              deliverable is one timeline, so show all segments together as a
+              rundown table. Row click switches the mockup to that segment;
+              edits made above are reflected because `overrides` feeds in. */}
+          {isSequenceTask && variants.length > 1 && (
+            <div className="rounded-2xl bg-white shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-divider">
+                <p className="text-small font-semibold text-default-800">
+                  {lang === "en" ? "Full run of show" : "完整流程表"}
+                </p>
+                <button
+                  onClick={async () => {
+                    const text = variants
+                      .map((v, i) => {
+                        const r = parseRunOfShow(overrides[i]?.caption ?? v.caption ?? "", v.label ?? "");
+                        return [
+                          `${r.time}　${r.stage}`.trim(),
+                          r.cues && `${lang === "en" ? "Screen / action" : "畫面／動作指示"}：\n${r.cues}`,
+                          r.script && `${lang === "en" ? "Host script" : "主播口白"}：\n${r.script}`,
+                        ].filter(Boolean).join("\n");
+                      })
+                      .join("\n\n");
+                    try {
+                      await navigator.clipboard.writeText(text);
+                      showToastGlobal(lang === "en" ? "Run of show copied" : "已複製整份流程表");
+                    } catch {
+                      showToastGlobal(lang === "en" ? "Copy failed" : "複製失敗");
+                    }
+                  }}
+                  className="text-tiny px-3 py-1 rounded-full border border-default-200 text-default-700 hover:border-secondary hover:text-secondary transition"
+                >
+                  {lang === "en" ? "Copy all" : "複製整份"}
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] text-tiny border-collapse">
+                  <thead>
+                    <tr className="bg-default-50 text-default-500">
+                      <th className="text-left font-medium px-3 py-2 w-[96px]">{lang === "en" ? "Time" : "時間"}</th>
+                      <th className="text-left font-medium px-3 py-2 w-[104px]">{lang === "en" ? "Stage" : "流程階段"}</th>
+                      <th className="text-left font-medium px-3 py-2">{lang === "en" ? "Screen / action" : "畫面／動作指示"}</th>
+                      <th className="text-left font-medium px-3 py-2">{lang === "en" ? "Host script" : "主播口白"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variants.map((v, i) => {
+                      const r = parseRunOfShow(overrides[i]?.caption ?? v.caption ?? "", v.label ?? "");
+                      return (
+                        <tr
+                          key={i}
+                          onClick={() => setActiveIdx(i)}
+                          className={`cursor-pointer border-t border-divider align-top ${
+                            i === activeIdx ? "bg-secondary/10" : "hover:bg-default-50"
+                          }`}
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-default-700 font-medium">{r.time}</td>
+                          <td className="px-3 py-2 text-default-700">{r.stage}</td>
+                          <td className="px-3 py-2 text-default-600 whitespace-pre-line">{r.cues}</td>
+                          <td className="px-3 py-2 text-default-600 whitespace-pre-line">{r.script}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           {/* 2026-05-17 (CJ「可以讓用戶編輯後直接下載」): speech script
               download. Uses the current (edited) caption + the same
               <a download> blob pattern as the .ics export. */}
