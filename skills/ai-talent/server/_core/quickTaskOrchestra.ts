@@ -24,6 +24,7 @@ import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforce
 import { resolveBrandPersona, composePersonaPrompt } from "./brandPersonas";
 import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
+import { resolveTierVariantShape } from "./tierVariantShape";
 import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
 import { isLinkedInBodyTask, LI_CRAFT_RUBRIC, liPlaybookFor } from "./liCraft";
 import { isTikTokBodyTask, TT_CRAFT_RUBRIC, ttPlaybookFor } from "./ttCraft";
@@ -1899,11 +1900,19 @@ export async function runOrchestra(args: {
   const isCardsConfig = (args.config.cardsPerVariant ?? 0) > 1;
   const tier: OrchestraTier = args.tier ?? "30s";
   if ((tier === "60s" || tier === "99s") && !isCardsConfig) {
-    const baseLabels = args.config.variantLabels;
-    const extraLabels = ["進階版", "替代版", "極簡版", "完整版"]; // generic fallbacks
-    const scaledLabels = baseLabels.length >= 5
-      ? baseLabels.slice(0, 5)
-      : [...baseLabels, ...extraLabels.slice(0, 5 - baseLabels.length)];
+    // 2026-08-22 (CJ 驗收 ig-60-live-suite「6 段流程表只回 5 段」): this used to
+    // hardcode variants:5, which TRUNCATED every pack declaring more (6 段直播
+    // 流程少了收尾預告；fb-99-livestream-9seg 的 9 段只出 5 段) and PADDED every
+    // pack declaring fewer (3 篇連載多出「進階版／替代版」兩個沒人要的 tab).
+    // See tierVariantShape.ts — a pack ships what it declares, everything
+    // else keeps the 5-version floor.
+    const shape = resolveTierVariantShape({
+      variants: args.config.variants,
+      images: args.config.images,
+      variantLabels: args.config.variantLabels,
+      postLabels: args.config.postLabels,
+      postsCount: args.config.extras?.postsCount,
+    });
 
     // 60s tier KEY differentiators vs 30s:
     //   1. runImageGen=true (Flux really runs — real images, not just briefs)
@@ -1918,9 +1927,9 @@ export async function runOrchestra(args: {
       ...args,
       config: {
         ...args.config,
-        variants: 5,
-        images: args.config.images > 0 ? 5 : 0,
-        variantLabels: scaledLabels,
+        variants: shape.variants,
+        images: shape.images,
+        variantLabels: shape.variantLabels,
         runImageGen: args.config.images > 0,  // 60s: yes if task has visual
         extras: { ...defaultExtras, ...(args.config.extras ?? {}) },
       },
