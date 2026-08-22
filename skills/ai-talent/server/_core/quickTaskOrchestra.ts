@@ -884,13 +884,19 @@ async function callOneVariant(args: {
     ? `# 角色（寫作口吻參考，不要把自我介紹寫進輸出）\n${captionPersona}\n\n` +
       `# 任務（最高指令，必須完全逐條遵循其格式與【絕對規則】）\n` +
       filledSystemPrompt +
-      `\n\n【本次只產 1 個變體】**${label}**：只接「這一個」時事/角度，` +
-      `完全照任務指定的四欄純文字格式輸出這 1 個變體的內容。\n` +
-      `**嚴禁**輸出 JSON 陣列、**嚴禁**一次列出多個變體、**嚴禁**把其他 ` +
+      // 2026-08-22: strategist anchor was missing from cleanMode — a
+      // multi-segment clean-prompt task (live run-of-show) needs the arc
+      // just as much as a social one. No-op for newsjack (no strategist).
+      strategistSection +
+      `\n\n【本次只產 1 個變體】**${label}**：` +
+      (config.cleanPromptVariantHint ??
+        `只接「這一個」時事/角度，完全照任務指定的四欄純文字格式輸出這 1 個變體的內容。`) +
+      `\n**嚴禁**輸出 JSON 陣列、**嚴禁**一次列出多個變體、**嚴禁**把其他 ` +
       `tab 的內容也寫進來——每個變體是獨立一次產出，只有一份。\n\n` +
       `【輸出格式】輸出嚴格 JSON 物件（不是陣列）：\n` +
-      `{"caption":"<這 1 個變體的四欄純文字內容，保留【角度】【為什麼會被報】` +
-      `【一句 pitch】【建議下一步】四個方括號標題與換行>","hashtags":[]}\n` +
+      `{"caption":"${config.cleanPromptCaptionSpec ??
+        `<這 1 個變體的四欄純文字內容，保留【角度】【為什麼會被報】【一句 pitch】【建議下一步】四個方括號標題與換行>`
+      }","hashtags":[]}\n` +
       `第一個字元就是 {。不要 code fence、不要前言、caption 外不要多寫字。\n` +
       `\n# 品牌脈絡（素材，扣回用，不要照抄）\n${brandPrefix}` +
       (hasUrl ? `\n\n# 參考素材（URL 抓到的內容）\n${urlContext}` : "")
@@ -1426,17 +1432,23 @@ async function callStrategist(args: {
   urlContext: string;
   userMsg: string;
   postLabels: string[];
+  /** 2026-08-22: what the writers are actually producing. Default keeps the
+   *  original 「FB 系列貼文」/「篇」 wording for every existing task. */
+  deliverable?: string;
+  unit?: string;
 }): Promise<string> {
   const { strategistPersona, template, brandPrefix, urlContext, userMsg, postLabels } = args;
+  const deliverable = args.deliverable ?? "FB 系列貼文";
+  const unit = args.unit ?? "篇";
   const system =
     `# 你的角色\n` +
     strategistPersona +
     `\n# 任務\n` +
-    `用戶要產出 FB 系列貼文（${postLabels.length} 篇）。你不寫 caption — 你寫整體「結構錨點」給後續寫手用。\n\n` +
+    `用戶要產出${deliverable}（${postLabels.length} ${unit}）。你不寫 caption — 你寫整體「結構錨點」給後續寫手用。\n\n` +
     `產出 4-8 行繁體中文，涵蓋：\n` +
     `1) 整體 narrative 主題 / 核心訊息\n` +
-    `2) 每篇的角色定位（${postLabels.map((l) => `「${l}」`).join(" / ")}）\n` +
-    `3) 篇與篇之間的勾連邏輯（每篇結尾如何帶到下一篇）\n` +
+    `2) 每${unit}的角色定位（${postLabels.map((l) => `「${l}」`).join(" / ")}）\n` +
+    `3) ${unit}與${unit}之間的勾連邏輯（每${unit}結尾如何帶到下一${unit}）\n` +
     `4) 整體調性（情感 / 理性 / 緊湊 / 慢敘事 etc.）\n\n` +
     `直接給結構錨點文字，不要前言。\n` +
     (urlContext ? `\n# URL 內容\n${urlContext}` : "") +
@@ -2138,6 +2150,8 @@ export async function runOrchestra(args: {
           urlContext,
           userMsg,
           postLabels: labels,
+          deliverable: args.config.strategistDeliverable,
+          unit: args.config.strategistUnit,
         });
         stStrat.status = strategistAnchor ? "done" : "failed";
         stStrat.completedAt = Date.now() - startedAt;
@@ -2294,7 +2308,14 @@ export async function runOrchestra(args: {
     // it fails do ONE LLM tighten pass against the IG rubric —
     // ~zero cost when output is already good (same proven pattern
     // as EDM self-check / brand-rule enforcement). Fail-safe.
-    if (Array.isArray(captions) && captions.length && isInstagramBodyTask(args.template)) {
+    // 2026-08-22 (CJ「IG 直播配套應該是完整直播範本」): cleanPrompt tasks are
+    // strict structured deliverables (直播流程表 / newsjack 四欄), not posts.
+    // The gate below fires on exactly what such a script legitimately
+    // contains — a spoken opener（「大家好…」＝genericOpener）and several
+    // 互動指令（愛心 / 留言 / 私訊 / 截圖 ＝ ctaBloat）— and the tighten pass
+    // would rewrite the run-of-show back into an IG caption. Skip them.
+    if (Array.isArray(captions) && captions.length && isInstagramBodyTask(args.template) &&
+        !args.config.cleanPrompt) {
       const ctaCount = (t: string) =>
         (t.match(/立即|馬上|點此|點擊|了解更多|現在就|搶先|報名|購買|訂閱|前往|查看|按此|留言|分享|儲存|收藏|追蹤|here|now|shop|buy|join|register|save|share|follow|link in bio/gi) || []).length;
       for (const v of captions) {

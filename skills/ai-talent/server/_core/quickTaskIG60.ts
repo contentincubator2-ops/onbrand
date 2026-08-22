@@ -190,26 +190,62 @@ ${IG_TONE}`,
     outputDefaults: { platform: "instagram", post_type: "profile" },
   },
 
-  // 7. IG Live 完整配套 — Yiting Tsai, strategist: Live Engagement, multi-post 5
+  // 7. IG 直播 30 分鐘流程腳本 — Yiting Tsai, strategist: Live Engagement, 6 段
+  //
+  // 2026-08-22 (CJ 驗收 /run/4006「IG 直播配套…應該是指完整的直播範本，
+  // 目前的寫法比較像是貼文的預告，目前是不正確的」): 舊版把「直播配套」
+  // 做成 5 篇圍繞直播的 IG 貼文（預告 / 開場宣告 / 高潮亮點 / 結尾 CTA /
+  // 精華回顧），交付的是貼文而不是主播能照著播的流程表。改成 CJ 給的
+  // 30 分鐘標準流程範本：6 個時間段，每段給【畫面／動作指示】＋【主播
+  // 口白】。直播前後的貼文改由既有 extras 覆蓋（開播時段 / 留言回覆
+  // 模板 / 直播後跟進貼文），不再佔用主交付。
   {
     id: "ig-60-live-suite",
     tier: "60s",
     postType: "live",
-    label: { en: "IG Live Full Kit (5 Segments)", zh: "IG 直播完整配套（5 段）" },
-    description: { en: "Teaser / opener / peak / closer / highlights — 5 segments in parallel", zh: "預告 / 開場 / 高潮 / 結尾 / 精華 5 段平行" },
+    label: { en: "IG Live 30-Min Run-of-Show", zh: "IG 直播 30 分鐘流程腳本" },
+    description: { en: "6 time-blocked segments — screen/action cues + word-for-word host script for a 30-minute IG Live", zh: "6 個時間段的完整直播範本：每段畫面／動作指示 ＋ 可直接唸的主播口白" },
     agent_id: 60072, // Yiting Tsai | Live Shopping Script - Beauty
     skill_slug: "live-content",
-    primary_question: "直播主題？",
-    primary_input: { key: "live_topic", placeholder: "Q&A / 新品試用 / 創辦故事", type: "text" },
+    // 意圖說明：intake 只送 primary_input 一格（PlatformTaskPage handleRun
+    // 送的是 { [primary_input.key]: primaryAnswer }），所以「重點」與「直播
+    // 限定優惠」要靠這一題的提問方式問出來，不能靠 inputs[] 多開欄位。
+    primary_question: "這場直播要聊什麼 / 賣什麼？有直播限定優惠也一起說",
+    primary_input: { key: "live_topic", placeholder: "例：新品洗面乳開箱，重點是低敏、可卸妝、好沖洗；直播限定折扣碼 LIVE20", type: "textarea" },
     inputs: [
-      { key: "live_topic", label: "直播主題", type: "text", required: true },
-      { key: "key_points", label: "預計 3-5 個重點", type: "textarea", required: true },
+      { key: "live_topic", label: "直播主題 / 重點 / 直播限定優惠", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 IG Live 配套貼文其中 1 段（80-200 字依段而異）。
-本次你寫的是「{label}」段（預告 / 開場宣告 / 高潮亮點 / 結尾 CTA / 精華回顧）。
-${IG_TONE}`,
+    systemPrompt: `你在寫「IG 直播 30 分鐘標準流程」的其中 1 段，本段 150-350 字。
+本次你寫的是「{label}」這一段。整場 6 段依序是：
+00:00-03:00 黃金開場 → 03:00-10:00 主軸切入 → 10:00-18:00 深度互動 →
+18:00-23:00 高潮／優惠公布 → 23:00-28:00 限時催單 → 28:00-30:00 收尾預告。
+
+【這是直播執行腳本，不是 IG 貼文（最高優先）】
+- 讀的人是「正要開播的主播 / 小編」，他會把這頁放在鏡頭旁邊邊看邊播。
+- 嚴禁寫成貼文文案、嚴禁 hashtag、嚴禁「儲存這篇」「點 bio 連結」這種貼文 CTA。
+- 主播口白＝可以直接照著唸出來的口語，不是書面文案。
+
+【輸出格式 — 只有這四個方括號標題，順序固定，前後不要多寫任何字】
+【時間】本段的時間段（例：00:00-03:00）
+【流程階段】本段的階段名稱
+【畫面／動作指示】2-4 條，每條以「・」開頭，寫主播當下要做的具體動作：鏡位、手上拿什麼、要點開哪個功能（留言區 / 購物袋 / 精選提問）、要看哪裡。
+【主播口白】用「」包住 2-4 句可以直接唸的話，扣住本場主題與重點；其中要有一個當下就能做的互動指令（按愛心 / 留言關鍵字 / 截圖私訊 / 點購物袋）。
+
+【各段各自要做到的事（只寫你被指派的那一段）】
+- 黃金開場：確認收音與燈光、等觀眾進場；一句話講清楚今天要幹嘛以及留下來的理由；請大家按愛心，預告後面有福利。
+- 主軸切入：進入今天的主題／商品，先講觀眾的痛點再給解法，明講「今天重點有幾個」。
+- 深度互動：唸留言、回答問題、實測或近距離展示細節；主動丟一個問題請觀眾留言決定下一個要看什麼。
+- 高潮／優惠公布：公布直播限定的優惠、代碼或福利，講清楚怎麼拿、什麼時候截止。若使用者沒有提供優惠，就改成公布「只有直播講」的獨家資訊、名額或搶先體驗，不要自己編折扣。
+- 限時催單：講剩餘名額／庫存／倒數，引導私訊或點連結；有急迫感但不恐嚇、不誇大不實。
+- 收尾預告：謝謝陪伴、用一句話複習今天重點、預告下一場時間與主題，請觀眾追蹤並開啟通知。
+
+【絕對規則】
+- 全篇繁體中文台灣用語，不要簡體字。
+- 折扣數字、名額、價格、庫存只能用使用者輸入或品牌資料裡真的有的；沒有就用「直播限定福利」這類不涉及具體數字的講法。
+- 不要出現任務名稱、agent 的自我介紹、英文 prompt、image_style 之類技術註記。
+- 只輸出你這一段，不要把其他 5 段一起寫出來。`,
     preferredModel: "qwen",
-    maxTokens: 800,
+    maxTokens: 1000,
     outputDefaults: { platform: "instagram", post_type: "live" },
   },
 
@@ -340,14 +376,22 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 5, highlightCovers: 5, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
+  // 2026-08-22 (CJ 驗收 /run/4006): 5 篇直播周邊貼文 → 6 段 30 分鐘流程表。
+  // cleanPrompt=true 讓四欄格式不被社群 caption scaffolding（hashtag 文末 /
+  // 不要結構化卡片 / 首行 hook）蓋掉，也順帶關掉 IG craft 產後改寫。
   "ig-60-live-suite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_TODD,
+    variants: 6, images: 6, runImageGen: true, imageDirectorId: IG60_DIR_TODD,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["預告", "開場宣告", "高潮亮點", "結尾 CTA", "精華回顧"],
-    captionMinChars: 80, captionMaxChars: 200,
+    variantLabels: ["00:00-03:00 黃金開場", "03:00-10:00 主軸切入", "10:00-18:00 深度互動", "18:00-23:00 高潮／優惠公布", "23:00-28:00 限時催單", "28:00-30:00 收尾預告"],
+    captionMinChars: 150, captionMaxChars: 400,
     strategistAgentId: 60034, // Ethan Tsai — Travel Short Video Scriptwriter (942 char)
-    postLabels: ["預告", "開場宣告", "高潮亮點", "結尾 CTA", "精華回顧"],
-    extras: { postsCount: 5, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
+    postLabels: ["00:00-03:00 黃金開場", "03:00-10:00 主軸切入", "10:00-18:00 深度互動", "18:00-23:00 高潮／優惠公布", "23:00-28:00 限時催單", "28:00-30:00 收尾預告"],
+    cleanPrompt: true,
+    cleanPromptVariantHint: "只寫「這一段」時間軸，完全照任務指定的四個方括號欄位輸出這一段的內容。",
+    cleanPromptCaptionSpec: "<這一段的四欄純文字內容，保留【時間】【流程階段】【畫面／動作指示】【主播口白】四個方括號標題與換行>",
+    strategistDeliverable: "一場 30 分鐘 IG 直播的完整流程腳本",
+    strategistUnit: "段",
+    extras: { postsCount: 6, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
   "ig-60-serial-3": {
