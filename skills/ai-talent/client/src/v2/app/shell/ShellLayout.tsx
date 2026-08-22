@@ -110,6 +110,17 @@ export function isStrategyPreviewEmail(_email?: string | null): boolean {
   return true;
 }
 
+// 2026-08-22 (CJ「人設的功能，我只想嘗試在媽爹講故事的帳號」): unlike the
+// 策略/內容 switcher above (graduated to everyone), the 人設 tab specifically
+// stays gated while it's still being shaken out — real bugs (missing
+// brand_integrations table, an unbounded OAuth-callback fetch) turned up in
+// the first round of testing. Exported so BrandsPage.tsx's render guard uses
+// the exact same check as the nav item, not an independently-drifting copy.
+const PERSONA_PREVIEW_EMAILS = ["marketing@momdadstory.com"];
+export function isPersonaPreviewEmail(email?: string | null): boolean {
+  return PERSONA_PREVIEW_EMAILS.includes(String(email ?? "").toLowerCase());
+}
+
 // 2026-05-26 (CJ「左欄改成平台優先」): replace tier-first nav (30s/60s/99s)
 // with platform icons. Users pick the *platform* first; speed is shown as
 // a badge on each task card inside the platform page.
@@ -118,6 +129,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   const en = lang === "en";
   const isPrivate = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
+  const isPersonaPreview = isPersonaPreviewEmail(userEmail);
 
   // In data modes, the main left rail switches meaning. The top-left mode
   // switcher chooses the workspace; this rail only shows functions inside it.
@@ -161,9 +173,13 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
       // agents — trained from pasted text / article links / video links,
-      // each scoped to a subset of the 8 AI-指令庫 platforms.
-      { to: "/brands/edit?cat=persona", catKey: "persona", label: en ? "Persona" : "人設", icon: <FontAwesomeIcon icon={faMicrophone} />,
-        tooltip: en ? "Custom persona agents — train, test-draft, and scope by platform" : "自訂人設 Agent — 訓練、試寫、指定套用平台" },
+      // each scoped to a subset of the 8 AI-指令庫 platforms. 2026-08-22:
+      // stays gated to isPersonaPreview while still being shaken out —
+      // see isPersonaPreviewEmail's comment above.
+      ...(isPersonaPreview ? [
+        { to: "/brands/edit?cat=persona", catKey: "persona", label: en ? "Persona" : "人設", icon: <FontAwesomeIcon icon={faMicrophone} />,
+          tooltip: en ? "Custom persona agents — train, test-draft, and scope by platform" : "自訂人設 Agent — 訓練、試寫、指定套用平台" },
+      ] : []),
       { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
         tooltip: en ? "Name / industry / market" : "名稱 / 產業 / 市場" },
     ];

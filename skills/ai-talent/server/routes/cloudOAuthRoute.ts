@@ -98,6 +98,10 @@ cloudOAuthRouter.get("/google-drive/callback", async (req: Request, res: Respons
         redirect_uri: `${appUrl()}/api/oauth/google-drive/callback`,
         grant_type: "authorization_code",
       }),
+      // 2026-08-22 (CJ「跳出的視窗運行很久，都還沒反應」): this fetch had no
+      // timeout — a hung/slow call to Google left the popup blank forever,
+      // since res.send() only fires after the whole handler resolves.
+      signal: AbortSignal.timeout(15_000),
     });
     if (!tokenResp.ok) throw new Error(`token exchange HTTP ${tokenResp.status}`);
     const tokens = await tokenResp.json() as { access_token: string; refresh_token?: string; expires_in: number };
@@ -113,6 +117,7 @@ cloudOAuthRouter.get("/google-drive/callback", async (req: Request, res: Respons
     try {
       const meResp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
+        signal: AbortSignal.timeout(10_000),
       });
       if (meResp.ok) accountEmail = ((await meResp.json()) as any)?.email ?? null;
     } catch { /* non-fatal */ }
@@ -172,6 +177,7 @@ cloudOAuthRouter.get("/onedrive/callback", async (req: Request, res: Response) =
         grant_type: "authorization_code",
         scope: MS_SCOPE,
       }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!tokenResp.ok) throw new Error(`token exchange HTTP ${tokenResp.status}`);
     const tokens = await tokenResp.json() as { access_token: string; refresh_token: string; expires_in: number };
@@ -180,6 +186,7 @@ cloudOAuthRouter.get("/onedrive/callback", async (req: Request, res: Response) =
     try {
       const meResp = await fetch("https://graph.microsoft.com/v1.0/me", {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
+        signal: AbortSignal.timeout(10_000),
       });
       if (meResp.ok) {
         const me = await meResp.json() as any;
