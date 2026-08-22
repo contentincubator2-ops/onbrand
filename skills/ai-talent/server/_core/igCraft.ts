@@ -90,7 +90,9 @@ export const IG_TASK_REF: Record<string, string> = {
   "ig-60-story-3frame":         "Headspace Instagram Story 3 幀冥想邀請 (Shorty Award Best in Health & Wellness；Headspace 的 3 幀 Story 是健康品牌最高完成率的微內容格式)：3 幀 = 問題引發（你最近睡不好？）→ 概念揭示（10 分鐘能改變一切）→ 互動/CTA（試試這個呼吸練習）；末幀互動貼紙讓 Story 從廣播變對話。",
   "ig-60-countdown-5day":       "Select Registry「Stay for the Story」(IAC 飯店)：5 天分眾升級（認知→意圖→轉換），每天獨立目標。",
   "ig-60-highlight-suite":      "Glossier Instagram Highlight 套組 (Shorty Award Best in Beauty；Glossier 把 Highlight 設計成品牌永久圖書館)：5 個 Highlight = 封面視覺一致的主題分類系統；每個 Highlight 標題即品牌語言（不是「新品」「活動」，是「Skin」「You Look」「Into The Gloss」）；讓陌生訪客 3 秒掌握品牌世界觀。",
-  "ig-60-live-suite":           "NBA Instagram Live 完整直播套組 (Shorty Award Best Brand in Sports 多屆；NBA 的賽前/賽中/賽後 IG Live 三段式套組是體育品牌直播的標準格式)：5 段 Live 套組 = 賽前熱身（球員暖身幕後）→ 賽中即時互動（球迷投票預測）→ 賽後獨家 Q&A（更衣室訪問）；每段有不同的觀眾參與機制，建立完整的直播事件生命週期。",
+  // 2026-08-22 (CJ 驗收 /run/4006): 交付物已從「5 篇直播周邊貼文」改成
+  // 「30 分鐘直播流程表」，參考案例也跟著換成 run-of-show 的分段紀律。
+  "ig-60-live-suite":           "NBA Instagram Live (Shorty Award Best Brand in Sports 多屆) 的賽前/賽中/賽後三段式直播紀律：每一段都預先定義好「這幾分鐘要做什麼動作、觀眾用什麼機制參與」，主播照表操課而不是即興。同樣邏輯拉成 30 分鐘 run-of-show = 黃金開場（等人進場＋給留下來的理由）→ 主軸切入（痛點→解法）→ 深度互動（唸留言、實測細節）→ 高潮／優惠公布 → 限時催單 → 收尾預告；每段都要有畫面／動作指示與可直接唸的口白。",
   "ig-60-serial-3":             "Humans of New York Instagram 連載格式 (TIME Magazine 封面故事；Peabody Award；Instagram 人物連載的定義性帳號)：3 集連載建在一個可無限持續的採訪前提（問 1 個問題 + 真實答案）；每集獨立完整，合起來建立整個世界觀；可重複的格式是讓創作者不會枯竭的結構。",
   "ig-60-viral-rewrite":        "Ryan Reynolds / Maximum Effort 病毒改寫策略 (Shorty Award Best Humor Brand 2021；Aviation Gin / Mint Mobile 一系列即時病毒回應)：分析文化病毒事件的分享機制（反差/荒謬/意外）→ 以「低預算但高智慧」幽默反差重建；品牌成為評論者而非主角；速度比製作精緻度重要。",
   "ig-60-testimonial-rewrite":  "8x8「The Power of You」(IAC B2B)：把客戶寫成解決真實挑戰的主角（短片敘事），非產品為主詞。",

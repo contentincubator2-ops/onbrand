@@ -559,10 +559,12 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
             />
           </div>
         )}
-        {/* Live opening script overlay — shows the caption (host's opening 30s) */}
+        {/* Live script overlay — the segment's script (opening 30s for the
+            30s task; one time-block of the run-of-show for ig-60-live-suite,
+            which is why this no longer says "開場"). */}
         {liveCaption && (
           <div className="absolute top-24 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto">
-            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">{lang === "en" ? "Opening script" : "開場腳本"}</p>
+            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">{lang === "en" ? "Live script" : "直播腳本"}</p>
             <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
           </div>
         )}
