@@ -2486,6 +2486,31 @@ async function main() {
       }
     }
 
+    // ─── brand_integrations — persona-agent cloud-file OAuth connections ────
+    // 2026-08-22 (CJ 測試 Google Drive 連接時：「連接失敗：Table
+    // 'mos_db.brand_integrations' doesn't exist」): the table was declared in
+    // drizzle/schema.ts (drizzle/migrations/0000_fair_ben_parker.sql:99) but
+    // this repo's real deploy-time migration path is this script, not
+    // drizzle-kit push — the table was never actually created in prod.
+    // Columns/shape match the drizzle schema exactly so both stay in sync.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_integrations (
+        id                    INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId                INT          NOT NULL,
+        brandId               INT          NULL,
+        integrationType       VARCHAR(50)  NOT NULL,
+        status                ENUM('connected','disconnected','error') NOT NULL DEFAULT 'disconnected',
+        accessToken           TEXT         NULL,
+        selectedResourceId    VARCHAR(255) NULL,
+        authorizedResources   JSON         NULL,
+        connectedAt           TIMESTAMP    NULL,
+        createdAt             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_user_brand_type (userId, brandId, integrationType)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_integrations: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
