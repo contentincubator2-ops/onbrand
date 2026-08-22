@@ -1,0 +1,83 @@
+name: "Op — Probe any quick task end-to-end (SSH)"
+
+# 2026-08-22: the old admin-probe-orchestra.yml is gone and
+# op-probe-tiktok-video-task.yml hardcodes a tt-30-* choice list, so there was
+# no way to run an arbitrary task server-side before shipping it (SOP step 8
+# 「Probe E2E 必跑 — 失敗不上線」). This one takes any task id + tier, prints the
+# FULL caption of every variant (format is usually what's under test), and can
+# persist the run so it opens in the real UI.
+#
+# Read-mostly: persist=false writes nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "Task id, e.g. ig-60-live-suite / fb-30-caption-short"
+        required: true
+        type: string
+      tier:
+        description: "Tier the task belongs to"
+        required: true
+        default: "60s"
+        type: choice
+        options: ["30s", "60s", "99s"]
+      task_input:
+        description: "The user's answer to the task's primary question"
+        required: true
+        type: string
+      brand_id:
+        description: "Brand id (brand brain the task writes for)"
+        required: true
+        default: "2924"
+        type: string
+      persist:
+        description: "Save to mission_outputs so it opens at /run/<id>"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Run orchestra probe on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          TIER: ${{ inputs.tier }}
+          TASK_INPUT: ${{ inputs.task_input }}
+          BRAND_ID: ${{ inputs.brand_id }}
+          PERSIST: ${{ inputs.persist }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 22m
+          envs: TASK_ID,TIER,TASK_INPUT,BRAND_ID,PERSIST
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a
+            source .env 2>/dev/null || true
+            set +a
+            export TASK_ID TIER TASK_INPUT BRAND_ID
+            export FULL=1   # print every variant in full — format is the thing under test
+
+            # recordTaskRun only persists when userId is set. Derive the brand
+            # owner so the run shows up in that user's own history, never a
+            # hardcoded id.
+            if [ "$PERSIST" = "true" ]; then
+              UID_FOUND=$(mysql -h"${LOCAL_DB_HOST:-127.0.0.1}" -u"${LOCAL_DB_USER:-mos_user}" \
+                -p"${LOCAL_DB_PASSWORD}" "${LOCAL_DB_NAME:-mos_db}" -N -s \
+                -e "SELECT userId FROM brands WHERE id=${BRAND_ID} LIMIT 1" 2>/dev/null || true)
+              if [ -n "$UID_FOUND" ] && [ "$UID_FOUND" != "NULL" ]; then
+                export USER_ID="$UID_FOUND"
+                echo "Persisting as userId=$USER_ID (owner of brand $BRAND_ID)"
+              else
+                echo "No owner found for brand $BRAND_ID — running without persist"
+              fi
+            fi
+
+            node --import tsx scripts/probe-orchestra.ts

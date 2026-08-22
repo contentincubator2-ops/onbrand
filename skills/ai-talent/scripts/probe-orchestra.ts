@@ -105,6 +105,12 @@ import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/_core/qu
       (v.image?.style ? ` · style="${v.image.style.slice(0, 60)}…"` : "") +
       (v.caption ? `\n      preview: ${v.caption.slice(0, 80).replace(/\n/g, " ")}…` : ""),
     );
+    // 2026-08-22: an 80-char preview is enough to prove "a caption came
+    // back", but not to review a structured deliverable (直播流程表 /
+    // newsjack 四欄 / 分鏡) where the FORMAT is the thing under test.
+    if (process.env.FULL && v.caption) {
+      console.log(v.caption.split("\n").map((l) => `      | ${l}`).join("\n"));
+    }
     if (v.image?.url) console.log(`      image[${v.image.status}]: ${v.image.url}`);
     else if (v.image?.status && v.image.status !== "skipped") {
       console.log(`      image[${v.image.status}]: ${v.image.errorMsg ?? "no url"}`);
