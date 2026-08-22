@@ -83,7 +83,7 @@ cloudOAuthRouter.get("/google-drive/callback", async (req: Request, res: Respons
   const { code, state, error } = req.query as Record<string, string>;
   if (error) { res.send(popupResultPage(false, "google_drive", "使用者取消授權")); return; }
   const ctx = state ? pendingStates.get(state) : null;
-  if (!ctx || ctx.provider !== "google_drive") { res.status(400).send(popupResultPage(false, "google_drive", "無效的狀態，請重新連接")); return; }
+  if (!state || !ctx || ctx.provider !== "google_drive") { res.status(400).send(popupResultPage(false, "google_drive", "無效的狀態，請重新連接")); return; }
   pendingStates.delete(state);
   if (!code) { res.send(popupResultPage(false, "google_drive", "缺少授權碼")); return; }
 
@@ -161,7 +161,7 @@ cloudOAuthRouter.get("/onedrive/callback", async (req: Request, res: Response) =
   const { code, state, error } = req.query as Record<string, string>;
   if (error) { res.send(popupResultPage(false, "onedrive", "使用者取消授權")); return; }
   const ctx = state ? pendingStates.get(state) : null;
-  if (!ctx || ctx.provider !== "onedrive") { res.status(400).send(popupResultPage(false, "onedrive", "無效的狀態，請重新連接")); return; }
+  if (!state || !ctx || ctx.provider !== "onedrive") { res.status(400).send(popupResultPage(false, "onedrive", "無效的狀態，請重新連接")); return; }
   pendingStates.delete(state);
   if (!code) { res.send(popupResultPage(false, "onedrive", "缺少授權碼")); return; }
 
