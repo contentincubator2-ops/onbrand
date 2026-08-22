@@ -18,7 +18,7 @@ import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
-import { isStrategyPreviewEmail } from "../app/shell/ShellLayout";
+import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../app/shell/ShellLayout";
 import {
   Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
@@ -132,6 +132,7 @@ export default function BrandsPage() {
   // strip out of sync with no way to recover short of a reload (Codex
   // review, PR #119).
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
+  const isPersonaPreview = isPersonaPreviewEmail(userEmail);
   const scope = React.useMemo(
     () => ({
       brandId: globalScope?.brandId ?? brandId ?? null,
@@ -2369,8 +2370,11 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* ── 人設 Agent (persona) — user-created, trained persona agents ── */}
-          {derivedCategory === "persona" && scopeMode === "brand" && (
+          {/* ── 人設 Agent (persona) — user-created, trained persona agents ──
+               2026-08-22: gated to isPersonaPreview independently of the nav
+               item that links here — a direct ?cat=persona URL shouldn't
+               bypass the same gate. */}
+          {derivedCategory === "persona" && scopeMode === "brand" && isPersonaPreview && (
             <div style={{ padding: "8px 0 32px" }}>
               <PersonaAgentPanel brandId={activeBrandIdForLocks} />
             </div>
