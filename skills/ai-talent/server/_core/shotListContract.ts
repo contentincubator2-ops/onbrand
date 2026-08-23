@@ -142,6 +142,11 @@ export function normalizeShotList(caption: string): string {
   // 模型愛在區塊之間加 markdown 分隔線，實測會黏在字卡尾巴（字卡：… ---）。
   // 分格腳本不是 markdown，一律拿掉。
   t = t.replace(/[ \t　]*(?:-{3,}|_{3,}|\*{3,})[ \t　]*(?=\n|$)/gu, "");
+  // 區塊內的條目也要各自成行 —— 實測整個【常見失誤】會擠成一行
+  //（【常見失誤】失誤：… 改法：… 失誤：… 改法：…）。只切「失誤：」與
+  // 條列符號，不切「改法：」，那是同一行的後半段。
+  t = t.replace(/([^\n])[ \t　]*(失誤\s*[：:])/gu, "$1\n$2");
+  t = t.replace(/([^\n])[ \t　]+([・·]\s*\S)/gu, "$1\n$2");
   return t.replace(/\n{3,}/gu, "\n\n").trim();
 }
 
