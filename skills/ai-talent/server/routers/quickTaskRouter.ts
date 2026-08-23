@@ -933,6 +933,7 @@ import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../_core/
 import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../_core/quickTaskMulti60";
 import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../_core/quickTask100";
 import { ALL_99S_SQUADS } from "../_core/quickTask100Squads";
+import { is99sOrchestraListed, platformOfTaskId } from "../_core/taskCatalogIndex";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import {
   checkViralSource,
@@ -1255,43 +1256,18 @@ export const quickTaskRouter = router({
     // 2026-05-18 (CJ): fb-99-carousel-5 is the one FB 99s task that runs
     // via the orchestra (multi-card carousel), not a squad — let it
     // through so it appears in the 99s tab; other fb-/ig- stay squad-driven.
-    const tasks99Orchestra = ALL_99S_TASKS.filter((t) =>
-      t.id === "fb-99-carousel-5" || t.id === "fb-99-serial-3" ||
-      t.id === "fb-99-trend-rewrite" || t.id === "fb-99-viral-rewrite" ||
-      t.id === "fb-99-testimonial-rewrite" || t.id === "fb-99-30day-calendar" ||
-      t.id === "fb-99-monthly-calendar-promo" || t.id === "fb-99-14day-countdown" ||
-      (!t.id.startsWith("fb-") && !t.id.startsWith("ig-"))
-    ).map((t) => {
-      const id = t.id;
-      const platform =
-        id.startsWith("yt-") ? "youtube"
-        : id.startsWith("tt-") ? "tiktok"
-        : id.startsWith("li-") ? "linkedin"
-        : id.startsWith("em-") ? "email"
-        : id.startsWith("pr-") ? "pr"
-        : id.startsWith("br-") ? "brand"
-        : id.startsWith("rs-") ? "audience"
-        // 2026-05-18 (CJ): kl-* (e.g. kl-99-campaign-toolkit) → KOL category
-        : id.startsWith("kl-") ? "kol"
-        : "facebook";
-      return { ...t, kind: "fast" as const, platform };
-    });
+    // 2026-08-23: allowlist 與平台推斷改從 _core/taskCatalogIndex 拿。這兩段邏輯
+    // 原本只存在這個函式裡，client 那 7 份 pill 對照表只能自己再抄一份，
+    // 於是 FB 與 IG 都漂出死 key 而沒人發現。現在 router 與防漂移測試共用同一份。
+    const tasks99Orchestra = ALL_99S_TASKS
+      .filter((t) => is99sOrchestraListed(t.id))
+      .map((t) => ({ ...t, kind: "fast" as const, platform: platformOfTaskId(t.id) }));
     const tasks100 = [...tasks99Squads, ...tasks99Orchestra];
-    const multi60Tasks = MULTI_60S_TASKS.map((t) => {
-      const id = t.id;
-      const platform =
-        id.startsWith("tt-") ? "tiktok"
-        : id.startsWith("li-") ? "linkedin"
-        : id.startsWith("em-") ? "email"
-        : id.startsWith("pr-") ? "pr"
-        : id.startsWith("br-") ? "brand"
-        : id.startsWith("rs-") ? "audience"
-        // 2026-05-18 (CJ「KOL 完整邀約話術包應在 KOL 類別」): kl-* was
-        // missing → fell through to "facebook". Tag it as the KOL category.
-        : id.startsWith("kl-") ? "kol"
-        : "facebook";
-      return { ...t, kind: "fast" as const, platform };
-    });
+    // 2026-05-18 (CJ「KOL 完整邀約話術包應在 KOL 類別」): kl-* 曾經漏掉而
+    // fallback 成 facebook。規則現在在 platformOfTaskId 一處維護。
+    const multi60Tasks = MULTI_60S_TASKS.map((t) => ({
+      ...t, kind: "fast" as const, platform: platformOfTaskId(t.id),
+    }));
     // 2026-05-18 (CJ「media to copy」): photo/video/doc tasks — isMediaTask:true
     // tells the frontend to route directly to the upload page (ctaPath) instead
     // of opening the standard orchestra modal.
