@@ -143,6 +143,33 @@ describe("normalizeShotList — 救回「內容對、包裝爛」的回應", () 
   });
 });
 
+describe("repairShotList — 品牌規則改寫之後的第二道防線", () => {
+  it("re-splits the timestamp a brand rewrite glued onto the 字卡 line", () => {
+    // 2026-08-23 VM probe（brand_id=2924，Anthropic）實際回來的形狀：
+    // enforceBrandRulesOnTextWithReport 改寫後，下一格的時間戳黏回上一行。
+    const glued = [
+      "[0.0-0.5s] 開場",
+      "畫面：俯拍冰箱冷凍層，8 款包裝整齊排列",
+      "動作：鏡頭緩慢推進",
+      "聲音：低沉電子音起",
+      "字卡：冷凍微波 5 分鐘 [0.5-1.0s] 品項 1 — 黑椒牛肉",
+      "畫面：手拿盒裝，背景白牆",
+      "動作：轉向鏡頭",
+      "聲音：清脆音效跟拍",
+      "字卡：24g 蛋白質 [1.0-1.5s] 品項 2 — 麻辣雞腿",
+      "畫面：同機位，切換款式",
+      "動作：包裝轉向正面",
+      "聲音：同前音效",
+      "字卡：24g 蛋白質",
+    ].join("\n");
+    expect(countShots(glued)).toBe(1); // 黏在一起時只認得出 1 格
+    const fixed = repairShotList(glued);
+    expect(countShots(fixed)).toBe(3);
+    expect(validateShotList(fixed)).toBeNull();
+    expect(fixed).toContain("字卡：冷凍微波 5 分鐘\n[0.5-1.0s]");
+  });
+});
+
 describe("repairShotList", () => {
   it("strips hashtags and leaves the shots intact", () => {
     const repaired = repairShotList(`${GOOD}\n\n#桂冠 #高蛋白`);
