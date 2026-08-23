@@ -71,6 +71,26 @@ describe("高互動機制腳本卡", () => {
     expect(TT_30S_TASKS.some((t) => t.id === id)).toBe(true);
   });
 
+  it.each(MECHANIC_CARDS)("%s is written for the person holding the phone", (id) => {
+    // 2026-08-23 (CJ「我要」— 要求產出比照 IG 直播腳本的可執行程度)。
+    // 直播腳本好用是因為它有「開播前 24 小時預熱」與「3 個備答」這種
+    // 拿了就能做的東西。無台詞短片的對應物 = 開拍前準備清單 + 失敗點。
+    const t = TT_30S_TASKS.find((x) => x.id === id)!;
+    expect(t.systemPrompt).toContain("讀的人是誰");
+    expect(t.systemPrompt).toContain("【開拍前準備】");
+    expect(t.systemPrompt).toContain("【最容易拍壞的地方】");
+    // 器材／場地／道具／人力 四項缺一項，拍的人就得自己補，等於不能照做
+    for (const item of ["器材", "場地", "道具", "人力"]) {
+      expect(t.systemPrompt).toContain(item);
+    }
+  });
+
+  it.each(MECHANIC_CARDS)("%s shows what 'specific enough' looks like", (id) => {
+    // 光說「要具體」沒有用，實測模型會寫「畫面：廚房場景」。要給好壞對照。
+    const t = TT_30S_TASKS.find((x) => x.id === id)!;
+    expect(t.systemPrompt).toMatch(/✗[\s\S]*✓/);
+  });
+
   it.each(MECHANIC_CARDS)("%s writes a shot list, not a voiceover script", (id) => {
     const t = TT_30S_TASKS.find((x) => x.id === id)!;
     // 這五條鐵律是這批卡的全部價值所在（零台詞 / 視覺鉤子 / 單一滿足點 /

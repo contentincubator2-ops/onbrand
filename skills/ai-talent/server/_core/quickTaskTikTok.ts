@@ -16,6 +16,12 @@ TikTok 觀眾極短專注力。前 1.5 秒沒抓到 = 滑掉。語氣要野、�
  * 分格腳本，不是旁白稿，所以格式必須逼模型一格一格寫，不能寫成散文。
  */
 const TT_MECHANIC_CORE = `
+【讀的人是誰 — 最高優先】
+讀這份腳本的人，是等一下要拿手機去拍的人（品牌小編、店員、老闆本人）。
+他會把這頁開在旁邊，一格一格照著拍。所以每一行都要是「他看完就知道手該
+放哪、鏡頭對哪裡」的指示，不是描述影片看起來像什麼。
+判準：把腳本交給一個沒參與討論的同事，他能不問問題就拍完。做不到就是還不夠具體。
+
 【這類影片的共同鐵律 — 五條都要遵守】
 ① 零台詞或極少台詞：交付的是「畫面怎麼演」，要說的話用字卡，不要寫旁白稿。
 ② 前 0.5 秒畫面就要有懸念：鉤子是眼睛看到的東西，不是一句開場白。
@@ -25,10 +31,28 @@ const TT_MECHANIC_CORE = `
 
 【輸出格式 — 每一格都照這五行寫，不可寫成散文】
 [起-迄s] 這一格的名稱
-　畫面：鏡位 + 構圖 + 主體是什麼（具體到可以照著拍）
-　動作：什麼在動、怎麼動
+　畫面：手機放哪（平拍／俯拍／貼地）+ 景別（特寫／中景／全身）+ 畫面裡有什麼
+　動作：誰的手、對什麼東西、做什麼、多快（一格只寫一個動作）
 　聲音：音樂拍點 / 現場音 / 音效（沒有旁白就寫「無旁白」）
 　字卡：畫面上出現的字（≤12 字；沒有就寫「無」）
+
+【「畫面」與「動作」寫到什麼程度才算合格】
+　✗ 畫面：廚房場景，產品放在桌上　　→ 拍的人不知道鏡頭要放哪、要拍多近
+　✓ 畫面：手機平放桌面高度、鏡頭與桌面同高，中景，產品置中，背景是白牆
+　✗ 動作：展示產品　　　　　　　　→ 怎麼展示？誰展示？多快？
+　✓ 動作：右手把產品從左邊推進畫面正中央，約 1 秒，推到定位後停住不動
+
+【腳本之後，接這兩個區塊（各自獨立一段，用方括號標題）】
+【開拍前準備】
+　・器材：一律先給手機拍得出來的做法（要用到腳架／補光燈／第二支手機也寫出來）
+　・場地：在哪拍、背景要什麼、光從哪來（幾點的自然光 / 靠窗第幾格）
+　・道具：條列這支片會用到的東西，含數量（拍的人要照這張清單去備料）
+　・人力：需要幾個人、各自做什麼（只有一個人時要怎麼拍也要寫）
+　・預估：拍攝＋重拍大約多久
+【最容易拍壞的地方】
+　寫 2 點：這個機制最常失敗的狀況，以及怎麼避開。要具體到可以當場檢查
+　（例：「切換時手機被碰到位移 → 用膠帶在桌面標好機位，每次放回同一點」），
+　不要寫「注意光線」「保持穩定」這種誰都知道的話。
 
 ※ 實測會踩的兩個雷，務必避開：
 　- 四行必須**各自獨立換行**。不可以擠成一行，不可以用方括號 [畫面：…] 包起來。
@@ -148,7 +172,7 @@ ${TT_SUFFIX}`,
 [2.0-4.0s] 揭曉：變化後的畫面，停住讓人看清楚
 [4.0-8.0s] 回放或重複：再做一次，讓人第二次看懂
 ${TT_MECHANIC_CORE}`,
-    preferredModel: "qwen", maxTokens: 900,
+    preferredModel: "qwen", maxTokens: 1500,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
@@ -180,7 +204,7 @@ ${TT_MECHANIC_CORE}`,
 [2.0-9.0s] 過程快剪：3-5 個關鍵動作，每個動作一格
 [9.0-12.0s] 完成瞬間：慢下來，停 1 秒以上讓人看清楚
 ${TT_MECHANIC_CORE}`,
-    preferredModel: "qwen", maxTokens: 900,
+    preferredModel: "qwen", maxTokens: 1500,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
@@ -212,7 +236,7 @@ ${TT_MECHANIC_CORE}`,
 [第 9 拍]   破一次規律：停格 / 靜音 / 反向，這是全片的記憶點
 [第 10-12 拍] 收：回到第一格的構圖，讓片子能無縫循環
 ${TT_MECHANIC_CORE}`,
-    preferredModel: "qwen", maxTokens: 900,
+    preferredModel: "qwen", maxTokens: 1500,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
@@ -243,7 +267,7 @@ ${TT_MECHANIC_CORE}`,
 [8.0-12.0s] 揭曉：全貌出現的那一刻停住，讓數字或規模自己說話
 [12.0-15.0s] 收：字卡點出這代表什麼（一句，≤12 字）
 ${TT_MECHANIC_CORE}`,
-    preferredModel: "qwen", maxTokens: 900,
+    preferredModel: "qwen", maxTokens: 1500,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
@@ -280,7 +304,7 @@ ${TT_MECHANIC_CORE}`,
 - 必須寫一段「拍攝前要先取得同意」的提醒（尤其涉及長輩、小孩、路人）。
 - 如果情境需要素人，腳本要說明去哪找（現有顧客 / 門市現場 / 員工家人）。
 ${TT_MECHANIC_CORE}`,
-    preferredModel: "qwen", maxTokens: 1000,
+    preferredModel: "qwen", maxTokens: 1500,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
@@ -556,11 +580,11 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 忙，而且用戶會想連試好幾種機制，每張卡都要便宜。
   // captionMaxChars 放到 1200：一格 5 行 × 4-6 格，壓太緊模型會把格子合併，
   // 就退回散文了。下限 400 則是防止只寫兩格交差。
-  "tt-30-visual-illusion":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["一秒變身", "借位錯覺", "倒放回原"], captionMinChars: 400, captionMaxChars: 1200 },
-  "tt-30-process-payoff":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["製作過程", "整理復原", "組裝完成"], captionMinChars: 400, captionMaxChars: 1200 },
-  "tt-30-beat-sync":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["多品項快切", "情境輪播", "安靜→爆點"], captionMinChars: 400, captionMaxChars: 1200 },
-  "tt-30-scale-reveal":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["細節拉到全景", "一鏡到底走位", "數量堆疊"], captionMinChars: 400, captionMaxChars: 1200 },
-  "tt-30-real-reaction":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["第一次使用", "旁人被吸引", "素人真實回饋"], captionMinChars: 400, captionMaxChars: 1200 },
+  "tt-30-visual-illusion":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["一秒變身", "借位錯覺", "倒放回原"], captionMinChars: 600, captionMaxChars: 1800 },
+  "tt-30-process-payoff":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["製作過程", "整理復原", "組裝完成"], captionMinChars: 600, captionMaxChars: 1800 },
+  "tt-30-beat-sync":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["多品項快切", "情境輪播", "安靜→爆點"], captionMinChars: 600, captionMaxChars: 1800 },
+  "tt-30-scale-reveal":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["細節拉到全景", "一鏡到底走位", "數量堆疊"], captionMinChars: 600, captionMaxChars: 1800 },
+  "tt-30-real-reaction":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["第一次使用", "旁人被吸引", "素人真實回饋"], captionMinChars: 600, captionMaxChars: 1800 },
   "tt-30-bio-rewrite":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["專家定位", "個性風格", "結果導向"], captionMinChars: 50, captionMaxChars: 80 },
   "tt-30-hashtag-set":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["fyp 大流量", "精準利基", "趨勢搭便車"], captionMinChars: 0, captionMaxChars: 400 },
   "tt-30-caption-description":{ variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["懸念", "直球", "反差"], captionMinChars: 50, captionMaxChars: 100 },
