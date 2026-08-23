@@ -12,10 +12,19 @@
  * 對照基準用 server 的 buildFbCatalog()（postFormatScout.ts）—— 它就是從
  * FB_30S_TASKS / FB_60S_TASKS_V2 / ALL_99S_SQUADS / ALL_99S_TASKS 組出來的
  * 真實目錄，不是另一份手抄清單。
+ *
+ * 為什麼放在 server 側：scripts/check-client-server-boundary.sh 禁止 client
+ * 對 server 的 value import（只允許 import type），而這個測試必須真的叫
+ * buildFbCatalog()。同一個問題 viralSourceGuard.parity.test.ts 已經解過：
+ * 跨邊界的測試放 server 側，反過來 import client 的模組。
  */
 import { describe, it, expect } from "vitest";
-import { FORMAT_TABS, TASK_FORMAT_MAP, UNMAPPED_BY_DESIGN } from "./fbTaskFormats";
-import { buildFbCatalog } from "../../../../server/_core/postFormatScout";
+import { buildFbCatalog } from "./postFormatScout";
+import {
+  FORMAT_TABS,
+  TASK_FORMAT_MAP,
+  UNMAPPED_BY_DESIGN,
+} from "../../client/src/v2/lib/fbTaskFormats";
 
 const CATALOG = buildFbCatalog();
 const CATALOG_IDS = new Set(CATALOG.map((c) => c.id));
