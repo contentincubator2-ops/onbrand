@@ -65,6 +65,7 @@ import { findValidRunProductSelection, type RunProductImage } from "../lib/runPr
 import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { parseRunOfShow } from "../lib/runOfShow";
+import { tierLabel } from "../lib/tierVocabulary";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
@@ -2008,9 +2009,7 @@ export default function RunPage() {
         {/* 2026-07-17 (CJ): deliverable label, not duration — tier is internal config */}
         {data.mission?.tier && (
           <Chip size="sm" variant="flat" color="secondary">
-            {data.mission.tier === "60s" ? (lang === "en" ? "Pack" : "套組")
-              : data.mission.tier === "99s" ? (lang === "en" ? "Campaign" : "企劃")
-              : (lang === "en" ? "Single" : "單篇")}
+            {tierLabel(data.mission.tier, lang)}
           </Chip>
         )}
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
@@ -3124,7 +3123,7 @@ export default function RunPage() {
                     }}
                   >
                     {imageGenMut.isPending
-                      ? (lang === "en" ? "Generating… (~15-30s)" : "產圖中…（約 15-30s）")
+                      ? (lang === "en" ? "Generating… (~15-30s)" : "產圖中…（約 15–30 秒）")
                       : t("run_image_make")}
                   </Button>
                   {!data.brand?.id && (

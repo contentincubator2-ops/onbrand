@@ -103,7 +103,7 @@ const authAwareFetch: typeof fetch = async (input, init) => {
     const text = await res.text().catch(() => "");
     const isHtml = /<\s*html|<\s*body/i.test(text);
     const userMsg = isHtml
-      ? `伺服器忙碌（${res.status}），請稍後重試。如果反覆出現，可能是任務太重（>60s）或服務正在重啟。`
+      ? `伺服器忙碌（${res.status}），請稍後重試。如果反覆出現，可能是任務太重（超過 60 秒）或服務正在重啟。`
       : `伺服器錯誤 ${res.status}：${text.slice(0, 120)}`;
     return new Response(JSON.stringify(buildBatchErrorEnvelope(userMsg, res.status, batchN)), {
       status: 200,
