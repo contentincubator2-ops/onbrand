@@ -548,6 +548,13 @@ async function runStartupMigrations() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log("[migrate] squad_usage_log: OK");
+
+    // 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」):
+    // 每月排程掃出來的貼文形式候選佇列。DDL 的來源在 _core/postFormatStore.ts，
+    // 那裡也寫了為什麼去重不看 status（否則被否決的形式每月復活）。
+    const { POST_FORMAT_CANDIDATES_DDL } = await import("./_core/postFormatStore");
+    await db.execute(sql.raw(POST_FORMAT_CANDIDATES_DDL));
+    console.log("[migrate] post_format_candidates: OK");
   } catch (err) {
     console.error("[migrate] startup migration error:", err);
   }

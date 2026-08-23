@@ -6,7 +6,8 @@
  * Replaces the old 30s/60s/99s tier pages as the primary entry point.
  * Users pick the *platform* in the sidebar, then filter by complexity via
  * tabs inside this page:
- *   全部  |  一篇內容 · 30s  |  內容套組 · 60s  |  完整活動 · 99s
+ *   全部  |  單篇內容  |  內容套組  |  完整企劃
+ *   （分頁名一律取自 v2/lib/tierVocabulary.ts，不要在這裡另寫一套）
  *
  * Speed badges appear on every card so the timing expectation is clear
  * without requiring users to navigate tiers before seeing tasks.
@@ -17,6 +18,8 @@ import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
+import { TIER_ORDER, tierAccent, tierLabel } from "../lib/tierVocabulary";
+import { FORMAT_TABS, TASK_FORMAT_MAP, type ActiveFormat } from "../lib/fbTaskFormats";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
 import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope";
@@ -145,20 +148,13 @@ const CARD_PALETTES = [
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
-function tierAccent(tier: string | undefined | null): string {
-  if (tier === "60s") return "#7c3aed";
-  if (tier === "99s") return "#f59e0b";
-  return "#00b4bc";
-}
-
+// tier 的顯示名與識別色都在 v2/lib/tierVocabulary.ts —— 這裡曾經有自己的
+// tierLabel() / tierAccent()，和 TIER_TABS、AccountPage、RunPage 各自硬寫的
+// 版本漂成四份。要改叫法就改那一個檔案。
+//
 // 2026-07-17 (CJ「去除 30s/60s/99s 分類標籤，不再使用時間長度分類」):
 // tier stays as INTERNAL engine config (routing / quota / timeouts), but the
 // user-facing classification is by deliverable, never by duration.
-function tierLabel(tier: string | undefined | null, lang: string): string {
-  if (tier === "60s") return lang === "en" ? "Pack" : "套組";
-  if (tier === "99s") return lang === "en" ? "Campaign" : "企劃";
-  return lang === "en" ? "Single" : "單篇";
-}
 
 // Tasks that should hold the modal open until image is done
 const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
@@ -206,75 +202,19 @@ interface TierTab {
 }
 
 const TIER_TABS: TierTab[] = [
-  { id: "all",  labelZh: "全部",     labelEn: "All",      accent: "#171717" },
-  { id: "30s",  labelZh: "單篇內容", labelEn: "Single",   accent: "#00b4bc" },
-  { id: "60s",  labelZh: "內容套組", labelEn: "Pack",     accent: "#7c3aed" },
-  { id: "99s",  labelZh: "完整企劃", labelEn: "Campaign", accent: "#f59e0b" },
+  { id: "all", labelZh: "全部", labelEn: "All", accent: "#171717" },
+  ...TIER_ORDER.map((code): TierTab => ({
+    id: code,
+    labelZh: tierLabel(code, "zh", { long: true }),
+    labelEn: tierLabel(code, "en"),
+    accent: tierAccent(code),
+  })),
 ];
 
-// ── Format category config (FB only) ────────────────────────────────────────
-type ActiveFormat =
-  | "all" | "貼文" | "連結貼文" | "廣告" | "輪播 Carousel"
-  | "多媒體" | "直播" | "釘選貼文" | "活動 / 系列" | "月曆 / 策略" | "互動 / 工具";
-
-const FORMAT_TABS: { id: ActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",            label: "全部",          labelEn: "All"                },
-  { id: "貼文",           label: "貼文",          labelEn: "Posts"              },
-  { id: "連結貼文",       label: "連結貼文",      labelEn: "Link Posts"         },
-  { id: "廣告",           label: "廣告",          labelEn: "Ads"                },
-  { id: "輪播 Carousel",  label: "輪播 Carousel", labelEn: "Carousel"           },
-  { id: "多媒體",         label: "多媒體",        labelEn: "Media"              },
-  { id: "直播",           label: "直播",          labelEn: "Live"               },
-  { id: "釘選貼文",       label: "釘選貼文",      labelEn: "Pinned Posts"       },
-  { id: "活動 / 系列",    label: "活動 / 系列",   labelEn: "Events & Series"    },
-  { id: "月曆 / 策略",    label: "月曆 / 策略",   labelEn: "Calendar & Strategy"},
-  { id: "互動 / 工具",    label: "互動 / 工具",   labelEn: "Engagement & Tools" },
-];
-
-const TASK_FORMAT_MAP: Record<string, ActiveFormat> = {
-  // 貼文
-  "fb-30-caption-short":          "貼文",
-  "fb-30-pure-text-hook":         "貼文",
-  "fb-60-single-full":            "貼文",
-  // 連結貼文
-  "fb-30-link-caption":           "連結貼文",
-  "fb-60-link-full":              "連結貼文",
-  // 廣告
-  "fb-30-ad-headline":            "廣告",
-  "fb-30-ad-primary":             "廣告",
-  "fb-30-ad-cta":                 "廣告",
-  "fb-30-ad-description":         "廣告",
-  "fb-60-ad-pack-3":              "廣告",
-  // 輪播 Carousel
-  "fb-90-carousel-10frame":       "輪播 Carousel",
-  // 多媒體 (Album + Reels + Story 合併)
-  "fb-60-album-4":                "多媒體",
-  "fb-90-reels-full":             "多媒體",
-  "fb-30-story-text":             "多媒體",
-  // 直播
-  "fb-30-live-title":             "直播",
-  "fb-60-live-suite":             "直播",
-  "fb-90-livestream-suite":       "直播",
-  // 釘選貼文
-  "fb-30-pinned-short":           "釘選貼文",
-  "fb-60-pinned-suite":           "釘選貼文",
-  // 活動 / 系列
-  "fb-30-countdown-1day":         "活動 / 系列",
-  "fb-60-countdown-5day":         "活動 / 系列",
-  "fb-60-launch-kit":             "活動 / 系列",
-  "fb-90-event-launch":           "活動 / 系列",
-  "fb-90-countdown-series":       "活動 / 系列",
-  // 月曆 / 策略
-  "fb-90-monthly-calendar":       "月曆 / 策略",
-  "fb-90-monthly-calendar-promo": "月曆 / 策略",
-  "fb-90-account-reposition":     "月曆 / 策略",
-  "fb-90-quarterly-strategy":     "月曆 / 策略",
-  "fb-90-monthly-analytics":      "月曆 / 策略",
-  // 互動 / 工具
-  "fb-30-comment-reply":          "互動 / 工具",
-  "fb-30-hashtag-set":            "互動 / 工具",
-  "fb-90-crisis-full":            "互動 / 工具",
-};
+// ── Format category config (FB only) ────────────────────────────
+// 2026-08-23: 搬到 v2/lib/fbTaskFormats.ts —— 這份對照表爫過一次（90s 退役後
+// 11 個 key 全指向不存在的任務，16 張 99s 卡一個都沒補），抽出去才能被
+// fbTaskFormats.test.ts import 並鎖住。
 
 // ── Format category config (IG) ─────────────────────────────────────────────
 type IGActiveFormat =

@@ -7,6 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { useLang } from "../../lib/i18n";
+import { tierLabel } from "../lib/tierVocabulary";
 import { ChevronLeft, Download, Trash2, AlertTriangle, Plus, X, Sparkles } from "lucide-react";
 
 export default function AccountPage() {
@@ -306,9 +307,9 @@ export default function AccountPage() {
                 {/* Cost cheatsheet */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {[
-                    { key: "task_30s",   label: lang === "en" ? "Single"   : "單篇" },
-                    { key: "task_60s",   label: lang === "en" ? "Pack"     : "套組" },
-                    { key: "task_99s",   label: lang === "en" ? "Campaign" : "企劃" },
+                    { key: "task_30s",   label: tierLabel("30s", lang) },
+                    { key: "task_60s",   label: tierLabel("60s", lang) },
+                    { key: "task_99s",   label: tierLabel("99s", lang) },
                     { key: "image_flux", label: lang === "en" ? "AI image"      : "AI 圖片" },
                   ].map(({ key, label }) => (
                     <div key={key} className="bg-neutral-50 rounded-lg px-3 py-2">

@@ -18,6 +18,7 @@ import { entityRouter } from "./entityRouter";
 import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
 import { pipelineRouter } from "./pipelineRouter";
 import { marketIntelRouter } from "./marketIntelRouter";
+import { postFormatRouter } from "./postFormatRouter";
 import { mediaRouter } from "./mediaRouter";
 import { taskCatalogRouter } from "./taskCatalogRouter";
 import { platformConnectRouter } from "./platformConnectRouter";
@@ -81,6 +82,7 @@ export const appRouter = router({
   scope:         scopeRouter,
   pipeline:      pipelineRouter,
   marketIntel:   marketIntelRouter,
+  postFormat:    postFormatRouter,
   media:         mediaRouter,
   taskCatalog:   taskCatalogRouter,
   platformConnect: platformConnectRouter,
