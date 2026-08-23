@@ -836,6 +836,8 @@ const TASK_LABEL_EN: Record<string, string> = {
   "ig-60-countdown-5day":         "IG 5-day countdown series",
   "ig-60-highlight-suite":        "IG Highlight × 5 (cover + content)",
   "ig-60-live-suite":             "IG Live 30-min run-of-show (6 segments)",
+  "ig-60-live-event":             "IG Live audience-goal event (7 segments)",
+  "ig-60-live-founder":           "IG founder-led live (5 segments)",
   "ig-60-serial-3":               "IG 3-part narrative series",
   "ig-60-viral-rewrite":          "IG Viral rewrite",
   "ig-60-testimonial-rewrite":    "IG Testimonial rewrite",
