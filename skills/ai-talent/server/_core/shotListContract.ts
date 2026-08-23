@@ -136,6 +136,9 @@ export function normalizeShotList(caption: string): string {
   );
   // 四個標籤各自獨立成行
   t = t.replace(INLINE_LABEL_RE, "$1\n$2");
+  // 腳本後面的區塊標題（【開拍前準備】…）也要自成一行 —— 實測會黏在最後
+  // 一格的「字卡：」後面（字卡：開了。【開拍前準備】）。
+  t = t.replace(/([^\n])[ \t　]*(【[^】\n]{2,10}】)/gu, "$1\n\n$2");
   return t.replace(/\n{3,}/gu, "\n\n").trim();
 }
 
