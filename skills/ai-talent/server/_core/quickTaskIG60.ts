@@ -10,6 +10,8 @@
  * Universal helpers + QA shared across all channels.
  */
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
+// 2026-08-23 (CJ「做成不同任務卡」): 六種直播類型卡另立一檔，避免這支再長 400 行。
+import { IG_LIVE_ARCHETYPE_TASKS, IG_LIVE_ARCHETYPE_ORCHESTRA } from "./quickTaskIGLive";
 
 const NANCY = 180170; // Nancy Yeh — IG Visual Direction Lead (主場 feed-full)
 // 2026-05-08 (CJ direction): per-task unique image directors for IG 60s
@@ -464,6 +466,8 @@ ${IG_TONE}`,
     maxTokens: 900,
     outputDefaults: { platform: "instagram", post_type: "feed" },
   },
+  // 六種直播類型卡（對打 / 回歸 / 聯名發布 / 首播 / 日常 / 多人同框）
+  ...IG_LIVE_ARCHETYPE_TASKS,
 ];
 
 // ─── Orchestra configs ──────────────────────────────────────────────────────
@@ -601,6 +605,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     specialtyAgentId: 180559,  // Deborah Williams — VP & Chief Legal Officer
     extras: { legalAssistant: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
+  ...IG_LIVE_ARCHETYPE_ORCHESTRA,
 };
 
 export function getIG60Template(taskId: string): FBTaskTemplate | null {

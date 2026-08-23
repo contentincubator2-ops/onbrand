@@ -268,6 +268,8 @@ const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"
 // 一次全部攤開。用明列 id 而不是關鍵字猜（見 inferMockup 的教訓）。
 const SEQUENCE_TASKS = new Set<string>([
   "ig-60-live-suite", "ig-60-live-event", "ig-60-live-founder",
+  "ig-60-live-versus", "ig-60-live-comeback", "ig-60-live-collab-drop",
+  "ig-60-live-first-ever", "ig-60-live-behind-scenes", "ig-60-live-crew",
 ]);
 
 function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
