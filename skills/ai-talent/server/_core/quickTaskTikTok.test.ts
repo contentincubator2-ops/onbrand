@@ -85,6 +85,15 @@ describe("高互動機制腳本卡", () => {
     }
   });
 
+  it.each(MECHANIC_CARDS)("%s caps the shot count so the two blocks fit", (id) => {
+    // 2026-08-23 VM probe：沒有格數上限時模型寫了 10-12 格，token 燒光，
+    // 兩個新區塊一個都沒寫出來，變體 0 還在句子中間被截斷、變體 1 直接
+    // 超過 40 秒預算。格數上限是這批卡能不能交付完整的前提。
+    const t = TT_30S_TASKS.find((x) => x.id === id)!;
+    expect(t.systemPrompt).toContain("5-7 格");
+    expect(t.maxTokens).toBeGreaterThanOrEqual(2000);
+  });
+
   it.each(MECHANIC_CARDS)("%s shows what 'specific enough' looks like", (id) => {
     // 光說「要具體」沒有用，實測模型會寫「畫面：廚房場景」。要給好壞對照。
     const t = TT_30S_TASKS.find((x) => x.id === id)!;
