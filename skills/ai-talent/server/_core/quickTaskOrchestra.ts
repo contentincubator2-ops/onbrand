@@ -2065,6 +2065,7 @@ export async function runOrchestra(args: {
     // fetch it and never let it override the brand as「主題」. YouTube links
     // stay reference material and keep the existing fetch path.
     const adCopyTask = isAdCopyTemplate(args.template);
+    const shotListTask = isShotListTemplate(args.template);
     const requestedUrl = adCopyTask ? extractRequestedUrl(args.inputs) : null;
     const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
     const firstUrl = ytUrlInput
@@ -2335,10 +2336,19 @@ export async function runOrchestra(args: {
           if (report.text && report.text !== v.caption) {
             // A banned-word LLM rewrite can drop the markers / landing URL;
             // re-apply the deterministic repair and re-validate.
-            v.caption = adCopyTask ? repairAdCopy(report.text, requestedUrl) : report.text;
+            // 2026-08-23: 分格腳本同理 —— VM probe（brand_id=2924）實測，改寫
+            // 後下一格的時間戳會被黏回上一格「字卡：」那行。本機沒帶 brandId
+            // 跑不到這一關，所以只有正式環境現形。
+            v.caption = adCopyTask ? repairAdCopy(report.text, requestedUrl)
+              : shotListTask ? repairShotList(report.text)
+              : report.text;
             if (adCopyTask) {
               const issue = validateAdCopy(v.caption, requestedUrl);
               if (issue) console.warn(`[orchestra] ad-copy contract unmet after brand rewrite (${v.label}): ${issue.detail}`);
+            }
+            if (shotListTask) {
+              const issue = validateShotList(v.caption);
+              if (issue) console.warn(`[orchestra] shot-list contract unmet after brand rewrite (${v.label}): ${issue.detail}`);
             }
           }
           if (report.bannedHits.length > 0 || report.subsApplied.length > 0) {
