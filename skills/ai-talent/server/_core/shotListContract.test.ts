@@ -143,6 +143,33 @@ describe("normalizeShotList — 救回「內容對、包裝爛」的回應", () 
   });
 });
 
+describe("normalizeShotList — 句子裡提到的時間戳不是一格", () => {
+  it("does not split a timestamp used as an inline reference", () => {
+    // 2026-08-23 VM probe：最後一格寫「…無縫切回格 [0.0-0.5s]）」，被切開後
+    // 留下孤零零的一行「[0.0-0.5s]）」，看起來像多了一格空的。
+    const withRef = [
+      "[0.0-0.5s] 開場",
+      "畫面：a",
+      "動作：b",
+      "聲音：c",
+      "字卡：d",
+      "[14.5-15.0s] 回環",
+      "畫面：同開場",
+      "動作：靜止 0.5 秒，無縫切回第一格 [0.0-0.5s]）",
+      "聲音：淡出",
+      "字卡：無",
+    ].join("\n");
+    const out = normalizeShotList(withRef);
+    expect(countShots(out)).toBe(2); // 不是 3
+    expect(out).toContain("無縫切回第一格 [0.0-0.5s]）");
+  });
+
+  it("still splits a real shot header that follows content", () => {
+    const glued = "字卡：d [0.5-1.0s] 第二格\n畫面：e";
+    expect(normalizeShotList(glued)).toContain("字卡：d\n[0.5-1.0s] 第二格");
+  });
+});
+
 describe("repairShotList — 品牌規則改寫之後的第二道防線", () => {
   it("re-splits the timestamp a brand rewrite glued onto the 字卡 line", () => {
     // 2026-08-23 VM probe（brand_id=2924，Anthropic）實際回來的形狀：

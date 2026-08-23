@@ -126,8 +126,14 @@ export function normalizeShotList(caption: string): string {
   // 避免吃掉字卡本身的標點。
   const tail = t.match(JSON_TAIL_RE);
   if (tail && /["'\]\}]/u.test(tail[0])) t = t.slice(0, t.length - tail[0].length);
-  // 每個時間戳自成一行的開頭
-  t = t.replace(/(?!^)[ \t　]*(\[\s*\d+(?:\.\d+)?\s*[-–~]\s*\d+(?:\.\d+)?\s*s?\s*\])/gu, "\n$1");
+  // 每個時間戳自成一行的開頭。
+  // 2026-08-23 VM probe：句子裡順帶提到的時間戳不算一格 —— 「無縫接回第一格
+  // [0.0-0.5s]）」被切開後會留下一行孤零零的「[0.0-0.5s]）」。真正的格頭後面
+  // 接的是格名，不會緊跟著收尾標點，所以用後方字元排除掉這種行內引用。
+  t = t.replace(
+    /(?!^)[ \t　]*(\[\s*\d+(?:\.\d+)?\s*[-–~]\s*\d+(?:\.\d+)?\s*s?\s*\])(?![）)〕】\]，,。、；;])/gu,
+    "\n$1",
+  );
   // 四個標籤各自獨立成行
   t = t.replace(INLINE_LABEL_RE, "$1\n$2");
   return t.replace(/\n{3,}/gu, "\n\n").trim();
