@@ -2522,6 +2522,24 @@ export async function runOrchestra(args: {
       }
     }
 
+    // ── 分格腳本：出貨前最後一次正規化（2026-08-23）──────────────────
+    // caption 從產生到這裡會經過 6 個改寫點（禁用詞改寫、zh-TW voice
+    // sanitizer、簡轉繁…），任何一個都可能把「下一格的時間戳」黏回上一格
+    // 「字卡：」那一行 —— VM probe（brand_id=2924）實測就是這個症狀，而本機
+    // probe 不帶 brandId，那幾關全都不會跑，所以完全看不到。
+    // 與其逐一在每個改寫點後面補修補，這裡收一次總的：normalize 是冪等的，
+    // 已經正確的腳本原樣不動。
+    if (shotListTask && Array.isArray(captions)) {
+      for (const v of captions) {
+        if (!v?.caption) continue;
+        const fixed = normalizeShotList(v.caption);
+        if (fixed !== v.caption) {
+          console.log(`[orchestra] shot-list re-normalised after post-processing (${v.label})`);
+          v.caption = fixed;
+        }
+      }
+    }
+
     // ── Checkpoint (2026-05-14 「先回 caption + brief、image 跟 QA 變 async polling」) ─
     // Captions + briefs are ready. If the caller passed `onCheckpoint`,
     // (a) persist a PARTIAL mission_outputs row now with progress='caption_ready',
