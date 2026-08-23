@@ -19,6 +19,7 @@ import { useLang } from "../../lib/i18n";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import { TIER_ORDER, tierAccent, tierLabel } from "../lib/tierVocabulary";
+import { FORMAT_TABS, TASK_FORMAT_MAP, type ActiveFormat } from "../lib/fbTaskFormats";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
 import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope";
@@ -210,69 +211,10 @@ const TIER_TABS: TierTab[] = [
   })),
 ];
 
-// ── Format category config (FB only) ────────────────────────────────────────
-type ActiveFormat =
-  | "all" | "貼文" | "連結貼文" | "廣告" | "輪播 Carousel"
-  | "多媒體" | "直播" | "釘選貼文" | "活動 / 系列" | "月曆 / 策略" | "互動 / 工具";
-
-const FORMAT_TABS: { id: ActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",            label: "全部",          labelEn: "All"                },
-  { id: "貼文",           label: "貼文",          labelEn: "Posts"              },
-  { id: "連結貼文",       label: "連結貼文",      labelEn: "Link Posts"         },
-  { id: "廣告",           label: "廣告",          labelEn: "Ads"                },
-  { id: "輪播 Carousel",  label: "輪播 Carousel", labelEn: "Carousel"           },
-  { id: "多媒體",         label: "多媒體",        labelEn: "Media"              },
-  { id: "直播",           label: "直播",          labelEn: "Live"               },
-  { id: "釘選貼文",       label: "釘選貼文",      labelEn: "Pinned Posts"       },
-  { id: "活動 / 系列",    label: "活動 / 系列",   labelEn: "Events & Series"    },
-  { id: "月曆 / 策略",    label: "月曆 / 策略",   labelEn: "Calendar & Strategy"},
-  { id: "互動 / 工具",    label: "互動 / 工具",   labelEn: "Engagement & Tools" },
-];
-
-const TASK_FORMAT_MAP: Record<string, ActiveFormat> = {
-  // 貼文
-  "fb-30-caption-short":          "貼文",
-  "fb-30-pure-text-hook":         "貼文",
-  "fb-60-single-full":            "貼文",
-  // 連結貼文
-  "fb-30-link-caption":           "連結貼文",
-  "fb-60-link-full":              "連結貼文",
-  // 廣告
-  "fb-30-ad-headline":            "廣告",
-  "fb-30-ad-primary":             "廣告",
-  "fb-30-ad-cta":                 "廣告",
-  "fb-30-ad-description":         "廣告",
-  "fb-60-ad-pack-3":              "廣告",
-  // 輪播 Carousel
-  "fb-90-carousel-10frame":       "輪播 Carousel",
-  // 多媒體 (Album + Reels + Story 合併)
-  "fb-60-album-4":                "多媒體",
-  "fb-90-reels-full":             "多媒體",
-  "fb-30-story-text":             "多媒體",
-  // 直播
-  "fb-30-live-title":             "直播",
-  "fb-60-live-suite":             "直播",
-  "fb-90-livestream-suite":       "直播",
-  // 釘選貼文
-  "fb-30-pinned-short":           "釘選貼文",
-  "fb-60-pinned-suite":           "釘選貼文",
-  // 活動 / 系列
-  "fb-30-countdown-1day":         "活動 / 系列",
-  "fb-60-countdown-5day":         "活動 / 系列",
-  "fb-60-launch-kit":             "活動 / 系列",
-  "fb-90-event-launch":           "活動 / 系列",
-  "fb-90-countdown-series":       "活動 / 系列",
-  // 月曆 / 策略
-  "fb-90-monthly-calendar":       "月曆 / 策略",
-  "fb-90-monthly-calendar-promo": "月曆 / 策略",
-  "fb-90-account-reposition":     "月曆 / 策略",
-  "fb-90-quarterly-strategy":     "月曆 / 策略",
-  "fb-90-monthly-analytics":      "月曆 / 策略",
-  // 互動 / 工具
-  "fb-30-comment-reply":          "互動 / 工具",
-  "fb-30-hashtag-set":            "互動 / 工具",
-  "fb-90-crisis-full":            "互動 / 工具",
-};
+// ── Format category config (FB only) ────────────────────────────
+// 2026-08-23: 搬到 v2/lib/fbTaskFormats.ts —— 這份對照表爫過一次（90s 退役後
+// 11 個 key 全指向不存在的任務，16 張 99s 卡一個都沒補），抽出去才能被
+// fbTaskFormats.test.ts import 並鎖住。
 
 // ── Format category config (IG) ─────────────────────────────────────────────
 type IGActiveFormat =
