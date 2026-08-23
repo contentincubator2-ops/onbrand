@@ -935,6 +935,12 @@ import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../_core/qui
 import { ALL_99S_SQUADS } from "../_core/quickTask100Squads";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import {
+  checkViralSource,
+  platformLabelOf,
+  templateNeedsViralSource,
+  VIRAL_SOURCE_KEY,
+} from "../_core/viralSourceGuard";
+import {
   getIgStrategyExecutionSlug,
   getIgStrategyPublicPolicy,
   getIgStrategyRecordOverrides,
@@ -1466,15 +1472,6 @@ export const quickTaskRouter = router({
     .mutation(async ({ ctx, input }) => {
       input = { ...input, taskId: normalizeTaskId(input.taskId) }; // 100s→99s compat
       const userId = ctx.user!.id;
-      // P0-D pre-flight cost guard
-      const { preflightCostCheck } = await import("../llmWithBilling");
-      const guard60 = await preflightCostCheck(userId);
-      if (!guard60.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard60.reason });
-      // 2026-05-14: points-based gating (1 pt = 1 second of task compute)
-      const { assertPoints, deductPoints } = await import("../_core/pointsService");
-      await assertPoints(userId, "task_60s");
-      await deductPoints(userId, "task_60s", { kind: "task", id: null });
-      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
 
       // Pick template + config (same priority chain as before).
@@ -1507,6 +1504,35 @@ export const quickTaskRouter = router({
           getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId);
         if (!config) throw new Error(`No config for: ${input.taskId}`);
       }
+
+      // ── Input validation — BEFORE the cost guard / points deduction ──────
+      // 2026-08-23 (CJ「tt-60-viral-rewrite 沒給爆款連結或主題時要出現錯誤提醒」):
+      // 爆款改寫任務的交付物就是「借用某一支既有爆款的結構」。沒有來源時
+      // orchestra 照跑，模型會自己編一支不存在的爆款去拆解 —— 用戶拿到的
+      // 東西看起來完整但毫無依據。空白、敷衍字、太簡略的答案都擋在這裡。
+      // 擺在扣點之前：被擋下來的請求一點都不扣。
+      //
+      // 注意：這裡故意「沒有」對 template.inputs 全跑一次 required 檢查
+      // （runQuick / runOrchestra99 有）。intake 只會送 primary_input 那一格，
+      // 而 fb-60-launch-kit / fb-60-countdown-5day / fb-60-link-full /
+      // fb-60-live-suite / ig-60-countdown-5day 這 5 個任務宣告了 primary 以外的
+      // required 欄位，通用檢查會把它們全部擋死。要補通用檢查得先修那些宣告。
+      if (templateNeedsViralSource(template)) {
+        const viral = checkViralSource(input.inputs[VIRAL_SOURCE_KEY], {
+          platformLabel: platformLabelOf(template),
+        });
+        if (!viral.ok) throw new TRPCError({ code: "BAD_REQUEST", message: viral.message.zh });
+      }
+
+      // P0-D pre-flight cost guard
+      const { preflightCostCheck } = await import("../llmWithBilling");
+      const guard60 = await preflightCostCheck(userId);
+      if (!guard60.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard60.reason });
+      // 2026-05-14: points-based gating (1 pt = 1 second of task compute)
+      const { assertPoints, deductPoints } = await import("../_core/pointsService");
+      await assertPoints(userId, "task_60s");
+      await deductPoints(userId, "task_60s", { kind: "task", id: null });
+      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
 
       // 2026-05-18 (CJ「所有 60s 任務都要：圖完成才展示，非套組降到 2 版」):
       // every 60s task generates images and promised a "complete post".
@@ -2460,16 +2486,6 @@ export const quickTaskRouter = router({
       // renamed definition. Idempotent for new "fb-99-…" ids.
       input = { ...input, taskId: normalizeTaskId(input.taskId) };
       const userId = ctx.user!.id;
-      // P0-D pre-flight cost guard (99s tier is the most expensive)
-      const { preflightCostCheck } = await import("../llmWithBilling");
-      const guard100 = await preflightCostCheck(userId);
-      if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
-      // 2026-05-12: paywall quota check (plan task_99s cap)
-      // 2026-05-14: points-based gating
-      const { assertPoints, deductPoints } = await import("../_core/pointsService");
-      await assertPoints(userId, "task_99s");
-      await deductPoints(userId, "task_99s", { kind: "task", id: null });
-      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
 
       // Pick template + config (same priority chain as before).
@@ -2508,6 +2524,28 @@ export const quickTaskRouter = router({
           if (!config) throw new Error(`No config for: ${input.taskId}`);
         }
       }
+
+      // ── Input validation — BEFORE the cost guard / points deduction ──────
+      // 2026-08-23: same guard as runOrchestra60, for fb-99-viral-rewrite.
+      // 沒有原始爆款就沒有東西可以改寫，模型會自己編一支去拆解。
+      // 擺在扣點之前：被擋下來的請求一點都不扣。
+      if (templateNeedsViralSource(template)) {
+        const viral = checkViralSource(input.inputs[VIRAL_SOURCE_KEY], {
+          platformLabel: platformLabelOf(template),
+        });
+        if (!viral.ok) throw new TRPCError({ code: "BAD_REQUEST", message: viral.message.zh });
+      }
+
+      // P0-D pre-flight cost guard (99s tier is the most expensive)
+      const { preflightCostCheck } = await import("../llmWithBilling");
+      const guard100 = await preflightCostCheck(userId);
+      if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
+      // 2026-05-12: paywall quota check (plan task_99s cap)
+      // 2026-05-14: points-based gating
+      const { assertPoints, deductPoints } = await import("../_core/pointsService");
+      await assertPoints(userId, "task_99s");
+      await deductPoints(userId, "task_99s", { kind: "task", id: null });
+      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
 
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const,
         audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef) };
