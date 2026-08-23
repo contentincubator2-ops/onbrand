@@ -320,6 +320,12 @@ const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
   "ig-60-live-suite":            "Live 直播",
   "ig-60-live-event":            "Live 直播",
   "ig-60-live-founder":          "Live 直播",
+  "ig-60-live-versus":            "Live 直播",
+  "ig-60-live-comeback":          "Live 直播",
+  "ig-60-live-collab-drop":       "Live 直播",
+  "ig-60-live-first-ever":        "Live 直播",
+  "ig-60-live-behind-scenes":     "Live 直播",
+  "ig-60-live-crew":              "Live 直播",
   // 個人頁
   "ig-30-bio-rewrite":           "個人頁",
   "ig-60-highlight-suite":       "個人頁",
