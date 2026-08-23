@@ -31,6 +31,7 @@ import { probeImageUrl } from "./imageFetch";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
+import { isShotListTemplate, buildShotListRule, normalizeShotList, validateShotList, repairShotList } from "./shotListContract";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "./brandContext";
@@ -648,6 +649,8 @@ async function callOneVariant(args: {
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
   const adCopy = isAdCopyTemplate(template);
+  // 2026-08-23: 分格腳本卡的交付物不是貼文，需要自己的合約把社群骨架關掉。
+  const shotList = isShotListTemplate(template);
   const requestedUrl = adCopy ? (args.requestedUrl ?? null) : null;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
@@ -951,7 +954,9 @@ async function callOneVariant(args: {
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
   // Ad-copy contract goes LAST so it is the freshest instruction and wins
   // over the social scaffold's「不要排成結構化卡片」rule.
-  const system = promptCore + deliverableOnlyRule + (adCopy ? buildAdCopyRule(requestedUrl) : "");
+  const system = promptCore + deliverableOnlyRule
+    + (adCopy ? buildAdCopyRule(requestedUrl) : "")
+    + (shotList ? buildShotListRule() : "");
 
   // Provider + model selection priority:
   //   1. Agent's aiModel (from JSON-assigned real-person agent) — uses both
@@ -1054,13 +1059,14 @@ async function callOneVariant(args: {
   let lastErr: any = null;
   let lastRaw = ""; // for diagnostics
   let adCopyIssue = ""; // ad-copy contract violation from the previous attempt
+  let shotListIssue = ""; // shot-list contract violation from the previous attempt
   while (attempt < 2) {
     attempt++;
     try {
       // 2nd attempt: append explicit reminder to user msg, lowering model
       // creativity and forcing strict JSON.
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] ${adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
+        ? `${userMsg}\n\n[REMINDER] ${shotListIssue ? `上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -1097,6 +1103,27 @@ async function callOneVariant(args: {
               console.warn(`[callOneVariant] ad-copy contract still unmet for ${label} (${issue.reason}) — applying repair`);
               return { label, caption: repairAdCopy(caption, requestedUrl), hashtags: out.hashtags };
             }
+          }
+          if (shotList) {
+            // 先把「內容對、包裝爛」的回應（字面 \n、漏出來的 JSON 外殼、
+            // 四行擠成一行）機械性救回來，再驗證 —— 否則會為了包裝問題
+            // 白燒一次重試，而重試的結果通常比第一次差。
+            const normalized = normalizeShotList(caption);
+            const issue = validateShotList(normalized);
+            if (issue && attempt < 2) {
+              lastErr = new Error(`shot-list contract miss for ${label} (${issue.reason}): ${issue.detail}`);
+              shotListIssue = issue.detail;
+              console.warn(`[callOneVariant] attempt ${attempt} shot-list miss for ${label} (${issue.reason}): ${lastRaw.slice(0, 300)}`);
+              continue;
+            }
+            if (issue) {
+              // 最後一次：能修的只有 hashtag，格數/缺行修不了，照實出貨。
+              console.warn(`[callOneVariant] shot-list contract still unmet for ${label} (${issue.reason}) — applying repair`);
+              return { label, caption: repairShotList(caption), hashtags: [] };
+            }
+            // 出貨的是正規化後的版本 —— 原始那份還帶著逸出的換行字元與
+            // JSON 外殼殘骸。
+            return { label, caption: normalized, hashtags: [] };
           }
           return { label, caption, hashtags: out.hashtags };
         }
