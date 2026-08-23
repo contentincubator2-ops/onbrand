@@ -20,6 +20,7 @@ import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
 import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope";
+import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Textarea,
@@ -27,7 +28,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBolt, faPaperPlane, faXmark, faMagnifyingGlass,
-  faEnvelope, faBullhorn, faWandMagicSparkles,
+  faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -482,6 +483,13 @@ const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
   "tt-30-caption-rhythm":      "腳本",
   "tt-60-foryou-full":         "腳本",
   "tt-60-viral-rewrite":       "腳本",
+  // 2026-08-23 高互動機制卡 — 從史上最多讚的 10 支 TikTok 反推出的 5 種
+  // 視覺機制，一種機制一張卡，用戶自己挑要拍哪一種。
+  "tt-30-visual-illusion":     "腳本",
+  "tt-30-process-payoff":      "腳本",
+  "tt-30-beat-sync":           "腳本",
+  "tt-30-scale-reveal":        "腳本",
+  "tt-30-real-reaction":       "腳本",
   // 分鏡表 — 腳本與影片之間的橋
   "tt-30-storyboard":          "分鏡表",
   // 模擬影片 — 真的產出 mp4
@@ -805,6 +813,9 @@ function PlatformTaskPageInner() {
   const [primaryAnswer, setPrimaryAnswer] = useState("");
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // 2026-08-23: intake validation error, rendered right under the question
+  // box (errorMsg renders at the bottom of the modal, often below the fold).
+  const [inputError, setInputError] = useState<string | null>(null);
   const [agentMeta, setAgentMeta] = useState<any | null>(null);
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
   const [orchestraStages, setOrchestraStages] = useState<any[] | null>(null);
@@ -1235,6 +1246,7 @@ function PlatformTaskPageInner() {
     if (strategyTopic) prefill = strategyTopic;
     setPrimaryAnswer(prefill);
     setErrorMsg(null);
+    setInputError(null);
     setLatencyMs(null);
     setAgentMeta(null);
   };
@@ -1250,6 +1262,7 @@ function PlatformTaskPageInner() {
     runSeqRef.current++; // invalidate any in-flight run attempt
     setActiveTask(null);
     setRunning(false);
+    setInputError(null);
     setCountdownStart(null);
     setOrchestraStages(null);
     setModalEntity({ kind: "brand", id: null });
@@ -1318,23 +1331,41 @@ function PlatformTaskPageInner() {
     const primaryRequired = (activeTask.inputs?.[0] as any)?.required !== false;
     const hasDerive = !!(activeTask.primary_input as any)?.derive
       || !!(activeTask.contextSources && activeTask.contextSources.length > 0);
-    if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive) {
-      // 2026-07-07 (CJ「開始做按下去沒反應」— live repro): the errorMsg card
-      // renders at the BOTTOM of the scrollable ModalBody, below the fold on
-      // laptop screens, so this validation read as a silent no-op. Toast it
-      // and scroll the question input into view so the user sees what's asked.
-      const msg = lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成";
+    // 2026-07-07 (CJ「開始做按下去沒反應」— live repro): the errorMsg card
+    // renders at the BOTTOM of the scrollable ModalBody, below the fold on
+    // laptop screens, so validation read as a silent no-op. Every intake
+    // rejection now toasts, prints under the question box, and scrolls the
+    // input into view.
+    const rejectIntake = (msg: string) => {
       setErrorMsg(msg);
+      setInputError(msg);
       showToastGlobal(msg);
       try {
         const el = document.querySelector<HTMLElement>("[data-primary-question]");
         el?.scrollIntoView({ behavior: "smooth", block: "center" });
         el?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
       } catch { /* non-fatal */ }
+    };
+    // 2026-08-23 (CJ「tt-60-viral-rewrite 沒給爆款連結或主題時要出現錯誤提醒」):
+    // 爆款改寫任務沒有來源就無從改寫 — 模型會自己編一支不存在的爆款去拆解。
+    // 空白、敷衍字（無 / 隨便 / test）、太簡略的答案都在這裡擋下。
+    // 權威判斷在 server（扣點前），這份鏡像只是讓提示即時出現。
+    if (taskNeedsViralSource(activeTask as any)) {
+      const viral = checkViralSource(primaryAnswer, {
+        platformLabel: platformLabelForTask(activeTask.platform),
+      });
+      if (!viral.ok) {
+        rejectIntake(lang === "en" ? viral.message.en : viral.message.zh);
+        return;
+      }
+    }
+    if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive) {
+      rejectIntake(lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成");
       return;
     }
     setRunning(true);
     setErrorMsg(null);
+    setInputError(null);
     setCountdownStart(Date.now());
     // 2026-07-20 (CJ QA): this attempt's ticket. closeTask() bumps the ref,
     // so a cancelled attempt resolves silently — no navigation, no state.
@@ -1460,7 +1491,14 @@ function PlatformTaskPageInner() {
         ? "This task isn't ready yet."
         : "這個任務還在開發中，請改試其他任務。");
     } catch (e: any) {
-      if (!isStale()) setErrorMsg(e?.message ?? String(e));
+      if (!isStale()) {
+        const msg = e?.message ?? String(e);
+        setErrorMsg(msg);
+        // The errorMsg card sits at the bottom of the modal body — toast it
+        // too, so a server-side rejection (e.g. the viral-source guard on a
+        // stale client) is never a silent no-op.
+        showToastGlobal(msg);
+      }
     } finally {
       // Only the CURRENT attempt may reset run state — a cancelled attempt
       // resolving late must not clobber a newer run the user has started.
@@ -2294,17 +2332,28 @@ function PlatformTaskPageInner() {
                       <Textarea
                         placeholder={activeTask.primary_input.placeholder ?? ""}
                         value={primaryAnswer}
-                        onChange={(e) => setPrimaryAnswer(e.target.value)}
+                        onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                         minRows={3}
                         autoFocus
+                        isInvalid={!!inputError}
                       />
                     ) : (
                       <Input
                         placeholder={activeTask.primary_input.placeholder ?? ""}
                         value={primaryAnswer}
-                        onChange={(e) => setPrimaryAnswer(e.target.value)}
+                        onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                         autoFocus
+                        isInvalid={!!inputError}
                       />
+                    )}
+                    {/* 2026-08-23: intake rejection prints here, next to the
+                        field it is about — not only in the card at the very
+                        bottom of the modal body. */}
+                    {inputError && (
+                      <p className="text-tiny text-danger-500 flex items-start gap-1.5">
+                        <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
+                        <span>{inputError}</span>
+                      </p>
                     )}
                     {polishInputMut && !running && (
                       <div className="flex items-center gap-2">
