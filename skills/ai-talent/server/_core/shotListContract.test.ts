@@ -164,6 +164,13 @@ describe("normalizeShotList — 句子裡提到的時間戳不是一格", () => 
     expect(out).toContain("無縫切回第一格 [0.0-0.5s]）");
   });
 
+  it("puts a trailing block heading on its own line", () => {
+    // 2026-08-23 VM probe：「字卡：開了。【開拍前準備】」黏成一行。
+    const glued = "字卡：開了。 【開拍前準備】\n・器材：手機＋腳架";
+    const out = normalizeShotList(glued);
+    expect(out).toContain("字卡：開了。\n\n【開拍前準備】");
+  });
+
   it("still splits a real shot header that follows content", () => {
     const glued = "字卡：d [0.5-1.0s] 第二格\n畫面：e";
     expect(normalizeShotList(glued)).toContain("字卡：d\n[0.5-1.0s] 第二格");

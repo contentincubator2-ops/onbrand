@@ -78,7 +78,7 @@ describe("高互動機制腳本卡", () => {
     const t = TT_30S_TASKS.find((x) => x.id === id)!;
     expect(t.systemPrompt).toContain("讀的人是誰");
     expect(t.systemPrompt).toContain("【開拍前準備】");
-    expect(t.systemPrompt).toContain("【最容易拍壞的地方】");
+    expect(t.systemPrompt).toContain("【常見失誤】");
     // 器材／場地／道具／人力 四項缺一項，拍的人就得自己補，等於不能照做
     for (const item of ["器材", "場地", "道具", "人力"]) {
       expect(t.systemPrompt).toContain(item);
