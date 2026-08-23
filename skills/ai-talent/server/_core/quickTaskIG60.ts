@@ -22,6 +22,9 @@ const IG60_DIR_TODD   = 220730; // Todd Huang — Decision Design Consultant
 const IG60_DIR_DAWN   = 220725; // Dawn Su — Decision Design Consultant
 const IG60_DIR_BRIAN  = 220727; // Brian Yeh — Decision Design Consultant
 const IG60_DIR_PENNY  = 220724; // Penny Huang — Decision Design Consultant
+// 2026-08-23: two more for the new live task cards (same pool, unused in IG).
+const IG60_DIR_LYDIA  = 220723; // Lydia Tsai — Decision Design Consultant
+const IG60_DIR_DREW   = 220726; // Drew Chen — Decision Design Consultant
 
 const IG_TONE = `
 語氣要求：自然像朋友、有 IG-native 的呼吸感。不要罐頭口吻。
@@ -264,6 +267,131 @@ ${IG_TONE}`,
     outputDefaults: { platform: "instagram", post_type: "live" },
   },
 
+  // 7b. IG 直播衝人數活動腳本 — Amy Huang, strategist: Ryan Yu (growth), 7 段
+  //
+  // 2026-08-23 (CJ「把 acun / deepika 做成 IG 直播底下的不同任務卡，不要糾結
+  // 在單一任務裡面用 pill 分類」): 帶貨型（ig-60-live-suite）只是直播的一種。
+  // 這張卡是「事件型」——原型是 Acun Ilıcalı 2020-05-25 那場 IG 直播（2 分鐘
+  // 300 萬同時觀看，破當時世界紀錄）。他做對的不是內容，是把直播變成一個有
+  // 明確終點的集體任務：公開的數字目標、會跳動的進度、達標當場兌現（島上
+  // 派對）。觀眾不是來看主播，是來一起達成一件事。
+  {
+    id: "ig-60-live-event",
+    tier: "60s",
+    postType: "live",
+    label: { en: "IG Live Audience-Goal Event", zh: "IG 直播衝人數活動腳本" },
+    description: { en: "Turn the live into a collective mission with a visible number: warm-up, goal, sprint, progress calls, final push, payoff", zh: "把直播變成有數字目標的集體任務：開播前預熱 → 目標宣告 → 衝刺 → 進度回報 → 臨門一腳 → 達標當場兌現" },
+    agent_id: 30009, // Amy Huang — Event Marketing Strategy PM
+    skill_slug: "live-content",
+    primary_question: "這場直播想跟觀眾一起達成什麼數字？達標你要當場給什麼？",
+    primary_input: { key: "live_goal", placeholder: "例：週年慶開箱直播，目標同時在線 300 人，達標當場抽 3 組新品；沒達標也會公布下一場目標", type: "textarea" },
+    inputs: [
+      { key: "live_goal", label: "直播主題 / 集體目標 / 達標獎勵", type: "textarea", required: true },
+    ],
+    systemPrompt: `你在寫「IG 直播衝人數活動」的其中 1 段，本段 200-450 字。
+本次你寫的是「{label}」這一段。整場 7 段依序是：
+T-24h 預熱宣告 → 00:00-03:00 目標宣告 → 03:00-10:00 第一波衝刺 →
+10:00-18:00 內容填充 → 18:00-24:00 臨門一腳 → 24:00-28:00 達標兌現 →
+28:00-30:00 下一個目標。
+
+【這是直播執行腳本，不是 IG 貼文（最高優先）】
+- 讀的人是「正要開播的主播 / 小編」，他會把這頁放在鏡頭旁邊邊看邊播。
+- 嚴禁寫成貼文文案、嚴禁 hashtag、嚴禁「儲存這篇」「點 bio 連結」這種貼文 CTA。
+- 主播口白＝可以直接照著唸出來的口語，不是書面文案。
+
+【這種直播的核心 — 每一段都要遵守】
+- 觀眾不是來看主播，是來「一起達成一件事」。每一段都要出現那個數字。
+- 目標必須是觀眾做得到、而且主播在畫面上看得到的（同時在線人數 / 留言數 /
+  分享到限動的截圖數 / 標記朋友數），不要用主播看不到的指標。
+- 進度要一直播報，哪怕是估的：「現在 180，還差 120」。張力來自計數器，不是口才。
+- 獎勵必須當場兌現得了（當場抽、當場拆箱、當場公布名單）。「之後會…」沒有用。
+
+【輸出格式 — 只有這四個方括號標題，順序固定，前後不要多寫任何字】
+【時間】本段的時間段（例：03:00-10:00；第一段寫 T-24h）
+【流程階段】只寫階段名稱本身，4-8 字。不要加副標、不要用「｜」。
+【畫面／動作指示】2-4 條，每條以「・」開頭，寫主播當下要做的具體動作：鏡位、要看哪個數字、要點開哪個功能（留言區 / 觀看人數 / 限動分享）。
+【主播口白】用「」包住 2-4 句可以直接唸的話，其中一定要包含當下的數字與一個明確的集體指令。
+
+【各段各自要做到的事（只寫你被指派的那一段）】
+- T-24h 預熱宣告：開播前 24 小時要做的事。用限動投票問一題跟主題相關的問題（開播時要唸結果），並把「時間 + 目標 + 達標獎勵」講成一句話貼出去。同時指派一位「頭號留言者」（同事 / 店長 / 夥伴），負責開播前 3 分鐘回應主播每一次提問，讓留言區先有人講話。
+- 目標宣告：不要自我介紹。第一句就講「我們今天要一起做到什麼、做到會發生什麼」，並唸出開播前的限動投票結果暖場。講清楚觀眾具體要做哪一個動作。
+- 第一波衝刺：把動作講到最白（標記一位朋友 / 分享到限動並截圖回傳），現場回報數字變化，指名感謝前幾位。這段是把在線人數往上推的主力。
+- 內容填充：數字在跑的同時要有東西看，不能只有喊口號。用主題本身的內容（展示、實測、故事）填滿，每 2-3 分鐘插一次進度回報。
+- 臨門一腳：講還差多少、還剩幾分鐘，給一個具體的最後推力（差 30 個就先拆一個）。有急迫感但不恐嚇、不誇大。
+- 達標兌現：達標就當場兌現，動作要寫清楚（現場抽、現場拆、唸出名單）。沒達標也要誠實講，並把已經給得起的部分先給，不要跳過這一段。
+- 下一個目標：謝謝參與、公布最終數字、預告下一場的時間與下一個目標，請觀眾追蹤並開啟通知。
+
+【絕對規則】
+- 全篇繁體中文台灣用語，不要簡體字。
+- 獎品、名額、折扣只能用使用者輸入或品牌資料裡真的有的。目標數字可以自己建議，但要標成建議值。
+- 不要出現任務名稱、agent 的自我介紹、英文 prompt、image_style 之類技術註記。
+- 只輸出你這一段，不要把其他 6 段一起寫出來。`,
+    preferredModel: "qwen",
+    maxTokens: 1000,
+    outputDefaults: { platform: "instagram", post_type: "live" },
+  },
+
+  // 7c. IG 創辦人開講直播腳本 — Yizhen Lai (brand story), strategist: Grace Wu, 5 段
+  //
+  // 2026-08-23: 「創辦人型」直播，原型是 Deepika Padukone 的 82°E 上市直播。
+  // 開場不是產品是命名與起源（82°E 是穿過印度的經線），做這個品類的理由是
+  // 一句私人陳述（"Skincare because it has been very personal to me"），留言區
+  // 事先有頭號支持者（Ranveer Singh 全程洗版）。她另外常用事前徵題的 AMA。
+  // 這場也有公開的翻車紀錄：粉絲問產品、創辦人答不清楚，加上定價爭議 → 所以
+  // 這張卡把「最難的三題」獨立成一段，強制備答。
+  {
+    id: "ig-60-live-founder",
+    tier: "60s",
+    postType: "live",
+    label: { en: "IG Founder-Led Live", zh: "IG 創辦人開講直播腳本" },
+    description: { en: "Founder on camera: origin story, why me, pre-collected AMA, the three hardest questions answered, then an invitation instead of a hard sell", zh: "創辦人親上鏡：起源故事 → 為什麼是我 → 事前徵集的提問 → 最難的三題（定價／根據／比較）→ 邀請而不是催單" },
+    agent_id: 60068, // Yizhen Lai — Brand Story Copy
+    skill_slug: "live-content",
+    primary_question: "你（創辦人）為什麼做這個品牌？這場想講的產品或決定是什麼？",
+    primary_input: { key: "founder_story", placeholder: "例：我自己敏感肌 10 年、試過的都刺痛才決定自己做；這次想講新防曬為什麼賣 1280", type: "textarea" },
+    inputs: [
+      { key: "founder_story", label: "創辦動機 / 這次要講的產品或決定", type: "textarea", required: true },
+    ],
+    systemPrompt: `你在寫「IG 創辦人開講直播」的其中 1 段，本段 200-450 字。
+本次你寫的是「{label}」這一段。整場 5 段依序是：
+00:00-04:00 起源故事 → 04:00-10:00 為什麼是我 → 10:00-20:00 事前徵集提問 →
+20:00-26:00 最難的三題 → 26:00-30:00 邀請與下一步。
+
+【這是直播執行腳本，不是 IG 貼文（最高優先）】
+- 讀的人是「準備上鏡的創辦人」，他會把這頁放在鏡頭旁邊邊看邊講。
+- 嚴禁寫成貼文文案、嚴禁 hashtag、嚴禁「儲存這篇」「點 bio 連結」這種貼文 CTA。
+- 口白＝創辦人可以直接照著講的口語，第一人稱，不是品牌新聞稿。
+
+【這種直播的核心 — 每一段都要遵守】
+- 賣的是「為什麼是我來做這件事」，不是規格。觀眾買的是可信度。
+- 用具體的私人時刻，不要使命宣言。壞例：「我們致力於提供最好的產品」；
+  好例：「那天我第三次退貨，坐在地上想說不然自己做算了」。
+- 不要業配腔、不要「在這個時代」「用心打造」這類空話。
+- 這場的收尾不是催單，是邀請。關係比轉換重要。
+
+【輸出格式 — 只有這四個方括號標題，順序固定，前後不要多寫任何字】
+【時間】本段的時間段（例：00:00-04:00）
+【流程階段】只寫階段名稱本身，4-8 字。不要加副標、不要用「｜」。
+【畫面／動作指示】2-4 條，每條以「・」開頭，寫創辦人當下要做的具體動作：鏡位、手上拿什麼、要點開哪個功能、要看哪裡。
+【主播口白】用「」包住 2-4 句可以直接講的第一人稱口語，其中要有一個當下就能做的互動指令（留言問我 / 按愛心 / 投票選下一個主題）。
+
+【各段各自要做到的事（只寫你被指派的那一段）】
+- 起源故事：開場**不要講產品**。講品牌名字或這件事的由來——名字從哪來、為什麼是這個名字、跟你的人生哪一段有關。第一條動作指示要指派一位「頭號留言者」（夥伴 / 同事），前 3 分鐘負責回應每一次提問，讓留言區先熱起來。
+- 為什麼是我：一段具體的個人經驗，說明為什麼是你來做這個品類。要有時間、地點、當下的感受，不要抽象。結尾把它接回這次要講的產品或決定。
+- 事前徵集提問：第一條動作指示必須是「（開播前 24 小時）用限動問答貼紙收題，挑 5 題」。這一段把挑好的問題唸出來回答，並在畫面上點開精選提問。要寫出 5 個「觀眾真的會問」的具體問題與回答方向，不能只寫「回答粉絲提問」。
+- 最難的三題：獨立處理三個會傷到信任的問題，每題都要有實際答案：(1) 為什麼賣這個價 (2) 成分／材質／工法有什麼根據 (3) 跟便宜的替代品差在哪。答不出來的就誠實說「這題我回去確認完在限動回你」，不要硬掰、不要迴避。
+- 邀請與下一步：謝謝陪伴、用一句話收攏今天講的事、邀請觀眾進社群或追蹤（不是催單），並讓觀眾投票決定下一場想聽什麼。
+
+【絕對規則】
+- 全篇繁體中文台灣用語，不要簡體字。
+- 價格、成分、數據只能用使用者輸入或品牌資料裡真的有的；沒有就把答法寫成「我回去確認完在限動回你」，不要自己編成分或數字。
+- 不要出現任務名稱、agent 的自我介紹、英文 prompt、image_style 之類技術註記。
+- 只輸出你這一段，不要把其他 4 段一起寫出來。`,
+    preferredModel: "qwen",
+    maxTokens: 1000,
+    outputDefaults: { platform: "instagram", post_type: "live" },
+  },
+
   // 8. IG 3 篇連載 — Yizhen Lai, strategist: Nelson Chen, multi-post 3
   {
     id: "ig-60-serial-3",
@@ -407,6 +535,38 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     strategistDeliverable: "一場 30 分鐘 IG 直播的完整流程腳本",
     strategistUnit: "段",
     extras: { postsCount: 6, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
+  },
+
+  // 2026-08-23 (CJ「做成不同任務卡」): 事件型 —— 7 段，含開播前那一段。
+  "ig-60-live-event": {
+    variants: 7, images: 7, runImageGen: true, imageDirectorId: IG60_DIR_LYDIA,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["T-24h 預熱宣告", "00:00-03:00 目標宣告", "03:00-10:00 第一波衝刺", "10:00-18:00 內容填充", "18:00-24:00 臨門一腳", "24:00-28:00 達標兌現", "28:00-30:00 下一個目標"],
+    captionMinChars: 200, captionMaxChars: 500,
+    strategistAgentId: 60007, // Ryan Yu — Growth + campaign-orch
+    postLabels: ["T-24h 預熱宣告", "00:00-03:00 目標宣告", "03:00-10:00 第一波衝刺", "10:00-18:00 內容填充", "18:00-24:00 臨門一腳", "24:00-28:00 達標兌現", "28:00-30:00 下一個目標"],
+    cleanPrompt: true,
+    cleanPromptVariantHint: "只寫「這一段」時間軸，完全照任務指定的四個方括號欄位輸出這一段的內容。",
+    cleanPromptCaptionSpec: "<這一段的四欄純文字內容，保留【時間】【流程階段】【畫面／動作指示】【主播口白】四個方括號標題與換行>",
+    strategistDeliverable: "一場以集體目標為核心的 IG 直播活動流程腳本",
+    strategistUnit: "段",
+    extras: { postsCount: 7, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
+  },
+
+  // 創辦人型 —— 5 段，收尾是邀請不是催單，所以沒有催單段。
+  "ig-60-live-founder": {
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_DREW,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["00:00-04:00 起源故事", "04:00-10:00 為什麼是我", "10:00-20:00 事前徵集提問", "20:00-26:00 最難的三題", "26:00-30:00 邀請與下一步"],
+    captionMinChars: 200, captionMaxChars: 500,
+    strategistAgentId: 180006, // Grace Wu — Brand Storyteller
+    postLabels: ["00:00-04:00 起源故事", "04:00-10:00 為什麼是我", "10:00-20:00 事前徵集提問", "20:00-26:00 最難的三題", "26:00-30:00 邀請與下一步"],
+    cleanPrompt: true,
+    cleanPromptVariantHint: "只寫「這一段」時間軸，完全照任務指定的四個方括號欄位輸出這一段的內容。",
+    cleanPromptCaptionSpec: "<這一段的四欄純文字內容，保留【時間】【流程階段】【畫面／動作指示】【主播口白】四個方括號標題與換行>",
+    strategistDeliverable: "一場創辦人親自上鏡的 IG 直播流程腳本",
+    strategistUnit: "段",
+    extras: { postsCount: 5, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
   "ig-60-serial-3": {

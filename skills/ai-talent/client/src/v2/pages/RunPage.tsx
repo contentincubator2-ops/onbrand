@@ -266,7 +266,9 @@ const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"
 // 漸進揭露（headline pool：變體是可互換的角度，先給 3 個）。但序列型任務
 // 的每個變體是「流程的一段」，藏起後半段等於把流程表切一半 —— 這類任務
 // 一次全部攤開。用明列 id 而不是關鍵字猜（見 inferMockup 的教訓）。
-const SEQUENCE_TASKS = new Set<string>(["ig-60-live-suite"]);
+const SEQUENCE_TASKS = new Set<string>([
+  "ig-60-live-suite", "ig-60-live-event", "ig-60-live-founder",
+]);
 
 function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
   const [open, setOpen] = React.useState(false);
