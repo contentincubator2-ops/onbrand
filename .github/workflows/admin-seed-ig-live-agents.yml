@@ -1,0 +1,28 @@
+name: "Admin — Seed IG-live archetype agents (SSH)"
+
+# 2026-08-23: 建立 5 個「直播類型主理人」分身，給 IG 直播的新任務卡使用。
+# 冪等（以 slug 判斷，已存在只更新內容），可重跑。
+# 執行完會在 log 尾端印出 agent id，要貼回 quickTaskIG60.ts。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Seed agents on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a
+            source .env 2>/dev/null || true
+            set +a
+            node --import tsx scripts/seed-ig-live-archetype-agents.ts
