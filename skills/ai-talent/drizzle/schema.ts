@@ -124,8 +124,16 @@ export const agents = mysqlTable("agents", {
    * 2026-05-08 (CJ direction): per-role thick system prompt — the agent's
    * actual writing manual (formulas / structure / banlist / examples).
    * Read by loadAgent() and prepended to every LLM call this agent runs.
-   * 200-500 words ideal; the role-specific operating layer between the
-   * market master persona and the per-task systemPrompt.
+   * The role-specific operating layer between the market master persona and
+   * the per-task systemPrompt.
+   *
+   * 2026-08-23 (CJ「每一個新增的 facebook 貼文任務，agent 的設計都要按照
+   * 真實人物設計，system prompt 不少於 2200 個字」): 舊標準是「200-500 words
+   * ideal」，已作廢。綁到 FB 貼文類任務（postType feed / pinned / story）的
+   * agent，這欄不得少於 2200 字，且必須按真實人物設計——具體的口頭禪、
+   * 句型、立場，不是「專業親切溫暖」堆字數。同一條標準已存在於
+   * personaAgentRouter.ts（persona + skill 合計 ≥ 2200 字，且緊扣真實素材）。
+   * 稽核：npx tsx scripts/audit-fb-agent-personas.ts --posts
    */
   taskSystemPrompt: text("taskSystemPrompt"),
   // Creator / UGC fields
@@ -731,6 +739,36 @@ export const missionResources = mysqlTable("mission_resources", {
 });
 export type MissionResource = typeof missionResources.$inferSelect;
 export type InsertMissionResource = typeof missionResources.$inferInsert;
+
+// ─── 貼文形式候選佇列 ───────────────────────────────────────
+// 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」)
+// 每月排程（op-scan-post-formats.yml）寫入、/admin/post-formats 審核。
+// 建表走 server/index.ts 的啟動 migration，DDL 在 _core/postFormatStore.ts；
+// 這裡只是型別來源（同 mission_resources 的做法）。
+export const postFormatCandidates = mysqlTable("post_format_candidates", {
+  id:            int("id").autoincrement().primaryKey(),
+  platform:      varchar("platform", { length: 32 }).notNull().default("facebook"),
+  market:        varchar("market", { length: 8 }).notNull(),        // ISO 3166-1 alpha-2
+  language:      varchar("language", { length: 16 }),               // BCP 47
+  kind:          varchar("kind", { length: 16 }).notNull().default("format"), // format | topic
+  candidateKey:  varchar("candidateKey", { length: 191 }).notNull(), // 跨月去重鍵
+  name:          varchar("name", { length: 255 }).notNull(),
+  nameEn:        varchar("nameEn", { length: 255 }),
+  mechanism:     text("mechanism"),                                  // 可重複的結構
+  whyItWorks:    text("whyItWorks"),                                 // 零粉絲為何仍有效
+  evidence:      longtext("evidence"),                               // JSON: [{title,url,observedAt}]
+  duplicateOf:   varchar("duplicateOf", { length: 64 }),             // 對到的現有 task id
+  status:        varchar("status", { length: 16 }).notNull().default("pending"), // pending|approved|rejected|shipped
+  seenCount:     int("seenCount").notNull().default(1),
+  firstSeenAt:   datetime("firstSeenAt", { fsp: 3 }).notNull(),
+  lastSeenAt:    datetime("lastSeenAt", { fsp: 3 }).notNull(),
+  reviewedBy:    int("reviewedBy"),
+  reviewedAt:    datetime("reviewedAt", { fsp: 3 }),
+  reviewNote:    text("reviewNote"),
+  shippedTaskId: varchar("shippedTaskId", { length: 64 }),
+});
+export type PostFormatCandidate = typeof postFormatCandidates.$inferSelect;
+export type InsertPostFormatCandidate = typeof postFormatCandidates.$inferInsert;
 
 // ─── User Workspaces (用戶自訂工作區) ─────────────────────────────────────────
 export const userWorkspaces = mysqlTable("user_workspaces", {

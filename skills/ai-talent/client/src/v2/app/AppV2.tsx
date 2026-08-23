@@ -79,6 +79,7 @@ const DocRewritePage = React.lazy(() => import("../pages/media/DocRewritePage"))
 // Admin (heaviest — adminProcedure-gated, almost never needed by general traffic)
 const AdminErrorsPage = React.lazy(() => import("../pages/AdminErrorsPage"));
 const AdminDashboardPage = React.lazy(() => import("../pages/AdminDashboardPage"));
+const AdminPostFormatsPage = React.lazy(() => import("../pages/AdminPostFormatsPage"));
 const AdminUserDetailPage = React.lazy(() => import("../pages/AdminUserDetailPage"));
 const AdminSupportPage = React.lazy(() => import("../pages/AdminSupportPage"));
 // 2026-06-21 (CJ「TTFV dashboard」)
@@ -338,6 +339,9 @@ export default function AppV2() {
           <Route path="/admin/user/:id" element={<AdminUserDetailPage />} />
           {/* 2026-06-21 (CJ「TTFV dashboard」) — register→first-week funnel */}
           <Route path="/admin/activation" element={<AdminActivationPage />} />
+          {/* 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」)
+              — 每月掃描產出的貼文形式候選佇列，核准後才照 SOP 開卡 */}
+          <Route path="/admin/post-formats" element={<AdminPostFormatsPage />} />
           {/* 2026-05-11 — content calendar (P0-1) */}
           <Route path="/calendar" element={<CalendarPage />} />
           {/* 2026-05-10 account settings + achievements */}
