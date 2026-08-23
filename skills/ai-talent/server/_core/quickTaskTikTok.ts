@@ -123,11 +123,11 @@ ${TT_SUFFIX}`,
     id: "tt-30-visual-illusion",
     tier: "30s",
     postType: "foryou",
-    label: { en: "One-Second Flip Clip", zh: "一秒反轉短片" },
-    description: { en: "A shot the eye can't explain — viewers replay to figure it out", zh: "一個看不懂怎麼辦到的畫面，觀眾為了看懂而重播" },
+    label: { en: "TikTok One-Second Flip Script (8–15s)", zh: "TikTok 一秒變身腳本（8-15 秒）" },
+    description: { en: "Same frame, two different things · shot-by-shot visual / action / sound / on-screen text", zh: "同一個鏡頭前後判若兩物 · 逐格畫面／動作／音效／字卡" },
     agent_id: 180167,
     skill_slug: "tiktok-content",
-    primary_question: "想讓觀眾「重播三次才看懂」的是你的什麼？",
+    primary_question: "想拍什麼東西的「一秒變身」？",
     primary_input: { key: "topic", placeholder: "例：一秒收納的嬰兒推車 / 沖下去才變色的茶包", type: "textarea" },
     inputs: [{ key: "topic", label: "產品 / 主題 + 想被看見的那個瞬間", type: "textarea", required: true }],
     systemPrompt: `你在寫「視覺魔術式」TikTok 短片腳本。本變體的切角是「{label}」。
@@ -139,8 +139,8 @@ ${TT_SUFFIX}`,
 
 【各切角怎麼執行 — 嚴格照 {label} 走】
 - 「一秒變身」：同一顆鏡頭、同一個構圖，一個遮擋或一次轉身之後主體完全變了。
-- 「錯位接合」：利用前後景錯位，讓兩個不相干的東西在畫面上接成一個。
-- 「時間扭曲」：慢動作與正常速度在同一鏡切換，或倒放讓散開的東西回到原位。
+- 「借位錯覺」：利用前後景錯位，讓兩個不相干的東西在畫面上接成一個。
+- 「倒放回原」：慢動作與正常速度在同一鏡切換，或倒放讓散開的東西回到原位。
 
 【這支片的骨架 — 下面只列「每一格要交代什麼」，實際輸出仍要照上面的四行格式寫】
 [0.0-0.5s] 開場：先給一個「正常」的畫面，但構圖已經藏好破綻
@@ -155,11 +155,11 @@ ${TT_MECHANIC_CORE}`,
     id: "tt-30-process-payoff",
     tier: "30s",
     postType: "foryou",
-    label: { en: "Zero-to-Done Satisfying Clip", zh: "從無到有滿足短片" },
-    description: { en: "No talking — just the process and the moment it's finished", zh: "全程無旁白，只有過程與完成的那一刻" },
+    label: { en: "TikTok Process Script (8–15s)", zh: "TikTok 製作過程腳本（8-15 秒）" },
+    description: { en: "From raw to finished, no voiceover · shot-by-shot visual / action / sound / on-screen text", zh: "從原料到完成那一刻，全程無旁白 · 逐格畫面／動作／音效／字卡" },
     agent_id: 30011,
     skill_slug: "short-video-script",
-    primary_question: "你的品牌有什麼「做出來 / 弄好」的過程可以拍？",
+    primary_question: "有什麼「做出來 / 弄好」的過程可以拍？",
     primary_input: { key: "topic", placeholder: "例：手沖一杯的 90 秒 / 亂到整齊的衣櫃 / 蛋糕裱花", type: "textarea" },
     inputs: [{ key: "topic", label: "要拍的過程 + 完成品", type: "textarea", required: true }],
     systemPrompt: `你在寫「從無到有滿足式」TikTok 短片腳本。本變體的切角是「{label}」。
@@ -187,11 +187,11 @@ ${TT_MECHANIC_CORE}`,
     id: "tt-30-beat-sync",
     tier: "30s",
     postType: "foryou",
-    label: { en: "Beat-Synced Cut Clip", zh: "卡點快剪短片" },
-    description: { en: "Every cut lands on the beat — the rhythm is the content", zh: "每一次切換都卡在拍點上，節奏本身就是內容" },
+    label: { en: "TikTok Beat-Sync Script (8–15s)", zh: "TikTok 音樂卡點腳本（8-15 秒）" },
+    description: { en: "Multiple items or scenes cut on the beat · every shot marked with its beat + visual / action / on-screen text", zh: "多品項／多情境跟著拍點快切 · 每格標拍點＋畫面／動作／字卡" },
     agent_id: 60033,
     skill_slug: "short-video-script",
-    primary_question: "有哪些畫面 / 品項可以用節奏串成一串？",
+    primary_question: "有哪些品項 / 畫面想串成一支？",
     primary_input: { key: "topic", placeholder: "例：8 種口味輪流出場 / 一週穿搭 / 門市到出貨", type: "textarea" },
     inputs: [{ key: "topic", label: "要串起來的畫面或品項", type: "textarea", required: true }],
     systemPrompt: `你在寫「節奏卡點式」TikTok 短片腳本。本變體的切角是「{label}」。
@@ -219,11 +219,11 @@ ${TT_MECHANIC_CORE}`,
     id: "tt-30-scale-reveal",
     tier: "30s",
     postType: "foryou",
-    label: { en: "Scale Reveal Clip", zh: "尺度揭曉短片" },
-    description: { en: "One unbroken move that keeps pulling out until the scale lands", zh: "一鏡到底把尺度拉開，最後揭曉全貌" },
+    label: { en: "TikTok One-Take Reveal Script (8–15s)", zh: "TikTok 一鏡到底腳本（8-15 秒）" },
+    description: { en: "No cuts — the camera keeps pulling out until the scale lands · shot-by-shot visual / action / sound / on-screen text", zh: "鏡頭不剪接持續拉開，最後揭曉規模 · 逐格畫面／動作／音效／字卡" },
     agent_id: 60031,
     skill_slug: "short-video-script",
-    primary_question: "你的品牌有什麼「規模 / 數量 / 細節」值得被看見？",
+    primary_question: "有什麼「規模 / 數量 / 細節」值得被看見？",
     primary_input: { key: "topic", placeholder: "例：一天出貨 3000 箱的倉庫 / 一顆鏡片的 12 道工序", type: "textarea" },
     inputs: [{ key: "topic", label: "想被看見的規模或細節", type: "textarea", required: true }],
     systemPrompt: `你在寫「尺度震撼式」TikTok 短片腳本。本變體的切角是「{label}」。
@@ -233,7 +233,7 @@ ${TT_MECHANIC_CORE}`,
 鏡頭一拉才發現規模完全不是那回事。腳本要設計的就是「什麼時候讓人發現」。
 
 【各切角怎麼執行 — 嚴格照 {label} 走】
-- 「微觀拉到全貌」：從一個極近的細節開始，一路後退到全景。
+- 「細節拉到全景」：從一個極近的細節開始，一路後退到全景。
 - 「一鏡到底走位」：鏡頭跟著一個主體穿過空間，用移動累積規模感。
 - 「數量堆疊」：同一構圖，東西一件一件加進來，最後滿到出框。
 
@@ -250,11 +250,11 @@ ${TT_MECHANIC_CORE}`,
     id: "tt-30-real-reaction",
     tier: "30s",
     postType: "foryou",
-    label: { en: "Unscripted Reaction Clip", zh: "真實反應短片" },
-    description: { en: "Set up a moment where a genuine reaction can actually happen", zh: "設計一個「真的會發生反應」的情境，不是演出來的" },
+    label: { en: "TikTok Real Reaction Script (8–15s)", zh: "TikTok 真實反應腳本（8-15 秒）" },
+    description: { en: "Film a customer's first-use reaction (not acted) · shot-by-shot visual / action / live sound / on-screen text + consent reminder", zh: "拍顧客第一次使用的真實反應（不是演的） · 逐格畫面／動作／現場音／字卡＋同意提醒" },
     agent_id: 180158,
     skill_slug: "social-engagement",
-    primary_question: "誰第一次接觸你的產品時，會有藏不住的反應？",
+    primary_question: "誰第一次用你的產品時，會有藏不住的反應？",
     primary_input: { key: "topic", placeholder: "例：阿嬤第一次用語音助理 / 客人聞到剛出爐那一下", type: "textarea" },
     inputs: [{ key: "topic", label: "誰 + 在什麼情境下會有反應", type: "textarea", required: true }],
     systemPrompt: `你在寫「真實反應式」TikTok 短片腳本。本變體的切角是「{label}」。
@@ -556,10 +556,10 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 忙，而且用戶會想連試好幾種機制，每張卡都要便宜。
   // captionMaxChars 放到 1200：一格 5 行 × 4-6 格，壓太緊模型會把格子合併，
   // 就退回散文了。下限 400 則是防止只寫兩格交差。
-  "tt-30-visual-illusion":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["一秒變身", "錯位接合", "時間扭曲"], captionMinChars: 400, captionMaxChars: 1200 },
+  "tt-30-visual-illusion":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["一秒變身", "借位錯覺", "倒放回原"], captionMinChars: 400, captionMaxChars: 1200 },
   "tt-30-process-payoff":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["製作過程", "整理復原", "組裝完成"], captionMinChars: 400, captionMaxChars: 1200 },
   "tt-30-beat-sync":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["多品項快切", "情境輪播", "安靜→爆點"], captionMinChars: 400, captionMaxChars: 1200 },
-  "tt-30-scale-reveal":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["微觀拉到全貌", "一鏡到底走位", "數量堆疊"], captionMinChars: 400, captionMaxChars: 1200 },
+  "tt-30-scale-reveal":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["細節拉到全景", "一鏡到底走位", "數量堆疊"], captionMinChars: 400, captionMaxChars: 1200 },
   "tt-30-real-reaction":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["第一次使用", "旁人被吸引", "素人真實回饋"], captionMinChars: 400, captionMaxChars: 1200 },
   "tt-30-bio-rewrite":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["專家定位", "個性風格", "結果導向"], captionMinChars: 50, captionMaxChars: 80 },
   "tt-30-hashtag-set":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["fyp 大流量", "精準利基", "趨勢搭便車"], captionMinChars: 0, captionMaxChars: 400 },

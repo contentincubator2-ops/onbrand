@@ -43,6 +43,29 @@ describe("TikTok task pool invariants", () => {
   });
 });
 
+describe("卡片命名 — 使用者掃過卡牆時要看得出「這會給我一份腳本」", () => {
+  // 2026-08-23 (CJ 看到上線後的卡牆：「看起來也不像是腳本類型，一秒反轉、
+  // 從無到有滿足短片，看起來都不好懂」)。同一面牆上好懂的卡長這樣：
+  //   TikTok 完整腳本（30-60s） / hook → reveal → 3 段內容 → CTA
+  //   IG 直播 30 分鐘流程腳本   / 6 個時間段的完整直播範本：…
+  // 規則 = 標題寫「平台 + 交付物（規格）」，副標寫「裡面有什麼」。
+  // 原本的命名是機制的比喻（一秒反轉短片），副標在講原理（觀眾為了看懂而
+  // 重播）—— 整張卡沒有一個字說「你會拿到腳本」。
+  it.each(MECHANIC_CARDS)("%s names the platform and the deliverable", (id) => {
+    const t = TT_30S_TASKS.find((x) => x.id === id)!;
+    const zh = typeof t.label === "string" ? t.label : t.label.zh;
+    expect(zh.startsWith("TikTok ")).toBe(true);
+    expect(zh).toContain("腳本");
+  });
+
+  it.each(MECHANIC_CARDS)("%s says what is inside the deliverable", (id) => {
+    const t = TT_30S_TASKS.find((x) => x.id === id)!;
+    const zh = typeof t.description === "string" ? t.description : t.description.zh;
+    // 副標必須點出交付物的組成（畫面／動作／字卡…），不能只描述原理。
+    expect(zh).toMatch(/畫面|拍點|字卡/);
+  });
+});
+
 describe("高互動機制腳本卡", () => {
   it.each(MECHANIC_CARDS)("%s exists in the 30s pool", (id) => {
     expect(TT_30S_TASKS.some((t) => t.id === id)).toBe(true);
