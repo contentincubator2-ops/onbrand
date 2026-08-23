@@ -178,6 +178,18 @@ describe("normalizeShotList — 句子裡提到的時間戳不是一格", () => 
     expect(out).not.toContain("---");
   });
 
+  it("breaks a block that came back as one long line", () => {
+    // 2026-08-23 VM probe：整個【常見失誤】擠成一行。
+    const oneLine = "字卡：無 【常見失誤】 失誤：位置不一致　改法：貼膠帶標中央點 失誤：煙霧擋住盒子　改法：等一秒再倒";
+    const out = normalizeShotList(oneLine).split("\n").filter(Boolean);
+    expect(out).toEqual([
+      "字卡：無",
+      "【常見失誤】",
+      "失誤：位置不一致　改法：貼膠帶標中央點",
+      "失誤：煙霧擋住盒子　改法：等一秒再倒",
+    ]);
+  });
+
   it("still splits a real shot header that follows content", () => {
     const glued = "字卡：d [0.5-1.0s] 第二格\n畫面：e";
     expect(normalizeShotList(glued)).toContain("字卡：d\n[0.5-1.0s] 第二格");
