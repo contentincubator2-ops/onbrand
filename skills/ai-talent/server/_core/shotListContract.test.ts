@@ -171,6 +171,13 @@ describe("normalizeShotList — 句子裡提到的時間戳不是一格", () => 
     expect(out).toContain("字卡：開了。\n\n【開拍前準備】");
   });
 
+  it("drops the markdown rule the model leaves before a block", () => {
+    // 2026-08-23 VM probe：「字卡：微波 5 分鐘的距離 ---」。
+    const out = normalizeShotList("字卡：微波 5 分鐘的距離 ---\n\n【開拍前準備】\n・器材：手機");
+    expect(out).toContain("字卡：微波 5 分鐘的距離\n");
+    expect(out).not.toContain("---");
+  });
+
   it("still splits a real shot header that follows content", () => {
     const glued = "字卡：d [0.5-1.0s] 第二格\n畫面：e";
     expect(normalizeShotList(glued)).toContain("字卡：d\n[0.5-1.0s] 第二格");

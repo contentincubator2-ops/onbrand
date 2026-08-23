@@ -139,6 +139,9 @@ export function normalizeShotList(caption: string): string {
   // 腳本後面的區塊標題（【開拍前準備】…）也要自成一行 —— 實測會黏在最後
   // 一格的「字卡：」後面（字卡：開了。【開拍前準備】）。
   t = t.replace(/([^\n])[ \t　]*(【[^】\n]{2,10}】)/gu, "$1\n\n$2");
+  // 模型愛在區塊之間加 markdown 分隔線，實測會黏在字卡尾巴（字卡：… ---）。
+  // 分格腳本不是 markdown，一律拿掉。
+  t = t.replace(/[ \t　]*(?:-{3,}|_{3,}|\*{3,})[ \t　]*(?=\n|$)/gu, "");
   return t.replace(/\n{3,}/gu, "\n\n").trim();
 }
 
