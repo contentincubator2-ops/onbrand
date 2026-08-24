@@ -1,0 +1,95 @@
+name: Ops — Diagnose IRIS product JSON structure (two accounts)
+
+# 2026-08-24 (CJ: 確認 vmdirisfamily@gmail.com 與 sowork@sowork.tw 兩帳號下
+# IRIS 品牌的 products.positioning JSON 結構是否一致，特別是圖片欄位
+# imageUrl / image / images / _interim / _assets 的形狀 — 懷疑貼文產圖時
+# 因結構不同而行為不同)。唯讀診斷，不寫任何資料。
+# Run via: GitHub → Actions → this workflow → Run workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Compare IRIS product positioning structure
+        run: |
+          set -e
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
+          DB_USER="${LOCAL_DB_USER:-mos_user}"
+          DB_PASS="${LOCAL_DB_PASSWORD:-}"
+          DB_NAME="${LOCAL_DB_NAME:-mos_db}"
+          echo "::add-mask::${DB_PASS}"
+          MYSQL() { mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "$1" 2>&1; }
+
+          echo "════════════════════════════════════════════════════"
+          echo "  1. Users"
+          echo "════════════════════════════════════════════════════"
+          MYSQL "SELECT id, email FROM users
+                 WHERE email IN ('vmdirisfamily@gmail.com','sowork@sowork.tw');"
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  2. IRIS-ish brands per account"
+          echo "════════════════════════════════════════════════════"
+          MYSQL "SELECT b.id, b.name, b.userId, u.email
+                 FROM brands b JOIN users u ON u.id = b.userId
+                 WHERE u.email IN ('vmdirisfamily@gmail.com','sowork@sowork.tw')
+                   AND (b.name LIKE '%iris%' OR b.name LIKE '%IRIS%' OR b.name LIKE '%艾莉詩%')
+                 ORDER BY u.email, b.id;"
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  3. Product count + positioning top-level keys per brand"
+          echo "════════════════════════════════════════════════════"
+          MYSQL "SELECT u.email, b.id AS brandId, b.name AS brand,
+                        COUNT(p.id) AS products,
+                        JSON_KEYS(COALESCE(p2.positioning, JSON_OBJECT())) AS sample_keys
+                 FROM brands b
+                 JOIN users u ON u.id = b.userId
+                 LEFT JOIN products p ON p.brandId = b.id AND p.userId = b.userId
+                 LEFT JOIN products p2 ON p2.id = (
+                   SELECT MIN(id) FROM products WHERE brandId = b.id AND userId = b.userId)
+                 WHERE u.email IN ('vmdirisfamily@gmail.com','sowork@sowork.tw')
+                   AND (b.name LIKE '%iris%' OR b.name LIKE '%IRIS%' OR b.name LIKE '%艾莉詩%')
+                 GROUP BY u.email, b.id, b.name, sample_keys;"
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  4. Per-product image-field shape (both accounts)"
+          echo "════════════════════════════════════════════════════"
+          MYSQL "SELECT u.email, b.name AS brand, p.id, p.name,
+                        JSON_KEYS(p.positioning) AS top_keys,
+                        JSON_UNQUOTE(JSON_EXTRACT(p.positioning,'$.imageUrl'))  AS imageUrl,
+                        JSON_UNQUOTE(JSON_EXTRACT(p.positioning,'$.image'))     AS image,
+                        JSON_TYPE(JSON_EXTRACT(p.positioning,'$.images'))       AS images_type,
+                        JSON_LENGTH(JSON_EXTRACT(p.positioning,'$.images'))     AS images_len,
+                        JSON_KEYS(JSON_EXTRACT(p.positioning,'$._interim'))     AS interim_keys,
+                        JSON_TYPE(JSON_EXTRACT(p.positioning,'$._assets.photos')) AS assets_photos_type,
+                        JSON_UNQUOTE(JSON_EXTRACT(p.positioning,'$.productUrl')) AS productUrl,
+                        JSON_UNQUOTE(JSON_EXTRACT(p.positioning,'$.price'))     AS price
+                 FROM products p
+                 JOIN brands b ON b.id = p.brandId
+                 JOIN users u ON u.id = p.userId
+                 WHERE u.email IN ('vmdirisfamily@gmail.com','sowork@sowork.tw')
+                   AND (b.name LIKE '%iris%' OR b.name LIKE '%IRIS%' OR b.name LIKE '%艾莉詩%')
+                 ORDER BY u.email, b.id, p.id\\G"
+
+          echo ""
+          echo "════════════════════════════════════════════════════"
+          echo "  5. First 400 chars of one sample positioning per account"
+          echo "════════════════════════════════════════════════════"
+          for EMAIL in vmdirisfamily@gmail.com sowork@sowork.tw; do
+            echo "--- $EMAIL ---"
+            MYSQL "SELECT p.id, p.name, LEFT(p.positioning, 400) AS positioning_preview
+                   FROM products p
+                   JOIN brands b ON b.id = p.brandId
+                   JOIN users u ON u.id = p.userId
+                   WHERE u.email = '$EMAIL'
+                     AND (b.name LIKE '%iris%' OR b.name LIKE '%IRIS%' OR b.name LIKE '%艾莉詩%')
+                   ORDER BY p.id
+                   LIMIT 2\\G"
+          done
