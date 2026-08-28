@@ -966,6 +966,8 @@ import { RESEARCH_30S_TASKS, getResearchOrchestraConfig } from "../_core/quickTa
 // 2026-05-12 (CJ「KOL 提供說法不提供名單」)
 import { KOL_30S_TASKS, KOL_30S_ORCHESTRA } from "../_core/quickTaskKOL";
 function getKOLOrchestraConfig(taskId: string) { return KOL_30S_ORCHESTRA[taskId] ?? null; }
+// 2026-08-29 官網頻道 (web-)：品牌自己的部落格長文 / 品牌專欄 / 案例 / 產品頁。
+import { WEBSITE_30S_TASKS, getWebsiteOrchestraConfig } from "../_core/quickTaskWebsite";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
@@ -1189,6 +1191,12 @@ export const quickTaskRouter = router({
       platform: "audience",
     }));
     // 2026-05-12 — KOL outreach 30s tasks
+    // 2026-08-29 官網頻道：品牌自己的長文與產品頁，不是社群通路。
+    const webTasks = WEBSITE_30S_TASKS.map((t) => ({
+      ...t,
+      kind: "fast" as const,
+      platform: "website",
+    }));
     const kolTasks = KOL_30S_TASKS.map((t) => ({
       ...t,
       kind: "fast" as const,
@@ -1289,6 +1297,7 @@ export const quickTaskRouter = router({
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
       ...tasks100,
       ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks, ...kolTasks,
+      ...webTasks,
       ...mediaTasks,
     ];
     // 60s production-package universal team agent IDs (used by orchestra)
@@ -1471,13 +1480,14 @@ export const quickTaskRouter = router({
           PR_30S_TASKS.find((t) => t.id === input.taskId) ??
           BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
           RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-          KOL_30S_TASKS.find((t) => t.id === input.taskId);
+          KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
+          WEBSITE_30S_TASKS.find((t) => t.id === input.taskId);
         if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
         const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
         config =
           _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
           getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
-          getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId);
+          getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId);
         if (!config) throw new Error(`No config for: ${input.taskId}`);
       }
 
@@ -2490,13 +2500,14 @@ export const quickTaskRouter = router({
             PR_30S_TASKS.find((t) => t.id === input.taskId) ??
             BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
             RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-            KOL_30S_TASKS.find((t) => t.id === input.taskId);
+            KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
+            WEBSITE_30S_TASKS.find((t) => t.id === input.taskId);
           if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
           const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
           config =
             _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
             getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
-            getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId);
+            getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId);
           if (!config) throw new Error(`No config for: ${input.taskId}`);
         }
       }
@@ -2634,7 +2645,8 @@ export const quickTaskRouter = router({
         PR_30S_TASKS.find((t) => t.id === input.taskId) ??
         BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-        KOL_30S_TASKS.find((t) => t.id === input.taskId);
+        KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
+        WEBSITE_30S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId} (orchestra is 30s-only).`);
       }
@@ -2648,7 +2660,8 @@ export const quickTaskRouter = router({
         getPROrchestraConfig(input.taskId) ??
         getBrandOrchestraConfig(input.taskId) ??
         getResearchOrchestraConfig(input.taskId) ??
-        getKOLOrchestraConfig(input.taskId);
+        getKOLOrchestraConfig(input.taskId) ??
+        getWebsiteOrchestraConfig(input.taskId);
       if (!config) {
         throw new Error(`No orchestra config for task ${input.taskId}.`);
       }
@@ -2790,6 +2803,7 @@ export const quickTaskRouter = router({
         BRAND_30S_TASKS.find((t) => t.id === taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === taskId) ??
         KOL_30S_TASKS.find((t) => t.id === taskId) ??
+        WEBSITE_30S_TASKS.find((t) => t.id === taskId) ??
         getFB60Template(taskId) ??
         getIG60Template(taskId) ??
         getYT60Template(taskId) ??
@@ -2812,7 +2826,8 @@ export const quickTaskRouter = router({
         getIG60OrchestraConfig(taskId) ??
         getYT60OrchestraConfig(taskId) ??
         getMulti60OrchestraConfig(taskId) ??
-        get99OrchestraConfig(taskId);
+        get99OrchestraConfig(taskId) ??
+        getWebsiteOrchestraConfig(taskId);
       if (!fullConfig) throw new Error(`no orchestra config for ${taskId}`);
 
       // Override config to produce ONE variant only — use the same label
@@ -2885,7 +2900,8 @@ export const quickTaskRouter = router({
         PR_30S_TASKS.find((t) => t.id === input.taskId) ??
         BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-        KOL_30S_TASKS.find((t) => t.id === input.taskId);
+        KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
+        WEBSITE_30S_TASKS.find((t) => t.id === input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId}. (60s uses runOrchestra60; 90s uses squad.stepExecute.)`);
       }

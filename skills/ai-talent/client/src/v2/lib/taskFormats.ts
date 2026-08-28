@@ -423,6 +423,30 @@ export const PR_TASK_FORMAT_MAP: Record<string, PRActiveFormat> = {
   "pr-99-newsjack":          "策略 / 發佈",
 };
 
+// ── 官網 (web-) ─────────────────────────────────────────────────────────
+// 2026-08-29 (CJ「官網長文會新增一個官網類別，裡面有長文還有產品描述的
+// 不同類別的任務」)。品牌自己的官網，不是社群通路。
+export type WEBActiveFormat = "all" | "長文" | "產品描述";
+
+export const WEB_FORMAT_TABS: { id: WEBActiveFormat; label: string; labelEn: string }[] = [
+  { id: "all",      label: "全部",     labelEn: "All"          },
+  { id: "長文",     label: "長文",     labelEn: "Long-form"    },
+  { id: "產品描述", label: "產品描述", labelEn: "Product Copy" },
+];
+
+export const WEB_TASK_FORMAT_MAP: Record<string, WEBActiveFormat> = {
+  // 長文
+  "web-30-longform":     "長文",
+  "web-30-column":       "長文",
+  "web-30-case-study":   "長文",
+  // 產品描述
+  "web-30-product-desc": "產品描述",
+  "web-30-product-faq":  "產品描述",
+};
+
+/** WEB: 目前沒有刻意不分類的卡。新卡不想進 pill 就加進來。 */
+export const WEB_UNMAPPED_BY_DESIGN = new Set<string>([]);
+
 /** IG: 目前沒有刻意不分類的卡。新卡不想進 pill 就加進來。 */
 export const IG_UNMAPPED_BY_DESIGN = new Set<string>([]);
 

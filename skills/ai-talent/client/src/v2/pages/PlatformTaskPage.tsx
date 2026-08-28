@@ -29,6 +29,7 @@ import {
   TT_FORMAT_TABS, TT_TASK_FORMAT_MAP, type TTActiveFormat,
   EM_FORMAT_TABS, EM_TASK_FORMAT_MAP, type EMActiveFormat,
   PR_FORMAT_TABS, PR_TASK_FORMAT_MAP, type PRActiveFormat,
+  WEB_FORMAT_TABS, WEB_TASK_FORMAT_MAP, type WEBActiveFormat,
 } from "../lib/taskFormats";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
@@ -41,7 +42,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBolt, faPaperPlane, faXmark, faMagnifyingGlass,
-  faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation,
+  faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -78,6 +79,8 @@ const ROUTE_TO_PLATFORM: Record<string, string> = {
   tt:    "tiktok",
   email: "email",
   pr:    "pr",
+  // 2026-08-29 官網頻道。路由是 /tasks/web，平台代號是 website。
+  web:   "website",
 };
 
 interface PlatformMeta {
@@ -140,6 +143,13 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
     heroEn: "Written to get picked up — not just to check a box",
     subZh: "PR Strategist 代理人以記者視角找到新聞價值，再產出完整稿件",
     subEn: "PR Strategist finds the news angle before writing a single word",
+  },
+  website: {
+    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#0F766E",
+    heroZh: "官網長文不是部落格隨筆，是品牌把觀點說完整的地方",
+    heroEn: "Long-form that earns the reader's time — not filler blog posts",
+    subZh: "引言＋3 段的固定骨架，把案例與規格翻譯成讀者的生活感受",
+    subEn: "A fixed intro-plus-three structure that turns specs into felt experience",
   },
 };
 
@@ -459,6 +469,7 @@ function PlatformTaskPageInner() {
   const [activeEMFormat, setActiveEMFormat] = useState<EMActiveFormat>("all");
   // Format tab state (used for PR)
   const [activePRFormat, setActivePRFormat] = useState<PRActiveFormat>("all");
+  const [activeWEBFormat, setActiveWEBFormat] = useState<WEBActiveFormat>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -722,6 +733,7 @@ function PlatformTaskPageInner() {
       : task.id?.startsWith("li-") ? "linkedin"
       : task.id?.startsWith("em-") ? "email"
       : task.id?.startsWith("pr-") ? "pr"
+      : task.id?.startsWith("web-") ? "website"
       : task.id?.startsWith("br-") ? "brand"
       : task.id?.startsWith("rs-") ? "audience"
       : "facebook");
@@ -764,6 +776,11 @@ function PlatformTaskPageInner() {
       if (activePRFormat !== "all") {
         list = list.filter((task) => PR_TASK_FORMAT_MAP[task.id] === activePRFormat);
       }
+    } else if (platform === "website") {
+      // Format-based filter for 官網
+      if (activeWEBFormat !== "all") {
+        list = list.filter((task) => WEB_TASK_FORMAT_MAP[task.id] === activeWEBFormat);
+      }
     } else {
       // Tier-based filter for other platforms
       if (activeTier !== "all") {
@@ -782,7 +799,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -868,6 +885,18 @@ function PlatformTaskPageInner() {
     const counts: Record<string, number> = { all: prTasks.length };
     for (const task of prTasks) {
       const fmt = PR_TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
+
+  // Count tasks per format category (官網)
+  const webFormatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "website") return {};
+    const webTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: webTasks.length };
+    for (const task of webTasks) {
+      const fmt = WEB_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
@@ -1476,6 +1505,41 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActivePRFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {lang === "en" ? tab.labelEn : tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "website" ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {WEB_FORMAT_TABS.map((tab) => {
+                  const active = activeWEBFormat === tab.id;
+                  const count = webFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveWEBFormat(tab.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active

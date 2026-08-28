@@ -1716,8 +1716,19 @@ export default function RunPage() {
     const idPrefixMap: Record<string, string> = {
       fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
       li: "linkedin", em: "email", pr: "press",
+      // 2026-08-29 官網頻道。web:blog / web:product-page / web:landing 三個
+      // mockup 元件早就實作並註冊了，缺的只是這條前綴對應。
+      web: "web",
     };
     const formatFromTaskId = (id: string): string => {
+      // 2026-08-29 官網 (web-)：跟 pr- / em- 同樣的理由——先用前綴決斷，
+      // 否則下面的關鍵字掃描會誤傷，例如 "web-30-product-faq" 會被 faq
+      // 規則搶去判成 "qa"（那是新聞稿的 Q&A 卡片版型，不是產品頁）。
+      if (id.startsWith("web-")) {
+        if (id.includes("product")) return "product-page";
+        if (id.includes("landing")) return "landing";
+        return "blog";
+      }
       // 2026-05-16 (CJ「pr-30-lead-paragraph mockup 格式不對」):
       // press (pr-) + email (em-) each have ONE mockup family. Decide
       // by prefix FIRST — otherwise generic keyword scans below

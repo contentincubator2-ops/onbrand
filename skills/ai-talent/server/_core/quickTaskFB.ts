@@ -94,7 +94,11 @@ export interface FBTaskTemplate {
    * Widened 2026-05-05 to support IG / Threads / etc. as channel rollout
    * progresses (see project_30s_task_sop.md). */
   outputDefaults: {
-    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "generic";
+    // 2026-08-29 官網頻道 (web-)：mission_outputs.platform 的 enum 沒有 "web"，
+    // recordTaskRun 的 SAFE_PLATFORMS 會把未知值降級成 "other"（能寫入，但
+    // 丟失語意）。"doc" 在 enum 值域內且語意正確，所以官網長文用它。
+    // mockup 不靠這個欄位 —— RunPage Layer 1 由 taskId 前綴決定。
+    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "doc" | "generic";
     post_type: string;
   };
   /**

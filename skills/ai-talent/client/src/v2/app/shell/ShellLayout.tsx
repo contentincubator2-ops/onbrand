@@ -42,7 +42,7 @@ import {
   faShareNodes, faTrophy, faUsers, faLanguage,
   faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
-  faEnvelope, faBullhorn, faChartLine, faDatabase,
+  faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -213,6 +213,9 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
     { to: "/tasks/pr",    label: en ? "PR" : "新聞稿",   icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/tasks/pr",
       tooltip: en ? "Press releases, media pitch, CEO quotes, fact sheets" : "新聞稿 / 媒體提案 / CEO 聲明 / 資料頁" },
+    // 2026-08-29 官網頻道：品牌自己的長文與產品頁，不是社群通路。
+    { to: "/tasks/web",   label: en ? "Website" : "官網",  icon: <FontAwesomeIcon icon={faGlobe} />,    matchPrefix: "/tasks/web",
+      tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
     // ── Workspace & tools ──────────────────────────────────────────────────
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
