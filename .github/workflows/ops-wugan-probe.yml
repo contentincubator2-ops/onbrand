@@ -91,7 +91,7 @@ jobs:
             process.exit(0);
           })().catch(e => { console.error('DUMP FAILED:', e && e.message || e); process.exit(1); });
           JS
-          BID="${{ github.event.inputs.brandId }}" node /tmp/wugan_dump.cjs
+          BID="${{ github.event.inputs.brandId }}" node -e "$(cat /tmp/wugan_dump.cjs)"
           exit 0
 
       - name: brandRealContent live probe (force refresh)
@@ -117,7 +117,7 @@ jobs:
           }
           process.exit(0);
           JS
-          BID="${{ github.event.inputs.brandId }}" node --import tsx /tmp/wugan_grounding.mjs
+          BID="${{ github.event.inputs.brandId }}" node --import tsx --input-type=module -e "$(cat /tmp/wugan_grounding.mjs)"
           echo "grounding exit=$?"
           exit 0
 
@@ -140,5 +140,5 @@ jobs:
           }
           process.exit(0);
           JS
-          node --import tsx /tmp/wugan_urls.mjs
+          node --import tsx --input-type=module -e "$(cat /tmp/wugan_urls.mjs)"
           exit 0
