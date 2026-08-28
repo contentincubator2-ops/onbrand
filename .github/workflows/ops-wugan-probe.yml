@@ -80,11 +80,19 @@ jobs:
             console.log(b[0].description || '(empty)');
             console.log('===== BRAND POSITIONING (full) =====');
             console.log(JSON.stringify(pos, null, 2));
-            const [ps] = await conn.execute('SELECT id, name, positioning, description FROM products WHERE brandId=? ORDER BY id', [BID]);
+            const [cols] = await conn.execute("SHOW COLUMNS FROM products");
+            console.log('===== products columns =====');
+            console.log(cols.map(c => c.Field).join(', '));
+            const [ps] = await conn.execute('SELECT * FROM products WHERE brandId=? ORDER BY id', [BID]);
             for (const p of ps) {
-              const pp = typeof p.positioning === 'string' ? JSON.parse(p.positioning) : p.positioning;
               console.log('===== PRODUCT ' + p.id + ' ' + p.name + ' =====');
-              console.log('description: ' + (p.description || '(empty)'));
+              for (const [k, v] of Object.entries(p)) {
+                if (k === 'positioning') continue;
+                const sv = v == null ? '(null)' : String(typeof v === 'object' ? JSON.stringify(v) : v);
+                if (sv !== '(null)' && sv !== '') console.log('  ' + k + ': ' + sv.slice(0, 600));
+              }
+              const pp = typeof p.positioning === 'string' ? JSON.parse(p.positioning) : p.positioning;
+              console.log('  --- positioning ---');
               console.log(JSON.stringify(pp, null, 2));
             }
             await conn.end();
@@ -109,8 +117,8 @@ jobs:
             console.log('HAS_CONTENT ' + res.hasContent);
             console.log('SOURCES ' + JSON.stringify(res.sources));
             console.log('CONTEXT_LEN ' + (res.context || '').length);
-            console.log('===== CONTEXT (first 2500 chars) =====');
-            console.log((res.context || '(empty)').slice(0, 2500));
+            console.log('===== CONTEXT (full) =====');
+            console.log(res.context || '(empty)');
           } catch (e) {
             console.error('GROUNDING FAILED:', e && e.stack || e);
             process.exit(1);
