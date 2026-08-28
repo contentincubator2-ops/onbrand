@@ -350,6 +350,8 @@ function PlatformTaskPageInner() {
   // param, show a banner; the next task the user opens gets the topic
   // prefilled as its primary answer (strategy → copy in one line).
   const [strategyTopic, setStrategyTopic] = useState<string | null>(null);
+  // 換頻道時把客製 pill 歸位 —— 「生活實踐」留在官網頁會濾成空白。
+  useEffect(() => { setActivePackFormat("all"); }, [platform]);
   useEffect(() => {
     const t = searchParams.get("topic");
     if (t && t.trim()) {
@@ -470,6 +472,8 @@ function PlatformTaskPageInner() {
   // Format tab state (used for PR)
   const [activePRFormat, setActivePRFormat] = useState<PRActiveFormat>("all");
   const [activeWEBFormat, setActiveWEBFormat] = useState<WEBActiveFormat>("all");
+  // 客製包的 pill。分類值由 pack 定義，所以是自由字串，不是 union。
+  const [activePackFormat, setActivePackFormat] = useState<string>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -641,9 +645,23 @@ function PlatformTaskPageInner() {
   // 2026-07-20 (CJ「直連 /tasks/fb?b=XXXX 顯示 0/0 個任務」): a failed
   // catalog fetch used to silently render as「0/0 個任務」— retry transient
   // fresh-load hiccups and surface a real error state instead.
+  // 2026-08-29：帶 brandId 進去，有客製任務包的品牌會拿到「只有他的卡」的
+  // 目錄。沒有包的品牌回傳的東西跟以前一模一樣。
   const listQuery = (trpc as any).quickTask?.listFB?.useQuery
-    ? (trpc as any).quickTask.listFB.useQuery(undefined, { refetchOnWindowFocus: false, retry: 2 })
+    ? (trpc as any).quickTask.listFB.useQuery(
+        { brandId: brandId ?? undefined, brandName: brandName ?? undefined },
+        { refetchOnWindowFocus: false, retry: 2 },
+      )
     : { data: [] };
+  // 這個品牌的頻道 / pill 結構。null = 沒有客製包，走既有的全域 pill。
+  const packNavQuery = (trpc as any).quickTask?.brandNav?.useQuery
+    ? (trpc as any).quickTask.brandNav.useQuery(
+        { brandId: brandId ?? undefined, brandName: brandName ?? undefined },
+        { refetchOnWindowFocus: false, staleTime: 300_000 },
+      )
+    : { data: null };
+  const packNav = (packNavQuery.data as any) ?? null;
+  const packChannel = packNav?.channels?.find((c: any) => c.key === platform) ?? null;
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
   const catalogFailed = !!listQuery?.error && allTasks.length === 0;
 
@@ -776,6 +794,11 @@ function PlatformTaskPageInner() {
       if (activePRFormat !== "all") {
         list = list.filter((task) => PR_TASK_FORMAT_MAP[task.id] === activePRFormat);
       }
+    } else if (packChannel) {
+      // 2026-08-29 客製包優先：分類值來自 pack，卡片自帶 packFormat。
+      if (activePackFormat !== "all") {
+        list = list.filter((task) => (task as any).packFormat === activePackFormat);
+      }
     } else if (platform === "website") {
       // Format-based filter for 官網
       if (activeWEBFormat !== "all") {
@@ -799,7 +822,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -889,6 +912,18 @@ function PlatformTaskPageInner() {
     }
     return counts;
   }, [allTasks, platform]);
+
+  // Count tasks per format category (客製包)
+  const packFormatCounts = useMemo<Record<string, number>>(() => {
+    if (!packChannel) return {};
+    const scoped = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: scoped.length };
+    for (const task of scoped) {
+      const fmt = (task as any).packFormat;
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform, packChannel]);
 
   // Count tasks per format category (官網)
   const webFormatCounts = useMemo<Record<string, number>>(() => {
@@ -1284,7 +1319,45 @@ function PlatformTaskPageInner() {
           </div>
 
           {/* ── Format tiles (FB) / Format tiles (IG) / Tier tabs (other) ── */}
-          {platform === "facebook" ? (
+          {/* 2026-08-29 客製包的 pill 優先於所有內建平台分類。分類值由該品牌的
+              pack 定義（例如五感十築的 生活實踐／生態健築／永續生活／永續價值），
+              不是全域那七份手抄對照表 —— 有包的品牌完全繞開它們。 */}
+          {packChannel ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {[{ id: "all", labelZh: "全部", labelEn: "All" }, ...packChannel.formats].map((tab: any) => {
+                  const active = activePackFormat === tab.id;
+                  const count = packFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActivePackFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {lang === "en" ? tab.labelEn : tab.labelZh}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "facebook" ? (
             <div className="w-full" style={{ maxWidth: 860 }}>
               <div className="flex items-center gap-2 flex-wrap justify-center">
                 {FORMAT_TABS.map((tab) => {

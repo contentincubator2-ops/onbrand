@@ -968,6 +968,11 @@ import { KOL_30S_TASKS, KOL_30S_ORCHESTRA } from "../_core/quickTaskKOL";
 function getKOLOrchestraConfig(taskId: string) { return KOL_30S_ORCHESTRA[taskId] ?? null; }
 // 2026-08-29 官網頻道 (web-)：品牌自己的部落格長文 / 品牌專欄 / 案例 / 產品頁。
 import { WEBSITE_30S_TASKS, getWebsiteOrchestraConfig } from "../_core/quickTaskWebsite";
+// 2026-08-29 per-brand 任務包。有 pack 的品牌，頻道與卡片完全由 pack 決定。
+import {
+  resolveBrandPack, expandPackCards, packNavForBrand,
+  findPackTemplate, findPackOrchestraConfig,
+} from "../_core/brandPacks";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
@@ -1145,7 +1150,37 @@ export const quickTaskRouter = router({
   // listFB: returns the entire FB task catalog (30s/60s/90s) for the new
   // home page chips. Includes bound agent metadata (avatar/name/title)
   // so cards can render the agent face as the thumbnail.
-  listFB: protectedProcedure.query(async () => {
+  /**
+   * 2026-08-29 —— 這個品牌的頻道列與 pill。
+   *
+   * 回 null 代表「沒有客製包」，前端就顯示今天的全部頻道。有包的話，側邊欄
+   * 只渲染包裡宣告的頻道 —— 建設公司不該看到 TikTok 開場鉤子和 KOL 邀約信。
+   *
+   * 跟 listFB 分開是因為呼叫端不同：頻道列在 ShellLayout（每頁都在），
+   * 任務清單在 PlatformTaskPage（只有 /tasks 才在）。合併會讓側邊欄去拉
+   * 一份 200 筆的目錄。
+   */
+  brandNav: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.number().optional(),
+        brandName: z.string().optional(),
+      }).optional(),
+    )
+    .query(({ input }) => {
+      return packNavForBrand({ brandId: input?.brandId, brandName: input?.brandName });
+    }),
+
+  listFB: protectedProcedure
+    .input(
+      z.object({
+        // 2026-08-29：帶了 brandId（或 brandName）才有辦法判斷這個品牌有沒有
+        // 客製任務包。維持 optional —— 舊呼叫端不傳就是全域目錄，行為不變。
+        brandId: z.number().optional(),
+        brandName: z.string().optional(),
+      }).optional(),
+    )
+    .query(async ({ input }) => {
     // Despite the name, this catalog now spans FB + IG (and other channels
     // as they ship). Frontend channel-icon row filters by task.platform /
     // postType prefix.
@@ -1293,13 +1328,25 @@ export const quickTaskRouter = router({
       squadName: null,
     }));
 
-    const tasks: any[] = [
+    const globalTasks: any[] = [
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
       ...tasks100,
       ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks, ...kolTasks,
       ...webTasks,
       ...mediaTasks,
     ];
+
+    // 2026-08-29 (CJ「每個品牌，只出現他的定位、任務，不會出現他用不到的」):
+    // 有客製包的品牌，整份目錄由包取代 —— 不是全域再加幾張，是只有包裡那些。
+    // 疊加模式解決不了原本的問題（客戶還是得滑過 200 張用不到的卡）。
+    // 沒有包的品牌走 globalTasks，行為與這次改動前完全一致。
+    //
+    // 這裡換掉 tasks 而不是在 return 前才過濾，是因為下面要靠 tasks 蒐集
+    // agent_id 去查頭像與團隊名單；晚換的話包裡的 agent 會查不到。
+    const brandPack = resolveBrandPack({ brandId: input?.brandId, brandName: input?.brandName });
+    const tasks: any[] = brandPack
+      ? expandPackCards(brandPack, new Map(globalTasks.map((t) => [t.id, t])))
+      : globalTasks;
     // 60s production-package universal team agent IDs (used by orchestra)
     // Emma Zhang / Helen Sung / David Wang / Sophie Ho / Jordan Hayes / Mandy / Nancy / Nina / Anna / Zeyu / Nathan
     const UNIVERSAL_60S_IDS = [30005, 180163, 30003, 60012, 239184, 180170, 180157, 180165, 60071, 60062];
@@ -1481,13 +1528,14 @@ export const quickTaskRouter = router({
           BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
           RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
           KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
-          WEBSITE_30S_TASKS.find((t) => t.id === input.taskId);
+          WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
+        findPackTemplate(input.taskId);
         if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
         const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
         config =
           _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
           getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
-          getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId);
+          getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId) ?? findPackOrchestraConfig(input.taskId);
         if (!config) throw new Error(`No config for: ${input.taskId}`);
       }
 
@@ -2501,13 +2549,14 @@ export const quickTaskRouter = router({
             BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
             RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
             KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
-            WEBSITE_30S_TASKS.find((t) => t.id === input.taskId);
+            WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
+        findPackTemplate(input.taskId);
           if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
           const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
           config =
             _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
             getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
-            getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId);
+            getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId) ?? findPackOrchestraConfig(input.taskId);
           if (!config) throw new Error(`No config for: ${input.taskId}`);
         }
       }
@@ -2646,7 +2695,8 @@ export const quickTaskRouter = router({
         BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
         KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
-        WEBSITE_30S_TASKS.find((t) => t.id === input.taskId);
+        WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
+        findPackTemplate(input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId} (orchestra is 30s-only).`);
       }
@@ -2661,7 +2711,7 @@ export const quickTaskRouter = router({
         getBrandOrchestraConfig(input.taskId) ??
         getResearchOrchestraConfig(input.taskId) ??
         getKOLOrchestraConfig(input.taskId) ??
-        getWebsiteOrchestraConfig(input.taskId);
+        getWebsiteOrchestraConfig(input.taskId) ?? findPackOrchestraConfig(input.taskId);
       if (!config) {
         throw new Error(`No orchestra config for task ${input.taskId}.`);
       }
@@ -2804,6 +2854,7 @@ export const quickTaskRouter = router({
         RESEARCH_30S_TASKS.find((t) => t.id === taskId) ??
         KOL_30S_TASKS.find((t) => t.id === taskId) ??
         WEBSITE_30S_TASKS.find((t) => t.id === taskId) ??
+        findPackTemplate(taskId) ??
         getFB60Template(taskId) ??
         getIG60Template(taskId) ??
         getYT60Template(taskId) ??
@@ -2827,7 +2878,7 @@ export const quickTaskRouter = router({
         getYT60OrchestraConfig(taskId) ??
         getMulti60OrchestraConfig(taskId) ??
         get99OrchestraConfig(taskId) ??
-        getWebsiteOrchestraConfig(taskId);
+        getWebsiteOrchestraConfig(taskId) ?? findPackOrchestraConfig(taskId);
       if (!fullConfig) throw new Error(`no orchestra config for ${taskId}`);
 
       // Override config to produce ONE variant only — use the same label
@@ -2901,7 +2952,8 @@ export const quickTaskRouter = router({
         BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
         KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
-        WEBSITE_30S_TASKS.find((t) => t.id === input.taskId);
+        WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
+        findPackTemplate(input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId}. (60s uses runOrchestra60; 90s uses squad.stepExecute.)`);
       }
