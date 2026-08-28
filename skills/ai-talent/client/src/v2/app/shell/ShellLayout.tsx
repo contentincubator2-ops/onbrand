@@ -42,7 +42,7 @@ import {
   faShareNodes, faTrophy, faUsers, faLanguage,
   faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
-  faEnvelope, faBullhorn, faChartLine, faDatabase,
+  faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -125,7 +125,27 @@ export function isPersonaPreviewEmail(email?: string | null): boolean {
 // with platform icons. Users pick the *platform* first; speed is shown as
 // a badge on each task card inside the platform page.
 // Brand Strategy + Research Analysis removed per CJ direction; Brand Brain kept.
-function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string): NavItem[] {
+/**
+ * CatalogPlatform → /tasks 路由。用來把品牌任務包宣告的頻道換算成側邊欄項目。
+ * 這份要跟 PlatformTaskPage 的 ROUTE_TO_PLATFORM 對得起來（方向相反）。
+ */
+const CHANNEL_TO_TASK_ROUTE: Record<string, string> = {
+  facebook: "/tasks/fb",
+  instagram: "/tasks/ig",
+  linkedin: "/tasks/li",
+  youtube: "/tasks/yt",
+  tiktok: "/tasks/tt",
+  email: "/tasks/email",
+  pr: "/tasks/pr",
+  website: "/tasks/web",
+};
+
+/**
+ * @param allowedTaskRoutes 這個品牌可見的 /tasks 路由。null = 沒有客製包，
+ *   顯示全部（今天的行為）。非 null 時，不在名單裡的頻道整個不渲染 ——
+ *   建設公司的側邊欄不該出現 TikTok。非 /tasks 的項目一律不受影響。
+ */
+function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string, allowedTaskRoutes?: Set<string> | null): NavItem[] {
   const en = lang === "en";
   const isPrivate = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
@@ -197,7 +217,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     ];
   }
 
-  return [
+  const items: NavItem[] = [
     // ── Platform tier (primary content creation entry points) ──────────────
     { to: "/tasks/fb",    label: "Facebook",  icon: <FontAwesomeIcon icon={faFacebookF} />,  matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
@@ -213,6 +233,9 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
     { to: "/tasks/pr",    label: en ? "PR" : "新聞稿",   icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/tasks/pr",
       tooltip: en ? "Press releases, media pitch, CEO quotes, fact sheets" : "新聞稿 / 媒體提案 / CEO 聲明 / 資料頁" },
+    // 2026-08-29 官網頻道：品牌自己的長文與產品頁，不是社群通路。
+    { to: "/tasks/web",   label: en ? "Website" : "官網",  icon: <FontAwesomeIcon icon={faGlobe} />,    matchPrefix: "/tasks/web",
+      tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
     // ── Workspace & tools ──────────────────────────────────────────────────
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
@@ -231,6 +254,15 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     // Social profile URLs now live in 基本資料 tab; OAuth connections in 平台授權 tab.
     // Both reachable via Brand Brain → settings gear → respective tab.
   ];
+
+  // 2026-08-29 客製任務包：只留這個品牌實際在經營的頻道。
+  // allowedTaskRoutes 為 null（沒有包）時整段跳過，行為與改動前一致。
+  if (allowedTaskRoutes) {
+    return items.filter(
+      (it) => !it.to.startsWith("/tasks/") || allowedTaskRoutes.has(it.to),
+    );
+  }
+  return items;
 }
 
 /* ─────────────────────────── Root layout ─────────────────────────── */
@@ -677,7 +709,27 @@ function IconBar({
 }) {
   const { lang, setLang } = useLang();
   const isEn = lang === "en";
-  const NAV_ITEMS = React.useMemo(() => buildNavItems(lang, userEmail, currentPath), [lang, userEmail, currentPath]);
+  // 2026-08-29 (CJ「每個品牌，只出現他的定位、任務，不會出現他用不到的」):
+  // 這個品牌若有客製任務包，側邊欄只留包裡宣告的頻道。沒有包就回 null，
+  // buildNavItems 整段跳過。
+  const packNavQuery = (trpc as any).quickTask?.brandNav?.useQuery
+    ? (trpc as any).quickTask.brandNav.useQuery(
+        { brandId: scope.brandId ?? undefined },
+        { enabled: !!scope.brandId, refetchOnWindowFocus: false, staleTime: 300_000 },
+      )
+    : { data: null };
+  const allowedTaskRoutes = React.useMemo<Set<string> | null>(() => {
+    const channels = (packNavQuery.data as any)?.channels;
+    if (!Array.isArray(channels) || channels.length === 0) return null;
+    const routes = channels
+      .map((c: any) => CHANNEL_TO_TASK_ROUTE[c.key])
+      .filter(Boolean) as string[];
+    return routes.length > 0 ? new Set(routes) : null;
+  }, [packNavQuery.data]);
+  const NAV_ITEMS = React.useMemo(
+    () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes),
+    [lang, userEmail, currentPath, allowedTaskRoutes],
+  );
   const isPrivatePreview = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   // 2026-08-20: 策略 added as a first-class workspace mode alongside the

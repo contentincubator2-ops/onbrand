@@ -25,6 +25,7 @@ import {
   TT_FORMAT_TABS, TT_TASK_FORMAT_MAP, TT_UNMAPPED_BY_DESIGN,
   EM_FORMAT_TABS, EM_TASK_FORMAT_MAP, EM_UNMAPPED_BY_DESIGN,
   PR_FORMAT_TABS, PR_TASK_FORMAT_MAP, PR_UNMAPPED_BY_DESIGN,
+  WEB_FORMAT_TABS, WEB_TASK_FORMAT_MAP, WEB_UNMAPPED_BY_DESIGN,
 } from "../../client/src/v2/lib/taskFormats";
 
 interface PlatformSpec {
@@ -43,6 +44,8 @@ const SPECS: PlatformSpec[] = [
   { platform: "tiktok",    name: "TT", tabs: TT_FORMAT_TABS, map: TT_TASK_FORMAT_MAP, byDesign: TT_UNMAPPED_BY_DESIGN },
   { platform: "email",     name: "EM", tabs: EM_FORMAT_TABS, map: EM_TASK_FORMAT_MAP, byDesign: EM_UNMAPPED_BY_DESIGN },
   { platform: "pr",        name: "PR", tabs: PR_FORMAT_TABS, map: PR_TASK_FORMAT_MAP, byDesign: PR_UNMAPPED_BY_DESIGN },
+  // 2026-08-29 官網頻道也納入防漂移保護，不要讓新頻道變成沒有測試網的死角。
+  { platform: "website",   name: "WEB", tabs: WEB_FORMAT_TABS, map: WEB_TASK_FORMAT_MAP, byDesign: WEB_UNMAPPED_BY_DESIGN },
 ];
 
 const INDEX = buildTaskCatalogIndex();
