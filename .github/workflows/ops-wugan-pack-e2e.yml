@@ -1,0 +1,145 @@
+name: "Ops — 五感十築 pack E2E (resolve + real task run)"
+
+# 2026-08-29. Verifies the per-brand task pack end to end on the deployed
+# code, not in a unit test:
+#   1. the deployed build actually contains the pack (resolve by brandId)
+#   2. the brand's visible catalog is the pack's cards, not the global 207
+#   3. a pack card runs through the real orchestra against the real brand
+#      and produces content that sounds like 五感十築
+#
+# Step 3 writes a mission_output row and spends LLM credit — that is the
+# point. A dry run proves nothing about whether the prompt works.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: "Brand id"
+        required: true
+        default: "2840"
+        type: string
+      taskId:
+        description: "Pack card to run"
+        required: true
+        default: "wg-fb-life-practice"
+        type: string
+      context:
+        description: "The card's primary input"
+        required: true
+        default: "入秋後早晚溫差大，家裡的空氣品質怎麼顧。對到十築好氧。"
+        type: string
+      runTask:
+        description: "Actually run the task (costs LLM credit)"
+        required: true
+        default: "yes"
+        type: string
+
+jobs:
+  e2e:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 20
+    steps:
+      - name: Deployed code version
+        run: |
+          set +e
+          cd /opt/onbrand/app
+          echo "commit: $(git rev-parse --short HEAD 2>/dev/null)"
+          echo "subject: $(git log -1 --pretty=%s 2>/dev/null)"
+          ls skills/ai-talent/server/_core/brandPacks/ 2>/dev/null \
+            && echo "brandPacks: PRESENT" || echo "brandPacks: MISSING (deploy not landed)"
+          exit 0
+
+      - name: Resolve pack + list what this brand can see
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          cat > ./.wugan_resolve.mts <<'JS'
+          const { resolveBrandPack, packNavForBrand, expandPackCards } =
+            await import("./server/_core/brandPacks/index.ts");
+          const { buildTaskCatalogIndex } = await import("./server/_core/taskCatalogIndex.ts");
+          const BID = Number(process.env.BID);
+          const globalIdx = buildTaskCatalogIndex();
+          console.log("全域目錄總卡數:", globalIdx.length);
+          const pack = resolveBrandPack({ brandId: BID });
+          if (!pack) { console.log("NO PACK for brand " + BID); process.exit(0); }
+          const nav = packNavForBrand({ brandId: BID });
+          console.log("PACK", pack.key);
+          for (const c of nav.channels) {
+            console.log("  頻道", c.labelZh, "(" + c.key + ")  pill:",
+              c.formats.map((f) => f.labelZh).join(" / "));
+          }
+          const cards = expandPackCards(pack, new Map(globalIdx.map((t) => [t.id, t])));
+          console.log("該品牌可見卡片數:", cards.length);
+          for (const c of cards) {
+            const zh = typeof c.label === "object" ? c.label.zh : c.label;
+            console.log("   ", c.id.padEnd(24), zh);
+          }
+          process.exit(0);
+          JS
+          BID="${{ github.event.inputs.brandId }}" node --import tsx ./.wugan_resolve.mts
+          rm -f ./.wugan_resolve.mts
+          exit 0
+
+      - name: Run one pack card for real
+        if: ${{ github.event.inputs.runTask == 'yes' }}
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          cat > ./.wugan_run.mts <<'JS'
+          const mysql = await import("mysql2/promise");
+          const { findPackTemplate, findPackOrchestraConfig } =
+            await import("./server/_core/brandPacks/index.ts");
+          const { runOrchestra } = await import("./server/_core/quickTaskOrchestra.ts");
+
+          const BID = Number(process.env.BID);
+          const TASK = process.env.TASK;
+          const CTX = process.env.CTX;
+
+          const template = findPackTemplate(TASK);
+          const config = findPackOrchestraConfig(TASK);
+          if (!template || !config) {
+            console.error("NOT A PACK CARD:", TASK, "template?", !!template, "config?", !!config);
+            process.exit(1);
+          }
+          console.log("template:", template.id, "| outputMode:", template.outputMode ?? "social",
+                      "| model:", template.preferredModel, "| variants:", config.variants);
+
+          const conn = await mysql.createConnection({
+            host: process.env.LOCAL_DB_HOST || "127.0.0.1",
+            port: Number(process.env.LOCAL_DB_PORT || 3306),
+            user: process.env.LOCAL_DB_USER || "mos_user",
+            password: process.env.LOCAL_DB_PASSWORD,
+            database: process.env.LOCAL_DB_NAME || "mos_db",
+          });
+          const [u] = await conn.execute("SELECT userId FROM brands WHERE id=?", [BID]);
+          const userId = u[0]?.userId;
+          console.log("brand owner userId:", userId);
+          await conn.end();
+
+          const key = template.primary_input?.key ?? "context";
+          const t0 = Date.now();
+          const res = await runOrchestra({
+            template, config,
+            inputs: { [key]: CTX },
+            brandId: BID, productId: null, eventId: null,
+            userId, audienceTag: null,
+          });
+          console.log("ELAPSED_S", Math.round((Date.now() - t0) / 1000));
+          console.log("outputId:", res?.outputId ?? "(none)");
+          const items = res?.items ?? res?.variants ?? [];
+          console.log("variants returned:", Array.isArray(items) ? items.length : 0);
+          for (const [i, it] of (items || []).entries()) {
+            console.log("\n──────── 變體 " + (i + 1) + "  " + (it?.label ?? "") + " ────────");
+            console.log(it?.caption ?? it?.content ?? JSON.stringify(it).slice(0, 2000));
+          }
+          process.exit(0);
+          JS
+          BID="${{ github.event.inputs.brandId }}" \
+          TASK="${{ github.event.inputs.taskId }}" \
+          CTX="${{ github.event.inputs.context }}" \
+          node --import tsx ./.wugan_run.mts
+          echo "run exit=$?"
+          rm -f ./.wugan_run.mts
+          exit 0
