@@ -551,6 +551,18 @@ export interface OrchestraConfig {
    * that never actually contrasted anything.
    */
   videoTailHint?: string;
+  /**
+   * 2026-08-29：這張卡的 caption 生成逾時上限（毫秒）。不給就用 orchestra
+   * 的預設 40s。
+   *
+   * 為什麼需要它：預設 40s 是照「一則貼文」的長度訂的。要求一次產出整個月
+   * 排程的卡（五感十築行事曆，一次 3 篇摘要）在 40s 內生不完，兩次嘗試都
+   * 逾時，變體回空字串 —— 任務看起來成功，產出卻是空白。
+   *
+   * 上限請留在 90s 以內：nginx /trpc 的 proxy_read_timeout 是 230s、Node
+   * server.timeout 220s，30s 層是同步回應，整條鏈要留餘裕給其他階段。
+   */
+  captionBudgetMs?: number;
   variantLabels: string[];
   /** Caption length range hint (chars, lower bound) for prompt + UI badge */
   captionMinChars: number;

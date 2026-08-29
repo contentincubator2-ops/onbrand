@@ -1078,7 +1078,8 @@ async function callOneVariant(args: {
           provider,
           explicitModel,
         ),
-        timeoutPromise<never>(LLM_BUDGET_MS, `caption[${label}]`),
+        // 長篇卡（例如一次排整個月的行事曆）用自己的預算；其餘照舊 40s。
+        timeoutPromise<never>(config.captionBudgetMs ?? LLM_BUDGET_MS, `caption[${label}]`),
       ]);
       lastRaw = r.content ?? "";
       const parsed = tryParseJson(lastRaw);

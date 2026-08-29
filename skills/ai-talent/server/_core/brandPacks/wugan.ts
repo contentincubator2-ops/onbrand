@@ -338,11 +338,18 @@ ${args.guidance}
 - 摘要不加 hashtag。${WUGAN_VOICE}`,
       outputMode: "document",
       preferredModel: "anthropic",
-      maxTokens: 2000,
+      // 隨篇數放大。2026-08-29 第二次實跑：3 篇一次產出時 maxTokens 2000
+      // 會截斷，而且 40s 的預設 caption 預算會逾時兩次、變體回空字串
+      // （任務顯示成功、產出卻空白）。
+      maxTokens: 1400 * n,
       outputDefaults: { platform: "doc", post_type: "report" },
     },
-    // 單一產出，篇數靠 prompt 控制。字數下限隨篇數放大，避免 ${n} 篇被壓縮成條列。
-    textConfig(["當月排程"], 300 * n, 1200 * n),
+    {
+      // 單一產出，篇數靠 prompt 控制。字數下限隨篇數放大，避免 ${n} 篇被壓縮成條列。
+      ...textConfig(["當月排程"], 300 * n, 1200 * n),
+      // 上限 90s：nginx /trpc 是 230s、Node 220s，30s 層同步回應，留餘裕。
+      captionBudgetMs: Math.min(40_000 + 25_000 * n, 90_000),
+    },
   );
 }
 
