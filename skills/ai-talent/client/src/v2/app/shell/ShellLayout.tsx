@@ -138,6 +138,8 @@ const CHANNEL_TO_TASK_ROUTE: Record<string, string> = {
   email: "/tasks/email",
   pr: "/tasks/pr",
   website: "/tasks/web",
+  case: "/tasks/case",
+  calendar: "/tasks/calendar",
 };
 
 /**
@@ -236,6 +238,13 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     // 2026-08-29 官網頻道：品牌自己的長文與產品頁，不是社群通路。
     { to: "/tasks/web",   label: en ? "Website" : "官網",  icon: <FontAwesomeIcon icon={faGlobe} />,    matchPrefix: "/tasks/web",
       tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
+    // 2026-08-29 素材與規劃頻道。只有帶任務包的品牌會看到 —— 沒有包時
+    // allowedTaskRoutes 是 null，但全域目錄在這兩個頻道沒有卡，所以即使
+    // 顯示也是空的。放在這裡是為了讓有包的品牌拿得到入口。
+    { to: "/tasks/case",     label: en ? "Cases" : "案例",   icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
+      tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
+    { to: "/tasks/calendar", label: en ? "Calendar" : "行事曆", icon: <FontAwesomeIcon icon={faCalendarDays} />, matchPrefix: "/tasks/calendar",
+      tooltip: en ? "Plan the month's slots per content type" : "各類型當月篇數與切角規劃" },
     // ── Workspace & tools ──────────────────────────────────────────────────
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,

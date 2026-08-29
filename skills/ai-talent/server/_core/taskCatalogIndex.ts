@@ -45,7 +45,13 @@ export type CatalogPlatform =
   | "email" | "pr" | "brand" | "audience" | "kol"
   // 2026-08-29：品牌自己的官網（部落格長文 / 品牌專欄 / 案例 / 產品頁）。
   // 在這之前官網內容只能硬塞進 pr- 或 br-，然後拿到新聞稿版型。
-  | "website";
+  | "website"
+  // 2026-08-29：素材與規劃型頻道，目前只由品牌任務包使用，全域目錄沒有卡。
+  //   case     — 案例庫（查找 / 去重 / 提報），持續累積的素材
+  //   calendar — 內容行事曆（產出當月各類型的篇數與摘要）
+  // 兩者都刻意獨立於「月報」：月報是把它們整理出來的產物，不是它們的容器。
+  | "case"
+  | "calendar";
 
 export interface CatalogTask {
   id: string;

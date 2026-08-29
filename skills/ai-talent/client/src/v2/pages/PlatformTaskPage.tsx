@@ -43,6 +43,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBolt, faPaperPlane, faXmark, faMagnifyingGlass,
   faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe,
+  faBookBookmark, faCalendarDays,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -81,6 +82,10 @@ const ROUTE_TO_PLATFORM: Record<string, string> = {
   pr:    "pr",
   // 2026-08-29 官網頻道。路由是 /tasks/web，平台代號是 website。
   web:   "website",
+  // 素材與規劃頻道。目前只有品牌任務包會用到，全域目錄沒有卡 ——
+  // 沒有包的品牌走到這兩個路由會看到空清單，側邊欄也不會有入口。
+  case:     "case",
+  calendar: "calendar",
 };
 
 interface PlatformMeta {
@@ -143,6 +148,20 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
     heroEn: "Written to get picked up — not just to check a box",
     subZh: "PR Strategist 代理人以記者視角找到新聞價值，再產出完整稿件",
     subEn: "PR Strategist finds the news angle before writing a single word",
+  },
+  case: {
+    label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#7C3AED",
+    heroZh: "案例不是寫稿當下才找，是平常就在累積",
+    heroEn: "A case library you build over time, not scramble for at deadline",
+    subZh: "依十項標準分別建檔，每次提報都對照既有紀錄去重",
+    subEn: "Filed by standard, deduplicated against everything already logged",
+  },
+  calendar: {
+    label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#B45309",
+    heroZh: "先把整個月的篇數與切角排好，再逐篇寫",
+    heroEn: "Plan the month's slots and angles first, then write them one by one",
+    subZh: "每種內容類型一張卡，一次產出該類型當月所有篇數的摘要",
+    subEn: "One card per content type, producing every slot that type owns this month",
   },
   website: {
     label: "Website", labelZh: "官網", icon: faGlobe, bg: "#0F766E",

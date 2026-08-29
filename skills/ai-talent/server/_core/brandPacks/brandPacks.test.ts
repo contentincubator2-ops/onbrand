@@ -13,7 +13,7 @@ const GLOBAL_IDS = new Set(buildTaskCatalogIndex().map((t) => t.id));
 
 const VALID_PLATFORMS: CatalogPlatform[] = [
   "facebook", "instagram", "youtube", "tiktok", "linkedin",
-  "email", "pr", "brand", "audience", "kol", "website",
+  "email", "pr", "brand", "audience", "kol", "website", "case", "calendar",
 ];
 
 describe("brandPacks 註冊表", () => {
@@ -137,13 +137,45 @@ describe("五感十築 pack 的內容規則", () => {
 
   it("存在", () => expect(wugan).toBeTruthy());
 
-  it("只經營官網與 Facebook —— 不該冒出 TikTok / LinkedIn / KOL", () => {
-    expect(wugan.channels.map((c) => c.key).sort()).toEqual(["facebook", "website"]);
+  it("只有這四個頻道 —— 不該冒出 TikTok / LinkedIn / KOL", () => {
+    expect(wugan.channels.map((c) => c.key).sort()).toEqual(["calendar", "case", "facebook", "website"]);
   });
 
-  it("FB 的四個內容分類齊全", () => {
+  it("官網三種文章各自成類（CJ 要求十築建築展獨立）", () => {
+    const web = wugan.channels.find((c) => c.key === "website")!;
+    expect(web.formats.map((f) => f.id)).toEqual(["原創文章", "遇見十築", "十築建築展"]);
+  });
+
+  it("FB 四個內容分類 ＋ 分享文", () => {
     const fb = wugan.channels.find((c) => c.key === "facebook")!;
-    expect(fb.formats.map((f) => f.id)).toEqual(["生活實踐", "生態健築", "永續生活", "永續價值"]);
+    expect(fb.formats.map((f) => f.id)).toEqual(["生活實踐", "生態健築", "永續生活", "永續價值", "分享文"]);
+  });
+
+  it("三種分享文齊全（GQ / 遇見十築 / 原創官網）", () => {
+    const shares = wugan.cards.filter((c) => c.channel === "facebook" && c.format === "分享文");
+    expect(shares.map(packCardId).sort()).toEqual(
+      ["wg-fb-share-gq", "wg-fb-share-meetten", "wg-fb-share-web"],
+    );
+  });
+
+  it("十項標準各一張案例卡", () => {
+    const cases = wugan.cards.filter((c) => c.channel === "case");
+    expect(cases.length).toBe(10);
+    const formats = cases.map((c) => c.format).sort();
+    expect(new Set(formats).size).toBe(10);
+  });
+
+  it("行事曆卡的變體數等於該類型的當月篇數", () => {
+    const cal = wugan.cards.filter((c) => c.channel === "calendar");
+    expect(cal.length).toBeGreaterThan(0);
+    for (const c of cal) {
+      if (c.kind !== "custom") continue;
+      // 標題形如「生活實踐｜當月排程（2 篇）」——括號裡的數字要等於 variants
+      const zh = (c.template.label as any).zh as string;
+      const n = Number(zh.match(/（(\d+) 篇）/)?.[1]);
+      expect(n, `${c.template.id} 的標題沒帶篇數`).toBeGreaterThan(0);
+      expect(c.config.variants, `${c.template.id} 篇數與變體數不一致`).toBe(n);
+    }
   });
 
   it("每張自訂卡的 systemPrompt 都帶了品牌語氣紅線（禁豪宅語言那條）", () => {
