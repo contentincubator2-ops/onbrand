@@ -6,7 +6,7 @@
  * 在資料庫裡已驗證過的 voice.samples / voice.forbidden。
  *
  * ── 這個品牌的內容結構 ────────────────────────────────────────────────
- * 官網：長文（官網長文 / 遇見十築 / 十築建築展）
+ * 官網：原創文章（官網長文 / 十築建築展）、遇見十築
  * FB  ：四個內容分類 —— 生活實踐、生態健築、永續生活、永續價值
  * 每月 8 篇，配比 生活實踐 2 / 生態健築 3 / 永續生活 1 / 永續價值 2
  *
@@ -78,7 +78,11 @@ export const WUGAN_PACK: BrandPack = {
       labelZh: "官網",
       labelEn: "Website",
       formats: [
-        { id: "長文", labelZh: "長文", labelEn: "Long-form" },
+        // CJ 2026-08-29「官網的文章，有分為原創文章、還有遇見十築」。
+        // 《遇見十築》是品牌自己的標準介紹專欄，性質跟一般原創文章不同
+        // ——它不找外部案例，主角是五感十築自己的建築標準——所以獨立成一類。
+        { id: "原創文章", labelZh: "原創文章", labelEn: "Original Articles" },
+        { id: "遇見十築", labelZh: "遇見十築", labelEn: "Meeting the Ten" },
       ],
     },
     {
@@ -99,7 +103,7 @@ export const WUGAN_PACK: BrandPack = {
     {
       kind: "custom",
       channel: "website",
-      format: "長文",
+      format: "原創文章",
       origin: "brand",
       template: {
         id: "wg-web-longform",
@@ -151,7 +155,7 @@ export const WUGAN_PACK: BrandPack = {
     {
       kind: "custom",
       channel: "website",
-      format: "長文",
+      format: "遇見十築",
       origin: "brand",
       template: {
         id: "wg-web-meetten",
@@ -200,7 +204,9 @@ export const WUGAN_PACK: BrandPack = {
     {
       kind: "custom",
       channel: "website",
-      format: "長文",
+      // 十築建築展也是原創產出（策展式深度案例），只是密度比一般長文高。
+      // 若五感十築認為它該自成一類，把 formats 加一項再改這裡即可。
+      format: "原創文章",
       origin: "brand",
       template: {
         id: "wg-web-expo",
