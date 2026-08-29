@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { PACKS, resolveBrandPack, findPackTemplate, findPackOrchestraConfig, packCardId } from "./index";
+import { MONTHLY_QUOTA } from "./wugan";
 import { buildTaskCatalogIndex, type CatalogPlatform } from "../taskCatalogIndex";
 
 const GLOBAL_IDS = new Set(buildTaskCatalogIndex().map((t) => t.id));
@@ -165,16 +166,30 @@ describe("五感十築 pack 的內容規則", () => {
     expect(new Set(formats).size).toBe(10);
   });
 
-  it("行事曆卡的變體數等於該類型的當月篇數", () => {
+  it("行事曆卡是單一產出 —— 篇數靠 prompt 控制，不能用變體拆", () => {
+    // 2026-08-29 實跑證明：變體是獨立呼叫，彼此看不到，所以「N 篇之間標準
+    // 不重複」無法用 variants=N 達成，而且每個變體會各自把整月寫一遍。
     const cal = wugan.cards.filter((c) => c.channel === "calendar");
     expect(cal.length).toBeGreaterThan(0);
     for (const c of cal) {
       if (c.kind !== "custom") continue;
-      // 標題形如「生活實踐｜當月排程（2 篇）」——括號裡的數字要等於 variants
+      expect(c.config.variants, `${c.template.id} 不該用變體拆篇數`).toBe(1);
+    }
+  });
+
+  it("行事曆卡的標題篇數對得上 MONTHLY_QUOTA，prompt 也宣告了同一個數字", () => {
+    for (const c of wugan.cards) {
+      if (c.kind !== "custom" || c.channel !== "calendar") continue;
       const zh = (c.template.label as any).zh as string;
-      const n = Number(zh.match(/（(\d+) 篇）/)?.[1]);
-      expect(n, `${c.template.id} 的標題沒帶篇數`).toBeGreaterThan(0);
-      expect(c.config.variants, `${c.template.id} 篇數與變體數不一致`).toBe(n);
+      const type = zh.split("｜")[0] as keyof typeof MONTHLY_QUOTA;
+      const quota = MONTHLY_QUOTA[type];
+      expect(quota, `${c.template.id} 的類型 ${type} 不在 MONTHLY_QUOTA 裡`).toBeGreaterThan(0);
+      const labelled = Number(zh.match(/（(\d+) 篇）/)?.[1]);
+      expect(labelled, `${c.template.id} 標題篇數與 MONTHLY_QUOTA 不符`).toBe(quota);
+      expect(
+        c.template.systemPrompt,
+        `${c.template.id} 的 prompt 沒有宣告要產出 ${quota} 篇`,
+      ).toContain(`一次輸出 ${quota} 篇的摘要`);
     }
   });
 

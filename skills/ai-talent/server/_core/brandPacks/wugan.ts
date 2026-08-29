@@ -272,9 +272,17 @@ ${std.focus}
  * 的任務卡，按下去後，會產出符合該篇數要求的內容篇數，寫法則跟月報當中每
  * 一篇文的摘要方式相同」。
  *
- * variants = 該類型的當月篇數。一個變體就是一篇的摘要 —— RunPage 對每個
- * 變體都給獨立的編輯與排程 UI，所以「一篇一變體」剛好對上行事曆的用法，
- * 排完可以逐篇送去產全文。
+ * variants = 1，**不是**該類型的當月篇數。
+ *
+ * 一開始做成「一篇一變體」（variants = N），想借用 RunPage 的逐變體編輯 UI。
+ * 2026-08-29 實跑 wg-cal-eco-architecture（3 篇）證明那是錯的：
+ *   · orchestra 的每個變體是獨立呼叫，變體之間看不到彼此
+ *   · 於是變體 1 與變體 2 各自把整個月的 3 篇都寫了一遍，只有變體 3 寫一篇
+ *   · 而且三個變體各自挑標準，變體 1 排舒適/好氧/自然、變體 2 排舒適/好氧/
+ *     安心 —— 「N 篇之間標準不重複」這個要求在獨立生成下根本無法成立
+ *
+ * 行事曆的本質是「整月一起排」：標準不能重複、日期要避開已佔用檔期、整月
+ * 要有節奏。這些都需要同時看到全部 N 篇才做得到，所以必須在同一次生成裡完成。
  */
 function calendarCard(args: {
   channelPill: "官網" | "Facebook";
@@ -283,7 +291,6 @@ function calendarCard(args: {
   guidance: string;
 }): BrandPackCard {
   const n = MONTHLY_QUOTA[args.type];
-  const labels = Array.from({ length: n }, (_, i) => `第 ${i + 1} 篇`);
   return card(
     "calendar",
     args.channelPill,
@@ -306,7 +313,11 @@ function calendarCard(args: {
       },
       inputs: [{ key: "context", label: "月份 + 議題設定 + 已排定事項", type: "textarea", required: true }],
       contextSources: ["brand.name", "brand.positioning.values", "brand.positioning.audience.primary"],
-      systemPrompt: `你在為五感十築規劃「${args.type}」這個類型當月的 ${n} 篇內容，每個變體產出一篇的摘要。
+      systemPrompt: `你在為五感十築規劃「${args.type}」這個類型當月的內容排程。
+
+【產出篇數】
+一次輸出 ${n} 篇的摘要，依建議日期由早到晚排列。不多不少，就是 ${n} 篇。
+${n === 1 ? "這個類型當月只有 1 篇，把它排好即可。" : `${n} 篇要一起規劃，因為它們彼此有關係 —— 標準不能重複、日期不能撞、整月要有節奏。`}
 
 ${args.guidance}
 
@@ -319,8 +330,10 @@ ${args.guidance}
 收尾方向：一句，這篇最後要把讀者帶到哪個感受。
 
 【整體要求】
-- ${n} 篇之間的十築標準不要重複，切角也不要重複。同一個月連續講兩篇通風，讀者會覺得在跳針。
+- ${n} 篇之間的十築標準不得重複，切角也不得重複。同一個月連續講兩篇通風，讀者會覺得在跳針。
+- 建議日期要避開輸入裡已排定的檔期。
 - 依輸入的時令與節慶安排順序，讓整月讀起來有節奏。
+- ${n} 篇全部列完後，補一段「整月節奏說明」，用兩三句講清楚為什麼是這個順序。
 - 每一篇都要具體到「照著這份摘要就能直接寫全文」。寫成「談談居家健康」這種程度等於沒規劃。
 - 摘要不加 hashtag。${WUGAN_VOICE}`,
       outputMode: "document",
@@ -328,7 +341,8 @@ ${args.guidance}
       maxTokens: 2000,
       outputDefaults: { platform: "doc", post_type: "report" },
     },
-    textConfig(labels, 250, 900),
+    // 單一產出，篇數靠 prompt 控制。字數下限隨篇數放大，避免 ${n} 篇被壓縮成條列。
+    textConfig(["當月排程"], 300 * n, 1200 * n),
   );
 }
 
