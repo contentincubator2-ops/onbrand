@@ -273,8 +273,9 @@ ${std.focus}
     {
       ...textConfig([std.name], 800, 2600),
       // 2026-08-29 實跑 wg-case-9：三個案例的完整提報在 40s 預設預算下
-      // attempt 1 逾時，靠重試才成功（總共 75s）。給足預算避免白跑一次。
-      captionBudgetMs: 80_000,
+      // attempt 1 逾時、靠重試才成功；改成 80s 後單次跑了 78s —— 只剩 2 秒
+      // 餘裕，正式站上會間歇逾時然後回空字串。拉到 90s（仍遠低於 nginx 230s）。
+      captionBudgetMs: 90_000,
     },
   );
 }
