@@ -1769,7 +1769,13 @@ async function genOneImage(
     // capping the primary attempt tighter means a slow Imagen falls back
     // to the proven (faster) Flux sooner. Saves up to ~7s/image on the
     // slow path — directly shortens the hold-for-images wait.
-    const IMAGEN_CAP_MS = 18_000;
+    // 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」): imagen-4 is GONE
+    // from this key's ListModels — every :predict answers 404 NOT_FOUND — so
+    // the primary attempt below could only ever burn the cap and fall back.
+    // Nano Banana (gemini-2.5-flash-image) IS on the key and does plain
+    // text-to-image, so it takes over as the primary; the cap keeps its old
+    // job of handing slow runs to Flux Schnell inside the task budget.
+    const PRIMARY_IMAGE_CAP_MS = 18_000;
     // 2026-07-07 (CJ「鎖定 gpt-image-2」): a task may pin its primary image
     // model (e.g. YT → gpt-image-2 for clean 16:9 backgrounds). gpt-image-2 is
     // slower than imagen-4, so give the override a wider cap. Flux Schnell
@@ -1777,8 +1783,8 @@ async function genOneImage(
     // 2026-07-27: subjectMode always routes through Nano Banana (image-edit,
     // not text-to-image) — it's the only model here that takes a subject
     // reference photo.
-    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "google/imagen-4-default");
-    const primaryCapMs = subjectMode ? 35_000 : (config.imageModelOverride ? 35_000 : IMAGEN_CAP_MS);
+    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "google/nano-banana");
+    const primaryCapMs = subjectMode ? 35_000 : (config.imageModelOverride ? 35_000 : PRIMARY_IMAGE_CAP_MS);
     let r;
     let fallbackUsed = false;
     try {

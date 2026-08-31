@@ -95,7 +95,10 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Google",
     provider: "google-gemini",
     kind: "image",
-    status: "ready", // VERIFIED working with GEMINI_API_KEY
+    // 2026-08-31: ListModels on the prod GEMINI_API_KEY returns no imagen
+    // model at all — :predict answers 404 NOT_FOUND for every Imagen 4
+    // variant. Needs a billing-enabled Google AI Studio / Vertex key.
+    status: "soon",
     strengths: "快速生成、攝影寫實，Gemini API 直接整合",
     costEstimateUsd: 0.02,
     durationSecEstimate: 5,
@@ -108,7 +111,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Google",
     provider: "google-gemini",
     kind: "image",
-    status: "ready",
+    status: "soon", // 2026-08-31: 404 NOT_FOUND — see imagen-4-fast above
     strengths: "標準品質，攝影寫實 / 真人場景強",
     costEstimateUsd: 0.04,
     durationSecEstimate: 12,
@@ -121,7 +124,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Google",
     provider: "google-gemini",
     kind: "image",
-    status: "ready",
+    status: "soon", // 2026-08-31: 404 NOT_FOUND — see imagen-4-fast above
     strengths: "最高品質，細節與光影最佳，適合品牌主視覺",
     costEstimateUsd: 0.08,
     durationSecEstimate: 25,

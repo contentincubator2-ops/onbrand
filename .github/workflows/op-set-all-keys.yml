@@ -47,6 +47,12 @@ jobs:
           GOOGLE_API_KEY_5:         ${{ secrets.GOOGLE_API_KEY_5 }}
           COHERE_API_KEY:           ${{ secrets.COHERE_API_KEY }}
           # Image / video / voice
+          # 2026-08-31 (CJ「我要補足不同的 API KEY 給生圖使用」): PIAPI_KEY and
+          # REPLICATE_API_TOKEN were never pushed here, so the PiAPI key that
+          # currently carries ALL image generation only exists as a hand-edit
+          # on the VM — any .env rebuild silently drops it.
+          PIAPI_KEY:                ${{ secrets.PIAPI_KEY }}
+          REPLICATE_API_TOKEN:      ${{ secrets.REPLICATE_API_TOKEN }}
           FAL_AI_API_KEY_1:         ${{ secrets.FAL_AI_API_KEY_1 }}
           FAL_AI_API_KEY_2:         ${{ secrets.FAL_AI_API_KEY_2 }}
           FAL_AI_API_KEY_3:         ${{ secrets.FAL_AI_API_KEY_3 }}
@@ -76,7 +82,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 60s
-          envs: ANTHROPIC_API_KEY,CLAUDE_API_KEY_DEFAULT,CLAUDE_API_KEY_1,CLAUDE_API_KEY_2,OPENAI_API_KEY,OPENAI_API_KEY_1,OPENAI_API_KEY_2,OPENAI_API_KEY_3,DEEPSEEK_API_KEY_2,DEEPSEEK_API_KEY_3,DEEPSEEK_API_KEY_4,DEEPSEEK_API_KEY_7,DEEPSEEK_API_KEY_8,DEEPSEEK_API_KEY_9,DEEPSEEK_API_KEY_10,QWEN_API_KEY,ZHIPU_API_KEY,PERPLEXITY_API_KEY_1,PERPLEXITY_API_KEY_2,PERPLEXITY_API_KEY_3,PERPLEXITY_API_KEY_4,PERPLEXITY_API_KEY_5,GOOGLE_API_KEY_1,GOOGLE_API_KEY_3,GOOGLE_API_KEY_4,GOOGLE_API_KEY_5,COHERE_API_KEY,FAL_AI_API_KEY_1,FAL_AI_API_KEY_2,FAL_AI_API_KEY_3,FAL_AI_API_KEY_4,MANUS_API_KEY_1,MANUS_API_KEY_2,MANUS_API_KEY_3,MANUS_API_KEY_4,HAILUO_API_KEY,BROWSERBASE_API_KEY,TAVILY_API_KEY_1,TAVILY_API_KEY_2,OPENROUTER_API_KEY,META_ACCESS_TOKEN_1,META_ACCESS_TOKEN_2,META_APP_SECRET,GOOGLE_VERTEX_PROJECT_ID,GOOGLE_VERTEX_TOKEN,GEMINI_API_KEY,AZURE_CLAUDE_SWEDEN_API_KEY,AZURE_FOUNDRY_API_KEY
+          envs: PIAPI_KEY,REPLICATE_API_TOKEN,ANTHROPIC_API_KEY,CLAUDE_API_KEY_DEFAULT,CLAUDE_API_KEY_1,CLAUDE_API_KEY_2,OPENAI_API_KEY,OPENAI_API_KEY_1,OPENAI_API_KEY_2,OPENAI_API_KEY_3,DEEPSEEK_API_KEY_2,DEEPSEEK_API_KEY_3,DEEPSEEK_API_KEY_4,DEEPSEEK_API_KEY_7,DEEPSEEK_API_KEY_8,DEEPSEEK_API_KEY_9,DEEPSEEK_API_KEY_10,QWEN_API_KEY,ZHIPU_API_KEY,PERPLEXITY_API_KEY_1,PERPLEXITY_API_KEY_2,PERPLEXITY_API_KEY_3,PERPLEXITY_API_KEY_4,PERPLEXITY_API_KEY_5,GOOGLE_API_KEY_1,GOOGLE_API_KEY_3,GOOGLE_API_KEY_4,GOOGLE_API_KEY_5,COHERE_API_KEY,FAL_AI_API_KEY_1,FAL_AI_API_KEY_2,FAL_AI_API_KEY_3,FAL_AI_API_KEY_4,MANUS_API_KEY_1,MANUS_API_KEY_2,MANUS_API_KEY_3,MANUS_API_KEY_4,HAILUO_API_KEY,BROWSERBASE_API_KEY,TAVILY_API_KEY_1,TAVILY_API_KEY_2,OPENROUTER_API_KEY,META_ACCESS_TOKEN_1,META_ACCESS_TOKEN_2,META_APP_SECRET,GOOGLE_VERTEX_PROJECT_ID,GOOGLE_VERTEX_TOKEN,GEMINI_API_KEY,AZURE_CLAUDE_SWEDEN_API_KEY,AZURE_FOUNDRY_API_KEY
           script: |
             set -e
             ENV=/opt/onbrand/app/skills/ai-talent/.env
@@ -129,11 +135,41 @@ jobs:
             upsert PERPLEXITY_API_KEY_BACKUP_2 "$PERPLEXITY_API_KEY_4"
             upsert PERPLEXITY_API_KEY_BACKUP_3 "$PERPLEXITY_API_KEY_1"
             upsert GOOGLE_API_KEY           "$GOOGLE_API_KEY_1"
-            upsert GEMINI_API_KEY           "$GOOGLE_API_KEY_1"
+            # 2026-08-31: this line used to seed GEMINI_API_KEY from
+            # GOOGLE_API_KEY_1 as well. GOOGLE_API_KEY_1 dates from April and
+            # the same-generation keys in the local .env all answer 400
+            # API_KEY_INVALID today, while the key on the VM works — so
+            # running this workflow would have DOWNGRADED the one working
+            # Google image key to an unverified older one. The GEMINI_API_KEY
+            # secret is the only source for that slot now; when it is unset,
+            # upsert skips and the VM keeps whatever already works.
             upsert GOOGLE_API_KEY_BACKUP_1  "$GOOGLE_API_KEY_3"
             upsert GOOGLE_API_KEY_BACKUP_2  "$GOOGLE_API_KEY_4"
             upsert GOOGLE_API_KEY_BACKUP_3  "$GOOGLE_API_KEY_5"
+            # 2026-08-31: googleApiKeyPool() (mediaGen / imageGen) reads ONLY
+            # GEMINI_API_KEY_POOL, GEMINI_API_KEY, GOOGLE_AI_API_KEY and
+            # GOOGLE_API_KEY. The three GOOGLE_API_KEY_BACKUP_* written just
+            # above are invisible to image generation, so a 429 on the primary
+            # key had no spare to rotate to even though spares were on disk.
+            # Join them into the one variable the code actually reads.
+            POOL=""
+            for K in "$GEMINI_API_KEY" "$GOOGLE_API_KEY_1" "$GOOGLE_API_KEY_3" \
+                     "$GOOGLE_API_KEY_4" "$GOOGLE_API_KEY_5"; do
+              if [ -n "$K" ]; then
+                case ",$POOL," in
+                  *",$K,"*) ;;
+                  *) POOL="${POOL:+$POOL,}$K" ;;
+                esac
+              fi
+            done
+            upsert GEMINI_API_KEY_POOL      "$POOL"
             upsert COHERE_API_KEY           "$COHERE_API_KEY"
+            # PiAPI currently carries every image that still generates, and
+            # Replicate is what productImageCutout falls back from when absent.
+            # An empty secret is skipped by upsert, so this can't wipe a key
+            # that only exists as a hand-edit on the VM.
+            upsert PIAPI_KEY                "$PIAPI_KEY"
+            upsert REPLICATE_API_TOKEN      "$REPLICATE_API_TOKEN"
             upsert FAL_API_KEY              "$FAL_AI_API_KEY_1"
             upsert FAL_AI_API_KEY           "$FAL_AI_API_KEY_1"
             upsert FAL_AI_API_KEY_BACKUP_1  "$FAL_AI_API_KEY_2"

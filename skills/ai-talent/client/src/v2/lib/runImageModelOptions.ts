@@ -13,5 +13,10 @@ export const RUN_IMAGE_MODEL_OPTIONS: readonly RunImageModelOption[] = [
   // Every manual image path appends the system-wide zero-text guard. Do not
   // advertise Ideogram as a way to render text that the server forbids.
   { value: "ideogram-v3", en: "Graphic design — Ideogram V3 (text disabled)", zh: "平面設計 — Ideogram V3（依規範不生成圖中文字）" },
-  { value: "imagen-3", en: "Google Imagen 4", zh: "Google Imagen 4" },
+  // 2026-08-31: the value stays "imagen-3" (stored on existing variants), but
+  // Google retired the Imagen predict surface for this key — the server now
+  // routes this choice to gemini-2.5-flash-image. Label the model that
+  // actually runs; advertising Imagen would be the same broken promise as the
+  // Ideogram text case above.
+  { value: "imagen-3", en: "Google — Nano Banana (Gemini image)", zh: "Google — Nano Banana（Gemini 圖像）" },
 ] as const;
