@@ -39,7 +39,7 @@ jobs:
           const { TEN_STANDARDS } = await import("./server/_core/brandPacks/wugan.ts");
           const { buildBrandPrefix } = await import("./server/_core/brandContext.ts");
           const { callModel } = await import("./server/_core/multiModelRouter.ts");
-          const { validateWuganVoice } = await import("./server/_core/wuganVoiceContract.ts");
+          const { validateWuganVoice, repairWuganVoice } = await import("./server/_core/wuganVoiceContract.ts");
 
           const TASK = process.env.TASK!;
           const TEXT = process.env.TEXT!;
@@ -77,8 +77,14 @@ jobs:
             [{ role: "system", content: proposeSystem }, { role: "user", content: TEXT }],
             undefined, "anthropic",
           );
-          const out = (r.content ?? "").trim();
-          console.log("\n===== 產出 =====");
+          let out = (r.content ?? "").trim();
+          // 與 polishInput 部署後的行為一致：提案模式一律修補
+          const before = validateWuganVoice(out);
+          if (before) {
+            console.log("修補前偵測到:", before.pattern, "x" + before.count);
+            out = repairWuganVoice(out);
+          }
+          console.log("\n===== 產出（已套用與正式站相同的修補）=====");
           console.log(out);
 
           console.log("\n===== 檢查 =====");
