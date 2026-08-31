@@ -1,0 +1,98 @@
+name: "Ops — 五感十築 AI 潤稿探測（提案模式 + 十築標準正確性）"
+
+# 2026-09-01。CJ 回報：按下生活實踐卡的 AI 潤稿，得到的是三個反問，而且
+# 裡面的「十築標準」寫成「光線、通風、材質、空間機能、人文連結」——
+# 沒有一個是真的。
+#
+# 這支探測用「部署後的」程式碼驗兩件事：
+#   1. findPackTemplate(taskId).polishHint 真的帶了十項標準的正式名稱
+#   2. 素材很短時走提案模式，產出三個建議，且標準名稱全部取自官方清單
+#
+# 提案的 system prompt 在這裡是複製一份（router 裡那份是 procedure 內的
+# 區域變數，無法從外部 import）。標準清單與品牌 digest 都是真的。
+
+on:
+  workflow_dispatch:
+    inputs:
+      taskId:
+        required: true
+        default: "wg-fb-life-practice"
+        type: string
+      text:
+        description: "使用者輸入（留很短以觸發提案模式）"
+        required: true
+        default: "想寫一篇"
+        type: string
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 10
+    steps:
+      - run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          echo "deployed: $(git -C /opt/onbrand/app rev-parse --short HEAD)"
+          cat > ./.wugan_polish.mts <<'JS'
+          const { findPackTemplate } = await import("./server/_core/brandPacks/index.ts");
+          const { TEN_STANDARDS } = await import("./server/_core/brandPacks/wugan.ts");
+          const { buildBrandPrefix } = await import("./server/_core/brandContext.ts");
+          const { callModel } = await import("./server/_core/multiModelRouter.ts");
+          const { validateWuganVoice } = await import("./server/_core/wuganVoiceContract.ts");
+
+          const TASK = process.env.TASK!;
+          const TEXT = process.env.TEXT!;
+          const tpl = findPackTemplate(TASK);
+          if (!tpl) { console.error("NOT A PACK CARD:", TASK); process.exit(1); }
+
+          console.log("===== polishHint 檢查 =====");
+          const hint = tpl.polishHint ?? "";
+          console.log("有 polishHint:", !!hint, "| 長度:", hint.length);
+          const missing = TEN_STANDARDS.filter((s) => !hint.includes(s.name)).map((s) => s.name);
+          console.log("十項標準缺漏:", missing.length ? missing.join("、") : "無");
+
+          const bare = TEXT.trim();
+          const proposeMode = bare.length < 40;
+          console.log("輸入長度:", bare.length, "→ 提案模式:", proposeMode);
+
+          const brandPrefix = await buildBrandPrefix(2840, null, null, "core").catch(() => "");
+          const taskHint = typeof tpl.label === "object" ? tpl.label.zh : tpl.label;
+          const hintBlock = hint
+            ? "\n\n【這個任務必須知道的事實 — 只能從這裡取用專有名詞，不要自己造】\n" + hint
+            : "";
+          const proposeSystem =
+            "你是資深行銷企劃。用戶點開了任務「" + taskHint + "」，但還沒有具體想法，想先看你的方向建議。\n"
+            + "請提出 3 個具體、可以直接執行的選題。\n\n"
+            + "每個建議照這個格式：\n【建議 N】<一句話的題目>\n　對應標準：<從下方任務知識裡挑一項，用它的正式名稱>\n"
+            + "　切角：<2 句。從什麼生活情境或身體感受切入，要具體到看得到畫面>\n　為什麼適合：<1 句>\n\n"
+            + "規則：\n1. 專有名詞只能用下方品牌資料與任務知識裡確實有的，絕對不可自己造。\n"
+            + "2. 三個建議要用不同的標準、不同的切入角度。\n3. 不要綁特定節慶，除非用戶自己提到。\n"
+            + "4. 全文正向直述，嚴禁「不是⋯而是⋯」「不只是⋯而是⋯」「而不是⋯」等否定轉折句型。\n"
+            + "5. 第一行先寫：「以下是三個方向建議，不是既定事實 — 選一個改寫，或直接覆蓋成你自己的想法。」\n"
+            + "6. 只輸出建議本身，不要前言、不要 markdown 圍欄。\n"
+            + hintBlock + brandPrefix;
+
+          const r = await callModel(
+            [{ role: "system", content: proposeSystem }, { role: "user", content: TEXT }],
+            undefined, "anthropic",
+          );
+          const out = (r.content ?? "").trim();
+          console.log("\n===== 產出 =====");
+          console.log(out);
+
+          console.log("\n===== 檢查 =====");
+          const used = TEN_STANDARDS.filter((s) => out.includes(s.name)).map((s) => s.name);
+          console.log("用到的官方標準:", used.length ? used.join("、") : "（無）");
+          const FAKE = ["光線", "通風", "材質", "空間機能", "人文連結"];
+          const fake = FAKE.filter((f) => new RegExp("十築" + f).test(out));
+          console.log("捏造的標準名稱:", fake.length ? fake.join("、") : "無");
+          console.log("建議則數:", (out.match(/【建議/g) ?? []).length);
+          const v = validateWuganVoice(out);
+          console.log("禁用句型:", v ? v.pattern + " ×" + v.count : "無");
+          process.exit(0);
+          JS
+          TASK="${{ github.event.inputs.taskId }}" TEXT="${{ github.event.inputs.text }}" \
+            node --import tsx ./.wugan_polish.mts
+          rm -f ./.wugan_polish.mts
+          exit 0
