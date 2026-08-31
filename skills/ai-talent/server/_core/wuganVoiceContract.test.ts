@@ -105,6 +105,14 @@ describe("repairWuganVoice", () => {
     expect(out).toContain("透氣");
   });
 
+  it("修得掉沒有逗號的「A而不是B」，且不吃掉 Markdown 記號", () => {
+    // 2026-08-31 實測殘留：bullet 標題裡的「讓冷氣成為支持而不是依賴」
+    const out = repairWuganVoice("**負荷的預測與調控，讓冷氣成為支持而不是依賴**");
+    expect(validateWuganVoice(out)).toBeNull();
+    expect(out).toContain("讓冷氣成為支持");
+    expect(out.endsWith("**")).toBe(true);
+  });
+
   it("合格的句子原封不動", () => {
     for (const line of CLEAN) expect(repairWuganVoice(line)).toBe(line);
   });

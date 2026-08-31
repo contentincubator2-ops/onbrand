@@ -120,6 +120,12 @@ export function repairWuganVoice(text: string): string {
   // 破折號引出的對比尾巴同理
   out = out.replace(new RegExp(`[—–-]{1,2}\\s*(而不是|不再是)[^${STOP}]*`, "g"), "");
 
+  // 2b. 無逗號的「A而不是B」——實測出現在 bullet 標題裡：
+  //     「讓冷氣成為支持而不是依賴」。刪掉被否定的那半邊，保留肯定的。
+  //     邊界要含 * 與 」，否則會把 Markdown 粗體的收尾記號一起吃掉。
+  out = out.replace(new RegExp(`而不是[^。！？；，,、*」
+]{0,20}`, "g"), "");
+
   // 3. 清掉修補後可能留下的重複標點與行尾逗號
   out = out.replace(/[，,]{2,}/g, "，").replace(new RegExp(`[，,](?=[${STOP}])`, "g"), "");
   return out;
