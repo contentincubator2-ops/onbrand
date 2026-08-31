@@ -48,6 +48,18 @@ describe("validateWuganVoice", () => {
     expect(issue.excerpt.length).toBeGreaterThan(0);
   });
 
+  it("單獨的「不再是」不算違反 —— skill 禁的是「不再是⋯而是⋯」的轉折構造", () => {
+    // 2026-08-31 實測誤判：「讓空調不再是唯一的溫濕調節工具」是正常中文，
+    // 攔下來只會白白燒一次重試。
+    expect(validateWuganVoice("隔熱與通風的平衡，讓空調不再是唯一的溫濕調節工具。")).toBeNull();
+    expect(validateWuganVoice("好的設計讓除濕機不再是必需品。")).toBeNull();
+  });
+
+  it("頓號形式的轉折仍然抓得到", () => {
+    expect(validateWuganVoice("當空氣流動被感受到時，家不再是悶的、是透氣的。")).not.toBeNull();
+    expect(validateWuganVoice("這不是裝飾、是每天都在運作的條件。")).not.toBeNull();
+  });
+
   it("空字串不算違反", () => {
     expect(validateWuganVoice("")).toBeNull();
   });
@@ -85,6 +97,12 @@ describe("repairWuganVoice", () => {
   it("破折號引出的對比尾巴同樣處理", () => {
     const out = repairWuganVoice("讓空氣自然流動——而不是靠機器硬撐。");
     expect(validateWuganVoice(out)).toBeNull();
+  });
+
+  it("修得掉頓號形式的轉折", () => {
+    const out = repairWuganVoice("當空氣流動被感受到時，家不再是悶的、是透氣的。");
+    expect(validateWuganVoice(out)).toBeNull();
+    expect(out).toContain("透氣");
   });
 
   it("合格的句子原封不動", () => {
