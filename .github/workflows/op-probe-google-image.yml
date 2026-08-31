@@ -1,0 +1,86 @@
+name: "Op — Probe Google image surface (read-only)"
+
+# 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」).
+#
+# op-probe-imagen.yml only exercises the Imagen :predict surface, which now
+# answers 404 NOT_FOUND on every key — ListModels shows this key tier has no
+# imagen model at all, only gemini-*-image. That left one question unanswered
+# before we make Nano Banana the primary: does the gemini image surface
+# actually RETURN an image for a plain text prompt (no subject reference) on
+# the prod keys?
+#
+# Read-only: one generateContent call per key per model. Prints HTTP status,
+# latency, and whether an inline image part came back — never the key, never
+# the image bytes.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Probe gemini image models across the key pool
+        run: |
+          set +e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV" 2>/dev/null; set +a
+
+          # Same precedence googleApiKeyPool() uses in mediaGen/imageGen.
+          POOL=$(printf '%s\n%s\n%s\n%s\n' \
+            "$(echo "${GEMINI_API_KEY_POOL:-}" | tr ',' '\n')" \
+            "${GEMINI_API_KEY:-}" "${GOOGLE_AI_API_KEY:-}" "${GOOGLE_API_KEY:-}" \
+            | sed 's/[[:space:]]//g' | grep -v '^$' | awk '!seen[$0]++')
+
+          if [ -z "$POOL" ]; then
+            echo "No Google key on this host — image gen has no Google path at all."
+            exit 0
+          fi
+          echo "keys in pool: $(echo "$POOL" | wc -l)"
+          echo
+
+          for MODEL in gemini-2.5-flash-image gemini-3-pro-image gemini-3.1-flash-image; do
+            echo "════ $MODEL ════"
+            IDX=0
+            echo "$POOL" | while IFS= read -r KEY; do
+              IDX=$((IDX + 1))
+              START=$(date +%s%3N)
+              CODE=$(curl -s -o /tmp/probe.json -w '%{http_code}' --max-time 120 \
+                -X POST "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}" \
+                -H "Content-Type: application/json" \
+                -d '{"contents":[{"role":"user","parts":[{"text":"A clean product photography background, soft studio light, no text.\n\nOutput aspect ratio: 1:1."}]}],"generationConfig":{"responseModalities":["IMAGE"]}}')
+              MS=$(( $(date +%s%3N) - START ))
+              # Report whether an inline image part came back — a 200 with only
+              # a text part is the "success-shaped, no image" case the adapter
+              # must treat as a failure.
+              VERDICT=$(python3 - "$CODE" <<'PY' < /tmp/probe.json
+import json, sys
+code = sys.argv[1]
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("unparseable body"); raise SystemExit
+if "error" in d:
+    print("ERROR: " + str(d["error"].get("status", "?")) + " " + str(d["error"].get("message", ""))[:110])
+    raise SystemExit
+cand = (d.get("candidates") or [{}])[0]
+parts = ((cand.get("content") or {}).get("parts")) or []
+img = next((p for p in parts if p.get("inlineData") or p.get("inline_data")), None)
+if img:
+    blob = (img.get("inlineData") or img.get("inline_data") or {})
+    print("IMAGE OK (" + str(len(blob.get("data", ""))) + " b64 chars, " + str(blob.get("mimeType") or blob.get("mime_type")) + ")")
+else:
+    print("NO IMAGE PART (finishReason=" + str(cand.get("finishReason")) + ")")
+PY
+)
+              printf '  key#%d  HTTP %s  %6sms  %s\n' "$IDX" "$CODE" "$MS" "$VERDICT"
+            done
+            echo
+          done
+
+          echo "── how to read this ──"
+          echo "IMAGE OK on at least one key  → Nano Banana is a viable primary."
+          echo "API_KEY_INVALID              → that key is dead, drop it from GEMINI_API_KEY_POOL."
+          echo "NOT_FOUND                    → that model is not on this key tier."
+          echo "RESOURCE_EXHAUSTED / 429     → quota; the adapter rotates to the next key."

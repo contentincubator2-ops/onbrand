@@ -29,6 +29,8 @@ describe("generateImage provider validation", () => {
     vi.stubEnv("GOOGLE_API_KEY", "");
     vi.stubEnv("IMAGE_GEN_PROVIDER_PRIMARY", "openai");
     vi.stubEnv("IMAGE_GEN_PROVIDER_FALLBACK", "google");
+    // Reset per-test, or the pinned-imagen case below leaks into later tests.
+    vi.stubEnv("IMAGE_GEN_MODEL_GOOGLE", "");
     dispatchGenerateMock.mockResolvedValue({
       status: "ready",
       modelId: "google/nano-banana",
@@ -43,7 +45,7 @@ describe("generateImage provider validation", () => {
         headers: { "content-type": "application/json" },
       }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        predictions: [{ bytesBase64Encoded: "aW1hZ2U=" }],
+        candidates: [{ content: { parts: [{ inlineData: { data: "aW1hZ2U=" } }] } }],
       }), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -68,7 +70,7 @@ describe("generateImage provider validation", () => {
     expect(fetchMock.mock.calls[1]![1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("rotates manual Imagen generation past a quota-exhausted pooled key", async () => {
+  it("rotates manual Google generation past a quota-exhausted pooled key", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
     vi.stubEnv("GEMINI_API_KEY_POOL", "quota-key,working-key");
     const fetchMock = vi.fn()
@@ -76,7 +78,7 @@ describe("generateImage provider validation", () => {
         error: { status: "RESOURCE_EXHAUSTED" },
       }), { status: 429, headers: { "content-type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        predictions: [{ bytesBase64Encoded: "aW1hZ2U=" }],
+        candidates: [{ content: { parts: [{ inlineData: { data: "aW1hZ2U=" } }] } }],
       }), { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -88,6 +90,56 @@ describe("generateImage provider validation", () => {
 
     expect(result).toMatchObject({ status: "ready", provider: "google" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  // 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」): the prod key lost the
+  // Imagen predict surface entirely, so an .env still pinning an imagen model
+  // would otherwise take the whole Google fallback down.
+  it("hands a 404 imagen model off to the gemini image surface", async () => {
+    vi.stubEnv("IMAGE_GEN_MODEL_GOOGLE", "imagen-4.0-generate-001");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: {
+          code: 404,
+          message: "models/imagen-4.0-generate-001 is not found for API version v1beta",
+          status: "NOT_FOUND",
+        },
+      }), { status: 404, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ inlineData: { data: "aW1hZ2U=" } }] } }],
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateImage({
+      brandId: 1,
+      prompt: "A clean studio scene",
+      modelChoice: "imagen-3",
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      provider: "google",
+      model: "gemini-2.5-flash-image",
+    });
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("imagen-4.0-generate-001:predict");
+    expect(String(fetchMock.mock.calls[1]![0])).toContain("gemini-2.5-flash-image:generateContent");
+  });
+
+  it("falls back instead of reporting ready when the gemini surface returns no image part", async () => {
+    // A success-shaped response carrying only a text part must not be written
+    // as ready — that is the bug that stopped the fallback chain for OpenAI.
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      candidates: [{ finishReason: "IMAGE_OTHER", content: { parts: [{ text: "no image" }] } }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateImage({
+      brandId: 1,
+      prompt: "A clean studio scene",
+      modelChoice: "imagen-3",
+    });
+
+    expect(result).toMatchObject({ status: "ready", provider: "piapi", usedFallback: true });
   });
 
   it("puts product-reference arbitration before a conflicting scene prompt", async () => {

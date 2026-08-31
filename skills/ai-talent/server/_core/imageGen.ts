@@ -309,20 +309,98 @@ async function runOpenAI(
   return { url: item.url ?? null, b64: item.b64_json ?? null, model };
 }
 
+function aspectForSize(size: ImageSize): string {
+  return size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
+}
+
+/**
+ * 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」): ListModels on the prod
+ * key now returns NO imagen model at all — imagen-3.0-* AND imagen-4.0-*
+ * both answer 404 NOT_FOUND for :predict — while gemini-2.5-flash-image /
+ * gemini-3-pro-image / gemini-3.1-flash-image ARE listed. Google moved image
+ * generation off the Imagen predict surface for this key tier, which took the
+ * whole "google" fallback down with it: OpenAI (429 no credits) → Google (404)
+ * → PiAPI Flux was the only path still producing pictures.
+ *
+ * The gemini image surface is generateContent + responseModalities, not
+ * predict, so it needs its own request shape. Same wire format genNanoBanana
+ * (mediaGen) already uses.
+ */
+const GEMINI_IMAGE_FALLBACK_MODEL = "gemini-2.5-flash-image";
+
+async function runGeminiImage(
+  promptText: string,
+  size: ImageSize,
+  model: string,
+): Promise<{ url: string | null; b64: string | null; model: string }> {
+  const keys = googleApiKeys();
+  if (!keys.length) throw new Error("GEMINI_API_KEY not set");
+  // flash-image takes no size parameter — the aspect ratio goes in-prompt.
+  const prompt = `${promptText}\n\nOutput aspect ratio: ${aspectForSize(size)}.`;
+  const errors: string[] = [];
+  for (const apiKey of keys) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ["IMAGE"] },
+        }),
+        signal: AbortSignal.timeout(120_000),
+      }
+    );
+    if (!res.ok) {
+      const text = redactProviderSecrets(await res.text());
+      const error = `Google ${model} ${res.status}: ${text.slice(0, 300)}`;
+      errors.push(error);
+      if (isRetryableGoogleKeyError(`${res.status} ${text}`)) continue;
+      throw new Error(error);
+    }
+    const json: any = await res.json();
+    const parts: any[] = json?.candidates?.[0]?.content?.parts ?? [];
+    const part = parts.find((p) => p?.inlineData?.data || p?.inline_data?.data);
+    const b64 = part?.inlineData?.data ?? part?.inline_data?.data ?? null;
+    // A success-shaped response with no image part must throw, not return a
+    // null url — otherwise the caller writes status=ready and stops falling
+    // back (see the runOpenAI empty-response fix).
+    if (!b64) {
+      const finish = json?.candidates?.[0]?.finishReason ?? "no image part";
+      throw new Error(`Google ${model} returned no image (${finish})`);
+    }
+    return { url: null, b64, model };
+  }
+  throw new Error(errors.join("\n") || `Google ${model} failed`);
+}
+
 async function runGoogleImagen(
   promptText: string,
   size: ImageSize
 ): Promise<{ url: string | null; b64: string | null; model: string }> {
+  const model = process.env.IMAGE_GEN_MODEL_GOOGLE || GEMINI_IMAGE_FALLBACK_MODEL;
+  if (!model.startsWith("imagen-")) return runGeminiImage(promptText, size, model);
+  try {
+    return await runImagenPredict(promptText, size, model);
+  } catch (e: any) {
+    // A key without Imagen access answers 404 NOT_FOUND for every imagen
+    // model. A stale IMAGE_GEN_MODEL_GOOGLE=imagen-* pinned in an old .env
+    // must not take the Google fallback down again — hand off to the gemini
+    // surface instead. Any other failure (quota, safety, network) still
+    // propagates so the caller's PiAPI fallback runs.
+    if (!/\b404\b|NOT_FOUND/i.test(String(e?.message ?? e))) throw e;
+    return await runGeminiImage(promptText, size, GEMINI_IMAGE_FALLBACK_MODEL);
+  }
+}
+
+async function runImagenPredict(
+  promptText: string,
+  size: ImageSize,
+  model: string,
+): Promise<{ url: string | null; b64: string | null; model: string }> {
   const keys = googleApiKeys();
   if (!keys.length) throw new Error("GEMINI_API_KEY not set");
-  // 2026-05-18 (CJ「Imagen 3 產圖失敗」): ListModels on the prod key
-  // shows imagen-3.0-* is GONE (404 not_found for predict); only
-  // imagen-4.0-generate-001 / -fast / -ultra remain. Default to
-  // Imagen 4 so the "Imagen" choice works again.
-  const model = process.env.IMAGE_GEN_MODEL_GOOGLE || "imagen-4.0-generate-001";
-
-  const aspect =
-    size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
+  const aspect = aspectForSize(size);
   const errors: string[] = [];
   for (const apiKey of keys) {
     const res = await fetch(
