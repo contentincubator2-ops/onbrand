@@ -32,6 +32,8 @@ import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSumma
 import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
 import { isShotListTemplate, buildShotListRule, normalizeShotList, validateShotList, repairShotList } from "./shotListContract";
+// 2026-08-31 五感十築：正向直述句型合約（skill 01 Hard Rule 1）。
+import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice, buildWuganVoiceReminder } from "./wuganVoiceContract";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "./brandContext";
@@ -649,6 +651,7 @@ async function callOneVariant(args: {
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
   const adCopy = isAdCopyTemplate(template);
+  const wuganVoice = isWuganVoiceTemplate(template);
   // 2026-08-23: 分格腳本卡的交付物不是貼文，需要自己的合約把社群骨架關掉。
   const shotList = isShotListTemplate(template);
   const requestedUrl = adCopy ? (args.requestedUrl ?? null) : null;
@@ -1059,6 +1062,7 @@ async function callOneVariant(args: {
   let lastErr: any = null;
   let lastRaw = ""; // for diagnostics
   let adCopyIssue = ""; // ad-copy contract violation from the previous attempt
+  let wuganVoiceIssue = ""; // 五感十築句型合約：上一次的違反內容
   let shotListIssue = ""; // shot-list contract violation from the previous attempt
   while (attempt < 2) {
     attempt++;
@@ -1066,7 +1070,7 @@ async function callOneVariant(args: {
       // 2nd attempt: append explicit reminder to user msg, lowering model
       // creativity and forcing strict JSON.
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] ${shotListIssue ? `上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
+        ? `${userMsg}\n\n[REMINDER] ${shotListIssue ? `上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : wuganVoiceIssue ? wuganVoiceIssue : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -1103,6 +1107,24 @@ async function callOneVariant(args: {
               // (URL appended to [Primary]). Missing markers cannot be repaired.
               console.warn(`[callOneVariant] ad-copy contract still unmet for ${label} (${issue.reason}) — applying repair`);
               return { label, caption: repairAdCopy(caption, requestedUrl), hashtags: out.hashtags };
+            }
+          }
+          if (wuganVoice) {
+            // skill 01 Hard Rule 1。規則已經在 systemPrompt 最前面，實測
+            // 仍會滑回這個句型（一次三個變體共 8 處），所以照 adCopy /
+            // shotList 的做法補一次具名重試，再不行才確定性修補。
+            const issue = validateWuganVoice(caption);
+            if (issue && attempt < 2) {
+              lastErr = new Error(`wugan voice contract miss for ${label} (${issue.pattern})`);
+              wuganVoiceIssue = buildWuganVoiceReminder(issue);
+              console.warn(`[callOneVariant] attempt ${attempt} wugan-voice miss for ${label} (${issue.pattern} x${issue.count})`);
+              continue;
+            }
+            if (issue) {
+              // 最後一次：把對比句的否定半邊機械性拿掉，保留肯定半邊。
+              // 修不掉的形式會原樣留著 —— 修壞比留著更糟。
+              console.warn(`[callOneVariant] wugan-voice still unmet for ${label} (${issue.pattern}) — applying repair`);
+              return { label, caption: repairWuganVoice(caption), hashtags: out.hashtags };
             }
           }
           if (shotList) {
