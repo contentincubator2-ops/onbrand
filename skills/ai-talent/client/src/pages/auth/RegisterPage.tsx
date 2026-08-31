@@ -248,13 +248,13 @@ export default function RegisterPage() {
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
         ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
         ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
-        ["04", "Award-Craft", "168 tasks, each carrying its own award-winning craft."],
+        ["04", "Award-Craft", "207 tasks, each carrying its own award-winning craft."],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
         ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
         ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
-        ["04", "得獎工藝", "168 個任務，每個內建得獎案例工藝"],
+        ["04", "得獎工藝", "207 個任務，每個內建得獎案例工藝"],
       ];
 
   return (

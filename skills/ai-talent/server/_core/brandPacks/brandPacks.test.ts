@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { PACKS, resolveBrandPack, findPackTemplate, findPackOrchestraConfig, packCardId } from "./index";
-import { MONTHLY_QUOTA } from "./wugan";
+import { MONTHLY_QUOTA, TEN_STANDARDS } from "./wugan";
 import { buildTaskCatalogIndex, type CatalogPlatform } from "../taskCatalogIndex";
 
 const GLOBAL_IDS = new Set(buildTaskCatalogIndex().map((t) => t.id));
@@ -190,6 +190,47 @@ describe("五感十築 pack 的內容規則", () => {
         c.template.systemPrompt,
         `${c.template.id} 的 prompt 沒有宣告要產出 ${quota} 篇`,
       ).toContain(`一次輸出 ${quota} 篇的摘要`);
+    }
+  });
+
+  it("每張自訂卡都帶了第一鐵律：禁止「不是⋯而是⋯」句型", () => {
+    // skill 01 的 Hard Rules 第 1 條。2026-08-31 發現資料庫裡品牌 2840 的
+    // voice.samples 本身就在示範這個被禁的句型，等於一直在教模型寫錯 ——
+    // 所以規則必須由 pack 強制注入每一張卡，不能依賴 DB 的語氣範例。
+    for (const card of wugan.cards) {
+      if (card.kind !== "custom") continue;
+      expect(
+        card.template.systemPrompt,
+        `${card.template.id} 沒有帶到禁用句型規則`,
+      ).toContain("嚴禁否定轉折句型");
+    }
+  });
+
+  it("十項標準的定義用的是 skill 的原文，不是自行歸納的版本", () => {
+    const meixue = TEN_STANDARDS.find((s) => s.name === "十築美學")!;
+    // 這一項我先前寫成「光影、比例、材質觸感」，跟 skill 定義完全不同。
+    expect(meixue.core).toContain("地方文化");
+    expect(meixue.taboo).toContain("不能只寫好看");
+    const haoyang = TEN_STANDARDS.find((s) => s.name === "十築好氧")!;
+    expect(haoyang.taboo).toContain("不能只寫開窗通風");
+    expect(TEN_STANDARDS.length).toBe(10);
+    for (const s of TEN_STANDARDS) {
+      expect(s.core.length, `${s.name} 缺核心定義`).toBeGreaterThan(5);
+      expect(s.taboo.length, `${s.name} 缺禁忌`).toBeGreaterThan(3);
+    }
+  });
+
+  it("案例卡只掛一項標準 —— 月報製作 skill 的硬性規則", () => {
+    for (const card of wugan.cards) {
+      if (card.kind !== "custom" || card.channel !== "case") continue;
+      expect(
+        card.template.systemPrompt,
+        `${card.template.id} 沒有寫明只掛一項標準`,
+      ).toContain("只掛一項標準");
+      expect(
+        card.template.systemPrompt.includes("可延伸的十築價值"),
+        `${card.template.id} 還留著「可延伸的十築價值」，與一對一規則衝突`,
+      ).toBe(false);
     }
   });
 
