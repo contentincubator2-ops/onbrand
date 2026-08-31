@@ -48,6 +48,13 @@ const BANNED: { name: string; re: RegExp }[] = [
   { name: "並非⋯而是", re: new RegExp(`並非[^${STOP}]{0,40}?而是`, "g") },
   { name: "不只是⋯而是", re: new RegExp(`不只是[^${STOP}]{0,40}?而是`, "g") },
   { name: "不只是⋯更是", re: new RegExp(`不只是[^${STOP}]{0,40}?更是`, "g") },
+  // 2026-08-31：dry-run 修 DB 語氣範例時發現的漏洞 —— 原本只比對「不是」，
+  // 漏掉同一家族的「不止於／不僅／不光／不只」。skill 01 禁的是整個
+  // 「否定＋轉折＋肯定」構造，不是單一個詞。
+  { name: "不止(於)⋯而是", re: new RegExp(`不止(於)?[^${STOP}]{0,40}?而是`, "g") },
+  { name: "不僅⋯而是", re: new RegExp(`不僅[^${STOP}]{0,40}?[而更]是`, "g") },
+  { name: "不光⋯而是", re: new RegExp(`不光[^${STOP}]{0,40}?[而更]是`, "g") },
+  { name: "不只⋯而是", re: new RegExp(`不只[^${STOP}]{0,40}?[而更]是`, "g") },
   { name: "不是因為⋯而是", re: new RegExp(`不是因為[^${STOP}]{0,40}?而是`, "g") },
   { name: "不再是⋯而是", re: new RegExp(`不再是[^${STOP}]{0,40}?而是`, "g") },
   { name: "不是⋯而是", re: new RegExp(`不是[^${STOP}]{0,40}?而是`, "g") },

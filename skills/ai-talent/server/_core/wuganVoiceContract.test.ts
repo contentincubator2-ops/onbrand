@@ -60,6 +60,22 @@ describe("validateWuganVoice", () => {
     expect(validateWuganVoice("這不是裝飾、是每天都在運作的條件。")).not.toBeNull();
   });
 
+  it("同家族的否定詞也要抓 —— 不止於 / 不僅 / 不光 / 不只", () => {
+    // 2026-08-31：修 DB 語氣範例時發現。原本只比對「不是」，
+    // 品牌 2840 的 sample[1]「責任，不止於交屋那天，而是…」因此漏網。
+    expect(validateWuganVoice("好建築的責任，不止於交屋那天，而是對未來數十年的承諾。")).not.toBeNull();
+    expect(validateWuganVoice("這不僅是規格，更是生活條件。")).not.toBeNull();
+    expect(validateWuganVoice("好設計不光是好看，而是每天都在運作。")).not.toBeNull();
+    expect(validateWuganVoice("十築好氧不只是開窗，而是完整的換氣設計。")).not.toBeNull();
+  });
+
+  it("已知限制：否定與肯定跨句號時抓不到 —— 跨句比對誤判率太高，刻意不做", () => {
+    // 品牌 2840 的 sample[2]「不是給你看的規格表。它是管線裡流動的水質…」
+    // 語意上是同一個構造，但跨了句號。這裡把限制寫成測試，避免日後誤以為
+    // 驗證器涵蓋了它。
+    expect(validateWuganVoice("十項標準，不是給你看的規格表。它是管線裡流動的水質。")).toBeNull();
+  });
+
   it("空字串不算違反", () => {
     expect(validateWuganVoice("")).toBeNull();
   });
