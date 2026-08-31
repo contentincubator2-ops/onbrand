@@ -393,6 +393,10 @@ function calendarCard(args: {
   channelPill: "官網" | "Facebook";
   type: keyof typeof MONTHLY_QUOTA;
   labelEn: string;
+  /** 大綱標題行的形式欄位，對到月報的「短文 / 長文 / 建築展」。 */
+  formLabel: string;
+  /** 內容要點區塊的標題，隨類型不同（生活實踐點 / 生態健築特點 / 案例背景）。 */
+  pointLabel: string;
   guidance: string;
 }): BrandPackCard {
   const n = MONTHLY_QUOTA[args.type];
@@ -405,8 +409,8 @@ function calendarCard(args: {
       postType: "calendar",
       label: { en: `Calendar — ${args.labelEn}`, zh: `${args.type}｜當月排程（${n} 篇）` },
       description: {
-        en: `${n} post outlines for the month, in monthly-report summary form`,
-        zh: `產出當月 ${n} 篇的內容摘要，格式同月報`,
+        en: `${n} article outlines for the month, in the approved monthly-report format`,
+        zh: `產出當月 ${n} 篇的文章大綱，格式同月報發文內容大綱`,
       },
       agent_id: 220535, // Yu-Ting Tien — Creative Production Manager
       skill_slug: `wugan-calendar-${args.labelEn.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
@@ -418,40 +422,54 @@ function calendarCard(args: {
       },
       inputs: [{ key: "context", label: "月份 + 議題設定 + 已排定事項", type: "textarea", required: true }],
       contextSources: ["brand.name", "brand.positioning.values", "brand.positioning.audience.primary"],
-      systemPrompt: `你在為五感十築規劃「${args.type}」這個類型當月的內容排程。
+      systemPrompt: `你在為五感十築產出「${args.type}」這個類型當月的**文章大綱**。
 
 【產出篇數】
-一次輸出 ${n} 篇的摘要，依建議日期由早到晚排列。不多不少，就是 ${n} 篇。
-${n === 1 ? "這個類型當月只有 1 篇，把它排好即可。" : `${n} 篇要一起規劃，因為它們彼此有關係 —— 標準不能重複、日期不能撞、整月要有節奏。`}
+一次輸出 ${n} 篇的完整大綱，依建議日期由早到晚排列。不多不少，就是 ${n} 篇。
+${n === 1 ? "這個類型當月只有 1 篇，把它排好即可。" : `${n} 篇要一起規劃 —— 標準不能重複、日期不能撞、整月要有節奏。`}
 
 ${args.guidance}
 
-【每一篇的摘要格式】
-標題：一句，就是這篇最後會用的標題，不是主題描述。
-對應標準：${STANDARDS_LINE} 其中一項。
-建議日期：依輸入的月份與已排定事項給一個具體日期（例如 9/4（三）），避開已佔用的檔期。
-切角：一段話說明這篇從哪裡切入、要回答讀者什麼問題。
-內容要點：3 條，就是正文會展開的三個段落各自要講什麼。
-收尾方向：一句，這篇最後要把讀者帶到哪個感受。
+【每一篇的大綱格式 —— 照這個順序，標題行不可省略】
+
+${args.formLabel} ｜ <對應的十築標準> ｜ <日期（幾月幾日（週幾））> ｜ ${args.type}
+<文章標題 —— 這就是最後會用的標題，不是主題描述>
+
+【<十築標準>關聯度】
+一段。說明這篇的切入點跟這項標準的關係，以及讀者為什麼會在意。從生活情境或身體感受寫起，不要從品牌講起。
+
+【${args.pointLabel}】
+2–3 個要點。每個要點寫成「短標題」換行後接一段說明。
+短標題要具體到讀者一看就知道要做什麼或要看什麼，不要用「注意通風」這種層級。
+每一段說明都要走到「這樣做之後，人會感受到什麼差別」。
+
+<收尾金句>
+一句可以獨立被引用的話，把整篇收回到居住感受上。獨立成行。不用問句，不用行動呼籲。
+
+**重點：** 一句話點出這篇要傳遞的生活價值。這是給提報用的，要短、具體、跟正文對得起來。
 
 【整體要求】
-- ${n} 篇之間的十築標準不得重複，切角也不得重複。同一個月連續講兩篇通風，讀者會覺得在跳針。
+- ${n} 篇之間的十築標準不得重複，切角也不得重複。同一個月連續兩篇談通風，讀者會覺得在跳針。
 - 建議日期要避開輸入裡已排定的檔期。
 - 依輸入的時令與節慶安排順序，讓整月讀起來有節奏。
-- ${n} 篇全部列完後，補一段「整月節奏說明」，用兩三句講清楚為什麼是這個順序。
-- 每一篇都要具體到「照著這份摘要就能直接寫全文」。寫成「談談居家健康」這種程度等於沒規劃。
-- 摘要不加 hashtag。${WUGAN_VOICE}`,
+- 大綱要具體到「照著它就能直接寫全文」。寫成「談談居家健康」這種程度等於沒規劃。
+- 這是提報用的文件，不是社群貼文草稿。語氣直接、溫暖、低 AI 感。
+- 大綱不加 hashtag。
+
+【最後補一段】
+## 整月節奏說明
+兩三句講清楚為什麼是這個順序、三篇之間怎麼銜接。${WUGAN_SCAFFOLD}${WUGAN_VOICE}`,
       outputMode: "document",
       preferredModel: "anthropic",
       // 隨篇數放大。2026-08-29 第二次實跑：3 篇一次產出時 maxTokens 2000
       // 會截斷，而且 40s 的預設 caption 預算會逾時兩次、變體回空字串
       // （任務顯示成功、產出卻空白）。
-      maxTokens: 1400 * n,
+      maxTokens: 1800 * n,
       outputDefaults: { platform: "doc", post_type: "report" },
     },
     {
       // 單一產出，篇數靠 prompt 控制。字數下限隨篇數放大，避免 ${n} 篇被壓縮成條列。
-      ...textConfig(["當月排程"], 300 * n, 1200 * n),
+      ...textConfig(["當月排程"], 400 * n, 1600 * n),
       // 上限 90s：nginx /trpc 是 230s、Node 220s，30s 層同步回應，留餘裕。
       captionBudgetMs: Math.min(40_000 + 25_000 * n, 90_000),
     },
@@ -848,30 +866,37 @@ export const WUGAN_PACK: BrandPack = {
     // ══ 行事曆 · 每種內容類型一張 ════════════════════════════════════
     calendarCard({
       channelPill: "官網", type: "官網長文", labelEn: "Website Long-form",
+      formLabel: "長文", pointLabel: "段落重點",
       guidance: "這個類型是官網原創長文，主角是外部案例或生活議題，每篇約 1200–1600 字。",
     }),
     calendarCard({
       channelPill: "官網", type: "遇見十築", labelEn: "Meeting the Ten",
+      formLabel: "長文", pointLabel: "標準說明重點",
       guidance: "這個類型是《遇見十築》專欄，主角是五感十築自己的建築標準，由高層觀點出發。",
     }),
     calendarCard({
       channelPill: "官網", type: "十築建築展", labelEn: "Architecture Expo",
+      formLabel: "建築展", pointLabel: "十築價值表",
       guidance: "這個類型是策展式深度案例，一案對應多項十築標準，密度高於一般長文。",
     }),
     calendarCard({
       channelPill: "Facebook", type: "生活實踐", labelEn: "Living Practice",
+      formLabel: "短文", pointLabel: "生活實踐點",
       guidance: "這個類型從日常生活情境切入，把十築標準轉成讀者能動手做的事。要扣住當月時令與節慶。",
     }),
     calendarCard({
       channelPill: "Facebook", type: "生態健築", labelEn: "Eco Architecture",
+      formLabel: "長文", pointLabel: "生態健築特點",
       guidance: "這個類型介紹建築、空間、材料如何回應十築標準。三篇要涵蓋不同的建築類型（住宅／公共／商辦），不要都是住宅。",
     }),
     calendarCard({
       channelPill: "Facebook", type: "永續生活", labelEn: "Sustainable Living",
+      formLabel: "短文", pointLabel: "永續生活特點與連結",
       guidance: "這個類型的主角是外部品牌、趨勢或永續行動，不是建築案例。",
     }),
     calendarCard({
       channelPill: "Facebook", type: "永續價值", labelEn: "Sustainable Value",
+      formLabel: "短文", pointLabel: "品牌觀點重點",
       guidance: "這個類型回到品牌自己相信什麼。兩篇要談不同的十築標準，且不得出現建案名稱或銷售資訊。",
     }),
   ],

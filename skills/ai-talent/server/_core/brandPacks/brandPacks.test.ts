@@ -189,7 +189,14 @@ describe("五感十築 pack 的內容規則", () => {
       expect(
         c.template.systemPrompt,
         `${c.template.id} 的 prompt 沒有宣告要產出 ${quota} 篇`,
-      ).toContain(`一次輸出 ${quota} 篇的摘要`);
+      ).toContain(`一次輸出 ${quota} 篇的完整大綱`);
+      // 大綱格式的三個必要區塊 —— 少任何一個就不是月報那份格式了
+      for (const block of ["關聯度", "收尾金句", "**重點：**"]) {
+        expect(
+          c.template.systemPrompt,
+          `${c.template.id} 的大綱格式缺少「${block}」`,
+        ).toContain(block);
+      }
     }
   });
 
