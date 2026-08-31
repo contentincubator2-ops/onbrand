@@ -1114,7 +1114,14 @@ async function callOneVariant(args: {
             // 仍會滑回這個句型（一次三個變體共 8 處），所以照 adCopy /
             // shotList 的做法補一次具名重試，再不行才確定性修補。
             const issue = validateWuganVoice(caption);
-            if (issue && attempt < 2) {
+            // 2026-08-31：重試只用在短文本。長文件（行事曆一次 3 篇大綱、
+            // 案例一次 3 個提報）單次生成就要 45–100s，再生一份會撞破 caption
+            // 預算，整個變體回空 —— 任務顯示成功、產出空白。實測 wg-cal-
+            // eco-architecture 就是這樣掛掉的（attempt 1 命中 11 處 →
+            // 重試 → final gate hasUsableVariant=false）。
+            // 長文件直接走確定性修補：對比尾巴本來就是機械可刪的。
+            const longForm = (config.captionMaxChars ?? 0) > 2000;
+            if (issue && attempt < 2 && !longForm) {
               lastErr = new Error(`wugan voice contract miss for ${label} (${issue.pattern})`);
               wuganVoiceIssue = buildWuganVoiceReminder(issue);
               console.warn(`[callOneVariant] attempt ${attempt} wugan-voice miss for ${label} (${issue.pattern} x${issue.count})`);
