@@ -119,7 +119,10 @@ function sizeForAspectRatio(opts: GenOptions): NonNullable<GenOptions["size"]> {
 }
 
 // ── 1. OpenAI gpt-image-1 / gpt-image-2 ──────────────────────────────────
-async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-image-2" = "gpt-image-1"): Promise<GenResult> {
+// 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): gpt-image-2 is the
+// designated OpenAI image model, so it is the default here too. Callers that
+// want the older one must now name it explicitly.
+async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-image-2" = "gpt-image-2"): Promise<GenResult> {
   const key = process.env.OPENAI_API_KEY ?? "";
   if (!key) throw new Error("OPENAI_API_KEY missing");
   // Derive an OpenAI-supported size from the aspect ratio when an explicit

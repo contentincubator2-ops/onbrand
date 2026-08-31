@@ -70,6 +70,23 @@ describe("generateImage provider validation", () => {
     expect(fetchMock.mock.calls[1]![1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
+  // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): IMAGE_GEN_MODEL_OPENAI is
+  // unset on the VM, so the literal default in runOpenAI is what actually
+  // reaches OpenAI — it must be gpt-image-2, not the older model.
+  it("sends gpt-image-2 when nothing overrides the OpenAI model", async () => {
+    vi.stubEnv("IMAGE_GEN_MODEL_OPENAI", "");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: "aW1hZ2U=" }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateImage({ brandId: 1, prompt: "A clean studio scene" });
+
+    expect(result).toMatchObject({ status: "ready", provider: "openai" });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body));
+    expect(body.model).toBe("gpt-image-2");
+  });
+
   it("rotates manual Google generation past a quota-exhausted pooled key", async () => {
     vi.stubEnv("GEMINI_API_KEY", "");
     vi.stubEnv("GEMINI_API_KEY_POOL", "quota-key,working-key");

@@ -1,8 +1,8 @@
 /**
  * imageGen — Decision AI publish-gate image generation service.
  *
- * Primary:  OpenAI gpt-image-1 (best prompt adherence, brand-context friendly)
- * Fallback: Google Imagen 3 via Gemini REST API
+ * Primary:  OpenAI gpt-image-2 (best prompt adherence, brand-context friendly)
+ * Fallback: Google gemini image surface (Imagen is gone from this key tier)
  *
  * Every generation is persisted to `generated_images` for auditability and
  * linked back to the originating decision/option.
@@ -283,7 +283,13 @@ async function runOpenAI(
 ): Promise<{ url: string | null; b64: string | null; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-  const model = modelOverride || process.env.IMAGE_GEN_MODEL_OPENAI || "gpt-image-1";
+  // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): gpt-image-2 is the
+  // designated OpenAI image model. IMAGE_GEN_MODEL_OPENAI is unset on the VM,
+  // so this literal — not the env — was what actually ran, and it was still
+  // gpt-image-1 despite imageRouter's comment calling gpt-image-2 the global
+  // default. Verified openable on the current key before the switch
+  // (op-probe-openai-image: HTTP 200, 17.5s).
+  const model = modelOverride || process.env.IMAGE_GEN_MODEL_OPENAI || "gpt-image-2";
 
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
