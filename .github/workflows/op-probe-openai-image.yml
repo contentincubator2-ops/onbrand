@@ -30,41 +30,41 @@ jobs:
           echo
 
           probe_model() {
-            M="$1"; Q="$2"
+            M="$1"; SIZE="$2"; Q="$3"; LABEL="$4"
             START=$(date +%s%3N)
             CODE=$(curl -s -o /tmp/oi.json -w '%{http_code}' --max-time 180 \
               -X POST https://api.openai.com/v1/images/generations \
               -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-              -d "{\"model\":\"$M\",\"prompt\":\"a red circle on a white background\",\"n\":1,\"size\":\"1024x1024\"${Q}}")
+              -d "{\"model\":\"$M\",\"prompt\":\"a red circle on a white background\",\"n\":1,\"size\":\"$SIZE\"${Q}}")
             MS=$(( $(date +%s%3N) - START ))
             if grep -q '"b64_json"' /tmp/oi.json; then
               N=$(tr -d '\n' < /tmp/oi.json | sed 's/.*"b64_json"[[:space:]]*:[[:space:]]*"//; s/".*//' | wc -c)
-              printf '  %-14s HTTP %s %7sms  IMAGE OK (%s b64 chars)\n' "$M" "$CODE" "$MS" "$N"
+              printf '  %-42s HTTP %s %7sms  IMAGE OK (%s b64 chars)\n' "$LABEL" "$CODE" "$MS" "$N"
               return 0
             fi
             if grep -q '"url"' /tmp/oi.json; then
-              printf '  %-14s HTTP %s %7sms  IMAGE OK (url form)\n' "$M" "$CODE" "$MS"
+              printf '  %-42s HTTP %s %7sms  IMAGE OK (url form)\n' "$LABEL" "$CODE" "$MS"
               return 0
             fi
             MSG=$(tr -d '\n' < /tmp/oi.json | sed -n 's/.*"message"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | cut -c1-140)
-            printf '  %-14s HTTP %s %7sms  ERROR — %s\n' "$M" "$CODE" "$MS" "${MSG:-no image in response}"
+            printf '  %-42s HTTP %s %7sms  ERROR — %s\n' "$LABEL" "$CODE" "$MS" "${MSG:-no image in response}"
             return 1
           }
 
-          for M in gpt-image-1 gpt-image-2; do
-            # `quality` is model-specific; if the low-quality request is
-            # rejected as a bad param, retry without it before concluding the
-            # model itself is unavailable.
-            probe_model "$M" ',"quality":"low"'
-            if [ $? -ne 0 ]; then
-              if grep -qi "quality\|invalid_value\|unsupported" /tmp/oi.json; then
-                echo "    ↳ retrying without the quality parameter"
-                probe_model "$M" ""
-              fi
-            fi
-          done
+          # 2026-09-01: a YT thumbnail run pinned to openai/gpt-image-2 came
+          # back 1344x768 — Flux Schnell's 16:9 size, not OpenAI's 1536x1024 —
+          # so the pinned model failed and genOneImage silently fell back. The
+          # variables are the model, the quality value (mediaGen sends "high",
+          # the earlier probe sent "low") and the 16:9 size the task requests.
+          # Probe the exact body genOpenAIImage builds.
+          probe_model gpt-image-2 1024x1024 ',"quality":"low"'  'gpt-image-2  1024x1024  quality=low'
+          probe_model gpt-image-2 1024x1024 ',"quality":"high"' 'gpt-image-2  1024x1024  quality=high  ← app default'
+          probe_model gpt-image-2 1536x1024 ',"quality":"high"' 'gpt-image-2  1536x1024  quality=high  ← YT 16:9'
+          probe_model gpt-image-2 1536x1024 ''                  'gpt-image-2  1536x1024  (no quality)'
+          probe_model gpt-image-1 1536x1024 ',"quality":"high"' 'gpt-image-1  1536x1024  quality=high'
 
           echo
           echo "── how to read this ──"
-          echo "IMAGE OK on gpt-image-2 → safe to make it the OpenAI default."
-          echo "model_not_found / must be verified → the account cannot open that model yet."
+          echo "quality=low OK but quality=high ERROR → mediaGen's default is the bug."
+          echo "1024 OK but 1536 ERROR             → the model rejects that size."
+          echo "all OK but slow (>35s)             → genOneImage's cap is what fell back."
