@@ -140,6 +140,28 @@ describe("repairWuganVoice", () => {
   });
 });
 
+describe("潤稿路徑的修補（polishInput 不經過 orchestra 的 caption 迴圈）", () => {
+  it("提案產出裡的禁用句型修得掉", () => {
+    // 2026-09-01 實測提案模式殘留的那一處
+    const out = repairWuganVoice(
+      `【建議 1】晨起開窗，才發現空氣也分階級
+　切角：好的空氣不是靠開窗，而是靠可以被維持的換氣條件。`,
+    );
+    expect(validateWuganVoice(out)).toBeNull();
+    expect(out).toContain("【建議 1】");
+  });
+
+  it("修補不會動到建議的結構標記", () => {
+    const src = `【建議 2】腳踩地板的瞬間
+　對應標準：十築舒適
+　切角：舒適不是形容詞，而是可被量測的條件。`;
+    const out = repairWuganVoice(src);
+    expect(out).toContain("【建議 2】");
+    expect(out).toContain("對應標準：十築舒適");
+    expect(validateWuganVoice(out)).toBeNull();
+  });
+});
+
 describe("buildWuganVoiceReminder", () => {
   it("提示裡帶了句型名稱與原文摘錄", () => {
     const issue = validateWuganVoice("好氧不是選擇題，而是讓空氣流動。")!;

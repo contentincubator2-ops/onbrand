@@ -973,6 +973,7 @@ import {
   resolveBrandPack, expandPackCards, packNavForBrand,
   findPackTemplate, findPackOrchestraConfig,
 } from "../_core/brandPacks";
+import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice } from "../_core/wuganVoiceContract";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
@@ -1838,8 +1839,30 @@ ${polishTemplate.polishHint}`
           undefined,
           "anthropic",
         );
-        const polished = (r.content ?? "").trim();
+        let polished = (r.content ?? "").trim();
         if (!polished) return { polished: "", ok: false, error: "empty" };
+
+        // 2026-09-01：潤稿走的是 callModel，不經過 orchestra 的 caption 迴圈，
+        // 所以 wuganVoiceContract 管不到它 —— 實測提案產出仍有 1 處禁用句型。
+        //
+        // 這裡只做確定性修補、不重試：潤稿是使用者按下去等著看的動作，
+        // 多跑一輪模型會讓他多等一倍時間。
+        //
+        // 提案模式的文字完全由模型生成，一律修。
+        // 潤稿模式是在重組使用者自己寫的東西 —— 只有在「使用者原文乾淨、
+        // 是模型自己加上去」時才修，否則等於偷改使用者的句子。
+        if (polishTemplate && isWuganVoiceTemplate(polishTemplate)) {
+          const userHadIssue = validateWuganVoice(input.text) !== null;
+          if (proposeMode || !userHadIssue) {
+            const before = validateWuganVoice(polished);
+            if (before) {
+              polished = repairWuganVoice(polished);
+              console.warn(
+                `[polishInput] wugan-voice ${before.pattern} x${before.count} in ${proposeMode ? "propose" : "polish"} output for ${input.taskId} — repaired`,
+              );
+            }
+          }
+        }
         return { polished, ok: true, mode: proposeMode ? "propose" as const : "polish" as const };
       } catch (e: any) {
         return { polished: "", ok: false, error: e?.message ?? String(e) };
