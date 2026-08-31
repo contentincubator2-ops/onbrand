@@ -31,7 +31,12 @@ jobs:
                     echo "${GEMINI_API_KEY:-}"
                     echo "${GOOGLE_AI_API_KEY:-}"
                     echo "${GOOGLE_API_KEY:-}"; } \
-                  | tr -d '[:space:]' | grep -v '^$' | awk '!seen[$0]++' )
+                  | sed 's/[[:space:]]//g' | grep -v '^$' | awk '!seen[$0]++' )
+          # NOT `tr -d '[:space:]'` — tr works on the whole stream, so it eats
+          # the newlines too and glues every key into one unusable string. The
+          # first run of this probe did exactly that and reported a bogus
+          # 401 UNAUTHENTICATED for keys that authenticate fine. sed is
+          # per-line, so it strips padding without joining the records.
 
           if [ -z "$POOL" ]; then
             echo "No Google key on this host — image gen has no Google path at all."
