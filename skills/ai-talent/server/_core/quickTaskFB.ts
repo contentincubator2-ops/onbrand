@@ -112,6 +112,18 @@ export interface FBTaskTemplate {
    * Defaults to social when omitted.
    */
   outputMode?: "social" | "document";
+  /**
+   * 2026-09-01：給「AI 潤稿」用的任務知識。
+   *
+   * polishInput 只拿得到 buildBrandPrefix(..., "core")，那份 digest 沒有任何
+   * 任務專屬的領域知識。結果是它為五感十築的貼文卡問出「對應十築建築標準中
+   * 的哪一項？（例如：光線、通風、材質、空間機能、人文連結…）」——
+   * 這五個沒有一個是真的十築標準，全是模型自己編的。
+   *
+   * 這裡放「潤稿時必須知道的事實清單」，不放輸出格式規則（那是 systemPrompt
+   * 的事，而且太長）。
+   */
+  polishHint?: string;
 }
 
 /**

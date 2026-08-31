@@ -47,6 +47,29 @@ describe("shapeValue", () => {
     expect(out).not.toContain("items");
   });
 
+  it("voice 不會漏出 JSON —— 挑 tone 當預覽", () => {
+    // 2026-09-01 CJ 截圖：CONTEXT 那排出現 Voice · {"tone":["嚴謹而溫潤",…
+    const voice = {
+      tone: ["嚴謹而溫潤", "有底氣的克制", "感知導向", "不疾不徐的自信"],
+      archetypes: ["創造者", "智者"],
+      forbidden: ["用話術堆疊的促銷語氣"],
+      samples: [{ ours: "…", generic: "…" }],
+    };
+    const out = shapeValue(voice);
+    expect(out).not.toContain("{");
+    expect(out).not.toContain('"');
+    expect(out).not.toContain("tone");
+    expect(out).toContain("嚴謹而溫潤");
+  });
+
+  it("任何抽不出內容的物件都回空字串，絕不回 JSON", () => {
+    for (const raw of [{}, { a: 1 }, { nested: { deep: true } }, { items: [] }, { arr: [] }]) {
+      const out = shapeValue(raw);
+      expect(out, `${JSON.stringify(raw)} 洩漏了 JSON`).not.toContain("{");
+      expect(out).not.toContain('"');
+    }
+  });
+
   it("既有行為不變 —— 字串、字串陣列、帶 summary 的物件", () => {
     expect(shapeValue("  純文字  ")).toBe("純文字");
     expect(shapeValue(["A", "B"])).toBe("A、B");

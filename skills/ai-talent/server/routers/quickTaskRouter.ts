@@ -1662,6 +1662,8 @@ export const quickTaskRouter = router({
       const { buildBrandPrefix } = await import("../_core/brandContext");
       const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
 
+
+
       const system =
         `你是 ${input.agentName ?? "資深文案"}（${input.agentTitle ?? "Brand Copywriter"}），正在跟用戶討論這篇文案的修改方向。\n` +
         `任務：根據用戶的修改意見，**重寫**整篇文案。輸出格式：\n` +
@@ -1732,6 +1734,28 @@ export const quickTaskRouter = router({
       const { buildBrandPrefix } = await import("../_core/brandContext");
       const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
 
+      // 2026-09-01 (CJ「AI 潤稿當中的十築，根本不是官網定義的十築」):
+      // brandPrefix 是通用的品牌 digest，沒有任何任務專屬知識，所以模型會
+      // 自己編領域詞彙。把該任務的 polishHint 帶進來。
+      const polishTemplate =
+        findPackTemplate(input.taskId)
+        ?? FB_30S_TASKS.find((t) => t.id === input.taskId)
+        ?? IG_30S_TASKS.find((t) => t.id === input.taskId)
+        ?? WEBSITE_30S_TASKS.find((t) => t.id === input.taskId)
+        ?? null;
+      const hintBlock = polishTemplate?.polishHint
+        ? `
+
+【這個任務必須知道的事實 —— 只能從這裡取用專有名詞，不要自己造】
+${polishTemplate.polishHint}`
+        : "";
+
+      // 使用者按下潤稿時往往還沒有想法（CJ：「我按下生活實踐的文章時，一定是
+      // 毫無頭緒，想獲得你的想法」）。素材太短時「整理」沒有意義，模型只能
+      // 反問使用者要他補充 —— 剛好跟使用情境相反。改成提案模式。
+      const bare = input.text.trim();
+      const proposeMode = bare.length < 40;
+
       // 2026-05-18 (CJ「只填網址時，AI 潤稿也要讀取該網址」): if the user
       // pasted (mostly) a URL, polishing the bare link is useless. Detect
       // + fetch the page and feed its content in, so the polish produces
@@ -1757,6 +1781,40 @@ export const quickTaskRouter = router({
       const urlRule = fetchedUrl
         ? `7. 用戶主要只給了一個連結；系統已抓取該頁內容（見下方【已抓取參考連結】）。請以「該頁實際內容」為素材主體整理出 brief，並保留原始連結；不要寫成通用模板，要呼應這篇的具體訊息。仍然只能用頁面上或用戶寫的事實，不可自行新增。\n`
         : "";
+      // 提案模式：素材太短代表使用者還沒有想法，這時「整理」沒有意義。
+      const proposeSystem =
+        `你是資深行銷企劃。用戶點開了任務「${taskHint}」${qHint}，但還沒有具體想法，想先看你的方向建議。
+` +
+        `請提出 3 個具體、可以直接執行的選題。
+
+` +
+        `每個建議照這個格式：
+` +
+        `【建議 N】<一句話的題目>
+` +
+        `　對應標準：<從下方任務知識裡挑一項，用它的正式名稱>
+` +
+        `　切角：<2 句。從什麼生活情境或身體感受切入，要具體到看得到畫面>
+` +
+        `　為什麼適合：<1 句>
+
+` +
+        `規則：
+` +
+        `1. 專有名詞只能用下方品牌資料與任務知識裡確實有的，絕對不可自己造（標準名稱、建案名、認證、獎項、數據一律不得杜撰）。
+` +
+        `2. 三個建議要用不同的標準、不同的切入角度，不要三個都在講同一件事。
+` +
+        `3. 不要綁特定節慶，除非用戶自己提到。
+` +
+        `4. 全文正向直述，嚴禁「不是⋯而是⋯」「不只是⋯而是⋯」「而不是⋯」等否定轉折句型。
+` +
+        `5. 第一行先寫：「以下是三個方向建議，不是既定事實 —— 選一個改寫，或直接覆蓋成你自己的想法。」
+` +
+        `6. 只輸出建議本身，不要前言、不要 markdown 圍欄。
+` +
+        hintBlock +
+        brandPrefix;
       const system =
         `你是資深行銷企劃，負責把用戶填寫的任務素材「潤飾整理」成一份清楚、可直接交給執行 agent 的 brief。\n` +
         `這份素材會被用在任務：「${taskHint}」${qHint}。\n` +
@@ -1768,12 +1826,13 @@ export const quickTaskRouter = router({
         `5. 保持用戶原本的語言（繁體中文）與意圖，不要過度擴寫、不要換掉語氣。\n` +
         `6. 只輸出整理後的素材本身，不要前言、不要解釋、不要 markdown 圍欄。\n` +
         urlRule +
+        hintBlock +
         brandPrefix;
 
       try {
         const r = await callModel(
           [
-            { role: "system", content: system },
+            { role: "system", content: proposeMode ? proposeSystem : system },
             { role: "user", content: input.text + urlBlock },
           ],
           undefined,
@@ -1781,7 +1840,7 @@ export const quickTaskRouter = router({
         );
         const polished = (r.content ?? "").trim();
         if (!polished) return { polished: "", ok: false, error: "empty" };
-        return { polished, ok: true };
+        return { polished, ok: true, mode: proposeMode ? "propose" as const : "polish" as const };
       } catch (e: any) {
         return { polished: "", ok: false, error: e?.message ?? String(e) };
       }

@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { PACKS, resolveBrandPack, findPackTemplate, findPackOrchestraConfig, packCardId } from "./index";
 import { MONTHLY_QUOTA, TEN_STANDARDS } from "./wugan";
+import { validateWuganVoice } from "../wuganVoiceContract";
 import { buildTaskCatalogIndex, type CatalogPlatform } from "../taskCatalogIndex";
 
 const GLOBAL_IDS = new Set(buildTaskCatalogIndex().map((t) => t.id));
@@ -242,6 +243,48 @@ describe("五感十築 pack 的內容規則", () => {
       ).toBeGreaterThanOrEqual(50_000);
       // nginx /trpc 230s、Node 220s，30s 層同步回應，留餘裕
       expect(hard, `${card.template.id} 的總預算過高`).toBeLessThanOrEqual(150_000);
+    }
+  });
+
+  it("placeholder 與提問本身不得示範禁用句型", () => {
+    // 2026-09-01 CJ 截圖後發現：遇見十築的 placeholder 寫「隔音是基本條件
+    // 而不是加價選配」、品牌觀點寫「而不是只看它新的時候多好看」——
+    // 這是給使用者看的「好輸入範例」，卻在示範品牌最嚴格禁止的句型。
+    for (const card of wugan.cards) {
+      if (card.kind !== "custom") continue;
+      for (const [field, text] of [
+        ["primary_question", card.template.primary_question],
+        ["placeholder", card.template.primary_input?.placeholder],
+      ] as [string, string | undefined][]) {
+        if (!text) continue;
+        const issue = validateWuganVoice(text);
+        expect(issue, `${card.template.id} 的 ${field} 用了禁用句型：${text}`).toBeNull();
+      }
+    }
+  });
+
+  it("placeholder 不綁特定節慶 —— 會過時", () => {
+    // 生活實踐卡原本寫「父親節前的一餐飯」，到了九月就是過期範例。
+    const DATED = ["父親節", "母親節", "中秋", "端午", "春節", "農曆年", "聖誕", "情人節", "國慶"];
+    for (const card of wugan.cards) {
+      if (card.kind !== "custom") continue;
+      const ph = card.template.primary_input?.placeholder ?? "";
+      for (const d of DATED) {
+        expect(ph.includes(d), `${card.template.id} 的 placeholder 綁了「${d}」，會過時`).toBe(false);
+      }
+    }
+  });
+
+  it("每張卡都帶 polishHint，且列出十項標準的正式名稱", () => {
+    // 2026-09-01：沒有這個，AI 潤稿會自己編出「光線、通風、材質、空間機能、
+    // 人文連結」這種不存在的標準去問使用者。
+    for (const card of wugan.cards) {
+      if (card.kind !== "custom") continue;
+      const hint = card.template.polishHint;
+      expect(hint, `${card.template.id} 沒有 polishHint`).toBeTruthy();
+      for (const std of TEN_STANDARDS) {
+        expect(hint, `${card.template.id} 的 polishHint 缺少 ${std.name}`).toContain(std.name);
+      }
     }
   });
 

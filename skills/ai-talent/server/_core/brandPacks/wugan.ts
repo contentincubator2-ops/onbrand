@@ -172,6 +172,24 @@ ${STANDARDS_TABLE}
 
 一篇鎖定一項為主軸（十築建築展除外，它可帶多項但每項都要有公開資料支撐）。`;
 
+/**
+ * 「AI 潤稿」用得到的事實清單。
+ *
+ * 2026-09-01 (CJ「AI 潤稿當中的十築，根本不是官網定義的十築」)：潤稿只拿得到
+ * 通用的品牌 digest，沒有十築標準，於是模型自己編出「光線、通風、材質、
+ * 空間機能、人文連結」這五個不存在的標準去問使用者。
+ *
+ * 這裡只放專有名詞與定義，不放輸出格式 —— 格式是 systemPrompt 的事。
+ */
+const WUGAN_POLISH_HINT = `品牌：五感十築（宏國建設的永續創新住宅品牌）。
+
+十項建築標準只有以下這十項，名稱必須逐字使用，不得自創或改寫：
+${STANDARDS_TABLE}
+
+內容分類（Facebook）：生活實踐、生態健築、永續生活、永續價值。
+官網文章型態：官網長文、《遇見十築》、十築建築展。
+每一篇內容都要掛在其中一項十築標準底下。`;
+
 /** 少寫一層巢狀。custom 卡的共同結構就這四個欄位。 */
 function card(
   channel: BrandPack["channels"][number]["key"],
@@ -180,7 +198,11 @@ function card(
   config: OrchestraConfig,
   origin: "brand" | "sowork" = "brand",
 ): BrandPackCard {
-  return { kind: "custom", channel, format, origin, template, config };
+  // polishHint 統一在這裡注入，避免逐張卡漏掉。個別卡若已自訂就尊重它。
+  return {
+    kind: "custom", channel, format, origin, config,
+    template: { polishHint: WUGAN_POLISH_HINT, ...template },
+  };
 }
 
 /** 沒有圖、單一產出的 config —— 長文與摘要類卡片的預設。 */
@@ -421,7 +443,7 @@ function calendarCard(args: {
       primary_question: "這個月的議題設定是什麼？有哪些節慶、時令或品牌活動要納入？",
       primary_input: {
         key: "context",
-        placeholder: "例：9 月。中秋、開學、颱風季尾。想聚焦在家的空氣與濕度。已排定：9/18 GQ 聯名。",
+        placeholder: "填：月份 ＋ 當月時令或節慶 ＋ 想聚焦的主題 ＋ 已排定的檔期（例如月中的 GQ 聯名）",
         type: "textarea",
       },
       inputs: [{ key: "context", label: "月份 + 議題設定 + 已排定事項", type: "textarea", required: true }],
@@ -598,7 +620,7 @@ export const WUGAN_PACK: BrandPack = {
       primary_question: "這一篇要談十項標準裡的哪一項？由誰的觀點來說？",
       primary_input: {
         key: "context",
-        placeholder: "例：十築沉靜，由創新長觀點談為什麼隔音是基本條件而不是加價選配",
+        placeholder: "例：十築沉靜，由創新長觀點談隔音為什麼是基本條件",
         type: "textarea",
       },
       inputs: [{ key: "context", label: "十築標準 + 發言人觀點", type: "textarea", required: true }],
@@ -691,7 +713,7 @@ export const WUGAN_PACK: BrandPack = {
       primary_question: "這篇要談什麼生活情境？對應哪一項十築標準？",
       primary_input: {
         key: "context",
-        placeholder: "例：父親節前的一餐飯，對到十築健康 —— 從食材、共煮到飯後活動",
+        placeholder: "例：晚餐後全家一起收拾的那半小時，對到十築健康 —— 從共煮、餐後散步到家裡留給活動的空間",
         type: "textarea",
       },
       inputs: [{ key: "context", label: "生活情境 + 對應標準", type: "textarea", required: true }],
@@ -809,7 +831,7 @@ export const WUGAN_PACK: BrandPack = {
       primary_question: "這篇要談哪一項十築標準或哪個品牌主張？",
       primary_input: {
         key: "context",
-        placeholder: "例：談十築珍惜 —— 為什麼我們在意建材能不能被修、被換，而不是只看它新的時候多好看",
+        placeholder: "例：談十築珍惜 —— 為什麼我們在意建材能不能被修、能不能換",
         type: "textarea",
       },
       inputs: [{ key: "context", label: "標準 / 品牌主張", type: "textarea", required: true }],
