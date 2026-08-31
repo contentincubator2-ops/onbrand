@@ -135,7 +135,14 @@ jobs:
             upsert PERPLEXITY_API_KEY_BACKUP_2 "$PERPLEXITY_API_KEY_4"
             upsert PERPLEXITY_API_KEY_BACKUP_3 "$PERPLEXITY_API_KEY_1"
             upsert GOOGLE_API_KEY           "$GOOGLE_API_KEY_1"
-            upsert GEMINI_API_KEY           "$GOOGLE_API_KEY_1"
+            # 2026-08-31: this line used to seed GEMINI_API_KEY from
+            # GOOGLE_API_KEY_1 as well. GOOGLE_API_KEY_1 dates from April and
+            # the same-generation keys in the local .env all answer 400
+            # API_KEY_INVALID today, while the key on the VM works — so
+            # running this workflow would have DOWNGRADED the one working
+            # Google image key to an unverified older one. The GEMINI_API_KEY
+            # secret is the only source for that slot now; when it is unset,
+            # upsert skips and the VM keeps whatever already works.
             upsert GOOGLE_API_KEY_BACKUP_1  "$GOOGLE_API_KEY_3"
             upsert GOOGLE_API_KEY_BACKUP_2  "$GOOGLE_API_KEY_4"
             upsert GOOGLE_API_KEY_BACKUP_3  "$GOOGLE_API_KEY_5"
