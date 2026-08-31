@@ -1778,16 +1778,19 @@ async function genOneImage(
     // Nano Banana (gemini-2.5-flash-image) IS on the key and does plain
     // text-to-image, so it takes over as the primary; the cap keeps its old
     // job of handing slow runs to Flux Schnell inside the task budget.
-    const PRIMARY_IMAGE_CAP_MS = 18_000;
-    // 2026-07-07 (CJ「鎖定 gpt-image-2」): a task may pin its primary image
-    // model (e.g. YT → gpt-image-2 for clean 16:9 backgrounds). gpt-image-2 is
-    // slower than imagen-4, so give the override a wider cap. Flux Schnell
-    // stays the reliability fallback either way.
+    // 2026-09-01 (CJ「我要執行走 gpt-image 2」): gpt-image-2 is now the primary
+    // for every auto-generated image, not just the YT cards that pinned it.
+    // Measured 14.1s at 1536x1024 once the harmful quality="high" was dropped,
+    // and a 5-image YT run finished all five inside a 35s cap — so the cap is
+    // 35s across the board now rather than 18s for the default path and 35s
+    // for overrides. The old 18s existed for Imagen 4, which no longer exists
+    // on this key at all. Flux Schnell stays the reliability fallback.
+    const PRIMARY_IMAGE_CAP_MS = 35_000;
     // 2026-07-27: subjectMode always routes through Nano Banana (image-edit,
     // not text-to-image) — it's the only model here that takes a subject
-    // reference photo.
-    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "google/nano-banana");
-    const primaryCapMs = subjectMode ? 35_000 : (config.imageModelOverride ? 35_000 : PRIMARY_IMAGE_CAP_MS);
+    // reference photo, so「使用真實產品圖」must not follow the primary above.
+    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "openai/gpt-image-2");
+    const primaryCapMs = PRIMARY_IMAGE_CAP_MS;
     let r;
     let fallbackUsed = false;
     try {
