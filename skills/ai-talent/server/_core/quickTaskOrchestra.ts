@@ -1743,7 +1743,10 @@ async function genOneImage(
     const opts = {
       prompt: promptNoText,
       aspectRatio: aspect,
-      quality: "high" as const,
+      // 2026-09-01: quality is read only by the OpenAI and Azure adapters, and
+      // forcing "high" made gpt-image-2 take 73.8s instead of 14.1s for a
+      // SMALLER image — past the cap below, so every openai-pinned task fell
+      // back to Flux. Let each adapter use its own default.
       ...(args.subjectImageUrl ? { imageUrl: args.subjectImageUrl } : {}),
       // Product-subject mode can't send the blanket text-suppression negative —
       // it would fight the real product's own printed label. Mirror-only there,
@@ -1791,6 +1794,14 @@ async function genOneImage(
       r = await tryModel(primaryModel, primaryModel, primaryCapMs);
       if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
     } catch (e: any) {
+      // 2026-09-01: this catch used to swallow the reason entirely, so a
+      // pinned model that never ran was indistinguishable from one that ran
+      // fine — the openai/gpt-image-2 timeout below was only found by
+      // measuring the PNG dimensions of the delivered image. Say what failed.
+      console.warn(
+        `[genOneImage] primary ${primaryModel} failed after ${primaryCapMs}ms cap — ` +
+        `${String(e?.message ?? e).slice(0, 200)}`,
+      );
       // 2026-07-25 product-faithful gen policy (imageGen.ts): a hallucinated
       // product is worse than a failed run — do NOT fall back to text-to-image
       // when a real product photo was requested, it would silently ship a

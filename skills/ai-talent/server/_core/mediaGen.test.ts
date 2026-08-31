@@ -44,6 +44,41 @@ describe("mediaGen image provider request contracts", () => {
     expect(body.parameters).toMatchObject({ sampleCount: 1, aspectRatio: "9:16" });
   });
 
+  // 2026-09-01: quality="high" made gpt-image-2 take 73.8s instead of 14.1s
+  // for a smaller image, past genOneImage's 35s cap — so openai-pinned tasks
+  // silently shipped Flux output. Omit the parameter unless asked.
+  it("omits quality from the OpenAI request when the caller does not set one", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      data: [{ b64_json: "aW1hZ2U=" }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(dispatchGenerate("openai/gpt-image-2", {
+      prompt: "scene",
+      aspectRatio: "16:9",
+    })).resolves.toMatchObject({ status: "ready" });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body));
+    expect(body).not.toHaveProperty("quality");
+    expect(body.model).toBe("gpt-image-2");
+  });
+
+  it("still sends an explicitly requested quality", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      data: [{ b64_json: "aW1hZ2U=" }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(dispatchGenerate("openai/gpt-image-2", {
+      prompt: "scene",
+      aspectRatio: "16:9",
+      quality: "low",
+    })).resolves.toMatchObject({ status: "ready" });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body));
+    expect(body.quality).toBe("low");
+  });
+
   it.each([
     ["openai/gpt-image-2", "4:3", "1536x1024"],
     ["azure/gpt-image-2", "3:4", "1024x1536"],

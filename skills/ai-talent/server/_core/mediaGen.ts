@@ -136,7 +136,14 @@ async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-imag
       model,
       prompt: opts.prompt,
       size,
-      quality: opts.quality ?? "high",
+      // 2026-09-01: do NOT default this to "high". Measured on the prod key,
+      // gpt-image-2 at 1536x1024 takes 73.8s with quality=high and 14.1s with
+      // the parameter omitted — and the omitted-quality image comes back
+      // LARGER (1.40M vs 1.32M b64). "high" was 5x slower for a smaller
+      // result, and it blew genOneImage's 35s cap, so every task pinned to
+      // openai/gpt-image-2 silently fell back to Flux Schnell. Send quality
+      // only when a caller asks for a specific one.
+      ...(opts.quality ? { quality: opts.quality } : {}),
       n: 1,
     }),
     signal: AbortSignal.timeout(180_000),
