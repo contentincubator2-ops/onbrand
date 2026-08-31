@@ -364,6 +364,10 @@ Kellert 獎。案例庫會往下餵給十築建築展與官網長文，錯一次
       // attempt 1 逾時、靠重試才成功；改成 80s 後單次跑了 78s —— 只剩 2 秒
       // 餘裕，正式站上會間歇逾時然後回空字串。拉到 90s（仍遠低於 nginx 230s）。
       captionBudgetMs: 90_000,
+      // 30s 層的 job 總預算只有 100s，裝不下 90s 的 caption 加上 strategist
+      // 與 context 抓取 —— 十築自然案例卡就是這樣以
+      // 「orchestra: hard 100s budget exceeded」失敗的。150s 與 99s 層相同。
+      hardBudgetMs: 150_000,
     },
   );
 }
@@ -480,6 +484,8 @@ ${args.formLabel} ｜ <對應的十築標準> ｜ <日期（幾月幾日（週�
       ...textConfig(["當月排程"], 400 * n, 1600 * n),
       // 上限 90s：nginx /trpc 是 230s、Node 220s，30s 層同步回應，留餘裕。
       captionBudgetMs: Math.min(40_000 + 25_000 * n, 90_000),
+      // 同案例卡：整月大綱一次生成，30s 層的 100s 總預算不夠。
+      hardBudgetMs: 150_000,
     },
   );
 }

@@ -227,6 +227,24 @@ describe("五感十築 pack 的內容規則", () => {
     }
   });
 
+  it("長文件卡的預算撐得住 —— caption 預算必須裝得進 job 總預算", () => {
+    // 2026-08-31：案例卡 caption 開 90s，但 30s 層的 job 總預算只有 100s，
+    // 加上 strategist 與 context 抓取就爆掉，任務以
+    // 「orchestra: hard 100s budget exceeded」失敗。
+    for (const card of wugan.cards) {
+      if (card.kind !== "custom") continue;
+      const cap = card.config.captionBudgetMs;
+      if (!cap) continue;
+      const hard = card.config.hardBudgetMs ?? 100_000;
+      expect(
+        hard - cap,
+        `${card.template.id}: job 總預算 ${hard}ms 只比 caption ${cap}ms 多 ${hard - cap}ms，不夠跑其他階段`,
+      ).toBeGreaterThanOrEqual(50_000);
+      // nginx /trpc 230s、Node 220s，30s 層同步回應，留餘裕
+      expect(hard, `${card.template.id} 的總預算過高`).toBeLessThanOrEqual(150_000);
+    }
+  });
+
   it("案例卡只掛一項標準 —— 月報製作 skill 的硬性規則", () => {
     for (const card of wugan.cards) {
       if (card.kind !== "custom" || card.channel !== "case") continue;

@@ -60,6 +60,16 @@ export function shapeValue(raw: any, shape?: string): string {
       raw.why, raw.singleMindedProposition,
     ].filter((x: any) => typeof x === "string" && x.trim());
     if (candidates.length > 0) return candidates[0]!.trim();
+    // 2026-08-31 (CJ「context 當中 values 出現了 items" body 等程式碼文案」):
+    // positioning.values 的形狀是 { items: [{ label, body }] }，沒有任何一個
+    // summary 類的鍵，於是掉進下面的 JSON fallback，把整段 JSON 當文案顯示
+    // 給使用者看。凡是 { items: [...] } 這種包一層的結構都交回陣列分支處理
+    // ——它已經會挑 name / label / dim。goldenCircle 之外的多數 segment
+    // （values / competition.direct / _assets.*）都是這個形狀。
+    // 只要是 items 陣列就由陣列分支決定結果，抽不出東西時回空字串讓 chip
+    // 顯示「尚未填寫」。不可以再往下掉到 JSON fallback —— 空的 items 會變成
+    // 「{"items":[]}」出現在使用者眼前。
+    if (Array.isArray(raw.items)) return shapeValue(raw.items, shape);
     // Fall back to JSON stringify (rare)
     return JSON.stringify(raw).slice(0, 200);
   }

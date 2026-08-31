@@ -563,6 +563,20 @@ export interface OrchestraConfig {
    * server.timeout 220s，30s 層是同步回應，整條鏈要留餘裕給其他階段。
    */
   captionBudgetMs?: number;
+  /**
+   * 2026-08-31：整個 orchestra job 的硬性上限（毫秒）。不給就依 tier 取
+   * HARD_BUDGET_MS(30s)=100s / 130s / 150s。
+   *
+   * 為什麼需要：captionBudgetMs 只管單次 caption 生成，外面還有一層 job
+   * 總預算。案例卡把 caption 開到 90s，加上 strategist 錨點與品牌 context
+   * 抓取就超過 30s 層的 100s，任務直接以
+   * 「orchestra: hard 100s budget exceeded」失敗 —— 使用者看到的是
+   * 「這位 AI 專家目前無法產出文案」。
+   *
+   * 上限請留在 150s 以內（與 99s 層相同，已驗證安全）：nginx /trpc 是
+   * 230s、Node server.timeout 220s，30s 層是同步回應。
+   */
+  hardBudgetMs?: number;
   variantLabels: string[];
   /** Caption length range hint (chars, lower bound) for prompt + UI badge */
   captionMinChars: number;

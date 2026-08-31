@@ -2054,7 +2054,11 @@ export async function runOrchestra(args: {
   // about to land — which is exactly how a probe lost one variant at 360s.
   const VIDEO_BUDGET_MS = (args.config.videoTailHint ? 15 : 8) * 60_000;
   const baseBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "99s" ? HARD_BUDGET_99S : HARD_BUDGET_MS;
-  const tierBudget = args.config.runVideoGen ? VIDEO_BUDGET_MS : baseBudget;
+  // 長文件卡（案例提報 / 行事曆整月大綱）本質上不是 30s 的工作量，但仍走
+  // 30s 引擎。給它們自己的總預算，否則 caption 還沒生完 job 就被判超時。
+  const tierBudget = args.config.runVideoGen
+    ? VIDEO_BUDGET_MS
+    : (args.config.hardBudgetMs ?? baseBudget);
 
   const startedAt = Date.now();
   const stages: OrchestraStage[] = [];
