@@ -21,6 +21,51 @@
  * marked as Phase 2 work in their description).
  */
 
+export type IgPublicFormat = "feed" | "carousel" | "reel" | "story" | "live";
+
+export type IgPublicDeliverableRule =
+  | {
+      id: string;
+      kind: "fixed";
+      format: IgPublicFormat;
+      count: number;
+      label: { en: string; zh: string };
+      instruction: { en: string; zh: string };
+    }
+  | {
+      id: string;
+      kind: "per-input-item";
+      format: IgPublicFormat;
+      inputKind: "live-session" | "documented-asset" | "authentic-story";
+      defaultItems: number;
+      maxItems: number;
+      multiplier: number;
+      label: { en: string; zh: string };
+      instruction: { en: string; zh: string };
+    }
+  | {
+      id: string;
+      kind: "allocated-bundle";
+      formats: IgPublicFormat[];
+      inputKind: "live-session";
+      defaultItems: number;
+      maxItems: number;
+      perItemCount: number;
+      label: { en: string; zh: string };
+      instruction: { en: string; zh: string };
+    };
+
+export interface SquadPublicOutputPolicy {
+  /** Server-owned public contract. Private squad steps never become variants. */
+  presentation: "ig-public-bundle";
+  /** Methodology-free title used for mission/output cards. */
+  publicTitle: { en: string; zh: string };
+  /** Publishable IG deliverables, independent from the private step count. */
+  deliverables: IgPublicDeliverableRule[];
+  /** Method/author aliases used only for private reasoning and never exposed. */
+  privateAliases?: string[];
+}
+
 export interface SquadIndexEntry {
   /** Stable task id surfaced in listFB / clicked by user */
   id: string;
@@ -41,6 +86,8 @@ export interface SquadIndexEntry {
   primary_question?: string;
   /** Override the generic intake input config. */
   primary_input?: { key: string; placeholder: string; type: "textarea" | "text" };
+  /** Optional public-output boundary. Unlisted squads retain their legacy output byte-for-byte. */
+  publicOutput?: SquadPublicOutputPolicy;
 }
 
 // ─── FB 100s squads (11 — slugs verified to exist in DB 2026-05-06) ────
@@ -206,6 +253,21 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       placeholder: "例：幫餐廳老闆學拍菜單照、幫健身新手不踩雷、幫 SOHO 族管理時間",
       type: "textarea",
     },
+    publicOutput: {
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Useful Content Deliverables", zh: "IG 實用內容成品" },
+      privateAliases: ["Youtility", "Jay Baer", "Baer"],
+      deliverables: [
+        {
+          id: "useful-feed", kind: "fixed", format: "feed", count: 1,
+          label: { en: "Useful Post", zh: "實用貼文" },
+          instruction: {
+            en: "One complete, useful Instagram feed post that helps without selling.",
+            zh: "一篇完整、可直接發布的 IG Feed 實用貼文；提供具體幫助，不推銷。",
+          },
+        },
+      ],
+    },
   },
   {
     id: "ig-99-visual-story",
@@ -219,6 +281,21 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       key: "topic",
       placeholder: "例：目前太雜亂，想走極簡日系奶油色系，參考 @xxx 的構圖方式",
       type: "textarea",
+    },
+    publicOutput: {
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Visual Story Deliverables", zh: "IG 視覺敘事內容成品" },
+      privateAliases: ["Chris Do", "ChrisDo", "The Futur", "TheFutur"],
+      deliverables: [
+        {
+          id: "visual-feed", kind: "fixed", format: "feed", count: 1,
+          label: { en: "Visual Story Post", zh: "視覺敘事貼文" },
+          instruction: {
+            en: "One complete Instagram feed post with a consistent visual direction and publishable caption.",
+            zh: "一篇完整、可直接發布的 IG Feed 貼文，包含一致的視覺方向與成品文案。",
+          },
+        },
+      ],
     },
   },
   {
@@ -234,6 +311,21 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       placeholder: "例：每週四晚上 8 點直播 45 分鐘，分享品牌經營心得，目的是建立信任感",
       type: "textarea",
     },
+    publicOutput: {
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Live Content Deliverables", zh: "IG 直播內容成品" },
+      privateAliases: ["Live-First", "LiveFirst", "Brian Fanzo", "BrianFanzo"],
+      deliverables: [
+        {
+          id: "live-session", kind: "fixed", format: "live", count: 1,
+          label: { en: "Live Session", zh: "直播場次" },
+          instruction: {
+            en: "A complete audience-facing Instagram Live run-of-show and host script.",
+            zh: "一份面向觀眾、可直接使用的 IG Live 流程與主持腳本。",
+          },
+        },
+      ],
+    },
   },
   {
     id: "ig-99-document",
@@ -248,6 +340,21 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       placeholder: "例：設計師接案日常、產品從打樣到出貨的過程、客戶見面 / 工作室環境",
       type: "textarea",
     },
+    publicOutput: {
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Documentary Content Deliverables", zh: "IG 紀實內容成品" },
+      privateAliases: ["GaryVee", "Gary Vee", "Gary Vaynerchuk", "GaryVaynerchuk", "Document Don't Create", "DocumentDontCreate"],
+      deliverables: [
+        {
+          id: "document-feed", kind: "fixed", format: "feed", count: 1,
+          label: { en: "Documentary Post", zh: "紀實貼文" },
+          instruction: {
+            en: "A complete, publishable feed post created from one documented real-world asset or scene.",
+            zh: "由一個真實紀錄素材或場景改寫而成、可直接發布的 feed 成品。",
+          },
+        },
+      ],
+    },
   },
   {
     id: "ig-99-radical-transparency",
@@ -261,6 +368,21 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
       key: "topic",
       placeholder: "例：第一年虧損差點收掉、改配方失敗的過程、曾被客戶退單的經驗",
       type: "textarea",
+    },
+    publicOutput: {
+      presentation: "ig-public-bundle",
+      publicTitle: { en: "IG Authentic Story Deliverables", zh: "IG 真實故事內容成品" },
+      privateAliases: ["Rachel Hollis", "RachelHollis", "Radical Transparency", "RadicalTransparency"],
+      deliverables: [
+        {
+          id: "authentic-story", kind: "fixed", format: "feed", count: 1,
+          label: { en: "Authentic Story", zh: "真實故事貼文" },
+          instruction: {
+            en: "One complete, publishable Instagram feed post based only on a story the user agreed to share.",
+            zh: "一篇只根據使用者同意公開的真實故事撰寫、可直接發布的 IG Feed 貼文。",
+          },
+        },
+      ],
     },
   },
   {

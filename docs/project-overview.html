@@ -1,0 +1,1214 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="OnBrand AI 專案總覽：功能、API、AI 模型、架構與目前狀態。">
+  <meta name="theme-color" content="#E85D2E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23E85D2E' d='M32 4C24 18 13 28 13 41a19 19 0 0 0 38 0C51 28 40 18 32 4Z'/%3E%3C/svg%3E">
+  <title>OnBrand AI｜專案功能與技術總覽</title>
+  <style>
+    :root {
+      --cream: #f7f2eb;
+      --paper: #fffdf9;
+      --ink: #0f0f0e;
+      --muted: #625e57;
+      --orange: #e85d2e;
+      --orange-dark: #bd3d12;
+      --orange-soft: #fde6d8;
+      --line: #d8cdbb;
+      --line-soft: #e8decc;
+      --green: #237a57;
+      --green-soft: #def3e8;
+      --blue: #3559a6;
+      --blue-soft: #e4ebff;
+      --purple: #7148a8;
+      --purple-soft: #efe5ff;
+      --shadow: 6px 6px 0 var(--ink);
+      --shadow-small: 3px 3px 0 var(--ink);
+      --radius: 20px;
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 88px;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--cream);
+      background-image: radial-gradient(rgba(15, 15, 14, .12) .7px, transparent .7px);
+      background-size: 18px 18px;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: inherit; }
+    a:focus-visible {
+      outline: 3px solid var(--blue);
+      outline-offset: 3px;
+    }
+    button, a { -webkit-tap-highlight-color: transparent; }
+
+    .skip-link {
+      position: fixed;
+      left: 16px;
+      top: -80px;
+      z-index: 100;
+      padding: 10px 14px;
+      color: white;
+      background: var(--ink);
+      border-radius: 8px;
+    }
+
+    .skip-link:focus { top: 12px; }
+
+    .shell {
+      width: min(calc(100% - 36px), var(--max));
+      margin-inline: auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(247, 242, 235, .94);
+      border-bottom: 2px solid var(--ink);
+      backdrop-filter: blur(12px);
+    }
+
+    .topbar-inner {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 22px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      font-weight: 900;
+      letter-spacing: -.04em;
+      white-space: nowrap;
+    }
+
+    .brand-mark { width: 25px; height: 31px; display: block; }
+
+    .nav {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: 8px;
+      padding-block: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .nav::-webkit-scrollbar { display: none; }
+
+    .nav a {
+      padding: 8px 10px;
+      color: #393632;
+      border-radius: 999px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .nav a:hover,
+    .nav a:focus-visible { background: var(--orange-soft); color: var(--orange-dark); }
+
+    .nav .nav-cta {
+      color: white;
+      background: var(--ink);
+      border: 2px solid var(--ink);
+    }
+
+    .nav .nav-cta:hover,
+    .nav .nav-cta:focus-visible { color: var(--ink); background: white; }
+
+    main { overflow: hidden; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      align-items: center;
+      gap: 56px;
+      min-height: 660px;
+      padding-block: 76px 64px;
+    }
+
+    .eyebrow,
+    .section-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 18px;
+      color: var(--orange-dark);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before,
+    .section-kicker::before {
+      width: 24px;
+      height: 3px;
+      content: "";
+      background: currentColor;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 24px;
+      font-size: clamp(48px, 7.2vw, 88px);
+      line-height: .98;
+      letter-spacing: -.065em;
+      font-weight: 950;
+    }
+
+    h1 .accent {
+      position: relative;
+      color: var(--orange);
+      white-space: nowrap;
+    }
+
+    h1 .accent::after {
+      position: absolute;
+      left: 3%;
+      right: 1%;
+      bottom: -3px;
+      height: 7px;
+      content: "";
+      background: var(--orange-dark);
+      border-radius: 999px;
+      transform: rotate(-1.4deg);
+    }
+
+    .lead {
+      max-width: 660px;
+      margin-bottom: 28px;
+      color: #37332e;
+      font-size: clamp(18px, 2vw, 22px);
+      line-height: 1.62;
+    }
+
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 26px; }
+
+    .button {
+      display: inline-flex;
+      min-height: 48px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      color: white;
+      background: var(--orange-dark);
+      border: 2px solid var(--ink);
+      border-radius: 12px;
+      box-shadow: var(--shadow-small);
+      text-decoration: none;
+      font-weight: 850;
+      transition: transform .16s ease, box-shadow .16s ease;
+    }
+
+    .button.secondary { color: var(--ink); background: white; }
+
+    .button:hover,
+    .button:focus-visible {
+      box-shadow: 1px 1px 0 var(--ink);
+      transform: translate(2px, 2px);
+    }
+
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 11px;
+      background: rgba(255, 253, 249, .88);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #4e4942;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .pill::before {
+      width: 7px;
+      height: 7px;
+      content: "";
+      background: var(--orange-dark);
+      border-radius: 50%;
+    }
+
+    .hero-board {
+      position: relative;
+      padding: 28px;
+      background: var(--paper);
+      border: 3px solid var(--ink);
+      border-radius: 30px;
+      box-shadow: 10px 10px 0 var(--ink);
+      transform: rotate(1deg);
+    }
+
+    .hero-board::before {
+      position: absolute;
+      top: -18px;
+      right: 40px;
+      width: 78px;
+      height: 28px;
+      content: "";
+      background: rgba(232, 93, 46, .74);
+      transform: rotate(4deg);
+    }
+
+    .board-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font: 800 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .board-live { display: inline-flex; align-items: center; gap: 6px; color: var(--green); }
+    .board-live::before { width: 8px; height: 8px; content: ""; background: var(--green); border-radius: 50%; }
+
+    .system-map {
+      position: relative;
+      min-height: 428px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-content: center;
+    }
+
+    .system-map::before,
+    .system-map::after {
+      position: absolute;
+      z-index: 0;
+      content: "";
+      background: var(--ink);
+      opacity: .18;
+    }
+
+    .system-map::before { top: 50%; left: 13%; right: 13%; height: 2px; }
+    .system-map::after { left: 50%; top: 13%; bottom: 13%; width: 2px; }
+
+    .map-card {
+      position: relative;
+      z-index: 1;
+      min-height: 116px;
+      padding: 15px;
+      background: var(--cream);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+    }
+
+    .map-card strong { display: block; margin-bottom: 5px; font-size: 15px; }
+    .map-card span { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .map-card.orange { background: var(--orange-soft); }
+    .map-card.blue { background: var(--blue-soft); }
+    .map-card.green { background: var(--green-soft); }
+
+    .brain {
+      position: absolute;
+      z-index: 3;
+      top: 50%;
+      left: 50%;
+      width: 126px;
+      height: 126px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      color: white;
+      background: var(--orange-dark);
+      border: 3px solid var(--ink);
+      border-radius: 50%;
+      box-shadow: var(--shadow-small);
+      text-align: center;
+      transform: translate(-50%, -50%);
+    }
+
+    .brain svg { width: 29px; height: 35px; margin-bottom: 3px; }
+    .brain b { display: block; font-size: 13px; line-height: 1.2; }
+
+    .scan-note {
+      margin-top: 18px;
+      padding: 12px 14px;
+      color: #4e4942;
+      background: #f0eadf;
+      border-left: 4px solid var(--orange);
+      font-size: 12px;
+    }
+
+    .band {
+      color: white;
+      background: var(--ink);
+      border-block: 3px solid var(--ink);
+    }
+
+    .band-inner {
+      min-height: 104px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: center;
+    }
+
+    .band-item { padding: 22px 26px; border-right: 1px solid #494945; }
+    .band-item:last-child { border-right: 0; }
+    .band-item strong { display: block; color: #ff9b77; font-size: 13px; letter-spacing: .05em; }
+    .band-item span { color: #e2e0da; font-size: 14px; }
+
+    section { padding-block: 92px; }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: .85fr 1.15fr;
+      gap: 60px;
+      align-items: end;
+      margin-bottom: 42px;
+    }
+
+    h2 {
+      margin-bottom: 0;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.04;
+      letter-spacing: -.055em;
+      font-weight: 930;
+    }
+
+    .section-intro { margin-bottom: 3px; color: var(--muted); font-size: 17px; }
+
+    .journey {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      counter-reset: journey;
+    }
+
+    .journey-step {
+      position: relative;
+      min-height: 220px;
+      padding: 20px 17px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      counter-increment: journey;
+    }
+
+    .journey-step::before {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 22px;
+      content: counter(journey, decimal-leading-zero);
+      color: white;
+      background: var(--ink);
+      border-radius: 50%;
+      font: 800 11px/1 ui-monospace, monospace;
+    }
+
+    .journey-step::after {
+      position: absolute;
+      z-index: 2;
+      top: 34px;
+      right: -19px;
+      width: 24px;
+      content: "→";
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .journey-step:last-child::after { display: none; }
+    .journey-step h3 { margin-bottom: 8px; font-size: 17px; line-height: 1.3; }
+    .journey-step p { margin-bottom: 0; color: var(--muted); font-size: 13px; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 8px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    .status.live { color: var(--green); background: var(--green-soft); }
+    .status.conditional { color: var(--blue); background: var(--blue-soft); }
+    .status.preview { color: var(--purple); background: var(--purple-soft); }
+    .status.prototype { color: #735b32; background: #f7e9c8; }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      position: relative;
+      min-height: 310px;
+      padding: 26px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-small);
+    }
+
+    .feature-card.featured { background: var(--orange-soft); }
+
+    .feature-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .feature-number {
+      color: var(--orange-dark);
+      font: 900 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .feature-card h3 { margin-bottom: 9px; font-size: 25px; line-height: 1.15; letter-spacing: -.025em; }
+    .feature-card > p { color: var(--muted); font-size: 14px; }
+
+    .tech-lines {
+      display: grid;
+      gap: 10px;
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px dashed #a89f91;
+    }
+
+    .tech-line {
+      display: grid;
+      grid-template-columns: 55px 1fr;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .tech-line b { color: var(--orange-dark); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .tech-line span { color: #403c36; }
+
+    .callout {
+      margin-top: 28px;
+      padding: 22px 24px;
+      background: var(--ink);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      color: white;
+    }
+
+    .callout strong { color: #ff9b77; }
+
+    .surface { background: rgba(255, 253, 249, .72); border-block: 1px solid var(--line-soft); }
+
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: 18px;
+      box-shadow: var(--shadow-small);
+    }
+
+    table {
+      width: 100%;
+      min-width: 850px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td { padding: 15px 16px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: top; }
+    th { color: white; background: var(--ink); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:nth-child(even) td { background: #faf6ef; }
+    td strong { display: block; margin-bottom: 3px; }
+    td code, .code {
+      padding: 2px 5px;
+      color: #8e3618;
+      background: var(--orange-soft);
+      border-radius: 5px;
+      font: 700 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .subheading {
+      margin: 54px 0 18px;
+      font-size: 25px;
+      line-height: 1.2;
+      letter-spacing: -.025em;
+    }
+
+    .router-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+
+    .router-card {
+      padding: 18px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: 14px;
+    }
+
+    .router-card code { color: var(--orange-dark); font-weight: 900; }
+    .router-card p { margin: 9px 0 0; color: var(--muted); font-size: 12px; }
+
+    .provider-cloud { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+
+    .provider {
+      padding: 8px 11px;
+      color: #332f2a;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .architecture {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 30px;
+      align-items: stretch;
+    }
+
+    .arch-column {
+      position: relative;
+      padding: 22px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+    }
+
+    .arch-column:not(:last-child)::after {
+      position: absolute;
+      top: 50%;
+      right: -28px;
+      width: 25px;
+      content: "→";
+      font-size: 24px;
+      font-weight: 900;
+      text-align: center;
+      transform: translateY(-50%);
+    }
+
+    .arch-column .arch-label {
+      display: inline-block;
+      margin-bottom: 16px;
+      color: var(--orange-dark);
+      font: 900 11px/1 ui-monospace, monospace;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .arch-column h3 { margin-bottom: 12px; font-size: 20px; }
+    .arch-column ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+    .arch-column li + li { margin-top: 6px; }
+
+    .truth-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .truth-card {
+      padding: 25px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+    }
+
+    .truth-card.warning { background: #fff1df; }
+    .truth-card h3 { margin-bottom: 14px; font-size: 21px; }
+    .truth-card ul { margin: 0; padding-left: 20px; color: #4f4941; font-size: 14px; }
+    .truth-card li + li { margin-top: 8px; }
+
+    .repo-map {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 22px;
+    }
+
+    pre {
+      margin: 0;
+      overflow-x: auto;
+      padding: 24px;
+      color: #f5eee4;
+      background: var(--ink);
+      border: 2px solid var(--ink);
+      border-radius: 18px;
+      font: 13px/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .repo-notes { display: grid; gap: 12px; }
+
+    .repo-note {
+      padding: 17px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-size: 13px;
+    }
+
+    .repo-note strong { display: block; margin-bottom: 4px; }
+
+    footer {
+      padding-block: 45px;
+      color: #ddd7ce;
+      background: var(--ink);
+      border-top: 3px solid var(--ink);
+    }
+
+    .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .footer-brand { display: flex; align-items: center; gap: 10px; font-weight: 900; color: white; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 14px; }
+    .footer-links a { color: #ddd7ce; font-size: 13px; }
+    .footer-links a:hover { color: #ff9b77; }
+
+    @media (max-width: 1000px) {
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+      .hero-board { max-width: 620px; }
+      .journey { grid-template-columns: repeat(3, 1fr); }
+      .journey-step:nth-child(3)::after { display: none; }
+      .router-grid { grid-template-columns: repeat(3, 1fr); }
+      .architecture { grid-template-columns: repeat(2, 1fr); }
+      .arch-column:nth-child(2)::after { display: none; }
+      .repo-map { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .shell { width: min(calc(100% - 24px), var(--max)); }
+      .topbar-inner { min-height: 60px; gap: 10px; }
+      .brand span { display: none; }
+      .nav { justify-content: flex-start; }
+      .hero { padding-block: 54px; gap: 42px; }
+      h1 { font-size: clamp(47px, 16vw, 72px); }
+      .hero-board { padding: 20px; transform: none; }
+      .system-map { min-height: 380px; }
+      .band-inner { grid-template-columns: 1fr; padding-block: 8px; }
+      .band-item { border-right: 0; border-bottom: 1px solid #494945; }
+      .band-item:last-child { border-bottom: 0; }
+      section { padding-block: 68px; }
+      .section-heading { grid-template-columns: 1fr; gap: 20px; }
+      .journey { grid-template-columns: 1fr 1fr; }
+      .journey-step:nth-child(3)::after { display: block; }
+      .journey-step:nth-child(even)::after { display: none; }
+      .feature-grid, .truth-grid { grid-template-columns: 1fr; }
+      .feature-card { min-height: 0; }
+      .router-grid { grid-template-columns: 1fr 1fr; }
+      .architecture { grid-template-columns: 1fr; gap: 16px; }
+      .arch-column::after { display: none !important; }
+      .footer-inner { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (max-width: 460px) {
+      .nav .nav-cta { padding: 7px 9px; font-size: 11px; }
+      .hero-actions, .button { width: 100%; }
+      .system-map { min-height: 0; grid-template-columns: 1fr; }
+      .system-map::before, .system-map::after { display: none; }
+      .map-card { min-height: 126px; padding: 12px; }
+      .brain {
+        position: relative;
+        top: auto;
+        left: auto;
+        width: 105px;
+        height: 105px;
+        grid-column: 1 / -1;
+        justify-self: center;
+        transform: none;
+      }
+      .journey, .router-grid { grid-template-columns: 1fr; }
+      .journey-step::after { display: none !important; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+
+    @media print {
+      .topbar, .hero-actions { display: none; }
+      body { background: white; }
+      .hero { min-height: auto; }
+      .hero-board, .feature-card, .table-wrap { box-shadow: none; }
+      section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="#top" aria-label="回到 OnBrand AI 專案總覽頂端">
+        <svg class="brand-mark" viewBox="0 0 64 78" aria-hidden="true">
+          <path fill="#E85D2E" stroke="#0F0F0E" stroke-width="5" d="M32 4C23 23 8 36 8 52a24 24 0 0 0 48 0C56 36 41 23 32 4Z"/>
+        </svg>
+        <span>OnBrand AI · Project Map</span>
+      </a>
+      <nav class="nav" aria-label="頁面導覽">
+        <a href="#journey">使用流程</a>
+        <a href="#features">功能</a>
+        <a href="#api-ai">API &amp; AI</a>
+        <a href="#architecture">架構</a>
+        <a href="#repo">Repo</a>
+        <a class="nav-cta" href="../README.md">README ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <div id="top" class="shell hero">
+      <div>
+        <p class="eyebrow">Project overview · 2026-08-10</p>
+        <h1>永遠<br><span class="accent">on-brand</span><br>的 AI 工作室</h1>
+        <p class="lead">OnBrand AI 把品牌定位、產品、活動、語氣與知識寫進 Brand Brain，再由多模型 AI 與專業 Agent 產出跨平台內容、視覺、企劃與發布排程。</p>
+        <div class="hero-actions">
+          <a class="button" href="#features">看完整功能 <span aria-hidden="true">↓</span></a>
+          <a class="button secondary" href="#api-ai">API / AI 對照</a>
+        </div>
+        <div class="hero-meta" aria-label="專案摘要">
+          <span class="pill">Brand Brain 優先</span>
+          <span class="pill">多模型 fallback</span>
+          <span class="pill">React + Express + tRPC</span>
+          <span class="pill">MySQL 主資料層</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="hero-board" aria-label="OnBrand AI 資料流示意圖">
+          <div class="board-label">
+            <span>Brand operating system</span>
+            <span class="board-live">Source scanned</span>
+          </div>
+          <div class="system-map">
+            <div class="map-card orange">
+              <strong>01 · 品牌輸入</strong>
+              <span>網站、產品、活動、受眾、競品、語氣、真實內容</span>
+            </div>
+            <div class="map-card blue">
+              <strong>02 · AI 團隊</strong>
+              <span>策略、研究、文案、視覺、QA 與任務編排</span>
+            </div>
+            <div class="map-card green">
+              <strong>03 · 跨渠道輸出</strong>
+              <span>單篇、套組、企劃、圖片、影片與平台版本</span>
+            </div>
+            <div class="map-card">
+              <strong>04 · 排程與回饋</strong>
+              <span>Projects、7-Day Publisher、Calendar、發布與洞察</span>
+            </div>
+            <div class="brain">
+              <div>
+                <svg viewBox="0 0 64 78" aria-hidden="true">
+                  <path fill="white" d="M32 4C23 23 8 36 8 52a24 24 0 0 0 48 0C56 36 41 23 32 4Z"/>
+                </svg>
+                <b>Brand Brain</b>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="scan-note"><strong>判讀方式：</strong>本頁以 active import、route、runtime guard 與 adapter 為準。UI 出現不等於第三方 API 一定可用。</p>
+      </div>
+    </div>
+
+    <div class="band" aria-label="專案核心原則">
+      <div class="shell band-inner">
+        <div class="band-item"><strong>先定位</strong><span>內容不是每次從零，先共用品牌脈絡。</span></div>
+        <div class="band-item"><strong>再協作</strong><span>依任務切換 Agent、模型、研究與 QA。</span></div>
+        <div class="band-item"><strong>後執行</strong><span>輸出進專案、排程、發布與下一輪回饋。</span></div>
+      </div>
+    </div>
+
+    <section id="journey">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">How it works</p>
+            <h2>從品牌資料到可發布成果</h2>
+          </div>
+          <p class="section-intro">真正的主流程是 Brand Brain → 平台任務 → quickTaskOrchestra → mission/output → Projects／Calendar。舊 A2A endpoint 仍在，但不是目前一般 Web 任務的核心路徑。</p>
+        </div>
+
+        <div class="journey">
+          <article class="journey-step">
+            <h3>建立品牌</h3>
+            <p>輸入網站、品牌、產品、活動、目標市場與官方受眾。</p>
+          </article>
+          <article class="journey-step">
+            <h3>鎖定定位</h3>
+            <p>互動研究管線與背景 canonical runner 產出可重用 positioning。</p>
+          </article>
+          <article class="journey-step">
+            <h3>選任務</h3>
+            <p>依平台選 Single、Pack 或 Campaign，帶入 Brand Brain。</p>
+          </article>
+          <article class="journey-step">
+            <h3>Agent 編排</h3>
+            <p>載入資料、選模、產生文案與視覺 brief，再經品牌規則檢查。</p>
+          </article>
+          <article class="journey-step">
+            <h3>編修成果</h3>
+            <p>先寫入 caption checkpoint，再補媒體、extras、QA 與版本。</p>
+          </article>
+          <article class="journey-step">
+            <h3>排程發布</h3>
+            <p>成果進 Projects、Theater 與 Calendar；已連線渠道再執行發布。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="surface">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Capabilities</p>
+            <h2>功能、API 與 AI 一起看</h2>
+          </div>
+          <div>
+            <p class="section-intro">「已接通」代表前後端有真實接線；「條件式」仍要看憑證或 feature flag；「私人預覽」不可當成全客戶正式功能。</p>
+            <div class="legend" aria-label="狀態圖例">
+              <span class="status live">已接通</span>
+              <span class="status conditional">條件式</span>
+              <span class="status preview">私人預覽</span>
+              <span class="status prototype">原型／歷史</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card featured">
+            <div class="feature-head"><span class="feature-number">01 / CORE</span><span class="status live">已接通</span></div>
+            <h3>Brand Brain 與定位</h3>
+            <p>管理品牌、產品、活動、知識、品牌色、語氣與定位結果，供任務、顧問與 Theater 共用。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/brands · /brands/edit · /brands/settings</span></div>
+              <div class="tech-line"><b>API</b><span>brand · brandBrain · pipeline · positioningJobs · workbench · brandKnowledge</span></div>
+              <div class="tech-line"><b>AI</b><span>invokeLLM / callLLM；互動頁標示 14 步，背景 canonical brand runner 為 10 segments</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">02 / CREATE</span><span class="status live">已接通</span></div>
+            <h3>七渠道內容任務</h3>
+            <p>Facebook、Instagram、LinkedIn、YouTube、TikTok、Email、PR 的單篇、套組與完整企劃。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/tasks/:platform · /run/:outputId</span></div>
+              <div class="tech-line"><b>API</b><span>taskCatalog · quickTask · squad · mission · output · quickTaskOrchestra</span></div>
+              <div class="tech-line"><b>AI</b><span>callModel + invokeLLM fallback；caption、image brief、brand gate、extras、QA</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">03 / OUTPUT</span><span class="status live">已接通</span></div>
+            <h3>Projects 與輸出工作台</h3>
+            <p>任務結果集中成 mission/output，支援 checkpoint、版本、編修、定稿、email、ICS 與匯出。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/projects · /run/:outputId</span></div>
+              <div class="tech-line"><b>API</b><span>mission · output · export routes</span></div>
+              <div class="tech-line"><b>AI</b><span>生成與修訂沿用任務路由；PDFKit / python-pptx 匯出不需要 AI</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">04 / MEDIA</span><span class="status conditional">條件式</span></div>
+            <h3>圖片、影片與媒體轉文案</h3>
+            <p>先提視覺方向與 prompt，再選模型生圖／影片；也可把照片、YouTube 或文件改寫成各平台文案。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/media/photo/:channel · /media/video/:channel · /media/doc</span></div>
+              <div class="tech-line"><b>API</b><span>media · image · video · mediaCopy · dispatchGenerate</span></div>
+              <div class="tech-line"><b>AI</b><span>GPT Image 1、Imagen、Veo、FLUX、Kling、Runway、Pika、Hedra；依 model registry 狀態</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">05 / PLAN</span><span class="status conditional">條件式</span></div>
+            <h3>7-Day Publisher / Theater</h3>
+            <p>按日與平台規劃內容，逐格生成、QA、生圖、鎖定與排程。Theater 的渠道是 FB、IG、YouTube、Threads、LINE、Blog。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/theater</span></div>
+              <div class="tech-line"><b>API</b><span>theater.planSchedule · runStart · generateCell · reviewCell · generateImage · schedule</span></div>
+              <div class="tech-line"><b>AI</b><span>文字 LLM 做規劃、文案與 QA；dispatchGenerate 做圖像</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">06 / PUBLISH</span><span class="status conditional">條件式</span></div>
+            <h3>Calendar、連線與發布</h3>
+            <p>排程、改期、取消與發布；OAuth／token 可走 Pipedream 或 bundle.social。發布能力依平台與權限不同。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/calendar · /brands/edit?tab=publish</span></div>
+              <div class="tech-line"><b>API</b><span>calendar · publish · platformConnect · bundleConnect</span></div>
+              <div class="tech-line"><b>EXT</b><span>FB / LinkedIn / IG 有 direct adapter；YouTube / TikTok calendar direct publish 未支援</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">07 / ADVISE</span><span class="status conditional">條件式</span></div>
+            <h3>AI Strategy Consultant</h3>
+            <p>以五種商業情境與方法論選擇顧問 Agent，產出品牌背景化策略報告並支援追問。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/consultant</span></div>
+              <div class="tech-line"><b>API</b><span>strategyConsultant.listAgents · analyze · chat</span></div>
+              <div class="tech-line"><b>AI</b><span>callModel + Brand Brain；Tavily 可提供即時 grounding</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">08 / INSIGHT</span><span class="status preview">私人預覽</span></div>
+            <h3>Performance / Market Intel</h3>
+            <p>目前僅 allow-list 帳號可見，多數卡片為策展預覽；三個 listening 動作有接研究 cascade。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/performance* · /market-intel*</span></div>
+              <div class="tech-line"><b>API</b><span>marketIntel.runListeningTask · perplexityScout</span></div>
+              <div class="tech-line"><b>AI</b><span>Vertex Grounding → Gemini Google Search → Tavily → LLM-only；最後一層非即時資料</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">09 / BUSINESS</span><span class="status conditional">條件式</span></div>
+            <h3>帳務、多租戶與工作區</h3>
+            <p>支援 trial、方案、點數、訂閱、加值、tenant、workspace、邀請與角色管理。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>API</b><span>billing · credits · stripe · tenant</span></div>
+              <div class="tech-line"><b>EXT</b><span>Stripe Checkout / webhook · open.er-api.com 匯率</span></div>
+              <div class="tech-line"><b>NOTE</b><span>部分 AI 有計費 wrapper，但不是所有 LLM 呼叫都已統一經過它</span></div>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-head"><span class="feature-number">10 / OPS</span><span class="status live">已接通</span></div>
+            <h3>支援、通知與管理後台</h3>
+            <p>Mia 對話、ticket、人工升級、錯誤、漏斗、成本、健康度、使用者、成就與節慶提醒。</p>
+            <div class="tech-lines">
+              <div class="tech-line"><b>ROUTE</b><span>/admin/* · /settings/* · /achievements</span></div>
+              <div class="tech-line"><b>API</b><span>support · ops · adminStats · notifications · achievements · festival</span></div>
+              <div class="tech-line"><b>AI</b><span>支援對話可走 callModel；context nudge 目前因參數不相容偏向靜態 fallback</span></div>
+            </div>
+          </article>
+        </div>
+
+        <div class="callout"><strong>定位研究提醒：</strong>互動 pipeline 的 prompt 曾寫到 OpenClaw <code>web_search</code>，但目前 <code>pipeline.runStep</code> 實際呼叫的 <code>callLLM</code> 沒有掛 tools。可抓使用者提供的 URL，但不能把全部定位步驟描述成即時網搜或已有來源驗證。</div>
+      </div>
+    </section>
+
+    <section id="api-ai">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">API &amp; AI map</p>
+            <h2>不是固定一顆模型</h2>
+          </div>
+          <p class="section-intro">最後成功的模型由 caller、任務分類、Agent 設定、env、fallback 與 circuit breaker 共同決定。requested model 也不一定等於真正完成呼叫的 model。</p>
+        </div>
+
+        <div class="router-grid">
+          <article class="router-card"><code>invokeLLM</code><p>通用 provider cascade、缺 key 略過、circuit breaker 與串流。</p></article>
+          <article class="router-card"><code>callModel</code><p>依中文、創作、分析、分類、搜尋、程式等任務選 provider。</p></article>
+          <article class="router-card"><code>callLLM</code><p>有時間預算的 Anthropic / Azure / OpenRouter 跨供應商救援。</p></article>
+          <article class="router-card"><code>LLM + billing</code><p>點數與 token ledger wrapper；尚未涵蓋所有直接 LLM 呼叫。</p></article>
+          <article class="router-card"><code>media dispatch</code><p>依 image/video model ID 分派 Google、OpenAI、PiAPI 等 adapter。</p></article>
+        </div>
+
+        <p class="section-intro" style="margin-top:22px">通用 <span class="code">invokeLLM</span> 沒有覆寫時的預設順序是 Anthropic → OpenAI → Azure Claude → Azure Foundry → Gemini → Qwen → Zhipu → Ollama；缺 key、不可達或 circuit-open 會略過，<span class="code">LLM_FALLBACK_CHAIN</span> 也可完整覆寫。</p>
+
+        <div class="provider-cloud" aria-label="程式內的 AI 供應商">
+          <span class="provider">Qwen · qwen-plus</span>
+          <span class="provider">Zhipu · glm-4-flash</span>
+          <span class="provider">OpenAI · gpt-4.1-mini</span>
+          <span class="provider">Anthropic · Claude</span>
+          <span class="provider">Azure AI Foundry</span>
+          <span class="provider">Google Gemini / Vertex</span>
+          <span class="provider">Cohere alias → default</span>
+          <span class="provider">Hermes explicit / Ollama fixed local fallback</span>
+          <span class="provider">OpenRouter · legacy fallback</span>
+        </div>
+
+        <h3 class="subheading">主要功能的 API / 外部服務 / AI</h3>
+        <div class="table-wrap" tabindex="0" aria-label="功能 API AI 對照表，可橫向捲動">
+          <table>
+            <thead><tr><th>功能</th><th>內部 API / service</th><th>外部 API</th><th>AI / 判讀</th></tr></thead>
+            <tbody>
+              <tr><td><strong>帳號與 onboarding</strong></td><td><code>/api/auth</code>、brand、positioningJobs</td><td>Google OAuth、Resend / SendGrid</td><td>建立品牌後可啟動定位 LLM</td></tr>
+              <tr><td><strong>Brand Brain</strong></td><td>brand、pipeline、positioningJobs、brandKnowledge、workbench</td><td>使用者 URL 抓取；特定 service 才會用 Browserbase / search</td><td>invokeLLM、callLLM、多供應商 fallback</td></tr>
+              <tr><td><strong>內容任務</strong></td><td>quickTask、taskCatalog、squad、mission、output</td><td>可條件式帶入 market / URL / YouTube</td><td>callModel + quickTaskOrchestra + media dispatch</td></tr>
+              <tr><td><strong>媒體</strong></td><td>media、image、video、mediaCopy</td><td>OpenAI、Google、PiAPI、Replicate、ElevenLabs、Creatomate</td><td>文字 brief / vision + image / video models</td></tr>
+              <tr><td><strong>Theater / Calendar</strong></td><td>theater、calendar、publish</td><td>Pipedream、bundle.social、Meta Graph</td><td>規劃、文案、QA、生圖；發布本身不需 AI</td></tr>
+              <tr><td><strong>策略顧問</strong></td><td>strategyConsultant</td><td>Tavily</td><td>callModel + Brand Brain grounding</td></tr>
+              <tr><td><strong>Market Intel Preview</strong></td><td>marketIntel、perplexityScout</td><td>Vertex / Gemini Search / Tavily</td><td>最後可退到 LLM-only，不能保證即時或 URL 真實</td></tr>
+              <tr><td><strong>帳務與 workspace</strong></td><td>billing、credits、stripe、tenant</td><td>Stripe、匯率 API</td><td>無必要 AI；任務前可做點數與方案檢查</td></tr>
+              <tr><td><strong>支援與管理</strong></td><td>support、ops、adminStats</td><td>Email provider</td><td>對話 / 摘要可用 AI，指標查詢本身不需 AI</td></tr>
+              <tr><td><strong>Slack / 通知</strong></td><td>Slack REST routes、notificationService</td><td>Slack、OpenClaw gateway、LINE Notify、Telegram</td><td>adapter 不選模；轉為任務後才進 AI route</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="subheading">媒體模型狀態</h3>
+        <div class="table-wrap" tabindex="0" aria-label="媒體模型狀態表，可橫向捲動">
+          <table>
+            <thead><tr><th>狀態</th><th>圖片</th><th>影片</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td><span class="status live">Ready</span></td><td>Nano Banana、GPT Image 1、Imagen 4 Fast / Default / Ultra、FLUX Pro / Realism</td><td>Veo 3 / Fast、Kling v2 / 1.6 i2v、Runway Gen-4 / Turbo、Pika v2、Hedra Character 3</td><td>adapter 已接，但仍需有效 key、額度與 provider 可用性；FLUX Pro 公開 ID 目前在 adapter 內 alias 到 Schnell。</td></tr>
+              <tr><td><span class="status prototype">Manual</span></td><td>Midjourney v7</td><td>—</td><td>沒有 API；系統只提供 prompt 給使用者自行貼上。</td></tr>
+              <tr><td><span class="status conditional">Soon</span></td><td>Azure GPT Image 2、Hailuo Image、Ideogram v3、SD 3.5 Large</td><td>Hailuo i2v / t2v</td><td>目前 key、model ID 或 adapter 驗證未完成，UI 應停用。</td></tr>
+              <tr><td><span class="status prototype">Removed</span></td><td colspan="2">fal.ai、Atlas image、Seedance legacy stub</td><td>repo 可能仍留歷史程式，不可當作可用功能。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout"><strong>Runtime 缺口：</strong><code>env.ts</code> 的 Zod schema 會移除未宣告欄位；透過 <code>ENV as any</code> 讀取的部分 Azure keys、Gemini／Ollama override 與 model override 因此會是 <code>undefined</code>。直接讀取 <code>process.env</code> 的 media／scout 路徑與固定 localhost 的 Ollama fallback 不受此限制，不能把單一路徑的缺口解讀為整個 provider 都不可用。</div>
+      </div>
+    </section>
+
+    <section id="architecture" class="surface">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Architecture</p>
+            <h2>四層看懂系統</h2>
+          </div>
+          <p class="section-intro">主產品位於 <span class="code">skills/ai-talent</span>。React SPA 經 tRPC／REST／SSE 進入 Express，再由 domain router 串接 orchestration、資料與第三方服務。</p>
+        </div>
+
+        <div class="architecture">
+          <article class="arch-column">
+            <span class="arch-label">01 · Browser</span>
+            <h3>OnBrand Studio</h3>
+            <ul><li>React 18 + Vite 5</li><li>React Router 6</li><li>TanStack Query + tRPC client</li><li>HeroUI + Tailwind + Framer Motion</li></ul>
+          </article>
+          <article class="arch-column">
+            <span class="arch-label">02 · API</span>
+            <h3>Express Gateway</h3>
+            <ul><li>/trpc type-safe procedures</li><li>/api/auth 與 webhook</li><li>mission / A2A SSE</li><li>JWT cookie / Bearer context</li></ul>
+          </article>
+          <article class="arch-column">
+            <span class="arch-label">03 · Domain</span>
+            <h3>Routers + Orchestration</h3>
+            <ul><li>Brand / task / project</li><li>Theater / calendar / publish</li><li>LLM / media router</li><li>BullMQ / Redis workers（可選）</li></ul>
+          </article>
+          <article class="arch-column">
+            <span class="arch-label">04 · Data &amp; SaaS</span>
+            <h3>Storage + Providers</h3>
+            <ul><li>MySQL mos_db + Drizzle</li><li>Azure AI Search（查詢路徑可選）</li><li>AI / OAuth / Stripe / Email</li><li>Pipedream / bundle.social</li></ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="truth">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Reality check</p>
+            <h2>文件上最容易誤判的地方</h2>
+          </div>
+          <p class="section-intro">這些差異來自產品快速演進：UI 文案、註解、舊 blueprint 與 runtime 接線並不總是同步。</p>
+        </div>
+
+        <div class="truth-grid">
+          <article class="truth-card">
+            <h3>目前可以當核心產品理解</h3>
+            <ul>
+              <li>Brand Brain、品牌／產品／活動 scope 與定位資料。</li>
+              <li>七渠道內容任務、quickTaskOrchestra、Run 與 Projects。</li>
+              <li>Theater、Calendar、策略顧問、帳號、帳務與 workspace。</li>
+              <li>媒體模型 picker 中標為 Ready 的 adapter。</li>
+              <li>支援、錯誤、成本與 activation 管理後台。</li>
+            </ul>
+          </article>
+          <article class="truth-card warning">
+            <h3>必須加註狀態才可對外描述</h3>
+            <ul>
+              <li>Performance / Market Intel 是私人預覽，多數為 curated demo。</li>
+              <li>社群發布要看 connector、Meta 權限、feature flag 與平台支援。</li>
+              <li>影片 API / UI 存在，但完整合成流程仍屬實驗性或依方案開放。</li>
+              <li>A2A workflow map 目前為空；community marketplace 尚無前台入口。</li>
+              <li>Azure AI Search 有查詢路徑，但沒有已接線的自動 index / delete 流程。</li>
+              <li>不是每個 LLM 呼叫都經 billing wrapper，ledger 也可能記 requested model 而非實際 fallback。</li>
+              <li>根 .env.example 與 runtime key 名稱已有落差；不能直接當完整設定清單。</li>
+              <li>安全性事件、憑證輪替與弱點位置應只記錄於私人 security issue；公開文件僅保留一般性安全政策。</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="repo" class="surface">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Repository map</p>
+            <h2>真正入口在哪裡？</h2>
+          </div>
+          <p class="section-intro">根目錄 scripts 與部分舊文件已落後。開發、build 與測試應以 <span class="code">skills/ai-talent/package.json</span> 和 client package 為準。</p>
+        </div>
+
+        <div class="repo-map">
+          <pre aria-label="專案目錄樹">onbrand/
+├── skills/ai-talent/        ← 主產品
+│   ├── client/              React 18 / Vite SPA
+│   ├── server/              Express / tRPC / AI adapters
+│   ├── drizzle/             MySQL schema + migrations
+│   ├── data/                Agent / prompt 資料
+│   └── scripts/             seed / audit / migration
+├── skills/brand-engine/     相容 shim
+├── skills/market-intel/     legacy cache query service
+├── skills/mobile/           prototype
+├── shared/                  共用 utilities
+├── tests/e2e/               Playwright E2E
+├── docs/                    架構與稽核文件
+├── onbrand-onepager/        未改造的 Vite starter
+└── README.md                完整技術盤點</pre>
+          <div class="repo-notes">
+            <div class="repo-note"><strong>Frontend entry</strong><span class="code">skills/ai-talent/client/src/main.tsx → AppV2</span></div>
+            <div class="repo-note"><strong>Backend entry</strong><span class="code">skills/ai-talent/server/index.ts</span></div>
+            <div class="repo-note"><strong>API registry</strong><span class="code">skills/ai-talent/server/routers/index.ts</span></div>
+            <div class="repo-note"><strong>Database</strong>MySQL 8；本機 primary schema 預設 <span class="code">mos_db</span></div>
+            <div class="repo-note"><strong>Local start</strong><span class="code">cd skills/ai-talent &amp;&amp; npm run dev</span><br>前端另於 <span class="code">client/</span> 執行 <span class="code">npm run dev</span></div>
+            <div class="repo-note"><strong>Environment</strong>以 <span class="code">server/_core/env.ts</span> 與各 adapter runtime check 為準；根 <span class="code">.env.example</span> 已不完整。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-inner">
+      <div>
+        <div class="footer-brand">
+          <svg width="19" height="24" viewBox="0 0 64 78" aria-hidden="true"><path fill="#E85D2E" d="M32 4C23 23 8 36 8 52a24 24 0 0 0 48 0C56 36 41 23 32 4Z"/></svg>
+          <span>OnBrand AI · by SoWork</span>
+        </div>
+        <small>Source scan snapshot · 2026-08-10</small>
+      </div>
+      <div class="footer-links">
+        <a href="../README.md">README</a>
+        <a href="ARCHITECTURE.md">Architecture</a>
+        <a href="../TESTING.md">Testing</a>
+        <a href="../CONTRIBUTING.md">Contributing</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

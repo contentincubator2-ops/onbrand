@@ -293,7 +293,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   ] : [
                     { num: "01", label: "建立品牌", desc: "名稱、官網、FB — 給 AI 抓真實內容的入口" },
                     { num: "02", label: "套用定位法", desc: "14 步深度分析：黃金圈 → 差異化 → Voice" },
-                    { num: "03", label: "內容自動產出", desc: "單篇 / 套組 / 完整企劃" },
+                    { num: "03", label: "內容自動產出", desc: "單篇 / 套組 / 企劃" },
                   ]).map((s, i, arr) => (
                     <div
                       key={s.num}

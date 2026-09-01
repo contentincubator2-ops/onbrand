@@ -18,6 +18,7 @@ import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
+import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../app/shell/ShellLayout";
 import {
   Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
@@ -39,6 +40,7 @@ import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as Bra
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
+import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
@@ -109,7 +111,7 @@ interface Tile {
 
 export default function BrandsPage() {
   const { t, lang } = useLang();
-  const { brandId, setBrandId, brands, scope: globalScope, setScope } = useOutletContext<ShellOutletCtx>();
+  const { brandId, setBrandId, brands, scope: globalScope, setScope, userEmail } = useOutletContext<ShellOutletCtx>();
 
   // 2026-06-19 Phase 2 (CJ「BrandsPage 改用 URL 帶 id」): the global scope is
   // brand-only now. The specific product / event being edited comes from the
@@ -121,24 +123,16 @@ export default function BrandsPage() {
   const urlProductId = Number(searchParams.get("p")) || null;
   const urlEventId = Number(searchParams.get("e")) || null;
 
-  // 2026-08-11: the 策略 rail (ShellLayout) lists this page's seven sections
-  // for private preview, which makes the in-page tile strip a duplicate of the
-  // same control. Same gate as the rail so the two can't disagree — if this
-  // ever drifts from ShellLayout's check, a user gets either two switchers or
-  // none. Follows DataWorkspacePage's existing /api/auth/me pattern.
-  const [isPrivatePreview, setIsPrivatePreview] = React.useState(false);
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch("/api/auth/me", { method: "POST", credentials: "include" });
-        const d = r.ok ? await r.json() : null;
-        const email = String(d?.user?.email ?? "").toLowerCase();
-        if (!cancelled) setIsPrivatePreview(email === "sowork@sowork.tw");
-      } catch { /* default false — tiles stay visible, never strands the user */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // 2026-08-20: the 策略 rail (ShellLayout) lists this page's seven sections
+  // for strategy-preview accounts, which makes the in-page tile strip below
+  // a duplicate of the same control. Gate on the SAME resolved email the
+  // shell already fetched (via outlet context), not a second independent
+  // `/api/auth/me` call — two separate requests can disagree (one fails
+  // transiently while the other succeeds), leaving the rail and this tile
+  // strip out of sync with no way to recover short of a reload (Codex
+  // review, PR #119).
+  const isStrategyPreview = isStrategyPreviewEmail(userEmail);
+  const isPersonaPreview = isPersonaPreviewEmail(userEmail);
   const scope = React.useMemo(
     () => ({
       brandId: globalScope?.brandId ?? brandId ?? null,
@@ -657,7 +651,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" | "persona" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -668,6 +662,7 @@ export default function BrandsPage() {
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
     : urlCat === "tools" ? "tools"
+    : urlCat === "persona" ? "persona"
     : "positioning";
   // 2026-07-28 (CJ「選活動定位卡片，跑回品牌定位頁面」): this built its
   // next params from the `searchParams` closure instead of the functional
@@ -678,7 +673,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -1202,6 +1197,17 @@ export default function BrandsPage() {
       _autoPosFired.current = null;
       setAutoPosPhase("idle");
     }
+    // 2026-08-21 (CJ「有推導過的品牌，解鎖時不用再觸發新的推導」/「他一直
+    // 不斷地重新推導」): scopeActiveQuery hasn't necessarily resolved yet on
+    // first mount/scope-change — until it does, `fullPositioning` (and so
+    // `hasAnyPositioningContent`) falls back to `{}`, making an ALREADY-
+    // positioned brand look empty for one render. Without this guard the
+    // effect fired a full pipeline right then (fire-and-forget, so the
+    // later re-run with real data couldn't undo it) — every fresh page
+    // load/scope switch for that brand could silently re-derive and
+    // overwrite manually-finalized content. Mirrors the guard
+    // PlatformTaskPage.tsx already has for product/event scope.
+    if (scopeActiveQuery?.isLoading || !scopeActiveQuery?.data) return;
     // Guard: only fire once per (scopeMode, targetId), skip if already has content
     if (
       _autoPosFired.current === key ||
@@ -1235,8 +1241,12 @@ export default function BrandsPage() {
       // Invalidate so the strategist bar / speed card pick up the new _interim data
       utils?.scope?.active?.invalidate?.();
     })();
+    // scopeActiveQuery?.data is in deps so this re-evaluates once loading
+    // resolves — without it, a genuinely-empty brand whose
+    // hasAnyPositioningContent reads `false` both before and after load
+    // would never re-fire (React sees no dependency change).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeMode, targetId, hasAnyPositioningContent, pipeline.status]);
+  }, [scopeMode, targetId, hasAnyPositioningContent, pipeline.status, scopeActiveQuery?.isLoading, scopeActiveQuery?.data]);
 
   // 2026-07-28 (CJ「視覺頁沒有全自動填寫按鈕」): one-shot LLM draft for the
   // visual tab's text/style asset cards (視覺規範/圖像風格/圖示風格/圖表
@@ -1489,13 +1499,12 @@ export default function BrandsPage() {
               available for any debug page that wants to surface it. */}
 
           {/* Tab tiles — 7 consistent tiles in one scrollable row.
-              2026-08-11 (CJ「左側已經有品牌、文字、活動等 rail tray，中間就不需要
-              重複了」): under the 策略 workspace the left rail already lists these
-              exact seven sections, so rendering them again here is a duplicate
-              control for the same state. Hidden for private preview only —
-              everyone else has no rail, and hiding it for them would leave no
-              way to change section at all. */}
-          {!isPrivatePreview && (
+              2026-08-20: under the 策略 workspace the left rail already lists
+              these exact seven sections, so rendering them again here is a
+              duplicate control for the same state. Hidden for strategy-preview
+              accounts only — everyone else has no rail, and hiding it for
+              them would leave no way to change section at all. */}
+          {!isStrategyPreview && (
           <div className="mt-6 w-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <div className="flex items-start gap-2 min-w-max mx-auto px-2">
               {(() => {
@@ -1995,6 +2004,10 @@ export default function BrandsPage() {
                           eventId={scopeMode === "event" ? (scope?.eventId ?? null) : null}
                           positioning={workbenchPositioning}
                           lang={lang}
+                          // 2026-08-21 (CJ「鎖定後，策略工作檯就會只留下最後
+                          // 定案的，變成下方的文字就好」): only brand scope
+                          // has a 定位 lock — events aren't lockable.
+                          locked={scopeMode === "brand" ? !!tabLocks.positioning : false}
                         />
                       ) : null}
                       <PositioningGrid
@@ -2357,6 +2370,16 @@ export default function BrandsPage() {
             </div>
           )}
 
+          {/* ── 人設 Agent (persona) — user-created, trained persona agents ──
+               2026-08-22: gated to isPersonaPreview independently of the nav
+               item that links here — a direct ?cat=persona URL shouldn't
+               bypass the same gate. */}
+          {derivedCategory === "persona" && scopeMode === "brand" && isPersonaPreview && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <PersonaAgentPanel brandId={activeBrandIdForLocks} />
+            </div>
+          )}
+
           {/* ── 產品 (products) — card grid with positioning preview ── */}
           {derivedCategory === "products" && scopeMode === "brand" && (
             <div style={{ padding: "8px 0 32px" }}>
@@ -2536,6 +2559,7 @@ export default function BrandsPage() {
           productId={productDetailId}
           brandId={activeBrandIdForLocks}
           onClose={() => setProductDetailId(null)}
+          onImageUpdated={() => brandProductsQ?.refetch?.()}
           onReposition={(id) => {
             setProductDetailId(null);
             kickReposition("product", id, brandProductsList?.find((p: any) => p.id === id)?.name);
@@ -4919,6 +4943,9 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
   async function handleSave() {
     if (!productId || !upsertM?.mutateAsync) return;
     const p = q?.data;
+    const existingPositioning = (typeof p?.positioning === "string"
+      ? safeParse(p.positioning)
+      : p?.positioning) ?? {};
     const w = website.trim();
     const summary = [usp.trim(), w ? `官方網址：${w}` : ""].filter(Boolean).join("\n");
     await upsertM.mutateAsync({
@@ -4926,9 +4953,16 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
       brandId: p?.brandId ?? undefined,
       slug: p?.slug ?? String(productId),
       name: name.trim() || (p?.name ?? "未命名產品"),
-      positioning: (usp.trim() || w || sku.trim())
-        ? { summary: summary || undefined, website: w || undefined, sku: sku.trim() || undefined }
-        : undefined,
+      // 2026-08-21: spread existing positioning so imageUrl / price /
+      // pipeline segments survive an edit. Cleared fields are sent as null
+      // (not undefined) — the server's merge drops undefined keys, so null
+      // is the only way for the user to actually clear a value.
+      positioning: {
+        ...existingPositioning,
+        summary: summary || null,
+        website: w || null,
+        sku: sku.trim() || null,
+      },
     });
     setSavedAt(Date.now());
   }
@@ -5351,6 +5385,47 @@ function BrandPaletteHero({
  * Shows each entity's positioning preview (tagline / USP / audience).
  * Cards with no positioning show a placeholder state.
  * ─────────────────────────────────────────────────────────────────── */
+function ProductCardThumbnail({ imageUrl, name, en }: { imageUrl?: string; name: string; en: boolean }) {
+  const [failed, setFailed] = React.useState(false);
+  return (
+    <div
+      className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden relative"
+      style={{ aspectRatio: "4 / 3", maxHeight: 140 }}
+    >
+      {imageUrl && !failed ? (
+        <>
+          <img
+            src={imageUrl}
+            aria-hidden
+            className="absolute inset-0 w-full h-full object-cover scale-110 opacity-50"
+            style={{ filter: "blur(16px)" }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+          <img
+            src={imageUrl}
+            alt={name}
+            loading="lazy"
+            className="relative w-full h-full object-contain transition-transform group-hover:scale-105"
+            onError={() => setFailed(true)}
+          />
+        </>
+      ) : (
+        <div className={`flex flex-col items-center gap-1 px-3 text-center ${failed ? "text-amber-700" : "text-neutral-400"}`}>
+          <FontAwesomeIcon icon={faBox} className="text-2xl" />
+          <span className="text-[10px] font-semibold tracking-wide">
+            {failed
+              ? (en ? "Image link expired" : "圖片連結已失效")
+              : (en ? "No image" : "尚無圖片")}
+          </span>
+          <span className="text-[9px] opacity-80">
+            {en ? "Open this product to fix it" : "點擊查看以修正"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BrandEntityGrid({
   kind, items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
   runningIds, progressMap,
@@ -5398,12 +5473,13 @@ function BrandEntityGrid({
     const interim = p._interim ?? {};   // interim positioning from auto-discovery
     if (kind === "product") {
       return {
-        tagline:  extractField(p, "tagline", "tagline.zhTagline", "differentiation.summary")
+        tagline:  extractField(p, "tagline", "tagline.zhTagline", "core.zhTagline", "core.oneLineValueProp", "differentiation.summary")
                     || interim.tagline || "",
-        usp:      extractField(p, "usp", "differentiation.functional", "differentiation.summary")
+        usp:      extractField(p, "usp", "competition.uniqueUsp", "core.oneLineValueProp", "differentiation.functional", "differentiation.summary")
                     || interim.usp || "",
         audience: extractField(p, "audience.primary", "targetAudience")
                     || interim.targetAudience || "",
+        price: extractField(p, "price"),
       };
     } else {
       return {
@@ -5412,6 +5488,7 @@ function BrandEntityGrid({
         audience: item.startAt
           ? `${new Date(item.startAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}${item.endAt ? ` → ${new Date(item.endAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}` : ""}`
           : "",
+        price: "",
       };
     }
   };
@@ -5421,6 +5498,7 @@ function BrandEntityGrid({
     const interim = p._interim ?? {};
     return !!(
       p.tagline || p.usp || p.theme || p.differentiation?.summary ||
+      p.core?.zhTagline || p.core?.oneLineValueProp || p.competition?.uniqueUsp ||
       p.audience?.primary || p.targetAudience ||
       interim.tagline || interim.usp || interim.targetAudience
     );
@@ -5488,54 +5566,15 @@ function BrandEntityGrid({
                     item.imageUrl,   // legacy top-level, if any writer sets it
                   ];
                   const imgUrl = imgCandidates.find((c: any) => typeof c === "string" && /^https?:\/\//.test(c)) as string | undefined;
-                  return (
-                  <div
-                    className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden relative"
-                    style={{ aspectRatio: "4 / 3", maxHeight: 140 }}
-                  >
-                    {imgUrl ? (
-                      // 2026-07-24 (CJ「圖片頭都被切一半…如何適應不同品牌官網
-                      // 圖片不一致，但又能完整呈現」): source sites ship any
-                      // aspect ratio (fashion sites = portrait model shots) and
-                      // object-cover in a 4:3 box beheads them. Universal fix:
-                      // the REAL image is object-contain (always fully visible,
-                      // any ratio), and the letterbox gap is filled by the same
-                      // image blown up + blurred as a soft backdrop — adapts to
-                      // every source site with zero per-brand tuning.
-                      <>
-                        <img
-                          src={imgUrl}
-                          aria-hidden
-                          className="absolute inset-0 w-full h-full object-cover scale-110 opacity-50"
-                          style={{ filter: "blur(16px)" }}
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                        />
-                        <img
-                          src={imgUrl}
-                          alt={item.name}
-                          loading="lazy"
-                          className="relative w-full h-full object-contain transition-transform group-hover:scale-105"
-                          onError={(e) => {
-                            // Hide broken image; parent placeholder still shows
-                            (e.currentTarget as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 text-neutral-300">
-                        <FontAwesomeIcon icon={faBox} className="text-2xl" />
-                        <span className="text-[10px] uppercase tracking-wider">
-                          {en ? "no image" : "無圖"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  );
+                  return <ProductCardThumbnail key={imgUrl ?? "none"} imageUrl={imgUrl} name={item.name} en={en} />;
                 })()}
 
                 <div className={kind === "product" ? "p-3" : "p-4"}>
                 {/* Name */}
                 <p className="text-sm font-semibold text-neutral-900 mb-2 truncate">{item.name}</p>
+                {kind === "product" && preview.price && (
+                  <p className="text-[10px] font-medium text-neutral-500 -mt-1 mb-2">{preview.price}</p>
+                )}
 
                 {positioned ? (
                   <div className="space-y-1.5">

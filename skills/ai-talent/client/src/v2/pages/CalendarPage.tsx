@@ -24,6 +24,10 @@ import {
 } from "lucide-react";
 import { useLang } from "../../lib/i18n";
 import { getFestivalHintEn } from "../lib/festivalI18n";
+import {
+  getCalendarPublishPayload,
+  getPlanningPublishWarning,
+} from "../lib/strategyContentEnvelope";
 
 /* ── Platform metadata ────────────────────────────────────────── */
 const PLATFORMS: Array<{
@@ -796,7 +800,9 @@ export default function CalendarPage() {
                               setRescheduleId(id);
                               setRescheduleAt(formatLocalDatetimeInput(new Date(at)));
                             }}
-                            onPublish={(id) => publishMut?.mutateAsync?.({ id })}
+                            onPublish={(id, contentKind) => publishMut?.mutateAsync?.(
+                              getCalendarPublishPayload(id, contentKind),
+                            )}
                             onConnectFacebook={connectFacebookFromCalendar}
                             onPrefetchFacebook={prefetchFacebookConnect}
                             rescheduling={rescheduleId === it.id}
@@ -1088,7 +1094,7 @@ function PostPill({
   navigate: (to: string) => void;
   onCancel: (id: number) => void;
   onReschedule: (id: number, at: string) => void;
-  onPublish?: (id: number) => Promise<void>;
+  onPublish?: (id: number, contentKind?: unknown) => Promise<void>;
   onConnectFacebook?: (brandId: number) => void;
   onPrefetchFacebook?: (brandId: number) => Promise<void>;
   rescheduling: boolean;
@@ -1173,13 +1179,16 @@ function PostPill({
                 <button
                   onClick={async () => {
                     const platformLabel = getPlatformLabel(item.platform);
-                    if (!confirm(lang === "en"
+                    const planningWarning = item.contentKind === "planning"
+                      ? getPlanningPublishWarning("planningArtifacts", "publish", lang === "en" ? "en" : "zh")
+                      : null;
+                    if (!confirm(planningWarning ?? (lang === "en"
                       ? `Publish to ${platformLabel} now? This will post immediately.`
-                      : `確定立即發布到 ${platformLabel}？發布後無法撤回。`)) return;
+                      : `確定立即發布到 ${platformLabel}？發布後無法撤回。`))) return;
                     setPublishing(true);
                     setPublishError(null);
                     try {
-                      await onPublish(item.id);
+                      await onPublish(item.id, item.contentKind);
                     } catch (e: any) {
                       const msg: string = e?.message ?? String(e);
                       // Show friendly inline error; raw TRPC error contains the server message

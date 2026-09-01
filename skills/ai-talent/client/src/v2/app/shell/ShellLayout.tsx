@@ -42,7 +42,7 @@ import {
   faShareNodes, faTrophy, faUsers, faLanguage,
   faUser, faPaintBrush, faFont, faMagnifyingGlass,
   faTrademark, faChevronDown, faCrown,
-  faEnvelope, faBullhorn, faChartLine, faDatabase,
+  faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase,
   faFire, faComments, faFileLines,
 } from "@fortawesome/free-solid-svg-icons";
 import {
@@ -85,20 +85,74 @@ interface NavItem {
   /** 2026-05-11 — hover tooltip explaining when this tier is for.
    *  Reviewer:「30s / 60s / 99s 的差異我看不清楚」. */
   tooltip?: string;
-  /** 2026-08-11 — 策略 rail only. Those entries all live on /brands/edit and
+  /** 2026-08-20 — 策略 rail only. Those entries all live on /brands/edit and
    *  differ only by the `cat` query param, but active-state matching runs on
    *  pathname alone, so every one of them would light up at once. When set,
    *  the item is active iff the current `cat` equals this value. */
   catKey?: string;
 }
 
+// 2026-08-20: 策略 (Strategy) workspace — 品牌大腦's tile strip promoted to
+// a left-rail workspace. Originally gated to a 2-account preview list, kept
+// separate from `isPrivate` below (still sowork@sowork.tw-only, gates the
+// market-intel / performance preview rails which haven't been vetted for
+// accounts outside the sowork.tw team).
+//
+// 2026-08-21 (CJ「所有用戶左方的mission rail上方，都改成策略和內容可切換
+// 的」): graduated from the 2-account preview to every account —
+// isStrategyPreviewEmail() now always returns true. The helper (rather than
+// inlining `true` at each of its three call sites) stays so a future
+// partial-rollout need doesn't require re-threading them again.
+// Exported so BrandsPage.tsx's in-page tile strip (hidden once the left rail
+// already lists the same 7 sections) can gate on the exact same check —
+// two independently-maintained copies of this list is how a user ends up
+// with either two switchers or none.
+export function isStrategyPreviewEmail(_email?: string | null): boolean {
+  return true;
+}
+
+// 2026-08-22 (CJ「人設的功能，我只想嘗試在媽爹講故事的帳號」): unlike the
+// 策略/內容 switcher above (graduated to everyone), the 人設 tab specifically
+// stays gated while it's still being shaken out — real bugs (missing
+// brand_integrations table, an unbounded OAuth-callback fetch) turned up in
+// the first round of testing. Exported so BrandsPage.tsx's render guard uses
+// the exact same check as the nav item, not an independently-drifting copy.
+const PERSONA_PREVIEW_EMAILS = ["marketing@momdadstory.com"];
+export function isPersonaPreviewEmail(email?: string | null): boolean {
+  return PERSONA_PREVIEW_EMAILS.includes(String(email ?? "").toLowerCase());
+}
+
 // 2026-05-26 (CJ「左欄改成平台優先」): replace tier-first nav (30s/60s/99s)
 // with platform icons. Users pick the *platform* first; speed is shown as
 // a badge on each task card inside the platform page.
 // Brand Strategy + Research Analysis removed per CJ direction; Brand Brain kept.
-function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string): NavItem[] {
+/**
+ * CatalogPlatform → /tasks 路由。用來把品牌任務包宣告的頻道換算成側邊欄項目。
+ * 這份要跟 PlatformTaskPage 的 ROUTE_TO_PLATFORM 對得起來（方向相反）。
+ */
+const CHANNEL_TO_TASK_ROUTE: Record<string, string> = {
+  facebook: "/tasks/fb",
+  instagram: "/tasks/ig",
+  linkedin: "/tasks/li",
+  youtube: "/tasks/yt",
+  tiktok: "/tasks/tt",
+  email: "/tasks/email",
+  pr: "/tasks/pr",
+  website: "/tasks/web",
+  case: "/tasks/case",
+  calendar: "/tasks/calendar",
+};
+
+/**
+ * @param allowedTaskRoutes 這個品牌可見的 /tasks 路由。null = 沒有客製包，
+ *   顯示全部（今天的行為）。非 null 時，不在名單裡的頻道整個不渲染 ——
+ *   建設公司的側邊欄不該出現 TikTok。非 /tasks 的項目一律不受影響。
+ */
+function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string, allowedTaskRoutes?: Set<string> | null): NavItem[] {
   const en = lang === "en";
   const isPrivate = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
+  const isStrategyPreview = isStrategyPreviewEmail(userEmail);
+  const isPersonaPreview = isPersonaPreviewEmail(userEmail);
 
   // In data modes, the main left rail switches meaning. The top-left mode
   // switcher chooses the workspace; this rail only shows functions inside it.
@@ -116,23 +170,19 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     ];
   }
 
-  // 2026-08-11 (CJ「將品牌大腦所有區塊，變成策略底下的不同 rail tray」):
-  // 品牌大腦's own tile strip (定位 / 文字 / 視覺 / 基本資料 / 品牌工具 /
-  // 產品 / 活動) is promoted to the left rail as the 策略 workspace. Same
-  // sections, same `cat` param, same page — only the entry point moves, so
-  // BrandsPage itself needs no change and every existing deep link still
-  // works. Saves a hop: previously 品牌大腦 → land on 定位 → click a tile.
+  // 2026-08-20 (CJ「參考 DEV 環境，將品牌大腦獨立成一個策略區」): 品牌大腦's
+  // own tile strip (定位 / 產品 / 活動 / 文字 / 視覺 / 工具 / 基本資料) is
+  // promoted to the left rail as the 策略 workspace. Same sections, same
+  // `cat` param, same page — only the entry point moves, so BrandsPage
+  // itself needs no change and every existing deep link still works.
   //
   // Brand/product/event scope ids are injected by the nav click handler, so
   // these `to` values deliberately carry only `cat`.
-  if (isPrivate && currentPath?.startsWith("/brands")) {
-    // 2026-08-11 (CJ「前三個分別是品牌、產品、活動，接下去才是文字、視覺、
-    // 工具、基本資料」): ordered by what the entry IS, not alphabetically.
-    // The first three are the three positioning SCOPES — 品牌 / 產品 / 活動 —
-    // i.e. "which thing am I positioning". Everything after is brand-level
-    // ASSET that supports whichever scope is active. Grouping them this way
-    // means the rail's top block mirrors the scope selector rather than
-    // interleaving scopes with assets.
+  if (isStrategyPreview && currentPath?.startsWith("/brands")) {
+    // Ordered by what the entry IS, not alphabetically: the first three are
+    // the three positioning SCOPES — 品牌 / 產品 / 活動 — i.e. "which thing
+    // am I positioning". Everything after is brand-level ASSET that supports
+    // whichever scope is active.
     return [
       { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Brand" : "品牌", icon: <FontAwesomeIcon icon={faBrain} />,
         tooltip: en ? "Brand positioning — the locked constitution" : "品牌定位 — 鎖定的品牌憲法" },
@@ -146,6 +196,16 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
         tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
       { to: "/brands/edit?cat=tools", catKey: "tools", label: en ? "Tools" : "工具", icon: <FontAwesomeIcon icon={faBookBookmark} />,
         tooltip: en ? "Knowledge base / AI prompt library" : "知識庫 / AI 指令庫" },
+      // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
+      // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
+      // agents — trained from pasted text / article links / video links,
+      // each scoped to a subset of the 8 AI-指令庫 platforms. 2026-08-22:
+      // stays gated to isPersonaPreview while still being shaken out —
+      // see isPersonaPreviewEmail's comment above.
+      ...(isPersonaPreview ? [
+        { to: "/brands/edit?cat=persona", catKey: "persona", label: en ? "Persona" : "人設", icon: <FontAwesomeIcon icon={faMicrophone} />,
+          tooltip: en ? "Custom persona agents — train, test-draft, and scope by platform" : "自訂人設 Agent — 訓練、試寫、指定套用平台" },
+      ] : []),
       { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
         tooltip: en ? "Name / industry / market" : "名稱 / 產業 / 市場" },
     ];
@@ -156,7 +216,8 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       { to: "/performance/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/overview", tooltip: en ? "Cross-platform overview" : "跨平台總覽" },
       { to: "/performance/meta", label: "Meta", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/performance/meta", tooltip: "Meta Ads" },
       { to: "/performance/google", label: "Google", icon: <FontAwesomeIcon icon={faMagnifyingGlass} />, matchPrefix: "/performance/google", tooltip: "Google Ads" },
-      { to: "/performance/shopline", label: "Shopline", icon: <FontAwesomeIcon icon={faFolderOpen} />, matchPrefix: "/performance/shopline", tooltip: "Shopline / Ecommerce" },
+      { to: "/performance/shopline", label: "SHOPLINE", icon: <FontAwesomeIcon icon={faFolderOpen} />, matchPrefix: "/performance/shopline", tooltip: "SHOPLINE / Ecommerce" },
+      { to: "/performance/91app", label: "91APP", icon: <FontAwesomeIcon icon={faFolderOpen} />, matchPrefix: "/performance/91app", tooltip: "91APP / Ecommerce" },
       { to: "/performance/ga", label: "GA", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/ga", tooltip: "GA / Website" },
       { to: "/performance/attribution", label: en ? "Attribution" : "歸因", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/performance/attribution", tooltip: en ? "Attribution" : "整合歸因" },
       // 2026-08-13 (CJ「新的任務 tray，稱為粉絲團月報，是 dev 底下大家都有的」)
@@ -164,7 +225,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     ];
   }
 
-  return [
+  const items: NavItem[] = [
     // ── Platform tier (primary content creation entry points) ──────────────
     { to: "/tasks/fb",    label: "Facebook",  icon: <FontAwesomeIcon icon={faFacebookF} />,  matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
@@ -180,24 +241,43 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
     { to: "/tasks/pr",    label: en ? "PR" : "新聞稿",   icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/tasks/pr",
       tooltip: en ? "Press releases, media pitch, CEO quotes, fact sheets" : "新聞稿 / 媒體提案 / CEO 聲明 / 資料頁" },
+    // 2026-08-29 官網頻道：品牌自己的長文與產品頁，不是社群通路。
+    { to: "/tasks/web",   label: en ? "Website" : "官網",  icon: <FontAwesomeIcon icon={faGlobe} />,    matchPrefix: "/tasks/web",
+      tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
+    // 2026-08-29 素材與規劃頻道。只有帶任務包的品牌會看到 —— 沒有包時
+    // allowedTaskRoutes 是 null，但全域目錄在這兩個頻道沒有卡，所以即使
+    // 顯示也是空的。放在這裡是為了讓有包的品牌拿得到入口。
+    { to: "/tasks/case",     label: en ? "Cases" : "案例",   icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
+      tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
+    { to: "/tasks/calendar", label: en ? "Calendar" : "行事曆", icon: <FontAwesomeIcon icon={faCalendarDays} />, matchPrefix: "/tasks/calendar",
+      tooltip: en ? "Plan the month's slots per content type" : "各類型當月篇數與切角規劃" },
     // ── Workspace & tools ──────────────────────────────────────────────────
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
       tooltip: en ? "Calendar view — all scheduled and published posts" : "月曆視圖 — 已排程 + 已發布內容" },
     { to: "/theater",   label: en ? "7-Day Publisher" : "七日發布台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
     // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav).
-    // 2026-08-11: for private preview it moved OUT of this rail and became the
-    // 策略 workspace (its sections are now rail entries there), so keeping it
-    // here too would be a duplicate entry point. Everyone else has no mode
-    // switcher, so for them it must stay — removing it outright would strand
-    // 品牌大腦 with no way in.
-    ...(isPrivate ? [] : [
+    // 2026-08-20: for the 策略 preview it moved OUT of this rail and became
+    // the 策略 workspace (its sections are now rail entries there), so
+    // keeping it here too would be a duplicate entry point. Everyone else
+    // has no mode switcher, so for them it must stay — removing it outright
+    // would strand 品牌大腦 with no way in.
+    ...(isStrategyPreview ? [] : [
       { to: "/brands", label: en ? "Brand Brain" : "品牌大腦", icon: <FontAwesomeIcon icon={faBrain} /> },
     ]),
     // 2026-05-30 (CJ「移除連結頁」): "連結" sidebar item removed entirely.
     // Social profile URLs now live in 基本資料 tab; OAuth connections in 平台授權 tab.
     // Both reachable via Brand Brain → settings gear → respective tab.
   ];
+
+  // 2026-08-29 客製任務包：只留這個品牌實際在經營的頻道。
+  // allowedTaskRoutes 為 null（沒有包）時整段跳過，行為與改動前一致。
+  if (allowedTaskRoutes) {
+    return items.filter(
+      (it) => !it.to.startsWith("/tasks/") || allowedTaskRoutes.has(it.to),
+    );
+  }
+  return items;
 }
 
 /* ─────────────────────────── Root layout ─────────────────────────── */
@@ -353,17 +433,28 @@ export default function ShellLayout() {
         currentPath={loc.pathname}
         activeCat={new URLSearchParams(loc.search).get("cat")}
         onNavigate={(to) => {
-          // 2026-08-11 策略 rail: entries carry only `?cat=`; the active
+          // 2026-08-20 策略 rail: entries carry only `?cat=`; the active
           // brand/product/event ids are injected here so the rail definition
           // stays scope-free and the ScopeBar doesn't reset on navigation.
+          //
+          // 2026-08-20 (Codex review, PR #118): product/event scope must be
+          // read from the CURRENT URL, not from `scope` (useScopeState()) —
+          // that hook's productId/eventId are always null (vestigial in its
+          // returned shape; BrandsPage reads `p`/`e` directly off the URL
+          // search params instead). Using `scope` here silently dropped the
+          // active product/event and bounced the editor back to brand-level
+          // content on every strategy-rail click.
           if (to.startsWith("/brands/edit?cat=")) {
             const cat = to.split("cat=")[1]!;
             const bid = scope.brandId ?? brands[0]?.id;
+            const currentParams = new URLSearchParams(loc.search);
+            const pid = currentParams.get("p");
+            const eid = currentParams.get("e");
             const qs: string[] = [];
             if (bid) {
               qs.push(`b=${bid}`);
-              if (scope.productId) qs.push(`p=${scope.productId}`);
-              if (scope.eventId)   qs.push(`e=${scope.eventId}`);
+              if (pid) qs.push(`p=${pid}`);
+              if (eid) qs.push(`e=${eid}`);
             }
             qs.push(`cat=${cat}`);
             navigate(`/brands/edit?${qs.join("&")}`);
@@ -466,7 +557,7 @@ export default function ShellLayout() {
             and the /99s deep-link route returns 404. Festival prep handled
             through normal task picker instead. */}
         <RouteErrorBoundary>
-          <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope }} />
+          <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope, userEmail: currentUserEmail }} />
         </RouteErrorBoundary>
         {/* 2026-05-10 global footer w/ legal links — shows on every authenticated page */}
         <footer className="mt-12 pt-6 pb-8 border-t border-neutral-200 text-center text-[11px] text-neutral-400 space-x-3">
@@ -633,12 +724,33 @@ function IconBar({
 }) {
   const { lang, setLang } = useLang();
   const isEn = lang === "en";
-  const NAV_ITEMS = React.useMemo(() => buildNavItems(lang, userEmail, currentPath), [lang, userEmail, currentPath]);
+  // 2026-08-29 (CJ「每個品牌，只出現他的定位、任務，不會出現他用不到的」):
+  // 這個品牌若有客製任務包，側邊欄只留包裡宣告的頻道。沒有包就回 null，
+  // buildNavItems 整段跳過。
+  const packNavQuery = (trpc as any).quickTask?.brandNav?.useQuery
+    ? (trpc as any).quickTask.brandNav.useQuery(
+        { brandId: scope.brandId ?? undefined },
+        { enabled: !!scope.brandId, refetchOnWindowFocus: false, staleTime: 300_000 },
+      )
+    : { data: null };
+  const allowedTaskRoutes = React.useMemo<Set<string> | null>(() => {
+    const channels = (packNavQuery.data as any)?.channels;
+    if (!Array.isArray(channels) || channels.length === 0) return null;
+    const routes = channels
+      .map((c: any) => CHANNEL_TO_TASK_ROUTE[c.key])
+      .filter(Boolean) as string[];
+    return routes.length > 0 ? new Set(routes) : null;
+  }, [packNavQuery.data]);
+  const NAV_ITEMS = React.useMemo(
+    () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes),
+    [lang, userEmail, currentPath, allowedTaskRoutes],
+  );
   const isPrivatePreview = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
-  // 2026-08-11 (CJ「改成四個選單：市場、策略、內容、成效」): 策略 added as a
-  // first-class workspace. Order follows how the work actually flows —
-  // understand the market, decide the strategy, produce the content, read the
-  // results — so the switcher reads left-to-right as the pipeline.
+  const isStrategyPreview = isStrategyPreviewEmail(userEmail);
+  // 2026-08-20: 策略 added as a first-class workspace mode alongside the
+  // existing market/content/performance ones. Order follows how the work
+  // actually flows — understand the market, decide the strategy, produce
+  // the content, read the results.
   const activeWorkspaceMode: "market" | "strategy" | "content" | "performance" =
     currentPath.startsWith("/performance")
       ? "performance"
@@ -647,20 +759,17 @@ function IconBar({
         : currentPath.startsWith("/brands")
           ? "strategy"
           : "content";
-  // 2026-08-11 (CJ「這四格要大的好識別，現在並列在一起字都很小」): four
-  // single-char pills sharing a 64px capsule left ~15px each — unreadable.
-  // Now a vertical stack: each cell gets the full rail width, an icon and a
-  // real two-character label.
+  // market/performance stay gated to the sowork.tw preview group (unchanged
+  // from before); 策略 additionally opens to isStrategyPreview accounts;
+  // 內容 is always available. Dropdown reads fine at 2 items
+  // (isStrategyPreview-only accounts) or 4 (sowork.tw).
   const modeOptions = [
-    { id: "market" as const, label: isEn ? "Market" : "市場", icon: faMagnifyingGlass, to: "/market-intel/overview",
-      tip: isEn ? "Market intelligence" : "市場情報" },
-    { id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands",
-      tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" },
-    { id: "content" as const, label: isEn ? "Content" : "內容", icon: faWandMagicSparkles, to: "/tasks/fb",
-      tip: isEn ? "Content production" : "內容產出" },
-    { id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview",
-      tip: isEn ? "Performance" : "成效數據" },
+    ...(isPrivatePreview ? [{ id: "market" as const, label: isEn ? "Market" : "市場", icon: faMagnifyingGlass, to: "/market-intel/overview", tip: isEn ? "Market intelligence" : "市場情報" }] : []),
+    ...(isStrategyPreview ? [{ id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands", tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" }] : []),
+    { id: "content" as const, label: isEn ? "Content" : "內容", icon: faWandMagicSparkles, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
+    ...(isPrivatePreview ? [{ id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview", tip: isEn ? "Performance" : "成效數據" }] : []),
   ];
+  const showModeSwitcher = isPrivatePreview || isStrategyPreview;
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
 
@@ -674,10 +783,11 @@ function IconBar({
     return () => document.removeEventListener("mousedown", handler);
   }, [avatarOpen]);
 
-  // 2026-08-11 (CJ「我寧願是下拉式選單，但會一直有小動畫，提醒用戶可以切換」):
-  // workspace switcher as a dropdown. A dropdown hides the other three modes,
-  // so the trigger carries a periodic nudge — without it the control reads as
-  // a static label and users never learn it's switchable.
+  // 2026-08-20: workspace switcher as a dropdown, matching the dev-branch
+  // design — a static small capsule doesn't communicate that 策略 exists as
+  // a 4th (or 2nd) mode. A dropdown hides the other options, so the trigger
+  // carries a periodic nudge — without it the control reads as a static
+  // label and users never learn it's switchable.
   const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
   const modeRef = React.useRef<HTMLDivElement>(null);
 
@@ -748,7 +858,7 @@ function IconBar({
         </Tooltip>
       </div>
 
-      {isPrivatePreview && (
+      {showModeSwitcher && (
         <div
           ref={modeRef}
           style={{
@@ -860,14 +970,12 @@ function IconBar({
           as horizontal hierarchy bar (BrandHierarchyPill in main layout) */}
 
       {/* Nav icons */}
-      {/* 2026-08-11: overflowY was "hidden" — fine when the mode switcher was a
-          24px capsule, but the stacked switcher takes ~190px and would then
-          silently clip the last nav icons off the bottom with no way to reach
-          them. "auto" keeps every item reachable on short viewports.
-          scrollbarWidth:none hides the bar so the 70px rail stays clean. */}
-      <nav
-        style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px", scrollbarWidth: "none" }}
-      >
+      {/* 2026-08-20: overflowY was "hidden" — fine for the platform-tasks
+          rail, but the 策略 rail has 7 items and would silently clip the
+          last ones on short viewports with no way to reach them. "auto"
+          keeps every item reachable; scrollbarWidth:none hides the bar so
+          the 70px rail stays visually clean. */}
+      <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px", scrollbarWidth: "none" }}>
         {NAV_ITEMS.map((item) => {
           // 2026-05-12 (CJ「按了連結還是顯示為品牌區」): pick the MOST SPECIFIC
           // matching item. If another nav item has a longer matching prefix,
@@ -3175,4 +3283,12 @@ export interface ShellOutletCtx {
   brandsLoaded: boolean;
   scope: ScopeState;
   setScope: (s: ScopeState) => void;
+  /** 2026-08-20 (Codex review, PR #119): the shell's own resolved
+   *  `/api/auth/me` email — child pages that need the strategy-preview
+   *  gate must read THIS instead of firing their own independent fetch.
+   *  Two separate requests can disagree (one fails transiently while the
+   *  other succeeds), leaving the rail and the in-page controls out of
+   *  sync with no way to recover short of a reload. Null while the
+   *  shell's own fetch hasn't resolved yet. */
+  userEmail: string | null;
 }

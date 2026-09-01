@@ -1,0 +1,63 @@
+name: Ops — Scan FB post formats (monthly)
+
+# 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」)
+#
+# 每月掃描 brands 表裡「真的有客戶」的每個市場，找出現有 FB 任務卡還沒覆蓋的
+# 貼文形式，寫進 post_format_candidates 佇列等人審。審過才建卡 —— 自動建卡會
+# 繞過 30s SOP 的「probe E2E 失敗不上線」。
+#
+# 產出在 /admin/post-formats。掃不到新東西是正常的：貼文形式是有限集合，
+# 不會每個月都長出新的。真正每月都有的是「題材」，那些標成 kind=topic，
+# 拿去餵 fb-99-trend-rewrite / fb-99-viral-rewrite，不會進開卡佇列。
+#
+# 依賴 Vertex grounding 憑證（GOOGLE_APPLICATION_CREDENTIALS 或
+# GOOGLE_VERTEX_TOKEN，已在 VM 的 .env）。沒有憑證時整場掃描中止而不是
+# 退回無搜尋的 LLM —— 那條路產出的 URL 是編的，比沒資料更糟。
+
+on:
+  schedule:
+    - cron: "0 1 1 * *"     # 每月 1 號 09:00 Asia/Taipei (UTC+8)
+  workflow_dispatch:
+    inputs:
+      markets:
+        description: "只掃這些市場（空白 = brands 表裡全部），逗號分隔，例：TW,JP"
+        required: false
+        default: ""
+      days:
+        description: "回看天數"
+        required: false
+        default: "45"
+      dry_run:
+        description: "只印不寫入資料庫"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  scan:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 30
+    steps:
+      - name: Scan post formats
+        run: |
+          set -e
+          APP=/opt/onbrand/app/skills/ai-talent
+          cd "$APP"
+          set -a; source "$APP/.env"; set +a
+
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ -n "${{ inputs.markets }}" ]; then
+            IFS=',' read -ra M <<< "${{ inputs.markets }}"
+            for m in "${M[@]}"; do
+              m="$(echo "$m" | tr -d '[:space:]')"
+              [ -n "$m" ] && ARGS="$ARGS --market $m"
+            done
+          fi
+          DAYS="${{ inputs.days }}"
+          [ -n "$DAYS" ] && ARGS="$ARGS --days $DAYS"
+
+          echo "── running: npx tsx scripts/scan-post-formats.ts $ARGS ──"
+          npx tsx scripts/scan-post-formats.ts $ARGS

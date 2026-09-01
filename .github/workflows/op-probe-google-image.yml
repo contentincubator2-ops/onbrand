@@ -1,0 +1,83 @@
+name: "Op — Probe Google image surface (read-only)"
+
+# 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」).
+#
+# op-probe-imagen.yml only exercises the Imagen :predict surface, which now
+# answers 404 NOT_FOUND on every key — ListModels on the prod key returns no
+# imagen model at all, only gemini-*-image. That left one question open before
+# making Nano Banana the primary: does the gemini image surface actually
+# RETURN an image for a plain text prompt (no subject reference)?
+#
+# Read-only: one generateContent call per key per model. Prints HTTP status,
+# latency and whether an inline image part came back — never the key, never
+# the image bytes.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Probe gemini image models across the key pool
+        run: |
+          set +e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV" 2>/dev/null; set +a
+
+          # Same precedence googleApiKeyPool() uses in mediaGen / imageGen.
+          POOL=$( { echo "${GEMINI_API_KEY_POOL:-}" | tr ',' '\n'
+                    echo "${GEMINI_API_KEY:-}"
+                    echo "${GOOGLE_AI_API_KEY:-}"
+                    echo "${GOOGLE_API_KEY:-}"; } \
+                  | sed 's/[[:space:]]//g' | grep -v '^$' | awk '!seen[$0]++' )
+          # NOT `tr -d '[:space:]'` — tr works on the whole stream, so it eats
+          # the newlines too and glues every key into one unusable string. The
+          # first run of this probe did exactly that and reported a bogus
+          # 401 UNAUTHENTICATED for keys that authenticate fine. sed is
+          # per-line, so it strips padding without joining the records.
+
+          if [ -z "$POOL" ]; then
+            echo "No Google key on this host — image gen has no Google path at all."
+            exit 0
+          fi
+          echo "keys in pool: $(echo "$POOL" | wc -l)"
+          echo
+
+          for MODEL in gemini-2.5-flash-image gemini-3-pro-image gemini-3.1-flash-image; do
+            echo "════ $MODEL ════"
+            IDX=0
+            echo "$POOL" | while IFS= read -r KEY; do
+              IDX=$((IDX + 1))
+              START=$(date +%s%3N)
+              CODE=$(curl -s -o /tmp/probe.json -w '%{http_code}' --max-time 120 \
+                -X POST "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}" \
+                -H "Content-Type: application/json" \
+                -d '{"contents":[{"role":"user","parts":[{"text":"A clean product photography background, soft studio light, no text. Output aspect ratio: 1:1."}]}],"generationConfig":{"responseModalities":["IMAGE"]}}')
+              MS=$(( $(date +%s%3N) - START ))
+
+              # A 200 carrying only a text part is the "success-shaped, no
+              # image" case the adapter must treat as a failure — so report the
+              # image part, not just the status code.
+              if grep -q '"inlineData"\|"inline_data"' /tmp/probe.json; then
+                BYTES=$(tr -d '\n' < /tmp/probe.json | sed 's/.*"data"[[:space:]]*:[[:space:]]*"//; s/".*//' | wc -c)
+                VERDICT="IMAGE OK (${BYTES} b64 chars)"
+              elif grep -q '"error"' /tmp/probe.json; then
+                STATUS=$(tr -d '\n' < /tmp/probe.json | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([A-Z_]*\)".*/\1/p')
+                MSG=$(tr -d '\n' < /tmp/probe.json | sed -n 's/.*"message"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | cut -c1-100)
+                VERDICT="ERROR ${STATUS:-?} — ${MSG}"
+              else
+                FINISH=$(tr -d '\n' < /tmp/probe.json | sed -n 's/.*"finishReason"[[:space:]]*:[[:space:]]*"\([A-Z_]*\)".*/\1/p')
+                VERDICT="NO IMAGE PART (finishReason=${FINISH:-none})"
+              fi
+              printf '  key#%d  HTTP %s  %6sms  %s\n' "$IDX" "$CODE" "$MS" "$VERDICT"
+            done
+            echo
+          done
+
+          echo "── how to read this ──"
+          echo "IMAGE OK on at least one key → Nano Banana is a viable primary."
+          echo "API_KEY_INVALID             → that key is dead; drop it from GEMINI_API_KEY_POOL."
+          echo "NOT_FOUND                   → that model is not on this key tier."
+          echo "RESOURCE_EXHAUSTED / 429    → quota; the adapter rotates to the next key."

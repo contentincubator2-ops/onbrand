@@ -36,8 +36,10 @@ import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
 import { missionSquadRouter } from "./routes/missionSquadRoute";
 import { projectSyncCallbackRouter } from "./routes/projectSyncCallbackRoute";
+import { cloudOAuthRouter } from "./routes/cloudOAuthRoute";
 import { squadSearchRouter } from "./routers/squadSearchRouter";
 import { entitySearchRouter } from "./routers/entitySearchRouter";
+import { manusRouter } from "./routers/manusRouter";
 import { intakeRouter } from "./routers/intakeRouter";
 import { missionStepStreamRouter } from "./routes/missionStepStreamRoute";
 import { publicAgentsRoute } from "./routes/publicAgentsRoute";
@@ -364,8 +366,10 @@ app.use("/api/brand-brain", brandBrainRouter);
 app.use("/api/exports", exportsRouter);
 app.use("/api/missions", missionSquadRouter);
 app.use("/api/project-sync", projectSyncCallbackRouter);
+app.use("/api/oauth", cloudOAuthRouter);
 app.use("/api/squads/search", squadSearchRouter);
 app.use("/api/entity/search", entitySearchRouter);
+app.use("/api/manus", manusRouter);
 app.use("/api/intake", intakeRouter);
 app.use("/api/missions", missionStepStreamRouter);
 
@@ -546,6 +550,13 @@ async function runStartupMigrations() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log("[migrate] squad_usage_log: OK");
+
+    // 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」):
+    // 每月排程掃出來的貼文形式候選佇列。DDL 的來源在 _core/postFormatStore.ts，
+    // 那裡也寫了為什麼去重不看 status（否則被否決的形式每月復活）。
+    const { POST_FORMAT_CANDIDATES_DDL } = await import("./_core/postFormatStore");
+    await db.execute(sql.raw(POST_FORMAT_CANDIDATES_DDL));
+    console.log("[migrate] post_format_candidates: OK");
   } catch (err) {
     console.error("[migrate] startup migration error:", err);
   }
@@ -667,11 +678,43 @@ const server = app.listen(PORT, async () => {
 });
 
 // 2026-05-09: bump server timeouts so heavy orchestra calls (60s tier
-// with 5 variants + image gen) don't get killed mid-flight. Pair with
-// nginx proxy_read_timeout 150s (set via admin-set-nginx-timeout workflow).
-server.timeout = 140_000;          // 140s for entire request
+// with 5 variants + image gen) don't get killed mid-flight.
+//
+// 2026-08-19 (IG 99s 502 root cause, confirmed from production nginx logs):
+// the old 140s here was the binding constraint and it fired on every slow
+// quickTask.runSquadAuto. nginx logged, five times on 2026-08-19 alone:
+//   upstream prematurely closed connection while reading response header
+//   from upstream, request: "POST /trpc/quickTask.runSquadAuto?batch=1"
+// and ZERO "upstream timed out (110)" — i.e. nginx's own 180s never got a
+// chance, Node destroyed the socket first and nginx surfaced that as a 502.
+//
+// runSquadAuto's synchronous worst case is ~196s:
+//   scout <=12s (socialListeningScout SCOUT_TIMEOUT_MS)
+// + 5 planning steps run in sequence, <=25s each  = 125s
+// + public synthesis shared deadline               = 55s
+// + brand context / redaction / persistence        ~4s
+// 220s covers that with margin while staying under both nginx's read
+// timeout (raise to 230s) and Azure's default 4-minute L4 idle timeout.
+// The real fix is to stop running a 3-minute job inside an HTTP request;
+// this only stops the bleeding.
+//
+// The three knobs mean different things — do NOT scale them together:
+//   timeout        — socket INACTIVITY, not total request time. This is the
+//                    one that was killing us.
+//   keepAliveTimeout — idle wait for the NEXT request on a kept-alive socket.
+//                    Raising it only piles up idle sockets. Leave it.
+//   headersTimeout — time allowed to RECEIVE request headers. It is a
+//                    slow-header DoS guard and must not grow with handler
+//                    time. The old "must be > server.timeout" comment was
+//                    wrong; Node imposes no such rule.
+//   requestTimeout — time allowed to receive the ENTIRE request (409/408 on
+//                    expiry). It does not cover handler execution, so Node
+//                    22's 300s default was never our ceiling. Pinned here so
+//                    the behaviour can't drift with the Node version.
+server.timeout = 220_000;          // socket inactivity
 server.keepAliveTimeout = 65_000;  // > nginx's default keep-alive
-server.headersTimeout = 145_000;   // must be > server.timeout per Node docs
+server.headersTimeout = 60_000;    // receiving headers only — slow-header guard
+server.requestTimeout = 300_000;   // receiving the request body only
 
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {

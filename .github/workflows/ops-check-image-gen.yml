@@ -1,0 +1,137 @@
+name: "Ops — Check image generation provenance"
+
+# 2026-08-19: every 產圖 writes a row to `generated_images` (provider, model,
+# full prompt, url, status), but nothing surfaces it — image.listForDecision
+# only queries by decisionId, and the RunPage 改配圖 path never has one. So
+# "which model actually made this picture?" was only answerable by reading the
+# code and guessing. This prints the ground truth instead.
+#
+# Also dumps the product photos that「📦 使用真實產品圖」would attach, and
+# probes whether they are reachable — the picker thumbnails render broken in
+# the browser while the server-side fetch succeeds, which points at Referer
+# hotlink protection on the source site.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: "Brand ID (e.g. 2947)"
+        required: true
+        type: string
+      limit:
+        description: "How many recent generations to list"
+        required: false
+        default: "20"
+        type: string
+
+jobs:
+  check:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Image generation provenance
+        env:
+          BRAND_ID: ${{ inputs.brandId }}
+          ROW_LIMIT: ${{ inputs.limit }}
+        run: |
+          set -u
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"
+          U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD:-}"
+          D="${LOCAL_DB_NAME:-mos_db}"
+
+          # Inputs arrive as strings from workflow_dispatch. Force them to
+          # integers before they reach SQL.
+          BID=$(printf '%d' "$BRAND_ID" 2>/dev/null) || { echo "brandId must be a number"; exit 1; }
+          LIM=$(printf '%d' "$ROW_LIMIT" 2>/dev/null) || LIM=20
+          [ "$LIM" -gt 0 ] && [ "$LIM" -le 200 ] || LIM=20
+
+          q() { mysql -h"$H" -u"$U" -p"$P" "$D" "$@"; }
+
+          echo "===== Deployed commit (which code produced these rows) ====="
+          git -C /opt/onbrand/app log --oneline -1 || true
+          echo
+
+          echo "===== Recent generations for brand $BID (newest first) ====="
+          # provider/model is what actually ran, NOT what the UI model picker
+          # showed — a subject-reference run forces nano-banana and ignores the
+          # picker, and a failed primary silently falls back to another model.
+          q -e "
+            SELECT id, createdAt, provider, model, status, sizeSpec,
+                   CASE
+                     WHEN prompt LIKE '%PRODUCT FIDELITY%' THEN 'product-faithful'
+                     ELSE 'text-to-image'
+                   END AS mode,
+                   CASE
+                     WHEN prompt LIKE '%BRAND ADAPTATION%' THEN 'yes'
+                     ELSE 'no'
+                   END AS brand_name_injected,
+                   LEFT(COALESCE(url, CONCAT('(b64) ', COALESCE(b64DataKey,''))), 70) AS url,
+                   LEFT(COALESCE(errorMsg, ''), 60) AS err
+            FROM generated_images
+            WHERE brandId = $BID
+            ORDER BY createdAt DESC
+            LIMIT $LIM;"
+          echo
+
+          echo "===== Full prompt of the 3 newest generations ====="
+          q --vertical -e "
+            SELECT id, createdAt, provider, model, status, sizeSpec, url, prompt
+            FROM generated_images
+            WHERE brandId = $BID
+            ORDER BY createdAt DESC
+            LIMIT 3;"
+          echo
+
+          echo "===== Model mix over the last 30 days ====="
+          q -e "
+            SELECT provider, model, status, COUNT(*) AS n
+            FROM generated_images
+            WHERE brandId = $BID AND createdAt > NOW() - INTERVAL 30 DAY
+            GROUP BY provider, model, status
+            ORDER BY n DESC;"
+          echo
+
+          echo "===== Product photos「使用真實產品圖」would attach ====="
+          # Same 7 candidate locations media.listProductImages walks. Only
+          # positioning.imageUrl is ever written (by productDiscovery); the
+          # rest are read-only dead ends kept for older/other writers.
+          q -e "
+            SELECT id, LEFT(name, 24) AS name,
+                   LEFT(COALESCE(
+                     JSON_UNQUOTE(JSON_EXTRACT(positioning, '\$.imageUrl')),
+                     JSON_UNQUOTE(JSON_EXTRACT(positioning, '\$.image')),
+                     JSON_UNQUOTE(JSON_EXTRACT(positioning, '\$._interim.imageUrl')),
+                     JSON_UNQUOTE(JSON_EXTRACT(positioning, '\$.images[0]')),
+                     JSON_UNQUOTE(JSON_EXTRACT(positioning, '\$._assets.photos[0]')),
+                     '(none)'
+                   ), 110) AS product_image
+            FROM products
+            WHERE brandId = $BID
+            ORDER BY id;"
+          echo
+
+          echo "===== Are those photos actually fetchable? ====="
+          # The server fetches them with no Referer (genNanoBanana), the browser
+          # sends one. A site with hotlink protection answers differently to the
+          # two — that shows up as a broken thumbnail in the picker while
+          # generation still works. Probe both ways.
+          URLS=$(q -N -B -e "
+            SELECT JSON_UNQUOTE(JSON_EXTRACT(positioning, '\$.imageUrl'))
+            FROM products
+            WHERE brandId = $BID
+              AND JSON_EXTRACT(positioning, '\$.imageUrl') IS NOT NULL
+            LIMIT 12;")
+          if [ -z "$URLS" ]; then
+            echo "(no product imageUrl set for this brand)"
+          else
+            printf '%-8s %-8s %-10s %s\n' "no-ref" "w/ref" "bytes" "url"
+            echo "$URLS" | while IFS= read -r u; do
+              [ -n "$u" ] && [ "$u" != "NULL" ] || continue
+              BARE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$u" || echo "ERR")
+              REF=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+                    -H "Referer: https://onbrand.sowork.ai/" "$u" || echo "ERR")
+              LEN=$(curl -s -o /dev/null -w '%{size_download}' --max-time 15 "$u" || echo "-")
+              printf '%-8s %-8s %-10s %s\n' "$BARE" "$REF" "$LEN" "$u"
+            done
+          fi

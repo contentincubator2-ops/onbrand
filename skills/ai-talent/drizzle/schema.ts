@@ -1,6 +1,8 @@
 import {
   boolean,
+  bigint,
   int,
+  index,
   tinyint,
   mysqlEnum,
   mysqlTable,
@@ -122,8 +124,16 @@ export const agents = mysqlTable("agents", {
    * 2026-05-08 (CJ direction): per-role thick system prompt — the agent's
    * actual writing manual (formulas / structure / banlist / examples).
    * Read by loadAgent() and prepended to every LLM call this agent runs.
-   * 200-500 words ideal; the role-specific operating layer between the
-   * market master persona and the per-task systemPrompt.
+   * The role-specific operating layer between the market master persona and
+   * the per-task systemPrompt.
+   *
+   * 2026-08-23 (CJ「每一個新增的 facebook 貼文任務，agent 的設計都要按照
+   * 真實人物設計，system prompt 不少於 2200 個字」): 舊標準是「200-500 words
+   * ideal」，已作廢。綁到 FB 貼文類任務（postType feed / pinned / story）的
+   * agent，這欄不得少於 2200 字，且必須按真實人物設計——具體的口頭禪、
+   * 句型、立場，不是「專業親切溫暖」堆字數。同一條標準已存在於
+   * personaAgentRouter.ts（persona + skill 合計 ≥ 2200 字，且緊扣真實素材）。
+   * 稽核：npx tsx scripts/audit-fb-agent-personas.ts --posts
    */
   taskSystemPrompt: text("taskSystemPrompt"),
   // Creator / UGC fields
@@ -730,6 +740,36 @@ export const missionResources = mysqlTable("mission_resources", {
 export type MissionResource = typeof missionResources.$inferSelect;
 export type InsertMissionResource = typeof missionResources.$inferInsert;
 
+// ─── 貼文形式候選佇列 ───────────────────────────────────────
+// 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」)
+// 每月排程（op-scan-post-formats.yml）寫入、/admin/post-formats 審核。
+// 建表走 server/index.ts 的啟動 migration，DDL 在 _core/postFormatStore.ts；
+// 這裡只是型別來源（同 mission_resources 的做法）。
+export const postFormatCandidates = mysqlTable("post_format_candidates", {
+  id:            int("id").autoincrement().primaryKey(),
+  platform:      varchar("platform", { length: 32 }).notNull().default("facebook"),
+  market:        varchar("market", { length: 8 }).notNull(),        // ISO 3166-1 alpha-2
+  language:      varchar("language", { length: 16 }),               // BCP 47
+  kind:          varchar("kind", { length: 16 }).notNull().default("format"), // format | topic
+  candidateKey:  varchar("candidateKey", { length: 191 }).notNull(), // 跨月去重鍵
+  name:          varchar("name", { length: 255 }).notNull(),
+  nameEn:        varchar("nameEn", { length: 255 }),
+  mechanism:     text("mechanism"),                                  // 可重複的結構
+  whyItWorks:    text("whyItWorks"),                                 // 零粉絲為何仍有效
+  evidence:      longtext("evidence"),                               // JSON: [{title,url,observedAt}]
+  duplicateOf:   varchar("duplicateOf", { length: 64 }),             // 對到的現有 task id
+  status:        varchar("status", { length: 16 }).notNull().default("pending"), // pending|approved|rejected|shipped
+  seenCount:     int("seenCount").notNull().default(1),
+  firstSeenAt:   datetime("firstSeenAt", { fsp: 3 }).notNull(),
+  lastSeenAt:    datetime("lastSeenAt", { fsp: 3 }).notNull(),
+  reviewedBy:    int("reviewedBy"),
+  reviewedAt:    datetime("reviewedAt", { fsp: 3 }),
+  reviewNote:    text("reviewNote"),
+  shippedTaskId: varchar("shippedTaskId", { length: 64 }),
+});
+export type PostFormatCandidate = typeof postFormatCandidates.$inferSelect;
+export type InsertPostFormatCandidate = typeof postFormatCandidates.$inferInsert;
+
 // ─── User Workspaces (用戶自訂工作區) ─────────────────────────────────────────
 export const userWorkspaces = mysqlTable("user_workspaces", {
   id: int("id").autoincrement().primaryKey(),
@@ -845,6 +885,75 @@ export const missionOutputs = mysqlTable("mission_outputs", {
 });
 export type MissionOutput = typeof missionOutputs.$inferSelect;
 export type InsertMissionOutput = typeof missionOutputs.$inferInsert;
+
+/**
+ * Calendar queue rows. The raw-SQL calendar/publish workers are the runtime
+ * consumers, but keeping this mapping aligned with migrate.ts prevents the
+ * selector columns for planning/public content from drifting out of schema.
+ */
+export const scheduledPosts = mysqlTable("scheduled_posts", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  workspaceId: int("workspaceId"),
+  brandId: int("brandId"),
+  outputId: bigint("outputId", { mode: "number" }).notNull(),
+  variantIndex: int("variantIndex").default(0).notNull(),
+  contentKind: varchar("contentKind", { length: 16 }),
+  contentIndex: int("contentIndex"),
+  planningConfirmed: tinyint("planningConfirmed").default(0).notNull(),
+  platform: varchar("platform", { length: 24 }).notNull(),
+  scheduledAt: datetime("scheduledAt", { fsp: 3 }).notNull(),
+  status: varchar("status", { length: 12 }).default("pending").notNull(),
+  publishedAt: datetime("publishedAt", { fsp: 3 }),
+  externalPostId: varchar("externalPostId", { length: 120 }),
+  externalUrl: varchar("externalUrl", { length: 500 }),
+  attempts: int("attempts").default(0).notNull(),
+  lastError: text("lastError"),
+  cancelledAt: datetime("cancelledAt", { fsp: 3 }),
+  cancelledBy: int("cancelledBy"),
+  createdAt: datetime("createdAt", { fsp: 3 })
+    .default(sql`CURRENT_TIMESTAMP(3)`).notNull(),
+  updatedAt: datetime("updatedAt", { fsp: 3 })
+    .default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()).notNull(),
+}, (table) => [
+  index("idx_sp_due").on(table.status, table.scheduledAt),
+  index("idx_sp_user").on(table.userId, table.scheduledAt),
+  index("idx_sp_workspace").on(table.workspaceId, table.scheduledAt),
+  index("idx_sp_brand").on(table.brandId, table.scheduledAt),
+  index("idx_sp_output").on(table.outputId),
+]);
+export type ScheduledPost = typeof scheduledPosts.$inferSelect;
+export type InsertScheduledPost = typeof scheduledPosts.$inferInsert;
+
+/**
+ * Private execution artifacts for the five IG strategy-to-public-content
+ * tasks. This table intentionally has no tRPC/REST reader; public clients
+ * receive only sanitized planning DTOs and final public variants.
+ */
+export const strategyInternalStepArtifacts = mysqlTable("strategy_internal_step_artifacts", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: varchar("runId", { length: 36 }).notNull(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  missionId: int("missionId").notNull().references(() => missions.id, { onDelete: "cascade" }),
+  outputId: int("outputId").notNull(),
+  taskId: varchar("taskId", { length: 64 }).notNull(),
+  squadSlug: varchar("squadSlug", { length: 96 }).notNull(),
+  stepOrder: int("stepOrder").notNull(),
+  status: mysqlEnum("status", ["done", "failed"]).notNull(),
+  internalLabel: varchar("internalLabel", { length: 255 }).notNull(),
+  outputType: varchar("outputType", { length: 128 }),
+  outputKind: varchar("outputKind", { length: 128 }),
+  agentId: int("agentId"),
+  agentName: varchar("agentName", { length: 255 }),
+  rawContent: longtext("rawContent").notNull(),
+  errorCode: varchar("errorCode", { length: 64 }),
+  latencyMs: int("latencyMs").notNull(),
+  expiresAt: datetime("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type StrategyInternalStepArtifact = typeof strategyInternalStepArtifacts.$inferSelect;
+export type InsertStrategyInternalStepArtifact = typeof strategyInternalStepArtifacts.$inferInsert;
 
 export const missionKnowledgeFiles = mysqlTable("mission_knowledge_files", {
   id: int("id").autoincrement().primaryKey(),

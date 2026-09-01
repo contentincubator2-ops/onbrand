@@ -94,7 +94,11 @@ export interface FBTaskTemplate {
    * Widened 2026-05-05 to support IG / Threads / etc. as channel rollout
    * progresses (see project_30s_task_sop.md). */
   outputDefaults: {
-    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "generic";
+    // 2026-08-29 官網頻道 (web-)：mission_outputs.platform 的 enum 沒有 "web"，
+    // recordTaskRun 的 SAFE_PLATFORMS 會把未知值降級成 "other"（能寫入，但
+    // 丟失語意）。"doc" 在 enum 值域內且語意正確，所以官網長文用它。
+    // mockup 不靠這個欄位 —— RunPage Layer 1 由 taskId 前綴決定。
+    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "doc" | "generic";
     post_type: string;
   };
   /**
@@ -108,6 +112,18 @@ export interface FBTaskTemplate {
    * Defaults to social when omitted.
    */
   outputMode?: "social" | "document";
+  /**
+   * 2026-09-01：給「AI 潤稿」用的任務知識。
+   *
+   * polishInput 只拿得到 buildBrandPrefix(..., "core")，那份 digest 沒有任何
+   * 任務專屬的領域知識。結果是它為五感十築的貼文卡問出「對應十築建築標準中
+   * 的哪一項？（例如：光線、通風、材質、空間機能、人文連結…）」——
+   * 這五個沒有一個是真的十築標準，全是模型自己編的。
+   *
+   * 這裡放「潤稿時必須知道的事實清單」，不放輸出格式規則（那是 systemPrompt
+   * 的事，而且太長）。
+   */
+  polishHint?: string;
 }
 
 /**
@@ -176,13 +192,13 @@ ${FB_TONE_SUFFIX}
     // was hook-only + verbatim body append (body 跟 hook 常不搭、又一大坨).
     // Now output a COMPLETE post: hook + a re-structured body in the same
     // angle/tone. All facts preserved, nothing invented.
-    systemPrompt: `任務：用戶在 article_body 提供「原本要發的貼文內文（可能很亂、是一大段）」。
+    systemPrompt: `任務：用戶在「原本的貼文內容」提供要發布的內文（可能很亂、是一大段）。
 請輸出「一篇可以直接發的完整 FB 貼文」= 開場 hook ＋ 整理過的內文。
 
 每個 variant.caption = 完整貼文（不是只有 hook）：
 1. 開場 hook（1–2 句，該變體的口吻）。
 2. 緊接「重新整理過的內文」：
-   - 保留 article_body 的**所有事實、數字、名稱、論點**——不可新增、不可刪改事實、不可杜撰。
+   - 保留「原本的貼文內容」的**所有事實、數字、名稱、論點**——不可新增、不可刪改事實、不可杜撰。
    - 但**應該**重排順序、分段、刪冗詞，讓邏輯通順。
    - 內文切角與語氣要**呼應這個 hook**（hook 問什麼內文就回答什麼；hook 講反差內文就把反差講清楚）——讓「標題與原文相符」。
    - 排版易讀：短段落、必要時條列；不要一整坨。
@@ -556,6 +572,32 @@ export interface OrchestraConfig {
    * that never actually contrasted anything.
    */
   videoTailHint?: string;
+  /**
+   * 2026-08-29：這張卡的 caption 生成逾時上限（毫秒）。不給就用 orchestra
+   * 的預設 40s。
+   *
+   * 為什麼需要它：預設 40s 是照「一則貼文」的長度訂的。要求一次產出整個月
+   * 排程的卡（五感十築行事曆，一次 3 篇摘要）在 40s 內生不完，兩次嘗試都
+   * 逾時，變體回空字串 —— 任務看起來成功，產出卻是空白。
+   *
+   * 上限請留在 90s 以內：nginx /trpc 的 proxy_read_timeout 是 230s、Node
+   * server.timeout 220s，30s 層是同步回應，整條鏈要留餘裕給其他階段。
+   */
+  captionBudgetMs?: number;
+  /**
+   * 2026-08-31：整個 orchestra job 的硬性上限（毫秒）。不給就依 tier 取
+   * HARD_BUDGET_MS(30s)=100s / 130s / 150s。
+   *
+   * 為什麼需要：captionBudgetMs 只管單次 caption 生成，外面還有一層 job
+   * 總預算。案例卡把 caption 開到 90s，加上 strategist 錨點與品牌 context
+   * 抓取就超過 30s 層的 100s，任務直接以
+   * 「orchestra: hard 100s budget exceeded」失敗 —— 使用者看到的是
+   * 「這位 AI 專家目前無法產出文案」。
+   *
+   * 上限請留在 150s 以內（與 99s 層相同，已驗證安全）：nginx /trpc 是
+   * 230s、Node server.timeout 220s，30s 層是同步回應。
+   */
+  hardBudgetMs?: number;
   variantLabels: string[];
   /** Caption length range hint (chars, lower bound) for prompt + UI badge */
   captionMinChars: number;
@@ -665,6 +707,23 @@ export interface OrchestraConfig {
    *  strict structured deliverables (e.g. newsjack 4-field format) whose
    *  format/guardrails the social scaffolding otherwise overrides. */
   cleanPrompt?: boolean;
+  /**
+   * 2026-08-22 (CJ「IG 直播配套應該是完整直播範本」): cleanPrompt's two
+   * per-variant lines were written for newsjack (「只接這一個時事/角度」+
+   * 【角度】【為什麼會被報】…四欄). A second cleanPrompt task with a
+   * different field set needs its own wording, so both lines are
+   * overridable. Omitted → newsjack defaults (unchanged behaviour).
+   */
+  cleanPromptVariantHint?: string;
+  cleanPromptCaptionSpec?: string;
+  /**
+   * 2026-08-22: the narrativeArc strategist prompt hardcoded 「FB 系列貼文
+   * （N 篇）」, which steers every downstream writer toward posts. Tasks whose
+   * deliverable is not a post series (e.g. a live run-of-show) override the
+   * noun + counting unit here. Omitted → 「FB 系列貼文」/「篇」.
+   */
+  strategistDeliverable?: string;
+  strategistUnit?: string;
 }
 
 const MANDY_ID = 220887;     // Claire Chen — Brand Visual Designer (977 char persona, was Mandy 199)

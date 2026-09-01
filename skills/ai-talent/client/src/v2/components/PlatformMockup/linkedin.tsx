@@ -619,3 +619,74 @@ export function LIEvent({ title, brief, brandName, variantLabel, liveImageStyle,
     </div>
   );
 }
+
+/* ─────────────── LI Comment reply (li-30-comment) ───────────────
+ *
+ * 2026-08-20: "linkedin:comment" had no case in PlatformMockup, so
+ * li-30-comment fell to the「即將推出」placeholder and its produced
+ * comment copy was never rendered. LinkedIn comment chrome: the post
+ * being commented on is context, the deliverable is the reply itself.
+ */
+export function LIComment({
+  title, brandName, brandLogoUrl, variantLabel, liveCaption, liveSourceComment,
+}: MockupFields) {
+  const { lang } = useLang();
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const source = (liveSourceComment ?? "").trim();
+
+  return (
+    <div className="w-full max-w-[520px] mx-auto">
+      <MockupHeader
+        icon={faLinkedin}
+        label={lang === "en" ? "LinkedIn Comment" : "LinkedIn 留言"}
+        variantLabel={variantLabel}
+      />
+
+      <div className="bg-white border border-[#E0DFDC] rounded-xl overflow-hidden shadow-lg">
+        {/* Context: the post being replied to */}
+        <div className="px-4 py-3 border-b border-[#E0DFDC]">
+          <div className="flex items-center gap-2 mb-2">
+            <Avatar src={dicebear("li-author")} className="w-9 h-9" />
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-[#191919] leading-tight">
+                {lang === "en" ? "Post author" : "原貼文作者"}
+              </p>
+              <p className="text-[11px] text-[#666]">
+                {lang === "en" ? "2nd · 3h ago" : "2 度人脈 · 3 小時前"}
+              </p>
+            </div>
+          </div>
+          {/* a LinkedIn post can be very long — clamp so the deliverable
+              (our comment, below) is never pushed off screen */}
+          <p className="text-[13px] text-[#191919] leading-relaxed break-words line-clamp-6">
+            {source || (lang === "en"
+              ? "(the post / comment you are replying to shows up here)"
+              : "（你要回覆的原貼文或留言會顯示在這）")}
+          </p>
+        </div>
+
+        {/* The produced comment */}
+        <div className="px-4 py-3 bg-[#F4F2EE]">
+          <div className="flex items-start gap-2">
+            <Avatar src={avatarSrc} className="w-8 h-8 shrink-0" />
+            <div className="flex-1 min-w-0 bg-white rounded-lg border border-[#E0DFDC] px-3 py-2">
+              <div className="flex items-baseline gap-2">
+                <p className="text-[13px] font-semibold text-[#191919]">{brandName || "Your Brand"}</p>
+                <span className="text-[11px] text-[#666]">{lang === "en" ? "Just now" : "剛剛"}</span>
+              </div>
+              {liveCaption
+                ? <MarkdownText content={liveCaption} className="text-[13px] text-[#191919] leading-relaxed mt-1" />
+                : <Skeleton className="h-3 w-3/4 rounded mt-2" />}
+            </div>
+          </div>
+          <div className="flex items-center gap-4 pl-10 mt-1.5 text-[12px] text-[#666] font-semibold">
+            <span><FontAwesomeIcon icon={faThumbsUp} className="mr-1" />{lang === "en" ? "Like" : "讚"}</span>
+            <span><FontAwesomeIcon icon={faComment} className="mr-1" />{lang === "en" ? "Reply" : "回覆"}</span>
+          </div>
+        </div>
+      </div>
+
+      {title && <p className="text-tiny text-default-500 mt-2 text-center">{title}</p>}
+    </div>
+  );
+}

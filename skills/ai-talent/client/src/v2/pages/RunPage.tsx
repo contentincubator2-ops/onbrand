@@ -40,6 +40,32 @@ import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
+import { getStrategyPresentationMockup } from "../lib/strategyPresentation";
+import {
+  getIgPublicVariantImageSize,
+  getStrategySelectionMockup,
+  getMutationLocatorSelectionKey,
+  getPlanningPublishWarning,
+  getPlanningConfirmationPayload,
+  getStrategyPublicGenerationState,
+  getStrategyPublicTabLabel,
+  getRunContentMutationLocator,
+  getRunContentSelectionKey,
+  isEmptyStrategyPublicSelection,
+  isPlanningArtifactMissingOutput,
+  isStrategyPlanningSelection,
+  resolveRunContent,
+  shouldApplyMutationPreview,
+  shouldHideStrategyPlanningTabs,
+  type RunContentKind,
+  type RunContentMutationLocator,
+} from "../lib/strategyContentEnvelope";
+import { RUN_IMAGE_MODEL_OPTIONS } from "../lib/runImageModelOptions";
+import { findValidRunProductSelection, type RunProductImage } from "../lib/runProductSelection";
+import { pickImagePromptSeed } from "../lib/imagePromptSeed";
+import { buildAllDayIcs, downloadIcs } from "../lib/ics";
+import { parseRunOfShow } from "../lib/runOfShow";
+import { tierLabel } from "../lib/tierVocabulary";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
@@ -90,10 +116,21 @@ const REWRITE_AGENTS: Array<{
 ];
 
 interface VariantData {
+  id?: string;
   label: string;
+  format?: "feed" | "carousel" | "reel" | "story" | "live";
   caption: string;
   hashtags?: string[];
   imageStyle?: string;
+  /** 2026-08-19: the prompt the image model actually received (see
+   *  quickTaskOrchestra OrchestraVariant.image.prompt). Older runs don't
+   *  have it — callers fall back to imageStyle. */
+  imagePrompt?: string;
+  /** Traditional Chinese display/edit counterpart of imagePrompt. */
+  imagePromptZh?: string;
+  imageModelId?: string;
+  imageRequestedModelId?: string;
+  imageFallbackUsed?: boolean;
   imageUrl?: string | null;
   imageStatus?: string;
   // 2026-07-29 Tier-1 TikTok 影片卡 — 非影片任務一律 undefined
@@ -106,7 +143,17 @@ interface VariantData {
   cards?: Array<{
     headline: string;
     body: string;
-    image: { style: string | null; url: string | null; status: string; errorMsg?: string };
+    image: {
+      style: string | null;
+      prompt?: string | null;
+      promptZh?: string | null;
+      modelId?: string | null;
+      requestedModelId?: string | null;
+      fallbackUsed?: boolean;
+      url: string | null;
+      status: string;
+      errorMsg?: string;
+    };
   }>;
 }
 
@@ -119,6 +166,32 @@ function sanitizeCaption(s: unknown): string {
   t = t.replace(/\\r\\n|\\n|\\r/g, "\n").replace(/\\t/g, " ");
   t = t.replace(/\n{3,}/g, "\n\n").trim();
   return t;
+}
+
+function normalizeVariantData(v: any): VariantData {
+  const img = v?.image ?? {};
+  const vid = v?.video ?? {};
+  return {
+    id: typeof v?.id === "string" ? v.id : undefined,
+    label: v?.label,
+    format: ["feed", "carousel", "reel", "story", "live"].includes(v?.format) ? v.format : undefined,
+    caption: sanitizeCaption(v?.caption),
+    hashtags: v?.hashtags ?? [],
+    imageUrl: v?.imageUrl ?? img.url ?? null,
+    imageStatus: v?.imageStatus ?? img.status ?? undefined,
+    imageStyle: v?.imageStyle ?? img.style ?? undefined,
+    imagePrompt: v?.imagePrompt ?? img.prompt ?? undefined,
+    imagePromptZh: v?.imagePromptZh ?? img.promptZh ?? undefined,
+    imageModelId: v?.imageModelId ?? img.modelId ?? undefined,
+    imageRequestedModelId: v?.imageRequestedModelId ?? img.requestedModelId ?? undefined,
+    imageFallbackUsed: v?.imageFallbackUsed ?? img.fallbackUsed ?? undefined,
+    videoUrl: v?.videoUrl ?? vid.url ?? null,
+    videoStatus: v?.videoStatus ?? vid.status ?? undefined,
+    videoPosterUrl: v?.videoPosterUrl ?? vid.posterUrl ?? null,
+    qa: v?.qa,
+    extras: v?.extras,
+    cards: Array.isArray(v?.cards) ? v.cards : undefined,
+  };
 }
 
 /* 2026-05-17 (CJ「把得獎工藝依據展示在前台」): per-task craft reference.
@@ -189,6 +262,16 @@ const PR_CRAFT_REF: Record<string, {
 // hold the mockup and show a "generating" state, then reveal the full
 // post once images finish. Mirrors OrchestraConfig.holdForImages server-side.
 const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
+
+// 2026-08-22 (CJ「IG 直播配套應該是完整直播範本」): >4 變體預設走 pool
+// 漸進揭露（headline pool：變體是可互換的角度，先給 3 個）。但序列型任務
+// 的每個變體是「流程的一段」，藏起後半段等於把流程表切一半 —— 這類任務
+// 一次全部攤開。用明列 id 而不是關鍵字猜（見 inferMockup 的教訓）。
+const SEQUENCE_TASKS = new Set<string>([
+  "ig-60-live-suite", "ig-60-live-event", "ig-60-live-founder",
+  "ig-60-live-versus", "ig-60-live-comeback", "ig-60-live-collab-drop",
+  "ig-60-live-first-ever", "ig-60-live-behind-scenes", "ig-60-live-crew",
+]);
 
 function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
   const [open, setOpen] = React.useState(false);
@@ -318,6 +401,7 @@ export default function RunPage() {
   );
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const [activeContentKind, setActiveContentKind] = useState<RunContentKind>("legacy");
 
   // ── Mia contextual nudges for RunPage ────────────────────────────────
   // Fires when output first loads: tells user what they can do right now
@@ -421,6 +505,7 @@ export default function RunPage() {
     setEditText(null);
     setMode("chat");
     setActiveIdx(0);
+    setActiveContentKind("legacy");
     setRevealCount(REVEAL_STEP);
     setOverrides({});
     setChatPrompt("");
@@ -445,15 +530,21 @@ export default function RunPage() {
     permissionError?: string;
   }>>([]);
   /** Local override for variants — applied after save, mockup updates live. */
-  const [overrides, setOverrides] = useState<Record<number, { caption: string }>>({});
+  const [overrides, setOverrides] = useState<Record<string, { caption: string }>>({});
   /** AI chat history per variant. */
   const [chatHistory, setChatHistory] = useState<Array<{ role: "user"|"assistant"; content: string }>>([]);
-  const [aiPreview, setAiPreview] = useState<string | null>(null);
+  const [aiPreview, setAiPreview] = useState<{ text: string; locator: RunContentMutationLocator } | null>(null);
   // 2026-07-07 (CJ): rewrite-agent picker — persona name in flight + preview
   const [rewriteBusy, setRewriteBusy] = useState<string | null>(null);
-  const [rewritePreview, setRewritePreview] = useState<{ agent: string; text: string } | null>(null);
-  /** P4: image regen prompt — pre-filled from variant.imageStyle, editable. */
+  const [rewritePreview, setRewritePreview] = useState<{
+    agent: string;
+    text: string;
+    locator: RunContentMutationLocator;
+  } | null>(null);
+  /** P4: human-editable image instruction — prefers the Chinese counterpart
+   *  and falls back through model prompt → art direction → local template. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
+  const imageMutationTargetRef = useRef<{ locator: RunContentMutationLocator; promptZh: string } | null>(null);
   /** 2026-07-07 (CJ): user-editable thumbnail title text overlaid on the (now
    *  text-free) AI thumbnail. Seeded from the variant title/caption, editable
    *  in the right panel; passed to the YT mockup as overlayTitle. */
@@ -813,23 +904,6 @@ export default function RunPage() {
     },
   }) ?? { mutateAsync: async () => {}, isPending: false };
 
-  // Called when user clicks "排程發布" on a specific platform row.
-  // `rowPlatform` = the p.key of the row the user clicked ("facebook","instagram",…).
-  // Schedules the current output to calendar, then user publishes from CalendarPage.
-  const handleScheduleToCalendar = React.useCallback(async (rowPlatform: string) => {
-    if (!confirm(lang === "en"
-      ? `Add to Calendar as ${rowPlatform}? You can then publish from the Calendar page.`
-      : `加入日曆（${rowPlatform}）？可在日曆頁面選擇時間並發布。`)) return;
-
-    await scheduleToCalMut?.mutateAsync?.({
-      outputId: id,
-      variantIndex: activeIdx,
-      platform: rowPlatform,
-      scheduledAt: new Date().toISOString(),
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang, id, activeIdx]);
-
   // Uses Pipedream SDK iframe — window.open popup throws "Must be inside iframe"
   const connectFacebookViaUrl = () => {
     (async () => {
@@ -943,7 +1017,7 @@ export default function RunPage() {
     String(videoStatus.status);
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
-        onSuccess: (r: any) => {
+        onSuccess: async (r: any) => {
           // 2026-05-10: image.generate returns either {url} (Flux/Leonardo) or
           // {b64} (OpenAI gpt-image-1). Normalize to a usable image source —
           // for b64 we wrap as data: URL so <img> tag renders directly.
@@ -952,8 +1026,38 @@ export default function RunPage() {
             imageSrc = `data:image/png;base64,${r.b64}`;
           }
           if (imageSrc && updateImageMut) {
-            updateImageMut.mutate({ id, variantIndex: activeIdx, imageUrl: imageSrc, style: imagePrompt.slice(0, 480) });
-            showToastGlobal(lang === "en" ? "Image ready ✓" : "已產圖 ✓");
+            const target = imageMutationTargetRef.current;
+            if (!target) {
+              showToastGlobal(lang === "en" ? "Image target was lost — please try again" : "找不到原本的圖片位置，請重試");
+              return;
+            }
+            try {
+              await updateImageMut.mutateAsync({
+                id,
+                ...target.locator,
+                imageUrl: imageSrc,
+                prompt: r?.effectivePrompt ?? target.promptZh,
+                promptZh: r?.normalizedDisplayPrompt ?? target.promptZh,
+                modelId: r?.model ?? undefined,
+                requestedModelId: r?.requestedModel ?? undefined,
+                fallbackUsed: r?.usedFallback ?? false,
+              });
+            } catch {
+              // updateImageMut.onError already shows the persistence error.
+              imageMutationTargetRef.current = null;
+              return;
+            }
+            imageMutationTargetRef.current = null;
+            const actualModel = String(r?.model ?? "").trim();
+            const requestedModel = String(r?.requestedModel ?? "").trim();
+            const modelNote = actualModel
+              ? r?.usedFallback
+                ? (lang === "en"
+                    ? ` — used ${actualModel} fallback (requested ${requestedModel || "auto"})`
+                    : ` — 實際使用 ${actualModel} fallback（原選 ${requestedModel || "自動"}）`)
+                : (lang === "en" ? ` — ${actualModel}` : ` — 實際使用 ${actualModel}`)
+              : "";
+            showToastGlobal(lang === "en" ? `Image ready ✓${modelNote}` : `已產圖 ✓${modelNote}`);
           } else {
             // 2026-05-12: server should TRPCError on failure now; this branch
             // only reaches if a provider returned success-shaped but empty
@@ -969,6 +1073,7 @@ export default function RunPage() {
           }
         },
         onError: (e: any) => {
+          imageMutationTargetRef.current = null;
           const detail = sanitizeProviderErrorForToast(e?.message ?? e);
           showToastGlobal(lang === "en" ? `Image failed: ${detail}` : `產圖失敗：${detail}`);
         },
@@ -984,18 +1089,28 @@ export default function RunPage() {
     { brandId: data?.brand?.id ?? 0 },
     { enabled: !!data?.brand?.id, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
-  const runProductImages: Array<{ productId: number; name: string; imageUrl: string }> =
+  const runProductImages: RunProductImage[] =
     (runProductImagesQ.data as any)?.products ?? [];
   const [useRealProduct, setUseRealProduct] = React.useState(false);
-  const [pickedRunProduct, setPickedRunProduct] = React.useState<{ productId: number; name: string; imageUrl: string } | null>(null);
-  const realProductMode = useRealProduct && !!pickedRunProduct;
+  const [pickedRunProduct, setPickedRunProduct] = React.useState<RunProductImage | null>(null);
+  const validRunProduct = findValidRunProductSelection(pickedRunProduct, runProductImages);
+  const missingRealProductSelection = useRealProduct && !validRunProduct;
+  const realProductMode = useRealProduct && !!validRunProduct;
+
+  // RunPage is reused between route ids, and brand data can also change while
+  // the component stays mounted. Never carry a product photo across either
+  // boundary.
+  React.useEffect(() => {
+    setUseRealProduct(false);
+    setPickedRunProduct(null);
+  }, [id, data?.brand?.id]);
 
   // 2026-06-15: generate image prompt from the current variant's caption.
   const captionToPromptMut = (trpc as any).image?.promptFromCaption?.useMutation
     ? (trpc as any).image.promptFromCaption.useMutation({
         onSuccess: (r: any) => {
-          if (r?.prompt) {
-            setImagePrompt(r.prompt);
+          if (r?.promptZh || r?.prompt) {
+            setImagePrompt(lang === "en" ? (r.prompt || r.promptZh) : (r.promptZh || r.prompt));
             showToastGlobal(lang === "en" ? "Image prompt generated from caption ✓" : "已從文案產生圖片指令 ✓");
           }
         },
@@ -1036,47 +1151,146 @@ export default function RunPage() {
     return d.toISOString().slice(0, 10);
   });
 
-  const variants: VariantData[] = useMemo(() => {
-    if (!data) return [];
+  const resolvedContent = useMemo(() => {
+    if (!data) return resolveRunContent<VariantData>([], null);
     try {
       const parsed = JSON.parse(data.content);
-      const raw: any[] = Array.isArray(parsed) ? parsed : (parsed?.variants ?? []);
-      // 2026-05-14 (CJ「圖片還是跑很久」根因): orchestra persists nested
-      //   { image: { url, status, style, errorMsg } }
-      // but the VariantData interface + mockup expect FLAT
-      //   { imageUrl, imageStatus, imageStyle }.
-      // Without this normalize, even a successfully-generated image showed
-      // as "等待 AI 生成" because imageUrl was always undefined.
-      return raw.map((v: any) => {
-        const img = v.image ?? {};
-        // Same nested→flat normalize as image, for the Tier-1 video clip.
-        const vid = v.video ?? {};
-        return {
-          label: v.label,
-          caption: sanitizeCaption(v.caption),
-          hashtags: v.hashtags ?? [],
-          imageUrl: v.imageUrl ?? img.url ?? null,
-          imageStatus: v.imageStatus ?? img.status ?? undefined,
-          imageStyle: v.imageStyle ?? img.style ?? undefined,
-          videoUrl: v.videoUrl ?? vid.url ?? null,
-          videoStatus: v.videoStatus ?? vid.status ?? undefined,
-          videoPosterUrl: v.videoPosterUrl ?? vid.posterUrl ?? null,
-          qa: v.qa,
-          extras: v.extras,
-          cards: Array.isArray(v.cards) ? v.cards : undefined,
-        } as VariantData;
-      });
-    } catch { /* ignore */ }
-    return [{ label: lang === "en" ? "Main version" : "主版本", caption: sanitizeCaption(data.content || "") }];
-  }, [data]);
+      return resolveRunContent<any>(parsed, data?.mission?.taskId ?? null, data?.metadata);
+    } catch {
+      return resolveRunContent<any>([
+        { label: lang === "en" ? "Main version" : "主版本", caption: sanitizeCaption(data.content || "") },
+      ], data?.mission?.taskId ?? null, data?.metadata);
+    }
+  }, [data, lang]);
+
+  const planningVariants = useMemo(
+    () => resolvedContent.planningArtifacts.map(normalizeVariantData),
+    [resolvedContent],
+  );
+  const publicVariants = useMemo(
+    () => resolvedContent.publicVariants.map(normalizeVariantData),
+    [resolvedContent],
+  );
+  const legacyVariants = useMemo(
+    () => resolvedContent.legacyVariants.map(normalizeVariantData),
+    [resolvedContent],
+  );
+  const isStrategyEnvelope = resolvedContent.isStrategyEnvelope;
+  const hideStrategyPlanningTabs = shouldHideStrategyPlanningTabs(
+    data?.mission?.taskId,
+    isStrategyEnvelope,
+  );
+  const strategyPublicGenerationState = getStrategyPublicGenerationState({
+    taskId: data?.mission?.taskId,
+    isStrategyEnvelope,
+    progress: (data as any)?.progress,
+    publicVariantCount: publicVariants.length,
+  });
+  const selectedContentKind: RunContentKind = isStrategyEnvelope
+    ? hideStrategyPlanningTabs
+      ? "publicVariants"
+      : activeContentKind === "legacy"
+      ? (publicVariants.length > 0 ? "publicVariants" : "planningArtifacts")
+      : activeContentKind
+    : "legacy";
+  const variants: VariantData[] = selectedContentKind === "publicVariants"
+    ? publicVariants
+    : selectedContentKind === "planningArtifacts"
+      ? planningVariants
+      : legacyVariants;
+  const isEmptyPublicSelection = hideStrategyPlanningTabs && isEmptyStrategyPublicSelection(
+    isStrategyEnvelope,
+    selectedContentKind,
+    publicVariants.length,
+  );
+  const isStrategyPlanning = isStrategyPlanningSelection(
+    isStrategyEnvelope,
+    selectedContentKind,
+  );
+  const activeSelectionKey = getRunContentSelectionKey(selectedContentKind, activeIdx);
+  const activeSelectionKeyRef = useRef(activeSelectionKey);
+
+  useEffect(() => {
+    activeSelectionKeyRef.current = activeSelectionKey;
+  }, [activeSelectionKey]);
+
+  useEffect(() => {
+    if (!isStrategyEnvelope) {
+      if (activeContentKind !== "legacy") {
+        setActiveContentKind("legacy");
+        setActiveIdx(0);
+      }
+      return;
+    }
+    if (hideStrategyPlanningTabs && activeContentKind !== "publicVariants") {
+      setActiveContentKind("publicVariants");
+      setActiveIdx(0);
+    } else if (activeContentKind === "legacy") {
+      setActiveContentKind(publicVariants.length > 0 ? "publicVariants" : "planningArtifacts");
+      setActiveIdx(0);
+    }
+  }, [isStrategyEnvelope, hideStrategyPlanningTabs, activeContentKind, publicVariants.length]);
+
+  const selectContent = React.useCallback((contentKind: RunContentKind, index: number) => {
+    if (isStrategyPlanningSelection(isStrategyEnvelope, contentKind)) {
+      setMode((currentMode) => currentMode === "image" ? "chat" : currentMode);
+      manualImageRef.current = false;
+    }
+    setActiveContentKind(contentKind);
+    setActiveIdx(index);
+    setEditText(null);
+    setChatPrompt("");
+    setChatHistory([]);
+    setAiPreview(null);
+    setRewritePreview(null);
+  }, [isStrategyEnvelope]);
+
+  const rerunOriginalTask = React.useCallback(() => {
+    const taskId = data?.mission?.taskId;
+    if (!taskId) {
+      showToastGlobal(lang === "en" ? "Original task ID not found" : "找不到原任務 ID");
+      return;
+    }
+    const ws = String(data?.mission?.workspace ?? "").toLowerCase();
+    const slug =
+      ws.includes("instagram") ? "ig" :
+      ws.includes("linkedin")  ? "li" :
+      ws.includes("youtube")   ? "yt" :
+      ws.includes("tiktok")    ? "tt" :
+      ws.includes("email")     ? "email" :
+      (ws.includes("press") || ws.includes("pr")) ? "pr" :
+      "fb";
+    navigate(`/tasks/${slug}?rerun=${id}`);
+  }, [data?.mission?.taskId, data?.mission?.workspace, id, lang, navigate]);
+
+  // Captures both the envelope collection and its local index. Legacy payloads
+  // omit contentKind, preserving the pre-envelope mutation contract exactly.
+  const handleScheduleToCalendar = React.useCallback(async (rowPlatform: string) => {
+    const planningWarning = getPlanningPublishWarning(
+      selectedContentKind,
+      "schedule",
+      lang === "en" ? "en" : "zh",
+    );
+    if (!confirm(planningWarning ?? (lang === "en"
+      ? `Add to Calendar as ${rowPlatform}? You can then publish from the Calendar page.`
+      : `加入日曆（${rowPlatform}）？可在日曆頁面選擇時間並發布。`))) return;
+
+    await scheduleToCalMut?.mutateAsync?.({
+      outputId: id,
+      ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+      ...getPlanningConfirmationPayload(selectedContentKind),
+      platform: rowPlatform,
+      scheduledAt: new Date().toISOString(),
+    });
+  }, [lang, id, activeIdx, selectedContentKind, scheduleToCalMut]);
 
   // 2026-07-20 (CJ「FB 短貼文的『改圖』應隱藏但仍顯示、點了也不會生圖」):
   // text-only tasks (every variant image status "skipped", no url) have
   // nothing to redo — hide the 改圖 toolbar entry for them. Manual opt-in
   // image gen stays available via the mockup's 點此手動生圖.
   const hasImageSlot = useMemo(
-    () => variants.some((v) => v.imageUrl || (v.imageStatus && v.imageStatus !== "skipped")),
-    [variants],
+    () => !isStrategyPlanning && variants.some((v) => v.imageUrl || (v.imageStatus && v.imageStatus !== "skipped")),
+    [isStrategyPlanning, variants],
   );
   // 2026-07-23 (CJ IRIS QA「點此手動生圖，但我按下去以後，並沒有生圖」):
   // the fallback below used to bounce EVERY entry into image mode back to
@@ -1088,8 +1302,13 @@ export default function RunPage() {
   React.useEffect(() => { manualImageRef.current = false; }, [id]);
   // If the panel somehow lands on the (now hidden) image mode, fall back.
   React.useEffect(() => {
+    if (isStrategyPlanning && mode === "image") {
+      manualImageRef.current = false;
+      setMode("chat");
+      return;
+    }
     if (!hasImageSlot && mode === "image" && !manualImageRef.current) setMode("chat");
-  }, [hasImageSlot, mode]);
+  }, [hasImageSlot, isStrategyPlanning, mode]);
 
   // Fires when the active variant's image finishes generating. Placed here
   // (after variants declaration) so the hook can safely read variants[activeIdx].
@@ -1106,14 +1325,14 @@ export default function RunPage() {
   // variant (title or first caption line), once per (id, activeIdx) so a user's
   // edits aren't clobbered on re-render. Only meaningful for YT thumbnail tasks.
   React.useEffect(() => {
-    const seedKey = `${id}:${activeIdx}`;
+    const seedKey = `${id}:${selectedContentKind}:${activeIdx}`;
     if (overlaySeededRef.current === seedKey) return;
     overlaySeededRef.current = seedKey;
     const cap = variants[activeIdx]?.caption ?? "";
     const seed = (data?.title?.trim() || cap.split("\n").map((l) => l.trim()).find(Boolean) || "").slice(0, 60);
     setOverlayTitle(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, activeIdx, variants]);
+  }, [id, activeIdx, selectedContentKind, variants]);
 
   // Compute per-variant post dates for multi-day series tasks.
   // Countdown: anchor = event date, posts go Day5…Day1 (earliest to latest).
@@ -1137,6 +1356,13 @@ export default function RunPage() {
   // (Defined here, after schedMode / schedPlatform / scheduleAt / variants are
   //  all in scope — was above them before which caused TS2448 TDZ errors.)
   const handleScheduleConfirm = React.useCallback(async () => {
+    const planningWarning = getPlanningPublishWarning(
+      selectedContentKind,
+      schedMode === "publish" ? "publish" : "schedule",
+      lang === "en" ? "en" : "zh",
+    );
+    if (planningWarning && !confirm(planningWarning)) return;
+
     const _tid = (data as any)?.mission?.taskId ?? "";
     const _pfxMap: Record<string, string> = {
       fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
@@ -1149,42 +1375,22 @@ export default function RunPage() {
 
     // ── Multi-day series path ─────────────────────────────────────────────
     if (isMultiDayTask && postDates.length === variants.length && schedMode !== "publish") {
-      const esc = (s: string) => String(s ?? "")
-        .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
-        .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-
       if (schedMode === "ics") {
         // Build multi-event .ics, one per variant
         const brandName = (data as any)?.brand?.name ?? "";
-        const ev: string[] = [];
-        variants.forEach((v, i) => {
-          const d = postDates[i];
-          if (!d) return;
-          const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-          const dEnd = new Date(d); dEnd.setDate(d.getDate() + 1);
-          const ymdEnd = `${dEnd.getFullYear()}${String(dEnd.getMonth() + 1).padStart(2, "0")}${String(dEnd.getDate()).padStart(2, "0")}`;
-          const summary = (brandName ? brandName + " · " : "") + (v.label ?? `Day ${i + 1}`);
-          ev.push(
-            "BEGIN:VEVENT",
-            `UID:${id}-series-${i}@onbrand.sowork.ai`,
-            `DTSTART;VALUE=DATE:${ymd}`,
-            `DTEND;VALUE=DATE:${ymdEnd}`,
-            `SUMMARY:${esc(summary)}`,
-            `DESCRIPTION:${esc(v.caption ?? "")}`,
-            "END:VEVENT",
-          );
-        });
-        const icsStr = [
-          "BEGIN:VCALENDAR", "VERSION:2.0",
-          "PRODID:-//OnBrand//Content Calendar//ZH",
-          "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
-        ].join("\r\n");
-        const blob = new Blob([icsStr], { type: "text/calendar;charset=utf-8" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `series-${id}.ics`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const icsStr = buildAllDayIcs(
+          variants.flatMap((v, i) => {
+            const d = postDates[i];
+            if (!d) return [];
+            return [{
+              uid: `${id}-series-${i}@onbrand.sowork.ai`,
+              date: d,
+              summary: (brandName ? brandName + " · " : "") + (v.label ?? `Day ${i + 1}`),
+              description: v.caption ?? "",
+            }];
+          }),
+        );
+        downloadIcs(icsStr, `series-${id}.ics`);
         setScheduleDialogOpen(false);
         showToastGlobal(lang === "en"
           ? `Exported ${variants.length} posts — drop the .ics into your calendar`
@@ -1199,7 +1405,8 @@ export default function RunPage() {
           if (!d) continue;
           await scheduleToCalMut?.mutateAsync?.({
             outputId: id,
-            variantIndex: i,
+            ...getRunContentMutationLocator(selectedContentKind, i),
+            ...getPlanningConfirmationPayload(selectedContentKind),
             platform: _platform,
             scheduledAt: d.toISOString(),
           });
@@ -1216,14 +1423,16 @@ export default function RunPage() {
     const _scheduledAt = new Date(scheduleAt).toISOString();
     if (schedMode === "ics") {
       scheduleMut.mutate({
-        id, variantIndex: activeIdx,
+        id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+        ...getPlanningConfirmationPayload(selectedContentKind),
         scheduledAt: _scheduledAt,
         durationMinutes: 30,
       }, {
         onSuccess: () => {
           setScheduleDialogOpen(false);
           scheduleToCalMut?.mutateAsync?.({
-            outputId: id, variantIndex: activeIdx,
+            outputId: id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+            ...getPlanningConfirmationPayload(selectedContentKind),
             platform: _platform, scheduledAt: _scheduledAt,
           }).catch(() => {/* non-fatal */});
         },
@@ -1231,7 +1440,8 @@ export default function RunPage() {
     } else {
       try {
         await scheduleToCalMut?.mutateAsync?.({
-          outputId: id, variantIndex: activeIdx,
+          outputId: id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+          ...getPlanningConfirmationPayload(selectedContentKind),
           platform: _platform, scheduledAt: _scheduledAt,
         });
         setScheduleDialogOpen(false);
@@ -1241,51 +1451,30 @@ export default function RunPage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schedMode, schedPlatform, scheduleAt, seriesAnchorDate, id, activeIdx, data, variants, postDates, isMultiDayTask, scheduleMut, scheduleToCalMut, navigate, lang]);
+  }, [schedMode, schedPlatform, scheduleAt, seriesAnchorDate, id, activeIdx, selectedContentKind, data, variants, postDates, isMultiDayTask, scheduleMut, scheduleToCalMut, navigate, lang]);
 
   // ── Bulk .ics export (calendar-type tasks only) ──────────────────────────
   const handleBulkIcsExport = React.useCallback(() => {
-    const esc = (s: string) => String(s ?? "")
-      .replace(/\\/g, "\\\\").replace(/;/g, "\\;")
-      .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-    const ev: string[] = [];
-    let eventCount = 0;
-    variants.forEach((v: any, i: number) => {
+    const brandName = (data as any)?.brand?.name ?? "";
+    const events = (variants as any[]).flatMap((v: any, i: number) => {
       const m = /(\d{4})\/(\d{2})\/(\d{2})/.exec(String(v.label ?? ""));
-      if (!m) return;
-      eventCount++;
-      const ymd = `${m[1]}${m[2]}${m[3]}`;
-      const next = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1);
-      const ymdEnd = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(next.getDate()).padStart(2, "0")}`;
+      if (!m) return [];
       const summary = String(v.label ?? "").replace(/^\d{4}\/\d{2}\/\d{2}\s*·\s*/, "");
-      ev.push(
-        "BEGIN:VEVENT",
-        `UID:${id}-${i}@onbrand.sowork.ai`,
-        `DTSTART;VALUE=DATE:${ymd}`,
-        `DTEND;VALUE=DATE:${ymdEnd}`,
-        `SUMMARY:${esc(((data as any)?.brand?.name ? (data as any).brand.name + " · " : "") + summary)}`,
-        `DESCRIPTION:${esc(v.caption ?? "")}`,
-        "END:VEVENT",
-      );
+      return [{
+        uid: `${id}-${i}@onbrand.sowork.ai`,
+        date: new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])),
+        summary: (brandName ? brandName + " · " : "") + summary,
+        description: v.caption ?? "",
+      }];
     });
-    if (ev.length === 0) {
+    if (events.length === 0) {
       showToastGlobal(lang === "en" ? "No dated posts to export" : "沒有可匯出的日期貼文");
       return;
     }
-    const ics = [
-      "BEGIN:VCALENDAR", "VERSION:2.0",
-      "PRODID:-//OnBrand//Content Calendar//ZH",
-      "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR",
-    ].join("\r\n");
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `content-calendar-${id}.ics`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadIcs(buildAllDayIcs(events), `content-calendar-${id}.ics`);
     showToastGlobal(lang === "en"
-      ? `Exported ${eventCount} posts — drop the .ics into your calendar`
-      : `已匯出 ${eventCount} 篇 — 拖進日曆 App 即可`);
+      ? `Exported ${events.length} posts — drop the .ics into your calendar`
+      : `已匯出 ${events.length} 篇 — 拖進日曆 App 即可`);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variants, id, data, lang]);
 
@@ -1297,9 +1486,46 @@ export default function RunPage() {
     const safeIdx = Math.min(Math.max(0, activeIdx), variants.length - 1);
     const base = variants[safeIdx];
     if (!base) return base;
-    const ov = overrides[safeIdx];
+    const ov = overrides[getRunContentSelectionKey(selectedContentKind, safeIdx)];
     return ov ? { ...base, caption: ov.caption } : base;
-  }, [variants, activeIdx, overrides]);
+  }, [variants, activeIdx, overrides, selectedContentKind]);
+
+  /* 2026-08-20 (CJ「IG 留言回覆（一般）… 為什麼沒有產出內容」): reply-type
+   * tasks answer something the user pasted in (用戶留言 / 評價 / 提問). The
+   * writer's own `description` field is never persisted (OrchestraVariant has
+   * no such field), so the comment mockups used to render a grey「原始留言會
+   * 顯示在這」stand-in forever. The text IS on the row though — metadata.inputs
+   * keeps every answer the user typed. Read it here and hand it to the mockup
+   * as liveSourceComment (a dedicated field: liveDescription already carries
+   * model-produced sub-copy elsewhere, e.g. FBPoll parses it as JSON).
+   * Scoped to comment/reply tasks, so no other mockup sees a new value. */
+  const sourceComment = useMemo(() => {
+    const tid = data?.mission?.taskId ?? "";
+    if (!/comment|reply|recommendation/i.test(tid)) return undefined;
+    const inputs = (data as any)?.metadata?.inputs;
+    if (!inputs || typeof inputs !== "object") return undefined;
+    // Key order = specificity. li-30-comment stores the post being answered
+    // under "context" (quickTaskLI.ts:108), everything else uses
+    // "user_comment" (quickTaskFB/IG/YT/TikTok).
+    const preferred = [
+      "user_comment", "comment", "original_comment", "customer_comment",
+      "review", "user_review", "testimonial_source", "question", "context",
+    ];
+    for (const k of preferred) {
+      const v = inputs[k];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    // Deliberately no "just take the only input" fallback: yt-30-pinned-comment
+    // asks for a video URL / topic, which is not a comment. Better to show the
+    // mockup's own hint than to caption someone else's words with a URL.
+    return undefined;
+  }, [data]);
+
+  // 2026-08-22 (CJ「應該是指完整的直播範本」): sequence tasks deliver ONE
+  // timeline split across variants. Besides never pooling the pills, they
+  // also get the whole thing as a table under the mockup — the deliverable
+  // is the run of show, not 6 separate cards the user has to click through.
+  const isSequenceTask = SEQUENCE_TASKS.has((data as any)?.mission?.taskId ?? "");
 
   // 2026-07-17 (CJ「文案偶爾很短、沒講重點，推測系統不穩」— seen on
   // fb-30-ad-headline / link-desc): those are COMPONENT tasks — the
@@ -1369,9 +1595,26 @@ export default function RunPage() {
     const subject = extractSubject(cap);
 
     if (mode === "image") {
-      // Prefer existing imageStyle (the brief that produced current image)
-      if (slide?.imageStyle && slide.imageStyle.trim().length > 0) {
-        setImagePrompt(slide.imageStyle);
+      // 2026-08-19 (客戶回報「產出跟指令大相逕庭的圖」): this box is an
+      // editable instruction. CJK input is transparently translated on the
+      // server before generation. It used to be seeded from `imageStyle`,
+      // the agent-written Chinese 風格方向, which is display-only and never reached the model
+      // (quickTaskOrchestra.genOneImage converts the CAPTION into the real
+      // brief). So the prompt on screen described one image and the picture
+      // beside it came from another — every single quick-task run. Seed from
+      // the image's equivalent Chinese prompt first, then the actual English
+      // model prompt, and only then the display-only style for older runs.
+      // 2026-08-20: `imageStyle` is the last-resort, display-only fallback and
+      // is the one IG-strategy runs land on. Drop it when it is an English
+      // keyword slug so the box falls through to the Chinese caption-derived
+      // brief below instead of showing an unusable slug (see isKeywordSlug).
+      const seedPrompt = pickImagePromptSeed({
+        imagePromptZh: slide?.imagePromptZh,
+        imagePrompt: slide?.imagePrompt,
+        imageStyle: slide?.imageStyle,
+      });
+      if (seedPrompt) {
+        setImagePrompt(seedPrompt);
         return;
       }
       // Richer image brief: subject + lighting + composition + mood + style cue
@@ -1397,7 +1640,7 @@ export default function RunPage() {
       setImagePrompt(seed);
       return;
     }
-  }, [mode, activeIdx, slide?.imageStyle, slide?.caption]);
+  }, [mode, activeIdx, slide?.imagePromptZh, slide?.imagePrompt, slide?.imageStyle, slide?.caption]);
 
   // 2026-05-09 (CJ direction「只留一個 mockup 路徑」): 一律渲染 mockup，
   // 不再 block on missing taskId. Inference falls through 3 layers:
@@ -1409,6 +1652,12 @@ export default function RunPage() {
     // but a legacy "fb-100-…" id reaching here from any other path must
     // still resolve to the renamed mockup/prefix logic. Inline + idempotent.
     const taskId = (data?.mission?.taskId ?? "").replace(/^([a-z]+)-100-/, "$1-99-");
+
+    // Server-owned metadata flag: only the five catalogued IG strategy
+    // reports use this presentation. Check before task-id substring routing
+    // so visual-story/live-first/document cannot be mistaken for post mockups.
+    const strategyReportMockup = getStrategyPresentationMockup(data?.metadata, taskId);
+    if (strategyReportMockup) return strategyReportMockup as any;
 
     // 2026-05-18 (CJ「改成用 word 形式，不要 ppt」): these FB squads are
     // strategy plans / reports / playbooks, NOT postable social content
@@ -1467,8 +1716,19 @@ export default function RunPage() {
     const idPrefixMap: Record<string, string> = {
       fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
       li: "linkedin", em: "email", pr: "press",
+      // 2026-08-29 官網頻道。web:blog / web:product-page / web:landing 三個
+      // mockup 元件早就實作並註冊了，缺的只是這條前綴對應。
+      web: "web",
     };
     const formatFromTaskId = (id: string): string => {
+      // 2026-08-29 官網 (web-)：跟 pr- / em- 同樣的理由——先用前綴決斷，
+      // 否則下面的關鍵字掃描會誤傷，例如 "web-30-product-faq" 會被 faq
+      // 規則搶去判成 "qa"（那是新聞稿的 Q&A 卡片版型，不是產品頁）。
+      if (id.startsWith("web-")) {
+        if (id.includes("product")) return "product-page";
+        if (id.includes("landing")) return "landing";
+        return "blog";
+      }
       // 2026-05-16 (CJ「pr-30-lead-paragraph mockup 格式不對」):
       // press (pr-) + email (em-) each have ONE mockup family. Decide
       // by prefix FIRST — otherwise generic keyword scans below
@@ -1492,21 +1752,13 @@ export default function RunPage() {
       // Match a real "-ad-" / "ad-" / "-ad" segment, NOT the "ad-"
       // inside words like "lead-paragraph" / "broadcast".
       if (/(?:^|-)ad(?:-|$)/.test(id)) return "ad";
-      // 2026-08-11 (bug checklist C4「僅顯示製作中佔位訊息」): the "comment"
-      // mockup (FBComment) only exists for Facebook — inferMockup.ts's
-      // FORMAT_RULES already scopes this keyword to platforms:["facebook"],
-      // but this SEPARATE taskId-prefix inference didn't, so ig-30-comment-
-      // reply / tt-30-comment-reply resolved to instagram:comment /
-      // tiktok:comment — neither has a mockup case → fell through to the
-      // "coming soon" placeholder even though the reply caption existed.
-      // Scope it the same way so those tasks fall through to their real,
-      // better-fitting rules below (ig- → default "feed", tt- → "foryou").
-      if (id.startsWith("fb-") && id.includes("comment")) return "comment";
-      // "pinned" mockup (FBPinned) is also Facebook-only — same bug shape as
-      // "comment" above. yt-30-pinned-comment was falling through to it
-      // (after the comment-scoping fix) with no youtube:pinned case →
-      // placeholder again. Scope it too so it reaches its real yt- rule.
-      if (id.startsWith("fb-") && id.includes("pinned")) return "pinned";
+      // 2026-08-20: a PINNED comment is still a comment — but YouTube shows
+      // it with the「由頻道發布者置頂」row, so give it its own key. Must be
+      // tested before the plain "comment" rule below (and before "pinned",
+      // which would otherwise never see it).
+      if (id.startsWith("yt-") && id.includes("pinned-comment")) return "pinned-comment";
+      if (id.includes("comment")) return "comment";
+      if (id.includes("pinned")) return "pinned";
       // 2026-08-01: check BEFORE the "story" rule below — "storyboard"
       // contains "story" as a substring and was silently misclassified
       // as an IG/FB Stories mockup (CJ「分鏡圖的產出明顯不是分鏡圖」).
@@ -1568,6 +1820,12 @@ export default function RunPage() {
   // task-level one. Tone labels (真誠版 / 事實式…) match no platform
   // keyword → base variant kept, so this is safe globally.
   const effectiveVariant: MockupVariant = useMemo(() => {
+    const strategySelectionMockup = getStrategySelectionMockup(
+      isStrategyEnvelope,
+      selectedContentKind,
+      slide?.format,
+    );
+    if (strategySelectionMockup) return strategySelectionMockup;
     const lbl = String(slide?.label ?? "");
     const v = (platform: string, format: string): MockupVariant =>
       ({ platform: platform as any, format: format as any, label: `${platform}:${format}` });
@@ -1610,7 +1868,7 @@ export default function RunPage() {
     if (/instagram|\bIG\b/i.test(lbl)) return v("instagram", "feed");
     if (/\bLINE\b/i.test(lbl)) return v("line", "broadcast");
     return mockupVariant;
-  }, [mockupVariant, slide?.label, data?.mission?.taskId]);
+  }, [mockupVariant, slide?.label, slide?.format, isStrategyEnvelope, selectedContentKind, data?.mission?.taskId]);
 
   if (!id || isNaN(id)) {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;
@@ -1691,6 +1949,18 @@ export default function RunPage() {
           orchestra wrote captions early and is still working on images/QA */}
       {(() => {
         const p = (data as any)?.progress;
+        if (strategyPublicGenerationState === "generating") {
+          return (
+            <div className="mb-3 mx-1 flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-tiny text-primary-700">
+              <span className="inline-block w-3 h-3 border-2 border-primary-400 border-t-primary-700 rounded-full animate-spin" />
+              <span className="flex-1">
+                {lang === "en"
+                  ? "Planning is ready — public posts are being generated in the background. This card will refresh automatically."
+                  : "內容規劃已完成 · 對外貼文正在背景產生，這張卡會自動更新"}
+              </span>
+            </div>
+          );
+        }
         // hold-for-images tasks show their own full-card generating state
         // (the mockup is replaced) — skip the redundant slim banner.
         if (p === "caption_ready" &&
@@ -1750,9 +2020,7 @@ export default function RunPage() {
         {/* 2026-07-17 (CJ): deliverable label, not duration — tier is internal config */}
         {data.mission?.tier && (
           <Chip size="sm" variant="flat" color="secondary">
-            {data.mission.tier === "60s" ? (lang === "en" ? "Pack" : "套組")
-              : data.mission.tier === "99s" ? (lang === "en" ? "Campaign" : "企劃")
-              : (lang === "en" ? "Single" : "單篇")}
+            {tierLabel(data.mission.tier, lang)}
           </Chip>
         )}
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
@@ -1762,10 +2030,89 @@ export default function RunPage() {
       </div>
 
       {/* ─── Variant pills (horizontal) ─────────────────────────────── */}
-      {variants.length > 1 && (() => {
+      {isStrategyEnvelope ? (
+        hideStrategyPlanningTabs ? (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {publicVariants.map((v, i) => (
+              <button
+                key={v.id ?? `public-${i}`}
+                onClick={() => selectContent("publicVariants", i)}
+                className={`px-3 py-1 rounded-full text-tiny transition border ${
+                  i === activeIdx
+                    ? "bg-primary text-white border-primary"
+                    : "bg-white text-default-700 border-default-200 hover:border-primary"
+                }`}
+              >
+                {getStrategyPublicTabLabel({
+                  taskId: data?.mission?.taskId,
+                  isStrategyEnvelope,
+                  format: v.format,
+                  index: i,
+                  fallbackLabel: v.label,
+                  language: lang === "en" ? "en" : "zh",
+                })}
+              </button>
+            ))}
+          </div>
+        ) : (
+        <div className="mb-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] text-default-500 mr-1">
+              {lang === "en" ? "Strategy:" : "策略："}
+            </span>
+            {planningVariants.map((v, i) => (
+              <button
+                key={v.id ?? `planning-${i}`}
+                onClick={() => selectContent("planningArtifacts", i)}
+                className={`px-3 py-1 rounded-full text-tiny transition border ${
+                  selectedContentKind === "planningArtifacts" && i === activeIdx
+                    ? "bg-secondary text-white border-secondary"
+                    : "bg-white text-default-700 border-default-200 hover:border-secondary"
+                }`}
+              >
+                {v.label || (lang === "en" ? `Plan ${i + 1}` : `策略 ${i + 1}`)}
+              </button>
+            ))}
+            <button
+              onClick={() => selectContent("publicVariants", 0)}
+              className={`px-3 py-1 rounded-full text-tiny font-semibold transition border ${
+                selectedContentKind === "publicVariants"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-primary-50 text-primary-700 border-primary-200 hover:border-primary"
+              }`}
+            >
+              {lang === "en" ? "Public posts" : "對外貼文"}
+              {publicVariants.length > 0 ? ` (${publicVariants.length})` : ""}
+            </button>
+          </div>
+          {selectedContentKind === "publicVariants" && publicVariants.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l-2 border-primary-100">
+              <span className="text-[10px] text-default-400 mr-1">
+                {lang === "en" ? "Posts:" : "貼文："}
+              </span>
+              {publicVariants.map((v, i) => (
+                <button
+                  key={v.id ?? `public-${i}`}
+                  onClick={() => selectContent("publicVariants", i)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] transition border ${
+                    i === activeIdx
+                      ? "bg-primary text-white border-primary"
+                      : "bg-white text-default-600 border-default-200 hover:border-primary"
+                  }`}
+                >
+                  {v.label || (lang === "en" ? `Post ${i + 1}` : `貼文 ${i + 1}`)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        )
+      ) : variants.length > 1 && (() => {
         // Pool mode: >4 variants → progressive reveal (headline pool).
         // ≤4 → show all (normal multi-variant task, unchanged behavior).
-        const pool = variants.length > 4;
+        // Sequence tasks (每個變體是流程的一段) never pool — see SEQUENCE_TASKS.
+        const isSequence = isSequenceTask;
+        const pool = variants.length > 4 && !isSequence;
         const shown = pool ? Math.min(revealCount, variants.length) : variants.length;
         const more = variants.length - shown;
         return (
@@ -1773,6 +2120,8 @@ export default function RunPage() {
             <span className="text-[10px] text-default-500 mr-1">
               {pool
                 ? (lang === "en" ? "Headlines:" : "標題：")
+                : isSequence
+                ? (lang === "en" ? "Run of show:" : "流程：")
                 : (lang === "en" ? "Versions:" : "版本：")}
             </span>
             {variants.slice(0, shown).map((v, i) => (
@@ -1828,6 +2177,55 @@ export default function RunPage() {
                   </div>
                 );
               }
+              if (isStrategyEnvelope && selectedContentKind === "publicVariants" && publicVariants.length === 0) {
+                const isGeneratingPublicPosts = strategyPublicGenerationState === "generating";
+                return (
+                  <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+                    <div className="w-12 h-12 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center text-xl">
+                      {isGeneratingPublicPosts
+                        ? <span className="inline-block w-6 h-6 border-[3px] border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                        : "↻"}
+                    </div>
+                    <p className="text-small font-semibold text-default-800">
+                      {isGeneratingPublicPosts
+                        ? (lang === "en" ? "Generating the public post…" : "對外貼文產生中…")
+                        : (lang === "en" ? "The public post wasn't generated" : "尚未產生對外貼文")}
+                    </p>
+                    <p className="text-tiny text-default-500 max-w-sm leading-relaxed">
+                      {isGeneratingPublicPosts
+                        ? (lang === "en"
+                            ? "Planning is ready. The publish-ready Instagram post will appear here automatically when background generation finishes."
+                            : "內容規劃已完成。背景產生結束後，可直接發布的 Instagram 貼文會自動顯示在這裡。")
+                        : (lang === "en"
+                            ? "This run has no publish-ready post. Re-run the original task to try again."
+                            : "這次產出尚未完成可直接發布的貼文，請重跑原任務再試一次。")}
+                    </p>
+                  </div>
+                );
+              }
+              if (isPlanningArtifactMissingOutput(
+                isStrategyEnvelope,
+                selectedContentKind,
+                slide?.caption,
+                slide?.imageStatus,
+              )) {
+                return (
+                  <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+                    <div className="w-12 h-12 rounded-full bg-warning-50 text-warning-600 flex items-center justify-center text-xl">!</div>
+                    <p className="text-small font-semibold text-default-800">
+                      {lang === "en" ? "This step produced no output" : "這個步驟沒有產出"}
+                    </p>
+                    <p className="text-tiny text-default-500 max-w-sm leading-relaxed">
+                      {lang === "en"
+                        ? "This is an incomplete strategy step, not an image-generation failure. Re-run the original task to try the full strategy workflow again."
+                        : "這是策略步驟未完成，不是圖片生成失敗。請重新執行原任務，再跑一次完整策略流程。"}
+                    </p>
+                    <Button color="primary" variant="flat" onPress={rerunOriginalTask}>
+                      {lang === "en" ? "Re-run this task" : "重新產生這個任務"}
+                    </Button>
+                  </div>
+                );
+              }
               return effectiveVariant && slide ? (
               <>
               {isComponentTask && (
@@ -1851,6 +2249,7 @@ export default function RunPage() {
                 brandName={(data as any).product?.name ?? data.brand?.name ?? ""}
                 brandLogoUrl={(data as any).product?.logoUrl ?? data.brand?.logoUrl ?? null}
                 liveCaption={slide.caption}
+                liveSourceComment={sourceComment}
                 liveHashtags={slide.hashtags}
                 liveImageStyle={slide.imageStyle}
                 liveImageUrl={slide.imageUrl ?? undefined}
@@ -1860,7 +2259,9 @@ export default function RunPage() {
                 liveVideoPoster={slide.videoPosterUrl ?? undefined}
                 liveCards={slide.cards as any}
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
-                onGenerateImage={() => { manualImageRef.current = true; setMode("image"); }}
+                onGenerateImage={isStrategyPlanning
+                  ? undefined
+                  : () => { manualImageRef.current = true; setMode("image"); }}
                 componentSlot={componentSlot}
               />
               </>
@@ -1953,6 +2354,73 @@ export default function RunPage() {
               );
             })()}
           </div>
+          {/* 2026-08-22 (CJ「IG 直播配套…應該是指完整的直播範本」): the
+              deliverable is one timeline, so show all segments together as a
+              rundown table. Row click switches the mockup to that segment;
+              edits made above are reflected because `overrides` feeds in. */}
+          {isSequenceTask && variants.length > 1 && (
+            <div className="rounded-2xl bg-white shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-divider">
+                <p className="text-small font-semibold text-default-800">
+                  {lang === "en" ? "Full run of show" : "完整流程表"}
+                </p>
+                <button
+                  onClick={async () => {
+                    const text = variants
+                      .map((v, i) => {
+                        const r = parseRunOfShow(overrides[i]?.caption ?? v.caption ?? "", v.label ?? "");
+                        return [
+                          `${r.time}　${r.stage}`.trim(),
+                          r.cues && `${lang === "en" ? "Screen / action" : "畫面／動作指示"}：\n${r.cues}`,
+                          r.script && `${lang === "en" ? "Host script" : "主播口白"}：\n${r.script}`,
+                        ].filter(Boolean).join("\n");
+                      })
+                      .join("\n\n");
+                    try {
+                      await navigator.clipboard.writeText(text);
+                      showToastGlobal(lang === "en" ? "Run of show copied" : "已複製整份流程表");
+                    } catch {
+                      showToastGlobal(lang === "en" ? "Copy failed" : "複製失敗");
+                    }
+                  }}
+                  className="text-tiny px-3 py-1 rounded-full border border-default-200 text-default-700 hover:border-secondary hover:text-secondary transition"
+                >
+                  {lang === "en" ? "Copy all" : "複製整份"}
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] text-tiny border-collapse">
+                  <thead>
+                    <tr className="bg-default-50 text-default-500">
+                      <th className="text-left font-medium px-3 py-2 w-[96px]">{lang === "en" ? "Time" : "時間"}</th>
+                      <th className="text-left font-medium px-3 py-2 w-[104px]">{lang === "en" ? "Stage" : "流程階段"}</th>
+                      <th className="text-left font-medium px-3 py-2">{lang === "en" ? "Screen / action" : "畫面／動作指示"}</th>
+                      <th className="text-left font-medium px-3 py-2">{lang === "en" ? "Host script" : "主播口白"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variants.map((v, i) => {
+                      const r = parseRunOfShow(overrides[i]?.caption ?? v.caption ?? "", v.label ?? "");
+                      return (
+                        <tr
+                          key={i}
+                          onClick={() => setActiveIdx(i)}
+                          className={`cursor-pointer border-t border-divider align-top ${
+                            i === activeIdx ? "bg-secondary/10" : "hover:bg-default-50"
+                          }`}
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-default-700 font-medium">{r.time}</td>
+                          <td className="px-3 py-2 text-default-700">{r.stage}</td>
+                          <td className="px-3 py-2 text-default-600 whitespace-pre-line">{r.cues}</td>
+                          <td className="px-3 py-2 text-default-600 whitespace-pre-line">{r.script}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           {/* 2026-05-17 (CJ「可以讓用戶編輯後直接下載」): speech script
               download. Uses the current (edited) caption + the same
               <a download> blob pattern as the .ics export. */}
@@ -2145,6 +2613,27 @@ export default function RunPage() {
             CJ direction 2026-05-09: 'toolbar 一道右方對話窗上面，當用戶選擇
             不同按鍵，在顯示出該功能' — toolbar is the tab bar for the panel */}
         <aside className="space-y-3 sticky top-2 self-start">
+          {isEmptyPublicSelection ? (
+            <Card>
+              <CardBody className="space-y-3 p-4">
+                <p className="text-small font-semibold">
+                  {lang === "en" ? "No public post to edit yet" : "目前沒有可操作的對外貼文"}
+                </p>
+                <p className="text-[11px] text-default-500 leading-relaxed">
+                  {lang === "en"
+                    ? "Re-run this task to generate the public post again."
+                    : "請重跑此任務，再次產生對外貼文。"}
+                </p>
+                <Button color="primary" fullWidth onPress={rerunOriginalTask}>
+                  {lang === "en" ? "Re-run task" : "重跑此任務"}
+                </Button>
+                <Button variant="light" fullWidth onPress={() => navigate("/projects")}>
+                  {lang === "en" ? "Back to Projects" : "返回專案"}
+                </Button>
+              </CardBody>
+            </Card>
+          ) : (
+          <>
           {/* Toolbar — clicking a button switches mode + the panel below
               expands to show that tool. */}
           <div className="bg-white rounded-xl border border-default-200 shadow-sm">
@@ -2188,7 +2677,9 @@ export default function RunPage() {
                 </button>
               </Tooltip>
               <Divider />
-              <ToolbarBtn icon={Wand2}         label={lang === "en" ? "Rewrite this" : "重生這段"}       active={mode==="regen"}    onClick={() => setMode("regen")} />
+              {!isStrategyEnvelope && (
+                <ToolbarBtn icon={Wand2} label={lang === "en" ? "Rewrite this" : "重生這段"} active={mode==="regen"} onClick={() => setMode("regen")} />
+              )}
               {/* 2026-07-07 (CJ「參數儀表板客戶看不懂 → 換成選不同 agent 重寫」) */}
               <ToolbarBtn icon={LucideUsers}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
               <Divider />
@@ -2203,26 +2694,7 @@ export default function RunPage() {
               <Divider />
               <Tooltip content={lang === "en" ? "Re-run task" : "重跑同任務"} placement="bottom">
                 <button
-                  onClick={() => {
-                    const taskId = data.mission?.taskId;
-                    if (!taskId) { showToastGlobal(lang === "en" ? "Original task ID not found" : "找不到原任務 ID"); return; }
-                    // 2026-07-07 (CJ「重跑同任務 404」): tier routes (/30s
-                    // /60s /99s) were removed 2026-05-27 when tasks went
-                    // platform-first — this still navigated to /${tier} and
-                    // landed on the 404 page. Map the mission's workspace to
-                    // the /tasks/:platform slug instead; PlatformTaskPage
-                    // already understands ?rerun=<outputId>.
-                    const ws = String(data.mission?.workspace ?? "").toLowerCase();
-                    const slug =
-                      ws.includes("instagram") ? "ig" :
-                      ws.includes("linkedin")  ? "li" :
-                      ws.includes("youtube")   ? "yt" :
-                      ws.includes("tiktok")    ? "tt" :
-                      ws.includes("email")     ? "email" :
-                      (ws.includes("press") || ws.includes("pr")) ? "pr" :
-                      "fb";
-                    navigate(`/tasks/${slug}?rerun=${id}`);
-                  }}
+                  onClick={rerunOriginalTask}
                   className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition"
                   aria-label={lang === "en" ? "Re-run" : "重跑"}
                 >
@@ -2269,13 +2741,14 @@ export default function RunPage() {
                   {aiPreview && (
                     <div className="text-[11px] bg-secondary-50 border border-secondary-200 rounded-lg p-2 space-y-1.5">
                       <p className="font-semibold text-secondary-700">{lang === "en" ? "AI rewrite preview" : "AI 改寫預覽"}</p>
-                      <p className="whitespace-pre-wrap leading-relaxed text-default-800 max-h-32 overflow-y-auto">{aiPreview}</p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-default-800 max-h-32 overflow-y-auto">{aiPreview.text}</p>
                       <div className="flex gap-1.5 pt-1">
                         <Button size="sm" color="secondary"
                           isDisabled={updateMut.isPending}
                           onPress={() => {
-                            setOverrides(o => ({ ...o, [activeIdx]: { caption: aiPreview } }));
-                            updateMut.mutate({ id, variantIndex: activeIdx, caption: aiPreview });
+                            const key = getMutationLocatorSelectionKey(aiPreview.locator);
+                            setOverrides(o => ({ ...o, [key]: { caption: aiPreview.text } }));
+                            updateMut.mutate({ id, ...aiPreview.locator, caption: aiPreview.text });
                             setAiPreview(null);
                           }}
                         >{lang === "en" ? "Use it" : "採用"}</Button>
@@ -2289,6 +2762,7 @@ export default function RunPage() {
                     isLoading={refineMut?.isPending}
                     onPress={async () => {
                       if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return; }
+                      const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
                       try {
                         const r = await refineMut.mutateAsync({
                           currentCaption: slide?.caption ?? "",
@@ -2297,13 +2771,15 @@ export default function RunPage() {
                           history: chatHistory,
                         });
                         if (r.ok) {
-                          setChatHistory(h => [
-                            ...h,
-                            { role: "user", content: chatPrompt },
-                            { role: "assistant", content: r.explanation || (lang === "en" ? "(rewritten)" : "(已改寫)") },
-                          ]);
-                          setAiPreview(r.rewritten);
-                          setChatPrompt("");
+                          if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
+                            setChatHistory(h => [
+                              ...h,
+                              { role: "user", content: chatPrompt },
+                              { role: "assistant", content: r.explanation || (lang === "en" ? "(rewritten)" : "(已改寫)") },
+                            ]);
+                            setAiPreview({ text: r.rewritten, locator });
+                            setChatPrompt("");
+                          }
                         } else {
                           showToastGlobal(
                             lang === "en"
@@ -2334,7 +2810,7 @@ export default function RunPage() {
                       const v = e.target.value;
                       setEditText(v);
                       // Live preview in mockup
-                      setOverrides(o => ({ ...o, [activeIdx]: { caption: v } }));
+                      setOverrides(o => ({ ...o, [activeSelectionKey]: { caption: v } }));
                     }}
                     minRows={10}
                   />
@@ -2345,7 +2821,7 @@ export default function RunPage() {
                       isLoading={updateMut.isPending}
                       onPress={() => {
                         if (editText == null) return;
-                        updateMut.mutate({ id, variantIndex: activeIdx, caption: editText });
+                        updateMut.mutate({ id, ...getRunContentMutationLocator(selectedContentKind, activeIdx), caption: editText });
                       }}
                     >{t("run_save_btn")}</Button>
                     <Button
@@ -2353,13 +2829,13 @@ export default function RunPage() {
                       isDisabled={editText == null}
                       onPress={() => {
                         setEditText(null);
-                        setOverrides(o => { const n = { ...o }; delete n[activeIdx]; return n; });
+                        setOverrides(o => { const n = { ...o }; delete n[activeSelectionKey]; return n; });
                       }}
                     >{t("run_revert")}</Button>
                   </div>
                 </>
               )}
-              {mode === "image" && (
+              {mode === "image" && !isStrategyPlanning && (
                 <>
                   <p className="text-tiny font-semibold">{t("run_mode_image")}</p>
                   {/* 2026-07-07 (CJ「產圖畫面有不是國字的國字」→ 圖改為無字背景，
@@ -2393,7 +2869,7 @@ export default function RunPage() {
                       : "Step 1：先告訴我你想要什麼樣的圖（或調整現有 prompt）"}
                   </div>
                   <Textarea
-                    label={lang === "en" ? "Image prompt" : "圖片指令（prompt）"}
+                    label={lang === "en" ? "Your image instruction" : "你的圖片指令"}
                     placeholder={lang === "en"
                       ? "e.g. Sunlight on a warm wooden table, a steaming bowl of soup, soft-focus background with a homey feel"
                       : "例：陽光灑落在溫暖木桌上，一碗冒著煙的健力湯，柔焦背景帶有家庭溫度"}
@@ -2402,8 +2878,8 @@ export default function RunPage() {
                     minRows={3}
                     maxRows={6}
                     description={lang === "en"
-                      ? "We'll auto-apply your brand's colors / style / tone. The more specific you are, the closer to what you want."
-                      : "會自動帶入品牌的色彩 / 風格 / 調性脈絡。寫越具體圖越貼近你要的"}
+                      ? "Write naturally in Chinese or English. Chinese instructions are automatically translated to English before being sent to the image AI; brand colors / style / tone are also applied."
+                      : "請直接用中文描述；送給圖片 AI 前會自動翻成英文，並帶入品牌色彩 / 風格 / 調性。翻譯失敗時仍會用原指令繼續產圖。"}
                     autoFocus
                   />
                   {/* 2026-05-17 (CJ「右側欄不需要展示出圖片了」): the
@@ -2433,6 +2909,7 @@ export default function RunPage() {
                             undefined
                           ) as any,
                           imageStyle: variants[activeIdx]?.imageStyle ?? undefined,
+                          size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
                         });
                       }}
                     >
@@ -2540,6 +3017,7 @@ export default function RunPage() {
                                     caption: activeCaption,
                                     channel: channelVal,
                                     imageStyle: styleHint,
+                                    size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
                                   });
                                   showToastGlobal(
                                     lang === "en"
@@ -2572,15 +3050,18 @@ export default function RunPage() {
                   )}
                   {/* 2026-07-25 (CJ): real-product compositing — the actual
                       IRIS/Iris Girls photo instead of an AI-imagined product. */}
-                  {runProductImages.length > 0 && (
+                  {(runProductImages.length > 0 || useRealProduct) && (
                     <div className="rounded-lg border border-default-200 bg-default-50 px-3 py-2.5 mt-2">
                       <label className="flex items-center gap-2 cursor-pointer flex-wrap">
                         <input
                           type="checkbox"
                           checked={useRealProduct}
                           onChange={(e) => {
-                            setUseRealProduct(e.target.checked);
-                            if (e.target.checked && !pickedRunProduct) setPickedRunProduct(runProductImages[0] ?? null);
+                            const checked = e.target.checked;
+                            setUseRealProduct(checked);
+                            if (checked && !findValidRunProductSelection(pickedRunProduct, runProductImages)) {
+                              setPickedRunProduct(runProductImages[0] ?? null);
+                            }
                           }}
                         />
                         <span className="text-tiny font-semibold">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
@@ -2623,14 +3104,25 @@ export default function RunPage() {
                     disabled={realProductMode}
                     className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary disabled:opacity-50"
                   >
-                    <option value="auto">{lang === "en" ? "Auto (default)" : "自動（預設）"}</option>
-                    <option value="flux-schnell">{lang === "en" ? "Fast — Flux Schnell (5-10s)" : "快速 — Flux Schnell（5-10 秒）"}</option>
-                    <option value="gpt-image-2">{lang === "en" ? "Best — GPT Image-2 (20-30s, OpenAI latest)" : "最佳 — GPT Image-2（20-30 秒，OpenAI 最新）"}</option>
-                    <option value="gpt-image-1">{lang === "en" ? "Photo-real — GPT Image-1 (15-25s)" : "寫實 — GPT Image-1（15-25 秒）"}</option>
-                    <option value="flux-realism">{lang === "en" ? "Photographic — Flux Realism (15-30s)" : "攝影感 — Flux Realism（15-30 秒）"}</option>
-                    <option value="ideogram-v3">{lang === "en" ? "With text — Ideogram V3 (best in-image text)" : "含文字 — Ideogram V3（圖中文字最強）"}</option>
-                    <option value="imagen-3">Google Imagen 4</option>
+                    {RUN_IMAGE_MODEL_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {lang === "en" ? option.en : option.zh}
+                      </option>
+                    ))}
                   </select>
+                  {slide?.imageModelId && (
+                    <p className={`text-[10px] ${slide.imageFallbackUsed ? "text-warning-700" : "text-default-500"}`}>
+                      {lang === "en" ? "Current image model: " : "目前圖片實際模型："}
+                      <span className="font-mono">{slide.imageModelId}</span>
+                      {slide.imageFallbackUsed && (
+                        <>
+                          {lang === "en" ? " (fallback from " : "（fallback，原選 "}
+                          <span className="font-mono">{slide.imageRequestedModelId || "auto"}</span>
+                          {lang === "en" ? ")" : "）"}
+                        </>
+                      )}
+                    </p>
+                  )}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
                     {lang === "en"
                       ? "Step 4: Hit the button to make a new image (replaces the current one)"
@@ -2639,7 +3131,7 @@ export default function RunPage() {
                   <Button
                     color="secondary" fullWidth
                     isLoading={imageGenMut.isPending}
-                    isDisabled={imageGenMut.isPending || !imagePrompt.trim() || !data.brand?.id}
+                    isDisabled={imageGenMut.isPending || !imagePrompt.trim() || !data.brand?.id || missingRealProductSelection}
                     onPress={() => {
                       if (!data.brand?.id) {
                         showToastGlobal(
@@ -2649,6 +3141,18 @@ export default function RunPage() {
                         );
                         return;
                       }
+                      if (useRealProduct && !validRunProduct) {
+                        showToastGlobal(
+                          lang === "en"
+                            ? "Select a product photo from this brand before generating"
+                            : "請先從目前品牌選擇有效的產品圖，再進行產圖"
+                        );
+                        return;
+                      }
+                      imageMutationTargetRef.current = {
+                        locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
+                        promptZh: imagePrompt,
+                      };
                       imageGenMut.mutate({
                         brandId: data.brand.id,
                         prompt: imagePrompt,
@@ -2662,16 +3166,23 @@ export default function RunPage() {
                           "fb"
                         ) as any,
                         modelChoice: imageModel as any,
-                        ...(realProductMode ? { subjectImageUrl: pickedRunProduct!.imageUrl } : {}),
+                        size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
+                        // TODO: send productId and resolve the brand-owned image
+                        // server-side. This hotfix intentionally closes the gap
+                        // with current-brand client validation only.
+                        ...(realProductMode ? { subjectImageUrl: validRunProduct!.imageUrl } : {}),
                       });
                     }}
                   >
                     {imageGenMut.isPending
-                      ? (lang === "en" ? "Generating… (~15-30s)" : "產圖中…（約 15-30s）")
+                      ? (lang === "en" ? "Generating… (~15-30s)" : "產圖中…（約 15–30 秒）")
                       : t("run_image_make")}
                   </Button>
                   {!data.brand?.id && (
                     <p className="text-[10px] text-warning-700">⚠ {lang === "en" ? "This run has no brand — link a brand first" : "此 run 沒有 brand，請先綁品牌再產圖"}</p>
+                  )}
+                  {missingRealProductSelection && (
+                    <p className="text-[10px] text-warning-700">⚠ {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
                   )}
                 </>
               )}
@@ -2833,6 +3344,12 @@ export default function RunPage() {
                 const focusedAgTitle = focusedAg?.title ?? "";
                 const stages: Array<{key: string; label: string; status: string; startedAt?: number; completedAt?: number}> = Array.isArray(md.stages) ? md.stages : [];
                 const totalMs = md.latencyMs ?? 0;
+                const fetchedUrl = typeof md.fetchedUrl === "string"
+                  ? md.fetchedUrl
+                  : (typeof md.fetchedUrl?.url === "string" ? md.fetchedUrl.url : null);
+                const unavailableUrl = typeof md.urlFetchFailure === "string"
+                  ? md.urlFetchFailure
+                  : (typeof md.urlFetchFailure?.url === "string" ? md.urlFetchFailure.url : null);
                 return (
                   <>
                     <p className="text-tiny font-semibold flex items-center gap-2">
@@ -2885,6 +3402,12 @@ export default function RunPage() {
                           <p className="whitespace-pre-wrap text-default-800">
                             {slide?.imageStyle || (lang === "en" ? "(This task has no image brief)" : "（這個任務沒有配圖指引）")}
                           </p>
+                          {slide?.imagePrompt && (
+                            <>
+                              <p className="font-semibold pt-1">{lang === "en" ? "Model-ready prompt used:" : "實際使用的模型指令："}</p>
+                              <p className="whitespace-pre-wrap text-default-800">{slide.imagePrompt}</p>
+                            </>
+                          )}
                         </>
                       ) : (
                         <>
@@ -2895,9 +3418,15 @@ export default function RunPage() {
                         </>
                       )}
                     </div>
-                    {md.fetchedUrl && (
+                    {unavailableUrl ? (
+                      <p className="text-[10px] text-warning-700" title={unavailableUrl}>
+                        ⚠️ {lang === "en"
+                          ? "This link's content could not be fetched (platform restriction). Paste the video caption or describe the topic instead."
+                          : "這個連結抓不到內容（平台限制），建議直接貼上影片文案或描述主題。"}
+                      </p>
+                    ) : fetchedUrl && (
                       <p className="text-[10px] text-default-500">
-                        🔗 {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={md.fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{md.fetchedUrl}</a>
+                        🔗 {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{fetchedUrl}</a>
                       </p>
                     )}
                     {Array.isArray(md.errors) && md.errors.length > 0 && (
@@ -2908,7 +3437,7 @@ export default function RunPage() {
                   </>
                 );
               })()}
-              {mode === "regen" && (
+              {mode === "regen" && !isStrategyEnvelope && (
                 <>
                   <p className="text-tiny font-semibold">{lang === "en" ? "Rewrite this version" : "重生這段文案"}</p>
                   <p className="text-[11px] text-default-500 leading-relaxed">
@@ -2922,7 +3451,7 @@ export default function RunPage() {
                     isLoading={regenMut.isPending}
                     isDisabled={regenMut.isPending}
                     onPress={() => {
-                      regenMut.mutate({ outputId: id, variantIndex: activeIdx });
+                      regenMut.mutate({ outputId: id, ...getRunContentMutationLocator(selectedContentKind, activeIdx) });
                     }}
                   >
                     {regenMut.isPending
@@ -2960,6 +3489,7 @@ export default function RunPage() {
                           if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return; }
                           const caption = slide?.caption ?? "";
                           if (!caption.trim()) { showToastGlobal(lang === "en" ? "This version has no caption yet" : "這個版本還沒有文案可以重寫"); return; }
+                          const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
                           setRewriteBusy(a.name);
                           try {
                             const r = await refineMut.mutateAsync({
@@ -2970,7 +3500,9 @@ export default function RunPage() {
                               brandId: data.mission?.brandId ?? undefined,
                             });
                             if (r.ok) {
-                              setRewritePreview({ agent: a.name, text: r.rewritten });
+                              if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
+                                setRewritePreview({ agent: a.name, text: r.rewritten, locator });
+                              }
                             } else {
                               showToastGlobal(
                                 lang === "en"
@@ -3015,8 +3547,9 @@ export default function RunPage() {
                         <Button size="sm" color="secondary"
                           isDisabled={updateMut.isPending}
                           onPress={() => {
-                            setOverrides(o => ({ ...o, [activeIdx]: { caption: rewritePreview.text } }));
-                            updateMut.mutate({ id, variantIndex: activeIdx, caption: rewritePreview.text });
+                            const key = getMutationLocatorSelectionKey(rewritePreview.locator);
+                            setOverrides(o => ({ ...o, [key]: { caption: rewritePreview.text } }));
+                            updateMut.mutate({ id, ...rewritePreview.locator, caption: rewritePreview.text });
                             setRewritePreview(null);
                           }}
                         >{lang === "en" ? "Use it" : "採用"}</Button>
@@ -3122,6 +3655,8 @@ export default function RunPage() {
 
             </CardBody>
           </Card>
+          </>
+          )}
         </aside>
       </div>
 
@@ -3157,7 +3692,7 @@ export default function RunPage() {
                 const recipients = emailRecipients.split(",").map(s => s.trim()).filter(Boolean);
                 if (recipients.length === 0) return;
                 emailMut.mutate({
-                  id, variantIndex: activeIdx,
+                  id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
                   recipients, note: emailNote || undefined,
                 }, {
                   onSuccess: () => setEmailDialogOpen(false),

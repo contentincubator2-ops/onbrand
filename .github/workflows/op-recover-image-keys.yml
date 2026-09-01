@@ -1,0 +1,133 @@
+name: "Op — Inspect / recover the image API keys on the VM"
+
+# 2026-08-31 (CJ「補 API KEY 給生圖使用」follow-up).
+#
+# op-set-all-keys.yml overwrote two image keys with values that do not work:
+#
+#   OPENAI_API_KEY  — the secret holds the literal text of the `gh secret set`
+#                     command, not a key. Besides being useless, an unquoted
+#                     value with spaces makes the whole .env unsourceable, so
+#                     every ops script that does `source .env` silently loses
+#                     the variables defined after it.
+#   GEMINI_API_KEY  — the new value is an OAuth-style credential; Google
+#                     answers 401 UNAUTHENTICATED "Expected OAuth 2 access
+#                     token" when it is passed as ?key=. It replaced the key
+#                     that ListModels accepted an hour earlier.
+#
+# op-set-all-keys.yml copies .env to .env.bak.<ts> before editing, so the
+# working values are still on disk. mode=check reports what is there without
+# printing any secret; mode=restore puts the newest backup values back.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "check (read-only) or restore (put the newest backup's OPENAI/GEMINI keys back)"
+        required: true
+        default: "check"
+        type: choice
+        options: [check, restore]
+
+jobs:
+  recover:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 6
+    steps:
+      - name: Inspect and optionally restore
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          set +e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+
+          # Never `source` this file — that is the failure mode being fixed.
+          # Read individual values with grep instead.
+          getval() { grep -m1 "^$1=" "$2" 2>/dev/null | cut -d= -f2-; }
+
+          # Shape only: length, first 4 chars, and whether the value contains
+          # spaces (which means it is not a key and breaks `source`).
+          shape() {
+            V="$1"
+            if [ -z "$V" ]; then echo "(missing)"; return; fi
+            SP=""
+            case "$V" in *" "*) SP=" ⚠ CONTAINS SPACES — not a key, and breaks source" ;; esac
+            printf '%s… (%d chars)%s' "$(printf '%s' "$V" | cut -c1-4)" "${#V}" "$SP"
+          }
+
+          # Ask Google whether a key authenticates, and how many image-capable
+          # models it exposes. Prints no part of the key.
+          probe_google() {
+            K="$1"
+            [ -z "$K" ] && { echo "(no key)"; return; }
+            CODE=$(curl -s -o /tmp/lm.json -w '%{http_code}' --max-time 30 \
+              "https://generativelanguage.googleapis.com/v1beta/models?key=${K}&pageSize=200")
+            N=$(grep -o '"name": *"models/[a-z0-9.-]*image[a-z0-9.-]*"' /tmp/lm.json | wc -l)
+            printf 'HTTP %s, %s image models' "$CODE" "$N"
+          }
+
+          echo "═══ current .env ═══"
+          for K in OPENAI_API_KEY GEMINI_API_KEY GEMINI_API_KEY_POOL PIAPI_KEY; do
+            printf '  %-22s %s\n' "$K" "$(shape "$(getval "$K" "$ENV")")"
+          done
+          echo
+          SRC=$(bash -c "set -a; source '$ENV'" 2>&1 | head -1 | cut -c1-90)
+          echo "  sourceable: ${SRC:-yes}"
+          echo
+          echo "  current GEMINI_API_KEY → $(probe_google "$(getval GEMINI_API_KEY "$ENV")")"
+          echo
+
+          BAK=$(ls -1t "${ENV}".bak.* 2>/dev/null | head -1)
+          if [ -z "$BAK" ]; then
+            echo "No .env.bak.* on disk — nothing to restore from."
+            exit 0
+          fi
+          echo "═══ newest backup: $BAK ═══"
+          for K in OPENAI_API_KEY GEMINI_API_KEY; do
+            printf '  %-22s %s\n' "$K" "$(shape "$(getval "$K" "$BAK")")"
+          done
+          echo "  backup GEMINI_API_KEY → $(probe_google "$(getval GEMINI_API_KEY "$BAK")")"
+          echo
+
+          if [ "$MODE" != "restore" ]; then
+            echo "mode=check — nothing written. Re-run with mode=restore to put these back."
+            exit 0
+          fi
+
+          BAK_GEMINI=$(getval GEMINI_API_KEY "$BAK")
+          BAK_OPENAI=$(getval OPENAI_API_KEY "$BAK")
+          if [ -z "$BAK_GEMINI" ]; then
+            echo "❌ backup has no GEMINI_API_KEY — refusing to write a blank key."
+            exit 1
+          fi
+
+          echo "═══ restoring ═══"
+          cp "$ENV" "${ENV}.prerestore.$(date +%s)"
+          # Drop then re-append, rather than sed-in-place: key values contain
+          # /, & and =, all of which are sed metacharacters or field breaks.
+          # "^GEMINI_API_KEY=" does not match "GEMINI_API_KEY_POOL=".
+          grep -v "^GEMINI_API_KEY=" "$ENV" \
+            | grep -v "^GEMINI_API_KEY_POOL=" \
+            | grep -v "^OPENAI_API_KEY=" > "${ENV}.tmp"
+          printf 'GEMINI_API_KEY=%s\n' "$BAK_GEMINI" >> "${ENV}.tmp"
+          # Pool = the one key we just proved works. The GOOGLE_API_KEY_* spares
+          # are April-era and answer API_KEY_INVALID, so seeding them here would
+          # only spend a failed request per image before rotating.
+          printf 'GEMINI_API_KEY_POOL=%s\n' "$BAK_GEMINI" >> "${ENV}.tmp"
+          if [ -n "$BAK_OPENAI" ]; then
+            printf 'OPENAI_API_KEY=%s\n' "$BAK_OPENAI" >> "${ENV}.tmp"
+            echo "  OPENAI_API_KEY restored (still the out-of-credits key — the"
+            echo "  point is to get a parseable line back, not a working key)"
+          else
+            echo "  OPENAI_API_KEY left absent — backup had none"
+          fi
+          mv "${ENV}.tmp" "$ENV"
+          echo "  GEMINI_API_KEY + GEMINI_API_KEY_POOL restored"
+          echo
+
+          echo "═══ after ═══"
+          SRC=$(bash -c "set -a; source '$ENV'" 2>&1 | head -1 | cut -c1-90)
+          echo "  sourceable: ${SRC:-yes}"
+          echo "  GEMINI_API_KEY → $(probe_google "$(getval GEMINI_API_KEY "$ENV")")"
+          pm2 restart onbrand --update-env 2>&1 | tail -3 || echo "(pm2 restart skipped)"
+          sleep 3
+          curl -s -o /dev/null -w "  health: HTTP %{http_code}\n" http://127.0.0.1:3101/health

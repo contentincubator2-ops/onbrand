@@ -1,0 +1,152 @@
+name: "Ops — 五感十築 probe: brandRealContent path + full existing content (read-only)"
+
+# Read-only. Touches nothing.
+# Purpose (2026-08-28): before rebuilding 五感十築 for frankie.cheng@sowork.tw,
+# prove that the brandRealContent grounding path actually works for this brand
+# (the 美妝 mis-fill incident is exactly what it exists to prevent), and dump
+# the existing brand 2840 content so it can be verified item by item.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: "Brand id to probe"
+        required: true
+        default: "2840"
+        type: string
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 15
+    steps:
+      - name: Target check
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          echo "host: $(hostname)"
+          echo "app : $(readlink -f /opt/onbrand/app)"
+          echo "db  : ${LOCAL_DB_NAME:-mos_db} @ ${LOCAL_DB_HOST:-127.0.0.1}"
+          echo "--- grounding-relevant keys present? (presence only, never values) ---"
+          for k in PERPLEXITY_API_KEY ANTHROPIC_API_KEY OPENAI_API_KEY GEMINI_API_KEY; do
+            v=$(eval echo "\$$k")
+            if [ -n "$v" ]; then echo "$k = SET (len ${#v})"; else echo "$k = MISSING"; fi
+          done
+          exit 0
+
+      - name: Brand row + socialLinks
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+          BID="${{ github.event.inputs.brandId }}"
+          echo "===== brand row ====="
+          Q "SELECT id, userId, slug, name, industry, website, targetCountry, outputLanguage, positioningStatus, dataSource FROM brands WHERE id=$BID\G"
+          echo "===== socialLinks ====="
+          Q "SELECT socialLinks FROM brands WHERE id=$BID\G"
+          echo "===== positioning top-level keys ====="
+          Q "SELECT JSON_KEYS(positioning) AS \`k\` FROM brands WHERE id=$BID\G"
+          echo "===== owner ====="
+          Q "SELECT u.id, u.email FROM users u JOIN brands b ON b.userId=u.id WHERE b.id=$BID;"
+          echo "===== brand_members ====="
+          Q "SELECT userId, role FROM brand_members WHERE brandId=$BID;"
+          echo "===== products ====="
+          Q "SELECT id, name, slug, JSON_KEYS(positioning) AS \`k\` FROM products WHERE brandId=$BID ORDER BY id;"
+          exit 0
+
+      - name: Full positioning JSON (brand + products)
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          cat > /tmp/wugan_dump.cjs <<'JS'
+          const mysql = require('mysql2/promise');
+          const BID = Number(process.env.BID);
+          (async () => {
+            const conn = await mysql.createConnection({
+              host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+              port: Number(process.env.LOCAL_DB_PORT || 3306),
+              user: process.env.LOCAL_DB_USER || 'mos_user',
+              password: process.env.LOCAL_DB_PASSWORD,
+              database: process.env.LOCAL_DB_NAME || 'mos_db',
+            });
+            const [b] = await conn.execute('SELECT positioning, description FROM brands WHERE id=?', [BID]);
+            const pos = typeof b[0].positioning === 'string' ? JSON.parse(b[0].positioning) : b[0].positioning;
+            console.log('===== BRAND DESCRIPTION =====');
+            console.log(b[0].description || '(empty)');
+            console.log('===== BRAND POSITIONING (full) =====');
+            console.log(JSON.stringify(pos, null, 2));
+            const [cols] = await conn.execute("SHOW COLUMNS FROM products");
+            console.log('===== products columns =====');
+            console.log(cols.map(c => c.Field).join(', '));
+            const [ps] = await conn.execute('SELECT * FROM products WHERE brandId=? ORDER BY id', [BID]);
+            for (const p of ps) {
+              console.log('===== PRODUCT ' + p.id + ' ' + p.name + ' =====');
+              for (const [k, v] of Object.entries(p)) {
+                if (k === 'positioning') continue;
+                const sv = v == null ? '(null)' : String(typeof v === 'object' ? JSON.stringify(v) : v);
+                if (sv !== '(null)' && sv !== '') console.log('  ' + k + ': ' + sv.slice(0, 600));
+              }
+              const pp = typeof p.positioning === 'string' ? JSON.parse(p.positioning) : p.positioning;
+              console.log('  --- positioning ---');
+              console.log(JSON.stringify(pp, null, 2));
+            }
+            await conn.end();
+            process.exit(0);
+          })().catch(e => { console.error('DUMP FAILED:', e && e.message || e); process.exit(1); });
+          JS
+          BID="${{ github.event.inputs.brandId }}" node -e "$(cat /tmp/wugan_dump.cjs)"
+          exit 0
+
+      - name: brandRealContent live probe (force refresh)
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          cat > /tmp/wugan_grounding.mjs <<'JS'
+          const BID = Number(process.env.BID);
+          const t0 = Date.now();
+          try {
+            const mod = await import('./server/_core/brandRealContent.ts');
+            const res = await mod.getBrandRealContent(BID, { force: true });
+            console.log('ELAPSED_MS ' + (Date.now() - t0));
+            console.log('HAS_CONTENT ' + res.hasContent);
+            console.log('SOURCES ' + JSON.stringify(res.sources));
+            console.log('CONTEXT_LEN ' + (res.context || '').length);
+            console.log('===== CONTEXT (full) =====');
+            console.log(res.context || '(empty)');
+          } catch (e) {
+            console.error('GROUNDING FAILED:', e && e.stack || e);
+            process.exit(1);
+          }
+          process.exit(0);
+          JS
+          BID="${{ github.event.inputs.brandId }}" node --import tsx --input-type=module -e "$(cat /tmp/wugan_grounding.mjs)"
+          echo "grounding exit=$?"
+          exit 0
+
+      - name: Direct fetch of the two public URLs (isolates which source works)
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          cat > /tmp/wugan_urls.mjs <<'JS'
+          const { fetchUrlSummary, formatUrlSummaryForPrompt } = await import('./server/_core/urlContext.ts');
+          for (const u of ['https://www.fivetothetenth.com/', 'https://www.facebook.com/fivetothetenthlab']) {
+            try {
+              const s = await fetchUrlSummary(u);
+              if (!s) { console.log('URL ' + u + ' => NULL (no meaningful content)'); continue; }
+              const f = formatUrlSummaryForPrompt(s);
+              console.log('URL ' + u + ' => OK len=' + f.length);
+              console.log(f.slice(0, 900));
+            } catch (e) { console.log('URL ' + u + ' => THREW ' + (e && e.message || e)); }
+            console.log('---');
+          }
+          process.exit(0);
+          JS
+          node --import tsx --input-type=module -e "$(cat /tmp/wugan_urls.mjs)"
+          exit 0

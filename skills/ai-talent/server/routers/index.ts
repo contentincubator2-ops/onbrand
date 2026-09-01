@@ -19,6 +19,7 @@ import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
 import { pipelineRouter } from "./pipelineRouter";
 import { marketIntelRouter } from "./marketIntelRouter";
 import { geoRouter } from "./geoRouter";
+import { postFormatRouter } from "./postFormatRouter";
 import { mediaRouter } from "./mediaRouter";
 import { taskCatalogRouter } from "./taskCatalogRouter";
 import { platformConnectRouter } from "./platformConnectRouter";
@@ -26,6 +27,8 @@ import { theaterRouter } from "./theaterRouter";
 import { positioningJobsRouter } from "./positioningJobsRouter";
 import { workbenchRouter } from "./workbenchRouter";
 import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
+import { personaAgentRouter } from "./personaAgentRouter";
+import { cloudDriveRouter } from "./cloudDriveRouter";
 import { publishRouter } from "./publishRouter";
 import { billingRouter } from "./billingRouter";
 import { opsRouter } from "./opsRouter";
@@ -81,6 +84,7 @@ export const appRouter = router({
   pipeline:      pipelineRouter,
   marketIntel:   marketIntelRouter,
   geo:           geoRouter,
+  postFormat:    postFormatRouter,
   media:         mediaRouter,
   taskCatalog:   taskCatalogRouter,
   platformConnect: platformConnectRouter,
@@ -88,6 +92,8 @@ export const appRouter = router({
   positioningJobs: positioningJobsRouter,
   workbench: workbenchRouter,
   brandKnowledge:  brandKnowledgeRouter,
+  personaAgent:    personaAgentRouter,
+  cloudDrive:      cloudDriveRouter,
   publish:         publishRouter,
   billing:         billingRouter,
   ops:             opsRouter,

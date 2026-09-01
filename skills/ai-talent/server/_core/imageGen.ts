@@ -1,8 +1,8 @@
 /**
  * imageGen — Decision AI publish-gate image generation service.
  *
- * Primary:  OpenAI gpt-image-1 (best prompt adherence, brand-context friendly)
- * Fallback: Google Imagen 3 via Gemini REST API
+ * Primary:  OpenAI gpt-image-2 (best prompt adherence, brand-context friendly)
+ * Fallback: Google gemini image surface (Imagen is gone from this key tier)
  *
  * Every generation is persisted to `generated_images` for auditability and
  * linked back to the originating decision/option.
@@ -14,6 +14,7 @@
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { loadLineage } from "./decisionBridge";
+import { translateImagePromptToEnglish } from "./imagePromptTranslation";
 
 export type ImageProvider = "openai" | "google" | "stability" | "piapi";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
@@ -46,6 +47,13 @@ export const NO_TEXT_PROMPT_BLOCK =
  * GENERATED text anywhere else in the frame.
  */
 export const PRODUCT_FAITHFUL_PROMPT_BLOCK =
+  "PRODUCT REFERENCE OVERRIDES ALL CONFLICTING TEXT — the attached reference " +
+  "image is the sole source of truth for the product or garment. If any scene " +
+  "text conflicts with the reference image about the product, clothing, color, " +
+  "style, cut, shape, proportions, material, pattern, details, label, or logo, " +
+  "ignore that conflicting text and follow the reference image. Use scene text " +
+  "only for the environment, lighting, composition, pose, and atmosphere; never " +
+  "replace the referenced product or garment with one described by the scene. " +
   "PRODUCT FIDELITY — the attached image is the REAL product; this is the " +
   "most important rule: reproduce the product EXACTLY as shown — identical " +
   "shape, proportions, materials, colors, and every printed label, logo and " +
@@ -53,9 +61,23 @@ export const PRODUCT_FAITHFUL_PROMPT_BLOCK =
   "NOT redraw, restyle, re-color or re-label the product. Place it naturally " +
   "into the scene: lighting direction consistent with the environment, " +
   "correct perspective and scale, realistic contact shadows and reflections " +
-  "— it must look photographed in place, never pasted on. Apart from the " +
-  "product's own printed label, do NOT add any other text, captions, " +
-  "watermarks, badges or typography anywhere in the image.";
+  "— it must look photographed in place, never pasted on. " +
+  // 2026-08-19 (客戶回報「勾選真實產品後再產圖，出現錯誤中文字」): the old
+  // wording ("apart from the product's own label, no other text") left the
+  // model room to treat the BRAND NAME as label-ish and stamp a garbled CJK
+  // watermark across the frame. State the allowance as a closed set — only
+  // glyphs visibly printed on the attached photo, copied, never invented —
+  // and name the failure modes we actually saw.
+  "TEXT — closed rule: the ONLY characters allowed anywhere in the output are " +
+  "the ones already visibly printed on the attached product photo, copied " +
+  "pixel-for-pixel. Do not invent, extend, translate, re-letter or repeat " +
+  "them. Do NOT render or repeat the brand name anywhere except where it is " +
+  "already printed on the product itself. Do not add a watermark (including " +
+  "large translucent or tiled brand marks), signage, captions, badges, stickers or " +
+  "any Chinese / Japanese / Korean characters elsewhere in the frame — not on " +
+  "the background, surfaces, props, or as an overlay. If the attached photo " +
+  "itself carries a watermark, leave it out. Every surface other than the " +
+  "product is blank.";
 
 /**
  * 2026-07-27 (CJ「鏡子裡的她，跟實際的髮型或頭的轉向不同」): mirror /
@@ -104,6 +126,19 @@ function redactProviderSecrets(text: string): string {
     .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
 }
 
+function googleApiKeys(): string[] {
+  return Array.from(new Set([
+    ...(process.env.GEMINI_API_KEY_POOL ?? "").split(","),
+    process.env.GEMINI_API_KEY ?? "",
+    process.env.GOOGLE_AI_API_KEY ?? "",
+    process.env.GOOGLE_API_KEY ?? "",
+  ].map((value) => value.trim()).filter(Boolean)));
+}
+
+function isRetryableGoogleKeyError(text: string): boolean {
+  return /suspended|permission_denied|api[_ ]key|consumer|unauthorized|forbidden|403|429|rate.?limit|quota|resource_exhausted/i.test(text);
+}
+
 export interface BrandVisualContext {
   brandName?: string;
   positioning?: string;
@@ -137,6 +172,12 @@ export interface ImageGenResult {
   url: string | null;
   b64: string | null;
   status: "ready" | "failed";
+  /** User scene prompt after optional CJK→English translation, before guards/context. */
+  effectivePrompt: string;
+  /** User selection before provider fallback (or nano-banana in subject mode). */
+  requestedModel: string;
+  /** True when the returned image came from a fallback, not the requested/default primary. */
+  usedFallback: boolean;
   errorMsg?: string;
 }
 
@@ -164,7 +205,25 @@ function channelSize(channel?: string): ImageSize {
 function buildPrompt(input: ImageGenInput): string {
   const bc = input.brandContext ?? {};
   const lines: string[] = [];
-  if (bc.brandName) lines.push(`Brand: ${bc.brandName}`);
+  // Product-reference arbitration must precede all scene/context prose. Models
+  // otherwise tend to follow a later, concrete clothing description instead of
+  // the attached customer's product photo.
+  if (input.subjectImageUrl) {
+    lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK);
+    lines.push("");
+  }
+  // 2026-08-19 (客戶回報「勾選真實產品後再產圖，出現錯誤中文字」): in
+  // subject-reference mode the blanket NO-TEXT guard is deliberately relaxed
+  // so the real product's own printed label survives — which means anything
+  // else text-shaped in the prompt becomes fair game for the model to paint.
+  // The brand name is a CJK string ("小安素"), and Nano Banana duly stamped a
+  // garbled approximation of it across the frame as a watermark. The attached
+  // photo already IS this brand's product, so naming the brand adds nothing
+  // here: withhold it (and the brand-substitution paragraph below, which only
+  // exists to swap OTHER brands' products out of template scenes — impossible
+  // when the real product is the subject).
+  const nameBrandInPrompt = !input.subjectImageUrl;
+  if (bc.brandName && nameBrandInPrompt) lines.push(`Brand: ${bc.brandName}`);
   if (bc.positioning) lines.push(`Positioning: ${bc.positioning}`);
   if (bc.archetype) lines.push(`Archetype: ${bc.archetype}`);
   if (bc.voiceTone) lines.push(`Voice: ${bc.voiceTone}`);
@@ -174,7 +233,7 @@ function buildPrompt(input: ImageGenInput): string {
   // Brand override: the scene may come from a commercial-photography
   // template that references another brand's product (e.g. Coca-Cola,
   // Sprite). Instruct the model to adapt the style for this brand instead.
-  if (bc.brandName) {
+  if (bc.brandName && nameBrandInPrompt) {
     lines.push("");
     lines.push(
       `BRAND ADAPTATION: This image represents ${bc.brandName}. ` +
@@ -184,7 +243,9 @@ function buildPrompt(input: ImageGenInput): string {
     );
   }
   lines.push("");
-  lines.push("Scene:");
+  lines.push(input.subjectImageUrl
+    ? "Scene (environment, lighting, composition, pose, and atmosphere only):"
+    : "Scene:");
   lines.push(input.prompt);
   lines.push("");
   // 2026-07-07 (CJ「YT 縮圖出現不是國字的國字」): image models (Flux /
@@ -198,8 +259,6 @@ function buildPrompt(input: ImageGenInput): string {
   // blanket NO-TEXT rule would strip the product's own label — use the
   // fidelity guard instead (label letter-perfect, no OTHER generated text).
   if (input.subjectImageUrl) {
-    lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK);
-    lines.push("");
     lines.push(NO_MIRROR_PROMPT_BLOCK);
     lines.push("");
     lines.push(
@@ -224,7 +283,13 @@ async function runOpenAI(
 ): Promise<{ url: string | null; b64: string | null; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-  const model = modelOverride || process.env.IMAGE_GEN_MODEL_OPENAI || "gpt-image-1";
+  // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): gpt-image-2 is the
+  // designated OpenAI image model. IMAGE_GEN_MODEL_OPENAI is unset on the VM,
+  // so this literal — not the env — was what actually ran, and it was still
+  // gpt-image-1 despite imageRouter's comment calling gpt-image-2 the global
+  // default. Verified openable on the current key before the switch
+  // (op-probe-openai-image: HTTP 200, 17.5s).
+  const model = modelOverride || process.env.IMAGE_GEN_MODEL_OPENAI || "gpt-image-2";
 
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
@@ -238,6 +303,7 @@ async function runOpenAI(
       size,
       n: 1,
     }),
+    signal: AbortSignal.timeout(180_000),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -245,48 +311,132 @@ async function runOpenAI(
   }
   const json: any = await res.json();
   const item = json?.data?.[0] ?? {};
+  if (!item.url && !item.b64_json) throw new Error("OpenAI image gen returned no image");
   return { url: item.url ?? null, b64: item.b64_json ?? null, model };
+}
+
+function aspectForSize(size: ImageSize): string {
+  return size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
+}
+
+/**
+ * 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」): ListModels on the prod
+ * key now returns NO imagen model at all — imagen-3.0-* AND imagen-4.0-*
+ * both answer 404 NOT_FOUND for :predict — while gemini-2.5-flash-image /
+ * gemini-3-pro-image / gemini-3.1-flash-image ARE listed. Google moved image
+ * generation off the Imagen predict surface for this key tier, which took the
+ * whole "google" fallback down with it: OpenAI (429 no credits) → Google (404)
+ * → PiAPI Flux was the only path still producing pictures.
+ *
+ * The gemini image surface is generateContent + responseModalities, not
+ * predict, so it needs its own request shape. Same wire format genNanoBanana
+ * (mediaGen) already uses.
+ */
+const GEMINI_IMAGE_FALLBACK_MODEL = "gemini-2.5-flash-image";
+
+async function runGeminiImage(
+  promptText: string,
+  size: ImageSize,
+  model: string,
+): Promise<{ url: string | null; b64: string | null; model: string }> {
+  const keys = googleApiKeys();
+  if (!keys.length) throw new Error("GEMINI_API_KEY not set");
+  // flash-image takes no size parameter — the aspect ratio goes in-prompt.
+  const prompt = `${promptText}\n\nOutput aspect ratio: ${aspectForSize(size)}.`;
+  const errors: string[] = [];
+  for (const apiKey of keys) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ["IMAGE"] },
+        }),
+        signal: AbortSignal.timeout(120_000),
+      }
+    );
+    if (!res.ok) {
+      const text = redactProviderSecrets(await res.text());
+      const error = `Google ${model} ${res.status}: ${text.slice(0, 300)}`;
+      errors.push(error);
+      if (isRetryableGoogleKeyError(`${res.status} ${text}`)) continue;
+      throw new Error(error);
+    }
+    const json: any = await res.json();
+    const parts: any[] = json?.candidates?.[0]?.content?.parts ?? [];
+    const part = parts.find((p) => p?.inlineData?.data || p?.inline_data?.data);
+    const b64 = part?.inlineData?.data ?? part?.inline_data?.data ?? null;
+    // A success-shaped response with no image part must throw, not return a
+    // null url — otherwise the caller writes status=ready and stops falling
+    // back (see the runOpenAI empty-response fix).
+    if (!b64) {
+      const finish = json?.candidates?.[0]?.finishReason ?? "no image part";
+      throw new Error(`Google ${model} returned no image (${finish})`);
+    }
+    return { url: null, b64, model };
+  }
+  throw new Error(errors.join("\n") || `Google ${model} failed`);
 }
 
 async function runGoogleImagen(
   promptText: string,
   size: ImageSize
 ): Promise<{ url: string | null; b64: string | null; model: string }> {
-  const pool = (process.env.GEMINI_API_KEY_POOL ?? process.env.GEMINI_API_KEY ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!pool.length) throw new Error("GEMINI_API_KEY not set");
-  const apiKey = pool[Math.floor(Math.random() * pool.length)];
-  // 2026-05-18 (CJ「Imagen 3 產圖失敗」): ListModels on the prod key
-  // shows imagen-3.0-* is GONE (404 not_found for predict); only
-  // imagen-4.0-generate-001 / -fast / -ultra remain. Default to
-  // Imagen 4 so the "Imagen" choice works again.
-  const model = process.env.IMAGE_GEN_MODEL_GOOGLE || "imagen-4.0-generate-001";
-
-  const aspect =
-    size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        instances: [{ prompt: promptText }],
-        parameters: { sampleCount: 1, aspectRatio: aspect },
-      }),
-    }
-  );
-  if (!res.ok) {
-    const text = redactProviderSecrets(await res.text());
-    throw new Error(`Google Imagen ${res.status}: ${text.slice(0, 300)}`);
+  const model = process.env.IMAGE_GEN_MODEL_GOOGLE || GEMINI_IMAGE_FALLBACK_MODEL;
+  if (!model.startsWith("imagen-")) return runGeminiImage(promptText, size, model);
+  try {
+    return await runImagenPredict(promptText, size, model);
+  } catch (e: any) {
+    // A key without Imagen access answers 404 NOT_FOUND for every imagen
+    // model. A stale IMAGE_GEN_MODEL_GOOGLE=imagen-* pinned in an old .env
+    // must not take the Google fallback down again — hand off to the gemini
+    // surface instead. Any other failure (quota, safety, network) still
+    // propagates so the caller's PiAPI fallback runs.
+    if (!/\b404\b|NOT_FOUND/i.test(String(e?.message ?? e))) throw e;
+    return await runGeminiImage(promptText, size, GEMINI_IMAGE_FALLBACK_MODEL);
   }
-  const json: any = await res.json();
-  const b64 =
-    json?.predictions?.[0]?.bytesBase64Encoded ??
-    json?.predictions?.[0]?.image?.bytesBase64Encoded ??
-    null;
-  return { url: null, b64, model };
+}
+
+async function runImagenPredict(
+  promptText: string,
+  size: ImageSize,
+  model: string,
+): Promise<{ url: string | null; b64: string | null; model: string }> {
+  const keys = googleApiKeys();
+  if (!keys.length) throw new Error("GEMINI_API_KEY not set");
+  const aspect = aspectForSize(size);
+  const errors: string[] = [];
+  for (const apiKey of keys) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instances: [{ prompt: promptText }],
+          parameters: { sampleCount: 1, aspectRatio: aspect },
+        }),
+        signal: AbortSignal.timeout(120_000),
+      }
+    );
+    if (!res.ok) {
+      const text = redactProviderSecrets(await res.text());
+      const error = `Google Imagen ${res.status}: ${text.slice(0, 300)}`;
+      errors.push(error);
+      if (isRetryableGoogleKeyError(`${res.status} ${text}`)) continue;
+      throw new Error(error);
+    }
+    const json: any = await res.json();
+    const b64 =
+      json?.predictions?.[0]?.bytesBase64Encoded ??
+      json?.predictions?.[0]?.image?.bytesBase64Encoded ??
+      null;
+    if (!b64) throw new Error("Google Imagen returned no image");
+    return { url: null, b64, model };
+  }
+  throw new Error(errors.join("\n") || "Google Imagen failed");
 }
 
 // 2026-05-12: PiAPI bridge for user-selectable image models.
@@ -320,7 +470,9 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   if (!db) throw new Error("DB unavailable");
 
   const size = input.size ?? channelSize(input.channel);
-  const promptText = buildPrompt(input);
+  const translated = await translateImagePromptToEnglish(input.prompt);
+  const effectivePrompt = translated.prompt;
+  const promptText = buildPrompt({ ...input, prompt: effectivePrompt });
 
   // Pre-insert a pending row so we can retrieve it even if provider crashes.
   const [ins] = (await db.execute(sql`
@@ -344,7 +496,13 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
         imageUrl: input.subjectImageUrl,
         aspectRatio: aspect as any,
         brandId: input.brandId,
+        // The blanket NO_TEXT_NEGATIVE_PROMPT can't be used here — it would
+        // fight the real product's own label. Mirror-only, matching what
+        // mediaRouter.generate already passes on this same path.
+        negativePrompt: NO_MIRROR_NEGATIVE_PROMPT,
       });
+      // TODO: Add post-generation vision validation/retry for product fidelity;
+      // prompt arbitration reduces conflicts but cannot prove output compliance.
       if (r.status === "ready" && r.url) {
         await db.execute(sql`
           UPDATE generated_images
@@ -352,15 +510,15 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
               status = 'ready', errorMsg = NULL
           WHERE id = ${id}
         `);
-        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready" };
+        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready", effectivePrompt, requestedModel: "nano-banana", usedFallback: false };
       }
       const msg = redactProviderSecrets(r.errorMsg ?? "nano-banana returned no image");
       await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", errorMsg: msg };
+      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, requestedModel: "nano-banana", usedFallback: false, errorMsg: msg };
     } catch (e: any) {
       const msg = redactProviderSecrets(`nano-banana: ${String(e?.message ?? e).slice(0, 400)}`).slice(0, 240);
       await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", errorMsg: msg };
+      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, requestedModel: "nano-banana", usedFallback: false, errorMsg: msg };
     }
   }
 
@@ -370,6 +528,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   // 2026-05-12: model choice override. When user picks a specific model,
   // it becomes "primary" and the env default becomes "fallback".
   const choice = input.modelChoice ?? "auto";
+  const requestedModel = choice;
   let effectivePrimary: ImageProvider = primary;
   let primaryModelId: string | null = null;
   switch (choice) {
@@ -393,6 +552,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   let provider: ImageProvider = effectivePrimary;
   let out: { url: string | null; b64: string | null; model: string } | null = null;
   let errorMsg: string | undefined;
+  let usedFallback = false;
   try {
     out = await run(effectivePrimary, primaryModelId);
   } catch (e: any) {
@@ -418,6 +578,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
       try {
         out = await run(fb.p, fb.modelId);
         provider = fb.p;
+        usedFallback = true;
         break;
       } catch (e2: any) {
         errorMsg = `${errorMsg}\n${fb.p}: ${String(e2?.message ?? e2).slice(0, 200)}`;
@@ -433,7 +594,7 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
           status = 'ready', errorMsg = NULL
       WHERE id = ${id}
     `);
-    return { id, provider, model: out.model, url: out.url, b64: out.b64, status: "ready" };
+    return { id, provider, model: out.model, url: out.url, b64: out.b64, status: "ready", effectivePrompt, requestedModel, usedFallback };
   }
   const safeErrorMsg = redactProviderSecrets(errorMsg ?? "unknown").slice(0, 800);
   await db.execute(sql`
@@ -448,6 +609,9 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
     url: null,
     b64: null,
     status: "failed",
+    effectivePrompt,
+    requestedModel,
+    usedFallback: false,
     errorMsg: safeErrorMsg,
   };
 }

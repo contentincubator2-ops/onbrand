@@ -248,13 +248,19 @@ ${FB60_TONE}`,
     inputs: [
       { key: "campaign", label: "活動主題", type: "textarea", required: true },
     ],
+    // 2026-08-21 (CJ「要求每篇加 CTA 網址，有的版本有、有的沒有」): the
+    // old「CTA (10 字)」cap forced the model to choose between the URL and
+    // the button text; the URL now lives at the end of [Primary] and [CTA]
+    // is button text only. Enforced by adCopyContract (prompt rule →
+    // validate/retry → deterministic repair).
     systemPrompt: `產出 FB 廣告完整包其中 1 支廣告（150-300 字）。
 本次你寫的是「{label}」這個切角的完整廣告。
-結構：headline (25 字) + primary text (80-150 字) + CTA (10 字)。
-caption 欄位整合輸出格式：
+結構：headline (25 字內) + primary text (80-150 字) + CTA 按鈕文字 (2–8 字)。
+caption 欄位整合輸出格式（三個標記缺一不可、順序固定）：
 [Headline] xxx
 [Primary] xxxxx
 [CTA] xxx
+若使用者在需求裡給了網址：把該網址**逐字**放在 [Primary] 的最後一行（每一個切角都要），[CTA] 只放按鈕文字、不放網址。沒給網址就不要捏造任何連結。
 每個切角獨立完整，可直接複製到 Ads Manager。${FB60_TONE}`,
     preferredModel: "qwen",
     maxTokens: 900,

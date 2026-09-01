@@ -39,6 +39,7 @@ interface Props {
   brandId: number;
   onClose: () => void;
   onReposition: (productId: number) => void;
+  onImageUpdated?: () => void;
 }
 
 // ── Chip Input ────────────────────────────────────────────────────────────────
@@ -144,7 +145,7 @@ function PeriodRow({
 }
 
 // ── Main Modal ─────────────────────────────────────────────────────────────────
-export default function ProductDetailModal({ productId, brandId, onClose, onReposition }: Props) {
+export default function ProductDetailModal({ productId, brandId, onClose, onReposition, onImageUpdated }: Props) {
   const { lang } = useLang();
   const en = lang === "en";
 
@@ -154,6 +155,14 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     { enabled: !!productId, refetchOnWindowFocus: false },
   );
   const product: any = productQ?.data ?? null;
+  const productPositioning: ProductPositioning = (() => {
+    try {
+      return typeof product?.positioning === "string"
+        ? JSON.parse(product.positioning)
+        : (product?.positioning ?? {});
+    } catch { return {}; }
+  })();
+  const price = typeof productPositioning.price === "string" ? productPositioning.price : "";
 
   // Upsert mutation
   const upsertMut = (trpc as any).product?.upsert?.useMutation?.({
@@ -161,6 +170,19 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
       productQ?.refetch?.();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+    },
+  });
+  const updateImageMut = (trpc as any).product?.updateImageUrl?.useMutation?.({
+    onSuccess: () => {
+      productQ?.refetch?.();
+      onImageUpdated?.();
+      setImageDirty(false);
+      setImageError("");
+      setImageSaved(true);
+      setTimeout(() => setImageSaved(false), 2000);
+    },
+    onError: (error: any) => {
+      setImageError(String(error?.message ?? (en ? "Image URL is not usable" : "圖片網址無法使用")));
     },
   });
 
@@ -171,6 +193,10 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
   const [preferred, setPreferred] = useState<string[]>([]);
   const [forbidden, setForbidden] = useState<string[]>([]);
   const [periods, setPeriods] = useState<PromotionPeriod[]>([]);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageDirty, setImageDirty] = useState(false);
+  const [imageSaved, setImageSaved] = useState(false);
+  const [imageError, setImageError] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const initialised = useRef(false);
@@ -189,12 +215,15 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     // Interim positioning is stored under _interim (auto-discovery quick-pulse).
     // Full positioning overwrites these; fall back to _interim if not yet done.
     const interim = (pos._interim as any) ?? {};
-    setTagline(pos.tagline ?? interim.tagline ?? "");
-    setAudience(pos.targetAudience ?? pos.audience?.primary ?? interim.targetAudience ?? "");
-    setUsp(pos.usp ?? pos.differentiation?.functional ?? interim.usp ?? "");
+    const firstText = (...values: unknown[]) =>
+      values.find((value): value is string => typeof value === "string" && !!value.trim())?.trim() ?? "";
+    setTagline(firstText(pos.tagline, (pos as any).tagline?.zhTagline, pos.core?.zhTagline, pos.core?.oneLineValueProp, interim.tagline));
+    setAudience(firstText(pos.targetAudience, pos.audience?.primary, interim.targetAudience));
+    setUsp(firstText(pos.usp, pos.competition?.uniqueUsp, pos.core?.oneLineValueProp, pos.differentiation?.functional, interim.usp));
     setPreferred(Array.isArray(pos.preferredWords) ? pos.preferredWords : []);
     setForbidden(Array.isArray(pos.forbiddenWords) ? pos.forbiddenWords : []);
     setPeriods(Array.isArray(pos.promotionPeriods) ? pos.promotionPeriods : []);
+    setImageUrl(typeof pos.imageUrl === "string" ? pos.imageUrl : "");
   }, [product]);
 
   // Mark dirty when user edits
@@ -277,7 +306,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
           {/* AI Positioning Summary */}
-          {(tagline || audience || usp) && (
+          {(tagline || audience || usp || price) && (
             <div className="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl p-4 border border-indigo-100">
               <div className="flex items-center gap-1.5 mb-3">
                 <Sparkles size={13} className="text-indigo-500" />
@@ -286,6 +315,9 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 </span>
               </div>
               <div className="grid gap-2">
+                {price && (
+                  <p className="text-xs font-medium text-neutral-500">{en ? "Price" : "價格"}：{price}</p>
+                )}
                 {tagline && (
                   <div>
                     <span className="text-[9px] font-semibold uppercase text-indigo-400 tracking-wider">
@@ -317,6 +349,51 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
             <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider border-b border-neutral-100 pb-2">
               {en ? "Edit & Refine" : "手動編輯與精修"}
             </p>
+
+            {/* Canonical product image — saved independently so the server can
+                validate bytes and JSON_SET only this field without replacing
+                the rest of positioning. */}
+            <div>
+              <label className="block text-xs font-semibold text-neutral-600 mb-1.5">
+                {en ? "Product image URL" : "產品圖片網址"}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => {
+                    setImageUrl(e.target.value);
+                    setImageDirty(true);
+                    setImageSaved(false);
+                    setImageError("");
+                  }}
+                  placeholder="https://example.com/product.jpg"
+                  className="flex-1 text-sm px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400"
+                />
+                <button
+                  onClick={() => {
+                    const next = imageUrl.trim();
+                    if (!next.startsWith("https://")) {
+                      setImageError(en ? "The image URL must start with https://" : "圖片網址必須以 https:// 開頭");
+                      return;
+                    }
+                    updateImageMut?.mutate?.({ id: productId, imageUrl: next });
+                  }}
+                  disabled={!imageDirty || updateImageMut?.isPending}
+                  className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold disabled:opacity-40"
+                >
+                  {updateImageMut?.isPending
+                    ? (en ? "Checking…" : "驗證中…")
+                    : imageSaved ? (en ? "Saved ✓" : "已更新 ✓")
+                    : (en ? "Check & save" : "驗證並更新")}
+                </button>
+              </div>
+              <p className={`text-[11px] mt-1.5 ${imageError ? "text-red-600" : "text-neutral-400"}`}>
+                {imageError || (en
+                  ? "Must be a public HTTPS URL that returns a raster image; SVG and HTML pages are rejected."
+                  : "必須是可公開存取、直接回傳點陣圖片的 HTTPS 網址；不接受 SVG 或網頁。")}
+              </p>
+            </div>
 
             {/* Tagline */}
             <div>

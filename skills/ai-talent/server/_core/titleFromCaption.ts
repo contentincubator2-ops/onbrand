@@ -34,6 +34,9 @@ export function titleFromCaption(
   let s = caption.trim();
   if (!s) return fallback;
 
+  // 2026-08-21 (FB ad pack): labelled ad copy starts with "[Headline] …" —
+  // the marker is structure, not title text.
+  s = s.replace(/^(?:\[|【)\s*headline\s*(?:\]|】)\s*/iu, "");
   // Strip leading emoji / hashtag noise (a single line full of #tags
   // before the actual text is also stripped).
   s = s.replace(LEADING_NOISE, "");

@@ -3,17 +3,30 @@
  *
  * 2026-07-16 (CJ「七日發布台的是標準，不應該被更改，是其他任務要對齊七日
  * 發布台的標準」): this is theater's original caption→English-brief logic
- * extracted VERBATIM — same provider (anthropic), same system prompt, same
- * maxTokens, same fallback — so theater's behavior is byte-for-byte
- * unchanged, and every other task reuses the exact same logic instead of
- * inventing its own.
+ * originally extracted verbatim. Every image path reuses this shared logic
+ * instead of inventing its own.
+ *
+ * 2026-08-19: the shared prompt now also receives a lightweight brand
+ * identity and explicit real-world-logo safety rules. Subject-reference
+ * requests preserve the attached product's own identifiers.
  *
  * Contract: the image prompt is derived from the FINISHED CAPTION (not from
  * a separately-written style direction), converted into a short ENGLISH
- * brief, and sent to the image model. The Chinese 風格方向 shown in task UIs
- * is display-only and never reaches the model.
+ * brief, and sent to the image model. A semantically equivalent Traditional
+ * Chinese copy is returned for human editing; the Chinese 風格方向 remains a
+ * separate display-only field and never reaches the model.
  */
 import { invokeLLM } from "./llm";
+import {
+  fallbackBilingualVisualBrief,
+  parseBilingualBriefChoice,
+  type BilingualVisualBrief,
+} from "./bilingualVisualBrief";
+
+export interface BrandIdentityForImage {
+  name: string;
+  industry: string | null;
+}
 
 /**
  * 2026-07-19 (CJ「品牌顏色會被貫穿到圖片生成的指令中嗎」— answer was no):
@@ -48,17 +61,71 @@ export async function loadBrandPaletteHexes(
   }
 }
 
-export async function captionToVisualBrief(args: {
+/**
+ * Load only the identity fields image prompting needs. Keep this separate from
+ * the full brand-context pipeline so image fan-out performs one lightweight
+ * lookup per run and can still proceed when the local DB is unavailable.
+ */
+export async function loadBrandIdentityForImage(
+  brandId?: number | null,
+): Promise<BrandIdentityForImage | null> {
+  if (!brandId) return null;
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT name, industry FROM brands WHERE id = ? LIMIT 1`,
+      [brandId],
+    );
+    const row = (rows as any[])[0];
+    if (!row) return null;
+    return {
+      name: String(row.name ?? "").trim(),
+      industry: row.industry == null ? null : String(row.industry).trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export type { BilingualVisualBrief } from "./bilingualVisualBrief";
+
+export interface VisualBriefArgs {
   caption: string;
   brandTagline?: string | null;
+  brandIdentity?: BrandIdentityForImage | null;
+  /** True when the image model receives the customer's real product image. */
+  subjectMode?: boolean;
   platform?: string;
   /** Brand palette (from loadBrandPaletteHexes) — woven into the brief as
    *  the scene's dominant color scheme so generated images stay on-brand. */
   palette?: Array<{ hex: string; role: string }>;
-}): Promise<string> {
+}
+
+/**
+ * Produce the model-ready English brief and its human-friendly Traditional
+ * Chinese equivalent in one LLM call. The two fields must describe the same
+ * shot; only `prompt` is used by the automatic image pipeline.
+ */
+export async function captionToBilingualVisualBrief(args: VisualBriefArgs): Promise<BilingualVisualBrief> {
+  const identity = args.brandIdentity;
+  // 2026-08-19 (#80 客訴「勾選真實產品後再產圖，出現錯誤中文字」):
+  // subject mode permits only text already visible on the attached product.
+  // Keep text-shaped brand identity out of the model brief so Nano Banana
+  // cannot turn a Chinese brand name into invented labels or watermarks.
+  const brandLine = args.subjectMode
+    ? "(unknown)"
+    : identity
+      ? [identity.name, identity.industry].filter(Boolean).join(" — ") || "(unknown)"
+      : args.brandTagline ?? "(unknown)";
   const paletteLine = args.palette && args.palette.length > 0
     ? `\nBrand colors: ${args.palette.map((p) => `${p.hex}${p.role ? ` (${p.role})` : ""}`).join(", ")}`
     : "";
+  const brandSafetyRule = args.subjectMode
+    ? "BRAND SAFETY: Preserve the attached real product and all of its own logos, labels, wordmarks, text, colors, and signature design elements exactly as shown. Apart from those attached-product identifiers, never introduce any other real-world brand logo, wordmark, or recognizable signature design element."
+    : "BRAND SAFETY: Never include any real-world brand logo, wordmark, or recognizable signature design element, including swooshes, three-stripe motifs, branded checks, or similar identifiers. All clothing, footwear, accessories, and products must be generic, unbranded, and plain. When the caption mentions a product category, never apply the visual characteristics of that category's best-known brands. Your brief MUST NOT name or reference ANY brand, product name, company, or competitor, and MUST NOT transliterate, romanize, or invent an English brand name (never turn a Chinese brand like 小安素 into a made-up wordmark such as \"Nutrion\"). Describe the subject only by its generic product category and physical form, as a clean UNLABELED design.";
+  const textRule = args.subjectMode
+    ? "Apart from text already printed on the attached real product, the image must contain no text."
+    : "The image must contain no text.";
   try {
     const r = await invokeLLM({
       provider: "anthropic",
@@ -66,28 +133,32 @@ export async function captionToVisualBrief(args: {
       // direct Anthropic API (Azure naming) → 404 every theater cell
       // → fallback chain → 企劃台 crawl. Let anthropic use its
       // proven default (claude-sonnet-4-6).
-      maxTokens: 180,
+      // 130 English words (~180 tokens) + ~150 CJK characters (~150-300
+      // tokens depending on tokenizer) + JSON escaping can exceed 500.
+      // 1200 leaves roughly 2x headroom for verbose providers.
+      maxTokens: 1200,
       messages: [
         {
           role: "system",
           content:
-            "Convert the social post caption into a 1-2 sentence English visual brief for a text-to-image model. Photorealistic, brand-friendly. " +
-            // 2026-08-11 (bug checklist C2 — 小安素→「Nutrion」烤字 / Adidas 貼文→NIKE logo):
-            // image models cannot render a real wordmark, so when the brief names a
-            // brand/competitor they invent a fake romanized label or a rival's logo.
-            // Forbid ALL proper-noun brand references so nothing pressures the model to
-            // draw a mark — the real title/logo is overlaid later on an editable layer.
-            "CRITICAL — the generated image must contain NO text and NO logos: your brief MUST NOT name or reference ANY brand, product name, company, or competitor, and MUST NOT transliterate, romanize, or invent an English brand name (never turn a Chinese brand like 小安素 into a made-up wordmark such as \"Nutrion\"). Describe the subject only by its generic product category and physical form, as a clean UNLABELED design — e.g. \"a nutritional supplement drink in a plain unlabeled bottle\", \"a pair of athletic running shoes with no visible logo\". Never depict any real or invented logo, wordmark, emblem, brand name, or packaging text. " +
-            "If brand colors are provided, make them the scene's dominant color palette (props, backdrop, lighting accents) while keeping the scene natural. Output only the brief.",
+            "Convert the social post caption into a 1-2 sentence visual brief for a text-to-image model. Return two semantically equivalent versions: model-ready English and natural Traditional Chinese written for a Taiwan user (not translationese). Photorealistic and brand-friendly. " +
+            `${textRule}\n\n` +
+            `${brandSafetyRule}\n\n` +
+            "If brand colors are provided, make them the scene's dominant color palette (props, backdrop, lighting accents) while keeping the scene natural. Output JSON only in exactly this shape: {\"prompt\":\"English brief\",\"promptZh\":\"繁體中文版\"}.",
         },
         {
           role: "user",
-          content: `Brand: ${args.brandTagline ?? "(unknown)"}${paletteLine}\nPlatform: ${args.platform ?? "social"}\nCaption:\n${args.caption}`,
+          content: `Brand: ${brandLine}${paletteLine}\nPlatform: ${args.platform ?? "social"}\nCaption:\n${args.caption}`,
         },
       ],
     });
-    return r.choices[0]?.message?.content?.toString().trim() ?? "";
+    return parseBilingualBriefChoice(r.choices[0], args.caption);
   } catch {
-    return `Photorealistic editorial scene representing: ${args.caption.slice(0, 120)}`;
+    return fallbackBilingualVisualBrief(args.caption);
   }
+}
+
+/** Backward-compatible English-only API used by Theater and older callers. */
+export async function captionToVisualBrief(args: VisualBriefArgs): Promise<string> {
+  return (await captionToBilingualVisualBrief(args)).prompt;
 }

@@ -27,6 +27,7 @@ import {
   type Layout,
 } from "../_core/brandedComposer";
 import { scrapeWebsiteImages } from "../_core/websiteImageScraper";
+import { probeImageUrl } from "../_core/imageFetch";
 
 // ── Zod ────────────────────────────────────────────────────────────────
 
@@ -110,7 +111,14 @@ async function loadBrandProductImageUrls(
 
     if (urls.length >= cap) break;
   }
-  return Array.from(new Set(urls)).slice(0, cap);
+  const unique = Array.from(new Set(urls));
+  const usable: string[] = [];
+  for (let offset = 0; offset < unique.length && usable.length < cap; offset += 8) {
+    const batch = unique.slice(offset, offset + 8);
+    const results = await Promise.all(batch.map(async (url) => ({ url, ok: await probeImageUrl(url, 8_000) })));
+    usable.push(...results.filter((result) => result.ok).map((result) => result.url));
+  }
+  return usable.slice(0, cap);
 }
 
 interface StoredBrandColors extends BrandPalette {
@@ -376,7 +384,14 @@ export const brandColorsRouter = router({
         subjectImageUrl = productUrls[0] ?? "";
       }
 
-      // Fallback: no product image → scrape the brand website (same source
+      // A URL-shaped value is not necessarily an image: retired sites often
+      // redirect old product paths to an HTML homepage. Treat that exactly as
+      // no image so the website scrape fallback below still gets a chance.
+      if (subjectImageUrl && !(await probeImageUrl(subjectImageUrl, 8_000))) {
+        subjectImageUrl = "";
+      }
+
+      // Fallback: no usable product image → scrape the brand website (same source
       // extractForBrand already uses for 色號, so if colors worked this works).
       if (!subjectImageUrl) {
         try {
@@ -388,7 +403,12 @@ export const brandColorsRouter = router({
           if (typeof website === "string" && website.trim()) {
             const { scrapeWebsiteImages } = await import("../_core/websiteImageScraper");
             const imgs = await scrapeWebsiteImages(website, 8);
-            subjectImageUrl = imgs[0]?.url ?? "";
+            for (const img of imgs) {
+              if (await probeImageUrl(img.url, 8_000)) {
+                subjectImageUrl = img.url;
+                break;
+              }
+            }
           }
         } catch { /* fall through to the reason below */ }
       }

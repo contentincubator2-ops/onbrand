@@ -11,6 +11,20 @@ import { Chip, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useLang } from "../../../lib/i18n";
 
+/* ── SHOW_IMAGE_STYLE_OVERLAY ───────────────────────────────────────────────
+ *
+ * 2026-08-19：IG / FB feed 在「圖已生成」時，會把中文視覺方向（image.style）
+ * 壓成一條黑底字幕疊在圖片下緣。那段文字看起來像是這張圖的生成指令，其實
+ * 不是 —— 它由 image_director agent 與 caption writer「平行」產出
+ * (quickTaskOrchestra.ts:2050)，從未進過生圖模型；真正的 prompt 是
+ * captionToVisualBrief 依完成的 caption 轉出的英文 brief
+ * (visualBrief.ts:51)。兩者沒有因果關係，字條常與眼前的圖對不上。
+ *
+ * 先隱藏而非刪除：把這個常數改回 true 就完整還原。
+ * 視覺方向本身沒有消失 —— 尚未生圖時仍由 ImageGenSlot 的「視覺方向：」
+ * 顯示，另外也在 RunPage 側欄「本版本配圖指引」(RunPage.tsx:3050)。*/
+export const SHOW_IMAGE_STYLE_OVERLAY: boolean = false;
+
 /* ── ImageGenSlot — THE standard image placeholder for every mockup ─────────
  *
  * 2026-07-17 (CJ「畫面讓人混淆能不能產圖/產影片…盤查一遍，完全都補上一個
@@ -64,7 +78,9 @@ export function ImageGenSlot({
       } ${clickable ? `cursor-pointer transition ${dark ? "hover:bg-black/40" : "hover:bg-default-200"}` : ""} ${className}`}
     >
       {clickable ? (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-tiny font-semibold shadow-sm ${
+        // Keep the actionable control above script/caption overlays. The slot
+        // root deliberately does not create its own stacking context.
+        <span className={`relative z-20 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-tiny font-semibold shadow-sm ${
           dark ? "bg-white/90 text-default-900" : "bg-white text-default-800 border border-default-300"
         }`}>
           🎨 {ctaText}
@@ -251,6 +267,16 @@ export interface MockupFields {
    *  "帶版型" download. */
   overlayTitle?: string;
   liveDescription?: string;
+  /**
+   * 2026-08-20 (CJ「IG 留言回覆出現『製作中』而且沒有內容」): the ORIGINAL
+   * material a reply-type task is answering — the user's own comment /
+   * review text, taken from the run's persisted metadata.inputs
+   * (RunPage.tsx). Only comment/reply mockups read it, so no other mockup
+   * changes behaviour. Kept separate from liveDescription because that
+   * field already carries model-produced sub-copy on threads / podcast /
+   * web / 小紅書 (and JSON poll options on FBPoll).
+   */
+  liveSourceComment?: string;
   liveImageDesc?: string;
   liveVideoDesc?: string;
   liveCta?: string;

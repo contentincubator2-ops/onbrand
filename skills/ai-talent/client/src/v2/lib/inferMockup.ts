@@ -60,6 +60,9 @@ export type Format =
   | "event"           // event card
   | "cover"           // FB cover photo (851×315)
   | "comment"         // FB comment reply (one-reply chrome)
+  // 2026-08-20: same chrome family — IG / LinkedIn / TikTok / YouTube reply,
+  // plus YouTube's creator-pinned comment (「由頻道發布者置頂」row).
+  | "pinned-comment"  // YT pinned comment (yt-30-pinned-comment)
   | "group"           // FB group post (group chrome)
   | "recommendation"  // FB recommendation reply (with star rating)
   | "pinned"          // FB pinned post (FBFeed + pin badge)

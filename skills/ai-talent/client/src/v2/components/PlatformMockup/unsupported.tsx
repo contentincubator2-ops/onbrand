@@ -71,19 +71,16 @@ interface Props extends MockupFields {
 }
 
 export function UnsupportedVariantPlaceholder({
-  variant, steps, variantLabel, liveCaption, liveHashtags,
+  variant, steps, variantLabel, title, liveCaption,
 }: Props) {
   const icon = PLATFORM_ICON[variant.platform];
   const label = PLATFORM_LABEL[variant.platform];
-  // 2026-08-11 (bug checklist C4「僅顯示製作中佔位訊息，未產出實際回覆內容」):
-  // this card used to show ONLY the "coming soon" notice — even though the
-  // task had already generated a real caption/reply, {...f} passes it in as
-  // liveCaption, this component just never rendered it. The disclaimer text
-  // below ALREADY claims "下列是...預期會產出的內容" (below is the content
-  // this will produce) — that promise only held for squad step lists, never
-  // for the actual generated text. Show it when present so a missing
-  // MOCKUP never reads as missing CONTENT.
-  const hasCaption = !!liveCaption?.trim();
+  /* 2026-08-20 (CJ「這功能出現製作中…而且為什麼沒有產出內容」— seen on
+   * instagram:comment): the copy WAS produced, but this placeholder rendered
+   * only the squad's step list, which quick tasks don't have — so the card
+   * looked like a total failure. Whenever there is real produced copy, show
+   * it. A missing mockup skin must never hide the deliverable. */
+  const producedCopy = (liveCaption ?? "").trim();
 
   return (
     <div className="w-full max-w-[480px] mx-auto">
@@ -108,25 +105,23 @@ export function UnsupportedVariantPlaceholder({
             <p className="text-tiny tracking-wider uppercase text-default-500 mb-1">{label}</p>
             <h2 className="text-xl font-semibold tracking-tight">{variant.label}</h2>
             <p className="text-small text-default-500 mt-2 max-w-[380px]">
-              {hasCaption
-                ? "此格式的精準預覽正在製作中，但內容已經產出——如下所示。"
+              {producedCopy
+                ? "這個格式還沒有專屬的版型預覽，以下是本次實際產出的內容（可直接複製使用）。"
                 : "此格式的精準預覽正在製作中。下列是這個 squad 預期會產出的內容 — 功能本身不受影響。"}
             </p>
           </div>
 
-          {hasCaption && (
+          {producedCopy && (
             <>
               <Divider className="w-full" />
-              <div className="w-full text-left rounded-medium bg-default-50 border border-divider p-3">
-                <p className="text-tiny tracking-wider uppercase text-default-500 font-medium mb-2">
-                  實際產出內容
+              <div className="w-full text-left">
+                <p className="text-tiny tracking-wider uppercase text-default-500 font-medium mb-2 flex items-center gap-1.5">
+                  <FontAwesomeIcon icon={faWandMagicSparkles} /> 本次產出
                 </p>
-                <MarkdownText content={liveCaption as string} />
-                {liveHashtags && liveHashtags.length > 0 && (
-                  <p className="text-tiny text-primary-500 mt-2">
-                    {liveHashtags.map((t) => `#${t.replace(/^#/, "")}`).join(" ")}
-                  </p>
-                )}
+                <div className="rounded-medium bg-default-50 border border-divider px-3 py-2.5">
+                  {title && <p className="text-tiny text-default-500 mb-1">{title}</p>}
+                  <MarkdownText content={producedCopy} className="text-small text-default-800" />
+                </div>
               </div>
             </>
           )}

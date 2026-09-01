@@ -1,0 +1,85 @@
+name: Ops — Probe 502 evidence (read-only)
+
+# 2026-08-19: settle whether the IG 99s squad 502s come from
+#   (a) Node's 140s socket timeout  → "upstream prematurely closed connection"
+#   (b) nginx's 180s read timeout   → "upstream timed out (110)"  (usually 504)
+#   (c) the process being gone      → "connect() failed (111: Connection refused)"
+# Strictly read-only: no sed -i, no cp, no reload, no restart.
+
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Only show nginx lines matching this date/hour prefix, e.g. 2026/08/19 11"
+        type: string
+        default: "2026/08/19"
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Runtime facts
+        run: |
+          set +e
+          echo "===== node / nginx versions ====="
+          node -v 2>&1
+          which node 2>&1
+          nginx -v 2>&1
+          echo ""
+          echo "===== pm2 show onbrand (is ecosystem applied?) ====="
+          pm2 show onbrand 2>/dev/null | grep -iE "status|uptime|restarts|script path|script args|exec cwd|node args|max memory restart|kill timeout|watch" || true
+
+      - name: The onbrand nginx server block (correct vhost)
+        run: |
+          set +e
+          echo "===== sites-enabled listing ====="
+          ls -1 /etc/nginx/sites-enabled/ 2>&1
+          echo ""
+          echo "===== timeouts actually loaded for onbrand.sowork.ai ====="
+          # nginx -T dumps the *loaded* config, not just the file on disk.
+          sudo nginx -T 2>/dev/null \
+            | awk '/server_name .*onbrand\.sowork\.ai/,/^}/' \
+            | grep -nE "server_name|location |proxy_pass|proxy_(read|send|connect)_timeout|client_max_body_size" \
+            || echo "(no onbrand server block matched)"
+
+      - name: nginx error.log — only onbrand / trpc / upstream signatures
+        run: |
+          set +e
+          SINCE='${{ inputs.since }}'
+          echo "===== filter: $SINCE ====="
+          echo ""
+          echo "----- (a) upstream prematurely closed  = Node killed the socket -----"
+          sudo zgrep -h "prematurely closed" /var/log/nginx/error.log* 2>/dev/null | grep "$SINCE" | tail -25
+          echo ""
+          echo "----- (b) upstream timed out (110)     = nginx read timeout -----"
+          sudo zgrep -h "upstream timed out" /var/log/nginx/error.log* 2>/dev/null | grep "$SINCE" | tail -25
+          echo ""
+          echo "----- (c) connect() failed / refused   = upstream was gone -----"
+          sudo zgrep -h "connect() failed" /var/log/nginx/error.log* 2>/dev/null \
+            | grep "$SINCE" | grep -v ":3000" | tail -25
+          echo ""
+          echo "----- any onbrand.sowork.ai error line -----"
+          sudo zgrep -h "onbrand.sowork.ai" /var/log/nginx/error.log* 2>/dev/null | grep "$SINCE" | tail -30
+
+      - name: nginx access.log — runSquadAuto requests
+        run: |
+          set +e
+          echo "===== log_format in use (does it record request_time?) ====="
+          sudo nginx -T 2>/dev/null | grep -A3 "log_format" | head -20
+          echo ""
+          echo "===== runSquadAuto requests (all rotations) ====="
+          sudo zgrep -h "runSquadAuto" /var/log/nginx/access.log* 2>/dev/null | tail -30
+          echo ""
+          echo "===== any 502/504 on onbrand today ====="
+          sudo zgrep -hE '" (502|504) ' /var/log/nginx/access.log* 2>/dev/null | tail -30
+
+      - name: App-side view of the same window
+        run: |
+          set +e
+          echo "===== onbrand-error.log: real signals only ====="
+          grep -hE "runSquadAuto|public synthesis|step [0-9]+ timeout|uncaughtException|unhandledRejection|SIGTERM|SIGINT|heap|out of memory" \
+            /home/azureuser/.pm2/logs/onbrand-error.log* 2>/dev/null | tail -40
+          echo ""
+          echo "===== kernel OOM killer ====="
+          sudo dmesg -T 2>/dev/null | grep -iE "out of memory|killed process" | tail -10 || echo "(dmesg unavailable)"

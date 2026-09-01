@@ -1,0 +1,141 @@
+name: "Admin — 五感十築 voice.samples 改成正向直述（brand 2840）"
+
+# 2026-08-31 (CJ「修掉」)。
+#
+# 品牌 2840 的 positioning.voice.samples 是自動定位 pipeline 產出的語氣範例，
+# 三句 `ours` 全都在示範 skill 01 第一鐵律禁止的「否定＋轉折＋肯定」句型：
+#   1.「…帶來的是柔和明亮，而不是散不掉的悶熱——這不是運氣，是座向…」
+#   2.「…好建築的責任，不止於交屋那天，而是對未來數十年…的承諾。」
+#   3.「十項健康建築標準，不是給你看的規格表。它是管線裡流動的水質…」
+#
+# 這不只影響 brandPacks —— buildBrandCoreDigest 會把 samples[0].ours 當
+# 「語氣示範 ✓」注入每一個短任務的 prompt，所以是全域在教模型寫禁用句型。
+#
+# 這支 workflow：
+#   1. 印出原始 voice 區塊（log 即備份，要回復時照著寫回去）
+#   2. 用 wuganVoiceContract 驗證新句子，任何一句沒過就中止不寫
+#   3. 只改 voice.samples[].ours 與 voice.forbidden，其餘 positioning 不動
+#   4. 寫入後重讀並再驗一次
+#
+# dryRun 預設 yes：先看差異，確認無誤再用 no 實際寫入。
+
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        required: true
+        default: "2840"
+        type: string
+      dryRun:
+        description: "yes = 只印出差異不寫入"
+        required: true
+        default: "yes"
+        type: string
+
+jobs:
+  fix:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 10
+    steps:
+      - name: Rewrite voice samples
+        run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          cat > ./.wugan_voice_fix.mts <<'JS'
+          const mysql = await import("mysql2/promise");
+          const { validateWuganVoice } = await import("./server/_core/wuganVoiceContract.ts");
+
+          const BID = Number(process.env.BID);
+          const DRY = process.env.DRY !== "no";
+
+          // 改寫原則：保留原句的具體意象與資訊，只把「否定＋轉折」拆成正向直述。
+          // 第 4 句原本就沒有踩到禁用句型，保持原樣。
+          const NEW_OURS: Record<number, string> = {
+            0: "午後的陽光進到室內，帶來的是柔和明亮。這份明亮來自座向與日照在設計之初就被認真安排過的結果。",
+            1: "一棟 1989 年落成的建築，在三十餘年後成為台灣首座 LEED v5 認證建築。這件事告訴我們：好建築的責任會一直延伸到交屋之後，成為對未來數十年裡每一個在這裡生活的人的承諾。",
+            2: "十項健康建築標準，是管線裡流動的水質、門縫間流過的空氣、腳踩在地板上時身體感受到的安定。它們累積成讓人住得久、也住得安心的身體記憶。",
+          };
+
+          const NEW_FORBIDDEN_ENTRY =
+            "否定轉折句型（不是⋯而是⋯／並不是⋯而是⋯／不只是⋯而是⋯／不只是⋯更是⋯／不再是⋯而是⋯／而不是⋯）——一律改寫成正向直述，直接說它是什麼、怎麼做、帶來什麼感受";
+
+          const conn = await mysql.createConnection({
+            host: process.env.LOCAL_DB_HOST || "127.0.0.1",
+            port: Number(process.env.LOCAL_DB_PORT || 3306),
+            user: process.env.LOCAL_DB_USER || "mos_user",
+            password: process.env.LOCAL_DB_PASSWORD,
+            database: process.env.LOCAL_DB_NAME || "mos_db",
+          });
+
+          const [rows]: any = await conn.execute("SELECT positioning FROM brands WHERE id=?", [BID]);
+          if (!rows[0]) { console.error("NO SUCH BRAND", BID); process.exit(1); }
+          const pos = typeof rows[0].positioning === "string"
+            ? JSON.parse(rows[0].positioning) : rows[0].positioning;
+
+          console.log("===== 原始 voice（這段就是備份，要回復照它寫回去）=====");
+          console.log(JSON.stringify(pos.voice ?? null, null, 2));
+
+          const voice = pos.voice ?? {};
+          const samples: any[] = Array.isArray(voice.samples) ? voice.samples : [];
+          console.log("\n===== 原始 samples 的合約檢查 =====");
+          samples.forEach((s, i) => {
+            const issue = validateWuganVoice(String(s?.ours ?? ""));
+            console.log(`  [${i}] ${issue ? "違反 " + issue.pattern + " ×" + issue.count : "合格"}`);
+          });
+
+          console.log("\n===== 新句子的合約檢查（沒過就中止）=====");
+          let bad = 0;
+          for (const [k, v] of Object.entries(NEW_OURS)) {
+            const issue = validateWuganVoice(v);
+            console.log(`  [${k}] ${issue ? "✗ " + issue.pattern : "✓ 合格"}`);
+            if (issue) bad++;
+          }
+          if (validateWuganVoice(NEW_FORBIDDEN_ENTRY)) {
+            // forbidden 那條本身就在列舉禁用句型，允許它含有這些字串
+            console.log("  (forbidden 條目本身列舉禁用句型，略過檢查)");
+          }
+          if (bad > 0) { console.error("ABORT: 改寫後仍有", bad, "句違反"); process.exit(1); }
+
+          const newSamples = samples.map((s, i) =>
+            NEW_OURS[i] ? { ...s, ours: NEW_OURS[i] } : s);
+          const forbidden: string[] = Array.isArray(voice.forbidden) ? [...voice.forbidden] : [];
+          if (!forbidden.some((f) => String(f).includes("否定轉折句型"))) {
+            forbidden.unshift(NEW_FORBIDDEN_ENTRY);
+          }
+
+          console.log("\n===== 改寫後 =====");
+          newSamples.forEach((s, i) => console.log(`  [${i}] ours: ${s.ours}`));
+          console.log("  forbidden[0]:", forbidden[0]);
+
+          if (DRY) {
+            console.log("\nDRY RUN — 沒有寫入。確認無誤後用 dryRun=no 重跑。");
+            await conn.end();
+            process.exit(0);
+          }
+
+          const nextVoice = { ...voice, samples: newSamples, forbidden };
+          await conn.execute(
+            "UPDATE brands SET positioning = JSON_SET(positioning, '$.voice', CAST(? AS JSON)), updatedAt = NOW() WHERE id = ?",
+            [JSON.stringify(nextVoice), BID],
+          );
+          console.log("\nWROTE brand", BID);
+
+          const [after]: any = await conn.execute("SELECT positioning FROM brands WHERE id=?", [BID]);
+          const pos2 = typeof after[0].positioning === "string"
+            ? JSON.parse(after[0].positioning) : after[0].positioning;
+          console.log("\n===== 寫入後重讀並再驗一次 =====");
+          (pos2.voice?.samples ?? []).forEach((s: any, i: number) => {
+            const issue = validateWuganVoice(String(s?.ours ?? ""));
+            console.log(`  [${i}] ${issue ? "✗ 仍違反 " + issue.pattern : "✓ 合格"}  ${String(s?.ours ?? "").slice(0, 40)}…`);
+          });
+          console.log("  forbidden 條數:", (pos2.voice?.forbidden ?? []).length);
+          console.log("  其餘 positioning 區塊仍在:", Object.keys(pos2).join(", "));
+          await conn.end();
+          process.exit(0);
+          JS
+          BID="${{ github.event.inputs.brandId }}" DRY="${{ github.event.inputs.dryRun }}" \
+            node --import tsx ./.wugan_voice_fix.mts
+          echo "exit=$?"
+          rm -f ./.wugan_voice_fix.mts
+          exit 0

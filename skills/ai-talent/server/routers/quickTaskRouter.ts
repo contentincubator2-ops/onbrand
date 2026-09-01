@@ -17,11 +17,24 @@
  * Provider 容錯：preferred 失敗 → forge fallback（同 v2）
  */
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, singleFlightPerUser } from "../_core/trpc";
 import { callModel, type ModelProvider } from "../_core/multiModelRouter";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { ContentKindSchema } from "../_core/outputContentEnvelope";
+import {
+  assertGenericRegenerationAllowed,
+  preserveExistingVariantImage,
+  replaceRegeneratedContent,
+  selectRegenerationTarget,
+} from "../_core/quickTaskRegenerateContent";
+import {
+  STRATEGY_PERSISTENCE_BUDGET_MS,
+  STRATEGY_SCOUT_BUDGET_MS,
+  STRATEGY_STEP_DEADLINE_MS,
+} from "../_core/strategyPublicStepRouting";
 
 type FieldDef = {
   key: string;
@@ -669,6 +682,55 @@ function fillTemplate(tpl: string, inputs: Record<string, string | number | unde
 // uses the same source of truth + same 1-min cache.
 import { buildBrandPrefix as buildBrandContext } from "../_core/brandContext";
 
+/**
+ * 2026-08-11: turn a workbench spot reference into the audience label stored
+ * alongside the produced content.
+ *
+ * The client sends only { scenarioId, spotIndex }; the labels are read here
+ * from the brand's own positioning._workbench so they always match the
+ * scenario that actually produced them, and so a long audience anchor never
+ * has to travel through a URL.
+ *
+ * Best-effort by design: attribution is a nice-to-have on top of the content,
+ * never a reason to fail someone's task. Any miss (no ref, brand gone,
+ * scenario deleted, index out of range) simply yields an untagged run.
+ */
+async function resolveAudienceTag(
+  userId: number,
+  brandId: number | undefined,
+  spotRef: { scenarioId: string; spotIndex: number } | null | undefined,
+): Promise<{ audience: string; spotTitle: string | null; scenarioId: string; spotIndex: number } | null> {
+  if (!spotRef || !brandId) return null;
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+      [brandId, userId],
+    );
+    let pos: any = (rows as any[])[0]?.positioning;
+    if (!pos) return null;
+    if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { return null; } }
+
+    const scenarios: any[] = Array.isArray(pos?._workbench?.scenarios) ? pos._workbench.scenarios : [];
+    const scn = scenarios.find((s) => s?.id === spotRef.scenarioId);
+    if (!scn) return null;
+
+    const audience = String(scn?.selection?.audience ?? "").trim();
+    if (!audience) return null;
+    const spot = scn?.derived?.spots?.[spotRef.spotIndex];
+
+    return {
+      audience: audience.slice(0, 600),
+      spotTitle: spot?.title ? String(spot.title).slice(0, 120) : null,
+      scenarioId: spotRef.scenarioId,
+      spotIndex: spotRef.spotIndex,
+    };
+  } catch (e) {
+    console.warn("[resolveAudienceTag] non-fatal:", (e as Error)?.message);
+    return null;
+  }
+}
+
 // ── English labels for all 30s/60s tasks ────────────────────────────────────
 // Primary display locale is zh-TW; this map supplies the EN equivalent used
 // when the UI language is switched to English. KOL tasks already use the
@@ -773,7 +835,15 @@ const TASK_LABEL_EN: Record<string, string> = {
   "ig-60-story-3frame":           "IG Story 3-frame set",
   "ig-60-countdown-5day":         "IG 5-day countdown series",
   "ig-60-highlight-suite":        "IG Highlight × 5 (cover + content)",
-  "ig-60-live-suite":             "IG Live suite (5 pieces)",
+  "ig-60-live-suite":             "IG Live 30-min run-of-show (6 segments)",
+  "ig-60-live-event":             "IG Live audience-goal event (7 segments)",
+  "ig-60-live-founder":           "IG founder-led live (5 segments)",
+  "ig-60-live-versus":             "IG versus live (two-sided rounds)",
+  "ig-60-live-comeback":           "IG comeback live (after a long absence)",
+  "ig-60-live-collab-drop":        "IG collab drop live (two accounts, one launch)",
+  "ig-60-live-first-ever":         "IG first-ever live",
+  "ig-60-live-behind-scenes":      "IG unscripted workday live",
+  "ig-60-live-crew":               "IG crew live (3-5 people on camera)",
   "ig-60-serial-3":               "IG 3-part narrative series",
   "ig-60-viral-rewrite":          "IG Viral rewrite",
   "ig-60-testimonial-rewrite":    "IG Testimonial rewrite",
@@ -863,7 +933,28 @@ import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../_core/
 import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../_core/quickTaskMulti60";
 import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../_core/quickTask100";
 import { ALL_99S_SQUADS } from "../_core/quickTask100Squads";
+import { is99sOrchestraListed, platformOfTaskId } from "../_core/taskCatalogIndex";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
+import {
+  checkViralSource,
+  platformLabelOf,
+  templateNeedsViralSource,
+  VIRAL_SOURCE_KEY,
+} from "../_core/viralSourceGuard";
+import {
+  getIgStrategyExecutionSlug,
+  getIgStrategyPublicPolicy,
+  getIgStrategyRecordOverrides,
+  redactIgStrategySynthesisContext,
+} from "../_core/igStrategyPublicOutput";
+import {
+  buildIgStrategyPublicSlots,
+  type IgStrategyPrivateArtifact,
+} from "../_core/igStrategyPublicSynthesis";
+import {
+  assertIgStrategyPublicCampaignSafe,
+  synthesizeIgStrategyPublicSlots,
+} from "../_core/igStrategyPublicGeneration";
 import { IG_30S_TASKS, getIGOrchestraConfig } from "../_core/quickTaskIG";
 import { YT_30S_TASKS, getYTOrchestraConfig } from "../_core/quickTaskYT";
 import { TT_30S_TASKS, getTTOrchestraConfig } from "../_core/quickTaskTikTok";
@@ -875,6 +966,14 @@ import { RESEARCH_30S_TASKS, getResearchOrchestraConfig } from "../_core/quickTa
 // 2026-05-12 (CJ「KOL 提供說法不提供名單」)
 import { KOL_30S_TASKS, KOL_30S_ORCHESTRA } from "../_core/quickTaskKOL";
 function getKOLOrchestraConfig(taskId: string) { return KOL_30S_ORCHESTRA[taskId] ?? null; }
+// 2026-08-29 官網頻道 (web-)：品牌自己的部落格長文 / 品牌專欄 / 案例 / 產品頁。
+import { WEBSITE_30S_TASKS, getWebsiteOrchestraConfig } from "../_core/quickTaskWebsite";
+// 2026-08-29 per-brand 任務包。有 pack 的品牌，頻道與卡片完全由 pack 決定。
+import {
+  resolveBrandPack, expandPackCards, packNavForBrand,
+  findPackTemplate, findPackOrchestraConfig,
+} from "../_core/brandPacks";
+import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice } from "../_core/wuganVoiceContract";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
@@ -928,6 +1027,31 @@ function buildPriorContext(
 }
 
 /* ──────────────────────────── ROUTER ───────────────────────────────────── */
+
+// Production's largest DB-owned squad has seven planning steps. Its strictly
+// sequential wall-clock ceiling is 12s scout + (7 * 45s step deadline) + 4s
+// persistence = 331s (5m31s). A 2x safety factor covers scheduling jitter,
+// DB/context work outside those named budgets, and one full ceiling again,
+// while still guaranteeing recovery in 662s instead of leaking until PM2
+// restarts. This is intentionally independent of the 220s socket limit: a
+// disconnected handler/provider can outlive that socket, which is precisely
+// the stale-slot failure this upper bound must contain.
+const MAX_RUN_SQUAD_AUTO_PLANNING_STEPS = 7;
+const RUN_SQUAD_AUTO_SINGLE_FLIGHT_SAFETY_FACTOR = 2;
+export const RUN_SQUAD_AUTO_SINGLE_FLIGHT_TTL_MS =
+  (
+    STRATEGY_SCOUT_BUDGET_MS
+    + (MAX_RUN_SQUAD_AUTO_PLANNING_STEPS * STRATEGY_STEP_DEADLINE_MS)
+    + STRATEGY_PERSISTENCE_BUDGET_MS
+  ) * RUN_SQUAD_AUTO_SINGLE_FLIGHT_SAFETY_FACTOR;
+export const RUN_SQUAD_AUTO_MAX_CONCURRENT_PER_USER = 5;
+
+const runSquadAutoSingleFlight = singleFlightPerUser({
+  key: "quickTask.runSquadAuto",
+  message: "這個帳號同時產生中的企劃已達 5 個，請等其中一個完成後再開。",
+  ttlMs: RUN_SQUAD_AUTO_SINGLE_FLIGHT_TTL_MS,
+  maxConcurrent: RUN_SQUAD_AUTO_MAX_CONCURRENT_PER_USER,
+});
 
 export const quickTaskRouter = router({
   list: protectedProcedure.query(() => {
@@ -1027,7 +1151,37 @@ export const quickTaskRouter = router({
   // listFB: returns the entire FB task catalog (30s/60s/90s) for the new
   // home page chips. Includes bound agent metadata (avatar/name/title)
   // so cards can render the agent face as the thumbnail.
-  listFB: protectedProcedure.query(async () => {
+  /**
+   * 2026-08-29 —— 這個品牌的頻道列與 pill。
+   *
+   * 回 null 代表「沒有客製包」，前端就顯示今天的全部頻道。有包的話，側邊欄
+   * 只渲染包裡宣告的頻道 —— 建設公司不該看到 TikTok 開場鉤子和 KOL 邀約信。
+   *
+   * 跟 listFB 分開是因為呼叫端不同：頻道列在 ShellLayout（每頁都在），
+   * 任務清單在 PlatformTaskPage（只有 /tasks 才在）。合併會讓側邊欄去拉
+   * 一份 200 筆的目錄。
+   */
+  brandNav: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.number().optional(),
+        brandName: z.string().optional(),
+      }).optional(),
+    )
+    .query(({ input }) => {
+      return packNavForBrand({ brandId: input?.brandId, brandName: input?.brandName });
+    }),
+
+  listFB: protectedProcedure
+    .input(
+      z.object({
+        // 2026-08-29：帶了 brandId（或 brandName）才有辦法判斷這個品牌有沒有
+        // 客製任務包。維持 optional —— 舊呼叫端不傳就是全域目錄，行為不變。
+        brandId: z.number().optional(),
+        brandName: z.string().optional(),
+      }).optional(),
+    )
+    .query(async ({ input }) => {
     // Despite the name, this catalog now spans FB + IG (and other channels
     // as they ship). Frontend channel-icon row filters by task.platform /
     // postType prefix.
@@ -1073,6 +1227,12 @@ export const quickTaskRouter = router({
       platform: "audience",
     }));
     // 2026-05-12 — KOL outreach 30s tasks
+    // 2026-08-29 官網頻道：品牌自己的長文與產品頁，不是社群通路。
+    const webTasks = WEBSITE_30S_TASKS.map((t) => ({
+      ...t,
+      kind: "fast" as const,
+      platform: "website",
+    }));
     const kolTasks = KOL_30S_TASKS.map((t) => ({
       ...t,
       kind: "fast" as const,
@@ -1140,43 +1300,18 @@ export const quickTaskRouter = router({
     // 2026-05-18 (CJ): fb-99-carousel-5 is the one FB 99s task that runs
     // via the orchestra (multi-card carousel), not a squad — let it
     // through so it appears in the 99s tab; other fb-/ig- stay squad-driven.
-    const tasks99Orchestra = ALL_99S_TASKS.filter((t) =>
-      t.id === "fb-99-carousel-5" || t.id === "fb-99-serial-3" ||
-      t.id === "fb-99-trend-rewrite" || t.id === "fb-99-viral-rewrite" ||
-      t.id === "fb-99-testimonial-rewrite" || t.id === "fb-99-30day-calendar" ||
-      t.id === "fb-99-monthly-calendar-promo" || t.id === "fb-99-14day-countdown" ||
-      (!t.id.startsWith("fb-") && !t.id.startsWith("ig-"))
-    ).map((t) => {
-      const id = t.id;
-      const platform =
-        id.startsWith("yt-") ? "youtube"
-        : id.startsWith("tt-") ? "tiktok"
-        : id.startsWith("li-") ? "linkedin"
-        : id.startsWith("em-") ? "email"
-        : id.startsWith("pr-") ? "pr"
-        : id.startsWith("br-") ? "brand"
-        : id.startsWith("rs-") ? "audience"
-        // 2026-05-18 (CJ): kl-* (e.g. kl-99-campaign-toolkit) → KOL category
-        : id.startsWith("kl-") ? "kol"
-        : "facebook";
-      return { ...t, kind: "fast" as const, platform };
-    });
+    // 2026-08-23: allowlist 與平台推斷改從 _core/taskCatalogIndex 拿。這兩段邏輯
+    // 原本只存在這個函式裡，client 那 7 份 pill 對照表只能自己再抄一份，
+    // 於是 FB 與 IG 都漂出死 key 而沒人發現。現在 router 與防漂移測試共用同一份。
+    const tasks99Orchestra = ALL_99S_TASKS
+      .filter((t) => is99sOrchestraListed(t.id))
+      .map((t) => ({ ...t, kind: "fast" as const, platform: platformOfTaskId(t.id) }));
     const tasks100 = [...tasks99Squads, ...tasks99Orchestra];
-    const multi60Tasks = MULTI_60S_TASKS.map((t) => {
-      const id = t.id;
-      const platform =
-        id.startsWith("tt-") ? "tiktok"
-        : id.startsWith("li-") ? "linkedin"
-        : id.startsWith("em-") ? "email"
-        : id.startsWith("pr-") ? "pr"
-        : id.startsWith("br-") ? "brand"
-        : id.startsWith("rs-") ? "audience"
-        // 2026-05-18 (CJ「KOL 完整邀約話術包應在 KOL 類別」): kl-* was
-        // missing → fell through to "facebook". Tag it as the KOL category.
-        : id.startsWith("kl-") ? "kol"
-        : "facebook";
-      return { ...t, kind: "fast" as const, platform };
-    });
+    // 2026-05-18 (CJ「KOL 完整邀約話術包應在 KOL 類別」): kl-* 曾經漏掉而
+    // fallback 成 facebook。規則現在在 platformOfTaskId 一處維護。
+    const multi60Tasks = MULTI_60S_TASKS.map((t) => ({
+      ...t, kind: "fast" as const, platform: platformOfTaskId(t.id),
+    }));
     // 2026-05-18 (CJ「media to copy」): photo/video/doc tasks — isMediaTask:true
     // tells the frontend to route directly to the upload page (ctaPath) instead
     // of opening the standard orchestra modal.
@@ -1194,12 +1329,25 @@ export const quickTaskRouter = router({
       squadName: null,
     }));
 
-    const tasks: any[] = [
+    const globalTasks: any[] = [
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
       ...tasks100,
       ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks, ...kolTasks,
+      ...webTasks,
       ...mediaTasks,
     ];
+
+    // 2026-08-29 (CJ「每個品牌，只出現他的定位、任務，不會出現他用不到的」):
+    // 有客製包的品牌，整份目錄由包取代 —— 不是全域再加幾張，是只有包裡那些。
+    // 疊加模式解決不了原本的問題（客戶還是得滑過 200 張用不到的卡）。
+    // 沒有包的品牌走 globalTasks，行為與這次改動前完全一致。
+    //
+    // 這裡換掉 tasks 而不是在 return 前才過濾，是因為下面要靠 tasks 蒐集
+    // agent_id 去查頭像與團隊名單；晚換的話包裡的 agent 會查不到。
+    const brandPack = resolveBrandPack({ brandId: input?.brandId, brandName: input?.brandName });
+    const tasks: any[] = brandPack
+      ? expandPackCards(brandPack, new Map(globalTasks.map((t) => [t.id, t])))
+      : globalTasks;
     // 60s production-package universal team agent IDs (used by orchestra)
     // Emma Zhang / Helen Sung / David Wang / Sophie Ho / Jordan Hayes / Mandy / Nancy / Nina / Anna / Zeyu / Nathan
     const UNIVERSAL_60S_IDS = [30005, 180163, 30003, 60012, 239184, 180170, 180157, 180165, 60071, 60062];
@@ -1347,20 +1495,16 @@ export const quickTaskRouter = router({
       // the backend is still working. Same async-checkpoint pattern as
       // runOrchestra99 fixes this: return after captions+briefs (~30s),
       // run image gen + extras + QA in background, UI polls until done.
+      // 2026-08-11: workbench sweet-spot reference for audience attribution.
+      spotRef: z.object({
+        scenarioId: z.string().min(1).max(40),
+        spotIndex: z.number().int().min(0).max(7),
+      }).optional().nullable(),
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       input = { ...input, taskId: normalizeTaskId(input.taskId) }; // 100s→99s compat
       const userId = ctx.user!.id;
-      // P0-D pre-flight cost guard
-      const { preflightCostCheck } = await import("../llmWithBilling");
-      const guard60 = await preflightCostCheck(userId);
-      if (!guard60.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard60.reason });
-      // 2026-05-14: points-based gating (1 pt = 1 second of task compute)
-      const { assertPoints, deductPoints } = await import("../_core/pointsService");
-      await assertPoints(userId, "task_60s");
-      await deductPoints(userId, "task_60s", { kind: "task", id: null });
-      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
 
       // Pick template + config (same priority chain as before).
@@ -1384,15 +1528,46 @@ export const quickTaskRouter = router({
           PR_30S_TASKS.find((t) => t.id === input.taskId) ??
           BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
           RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-          KOL_30S_TASKS.find((t) => t.id === input.taskId);
+          KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
+          WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
+        findPackTemplate(input.taskId);
         if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
         const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
         config =
           _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
           getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
-          getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId);
+          getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId) ?? findPackOrchestraConfig(input.taskId);
         if (!config) throw new Error(`No config for: ${input.taskId}`);
       }
+
+      // ── Input validation — BEFORE the cost guard / points deduction ──────
+      // 2026-08-23 (CJ「tt-60-viral-rewrite 沒給爆款連結或主題時要出現錯誤提醒」):
+      // 爆款改寫任務的交付物就是「借用某一支既有爆款的結構」。沒有來源時
+      // orchestra 照跑，模型會自己編一支不存在的爆款去拆解 —— 用戶拿到的
+      // 東西看起來完整但毫無依據。空白、敷衍字、太簡略的答案都擋在這裡。
+      // 擺在扣點之前：被擋下來的請求一點都不扣。
+      //
+      // 注意：這裡故意「沒有」對 template.inputs 全跑一次 required 檢查
+      // （runQuick / runOrchestra99 有）。intake 只會送 primary_input 那一格，
+      // 而 fb-60-launch-kit / fb-60-countdown-5day / fb-60-link-full /
+      // fb-60-live-suite / ig-60-countdown-5day 這 5 個任務宣告了 primary 以外的
+      // required 欄位，通用檢查會把它們全部擋死。要補通用檢查得先修那些宣告。
+      if (templateNeedsViralSource(template)) {
+        const viral = checkViralSource(input.inputs[VIRAL_SOURCE_KEY], {
+          platformLabel: platformLabelOf(template),
+        });
+        if (!viral.ok) throw new TRPCError({ code: "BAD_REQUEST", message: viral.message.zh });
+      }
+
+      // P0-D pre-flight cost guard
+      const { preflightCostCheck } = await import("../llmWithBilling");
+      const guard60 = await preflightCostCheck(userId);
+      if (!guard60.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard60.reason });
+      // 2026-05-14: points-based gating (1 pt = 1 second of task compute)
+      const { assertPoints, deductPoints } = await import("../_core/pointsService");
+      await assertPoints(userId, "task_60s");
+      await deductPoints(userId, "task_60s", { kind: "task", id: null });
+      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
 
       // 2026-05-18 (CJ「所有 60s 任務都要：圖完成才展示，非套組降到 2 版」):
       // every 60s task generates images and promised a "complete post".
@@ -1415,7 +1590,8 @@ export const quickTaskRouter = router({
         };
       }
 
-      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" as const };
+      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" as const,
+        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef) };
 
       if (!input.asyncMode) {
         return runOrchestra(baseArgs);
@@ -1487,6 +1663,8 @@ export const quickTaskRouter = router({
       const { buildBrandPrefix } = await import("../_core/brandContext");
       const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
 
+
+
       const system =
         `你是 ${input.agentName ?? "資深文案"}（${input.agentTitle ?? "Brand Copywriter"}），正在跟用戶討論這篇文案的修改方向。\n` +
         `任務：根據用戶的修改意見，**重寫**整篇文案。輸出格式：\n` +
@@ -1557,6 +1735,28 @@ export const quickTaskRouter = router({
       const { buildBrandPrefix } = await import("../_core/brandContext");
       const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
 
+      // 2026-09-01 (CJ「AI 潤稿當中的十築，根本不是官網定義的十築」):
+      // brandPrefix 是通用的品牌 digest，沒有任何任務專屬知識，所以模型會
+      // 自己編領域詞彙。把該任務的 polishHint 帶進來。
+      const polishTemplate =
+        findPackTemplate(input.taskId)
+        ?? FB_30S_TASKS.find((t) => t.id === input.taskId)
+        ?? IG_30S_TASKS.find((t) => t.id === input.taskId)
+        ?? WEBSITE_30S_TASKS.find((t) => t.id === input.taskId)
+        ?? null;
+      const hintBlock = polishTemplate?.polishHint
+        ? `
+
+【這個任務必須知道的事實 —— 只能從這裡取用專有名詞，不要自己造】
+${polishTemplate.polishHint}`
+        : "";
+
+      // 使用者按下潤稿時往往還沒有想法（CJ：「我按下生活實踐的文章時，一定是
+      // 毫無頭緒，想獲得你的想法」）。素材太短時「整理」沒有意義，模型只能
+      // 反問使用者要他補充 —— 剛好跟使用情境相反。改成提案模式。
+      const bare = input.text.trim();
+      const proposeMode = bare.length < 40;
+
       // 2026-05-18 (CJ「只填網址時，AI 潤稿也要讀取該網址」): if the user
       // pasted (mostly) a URL, polishing the bare link is useless. Detect
       // + fetch the page and feed its content in, so the polish produces
@@ -1582,6 +1782,40 @@ export const quickTaskRouter = router({
       const urlRule = fetchedUrl
         ? `7. 用戶主要只給了一個連結；系統已抓取該頁內容（見下方【已抓取參考連結】）。請以「該頁實際內容」為素材主體整理出 brief，並保留原始連結；不要寫成通用模板，要呼應這篇的具體訊息。仍然只能用頁面上或用戶寫的事實，不可自行新增。\n`
         : "";
+      // 提案模式：素材太短代表使用者還沒有想法，這時「整理」沒有意義。
+      const proposeSystem =
+        `你是資深行銷企劃。用戶點開了任務「${taskHint}」${qHint}，但還沒有具體想法，想先看你的方向建議。
+` +
+        `請提出 3 個具體、可以直接執行的選題。
+
+` +
+        `每個建議照這個格式：
+` +
+        `【建議 N】<一句話的題目>
+` +
+        `　對應標準：<從下方任務知識裡挑一項，用它的正式名稱>
+` +
+        `　切角：<2 句。從什麼生活情境或身體感受切入，要具體到看得到畫面>
+` +
+        `　為什麼適合：<1 句>
+
+` +
+        `規則：
+` +
+        `1. 專有名詞只能用下方品牌資料與任務知識裡確實有的，絕對不可自己造（標準名稱、建案名、認證、獎項、數據一律不得杜撰）。
+` +
+        `2. 三個建議要用不同的標準、不同的切入角度，不要三個都在講同一件事。
+` +
+        `3. 不要綁特定節慶，除非用戶自己提到。
+` +
+        `4. 全文正向直述，嚴禁「不是⋯而是⋯」「不只是⋯而是⋯」「而不是⋯」等否定轉折句型。
+` +
+        `5. 第一行先寫：「以下是三個方向建議，不是既定事實 —— 選一個改寫，或直接覆蓋成你自己的想法。」
+` +
+        `6. 只輸出建議本身，不要前言、不要 markdown 圍欄。
+` +
+        hintBlock +
+        brandPrefix;
       const system =
         `你是資深行銷企劃，負責把用戶填寫的任務素材「潤飾整理」成一份清楚、可直接交給執行 agent 的 brief。\n` +
         `這份素材會被用在任務：「${taskHint}」${qHint}。\n` +
@@ -1593,20 +1827,43 @@ export const quickTaskRouter = router({
         `5. 保持用戶原本的語言（繁體中文）與意圖，不要過度擴寫、不要換掉語氣。\n` +
         `6. 只輸出整理後的素材本身，不要前言、不要解釋、不要 markdown 圍欄。\n` +
         urlRule +
+        hintBlock +
         brandPrefix;
 
       try {
         const r = await callModel(
           [
-            { role: "system", content: system },
+            { role: "system", content: proposeMode ? proposeSystem : system },
             { role: "user", content: input.text + urlBlock },
           ],
           undefined,
           "anthropic",
         );
-        const polished = (r.content ?? "").trim();
+        let polished = (r.content ?? "").trim();
         if (!polished) return { polished: "", ok: false, error: "empty" };
-        return { polished, ok: true };
+
+        // 2026-09-01：潤稿走的是 callModel，不經過 orchestra 的 caption 迴圈，
+        // 所以 wuganVoiceContract 管不到它 —— 實測提案產出仍有 1 處禁用句型。
+        //
+        // 這裡只做確定性修補、不重試：潤稿是使用者按下去等著看的動作，
+        // 多跑一輪模型會讓他多等一倍時間。
+        //
+        // 提案模式的文字完全由模型生成，一律修。
+        // 潤稿模式是在重組使用者自己寫的東西 —— 只有在「使用者原文乾淨、
+        // 是模型自己加上去」時才修，否則等於偷改使用者的句子。
+        if (polishTemplate && isWuganVoiceTemplate(polishTemplate)) {
+          const userHadIssue = validateWuganVoice(input.text) !== null;
+          if (proposeMode || !userHadIssue) {
+            const before = validateWuganVoice(polished);
+            if (before) {
+              polished = repairWuganVoice(polished);
+              console.warn(
+                `[polishInput] wugan-voice ${before.pattern} x${before.count} in ${proposeMode ? "propose" : "polish"} output for ${input.taskId} — repaired`,
+              );
+            }
+          }
+        }
+        return { polished, ok: true, mode: proposeMode ? "propose" as const : "polish" as const };
       } catch (e: any) {
         return { polished: "", ok: false, error: e?.message ?? String(e) };
       }
@@ -1685,11 +1942,16 @@ export const quickTaskRouter = router({
       }
     }),
 
-  // 100s squad auto-run — sequentially executes all steps of a real squad
-  // inline (no /picker redirect, no DB mission). Returns OrchestraResult-shaped
-  // variants[] where each variant = one step's output, so the existing
-  // OutputCarousel UI renders it the same as 30s/60s.
+  // 99s squad auto-run. Legacy squads still expose one variant per step.
+  // The five explicitly catalogued IG strategy tasks instead keep every step
+  // private and run a final public-content synthesis into publishable IG slots.
   runSquadAuto: protectedProcedure
+    // 2026-08-21: allow up to five runSquadAuto pipelines per user at a time.
+    // The per-user ceiling still limits repeated clicks from stacking work
+    // without bound on the single Node fork. See singleFlightPerUser in
+    // _core/trpc.ts for why this returns CONFLICT (409 JSON) rather than
+    // anything the client reads as a 502.
+    .use(runSquadAutoSingleFlight)
     .input(z.object({
       squadSlug: z.string().min(1).max(80),
       topic:     z.string().max(2000).default(""),
@@ -1697,15 +1959,20 @@ export const quickTaskRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const startedAt = Date.now();
+      const routeStartedAt = Date.now();
+      const startedAt = routeStartedAt;
       // 1. Load squad + agents + steps.
       // 100s→99s rename compat: the in-code squad index was renamed to the
       // new "fb-99-…" slugs, but the production `squads` table may still
       // hold the legacy "fb-100-…" slug (no DB migration). Match BOTH so
       // the lookup resolves regardless of which form the row has.
-      const sqSlugNew = normalizeTaskId(input.squadSlug);
+      const sqSlugNew = getIgStrategyExecutionSlug(input.squadSlug);
       const sqSlugLegacy = legacyTaskId(sqSlugNew);
       const sqSlugs = sqSlugLegacy ? [sqSlugNew, sqSlugLegacy] : [sqSlugNew];
+      // Only five catalogued IG strategy tasks get the private-artifact +
+      // final-public-synthesis boundary. Every unlisted squad keeps its variants and
+      // persistence fields unchanged.
+      const strategyPublicPolicy = getIgStrategyPublicPolicy(sqSlugNew);
       const [sqRows]: any = await localPool.execute(
         `SELECT id, slug, name, agents, steps, methodology, lead_agent_id
            FROM squads WHERE slug IN (${sqSlugs.map(() => "?").join(",")}) AND is_active = 1 LIMIT 1`,
@@ -1727,6 +1994,7 @@ export const quickTaskRouter = router({
       // whether the zh-TW deterministic sanitizer may run on step output.
       const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../_core/brandMarket");
       const brandMarket = await getBrandMarket(input.brandId).catch(() => DEFAULT_BRAND_MARKET);
+      const strategyRecordOverrides = getIgStrategyRecordOverrides(sqSlugNew, brandMarket.outputLanguage);
 
       // 3. Inject 100s scout data (real-time festivals/trending/news)
       let scoutBlock = "";
@@ -1752,12 +2020,61 @@ export const quickTaskRouter = router({
         }
       } catch { /* non-fatal */ }
 
-      // 4. Run each step in sequence — collect outputs as variants
-      const { callModel } = await import("../_core/multiModelRouter");
+      // 4. Run each step in sequence. For the five targets these are private
+      // reasoning artifacts; legacy squads still collect them as variants.
+      const { callModel, callModelStrict } = await import("../_core/multiModelRouter");
       const variants: any[] = [];
       const errors: string[] = [];
       const stages: any[] = [];
-      const prevOutputs: string[] = [];
+      // Keyed by step index, never appended. A merged round finishes in
+      // completion order, so a push-ordered list would hand a later step the
+      // wrong predecessors: with steps 1 and 2 sharing a round and step 2
+      // landing first, step 4's "last two" became step 1 + step 3 instead of
+      // step 2 + step 3 — exactly the dependency this plan exists to protect.
+      // Selecting by index reproduces the sequential reading whatever order
+      // the round settles in.
+      const stepOutputs: Array<string | undefined> = [];
+      const planningArtifacts: any[] = [];
+      const privateArtifacts: IgStrategyPrivateArtifact[] = [];
+      const privateRunId = strategyPublicPolicy ? randomUUID() : null;
+      const strategyStepRouting = strategyPublicPolicy
+        ? await import("../_core/strategyPublicStepRouting")
+        : null;
+      // The DB owns the number of steps. Four steps stay strictly sequential:
+      // 12s scout + (4 * 40s step) + ~4s persistence = ~176s, inside the 205s
+      // admission guard (220s socket timeout - 15s finalization reserve).
+      // Five steps would need 212s, so the planner merges the two leading
+      // steps into one round and leaves 3 -> 4 -> 5 sequential, because those
+      // later steps really do read their predecessors.
+      const strategyPlanning = strategyStepRouting
+        ? strategyStepRouting.planStrategyPlanning({
+            stepCount: stepsRaw.length,
+            serverTimeoutMs: strategyStepRouting.STRATEGY_SERVER_TIMEOUT_MS,
+          })
+        : null;
+      const strategyRouteBudget = strategyPlanning?.budget ?? null;
+      // 2026-08-20: this used to throw PRECONDITION_FAILED here. That was
+      // wrong, and production proved it within the hour: ig-99-visual-story
+      // carries SEVEN steps in the DB (the seed file's five are stale), so
+      // every run was refused outright and the user got nothing at all —
+      // strictly worse than before, where the route ran until the per-step
+      // admission guard stopped it and at least persisted the planning drafts
+      // it had already paid for.
+      //
+      // An oversized squad is a configuration problem, not a request the user
+      // can fix by being told to go away. Record it loudly, then let the
+      // per-step guard do what it already does: run what fits, refuse the
+      // tail, keep the drafts. Public synthesis still fails closed on the
+      // incomplete artifacts, which is the honest outcome.
+      if (strategyPlanning && !strategyPlanning.budget.fitsRouteBudget) {
+        console.warn("[runSquadAuto] strategy route cannot fit its planning steps", {
+          taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
+          stepCount: stepsRaw.length,
+          waveCount: strategyPlanning.waves.length,
+          planningWorstCaseMs: strategyPlanning.budget.planningWorstCaseMs,
+          routeLimitMs: strategyPlanning.budget.routeLimitMs,
+        });
+      }
 
       // Resolve all unique step agent IDs in one query
       const agentIds = Array.from(new Set(stepsRaw
@@ -1775,11 +2092,15 @@ export const quickTaskRouter = router({
         }
       }
 
-      for (let i = 0; i < stepsRaw.length; i++) {
+      const runPlanningStep = async (i: number) => {
         const step = stepsRaw[i];
+        const stepStartedAt = Date.now();
         const stageStart = Date.now() - startedAt;
         const stageKey = `step${i + 1}`;
-        const stageLabel = step.name ?? step.title ?? `Step ${i + 1}`;
+        const internalStageLabel = step.name ?? step.title ?? `Step ${i + 1}`;
+        const publicStageLabel = strategyPublicPolicy
+          ? (brandMarket.isZhTW ? `內容分析 ${i + 1}` : `Content analysis ${i + 1}`)
+          : internalStageLabel;
         const aid = Number(step.assignedAgentId);
         const a = agentMap[aid];
         const agentName = a?.name ?? step.assignedAgentName ?? "Squad Agent";
@@ -1805,22 +2126,117 @@ export const quickTaskRouter = router({
           ? `▸ 全文禁句尾與句中驚嘆號（! 與 ！都禁）；禁 emoji；繁體台灣用語（用「管道」非「渠道」，不得簡體字）。\n▸ 禁業配 / 空洞套語：「強大功能」「突破性的功能」「期待你的回音」「期待聽到你的想法」「非常期待與你合作」「讓我們一起創造」「一起創造美好的合作」「管理品牌形象」「在這個數位時代」「更加精彩」「非常契合」等一律不准出現。沉穩、真誠、務實的守護者語氣，5 個 step 語氣必須一致。`
           : `▸ 全文一律使用 ${brandMarket.outputLanguage}（品牌目標市場語言）撰寫，不得混入中文。\n▸ 語氣沉穩、真誠、務實，5 個 step 語氣必須一致；避免浮誇銷售腔、空洞套語與 PR 腔。`;
         const VOICE_GUARD = `\n══════════════════════════════════════════\n【文字衛生與交付物保真 — 違反直接不合格，輸出前逐句自查】\n══════════════════════════════════════════\n${voiceLangRules}\n▸ 收尾用一個對方會想回的具體問句，不要 PR 套語。\n▸ **交付物必須對得上本 step 的名稱與功能，不是每個 step 都寫一封邀約信**：\n  ・名稱含「Brief / 資料包」＝給 KOL 看的品牌資料文件（條列：品牌背景、目標受眾、合作規格、報酬與時程方向、使用方式），**不是邀請信**。\n  ・名稱含「報價回應 / 議價」＝在「KOL 已回覆報價」情境下你方的回信（含可接受 / 需調整兩種談法），**不是群發邀約**。\n  ・名稱含「追蹤 / follow-up」＝未回覆時的短追蹤（不催促，給新切入點）。\n  ・名稱含「感謝 / 結案」＝內容上線後的感謝＋成效回饋詢問＋長期關係。\n  ・名稱含「邀請 / 開場 / 主信」＝完整可寄出的邀約信。\n══════════════════════════════════════════`;
-        const system = `${persona}\nSquad「${squad.name}」步驟「${stageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}\n步驟說明：${step.description ?? ""}\n預期產出：${step.outputType ?? step.outputKind ?? "(未指定)"}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合上方「交付物保真」對「${stageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。直接給結果，不要前言、不要 markdown 圍籬。`;
+        const promptHeader = strategyPublicPolicy
+          ? `【伺服器內部分析，不是公開成品】\nSquad「${squad.name}」步驟「${internalStageLabel}」。\n內部方法：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}。完整保留分析細節，供最後的公開內容編輯階段使用。`
+          : `Squad「${squad.name}」步驟「${internalStageLabel}」負責人。\n方法論：${typeof squad.methodology === "string" ? squad.methodology : (squad.methodology?.author ?? "")}`;
+        const expectedOutput = strategyPublicPolicy
+          ? step.outputType ?? step.outputKind ?? internalStageLabel
+          : step.outputType ?? step.outputKind ?? "(未指定)";
+        const strategyLengthLimit = strategyPublicPolicy
+          ? (brandMarket.isZhTW
+              ? `【整份回覆硬上限 — 最高優先】整份回覆的所有交付物合計不得超過 ${strategyStepRouting?.STRATEGY_STEP_ZH_TW_CHAR_LIMIT ?? 800} 個繁體中文字，不是每個平台或區塊各自計算。若 step 要求多平台、多格式或多版本，必須精簡每份交付物，仍要共用這個總上限。在上限內保留核心洞察、具體建議與可執行細節，刪除重複鋪陳。`
+              : `【Whole-response hard limit — highest priority】The complete response, with every deliverable combined, must not exceed 600 words in ${brandMarket.outputLanguage}; this is not a separate allowance for each platform or section. If the step requests multiple platforms, formats, or variants, shorten each deliverable to keep their combined response within this single limit. Retain core insights, concrete recommendations, and actionable details; remove repetition.`)
+          : "";
+        const system = `${persona}\n${promptHeader}\n步驟說明：${step.description ?? ""}\n預期產出：${expectedOutput}${ZERO_TOLERANCE}${VOICE_GUARD}\n\n${brandMarket.isZhTW ? "用繁體中文（台灣用語，不得簡體字）輸出" : `一律用 ${brandMarket.outputLanguage} 輸出（品牌目標市場語言）`}，扣回品牌語氣；本 step 的交付物形態必須符合「${internalStageLabel}」的定義，不要寫成跟其他 step 一樣的邀約信。只能使用「下方注入的真實資料」中逐字存在的數字，沒有就用質化描述，不要自行補數據。${strategyLengthLimit ? `\n${strategyLengthLimit}` : ""}\n直接給結果，不要前言、不要 markdown 圍籬。`;
+
+        // Steps sharing a round cannot see each other; that is the point of
+        // capping the round size. Everything already finished before this
+        // step's index is visible, nearest two first, as in the sequential run.
+        const upstreamOutputs = stepOutputs
+          .slice(0, i)
+          .filter((value): value is string => typeof value === "string" && value.length > 0)
+          .slice(-2);
 
         const userMsg = [
           `【任務主題】${input.topic || "(未指定)"}`,
           brandPrefix ? `\n${brandPrefix}` : "",
           scoutBlock,
-          prevOutputs.length > 0 ? `\n【上游 step 已產出】\n${prevOutputs.slice(-2).join("\n\n").slice(0, 2000)}` : "",
+          upstreamOutputs.length > 0 ? `\n【上游 step 已產出】\n${upstreamOutputs.join("\n\n").slice(0, 2000)}` : "",
           `\n請執行此步驟。`,
         ].filter(Boolean).join("\n");
 
+        let stepProvider: "anthropic" | "qwen" = "qwen";
+        let stepAttempt: 1 = 1;
+        let stepStatus: "done" | "failed" = "failed";
+        let stepErrorCode: string | null = null;
         try {
-          const r = await Promise.race([
-            callModel([{ role: "system", content: system }, { role: "user", content: userMsg }], undefined, "qwen"),
-            new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`step ${i+1} timeout`)), 25_000)),
-          ]);
-          let text = (r.content ?? "").trim();
+          const messages = [{ role: "system" as const, content: system }, { role: "user" as const, content: userMsg }];
+          let r: Awaited<ReturnType<typeof callModel>>;
+          if (strategyPublicPolicy && strategyStepRouting && strategyRouteBudget) {
+            // Production shows OpenAI cannot complete this strategy workload,
+            // while the shared deadline gave a fallback no useful runtime.
+            // Let the proven Anthropic path own the complete 40-second budget.
+            stepProvider = strategyStepRouting.STRATEGY_STEP_PROVIDER;
+            // Background synthesis does not consume the HTTP budget. Before
+            // each DB-owned step, require its full 40s to fit before the 205s
+            // route guard, preserving 15s of the 220s socket limit for
+            // persistence, response work and scheduling jitter.
+            if (!strategyStepRouting.hasStrategyStepBudget({
+              routeStartedAt,
+              now: Date.now(),
+              routeLimitMs: strategyRouteBudget.routeLimitMs,
+              stepDeadlineMs: strategyRouteBudget.stepDeadlineMs,
+            })) {
+              throw Object.assign(new Error("strategy route has insufficient budget for another planning step"), {
+                strategyErrorCode: "step_route_budget",
+                strategyProvider: strategyStepRouting.STRATEGY_STEP_PROVIDER,
+                strategyAttempt: 1,
+              });
+            }
+            // TODO: callModel/callModelStrict cannot reliably cancel this route-local
+            // deadline. In particular llm.ts's Anthropic branch does not pass a signal
+            // (unlike OpenAI), so a timed-out Anthropic call can remain a ghost request.
+            // Fixing that requires shared LLM changes and is intentionally outside PR 1.
+            const routed = await strategyStepRouting.runAnthropicStrategyStep({
+              deadlineAt: stepStartedAt + strategyRouteBudget.stepDeadlineMs,
+              execute: () => callModelStrict(
+                messages,
+                strategyStepRouting.STRATEGY_STEP_PROVIDER,
+                undefined,
+                {
+                  // Derived from the three production truncations and their
+                  // 19,667-25,749ms latency; see the routing constant comment.
+                  maxTokens: strategyStepRouting.STRATEGY_STEP_MAX_TOKENS,
+                  includeFinishReason: true,
+                },
+              ),
+            });
+            stepProvider = routed.provider;
+            stepAttempt = routed.attempt;
+            stepErrorCode = routed.errorCode;
+            if (!routed.ok) {
+              throw Object.assign(routed.error, {
+                strategyErrorCode: routed.errorCode,
+                strategyProvider: routed.provider,
+                strategyAttempt: routed.attempt,
+              });
+            }
+            const finishErrorCode = strategyStepRouting.getStrategyStepFinishErrorCode(
+              routed.value.finishReason,
+            );
+            if (finishErrorCode) {
+              stepErrorCode = finishErrorCode;
+            }
+            r = routed.value;
+          } else {
+            r = await Promise.race([
+              callModel(messages, undefined, "qwen"),
+              new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`step ${i+1} timeout`)), 25_000)),
+            ]);
+          }
+          const rawText = (r.content ?? "").trim();
+          if (
+            strategyPublicPolicy
+            && stepErrorCode === "step_truncated"
+            && !strategyStepRouting?.isUsableTruncatedStrategyStepContent(rawText)
+          ) {
+            throw Object.assign(new Error("strategy step output was truncated before producing usable material"), {
+              strategyErrorCode: stepErrorCode,
+              strategyProvider: stepProvider,
+              strategyAttempt: stepAttempt,
+            });
+          }
+          let text = rawText;
           // 2026-05-19 (CJ 驗收 v#3): deterministic 文字衛生 backstop on
           // squad-step output — guaranteed, independent of model adherence.
           try {
@@ -1836,31 +2252,165 @@ export const quickTaskRouter = router({
               if (latinPunctLang(brandMarket.outputLanguage)) text = normalizeLatinPunct(text);
             }
           } catch { /* fail-safe: keep raw text */ }
-          prevOutputs.push(`【${stageLabel}】${text.slice(0, 800)}`);
-          variants.push({
-            label: stageLabel,
-            caption: text,
-            hashtags: [],
-            image: { style: null, url: null, status: "skipped" },
-            agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
-          });
-          stages.push({ key: stageKey, label: stageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
+          if (strategyPublicPolicy) {
+            const privateTerms = [
+              { value: squad.name, replacement: { zh: "策略團隊", en: "strategy team" } },
+              { value: a?.name ?? step.assignedAgentName, replacement: { zh: "策略團隊", en: "strategy team" } },
+              { value: a?.title, replacement: { zh: "策略團隊", en: "strategy team" } },
+              { value: a?.specialty, replacement: { zh: "內容方法", en: "content approach" } },
+              { value: a?.methodology, replacement: { zh: "內容方法", en: "content approach" } },
+            ];
+            privateArtifacts.push({
+              stepOrder: i + 1,
+              status: "done",
+              internalLabel: String(internalStageLabel),
+              outputType: typeof step.outputType === "string" ? step.outputType : null,
+              outputKind: typeof step.outputKind === "string" ? step.outputKind : null,
+              agentId: Number.isFinite(aid) && aid > 0 ? aid : null,
+              agentName: a?.name ?? step.assignedAgentName ?? null,
+              rawContent: rawText,
+              // A substantial partial response follows the exact same
+              // sanitizer/privacy path and remains observable as truncated.
+              errorCode: stepErrorCode,
+              latencyMs: Date.now() - startedAt - stageStart,
+            });
+            const planningCaption = redactIgStrategySynthesisContext(
+              sqSlugNew,
+              text,
+              { steps: stepsRaw, outputLanguage: brandMarket.outputLanguage, privateTerms },
+            );
+            planningArtifacts.push({
+              id: `planning-${i + 1}`,
+              label: String(internalStageLabel),
+              caption: planningCaption || (brandMarket.isZhTW ? "此策略內容已完成。" : "This planning artifact is complete."),
+              hashtags: [],
+              image: { style: null, url: null, status: "skipped" },
+            });
+            // Downstream private analysis consumes the full private result,
+            // never the sanitized public DTO.
+            stepOutputs[i] = `【${internalStageLabel}】${text.slice(0, 8_000)}`;
+          } else {
+            const variant = {
+              label: internalStageLabel,
+              caption: text,
+              hashtags: [],
+              image: { style: null, url: null, status: "skipped" },
+              agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+            };
+            stepOutputs[i] = `【${variant.label}】${variant.caption.slice(0, 800)}`;
+            variants.push(variant);
+          }
+          stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "done" });
+          stepStatus = "done";
         } catch (e: any) {
-          errors.push(`step ${i+1} (${stageLabel}): ${e?.message ?? e}`);
-          variants.push({
-            label: stageLabel,
-            caption: "",
-            hashtags: [],
-            image: { style: null, url: null, status: "failed" },
-            agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
-          });
-          stages.push({ key: stageKey, label: stageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
+          stepProvider = e?.strategyProvider ?? stepProvider;
+          stepAttempt = e?.strategyAttempt ?? stepAttempt;
+          stepErrorCode = e?.strategyErrorCode
+            ?? (/timeout|deadline/i.test(String(e?.message ?? e)) ? "step_timeout" : "step_failed");
+          errors.push(`step ${i+1} (${publicStageLabel}): ${e?.message ?? e}`);
+          if (strategyPublicPolicy) {
+            privateArtifacts.push({
+              stepOrder: i + 1,
+              status: "failed",
+              internalLabel: String(internalStageLabel),
+              outputType: typeof step.outputType === "string" ? step.outputType : null,
+              outputKind: typeof step.outputKind === "string" ? step.outputKind : null,
+              agentId: Number.isFinite(aid) && aid > 0 ? aid : null,
+              agentName: a?.name ?? step.assignedAgentName ?? null,
+              rawContent: "",
+              errorCode: stepErrorCode,
+              latencyMs: Date.now() - startedAt - stageStart,
+            });
+            planningArtifacts.push({
+              id: `planning-${i + 1}`,
+              label: String(internalStageLabel),
+              caption: "",
+              hashtags: [],
+              image: { style: null, url: null, status: "failed" },
+            });
+          } else {
+            variants.push({
+              label: internalStageLabel,
+              caption: "",
+              hashtags: [],
+              image: { style: null, url: null, status: "failed" },
+              agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+            });
+          }
+          stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
+        } finally {
+          if (strategyPublicPolicy) {
+            console.info("[runSquadAuto] step", {
+              taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
+              stepOrder: i + 1,
+              provider: stepProvider,
+              attempt: stepAttempt,
+              latencyMs: Date.now() - stepStartedAt,
+              status: stepStatus,
+              errorCode: stepErrorCode,
+            });
+          }
+        }
+      };
+
+      // Walk the planned rounds. Today every squad but one is a list of
+      // single-step rounds, i.e. exactly the sequential loop this replaced;
+      // only a squad the budget cannot fit gets a merged leading round.
+      const planningWaves = strategyPlanning?.waves
+        ?? stepsRaw.map((_: any, i: number) => [i]);
+      let ranAnyWaveInParallel = false;
+      for (const wave of planningWaves) {
+        if (wave.length === 1) {
+          await runPlanningStep(wave[0]!);
+        } else {
+          ranAnyWaveInParallel = true;
+          await Promise.all(wave.map((i) => runPlanningStep(i)));
         }
       }
+      if (ranAnyWaveInParallel) {
+        // A merged round settles in completion order, so anything the UI or
+        // the ledger reads positionally has to be put back into step order.
+        const stepIndexOf = (value: string) => {
+          const matched = /(\d+)/.exec(value);
+          return matched ? Number(matched[1]) : Number.MAX_SAFE_INTEGER;
+        };
+        privateArtifacts.sort((a, b) => a.stepOrder - b.stepOrder);
+        planningArtifacts.sort((a: any, b: any) => stepIndexOf(String(a.id)) - stepIndexOf(String(b.id)));
+        stages.sort((a: any, b: any) => stepIndexOf(String(a.key)) - stepIndexOf(String(b.key)));
+        errors.sort((a, b) => stepIndexOf(a) - stepIndexOf(b));
+      }
 
-      // 5. Look up squad lead for captionAgent slot
+      // 5. Build the background synthesis now, but do not start it until
+      // the planning checkpoint has been committed and the HTTP response is
+      // ready to return. Per user authorization, Anthropic receives only
+      // de-identified planning conclusions, brand context and task input.
+      const synthesizeStrategyPublicVariants = strategyPublicPolicy ? async () => {
+          const slots = buildIgStrategyPublicSlots(sqSlugNew, input.topic, brandMarket.outputLanguage);
+          if (!slots?.length) throw new Error("no public deliverable slots configured");
+          return synthesizeIgStrategyPublicSlots({
+            idOrSlug: sqSlugNew,
+            topic: input.topic,
+            brandContext: brandPrefix,
+            brandId: input.brandId,
+            outputLanguage: brandMarket.outputLanguage,
+            slots,
+            privateArtifacts,
+            steps: stepsRaw,
+            squadName: squad.name,
+            methodology: typeof squad.methodology === "string"
+              ? squad.methodology
+              : squad.methodology?.author,
+            agents: Object.values(agentMap),
+          });
+      } : null;
+      const strategyPublicSlotCount = strategyPublicPolicy
+        ? (buildIgStrategyPublicSlots(sqSlugNew, input.topic, brandMarket.outputLanguage)?.length ?? 0)
+        : 0;
+
+      // 6. Look up squad lead for the legacy captionAgent slot. Target tasks
+      // never return an internal agent identity.
       let captionAgent: any = null;
-      if (squad.lead_agent_id) {
+      if (!strategyPublicPolicy && squad.lead_agent_id) {
         const lead = agentMap[squad.lead_agent_id];
         if (lead) captionAgent = { id: squad.lead_agent_id, name: lead.name, title: lead.title, avatarUrl: lead.avatarUrl };
         else {
@@ -1875,50 +2425,152 @@ export const quickTaskRouter = router({
         }
       }
 
-      const ok = variants.some((v) => v.caption.length > 0);
+      let ok = strategyPublicPolicy
+        ? planningArtifacts.some((artifact) => artifact.caption.length > 0)
+        : variants.some((v) => v.caption.length > 0);
 
       // 2026-05-09 (CJ Phase 2): persist squad runs too so client can
       // navigate to /run/:outputId (consistent with orchestra path).
       let outputId: number | null = null;
       let missionId: number | null = null;
-      if (ok) {
+      const shouldPersist = strategyPublicPolicy
+        ? true
+        : ok;
+      if (shouldPersist) {
         try {
-          const { recordTaskRun } = await import("../_core/recordTaskRun");
+          const { recordTaskRun, finaliseTaskRun } = await import("../_core/recordTaskRun");
+          const content = strategyPublicPolicy
+            ? JSON.stringify({
+                schemaVersion: 2,
+                contentModel: "ig-strategy-bundle",
+                planningArtifacts,
+                publicVariants: variants,
+              }, null, 2)
+            : JSON.stringify(variants, null, 2);
+          const metadata = strategyPublicPolicy
+            ? {
+                latencyMs: Date.now() - startedAt,
+                contentModel: "ig-strategy-bundle",
+                planningCount: planningArtifacts.length,
+                publicVariantCount: variants.length,
+                publicSlotCount: strategyPublicSlotCount,
+                publicFormats: [...new Set(variants.map((variant) => variant.format))],
+                inputs: { topic: input.topic ?? "" },
+              }
+            : {
+                latencyMs: Date.now() - startedAt,
+                squadSlug: input.squadSlug,
+                variantCount: variants.length,
+                inputs: { topic: input.topic ?? "" },
+              };
           const persisted = await recordTaskRun({
             userId,
             brandId: input.brandId ?? null,
-            workspace: "facebook", // squad 100s default — could be inferred from squad
-            taskId: input.squadSlug,
-            taskLabel: squad.name ?? input.squadSlug,
+            workspace: strategyRecordOverrides?.workspace ?? "facebook",
+            platform: strategyRecordOverrides?.platform,
+            outputType: strategyRecordOverrides?.outputType,
+            taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
+            taskLabel: strategyRecordOverrides?.taskLabel ?? squad.name ?? input.squadSlug,
             tier: "99s",
-            title: (await import("../_core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
-            content: JSON.stringify(variants, null, 2),
-            metadata: {
-              latencyMs: Date.now() - startedAt,
-              squadSlug: input.squadSlug,
-              variantCount: variants.length,
-              inputs: { topic: input.topic ?? "" },
-            },
+            title: strategyRecordOverrides?.taskLabel
+              ?? (await import("../_core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
+            content,
+            metadata,
+            ...(strategyPublicPolicy ? { progress: "caption_ready" as const } : {}),
+            privateStrategyArtifacts: strategyPublicPolicy && privateRunId
+              ? { runId: privateRunId, squadSlug: sqSlugNew, rows: privateArtifacts }
+              : undefined,
           });
           outputId = persisted.outputId;
           missionId = persisted.missionId;
+          if (strategyPublicPolicy && !outputId) {
+            ok = false;
+            errors.unshift(brandMarket.isZhTW
+              ? "內容儲存失敗，請重試。"
+              : "Content storage failed. Please retry.");
+          } else if (strategyPublicPolicy && outputId && synthesizeStrategyPublicVariants) {
+            const checkpointOutputId = outputId;
+            // setImmediate keeps the mutation response independent of even the
+            // first async brand-rule read. The output row already exists, so a
+            // refresh can poll caption_ready while this continuation runs.
+            setImmediate(() => {
+              void (async () => {
+                try {
+                  const publicResults = await synthesizeStrategyPublicVariants();
+                  const finalContent = JSON.stringify({
+                    schemaVersion: 2,
+                    contentModel: "ig-strategy-bundle",
+                    planningArtifacts,
+                    publicVariants: publicResults,
+                  }, null, 2);
+                  const finalMetadata = {
+                    ...metadata,
+                    taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
+                    tier: "99s",
+                    latencyMs: Date.now() - startedAt,
+                    publicVariantCount: publicResults.length,
+                    publicFormats: [...new Set(publicResults.map((variant) => variant.format))],
+                  };
+                  const finalised = await finaliseTaskRun({
+                    outputId: checkpointOutputId,
+                    content: finalContent,
+                    metadata: finalMetadata,
+                    progress: "done",
+                  });
+                  if (!finalised.ok) {
+                    console.warn("[runSquadAuto] target public synthesis finalise failed", {
+                      taskId: strategyRecordOverrides?.taskId,
+                      outputId: checkpointOutputId,
+                    });
+                  }
+                } catch (e) {
+                  console.warn("[runSquadAuto] target public synthesis failed", {
+                    taskId: strategyRecordOverrides?.taskId,
+                    outputId: checkpointOutputId,
+                    message: (e as Error).message,
+                  });
+                  const finalised = await finaliseTaskRun({
+                    outputId: checkpointOutputId,
+                    progress: "failed",
+                    progressDetail: brandMarket.isZhTW
+                      ? "對外貼文產生失敗，內容規劃仍可使用，請重跑一次。"
+                      : "Public post generation failed. The planning remains available; please run the task again.",
+                  });
+                  if (!finalised.ok) {
+                    console.warn("[runSquadAuto] target public synthesis failure state could not be saved", {
+                      taskId: strategyRecordOverrides?.taskId,
+                      outputId: checkpointOutputId,
+                    });
+                  }
+                }
+              })();
+            });
+          }
         } catch (e) {
           console.warn("[runSquadAuto] recordTaskRun failed:", (e as Error).message);
+          if (strategyPublicPolicy) {
+            ok = false;
+            errors.unshift(brandMarket.isZhTW
+              ? "內容儲存失敗，請重試。"
+              : "Content storage failed. Please retry.");
+          }
         }
       }
 
       return {
-        taskId: input.squadSlug,
+        taskId: strategyRecordOverrides?.taskId ?? input.squadSlug,
         totalLatencyMs: Date.now() - startedAt,
         fetchedUrl: null,
         captionAgent,
         imageAgent: null,
         variants,
+        planningArtifacts: strategyPublicPolicy ? planningArtifacts : undefined,
         stages,
         ok,
         errors,
         outputId,
         missionId,
+        ...(strategyPublicPolicy && outputId ? { progress: "caption_ready" as const } : {}),
       };
     }),
 
@@ -1937,6 +2589,11 @@ export const quickTaskRouter = router({
       // 'caption_ready'. The full orchestra continues in background and
       // UPDATEs the same mission_outputs row. Frontend polls
       // output.getById until progress='done' or 'failed'.
+      // 2026-08-11: workbench sweet-spot reference for audience attribution.
+      spotRef: z.object({
+        scenarioId: z.string().min(1).max(40),
+        spotIndex: z.number().int().min(0).max(7),
+      }).optional().nullable(),
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1945,16 +2602,6 @@ export const quickTaskRouter = router({
       // renamed definition. Idempotent for new "fb-99-…" ids.
       input = { ...input, taskId: normalizeTaskId(input.taskId) };
       const userId = ctx.user!.id;
-      // P0-D pre-flight cost guard (99s tier is the most expensive)
-      const { preflightCostCheck } = await import("../llmWithBilling");
-      const guard100 = await preflightCostCheck(userId);
-      if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
-      // 2026-05-12: paywall quota check (plan task_99s cap)
-      // 2026-05-14: points-based gating
-      const { assertPoints, deductPoints } = await import("../_core/pointsService");
-      await assertPoints(userId, "task_99s");
-      await deductPoints(userId, "task_99s", { kind: "task", id: null });
-      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
 
       // Pick template + config (same priority chain as before).
@@ -1983,18 +2630,43 @@ export const quickTaskRouter = router({
             PR_30S_TASKS.find((t) => t.id === input.taskId) ??
             BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
             RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-            KOL_30S_TASKS.find((t) => t.id === input.taskId);
+            KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
+            WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
+        findPackTemplate(input.taskId);
           if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
           const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
           config =
             _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
             getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
-            getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId);
+            getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId) ?? findPackOrchestraConfig(input.taskId);
           if (!config) throw new Error(`No config for: ${input.taskId}`);
         }
       }
 
-      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const };
+      // ── Input validation — BEFORE the cost guard / points deduction ──────
+      // 2026-08-23: same guard as runOrchestra60, for fb-99-viral-rewrite.
+      // 沒有原始爆款就沒有東西可以改寫，模型會自己編一支去拆解。
+      // 擺在扣點之前：被擋下來的請求一點都不扣。
+      if (templateNeedsViralSource(template)) {
+        const viral = checkViralSource(input.inputs[VIRAL_SOURCE_KEY], {
+          platformLabel: platformLabelOf(template),
+        });
+        if (!viral.ok) throw new TRPCError({ code: "BAD_REQUEST", message: viral.message.zh });
+      }
+
+      // P0-D pre-flight cost guard (99s tier is the most expensive)
+      const { preflightCostCheck } = await import("../llmWithBilling");
+      const guard100 = await preflightCostCheck(userId);
+      if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
+      // 2026-05-12: paywall quota check (plan task_99s cap)
+      // 2026-05-14: points-based gating
+      const { assertPoints, deductPoints } = await import("../_core/pointsService");
+      await assertPoints(userId, "task_99s");
+      await deductPoints(userId, "task_99s", { kind: "task", id: null });
+      const { runOrchestra } = await import("../_core/quickTaskOrchestra");
+
+      const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const,
+        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef) };
 
       if (!input.asyncMode) {
         // Legacy sync path — fully await, return final result.
@@ -2066,6 +2738,14 @@ export const quickTaskRouter = router({
         // 2026-05-11 (CJ「product / event 也要 narrow LLM context」): scope.
         productId: z.number().optional().nullable(),
         eventId: z.number().optional().nullable(),
+        // 2026-08-11: where in the strategy workbench this piece came from.
+        // Only the reference travels — the labels are resolved server-side
+        // from the stored scenario so they can't drift, and the URL that
+        // carries this stays short.
+        spotRef: z.object({
+          scenarioId: z.string().min(1).max(40),
+          spotIndex: z.number().int().min(0).max(7),
+        }).optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -2096,7 +2776,9 @@ export const quickTaskRouter = router({
         PR_30S_TASKS.find((t) => t.id === input.taskId) ??
         BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-        KOL_30S_TASKS.find((t) => t.id === input.taskId);
+        KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
+        WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
+        findPackTemplate(input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId} (orchestra is 30s-only).`);
       }
@@ -2110,7 +2792,8 @@ export const quickTaskRouter = router({
         getPROrchestraConfig(input.taskId) ??
         getBrandOrchestraConfig(input.taskId) ??
         getResearchOrchestraConfig(input.taskId) ??
-        getKOLOrchestraConfig(input.taskId);
+        getKOLOrchestraConfig(input.taskId) ??
+        getWebsiteOrchestraConfig(input.taskId) ?? findPackOrchestraConfig(input.taskId);
       if (!config) {
         throw new Error(`No orchestra config for task ${input.taskId}.`);
       }
@@ -2128,6 +2811,7 @@ export const quickTaskRouter = router({
         productId: input.productId ?? null,
         eventId: input.eventId ?? null,
         userId,
+        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
       };
 
       // 2026-07-29 (Tier-1 TikTok video formats): a video task renders clips
@@ -2194,7 +2878,11 @@ export const quickTaskRouter = router({
   regenerateVariant: protectedProcedure
     .input(z.object({
       outputId: z.number().int().positive(),
+      // Keep the legacy contract strict: variantIndex was required before
+      // strategy bundles existed, so omitting it must not silently target 0.
       variantIndex: z.number().int().min(0),
+      contentKind: ContentKindSchema.optional(),
+      contentIndex: z.number().int().min(0).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -2211,6 +2899,15 @@ export const quickTaskRouter = router({
       );
       const row = (rows as any[])[0];
       if (!row) throw new Error("output not found or no permission");
+
+      // The generic orchestra regenerator cannot preserve the server-owned
+      // public slot contract (format/id) or re-run the IG strategy redaction
+      // boundary. Fail closed instead of allowing a regenerated item to leak
+      // planning internals or corrupt an IG strategy bundle. Those bundles
+      // remain editable through the selector-aware caption rewrite flows.
+      const target = selectRegenerationTarget(row.content, input);
+      assertGenericRegenerationAllowed(target, input);
+
       const md = typeof row.metadata === "string" ? JSON.parse(row.metadata) : (row.metadata ?? {});
       let taskId: string = row.taskId ?? "";
       const inputs = md.inputs ?? {};
@@ -2238,6 +2935,8 @@ export const quickTaskRouter = router({
         BRAND_30S_TASKS.find((t) => t.id === taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === taskId) ??
         KOL_30S_TASKS.find((t) => t.id === taskId) ??
+        WEBSITE_30S_TASKS.find((t) => t.id === taskId) ??
+        findPackTemplate(taskId) ??
         getFB60Template(taskId) ??
         getIG60Template(taskId) ??
         getYT60Template(taskId) ??
@@ -2260,16 +2959,13 @@ export const quickTaskRouter = router({
         getIG60OrchestraConfig(taskId) ??
         getYT60OrchestraConfig(taskId) ??
         getMulti60OrchestraConfig(taskId) ??
-        get99OrchestraConfig(taskId);
+        get99OrchestraConfig(taskId) ??
+        getWebsiteOrchestraConfig(taskId) ?? findPackOrchestraConfig(taskId);
       if (!fullConfig) throw new Error(`no orchestra config for ${taskId}`);
 
       // Override config to produce ONE variant only — use the same label
       // as the slot we're replacing, so the regenerated voice matches.
-      const existingVariants: any[] = (() => {
-        try { const p = JSON.parse(row.content); return Array.isArray(p) ? p : (p.variants ?? []); }
-        catch { return []; }
-      })();
-      const targetLabel = existingVariants[input.variantIndex]?.label ?? fullConfig.variantLabels[input.variantIndex] ?? `版本 ${input.variantIndex + 1}`;
+      const targetLabel = target.item?.label ?? fullConfig.variantLabels[target.index] ?? `版本 ${target.index + 1}`;
       const singleConfig = { ...fullConfig, variants: 1, images: 0, runImageGen: false, variantLabels: [targetLabel] };
 
       const taskTier: "30s" | "60s" | "99s" =
@@ -2283,15 +2979,22 @@ export const quickTaskRouter = router({
       const newVariant = r.variants?.[0];
       if (!newVariant?.caption) throw new Error("重生失敗，agent 沒回傳內容");
 
+      // This path deliberately runs with images:0, so replacing the whole
+      // variant would discard the still-current image and its persisted
+      // model prompt. Regenerating copy must not mutate the visual asset.
+      const replacementVariant = preserveExistingVariantImage(newVariant, target.item);
+
       // Replace the variant + archive the old one
       const archived = Array.isArray(md.archivedVariants) ? md.archivedVariants : [];
       archived.push({
         archivedAt: new Date().toISOString(),
-        index: input.variantIndex,
-        variant: existingVariants[input.variantIndex],
+        index: target.index,
+        variant: target.item,
+        ...(input.contentKind !== undefined
+          ? { contentKind: target.kind, contentIndex: target.index }
+          : {}),
       });
-      existingVariants[input.variantIndex] = newVariant;
-      const newContent = JSON.stringify(existingVariants, null, 2);
+      const newContent = replaceRegeneratedContent(row.content, input, replacementVariant, target);
       const newMetadata = JSON.stringify({ ...md, archivedVariants: archived, lastRegenAt: new Date().toISOString() });
 
       await localPool.execute(
@@ -2299,7 +3002,14 @@ export const quickTaskRouter = router({
         [newContent, newMetadata, input.outputId],
       );
 
-      return { ok: true, variantIndex: input.variantIndex, newCaption: newVariant.caption };
+      return {
+        ok: true,
+        variantIndex: input.variantIndex,
+        newCaption: newVariant.caption,
+        ...(input.contentKind !== undefined
+          ? { contentKind: target.kind, contentIndex: target.index }
+          : {}),
+      };
     }),
 
   runQuick: protectedProcedure
@@ -2323,7 +3033,9 @@ export const quickTaskRouter = router({
         PR_30S_TASKS.find((t) => t.id === input.taskId) ??
         BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
         RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-        KOL_30S_TASKS.find((t) => t.id === input.taskId);
+        KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
+        WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
+        findPackTemplate(input.taskId);
       if (!template) {
         throw new Error(`Unknown 30s quick task id: ${input.taskId}. (60s uses runOrchestra60; 90s uses squad.stepExecute.)`);
       }
@@ -2374,6 +3086,7 @@ export const quickTaskRouter = router({
           domain: string;
         };
       } | null = null;
+      let urlFetchFailure: { url: string; reason: "content_unavailable" } | null = null;
       for (const v of Object.values(input.inputs)) {
         if (typeof v === "string") {
           const url = findFirstUrl(v);
@@ -2387,8 +3100,10 @@ export const quickTaskRouter = router({
                 chars: summary.fetched_chars,
                 og: summary.og,
               };
+              urlFetchFailure = null;
               break; // first URL only — keep prompt budget reasonable
             }
+            urlFetchFailure ??= { url, reason: "content_unavailable" };
           }
         }
       }
@@ -2450,6 +3165,7 @@ export const quickTaskRouter = router({
         agent: agentMeta,        // {id, name, title, avatarUrl} or null
         skill_slug: template.skill_slug ?? null,
         fetchedUrl,              // {url, title, chars} or null — was a URL read?
+        urlFetchFailure,         // URL was present but yielded no promptable content
       };
     }),
 

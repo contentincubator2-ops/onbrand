@@ -38,6 +38,7 @@
  * Event   pipeline (4 steps) — even shorter, all parallel after step 1.
  */
 import localPool from "../localDb";
+import { isPositioningLocked } from "./positioningLock";
 
 export type EntityKind = "brand" | "product" | "event";
 export type JobStatus = "pending" | "running" | "done" | "failed";
@@ -65,9 +66,8 @@ export interface StepContext {
   brandName: string;
   industry?: string;
   description?: string;
-  /** Scraped website + social content from getBrandRealContent (brand only).
-   *  Injected before wave-1 so ALL steps can ground their output in real
-   *  brand content rather than hallucinating from the name alone. */
+  /** Scraped website/social content for brands, or standard product-page
+   *  metadata for products. Injected before wave-1 so all steps are grounded. */
   realContent?: string;
   /** 2026-07-17 多市場: compact market block from buildMarketContext —
    *  scopes competitor / trend / audience research to the brand's
@@ -168,6 +168,15 @@ async function recordUsageRow(args: {
  *  Spread-merge preserves wizard-written sibling keys: _assets,
  *  _aiPrompts, _interim, and any manually-edited segments not in this run. */
 async function mergePositioning(kind: EntityKind, id: number, userId: number, patch: Record<string, any>): Promise<void> {
+  // Defense-in-depth: even if a pipeline was already mid-flight when the
+  // user locked 定位, don't let a step that finishes afterwards overwrite
+  // it. The real guard is upstream (startPositioningJob / resumeInterrupted
+  // PositioningJobs / the router mutations skip firing locked brands at
+  // all) — this is the last line so no write path can slip through.
+  if (await isPositioningLocked(kind, id, userId)) {
+    console.warn(`[positioningJobRunner] skip merge — ${kind} ${id} positioning is locked`);
+    return;
+  }
   const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
   const col = "positioning";
   const [rows]: any = await localPool.execute(
@@ -202,6 +211,7 @@ export function startPositioningJob(args: {
   brandName: string;
   industry?: string;
   description?: string;
+  website?: string;
   steps: PositioningStep[];
 }): void {
   const k = jobKey(args.entityKind, args.entityId);
@@ -283,14 +293,30 @@ export async function resumeInterruptedPositioningJobs(): Promise<void> {
         continue;
       }
 
-      // Extract description from product's positioning JSON if present
+      // 2026-08-21: a job that was legitimately in-flight when the user
+      // locked 定位 mid-run must not resume after a restart and overwrite
+      // the now-finalized content. Mark it failed (not silently dropped)
+      // so it's visible instead of looking like it vanished.
+      if (await isPositioningLocked(kind, entityId, userId)) {
+        console.log(`[positioningJobRunner] startup: skip resume for locked ${kind}:${entityId}`);
+        await localPool.execute(
+          `UPDATE positioning_jobs SET status = 'failed', lastError = ?, finishedAt = NOW(3)
+            WHERE userId = ? AND entityKind = ? AND entityId = ? AND status IN ('pending','running')`,
+          ["定位已鎖定，未重新推導", userId, kind, entityId],
+        );
+        continue;
+      }
+
+      // Extract product page context from positioning JSON if present.
       let description: string | undefined;
+      let website: string | undefined;
       if (kind === "product" && row.productPositioning) {
         try {
           const pos = typeof row.productPositioning === "string"
             ? JSON.parse(row.productPositioning)
             : row.productPositioning;
-          description = pos?.summary ?? pos?.description ?? undefined;
+          description = pos?.description ?? pos?._interim?.description ?? pos?.summary ?? undefined;
+          website = pos?.productUrl ?? pos?.website ?? undefined;
         } catch { /* ignore */ }
       }
 
@@ -310,6 +336,7 @@ export async function resumeInterruptedPositioningJobs(): Promise<void> {
         brandName: name,
         industry: row.brandIndustry ?? undefined,
         description,
+        website,
         steps,
       });
     }
@@ -416,6 +443,7 @@ async function runPipelineDetached(args: {
   brandName: string;
   industry?: string;
   description?: string;
+  website?: string;
   steps: PositioningStep[];
 }): Promise<void> {
   const jobId = await upsertJob(args.userId, args.entityKind, args.entityId, args.steps.length);
@@ -437,6 +465,23 @@ async function runPipelineDetached(args: {
       }
     } catch (e: any) {
       console.warn(`[positioningJobRunner] getBrandRealContent failed for brand ${args.entityId}:`, e?.message ?? e);
+    }
+  } else if (args.entityKind === "product" && args.website) {
+    try {
+      const { fetchProductMeta } = await import("./productMeta");
+      const meta = await fetchProductMeta(args.website);
+      if (meta.source !== "none") {
+        realContent = [
+          "【商品頁資訊】",
+          meta.name ? `名稱：${meta.name}` : "",
+          meta.price ? `價格：${meta.currency ? `${meta.currency} ` : ""}${meta.price}` : "",
+          meta.description ? `說明：${meta.description}` : "",
+          `商品頁：${args.website}`,
+        ].filter(Boolean).join("\n");
+        console.log(`[positioningJobRunner] fetched product metadata for product ${args.entityId} from ${meta.source}`);
+      }
+    } catch (e: any) {
+      console.warn(`[positioningJobRunner] fetchProductMeta failed for product ${args.entityId}:`, e?.message ?? e);
     }
   }
 

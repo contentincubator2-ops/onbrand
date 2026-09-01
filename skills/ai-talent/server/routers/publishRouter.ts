@@ -39,6 +39,12 @@ import {
 } from "../_core/pipedreamFacebook";
 import { getPipedreamOAuthAppId } from "../_core/pipedreamOAuth";
 import { isRuntimeFeatureEnabled } from "../_core/runtimeSafety";
+import {
+  contentSelectorFields,
+  outputItemCaption,
+  requirePlanningConfirmation,
+  resolveOutputContent,
+} from "../_core/outputContentEnvelope";
 
 const ENV = process.env;
 
@@ -60,7 +66,8 @@ export const publishRouter = router({
   toFacebook: socialProcedure
     .input(z.object({
       outputId: z.number().int().positive(),
-      variantIndex: z.number().int().min(0).default(0),
+      ...contentSelectorFields,
+      confirmPlanningContent: z.boolean().optional(),
       pageId: z.string().min(1).max(64).optional(), // FB Page ID; optional if Pipedream workflow defaults
     }))
     .mutation(async ({ ctx, input }) => {
@@ -92,16 +99,11 @@ export const publishRouter = router({
       const row = (rows as any[])[0];
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "output 不存在或無權限" });
 
-      let caption = "";
-      try {
-        const parsed = JSON.parse(row.content);
-        const variants = Array.isArray(parsed) ? parsed : (parsed.variants ?? [parsed]);
-        caption = variants[input.variantIndex]?.caption ?? "";
-      } catch {
-        caption = String(row.content ?? "");
-      }
+      const selected = resolveOutputContent(row.content, input);
+      requirePlanningConfirmation(selected, input.confirmPlanningContent, "publish");
+      const caption = outputItemCaption(selected.item);
       if (!caption.trim()) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "此 variant 沒有 caption 可發布" });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "此內容沒有 caption 可發布" });
       }
 
       // 2026-05-11 (multi-tenant): page_id MUST come from this brand's
@@ -129,6 +131,8 @@ export const publishRouter = router({
           secret: secret ?? null,
           outputId: input.outputId,
           variantIndex: input.variantIndex,
+          contentKind: selected.kind,
+          contentIndex: selected.index,
           brandId: row.brandId,
           userId: ctx.user.id,
           fbPageName: row.brand_fb_page_name ?? null,
@@ -156,21 +160,40 @@ export const publishRouter = router({
       let pipedreamResult: any = text;
       try { pipedreamResult = JSON.parse(text); } catch { /* keep as text */ }
 
-      // Mark output as published in DB
+      const postId = pipedreamResult?.post_id ?? pipedreamResult?.id ?? null;
+      const permalink = pipedreamResult?.permalink_url ?? pipedreamResult?.permalink ?? null;
+
+      // Mark output as published in DB.
+      // 2026-08-11: postId/permalink are now PERSISTED, not just returned to
+      // the browser. Facebook hands us the post id on every successful publish
+      // and we were discarding it — so nothing published through this path
+      // could ever have its performance read back. Insights APIs are keyed by
+      // post id, and there is no way to recover it later, so each publish that
+      // didn't record one is permanently unmeasurable.
+      //
+      // Stored in metadata rather than a new column: this is the publish-now
+      // path, which has no scheduled_posts row to hang externalPostId on, and
+      // metadata is already the JSON bag this table uses for run details.
       try {
         await localPool.execute(
-          `UPDATE mission_outputs SET status = 'published', publishedAt = NOW(), updatedAt = NOW() WHERE id = ?`,
-          [input.outputId],
+          `UPDATE mission_outputs
+              SET status = 'published', publishedAt = NOW(), updatedAt = NOW(),
+                  metadata = JSON_MERGE_PATCH(COALESCE(metadata, JSON_OBJECT()), CAST(? AS JSON))
+            WHERE id = ?`,
+          [
+            JSON.stringify({
+              publish: { platform: "facebook", postId, permalink, publishedAt: new Date().toISOString() },
+            }),
+            input.outputId,
+          ],
         );
-      } catch { /* non-fatal */ }
+      } catch (e) {
+        // Non-fatal for the user's publish, but log it: a silent failure here
+        // is exactly how we lose the measurement anchor again.
+        console.error("[publish.toFacebook] failed to persist publish metadata:", (e as Error)?.message);
+      }
 
-      return {
-        ok: true,
-        latencyMs,
-        pipedreamResult,
-        postId: pipedreamResult?.post_id ?? pipedreamResult?.id ?? null,
-        permalink: pipedreamResult?.permalink_url ?? pipedreamResult?.permalink ?? null,
-      };
+      return { ok: true, latencyMs, pipedreamResult, postId, permalink };
     }),
 
   /**

@@ -60,8 +60,35 @@ export function shapeValue(raw: any, shape?: string): string {
       raw.why, raw.singleMindedProposition,
     ].filter((x: any) => typeof x === "string" && x.trim());
     if (candidates.length > 0) return candidates[0]!.trim();
-    // Fall back to JSON stringify (rare)
-    return JSON.stringify(raw).slice(0, 200);
+    // 2026-08-31 (CJ「context 當中 values 出現了 items" body 等程式碼文案」):
+    // positioning.values 的形狀是 { items: [{ label, body }] }，沒有任何一個
+    // summary 類的鍵，於是掉進下面的 JSON fallback，把整段 JSON 當文案顯示
+    // 給使用者看。凡是 { items: [...] } 這種包一層的結構都交回陣列分支處理
+    // ——它已經會挑 name / label / dim。goldenCircle 之外的多數 segment
+    // （values / competition.direct / _assets.*）都是這個形狀。
+    // 只要是 items 陣列就由陣列分支決定結果，抽不出東西時回空字串讓 chip
+    // 顯示「尚未填寫」。不可以再往下掉到 JSON fallback —— 空的 items 會變成
+    // 「{"items":[]}」出現在使用者眼前。
+    if (Array.isArray(raw.items)) return shapeValue(raw.items, shape);
+
+    // 2026-09-01 (CJ 截圖：CONTEXT 出現 `Voice · {"tone":["嚴謹而溫潤",…`):
+    // positioning.voice 的形狀是 { tone, samples, forbidden, archetypes }，
+    // 既沒有 summary 類的鍵，也沒有 items，於是整包 JSON 被當成文案顯示。
+    // 與其一個形狀一個形狀補，改成通用規則：挑第一個「字串陣列」屬性。
+    // voice → tone、_assets.preferred_terms → items（上面已處理）都命中。
+    for (const v of Object.values(raw)) {
+      if (Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === "string")) {
+        const joined = shapeValue(v, shape);
+        if (joined) return joined;
+      }
+    }
+    // 再退一步：第一個非空的字串屬性。
+    for (const v of Object.values(raw)) {
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    // 什麼都抽不出來就回空字串，讓 chip 顯示「尚未填寫」。
+    // **永遠不要把原始 JSON 顯示給使用者** —— 那是這個函式最初的失誤。
+    return "";
   }
   return "";
 }

@@ -21,7 +21,7 @@
  */
 
 import { ENV } from "./env";
-import { invokeLLM } from "./llm";
+import { invokeLLM, invokeLLMSingleProvider } from "./llm";
 
 export type TaskType =
   | "chinese_content"
@@ -263,4 +263,46 @@ export async function callModel(
   }
 
   return { content, provider, model };
+}
+
+/**
+ * Call exactly one explicitly authorized provider. Unlike callModel this does
+ * not fall back, so a payload approved for one destination cannot be routed to
+ * another provider when a key is missing.
+ */
+export async function callModelStrict(
+  messages: MultiModelMessage[],
+  provider: ModelProvider,
+  preferredModel?: string,
+  options?: { signal?: AbortSignal; maxTokens?: number; includeFinishReason?: boolean },
+): Promise<{
+  content: string;
+  provider: ModelProvider;
+  model: string;
+  finishReason?: string | null;
+}> {
+  const availability = getAvailabilityMap();
+  if (!availability[provider]) {
+    throw new Error(`[multiModelRouter] required provider "${provider}" is unavailable`);
+  }
+  const model = preferredModel ?? DEFAULT_MODELS[provider];
+  const result = await invokeLLMSingleProvider({
+    provider,
+    model,
+    messages,
+    signal: options?.signal,
+    ...(options?.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
+  });
+  const content = result.choices[0]?.message?.content;
+  if (typeof content !== "string") {
+    throw new Error("[multiModelRouter] Unexpected response structure from LLM");
+  }
+  return {
+    content,
+    provider,
+    model,
+    ...(options?.includeFinishReason
+      ? { finishReason: result.choices[0]?.finish_reason ?? null }
+      : {}),
+  };
 }

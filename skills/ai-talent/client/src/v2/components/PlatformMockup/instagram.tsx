@@ -25,9 +25,11 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
-  dicebear, handleOf, SlotContent, MarkdownText, titleEchoesCaption, ImageGenSlot,
+  dicebear, handleOf, SlotContent, MarkdownText, ImageGenSlot,
+  SHOW_IMAGE_STYLE_OVERLAY,
 } from "./shared";
 import { useLang } from "../../../lib/i18n";
+import { getPostTitleFallback } from "../../lib/mockupTitle";
 
 /* ─────────────── IG Feed (1:1 default) ─────────────── */
 
@@ -45,6 +47,7 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
   const effectiveCaption   = captionSlot?.status === "filled" ? captionSlot.value as string : liveCaption;
   const effectiveHashtags  = hashtagSlot?.status === "filled" ? hashtagSlot.value as string[] : liveHashtags;
   const effectiveImageDesc = imageSlot?.status   === "filled" ? imageSlot.value  as string : liveImageDesc;
+  const postTitleFallback = getPostTitleFallback(title, effectiveCaption);
 
   return (
     <div className="w-full max-w-[420px] mx-auto">
@@ -58,7 +61,6 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 {handle}
                 <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-tiny text-default-500 truncate leading-tight">{lang === "en" ? "Original audio" : "原創音訊"}</p>
             </div>
           </div>
           <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
@@ -77,7 +79,10 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
           {liveImageUrl && liveImageStatus === "ready" ? (
             <>
               <img src={liveImageUrl} alt={liveImageStyle ?? "generated"} className="absolute inset-0 w-full h-full object-cover" />
-              {liveImageStyle && (
+              {/* 2026-08-19: hidden behind SHOW_IMAGE_STYLE_OVERLAY — the
+                  Chinese style text never produced this image. Flip the flag
+                  in shared.tsx to restore. */}
+              {SHOW_IMAGE_STYLE_OVERLAY && liveImageStyle && (
                 <div className="absolute bottom-2 left-2 right-2 bg-black/55 backdrop-blur-sm rounded px-2 py-1">
                   <p className="text-[10px] text-white/90 line-clamp-2">{liveImageStyle}</p>
                 </div>
@@ -130,17 +135,11 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 
         <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
-          {/* 2026-05-13 (CJ「標題還是有重複」): if title is the first
-              sentence of liveCaption, the inline title + caption body
-              shows the same sentence twice. Hide the inline title when
-              that's the case — caption already carries it. */}
-          {(() => {
-            const t = (title ?? "").trim();
-            if (!t) return null;
-            // 2026-05-14: shared ellipsis-aware dedup (was inline startsWith).
-            if (titleEchoesCaption(t, liveCaption)) return null;
-            return <span className="text-foreground">{t}</span>;
-          })()}
+          {/* A real caption is the post body; mission_outputs.title is only a
+              fallback for legacy runs whose caption is empty. */}
+          {postTitleFallback && (
+            <span className="text-foreground">{postTitleFallback}</span>
+          )}
 
           {/* Caption slot — SlotContent handles loading/filled/empty */}
           <div className="mt-1.5">
@@ -212,6 +211,7 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
   const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const postTitleFallback = getPostTitleFallback(title, liveCaption);
   const carouselCount = 9;
   return (
     <div className="w-full max-w-[420px] mx-auto">
@@ -225,7 +225,6 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
                 {handle}
                 <FontAwesomeIcon icon={faCircleCheck} className="text-tiny text-primary" />
               </div>
-              <p className="text-tiny text-default-500 truncate leading-tight">{lang === "en" ? "Original audio" : "原創音訊"}</p>
             </div>
           </div>
           <Button isIconOnly size="sm" variant="light" radius="full" aria-label="more" className="min-w-0 w-7 h-7">
@@ -275,15 +274,11 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
 
         <div className="px-3 pb-1 text-small leading-snug">
           <span className="font-semibold mr-1.5">{handle}</span>
-          {/* 2026-05-13 (CJ「標題還是有重複」): hide inline title if it's
-              already the first sentence of liveCaption. */}
-          {(() => {
-            const t = (title ?? "").trim();
-            if (!t) return null;
-            // 2026-05-14: shared ellipsis-aware dedup (was inline startsWith).
-            if (titleEchoesCaption(t, liveCaption)) return null;
-            return <span className="text-foreground">{t}</span>;
-          })()}
+          {/* A real caption is the post body; mission_outputs.title is only a
+              fallback for legacy runs whose caption is empty. */}
+          {postTitleFallback && (
+            <span className="text-foreground">{postTitleFallback}</span>
+          )}
           {liveCaption ? (
             // 2026-05-13 (CJ「標題看起來都會不完整」): removed line-clamp
             // — IG captions can be long (2200 char cap), trimming at 5 lines
@@ -564,10 +559,12 @@ export function IGLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
             />
           </div>
         )}
-        {/* Live opening script overlay — shows the caption (host's opening 30s) */}
+        {/* Live script overlay — the segment's script (opening 30s for the
+            30s task; one time-block of the run-of-show for ig-60-live-suite,
+            which is why this no longer says "開場"). */}
         {liveCaption && (
           <div className="absolute top-24 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto">
-            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">{lang === "en" ? "Opening script" : "開場腳本"}</p>
+            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">{lang === "en" ? "Live script" : "直播腳本"}</p>
             <p className="text-tiny text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
           </div>
         )}
@@ -656,6 +653,109 @@ export function IGAd({ title, brandName, variantLabel, liveImageStyle, liveImage
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────── IG Comment reply (ig-30-comment-reply) ───────────────
+ *
+ * 2026-08-20 (CJ「IG 留言回覆（一般）出現『此格式的精準預覽正在製作中』，
+ * 而且看起來沒有產出內容」): RunPage maps any taskId containing "comment"
+ * to format "comment", so ig-30-comment-reply resolved to the key
+ * "instagram:comment" — which had no case in PlatformMockup and fell to
+ * UnsupportedVariantPlaceholder. The reply copy WAS produced; the
+ * placeholder simply never rendered it. This is the real IG comment
+ * thread chrome: the original comment on top, the brand's reply indented
+ * under it.
+ */
+export function IGComment({
+  title, brandName, brandLogoUrl, variantLabel, liveCaption, liveSourceComment,
+}: MockupFields) {
+  const { lang } = useLang();
+  const handle = handleOf(brandName ?? null);
+  const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
+  const userComment = (liveSourceComment ?? "").trim();
+
+  return (
+    <div className="w-full max-w-[440px] mx-auto">
+      <MockupHeader
+        icon={faInstagram}
+        label={lang === "en" ? "Instagram Reply" : "Instagram 留言回覆"}
+        variantLabel={variantLabel}
+      />
+
+      <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
+        {/* IG comment sheet header */}
+        <div className="flex items-center gap-3 px-3 py-2.5 border-b border-divider">
+          <FontAwesomeIcon icon={faChevronLeft} className="text-small text-default-600" />
+          <p className="text-small font-semibold flex-1 text-center pr-4">
+            {lang === "en" ? "Comments" : "留言"}
+          </p>
+        </div>
+
+        <div className="px-3 py-3 space-y-3">
+          {/* ── The comment being answered ── */}
+          <div className="flex items-start gap-2.5">
+            <Avatar src={dicebear("ig-commenter")} className="w-8 h-8 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-small leading-snug break-words">
+                <span className="font-semibold mr-1.5">
+                  {lang === "en" ? "a_follower" : "某位粉絲"}
+                </span>
+                {userComment ? (
+                  <span className="text-default-800">{userComment}</span>
+                ) : (
+                  <span className="text-default-400">
+                    {lang === "en"
+                      ? "(the comment you pasted shows up here)"
+                      : "（你貼上的原始留言會顯示在這）"}
+                  </span>
+                )}
+              </p>
+              <div className="flex items-center gap-3 mt-1 text-tiny text-default-500">
+                <span>{lang === "en" ? "2h" : "2 小時"}</span>
+                <span>{lang === "en" ? "12 likes" : "12 個讚"}</span>
+                <span className="font-medium">{lang === "en" ? "Reply" : "回覆"}</span>
+              </div>
+            </div>
+            <FontAwesomeIcon icon={faHeart} className="text-tiny text-default-400 mt-1.5" />
+          </div>
+
+          {/* ── The produced reply ── */}
+          <div className="flex items-start gap-2.5 pl-8">
+            <Avatar src={avatarSrc} className="w-7 h-7 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-small leading-snug break-words">
+                <span className="font-semibold mr-1.5 inline-flex items-center gap-1">
+                  {handle}
+                  <FontAwesomeIcon icon={faCircleCheck} className="text-[10px] text-primary-500" />
+                </span>
+                {liveCaption
+                  ? <span className="text-default-800 whitespace-pre-wrap">{liveCaption}</span>
+                  : <Skeleton className="h-3 w-40 rounded inline-block align-middle" />}
+              </div>
+              <div className="flex items-center gap-3 mt-1 text-tiny text-default-500">
+                <span>{lang === "en" ? "Just now" : "剛剛"}</span>
+                <span className="font-medium">{lang === "en" ? "Reply" : "回覆"}</span>
+              </div>
+            </div>
+            <FontAwesomeIcon icon={faHeart} className="text-tiny text-default-400 mt-1.5" />
+          </div>
+        </div>
+
+        {/* IG comment composer */}
+        <div className="flex items-center gap-2 px-3 py-2.5 border-t border-divider">
+          <Avatar src={avatarSrc} className="w-7 h-7 shrink-0" />
+          <p className="flex-1 text-tiny text-default-400 truncate">
+            {lang === "en" ? `Reply as ${handle}…` : `以 ${handle} 的身分回覆…`}
+          </p>
+          <span className="text-tiny text-primary-500 font-semibold">
+            {lang === "en" ? "Post" : "發布"}
+          </span>
+        </div>
+      </div>
+
+      {title && <p className="text-tiny text-default-500 mt-2 text-center">{title}</p>}
     </div>
   );
 }

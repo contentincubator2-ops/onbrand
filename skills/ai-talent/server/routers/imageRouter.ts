@@ -13,6 +13,11 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { generateImage, resolveBrandVisualContext } from "../_core/imageGen";
 import { assertBrandOwner } from "../_core/brandAuth";
+import { imageActionForRequest, reconcileImageCharge } from "../_core/imageBilling";
+import {
+  parseBilingualBriefChoice,
+  normalizeImagePromptInput,
+} from "../_core/bilingualVisualBrief";
 
 // 2026-08-02 (CJ「產圖失敗 invalid_enum_value tiktok」): this enum had
 // drifted out of sync with promptFromCaption's below — TikTok (and email)
@@ -62,36 +67,53 @@ export const imageRouter = router({
     .mutation(async ({ input, ctx }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
+      const normalizedPrompt = normalizeImagePromptInput(input.prompt);
+      if (normalizedPrompt === null) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "圖片指令包含不完整的 JSON，請重新產生圖片指令後再試。",
+        });
+      }
+      const { modelPrompt, displayPrompt } = normalizedPrompt;
       // 2026-05-14: per-model image point cost.
       // Flux (default) = 30 pts ≈ 30s task; gpt-image-1 premium = 100 pts;
       // Imagen/Ideogram middle = 50 pts.
       const { assertPoints, deductPoints } = await import("../_core/pointsService");
-      const imageAction =
-        input.subjectImageUrl                  ? "image_imagen"   : // nano-banana ≈ Gemini tier
-        (input.modelChoice === "gpt-image-1" ||
-         input.modelChoice === "gpt-image-2")  ? "image_gpt"      :
-        input.modelChoice === "imagen-3"       ? "image_imagen"   :
-        input.modelChoice === "ideogram-v3"    ? "image_ideogram" :
-        /* default flux-schnell / flux-realism / auto */           "image_flux";
-      await assertPoints(ctx.user.id, imageAction as any);
-      await deductPoints(ctx.user.id, imageAction as any, { kind: "brand", id: input.brandId });
+      const imageAction = imageActionForRequest(input);
+      await assertPoints(ctx.user.id, imageAction);
+      await deductPoints(ctx.user.id, imageAction, { kind: "brand", id: input.brandId });
 
-      const resolved = await resolveBrandVisualContext(
-        input.brandId,
-        input.upstreamDecisionId ?? input.decisionId
-      );
-      const brandContext = { ...resolved, ...(input.overrideBrandContext ?? {}) };
+      let result;
+      try {
+        const resolved = await resolveBrandVisualContext(
+          input.brandId,
+          input.upstreamDecisionId ?? input.decisionId
+        );
+        const brandContext = { ...resolved, ...(input.overrideBrandContext ?? {}) };
 
-      const result = await generateImage({
-        brandId: input.brandId,
-        decisionId: input.decisionId,
-        optionId: input.optionId,
-        prompt: input.prompt,
-        channel: input.channel,
-        size: input.size,
-        modelChoice: input.modelChoice,
-        subjectImageUrl: input.subjectImageUrl,
-        brandContext,
+        result = await generateImage({
+          brandId: input.brandId,
+          decisionId: input.decisionId,
+          optionId: input.optionId,
+          prompt: modelPrompt,
+          channel: input.channel,
+          size: input.size,
+          modelChoice: input.modelChoice,
+          subjectImageUrl: input.subjectImageUrl,
+          brandContext,
+        });
+      } catch (error) {
+        await reconcileImageCharge({
+          userId: ctx.user.id,
+          prepaidAction: imageAction,
+          result: { status: "failed" },
+        });
+        throw error;
+      }
+      await reconcileImageCharge({
+        userId: ctx.user.id,
+        prepaidAction: imageAction,
+        result,
       });
       // 2026-05-12: surface actual provider failures to the client.
       // Previously a failed result still returned 200 with url:null, leading
@@ -123,7 +145,7 @@ export const imageRouter = router({
             : `${friendly}\n\n[技術細節] ${raw.slice(0, 300)}`,
         });
       }
-      return result;
+      return { ...result, normalizedDisplayPrompt: displayPrompt };
     }),
 
   /**
@@ -138,6 +160,7 @@ export const imageRouter = router({
       brandId: z.number().int().positive(),
       caption: z.string().min(1).max(6000),
       channel: channel.optional(),
+      size: size.optional(),
       // 3000 chars: plain-text Nano-Banana templates can reach ~2600 chars;
       // JSON-converted templates are ~200-530 chars after nanoBananaJsonToPrompt.
       imageStyle: z.string().max(3000).optional(),
@@ -159,6 +182,8 @@ export const imageRouter = router({
       ].filter(Boolean).join("\n");
 
       const channelHint =
+        input.channel === "ig" && input.size === "1024x1536"
+                                  ? "Instagram Story, Reel, or Live creative (portrait 9:16)" :
         input.channel === "ig"        ? "Instagram feed post (square 1:1)"     :
         input.channel === "fb"        ? "Facebook post (landscape 4:3)"        :
         input.channel === "linkedin"  ? "LinkedIn post (landscape 16:9)"       :
@@ -171,14 +196,14 @@ export const imageRouter = router({
         : "";
 
       const systemPrompt = `You are a senior commercial photography art director.
-Given a social media caption and brand context, write a concise, specific image-generation prompt in English (80–160 words).
+Given a social media caption and brand context, write one concise, specific image-generation prompt (80–160 English words), then provide a natural Traditional Chinese version for a Taiwan user. Both versions must describe exactly the same scene.
 
 Rules:
 - Describe: main subject, environment/setting, lighting, mood, camera angle/framing
 - Reflect the caption's core message visually — do NOT illustrate literally (no text in frame)
 - Use the brand's visual identity (colours, archetype, tone)
 - Do NOT mention any competitor brand names
-- Output ONLY the image prompt — no explanation, no preamble, no quotes`;
+- Output JSON only in exactly this shape: {"prompt":"English prompt","promptZh":"繁體中文版"}`;
 
       const userMsg = `Brand context:\n${brandBlock}\n\nPlatform: ${channelHint}${styleHint}\n\nCaption:\n${input.caption}`;
 
@@ -187,13 +212,12 @@ Rules:
           { role: "system", content: systemPrompt },
           { role: "user",   content: userMsg },
         ],
-        maxTokens: 250,
+        // 160 English words (~220 tokens) plus a natural Traditional Chinese
+        // rendering (~200-350 tokens) and JSON escaping need ample headroom.
+        maxTokens: 1200,
       });
 
-      const raw = result.choices?.[0]?.message?.content ?? "";
-      const text = (typeof raw === "string" ? raw : "").trim();
-      if (!text) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "LLM returned empty prompt" });
-      return { prompt: text };
+      return parseBilingualBriefChoice(result.choices?.[0], input.caption);
     }),
 
   listForDecision: protectedProcedure

@@ -2,7 +2,7 @@
  * PlatformMockup — single entry, dispatches to platform/format variant.
  *
  * Variants implemented (63):
- *   instagram: feed, carousel, reel, story, profile, live, ad
+ *   instagram: feed, carousel, reel, story, profile, live, ad, comment
  *   facebook:  feed, reel, story, marketplace, event, ad, carousel
  *   linkedin:  feed, article, newsletter, poll, document,
  *              native-video, ad, event
@@ -25,7 +25,7 @@ import React from "react";
 import type { MockupVariant } from "../../lib/inferMockup";
 import type { MockupFields } from "./shared";
 import {
-  IGFeed, IGCarousel, IGReels, IGStories, IGProfile, IGLive, IGAd,
+  IGFeed, IGCarousel, IGReels, IGStories, IGProfile, IGLive, IGAd, IGComment,
 } from "./instagram";
 import {
   FBFeed, FBReel, FBStory, FBMarketplace, FBEvent, FBAd, FBCarousel, FBCalendar,
@@ -37,12 +37,13 @@ import {
 } from "./facebook-quicktask";
 import {
   LIFeed, LIArticle, LINewsletter, LIPoll, LIDocument,
-  LINativeVideo, LIAd, LIEvent,
+  LINativeVideo, LIAd, LIEvent, LIComment,
 } from "./linkedin";
 import {
   YTVideoCard, YTShorts, YTWatch, YTCommunity, YTPremiere, YTLive, YTStoryboard,
+  YTComment,
 } from "./youtube";
-import { TTForYou, TTProfile, TTCarousel, TTLive, TTStoryboard } from "./tiktok";
+import { TTForYou, TTProfile, TTCarousel, TTLive, TTStoryboard, TTComment } from "./tiktok";
 import { EDMMockup, EmailNewsletterMockup, KOLEmailMockup } from "./email";
 import { GoogleSearchAd, GoogleDisplayAd, GooglePMax } from "./google";
 import { XTweet, XThread } from "./twitter";
@@ -79,6 +80,11 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "instagram:profile":   return <IGProfile  {...f} />;
     case "instagram:live":      return <IGLive     {...f} />;
     case "instagram:ad":        return <IGAd       {...f} />;
+    // 2026-08-20 (CJ「IG 留言回覆（一般）出現『製作中』而且沒有產出內容」):
+    // ig-30-comment-reply resolves to instagram:comment. Without this case
+    // it fell to UnsupportedVariantPlaceholder, which dropped the reply copy
+    // the squad had already produced.
+    case "instagram:comment":   return <IGComment  {...f} />;
 
     // ── Facebook (15) ─────────────────────────────────────────────────
     case "facebook:feed":           return <FBFeed           {...f} />;
@@ -113,6 +119,8 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "linkedin:native-video":  return <LINativeVideo {...f} />;
     case "linkedin:ad":            return <LIAd          {...f} />;
     case "linkedin:event":         return <LIEvent       {...f} />;
+    // 2026-08-20: li-30-comment → real LinkedIn comment chrome (was placeholder).
+    case "linkedin:comment":       return <LIComment     {...f} />;
 
     // ── YouTube (6) ───────────────────────────────────────────────────
     case "youtube:video-card":  return <YTVideoCard {...f} />;
@@ -122,6 +130,9 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "youtube:premiere":    return <YTPremiere  {...f} />;
     case "youtube:live":        return <YTLive      {...f} />;
     case "youtube:storyboard":  return <YTStoryboard {...f} />;
+    // 2026-08-20: yt-30-comment-reply / yt-30-pinned-comment (was placeholder).
+    case "youtube:comment":        return <YTComment {...f} />;
+    case "youtube:pinned-comment": return <YTComment {...f} pinned />;
 
     // ── TikTok (5) ────────────────────────────────────────────────────
     case "tiktok:foryou":     return <TTForYou     {...f} />;
@@ -129,6 +140,8 @@ export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
     case "tiktok:carousel":   return <TTCarousel   {...f} />;
     case "tiktok:live":       return <TTLive       {...f} />;
     case "tiktok:storyboard": return <TTStoryboard {...f} />;
+    // 2026-08-20: tt-30-comment-reply → real TikTok comment sheet (was placeholder).
+    case "tiktok:comment":    return <TTComment    {...f} />;
 
     // ── Email / EDM (2) ───────────────────────────────────────────────
     case "email:edm":              return <EDMMockup           {...f} />;

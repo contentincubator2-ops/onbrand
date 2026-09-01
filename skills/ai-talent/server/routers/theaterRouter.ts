@@ -1377,16 +1377,17 @@ ${cleaned}
       }
 
       // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back
-      // to openai/gpt-image-1 when PIAPI_KEY is absent so Theater images
+      // to openai/gpt-image-2 (CJ 2026-09-01: the designated OpenAI image
+      // model) when PIAPI_KEY is absent so Theater images
       // still work when only OPENAI_API_KEY is configured.
       const hasPiapiKey = !!(process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY);
-      const primaryModel = hasPiapiKey ? "piapi/flux-schnell" : "openai/gpt-image-1";
-      // Helper: attempt OpenAI gpt-image-1 as fallback
+      const primaryModel = hasPiapiKey ? "piapi/flux-schnell" : "openai/gpt-image-2";
+      // Helper: attempt OpenAI gpt-image-2 as fallback
       const tryOpenAIFallback = async (): Promise<{ ok: true; imageUrl: string; brief: string } | null> => {
-        if (primaryModel === "openai/gpt-image-1" || !(process.env.OPENAI_API_KEY ?? "")) return null;
+        if (primaryModel === "openai/gpt-image-2" || !(process.env.OPENAI_API_KEY ?? "")) return null;
         try {
-          console.warn(`[theater.generateImage] ${primaryModel} failed, falling back to openai/gpt-image-1`);
-          const r2 = await dispatchGenerate("openai/gpt-image-1", { prompt: imagePrompt, aspectRatio: aspect as any, brandId: input.brandId, negativePrompt: NO_TEXT_NEGATIVE_PROMPT } as any);
+          console.warn(`[theater.generateImage] ${primaryModel} failed, falling back to openai/gpt-image-2`);
+          const r2 = await dispatchGenerate("openai/gpt-image-2", { prompt: imagePrompt, aspectRatio: aspect as any, brandId: input.brandId, negativePrompt: NO_TEXT_NEGATIVE_PROMPT } as any);
           if (r2.status === "ready" && r2.url) return { ok: true as const, imageUrl: r2.url, brief };
         } catch (e2) {
           console.error(`[theater.generateImage] openai fallback also failed:`, e2);

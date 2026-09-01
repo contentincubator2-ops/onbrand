@@ -16,13 +16,30 @@
  */
 import { callModel, type ModelProvider } from "./multiModelRouter";
 import { dispatchGenerate, checkJob } from "./mediaGen";
-import { captionToVisualBrief, loadBrandPaletteHexes } from "./visualBrief";
+import {
+  captionToBilingualVisualBrief,
+  loadBrandIdentityForImage,
+  loadBrandPaletteHexes,
+  type BrandIdentityForImage,
+} from "./visualBrief";
+import { buildImageGuardBlock } from "./imagePromptGuards";
+import {
+  PRODUCT_SUBJECT_UNAVAILABLE_ERROR,
+  resolveProductSubjectReference,
+} from "./productSubjectPolicy";
+import { probeImageUrl } from "./imageFetch";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
+import { detectNonDeliverable } from "./captionSanity";
+import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
+import { isShotListTemplate, buildShotListRule, normalizeShotList, validateShotList, repairShotList } from "./shotListContract";
+// 2026-08-31 五感十築：正向直述句型合約（skill 01 Hard Rule 1）。
+import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice, buildWuganVoiceReminder } from "./wuganVoiceContract";
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "./brandContext";
 import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
+import { resolveTierVariantShape } from "./tierVariantShape";
 import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
 import { isLinkedInBodyTask, LI_CRAFT_RUBRIC, liPlaybookFor } from "./liCraft";
 import { isTikTokBodyTask, TT_CRAFT_RUBRIC, ttPlaybookFor } from "./ttCraft";
@@ -88,6 +105,22 @@ export interface OrchestraVariant {
   hashtags: string[];
   image: {
     style: string | null;
+    /**
+     * 2026-08-19 (客戶回報「產出跟指令大相逕庭的圖」): the prompt that was
+     * used to drive the image model. `style` is the agent-written Chinese
+     * 風格方向 — display-only, it never reaches the model (see genOneImage).
+     * RunPage's 改配圖 panel used to pre-fill its editable prompt box from
+     * `style`, so users compared a brief the model never saw against the
+     * image and (correctly) concluded the two had nothing to do with each
+     * other. Persist the real brief so the box shows what made this image.
+     */
+    prompt?: string | null;
+    /** Traditional Chinese equivalent shown and edited in RunPage. */
+    promptZh?: string | null;
+    /** Actual provider model and whether the primary silently fell back. */
+    modelId?: string | null;
+    requestedModelId?: string | null;
+    fallbackUsed?: boolean;
     url: string | null;
     status: "ready" | "failed" | "skipped" | "timeout";
     errorMsg?: string;
@@ -116,6 +149,11 @@ export interface OrchestraVariant {
     body: string;
     image: {
       style: string | null;
+      prompt?: string | null;
+      promptZh?: string | null;
+      modelId?: string | null;
+      requestedModelId?: string | null;
+      fallbackUsed?: boolean;
       url: string | null;
       status: "ready" | "failed" | "skipped" | "timeout" | "pending";
       errorMsg?: string;
@@ -160,6 +198,12 @@ export interface OrchestraResult {
     title: string | null;
     chars: number;
     og: UrlSummary["og"];
+  } | null;
+  /** The input contained a URL, but neither the page nor a supported fallback
+   * yielded promptable content. Optional for persisted-record compatibility. */
+  urlFetchFailure?: {
+    url: string;
+    reason: "content_unavailable";
   } | null;
   captionAgent: AgentMeta | null;
   imageAgent: AgentMeta | null;
@@ -691,14 +735,25 @@ async function callOneVariant(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  /** Actual args.inputs keys for the deterministic internal-key leak gate. */
+  inputKeys: readonly string[];
   /** Agent's aiModel field — maps to provider (qwen/Kimi/glm). null = use template.preferredModel */
   agentAiModel?: string | null;
   /** Strategist anchor (multi-post / narrativeArc tasks) — injected before user msg */
   strategistAnchor?: string;
   /** 2026-07-17 多市場: brand's master-persona market. undefined = legacy zh-TW; null = no matching master → omit block. */
   market?: MarketCode | null;
+  /** Whether final copy must be zh-TW; used by the non-deliverable gate. */
+  isZhTW: boolean;
+  /** Ad-copy tasks: landing URL the user typed (deterministically extracted); null = none. */
+  requestedUrl?: string | null;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
-  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, agentAiModel, strategistAnchor, market } = args;
+  const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
+  const adCopy = isAdCopyTemplate(template);
+  const wuganVoice = isWuganVoiceTemplate(template);
+  // 2026-08-23: 分格腳本卡的交付物不是貼文，需要自己的合約把社群骨架關掉。
+  const shotList = isShotListTemplate(template);
+  const requestedUrl = adCopy ? (args.requestedUrl ?? null) : null;
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
   // {today} → market-appropriate date format so PR datelines / calendar
@@ -753,7 +808,10 @@ async function callOneVariant(args: {
     ? `\n【主題優先序 — 最重要】\n` +
       `本次任務的「主題」=上面 URL 抓到的內容。品牌不是主題。\n` +
       `caption 必須具體呼應 URL 內容（提到影片裡的事件、數字、名稱、人事物），不要寫通用模板，不要繞回品牌主商品。\n` +
-      `若 URL 抓到的內容跟品牌領域不相關，那就照 URL 主題寫，不要硬扯品牌。\n`
+      `即使 URL 主題與品牌領域完全無關，也必須直接以 URL 主題撰寫貼文，不要硬扯品牌。\n` +
+      `嚴禁輸出提問、澄清請求、說明、免責聲明、或任何非貼文內容。\n` +
+      `素材不足時，以標題與描述推論主題撰寫；不得臆造具體數據或事件細節。\n` +
+      `一律使用品牌目標市場語言輸出。\n`
     : "";
 
   const strategistSection = strategistAnchor
@@ -873,7 +931,16 @@ async function callOneVariant(args: {
   const calendarMode = !!config.calendarMerge;
   const cleanMode = !!config.cleanPrompt && !config.calendarMerge;
   const docMode = template.outputMode === "document";
-  const system = calendarMode
+  const deliverableOnlyRule =
+    `\n\n【只輸出可交付成品 — 最高優先，違反即視為失敗】\n` +
+    `這是一鍵速產任務，使用者不會再補充。**無論資訊多不足，都必須直接產出一份完整、可用的成品**。\n` +
+    `- 禁止輸出任何審議過程、選項評估、抓取流程、處理步驟或模型內心獨白。\n` +
+    `- 禁止自述工作原則、限制、降級策略或「我的處理方式」，不得解釋理由。\n` +
+    `- 嚴禁反問或要求補充，尤其不得輸出「我需要更多資訊」「請提供」「請補充」「為了完成需要…」等句子或要求清單。\n` +
+    `- 禁止輸出輸入欄位的內部名稱（例如 snake_case 識別字）；只使用使用者看得懂的自然語言。\n` +
+    `- 來源連結抓不到內容時，直接依 URL 標題、描述與主題完成任務要求的成品；不得提及、暗示或解釋抓取失敗。\n` +
+    `caption 只能包含最終可發布文字本身。`;
+  const promptCore = calendarMode
     ? `# 角色（寫作口吻參考）\n${captionPersona}\n\n` +
       `# 任務（最高指令，必須完全遵循；只輸出 JSON 陣列，不要任何其他文字）\n` +
       filledSystemPrompt +
@@ -883,13 +950,19 @@ async function callOneVariant(args: {
     ? `# 角色（寫作口吻參考，不要把自我介紹寫進輸出）\n${captionPersona}\n\n` +
       `# 任務（最高指令，必須完全逐條遵循其格式與【絕對規則】）\n` +
       filledSystemPrompt +
-      `\n\n【本次只產 1 個變體】**${label}**：只接「這一個」時事/角度，` +
-      `完全照任務指定的四欄純文字格式輸出這 1 個變體的內容。\n` +
-      `**嚴禁**輸出 JSON 陣列、**嚴禁**一次列出多個變體、**嚴禁**把其他 ` +
+      // 2026-08-22: strategist anchor was missing from cleanMode — a
+      // multi-segment clean-prompt task (live run-of-show) needs the arc
+      // just as much as a social one. No-op for newsjack (no strategist).
+      strategistSection +
+      `\n\n【本次只產 1 個變體】**${label}**：` +
+      (config.cleanPromptVariantHint ??
+        `只接「這一個」時事/角度，完全照任務指定的四欄純文字格式輸出這 1 個變體的內容。`) +
+      `\n**嚴禁**輸出 JSON 陣列、**嚴禁**一次列出多個變體、**嚴禁**把其他 ` +
       `tab 的內容也寫進來——每個變體是獨立一次產出，只有一份。\n\n` +
       `【輸出格式】輸出嚴格 JSON 物件（不是陣列）：\n` +
-      `{"caption":"<這 1 個變體的四欄純文字內容，保留【角度】【為什麼會被報】` +
-      `【一句 pitch】【建議下一步】四個方括號標題與換行>","hashtags":[]}\n` +
+      `{"caption":"${config.cleanPromptCaptionSpec ??
+        `<這 1 個變體的四欄純文字內容，保留【角度】【為什麼會被報】【一句 pitch】【建議下一步】四個方括號標題與換行>`
+      }","hashtags":[]}\n` +
       `第一個字元就是 {。不要 code fence、不要前言、caption 外不要多寫字。\n` +
       `\n# 品牌脈絡（素材，扣回用，不要照抄）\n${brandPrefix}` +
       (hasUrl ? `\n\n# 參考素材（URL 抓到的內容）\n${urlContext}` : "")
@@ -968,10 +1041,6 @@ async function callOneVariant(args: {
     // New version: 3-step smart fallback (素材 → 場景 → 對話起手式).
     // Placeholders forbidden entirely; defensive scrub also strips them
     // post-LLM (see sanitizeCaption regex below).
-    `【絕不反問 — 最高優先，違反即視為失敗】\n` +
-    `這是一鍵速產任務，使用者不會再補充。**無論資訊多不足，都必須直接產出一份完整、可用的成品**。\n` +
-    `- 嚴禁輸出任何「我需要更多資訊」「請提供」「請補充」「為了完成需要…」之類反問或要求清單。\n` +
-    `- caption 必須是最終可發布的文字本身，不是給用戶的提問或工作說明。\n` +
     `\n【缺資訊時的處理 — 三步降級，禁用任何佔位符】\n` +
     `**絕對不准**輸出「[待補：xxx]」「[請補充：xxx]」「[填入：xxx]」「[ASSUMPTION]」這類括號標記。\n` +
     `缺具體事實（日期 / 數字 / 人名 / 連結）時，按順序降級：\n` +
@@ -985,6 +1054,11 @@ async function callOneVariant(args: {
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
     brandSection +
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
+  // Ad-copy contract goes LAST so it is the freshest instruction and wins
+  // over the social scaffold's「不要排成結構化卡片」rule.
+  const system = promptCore + deliverableOnlyRule
+    + (adCopy ? buildAdCopyRule(requestedUrl) : "")
+    + (shotList ? buildShotListRule() : "");
 
   // Provider + model selection priority:
   //   1. Agent's aiModel (from JSON-assigned real-person agent) — uses both
@@ -1086,13 +1160,16 @@ async function callOneVariant(args: {
   let attempt = 0;
   let lastErr: any = null;
   let lastRaw = ""; // for diagnostics
+  let adCopyIssue = ""; // ad-copy contract violation from the previous attempt
+  let wuganVoiceIssue = ""; // 五感十築句型合約：上一次的違反內容
+  let shotListIssue = ""; // shot-list contract violation from the previous attempt
   while (attempt < 2) {
     attempt++;
     try {
       // 2nd attempt: append explicit reminder to user msg, lowering model
       // creativity and forcing strict JSON.
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] 上次回應沒給可解析的 caption。請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。`
+        ? `${userMsg}\n\n[REMINDER] ${shotListIssue ? `上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : wuganVoiceIssue ? wuganVoiceIssue : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -1104,16 +1181,90 @@ async function callOneVariant(args: {
           provider,
           explicitModel,
         ),
-        timeoutPromise<never>(LLM_BUDGET_MS, `caption[${label}]`),
+        // 長篇卡（例如一次排整個月的行事曆）用自己的預算；其餘照舊 40s。
+        timeoutPromise<never>(config.captionBudgetMs ?? LLM_BUDGET_MS, `caption[${label}]`),
       ]);
       lastRaw = r.content ?? "";
       const parsed = tryParseJson(lastRaw);
       const out = extractCaption(lastRaw, parsed);
       if (out.caption.length > 0) {
-        return { label, caption: sanitizeCaption(stripCaptionPreamble(out.caption)), hashtags: out.hashtags };
+        const caption = stripCaptionPreamble(out.caption);
+        const sanity = detectNonDeliverable(caption, { isZhTW, structured: calendarMode, inputKeys });
+        if (!sanity) {
+          if (adCopy) {
+            const issue = validateAdCopy(caption, requestedUrl);
+            if (issue && attempt < 2) {
+              // Contract miss on the first try → one strict retry (the
+              // reminder below names the exact violation).
+              lastErr = new Error(`ad-copy contract miss for ${label} (${issue.reason}): ${issue.detail}`);
+              adCopyIssue = issue.detail;
+              console.warn(`[callOneVariant] attempt ${attempt} contract miss for ${label} (${issue.reason}): ${lastRaw.slice(0, 300)}`);
+              continue;
+            }
+            if (issue) {
+              // Last attempt: ship what we have, deterministically repaired
+              // (URL appended to [Primary]). Missing markers cannot be repaired.
+              console.warn(`[callOneVariant] ad-copy contract still unmet for ${label} (${issue.reason}) — applying repair`);
+              return { label, caption: repairAdCopy(caption, requestedUrl), hashtags: out.hashtags };
+            }
+          }
+          if (wuganVoice) {
+            // skill 01 Hard Rule 1。規則已經在 systemPrompt 最前面，實測
+            // 仍會滑回這個句型（一次三個變體共 8 處），所以照 adCopy /
+            // shotList 的做法補一次具名重試，再不行才確定性修補。
+            const issue = validateWuganVoice(caption);
+            // 2026-08-31：重試只用在短文本。長文件（行事曆一次 3 篇大綱、
+            // 案例一次 3 個提報）單次生成就要 45–100s，再生一份會撞破 caption
+            // 預算，整個變體回空 —— 任務顯示成功、產出空白。實測 wg-cal-
+            // eco-architecture 就是這樣掛掉的（attempt 1 命中 11 處 →
+            // 重試 → final gate hasUsableVariant=false）。
+            // 長文件直接走確定性修補：對比尾巴本來就是機械可刪的。
+            const longForm = (config.captionMaxChars ?? 0) > 2000;
+            if (issue && attempt < 2 && !longForm) {
+              lastErr = new Error(`wugan voice contract miss for ${label} (${issue.pattern})`);
+              wuganVoiceIssue = buildWuganVoiceReminder(issue);
+              console.warn(`[callOneVariant] attempt ${attempt} wugan-voice miss for ${label} (${issue.pattern} x${issue.count})`);
+              continue;
+            }
+            if (issue) {
+              // 最後一次：把對比句的否定半邊機械性拿掉，保留肯定半邊。
+              // 修不掉的形式會原樣留著 —— 修壞比留著更糟。
+              console.warn(`[callOneVariant] wugan-voice still unmet for ${label} (${issue.pattern}) — applying repair`);
+              return { label, caption: repairWuganVoice(caption), hashtags: out.hashtags };
+            }
+          }
+          if (shotList) {
+            // 先把「內容對、包裝爛」的回應（字面 \n、漏出來的 JSON 外殼、
+            // 四行擠成一行）機械性救回來，再驗證 —— 否則會為了包裝問題
+            // 白燒一次重試，而重試的結果通常比第一次差。
+            const normalized = normalizeShotList(caption);
+            const issue = validateShotList(normalized);
+            if (issue && attempt < 2) {
+              lastErr = new Error(`shot-list contract miss for ${label} (${issue.reason}): ${issue.detail}`);
+              shotListIssue = issue.detail;
+              console.warn(`[callOneVariant] attempt ${attempt} shot-list miss for ${label} (${issue.reason}): ${lastRaw.slice(0, 300)}`);
+              continue;
+            }
+            if (issue) {
+              // 最後一次：能修的只有 hashtag，格數/缺行修不了，照實出貨。
+              console.warn(`[callOneVariant] shot-list contract still unmet for ${label} (${issue.reason}) — applying repair`);
+              return { label, caption: repairShotList(caption), hashtags: [] };
+            }
+            // 出貨的是正規化後的版本 —— 原始那份還帶著逸出的換行字元與
+            // JSON 外殼殘骸。
+            return { label, caption: normalized, hashtags: [] };
+          }
+          // dev 2026-08: strip draft-leak lines / internal snake_case keys
+          // from the shipped caption. Only on this path — the contract
+          // branches above return formats whose markers this would eat.
+          return { label, caption: sanitizeCaption(caption), hashtags: out.hashtags };
+        }
+        lastErr = new Error(`non-deliverable caption for ${label} (${sanity.reason}) — raw[0:200]: ${lastRaw.slice(0, 200)}`);
+        console.warn(`[callOneVariant] attempt ${attempt} rejected for ${label} (${sanity.reason}): ${lastRaw.slice(0, 300)}`);
+      } else {
+        lastErr = new Error(`empty caption for ${label} — raw[0:200]: ${lastRaw.slice(0, 200)}`);
+        console.warn(`[callOneVariant] attempt ${attempt} failed for ${label} (raw len=${lastRaw.length}): ${lastRaw.slice(0, 300)}`);
       }
-      lastErr = new Error(`empty caption for ${label} — raw[0:200]: ${lastRaw.slice(0, 200)}`);
-      console.warn(`[callOneVariant] attempt ${attempt} failed for ${label} (raw len=${lastRaw.length}): ${lastRaw.slice(0, 300)}`);
     } catch (e) {
       lastErr = e;
       console.warn(`[callOneVariant] attempt ${attempt} threw for ${label}:`, (e as Error)?.message);
@@ -1130,9 +1281,12 @@ async function callCaptionWriter(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  inputKeys: readonly string[];
   agentAiModel?: string | null;
   strategistAnchor?: string;
   market?: MarketCode | null;
+  isZhTW: boolean;
+  requestedUrl?: string | null;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
   // Parallel fanout — each variant in its own LLM call.
@@ -1197,9 +1351,20 @@ async function callOneBrief(args: {
     "第1天": "最強視覺衝擊，戲劇光影與高飽和對比色，最終倒數的緊張感，聚焦單一明確行動",
   };
   const lens = labelLens[label] ?? `緊扣「${label}」的獨特視覺概念，與其他版本明顯不同`;
+  // 2026-08-23 (CJ 驗收 ig-60-live-event 的 7 段圖): run-of-show 任務的 label
+  // 開頭是流程時間碼（"03:00-10:00 第一波衝刺" / "T-24h 預熱宣告"），視覺總監
+  // 把它讀成一天中的時刻，於是「03:00」畫成凌晨檯燈、「10:00-18:00」畫成正午
+  // 強光、「T-24h」畫成深夜沙漏 —— 整組圖在演時鐘，不是在演直播現場。
+  const isTimecodeLabel = /^(T-\d+h|\d{1,2}:\d{2})/.test(label);
+  const timecodeNote = isTimecodeLabel
+    ? `\n【重要】「${label}」開頭的時間碼是「直播進行到第幾分鐘」，**不是一天中的時刻**。` +
+      `絕對不要據此畫成凌晨 / 清晨 / 正午 / 深夜的光線或氛圍，也不要畫時鐘、沙漏、倒數計時器。` +
+      `視覺要呼應這一段「正在做的事」（例如：正在拆箱、正在看留言、正在展示成分表）。\n`
+    : "";
   const system =
     imagePersona +
     `任務：寫 1 條**繁體中文**視覺方向描述，呼應「${label}」這個口吻。\n` +
+    timecodeNote +
     `此版本的視覺切角（務必照此走，不要寫成通用品牌圖）：${lens}。\n` +
     `這是一組多版本中的「${label}」，**必須與其他版本在主體、場景、構圖、色調上明顯不同**，不可雷同。\n` +
     `比例：${config.aspectRatio ?? "1:1"}\n` +
@@ -1425,17 +1590,23 @@ async function callStrategist(args: {
   urlContext: string;
   userMsg: string;
   postLabels: string[];
+  /** 2026-08-22: what the writers are actually producing. Default keeps the
+   *  original 「FB 系列貼文」/「篇」 wording for every existing task. */
+  deliverable?: string;
+  unit?: string;
 }): Promise<string> {
   const { strategistPersona, template, brandPrefix, urlContext, userMsg, postLabels } = args;
+  const deliverable = args.deliverable ?? "FB 系列貼文";
+  const unit = args.unit ?? "篇";
   const system =
     `# 你的角色\n` +
     strategistPersona +
     `\n# 任務\n` +
-    `用戶要產出 FB 系列貼文（${postLabels.length} 篇）。你不寫 caption — 你寫整體「結構錨點」給後續寫手用。\n\n` +
+    `用戶要產出${deliverable}（${postLabels.length} ${unit}）。你不寫 caption — 你寫整體「結構錨點」給後續寫手用。\n\n` +
     `產出 4-8 行繁體中文，涵蓋：\n` +
     `1) 整體 narrative 主題 / 核心訊息\n` +
-    `2) 每篇的角色定位（${postLabels.map((l) => `「${l}」`).join(" / ")}）\n` +
-    `3) 篇與篇之間的勾連邏輯（每篇結尾如何帶到下一篇）\n` +
+    `2) 每${unit}的角色定位（${postLabels.map((l) => `「${l}」`).join(" / ")}）\n` +
+    `3) ${unit}與${unit}之間的勾連邏輯（每${unit}結尾如何帶到下一${unit}）\n` +
     `4) 整體調性（情感 / 理性 / 緊湊 / 慢敘事 etc.）\n\n` +
     `直接給結構錨點文字，不要前言。\n` +
     (urlContext ? `\n# URL 內容\n${urlContext}` : "") +
@@ -1571,7 +1742,7 @@ async function loadProductImageUrl(brandId?: number | null, productId?: number |
         : null,
     ];
     for (const c of candidates) {
-      if (typeof c === "string" && /^https?:\/\//.test(c)) return c;
+      if (typeof c === "string" && /^https?:\/\//.test(c) && await probeImageUrl(c, 8_000)) return c;
     }
     return null;
   } catch {
@@ -1592,24 +1763,50 @@ async function loadProductImageUrl(brandId?: number | null, productId?: number |
 async function genOneImage(
   args: {
     content: string; style: string | null; platform?: string; palette?: Array<{ hex: string; role: string }>;
+    brandIdentity?: BrandIdentityForImage | null;
     /** 2026-07-27 (CJ「合成圖也套用真實產品圖片」): real product photo URL —
      *  when set, routes to Nano Banana subject-reference compositing instead
      *  of text-to-image, mirroring the manual RunPage「使用真實產品圖」panel. */
     subjectImageUrl?: string | null;
+    /** True when the run is product-scoped even if its stored photo is broken. */
+    subjectImageRequired?: boolean;
   },
   config: OrchestraConfig,
 ): Promise<OrchestraVariant["image"]> {
   const prompt = args.style ?? ""; // returned as `style` — what the UI shows
   const source = (args.content || args.style || "").trim();
-  if (!source) return { style: args.style, url: null, status: "skipped" };
+  if (!source) return { style: args.style, prompt: null, promptZh: null, url: null, status: "skipped" };
+  if (args.subjectImageRequired && !args.subjectImageUrl) {
+    return {
+      style: args.style,
+      prompt: null,
+      promptZh: null,
+      modelId: null,
+      requestedModelId: "google/nano-banana",
+      fallbackUsed: false,
+      url: null,
+      status: "failed",
+      errorMsg: PRODUCT_SUBJECT_UNAVAILABLE_ERROR,
+    };
+  }
+  // 2026-08-19: hoisted out of the try so every return path can persist the
+  // generated visual brief that drove the model (see image.prompt). Provider
+  // safety/fidelity guardrails are appended separately and are not UI content.
+  let modelPrompt: string | null = null;
+  let displayPromptZh: string | null = null;
   try {
+    const subjectMode = !!args.subjectImageUrl;
     // 2026-07-19 (CJ「品牌顏色會被貫穿到圖片生成的指令中嗎」): brand palette
     // rides along into the shared brief converter → on-brand color schemes.
-    const modelPrompt = await captionToVisualBrief({
+    const visualBrief = await captionToBilingualVisualBrief({
       caption: source,
       platform: args.platform,
       palette: args.palette,
+      brandIdentity: args.brandIdentity,
+      subjectMode,
     });
+    modelPrompt = visualBrief.prompt;
+    displayPromptZh = visualBrief.promptZh;
     // 2026-05-18 (CJ「目前的圖很不行，最好的生圖模型是什麼」): quick-task
     // images were hardcoded to piapi/flux-schnell — the fastest/lowest-
     // quality Flux tier (draft-grade, weak prompt adherence). Upgrade the
@@ -1631,42 +1828,37 @@ async function genOneImage(
     // prompt our way to a correct reflection (unreliable), avoid the
     // composition entirely — same philosophy as the NO-TEXT policy: route
     // around what models can't do, don't ship the broken result.
-    const noMirrorLine =
-      "Do NOT include a mirror, reflective surface, reflection, or any shot " +
-      "composed as \"person looking at their own reflection\" — reflections " +
-      "never stay physically consistent with the subject's actual pose/hair/" +
-      "head angle. Show the subject directly instead.";
-    const subjectMode = !!args.subjectImageUrl;
-    const promptNoText = subjectMode
-      // 2026-07-25 product-faithful gen: the blanket NO-TEXT rule would strip
-      // the product's own label — use the fidelity guard instead (label
-      // letter-perfect, no OTHER generated text). Mirrors imageGen.ts's
-      // PRODUCT_FAITHFUL_PROMPT_BLOCK so both paths hold the same bar.
-      ? modelPrompt +
-        "\n\nPRODUCT FIDELITY — the attached image is the REAL product; reproduce it " +
-        "EXACTLY as shown (identical shape, proportions, materials, colors, and every " +
-        "printed label/logo/text on the product itself must stay letter-perfect and " +
-        "unaltered). Do NOT redraw, restyle, re-color or re-label the product. Place it " +
-        "naturally into the scene: matching light direction, correct perspective and " +
-        "scale, realistic contact shadows — it must look photographed in place, never " +
-        "pasted on. Apart from the product's own printed label, add no other text, " +
-        "captions, watermarks or typography anywhere.\n\n" + noMirrorLine
-      : modelPrompt +
-        "\n\nABSOLUTELY NO TEXT: render zero written characters — no text, letters, " +
-        "words, numbers, Chinese/Japanese/Korean characters, titles, headlines, " +
-        "captions, labels, badges, signage, logos, watermarks or typography anywhere. " +
-        "Leave any title area as empty visual space; text is added later on a separate layer.\n\n" +
-        noMirrorLine;
+    // 2026-08-19 (客戶回報「勾選真實產品後再產圖，出現錯誤中文字」): this file
+    // used to carry its own paraphrase of the fidelity guard, so tightening
+    // imageGen's copy left this path on the old, looser wording. Import the
+    // shared constant — one guard, one place to fix it.
+    const {
+      PRODUCT_FAITHFUL_PROMPT_BLOCK,
+      NO_MIRROR_PROMPT_BLOCK,
+      NO_MIRROR_NEGATIVE_PROMPT,
+    } = await import("./imageGen");
+    const promptNoText = `${modelPrompt}\n\n${buildImageGuardBlock({
+      subjectMode,
+      productFaithfulBlock: PRODUCT_FAITHFUL_PROMPT_BLOCK,
+      noMirrorBlock: NO_MIRROR_PROMPT_BLOCK,
+    })}`;
     const opts = {
       prompt: promptNoText,
       aspectRatio: aspect,
-      quality: "high" as const,
+      // 2026-09-01: quality is read only by the OpenAI and Azure adapters, and
+      // forcing "high" made gpt-image-2 take 73.8s instead of 14.1s for a
+      // SMALLER image — past the cap below, so every openai-pinned task fell
+      // back to Flux. Let each adapter use its own default.
       ...(args.subjectImageUrl ? { imageUrl: args.subjectImageUrl } : {}),
-      negativePrompt:
-        "text, letters, words, numbers, chinese characters, japanese characters, " +
-        "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
-        "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
-        "fake characters, writing, mirror, reflection, reflective surface",
+      // Product-subject mode can't send the blanket text-suppression negative —
+      // it would fight the real product's own printed label. Mirror-only there,
+      // matching imageGen.ts and mediaRouter.generate.
+      negativePrompt: subjectMode
+        ? NO_MIRROR_NEGATIVE_PROMPT
+        : "text, letters, words, numbers, chinese characters, japanese characters, " +
+          "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
+          "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
+          "fake characters, writing, mirror, reflection, reflective surface",
     };
     const tryModel = async (modelId: string, label: string, capMs: number) =>
       Promise.race([
@@ -1682,37 +1874,85 @@ async function genOneImage(
     // capping the primary attempt tighter means a slow Imagen falls back
     // to the proven (faster) Flux sooner. Saves up to ~7s/image on the
     // slow path — directly shortens the hold-for-images wait.
-    const IMAGEN_CAP_MS = 18_000;
-    // 2026-07-07 (CJ「鎖定 gpt-image-2」): a task may pin its primary image
-    // model (e.g. YT → gpt-image-2 for clean 16:9 backgrounds). gpt-image-2 is
-    // slower than imagen-4, so give the override a wider cap. Flux Schnell
-    // stays the reliability fallback either way.
+    // 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」): imagen-4 is GONE
+    // from this key's ListModels — every :predict answers 404 NOT_FOUND — so
+    // the primary attempt below could only ever burn the cap and fall back.
+    // Nano Banana (gemini-2.5-flash-image) IS on the key and does plain
+    // text-to-image, so it takes over as the primary; the cap keeps its old
+    // job of handing slow runs to Flux Schnell inside the task budget.
+    // 2026-09-01 (CJ「我要執行走 gpt-image 2」): gpt-image-2 is now the primary
+    // for every auto-generated image, not just the YT cards that pinned it.
+    // Measured 14.1s at 1536x1024 once the harmful quality="high" was dropped,
+    // and a 5-image YT run finished all five inside a 35s cap — so the cap is
+    // 35s across the board now rather than 18s for the default path and 35s
+    // for overrides. The old 18s existed for Imagen 4, which no longer exists
+    // on this key at all. Flux Schnell stays the reliability fallback.
+    const PRIMARY_IMAGE_CAP_MS = 35_000;
     // 2026-07-27: subjectMode always routes through Nano Banana (image-edit,
     // not text-to-image) — it's the only model here that takes a subject
-    // reference photo.
-    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "google/imagen-4-default");
-    const primaryCapMs = subjectMode ? 35_000 : (config.imageModelOverride ? 35_000 : IMAGEN_CAP_MS);
+    // reference photo, so「使用真實產品圖」must not follow the primary above.
+    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "openai/gpt-image-2");
+    const primaryCapMs = PRIMARY_IMAGE_CAP_MS;
     let r;
+    let fallbackUsed = false;
     try {
       r = await tryModel(primaryModel, primaryModel, primaryCapMs);
       if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
     } catch (e: any) {
+      // 2026-09-01: this catch used to swallow the reason entirely, so a
+      // pinned model that never ran was indistinguishable from one that ran
+      // fine — the openai/gpt-image-2 timeout below was only found by
+      // measuring the PNG dimensions of the delivered image. Say what failed.
+      console.warn(
+        `[genOneImage] primary ${primaryModel} failed after ${primaryCapMs}ms cap — ` +
+        `${String(e?.message ?? e).slice(0, 200)}`,
+      );
       // 2026-07-25 product-faithful gen policy (imageGen.ts): a hallucinated
       // product is worse than a failed run — do NOT fall back to text-to-image
       // when a real product photo was requested, it would silently ship a
       // fake product. Non-product runs keep the proven Flux Schnell fallback.
       if (subjectMode) {
-        return { style: prompt, url: null, status: "failed", errorMsg: String(e?.message ?? e) };
+        return {
+          style: prompt,
+          prompt: modelPrompt,
+          promptZh: displayPromptZh,
+          modelId: primaryModel,
+          requestedModelId: primaryModel,
+          fallbackUsed: false,
+          url: null,
+          status: "failed",
+          errorMsg: String(e?.message ?? e),
+        };
       }
+      fallbackUsed = true;
       r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
     }
     if (r.status === "ready" && r.url) {
-      return { style: prompt, url: r.url, status: "ready" };
+      return {
+        style: prompt,
+        prompt: modelPrompt,
+        promptZh: displayPromptZh,
+        modelId: r.modelId,
+        requestedModelId: primaryModel,
+        fallbackUsed,
+        url: r.url,
+        status: "ready",
+      };
     }
-    return { style: prompt, url: null, status: "failed", errorMsg: r.errorMsg ?? "no url returned" };
+    return {
+      style: prompt,
+      prompt: modelPrompt,
+      promptZh: displayPromptZh,
+      modelId: r.modelId,
+      requestedModelId: primaryModel,
+      fallbackUsed,
+      url: null,
+      status: "failed",
+      errorMsg: r.errorMsg ?? "no url returned",
+    };
   } catch (e: any) {
     const msg = String(e?.message ?? e);
-    return { style: prompt, url: null, status: msg.includes("exceeded") ? "timeout" : "failed", errorMsg: msg };
+    return { style: prompt, prompt: modelPrompt, promptZh: displayPromptZh, url: null, status: msg.includes("exceeded") ? "timeout" : "failed", errorMsg: msg };
   }
 }
 
@@ -1848,6 +2088,22 @@ export async function runOrchestra(args: {
   /** Tier override — 60s/100s scale variants + add QA stage. Default 30s. */
   tier?: OrchestraTier;
   /**
+   * 2026-08-11: which audience segment / sweet spot this piece was written
+   * for. Resolved by the caller from the brand's stored strategy scenario, so
+   * the labels can't drift from the scenario they came from.
+   *
+   * This is the anchor the whole performance story hangs on: without it a
+   * published post can be measured, but not attributed to an audience — and
+   * "which 族群 is worth more content" is the question the 成效 workspace
+   * exists to answer. Absent for tasks started outside the workbench.
+   */
+  audienceTag?: {
+    audience: string;
+    spotTitle?: string | null;
+    scenarioId?: string | null;
+    spotIndex?: number | null;
+  } | null;
+  /**
    * 2026-05-14 (CJ「先回 caption + brief、image 跟 QA 變 async polling」):
    * Optional checkpoint — fires AFTER captions + briefs are assembled but
    * BEFORE image gen / extras / QA. Caller can persist this partial result,
@@ -1885,12 +2141,20 @@ export async function runOrchestra(args: {
   // router's "isPack" clamp skip in quickTaskRouter's central 60s rule.
   const isCardsConfig = (args.config.cardsPerVariant ?? 0) > 1;
   const tier: OrchestraTier = args.tier ?? "30s";
-  if ((tier === "60s" || tier === "99s") && !isCardsConfig) {
-    const baseLabels = args.config.variantLabels;
-    const extraLabels = ["進階版", "替代版", "極簡版", "完整版"]; // generic fallbacks
-    const scaledLabels = baseLabels.length >= 5
-      ? baseLabels.slice(0, 5)
-      : [...baseLabels, ...extraLabels.slice(0, 5 - baseLabels.length)];
+  if (tier === "60s" || tier === "99s") {
+    // 2026-08-22 (CJ 驗收 ig-60-live-suite「6 段流程表只回 5 段」): this used to
+    // hardcode variants:5, which TRUNCATED every pack declaring more (6 段直播
+    // 流程少了收尾預告；fb-99-livestream-9seg 的 9 段只出 5 段) and PADDED every
+    // pack declaring fewer (3 篇連載多出「進階版／替代版」兩個沒人要的 tab).
+    // See tierVariantShape.ts — a pack ships what it declares, everything
+    // else keeps the 5-version floor.
+    const shape = resolveTierVariantShape({
+      variants: args.config.variants,
+      images: args.config.images,
+      variantLabels: args.config.variantLabels,
+      postLabels: args.config.postLabels,
+      postsCount: args.config.extras?.postsCount,
+    });
 
     // 60s tier KEY differentiators vs 30s:
     //   1. runImageGen=true (Flux really runs — real images, not just briefs)
@@ -1905,9 +2169,9 @@ export async function runOrchestra(args: {
       ...args,
       config: {
         ...args.config,
-        variants: 5,
-        images: args.config.images > 0 ? 5 : 0,
-        variantLabels: scaledLabels,
+        variants: shape.variants,
+        images: shape.images,
+        variantLabels: shape.variantLabels,
         runImageGen: args.config.images > 0,  // 60s: yes if task has visual
         extras: { ...defaultExtras, ...(args.config.extras ?? {}) },
       },
@@ -1926,7 +2190,11 @@ export async function runOrchestra(args: {
   // about to land — which is exactly how a probe lost one variant at 360s.
   const VIDEO_BUDGET_MS = (args.config.videoTailHint ? 15 : 8) * 60_000;
   const baseBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "99s" ? HARD_BUDGET_99S : HARD_BUDGET_MS;
-  const tierBudget = args.config.runVideoGen ? VIDEO_BUDGET_MS : baseBudget;
+  // 長文件卡（案例提報 / 行事曆整月大綱）本質上不是 30s 的工作量，但仍走
+  // 30s 引擎。給它們自己的總預算，否則 caption 還沒生完 job 就被判超時。
+  const tierBudget = args.config.runVideoGen
+    ? VIDEO_BUDGET_MS
+    : (args.config.hardBudgetMs ?? baseBudget);
 
   const startedAt = Date.now();
   const stages: OrchestraStage[] = [];
@@ -1938,9 +2206,13 @@ export async function runOrchestra(args: {
     return s;
   }
 
+  const inputLabels = new Map(
+    (args.template.inputs ?? []).map((input) => [input.key, input.label.trim()]),
+  );
+  const inputKeys = Object.keys(args.inputs);
   const userMsg =
     Object.entries(args.inputs)
-      .map(([k, v]) => `[${k}] ${v}`)
+      .map(([k, v]) => `[${inputLabels.get(k) || k}] ${v}`)
       .join("\n") || "(no extra inputs)";
 
   // 2026-05-14 (CJ「async polling」): when onCheckpoint persists a partial
@@ -1958,7 +2230,20 @@ export async function runOrchestra(args: {
     // metadata + transcript (richer context than generic urlContext).
     // Otherwise fall back to generic urlContext for non-YT links.
     const inputValues = Object.values(args.inputs).filter((v): v is string => typeof v === "string");
+    // Ad-copy tasks: a non-YouTube URL in the brief is the *landing page*
+    // (carried separately as requestedUrl), not the topic source — do not
+    // fetch it and never let it override the brand as「主題」. YouTube links
+    // stay reference material and keep the existing fetch path.
+    const adCopyTask = isAdCopyTemplate(args.template);
+    const shotListTask = isShotListTemplate(args.template);
+    const requestedUrl = adCopyTask ? extractRequestedUrl(args.inputs) : null;
     const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
+    const firstUrl = ytUrlInput
+      ? findFirstUrl(ytUrlInput)
+      : inputValues.map((v) => findFirstUrl(v)).find((url): url is string => !!url) ?? null;
+    const isLandingUrl = (u: string | null) =>
+      !!u && !!requestedUrl && u.replace(/^https?:\/\//i, "") === requestedUrl.replace(/^https?:\/\//i, "");
+    const detectedUrl = isLandingUrl(firstUrl) ? null : firstUrl;
 
     // 100s tier: also kick off scout (viral patterns research) in parallel
     const isResearchTier = tier === "99s";
@@ -1990,14 +2275,8 @@ export async function runOrchestra(args: {
         : Promise.resolve(null),
       // Generic URL fetch only when there's a non-YT URL
       (async () => {
-        if (ytUrlInput) return null; // skip — YT path handles it
-        for (const v of inputValues) {
-          const url = findFirstUrl(v);
-          if (url) {
-            try { return await fetchUrlSummary(url); } catch { return null; }
-          }
-        }
-        return null;
+        if (ytUrlInput || !detectedUrl) return null; // skip — YT path handles it
+        try { return await fetchUrlSummary(detectedUrl); } catch { return null; }
       })(),
       // Brand context + knowledge base + REAL public content merged.
       // brandRealContent (website + social via Perplexity) is the strongest
@@ -2080,6 +2359,9 @@ export async function runOrchestra(args: {
       : urlSummary
         ? { url: urlSummary.url, title: urlSummary.title, chars: urlSummary.fetched_chars, og: urlSummary.og }
         : null;
+    const urlFetchFailure = detectedUrl && !fetchedUrl
+      ? { url: detectedUrl, reason: "content_unavailable" as const }
+      : null;
     let urlContext = ytContext
       ? "\n\n" + formatYouTubeContextForPrompt(ytContext) + "\n\n"
       : urlSummary
@@ -2115,6 +2397,8 @@ export async function runOrchestra(args: {
           urlContext,
           userMsg,
           postLabels: labels,
+          deliverable: args.config.strategistDeliverable,
+          unit: args.config.strategistUnit,
         });
         stStrat.status = strategistAnchor ? "done" : "failed";
         stStrat.completedAt = Date.now() - startedAt;
@@ -2140,8 +2424,11 @@ export async function runOrchestra(args: {
         brandPrefix,
         urlContext,
         userMsg,
+        inputKeys,
         strategistAnchor: strategistAnchor || undefined,
         market: brandMarket.marketCode, // 2026-07-17 多市場
+        isZhTW: brandMarket.isZhTW,
+        requestedUrl,
       }).then((c) => { stCap.status = "done"; stCap.completedAt = Date.now() - startedAt; return c; }).catch((e) => {
         stCap.status = "failed";
         stCap.completedAt = Date.now() - startedAt;
@@ -2164,27 +2451,32 @@ export async function runOrchestra(args: {
         : Promise.resolve<string[]>([]),
     ]);
 
-    // ── Small-cap caption post-validation (2026-07-20) ─────────────────
+    // ── Caption post-validation ─────────────────────────────────────────
     // CJ QA:「FB 廣告 Headline 5 種：輸入籠統時 AI 回傳一大段要求澄清的
     // 文字（遠超 25 字），直接塞進廣告標題視覺區塊，破壞版型」。The
     // length rule lives in the prompt, but nothing enforced it after
-    // generation. For micro-caption tasks (captionMaxChars ≤ 60):
-    //   1. clarification-request output → blank the caption + push an
-    //      explicit error (no silent fallback, per 2026-05-28 principle)
-    //   2. multi-line/oversized output → reduce to first line, hard-cap
-    //      with … so a non-compliant answer can never break the layout.
-    if (args.config.captionMaxChars > 0 && args.config.captionMaxChars <= 60 && Array.isArray(captions)) {
-      const CLARIFY_RE = /請(再)?提供|請補充|需要更多|更多資訊|請告訴我|能否分享|請說明|資訊不足|無法(直接)?產出|我需要知道/;
-      const cap = args.config.captionMaxChars;
+    // generation. Non-deliverable content is rejected for every task. The
+    // first-line and hard-length clamps remain exclusive to micro tasks.
+    if (Array.isArray(captions)) {
       for (let vi = 0; vi < captions.length; vi++) {
         const v = captions[vi];
         if (!v?.caption) continue;
-        let c = v.caption.trim();
-        if (CLARIFY_RE.test(c)) {
-          errors.push(`caption(${v.label ?? vi + 1}): model asked for clarification instead of producing — 重生這段 to retry`);
+        const sanity = detectNonDeliverable(v.caption, {
+          isZhTW: brandMarket.isZhTW,
+          structured: !!args.config.calendarMerge,
+          inputKeys,
+        });
+        if (sanity) {
+          errors.push(`caption(${v.label ?? vi + 1}): model returned non-deliverable content (${sanity.reason}) — 重生這段 to retry`);
           v.caption = "";
-          continue;
         }
+      }
+    }
+    if (args.config.captionMaxChars > 0 && args.config.captionMaxChars <= 60 && Array.isArray(captions)) {
+      const cap = args.config.captionMaxChars;
+      for (const v of captions) {
+        if (!v?.caption) continue;
+        let c = v.caption.trim();
         // First non-empty line only (micro tasks are single-line by spec)
         const firstLine = c.split(/\n+/).map((l) => l.trim()).find((l) => l.length > 0) ?? "";
         if (firstLine && firstLine.length < c.length) c = firstLine;
@@ -2211,7 +2503,24 @@ export async function runOrchestra(args: {
           const v = captions[vi];
           if (!v?.caption) continue;
           const report = await enforceBrandRulesOnTextWithReport(args.brandId, v.caption);
-          if (report.text && report.text !== v.caption) v.caption = report.text;
+          if (report.text && report.text !== v.caption) {
+            // A banned-word LLM rewrite can drop the markers / landing URL;
+            // re-apply the deterministic repair and re-validate.
+            // 2026-08-23: 分格腳本同理 —— VM probe（brand_id=2924）實測，改寫
+            // 後下一格的時間戳會被黏回上一格「字卡：」那行。本機沒帶 brandId
+            // 跑不到這一關，所以只有正式環境現形。
+            v.caption = adCopyTask ? repairAdCopy(report.text, requestedUrl)
+              : shotListTask ? repairShotList(report.text)
+              : report.text;
+            if (adCopyTask) {
+              const issue = validateAdCopy(v.caption, requestedUrl);
+              if (issue) console.warn(`[orchestra] ad-copy contract unmet after brand rewrite (${v.label}): ${issue.detail}`);
+            }
+            if (shotListTask) {
+              const issue = validateShotList(v.caption);
+              if (issue) console.warn(`[orchestra] shot-list contract unmet after brand rewrite (${v.label}): ${issue.detail}`);
+            }
+          }
           if (report.bannedHits.length > 0 || report.subsApplied.length > 0) {
             brandFixes.push({
               variantIndex: vi,
@@ -2271,7 +2580,14 @@ export async function runOrchestra(args: {
     // it fails do ONE LLM tighten pass against the IG rubric —
     // ~zero cost when output is already good (same proven pattern
     // as EDM self-check / brand-rule enforcement). Fail-safe.
-    if (Array.isArray(captions) && captions.length && isInstagramBodyTask(args.template)) {
+    // 2026-08-22 (CJ「IG 直播配套應該是完整直播範本」): cleanPrompt tasks are
+    // strict structured deliverables (直播流程表 / newsjack 四欄), not posts.
+    // The gate below fires on exactly what such a script legitimately
+    // contains — a spoken opener（「大家好…」＝genericOpener）and several
+    // 互動指令（愛心 / 留言 / 私訊 / 截圖 ＝ ctaBloat）— and the tighten pass
+    // would rewrite the run-of-show back into an IG caption. Skip them.
+    if (Array.isArray(captions) && captions.length && isInstagramBodyTask(args.template) &&
+        !args.config.cleanPrompt) {
       const ctaCount = (t: string) =>
         (t.match(/立即|馬上|點此|點擊|了解更多|現在就|搶先|報名|購買|訂閱|前往|查看|按此|留言|分享|儲存|收藏|追蹤|here|now|shop|buy|join|register|save|share|follow|link in bio/gi) || []).length;
       for (const v of captions) {
@@ -2368,10 +2684,14 @@ export async function runOrchestra(args: {
         "数": "數", "据": "據", "网": "網", "资": "資", "讯": "訊",
         "构": "構", "习": "習", "众": "眾", "签": "籤", "动": "動",
         "钩": "鉤", "击": "擊", "门": "門", "问": "問", "题": "題",
+        // 2026-08-23 VM probe：分格腳本寫「每次放盒子都對齐同一點」漏網。
+        // 補的是拍攝指示常用字（對齊 / 冷凍 / 標記 / 對線 / 旋轉）。
+        "齐": "齊", "冻": "凍", "标": "標", "记": "記", "线": "線", "转": "轉",
       };
       for (const v of captions) {
         if (!v?.caption) continue;
-        v.caption = v.caption.replace(/[么这个们时应说让优体关实现发内数据网资讯构习众签动钩击门问题]/g,
+        // 字元類要跟 S2T 的 key 同步 —— 沒列進來的字不會被查表。
+        v.caption = v.caption.replace(/[么这个们时应说让优体关实现发内数据网资讯构习众签动钩击门问题齐冻标记线转]/g,
           (c: string) => S2T[c] ?? c);
       }
     }
@@ -2388,6 +2708,10 @@ export async function runOrchestra(args: {
         v.caption = await reaskInZhTW(v.caption);
       }
     }
+
+    // 分格腳本的正規化刻意 **不** 放在這裡 —— 下面的變體組裝會把整條
+    // transform chain 重跑一次（見 `const variants` 迴圈），在這裡修會被
+    // 蓋掉。正確的位置是那條 chain 的最後一步。
 
     // ── Checkpoint (2026-05-14 「先回 caption + brief、image 跟 QA 變 async polling」) ─
     // Captions + briefs are ready. If the caller passed `onCheckpoint`,
@@ -2428,6 +2752,7 @@ export async function runOrchestra(args: {
           taskId: args.template.id,
           totalLatencyMs: Date.now() - startedAt,
           fetchedUrl,
+          urlFetchFailure,
           captionAgent: captionLoad.meta,
           imageAgent: imageLoad.meta,
           variants: partialVariants,
@@ -2478,10 +2803,13 @@ export async function runOrchestra(args: {
               imageAgent: imageLoad.meta ?? null,
               stages: [...stages],
               fetchedUrl: fetchedUrl ?? null,
+              urlFetchFailure,
               errors: [...errors],
               ok: true,
               variantCount: partialVariants.length,
               inputs: args.inputs ?? {},
+              // 2026-08-11: audience attribution anchor — see args.audienceTag.
+              audienceTag: args.audienceTag ?? null,
               productId: args.productId ?? null,
               eventId: args.eventId ?? null,
             },
@@ -2511,24 +2839,37 @@ export async function runOrchestra(args: {
     // produce nothing (every image "skipped" → every clip skipped).
     const willRender = (args.config.runImageGen || !!args.config.runVideoGen) && args.config.images > 0;
     const stGen = willRender
-      ? stage("gen", `Flux Schnell ×${args.config.images} 平行生圖`)
+      // The primary is usually Imagen, can be GPT/Nano Banana, and may fall
+      // back to Flux. Per-image modelId records the actual provider; keep the
+      // stage label provider-neutral instead of claiming every image was Flux.
+      ? stage("gen", `平行生圖 ×${args.config.images}`)
       : null;
 
     const taskPlatform = args.template.id.split("-")[0];
     // 2026-07-19: brand palette loaded once per run → injected into every
     // image brief so generated visuals carry the brand color scheme.
     const brandPalette = await loadBrandPaletteHexes(args.brandId);
+    const brandIdentity = await loadBrandIdentityForImage(args.brandId);
     // 2026-07-27 (CJ「合成圖也套用真實產品圖片」): when this run is scoped
     // to a specific product, fetch its real photo once so every variant's
     // image composites the actual product — same fidelity bar as the manual
     // RunPage「使用真實產品圖」panel. Brand-level (no productId) runs are
     // unaffected — there's no single product to anchor to.
-    const subjectImageUrl = willRender ? await loadProductImageUrl(args.brandId, args.productId) : null;
+    const loadedSubjectImageUrl = willRender ? await loadProductImageUrl(args.brandId, args.productId) : null;
+    const productSubject = resolveProductSubjectReference(args.productId, loadedSubjectImageUrl);
     const images: OrchestraVariant["image"][] = willRender && briefs.length
       ? await Promise.all(briefs.map((b, i) =>
           // Theater standard: prompt derives from the variant's CAPTION;
           // the Chinese brief is display-only (style).
-          genOneImage({ content: captions[i]?.caption ?? "", style: b, platform: taskPlatform, palette: brandPalette, subjectImageUrl }, args.config)))
+          genOneImage({
+            content: captions[i]?.caption ?? "",
+            style: b,
+            platform: taskPlatform,
+            palette: brandPalette,
+            brandIdentity,
+            subjectImageUrl: productSubject.imageUrl,
+            subjectImageRequired: productSubject.required,
+          }, args.config)))
       : briefs.length
         ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
         : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
@@ -2574,7 +2915,9 @@ export async function runOrchestra(args: {
                     style: briefs[i] ?? null,
                     platform: taskPlatform,
                     palette: brandPalette,
-                    subjectImageUrl,
+                    brandIdentity,
+                    subjectImageUrl: productSubject.imageUrl,
+                    subjectImageRequired: productSubject.required,
                   },
                   args.config,
                 )
@@ -2688,6 +3031,11 @@ export async function runOrchestra(args: {
       // punctuation cleaned (writer prompt scaffolding is Chinese, the
       // model occasionally slips a 。／， into EN/DE/FR output).
       if (caption && latinPunctLang(brandMarket.outputLanguage)) caption = normalizeLatinPunct(caption);
+      // 2026-08-23: 分格腳本必須是這條 chain 的**最後一步**。上面每一關
+      // （mergeHookAndBody / deduplicateInternalCaption / voiceSanitizeZhTW）
+      // 都會重排段落，實測會把「下一格的時間戳」黏回上一格「字卡：」那行，
+      // 整份腳本只認得出 1 格。在上游修沒有用 —— 這裡才是持久化前最後一點。
+      if (caption && shotListTask) caption = normalizeShotList(caption);
       if (!caption) {
         errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
       }
@@ -2763,14 +3111,27 @@ export async function runOrchestra(args: {
             // the subjectImageUrl wiring Stage 3 already does above (line
             // ~2382) — every card was pure text-to-image, so the model
             // invented its own product instead of compositing the real one.
-            { content: `${c.headline}\n${c.body}`.trim(), style: c.imageBrief, platform: args.template.id.split("-")[0], palette: brandPalette, subjectImageUrl },
+            {
+              content: `${c.headline}\n${c.body}`.trim(),
+              style: c.imageBrief,
+              platform: args.template.id.split("-")[0],
+              palette: brandPalette,
+              brandIdentity,
+              subjectImageUrl: productSubject.imageUrl,
+              subjectImageRequired: productSubject.required,
+            },
             args.config,
           )),
         );
         variants[0].cards = cardSpecs.map((c, idx) => ({
           headline: c.headline,
           body: c.body,
-          image: cardImages[idx] ?? { style: c.imageBrief, url: null, status: "failed" as const },
+          image: cardImages[idx] ?? {
+            style: c.imageBrief,
+            prompt: null,
+            url: null,
+            status: "failed" as const,
+          },
         }));
         const okCards = (variants[0].cards ?? []).filter((c) => c.image.status === "ready").length;
         if (okCards === 0) errors.push("carousel: 卡片圖全部生成失敗");
@@ -2914,6 +3275,7 @@ export async function runOrchestra(args: {
       taskId: args.template.id,
       totalLatencyMs: Date.now() - startedAt,
       fetchedUrl,
+      urlFetchFailure,
       captionAgent: captionLoad.meta,
       imageAgent: imageLoad.meta,
       variants,
@@ -3003,6 +3365,7 @@ export async function runOrchestra(args: {
           imageAgent: result.imageAgent ?? null,
           stages: result.stages ?? [],
           fetchedUrl: result.fetchedUrl ?? null,
+          urlFetchFailure: result.urlFetchFailure ?? null,
           errors: result.errors ?? [],
           ok: result.ok ?? true,
           variantCount: result.variants.length,
@@ -3010,6 +3373,8 @@ export async function runOrchestra(args: {
           // navigate back to the task with the user's prior answers
           // pre-filled (no need to re-type 主問題 input).
           inputs: args.inputs ?? {},
+          // 2026-08-11: audience attribution anchor — see args.audienceTag.
+          audienceTag: args.audienceTag ?? null,
           // 2026-05-11 (CJ): persist scope so /projects can filter
           // missions by product/event and /run page can re-apply scope.
           productId: args.productId ?? null,

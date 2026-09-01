@@ -6,7 +6,8 @@
  * Replaces the old 30s/60s/99s tier pages as the primary entry point.
  * Users pick the *platform* in the sidebar, then filter by complexity via
  * tabs inside this page:
- *   全部  |  一篇內容 · 30s  |  內容套組 · 60s  |  完整活動 · 99s
+ *   全部  |  單篇內容  |  內容套組  |  完整企劃
+ *   （分頁名一律取自 v2/lib/tierVocabulary.ts，不要在這裡另寫一套）
  *
  * Speed badges appear on every card so the timing expectation is clear
  * without requiring users to navigate tiers before seeing tasks.
@@ -17,8 +18,23 @@ import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
+import { TIER_ORDER, tierAccent, tierLabel } from "../lib/tierVocabulary";
+import {
+  FB_FORMAT_TABS as FORMAT_TABS,
+  FB_TASK_FORMAT_MAP as TASK_FORMAT_MAP,
+  type FBActiveFormat as ActiveFormat,
+  IG_FORMAT_TABS, IG_TASK_FORMAT_MAP, type IGActiveFormat,
+  LI_FORMAT_TABS, LI_TASK_FORMAT_MAP, type LIActiveFormat,
+  YT_FORMAT_TABS, YT_TASK_FORMAT_MAP, type YTActiveFormat,
+  TT_FORMAT_TABS, TT_TASK_FORMAT_MAP, type TTActiveFormat,
+  EM_FORMAT_TABS, EM_TASK_FORMAT_MAP, type EMActiveFormat,
+  PR_FORMAT_TABS, PR_TASK_FORMAT_MAP, type PRActiveFormat,
+  WEB_FORMAT_TABS, WEB_TASK_FORMAT_MAP, type WEBActiveFormat,
+} from "../lib/taskFormats";
 import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
+import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope";
+import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Textarea,
@@ -26,7 +42,8 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBolt, faPaperPlane, faXmark, faMagnifyingGlass,
-  faEnvelope, faBullhorn, faWandMagicSparkles,
+  faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe,
+  faBookBookmark, faCalendarDays,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -63,6 +80,12 @@ const ROUTE_TO_PLATFORM: Record<string, string> = {
   tt:    "tiktok",
   email: "email",
   pr:    "pr",
+  // 2026-08-29 官網頻道。路由是 /tasks/web，平台代號是 website。
+  web:   "website",
+  // 素材與規劃頻道。目前只有品牌任務包會用到，全域目錄沒有卡 ——
+  // 沒有包的品牌走到這兩個路由會看到空清單，側邊欄也不會有入口。
+  case:     "case",
+  calendar: "calendar",
 };
 
 interface PlatformMeta {
@@ -126,6 +149,27 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
     subZh: "PR Strategist 代理人以記者視角找到新聞價值，再產出完整稿件",
     subEn: "PR Strategist finds the news angle before writing a single word",
   },
+  case: {
+    label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#7C3AED",
+    heroZh: "案例不是寫稿當下才找，是平常就在累積",
+    heroEn: "A case library you build over time, not scramble for at deadline",
+    subZh: "依十項標準分別建檔，每次提報都對照既有紀錄去重",
+    subEn: "Filed by standard, deduplicated against everything already logged",
+  },
+  calendar: {
+    label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#B45309",
+    heroZh: "先把整個月的篇數與切角排好，再逐篇寫",
+    heroEn: "Plan the month's slots and angles first, then write them one by one",
+    subZh: "每種內容類型一張卡，一次產出該類型當月所有篇數的摘要",
+    subEn: "One card per content type, producing every slot that type owns this month",
+  },
+  website: {
+    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#0F766E",
+    heroZh: "官網長文不是部落格隨筆，是品牌把觀點說完整的地方",
+    heroEn: "Long-form that earns the reader's time — not filler blog posts",
+    subZh: "引言＋3 段的固定骨架，把案例與規格翻譯成讀者的生活感受",
+    subEn: "A fixed intro-plus-three structure that turns specs into felt experience",
+  },
 };
 
 // ── Shared utilities ─────────────────────────────────────────────────────────
@@ -143,20 +187,13 @@ const CARD_PALETTES = [
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
-function tierAccent(tier: string | undefined | null): string {
-  if (tier === "60s") return "#7c3aed";
-  if (tier === "99s") return "#f59e0b";
-  return "#00b4bc";
-}
-
+// tier 的顯示名與識別色都在 v2/lib/tierVocabulary.ts —— 這裡曾經有自己的
+// tierLabel() / tierAccent()，和 TIER_TABS、AccountPage、RunPage 各自硬寫的
+// 版本漂成四份。要改叫法就改那一個檔案。
+//
 // 2026-07-17 (CJ「去除 30s/60s/99s 分類標籤，不再使用時間長度分類」):
 // tier stays as INTERNAL engine config (routing / quota / timeouts), but the
 // user-facing classification is by deliverable, never by duration.
-function tierLabel(tier: string | undefined | null, lang: string): string {
-  if (tier === "60s") return lang === "en" ? "Pack" : "套組";
-  if (tier === "99s") return lang === "en" ? "Campaign" : "企劃";
-  return lang === "en" ? "Single" : "單篇";
-}
 
 // Tasks that should hold the modal open until image is done
 const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
@@ -204,360 +241,24 @@ interface TierTab {
 }
 
 const TIER_TABS: TierTab[] = [
-  { id: "all",  labelZh: "全部",     labelEn: "All",      accent: "#171717" },
-  { id: "30s",  labelZh: "單篇內容", labelEn: "Single",   accent: "#00b4bc" },
-  { id: "60s",  labelZh: "內容套組", labelEn: "Pack",     accent: "#7c3aed" },
-  { id: "99s",  labelZh: "完整企劃", labelEn: "Campaign", accent: "#f59e0b" },
+  { id: "all", labelZh: "全部", labelEn: "All", accent: "#171717" },
+  ...TIER_ORDER.map((code): TierTab => ({
+    id: code,
+    labelZh: tierLabel(code, "zh", { long: true }),
+    labelEn: tierLabel(code, "en"),
+    accent: tierAccent(code),
+  })),
 ];
 
-// ── Format category config (FB only) ────────────────────────────────────────
-type ActiveFormat =
-  | "all" | "貼文" | "連結貼文" | "廣告" | "輪播 Carousel"
-  | "多媒體" | "直播" | "釘選貼文" | "活動 / 系列" | "月曆 / 策略" | "互動 / 工具";
+// ── Format category config (FB only) ────────────────────────────
+// 2026-08-23: 搬到 v2/lib/fbTaskFormats.ts —— 這份對照表爫過一次（90s 退役後
+// 11 個 key 全指向不存在的任務，16 張 99s 卡一個都沒補），抽出去才能被
+// fbTaskFormats.test.ts import 並鎖住。
 
-const FORMAT_TABS: { id: ActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",            label: "全部",          labelEn: "All"                },
-  { id: "貼文",           label: "貼文",          labelEn: "Posts"              },
-  { id: "連結貼文",       label: "連結貼文",      labelEn: "Link Posts"         },
-  { id: "廣告",           label: "廣告",          labelEn: "Ads"                },
-  { id: "輪播 Carousel",  label: "輪播 Carousel", labelEn: "Carousel"           },
-  { id: "多媒體",         label: "多媒體",        labelEn: "Media"              },
-  { id: "直播",           label: "直播",          labelEn: "Live"               },
-  { id: "釘選貼文",       label: "釘選貼文",      labelEn: "Pinned Posts"       },
-  { id: "活動 / 系列",    label: "活動 / 系列",   labelEn: "Events & Series"    },
-  { id: "月曆 / 策略",    label: "月曆 / 策略",   labelEn: "Calendar & Strategy"},
-  { id: "互動 / 工具",    label: "互動 / 工具",   labelEn: "Engagement & Tools" },
-];
-
-const TASK_FORMAT_MAP: Record<string, ActiveFormat> = {
-  // 貼文
-  "fb-30-caption-short":          "貼文",
-  "fb-30-pure-text-hook":         "貼文",
-  "fb-60-single-full":            "貼文",
-  // 連結貼文
-  "fb-30-link-caption":           "連結貼文",
-  "fb-60-link-full":              "連結貼文",
-  // 廣告
-  "fb-30-ad-headline":            "廣告",
-  "fb-30-ad-primary":             "廣告",
-  "fb-30-ad-cta":                 "廣告",
-  "fb-30-ad-description":         "廣告",
-  "fb-60-ad-pack-3":              "廣告",
-  // 輪播 Carousel
-  "fb-90-carousel-10frame":       "輪播 Carousel",
-  // 多媒體 (Album + Reels + Story 合併)
-  "fb-60-album-4":                "多媒體",
-  "fb-90-reels-full":             "多媒體",
-  "fb-30-story-text":             "多媒體",
-  // 直播
-  "fb-30-live-title":             "直播",
-  "fb-60-live-suite":             "直播",
-  "fb-90-livestream-suite":       "直播",
-  // 釘選貼文
-  "fb-30-pinned-short":           "釘選貼文",
-  "fb-60-pinned-suite":           "釘選貼文",
-  // 活動 / 系列
-  "fb-30-countdown-1day":         "活動 / 系列",
-  "fb-60-countdown-5day":         "活動 / 系列",
-  "fb-60-launch-kit":             "活動 / 系列",
-  "fb-90-event-launch":           "活動 / 系列",
-  "fb-90-countdown-series":       "活動 / 系列",
-  // 月曆 / 策略
-  "fb-90-monthly-calendar":       "月曆 / 策略",
-  "fb-90-monthly-calendar-promo": "月曆 / 策略",
-  "fb-90-account-reposition":     "月曆 / 策略",
-  "fb-90-quarterly-strategy":     "月曆 / 策略",
-  "fb-90-monthly-analytics":      "月曆 / 策略",
-  // 互動 / 工具
-  "fb-30-comment-reply":          "互動 / 工具",
-  "fb-30-hashtag-set":            "互動 / 工具",
-  "fb-90-crisis-full":            "互動 / 工具",
-};
-
-// ── Format category config (IG) ─────────────────────────────────────────────
-type IGActiveFormat =
-  | "all" | "Feed 貼文" | "Reels" | "Carousel 輪播"
-  | "Story 限時" | "Live 直播" | "個人頁" | "互動 / 工具" | "策略 / 月曆";
-
-const IG_FORMAT_TABS: { id: IGActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",            label: "全部",          labelEn: "All"                  },
-  { id: "Feed 貼文",      label: "Feed 貼文",     labelEn: "Feed Posts"           },
-  { id: "Reels",          label: "Reels",         labelEn: "Reels"                },
-  { id: "Carousel 輪播",  label: "Carousel 輪播", labelEn: "Carousel"             },
-  { id: "Story 限時",     label: "Story 限時",    labelEn: "Stories"              },
-  { id: "Live 直播",      label: "Live 直播",     labelEn: "Live"                 },
-  { id: "個人頁",         label: "個人頁",        labelEn: "Profile"              },
-  { id: "互動 / 工具",    label: "互動 / 工具",   labelEn: "Engagement & Tools"   },
-  { id: "策略 / 月曆",    label: "策略 / 月曆",   labelEn: "Strategy & Calendar"  },
-];
-
-const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
-  // Feed 貼文
-  "ig-30-caption-short":         "Feed 貼文",
-  "ig-30-pure-text-hook":        "Feed 貼文",
-  "ig-30-hashtag-set":           "Feed 貼文",
-  "ig-60-feed-full":             "Feed 貼文",
-  "ig-60-countdown-5day":        "Feed 貼文",
-  "ig-60-serial-3":              "Feed 貼文",
-  "ig-60-viral-rewrite":         "Feed 貼文",
-  "ig-60-testimonial-rewrite":   "Feed 貼文",
-  // Reels
-  "ig-30-reel-hook":             "Reels",
-  "ig-30-reel-script-full":      "Reels",
-  "ig-60-reel-full":             "Reels",
-  "ig-99-reel-series-6":         "Reels",
-  // Carousel 輪播
-  "ig-30-carousel-structure":    "Carousel 輪播",
-  "ig-60-carousel-7":            "Carousel 輪播",
-  "ig-99-save-worthy":           "Carousel 輪播",
-  // Story 限時
-  "ig-30-story-text":            "Story 限時",
-  "ig-30-story-repost-strategy": "Story 限時",
-  "ig-60-story-3frame":          "Story 限時",
-  // Live 直播
-  "ig-30-live-opening":          "Live 直播",
-  "ig-60-live-suite":            "Live 直播",
-  // 個人頁
-  "ig-30-bio-rewrite":           "個人頁",
-  "ig-60-highlight-suite":       "個人頁",
-  "ig-99-account-reposition":    "個人頁",
-  // 互動 / 工具
-  "ig-30-comment-reply":         "互動 / 工具",
-  "ig-30-dm-script":             "互動 / 工具",
-  "ig-30-threads-cross-post":    "互動 / 工具",
-  // 策略 / 月曆
-  "ig-99-monthly-calendar":      "策略 / 月曆",
-  "ig-99-30day-calendar":        "策略 / 月曆",
-  "ig-99-youtility":             "策略 / 月曆",
-  "ig-99-visual-story":          "策略 / 月曆",
-  "ig-99-live-first":            "策略 / 月曆",
-  "ig-99-document":              "策略 / 月曆",
-  "ig-99-radical-transparency":  "策略 / 月曆",
-};
-
-// ── Format category config (LI) ─────────────────────────────────────────────
-type LIActiveFormat =
-  | "all" | "貼文" | "Article 長文" | "投票"
-  | "Newsletter" | "Document" | "Thought Leadership" | "客戶案例" | "個人頁 / 觸達";
-
-const LI_FORMAT_TABS: { id: LIActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",                label: "全部",             labelEn: "All"               },
-  { id: "貼文",               label: "貼文",             labelEn: "Posts"             },
-  { id: "Article 長文",       label: "Article 長文",     labelEn: "Articles"          },
-  { id: "投票",               label: "投票",             labelEn: "Polls"             },
-  { id: "Newsletter",         label: "Newsletter",       labelEn: "Newsletter"        },
-  { id: "Document",           label: "Document",         labelEn: "Documents"         },
-  { id: "Thought Leadership", label: "Thought Leadership",labelEn: "Thought Leadership"},
-  { id: "客戶案例",           label: "客戶案例",         labelEn: "Case Studies"      },
-  { id: "個人頁 / 觸達",      label: "個人頁 / 觸達",    labelEn: "Profile & Outreach"},
-];
-
-const LI_TASK_FORMAT_MAP: Record<string, LIActiveFormat> = {
-  // 貼文
-  "li-30-insight-post":            "貼文",
-  "li-30-hook-3":                  "貼文",
-  "li-30-event-invite":            "貼文",
-  // Article 長文
-  "li-30-article-opener":          "Article 長文",
-  // 投票
-  "li-30-poll":                    "投票",
-  // Newsletter
-  "li-30-newsletter":              "Newsletter",
-  "li-60-newsletter":              "Newsletter",
-  "li-99-newsletter-quarterly":    "Newsletter",
-  // Document
-  "li-30-document":                "Document",
-  // Thought Leadership
-  "li-60-thought-leader":          "Thought Leadership",
-  "li-99-30day-thought-leadership":"Thought Leadership",
-  // 客戶案例
-  "li-60-case-study":              "客戶案例",
-  // 個人頁 / 觸達
-  "li-30-dm-intro":                "個人頁 / 觸達",
-  "li-30-comment":                 "個人頁 / 觸達",
-  "li-30-headline":                "個人頁 / 觸達",
-};
-
-// ── Format category config (YT) ─────────────────────────────────────────────
-// 2026-08-01 (CJ「參考 HeyGen 重新設計 YT 分類」): 舊分類是按「輸出格式」
-// 切（縮圖/Community/互動…），跟用戶心裡「我現在有什麼素材」的順序不一致。
-// 新分類改按 HeyGen 的成熟度階梯排：純文案（已有影片/腳本，只要文字）→
-// 腳本（從零寫可拍的腳本）→ 分鏡圖（腳本拆成逐鏡頭示意圖）→ 影片（AI 真的
-// 生成會動的素材）。系列/策略維持獨立分類，因為那些是跨多個階梯的整包產出。
-type YTActiveFormat =
-  | "all" | "純文案" | "腳本" | "分鏡圖" | "影片" | "系列 / 策略";
-
-const YT_FORMAT_TABS: { id: YTActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",         label: "全部",        labelEn: "All"               },
-  { id: "純文案",      label: "純文案",      labelEn: "Pure Copy"         },
-  { id: "腳本",        label: "腳本",        labelEn: "Script"            },
-  { id: "分鏡圖",      label: "分鏡圖",      labelEn: "Storyboard"        },
-  { id: "影片",        label: "影片 ⭐",      labelEn: "Video ⭐"           },
-  { id: "系列 / 策略", label: "系列 / 策略", labelEn: "Series & Strategy" },
-];
-
-const YT_TASK_FORMAT_MAP: Record<string, YTActiveFormat> = {
-  // 純文案 — 已有影片/主題，只需要文字（標題/說明/留言/社群貼文）
-  "yt-30-title-strategies":  "純文案",
-  "yt-30-thumbnail-text":    "純文案",
-  "yt-30-description-seo":   "純文案",
-  "yt-30-chapter-timeline":  "純文案",
-  "yt-30-comment-reply":     "純文案",
-  "yt-30-pinned-comment":    "純文案",
-  "yt-30-community-post":    "純文案",
-  "yt-60-video-package":     "純文案",
-  "yt-60-community-post":    "純文案",
-  // 腳本 — 從零規劃可拍攝的腳本（口播/字幕/鏡頭指示）
-  "yt-30-shorts-script":     "腳本",
-  "yt-30-opening-hook":      "腳本",
-  "yt-30-end-cta":           "腳本",
-  "yt-60-shorts-script":     "腳本",
-  "yt-60-viral-rewrite":     "腳本",
-  // 分鏡圖 — 腳本拆成逐格 AI 示意圖（縮圖包也算：同一套靜圖引擎產出多格視覺）
-  "yt-60-thumbnail-suite":   "分鏡圖",
-  "yt-60-storyboard":        "分鏡圖",
-  // 影片 — AI 真的生成會動的素材（image-to-video）
-  "yt-30-shorts-clip":       "影片",
-  // 系列 / 策略 — 跨階梯的整包產出
-  "yt-60-series-3ep":        "系列 / 策略",
-  "yt-99-series-6ep":        "系列 / 策略",
-  "yt-99-quarterly-strategy":"系列 / 策略",
-  "yt-99-premiere-kit":      "系列 / 策略",
-};
-
-// ── Format category config (TT) ─────────────────────────────────────────────
-//
-// 2026-07-29 (CJ「重新盤點 tiktok 的任務」): the old tabs were an ad-hoc mix
-// of format (腳本 / 字幕), surface (Live / 個人頁) and mechanic (Trend / Duet),
-// so users couldn't tell what they'd actually receive from any given card.
-//
-// Replaced with a PRODUCTION-DEPTH LADDER — each rung is a legitimate place
-// to stop, and the order also happens to track cost and wait time
-// (文案 ≈ instant/free → 模擬影片 ≈ minutes and real spend), so the category
-// itself sets the right expectation before the user clicks:
-//
-//   選題 → 文案 → 腳本 → 分鏡表 → 模擬影片
-//
-// 帳號營運 sits deliberately OUTSIDE the ladder: bio / comment replies / live
-// openers aren't stages of producing one piece of content, and folding them
-// in would blur what the ladder means.
-//
-// Empty tabs are hidden automatically (see the count===0 guard at render), so
-// 分鏡表 stays invisible until its cards land.
-type TTActiveFormat =
-  | "all" | "選題" | "文案" | "腳本" | "分鏡表" | "模擬影片" | "帳號營運";
-
-const TT_FORMAT_TABS: { id: TTActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",        label: "全部",     labelEn: "All"            },
-  { id: "選題",       label: "選題",     labelEn: "Ideation"       },
-  { id: "文案",       label: "文案",     labelEn: "Copy"           },
-  { id: "腳本",       label: "腳本",     labelEn: "Scripts"        },
-  { id: "分鏡表",     label: "分鏡表",   labelEn: "Storyboard"     },
-  { id: "模擬影片",   label: "模擬影片", labelEn: "Simulated Video" },
-  { id: "帳號營運",   label: "帳號營運", labelEn: "Account Ops"    },
-];
-
-const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
-  // 選題 — 還沒有內容之前，決定「要做什麼」
-  "tt-30-trend-remix":         "選題",
-  "tt-30-duet-angle":          "選題",
-  "tt-99-trend-week":          "選題",
-  "tt-99-30day-foryou":        "選題",
-  "tt-60-series-3":            "選題",
-  // 文案 — 交付物就是可直接貼上的文字
-  "tt-30-caption-description": "文案",
-  "tt-30-hashtag-set":         "文案",
-  // 腳本 — 交付物是「可以照著拍」的腳本
-  "tt-30-opening-hook":        "腳本",
-  "tt-30-full-script":         "腳本",
-  "tt-30-caption-rhythm":      "腳本",
-  "tt-60-foryou-full":         "腳本",
-  "tt-60-viral-rewrite":       "腳本",
-  // 分鏡表 — 腳本與影片之間的橋
-  "tt-30-storyboard":          "分鏡表",
-  // 模擬影片 — 真的產出 mp4
-  "tt-30-product-hero":        "模擬影片",
-  "tt-30-product-asmr":        "模擬影片",
-  "tt-30-text-hook-card":      "模擬影片",
-  "tt-30-before-after":        "模擬影片",
-  // 帳號營運 — 階梯之外，不隸屬於任何單一支內容
-  "tt-30-bio-rewrite":         "帳號營運",
-  "tt-30-comment-reply":       "帳號營運",
-  "tt-30-live-opening":        "帳號營運",
-};
-
-// ── Format category config (Email) ──────────────────────────────────────────
-type EMActiveFormat =
-  | "all" | "主旨 / 預覽" | "Newsletter / 培育"
-  | "促銷 / 發佈" | "歡迎 / Onboarding" | "挽回 / 再活化" | "開發 / 交易";
-
-const EM_FORMAT_TABS: { id: EMActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",               label: "全部",              labelEn: "All"                        },
-  { id: "主旨 / 預覽",       label: "主旨 / 預覽",       labelEn: "Subject & Preview"          },
-  { id: "Newsletter / 培育", label: "Newsletter / 培育", labelEn: "Newsletter & Nurture"       },
-  { id: "促銷 / 發佈",       label: "促銷 / 發佈",       labelEn: "Promo & Launch"             },
-  { id: "歡迎 / Onboarding", label: "歡迎 / Onboarding", labelEn: "Welcome & Onboarding"       },
-  { id: "挽回 / 再活化",     label: "挽回 / 再活化",     labelEn: "Win-back & Re-engagement"   },
-  { id: "開發 / 交易",       label: "開發 / 交易",       labelEn: "Prospecting & Transactional"},
-];
-
-const EM_TASK_FORMAT_MAP: Record<string, EMActiveFormat> = {
-  // 主旨 / 預覽
-  "em-30-subject-line":    "主旨 / 預覽",
-  "em-30-preview-text":    "主旨 / 預覽",
-  // Newsletter / 培育
-  "em-60-newsletter-full": "Newsletter / 培育",
-  "em-30-drip":            "Newsletter / 培育",
-  "em-99-4week-nurture":   "Newsletter / 培育",
-  // 促銷 / 發佈
-  "em-30-promo":           "促銷 / 發佈",
-  "em-30-event-invite":    "促銷 / 發佈",
-  "em-60-promo-sequence":  "促銷 / 發佈",
-  "em-99-launch-sequence": "促銷 / 發佈",
-  // 歡迎 / Onboarding
-  "em-30-welcome":         "歡迎 / Onboarding",
-  "em-60-onboarding-3":    "歡迎 / Onboarding",
-  // 挽回 / 再活化
-  "em-30-abandoned-cart":  "挽回 / 再活化",
-  "em-30-re-engagement":   "挽回 / 再活化",
-  // 開發 / 交易
-  "em-30-cold-email":      "開發 / 交易",
-  "em-30-transactional":   "開發 / 交易",
-};
-
-// ── Format category config (PR) ─────────────────────────────────────────────
-type PRActiveFormat =
-  | "all" | "新聞稿" | "文件 / 素材" | "媒體關係" | "社群擴散" | "策略 / 發佈";
-
-const PR_FORMAT_TABS: { id: PRActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",         label: "全部",         labelEn: "All"                    },
-  { id: "新聞稿",      label: "新聞稿",       labelEn: "Press Releases"         },
-  { id: "文件 / 素材", label: "文件 / 素材",  labelEn: "Docs & Assets"          },
-  { id: "媒體關係",    label: "媒體關係",     labelEn: "Media Relations"        },
-  { id: "社群擴散",    label: "社群擴散",     labelEn: "Social Amplification"   },
-  { id: "策略 / 發佈", label: "策略 / 發佈",  labelEn: "Strategy & Launch"      },
-];
-
-const PR_TASK_FORMAT_MAP: Record<string, PRActiveFormat> = {
-  // 新聞稿
-  "pr-30-headline":          "新聞稿",
-  "pr-30-subhead":           "新聞稿",
-  "pr-30-lead-paragraph":    "新聞稿",
-  "pr-60-news-release-full": "新聞稿",
-  // 文件 / 素材
-  "pr-30-boilerplate":       "文件 / 素材",
-  "pr-30-fact-sheet":        "文件 / 素材",
-  "pr-30-ceo-quote":         "文件 / 素材",
-  // 媒體關係
-  "pr-30-media-pitch":       "媒體關係",
-  "pr-30-spokesperson-qa":   "媒體關係",
-  // 社群擴散
-  "pr-30-launch-social":     "社群擴散",
-  // 策略 / 發佈
-  "pr-30-news-hook":         "策略 / 發佈",
-  "pr-99-launch-toolkit":    "策略 / 發佈",
-  "pr-99-newsjack":          "策略 / 發佈",
-};
+// ── Format category config (IG / LI / YT / TT / Email / PR) ───────────
+// 2026-08-23: 與 FB 一起搬到 v2/lib/taskFormats.ts —— 這 7 份對照表共 162 條
+// 手抄，埋在頁面裡沒有任何東西能驗證它們跟真實任務目錄對不對得上，
+// FB 與 IG 實際都漂過。現在由 server/_core/taskFormatCoverage.test.ts 鎖住。
 
 // ── FBTaskCard type (same as QuickTask30sPage) ───────────────────────────────
 interface FBTaskCard {
@@ -668,6 +369,8 @@ function PlatformTaskPageInner() {
   // param, show a banner; the next task the user opens gets the topic
   // prefilled as its primary answer (strategy → copy in one line).
   const [strategyTopic, setStrategyTopic] = useState<string | null>(null);
+  // 換頻道時把客製 pill 歸位 —— 「生活實踐」留在官網頁會濾成空白。
+  useEffect(() => { setActivePackFormat("all"); }, [platform]);
   useEffect(() => {
     const t = searchParams.get("topic");
     if (t && t.trim()) {
@@ -787,6 +490,9 @@ function PlatformTaskPageInner() {
   const [activeEMFormat, setActiveEMFormat] = useState<EMActiveFormat>("all");
   // Format tab state (used for PR)
   const [activePRFormat, setActivePRFormat] = useState<PRActiveFormat>("all");
+  const [activeWEBFormat, setActiveWEBFormat] = useState<WEBActiveFormat>("all");
+  // 客製包的 pill。分類值由 pack 定義，所以是自由字串，不是 union。
+  const [activePackFormat, setActivePackFormat] = useState<string>("all");
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -796,6 +502,9 @@ function PlatformTaskPageInner() {
   const [primaryAnswer, setPrimaryAnswer] = useState("");
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // 2026-08-23: intake validation error, rendered right under the question
+  // box (errorMsg renders at the bottom of the modal, often below the fold).
+  const [inputError, setInputError] = useState<string | null>(null);
   const [agentMeta, setAgentMeta] = useState<any | null>(null);
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
   const [orchestraStages, setOrchestraStages] = useState<any[] | null>(null);
@@ -955,9 +664,23 @@ function PlatformTaskPageInner() {
   // 2026-07-20 (CJ「直連 /tasks/fb?b=XXXX 顯示 0/0 個任務」): a failed
   // catalog fetch used to silently render as「0/0 個任務」— retry transient
   // fresh-load hiccups and surface a real error state instead.
+  // 2026-08-29：帶 brandId 進去，有客製任務包的品牌會拿到「只有他的卡」的
+  // 目錄。沒有包的品牌回傳的東西跟以前一模一樣。
   const listQuery = (trpc as any).quickTask?.listFB?.useQuery
-    ? (trpc as any).quickTask.listFB.useQuery(undefined, { refetchOnWindowFocus: false, retry: 2 })
+    ? (trpc as any).quickTask.listFB.useQuery(
+        { brandId: brandId ?? undefined, brandName: brandName ?? undefined },
+        { refetchOnWindowFocus: false, retry: 2 },
+      )
     : { data: [] };
+  // 這個品牌的頻道 / pill 結構。null = 沒有客製包，走既有的全域 pill。
+  const packNavQuery = (trpc as any).quickTask?.brandNav?.useQuery
+    ? (trpc as any).quickTask.brandNav.useQuery(
+        { brandId: brandId ?? undefined, brandName: brandName ?? undefined },
+        { refetchOnWindowFocus: false, staleTime: 300_000 },
+      )
+    : { data: null };
+  const packNav = (packNavQuery.data as any) ?? null;
+  const packChannel = packNav?.channels?.find((c: any) => c.key === platform) ?? null;
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
   const catalogFailed = !!listQuery?.error && allTasks.length === 0;
 
@@ -1017,6 +740,27 @@ function PlatformTaskPageInner() {
     setSearchParams(next, { replace: true });
   }, [searchParams]);
 
+  // 2026-08-11: ?sid=<scenarioId>&si=<spotIndex> — which strategy-workbench
+  // sweet spot this task was opened from. Held in a ref rather than state
+  // because the params are stripped from the URL immediately (same as topic)
+  // but the value must survive until the user actually presses run, which can
+  // be several interactions later. Only the reference is kept; the server
+  // resolves the audience labels from the stored scenario.
+  const spotRefRef = React.useRef<{ scenarioId: string; spotIndex: number } | null>(null);
+  useEffect(() => {
+    const sid = searchParams.get("sid");
+    const si = searchParams.get("si");
+    if (!sid || si == null) return;
+    const idx = Number(si);
+    if (Number.isInteger(idx) && idx >= 0) {
+      spotRefRef.current = { scenarioId: sid, spotIndex: idx };
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("sid");
+    next.delete("si");
+    setSearchParams(next, { replace: true });
+  }, [searchParams]);
+
   // ── Platform inference (matches QuickTask30sPage logic) ──────────────────
   const inferPlatform = (task: FBTaskCard): string =>
     task.platform ??
@@ -1026,6 +770,7 @@ function PlatformTaskPageInner() {
       : task.id?.startsWith("li-") ? "linkedin"
       : task.id?.startsWith("em-") ? "email"
       : task.id?.startsWith("pr-") ? "pr"
+      : task.id?.startsWith("web-") ? "website"
       : task.id?.startsWith("br-") ? "brand"
       : task.id?.startsWith("rs-") ? "audience"
       : "facebook");
@@ -1068,6 +813,16 @@ function PlatformTaskPageInner() {
       if (activePRFormat !== "all") {
         list = list.filter((task) => PR_TASK_FORMAT_MAP[task.id] === activePRFormat);
       }
+    } else if (packChannel) {
+      // 2026-08-29 客製包優先：分類值來自 pack，卡片自帶 packFormat。
+      if (activePackFormat !== "all") {
+        list = list.filter((task) => (task as any).packFormat === activePackFormat);
+      }
+    } else if (platform === "website") {
+      // Format-based filter for 官網
+      if (activeWEBFormat !== "all") {
+        list = list.filter((task) => WEB_TASK_FORMAT_MAP[task.id] === activeWEBFormat);
+      }
     } else {
       // Tier-based filter for other platforms
       if (activeTier !== "all") {
@@ -1086,7 +841,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, searchQuery]);
+  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -1177,6 +932,30 @@ function PlatformTaskPageInner() {
     return counts;
   }, [allTasks, platform]);
 
+  // Count tasks per format category (客製包)
+  const packFormatCounts = useMemo<Record<string, number>>(() => {
+    if (!packChannel) return {};
+    const scoped = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: scoped.length };
+    for (const task of scoped) {
+      const fmt = (task as any).packFormat;
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform, packChannel]);
+
+  // Count tasks per format category (官網)
+  const webFormatCounts = useMemo<Record<string, number>>(() => {
+    if (platform !== "website") return {};
+    const webTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const counts: Record<string, number> = { all: webTasks.length };
+    for (const task of webTasks) {
+      const fmt = WEB_TASK_FORMAT_MAP[task.id];
+      if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
+    }
+    return counts;
+  }, [allTasks, platform]);
+
   // ── Open / close task modal ───────────────────────────────────────────────
   const openTask = (task: FBTaskCard) => {
     if ((task as any).isMediaTask && (task as any).ctaPath) {
@@ -1205,6 +984,7 @@ function PlatformTaskPageInner() {
     if (strategyTopic) prefill = strategyTopic;
     setPrimaryAnswer(prefill);
     setErrorMsg(null);
+    setInputError(null);
     setLatencyMs(null);
     setAgentMeta(null);
   };
@@ -1220,6 +1000,7 @@ function PlatformTaskPageInner() {
     runSeqRef.current++; // invalidate any in-flight run attempt
     setActiveTask(null);
     setRunning(false);
+    setInputError(null);
     setCountdownStart(null);
     setOrchestraStages(null);
     setModalEntity({ kind: "brand", id: null });
@@ -1288,23 +1069,41 @@ function PlatformTaskPageInner() {
     const primaryRequired = (activeTask.inputs?.[0] as any)?.required !== false;
     const hasDerive = !!(activeTask.primary_input as any)?.derive
       || !!(activeTask.contextSources && activeTask.contextSources.length > 0);
-    if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive) {
-      // 2026-07-07 (CJ「開始做按下去沒反應」— live repro): the errorMsg card
-      // renders at the BOTTOM of the scrollable ModalBody, below the fold on
-      // laptop screens, so this validation read as a silent no-op. Toast it
-      // and scroll the question input into view so the user sees what's asked.
-      const msg = lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成";
+    // 2026-07-07 (CJ「開始做按下去沒反應」— live repro): the errorMsg card
+    // renders at the BOTTOM of the scrollable ModalBody, below the fold on
+    // laptop screens, so validation read as a silent no-op. Every intake
+    // rejection now toasts, prints under the question box, and scrolls the
+    // input into view.
+    const rejectIntake = (msg: string) => {
       setErrorMsg(msg);
+      setInputError(msg);
       showToastGlobal(msg);
       try {
         const el = document.querySelector<HTMLElement>("[data-primary-question]");
         el?.scrollIntoView({ behavior: "smooth", block: "center" });
         el?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
       } catch { /* non-fatal */ }
+    };
+    // 2026-08-23 (CJ「tt-60-viral-rewrite 沒給爆款連結或主題時要出現錯誤提醒」):
+    // 爆款改寫任務沒有來源就無從改寫 — 模型會自己編一支不存在的爆款去拆解。
+    // 空白、敷衍字（無 / 隨便 / test）、太簡略的答案都在這裡擋下。
+    // 權威判斷在 server（扣點前），這份鏡像只是讓提示即時出現。
+    if (taskNeedsViralSource(activeTask as any)) {
+      const viral = checkViralSource(primaryAnswer, {
+        platformLabel: platformLabelForTask(activeTask.platform),
+      });
+      if (!viral.ok) {
+        rejectIntake(lang === "en" ? viral.message.en : viral.message.zh);
+        return;
+      }
+    }
+    if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive) {
+      rejectIntake(lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成");
       return;
     }
     setRunning(true);
     setErrorMsg(null);
+    setInputError(null);
     setCountdownStart(Date.now());
     // 2026-07-20 (CJ QA): this attempt's ticket. closeTask() bumps the ref,
     // so a cancelled attempt resolves silently — no navigation, no state.
@@ -1330,13 +1129,37 @@ function PlatformTaskPageInner() {
           });
           if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
           if ((r as any).outputId) {
+            const publicVariants = (r as any).variants ?? [];
+            const hasAnyPublicCaption = publicVariants
+              .some((variant: any) => (variant?.caption ?? "").trim().length > 0);
+            const strategyPublicState = getStrategyPublicGenerationState({
+              taskId: (r as any).taskId,
+              isStrategyEnvelope: Array.isArray((r as any).planningArtifacts),
+              progress: (r as any).progress,
+              publicVariantCount: publicVariants.length,
+            });
+            if (strategyPublicState === "generating") {
+              showToastGlobal(lang === "en"
+                ? "Planning is ready. Public posts are being generated in the background."
+                : "內容規劃已完成，對外貼文正在背景產生。");
+            } else if ((r as any).ok === false || !hasAnyPublicCaption) {
+              showToastGlobal(lang === "en"
+                ? "Public posts weren't generated. Only internal drafts are available right now; you can regenerate them."
+                : "公開貼文未產生，目前只有內部草稿，可重新產生。");
+            }
             closeTask();
             navigate(`/run/${(r as any).outputId}`);
             return;
           }
-          setErrorMsg(lang === "en"
-            ? "Squad ran but the output ID didn't come back. Try again or contact support."
-            : "Squad 執行成功但 outputId 未回傳，請重試或回報。");
+          const squadErrors = Array.isArray((r as any).errors) ? (r as any).errors : [];
+          const errorPreview = squadErrors.slice(0, 2).join(" · ").slice(0, 200);
+          setErrorMsg(errorPreview
+            ? (lang === "en"
+                ? `The squad couldn't produce an output. Detail: ${errorPreview}`
+                : `Squad 無法產出內容。詳情：${errorPreview}`)
+            : (lang === "en"
+                ? "The squad couldn't produce an output. Try again or contact support."
+                : "Squad 無法產出內容，請重試或回報。"));
           return;
         }
         setErrorMsg(lang === "en" ? "Squad auto-run isn't available right now." : "Squad 自動執行 mutation 暫不可用");
@@ -1357,6 +1180,9 @@ function PlatformTaskPageInner() {
           brandId: brandId ?? undefined,
           productId: taskProductId,
           eventId: taskEventId,
+          // Null when the task wasn't opened from a workbench sweet spot —
+          // the run just goes untagged, it never blocks.
+          spotRef: spotRefRef.current,
         });
         if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
 
@@ -1403,7 +1229,14 @@ function PlatformTaskPageInner() {
         ? "This task isn't ready yet."
         : "這個任務還在開發中，請改試其他任務。");
     } catch (e: any) {
-      if (!isStale()) setErrorMsg(e?.message ?? String(e));
+      if (!isStale()) {
+        const msg = e?.message ?? String(e);
+        setErrorMsg(msg);
+        // The errorMsg card sits at the bottom of the modal body — toast it
+        // too, so a server-side rejection (e.g. the viral-source guard on a
+        // stale client) is never a silent no-op.
+        showToastGlobal(msg);
+      }
     } finally {
       // Only the CURRENT attempt may reset run state — a cancelled attempt
       // resolving late must not clobber a newer run the user has started.
@@ -1416,9 +1249,16 @@ function PlatformTaskPageInner() {
 
   // ── Progress / countdown ──────────────────────────────────────────────────
   const activeTierForProgress = activeTask ? effectiveTier(activeTask) : "30s";
+  // 2026-08-19: squad campaigns are the slow outlier. They run the whole
+  // quickTask.runSquadAuto pipeline inside one request — 5 planning steps in
+  // sequence plus a 30-post synthesis, measured worst case ~196s. A 100s ring
+  // hits 100% while there is still a minute and a half to go, which reads as
+  // "stuck" and gets the user clicking 開始做 again. Only the squad branch is
+  // widened; every other 99s task keeps its existing 100s pacing.
   const expectedSec =
     activeTierForProgress === "60s" ? 90 :
     activeTask && HOLD_FOR_IMAGES.has(activeTask.id) ? 90 :
+    activeTask?.kind === "squad" ? 200 :
     activeTierForProgress === "99s" ? 100 : 30;
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 
@@ -1498,7 +1338,45 @@ function PlatformTaskPageInner() {
           </div>
 
           {/* ── Format tiles (FB) / Format tiles (IG) / Tier tabs (other) ── */}
-          {platform === "facebook" ? (
+          {/* 2026-08-29 客製包的 pill 優先於所有內建平台分類。分類值由該品牌的
+              pack 定義（例如五感十築的 生活實踐／生態健築／永續生活／永續價值），
+              不是全域那七份手抄對照表 —— 有包的品牌完全繞開它們。 */}
+          {packChannel ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {[{ id: "all", labelZh: "全部", labelEn: "All" }, ...packChannel.formats].map((tab: any) => {
+                  const active = activePackFormat === tab.id;
+                  const count = packFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActivePackFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {lang === "en" ? tab.labelEn : tab.labelZh}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "facebook" ? (
             <div className="w-full" style={{ maxWidth: 860 }}>
               <div className="flex items-center gap-2 flex-wrap justify-center">
                 {FORMAT_TABS.map((tab) => {
@@ -1719,6 +1597,41 @@ function PlatformTaskPageInner() {
                     <button
                       key={tab.id}
                       onClick={() => setActivePRFormat(tab.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                      style={
+                        active
+                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {lang === "en" ? tab.labelEn : tab.label}
+                      {tab.id !== "all" && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          style={{
+                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : platform === "website" ? (
+            <div className="w-full" style={{ maxWidth: 860 }}>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {WEB_FORMAT_TABS.map((tab) => {
+                  const active = activeWEBFormat === tab.id;
+                  const count = webFormatCounts[tab.id] ?? 0;
+                  if (tab.id !== "all" && count === 0) return null;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveWEBFormat(tab.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
                       style={
                         active
@@ -2230,17 +2143,28 @@ function PlatformTaskPageInner() {
                       <Textarea
                         placeholder={activeTask.primary_input.placeholder ?? ""}
                         value={primaryAnswer}
-                        onChange={(e) => setPrimaryAnswer(e.target.value)}
+                        onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                         minRows={3}
                         autoFocus
+                        isInvalid={!!inputError}
                       />
                     ) : (
                       <Input
                         placeholder={activeTask.primary_input.placeholder ?? ""}
                         value={primaryAnswer}
-                        onChange={(e) => setPrimaryAnswer(e.target.value)}
+                        onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                         autoFocus
+                        isInvalid={!!inputError}
                       />
+                    )}
+                    {/* 2026-08-23: intake rejection prints here, next to the
+                        field it is about — not only in the card at the very
+                        bottom of the modal body. */}
+                    {inputError && (
+                      <p className="text-tiny text-danger-500 flex items-start gap-1.5">
+                        <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
+                        <span>{inputError}</span>
+                      </p>
                     )}
                     {polishInputMut && !running && (
                       <div className="flex items-center gap-2">

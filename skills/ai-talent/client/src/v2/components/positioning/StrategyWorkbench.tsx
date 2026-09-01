@@ -39,7 +39,7 @@ type Chip = {
 };
 
 export default function StrategyWorkbench({
-  brandId, eventId, positioning, lang,
+  brandId, eventId, positioning, lang, locked,
 }: {
   brandId: number;
   /** 2026-07-29 (「穩定了」— generalize workbench to events): when set, the
@@ -50,6 +50,16 @@ export default function StrategyWorkbench({
   eventId?: number | null;
   positioning: Record<string, any>;
   lang: "zh-TW" | "en";
+  /** 2026-08-21 (CJ「鎖定後，策略工作檯就會只留下最後定案的，變成下方的
+   *  文字就好」): tabLocks.positioning — the caller only passes this true
+   *  for brand scope (events have no lock of their own). When true, all the
+   *  editable chrome (anchor chips, ＋新增, 重新推導, 深挖/套用 buttons)
+   *  disappears; only the finalized scenario's board renders, as plain
+   *  read-only text. The server now enforces this too (workbenchRouter's
+   *  derive/applyScenario/researchItem all reject while locked) — this is
+   *  the matching UI so a locked brand doesn't dangle controls that would
+   *  just fail. */
+  locked?: boolean;
 }) {
   const en = lang === "en";
   const isEvent = !!eventId;
@@ -319,9 +329,17 @@ export default function StrategyWorkbench({
            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", cursor: "pointer" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 800 }}><Ic d={IC.target} /> {en ? "Strategy Workbench" : "策略工作台"}</span>
-          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".1em", border: "1px solid #C9C4BC", borderRadius: 5, padding: "1px 6px", color: "#8A8494" }}>BETA</span>
+          {locked ? (
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".05em", border: "1px solid #2A2630", borderRadius: 5, padding: "1px 8px", color: "#2A2630", background: "#F0EEEA" }}>
+              🔒 {en ? "LOCKED · FINAL" : "已鎖定・定案"}
+            </span>
+          ) : (
+            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".1em", border: "1px solid #C9C4BC", borderRadius: 5, padding: "1px 6px", color: "#8A8494" }}>BETA</span>
+          )}
           <span style={{ fontSize: 11.5, color: "#8A8494" }}>
-            {en ? "consumer wants × rivals can't × we can" : "消費者想要 × 競爭者無法 × 我們能提供"}
+            {locked
+              ? (en ? "finalized — editing is closed" : "已定案，這裡改為唯讀")
+              : (en ? "consumer wants × rivals can't × we can" : "消費者想要 × 競爭者無法 × 我們能提供")}
           </span>
           {cascadeRow && (
             <span style={{ fontSize: 11, fontWeight: 800, border: "1.5px solid #2A2630", borderRadius: 999, padding: "2px 10px", animation: "pulse 1.5s infinite" }}>
@@ -333,6 +351,7 @@ export default function StrategyWorkbench({
       </div>
       {collapsed ? null : (
       <div style={{ padding: "0 18px 16px" }}>
+        {!locked && (<>
         {/* 缺研究資料 → 明確指路，不再無聲隱藏 */}
         {missingResearch.length > 0 && (
           <div style={{
@@ -434,12 +453,15 @@ export default function StrategyWorkbench({
             </button>
           </div>
         </div>
+        </>)}
 
         {/* 看板 */}
         {!derived ? (
           <div style={{ textAlign: "center", padding: "26px 0 18px", color: "#8A8494", fontSize: 12.5 }}>
-            {en ? "Pick your anchors above and hit Derive — the four-zone board renders here."
-                : "選好上方三個錨點後按「重新推導」——四區策略看板會出現在這裡。"}
+            {locked
+              ? (en ? "Locked — no finalized scenario on record." : "已鎖定，但尚無定案的情境紀錄。")
+              : (en ? "Pick your anchors above and hit Derive — the four-zone board renders here."
+                     : "選好上方三個錨點後按「重新推導」——四區策略看板會出現在這裡。")}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 12 }}>
@@ -481,7 +503,8 @@ export default function StrategyWorkbench({
                       )}
                     </div>
                   )}
-                  {/* P2 spot actions: 深挖 / 套用此標語(SMP) */}
+                  {/* P2 spot actions: 深挖 / 套用此標語(SMP) — hidden once locked (server rejects both anyway) */}
+                  {!locked && (
                   <div style={{ display: "flex", gap: 7, marginTop: 8 }}>
                     <span style={{ ...S.act, background: "#2A2630", borderColor: "#2A2630", color: "#fff", opacity: digging === i ? .6 : 1 }}
                           onClick={() => {
@@ -528,6 +551,7 @@ export default function StrategyWorkbench({
                       </span>
                     ); })()}
                   </div>
+                  )}
                   {/* P2 dig accordion */}
                   {s.dig && (
                     <div style={{ marginTop: 8, background: "#FBF7F4", borderRadius: 9, padding: "9px 12px", fontSize: 11.5, color: "#4A4552" }}>
@@ -544,7 +568,16 @@ export default function StrategyWorkbench({
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "4px 0 7px" }}>
                           {s.dig.contentAngles.map((a: string, j: number) => (
                             <span key={j}
-                                  onClick={() => navigate(`/tasks/fb?b=${brandId}${isEvent ? `&e=${eventId}` : ""}&topic=${encodeURIComponent(a)}`)}
+                                  // 2026-08-11: carry WHICH spot this angle came
+                                  // from (sid/si), so the produced content can be
+                                  // attributed to an audience later. Only the
+                                  // reference travels — the server resolves the
+                                  // labels from the stored scenario.
+                                  onClick={() => navigate(
+                                    `/tasks/fb?b=${brandId}${isEvent ? `&e=${eventId}` : ""}` +
+                                    `&topic=${encodeURIComponent(a)}` +
+                                    (active?.id ? `&sid=${encodeURIComponent(active.id)}&si=${i}` : ""),
+                                  )}
                                   title={en ? "Open the task wall with this topic prefilled" : "帶著這個題目前往任務牆，點任一任務即自動填入"}
                                   style={{ fontSize: 11, border: "1px solid #2A2630", borderRadius: 999, padding: "2px 10px", background: "#fff", cursor: "pointer", fontWeight: 600 }}>
                               {a} ↗

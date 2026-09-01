@@ -122,7 +122,8 @@ const performanceSources: Source[] = [
   { id: "overview", label: "整合總覽", short: "總覽", icon: <BarChart3 size={18} />, color: "#111827", desc: "跨平台預算、成效、異常與老闆版摘要" },
   { id: "meta", label: "Meta", short: "Meta", icon: <Megaphone size={18} />, color: "#1877F2", desc: "Facebook / Instagram 廣告活動、受眾與素材" },
   { id: "google", label: "Google", short: "GAds", icon: <Search size={18} />, color: "#4285F4", desc: "Search / Display / PMax / YouTube Ads" },
-  { id: "shopline", label: "Shopline", short: "Shop", icon: <ShoppingBag size={18} />, color: "#00A870", desc: "商品銷售、轉換漏斗、客單價與回購" },
+  { id: "shopline", label: "SHOPLINE", short: "Shop", icon: <ShoppingBag size={18} />, color: "#00A870", desc: "商品銷售、轉換漏斗、客單價與回購" },
+  { id: "91app", label: "91APP", short: "91", icon: <ShoppingBag size={18} />, color: "#E4002B", desc: "訂單、會員分層、回購與線上門市分流" },
   { id: "ga", label: "GA / 官網", short: "GA", icon: <MousePointerClick size={18} />, color: "#F59E0B", desc: "流量來源、Landing page、路徑與轉換問題" },
   { id: "attribution", label: "整合歸因", short: "歸因", icon: <Target size={18} />, color: "#7C3AED", desc: "跨平台比較、預算重分配與 Campaign ROI" },
   // 2026-08-13 (CJ「將這份報告設定在成效報告當中，新的任務 tray，稱為粉絲團月報」):
@@ -710,7 +711,9 @@ export default function DataWorkspacePage() {
               performance page. Now each source's own desc, which actually says
               what the page shows. */}
           <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6b7280", maxWidth: 760 }}>
-            {active.desc}
+            {isPerformance
+              ? "Meta、Google Ads、SHOPLINE、91APP、GA4 —— 廣告花費與電商訂單收在同一頁，並按內容鎖定的族群拆開看。"
+              : active.desc}
           </p>
         </div>
         {!isPerformance && (

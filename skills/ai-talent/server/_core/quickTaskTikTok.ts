@@ -8,6 +8,71 @@ import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 const TT_SUFFIX = `
 TikTok 觀眾極短專注力。前 1.5 秒沒抓到 = 滑掉。語氣要野、不要官腔。`;
 
+/**
+ * 高互動機制卡共用的鐵律 + 輸出格式（2026-08-23）。
+ *
+ * 這五條是從史上最多讚的 10 支 TikTok 反推出來的共同點。它們全都是
+ * 「畫面怎麼演」的規則，不是文案規則 —— 這類卡的交付物是可以照著拍的
+ * 分格腳本，不是旁白稿，所以格式必須逼模型一格一格寫，不能寫成散文。
+ */
+const TT_MECHANIC_CORE = `
+【讀的人是誰 — 最高優先】
+讀這份腳本的人，是等一下要拿手機去拍的人（品牌小編、店員、老闆本人）。
+他會把這頁開在旁邊，一格一格照著拍。所以每一行都要是「他看完就知道手該
+放哪、鏡頭對哪裡」的指示，不是描述影片看起來像什麼。
+判準：把腳本交給一個沒參與討論的同事，他能不問問題就拍完。做不到就是還不夠具體。
+
+【這類影片的共同鐵律 — 五條都要遵守】
+① 零台詞或極少台詞：交付的是「畫面怎麼演」，要說的話用字卡，不要寫旁白稿。
+② 前 0.5 秒畫面就要有懸念：鉤子是眼睛看到的東西，不是一句開場白。
+③ 只做一件事：一支片一個滿足點。不要三段論，不要條列三個重點。
+④ 動作卡在拍點上：每個切換都要標拍點或時間戳，剪接點就是節奏。
+⑤ 可循環：最後一格要能無縫接回第一格，觀眾不自覺就重播。
+
+【輸出格式 — 每一格都照這五行寫，不可寫成散文】
+[起-迄s] 這一格的名稱
+　畫面：手機放哪（平拍／俯拍／貼地）+ 景別（特寫／中景／全身）+ 畫面裡有什麼
+　動作：誰的手、對什麼東西、做什麼、多快（一格只寫一個動作）
+　聲音：音樂拍點 / 現場音 / 音效（沒有旁白就寫「無旁白」）
+　字卡：畫面上出現的字（≤12 字；沒有就寫「無」）
+
+【「畫面」與「動作」寫到什麼程度才算合格】
+　✗ 畫面：廚房場景，產品放在桌上　　→ 拍的人不知道鏡頭要放哪、要拍多近
+　✓ 畫面：手機平放桌面高度、鏡頭與桌面同高，中景，產品置中，背景是白牆
+　✗ 動作：展示產品　　　　　　　　→ 怎麼展示？誰展示？多快？
+　✓ 動作：右手把產品從左邊推進畫面正中央，約 1 秒，推到定位後停住不動
+
+【格數與長度 — 這條沒守住，後面兩個區塊就寫不完】
+全片只切 5-7 格，不要逐一分解每個細微動作（拿出來、放下、打開… 併成一格）。
+每格四行加起來 ≤ 70 字。寫到第 7 格就收，把剩下的篇幅留給下面兩個區塊。
+
+【腳本之後，一定要接這兩個區塊（各自獨立一段，用方括號標題）】
+【開拍前準備】（五行，每行 ≤25 字）
+　・器材：先給手機拍得出來的做法；要腳架／補光燈也寫出來
+　・場地：在哪拍、背景、光從哪來
+　・道具：這支片要備的東西，含數量
+　・人力：幾個人、各自做什麼（只有一人時怎麼拍也要寫）
+　・預估：拍攝＋重拍大約多久
+【常見失誤】（兩行，每行 ≤35 字）
+　照這個範本寫兩行，每行只出現一次「失誤：」和一次「改法：」：
+　　失誤：手機被碰到位移　改法：用膠帶在桌面標機位，每次放回同一點
+　　失誤：手影擋住產品　　改法：補光燈從上方 60 度打下來
+　解法要當場檢查得出來，禁止「注意光線」「保持穩定」這種誰都知道的話。
+　※ 標題就寫【常見失誤】四個字，不要自己改長。不要加編號、不要用箭頭
+　　（→ 會被系統清掉），兩個欄位之間空一格就好。
+
+※ 實測會踩的兩個雷，務必避開：
+　- 四行必須**各自獨立換行**。不可以擠成一行，不可以用方括號 [畫面：…] 包起來。
+　- 時間戳那一行**只放格名**（例：[0.0-0.5s] 開場）。畫面內容一律寫在下一行的「畫面：」。
+
+【硬規則 — 違反即不合格】
+- 全片 8-15 秒，標時間戳。這類機制越短越好，不要寫成 60 秒。
+- 品牌的賣點要是畫面裡的主角，不能只在最後一格才出現。
+- 結尾 CTA 用字卡或畫面呈現，禁止「按讚追蹤分享」這種罐頭句。
+- 不得指名真實名人，不得照抄任何特定爆款的內容、金句或分鏡。
+- 拍攝條件要寫成一般品牌做得到的（手機 + 自然光 + 現有場地），
+  需要空拍機或特殊器材時，必須同時給一個手機也拍得出來的替代方案。`;
+
 export const TT_30S_TASKS: FBTaskTemplate[] = [
   {
     id: "tt-30-opening-hook",
@@ -63,6 +128,190 @@ ${TT_SUFFIX}`,
     systemPrompt: `把口播切成字幕節奏。每變體 1 種風格（標準 / 極簡 / 強調式）。每行：[Xs-Ys] 字幕文字
 規則：每行字幕 6-10 字最佳；強調詞用全大寫或加 emoji；不要超過 3 行同時顯示。${TT_SUFFIX}`,
     preferredModel: "qwen", maxTokens: 700,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+
+  // ── 高互動機制腳本卡（2026-08-23 CJ「參考史上互動最高的 10 支 TikTok」）──
+  //
+  // 來源：TikTok 史上最多讚的 10 支影片（41M–78.7M 讚）。這 10 支沒有一支
+  // 在賣東西，也沒有一支有 CTA —— 直接「改寫成品牌版」只會做出漂亮但不
+  // 轉換的腳本（而且「車站偶遇 8 歲小提琴女孩」這種機緣本來就無法改寫）。
+  // 所以搬的是它們共享的**視覺機制**，不是內容：
+  //
+  //   零台詞 · 0.5 秒內畫面就有懸念 · 單一滿足點 · 動作卡拍點 · 可循環
+  //
+  // 10 支歸成 5 種機制，一種機制一張卡，讓用戶自己挑要拍哪一種：
+  //   視覺魔術（倒轉特效對嘴 78.7M / 非綠幕特效 58.0M / TimeWarpScan 43.3M）
+  //   從無到有（巧克力草莓 52.1M / 繪畫展示 52.3M）
+  //   卡點快剪（加速 remix 54.4M / 音量爆點 46.3M）
+  //   尺度揭曉（空拍 45.7M）
+  //   真實反應（車站鋼琴＋小提琴女孩 58.3M / 大笑反應 41.0M）
+  //
+  // 全部歸在「腳本」類別（見 client TT_TASK_FORMAT_MAP），交付物是可以照著
+  // 拍的分格腳本，不產圖（runImageGen:false）—— 用戶會想連試好幾種機制，
+  // 每張卡都要便宜。
+  {
+    id: "tt-30-visual-illusion",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "TikTok One-Second Flip Script (8–15s)", zh: "TikTok 一秒變身腳本（8-15 秒）" },
+    description: { en: "Same frame, two different things · shot-by-shot visual / action / sound / on-screen text", zh: "同一個鏡頭前後判若兩物 · 逐格畫面／動作／音效／字卡" },
+    agent_id: 180167,
+    skill_slug: "tiktok-content",
+    primary_question: "想拍什麼東西的「一秒變身」？",
+    primary_input: { key: "topic", placeholder: "例：一秒收納的嬰兒推車 / 沖下去才變色的茶包", type: "textarea" },
+    inputs: [{ key: "topic", label: "產品 / 主題 + 想被看見的那個瞬間", type: "textarea", required: true }],
+    systemPrompt: `你在寫「視覺魔術式」TikTok 短片腳本。本變體的切角是「{label}」。
+
+【這個機制為什麼有效】
+史上最多讚的幾支片都靠同一招：畫面在一兩秒內做了一件眼睛沒預期的事，
+觀眾看不懂「這是怎麼辦到的」，於是重播——重播率把互動推上去。
+關鍵不是特效多炫，是**轉折點乾淨**：前一秒和後一秒必須判若兩物。
+
+【各切角怎麼執行 — 嚴格照 {label} 走】
+- 「一秒變身」：同一顆鏡頭、同一個構圖，一個遮擋或一次轉身之後主體完全變了。
+- 「借位錯覺」：利用前後景錯位，讓兩個不相干的東西在畫面上接成一個。
+- 「倒放回原」：慢動作與正常速度在同一鏡切換，或倒放讓散開的東西回到原位。
+
+【這支片的骨架 — 下面只列「每一格要交代什麼」，實際輸出仍要照上面的四行格式寫】
+[0.0-0.5s] 開場：先給一個「正常」的畫面，但構圖已經藏好破綻
+[0.5-2.0s] 觸發：遮擋 / 轉身 / 潑水 / 蓋上——轉折的動作本身要快
+[2.0-4.0s] 揭曉：變化後的畫面，停住讓人看清楚
+[4.0-8.0s] 回放或重複：再做一次，讓人第二次看懂
+${TT_MECHANIC_CORE}`,
+    preferredModel: "qwen", maxTokens: 2000,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-process-payoff",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "TikTok Process Script (8–15s)", zh: "TikTok 製作過程腳本（8-15 秒）" },
+    description: { en: "From raw to finished, no voiceover · shot-by-shot visual / action / sound / on-screen text", zh: "從原料到完成那一刻，全程無旁白 · 逐格畫面／動作／音效／字卡" },
+    agent_id: 30011,
+    skill_slug: "short-video-script",
+    primary_question: "有什麼「做出來 / 弄好」的過程可以拍？",
+    primary_input: { key: "topic", placeholder: "例：手沖一杯的 90 秒 / 亂到整齊的衣櫃 / 蛋糕裱花", type: "textarea" },
+    inputs: [{ key: "topic", label: "要拍的過程 + 完成品", type: "textarea", required: true }],
+    systemPrompt: `你在寫「從無到有滿足式」TikTok 短片腳本。本變體的切角是「{label}」。
+
+【這個機制為什麼有效】
+巧克力草莓、一幅畫的完成——這類片沒有一句話，觀眾就是為了看「完成的那一刻」
+留下來。有效的關鍵是**開頭就先讓人知道結局會很爽**（先閃一格完成品），
+然後才回到過程，觀眾才有理由等下去。
+
+【各切角怎麼執行 — 嚴格照 {label} 走】
+- 「製作過程」：原料 → 手的動作 → 成品。手是主角，臉不入鏡。
+- 「整理復原」：混亂 → 秩序。前後同機位同構圖，對比才成立。
+- 「組裝完成」：零散 → 一體。每個零件歸位都要有一個「卡進去」的瞬間。
+
+【這支片的骨架 — 下面只列「每一格要交代什麼」，實際輸出仍要照上面的四行格式寫】
+[0.0-1.0s] 先閃完成品 0.5 秒（承諾結局），立刻切回起點
+[1.0-2.0s] 起點畫面：越亂／越素越好，對比才夠
+[2.0-9.0s] 過程快剪：3-5 個關鍵動作，每個動作一格
+[9.0-12.0s] 完成瞬間：慢下來，停 1 秒以上讓人看清楚
+${TT_MECHANIC_CORE}`,
+    preferredModel: "qwen", maxTokens: 2000,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-beat-sync",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "TikTok Beat-Sync Script (8–15s)", zh: "TikTok 音樂卡點腳本（8-15 秒）" },
+    description: { en: "Multiple items or scenes cut on the beat · every shot marked with its beat + visual / action / on-screen text", zh: "多品項／多情境跟著拍點快切 · 每格標拍點＋畫面／動作／字卡" },
+    agent_id: 60033,
+    skill_slug: "short-video-script",
+    primary_question: "有哪些品項 / 畫面想串成一支？",
+    primary_input: { key: "topic", placeholder: "例：8 種口味輪流出場 / 一週穿搭 / 門市到出貨", type: "textarea" },
+    inputs: [{ key: "topic", label: "要串起來的畫面或品項", type: "textarea", required: true }],
+    systemPrompt: `你在寫「節奏卡點式」TikTok 短片腳本。本變體的切角是「{label}」。
+
+【這個機制為什麼有效】
+加速 remix、突然放大的音量——這類片的內容其實很普通，是**節奏**讓人看完。
+關鍵在於切點必須精準壓在拍子上，一格差半拍整支就鬆掉。
+所以這份腳本的每一格都要標「第幾拍」，不是只標秒數。
+
+【各切角怎麼執行 — 嚴格照 {label} 走】
+- 「多品項快切」：同機位同構圖，只換主體，每拍換一個。構圖不動是重點。
+- 「情境輪播」：同一個人／同一個動作，場景每拍換一次。
+- 「安靜→爆點」：前段刻意安靜緩慢，某一拍突然音量與剪接一起炸開。
+
+【這支片的骨架 — 下面只列「每一格要交代什麼」，實際輸出仍要照上面的四行格式寫】
+[第 1-2 拍] 建立規律：讓觀眾在兩拍內學會「接下來會怎麼切」
+[第 3-8 拍] 執行規律：一拍一格，越切越快或越切越大
+[第 9 拍]   破一次規律：停格 / 靜音 / 反向，這是全片的記憶點
+[第 10-12 拍] 收：回到第一格的構圖，讓片子能無縫循環
+${TT_MECHANIC_CORE}`,
+    preferredModel: "qwen", maxTokens: 2000,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-scale-reveal",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "TikTok One-Take Reveal Script (8–15s)", zh: "TikTok 一鏡到底腳本（8-15 秒）" },
+    description: { en: "No cuts — the camera keeps pulling out until the scale lands · shot-by-shot visual / action / sound / on-screen text", zh: "鏡頭不剪接持續拉開，最後揭曉規模 · 逐格畫面／動作／音效／字卡" },
+    agent_id: 60031,
+    skill_slug: "short-video-script",
+    primary_question: "有什麼「規模 / 數量 / 細節」值得被看見？",
+    primary_input: { key: "topic", placeholder: "例：一天出貨 3000 箱的倉庫 / 一顆鏡片的 12 道工序", type: "textarea" },
+    inputs: [{ key: "topic", label: "想被看見的規模或細節", type: "textarea", required: true }],
+    systemPrompt: `你在寫「尺度震撼式」TikTok 短片腳本。本變體的切角是「{label}」。
+
+【這個機制為什麼有效】
+空拍那支靠的不是風景漂亮，是**尺度落差**：觀眾以為自己在看一個東西，
+鏡頭一拉才發現規模完全不是那回事。腳本要設計的就是「什麼時候讓人發現」。
+
+【各切角怎麼執行 — 嚴格照 {label} 走】
+- 「細節拉到全景」：從一個極近的細節開始，一路後退到全景。
+- 「一鏡到底走位」：鏡頭跟著一個主體穿過空間，用移動累積規模感。
+- 「數量堆疊」：同一構圖，東西一件一件加進來，最後滿到出框。
+
+【這支片的骨架 — 下面只列「每一格要交代什麼」，實際輸出仍要照上面的四行格式寫】
+[0.0-2.0s] 起手：極近或極窄的畫面，觀眾此刻誤判了規模
+[2.0-8.0s] 持續拉開：不要剪接，用移動或變焦，速度平穩
+[8.0-12.0s] 揭曉：全貌出現的那一刻停住，讓數字或規模自己說話
+[12.0-15.0s] 收：字卡點出這代表什麼（一句，≤12 字）
+${TT_MECHANIC_CORE}`,
+    preferredModel: "qwen", maxTokens: 2000,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-real-reaction",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "TikTok Real Reaction Script (8–15s)", zh: "TikTok 真實反應腳本（8-15 秒）" },
+    description: { en: "Film a customer's first-use reaction (not acted) · shot-by-shot visual / action / live sound / on-screen text + consent reminder", zh: "拍顧客第一次使用的真實反應（不是演的） · 逐格畫面／動作／現場音／字卡＋同意提醒" },
+    agent_id: 180158,
+    skill_slug: "social-engagement",
+    primary_question: "誰第一次用你的產品時，會有藏不住的反應？",
+    primary_input: { key: "topic", placeholder: "例：阿嬤第一次用語音助理 / 客人聞到剛出爐那一下", type: "textarea" },
+    inputs: [{ key: "topic", label: "誰 + 在什麼情境下會有反應", type: "textarea", required: true }],
+    systemPrompt: `你在寫「真實反應式」TikTok 短片腳本。本變體的切角是「{label}」。
+
+【這個機制為什麼有效】
+車站裡陌生小女孩加入合奏、真的笑到停不下來——這類片贏在**情緒會傳染**，
+而且觀眾一眼分得出真假。所以這份腳本不能寫「演員演出驚訝」，
+要寫的是「怎麼佈置一個情境，讓反應自己發生，攝影機剛好在」。
+
+【各切角怎麼執行 — 嚴格照 {label} 走】
+- 「第一次使用」：找真的沒用過的人，不預告會發生什麼，機器先開著。
+- 「旁人被吸引」：拍主體做事，重點在旁邊路人的視線與停留。
+- 「素人真實回饋」：問一個開放問題後閉嘴，等對方自己講出那句話。
+
+【這支片的骨架 — 下面只列「每一格要交代什麼」，實際輸出仍要照上面的四行格式寫】
+[0.0-1.5s] 情境交代：一眼看懂是誰、在哪、正要發生什麼
+[1.5-4.0s] 觸發：把東西交給對方 / 打開 / 開始，不要提示反應
+[4.0-9.0s] 反應本身：不剪接、不配樂蓋掉現場音，讓表情完整發生
+[9.0-12.0s] 落點：字卡點出這個反應說明了什麼
+
+【這張卡的特別規則】
+- 禁止寫台詞讓人「照著念」。要寫的是「問什麼問題 / 怎麼交給對方」。
+- 必須寫一段「拍攝前要先取得同意」的提醒（尤其涉及長輩、小孩、路人）。
+- 如果情境需要素人，腳本要說明去哪找（現有顧客 / 門市現場 / 員工家人）。
+${TT_MECHANIC_CORE}`,
+    preferredModel: "qwen", maxTokens: 2000,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   {
@@ -332,6 +581,17 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "tt-30-opening-hook":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4, variantLabels: ["懸念", "反差", "直球"], captionMinChars: 30, captionMaxChars: 100 },
   "tt-30-full-script":       { variants: 3, images: 3, runImageGen: false, imageDirectorId: TT_DIR_YUNA, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4, variantLabels: ["教學型", "故事型", "反差型"], captionMinChars: 200, captionMaxChars: 800 },
   "tt-30-caption-rhythm":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["標準", "極簡", "強調式"], captionMinChars: 100, captionMaxChars: 600 },
+
+  // ── 高互動機制腳本卡（2026-08-23）────────────────────────────────────
+  // images:0 / runImageGen:false —— 交付物是「照著拍的分格腳本」，配圖幫不上
+  // 忙，而且用戶會想連試好幾種機制，每張卡都要便宜。
+  // captionMaxChars 放到 1200：一格 5 行 × 4-6 格，壓太緊模型會把格子合併，
+  // 就退回散文了。下限 400 則是防止只寫兩格交差。
+  "tt-30-visual-illusion":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["一秒變身", "借位錯覺", "倒放回原"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-process-payoff":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["製作過程", "整理復原", "組裝完成"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-beat-sync":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["多品項快切", "情境輪播", "安靜→爆點"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-scale-reveal":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["細節拉到全景", "一鏡到底走位", "數量堆疊"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-real-reaction":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["第一次使用", "旁人被吸引", "素人真實回饋"], captionMinChars: 500, captionMaxChars: 1000 },
   "tt-30-bio-rewrite":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["專家定位", "個性風格", "結果導向"], captionMinChars: 50, captionMaxChars: 80 },
   "tt-30-hashtag-set":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["fyp 大流量", "精準利基", "趨勢搭便車"], captionMinChars: 0, captionMaxChars: 400 },
   "tt-30-caption-description":{ variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["懸念", "直球", "反差"], captionMinChars: 50, captionMaxChars: 100 },

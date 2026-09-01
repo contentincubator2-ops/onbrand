@@ -1,0 +1,70 @@
+name: "Op — Probe OpenAI image models (read-only)"
+
+# 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」).
+#
+# ops-diagnose-image-gen.yml only ever tests gpt-image-1, so nothing proved
+# that the key can open gpt-image-2 — model access is per-account on OpenAI,
+# and a key with credits can still be denied a specific model. Verify before
+# making gpt-image-2 the default, or the OpenAI path breaks again the moment
+# it is actually used.
+#
+# Read-only: two small generations, no .env writes. Prints status, latency and
+# image size — never the key.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 8
+    steps:
+      - name: Probe gpt-image-1 and gpt-image-2
+        run: |
+          set +e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          KEY=$(grep -m1 "^OPENAI_API_KEY=" "$ENV" | cut -d= -f2-)
+          CURRENT=$(grep -m1 "^IMAGE_GEN_MODEL_OPENAI=" "$ENV" | cut -d= -f2-)
+          echo "IMAGE_GEN_MODEL_OPENAI on the VM: ${CURRENT:-(unset — code default applies)}"
+          if [ -z "$KEY" ]; then echo "OPENAI_API_KEY missing"; exit 0; fi
+          echo
+
+          probe_model() {
+            M="$1"; SIZE="$2"; Q="$3"; LABEL="$4"
+            START=$(date +%s%3N)
+            CODE=$(curl -s -o /tmp/oi.json -w '%{http_code}' --max-time 180 \
+              -X POST https://api.openai.com/v1/images/generations \
+              -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+              -d "{\"model\":\"$M\",\"prompt\":\"a red circle on a white background\",\"n\":1,\"size\":\"$SIZE\"${Q}}")
+            MS=$(( $(date +%s%3N) - START ))
+            if grep -q '"b64_json"' /tmp/oi.json; then
+              N=$(tr -d '\n' < /tmp/oi.json | sed 's/.*"b64_json"[[:space:]]*:[[:space:]]*"//; s/".*//' | wc -c)
+              printf '  %-42s HTTP %s %7sms  IMAGE OK (%s b64 chars)\n' "$LABEL" "$CODE" "$MS" "$N"
+              return 0
+            fi
+            if grep -q '"url"' /tmp/oi.json; then
+              printf '  %-42s HTTP %s %7sms  IMAGE OK (url form)\n' "$LABEL" "$CODE" "$MS"
+              return 0
+            fi
+            MSG=$(tr -d '\n' < /tmp/oi.json | sed -n 's/.*"message"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | cut -c1-140)
+            printf '  %-42s HTTP %s %7sms  ERROR — %s\n' "$LABEL" "$CODE" "$MS" "${MSG:-no image in response}"
+            return 1
+          }
+
+          # 2026-09-01: a YT thumbnail run pinned to openai/gpt-image-2 came
+          # back 1344x768 — Flux Schnell's 16:9 size, not OpenAI's 1536x1024 —
+          # so the pinned model failed and genOneImage silently fell back. The
+          # variables are the model, the quality value (mediaGen sends "high",
+          # the earlier probe sent "low") and the 16:9 size the task requests.
+          # Probe the exact body genOpenAIImage builds.
+          probe_model gpt-image-2 1024x1024 ',"quality":"low"'  'gpt-image-2  1024x1024  quality=low'
+          probe_model gpt-image-2 1024x1024 ',"quality":"high"' 'gpt-image-2  1024x1024  quality=high  ← app default'
+          probe_model gpt-image-2 1536x1024 ',"quality":"high"' 'gpt-image-2  1536x1024  quality=high  ← YT 16:9'
+          probe_model gpt-image-2 1536x1024 ''                  'gpt-image-2  1536x1024  (no quality)'
+          probe_model gpt-image-1 1536x1024 ',"quality":"high"' 'gpt-image-1  1536x1024  quality=high'
+
+          echo
+          echo "── how to read this ──"
+          echo "quality=low OK but quality=high ERROR → mediaGen's default is the bug."
+          echo "1024 OK but 1536 ERROR             → the model rejects that size."
+          echo "all OK but slow (>35s)             → genOneImage's cap is what fell back."

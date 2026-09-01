@@ -60,6 +60,26 @@ function safeJSON<T>(text: string, fallback: T): T {
   return fallback;
 }
 
+/**
+ * 2026-08-11: does this parsed segment actually carry anything a human would
+ * read? Every fallback shape in this file is an all-empty skeleton
+ * ({ primary: "", matrix: [] } and friends) — none of them is a meaningful
+ * default, they exist only so a parse failure doesn't crash. So "no strings
+ * and no populated arrays anywhere" is indistinguishable from failure, and
+ * must be treated as one.
+ *
+ * Numbers and booleans alone don't count: taglineScore's skeleton is
+ * { rows: [], total: 0 }, and a real score always carries text in rows[].
+ */
+export function hasContent(v: unknown): boolean {
+  if (v == null) return false;
+  if (typeof v === "string") return v.trim().length > 0;
+  if (typeof v === "number" || typeof v === "boolean") return false;
+  if (Array.isArray(v)) return v.some(hasContent);
+  if (typeof v === "object") return Object.values(v as Record<string, unknown>).some(hasContent);
+  return false;
+}
+
 // 2026-07-19 (CJ「競品分析 7/17-18 突然變不精準」post-mortem): the LLM
 // chain silently degraded to gpt-4.1 for two days (Anthropic credits ran
 // out) and nobody noticed until output quality complaints came in.
@@ -115,32 +135,49 @@ async function callJSON(
   await ctx.recordUsage(`positioning_step:${stepId}`, r.model || "anthropic/claude-haiku-4-5", inTok, outTok, costFor(inTok, outTok));
   void warnIfDegradedModel(r.model || "", stepId);
 
-  const SENTINEL = Symbol("parse-failed");
-  const parsed = safeJSON<any>(text, SENTINEL as any);
-
-  if (parsed === (SENTINEL as any)) {
+  // 2026-08-11 (heytom-market onboarding: job reported done 10/10 with an
+  // entirely blank 目標受眾): this used to `return safeJSON(text, fallback)`,
+  // which swallowed both failure modes — unparseable output and an empty
+  // object — by writing the empty skeleton and reporting success.
+  //
+  // That silently bypassed the runner's own safety net. positioningJobRunner
+  // already retries a throwing step 5 times with backoff and marks the job
+  // failed if it never recovers; returning a fallback meant that machinery
+  // never engaged. A blank segment then reaches the customer looking like a
+  // finished deliverable, which is worse than an honest failure.
+  //
+  // Throwing hands control back to the retry loop. `fallback` is still used —
+  // spread underneath the parsed object so expected keys always exist — it
+  // just can no longer stand in for a result.
+  const PARSE_FAILED = Symbol("parse-failed");
+  const parsed = safeJSON<any>(text, PARSE_FAILED as any);
+  if (parsed === (PARSE_FAILED as any)) {
     // outTok at/near the cap is the signature of truncation rather than a
     // malformed answer — worth distinguishing when reading logs.
     const truncated = outTok >= maxTokens - 8;
-    console.warn(
-      `[positioning:${stepId}] JSON parse FAILED` +
-      `${truncated ? ` (looks truncated: ${outTok}/${maxTokens} output tokens — raise maxTokens)` : ""}` +
-      ` · model=${r.model} · raw[0:240]=${text.slice(0, 240).replace(/\s+/g, " ")}`,
+    throw new Error(
+      `positioning step "${stepId}" returned unparseable output` +
+      `${truncated ? ` (looks truncated: ${outTok}/${maxTokens} output tokens — raise maxTokens)` : ""} ` +
+      `(model=${r.model || "?"}, ${text.length} chars): ${text.slice(0, 200)}`,
     );
-    if (required?.length) throw new Error(`${stepId}: JSON parse failed${truncated ? " (truncated)" : ""}`);
-    return fallback;
   }
-
+  if (!hasContent(parsed)) {
+    throw new Error(
+      `positioning step "${stepId}" parsed but produced no content ` +
+      `(model=${r.model || "?"}) — refusing to write a blank segment`,
+    );
+  }
+  // hasContent only proves SOMETHING came back. A caller that named required
+  // keys needs those specific keys, so check them too and let the runner retry.
   if (required?.length) {
     const isEmpty = (v: any) =>
       v == null || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
     const missing = required.filter((k) => isEmpty(parsed?.[k]));
     if (missing.length > 0) {
-      console.warn(`[positioning:${stepId}] parsed OK but required field(s) empty: ${missing.join(", ")} · model=${r.model}`);
-      throw new Error(`${stepId}: empty required field(s) — ${missing.join(", ")}`);
+      throw new Error(`positioning step "${stepId}": empty required field(s) — ${missing.join(", ")}`);
     }
   }
-  return parsed;
+  return { ...(fallback as any), ...parsed };
 }
 
 
@@ -419,7 +456,7 @@ export function buildProductPositioningSteps(opts: { lang?: string; outputLangua
     // audienceAnchorBlock: 產品受眾必須落在母品牌官方客群之內（2026-07-23）。
     const base = `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}${audienceAnchorBlock(c)}`;
     if (c.realContent) {
-      return base + `\n\n【官網 / 社群真實內容（以下為爬取結果，請以此為定位基礎）】\n${c.realContent}`;
+      return base + `\n\n${c.realContent}`;
     }
     return base;
   };

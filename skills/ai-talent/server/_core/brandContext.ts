@@ -48,20 +48,35 @@ export interface BrandSummary {
  * rules from positioning._assets so the orchestra can auto-apply
  * substitutions and detect banned words after generation.
  */
-export async function getBrandRuleAssets(
+export interface BrandRuleAssets {
+  banned: string[];
+  subs: Array<{ from: string; to: string }>;
+  preferred: string[];
+}
+
+export interface BrandRuleAssetsLoadResult {
+  rules: BrandRuleAssets;
+  loaded: boolean;
+}
+
+export async function getBrandRuleAssetsWithStatus(
   brandId: number | undefined | null,
-): Promise<{ banned: string[]; subs: Array<{ from: string; to: string }>; preferred: string[] }> {
+): Promise<BrandRuleAssetsLoadResult> {
   const empty = { banned: [] as string[], subs: [] as Array<{ from: string; to: string }>, preferred: [] as string[] };
-  if (!brandId) return empty;
+  if (!brandId) return { rules: empty, loaded: true };
   try {
     const { default: localPool } = await import("../localDb");
     const [rows]: any = await localPool.execute(
-      `SELECT positioning FROM brands WHERE id = ? LIMIT 1`,
+      `SELECT id, positioning FROM brands WHERE id = ? LIMIT 1`,
       [brandId],
     );
     const row = Array.isArray(rows) ? rows[0] : null;
-    if (!row?.positioning) return empty;
+    if (!row?.id) return { rules: empty, loaded: false };
+    if (!row?.positioning) return { rules: empty, loaded: true };
     const p = typeof row.positioning === "string" ? safeParse(row.positioning) : row.positioning;
+    if (!p || typeof p !== "object" || Array.isArray(p)) {
+      return { rules: empty, loaded: false };
+    }
     const a = p?._assets ?? {};
     const strArr = (x: any): string[] =>
       Array.isArray(x?.items) ? x.items.map((s: any) => String(s ?? "").trim()).filter(Boolean)
@@ -71,8 +86,19 @@ export async function getBrandRuleAssets(
           .map((pr: any) => ({ from: String(pr?.from ?? "").trim(), to: String(pr?.to ?? "").trim() }))
           .filter((pr: any) => pr.from && pr.to)
       : [];
-    return { banned: strArr(a?.banned_words), subs: pairs, preferred: strArr(a?.preferred_terms) };
-  } catch { return empty; }
+    return {
+      rules: { banned: strArr(a?.banned_words), subs: pairs, preferred: strArr(a?.preferred_terms) },
+      loaded: true,
+    };
+  } catch {
+    return { rules: empty, loaded: false };
+  }
+}
+
+export async function getBrandRuleAssets(
+  brandId: number | undefined | null,
+): Promise<BrandRuleAssets> {
+  return (await getBrandRuleAssetsWithStatus(brandId)).rules;
 }
 
 /**

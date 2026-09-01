@@ -1,0 +1,83 @@
+name: Ops — Diagnose runSquadAuto single-flight lock (read-only)
+
+# 2026-08-20: 使用者被「這個企劃還在產生中，完成後才能再開一個。」擋住。
+# 那則訊息來自 _core/trpc.ts 的 singleFlightPerUser，一個 process-local 的
+# per-user in-flight Set，沒有 TTL、沒有逃生口。要分辨兩種完全不同的情況：
+#
+#   (a) 真的有一條 pipeline 還在跑 —— 這是設計預期的行為，不是 bug。
+#   (b) 某條 runSquadAuto 的 await next() 永遠不 resolve，鎖被洩漏，
+#       使用者要等到 process 重啟才能再開企劃。
+#
+# 判準：pm2 uptime 內最後一筆 [runSquadAuto] step 的時間戳。若距今遠大於一條
+# pipeline 的最壞耗時（5 步 × 45s ≈ 4 分鐘），卻仍在 reject duplicate，就是 (b)。
+#
+# 只讀 log 與 SELECT，沒有 UPDATE / INSERT / DELETE，也不重啟任何服務。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: pm2 uptime and restart count
+        run: |
+          set +e
+          echo "===== now ====="
+          date -u +"%Y-%m-%dT%H:%M:%SZ"
+          echo ""
+          echo "===== pm2 (uptime / restarts decide whether the lock could have survived) ====="
+          pm2 jlist 2>/dev/null | node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              for (const p of JSON.parse(s||"[]")) {
+                if (!/onbrand/.test(p.name||"")) continue;
+                const up = p.pm2_env?.pm_uptime;
+                console.log(JSON.stringify({
+                  name: p.name, pid: p.pid, status: p.pm2_env?.status,
+                  restarts: p.pm2_env?.restart_time,
+                  uptimeSince: up ? new Date(up).toISOString() : null,
+                  uptimeMin: up ? Math.round((Date.now()-up)/60000) : null,
+                }));
+              }
+            })'
+
+      - name: recent runSquadAuto and singleFlight activity
+        run: |
+          set +e
+          ERR=/home/azureuser/.pm2/logs/onbrand-error.log
+          OUT=/home/azureuser/.pm2/logs/onbrand-out.log
+          echo "===== last 30 [runSquadAuto] lines (out) ====="
+          grep -a "\[runSquadAuto\]" "$OUT" | tail -30
+          echo ""
+          echo "===== last 30 [runSquadAuto] lines (error) ====="
+          grep -a "\[runSquadAuto\]" "$ERR" | tail -30
+          echo ""
+          echo "===== last 20 singleFlight rejections ====="
+          grep -a "singleFlight" "$ERR" | tail -20
+          echo ""
+          echo "===== last 20 runSquadAuto POSTs (start markers, with timestamps) ====="
+          grep -a "POST /trpc/quickTask.runSquadAuto" "$OUT" | tail -20
+
+      - name: this user's recent outputs
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          Q() { mysql -h localhost -u mos_user mos_db -t -e "$1"; }
+
+          echo "===== user 1237889 latest mission_outputs ====="
+          Q "SELECT mo.id, mo.title, mo.progress, mo.createdAt, mo.updatedAt
+               FROM mission_outputs mo
+               JOIN missions m ON m.id = mo.missionId
+              WHERE m.userId = 1237889
+              ORDER BY mo.createdAt DESC
+              LIMIT 15;"
+
+          echo ""
+          echo "===== newest strategy step artifacts (did a pipeline finish recently?) ====="
+          Q "SELECT squadSlug, stepOrder, status, errorCode, latencyMs, createdAt
+               FROM strategy_internal_step_artifacts
+              ORDER BY createdAt DESC, stepOrder
+              LIMIT 20;"

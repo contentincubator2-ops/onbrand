@@ -17,8 +17,9 @@ import {
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
   faChevronRight, faArrowRight, faThumbtack,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption, ImageGenSlot } from "./shared";
+import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption, ImageGenSlot, SHOW_IMAGE_STYLE_OVERLAY } from "./shared";
 import { useLang } from "../../../lib/i18n";
+import { parseAdCopy, shortenAdCta } from "../../lib/parseAdCopy";
 
 /* ─────────────── FB Feed ─────────────── */
 
@@ -138,7 +139,10 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 className="w-full h-auto object-contain"
                 style={{ maxHeight: 560 }}
               />
-              {liveImageStyle && (
+              {/* 2026-08-19: hidden behind SHOW_IMAGE_STYLE_OVERLAY — the
+                  Chinese style text never produced this image. Flip the flag
+                  in shared.tsx to restore. */}
+              {SHOW_IMAGE_STYLE_OVERLAY && liveImageStyle && (
                 <div className="absolute bottom-2 left-2 right-2 bg-black/55 backdrop-blur-sm rounded px-2 py-1">
                   <p className="text-[10px] text-white/90 line-clamp-2">{liveImageStyle}</p>
                 </div>
@@ -317,9 +321,11 @@ export function FBStory({ title, brandName, variantLabel, liveCaption, liveTitle
         {/* 2026-07-17 (CJ「畫面讓人混淆能不能產圖…提示詞秀在那邊不知道怎麼
             用」— screenshot was THIS component): the raw visual brief used to
             float mid-frame with no CTA. Standardized ImageGenSlot: centered
-            點此生成主圖 button + the brief as labeled supporting text. */}
+            點此生成主圖 button + the brief as labeled supporting text. Keep
+            this wrapper out of a stacking context so the CTA can rise above
+            the Story text overlay. */}
         {!hasImage && (
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0">
             <ImageGenSlot
               brief={liveImageStyle}
               status={liveImageStatus}
@@ -475,12 +481,13 @@ function GhostSlot({ label, lines = 2 }: { label: string; lines?: number }) {
   );
 }
 
-export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, onGenerateImage, componentSlot }: MockupFields) {
+export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, liveHashtags, onGenerateImage, componentSlot }: MockupFields) {
   const { lang } = useLang();
   // 2026-05-18 (CJ): FBAd ignored the generated headline — showed the
   // run title (same for every pill). Use the variant's caption (the
   // actual ad headline) as the primary ad text.
   const adText = (liveCaption ?? "").trim() || title;
+  const parsedAdCopy = componentSlot ? null : parseAdCopy(adText);
   // 2026-05-18 (CJ「選 A：隱藏空圖框」): only render the image block when
   // an image actually exists or was attempted. Headline-only ad tasks
   // (images:0 → no url, no status) → no fake forever-skeleton box.
@@ -494,6 +501,14 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
   const ctaBtnText = componentSlot === "cta" && ctaFirstLine.length > 0 && ctaFirstLine.length <= 12
     ? ctaFirstLine
     : (lang === "en" ? "Shop" : "選購");
+  const neutralCta = lang === "en" ? "Learn more" : "了解更多";
+  const adCtaTitle = parsedAdCopy?.cta || neutralCta;
+  const adCtaButton = parsedAdCopy?.cta ? shortenAdCta(parsedAdCopy.cta) : neutralCta;
+  const parsedHashtags = parsedAdCopy?.hashtags ?? [];
+  const displayedHashtags = Array.from(new Set([
+    ...parsedHashtags,
+    ...(liveHashtags ?? []).map((tag) => tag.replace(/^#/u, "")),
+  ].filter(Boolean)));
   const deliverableTag = (
     <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-secondary-600 bg-secondary-50 border border-secondary-200 rounded px-1 py-px mr-1.5 align-middle">
       {lang === "en" ? "Deliverable" : "本任務產出"}
@@ -521,8 +536,23 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
               : "主文案區 · 非本任務產出（可用「FB 廣告 Primary Text 5 種」任務產生）"} lines={3} />
           ) : (
             <>
-              <p className="text-small font-medium leading-relaxed whitespace-pre-wrap">{adText}</p>
-              <p className="text-tiny text-default-500 mt-1">{lang === "en" ? "Shop now — 10% off, limited time →" : "立即購買，限時 9 折優惠 →"}</p>
+              {parsedAdCopy ? (
+                <div className="space-y-1">
+                  {parsedAdCopy.headline && (
+                    <p className="text-small font-semibold leading-relaxed whitespace-pre-wrap">{parsedAdCopy.headline}</p>
+                  )}
+                  {parsedAdCopy.primary && (
+                    <p className="text-small leading-relaxed whitespace-pre-wrap">{parsedAdCopy.primary}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-small font-medium leading-relaxed whitespace-pre-wrap">{adText}</p>
+              )}
+              {displayedHashtags.length > 0 && (
+                <p className="text-tiny text-primary-500 break-words mt-1">
+                  {displayedHashtags.map((tag) => `#${tag}`).join(" ")}
+                </p>
+              )}
             </>
           )}
         </div>
@@ -552,8 +582,8 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
             </div>
           )
         )}
-        {/* CTA bar (FB ad signature) — component tasks render their
-            deliverable in its REAL slot here, highlighted */}
+        {/* Component tasks retain their existing slot treatment; full ads use
+            the CTA parsed from their own structured copy. */}
         <div className="px-4 py-2.5 bg-default-100 border-y border-divider flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-tiny text-default-500 uppercase tracking-wider">YOUR-BRAND.COM</p>
@@ -566,7 +596,7 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
             ) : isComponent ? (
               <div className="mt-0.5"><GhostSlot label={lang === "en" ? "Headline — not part of this task" : "廣告標題 · 非本任務產出"} lines={1} /></div>
             ) : (
-              <p className="text-small font-semibold truncate">{lang === "en" ? "Shop now · Limited offer" : "立即購買 · 限時優惠"}</p>
+              <p className="text-small font-semibold truncate">{adCtaTitle}</p>
             )}
             {componentSlot === "description" && (
               <p className="text-tiny text-default-600 rounded bg-secondary-50 ring-1 ring-secondary-200 px-1.5 py-0.5 mt-1 whitespace-pre-wrap line-clamp-3">
@@ -578,7 +608,7 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
             color="default" size="sm" radius="md"
             className={`font-semibold ml-2 shrink-0 ${componentSlot === "cta" ? "bg-secondary-100 ring-2 ring-secondary-300" : "bg-default-200"}`}
           >
-            {ctaBtnText}
+            {isComponent ? ctaBtnText : adCtaButton}
           </Button>
         </div>
         {componentSlot === "cta" && (

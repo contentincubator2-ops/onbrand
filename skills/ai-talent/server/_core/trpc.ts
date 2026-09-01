@@ -154,6 +154,98 @@ export const protectedProcedure = t.procedure
   });
 
 /**
+ * 2026-08-19 — process-local per-user concurrency guard.
+ *
+ * Motivation: quickTask.runSquadAuto runs a ~3-minute pipeline synchronously
+ * inside the HTTP request. The client's progress ring is calibrated for 100s,
+ * so a user who is still waiting at 100s reads it as stuck and clicks again.
+ * Each extra click starts another full pipeline on the same single-fork Node
+ * process, and the per-step Promise.race timeout does not cancel the upstream
+ * provider call, so abandoned work keeps consuming memory and provider quota.
+ *
+ * Guard is process-local, which is sufficient today: production runs one
+ * PM2 fork (`pm2 start tsx --name onbrand`, ci.yml). If this ever becomes
+ * cluster mode or multi-VM, this must move to Redis SET NX + TTL.
+ *
+ * CONFLICT is deliberate: it maps to HTTP 409 with a JSON tRPC envelope, so
+ * `authAwareFetch` in client/src/lib/trpc.ts leaves it alone (it only rewrites
+ * NON-JSON gateway errors into the synthetic "伺服器忙碌" 502 message). The
+ * user therefore sees the real reason, not a fake server error. CONFLICT is
+ * also already on errorLoggerMiddleware's expected list, so it does not
+ * pollute error_log.
+ *
+ * The TTL is a lease recovery ceiling, not an eager cancellation mechanism.
+ * A call keeps its slot normally until `finally`; only a later request can
+ * prune a generation whose owner has remained unresolved past the configured
+ * limit. Pruning does not cancel that owner, so actual concurrency may briefly
+ * exceed `maxConcurrent` while stale work finishes. Setting maxConcurrent > 1
+ * also weakens protection against repeated clicks by the same user compared
+ * with the default single-slot behavior; that tradeoff is intentional.
+ */
+export function singleFlightPerUser(
+  opts: { key: string; message: string; ttlMs: number; maxConcurrent?: number },
+  { now = Date.now }: { now?: () => number } = {},
+) {
+  if (!Number.isFinite(opts.ttlMs) || opts.ttlMs <= 0) {
+    throw new RangeError("single-flight TTL must be a positive finite number");
+  }
+  const maxConcurrent = opts.maxConcurrent ?? 1;
+  if (!Number.isInteger(maxConcurrent) || maxConcurrent <= 0) {
+    throw new RangeError("single-flight maxConcurrent must be a positive integer");
+  }
+
+  const inFlight = new Map<number, Map<symbol, number>>();
+  return t.middleware(async ({ ctx, next }) => {
+    const userId = ctx.user?.id;
+    // Unauthenticated calls are rejected by protectedProcedure anyway; not
+    // holding a slot for them keeps this guard free of a null-key bucket.
+    if (!userId) return next();
+
+    const startedAt = now();
+    let bucket = inFlight.get(userId);
+    if (bucket) {
+      for (const [existingToken, existingStartedAt] of bucket) {
+        const elapsedMs = startedAt - existingStartedAt;
+        if (elapsedMs >= opts.ttlMs) {
+          bucket.delete(existingToken);
+          console.warn(
+            `[singleFlight] expired stale slot for ${opts.key} for user ${userId}; elapsedMs=${elapsedMs}`,
+          );
+        }
+      }
+      if (bucket.size >= maxConcurrent) {
+        console.warn(`[singleFlight] rejected duplicate ${opts.key} for user ${userId}`);
+        throw new TRPCError({ code: "CONFLICT", message: opts.message });
+      }
+    } else {
+      bucket = new Map<symbol, number>();
+      inFlight.set(userId, bucket);
+    }
+
+    // Every generation gets a unique token, so each finally can release only
+    // its own slot even if another generation has the same injected timestamp.
+    const token = Symbol(opts.key);
+    bucket.set(token, startedAt);
+    try {
+      return await next();
+    } finally {
+      // Every resolved exit path releases: success, TRPCError, provider throw.
+      // A client disconnect does NOT release early — the handler keeps running
+      // because nothing propagates cancellation into it yet. Until the TTL is
+      // reached, this prevents a reconnecting tab from stacking a pipeline.
+      // A stale call may finish after its token was pruned and a newer call
+      // took its place. Deleting only this token prevents that old finally
+      // from unlocking the replacement generation.
+      const currentBucket = inFlight.get(userId);
+      if (currentBucket) {
+        currentBucket.delete(token);
+        if (currentBucket.size === 0) inFlight.delete(userId);
+      }
+    }
+  });
+}
+
+/**
  * 2026-05-11 — adminProcedure: gated by users.role = 'admin'. Used by
  * the error-tracking dashboard + future admin tools.
  */

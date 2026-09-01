@@ -26,6 +26,7 @@
     "db:seed-missing": "tsx scripts/seed-missing-squads.ts",
     "db:analyze-squads": "tsx scripts/analyze-existing-squads.ts",
     "db:audit-squads": "tsx scripts/audit-squads.ts",
+    "db:audit-fb-personas": "tsx scripts/audit-fb-agent-personas.ts",
     "db:cleanup-legacy": "tsx scripts/cleanup-legacy-squads.ts",
     "db:list-needing-patch": "tsx scripts/list-squads-needing-patch.ts",
     "db:patch-workspace": "tsx scripts/patch-squads-workspace.ts",
@@ -60,7 +61,7 @@
     "db:upgrade-mvp-squads": "tsx scripts/decision-ai/upgrade-mvp-squads.ts",
     "embed:squads": "tsx scripts/compute-squad-embeddings.ts",
     "db:studio": "drizzle-kit studio",
-    "lint": "tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@azure/search-documents": "^12.0.0",
