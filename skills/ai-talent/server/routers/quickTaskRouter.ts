@@ -972,6 +972,7 @@ import { resolveBrandPack, expandPackCards, packNavForBrand } from "../_core/bra
 // 2026-09-02: task id → template + config 的唯一解析點。這條鏈本來在這個檔案
 // 裡手抄了五次，抄第五次時漏了 KOL 的 config（KOL 任務按「換人重寫」直接炸）。
 import { resolveTaskOrThrow, resolveTaskTemplate } from "../_core/taskRegistry";
+import { assertIntakeComplete } from "../_core/taskIntake";
 import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice } from "../_core/wuganVoiceContract";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
@@ -1518,11 +1519,13 @@ export const quickTaskRouter = router({
       // 東西看起來完整但毫無依據。空白、敷衍字、太簡略的答案都擋在這裡。
       // 擺在扣點之前：被擋下來的請求一點都不扣。
       //
-      // 注意：這裡故意「沒有」對 template.inputs 全跑一次 required 檢查
-      // （runQuick / runOrchestra99 有）。intake 只會送 primary_input 那一格，
-      // 而 fb-60-launch-kit / fb-60-countdown-5day / fb-60-link-full /
-      // fb-60-live-suite / ig-60-countdown-5day 這 5 個任務宣告了 primary 以外的
-      // required 欄位，通用檢查會把它們全部擋死。要補通用檢查得先修那些宣告。
+      // 2026-09-02：通用 required 檢查開回來了。它原本關著是因為 intake 只送
+      // primary_input 一格，而 fb-60-launch-kit / fb-60-countdown-5day /
+      // fb-60-link-full / fb-60-live-suite / ig-60-countdown-5day 宣告了
+      // primary 以外的 required 欄位 —— 開了會把它們全部擋死。現在 modal 會
+      // 照 taskIntake.intakeExtraFields 把那些欄位渲染出來，驗證範圍等於 UI
+      // 範圍，不可能再出現「必填但沒地方填」。
+      assertIntakeComplete(template, input.inputs);
       if (templateNeedsViralSource(template)) {
         const viral = checkViralSource(input.inputs[VIRAL_SOURCE_KEY], {
           platformLabel: platformLabelOf(template),
@@ -2580,6 +2583,11 @@ ${polishTemplate.polishHint}`
       // 2026-08-23: same guard as runOrchestra60, for fb-99-viral-rewrite.
       // 沒有原始爆款就沒有東西可以改寫，模型會自己編一支去拆解。
       // 擺在扣點之前：被擋下來的請求一點都不扣。
+      //
+      // 2026-09-02: fb-99-launch-toolkit(event_when/event_why) 與
+      // fb-99-livestream-9seg(key_points) 也宣告了 primary 以外的必填欄位，
+      // 在 intake 只送一格的年代同樣問不到。
+      assertIntakeComplete(template, input.inputs);
       if (templateNeedsViralSource(template)) {
         const viral = checkViralSource(input.inputs[VIRAL_SOURCE_KEY], {
           platformLabel: platformLabelOf(template),
@@ -2707,11 +2715,9 @@ ${polishTemplate.polishHint}`
       const template = resolved.template;
       const config = resolved.config;
       // Required-field check
-      for (const f of template.inputs) {
-        if (f.required && !input.inputs[f.key]?.trim()) {
-          throw new Error(`Missing required input: ${f.key} (${f.label})`);
-        }
-      }
+      // 只驗 modal 真的渲染得出來的欄位（taskIntake 是 client/server 共用的
+      // 那一份判斷），所以不會擋一格使用者根本看不到的必填。
+      assertIntakeComplete(template, input.inputs);
       const orchestraArgs = {
         template,
         config,
@@ -2907,11 +2913,9 @@ ${polishTemplate.polishHint}`
       }
 
       // Required-field check
-      for (const f of template.inputs) {
-        if (f.required && !input.inputs[f.key]?.trim()) {
-          throw new Error(`Missing required input: ${f.key} (${f.label})`);
-        }
-      }
+      // 只驗 modal 真的渲染得出來的欄位（taskIntake 是 client/server 共用的
+      // 那一份判斷），所以不會擋一格使用者根本看不到的必填。
+      assertIntakeComplete(template, input.inputs);
 
       // 2026-05-05: load the bound agent persona (if set) and prepend to
       // the system prompt so the output really sounds like that agent.

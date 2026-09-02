@@ -35,6 +35,7 @@ import type { ShellOutletCtx } from "../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
 import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope";
 import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
+import { intakeExtraFields, missingRequiredInputs, type IntakeField } from "../lib/taskIntake";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Textarea,
@@ -284,6 +285,22 @@ interface FBTaskCard {
   methodology?: string;
 }
 
+/**
+ * 2026-09-02 — 額外欄位送出前的整理。
+ *
+ * 空白與只有空格的格子整個拿掉，不要送空字串過去：orchestra 的 prompt 組裝
+ * 會把「有這個 key」當成使用者有講，於是模型看到一個空的「活動優惠：」欄位，
+ * 反而比完全沒有這個欄位更容易生出胡話。
+ */
+function trimmedExtras(bag: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(bag)) {
+    const t = String(v ?? "").trim();
+    if (t) out[k] = t;
+  }
+  return out;
+}
+
 // ── Inline positioning-edit helpers (task modal) ─────────────────────────────
 // A context chip's `source` is "brand.positioning.<segment>.<field>" (the
 // "brand.positioning." prefix is a display convention even in product/event
@@ -500,6 +517,11 @@ function PlatformTaskPageInner() {
   // Task modal state
   const [activeTask, setActiveTask] = useState<FBTaskCard | null>(null);
   const [primaryAnswer, setPrimaryAnswer] = useState("");
+  // 2026-09-02: primary 以外的欄位。在這之前 intake 只渲染也只送出
+  // primary_input 一格，225 張卡裡有 24 張宣告了額外欄位、其中 7 張還是必填 ——
+  // 那些格子沒有任何 UI 可以填，模型只好自己編（例如「新品上市全套」從來不問
+  // 活動什麼時候辦）。要問哪幾格由 lib/taskIntake 決定，server 用同一份判斷驗。
+  const [extraAnswers, setExtraAnswers] = useState<Record<string, string>>({});
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // 2026-08-23: intake validation error, rendered right under the question
@@ -725,6 +747,14 @@ function PlatformTaskPageInner() {
       { kind: "brand", id: null },
     );
     setPrimaryAnswer(typeof prior === "string" ? prior : "");
+    // 重跑時把上一次填的額外欄位一併帶回來 —— 只還原 primary 的話，使用者
+    // 得把「活動什麼時候辦」之類的東西再打一次。
+    const priorExtra: Record<string, string> = {};
+    for (const f of intakeExtraFields(task as any)) {
+      const v = inputs[f.key];
+      if (typeof v === "string" && v.trim()) priorExtra[f.key] = v;
+    }
+    setExtraAnswers(priorExtra);
     const next = new URLSearchParams(searchParams);
     next.delete("rerun");
     setSearchParams(next, { replace: true });
@@ -983,6 +1013,7 @@ function PlatformTaskPageInner() {
     // 策略工作台帶入的題目優先於 derive 預填（用戶剛從策略點過來，意圖明確）
     if (strategyTopic) prefill = strategyTopic;
     setPrimaryAnswer(prefill);
+    setExtraAnswers({});
     setErrorMsg(null);
     setInputError(null);
     setLatencyMs(null);
@@ -1101,6 +1132,16 @@ function PlatformTaskPageInner() {
       rejectIntake(lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成");
       return;
     }
+    // 2026-09-02: primary 以外的必填。判斷跟 server 用同一份（lib/taskIntake
+    // 是 server/_core/taskIntake 的鏡像，parity 測試綁著），所以這裡擋得下來的
+    // 東西 server 也會擋，反之亦然 —— 不會出現「畫面過了但送出被拒」。
+    const missingExtra = missingRequiredInputs(activeTask as any, extraAnswers);
+    if (missingExtra.length > 0) {
+      rejectIntake(lang === "en"
+        ? `Fill in: ${missingExtra.map((f) => f.label).join(", ")}`
+        : `還缺必填欄位：${missingExtra.map((f) => f.label).join("、")}`);
+      return;
+    }
     setRunning(true);
     setErrorMsg(null);
     setInputError(null);
@@ -1174,9 +1215,11 @@ function PlatformTaskPageInner() {
         runOrchestraMut;
 
       if (tierMut) {
+        // 額外欄位先鋪、primary 後蓋 —— 萬一某張卡把 primary 的 key 又
+        // 宣告了一次，主問題的答案必須贏。
         const r = await tierMut.mutateAsync({
           taskId: activeTask.id,
-          inputs: { [inputKey]: primaryAnswer },
+          inputs: { ...trimmedExtras(extraAnswers), [inputKey]: primaryAnswer },
           brandId: brandId ?? undefined,
           productId: taskProductId,
           eventId: taskEventId,
@@ -2191,6 +2234,75 @@ function PlatformTaskPageInner() {
                     {polishErr && <p className="text-tiny text-danger-500">{polishErr}</p>}
                   </div>
                 )}
+
+                {/* 2026-09-02 — primary 以外的欄位。
+                    在這之前 intake 只渲染 primary_input 一格，`template.inputs[]`
+                    其餘欄位是死的：225 張卡有 24 張宣告了額外欄位，其中 7 張標成
+                    required 卻沒有任何 UI 可以填（fb-60-launch-kit 從來不問活動
+                    什麼時候辦、為什麼辦，模型就自己編一個）。
+
+                    必填的展開、選填的收在摺疊區：主問題必須維持是這個 modal 的
+                    主角，多幾個框會讓「30 秒生一篇」的體感直接變成填表。 */}
+                {!running && (() => {
+                  const fields = intakeExtraFields(activeTask as any);
+                  if (fields.length === 0) return null;
+                  const required = fields.filter((f) => f.required);
+                  const optional = fields.filter((f) => !f.required);
+                  const renderField = (f: IntakeField) => (
+                    <div key={f.key} className="space-y-1">
+                      <p className="text-tiny font-medium text-default-700">
+                        {f.label}
+                        {f.required && <span className="text-danger-500 ml-1">*</span>}
+                      </p>
+                      {f.type === "textarea" ? (
+                        <Textarea
+                          size="sm"
+                          minRows={2}
+                          placeholder={f.placeholder}
+                          value={extraAnswers[f.key] ?? ""}
+                          onChange={(e) => {
+                            setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
+                            if (inputError) setInputError(null);
+                          }}
+                        />
+                      ) : (
+                        <Input
+                          size="sm"
+                          placeholder={f.placeholder}
+                          value={extraAnswers[f.key] ?? ""}
+                          onChange={(e) => {
+                            setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
+                            if (inputError) setInputError(null);
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                  return (
+                    <div className="space-y-3" data-extra-inputs>
+                      {required.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-tiny text-default-500">
+                            {lang === "en"
+                              ? "This task needs a couple more things — without them the model makes them up."
+                              : "這張卡還需要這幾項 —— 沒給的話模型會自己編。"}
+                          </p>
+                          {required.map(renderField)}
+                        </div>
+                      )}
+                      {optional.length > 0 && (
+                        <details className="group">
+                          <summary className="text-tiny text-default-500 cursor-pointer select-none hover:text-default-700">
+                            {lang === "en"
+                              ? `Optional details (${optional.length})`
+                              : `補充資訊（選填，${optional.length} 項）`}
+                          </summary>
+                          <div className="space-y-2 mt-2">{optional.map(renderField)}</div>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Running carousel */}
                 {running && (() => {
