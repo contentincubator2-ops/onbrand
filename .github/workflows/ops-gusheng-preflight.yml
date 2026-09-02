@@ -1,70 +1,113 @@
 name: "Ops — Gusheng preflight (read-only)"
 
-# 2026-09-02 (CJ「在 sowork@sowork.tw 帳號下建立盛全工業品牌 + 客製任務卡」
-# 以及「請從 mos_db 當中，選擇適合的 agent」):
-# 建品牌與寫 brandPack 之前的唯讀盤點。
+# 2026-09-02 (CJ「在 sowork@sowork.tw 帳號下建立盛全工業品牌 + 客製任務卡」):
+# 唯讀盤點，一輪一輪推進。
 #
-# Round 1：owner userId=1237889 存在、全站沒有同名的盛全、16116 位 agent 裡
-#          taskSystemPrompt >= 2200 字的是 0 位。
+# Round 1：owner userId=1237889 存在、全站沒有同名的盛全、agent pool 16116 位
+#          但 taskSystemPrompt >= 2200 字的是 0 位。
 # Round 2：全庫只有 10 位寫了 taskSystemPrompt，最長 1965 字；pool 裡沒有任何
-#          製造／紡織／OEM 屬性的 agent，B2B 命中的全是 SaaS 與電商。
-# Round 3（本次）：要為 8 位 agent 補人設到 2200 字，先看現有那 10 份的寫法
-#          與語言慣例，新寫的才不會跟既有的長成兩種東西。
+#          製造／紡織／OEM 屬性的 agent。
+# Round 3：看現有人設的寫法與語言慣例，新寫的才不會長成兩種東西。
+# Round 4（本次）：pack 上線後的收尾驗證 —— 品牌 2988 的目錄是否「完全」由
+#          pack 決定（全域 207 張一張都不該出現），gs- 卡是否對其他品牌隱形，
+#          以及八位 agent 的人設是否真的落地。
 #
-# 純 SELECT，沒有任何寫入。
+# 純 SELECT 與純函式呼叫，沒有任何寫入。
 
 on:
   workflow_dispatch:
 
 jobs:
   preflight:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 10
     steps:
-      - name: Dump an existing persona to learn the house convention
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 120s
-          script: |
-            set -e
-            cd /opt/onbrand/app/skills/ai-talent
-            set -a; source .env 2>/dev/null; set +a
-            node -e "
-              const mysql = require('mysql2/promise');
-              (async () => {
-                const conn = await mysql.createConnection({
-                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
-                  port: Number(process.env.LOCAL_DB_PORT || 3306),
-                  user: process.env.LOCAL_DB_USER || 'mos_user',
-                  password: process.env.LOCAL_DB_PASSWORD,
-                  database: process.env.LOCAL_DB_NAME || 'mos_db',
-                });
+      - name: Verify pack exclusivity + persona landing
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          node --import tsx -e "
+            Promise.all([
+              import('./server/_core/brandPacks/index.ts'),
+              import('./server/_core/taskCatalogIndex.ts'),
+              import('./server/_core/brandMarket.ts'),
+              import('mysql2/promise'),
+            ]).then(async ([packs, catalog, market, mysqlMod]) => {
+              const mysql = mysqlMod.default ?? mysqlMod;
+              const { resolveBrandPack, expandPackCards, packNavForBrand, isPackTaskId, packCardId } = packs;
+              const { buildTaskCatalogIndex } = catalog;
 
-                const [full] = await conn.execute(
-                  'SELECT id, name, title, taskSystemPrompt FROM agents WHERE id = 239194'
-                );
-                console.log('===== K. FULL PERSONA OF AGENT 239194 (house convention) =====');
-                console.log(full[0]?.taskSystemPrompt || '(empty)');
+              const globalTasks = buildTaskCatalogIndex();
+              const globalById = new Map(globalTasks.map((t) => [t.id, t]));
+              console.log('global catalog size: ' + globalTasks.length);
 
-                const targets = [30002, 210266, 180143, 180162, 60005, 180173, 221080, 31];
-                const [t] = await conn.query(
-                  'SELECT id, name, englishName, title, layer, LEFT(COALESCE(bio,\'\'),200) AS bio, LEFT(COALESCE(specialty,\'\'),200) AS specialty, LEFT(COALESCE(methodology,\'\'),200) AS methodology, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen FROM agents WHERE id IN (?) ORDER BY FIELD(id, 30002,210266,180143,180162,60005,180173,221080,31)',
-                  [targets],
-                );
-                console.log('');
-                console.log('===== L. THE 8 AGENTS TO BE GIVEN PERSONAS =====');
-                for (const r of t) console.log(JSON.stringify(r));
+              // ── A. 品牌 2988 看到什麼 ──────────────────────────────────
+              const pack = resolveBrandPack({ brandId: 2988 });
+              console.log('');
+              console.log('===== A. BRAND 2988 RESOLVES TO PACK =====');
+              console.log('pack key: ' + (pack ? pack.key : 'NONE'));
+              if (!pack) { console.error('FAIL: brand 2988 resolved to no pack'); process.exit(1); }
 
-                const [used] = await conn.query(
-                  'SELECT agentId, COUNT(*) AS runs FROM mission_outputs WHERE agentId IN (?) GROUP BY agentId',
-                  [targets],
-                ).catch(() => [[]]);
-                console.log('');
-                console.log('===== M. HOW MUCH THESE AGENTS ARE ALREADY USED =====');
-                for (const r of used) console.log(JSON.stringify(r));
+              const cards = expandPackCards(pack, globalById);
+              console.log('cards the brand sees: ' + cards.length);
+              const leaked = cards.filter((c) => globalById.has(c.id));
+              console.log('of which come from the global catalog: ' + leaked.length +
+                (leaked.length ? ' -> ' + leaked.map((c) => c.id).join(',') : ' (exclusive, as intended)'));
+              if (leaked.length) { console.error('FAIL: global cards leaked into the pack'); process.exit(1); }
 
-                await conn.end();
-              })().catch(e => { console.error('FAILED:', e); process.exit(1); });
-            "
+              const nav = packNavForBrand({ brandId: 2988 });
+              console.log('channels: ' + nav.channels.map((c) => c.key + '(' + c.formats.length + ')').join(' '));
+
+              // ── B. gs- 卡對其他品牌隱形 ────────────────────────────────
+              console.log('');
+              console.log('===== B. GS CARDS ARE INVISIBLE TO OTHER BRANDS =====');
+              const gsIds = pack.cards.map(packCardId);
+              const notHidden = gsIds.filter((id) => !isPackTaskId(id));
+              console.log('gs cards: ' + gsIds.length + ' / flagged as pack-exclusive: ' + (gsIds.length - notHidden.length));
+              if (notHidden.length) {
+                console.error('FAIL: these would show up in other brands catalogues: ' + notHidden.join(','));
+                process.exit(1);
+              }
+              const otherBrand = resolveBrandPack({ brandId: 2984 });
+              console.log('brand 2984 (正美集團) resolves to: ' + (otherBrand ? otherBrand.key : 'no pack -> global catalogue, unchanged'));
+
+              // ── C. 市場設定 ────────────────────────────────────────────
+              console.log('');
+              console.log('===== C. MARKET RESOLUTION =====');
+              const m = await market.getBrandMarket(2988);
+              console.log(JSON.stringify(m));
+              if (m.isZhTW) { console.error('FAIL: brand 2988 should not be on the zh-TW path'); process.exit(1); }
+
+              // ── D. 人設是否真的落地 ────────────────────────────────────
+              const conn = await mysql.createConnection({
+                host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                port: Number(process.env.LOCAL_DB_PORT || 3306),
+                user: process.env.LOCAL_DB_USER || 'mos_user',
+                password: process.env.LOCAL_DB_PASSWORD,
+                database: process.env.LOCAL_DB_NAME || 'mos_db',
+              });
+              const agentIds = [...new Set(pack.cards.filter((c) => c.kind === 'custom').map((c) => c.template.agent_id))];
+              const [rows] = await conn.query(
+                'SELECT id, name, title, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen FROM agents WHERE id IN (?) ORDER BY promptLen DESC',
+                [agentIds],
+              );
+              console.log('');
+              console.log('===== D. AGENTS BOUND BY THE PACK =====');
+              for (const r of rows) console.log('  ' + JSON.stringify(r));
+              const thick = rows.filter((r) => r.promptLen >= 2200).length;
+              console.log('agents bound: ' + rows.length + ' / with a >=2200 char persona: ' + thick);
+
+              // ── E. 產品 picker 有東西可選 ──────────────────────────────
+              const [prods] = await conn.execute(
+                'SELECT COUNT(*) AS n FROM products WHERE brandId = 2988', []);
+              console.log('');
+              console.log('===== E. PRODUCTS AVAILABLE IN THE PER-TASK PICKER =====');
+              console.log('products under brand 2988: ' + prods[0].n);
+              if (Number(prods[0].n) === 0) { console.error('FAIL: the product picker would be empty'); process.exit(1); }
+
+              await conn.end();
+              console.log('');
+              console.log('=== ALL CHECKS PASS ===');
+            }).catch((e) => { console.error('FAILED:', e); process.exit(1); });
+          "
