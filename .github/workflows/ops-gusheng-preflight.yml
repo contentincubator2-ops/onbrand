@@ -1,0 +1,83 @@
+name: "Ops — Gusheng preflight (read-only)"
+
+# 2026-09-02 (CJ「在 sowork@sowork.tw 帳號下建立盛全工業品牌 + 客製任務卡」):
+# 建品牌與寫 brandPack 之前的唯讀盤點。三件事必須先知道，否則後面兩步是盲寫：
+#   1. sowork@sowork.tw 這個 owner 帳號存不存在（create workflow 會直接 exit 1）
+#   2. 這個帳號底下已經有哪些品牌 / 全站有沒有同名的盛全（避免重複建）
+#   3. agent pool —— brandPack 每張卡都要綁 agents.id，而 FB 貼文類卡片的
+#      agent 受 taskSystemPrompt >= 2200 字的硬標準約束，所以要連字數一起看
+#
+# 純 SELECT，沒有任何寫入。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query users / brands / agent pool
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            node -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+                const show = (label, rows) => {
+                  console.log('');
+                  console.log('===== ' + label + ' (' + rows.length + ' rows) =====');
+                  for (const r of rows) console.log(JSON.stringify(r));
+                };
+
+                const [u] = await conn.execute(
+                  'SELECT id, email, name, createdAt FROM users WHERE email = ?',
+                  ['sowork@sowork.tw'],
+                );
+                show('A. OWNER ACCOUNT sowork@sowork.tw', u);
+
+                if (u.length) {
+                  const [b] = await conn.execute(
+                    'SELECT id, name, slug, website, positioningStatus, targetCountry, outputLanguage, createdAt FROM brands WHERE userId = ? ORDER BY id DESC LIMIT 40',
+                    [u[0].id],
+                  );
+                  show('B. BRANDS OWNED BY THAT ACCOUNT', b);
+                }
+
+                const [dupe] = await conn.execute(
+                  'SELECT id, userId, name, slug, website FROM brands WHERE name LIKE ? OR name LIKE ? OR website LIKE ? LIMIT 20',
+                  ['%盛全%', '%usheng%', '%headwearmaker%'],
+                );
+                show('C. EXISTING GUSHENG-LIKE BRANDS (any owner)', dupe);
+
+                const [cnt] = await conn.execute(
+                  'SELECT COUNT(*) AS total, SUM(CASE WHEN CHAR_LENGTH(taskSystemPrompt) >= 2200 THEN 1 ELSE 0 END) AS thick FROM agents WHERE isAvailable = 1'
+                );
+                show('D. AGENT POOL SIZE', cnt);
+
+                const [thick] = await conn.execute(
+                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(taskSystemPrompt) AS promptLen, LEFT(COALESCE(specialty,\'\'), 90) AS specialty FROM agents WHERE isAvailable = 1 AND CHAR_LENGTH(taskSystemPrompt) >= 2200 ORDER BY promptLen DESC LIMIT 60'
+                );
+                show('E. AGENTS QUALIFIED FOR FB POST CARDS (>=2200 chars)', thick);
+
+                const [exec] = await conn.execute(
+                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen FROM agents WHERE isAvailable = 1 AND layer = \'execution\' ORDER BY id ASC LIMIT 80'
+                );
+                show('F. EXECUTION-LAYER AGENTS', exec);
+
+                await conn.end();
+              })().catch(e => { console.error('FAILED:', e); process.exit(1); });
+            "
