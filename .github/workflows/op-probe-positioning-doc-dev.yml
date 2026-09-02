@@ -1,0 +1,52 @@
+name: "Op — Probe 定位文件上傳 on DEV (真實資料，會自我還原)"
+
+# 2026-09-01。typecheck 與單元測試證明不了的三件事，只有真的在 DEV VM 上跑
+# 才知道：
+#   1. dev VM 有沒有 python3 + lxml（抽取器整條路徑靠它）
+#   2. HTTP 層（express.raw / JWT / 品牌權限）接不接得起來
+#   3. 產品／活動定位的 canonical 修正，套在真的資料上有沒有效
+#
+# 會寫入 positioning，所以 probe 自己在開頭快照整欄、finally 還原，並逐字元
+# 比對確認還原成功。跑在真實品牌上，不是測試資料。
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "DEV 上的品牌 id（留空 = 自動挑最新一個有定位的）"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    steps:
+      - name: Probe on the DEV VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          envs: BRAND_ID
+          script: |
+            set -euo pipefail
+            AI=/opt/onbrand/current/skills/ai-talent
+            cd "$AI"
+
+            echo "host: $(hostname)"
+            echo "release: $(readlink -f /opt/onbrand/current)"
+            echo
+
+            # lxml 是抽取器唯一的非 stdlib 相依。粉絲團月報那支 parse_template.py
+            # 也用它，所以理論上早就在了 —— 但「理論上」正是這支 probe 要消滅的東西。
+            if ! python3 -c "import lxml" 2>/dev/null; then
+              echo "!! python3 缺 lxml —— 嘗試安裝"
+              (python3 -m pip install --quiet lxml || sudo apt-get install -y python3-lxml) || true
+            fi
+
+            ./node_modules/.bin/tsx scripts/probe-positioning-doc.ts $BRAND_ID
