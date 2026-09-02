@@ -1,0 +1,111 @@
+name: "Ops — 品牌任務包隔離稽核（其他品牌會不會看到五感十築的東西）"
+
+# 2026-09-01 (CJ「我想確認，以上針對五感十築的修改，只會出現在五感十築這個
+# 品牌，其他人的帳號都不會有五感十築的任務卡、mission tray」)。
+#
+# 這支在部署後的正式站上，逐項比對「有 pack 的品牌」與「沒有 pack 的品牌」
+# 各自看得到什麼，並檢查五感十築的專屬卡有沒有洩漏到全域目錄。
+#
+# 對照組預設 2932（瑞威寵糧，同一個帳號底下的另一個品牌）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      packBrandId:
+        description: "有客製包的品牌"
+        required: true
+        default: "2840"
+        type: string
+      controlBrandId:
+        description: "沒有客製包的對照品牌"
+        required: true
+        default: "2932"
+        type: string
+
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 10
+    steps:
+      - run: |
+          set +e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          echo "deployed: $(git -C /opt/onbrand/app rev-parse --short HEAD)"
+          cat > ./.pack_audit.mts <<'JS'
+          const { resolveBrandPack, packNavForBrand, expandPackCards, PACKS } =
+            await import("./server/_core/brandPacks/index.ts");
+          const { buildTaskCatalogIndex } = await import("./server/_core/taskCatalogIndex.ts");
+          const { isWuganVoiceTemplate } = await import("./server/_core/wuganVoiceContract.ts");
+          const { FB_30S_TASKS } = await import("./server/_core/quickTaskFB.ts");
+          const { WEBSITE_30S_TASKS } = await import("./server/_core/quickTaskWebsite.ts");
+
+          const PACK_BID = Number(process.env.PACK_BID);
+          const CTRL_BID = Number(process.env.CTRL_BID);
+
+          const globalIdx = buildTaskCatalogIndex();
+          const globalMap = new Map(globalIdx.map((t) => [t.id, t]));
+          const packIds = new Set(
+            PACKS.flatMap((p) => p.cards.map((c) => (c.kind === "custom" ? c.template.id : c.ref))),
+          );
+
+          let fail = 0;
+          const check = (ok: boolean, label: string, detail = "") => {
+            if (!ok) fail++;
+            console.log(`${ok ? "PASS" : "FAIL"}  ${label}${detail ? "  — " + detail : ""}`);
+          };
+
+          console.log("=== 1. 全域目錄不含任何品牌專屬卡 ===");
+          const leaked = globalIdx.filter((t) => t.id.startsWith("wg-"));
+          check(leaked.length === 0, "全域目錄沒有 wg- 開頭的卡",
+            leaked.length ? leaked.map((t) => t.id).join(", ") : `全域共 ${globalIdx.length} 張`);
+
+          console.log("\n=== 2. 對照品牌（無 pack）===");
+          const ctrlPack = resolveBrandPack({ brandId: CTRL_BID });
+          check(ctrlPack === null, `brand ${CTRL_BID} 沒有命中任何 pack`);
+          const ctrlNav = packNavForBrand({ brandId: CTRL_BID });
+          check(ctrlNav === null, `brand ${CTRL_BID} 的 brandNav 回 null（＝側邊欄顯示全部頻道，行為與改動前一致）`);
+          // 沒有 pack 時 listFB 走 globalTasks，等同全域目錄
+          const ctrlVisible = globalIdx.map((t) => t.id);
+          const ctrlLeak = ctrlVisible.filter((id) => packIds.has(id));
+          check(ctrlLeak.length === 0, `brand ${CTRL_BID} 看不到任何 pack 專屬卡`,
+            ctrlLeak.length ? ctrlLeak.join(", ") : `可見 ${ctrlVisible.length} 張，全部是全域卡`);
+
+          console.log("\n=== 3. 有 pack 的品牌 ===");
+          const pack = resolveBrandPack({ brandId: PACK_BID })!;
+          check(!!pack, `brand ${PACK_BID} 命中 pack`, pack?.key);
+          const cards = expandPackCards(pack, globalMap);
+          check(cards.length > 0, `brand ${PACK_BID} 可見卡片數`, String(cards.length));
+          const nonPack = cards.filter((c) => !packIds.has(c.id));
+          check(nonPack.length === 0, "可見卡片全部來自 pack（沒有混進全域 207 張）",
+            nonPack.length ? nonPack.slice(0, 5).map((c) => c.id).join(", ") : "");
+          const nav = packNavForBrand({ brandId: PACK_BID })!;
+          console.log("     頻道:", nav.channels.map((c) => c.labelZh).join(" / "));
+
+          console.log("\n=== 4. 語氣合約只套用在 pack 卡 ===");
+          const globalSamples = [...FB_30S_TASKS.slice(0, 5), ...WEBSITE_30S_TASKS];
+          const wronglyGated = globalSamples.filter((t) => isWuganVoiceTemplate(t));
+          check(wronglyGated.length === 0, "全域卡不會被五感十築的句型合約攔截",
+            wronglyGated.length ? wronglyGated.map((t) => t.id).join(", ") : `抽驗 ${globalSamples.length} 張全域卡`);
+          const packCustom = pack.cards.filter((c) => c.kind === "custom");
+          const notGated = packCustom.filter((c: any) => !isWuganVoiceTemplate(c.template));
+          check(notGated.length === 0, "pack 的每一張卡都受句型合約保護",
+            notGated.length ? notGated.map((c: any) => c.template.id).join(", ") : `${packCustom.length} 張全數涵蓋`);
+
+          console.log("\n=== 5. polishHint 只掛在 pack 卡 ===");
+          const globalWithHint = globalSamples.filter((t: any) => t.polishHint);
+          check(globalWithHint.length === 0, "全域卡沒有被塞入五感十築的任務知識",
+            globalWithHint.length ? globalWithHint.map((t: any) => t.id).join(", ") : "");
+
+          console.log("\n=== 6. 只有一個 pack，且只綁定指定品牌 ===");
+          console.log("     已註冊的 pack:", PACKS.map((p) => `${p.key}(${JSON.stringify(p.match)})`).join(", "));
+          const boundIds = PACKS.flatMap((p) => p.match.brandIds ?? []);
+          check(!boundIds.includes(CTRL_BID), `對照品牌 ${CTRL_BID} 不在任何 pack 的綁定清單裡`);
+
+          console.log("\n" + (fail === 0 ? "ALL PASS — 隔離成立" : `${fail} 項未通過`));
+          process.exit(0);
+          JS
+          PACK_BID="${{ github.event.inputs.packBrandId }}" CTRL_BID="${{ github.event.inputs.controlBrandId }}" \
+            node --import tsx ./.pack_audit.mts
+          rm -f ./.pack_audit.mts
+          exit 0
