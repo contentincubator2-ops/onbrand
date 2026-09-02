@@ -20,6 +20,8 @@ import {
   intakePrimaryRequired as clientPrimaryRequired,
   missingRequiredInputs as clientMissing,
 } from "../../client/src/v2/lib/taskIntake";
+import * as serverModule from "./taskIntake";
+import * as clientModule from "../../client/src/v2/lib/taskIntake";
 import { resolveTaskTemplateSync } from "./taskRegistry";
 
 const CASES: any[] = [
@@ -67,6 +69,18 @@ describe("taskIntake parity (server ↔ client mirror)", () => {
   });
 });
 
+describe("兩邊的純函式名單要一致", () => {
+  it("client 鏡像涵蓋 server 的每一支純函式", () => {
+    // assertIntakeComplete 刻意只在 server（它丟 TRPCError，client 不該碰
+    // @trpc/server）。除了它以外，任一邊新增函式忘了同步就在這裡紅。
+    const SERVER_ONLY = new Set(["assertIntakeComplete"]);
+    const fnNames = (m: any) =>
+      Object.keys(m).filter((k) => typeof m[k] === "function").sort();
+    const server = fnNames(serverModule).filter((n) => !SERVER_ONLY.has(n));
+    expect(fnNames(clientModule)).toEqual(server);
+  });
+});
+
 describe("殘缺宣告不會渲染成無標籤空框", () => {
   const tpl = CASES[7];
   it("空 key / 空 label 被丟掉，重複 key 只留第一個", () => {
@@ -97,6 +111,10 @@ describe("真實目錄：7 張卡的 required 欄位現在問得到了", () => {
     const tpl = resolveTaskTemplateSync("fb-60-launch-kit")!;
     expect(() => assertIntakeComplete(tpl as any, { topic: "新品上市" }))
       .toThrow(/還缺必填欄位/);
+    // 使用者少填一格是輸入問題，不是伺服器壞了。回 500 會讓它混進 error_log
+    // 的錯誤堆 —— 那張表本來就已經難讀（analytics 事件與真錯誤共用）。
+    try { assertIntakeComplete(tpl as any, {}); expect.unreachable(); }
+    catch (e: any) { expect(e.code).toBe("BAD_REQUEST"); }
     // 訊息用 label 不用 key —— 使用者看不懂 event_when
     try { assertIntakeComplete(tpl as any, {}); } catch (e: any) {
       expect(e.message).not.toContain("event_when");

@@ -109,7 +109,9 @@ async function main(): Promise<void> {
     brandId: brand.id,
   });
   const msg = String(bad.json?.error?.message ?? bad.json?.error?.json?.message ?? "");
-  check(bad.status >= 400, "缺必填時被擋下來", `HTTP ${bad.status}`);
+  // 400 而不是 500：使用者少填一格是輸入問題，不是伺服器壞了。回 500 會讓它
+  // 混進 error_log 的錯誤堆，那張表本來就已經難讀。
+  check(bad.status === 400, "缺必填時回 400（不是 500）", `HTTP ${bad.status}`);
   check(msg.includes("還缺必填欄位"), "訊息是給人看的中文", msg.slice(0, 120));
   for (const label of requiredLabels) {
     check(msg.includes(label), `訊息點名了「${label}」`);

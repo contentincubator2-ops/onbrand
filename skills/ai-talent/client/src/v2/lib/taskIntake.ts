@@ -1,7 +1,9 @@
 /**
  * taskIntake（client 鏡像）— 一張任務卡到底要問使用者哪幾格。
  *
- * 這份是 `server/_core/taskIntake.ts` 的逐字鏡像。兩份不能互相 import
+ * 這份鏡像 `server/_core/taskIntake.ts` 的**純函式**部分。server 那邊多一支
+ * `assertIntakeComplete`（丟 TRPCError），client 不需要也不該碰 @trpc/server
+ * —— 它用 `missingRequiredInputs` 自己出訊息。兩份不能互相 import
  * （client 的 vite root 是 client/，跨出去在 dev server 會被 fs.allow 擋掉），
  * 所以用 `server/_core/taskIntake.parity.test.ts` 把它們綁在一起：改了一邊
  * 沒改另一邊就會紅。前例：viralSourceGuard 的同名鏡像。
@@ -80,14 +82,4 @@ export function missingRequiredInputs(
   return intakeExtraFields(template).filter(
     (f) => f.required && !String(bag[f.key] ?? "").trim(),
   );
-}
-
-/** server 端的守門：缺必填就丟一個看得懂的中文訊息。 */
-export function assertIntakeComplete(
-  template: IntakeTemplateLike | null | undefined,
-  inputs: Record<string, string | undefined> | null | undefined,
-): void {
-  const missing = missingRequiredInputs(template, inputs);
-  if (missing.length === 0) return;
-  throw new Error(`還缺必填欄位：${missing.map((f) => f.label).join("、")}`);
 }

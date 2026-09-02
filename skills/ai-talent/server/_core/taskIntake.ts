@@ -20,8 +20,11 @@
  *     「必填但沒地方填」這種死結
  *
  * client 有一份鏡像 `client/src/v2/lib/taskIntake.ts`（不能跨 vite root import），
- * 用 `taskIntake.parity.test.ts` 綁住。前例：viralSourceGuard。
+ * 鏡的是上面三支純函式；`assertIntakeComplete` 只在 server（它要丟 TRPCError）。
+ * 用 `taskIntake.parity.test.ts` 綁住，含一支「兩邊的純函式名單必須一致」的斷言，
+ * 所以之後在任一邊加函式忘了同步也會紅。前例：viralSourceGuard。
  */
+import { TRPCError } from "@trpc/server";
 
 /** 只取這支用得到的形狀，避免把整個 FBTaskTemplate 的型別拖進 client 鏡像。 */
 export interface IntakeTemplateLike {
@@ -96,12 +99,25 @@ export function missingRequiredInputs(
   );
 }
 
-/** server 端的守門：缺必填就丟一個看得懂的中文訊息。 */
+/**
+ * server 端的守門：缺必填就丟一個看得懂的中文訊息。
+ *
+ * 用 TRPCError BAD_REQUEST 而不是 `new Error` —— 後者 tRPC 會對映成
+ * INTERNAL_SERVER_ERROR（HTTP 500）。使用者少填一格是輸入問題，不是伺服器
+ * 壞了；回 500 會讓它混進 error_log 的錯誤堆裡，而那份儀表板本來就已經
+ * 難讀（analytics 事件與真錯誤共用同一張表）。
+ *
+ * 這支不在 client 鏡像裡：client 用 `missingRequiredInputs` 自己出訊息，
+ * 不需要（也不該）碰 @trpc/server。
+ */
 export function assertIntakeComplete(
   template: IntakeTemplateLike | null | undefined,
   inputs: Record<string, string | undefined> | null | undefined,
 ): void {
   const missing = missingRequiredInputs(template, inputs);
   if (missing.length === 0) return;
-  throw new Error(`還缺必填欄位：${missing.map((f) => f.label).join("、")}`);
+  throw new TRPCError({
+    code: "BAD_REQUEST",
+    message: `還缺必填欄位：${missing.map((f) => f.label).join("、")}`,
+  });
 }
