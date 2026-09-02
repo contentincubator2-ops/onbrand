@@ -54,8 +54,10 @@ jobs:
             fi
 
             # 觸發檔跟著 release 一起上機，所以品牌 id 直接從那份讀。
+            # 只認「整行就是數字」的那一行。原本用 tr -cd '0-9' 把整份檔案的
+            # 數字都吸進來，註解裡的 "trigger 2" 就變成了品牌 id 2。
             TRIG=/opt/onbrand/current/ops/probe-positioning/brand
-            BRAND_ID="$(tr -cd '0-9' < "$TRIG" 2>/dev/null || true)"
+            BRAND_ID="$(grep -oE '^[0-9]+$' "$TRIG" 2>/dev/null | head -1 || true)"
             echo "brand id from trigger file: ${BRAND_ID:-(auto)}"
 
             ./node_modules/.bin/tsx scripts/probe-positioning-doc.ts $BRAND_ID
