@@ -109,5 +109,10 @@ jobs:
               await conn.end();
               console.log('');
               console.log('=== ALL CHECKS PASS ===');
+              // Explicit exit: importing the server modules starts pools and
+              // timers that keep the event loop alive, so without this the run
+              // sits at 'ALL CHECKS PASS' until the step timeout cancels it —
+              // a green result reported as a failure.
+              process.exit(0);
             }).catch((e) => { console.error('FAILED:', e); process.exit(1); });
           "
