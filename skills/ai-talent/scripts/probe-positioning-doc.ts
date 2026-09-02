@@ -193,6 +193,69 @@ async function main(): Promise<void> {
       const listRes = await fetch(`${BASE}/api/positioning-doc/list?brandId=${brand.id}&scope=brand&scopeId=${brand.id}`, { headers: auth });
       const listJson: any = await listRes.json().catch(() => ({}));
       check(listRes.ok && (listJson.docs ?? []).some((d: any) => d.id === docId), "清單看得到這份文件");
+
+      // ── propose：功能的核心，也是唯一會花 LLM 錢的一步 ──────────────────
+      // dev 的 provider 常常是降級的，所以這一步失敗只回報、不判整支 probe 死
+      // —— 它證明的是 LLM 可用性，不是這個功能的接線。
+      const trpc = async (path: string, input: any) => {
+        const r = await fetch(`${BASE}/trpc/${path}`, {
+          method: "POST",
+          headers: { ...auth, "content-type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        return { ok: r.ok, json: await r.json().catch(() => ({})) as any };
+      };
+
+      const prop = await trpc("positioningDocs.propose", { scope: "brand", scopeId: brand.id, docId });
+      const result = prop.json?.result?.data;
+      if (!prop.ok || !result) {
+        console.log(`  ⚠️  propose 失敗（多半是 LLM provider 降級，不是接線問題）：${JSON.stringify(prop.json).slice(0, 300)}`);
+      } else {
+        check(result.proposals.length > 0, "LLM 對到欄位", `${result.proposals.length}/${result.total} 格`);
+        for (const p of result.proposals) {
+          console.log(`     · ${p.label} ← 「${p.fromHeading}」：${JSON.stringify(p.value).slice(0, 90)}`);
+        }
+        console.log(`     未對映段落：${result.unmapped.map((u: any) => u.heading).join("、") || "(無)"}`);
+
+        // 「只准引用不准創作」是這個功能最重要的保證。逐格確認值真的出自原文
+        // —— 編一句出來會直接變成品牌對外的說法。
+        const norm = (t: string) => t.replace(/[\s　，。、；：「」（）()·]/g, "");
+        const src = norm(FIXTURE);
+        const invented = result.proposals.filter((p: any) => {
+          const vals = typeof p.value === "string" ? [p.value]
+                     : Array.isArray(p.value) ? p.value.map((v: any) => typeof v === "string" ? v : v.ours ?? "")
+                     : [];
+          // 允許節錄：取值裡最長的一段連續 12 字，必須在原文找得到。
+          return vals.some((v: string) => {
+            const n = norm(v);
+            if (n.length < 12) return false;
+            for (let i = 0; i + 12 <= n.length; i += 4) if (src.includes(n.slice(i, i + 12))) return false;
+            return true;
+          });
+        });
+        check(invented.length === 0, "對映的值都出自原文（沒有創作）",
+          invented.length ? invented.map((p: any) => p.label).join("、") : "");
+
+        const appRes = await trpc("positioningDocs.applyMapping", {
+          scope: "brand", scopeId: brand.id, docId,
+          accepted: result.proposals.map((p: any) => ({ path: p.path, value: p.value })),
+          injectSections: result.unmapped.map((u: any) => u.index),
+        });
+        const appData = appRes.json?.result?.data;
+        check(!!appRes.ok && !!appData?.ok, "套用寫得進 positioning",
+          appData ? `寫入 ${appData.applied.filled.length} 格、補充 ${appData.applied.injectedContext.length} 字` : JSON.stringify(appRes.json).slice(0, 200));
+
+        if (appData?.ok) {
+          // 套用後，那幾格必須真的出現在下一次組出來的 prompt 裡 —— 這是整條鏈
+          // 的終點，寫進資料庫但沒進 prompt 等於沒做。
+          const after = await buildBrandPrefix(brand.id);
+          const sample = result.proposals.find((p: any) => typeof p.value === "string" && p.value.length > 12);
+          if (sample) check(after.includes(String(sample.value).slice(0, 12)), `套用後「${sample.label}」進了 prompt`);
+          if (appData.applied.injectedContext) {
+            check(after.includes(appData.applied.injectedContext.slice(0, 20)), "補充段落也進了 prompt");
+          }
+        }
+      }
     }
   } finally {
     if (docId) {
