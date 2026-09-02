@@ -34,6 +34,7 @@ import SpeedCard from "../components/positioning/SpeedCard";
 import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
+import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
 import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
@@ -1733,6 +1734,7 @@ export default function BrandsPage() {
 
             {/* 品牌定位 sub-items */}
             {category === "positioning" && [
+              { id: "doc",     label: lang === "en" ? "My document" : "我的定位文件" },
               { id: "card",    label: lang === "en" ? "Cheat sheet" : "速查卡"    },
               { id: "prompts", label: lang === "en" ? "AI prompts"  : "AI 指令庫" },
               ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${lang === "en" ? (s.titleEn ?? s.title) : s.title}` })),
@@ -3941,6 +3943,11 @@ function PositioningEditor({
     }, 800);
   };
 
+  if (section === "doc") {
+    return (
+      <PositioningDocPanel scopeMode={scopeMode} scopeId={targetId ?? null} scopeName={scopeName} />
+    );
+  }
   if (section === "card") {
     return (
       <SpeedCardView scopeMode={scopeMode} data={draft} scopeName={scopeName} />

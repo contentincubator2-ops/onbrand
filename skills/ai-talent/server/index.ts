@@ -29,6 +29,7 @@ import { createContext } from "./_core/trpc";
 import { authRouter } from "./auth/authRouter";
 import { exportRouter } from "./routes/exportRoute";
 import { reportTemplateRouter } from "./routes/reportTemplateRoute";
+import { positioningDocRouter } from "./routes/positioningDocRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
 import pmRouter from "./routes/pmRoute";
@@ -356,6 +357,7 @@ const healthLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: tr
 app.use("/api/auth", authRouter);
 app.use("/api/export", exportRouter);
 app.use("/api/report-template", reportTemplateRouter);
+app.use("/api/positioning-doc", positioningDocRouter);
 app.use("/api/a2a", a2aStreamRouter);
 
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────

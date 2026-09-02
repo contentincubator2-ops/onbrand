@@ -16,6 +16,48 @@ function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
 }
 
+/**
+ * 2026-09-01 — 依 canonical dot-path 取值並排進 prompt 行。
+ *
+ * 產品與活動的區塊本來是手寫的 `if (pp.usp) …`，路徑全是 PRODUCT_SEGMENTS /
+ * EVENT_SEGMENTS 裡不存在的舊 key，於是那兩層定位從來沒進過 prompt。改成
+ * 走登錄表的原因是：路徑寫在一起就看得出對不對，而且能被 positioningDocs 的
+ * PROMPT_FIELDS 拿去做落差報告 —— 「哪幾格會影響產出」不能有兩份各自維護的答案。
+ *
+ * 值可能是字串或字串陣列（canonical 的 array 欄位，例如 audience.pains）。
+ * 物件與 tableRows 一律跳過：把它們 String() 出來就是 "[object Object]"，
+ * 這正是活動受眾原本在做的事。
+ */
+function pushFrom(
+  lines: string[],
+  obj: any,
+  specs: [path: string, label: string, max: number][],
+): void {
+  for (const [path, label, max] of specs) {
+    const v = path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), obj);
+    if (v == null) continue;
+    let text = "";
+    if (typeof v === "string") text = v.trim();
+    else if (Array.isArray(v)) text = v.filter((x) => typeof x === "string" && x.trim()).join(" · ");
+    else continue;                       // 物件 / tableRows：沒有安全的一行表示法
+    if (!text) continue;
+    lines.push(`【${label}】${text.slice(0, max)}`);
+  }
+}
+
+/**
+ * 用戶上傳的定位文件裡，對不到任何 canonical 欄位、但他選擇照樣餵進來的段落。
+ *
+ * 存在的理由是 CJ 的「按照用戶有的內容呈現，不一定要填完我們設定的題目」——
+ * 沒有這條，用戶文件裡我們沒問到的東西就等於白上傳。上限在寫入端就卡死
+ * （positioningDocs.MAX_INJECTED_CHARS），這裡不再截，截兩次會把句子切一半。
+ */
+function pushSourceDoc(lines: string[], pos: any, label: string): void {
+  const text = String(pos?._sourceDoc?.injectedContext ?? "").trim();
+  if (text) lines.push(`【${label}】
+${text}`);
+}
+
 // Cache key includes optional product/event so different scopes don't collide.
 const CACHE = new Map<string, { prefix: string; expiresAt: number }>();
 const TTL_MS = 60_000; // 1-minute cache — brand_brain edits become visible quickly
@@ -400,6 +442,9 @@ export async function buildBrandPrefix(
       if (typeof d === "string") contextBlock.push(`【差異化】${d.slice(0, 300)}`);
       else if (d.summary) contextBlock.push(`【差異化】${String(d.summary).slice(0, 300)}`);
     }
+    // 用戶自己上傳的品牌定位文件裡，我們沒有對應欄位可放、但他要求照樣帶進來
+    // 的段落。放在 contextBlock 最後 —— 它是補充，不該蓋過上面那些鎖定屬性。
+    pushSourceDoc(contextBlock, positioning, "品牌定位文件補充");
 
     // ── 2026-05-11 (CJ): product + event positioning overlays ──
     let productSection = "";
@@ -415,13 +460,27 @@ export async function buildBrandPrefix(
           if (p.positioning) {
             const pp = typeof p.positioning === "string" ? safeParse(p.positioning) : p.positioning;
             if (pp && typeof pp === "object") {
-              if (pp.usp) lines.push(`【產品 USP】${String(pp.usp).slice(0, 300)}`);
-              if (pp.target) lines.push(`【產品目標客群】${String(pp.target).slice(0, 200)}`);
-              if (pp.tagline) lines.push(`【產品 Slogan】${String(pp.tagline).slice(0, 100)}`);
-              if (pp.description) lines.push(`【產品描述】${String(pp.description).slice(0, 400)}`);
-              if (pp.keyMessages && Array.isArray(pp.keyMessages)) {
-                lines.push(`【產品關鍵訊息】${pp.keyMessages.slice(0, 4).join(" · ")}`);
-              }
+              // 2026-09-01: 這裡本來讀 pp.usp / pp.target / pp.tagline /
+              // pp.description / pp.keyMessages —— PRODUCT_SEGMENTS 裡一個都
+              // 沒有。產品定位的 writer 早就改成 canonical（core / audience /
+              // value / competition / strategy / marketing，commit 60c9323b），
+              // 但這個 reader 沒跟著改，所以**產品定位從來沒進過 prompt**，
+              // 只有產品名稱進去了。定位頁滿的、任務卻寫得像沒選產品。
+              //
+              // 記憶裡記的是「三個 reader 要同步」；這是第四個，而且是唯一
+              // 一個真的影響產出品質的。
+              pushFrom(lines, pp, [
+                ["core.coreStatement",       "產品核心定位", 400],
+                ["core.zhTagline",           "產品 Slogan",  100],
+                ["core.oneLineValueProp",    "一句話價值主張", 200],
+                ["audience.primary",         "產品目標客群", 250],
+                ["audience.pains",           "客群痛點",     250],
+                ["value.coreFunctions",      "核心功能",     250],
+                ["value.userFeeling",        "使用者感受",   200],
+                ["competition.uniqueUsp",    "獨家賣點",     300],
+                ["marketing.tone",           "產品語氣",     200],
+              ]);
+              pushSourceDoc(lines, pp, "產品定位文件補充");
             }
           }
           productSection = "\n[本次產出聚焦的產品 — 必須圍繞此產品撰寫]\n" + lines.map(l => `- ${l}`).join("\n") + "\n";
@@ -452,10 +511,23 @@ export async function buildBrandPrefix(
           if (e.positioning) {
             const ep = typeof e.positioning === "string" ? safeParse(e.positioning) : e.positioning;
             if (ep && typeof ep === "object") {
-              if (ep.theme) lines.push(`【活動主軸】${String(ep.theme).slice(0, 200)}`);
-              if (ep.cta) lines.push(`【活動 CTA】${String(ep.cta).slice(0, 100)}`);
-              if (ep.offer) lines.push(`【活動優惠】${String(ep.offer).slice(0, 200)}`);
-              if (ep.audience) lines.push(`【活動受眾】${String(ep.audience).slice(0, 200)}`);
+              // 2026-09-01: 同產品那段的 bug，但這裡還多壞一層 —— 舊碼讀
+              // ep.theme / ep.cta / ep.offer / ep.audience，EVENT_SEGMENTS 一個
+              // 都沒有，而 canonical 的 `audience` 是**物件**，所以
+              // `String(ep.audience)` 會把字串 "[object Object]" 直接餵給模型。
+              pushFrom(lines, ep, [
+                ["brief.briefSummary",             "活動定位摘要", 400],
+                ["brief.eventType",                "活動類型",     60],
+                ["context.coreProblem",            "核心問題",     250],
+                ["audience.primaryAudience",       "活動核心受眾", 300],
+                ["audience.keyInsight",            "關鍵洞察",     200],
+                ["objectives.marketingGoal",       "行銷目標",     200],
+                ["smp.singleMindedProposition",    "SMP 單一主張", 200],
+                ["messaging.coreMessage",          "核心訊息",     250],
+                ["messaging.supportingPoints",     "支撐訊息",     300],
+                ["creative.creativeTheme",         "創意主題",     200],
+              ]);
+              pushSourceDoc(lines, ep, "活動定位文件補充");
             }
           }
           eventSection = "\n[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]\n" + lines.map(l => `- ${l}`).join("\n") + "\n";
