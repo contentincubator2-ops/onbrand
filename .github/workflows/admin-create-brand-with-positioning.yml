@@ -90,6 +90,17 @@ jobs:
 
                 await conn.execute('UPDATE brands SET positioning = ? WHERE id = ?', [JSON.stringify(payload.positioning), brandId]);
 
+                // 2026-09-02: Tier C market override. buildMarketContext gives this
+                // precedence over the built-in country profile, which matters when the
+                // country profile's language directive fights outputLanguage — a US
+                // profile written for consumer DTC is the wrong brief for a B2B
+                // sourcing audience even though the language is right. Optional:
+                // omit the key and the built-in profile stands.
+                if (payload.marketContextOverride) {
+                  await conn.execute('UPDATE brands SET marketContextOverride = ? WHERE id = ?', [payload.marketContextOverride, brandId]);
+                  console.log('MARKET_OVERRIDE_SET chars=' + String(payload.marketContextOverride).length);
+                }
+
                 console.log('BRAND_CREATED id=' + brandId + ' slug=' + slug + ' userId=' + userId);
                 const [check] = await conn.execute('SELECT id, name, slug, JSON_LENGTH(positioning) as segCount FROM brands WHERE id = ?', [brandId]);
                 console.log(JSON.stringify(check[0]));
