@@ -1,4 +1,4 @@
-name: "Op — Probe 定位文件上傳 on DEV (真實資料，會自我還原)"
+name: "Op — Probe DEV 新功能（定位上傳 + 任務卡前置，真實資料，會自我還原）"
 
 # 2026-09-01。typecheck 與單元測試證明不了的三件事，只有真的在 DEV VM 上跑
 # 才知道：
@@ -61,3 +61,10 @@ jobs:
             echo "brand id from trigger file: ${BRAND_ID:-(auto)}"
 
             ./node_modules/.bin/tsx scripts/probe-positioning-doc.ts $BRAND_ID
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo
+            # 任務卡前置：taskRegistry 收斂 + intake 多欄位。不跑完整張卡
+            # （那要花 LLM 錢），被 intake 擋下來的請求在扣點之前就結束。
+            ./node_modules/.bin/tsx scripts/probe-task-prereqs.ts
