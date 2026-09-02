@@ -1,11 +1,17 @@
 name: "Ops — Gusheng preflight (read-only)"
 
-# 2026-09-02 (CJ「在 sowork@sowork.tw 帳號下建立盛全工業品牌 + 客製任務卡」):
-# 建品牌與寫 brandPack 之前的唯讀盤點。三件事必須先知道，否則後面兩步是盲寫：
-#   1. sowork@sowork.tw 這個 owner 帳號存不存在（create workflow 會直接 exit 1）
-#   2. 這個帳號底下已經有哪些品牌 / 全站有沒有同名的盛全（避免重複建）
-#   3. agent pool —— brandPack 每張卡都要綁 agents.id，而 FB 貼文類卡片的
-#      agent 受 taskSystemPrompt >= 2200 字的硬標準約束，所以要連字數一起看
+# 2026-09-02 (CJ「在 sowork@sowork.tw 帳號下建立盛全工業品牌 + 客製任務卡」
+# 以及「請從 mos_db 當中，選擇適合的 agent」):
+# 建品牌與寫 brandPack 之前的唯讀盤點。
+#
+# Round 1 已確認：owner userId=1237889 存在、全站沒有同名的盛全、agent pool
+# 16116 位但 taskSystemPrompt >= 2200 字的是 0 位。
+#
+# Round 2 要回答的是「該綁誰」：
+#   · taskSystemPrompt 的實際長度分佈（確認 0 不是量錯，而是欄位真的很薄）
+#   · 現行 LI / Email / Website / IG / FB 任務卡實際綁的那批 agent 是誰
+#   · 盛全是 B2B 針織帽 OEM/ODM 製造商，pool 裡有沒有製造／紡織／工業／
+#     供應鏈／外銷這種產業屬性的 agent
 #
 # 純 SELECT，沒有任何寫入。
 
@@ -16,13 +22,13 @@ jobs:
   preflight:
     runs-on: ubuntu-latest
     steps:
-      - name: Query users / brands / agent pool
+      - name: Query agent pool for the Gusheng cards
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 120s
+          command_timeout: 180s
           script: |
             set -e
             cd /opt/onbrand/app/skills/ai-talent
@@ -43,40 +49,32 @@ jobs:
                   for (const r of rows) console.log(JSON.stringify(r));
                 };
 
-                const [u] = await conn.execute(
-                  'SELECT id, email, name, createdAt FROM users WHERE email = ?',
-                  ['sowork@sowork.tw'],
+                const [dist] = await conn.execute(
+                  'SELECT COUNT(*) AS total, SUM(taskSystemPrompt IS NOT NULL AND taskSystemPrompt <> \'\') AS hasPrompt, MAX(CHAR_LENGTH(taskSystemPrompt)) AS maxLen, ROUND(AVG(NULLIF(CHAR_LENGTH(taskSystemPrompt),0))) AS avgLen FROM agents'
                 );
-                show('A. OWNER ACCOUNT sowork@sowork.tw', u);
+                show('G. taskSystemPrompt LENGTH DISTRIBUTION (all agents)', dist);
 
-                if (u.length) {
-                  const [b] = await conn.execute(
-                    'SELECT id, name, slug, website, positioningStatus, targetCountry, outputLanguage, createdAt FROM brands WHERE userId = ? ORDER BY id DESC LIMIT 40',
-                    [u[0].id],
-                  );
-                  show('B. BRANDS OWNED BY THAT ACCOUNT', b);
-                }
-
-                const [dupe] = await conn.execute(
-                  'SELECT id, userId, name, slug, website FROM brands WHERE name LIKE ? OR name LIKE ? OR website LIKE ? LIMIT 20',
-                  ['%盛全%', '%usheng%', '%headwearmaker%'],
+                const [top] = await conn.execute(
+                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(taskSystemPrompt) AS promptLen FROM agents WHERE taskSystemPrompt IS NOT NULL AND taskSystemPrompt <> \'\' ORDER BY promptLen DESC LIMIT 40'
                 );
-                show('C. EXISTING GUSHENG-LIKE BRANDS (any owner)', dupe);
+                show('H. THICKEST PERSONAS IN THE POOL', top);
 
-                const [cnt] = await conn.execute(
-                  'SELECT COUNT(*) AS total, SUM(CASE WHEN CHAR_LENGTH(taskSystemPrompt) >= 2200 THEN 1 ELSE 0 END) AS thick FROM agents WHERE isAvailable = 1'
+                const bound = [180009,180172,180173,180176,180197,180199,180203,220862,30018,60005,180039,180054,180062,180068,221080,30017,60012,60046,60060,60063,220751,238853,60002,180143,180163,180166,180168,180170,222311,224094,60022,60029,180150,180159,180162,220583,224054,224079,224114,239023,239024,30002,30020,60021,180175,180193,210266,30008,60035,60036,60037,60038];
+                const [b] = await conn.query(
+                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen, LEFT(COALESCE(specialty,\'\'),110) AS specialty FROM agents WHERE id IN (?) ORDER BY id',
+                  [bound],
                 );
-                show('D. AGENT POOL SIZE', cnt);
+                show('I. AGENTS ALREADY BOUND BY LI / EMAIL / WEBSITE / IG / FB / PR CARDS', b);
 
-                const [thick] = await conn.execute(
-                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(taskSystemPrompt) AS promptLen, LEFT(COALESCE(specialty,\'\'), 90) AS specialty FROM agents WHERE isAvailable = 1 AND CHAR_LENGTH(taskSystemPrompt) >= 2200 ORDER BY promptLen DESC LIMIT 60'
+                const kw = ['%manufactur%','%industrial%','%textile%','%apparel%','%fashion%','%B2B%','%supply chain%','%export%','%trade show%','%製造%','%紡織%','%工業%','%供應鏈%','%外銷%','%機能%'];
+                const like = kw.map(() => '(title LIKE ? OR specialty LIKE ? OR industries LIKE ? OR name LIKE ?)').join(' OR ');
+                const params = [];
+                for (const k of kw) params.push(k, k, k, k);
+                const [ind] = await conn.query(
+                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen, LEFT(COALESCE(industries,\'\'),70) AS industries, LEFT(COALESCE(specialty,\'\'),90) AS specialty FROM agents WHERE isAvailable = 1 AND (' + like + ') ORDER BY promptLen DESC, id ASC LIMIT 60',
+                  params,
                 );
-                show('E. AGENTS QUALIFIED FOR FB POST CARDS (>=2200 chars)', thick);
-
-                const [exec] = await conn.execute(
-                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen FROM agents WHERE isAvailable = 1 AND layer = \'execution\' ORDER BY id ASC LIMIT 80'
-                );
-                show('F. EXECUTION-LAYER AGENTS', exec);
+                show('J. B2B / MANUFACTURING-FLAVOURED AGENTS', ind);
 
                 await conn.end();
               })().catch(e => { console.error('FAILED:', e); process.exit(1); });
