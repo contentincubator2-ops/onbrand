@@ -229,8 +229,12 @@ ${targets}
 
   /**
    * 套用用戶確認過的對映。只寫他勾選的格。
+   *
+   * 不叫 `apply`：tRPC 把它列為保留字（撞 Function.prototype.apply），
+   * router() 建構當下就丟 "Reserved words used in router({}) call"。
+   * 那是啟動期例外 —— typecheck 與單元測試都是綠的，伺服器直接起不來。
    */
-  apply: protectedProcedure
+  applyMapping: protectedProcedure
     .input(scopeInput.omit({ brandId: true }).extend({
       docId: z.string(),
       accepted: z.array(z.object({ path: z.string(), value: z.any() })).max(40),

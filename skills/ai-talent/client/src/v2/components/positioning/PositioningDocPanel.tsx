@@ -99,7 +99,7 @@ export default function PositioningDocPanel({
     onError: (e: any) => { setError(e?.message ?? "對映失敗"); setBusy(null); },
   }) ?? null;
 
-  const applyMut = (trpc as any).positioningDocs?.apply?.useMutation?.({
+  const applyMut = (trpc as any).positioningDocs?.applyMapping?.useMutation?.({
     onSuccess: () => { setReview(null); setBusy(null); coverageQuery.refetch?.(); },
     onError: (e: any) => { setError(e?.message ?? "套用失敗"); setBusy(null); },
   }) ?? null;
