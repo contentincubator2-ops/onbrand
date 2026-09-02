@@ -1,0 +1,48 @@
+name: "Ops — Probe a brandPack end to end"
+
+# 2026-09-02: runs scripts/probe-brand-pack.ts on the VM against a real
+# brand, so a pack's cards are proven to actually generate before anyone
+# tells the client the channel is ready.
+#
+# Runs on the self-hosted runner because the script needs the live DB and
+# the provider keys in /opt/onbrand/app/skills/ai-talent/.env.
+#
+# Cards are probed in batches: each card is 1–3 LLM calls and the long-form
+# website cards allow up to 85s per caption, so probing nineteen at once
+# would run past any sensible step timeout.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pack_key:
+        description: "brandPack key (e.g. gusheng)"
+        required: true
+        default: "gusheng"
+        type: string
+      brand_id:
+        description: "Brand id to probe against (drives market + positioning)"
+        required: true
+        default: "2988"
+        type: string
+      task_ids:
+        description: "Comma-separated card ids; empty = every card in the pack"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 25
+    steps:
+      - name: Probe
+        env:
+          PACK_KEY: ${{ inputs.pack_key }}
+          BRAND_ID: ${{ inputs.brand_id }}
+          TASK_IDS: ${{ inputs.task_ids }}
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a; source .env 2>/dev/null; set +a
+          PACK_KEY="$PACK_KEY" BRAND_ID="$BRAND_ID" TASK_IDS="$TASK_IDS" \
+            npx tsx scripts/probe-brand-pack.ts
