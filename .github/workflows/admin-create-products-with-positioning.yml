@@ -1,0 +1,99 @@
+name: "Admin — Create products with a supplied positioning book"
+
+# 2026-09-02 (CJ「建立客製化的任務卡和品牌定位資訊」— 盛全工業):
+# The product sibling of admin-create-brand-with-positioning.yml.
+#
+# Why not admin-create-products-run-positioning.yml: that one runs the real
+# AI pipeline, which is right when the source material is rich enough to
+# ground it. It is wrong here. The Gusheng site's OEM-process and
+# manufacturing-process pages are images with almost no text, so a pipeline
+# run over ten hat families would be inventing product positioning from the
+# category name alone. It also hardcodes lang/outputLanguage to zh-TW, and
+# this brand outputs English.
+#
+# So: same verbatim-import contract as the brand workflow. Idempotent on
+# (brandId, slug) — re-running updates the positioning instead of inserting
+# a duplicate, because a half-finished batch should be safe to re-dispatch.
+#
+# Payload is base64 JSON (avoids shell-quoting hazards with CJK text):
+#   { "brandId": 2988,
+#     "products": [ { "name", "slug", "positioning": { <PRODUCT_SEGMENTS ids> } } ] }
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_email:
+        description: "Owner's email (must already have an account)"
+        required: true
+        type: string
+      payload_b64:
+        description: "Base64-encoded JSON payload ({brandId, products})"
+        required: true
+        type: string
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Insert products + write positioning
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          USER_EMAIL: ${{ inputs.user_email }}
+          PAYLOAD_B64: ${{ inputs.payload_b64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: USER_EMAIL,PAYLOAD_B64
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            node -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const raw = Buffer.from(process.env.PAYLOAD_B64, 'base64').toString('utf8');
+                const payload = JSON.parse(raw);
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+                const [uRows] = await conn.execute('SELECT id FROM users WHERE email = ? LIMIT 1', [process.env.USER_EMAIL]);
+                const userId = uRows[0]?.id;
+                if (!userId) { console.error('NO SUCH USER:', process.env.USER_EMAIL); process.exit(1); }
+
+                const brandId = Number(payload.brandId);
+                const [bRows] = await conn.execute('SELECT id, name FROM brands WHERE id = ? LIMIT 1', [brandId]);
+                if (!bRows.length) { console.error('NO SUCH BRAND:', brandId); process.exit(1); }
+                console.log('TARGET BRAND ' + brandId + ' = ' + bRows[0].name);
+
+                for (const p of payload.products) {
+                  const pos = JSON.stringify(p.positioning);
+                  const [ex] = await conn.execute(
+                    'SELECT id FROM products WHERE brandId = ? AND slug = ? LIMIT 1',
+                    [brandId, p.slug],
+                  );
+                  if (ex.length) {
+                    await conn.execute('UPDATE products SET name = ?, positioning = ? WHERE id = ?', [p.name, pos, ex[0].id]);
+                    console.log('UPDATED product id=' + ex[0].id + ' slug=' + p.slug);
+                  } else {
+                    const [ins] = await conn.execute(
+                      'INSERT INTO products (userId, brandId, slug, name, positioning) VALUES (?, ?, ?, ?, ?)',
+                      [userId, brandId, p.slug, p.name, pos],
+                    );
+                    console.log('CREATED product id=' + ins.insertId + ' slug=' + p.slug);
+                  }
+                }
+
+                const [final] = await conn.execute(
+                  'SELECT id, name, slug, JSON_LENGTH(positioning) AS segCount FROM products WHERE brandId = ? ORDER BY id',
+                  [brandId],
+                );
+                console.log('FINAL_PRODUCTS ' + JSON.stringify(final));
+                await conn.end();
+              })().catch(e => { console.error('FAILED:', e); process.exit(1); });
+            "
