@@ -4,14 +4,12 @@ name: "Ops — Gusheng preflight (read-only)"
 # 以及「請從 mos_db 當中，選擇適合的 agent」):
 # 建品牌與寫 brandPack 之前的唯讀盤點。
 #
-# Round 1 已確認：owner userId=1237889 存在、全站沒有同名的盛全、agent pool
-# 16116 位但 taskSystemPrompt >= 2200 字的是 0 位。
-#
-# Round 2 要回答的是「該綁誰」：
-#   · taskSystemPrompt 的實際長度分佈（確認 0 不是量錯，而是欄位真的很薄）
-#   · 現行 LI / Email / Website / IG / FB 任務卡實際綁的那批 agent 是誰
-#   · 盛全是 B2B 針織帽 OEM/ODM 製造商，pool 裡有沒有製造／紡織／工業／
-#     供應鏈／外銷這種產業屬性的 agent
+# Round 1：owner userId=1237889 存在、全站沒有同名的盛全、16116 位 agent 裡
+#          taskSystemPrompt >= 2200 字的是 0 位。
+# Round 2：全庫只有 10 位寫了 taskSystemPrompt，最長 1965 字；pool 裡沒有任何
+#          製造／紡織／OEM 屬性的 agent，B2B 命中的全是 SaaS 與電商。
+# Round 3（本次）：要為 8 位 agent 補人設到 2200 字，先看現有那 10 份的寫法
+#          與語言慣例，新寫的才不會跟既有的長成兩種東西。
 #
 # 純 SELECT，沒有任何寫入。
 
@@ -22,13 +20,13 @@ jobs:
   preflight:
     runs-on: ubuntu-latest
     steps:
-      - name: Query agent pool for the Gusheng cards
+      - name: Dump an existing persona to learn the house convention
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 180s
+          command_timeout: 120s
           script: |
             set -e
             cd /opt/onbrand/app/skills/ai-talent
@@ -43,38 +41,29 @@ jobs:
                   password: process.env.LOCAL_DB_PASSWORD,
                   database: process.env.LOCAL_DB_NAME || 'mos_db',
                 });
-                const show = (label, rows) => {
-                  console.log('');
-                  console.log('===== ' + label + ' (' + rows.length + ' rows) =====');
-                  for (const r of rows) console.log(JSON.stringify(r));
-                };
 
-                const [dist] = await conn.execute(
-                  'SELECT COUNT(*) AS total, SUM(taskSystemPrompt IS NOT NULL AND taskSystemPrompt <> \'\') AS hasPrompt, MAX(CHAR_LENGTH(taskSystemPrompt)) AS maxLen, ROUND(AVG(NULLIF(CHAR_LENGTH(taskSystemPrompt),0))) AS avgLen FROM agents'
+                const [full] = await conn.execute(
+                  'SELECT id, name, title, taskSystemPrompt FROM agents WHERE id = 239194'
                 );
-                show('G. taskSystemPrompt LENGTH DISTRIBUTION (all agents)', dist);
+                console.log('===== K. FULL PERSONA OF AGENT 239194 (house convention) =====');
+                console.log(full[0]?.taskSystemPrompt || '(empty)');
 
-                const [top] = await conn.execute(
-                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(taskSystemPrompt) AS promptLen FROM agents WHERE taskSystemPrompt IS NOT NULL AND taskSystemPrompt <> \'\' ORDER BY promptLen DESC LIMIT 40'
+                const targets = [30002, 210266, 180143, 180162, 60005, 180173, 221080, 31];
+                const [t] = await conn.query(
+                  'SELECT id, name, englishName, title, layer, LEFT(COALESCE(bio,\'\'),200) AS bio, LEFT(COALESCE(specialty,\'\'),200) AS specialty, LEFT(COALESCE(methodology,\'\'),200) AS methodology, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen FROM agents WHERE id IN (?) ORDER BY FIELD(id, 30002,210266,180143,180162,60005,180173,221080,31)',
+                  [targets],
                 );
-                show('H. THICKEST PERSONAS IN THE POOL', top);
+                console.log('');
+                console.log('===== L. THE 8 AGENTS TO BE GIVEN PERSONAS =====');
+                for (const r of t) console.log(JSON.stringify(r));
 
-                const bound = [180009,180172,180173,180176,180197,180199,180203,220862,30018,60005,180039,180054,180062,180068,221080,30017,60012,60046,60060,60063,220751,238853,60002,180143,180163,180166,180168,180170,222311,224094,60022,60029,180150,180159,180162,220583,224054,224079,224114,239023,239024,30002,30020,60021,180175,180193,210266,30008,60035,60036,60037,60038];
-                const [b] = await conn.query(
-                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen, LEFT(COALESCE(specialty,\'\'),110) AS specialty FROM agents WHERE id IN (?) ORDER BY id',
-                  [bound],
-                );
-                show('I. AGENTS ALREADY BOUND BY LI / EMAIL / WEBSITE / IG / FB / PR CARDS', b);
-
-                const kw = ['%manufactur%','%industrial%','%textile%','%apparel%','%fashion%','%B2B%','%supply chain%','%export%','%trade show%','%製造%','%紡織%','%工業%','%供應鏈%','%外銷%','%機能%'];
-                const like = kw.map(() => '(title LIKE ? OR specialty LIKE ? OR industries LIKE ? OR name LIKE ?)').join(' OR ');
-                const params = [];
-                for (const k of kw) params.push(k, k, k, k);
-                const [ind] = await conn.query(
-                  'SELECT id, name, englishName, title, layer, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen, LEFT(COALESCE(industries,\'\'),70) AS industries, LEFT(COALESCE(specialty,\'\'),90) AS specialty FROM agents WHERE isAvailable = 1 AND (' + like + ') ORDER BY promptLen DESC, id ASC LIMIT 60',
-                  params,
-                );
-                show('J. B2B / MANUFACTURING-FLAVOURED AGENTS', ind);
+                const [used] = await conn.query(
+                  'SELECT agentId, COUNT(*) AS runs FROM mission_outputs WHERE agentId IN (?) GROUP BY agentId',
+                  [targets],
+                ).catch(() => [[]]);
+                console.log('');
+                console.log('===== M. HOW MUCH THESE AGENTS ARE ALREADY USED =====');
+                for (const r of used) console.log(JSON.stringify(r));
 
                 await conn.end();
               })().catch(e => { console.error('FAILED:', e); process.exit(1); });

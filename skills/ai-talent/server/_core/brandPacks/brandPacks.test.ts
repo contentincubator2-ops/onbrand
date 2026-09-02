@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { PACKS, resolveBrandPack, findPackTemplate, findPackOrchestraConfig, packCardId } from "./index";
 import { MONTHLY_QUOTA, TEN_STANDARDS } from "./wugan";
+import { GUSHENG_FACTS } from "./gusheng";
 import { validateWuganVoice } from "../wuganVoiceContract";
 import { buildTaskCatalogIndex, type CatalogPlatform } from "../taskCatalogIndex";
 
@@ -316,5 +317,198 @@ describe("五感十築 pack 的內容規則", () => {
     for (const card of wugan.cards) {
       expect(packCardId(card).startsWith("wg-")).toBe(true);
     }
+  });
+});
+
+describe("盛全工業 pack 的內容規則", () => {
+  const gs = PACKS.find((p) => p.key === "gusheng")!;
+
+  it("存在", () => expect(gs).toBeTruthy());
+
+  it("只有這五個頻道 —— 不該冒出 TikTok / YouTube / KOL", () => {
+    expect(gs.channels.map((c) => c.key).sort()).toEqual(
+      ["email", "facebook", "instagram", "linkedin", "website"],
+    );
+  });
+
+  it("官網三種文章：工法 / 保養 / 指南", () => {
+    const web = gs.channels.find((c) => c.key === "website")!;
+    expect(web.formats.map((f) => f.id)).toEqual(["craft", "care", "guide"]);
+  });
+
+  it("LinkedIn 一個頻道裝下公司 3 種 ＋ CMO 4 種", () => {
+    // 不能拆成兩個頻道：PlatformTaskPage 用 channels.find(c => c.key === platform)
+    // 找頻道，同一個 CatalogPlatform 出現兩次時第二個永遠拿不到。
+    const li = gs.channels.find((c) => c.key === "linkedin")!;
+    expect(li.formats.length).toBe(7);
+    expect(li.formats.filter((f) => f.id.startsWith("co-")).length).toBe(3);
+    expect(li.formats.filter((f) => f.id.startsWith("cmo-")).length).toBe(4);
+  });
+
+  it("task id 的第一段對得上頻道 —— 這是 mockup 路由的唯一依據", () => {
+    // RunPage.tsx:1789 的 idPrefixMap 查的是 taskId.split("-")[0]。前綴錯了
+    // 不會拋錯，只會靜默掉到 Layer 2 fallback 拿到別的版型。
+    const EXPECTED: Record<string, string> = {
+      website: "web", email: "em", instagram: "ig", linkedin: "li", facebook: "fb",
+    };
+    for (const card of gs.cards) {
+      const id = packCardId(card);
+      expect(
+        id.split("-")[0],
+        `${id} 掛在 ${card.channel} 頻道，前綴卻不是 ${EXPECTED[card.channel]}`,
+      ).toBe(EXPECTED[card.channel]);
+    }
+  });
+
+  it("task id 不含 formatFromTaskId 的關鍵字陷阱", () => {
+    // formatFromTaskId 在前綴之後還會掃關鍵字，掃到就決斷。例如「品牌故事」
+    // 若命名為 -brand-story，ig-/fb- 卡會被判成限時動態版型而不是貼文。
+    const TRAPS = [
+      "story", "live", "profile", "bio", "carousel", "comment", "pinned",
+      "poll", "reel", "shorts", "community", "thumbnail", "calendar",
+      "speech", "factsheet", "about", "faq", "landing", "document",
+    ];
+    for (const card of gs.cards) {
+      const id = packCardId(card);
+      for (const trap of TRAPS) {
+        expect(id.includes(trap), `${id} 含關鍵字「${trap}」，mockup 會被判錯`).toBe(false);
+      }
+      // 獨立的 ad 段會被判成廣告版型（lead-paragraph 那種子字串則不會）
+      expect(/(?:^|-)ad(?:-|$)/.test(id), `${id} 有獨立的 ad 段`).toBe(false);
+      // 官網卡走 web- 前綴分支，含 product 會被判成產品頁而不是部落格長文
+      if (card.channel === "website") {
+        expect(id.includes("product"), `${id} 是官網長文，含 product 會拿到產品頁版型`).toBe(false);
+      }
+    }
+  });
+
+  it("每張自訂卡都帶事實白名單 —— 少了模型就會自己編認證與設備", () => {
+    // 官網的 OEM流程／製作流程兩頁幾乎全是圖片，線上沒有任何文字來源可以
+    // 支撐「盛全有什麼設備」，所以白名單是唯一的防線。
+    for (const card of gs.cards) {
+      if (card.kind !== "custom") continue;
+      expect(
+        card.template.systemPrompt,
+        `${card.template.id} 沒有帶事實白名單`,
+      ).toContain("the ONLY things you may assert");
+      expect(
+        card.template.systemPrompt,
+        `${card.template.id} 的白名單漏了 MOQ`,
+      ).toContain("240 pieces per style");
+    }
+  });
+
+  it("每張自訂卡都禁止公開價格 —— 報價寫進內容就變成承諾", () => {
+    for (const card of gs.cards) {
+      if (card.kind !== "custom") continue;
+      expect(
+        card.template.systemPrompt,
+        `${card.template.id} 沒有帶價格禁令`,
+      ).toContain("Never publish a price");
+    }
+  });
+
+  it("prompt 與 placeholder 自己不得示範被禁的價格語言", () => {
+    // 五感十築踩過同型的坑：placeholder 是給使用者看的「好範例」，卻在
+    // 示範品牌最嚴格禁止的寫法。
+    const BANNED = ["affordable", "competitive pricing", "cost-effective", "best price"];
+    for (const card of gs.cards) {
+      if (card.kind !== "custom") continue;
+      const texts = [
+        card.template.primary_question ?? "",
+        card.template.primary_input?.placeholder ?? "",
+        ...(card.template.inputs ?? []).map((i: any) => i.placeholder ?? ""),
+      ];
+      for (const t of texts) {
+        for (const b of BANNED) {
+          expect(t.toLowerCase().includes(b), `${card.template.id} 的提示語用了「${b}」`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("每張自訂卡都有 polishHint，且列出十個產品家族", () => {
+    // 沒有這個，AI 潤稿只拿得到通用 digest，會編出盛全沒有的產品線去問使用者。
+    const FAMILIES = ["Beret", "Fedora", "Flat Cap", "Ball Cap", "Blocked Hat",
+      "Children's Hat", "Beanie", "Casquette", "Accessories", "Uniform Headwear"];
+    for (const card of gs.cards) {
+      if (card.kind !== "custom") continue;
+      const hint = card.template.polishHint;
+      expect(hint, `${card.template.id} 沒有 polishHint`).toBeTruthy();
+      for (const f of FAMILIES) {
+        expect(hint, `${card.template.id} 的 polishHint 缺少 ${f}`).toContain(f);
+      }
+    }
+  });
+
+  it("講工法卡照 CJ 的規格：三個版本 = 三種不同的既有文章結構", () => {
+    // CJ 2026-09-02:「輸入想溝通的工法後，agent 根據國際知名案例或熱門類似
+    // 文章結構的 skill，幫忙撰寫出三個版本」。變體是各自獨立的 LLM 呼叫、
+    // 彼此看不見，所以結構必須由 variantLabels 指派，不能讓模型自己挑 ——
+    // 否則三個變體會各自挑到同一種結構。
+    const craft = gs.cards.find((c) => packCardId(c) === "web-gs-craft")!;
+    expect(craft).toBeTruthy();
+    if (craft.kind !== "custom") throw new Error("web-gs-craft 應為自訂卡");
+    expect(craft.config.variants).toBe(3);
+    expect(craft.config.variantLabels.length).toBe(3);
+    for (const s of ["Process Walkthrough", "Single Detail Deep-Dive", "Myth Correction"]) {
+      expect(craft.template.systemPrompt, `講工法卡缺少結構 ${s}`).toContain(s);
+    }
+  });
+
+  it("官網長文的預算撐得住 —— caption 預算要裝得進 job 總預算", () => {
+    // 預設 caption 預算 40s 是照「一則貼文」訂的。800–1200 字的長文會逾時
+    // 兩次然後回空字串：任務顯示成功、產出空白。
+    for (const card of gs.cards) {
+      if (card.kind !== "custom" || card.channel !== "website") continue;
+      const cap = card.config.captionBudgetMs;
+      expect(cap, `${card.template.id} 是長文卡卻沒有加大 caption 預算`).toBeGreaterThan(40_000);
+      const hard = card.config.hardBudgetMs ?? 100_000;
+      expect(
+        hard - cap!,
+        `${card.template.id}: job 總預算只比 caption 多 ${hard - cap!}ms，不夠跑其他階段`,
+      ).toBeGreaterThanOrEqual(50_000);
+      // nginx /trpc 230s、Node 220s，30s 層是同步回應，要留餘裕
+      expect(hard, `${card.template.id} 的總預算過高`).toBeLessThanOrEqual(150_000);
+    }
+  });
+
+  it("CMO 四張卡都帶第二代經營者的發言者設定", () => {
+    // CJ 2026-09-02 指定「用第二代經營者的視角」。這是內容的素材來源而不是
+    // 稱謂設定 —— 少了它，「挑戰市場觀點」寫出來就是沒有立足點的空泛評論。
+    const cmo = gs.cards.filter((c) => c.channel === "linkedin" && c.format.startsWith("cmo-"));
+    expect(cmo.length).toBe(4);
+    for (const card of cmo) {
+      if (card.kind !== "custom") continue;
+      expect(
+        card.template.systemPrompt,
+        `${card.template.id} 沒有帶第二代經營者設定`,
+      ).toContain("second-generation operator");
+    }
+  });
+
+  it("每張卡綁不同的 agent —— 同一個人寫完十九張卡，語氣會塌成一種", () => {
+    const ids = gs.cards
+      .filter((c) => c.kind === "custom")
+      .map((c) => (c as any).template.agent_id);
+    expect(ids.every((v) => typeof v === "number")).toBe(true);
+    expect(new Set(ids).size, `agent 重複：${ids.join(",")}`).toBe(ids.length);
+  });
+
+  it("事實白名單每一條都有實質內容", () => {
+    expect(GUSHENG_FACTS.length).toBeGreaterThanOrEqual(12);
+    for (const f of GUSHENG_FACTS) expect(f.length).toBeGreaterThan(20);
+    expect(GUSHENG_FACTS.join(" ")).toContain("1984");
+    expect(GUSHENG_FACTS.join(" ")).toContain("240 pieces per style");
+  });
+
+  it("十九張卡，頻道分佈對得上 CJ 開的清單", () => {
+    expect(gs.cards.length).toBe(19);
+    const byChannel = (k: string) => gs.cards.filter((c) => c.channel === k).length;
+    expect(byChannel("website")).toBe(3);
+    expect(byChannel("email")).toBe(3);
+    expect(byChannel("instagram")).toBe(2);
+    expect(byChannel("linkedin")).toBe(7);
+    expect(byChannel("facebook")).toBe(4);
   });
 });
