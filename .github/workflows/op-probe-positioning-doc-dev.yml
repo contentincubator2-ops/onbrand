@@ -9,14 +9,21 @@ name: "Op — Probe 定位文件上傳 on DEV (真實資料，會自我還原)"
 # 會寫入 positioning，所以 probe 自己在開頭快照整欄、finally 還原，並逐字元
 # 比對確認還原成功。跑在真實品牌上，不是測試資料。
 
+# dev 分支上沒有 workflow_dispatch（那只在預設分支可用），所以跟
+# dev-tail-logs.yml 一樣：改觸發檔再 push。要指定品牌就把 id 寫進
+# ops/probe-positioning/brand（留空 = 自動挑最新一個有定位的）。
 on:
-  workflow_dispatch:
-    inputs:
-      brand_id:
-        description: "DEV 上的品牌 id（留空 = 自動挑最新一個有定位的）"
-        required: false
-        default: ""
-        type: string
+  push:
+    branches: [dev]
+    paths:
+      - "ops/probe-positioning/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: probe-positioning-doc
+  cancel-in-progress: true
 
 jobs:
   probe:
@@ -25,14 +32,11 @@ jobs:
     steps:
       - name: Probe on the DEV VM
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          BRAND_ID: ${{ inputs.brand_id }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 10m
-          envs: BRAND_ID
           script: |
             set -euo pipefail
             AI=/opt/onbrand/current/skills/ai-talent
@@ -48,5 +52,10 @@ jobs:
               echo "!! python3 缺 lxml —— 嘗試安裝"
               (python3 -m pip install --quiet lxml || sudo apt-get install -y python3-lxml) || true
             fi
+
+            # 觸發檔跟著 release 一起上機，所以品牌 id 直接從那份讀。
+            TRIG=/opt/onbrand/current/ops/probe-positioning/brand
+            BRAND_ID="$(tr -cd '0-9' < "$TRIG" 2>/dev/null || true)"
+            echo "brand id from trigger file: ${BRAND_ID:-(auto)}"
 
             ./node_modules/.bin/tsx scripts/probe-positioning-doc.ts $BRAND_ID
