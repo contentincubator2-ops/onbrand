@@ -1,0 +1,121 @@
+name: "Admin — Write agent taskSystemPrompt personas"
+
+# 2026-09-02 (CJ「要，寫這 8 位」):
+# Writes agents.taskSystemPrompt for a supplied list of agent ids.
+#
+# Why this exists: CJ's 2026-08-23 standard says the agent bound to a
+# Facebook post task must be designed as a real person with a
+# taskSystemPrompt of at least 2200 characters. A preflight over the pool
+# found 16118 agents, of which exactly 10 have any taskSystemPrompt at all,
+# the longest 1965 characters. So the standard is currently met by nobody,
+# and every FB card on the platform — including the shipped wugan pack —
+# binds an agent with an empty writing manual.
+#
+# These agents are GLOBAL. A persona written here is injected into every
+# brand's tasks that bind the same agent, so a persona must describe how
+# the person writes and must never mention a specific client brand.
+# Otherwise this becomes the brand-leak that admin-audit-brand-pack-scope
+# exists to catch.
+#
+# Safety: onlyIfEmpty defaults true, so a re-run never clobbers a persona
+# someone else authored. Pass onlyIfEmpty:false in the payload to
+# deliberately overwrite.
+#
+# Payload is base64 JSON:
+#   { "onlyIfEmpty": true,
+#     "agents": [ { "id": 30002, "name": "Sarah Liu", "taskSystemPrompt": "..." } ] }
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload_b64:
+        description: "Base64-encoded JSON payload ({onlyIfEmpty, agents})"
+        required: true
+        type: string
+      min_chars:
+        description: "Reject any persona shorter than this (CJ's floor is 2200)"
+        required: false
+        default: "2200"
+        type: string
+
+jobs:
+  write:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write personas
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PAYLOAD_B64: ${{ inputs.payload_b64 }}
+          MIN_CHARS: ${{ inputs.min_chars }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: PAYLOAD_B64,MIN_CHARS
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            node -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const raw = Buffer.from(process.env.PAYLOAD_B64, 'base64').toString('utf8');
+                const payload = JSON.parse(raw);
+                const minChars = Number(process.env.MIN_CHARS || 2200);
+                const onlyIfEmpty = payload.onlyIfEmpty !== false;
+
+                // Gate before touching the DB: a persona under the floor is the
+                // exact failure the standard exists to prevent, so refuse the
+                // whole batch rather than writing a partial one.
+                const short = payload.agents.filter(a => String(a.taskSystemPrompt || '').length < minChars);
+                if (short.length) {
+                  console.error('REFUSED — under the ' + minChars + ' char floor:');
+                  for (const a of short) console.error('  ' + a.id + ' ' + a.name + ' = ' + String(a.taskSystemPrompt || '').length);
+                  process.exit(1);
+                }
+
+                const conn = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+
+                let wrote = 0, skipped = 0, missing = 0;
+                for (const a of payload.agents) {
+                  const [rows] = await conn.execute(
+                    'SELECT id, name, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS len FROM agents WHERE id = ? LIMIT 1',
+                    [a.id],
+                  );
+                  if (!rows.length) { console.log('MISSING agent ' + a.id); missing++; continue; }
+                  if (rows[0].name !== a.name) {
+                    console.error('NAME MISMATCH for ' + a.id + ': db=' + rows[0].name + ' payload=' + a.name);
+                    process.exit(1);
+                  }
+                  if (onlyIfEmpty && rows[0].len > 0) {
+                    console.log('SKIP ' + a.id + ' ' + a.name + ' — already has ' + rows[0].len + ' chars');
+                    skipped++; continue;
+                  }
+                  await conn.execute('UPDATE agents SET taskSystemPrompt = ? WHERE id = ?', [a.taskSystemPrompt, a.id]);
+                  console.log('WROTE ' + a.id + ' ' + a.name + ' = ' + a.taskSystemPrompt.length + ' chars');
+                  wrote++;
+                }
+
+                console.log('');
+                console.log('SUMMARY wrote=' + wrote + ' skipped=' + skipped + ' missing=' + missing);
+
+                const ids = payload.agents.map(a => a.id);
+                const [check] = await conn.query(
+                  'SELECT id, name, title, CHAR_LENGTH(COALESCE(taskSystemPrompt,\'\')) AS promptLen FROM agents WHERE id IN (?) ORDER BY promptLen DESC',
+                  [ids],
+                );
+                console.log('VERIFY:');
+                for (const r of check) console.log('  ' + JSON.stringify(r));
+                const under = check.filter(r => r.promptLen < minChars);
+                if (under.length) { console.error('POST-WRITE CHECK FAILED — still under floor'); process.exit(1); }
+
+                await conn.end();
+              })().catch(e => { console.error('FAILED:', e); process.exit(1); });
+            "
