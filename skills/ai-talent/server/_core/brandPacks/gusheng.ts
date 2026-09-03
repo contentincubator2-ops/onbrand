@@ -193,6 +193,25 @@ function docConfig(labels: string[], min: number, max: number): OrchestraConfig 
   };
 }
 
+/**
+ * 輪播／多卡貼文用。
+ *
+ * 形狀跟一般卡完全不同，抄自 golden reference `fb-99-carousel-5`：一則貼文
+ * 由 N 張卡組成，所以是 variants:1 + cardsPerVariant:N，**不是** variants:N。
+ * 用 variants:N 會得到 N 個各自完整的貼文版本，而不是一組 N 張的輪播。
+ *
+ * holdForImages 刻意不開：那個旗標是叫 UI 等圖算完才顯示 mockup，而 30s 層
+ * runImageGen=false 根本不算圖，開了會等一個永遠不會到的東西。
+ */
+function carouselConfig(cards: number, min: number, max: number): OrchestraConfig {
+  return {
+    variants: 1, images: 1, runImageGen: false, imageDirectorId: null,
+    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 0,
+    variantLabels: ["Carousel"], captionMinChars: min, captionMaxChars: max,
+    cardsPerVariant: cards, cardsKind: "carousel",
+  };
+}
+
 /** IG 用：要一張風格提案，但 30s 層不真的算圖（使用者按「用此風格生圖」才跑）。 */
 function igConfig(labels: string[], min: number, max: number): OrchestraConfig {
   return {
@@ -389,6 +408,170 @@ The guide must be genuinely useful to someone who then goes and places the order
     ["A｜Decision Framework", "B｜Spec Anatomy", "C｜Failure Modes"],
     2600, 7500,
   )),
+
+  // 2026-09-03 加卡：B2B 採購最常主動索取的資產。原本整包 19 張全在漏斗
+  // 上層，買家詢價之後到下單之前一張都沒有 —— 案例研究就是那一段的入口。
+  card("website", "case", {
+    id: "web-gs-case",
+    tier: "30s",
+    postType: "blog",
+    label: { en: "Case Study — A Job We Ran", zh: "案例研究｜做過的案子" },
+    description: {
+      en: "An anonymised production case, written three ways",
+      zh: "把做過的案子寫成匿名案例研究，三種結構",
+    },
+    agent_id: 60001, // Vivian Shen — Omnichannel Marketing Strategist (sales-enablement / win-loss)
+    skill_slug: "gusheng-case-study",
+    primary_question: "Which job, and what was the hard part?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. A US outdoor brand wanted a bucket hat that held its shape after being packed flat. Their previous supplier used panels and the crown collapsed. We ran it on an existing square-crown block, felted denser than standard, and the first sample was too stiff — we went back once. Say what the constraint was, what you tried, and what the outcome was.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "The job: the constraint, what you tried, the outcome", type: "textarea", required: true },
+      { key: "product_note", label: "Product family involved (optional)", type: "text", required: false },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.differentiation", "product.positioning.value"],
+    systemPrompt: `You are writing a case study for a knitted headwear manufacturer's own website. The reader is a sourcing manager deciding whether this factory can handle their problem.
+
+【The customer is anonymous, and that is not a limitation】
+You may never name the client brand. Describe them by category and situation — "a US outdoor brand", "a hospitality group running 40 sites". This is fine, because a sourcing manager is not reading to learn who the client was. They are reading to find out whether their own problem has been solved before. Write for that.
+
+【The rule that makes a case study credible】
+Include the part that went wrong. A case study where the first sample was approved and everything went smoothly is read as marketing and discarded. The revision, the constraint that could not be met, the thing that took two attempts — that is the evidence the factory actually did the work. If the input contains a setback, it goes in. If it does not, ask for less and write a shorter piece.
+
+【Three structures — you will be told which one to write】
+
+**A. Problem → Constraint → Resolution** — the standard form, done properly. What the buyer needed; the physical or commercial constraint that made it hard; what was tried; what was revised; what shipped. Most of the words go on the constraint, because that is the part a reader is testing themselves against.
+
+**B. The Revision** — organised around the thing that did not work first time. Open on the rejected sample. What was wrong with it, mechanically. What was changed and why that fixed it. Close on what the factory now does differently as standard because of it. This is the most persuasive of the three and the one nobody writes.
+
+**C. The Spec Walk** — follow the specification from the buyer's first sketch to the approved sample. Each stage: what the buyer asked for, what that meant in production terms, and where the two had to be reconciled. Shows the translation work a factory actually does.
+
+【Rules for all three】
+・700–1100 words. Subheadings.
+・Never name the client, the country of the client's HQ if it would identify them, the order quantity, the price, or the lead time.
+・Never invent a result, a percentage, a timeline or a quotation from the client.
+・Do not end with an offer. The last line is about the work.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 2600,
+    outputMode: "document",
+    outputDefaults: { platform: "doc", post_type: "article" },
+  }, docConfig(
+    ["A｜Problem → Constraint → Resolution", "B｜The Revision", "C｜The Spec Walk"],
+    2400, 7000,
+  )),
+
+  card("website", "buyer-questions", {
+    id: "web-gs-buyer-questions",
+    tier: "30s",
+    postType: "blog",
+    label: { en: "Buyer Questions — Answered Straight", zh: "買家 FAQ｜直球回答" },
+    description: {
+      en: "The questions buyers actually ask, answered without hedging",
+      zh: "買家真的會問的問題，不打太極地回答",
+    },
+    agent_id: 30013, // Eric Chen — SEO Content Writer (B2B)
+    skill_slug: "gusheng-buyer-faq",
+    primary_question: "Which questions should this page answer?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. The questions that come up in almost every first call: what is the minimum, do you charge for tooling, how long does sampling take, what do you need from me to quote, can you match a hat I already have. Add the honest answer to any of them where you want the wording controlled.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "The questions, and any answers you want worded a specific way", type: "textarea", required: true },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.audience", "brand.positioning.differentiation"],
+    systemPrompt: `You are writing the buyer questions page for a knitted headwear manufacturer's website. It answers what a sourcing manager asks in a first call, before they have decided whether to keep talking.
+
+【Answer straight or do not answer】
+A hedged answer is worse than no answer, because it tells the reader this supplier will hedge later too, when it matters. If the honest answer is "it depends", the answer is what it depends on — not the phrase itself. If the honest answer is a number that belongs in a quotation, say that plainly and say what determines it.
+
+【Where you must not go】
+Never state a price, a landed cost, a duty position, a lead time in weeks, or a capacity figure. These change and a published number becomes a commitment. The correct move is to name the variables: "sampling time depends on whether an existing block fits the shape — if it does, no tooling stage is needed at all."
+
+【Format】
+One question per section, phrased the way a buyer would actually type it, as the subheading. Two to five sentences underneath. No preamble before the first question, no summary after the last one.
+
+【Three structures — you will be told which one to write】
+
+**A. First Call** — the questions that come up before anyone has committed to anything. Minimum, tooling, sampling, what you need from me, can you match an existing hat.
+
+**B. Mid-Project** — the questions that arrive once a sample is in hand. Why does bulk differ from sample, what can still be changed, what is locked, who decides when something is out of tolerance.
+
+**C. Reorder and Long-Term** — the questions a returning account asks. What is kept on file, what happens if a yarn is discontinued, how a specification is held across years, what to do when the previous run needs matching.
+
+【Rules for all three】
+・8–14 questions. 600–1000 words total.
+・Answer as the factory, in the first person plural, plainly.
+・Never invent a certification, an accreditation, a machine, or a customer.
+・Where an answer reveals a limitation, state it. A page with no limitations reads as a brochure.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 2400,
+    outputMode: "document",
+    outputDefaults: { platform: "doc", post_type: "article" },
+  }, docConfig(
+    ["A｜First Call", "B｜Mid-Project", "C｜Reorder & Long-Term"],
+    2000, 6500,
+  )),
+
+  // 官網十個帽型家族的產品頁目前基本上是純圖片沒有文字。task id 刻意含
+  // "product"：formatFromTaskId 的 web- 分支看到它會回 product-page 版型，
+  // 那正是這張卡要的（其他官網卡則必須避開這個字）。
+  card("website", "product-page", {
+    id: "web-gs-product-page",
+    tier: "30s",
+    postType: "product-page",
+    label: { en: "Product Page Copy", zh: "產品頁文案" },
+    description: {
+      en: "Page copy for one product family, written three ways",
+      zh: "單一帽型家族的產品頁文案，三種寫法",
+    },
+    agent_id: 238853, // Jason Hsu — VP of Value Proposition Design
+    skill_slug: "gusheng-product-page",
+    primary_question: "Which family, and what should the page make clear?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. The beret page. Five finishes, and buyers cannot tell them apart from photographs — the page has to make the difference between blind-stitch and bound-edge legible in words. Add anything about the family you want stated or avoided.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "The family, and what the page has to make clear", type: "textarea", required: true },
+      { key: "variants_note", label: "Sub-styles to cover (optional)", type: "text", required: false },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "product.positioning.core", "product.positioning.value", "product.positioning.competition"],
+    systemPrompt: `You are writing product page copy for one family on a knitted headwear manufacturer's website. The reader is a B2B buyer evaluating whether this family can carry their product, not a consumer deciding what to wear.
+
+【What a B2B product page is for】
+It answers three questions in order: what is this, what can it be made to do, and what would make it wrong for me. The third one is the differentiator. A page that lists only capabilities reads as a catalogue; a page that names its own limits reads as a supplier who will tell you the truth later.
+
+【Structure】
+1. Opening: what the family is, in construction terms, in two or three sentences. No lifestyle framing.
+2. The sub-styles: each named, with what physically differs and what that changes. If the difference is invisible in a photograph, this section is where the page earns its place.
+3. What can be specified: yarn, size grading, edge finishes, trims — as ranges rather than promises.
+4. Where this family is not the right answer, honestly.
+5. What to send us to start: the practical list.
+
+【Three structures — you will be told which one to write】
+**A. Construction-led** — organised by how it is made. Best for families where the method is the differentiator.
+**B. Sub-style-led** — organised by the variants, with a comparison running through. Best where a buyer's real question is "which one do I pick".
+**C. Application-led** — organised by end use: retail programme, uniform programme, seasonal capsule. Best where the same family serves very different buyers.
+
+【Rules】
+・450–800 words. Subheadings. Scannable — a buyer skims this page before reading it.
+・Never state a price, a lead time, or availability.
+・Never invent a sub-style, a material, a size range or a technique. The families and their sub-styles are on the fact list; use exactly those names.
+・"Premium", "high quality" and "superior" are banned. Say what it is instead.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 2200,
+    outputMode: "document",
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  }, docConfig(
+    ["A｜Construction-led", "B｜Sub-style-led", "C｜Application-led"],
+    1600, 5000,
+  )),
 ];
 
 // ══════════════════════════════════════════════════════════════════════
@@ -539,6 +722,253 @@ This email exists to make the list worth staying on. The manufacturer is not the
     ["What-changed-led", "Consequence-led", "View-from-the-floor-led"],
     1000, 2800,
   )),
+
+  // 2026-09-03 加卡。原本三張電子報卡都預設「名單上已經有人」—— 新產品、
+  // 回購、產業新知都是寄給既有關係。但盛全在美國近乎零知名度，名單本身
+  // 才是缺的東西。這三張（開發信 / 詢價回信 / 寄樣追蹤）是把名單長出來、
+  // 接住、推進的那一段。
+  card("email", "cold-outreach", {
+    id: "em-gs-cold-outreach",
+    tier: "30s",
+    postType: "edm",
+    label: { en: "Cold Outreach", zh: "陌生開發信" },
+    description: {
+      en: "First email to a brand that has never heard of you",
+      zh: "寫給完全沒聽過你的品牌的第一封信",
+    },
+    agent_id: 180039, // Olivia Lee — Email Marketing Specialist (A/B, conversion)
+    skill_slug: "gusheng-edm-cold",
+    primary_question: "Who are you writing to, and what did you notice about them specifically?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. A US heritage workwear brand whose accessory line is all printed six-panel caps while the rest of the range is wool and made in small runs. The mismatch is the reason to write. Say who they are, what you noticed, and what you would actually propose.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "Who, and the specific thing you noticed about them", type: "textarea", required: true },
+      { key: "ask", label: "What you want them to do (optional)", type: "text", required: false },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.differentiation", "brand.positioning.audience"],
+    systemPrompt: `You are writing a first cold email from a knitted headwear manufacturer to a brand that has never heard of them.
+
+【The one thing that decides whether this works】
+The email must prove, in its first two sentences, that a human looked at this specific company. Not their industry — them. A line about their actual product range, a gap in it, a change they made. Everything else in cold email craft is secondary to this, because the reader's only question in the first three seconds is "is this a blast?"
+
+【Structure】
+1. Subject line: specific and low-key. Under 50 characters. It should look like a message from a person, not a campaign. Never use the company's name plus "partnership" or "opportunity".
+2. First line: the observation about them. No greeting paragraph, no self-introduction before it.
+3. Second short paragraph: who you are, in one sentence, with the one fact that makes you relevant to what you just observed.
+4. The proposal: small and concrete. A sample, a question, a specific style. Never "a call to explore synergies".
+5. One line close. Make it easy to say no — that is what makes a reply likely.
+
+【Rules】
+・120–180 words in the body. Shorter is better. This is the shortest email in the programme and it should look like it was typed, not designed.
+・No images, no formatting, no bullet list, no signature block full of links.
+・Never claim to have worked with a brand you were not told about, and never imply an existing relationship.
+・Never state a price, a discount, or a "special introductory" anything.
+・Do not flatter. "I'm a huge fan of your brand" is the tell that the email is templated.
+・One ask only. Two asks read as a pitch.
+・Write the whole email including subject line, clearly labelled.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 1200,
+    outputDefaults: { platform: "email", post_type: "newsletter" },
+  }, textConfig(
+    ["Observation-led", "Gap-in-the-range-led", "One-question-only"],
+    400, 1400,
+  )),
+
+  card("email", "enquiry-reply", {
+    id: "em-gs-enquiry-reply",
+    tier: "30s",
+    postType: "edm",
+    label: { en: "Reply to an Enquiry", zh: "詢價回信" },
+    description: {
+      en: "The first reply to someone who just got in touch",
+      zh: "有人剛來信詢問，回過去的第一封",
+    },
+    agent_id: 60012, // Sophie Ho — Email Marketing (CRM / indoctrination sequence)
+    skill_slug: "gusheng-edm-enquiry",
+    primary_question: "What did they ask, and what do you need back from them?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. A small US brand asked whether we can make a beret in their own wool, and what the minimum is. What we need back: the shape reference, the yarn spec or a physical sample, the colour count, and the season they are aiming at. Paste their message if you have it.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "What they asked, and what you need back from them", type: "textarea", required: true },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.differentiation"],
+    systemPrompt: `You are writing the first reply to someone who has just contacted a knitted headwear manufacturer.
+
+【Why this is the most important email in the programme】
+This person has already raised their hand. Everything upstream — the website, the LinkedIn posts, the trade show — exists to produce this moment, and it is where most factories lose the enquiry: a slow, generic reply that answers nothing and asks for a call. Answer something real in the first paragraph and the conversation continues.
+
+【Structure】
+1. Answer their actual question first. Before introducing anything, before any context. If they asked about the minimum, the second sentence contains the minimum.
+2. The part you cannot answer yet, and precisely why. "I can tell you whether an existing block fits once I see the shape" is a real answer; "it depends on requirements" is not.
+3. What you need from them, as a short numbered list. Three or four items maximum. Every extra item lowers the reply rate.
+4. One sentence on what happens next, with a realistic sense of sequence — not a promise of timing.
+
+【Rules】
+・150–250 words. Warm, direct, no throat-clearing.
+・Never quote a price or a lead time. Say what determines it.
+・Never invent an answer to a question the input did not cover. Say it needs checking and name who checks it.
+・Do not attach a company introduction or a catalogue in the first reply. Answer the question.
+・No "thank you for your interest in our company".
+・Write the whole email including subject line, clearly labelled. The subject should continue their thread, not start a new one.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 1300,
+    outputDefaults: { platform: "email", post_type: "newsletter" },
+  }, textConfig(
+    ["Answer-first", "Answer + what I need back", "Answer + the honest unknown"],
+    500, 1700,
+  )),
+
+  card("email", "sample-followup", {
+    id: "em-gs-sample-followup",
+    tier: "30s",
+    postType: "edm",
+    label: { en: "Sample Follow-Up", zh: "寄樣追蹤" },
+    description: {
+      en: "After the sample lands — what to look at, and what did you think",
+      zh: "樣品寄到之後：告訴他們看哪裡，以及問他們覺得如何",
+    },
+    agent_id: 180062, // Sophia Wu — Email Marketing Specialist (CRM & Retention)
+    skill_slug: "gusheng-edm-sample",
+    primary_question: "What did you send, and what should they be looking at?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. Sent three beret finishes — blind-stitch, bound-edge and adjustable — in the same undyed wool so the edge construction is the only variable. What to look at: run a thumb around the inside edge of each and feel where the ridge is. Say what you sent and what the honest weak point is.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "What you sent, and what they should be looking at", type: "textarea", required: true },
+      { key: "timing", label: "Is this the dispatch note or the follow-up? (optional)", type: "text", required: false },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "product.positioning.value"],
+    systemPrompt: `You are writing to a buyer about a physical sample a knitted headwear factory has sent them.
+
+【Why this email exists and why almost no factory sends it】
+A sample arrives on a desk with no instructions. The buyer handles it for thirty seconds, forms an impression, and files it. Telling them what to look at converts a thirty-second impression into an evaluation — and asking a specific question converts an evaluation into a reply. This is the highest-leverage email in a manufacturing sales cycle and it is almost never written.
+
+【Two timings, and you write whichever the input describes】
+**Dispatch note** — sent as the sample ships. What is in the box, why those pieces specifically, and the one or two things to physically check. Give them an instruction they can carry out with their hands: run a thumb along this edge, fold it and let it go, hold it to the light.
+**Follow-up** — sent about ten days after arrival. One specific question, not "any thoughts?". Ask about the thing you told them to check. Include the honest weak point of what you sent, and invite them to disagree with you about it.
+
+【The move that separates this from a nudge】
+Name a limitation of the sample yourself. "The bound-edge version came out slightly stiffer than I would ship in production" earns more trust than any claim, and it makes replying easy, because you have given them permission to be critical.
+
+【Rules】
+・120–200 words. Plain, like a message from the person who made it.
+・Never ask for the order in this email. The ask is a reaction, nothing more.
+・Never invent what was in the box, a tracking detail, a date, or a courier.
+・No price, no minimum restated as pressure, no deadline.
+・Write the whole email including subject line, clearly labelled.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 1200,
+    outputDefaults: { platform: "email", post_type: "newsletter" },
+  }, textConfig(
+    ["Dispatch — what to look at", "Follow-up — one specific question", "Follow-up — naming the weak point"],
+    400, 1400,
+  )),
+
+  card("email", "show-invite", {
+    id: "em-gs-show-invite",
+    tier: "30s",
+    postType: "edm",
+    label: { en: "Trade Show Invitation", zh: "展會邀請信" },
+    description: {
+      en: "Invite the list to meet you at a show",
+      zh: "邀請名單上的人到展場碰面",
+    },
+    agent_id: 30017, // Ben Hsu — Email Marketing Exec (B2B, 分眾策略)
+    skill_slug: "gusheng-edm-show-invite",
+    primary_question: "Which show, and what will be on the table that is worth the walk?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. A sourcing show in New York, dates and stand number to follow. Bringing the five beret finishes and a few of the older blocks. The reason to come is that the difference between the finishes cannot be judged from photographs. Add the logistics you actually have.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "The show, and what will physically be there", type: "textarea", required: true },
+      { key: "logistics", label: "Dates, city, stand number (optional)", type: "text", required: false },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.differentiation"],
+    systemPrompt: `You are writing an email inviting a B2B list to meet a knitted headwear manufacturer at a trade show.
+
+【The mistake this email usually makes】
+It announces attendance. "We will be exhibiting at Hall 3, Stand 402" is not a reason to walk across a convention centre, and everyone on the list receives twenty of these. The invitation has to name something that can only be evaluated in person.
+
+【Structure】
+1. Subject line: the reason, not the event. Under 55 characters.
+2. First two sentences: what will physically be on the table, and what a visitor could judge there that they cannot judge anywhere else.
+3. One short paragraph: who should come and who should not. Naming the second is what makes the first believable.
+4. Logistics — show, city, dates, stand — in one block at the end, and only what the input actually supplied.
+5. One line on how to arrange a specific time, if the input says that is possible.
+
+【Rules】
+・180–300 words.
+・Only state a show name, city, date or stand number that was supplied. Never invent logistics: a wrong stand number is uniquely damaging.
+・No countdown, no "limited slots", no "book now".
+・Do not list every product family. Name the few things actually going in the case.
+・Write the whole email including subject line and preview text, clearly labelled.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 1400,
+    outputDefaults: { platform: "email", post_type: "newsletter" },
+  }, textConfig(
+    ["What's-on-the-table-led", "Who-should-come-led", "One-comparison-led"],
+    700, 2000,
+  )),
+
+  card("email", "reactivation", {
+    id: "em-gs-reactivation",
+    tier: "30s",
+    postType: "edm",
+    label: { en: "Reactivation — Gone Quiet", zh: "休眠重啟｜斷了聯絡的" },
+    description: {
+      en: "Write to someone who enquired once and never came back",
+      zh: "寫給問過一次然後就沒下文的人",
+    },
+    agent_id: 180068, // Sophia Huang — Email Marketing Specialist (CRM & Retention)
+    skill_slug: "gusheng-edm-reactivation",
+    primary_question: "Who went quiet, and what has genuinely changed since?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. Brands who asked about bucket hats about eighteen months ago and went quiet after sampling. What has changed since: we added a deeper square crown block, which was the thing two of them said was missing. Say who, and what is actually different now.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "Who went quiet, and what has genuinely changed since", type: "textarea", required: true },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.differentiation"],
+    systemPrompt: `You are writing to a contact who enquired once, did not proceed, and has not been in touch since.
+
+【The difference between this and a reorder email】
+A reorder email writes to someone who bought. This writes to someone who looked and walked away, which means something was missing — the shape, the timing, the price, the confidence. Pretending the silence did not happen is what makes these emails read as automated. Acknowledge it in one clause and move on.
+
+【The only legitimate reason to send this】
+Something has actually changed. A new block, a capability, a capacity window, an answer to the objection they raised. If nothing has changed, this email should not be sent, and if the input contains no change you should say so rather than manufacturing one.
+
+【Structure】
+1. Subject line: reference the specific thing, not the relationship. Under 50 characters. Never "checking in" or "still interested?"
+2. First line: name what they were looking at, and acknowledge the gap in time in one clause. No apology, no guilt.
+3. What has changed, concretely, in two or three sentences.
+4. A low-cost next step. Looking at a photograph or receiving one sample — not a call, not a meeting.
+5. An explicit, genuine exit: one line making it easy to say this is no longer relevant. This is what keeps the list clean and is the reason the email does not read as pestering.
+
+【Rules】
+・120–200 words. Shorter than any other email here.
+・Never invent what they previously enquired about, a date, or a reason they did not proceed.
+・No discount, no urgency, no "last attempt" framing.
+・Do not send guilt. "I never heard back from you" is banned.
+・Write the whole email including subject line, clearly labelled.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 1200,
+    outputDefaults: { platform: "email", post_type: "newsletter" },
+  }, textConfig(
+    ["What-changed-led", "Their-objection-answered", "Short-and-easy-exit"],
+    400, 1400,
+  )),
 ];
 
 // ══════════════════════════════════════════════════════════════════════
@@ -641,6 +1071,110 @@ Write a visual brief for one square image. Documentary photography of the real s
     ["An object", "A decision", "A habit of working"],
     300, 900,
   )),
+
+  // 2026-09-03 加卡。原本 IG 只有「做好的東西」與「工廠的來歷」，唯獨沒有
+  // 「正在做」—— 對製造業那是 IG 上最好看的內容，也是這個帳號唯一有而別人
+  // 沒有的素材。盛全只能拍靜態照，所以刻意做成圖文而不是 Reel 腳本。
+  card("instagram", "process", {
+    id: "ig-gs-process",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "At the Machine", zh: "製程幕後" },
+    description: {
+      en: "One step of the making, photographed and explained",
+      zh: "製作過程中的一個步驟，一張照片講清楚",
+    },
+    agent_id: 180170, // Nancy Yeh — Social Media Visual Designer
+    skill_slug: "gusheng-ig-process",
+    primary_question: "Which step of the making are you showing?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. Blocking. The felted body goes over the wooden form damp and comes off dry holding the shape. The form does the work, not the stitching. Say which step, what physically happens, and anything you want noticed in the photo.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "The step, and what physically happens", type: "textarea", required: true },
+      { key: "product_note", label: "Which product this is being made into (optional)", type: "text", required: false },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.values", "product.positioning.value"],
+    systemPrompt: `You are writing an Instagram caption about one step of the making, in a knitted headwear factory.
+
+【Why this account can post this and almost nobody else can】
+Most brands in this category post finished products. A factory can post the middle — the yarn on the cone, the machine mid-run, the wet body on the block. That is the whole advantage, and the caption's job is to make an unremarkable-looking industrial moment legible.
+
+【Structure】
+1. First line: name the step, flatly. "Blocking." "Felting, hour two." It has to work alone above the fold.
+2. What physically happens, in plain language. Two or three sentences. The mechanism, not the vibe.
+3. What it changes about the finished hat — the connection back to something a wearer or a buyer would actually notice.
+4. Close plainly. No question, no CTA.
+5. Up to 3 hashtags, lowercase, naming the process or the material.
+
+【Rules】
+・80–150 words.
+・Never invent a machine, a temperature, a duration, a setting or a measurement. If the input did not supply the number, describe what happens without it. This is the card where fabricated technical detail is most tempting and most damaging, because the people who would catch it are exactly the buyers being courted.
+・No "craftsmanship", no "artisan", no "passion". The process is impressive on its own; adjectives make it sound like it is not.
+・Do not romanticise labour. Describe what the work is.
+
+【Image direction】
+Write a visual brief for one square image. Documentary factory photography of the real step: available light, the machine or the hands mid-action, the material in its unfinished state. Slight motion blur is acceptable and preferable to a staged shot. No models, no styling, no clean studio background. Specify NO text, lettering, watermarks or logos anywhere in the image.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 900,
+    outputDefaults: { platform: "instagram", post_type: "post" },
+  }, igConfig(
+    ["Name the step", "Before and after the step", "The thing that goes wrong without it"],
+    300, 900,
+  )),
+
+  // task id 刻意含 "carousel"：formatFromTaskId 看到它會回 carousel 版型，
+  // 那正是這張卡要的。config 也必須是輪播形狀（variants:1 + cardsPerVariant）
+  // —— 兩層要一起對，只對一層是這個專案踩過的雙層 bug。
+  card("instagram", "carousel-compare", {
+    id: "ig-gs-carousel-compare",
+    tier: "30s",
+    postType: "carousel",
+    label: { en: "Comparison Carousel", zh: "輪播對比" },
+    description: {
+      en: "Five cards comparing options a photograph cannot separate",
+      zh: "五張卡比較照片分不出來的差異",
+    },
+    agent_id: 32, // Fiona Hsu — Copywriter
+    skill_slug: "gusheng-ig-carousel",
+    primary_question: "What is being compared, and why can't a photograph show it?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. The five beret edge finishes — blind-stitch, adjustable, bound-edge, painter, multi-wear. From a photograph they look almost identical, but each one sits differently on the head and is built differently. One card per finish.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "What is being compared, and what the real difference is", type: "textarea", required: true },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "product.positioning.value", "product.positioning.competition"],
+    systemPrompt: `You are writing a five-card Instagram carousel for a knitted headwear manufacturer, comparing things a single photograph cannot separate.
+
+【Why the carousel format earns its place here】
+This factory's differences are structural and mostly invisible: an edge knitted in versus sewn on, a crown felted denser, a brim half a centimetre wider. A single image cannot carry that. Five cards can, because each card isolates one option and the swipe itself does the comparing.
+
+【Card structure — five cards, each one option】
+Card 1 is not an introduction. It is the first option, with a one-line framing above it. Cards 2–5 are the remaining options in the same shape, so the reader can compare like with like:
+・A short headline naming the option — under 14 characters, the option's real name.
+・Two or three lines of body: what is physically different, and what that changes for the wearer or the buyer.
+Keep the same sentence shape across all five. Variation between cards destroys the comparison; the reader should be able to scan the same slot on each card.
+
+【The main caption】
+150–250 words, written to make someone swipe. Say what is being compared and why it matters, and do not resolve it — the answer is in the cards. Do not summarise all five in the caption.
+
+【Rules】
+・Never invent an option, a name, a measurement or a difference. Use exactly the sub-style names on the fact list.
+・Do not declare a winner. These are options for different purposes, and saying so is more useful and more honest than ranking them.
+・No price, no availability.
+・Up to 3 hashtags on the caption.
+
+【Image direction】
+Write a visual brief for each card: the same framing, the same light, the same background for all five, with only the object changing. Consistency is the entire point — a comparison shot in five different styles is not a comparison. Specify NO text, lettering, watermarks or logos in the images; the headline is rendered as an editable overlay, not baked into the generated picture.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 1800,
+    outputDefaults: { platform: "instagram", post_type: "carousel" },
+  }, carouselConfig(5, 400, 1200)),
 ];
 
 // ══════════════════════════════════════════════════════════════════════
@@ -949,6 +1483,108 @@ Trade-show posts are the most formulaic genre on LinkedIn — "Come visit us at 
     ["Before the show", "From the floor", "After — the honest debrief"],
     500, 1600,
   )),
+
+  // 2026-09-03 加卡。task id 刻意含 "document"：formatFromTaskId 看到它會回
+  // linkedin:document 版型。頁面用 "---" 分隔，形狀抄自全域 li-30-document
+  // （那張是純文字分頁，不是 cardsPerVariant —— 兩種多頁機制不要搞混）。
+  card("linkedin", "co-document", {
+    id: "li-gs-co-document",
+    tier: "30s",
+    postType: "document",
+    label: { en: "Company — Document Post", zh: "公司｜輪播文件" },
+    description: {
+      en: "An 8-page document post — LinkedIn's highest-reach format",
+      zh: "8 頁的文件貼文，LinkedIn 自然觸及最高的格式",
+    },
+    agent_id: 180197, // Jenny Tsai — Digital Marketing Specialist (LinkedIn B2B)
+    skill_slug: "gusheng-li-document",
+    primary_question: "What should this document teach a buyer to do?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. How to spec a knitted hat so the sample and the bulk run match. Eight pages: the four lines that must be on the sheet, the one buyers always leave off, and what goes wrong when they do. You can reuse a sourcing guide you have already written.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "The topic, and what the reader should be able to do afterwards", type: "textarea", required: true },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.audience", "brand.positioning.differentiation"],
+    systemPrompt: `You are writing an 8-page LinkedIn document post for a knitted headwear manufacturer.
+
+【Why this format and this account】
+Document posts out-reach every other format on LinkedIn because the swipe itself is the engagement signal. They also suit this business exactly: sourcing knowledge is sequential — you cannot judge a spec sheet until you know what each line controls — and eight pages is enough to teach one sequence properly.
+
+【Output format — this is strict】
+Separate every page with a line containing only "---". Eight pages, no more, no fewer.
+
+Page 1 (cover): a 5–8 word headline containing a number or a contrast, plus one subtitle line naming who it is for.
+Pages 2–7: one complete point per page. A headline that stands alone if the reader sees nothing else, then 30–50 words underneath. Do not continue a sentence across pages.
+Page 8: one-line summary plus one invitation — to comment with their own version, or to follow. Never "contact us".
+
+【What separates a good one from filler】
+Every page must be usable by someone who then goes and works with a different factory. Pages that only make sense as an argument for hiring this supplier are advertising, and readers stop swiping. At most one page may reference how this factory does it, and it must read as an example rather than a pitch.
+
+【Rules】
+・Concrete throughout: name the actual specification lines, the actual failure modes.
+・Never invent a statistic, a percentage or a benchmark. This format tempts them because they look good on a cover page.
+・No price, no lead time, no capacity claim.
+・Write the main post caption too — 60–120 words, labelled separately — whose job is to make someone start swiping without summarising the contents.${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 2000,
+    outputDefaults: { platform: "linkedin", post_type: "document" },
+  }, textConfig(
+    ["Teach-a-sequence", "Failure-modes", "Before-and-after a spec"],
+    900, 3000,
+  )),
+
+  // 私訊：id 含 "dm-intro" 是刻意的 —— liCraft.isLinkedInBodyTask 用
+  // /dm-intro/ 把私訊排除在貼文工藝準則之外，那份 rubric 是給動態貼文的，
+  // 套到一對一私訊會寫出一則貼文而不是一句開場。
+  card("linkedin", "cmo-dm", {
+    id: "li-gs-cmo-dm-intro",
+    tier: "30s",
+    postType: "dm",
+    label: { en: "CMO — DM Opener", zh: "CMO｜私訊開場" },
+    description: {
+      en: "A first LinkedIn message to one specific person",
+      zh: "寫給某一個特定的人的第一則 LinkedIn 私訊",
+    },
+    agent_id: 222311, // Ming-Han Zhou — Brand Strategist (positioning / messaging matrix)
+    skill_slug: "gusheng-li-dm",
+    primary_question: "Who are you messaging, and what did you notice about them?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. A head of product at a US heritage workwear brand who posted about moving their wool sourcing out of China. That post is the reason to write. Say who they are, what you saw, and what you would actually ask them.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "Who, what you noticed, and what you want to ask", type: "textarea", required: true },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.differentiation"],
+    systemPrompt: `You are writing a first LinkedIn direct message from the second-generation operator of a knitted headwear factory to one specific person.
+
+【This is a message, not a post】
+Everything about LinkedIn post craft is wrong here. No hook, no line breaks for rhythm, no closing question designed for comments. This is one person writing to another person who did not ask to be written to, and the only currency is brevity and evidence that you looked.
+
+【Structure — three or four sentences, that is all】
+1. The specific thing you noticed about them. Their post, their product range, a change they made. Not their company's industry.
+2. One sentence on who you are, containing the single fact that makes you relevant to that thing.
+3. A question or a small offer. Something answerable in one line, or a sample. Never a call.
+
+【Rules】
+・Under 400 characters if possible, never over 600. LinkedIn truncates, and long DMs read as templates.
+・No greeting paragraph. Start with the observation.
+・No flattery. "Big fan of what you're building" is the clearest possible signal that this is a mass message.
+・Never claim a mutual connection, a shared event, or a prior conversation that was not in the input.
+・No price, no capability list, no attachment, no link.
+・Make it easy to ignore. A DM that presumes a reply gets none.
+・Do not write a subject line. This is an in-app message.${GUSHENG_CMO_VOICE}${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 700,
+    outputDefaults: { platform: "linkedin", post_type: "dm" },
+  }, textConfig(
+    ["Their post as the opener", "A gap in their range", "One question only"],
+    150, 700,
+  )),
 ];
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1147,6 +1783,56 @@ The audience here is mixed — buyers, trade, and people who follow the page bec
     ["What it is", "What it replaces", "Where it came from"],
     500, 1600,
   )),
+
+  // 2026-09-03 加卡。跟 ig-gs-process 同素材、不同寫法：IG 那張寫給看物件的
+  // 人，這張寫給看工作的人 —— FB 粉專的讀者有一半是同業與在地社群，會注意
+  // 到的是「誰在做、做多久了」，不是構造細節。
+  card("facebook", "process", {
+    id: "fb-gs-process",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "How It Gets Made", zh: "製程幕後" },
+    description: {
+      en: "A step of the making, told for people who understand work",
+      zh: "製作過程的一個步驟，寫給看得懂工作的人",
+    },
+    agent_id: 180159, // Claire Hsu — Social Media Brand Strategist (Authentic Marketing)
+    skill_slug: "gusheng-fb-process",
+    primary_question: "Which step, and what does it take to do it well?",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. Felting. It is the step where the same yarn can come out right or come out ruined, and the difference is judgement about when to stop. Nobody has ever written that down here — it is learned by standing next to someone. Say which step and what makes it hard.",
+      type: "textarea",
+    },
+    inputs: [
+      { key: "context", label: "The step, and what makes it hard to do well", type: "textarea", required: true },
+    ],
+    contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.values", "brand.positioning.origin"],
+    systemPrompt: `You are writing a Facebook post about one step of making knitted headwear.
+
+【How this differs from the Instagram version of the same subject】
+Instagram is written for people looking at an object. Facebook is read by the trade, the local community, and people who have followed this page for years — and what interests them is the work: what it takes to do a step well, why it is hard, how long it takes to learn. Lead with the difficulty, not the mechanism.
+
+【Structure】
+1. Name the step in the first line, plainly.
+2. What makes it hard. The judgement call, the thing that cannot be measured, the point where the same material can go either way.
+3. How that judgement gets made here — practice, time, a rule of thumb, someone standing next to someone.
+4. What it means for the finished hat, in one sentence.
+5. Close plainly.
+
+【Rules】
+・150–300 words.
+・Never name an employee or attribute skill to a named individual.
+・Never invent a machine, a temperature, a duration, or how many years something takes to learn. If the input did not supply the number, describe the difficulty without it.
+・Do not romanticise. "Decades of craftsmanship" says nothing; "the same yarn can come out right or ruined, and the difference is knowing when to stop" says the same thing and is true.
+・The company's own positioning names skilled knitting labour as a scarce and ageing resource. That honesty is available to you and it is more persuasive than any claim of mastery — but only state it if the input supports it.${FB_PAGE_RULES}${GUSHENG_VOICE}`,
+    preferredModel: "anthropic",
+    maxTokens: 1000,
+    outputDefaults: { platform: "facebook", post_type: "post" },
+  }, textConfig(
+    ["What makes it hard", "What it takes to learn", "Where it can go wrong"],
+    500, 1600,
+  )),
 ];
 
 export const GUSHENG_PACK: BrandPack = {
@@ -1164,15 +1850,26 @@ export const GUSHENG_PACK: BrandPack = {
         { id: "craft", labelZh: "講工法", labelEn: "Craft" },
         { id: "care", labelZh: "講保養", labelEn: "Care" },
         { id: "guide", labelZh: "講指南", labelEn: "Guides" },
+        { id: "case", labelZh: "案例研究", labelEn: "Case Study" },
+        { id: "buyer-questions", labelZh: "買家 FAQ", labelEn: "Buyer Questions" },
+        { id: "product-page", labelZh: "產品頁文案", labelEn: "Product Page" },
       ],
     },
     {
+      // 2026-09-03 pill 順序改成 B2B 漏斗順序（開發 → 接住 → 推進 → 既有
+      // 關係 → 喚回）。原本三張都預設「名單上已經有人」，而盛全在美國近乎
+      // 零知名度，名單本身才是缺的東西，所以開發信排第一個。
       key: "email",
       labelZh: "電子報",
       labelEn: "Newsletter",
       formats: [
+        { id: "cold-outreach", labelZh: "陌生開發信", labelEn: "Cold Outreach" },
+        { id: "enquiry-reply", labelZh: "詢價回信", labelEn: "Enquiry Reply" },
+        { id: "sample-followup", labelZh: "寄樣追蹤", labelEn: "Sample Follow-Up" },
         { id: "new-product", labelZh: "新產品", labelEn: "New Product" },
         { id: "reorder", labelZh: "回購提醒", labelEn: "Reorder" },
+        { id: "reactivation", labelZh: "休眠重啟", labelEn: "Reactivation" },
+        { id: "show-invite", labelZh: "展會邀請信", labelEn: "Show Invite" },
         { id: "industry-news", labelZh: "產業新知", labelEn: "Industry" },
       ],
     },
@@ -1182,6 +1879,8 @@ export const GUSHENG_PACK: BrandPack = {
       labelEn: "Instagram",
       formats: [
         { id: "showcase", labelZh: "展示成品", labelEn: "Finished Pieces" },
+        { id: "process", labelZh: "製程幕後", labelEn: "At the Machine" },
+        { id: "carousel-compare", labelZh: "輪播對比", labelEn: "Comparison" },
         { id: "origin", labelZh: "品牌故事", labelEn: "Brand Story" },
       ],
     },
@@ -1193,10 +1892,12 @@ export const GUSHENG_PACK: BrandPack = {
         { id: "co-event", labelZh: "公司｜公司活動", labelEn: "Company · Update" },
         { id: "co-product", labelZh: "公司｜新產品", labelEn: "Company · Product" },
         { id: "co-industry", labelZh: "公司｜產業新知", labelEn: "Company · Industry" },
+        { id: "co-document", labelZh: "公司｜輪播文件", labelEn: "Company · Document" },
         { id: "cmo-contrarian", labelZh: "CMO｜挑戰市場觀點", labelEn: "CMO · Contrarian" },
         { id: "cmo-curation", labelZh: "CMO｜分享他人文章", labelEn: "CMO · Curation" },
         { id: "cmo-company", labelZh: "CMO｜公司活動", labelEn: "CMO · Company" },
         { id: "cmo-tradeshow", labelZh: "CMO｜參加展覽", labelEn: "CMO · Trade Show" },
+        { id: "cmo-dm", labelZh: "CMO｜私訊開場", labelEn: "CMO · DM Opener" },
       ],
     },
     {
@@ -1205,6 +1906,7 @@ export const GUSHENG_PACK: BrandPack = {
       labelEn: "Facebook",
       formats: [
         { id: "origin", labelZh: "品牌故事", labelEn: "Brand Story" },
+        { id: "process", labelZh: "製程幕後", labelEn: "How It's Made" },
         { id: "tradeshow", labelZh: "參展活動", labelEn: "Trade Show" },
         { id: "company-life", labelZh: "公司活動", labelEn: "At the Factory" },
         { id: "new-product", labelZh: "公司新品", labelEn: "New Piece" },

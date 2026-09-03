@@ -331,18 +331,31 @@ describe("盛全工業 pack 的內容規則", () => {
     );
   });
 
-  it("官網三種文章：工法 / 保養 / 指南", () => {
+  it("官網六種文章：CJ 原本開的三種 ＋ 2026-09-03 補的漏斗中段三種", () => {
     const web = gs.channels.find((c) => c.key === "website")!;
-    expect(web.formats.map((f) => f.id)).toEqual(["craft", "care", "guide"]);
+    expect(web.formats.map((f) => f.id)).toEqual([
+      "craft", "care", "guide", "case", "buyer-questions", "product-page",
+    ]);
   });
 
-  it("LinkedIn 一個頻道裝下公司 3 種 ＋ CMO 4 種", () => {
+  it("電子報的 pill 順序是 B2B 漏斗順序，開發信排第一", () => {
+    // 2026-09-03：原本三張卡都預設「名單上已經有人」（新品／回購／產業新知），
+    // 而盛全在美國近乎零知名度 —— 名單本身才是缺的東西。順序本身是給客戶看
+    // 的說明，所以鎖住它。
+    const em = gs.channels.find((c) => c.key === "email")!;
+    expect(em.formats.map((f) => f.id)).toEqual([
+      "cold-outreach", "enquiry-reply", "sample-followup",
+      "new-product", "reorder", "reactivation", "show-invite", "industry-news",
+    ]);
+  });
+
+  it("LinkedIn 一個頻道裝下公司 4 種 ＋ CMO 5 種", () => {
     // 不能拆成兩個頻道：PlatformTaskPage 用 channels.find(c => c.key === platform)
     // 找頻道，同一個 CatalogPlatform 出現兩次時第二個永遠拿不到。
     const li = gs.channels.find((c) => c.key === "linkedin")!;
-    expect(li.formats.length).toBe(7);
-    expect(li.formats.filter((f) => f.id.startsWith("co-")).length).toBe(3);
-    expect(li.formats.filter((f) => f.id.startsWith("cmo-")).length).toBe(4);
+    expect(li.formats.length).toBe(9);
+    expect(li.formats.filter((f) => f.id.startsWith("co-")).length).toBe(4);
+    expect(li.formats.filter((f) => f.id.startsWith("cmo-")).length).toBe(5);
   });
 
   it("task id 的第一段對得上頻道 —— 這是 mockup 路由的唯一依據", () => {
@@ -360,9 +373,22 @@ describe("盛全工業 pack 的內容規則", () => {
     }
   });
 
-  it("task id 不含 formatFromTaskId 的關鍵字陷阱", () => {
-    // formatFromTaskId 在前綴之後還會掃關鍵字，掃到就決斷。例如「品牌故事」
-    // 若命名為 -brand-story，ig-/fb- 卡會被判成限時動態版型而不是貼文。
+  it("task id 對 formatFromTaskId 的關鍵字路由是刻意的，不是碰巧的", () => {
+    // formatFromTaskId 在前綴之後還會掃關鍵字，掃到就決斷。這件事有兩面：
+    // 碰到不想要的關鍵字會拿到錯的版型（「品牌故事」若命名為 -brand-story，
+    // ig-/fb- 卡會被判成限時動態而不是貼文）；但有些卡就是要那個版型 ——
+    // 輪播卡要 carousel、LI 文件卡要 document、產品頁卡要 product-page。
+    //
+    // 2026-09-03 從「一律禁止」改成「每張卡自己宣告」。無條件禁止會讓
+    // 三張新卡為了避開關鍵字而拿到錯的版型 —— 規則本身會造成它要防的 bug。
+    // 這裡不重新實作 formatFromTaskId（那就是 client 手抄 server 知識的老毛病，
+    // 而且它在 RunPage.tsx 裡，跨了 client/server 邊界不能 import），
+    // 只鎖住「哪張卡允許命中哪個關鍵字」這個決定。
+    const INTENTIONAL: Record<string, string> = {
+      "ig-gs-carousel-compare": "carousel",   // → instagram:carousel，config 也是輪播形狀
+      "li-gs-co-document": "document",        // → linkedin:document，8 頁用 --- 分隔
+      "web-gs-product-page": "product",       // → web:product-page，這張就是產品頁文案
+    };
     const TRAPS = [
       "story", "live", "profile", "bio", "carousel", "comment", "pinned",
       "poll", "reel", "shorts", "community", "thumbnail", "calendar",
@@ -370,16 +396,40 @@ describe("盛全工業 pack 的內容規則", () => {
     ];
     for (const card of gs.cards) {
       const id = packCardId(card);
+      const allowed = INTENTIONAL[id];
       for (const trap of TRAPS) {
+        if (trap === allowed) continue;
         expect(id.includes(trap), `${id} 含關鍵字「${trap}」，mockup 會被判錯`).toBe(false);
       }
       // 獨立的 ad 段會被判成廣告版型（lead-paragraph 那種子字串則不會）
       expect(/(?:^|-)ad(?:-|$)/.test(id), `${id} 有獨立的 ad 段`).toBe(false);
       // 官網卡走 web- 前綴分支，含 product 會被判成產品頁而不是部落格長文
-      if (card.channel === "website") {
+      if (card.channel === "website" && allowed !== "product") {
         expect(id.includes("product"), `${id} 是官網長文，含 product 會拿到產品頁版型`).toBe(false);
       }
     }
+    // 宣告了刻意路由的卡，必須真的含那個關鍵字 —— 否則哪天改了 id
+    // 就會靜默失去它要的版型，而這張白名單還在說它有。
+    for (const [id, kw] of Object.entries(INTENTIONAL)) {
+      const card = gs.cards.find((c) => packCardId(c) === id);
+      expect(card, `INTENTIONAL 列了不存在的卡 ${id}`).toBeTruthy();
+      expect(id.includes(kw), `${id} 宣告要命中「${kw}」卻不含它`).toBe(true);
+    }
+  });
+
+  it("輪播卡的 config 是輪播形狀 —— 版型對了但 config 沒對是這個專案的雙層 bug", () => {
+    // 一則貼文由 N 張卡組成 = variants:1 + cardsPerVariant:N。寫成 variants:N
+    // 會得到 N 個各自完整的貼文版本，而不是一組 N 張的輪播；而版型那一層
+    // 仍然會渲染成輪播，所以畫面看起來像對的，內容是錯的。
+    const carousel = gs.cards.find((c) => packCardId(c) === "ig-gs-carousel-compare")!;
+    expect(carousel).toBeTruthy();
+    if (carousel.kind !== "custom") throw new Error("ig-gs-carousel-compare 應為自訂卡");
+    expect(carousel.config.variants, "輪播不能用變體拆卡").toBe(1);
+    expect(carousel.config.cardsPerVariant, "沒有 cardsPerVariant 就只會出一張").toBe(5);
+    // holdForImages 是叫 UI 等圖算完；30s 層 runImageGen=false 不算圖，
+    // 開了會等一個永遠不會到的東西。
+    expect(carousel.config.runImageGen).toBe(false);
+    expect(carousel.config.holdForImages ?? false).toBe(false);
   });
 
   it("每張自訂卡都帶事實白名單 —— 少了模型就會自己編認證與設備", () => {
@@ -477,7 +527,7 @@ describe("盛全工業 pack 的內容規則", () => {
     // CJ 2026-09-02 指定「用第二代經營者的視角」。這是內容的素材來源而不是
     // 稱謂設定 —— 少了它，「挑戰市場觀點」寫出來就是沒有立足點的空泛評論。
     const cmo = gs.cards.filter((c) => c.channel === "linkedin" && c.format.startsWith("cmo-"));
-    expect(cmo.length).toBe(4);
+    expect(cmo.length).toBe(5); // 2026-09-03 加了私訊開場，也是第二代在發言
     for (const card of cmo) {
       if (card.kind !== "custom") continue;
       expect(
@@ -502,13 +552,39 @@ describe("盛全工業 pack 的內容規則", () => {
     expect(GUSHENG_FACTS.join(" ")).toContain("240 pieces per style");
   });
 
-  it("十九張卡，頻道分佈對得上 CJ 開的清單", () => {
-    expect(gs.cards.length).toBe(19);
+  it("三十二張卡：CJ 原本開的 19 張 ＋ 2026-09-03 補漏斗的 13 張", () => {
+    // CJ 2026-09-03「是否還應該有新的任務類型」。盤點後補的 13 張全部落在
+    // 漏斗中下段 —— 原本 19 張幾乎都是品牌與認知內容，買家詢價之後到下單
+    // 之前一張都沒有。
+    expect(gs.cards.length).toBe(32);
     const byChannel = (k: string) => gs.cards.filter((c) => c.channel === k).length;
-    expect(byChannel("website")).toBe(3);
-    expect(byChannel("email")).toBe(3);
-    expect(byChannel("instagram")).toBe(2);
-    expect(byChannel("linkedin")).toBe(7);
-    expect(byChannel("facebook")).toBe(4);
+    expect(byChannel("website")).toBe(6);   // 工法/保養/指南 + 案例/FAQ/產品頁
+    expect(byChannel("email")).toBe(8);     // 新品/回購/產業 + 開發/詢價/寄樣/展會/喚回
+    expect(byChannel("instagram")).toBe(4); // 成品/故事 + 製程/輪播
+    expect(byChannel("linkedin")).toBe(9);  // 公司 4（含文件）+ CMO 5（含私訊）
+    expect(byChannel("facebook")).toBe(5);  // 故事/參展/活動/新品 + 製程
+  });
+
+  it("補的每一張卡都對得上一個 pill，沒有孤兒也沒有空 pill", () => {
+    // 這條在通用區已經雙向鎖過，這裡再點名 13 張新卡，是為了讓「加卡時漏了
+    // 更新 channels」這個最容易犯的錯誤直接指名道姓地紅。
+    const ADDED = [
+      "web-gs-case", "web-gs-buyer-questions", "web-gs-product-page",
+      "em-gs-cold-outreach", "em-gs-enquiry-reply", "em-gs-sample-followup",
+      "em-gs-show-invite", "em-gs-reactivation",
+      "ig-gs-process", "ig-gs-carousel-compare",
+      "li-gs-co-document", "li-gs-cmo-dm-intro",
+      "fb-gs-process",
+    ];
+    expect(ADDED.length).toBe(13);
+    for (const id of ADDED) {
+      const card = gs.cards.find((c) => packCardId(c) === id);
+      expect(card, `新卡 ${id} 不在 pack 裡`).toBeTruthy();
+      const ch = gs.channels.find((c) => c.key === card!.channel)!;
+      expect(
+        ch.formats.map((f) => f.id),
+        `${id} 的 pill「${card!.format}」沒有宣告在 ${card!.channel}`,
+      ).toContain(card!.format);
+    }
   });
 });
