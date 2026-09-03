@@ -114,6 +114,19 @@ const FORBIDDEN_IN_OUTPUT: { pattern: RegExp; why: string }[] = [
   { pattern: /\bper unit\b.{0,20}\d/i, why: "published price" },
   { pattern: /\bcost-effective\b/i, why: "banned price language" },
   { pattern: /\bcompetitive pricing\b/i, why: "banned price language" },
+  // 2026-09-03: all four of these came out of the first probe of the new
+  // cards. The voice block already banned "Let's dive in" as an exact
+  // phrase and the model wrote "Let's dive into your beret project" — so
+  // the check has to match the family, not the string. The pleasantries
+  // are the tell that nobody read the buyer's message, which is precisely
+  // what the enquiry reply exists to disprove.
+  { pattern: /\blet'?s dive (in|into)\b/i, why: "banned opener family" },
+  { pattern: /\bthanks for reaching out\b/i, why: "banned pleasantry opener" },
+  { pattern: /\bthank you for your interest\b/i, why: "banned pleasantry opener" },
+  { pattern: /\bhope this (email |message )?finds you well\b/i, why: "banned pleasantry opener" },
+  { pattern: /\bthe perfect \w+/i, why: "consumer hype — brand writes for buyers, not shoppers" },
+  { pattern: /\bswipe through to see\b/i, why: "generic carousel filler" },
+  { pattern: /\bgame[- ]changer\b/i, why: "banned hype" },
 ];
 
 function captionsOf(result: any): string[] {

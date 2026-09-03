@@ -83,7 +83,8 @@ Write plainly and specifically. Lead with the manufacturing fact, then say what 
 【Never do these】
 1. No unevidenced superlatives — "best", "world-class", "leading", "No.1", "premium quality" as a bare claim.
 2. No consumer hype or urgency — "limited time", "don't miss out", "act now", exclamation-led openers.
-3. No emoji-led openers, no more than 3 hashtags, and none of "Did you know?" / "Let's dive in" / "Here's the thing".
+3. No emoji-led openers, no more than 3 hashtags, and none of "Did you know?" / "Here's the thing" / "the perfect <anything>". "Let's dive in" is banned in every form, including "let's dive into your project" — the whole family goes, not just the exact phrase.
+3b. Email and reply openers to avoid: "Thanks for reaching out", "Thank you for your interest", "I hope this finds you well", "Great to hear from you". Open on the answer or the observation instead. A pleasantry before the substance is the tell that nobody read the message.
 4. Never publish a price, landed cost, duty or tariff figure. Pricing belongs in a quotation. This includes soft price language — "affordable", "competitive pricing", "cost-effective".
 5. Never claim a certification, test report, machine, or capability that is not on the fact list below. If the input does not supply it, write around it or leave it out.
 6. Never name a specific customer brand. Describe the category instead ("a US outdoor brand").
@@ -1160,8 +1161,13 @@ Card 1 is not an introduction. It is the first option, with a one-line framing a
 ・Two or three lines of body: what is physically different, and what that changes for the wearer or the buyer.
 Keep the same sentence shape across all five. Variation between cards destroys the comparison; the reader should be able to scan the same slot on each card.
 
-【The main caption】
-150–250 words, written to make someone swipe. Say what is being compared and why it matters, and do not resolve it — the answer is in the cards. Do not summarise all five in the caption.
+【The main caption — and how it becomes the cards】
+Write the caption as the full comparison: name each of the five options in order and give each one its line or two. This is not duplication. A separate step takes this caption and splits it into the five cards, so anything you leave out of the caption cannot appear on a card. A caption that only teases produces five empty cards.
+
+Open on the reason the comparison exists — that these look identical in a photograph and are not — then go through the options in a fixed order, same sentence shape each time.
+
+Banned in the caption, because this is where consumer-marketing habits reappear:
+"the perfect <anything>", "the details matter", "each designed to", "unique fit and look", "swipe through to see", "we're breaking down", and any sentence that could introduce a comparison of five of anything. Open on the specific claim, not on the fact that a comparison is happening.
 
 【Rules】
 ・Never invent an option, a name, a measurement or a difference. Use exactly the sub-style names on the fact list.
@@ -1517,8 +1523,12 @@ Document posts out-reach every other format on LinkedIn because the swipe itself
 Separate every page with a line containing only "---". Eight pages, no more, no fewer.
 
 Page 1 (cover): a 5–8 word headline containing a number or a contrast, plus one subtitle line naming who it is for.
-Pages 2–7: one complete point per page. A headline that stands alone if the reader sees nothing else, then 30–50 words underneath. Do not continue a sentence across pages.
+Pages 2–7: one complete point per page. A headline that stands alone if the reader sees nothing else, then 40–70 ENGLISH WORDS of body underneath. Do not continue a sentence across pages.
 Page 8: one-line summary plus one invitation — to comment with their own version, or to follow. Never "contact us".
+
+【Length — read this twice】
+40–70 English words per page, and 450–800 English words for the whole document.
+A general LinkedIn craft rubric is also in this prompt and it specifies page length in 字 — Chinese characters — because it was written for Chinese-language posts. Applied to English it produces roughly forty characters a page, which is a caption, not a document. Where that rubric and this card disagree about length, THIS CARD WINS. If your draft comes to under 400 words in total, you have followed the wrong rule; go back and write the pages properly.
 
 【What separates a good one from filler】
 Every page must be usable by someone who then goes and works with a different factory. Pages that only make sense as an argument for hiring this supplier are advertising, and readers stop swiping. At most one page may reference how this factory does it, and it must read as an example rather than a pitch.
