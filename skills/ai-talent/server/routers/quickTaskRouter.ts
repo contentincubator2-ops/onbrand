@@ -1476,6 +1476,9 @@ export const quickTaskRouter = router({
       return {
         ...base,
         inputs: t.inputs ?? [],
+        // 2026-09-04：這一層是明確列欄位的重塑，不是整包 spread —— 沒列到的
+        // key 會被靜靜丟掉。自建卡的標記就是這樣消失的（dev probe 抓到）。
+        ownCardId: t.ownCardId ?? null,
         eta_seconds: t.tier === "30s" ? 30 : 60,
         preferredModel: t.preferredModel,
         agent_id: t.agent_id ?? null,

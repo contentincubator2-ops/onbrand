@@ -284,6 +284,8 @@ interface FBTaskCard {
   team?: Array<{ id: number; name: string; title: string; avatarUrl: string | null }>;
   squad_slug?: string;
   methodology?: string;
+  /** 2026-09-04：非 null 代表這是使用者自己建的卡，可以編輯。 */
+  ownCardId?: string | null;
 }
 
 /**
@@ -1926,6 +1928,31 @@ function PlatformTaskPageInner() {
                       className="flex items-center justify-center relative"
                       style={{ height: 130, background: `linear-gradient(135deg, ${pal.from} 0%, ${pal.to} 100%)` }}
                     >
+                      {/* 自己建的卡：標記 + 編輯入口。編輯放在卡片上而不是另開
+                          管理頁 —— 使用者想改的時候，眼睛正看著這張卡。
+                          用 span 而不是巢狀 button（button 不能包 button）。 */}
+                      {task.ownCardId && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          title={lang === "en" ? "Edit this card" : "編輯這張卡"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setResumeCardId(task.ownCardId!);
+                            setComposerOpen(true);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            e.preventDefault(); e.stopPropagation();
+                            setResumeCardId(task.ownCardId!);
+                            setComposerOpen(true);
+                          }}
+                          className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-white/85 hover:bg-white text-[10px] font-semibold text-default-700 cursor-pointer"
+                        >
+                          <FontAwesomeIcon icon={faPenToSquare} />
+                          {lang === "en" ? "My card" : "我的卡"}
+                        </span>
+                      )}
                       <Avatar
                         src={avatarSrc}
                         size="lg"
