@@ -23,7 +23,13 @@ import "./../server/bootstrap-env";
 import localPool from "../server/localDb";
 import { getJwtSecret } from "../server/_core/env";
 import { resolveTask } from "../server/_core/taskRegistry";
-import { getBrandTaskCard } from "../server/_core/brandTaskCards";
+import { getBrandTaskCard, registerBrandTaskCardSource } from "../server/_core/brandTaskCards";
+
+// probe 是獨立的 node process。`taskRegistry` 的 SOURCES 是模組層狀態，server
+// process 靠 routers/index.ts → brandTaskCardRouter 的 side-effect 帶進來；
+// 這裡沒有那條路，所以要自己註冊，否則 resolveTask 永遠回 null（而且會誤報成
+// 「閘門有效」——第一次跑就是這樣騙過自己的）。
+registerBrandTaskCardSource();
 
 const BASE = process.env.PROBE_BASE ?? "http://127.0.0.1:3101";
 
@@ -70,14 +76,26 @@ async function main(): Promise<void> {
     .setIssuedAt().setExpirationTime("30m")
     .sign(new TextEncoder().encode(getJwtSecret()));
 
+  const unwrap = (r: Response, json: any) => ({
+    ok: r.ok, status: r.status,
+    data: json?.result?.data,
+    err: json?.error?.message ?? json?.error?.json?.message,
+  });
+  /** mutation：POST，input 放 body。 */
   const call = async (path: string, input: any) => {
     const r = await fetch(`${BASE}/trpc/${path}`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(input),
     });
-    const json: any = await r.json().catch(() => ({}));
-    return { ok: r.ok, status: r.status, data: json?.result?.data, err: json?.error?.message ?? json?.error?.json?.message };
+    return unwrap(r, await r.json().catch(() => ({})));
+  };
+  /** query：**GET**，input 走 query string。用 POST 打 query 會被 tRPC 拒絕，
+   *  回傳的 data 是 undefined —— 第一次跑就是這樣讓三個檢查全紅的。 */
+  const query = async (path: string, input: any) => {
+    const url = `${BASE}/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`;
+    const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    return unwrap(r, await r.json().catch(() => ({})));
   };
 
   let cardId: string | null = null;
@@ -165,7 +183,7 @@ async function main(): Promise<void> {
     check(resolved?.config.variants === 1, "config 的版本數對得上");
 
     console.log("\n=== 5. 出現在任務頁的清單裡 ===");
-    const listed = await call("quickTask.listFB", { brandId: brand.id });
+    const listed = await query("quickTask.listFB", { brandId: brand.id });
     const found = ((listed.data as any[]) ?? []).find((t) => t.id === cardId);
     check(!!found, "listFB 列得出這張卡");
     check(found?.platform === "facebook", "掛在正確的頻道", found?.platform);
