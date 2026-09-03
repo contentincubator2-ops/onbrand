@@ -187,9 +187,13 @@ export default function TaskCardComposer({
     <Modal
       isOpen={isOpen}
       onClose={() => { onClose(); }}
-      size="3xl"
+      // 2026-09-04 (CJ「這個文字編輯的空間要放大，現在太小了，可以全版」):
+      // 第 2 步是「讀一份一千多字的規則並逐條改」，那是文件編輯不是填表 ——
+      // 在一個 3xl 的框裡開 14 行的窗看它，等於用吸管讀文件。這一步給全螢幕，
+      // 其他兩步維持原尺寸（它們是短輸入，全螢幕只會讓內容飄在正中間很空）。
+      size={step === 2 ? "full" : "3xl"}
       scrollBehavior="inside"
-      classNames={{ base: "max-h-[92vh]" }}
+      classNames={{ base: step === 2 ? "" : "max-h-[92vh]" }}
     >
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
@@ -203,7 +207,7 @@ export default function TaskCardComposer({
           <p className="text-tiny text-default-500 font-normal">{stepLabel}</p>
         </ModalHeader>
 
-        <ModalBody className="gap-4">
+        <ModalBody className={`gap-4 ${step === 2 ? "flex flex-col" : ""}`}>
           {error && (
             <div className="rounded-medium border border-danger-200 bg-danger-50 px-3 py-2 text-tiny text-danger-700">
               {error}
@@ -409,10 +413,17 @@ export default function TaskCardComposer({
                       : "這就是這張卡每次執行會遵守的規則。哪一條抓錯了直接改 —— 你比模型清楚自己的寫法。"}
                   </p>
                   <Textarea
-                    minRows={14}
+                    // disableAutosize + 固定高度：讓框吃滿視窗剩下的空間，而不是
+                    // 跟著內容長高再被 modal 的捲軸截斷 —— 後者會變成「框裡捲一次、
+                    // modal 再捲一次」的雙層捲動，改長文件時最惱人。
+                    disableAutosize
                     value={skillDraft}
                     onValueChange={setSkillDraft}
-                    classNames={{ input: "text-tiny leading-relaxed font-mono" }}
+                    classNames={{
+                      base: "flex-1",
+                      inputWrapper: "h-[calc(100vh-340px)] min-h-[320px] items-start",
+                      input: "h-full text-small leading-relaxed font-mono resize-none",
+                    }}
                   />
                   <Button
                     size="sm" variant="light" startContent={<Wand2 size={13} />}
