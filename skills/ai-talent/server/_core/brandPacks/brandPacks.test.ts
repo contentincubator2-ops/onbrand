@@ -417,6 +417,30 @@ describe("盛全工業 pack 的內容規則", () => {
     }
   });
 
+  it("長文與多頁文件都走 document 模式 —— 社群分支會注入市場 master 的字數上限", () => {
+    // 2026-09-03 實跑兩次才找到：社群分支在最前面注入市場 master persona，
+    // en-US 那份的 outputRules 寫死「100-250 words」。八頁的 LI 文件卡被當
+    // 成一則貼文，只出 376–683 字元。docMode 分支刻意不放 master，官網卡
+    // 走它就穩定產出 1300–3900 字元。
+    //
+    // 判準是「這份產出是不是一則貼文」，不是頻道。凡是 captionMaxChars
+    // 超過貼文量（>2000）的卡，都必須是 document 模式。
+    // 電子報暫時排除：它有自己的 edmBlock 工藝層，而實跑顯示信件類並沒有
+    // 被壓到 250 字（em-gs-show-invite 上限 2000，實際產出 1795–2097）。
+    // em-gs-new-product 上限 2600 是唯一還沒驗過的，改它之前要有證據 ——
+    // document 模式會整個換掉 prompt 骨架，不是調一個旗標。
+    for (const card of gs.cards) {
+      if (card.kind !== "custom") continue;
+      if (card.channel === "email") continue;
+      if ((card.config.captionMaxChars ?? 0) <= 2000) continue;
+      expect(
+        card.template.outputMode,
+        `${card.template.id} 的 captionMaxChars 是 ${card.config.captionMaxChars}，` +
+        `走社群分支會被 master persona 的 100-250 words 壓住`,
+      ).toBe("document");
+    }
+  });
+
   it("輪播卡的 config 是輪播形狀 —— 版型對了但 config 沒對是這個專案的雙層 bug", () => {
     // 一則貼文由 N 張卡組成 = variants:1 + cardsPerVariant:N。寫成 variants:N
     // 會得到 N 個各自完整的貼文版本，而不是一組 N 張的輪播；而版型那一層

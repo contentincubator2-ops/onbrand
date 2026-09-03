@@ -1540,6 +1540,17 @@ Every page must be usable by someone who then goes and works with a different fa
 ・Write the main post caption too — 60–120 words, labelled separately — whose job is to make someone start swiping without summarising the contents.${GUSHENG_VOICE}`,
     preferredModel: "anthropic",
     maxTokens: 2000,
+    // 2026-09-03：這張卡沒有 outputMode:"document" 時，兩次實跑都只出
+    // 376–683 字元，八頁的文件連一頁的份量都不到。原因不是 LI 工藝準則
+    // （我先改了那個，沒有用），是社群分支會在最前面注入市場 master
+    // persona —— en-US 那份的 outputRules 寫死「100-250 words」，還帶著
+    // 「DTC / viral content」「hustle culture, weekend vibes」「結尾 3-5 個
+    // hashtag」。八頁文件被當成一則貼文，字數就被壓到貼文的量。
+    //
+    // docMode 分支是刻意不放 master 的（FBTaskTemplate.outputMode 的註解：
+    // 結構化文件不得走社群 caption 骨架）。同一個 pack 的官網卡走這條，
+    // 穩定產出 1300–3900 字元，就是對照組。
+    outputMode: "document",
     outputDefaults: { platform: "linkedin", post_type: "document" },
   }, textConfig(
     ["Teach-a-sequence", "Failure-modes", "Before-and-after a spec"],
