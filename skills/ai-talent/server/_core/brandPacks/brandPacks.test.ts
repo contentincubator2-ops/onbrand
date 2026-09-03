@@ -425,10 +425,10 @@ describe("盛全工業 pack 的內容規則", () => {
     //
     // 判準是「這份產出是不是一則貼文」，不是頻道。凡是 captionMaxChars
     // 超過貼文量（>2000）的卡，都必須是 document 模式。
-    // 電子報暫時排除：它有自己的 edmBlock 工藝層，而實跑顯示信件類並沒有
-    // 被壓到 250 字（em-gs-show-invite 上限 2000，實際產出 1795–2097）。
-    // em-gs-new-product 上限 2600 是唯一還沒驗過的，改它之前要有證據 ——
-    // document 模式會整個換掉 prompt 骨架，不是調一個旗標。
+    // 電子報排除，而且是驗過的：信件有自己的 edmBlock 工藝層，實跑沒有被
+    // 壓到 250 字 —— em-gs-show-invite 上限 2000／實際 1795–2097，
+    // em-gs-new-product 上限 2600／實際 1027–2117。兩張都健康，所以不動。
+    // document 模式會整個換掉 prompt 骨架，不是調一個旗標，沒壞就別改。
     for (const card of gs.cards) {
       if (card.kind !== "custom") continue;
       if (card.channel === "email") continue;
