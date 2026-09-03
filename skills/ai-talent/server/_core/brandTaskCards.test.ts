@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   brandIdOfCardId, slugifyCardName, measureSamples,
-  cardTemplate, cardConfig, factLeaks, redactFactLeaks, type BrandTaskCard,
+  cardTemplate, cardConfig, factLeaks, redactFactLeaks, verbatimSamples, type BrandTaskCard,
 } from "./brandTaskCards";
 
 function makeCard(over: Partial<BrandTaskCard> = {}): BrandTaskCard {
@@ -184,5 +184,55 @@ describe("SKILL 不可以帶著範例的具體數字", () => {
     const skill = "兩盒 499、一盒 279、六盒 1499。";
     const fixed = redactFactLeaks(skill, factLeaks(skill, samples, own));
     expect(factLeaks(fixed, samples, own)).toEqual([]);
+  });
+});
+
+describe("從對話串抽出來的樣本必須逐字出自原文", () => {
+  // 模型很愛順手把成品「整理得更好」再交出來。那樣抽到的就不是使用者真的發過的
+  // 文，而這張卡的全部價值就建立在「學你真的寫過的東西」。
+  const thread = `我：幫我寫三篇促購文
+AI：好的，我寫了三個版本給你參考。
+
+版本一：
+冷氣團來了。冰箱最上層那排熱可可，是我們去年冬天賣得最好的東西。
+
+版本二：
+有人問我們為什麼不做無糖版。因為甜度砍掉之後可可的厚度就不見了。
+
+我：第二篇太短
+AI：我幫你加長：
+有人問我們為什麼不做無糖版。因為甜度砍掉之後可可的厚度就不見了，喝起來像在喝溫水。`;
+
+  it("原文有的留下來", () => {
+    const got = verbatimSamples([
+      "冷氣團來了。冰箱最上層那排熱可可，是我們去年冬天賣得最好的東西。",
+    ], thread);
+    expect(got).toHaveLength(1);
+  });
+
+  it("模型改寫過的丟掉 —— 換一個字就對不上", () => {
+    expect(verbatimSamples([
+      "冷氣團來了。冰箱最上層那排熱可可，是我們去年冬天賣最好的商品。",
+    ], thread)).toEqual([]);
+  });
+
+  it("空白與 Markdown 記號的差異不算改寫（從網頁複製常會不一致）", () => {
+    expect(verbatimSamples([
+      "**冷氣團來了。**  冰箱最上層那排熱可可，是我們去年冬天賣得最好的東西。",
+    ], thread)).toHaveLength(1);
+  });
+
+  it("同一篇改了三版、內容一樣的只留一份", () => {
+    const one = "有人問我們為什麼不做無糖版。因為甜度砍掉之後可可的厚度就不見了。";
+    expect(verbatimSamples([one, one, ` ${one} `], thread)).toHaveLength(1);
+  });
+
+  it("太短的丟掉 —— 學不到東西", () => {
+    expect(verbatimSamples(["好的", "我："], thread)).toEqual([]);
+  });
+
+  it("完全沒抽到也不會炸", () => {
+    expect(verbatimSamples([], thread)).toEqual([]);
+    expect(verbatimSamples([null as any, undefined as any, 123 as any], thread)).toEqual([]);
   });
 });

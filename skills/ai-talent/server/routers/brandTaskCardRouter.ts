@@ -30,7 +30,7 @@ import {
   type BrandTaskCard, type BrandTaskCardField,
   listBrandTaskCards, getBrandTaskCard, mutateBrandTaskCards,
   measureSamples, slugifyCardName, cardTemplate, cardConfig,
-  factLeaks, redactFactLeaks,
+  factLeaks, redactFactLeaks, verbatimSamples,
   MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS,
   registerBrandTaskCardSource,
 } from "../_core/brandTaskCards";
@@ -213,7 +213,102 @@ async function runDistil(brandId: number, userId: number, cardId: string): Promi
   }
 }
 
+/**
+ * 從貼上的 AI 對話串裡挑出「哪幾段是成品」。
+ *
+ * 2026-09-04 (CJ「我該如何，讓用戶更無痛地，將本來在 chatgpt 等地方訓練好的
+ * 對話串，複製過來」)。
+ *
+ * ── 為什麼不是給用戶提示詞叫他去別的工具整理 ─────────────────────────
+ * 那會把工作推回另一個產品：離開這一頁 → 貼提示詞 → 等 → 複製回來，三步都在
+ * 別人的地盤，而且那邊的模型不聽話我們也不知道。「整理很亂的輸入」本來就是這個
+ * 產品在做的事（定位文件上傳就是同一招），把它留在自己這邊，抽取結果還能攤開來
+ * 讓使用者確認。使用者只需要按一次 Ctrl+A。
+ *
+ * ── 抽出來的必須逐字出自原文 ─────────────────────────────────────────
+ * 模型很愛順手把成品「整理得更好」再交出來。那樣抽到的就不是使用者真的發過的文，
+ * 而這張卡的全部價值就建立在「學你真的寫過的東西」。所以 LLM 回來之後還要過
+ * `verbatimSamples()` 這道確定性檢查，改寫過的一律丟掉 —— 寧可少幾篇。
+ */
+async function extractFromThread(text: string): Promise<{ samples: string[]; raw: number }> {
+  const sys = `使用者貼了一段他跟 AI 助手的對話紀錄。請從裡面挑出「可以直接發布的成品」。
+
+【什麼算成品】
+完整的一篇貼文／文案／文章 —— 也就是他當初就是要 AI 幫他生出來的那個東西。
+
+【什麼不算，要略過】
+- 使用者自己下的指令與追問（「幫我寫十篇」「太長了改短一點」）
+- AI 的解釋、開場白、收尾詢問（「好的，我幫你寫了三個版本」「需要我再調整嗎？」）
+- 被後面版本取代的舊稿 —— 同一篇改了三次只取**最後一版**
+- 大綱、條列的建議、分析、檢討
+
+【最重要的規則：逐字照抄】
+每一篇都必須**一字不改**地從原文複製出來。不可以修飾、不可以合併、不可以補完。
+你只是在畫線標記哪幾段是成品，不是在編輯它們。改寫過的會被系統丟掉。
+
+【輸出 JSON】
+{"samples": ["第一篇的完整原文", "第二篇的完整原文"]}
+挑不到任何成品就回 {"samples": []}。直接輸出 JSON，第一個字元就是 {。`;
+
+  const r = await Promise.race([
+    invokeLLM({
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: text.slice(0, 100_000) },
+      ],
+      maxTokens: 8000,
+    }),
+    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 120_000)),
+  ]);
+  const out = r.choices[0]?.message?.content;
+  const body = typeof out === "string" ? out : "";
+  const start = body.indexOf("{"), end = body.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("模型沒有回 JSON，可以重試");
+  const parsed = JSON.parse(body.slice(start, end + 1));
+  const candidates: string[] = Array.isArray(parsed?.samples)
+    ? parsed.samples.filter((x: any) => typeof x === "string")
+    : [];
+  return { samples: verbatimSamples(candidates, text), raw: candidates.length };
+}
+
 export const brandTaskCardRouter = router({
+  /**
+   * 貼上整串 AI 對話 → 挑出裡面的成品，變成一格一格的範例。
+   * 不寫任何東西進資料庫 —— 純粹是「幫你把貼上來的東西整理成範例框」。
+   */
+  extractSamples: protectedProcedure
+    .input(z.object({
+      brandId: z.number(),
+      text: z.string().min(80).max(200_000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      let result: { samples: string[]; raw: number };
+      try {
+        result = await extractFromThread(input.text);
+      } catch (err: any) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `抽取失敗（${String(err?.message ?? err).slice(0, 200)}）— 可以重試，或改成一篇一篇貼`,
+        });
+      }
+      if (result.samples.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: result.raw > 0
+            // 這是「模型改寫了原文所以被 verbatim 檢查丟掉」的情況，要說清楚，
+            // 不然使用者會以為自己貼的東西有問題。
+            ? "抽到的內容跟原文對不上（模型把它改寫過了），請重試一次；連續失敗的話改成一篇一篇貼。"
+            : "在這段對話裡找不到可以直接發布的成品。確認一下有沒有貼到完整的產出，或改成一篇一篇貼。",
+        });
+      }
+      return {
+        samples: result.samples,
+        // 抽到幾篇、丟掉幾篇都要講 —— 使用者才知道是不是漏了什麼。
+        dropped: Math.max(0, result.raw - result.samples.length),
+      };
+    }),
+
   list: protectedProcedure
     .input(z.object({ brandId: z.number(), channel: z.enum(CHANNELS).optional() }))
     .query(async ({ ctx, input }) => {

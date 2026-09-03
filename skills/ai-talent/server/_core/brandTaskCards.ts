@@ -171,6 +171,47 @@ export function measureSamples(samples: string[]): BrandTaskCard["measured"] {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 從 AI 對話串抽出成品
+// ─────────────────────────────────────────────────────────────────────
+/**
+ * 正規化：只留下用來比對「這段是不是真的出自原文」的字元。
+ *
+ * 對話串複製出來的東西，空白、換行、全形空格、Markdown 的粗體記號都可能跟
+ * 原文對不齊（尤其從網頁複製會夾帶不可見字元）。比對太嚴會把好樣本全丟掉，
+ * 比對太鬆又擋不住模型自己改寫。折衷：拿掉空白與常見的 Markdown 裝飾，
+ * 其餘照舊 —— 換字、改句就一定對不上。
+ */
+function normalizeForMatch(t: string): string {
+  return t
+    .replace(/[\s　]+/g, "")
+    .replace(/[*_`~]/g, "")
+    .trim();
+}
+
+/**
+ * 只留下**真的出現在原對話串裡**的候選樣本。
+ *
+ * 這是「只准引用，不准創作」在這條路上的版本。模型很愛順手把成品「整理得更好」
+ * 再交出來 —— 那樣抽出來的就不是使用者真的發過的文，而卡片的整個價值就建立在
+ * 「學你真的寫過的東西」。改寫過的一律丟掉，寧可少幾篇。
+ */
+export function verbatimSamples(candidates: string[], source: string): string[] {
+  const hay = normalizeForMatch(source);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of candidates) {
+    const text = String(c ?? "").trim();
+    if (text.length < 20) continue;                 // 太短學不到東西
+    const needle = normalizeForMatch(text);
+    if (needle.length < 20 || !hay.includes(needle)) continue;
+    if (seen.has(needle)) continue;                 // 對話串裡改了三版、內容一樣
+    seen.add(needle);
+    out.push(text);
+  }
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // 事實洩漏檢查
 // ─────────────────────────────────────────────────────────────────────
 /**

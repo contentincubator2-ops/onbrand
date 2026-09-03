@@ -27,7 +27,22 @@ import {
 } from "@heroui/react";
 import {
   Plus, Trash2, Wand2, FlaskConical, Check, AlertTriangle, ChevronLeft,
+  MessagesSquare, ClipboardCopy, FileText,
 } from "lucide-react";
+
+/**
+ * 給「想自己先整理」的使用者複製去別的 AI 用的提示詞。
+ *
+ * 主路徑是把整串貼進來讓我們抽（少三個步驟、而且結果攤開來可以確認）。這段是
+ * 給已經習慣在 ChatGPT 裡收尾的人 —— 收在摺疊區，不搶主路徑的視線。
+ */
+const CLEANUP_PROMPT = `請把我們這串對話裡「可以直接發布的成品」整理出來。
+
+規則：
+1. 只要完整的成品（一篇貼文／文案／文章），不要指令、解釋、大綱、分析。
+2. 同一篇改過很多版的，只留最後一版。
+3. 一字不改地照抄原文，不要修飾、不要合併、不要補完。
+4. 每篇之間用一行「---」隔開，前後不要加任何說明文字。`;
 
 export type ComposerChannel =
   | "facebook" | "instagram" | "threads" | "linkedin" | "tiktok"
@@ -75,6 +90,13 @@ export default function TaskCardComposer({
   const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [name, setName] = React.useState("");
   const [samples, setSamples] = React.useState<string[]>([""]);
+  // 一篇一篇貼 vs 貼整串 AI 對話。預設「一篇一篇」——它一定成功且不花 LLM，
+  // 整串抽取是給「我在 ChatGPT 練了半天」的人的捷徑。
+  const [sampleMode, setSampleMode] = React.useState<"one-by-one" | "thread">("one-by-one");
+  const [threadText, setThreadText] = React.useState("");
+  const [promptOpen, setPromptOpen] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [extractNote, setExtractNote] = React.useState<string | null>(null);
   const [primaryQuestion, setPrimaryQuestion] = React.useState("");
   const [primaryPlaceholder, setPrimaryPlaceholder] = React.useState("");
   const [askFields, setAskFields] = React.useState<AskField[]>([]);
@@ -114,6 +136,21 @@ export default function TaskCardComposer({
     if (card?.skill && !skillDraft) setSkillDraft(card.skill);
   }, [card?.skill]);
 
+  const extractMut = (trpc as any).brandTaskCard?.extractSamples?.useMutation?.({
+    onSuccess: (r: { samples: string[]; dropped: number }) => {
+      // 抽到的直接變成範例框 —— 使用者接著就在同一個畫面上勾掉不要的、改錯的。
+      setSamples(r.samples);
+      setSampleMode("one-by-one");
+      setExtractNote(
+        r.dropped > 0
+          ? `抽出 ${r.samples.length} 篇（另有 ${r.dropped} 段跟原文對不上，已略過）。請確認一下，不要的直接刪掉。`
+          : `抽出 ${r.samples.length} 篇。請確認一下，不要的直接刪掉。`,
+      );
+      setBusy(null);
+    },
+    onError: (e: any) => { setError(e?.message ?? "抽取失敗"); setBusy(null); },
+  }) ?? null;
+
   const createMut = (trpc as any).brandTaskCard?.create?.useMutation?.({
     onSuccess: (r: any) => { setCardId(r.cardId); setStep(2); setBusy(null); },
     onError: (e: any) => { setError(e?.message ?? "建立失敗"); setBusy(null); },
@@ -142,6 +179,7 @@ export default function TaskCardComposer({
 
   function reset(): void {
     setStep(1); setName(""); setSamples([""]); setPrimaryQuestion("");
+    setSampleMode("one-by-one"); setThreadText(""); setExtractNote(null);
     setPrimaryPlaceholder(""); setAskFields([]); setVariants(1);
     setCardId(null); setSkillDraft(""); setDryInputs({}); setDryResult(null);
     setBusy(null); setError(null);
@@ -244,7 +282,104 @@ export default function TaskCardComposer({
                     ? "The more real posts you paste, the closer the card gets. Length limits are measured from them — you never type a number."
                     : "貼得越多篇、越接近你真的發過的文，這張卡就越準。字數上下限直接從這些範例量出來，你不用填任何數字。"}
                 </p>
-                {samples.map((s, i) => (
+
+                {/* 2026-09-04 (CJ「讓用戶更無痛地，將本來在 chatgpt 等地方訓練好的
+                    對話串，複製過來」): 兩種貼法。
+                    ChatGPT 沒有讓第三方讀取對話紀錄的 API（官方 API 是把對話送進去，
+                    Apps SDK 也拿不到歷史），所以「登入後選一個對話串」不存在。
+                    能做的是把整串收下來自己抽 —— 而「整理很亂的輸入」本來就是這個
+                    產品在做的事，抽完還能攤開讓使用者確認。 */}
+                <div className="flex gap-1">
+                  {([
+                    ["one-by-one", en ? "Paste one by one" : "一篇一篇貼", <FileText key="a" size={12} />],
+                    ["thread", en ? "Paste a whole AI chat" : "貼上整串 AI 對話", <MessagesSquare key="b" size={12} />],
+                  ] as const).map(([mode, label, icon]) => (
+                    <Chip
+                      key={mode}
+                      size="sm"
+                      variant={sampleMode === mode ? "solid" : "bordered"}
+                      color={sampleMode === mode ? "primary" : "default"}
+                      className="cursor-pointer"
+                      startContent={icon}
+                      onClick={() => { setSampleMode(mode as any); setError(null); }}
+                    >
+                      {label}
+                    </Chip>
+                  ))}
+                </div>
+
+                {sampleMode === "thread" && (
+                  <div className="space-y-2 rounded-medium border border-primary-200 bg-primary-50/40 p-3">
+                    <p className="text-tiny text-default-600">
+                      {en
+                        ? "In ChatGPT / Claude / Gemini: select all (Ctrl+A), copy, paste here. We'll pick out the finished pieces and skip your prompts, the model's explanations, and superseded drafts."
+                        : "在 ChatGPT / Claude / Gemini 裡全選（Ctrl+A）複製，整串貼進來就好。我們會挑出裡面的成品，略過你下的指令、模型的解釋、還有被後面版本蓋掉的舊稿。"}
+                    </p>
+                    <Textarea
+                      minRows={8}
+                      placeholder={en ? "Paste the whole conversation here…" : "整串對話貼這裡…"}
+                      value={threadText}
+                      onValueChange={setThreadText}
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        size="sm" color="primary" startContent={<Wand2 size={13} />}
+                        isLoading={busy === "extract"}
+                        isDisabled={threadText.trim().length < 80 || !brandId}
+                        onPress={() => {
+                          setBusy("extract"); setError(null); setExtractNote(null);
+                          extractMut?.mutate({ brandId: brandId!, text: threadText });
+                        }}
+                      >
+                        {en ? "Pull out the finished pieces" : "挑出裡面的成品"}
+                      </Button>
+                      <span className="text-tiny text-default-400">
+                        {threadText.trim().length > 0 && `${threadText.trim().length} ${en ? "chars" : "字"}`}
+                      </span>
+                    </div>
+
+                    {/* 給已經習慣在 ChatGPT 裡收尾的人。收在摺疊區，不搶主路徑。 */}
+                    <details open={promptOpen} onToggle={(e) => setPromptOpen((e.target as HTMLDetailsElement).open)}>
+                      <summary className="text-tiny text-default-500 cursor-pointer select-none hover:text-default-700">
+                        {en ? "Rather tidy it up over there first?" : "想自己先在那邊整理好？複製這段提示詞"}
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        <pre className="text-tiny whitespace-pre-wrap bg-content2 rounded-medium p-2 text-default-700">
+                          {CLEANUP_PROMPT}
+                        </pre>
+                        <Button
+                          size="sm" variant="flat"
+                          startContent={copied ? <Check size={13} /> : <ClipboardCopy size={13} />}
+                          onPress={async () => {
+                            try {
+                              await navigator.clipboard.writeText(CLEANUP_PROMPT);
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            } catch {
+                              // 沒有剪貼簿權限（http 或舊瀏覽器）時不要靜靜失敗 ——
+                              // 使用者會以為複製成功然後貼出空白。
+                              setError(en ? "Copy failed — select the text above manually." : "複製失敗，請手動選取上面那段文字。");
+                            }
+                          }}
+                        >
+                          {copied ? (en ? "Copied" : "已複製") : (en ? "Copy prompt" : "複製提示詞")}
+                        </Button>
+                        <p className="text-tiny text-default-400">
+                          {en
+                            ? "It asks for pieces separated by --- lines. Paste the result back into \"one by one\" mode."
+                            : "它會請對方用 --- 分隔每一篇。拿回來之後切到「一篇一篇貼」貼上即可。"}
+                        </p>
+                      </div>
+                    </details>
+                  </div>
+                )}
+
+                {extractNote && (
+                  <div className="rounded-medium border border-success-200 bg-success-50 px-3 py-2 text-tiny text-success-800">
+                    {extractNote}
+                  </div>
+                )}
+                {sampleMode === "one-by-one" && samples.map((s, i) => (
                   <div key={i} className="flex gap-2 items-start">
                     <div className="flex-1">
                       <Textarea
@@ -269,13 +404,15 @@ export default function TaskCardComposer({
                     )}
                   </div>
                 ))}
-                <Button
-                  size="sm" variant="flat" startContent={<Plus size={14} />}
-                  isDisabled={samples.length >= 20}
-                  onPress={() => setSamples((prev) => [...prev, ""])}
-                >
-                  {en ? "Paste another" : "再貼一篇"}
-                </Button>
+                {sampleMode === "one-by-one" && (
+                  <Button
+                    size="sm" variant="flat" startContent={<Plus size={14} />}
+                    isDisabled={samples.length >= 20}
+                    onPress={() => setSamples((prev) => [...prev, ""])}
+                  >
+                    {en ? "Paste another" : "再貼一篇"}
+                  </Button>
+                )}
               </div>
 
               <div className="space-y-2">
