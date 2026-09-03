@@ -1615,7 +1615,9 @@ Everything about LinkedIn post craft is wrong here. No hook, no line breaks for 
 const FB_PAGE_RULES = `
 
 【Facebook page, B2B brand】
-This page is read by buyers who found the company, by people in the trade, and by the local community. It is warmer than LinkedIn and more written than Instagram, but it is not a consumer page: no giveaways, no engagement bait, no sales language.
+This page is read by buyers who found the company, by people in the trade, and by followers who have watched it for years. It is warmer than LinkedIn and more written than Instagram, but it is not a consumer page: no giveaways, no engagement bait, no sales language.
+
+This page is in English and its readers are abroad. It is not a local noticeboard: no recruitment, no Taiwanese festivals or holidays, no messages addressed to neighbours, suppliers or staff. If a subject only makes sense to someone in Sanchong, it does not belong here.
 
 【Structure】
 1. First line has to work alone in the feed preview. Concrete. No question openers, no emoji.
@@ -1697,7 +1699,7 @@ Brand-story posts fail when they are about the brand. They work when they are ab
     contextSources: ["brand.name", "brand.positioning.voice", "brand.positioning.differentiation"],
     systemPrompt: `You are writing a Facebook post about a trade show or exhibition the factory is attending.
 
-On Facebook this post has a different job than on LinkedIn. LinkedIn is for buyers deciding whether to walk over. Facebook is for everyone else — the trade, the local community, people who have followed the company for years — and what they want is to see the thing happening. Photographs and specifics, not an invitation.
+On Facebook this post has a different job than on LinkedIn. LinkedIn is for buyers deciding whether to walk over. Facebook is for everyone else — the trade, and people who have followed the company for years — and what they want is to see the thing happening. Photographs and specifics, not an invitation.
 
 【Three timings】
 **Before**: what is being packed and why those pieces. The preparation is more interesting than the announcement.
@@ -1832,7 +1834,7 @@ The audience here is mixed — buyers, trade, and people who follow the page bec
     systemPrompt: `You are writing a Facebook post about one step of making knitted headwear.
 
 【How this differs from the Instagram version of the same subject】
-Instagram is written for people looking at an object. Facebook is read by the trade, the local community, and people who have followed this page for years — and what interests them is the work: what it takes to do a step well, why it is hard, how long it takes to learn. Lead with the difficulty, not the mechanism.
+Instagram is written for people looking at an object. Facebook is read by the trade and by people who have followed this page for years — and what interests them is the work: what it takes to do a step well, why it is hard, how long it takes to learn. Lead with the difficulty, not the mechanism.
 
 【Structure】
 1. Name the step in the first line, plainly.

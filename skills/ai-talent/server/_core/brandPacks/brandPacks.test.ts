@@ -441,6 +441,23 @@ describe("盛全工業 pack 的內容規則", () => {
     }
   });
 
+  it("沒有任何一張卡假設在地受眾 —— 這個品牌只面對英文", () => {
+    // 2026-09-04 CJ「我只要面對英文」。我原本在 FB 卡裡用「在地社群」來跟
+    // IG 做受眾區隔，那個前提被推翻了：粉專的讀者在國外，不是三重的鄰居。
+    // 留著會讓模型寫出徵才、節慶、對同業喊話這類完全用不到的內容。
+    for (const card of gs.cards) {
+      if (card.kind !== "custom") continue;
+      expect(
+        card.template.systemPrompt.includes("local community"),
+        `${card.template.id} 還假設有在地社群受眾`,
+      ).toBe(false);
+    }
+    // FB 版規反過來要明講這件事，否則靠每張卡自己記
+    const fbCard = gs.cards.find((c) => packCardId(c) === "fb-gs-process")!;
+    if (fbCard.kind !== "custom") throw new Error("fb-gs-process 應為自訂卡");
+    expect(fbCard.template.systemPrompt).toContain("no recruitment");
+  });
+
   it("輪播卡的 config 是輪播形狀 —— 版型對了但 config 沒對是這個專案的雙層 bug", () => {
     // 一則貼文由 N 張卡組成 = variants:1 + cardsPerVariant:N。寫成 variants:N
     // 會得到 N 個各自完整的貼文版本，而不是一組 N 張的輪播；而版型那一層
