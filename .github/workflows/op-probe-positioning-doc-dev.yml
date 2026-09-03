@@ -1,4 +1,4 @@
-name: "Op — Probe DEV 新功能（定位上傳 + 任務卡前置，真實資料，會自我還原）"
+name: "Op — Probe DEV 新功能（定位上傳 + 任務卡，真實資料，會自我還原）"
 
 # 2026-09-01。typecheck 與單元測試證明不了的三件事，只有真的在 DEV VM 上跑
 # 才知道：
@@ -36,7 +36,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 10m
+          command_timeout: 20m
           script: |
             set -euo pipefail
             AI=/opt/onbrand/current/skills/ai-talent
@@ -68,3 +68,11 @@ jobs:
             # 任務卡前置：taskRegistry 收斂 + intake 多欄位。不跑完整張卡
             # （那要花 LLM 錢），被 intake 擋下來的請求在扣點之前就結束。
             ./node_modules/.bin/tsx scripts/probe-task-prereqs.ts
+
+            echo
+            echo "════════════════════════════════════════════════════════"
+            echo
+            # 自建任務卡全鏈。這支**會**花 LLM 錢（反推 SKILL + 試寫各一次），
+            # 而且應該花 —— 這個功能的核心就是從貼上的成品反推寫作規則，
+            # 不真的跑一次等於沒驗。跑完會自己刪卡並還原 positioning。
+            ./node_modules/.bin/tsx scripts/probe-task-card.ts
