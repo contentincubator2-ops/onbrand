@@ -1,22 +1,23 @@
 /**
  * taskRegistry — 「task id → template + orchestra config」的唯一解析點。
  *
- * 2026-09-02。在這之前，同一條查表鏈在 `quickTaskRouter.ts` 裡**手抄了五次**
- * （runOrchestra60 / runOrchestra99 / runOrchestra / runQuick / regenerateVariant），
- * 每次十幾個 `??`。後果不是理論上的：
+ * 2026-09-02。在這之前，同一條查表鏈在 `quickTaskRouter.ts` 裡**手抄了六次**
+ * （runOrchestra60 / polishInput / runOrchestra99 / runOrchestra /
+ * regenerateVariant / runQuick），每次十幾個 `??`。後果不是理論上的：
  *
  *   · `regenerateVariant` 的 config 鏈**漏了 KOL** —— KOL 任務按「換人重寫」
  *     直接丟 `no orchestra config`。抄第五次時漏一行，沒人看得出來。
  *   · 「AI 潤稿」取 polishHint 的那條只查了 pack + FB + IG + Website，其他
  *     頻道的 polishHint 寫了也讀不到。
  *
- * 而下一步（用戶自己新增任務卡）要再加一個來源，照舊寫法等於再抄五次、再賭
- * 一次沒漏。所以先收斂成一支。
+ * 而下一步（用戶自己新增任務卡）要再加一個來源，照舊寫法等於再抄六次、再賭
+ * 一次沒漏。所以先收斂成一支 —— 2026-09-04 的自建卡就是靠 registerTaskSource
+ * 一行接上來的。
  *
  * ── 為什麼是 async ────────────────────────────────────────────────────
  * 程式碼目錄與 brandPack 都是同步的，但用戶自建的卡會存在 DB（跟
  * personaAgentRouter 的 `brands.positioning._personaAgents[]` 同一個模式），
- * 查表就得是 async。五個呼叫點本來就都在 async mutation 裡，所以成本是零。
+ * 查表就得是 async。六個呼叫點本來就都在 async mutation 裡，所以成本是零。
  *
  * ── 為什麼來源不吃 brandId ────────────────────────────────────────────
  * `regenerateVariant` 拿不到 brandId（它只有 outputId → taskId）。brandPacks
@@ -52,7 +53,7 @@ export interface ResolvedTask {
 }
 
 /**
- * 額外的卡片來源。用戶自建目錄接上來時只註冊一次，五個呼叫點全部吃得到 ——
+ * 額外的卡片來源。用戶自建目錄接上來時只註冊一次，六個呼叫點全部吃得到 ——
  * 這正是這支檔案存在的理由。
  */
 export interface TaskSource {
@@ -124,14 +125,31 @@ export function resolveTaskTemplateSync(taskId: string): FBTaskTemplate | null {
       ?? findPackTemplate(taskId);
 }
 
+/**
+ * 外掛來源查表。**每一支各自 try/catch**：自建卡的來源要讀資料庫，DB 抖一下
+ * 就不該讓整個解析器丟一個 mysql 錯誤上去 —— 呼叫端會把它顯示成「任務壞了」，
+ * 而真正的原因（連線失敗）只留在 stack 裡。一支壞掉就跳過它繼續問下一支。
+ */
+async function fromSources<T>(
+  pick: (s: TaskSource) => Promise<T | null> | T | null,
+  what: string,
+  taskId: string,
+): Promise<T | null> {
+  for (const s of SOURCES) {
+    try {
+      const hit = await pick(s);
+      if (hit) return hit;
+    } catch (err: any) {
+      console.warn(`[taskRegistry] source "${s.name}" 查 ${what}(${taskId}) 失敗：${String(err?.message ?? err).slice(0, 200)}`);
+    }
+  }
+  return null;
+}
+
 export async function resolveTaskTemplate(taskId: string): Promise<FBTaskTemplate | null> {
   const sync = resolveTaskTemplateSync(taskId);
   if (sync) return sync;
-  for (const s of SOURCES) {
-    const hit = await s.template(taskId);
-    if (hit) return hit;
-  }
-  return null;
+  return await fromSources((s) => s.template(taskId), "template", taskId);
 }
 
 export async function resolveOrchestraConfig(taskId: string): Promise<OrchestraConfig | null> {
@@ -140,16 +158,12 @@ export async function resolveOrchestraConfig(taskId: string): Promise<OrchestraC
     ?? get30sConfig(taskId)
     ?? findPackOrchestraConfig(taskId);
   if (code) return code;
-  for (const s of SOURCES) {
-    const hit = await s.config(taskId);
-    if (hit) return hit;
-  }
-  return null;
+  return await fromSources((s) => s.config(taskId), "config", taskId);
 }
 
 /**
  * 完整解析。tier 由**哪一層同時給得出 template 與 config** 決定 —— 這是原本
- * 五個呼叫點的共同語意：99s 的 template 配不到 99s 的 config 時要往下掉到
+ * 六個呼叫點的共同語意：99s 的 template 配不到 99s 的 config 時要往下掉到
  * 60s，而不是拿 99s 的 template 硬配 30s 的 config。
  *
  * pack 卡與自建卡歸類為 "custom"，tier 取 template.tier（沒宣告就當 30s）。
@@ -170,8 +184,12 @@ export async function resolveTask(taskId: string): Promise<ResolvedTask | null> 
   }
 
   for (const s of SOURCES) {
-    const [tpl, cfg] = await Promise.all([s.template(taskId), s.config(taskId)]);
-    if (tpl && cfg) return { template: tpl, config: cfg, tier: tierOfTemplate(tpl), source: "custom" };
+    try {
+      const [tpl, cfg] = await Promise.all([s.template(taskId), s.config(taskId)]);
+      if (tpl && cfg) return { template: tpl, config: cfg, tier: tierOfTemplate(tpl), source: "custom" };
+    } catch (err: any) {
+      console.warn(`[taskRegistry] source "${s.name}" 解析 ${taskId} 失敗：${String(err?.message ?? err).slice(0, 200)}`);
+    }
   }
   return null;
 }

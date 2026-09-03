@@ -36,6 +36,7 @@ import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
 import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope";
 import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
 import { intakeExtraFields, missingRequiredInputs, type IntakeField } from "../lib/taskIntake";
+import TaskCardComposer, { type ComposerChannel } from "../components/taskCard/TaskCardComposer";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Textarea,
@@ -44,7 +45,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBolt, faPaperPlane, faXmark, faMagnifyingGlass,
   faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe,
-  faBookBookmark, faCalendarDays,
+  faBookBookmark, faCalendarDays, faPlus, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -292,6 +293,16 @@ interface FBTaskCard {
  * 會把「有這個 key」當成使用者有講，於是模型看到一個空的「活動優惠：」欄位，
  * 反而比完全沒有這個欄位更容易生出胡話。
  */
+/**
+ * 哪些頻道可以自建卡 —— 要跟 brandTaskCardRouter 的 CHANNELS 對齊。
+ * case / calendar 沒進來：那兩個是素材與規劃型頻道，只有品牌任務包在用，
+ * 產出形狀不是一篇貼文，自建卡的骨架套不上去。
+ */
+const COMPOSER_CHANNELS = new Set<string>([
+  "facebook", "instagram", "threads", "linkedin", "tiktok",
+  "youtube", "email", "pr", "website",
+]);
+
 function trimmedExtras(bag: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(bag)) {
@@ -522,6 +533,11 @@ function PlatformTaskPageInner() {
   // 那些格子沒有任何 UI 可以填，模型只好自己編（例如「新品上市全套」從來不問
   // 活動什麼時候辦）。要問哪幾格由 lib/taskIntake 決定，server 用同一份判斷驗。
   const [extraAnswers, setExtraAnswers] = useState<Record<string, string>>({});
+
+  // 2026-09-04 (CJ「加任務卡的符號，要在 facebook, instagram 等等頁面中，
+  // 比較明顯的右上方」): 自建任務卡的入口。
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [resumeCardId, setResumeCardId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // 2026-08-23: intake validation error, rendered right under the question
@@ -703,6 +719,17 @@ function PlatformTaskPageInner() {
     : { data: null };
   const packNav = (packNavQuery.data as any) ?? null;
   const packChannel = packNav?.channels?.find((c: any) => c.key === platform) ?? null;
+  // 這個品牌在這個頻道還沒上架的自建卡。listFB 只回 ready 的，所以「建了一半」
+  // 的卡如果不在這裡列出來就等於消失 —— 使用者會以為自己的卡不見了。
+  const ownCardsQuery = (trpc as any).brandTaskCard?.list?.useQuery
+    ? (trpc as any).brandTaskCard.list.useQuery(
+        { brandId: brandId ?? 0, channel: platform },
+        { enabled: !!brandId && COMPOSER_CHANNELS.has(platform), refetchOnWindowFocus: false },
+      )
+    : { data: null };
+  const unfinishedOwnCards: any[] = ((ownCardsQuery.data as any[]) ?? [])
+    .filter((c) => c.status !== "ready");
+
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
   const catalogFailed = !!listQuery?.error && allTasks.length === 0;
 
@@ -1316,6 +1343,37 @@ function PlatformTaskPageInner() {
     <div>
       {/* ─── HERO ──────────────────────────────────────────────────────── */}
       <div className="relative pt-8 pb-4 px-6 text-center">
+
+        {/* 2026-09-04 (CJ「加任務卡的符號，要在 facebook, instagram 等等頁面中，
+            比較明顯的右上方」): 自建任務卡的入口。
+
+            絕對定位在 hero 右上角而不是排進中央那一欄 —— hero 是置中的敘事區
+            （頻道 eyebrow → 標題 → 副標 → 搜尋），把一顆動作按鈕插進去會打斷
+            閱讀順序，而且會被誤讀成「這是這一頁的主要動作」（主要動作是挑一張
+            卡來跑）。右上角是這個產品裡固定放「新增」的位置。
+
+            沒選品牌就只顯示提示不給按 —— 卡是掛在品牌下面的，先問「哪個品牌」
+            比按下去才說「請先選品牌」好。 */}
+        {COMPOSER_CHANNELS.has(platform) && (
+          <div className="absolute top-6 right-6 z-20">
+            {brandId ? (
+              <Button
+                size="sm"
+                color="primary"
+                variant="shadow"
+                startContent={<FontAwesomeIcon icon={faPlus} />}
+                onPress={() => { setResumeCardId(null); setComposerOpen(true); }}
+              >
+                {lang === "en" ? "New card" : "新增任務卡"}
+              </Button>
+            ) : (
+              <Chip size="sm" variant="flat" className="text-default-500">
+                {lang === "en" ? "Pick a brand to add a card" : "選擇品牌後可新增任務卡"}
+              </Chip>
+            )}
+          </div>
+        )}
+
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
 
           {/* Platform eyebrow */}
@@ -1803,6 +1861,37 @@ function PlatformTaskPageInner() {
           </Card>
         ) : (
           <>
+            {/* 2026-09-04：建了一半的自建卡。沒有這條，中途關掉 composer 的卡
+                就無處可回（listFB 只列 ready），使用者會以為卡不見了。 */}
+            {unfinishedOwnCards.length > 0 && (
+              <div className="mb-4 rounded-medium border border-warning-200 bg-warning-50/60 px-4 py-3">
+                <p className="text-small font-semibold text-warning-800">
+                  {lang === "en"
+                    ? `${unfinishedOwnCards.length} card(s) not finished`
+                    : `你有 ${unfinishedOwnCards.length} 張還沒完成的任務卡`}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {unfinishedOwnCards.map((c) => (
+                    <Button
+                      key={c.id}
+                      size="sm"
+                      variant="flat"
+                      color={c.status === "failed" ? "danger" : "warning"}
+                      startContent={<FontAwesomeIcon icon={faPenToSquare} />}
+                      onPress={() => { setResumeCardId(c.id); setComposerOpen(true); }}
+                    >
+                      {c.name}
+                      {c.status === "failed"
+                        ? (lang === "en" ? " · failed" : "・生成失敗")
+                        : c.skill
+                          ? (lang === "en" ? " · ready to test" : "・可試寫")
+                          : (lang === "en" ? " · distilling" : "・生成中")}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-semibold text-lg tracking-tight">
@@ -2356,6 +2445,17 @@ function PlatformTaskPageInner() {
           )}
         </ModalContent>
       </Modal>
+
+      {/* 自建任務卡的作者流程。上架成功後重抓 listFB，新卡立刻出現在這一頁。 */}
+      <TaskCardComposer
+        isOpen={composerOpen}
+        onClose={() => { setComposerOpen(false); setResumeCardId(null); void ownCardsQuery?.refetch?.(); }}
+        brandId={brandId ?? null}
+        channel={platform as ComposerChannel}
+        channelLabel={lang === "en" ? meta.label : meta.labelZh}
+        initialCardId={resumeCardId}
+        onPublished={() => { void listQuery?.refetch?.(); void ownCardsQuery?.refetch?.(); }}
+      />
     </div>
   );
 }

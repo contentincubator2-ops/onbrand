@@ -1,0 +1,128 @@
+/**
+ * 自建任務卡：id 規則、範例量測、以及「卡 → template + config」的形狀。
+ *
+ * 這三件事錯了的症狀都不明顯：id 規則錯 → 卡在 regenerateVariant 那條路解析不到
+ * （其他入口都好，只有「換人重寫」壞）；量測錯 → caption 驗證一直重試最後回空白；
+ * template 形狀錯 → 任務跑得起來但 mockup 或 recordTaskRun 默默降級。
+ */
+import { describe, expect, it } from "vitest";
+import {
+  brandIdOfCardId, slugifyCardName, measureSamples,
+  cardTemplate, cardConfig, type BrandTaskCard,
+} from "./brandTaskCards";
+
+function makeCard(over: Partial<BrandTaskCard> = {}): BrandTaskCard {
+  const samples = ["a".repeat(300), "b".repeat(400), "c".repeat(500)];
+  return {
+    id: "u2976-promo", brandId: 2976, name: "促購文", channel: "facebook",
+    status: "ready", currentStep: 3, totalSteps: 3, lastError: null,
+    samples,
+    primaryQuestion: "這次要促銷哪個商品？",
+    primaryPlaceholder: "例：冬季限定熱可可",
+    askFields: [{ key: "promo_ends", label: "優惠截止日", type: "text", required: true, placeholder: "" }],
+    skill: "規則一：開場不用問句。".repeat(20),
+    measured: measureSamples(samples),
+    variants: 3, agentId: null,
+    createdAt: "", updatedAt: "", createdBy: 1, lastDryRun: null,
+    ...over,
+  };
+}
+
+describe("卡 id 帶 brandId（regenerateVariant 拿不到 brandId，只能從 id 剖）", () => {
+  it("剖得出 brandId", () => {
+    expect(brandIdOfCardId("u2976-promo")).toBe(2976);
+    expect(brandIdOfCardId("u1-a")).toBe(1);
+    expect(brandIdOfCardId("u2976-promo-wen-2")).toBe(2976);
+  });
+
+  it("不是自建卡的 id 一律回 null —— 免得每次解析內建卡都白查一次 DB", () => {
+    for (const id of [
+      "fb-30-caption-short", "wg-cal-eco", "u-promo", "u0-promo",
+      "U2976-promo", "u2976_promo", "u2976-", "", "u2976-Promo",
+    ]) {
+      expect(brandIdOfCardId(id), id).toBeNull();
+    }
+  });
+
+  it("中文卡名取不出 ascii 時退回時間戳，不會產生空 slug", () => {
+    expect(slugifyCardName("促購文")).toMatch(/^card-[a-z0-9]+$/);
+    expect(slugifyCardName("Promo Post")).toBe("promo-post");
+    expect(slugifyCardName("  --Promo!!--  ")).toBe("promo");
+    // 空 slug 會讓 id 變成 "u2976-"，那個過不了 CARD_ID_RE
+    expect(brandIdOfCardId(`u2976-${slugifyCardName("促購文")}`)).toBe(2976);
+  });
+});
+
+describe("字數區間從範例量出來", () => {
+  it("用中位數當基準，上下限各留兩成餘裕", () => {
+    const m = measureSamples(["x".repeat(100), "x".repeat(200), "x".repeat(300)]);
+    expect(m.count).toBe(3);
+    expect(m.medianChars).toBe(200);
+    expect(m.minChars).toBe(80);    // 100 * 0.8
+    expect(m.maxChars).toBe(360);   // 300 * 1.2
+  });
+
+  it("一篇特別長的不會把中位數拉走（所以不用平均）", () => {
+    const m = measureSamples([
+      "x".repeat(300), "x".repeat(310), "x".repeat(320), "x".repeat(330), "x".repeat(5000),
+    ]);
+    expect(m.medianChars).toBe(320);
+  });
+
+  it("下限有地板 —— 免得一篇 20 字的範例把下限壓到 16，caption 驗證會一直過不了", () => {
+    expect(measureSamples(["x".repeat(20)]).minChars).toBe(40);
+  });
+
+  it("空輸入不會炸", () => {
+    expect(measureSamples([])).toEqual({ count: 0, minChars: 0, maxChars: 0, medianChars: 0 });
+    expect(measureSamples(["", "   "])).toEqual({ count: 0, minChars: 0, maxChars: 0, medianChars: 0 });
+  });
+});
+
+describe("卡 → template", () => {
+  it("主問題永遠是 topic，額外欄位接在後面", () => {
+    const t = cardTemplate(makeCard());
+    expect(t.primary_input?.key).toBe("topic");
+    expect(t.inputs.map((f) => f.key)).toEqual(["topic", "promo_ends"]);
+  });
+
+  it("systemPrompt 就是 SKILL 本文", () => {
+    const card = makeCard({ skill: "這是我的規則" });
+    expect(cardTemplate(card).systemPrompt).toBe("這是我的規則");
+  });
+
+  it("官網卡用 platform:\"doc\" —— mission_outputs 的 enum 沒有 \"web\"，會被默默降級成 other", () => {
+    expect(cardTemplate(makeCard({ channel: "website" })).outputDefaults.platform).toBe("doc");
+    expect(cardTemplate(makeCard({ channel: "pr" })).outputDefaults.platform).toBe("press");
+    expect(cardTemplate(makeCard({ channel: "facebook" })).outputDefaults.platform).toBe("facebook");
+  });
+
+  it("maxTokens 跟著中位數走，且有下限（短範例不能把它壓到寫不完）", () => {
+    expect(cardTemplate(makeCard()).maxTokens).toBeGreaterThanOrEqual(700);
+    const long = makeCard({ measured: measureSamples(["x".repeat(3000)]) });
+    expect(cardTemplate(long).maxTokens).toBeGreaterThan(cardTemplate(makeCard()).maxTokens);
+    expect(cardTemplate(long).maxTokens).toBeLessThanOrEqual(8000);
+  });
+});
+
+describe("卡 → config", () => {
+  it("variants 收在 1–5，labels 數量對得上", () => {
+    expect(cardConfig(makeCard({ variants: 3 })).variants).toBe(3);
+    expect(cardConfig(makeCard({ variants: 3 })).variantLabels).toHaveLength(3);
+    expect(cardConfig(makeCard({ variants: 99 as any })).variants).toBe(5);
+    expect(cardConfig(makeCard({ variants: 0 as any })).variants).toBe(1);
+  });
+
+  it("不生圖 —— 自建卡目前只管文字，開了圖會拖到 30 秒體感又沒有 image director", () => {
+    const c = cardConfig(makeCard());
+    expect(c.runImageGen).toBe(false);
+    expect(c.images).toBe(0);
+  });
+
+  it("字數區間直接帶進 config，變成 caption 的驗收標準", () => {
+    const card = makeCard();
+    const c = cardConfig(card);
+    expect(c.captionMinChars).toBe(card.measured.minChars);
+    expect(c.captionMaxChars).toBe(card.measured.maxChars);
+  });
+});

@@ -972,6 +972,8 @@ import { resolveBrandPack, expandPackCards, packNavForBrand } from "../_core/bra
 // 2026-09-02: task id → template + config 的唯一解析點。這條鏈本來在這個檔案
 // 裡手抄了五次，抄第五次時漏了 KOL 的 config（KOL 任務按「換人重寫」直接炸）。
 import { resolveTaskOrThrow, resolveTaskTemplate } from "../_core/taskRegistry";
+// 2026-09-04 用戶自建任務卡。listFB 疊加，執行則走 taskRegistry 的來源註冊。
+import { listBrandTaskCards, cardTemplate } from "../_core/brandTaskCards";
 import { assertIntakeComplete } from "../_core/taskIntake";
 import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice } from "../_core/wuganVoiceContract";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
@@ -1345,9 +1347,27 @@ export const quickTaskRouter = router({
     // 這裡換掉 tasks 而不是在 return 前才過濾，是因為下面要靠 tasks 蒐集
     // agent_id 去查頭像與團隊名單；晚換的話包裡的 agent 會查不到。
     const brandPack = resolveBrandPack({ brandId: input?.brandId, brandName: input?.brandName });
-    const tasks: any[] = brandPack
+    const baseTasks: any[] = brandPack
       ? expandPackCards(brandPack, new Map(globalTasks.map((t) => [t.id, t])))
       : globalTasks;
+
+    // 2026-09-04：這個品牌自己建的卡。**疊加**在上面（pack 也一樣）——
+    // 「有 pack 就完全取代全域」那條規則是為了不讓客戶滑過 200 張用不到的卡，
+    // 而使用者自己做的卡，按定義就是他用得到的那些。
+    // 只列 status === "ready" 的：還在生成 SKILL 的卡按下去只會拿到空 prompt
+    // 寫出來的東西（同 registerBrandTaskCardSource 的閘門）。
+    const ownCards: any[] = input?.brandId
+      ? (await listBrandTaskCards(input.brandId))
+          .filter((c) => c.status === "ready")
+          .map((c) => ({
+            ...cardTemplate(c),
+            kind: "fast" as const,
+            platform: c.channel,
+            /** UI 靠這個標出「我自己的卡」，並提供編輯入口。 */
+            ownCardId: c.id,
+          }))
+      : [];
+    const tasks: any[] = [...ownCards, ...baseTasks];
     // 60s production-package universal team agent IDs (used by orchestra)
     // Emma Zhang / Helen Sung / David Wang / Sophie Ho / Jordan Hayes / Mandy / Nancy / Nina / Anna / Zeyu / Nathan
     const UNIVERSAL_60S_IDS = [30005, 180163, 30003, 60012, 239184, 180170, 180157, 180165, 60071, 60062];
