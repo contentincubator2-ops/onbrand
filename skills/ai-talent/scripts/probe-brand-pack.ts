@@ -69,6 +69,34 @@ const SAMPLE_INPUT: Record<string, string> = {
     "Reorganised the yarn store this week. Everything is now sorted by fibre and weight rather than by when it arrived. Took two days and nobody wanted to do it.",
   "fb-gs-new-product":
     "First run off a new mid-brim fedora block. The brim sits between the 787 and the 781, which is the width buyers kept asking for and we did not have.",
+
+  // ── 2026-09-03 additions: the middle of the funnel ──────────────────────
+  "web-gs-case":
+    "A US outdoor brand wanted a bucket hat that held its shape after being packed flat in a bag. Their previous supplier built it from cut panels and the crown collapsed within a season. We ran it on an existing square-crown block and felted denser than our standard. The first sample came back too stiff to fold at all, which was the opposite problem, so we went back and dropped the density between the two. Second sample was approved.",
+  "web-gs-buyer-questions":
+    "The questions that come up in almost every first call: what is the minimum, do you charge for tooling, how long does sampling take, what do you need from me before you can quote, and can you match a hat I already have. On tooling: if an existing block fits the shape there is no tooling stage at all, which is what most buyers do not realise.",
+  "web-gs-product-page":
+    "The beret page. Five finishes — blind-stitch, adjustable, bound-edge, painter, multi-wear — and buyers cannot tell them apart from photographs. The page has to make the difference between blind-stitch and bound-edge legible in words, because that difference is what a wearer feels against the forehead all day.",
+  "em-gs-cold-outreach":
+    "A US heritage workwear brand whose whole range is wool and made in small runs, except the accessories, which are printed six-panel caps bought from a catalogue. The mismatch is the reason to write. I would offer to send one bound-edge beret in their own colourway so they can handle it.",
+  "em-gs-enquiry-reply":
+    "A small US brand asked whether we can make a beret in their own wool and what the minimum is. The minimum is 240 per style, 24 per colour. What I cannot answer yet is whether their yarn will felt to the density the shape needs — that needs a physical sample of the yarn. What I need back: the shape reference, the yarn or a sample of it, the colour count, and the season they are aiming at.",
+  "em-gs-sample-followup":
+    "Sent three beret finishes — blind-stitch, bound-edge and adjustable — all in the same undyed wool so the edge construction is the only variable. What to look at: run a thumb around the inside edge of each and feel where the ridge sits. The honest weak point is that the bound-edge one came out stiffer than I would ship in production.",
+  "em-gs-show-invite":
+    "A sourcing show in New York next month. Bringing the five beret finishes and a few of the older blocks. The reason to come is that the difference between the finishes cannot be judged from photographs — you have to put them on. Stand number to follow.",
+  "em-gs-reactivation":
+    "Brands who asked about bucket hats around eighteen months ago and went quiet after sampling. What has changed since: we added a square-crown block with a deeper crown, which was exactly the thing two of them said was missing.",
+  "ig-gs-process":
+    "Blocking. The felted body goes over the wooden form damp and comes off dry holding the shape. The form does the work, not the stitching — which is why a blocked hat keeps its shape and a sewn one relies on its seams.",
+  "ig-gs-carousel-compare":
+    "The five beret edge finishes — blind-stitch, adjustable, bound-edge, painter, multi-wear. From a photograph they look almost identical, but each sits differently on the head and is built differently. One card per finish.",
+  "li-gs-co-document":
+    "How to write a spec for a knitted hat so the sample and the bulk run match. Eight pages: the four lines that must be on the sheet, the one buyers always leave off (finished diameter after felting), and what goes wrong when they do.",
+  "li-gs-cmo-dm-intro":
+    "A head of product at a US heritage workwear brand who posted last week about moving their wool sourcing out of mainland China. That post is the reason to write. I would ask what is actually blocking the move, because in my experience it is never the factory search.",
+  "fb-gs-process":
+    "Felting. It is the step where the same yarn can come out right or come out ruined, and the difference is judgement about when to stop. Nobody here has ever written that judgement down — it is learned by standing next to someone who already has it.",
 };
 
 /**
@@ -148,6 +176,23 @@ function captionsOf(result: any): string[] {
         console.error(`✗ ${id}: ${elapsed}s — ${caps.length} variants, ALL EMPTY`);
         failed++;
         continue;
+      }
+
+      // A multi-card deliverable is one post made of N cards. captionsOf only
+      // reads the caption, which for a carousel is the main post text — so a
+      // carousel that produced zero cards still looks like a pass here. That
+      // is the two-layer failure this project has shipped before: the mockup
+      // renders a carousel frame around content that was never split.
+      const wantCards = config.cardsPerVariant ?? 0;
+      if (wantCards > 1) {
+        const gotCards = (result?.variants?.[0]?.cards ?? []).length;
+        const withCopy = (result?.variants?.[0]?.cards ?? [])
+          .filter((c: any) => String(c?.headline ?? "").trim() || String(c?.body ?? "").trim()).length;
+        console.log(`    cards: ${gotCards}/${wantCards} attached, ${withCopy} with copy`);
+        if (gotCards < wantCards || withCopy < wantCards) {
+          console.error(`✗ ${id}: asked for ${wantCards} cards, got ${gotCards} (${withCopy} with copy)`);
+          failed++;
+        }
       }
 
       const lens = usable.map((c) => c.length);
