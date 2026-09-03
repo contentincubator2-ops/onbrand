@@ -123,6 +123,7 @@ async function main(): Promise<void> {
     const skill: string = card.skill;
     check(skill.length >= 300, "夠長（規則寫不進 300 字以內）", `${skill.length} 字`);
     // prompt 明文禁止把範例裡的具體事實抄進規則 —— 抄了這張卡就永遠在賣熱可可。
+    // 價格由 factLeaks 合約擋（驗證→重試→修補）；商品名靠 prompt。
     const LEAKED = ["熱可可", "499", "279", "1499", "六盒組", "無糖版"];
     const leaks = LEAKED.filter((w) => skill.includes(w));
     check(leaks.length === 0, "沒有把範例裡的具體事實寫進規則", leaks.length ? `洩漏：${leaks.join("、")}` : "");
@@ -130,10 +131,10 @@ async function main(): Promise<void> {
     check(/(^|\n)\s*(\d+[.、)]|[-•*])/.test(skill), "有條列出來的規則");
 
     console.log("\n=== 3. dryRun 試寫 ===");
-    const [beforeRows]: any = await localPool.execute(
-      `SELECT COUNT(*) AS n FROM mission_outputs WHERE userId = ?`, [brand.userId],
-    );
-    const beforeCount = Number((beforeRows as any[])[0]?.n ?? 0);
+    // mission_outputs 沒有 userId 欄位（只有 missionId）。用時間戳判斷試寫有沒有
+    // 新增任何一列 —— 一列都不該有。
+    const [tsRows]: any = await localPool.execute(`SELECT NOW() AS t`);
+    const since = (tsRows as any[])[0].t;
 
     const dry = await call("brandTaskCard.dryRun", {
       brandId: brand.id, cardId,
@@ -145,12 +146,11 @@ async function main(): Promise<void> {
       console.log("  " + String(dry.data.caption).replace(/\n/g, "\n  ").slice(0, 700));
     }
 
-    const [afterRows]: any = await localPool.execute(
-      `SELECT COUNT(*) AS n FROM mission_outputs WHERE userId = ?`, [brand.userId],
+    const [newRows]: any = await localPool.execute(
+      `SELECT COUNT(*) AS n FROM mission_outputs WHERE createdAt >= ?`, [since],
     );
-    check(Number((afterRows as any[])[0]?.n ?? 0) === beforeCount,
-      "試寫沒有落地 mission_outputs（/projects 不會被塞半成品）",
-      `${beforeCount} → ${(afterRows as any[])[0]?.n}`);
+    const added = Number((newRows as any[])[0]?.n ?? 0);
+    check(added === 0, "試寫沒有落地 mission_outputs（/projects 不會被塞半成品）", `新增 ${added} 列`);
 
     console.log("\n=== 4. publish 前後的閘門 ===");
     check((await resolveTask(cardId)) === null, "未上架的卡解析不到（閘門有效）");

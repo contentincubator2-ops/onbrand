@@ -30,6 +30,7 @@ import {
   type BrandTaskCard, type BrandTaskCardField,
   listBrandTaskCards, getBrandTaskCard, mutateBrandTaskCards,
   measureSamples, slugifyCardName, cardTemplate, cardConfig,
+  factLeaks, redactFactLeaks,
   MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS,
   registerBrandTaskCardSource,
 } from "../_core/brandTaskCards";
@@ -109,9 +110,13 @@ ${fieldList}
 1. **規則要可逐字檢查。** 不要寫「語氣溫暖專業」這種形容詞 —— 要寫「開場不用問句」
    「每段不超過三句」「CTA 一律放最後一行且用祈使句」「不用驚嘆號」這種能逐條核對的規則。
    寫完自問：另一個人拿這份規則檢查一篇稿，能不能明確說出「這條有遵守 / 沒遵守」？不能就重寫。
-2. **不可以把範例裡的具體事實寫進規則。** 商品名、活動日期、價格、專案名稱都不行 ——
-   那會讓這張卡永遠在重寫同一篇。你要抓的是骨架（結構、句長、節奏、開場與收尾方式、
-   標點與 emoji 習慣、資訊出現的順序），不是那批內容本身。
+2. **不可以把範例裡的具體事實寫進規則。** 商品名、活動日期、**價格數字**、專案名稱
+   都不行 —— 那會讓這張卡永遠在重寫同一篇。使用者下次拿它寫別的商品，文案裡會冒出
+   上一批商品的定價。你要抓的是骨架（結構、句長、節奏、開場與收尾方式、標點與 emoji
+   習慣、資訊出現的順序），不是那批內容本身。
+   舉要價格的例子時寫「兩盒 X 元」或「引用當次輸入的價格」，**不要寫「兩盒 499」**。
+   交稿前自己掃一遍：規則裡出現的每一個兩位數以上的數字，都必須是字數或段落數，
+   不能是範例裡的價格或數量。
 
 【字數】範例實測 ${args.measured.count} 篇，最短 ${args.measured.minChars} 字、最長 ${args.measured.maxChars} 字、中位數 ${args.measured.medianChars} 字。
 把區間寫進規則，並說明哪些段落佔多少比重。
@@ -130,20 +135,54 @@ ${brandPrefix}`;
     .map((s, i) => `【範例 ${i + 1}（${s.trim().length} 字）】\n${s.trim()}`)
     .join("\n\n");
 
-  const r = await Promise.race([
-    invokeLLM({
-      messages: [
-        { role: "system", content: sys },
-        { role: "user", content: samplesBlock.slice(0, 60_000) },
-      ],
-      maxTokens: 4000,
-    }),
-    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 120_000)),
-  ]);
-  const raw = r.choices[0]?.message?.content;
-  const skill = (typeof raw === "string" ? raw : "").trim();
+  // 我們自己塞進 prompt 的數字。它們出現在 SKILL 裡是正確的，不算洩漏。
+  const ownNumbers = [
+    args.measured.count, args.measured.minChars,
+    args.measured.maxChars, args.measured.medianChars,
+  ];
+
+  const ask = async (extra: string): Promise<string> => {
+    const r = await Promise.race([
+      invokeLLM({
+        messages: [
+          { role: "system", content: sys + extra },
+          { role: "user", content: samplesBlock.slice(0, 60_000) },
+        ],
+        maxTokens: 4000,
+      }),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 120_000)),
+    ]);
+    const raw = r.choices[0]?.message?.content;
+    return (typeof raw === "string" ? raw : "").trim();
+  };
+
+  let skill = await ask("");
   if (skill.length < 200) {
     throw new Error(`SKILL 太短（${skill.length} 字），可能是模型回了空白或前言。可以重試。`);
+  }
+
+  // 2026-09-04 dev 實測：prompt 明文禁止之後，模型還是把三個價格（499 / 279 /
+  // 1499）抄進規則。純 prompt 擋不住的東西就別只靠 prompt —— 照 adCopyContract
+  // 與 wuganVoiceContract 的同一模式做「驗證 → 具名重試 → 確定性修補」。
+  let leaks = factLeaks(skill, args.samples, ownNumbers);
+  if (leaks.length > 0) {
+    console.warn(`[brandTaskCard] SKILL 洩漏範例事實，重試一次：${leaks.join("、")}`);
+    const retry = await ask(`
+
+【上一版被退回】你寫的規則裡出現了這些**來自範例的具體數字**：${leaks.join("、")}。
+那些是上一批商品的價格／數量，寫進規則會讓這張卡永遠在賣同一個東西。
+重寫一份，同樣的結構與規則，但用「X 元」或「引用當次輸入」代替所有具體數字。
+規則裡只允許出現字數與段落數。`).catch(() => "");
+    if (retry.length >= 200 && factLeaks(retry, args.samples, ownNumbers).length < leaks.length) {
+      skill = retry;
+      leaks = factLeaks(skill, args.samples, ownNumbers);
+    }
+  }
+  // 重試還是漏就確定性修補。換占位而不是刪整句 —— 刪掉會把規則語意弄破
+  // （「兩盒 499」變成「兩盒」），換成占位反而變成一條正確的規則。
+  if (leaks.length > 0) {
+    console.warn(`[brandTaskCard] 重試後仍洩漏，確定性修補：${leaks.join("、")}`);
+    skill = redactFactLeaks(skill, leaks);
   }
   return skill;
 }

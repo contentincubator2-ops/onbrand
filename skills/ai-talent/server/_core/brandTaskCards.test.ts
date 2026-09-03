@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   brandIdOfCardId, slugifyCardName, measureSamples,
-  cardTemplate, cardConfig, type BrandTaskCard,
+  cardTemplate, cardConfig, factLeaks, redactFactLeaks, type BrandTaskCard,
 } from "./brandTaskCards";
 
 function makeCard(over: Partial<BrandTaskCard> = {}): BrandTaskCard {
@@ -124,5 +124,65 @@ describe("卡 → config", () => {
     const c = cardConfig(card);
     expect(c.captionMinChars).toBe(card.measured.minChars);
     expect(c.captionMaxChars).toBe(card.measured.maxChars);
+  });
+});
+
+describe("SKILL 不可以帶著範例的具體數字", () => {
+  // 2026-09-04 dev 實測：prompt 已經明文禁止，模型還是把三個價格抄進規則。
+  // 後果是使用者下次拿這張卡寫薑茶，文案裡冒出熱可可的定價。
+  const samples = [
+    "冷氣團來了，兩盒 499。",
+    "經典款這週補貨，一盒 279。",
+    "六盒組 1499，限量 40 組。",
+  ];
+  const own = [75, 126, 97, 3];   // 我們自己放進 prompt 的字數區間
+
+  it("抓得出洩漏的價格", () => {
+    const skill = "規則三：價格寫成「兩盒 499」這種格式，一盒 279 時省略單位。";
+    expect(factLeaks(skill, samples, own)).toEqual(expect.arrayContaining(["499", "279"]));
+  });
+
+  it("我們自己放進 prompt 的字數區間不算洩漏", () => {
+    const skill = "全文控制在 75–126 字，中位數 97 字附近最佳，共 3 段。";
+    expect(factLeaks(skill, samples, own)).toEqual([]);
+  });
+
+  it("邊界比對：499 不會命中 1499", () => {
+    expect(factLeaks("限量組是 1499 元", samples, own)).toEqual(["1499"]);
+    expect(factLeaks("兩盒 499", samples, own)).toEqual(["499"]);
+  });
+
+  it("乾淨的 SKILL 沒有偽報", () => {
+    const skill = "規則一：開場不用問句。規則二：每段不超過三句。規則三：價格一律引用當次輸入。";
+    expect(factLeaks(skill, samples, own)).toEqual([]);
+  });
+
+  it("一位數不算 —— 「最多 3 句」是規則本身在講數量", () => {
+    expect(factLeaks("每段最多 3 句，分 2 段", ["有 3 個重點", "共 2 段"], [])).toEqual([]);
+  });
+
+  it("修補換成占位而不是刪掉 —— 刪整句會把規則語意弄破", () => {
+    const skill = "價格寫成「兩盒 499」，六盒組 1499。";
+    const fixed = redactFactLeaks(skill, factLeaks(skill, samples, own));
+    expect(fixed).not.toMatch(/499|1499/);
+    expect(fixed).toContain("（依當次輸入）");
+    expect(fixed).toContain("兩盒");   // 語意還在
+  });
+
+  it("相鄰的占位會被收成一個（中間夾空白或頓號也算）", () => {
+    expect(redactFactLeaks("價格 499 279 都可以", ["499", "279"]))
+      .toBe("價格 （依當次輸入） 都可以");
+    expect(redactFactLeaks("價格 499、279 都可以", ["499", "279"]))
+      .toBe("價格 （依當次輸入） 都可以");
+  });
+
+  it("長的數字先換 —— 否則換掉 499 會把 1499 打成「1（依當次輸入）」", () => {
+    expect(redactFactLeaks("六盒組 1499", ["499", "1499"])).toBe("六盒組 （依當次輸入）");
+  });
+
+  it("修補完再驗一次應該乾淨", () => {
+    const skill = "兩盒 499、一盒 279、六盒 1499。";
+    const fixed = redactFactLeaks(skill, factLeaks(skill, samples, own));
+    expect(factLeaks(fixed, samples, own)).toEqual([]);
   });
 });

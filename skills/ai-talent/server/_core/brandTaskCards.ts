@@ -171,6 +171,60 @@ export function measureSamples(samples: string[]): BrandTaskCard["measured"] {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// 事實洩漏檢查
+// ─────────────────────────────────────────────────────────────────────
+/**
+ * SKILL 裡不可以出現範例的具體數字（價格、數量、日期）。
+ *
+ * 2026-09-04 dev 實測：prompt 已經明文禁止「不可以把範例裡的具體事實寫進規則」，
+ * 模型還是把三個價格（499 / 279 / 1499）抄進規則。後果是這張卡永遠帶著上一批
+ * 商品的價格，使用者下次拿它寫薑茶，文案裡會冒出熱可可的定價。
+ *
+ * 所以照這個 repo 既有的做法補三件套（adCopyContract / wuganVoiceContract 同一
+ * 模式）：驗證 → 具名重試 → 確定性修補。純 prompt 擋不住的東西就別只靠 prompt。
+ *
+ * `ownNumbers` 是**我們自己**放進 prompt 的數字（量出來的字數區間），那些出現在
+ * SKILL 裡是正確的，不算洩漏。
+ */
+/**
+ * 數字邊界比對。**用 String.raw** —— 一般 template literal 會把 `\d` 求值成
+ * 字面的 "d"（那不是合法轉義，JS 就把反斜線吃掉），regex 變成 `(?<!d)`，
+ * 於是「499」會命中「1499」。這個坑實測踩過一次。
+ */
+function numberBoundary(n: string, flags = ""): RegExp {
+  return new RegExp(String.raw`(?<!\d)${n}(?!\d)`, flags);
+}
+
+export function factLeaks(skill: string, samples: string[], ownNumbers: number[]): string[] {
+  const mine = new Set(ownNumbers.map(String));
+  // 兩位數以上才算 —— 一位數（「分三段」「最多 3 句」）幾乎都是規則本身在講數量。
+  const inSamples = new Set<string>();
+  for (const s of samples) for (const m of s.matchAll(/\d{2,}/g)) inSamples.add(m[0]);
+  const leaks: string[] = [];
+  for (const n of inSamples) {
+    if (mine.has(n)) continue;
+    if (numberBoundary(n).test(skill)) leaks.push(n);
+  }
+  return leaks.sort((a, b) => b.length - a.length);
+}
+
+/**
+ * 確定性修補：把洩漏的數字換成占位說明，而不是整段刪掉。
+ *
+ * 刪整句會把規則的語意弄破（「兩盒 499」變成「兩盒」），換成占位反而把它變成
+ * 一條正確的規則：價格要來自當次輸入，不是寫死在卡裡。
+ */
+export function redactFactLeaks(skill: string, leaks: string[]): string {
+  let out = skill;
+  // 長的先換，否則換掉 "499" 會把 "1499" 打成 "1（依當次輸入）"。
+  for (const n of [...leaks].sort((a, b) => b.length - a.length)) {
+    out = out.replace(numberBoundary(n, "g"), "（依當次輸入）");
+  }
+  // 「價格 499 279」修補後會變成兩個相鄰占位（中間可能夾空白或頓號），收成一個。
+  return out.replace(/（依當次輸入）(\s*[、,，/]?\s*（依當次輸入）)+/g, "（依當次輸入）");
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // 卡 → template + config
 // ─────────────────────────────────────────────────────────────────────
 const CHANNEL_OUTPUT: Record<string, { platform: FBTaskTemplate["outputDefaults"]["platform"]; post_type: string }> = {
