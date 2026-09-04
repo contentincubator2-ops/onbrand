@@ -153,6 +153,217 @@ That position is the credibility, and it has a specific shape:
 ・Do not attack competitors, countries, or named companies.
 ・Do not tell a heritage story every time. Four decades is context, not the subject of every post.`;
 
+/**
+ * 每張卡的具名參考。
+ *
+ * 2026-09-05 (CJ「重新檢查，每一個任務卡片，是否都有參考某個得獎案例或爆款
+ * 文章」＋「卡片的命名，請加上該案例的名稱」)。稽核結果：32 張裡只有
+ * web-gs-craft 自己寫了範例，官網六張連工藝層都沒有（已補 webCraft.ts），
+ * 其餘 25 張吃得到平台工藝準則、卻拿不到案例 —— 因為 fbCraft/igCraft/
+ * liCraft/edmCraft 只在「精確 task id」命中時才附參考，自建卡的 id 永遠不在
+ * 那份表裡。
+ *
+ * ── 引用紀律 ──────────────────────────────────────────────────────────
+ * `award` 只在該作品的得獎紀錄明確、且已被這個 repo 其他模組引用過時才標。
+ * 其餘一律標 `known`（業界廣泛引用的公開作品）。編一個得獎紀錄跟編一張 ISO
+ * 認證是同一種錯誤，而且更難被發現 —— 事實白名單擋得住產品規格，擋不住這個。
+ *
+ * ── 為什麼放在 card() 統一注入 ────────────────────────────────────────
+ * 26 張卡逐個改 prompt 會漏，而且下次加卡沒有東西提醒作者要配一個參考。
+ * 集中成一張表之後，測試可以要求「每張自訂卡都必須在表上」。
+ */
+type Exemplar = {
+  /** 顯示在卡片標題上的名字，越短越好 —— 那是 pill 上的空間。 */
+  short: string;
+  /** 進 prompt 的完整說明：是什麼、為什麼是標竿、可遷移的是哪一點。 */
+  note: string;
+  /** award = 有明確得獎紀錄；known = 業界廣泛引用但不宣稱得獎。 */
+  kind: "award" | "known";
+};
+
+export const CARD_EXEMPLARS: Record<string, Exemplar> = {
+  // ── 官網（webCraft 已在平台層給了參考，這裡補產業精度）──────────────
+  "web-gs-craft": {
+    // 三組案例已經逐一標在變體標籤上了，卡標只取一個代表，否則 pill 會爆版。
+    short: "Filson / Permanent Style",
+    kind: "known",
+    note: "三種結構各有出處，已寫在卡片的結構段裡：製程走站（Filson、Hiut Denim、Red Wing 的工廠內容）、單一細節深挖（Permanent Style、Heddels）、迷思糾正（Gear Patrol、Wirecutter）。",
+  },
+  "web-gs-care": {
+    short: "Woolmark / Nudie Jeans",
+    kind: "known",
+    note: "The Woolmark Company 的羊毛保養指引與 Nudie Jeans 的公開修補指南。兩者都把「救不回來的情況」明白寫出來，權威感來自那一段而不是來自宣稱專業。",
+  },
+  "web-gs-guide": {
+    short: "Stripe Docs / Wirecutter",
+    kind: "known",
+    note: "Stripe 文件與 Wirecutter 選購指南：把複雜決策寫成可執行清單。判準是「讀完就算去找別家也用得上」—— 那正是它建立信任的方式。",
+  },
+  "web-gs-case": {
+    short: "Slack / Intercom",
+    kind: "known",
+    note: "B2B 案例研究被拆解最多次的兩份範本。結構是限制→為什麼難→做了什麼→可驗證的結果；客戶是主角、供應商是工具；一定寫出中途不順的那段。",
+  },
+  "web-gs-buyer-questions": {
+    short: "Stripe Docs",
+    kind: "known",
+    note: "Stripe 文件的解答式寫作：一問一答、問句用讀者真的會打的字、答案第一句就是結論、「看情況」要展開成「看哪些情況」。",
+  },
+  "web-gs-product-page": {
+    short: "Bellroy",
+    kind: "known",
+    note: "Bellroy 產品頁：用「解決你哪個具體不便」取代規格堆疊，讓看不見的構造差異變得可以理解。規格放在能被理解之後，不放在開頭。",
+  },
+
+  // ── 電子報 ────────────────────────────────────────────────────────────
+  "em-gs-cold-outreach": {
+    short: "HubSpot 冷郵件框架",
+    kind: "known",
+    note: "HubSpot 的 B2B 冷郵件框架（HubSpot Academy 教材，全球 SDR 引用最多的格式）：五句以內，鉤子→為何是你→一個洞察→一個問題。不推銷，只建立對話；個性化勝過模板。",
+  },
+  "em-gs-enquiry-reply": {
+    short: "37signals 純文字回信",
+    kind: "known",
+    note: "Basecamp／37signals 的純文字客戶回信風格（公開倡議並實行多年）：不用制式問候、不附型錄，第一句就回答對方問的那件事；答不了的部分明說要查什麼。",
+  },
+  "em-gs-sample-followup": {
+    short: "Groove HQ 公開拆解",
+    kind: "known",
+    note: "Groove HQ 公開發表過自家每一封追蹤信的回覆率與改寫過程，是少數把「追蹤信怎麼寫才有人回」攤開講的公開資料：給一個容易回覆的下一步，不催促，主動點出自己的弱點。",
+  },
+  "em-gs-show-invite": {
+    short: "Salesforce Dreamforce",
+    kind: "award",
+    note: "Salesforce Dreamforce 的活動邀請 email（Cannes Lions B2B Lions 相關活動行銷；年度最大 B2B 活動）：邀請錨定在「你離開時會知道什麼」而不是活動後勤；一個主要 CTA；「誰會在那裡」是最強說服點。",
+  },
+  "em-gs-reactivation": {
+    short: "Duolingo 喚回信",
+    kind: "award",
+    note: "Duolingo 喚回 email 系列（IAC Award Winner Re-engagement Campaign）：A/B 兩種角度（情感 vs 實惠），版型不變只換訊息；記住「互動」與「轉換」常需要不同角度，先選定目標。",
+  },
+  "em-gs-new-product": {
+    short: "Apple 上市序列",
+    kind: "award",
+    note: "Apple 產品上市 email 序列（Litmus Email Design Awards 多次獲最佳互動體驗）：把承諾門檻往前移（預約→等候→上市→補貨）；分眾；主旨主打一個具名功能亮點，不是形容詞。",
+  },
+  "em-gs-reorder": {
+    short: "Chewy 補貨提醒",
+    kind: "known",
+    note: "Chewy 的補貨與客服體驗被廣泛報導為留存標竿：提醒建立在「你上次買的那個東西」的具體事實上，而不是促銷檔期；語氣像記得你的人，不像系統。",
+  },
+  "em-gs-industry-news": {
+    short: "Morning Brew",
+    kind: "award",
+    note: "Morning Brew（CMI Award Best B2B Newsletter；從 0 到 400 萬訂閱）：一期一主題；語氣一致（聰明但可親）；每一節都要賺到讀者繼續讀；結尾給一個具體行動建議。",
+  },
+
+  // ── Instagram ─────────────────────────────────────────────────────────
+  "ig-gs-showcase": {
+    short: "Hodinkee",
+    kind: "known",
+    note: "Hodinkee 的物件特寫與說明（腕錶媒體裡物件攝影＋細節敘事被引用最多的一家）：一張照片只講一個細節，文案負責說出眼睛看得到但講不出來的那件事。",
+  },
+  "ig-gs-brand-origin": {
+    short: "Patagonia Worn Wear",
+    kind: "known",
+    note: "Patagonia 的 Worn Wear 系列：品牌故事錨在「一件被穿舊的東西」這種具體物件上，不錨在年份與里程碑；願意寫出對自己不利的部分。",
+  },
+  "ig-gs-process": {
+    short: "Hiut Denim / Red Wing",
+    kind: "known",
+    note: "Hiut Denim（HistoryTag 讓每條褲子可追溯到縫製者）與 Red Wing 的工廠內容：製程的說服力來自具體到可以被檢查的細節，不來自「職人精神」這種詞。",
+  },
+  "ig-gs-carousel-compare": {
+    short: "Bellroy 差異圖解",
+    kind: "known",
+    note: "Bellroy 的產品差異圖解：每一張卡固定同一個句型與同一組拍攝條件，只有物件變動 —— 比較的說服力來自控制變因，五張不同風格的照片不構成比較。",
+  },
+
+  // ── LinkedIn ──────────────────────────────────────────────────────────
+  "li-gs-co-event": {
+    short: "TED Conferences",
+    kind: "award",
+    note: "TED Conferences 的 LinkedIn 活動策略（LinkedIn Marketing Award）：公司動態寫成「對參與者的意義」而不是公告；一則一件事；不用新聞稿語氣。",
+  },
+  "li-gs-co-product": {
+    short: "Figma 產品發布",
+    kind: "known",
+    note: "Figma 的產品發布貼文（被廣泛引用的 B2B 產品溝通範例）：新功能一律對照「在此之前你只能怎麼做」，讓差異可被理解；不列規格清單。",
+  },
+  "li-gs-co-industry": {
+    short: "Salesforce",
+    kind: "award",
+    note: "Salesforce 的 LinkedIn 思想領袖貼文策略（Cannes Lions B2B Lions Grand Prix）：產業觀察要帶一個可被反駁的立場；用自己的一手觀察當證據，不轉述二手研究。",
+  },
+  "li-gs-co-document": {
+    short: "Justin Welsh",
+    kind: "known",
+    note: "Justin Welsh 在 LinkedIn 的 document 貼文（公開拆解自己的成長數據，是該格式被引用最多的實作者）：每一頁要能單獨看懂，且每一頁都要賺到下一次滑動；末頁邀請討論而不是導流。",
+  },
+  "li-gs-cmo-contrarian": {
+    short: "Adam Grant",
+    kind: "award",
+    note: "Adam Grant 的 LinkedIn 貼文（LinkedIn 官方 Top Voices 多年，留言數位居平台前 0.1%）：最強的開場是「聽起來錯誤但可被驗證為真」的一句話，八個字內、不需要前情提要。",
+  },
+  "li-gs-cmo-curation": {
+    short: "Lenny Rachitsky",
+    kind: "known",
+    note: "Lenny Rachitsky 的轉載評述做法（訂閱數最高的產品類電子報之一）：轉貼別人的東西時，自己的立場必須佔一半以上，而且要明確說出哪裡同意、哪裡不同意。",
+  },
+  "li-gs-cmo-company": {
+    short: "Jason Fried",
+    kind: "known",
+    note: "Jason Fried（37signals）的第一人稱公司貼文：講一個當天真實發生的決策或對話，不講里程碑；短、具體、有立場，且從不用「我們很興奮地宣布」。",
+  },
+  "li-gs-cmo-tradeshow": {
+    short: "Dreamforce 與會者視角",
+    kind: "award",
+    note: "Salesforce Dreamforce 的與會者視角內容（Cannes Lions B2B Lions 相關）：展會貼文的價值在「我在現場看到什麼別人沒看到的」，不在「我們參展了」。",
+  },
+  "li-gs-cmo-dm-intro": {
+    short: "Josh Braun 不推銷開場",
+    kind: "known",
+    note: "Josh Braun 的 B2B 開發私訊教材（公開課程與大量拆解）：開場不能有任何推銷成分；先講你觀察到對方的什麼，再給一個容易拒絕的請求 —— 容易拒絕才會有人回。",
+  },
+
+  // ── Facebook ──────────────────────────────────────────────────────────
+  "fb-gs-brand-origin": {
+    short: "Patagonia",
+    kind: "known",
+    note: "Patagonia「Don't Buy This Jacket」與其後續內容：品牌故事要含一個代價 —— 講出當年放棄了什麼、為此付出什麼，比任何價值宣言都有效。",
+  },
+  "fb-gs-tradeshow": {
+    short: "National Geographic",
+    kind: "award",
+    note: "National Geographic 的 Facebook 主頁（Shorty Award Best Brand Presence in Travel 多屆）：現場內容靠一張真實照片加一句說明就成立；不要用「精彩回顧」這種總結語氣。",
+  },
+  "fb-gs-company-life": {
+    short: "Zappos 公司日常",
+    kind: "award",
+    note: "Zappos 的公開公司文化內容（Business Insider Best Customer Service）：公司日常要寫具體到有點瑣碎的事，那個瑣碎感就是可信度；不要寫成企業形象片。",
+  },
+  "fb-gs-new-product": {
+    short: "Bellroy",
+    kind: "known",
+    note: "Bellroy 的新品說明：新品貼文的主詞是「它解決了什麼以前解決不了的事」，不是「新品上市」；用讀者已知的東西當對照物。",
+  },
+  "fb-gs-process": {
+    short: "Hiut Denim / Red Wing",
+    kind: "known",
+    note: "Hiut Denim 與 Red Wing 的製程內容，但 Facebook 的切角是「這一步難在哪」而不是「這一步怎麼做」—— 讀者裡有同業，難度才是他們看得懂的語言。",
+  },
+};
+
+/** 把參考組成要接在 prompt 最後的區塊。 */
+function exemplarBlock(ex: Exemplar): string {
+  const tag = ex.kind === "award" ? "得獎案例" : "業界標竿";
+  return `
+
+【具名參考 — ${tag}：${ex.short}】
+${ex.note}
+學它的可遷移結構，不要抄它的作品、不要提到它的名字，也不要暗示盛全與它有任何關係。`;
+}
+
 /** 少寫一層巢狀。custom 卡的共同結構就這四個欄位。 */
 function card(
   channel: BrandPack["channels"][number]["key"],
@@ -161,10 +372,22 @@ function card(
   config: OrchestraConfig,
   origin: "brand" | "sowork" = "brand",
 ): BrandPackCard {
-  // polishHint 統一在這裡注入，避免逐張卡漏掉。個別卡若已自訂就尊重它。
+  // polishHint 與具名參考統一在這裡注入，避免逐張卡漏掉。個別卡若已自訂
+  // polishHint 就尊重它。
+  const ex = CARD_EXEMPLARS[template.id];
+  const label = typeof template.label === "string"
+    ? template.label
+    : ex
+      ? { en: `${template.label.en} · after ${ex.short}`, zh: `${template.label.zh}｜參考 ${ex.short}` }
+      : template.label;
   return {
     kind: "custom", channel, format, origin, config,
-    template: { polishHint: GUSHENG_POLISH_HINT, ...template },
+    template: {
+      polishHint: GUSHENG_POLISH_HINT,
+      ...template,
+      label,
+      systemPrompt: ex ? template.systemPrompt + exemplarBlock(ex) : template.systemPrompt,
+    },
   };
 }
 

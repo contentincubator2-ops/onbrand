@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { PACKS, resolveBrandPack, findPackTemplate, findPackOrchestraConfig, packCardId } from "./index";
 import { MONTHLY_QUOTA, TEN_STANDARDS } from "./wugan";
-import { GUSHENG_FACTS } from "./gusheng";
+import { CARD_EXEMPLARS, GUSHENG_FACTS } from "./gusheng";
 import { validateWuganVoice } from "../wuganVoiceContract";
 import { buildTaskCatalogIndex, type CatalogPlatform } from "../taskCatalogIndex";
 
@@ -438,6 +438,59 @@ describe("盛全工業 pack 的內容規則", () => {
         `${card.template.id} 的 captionMaxChars 是 ${card.config.captionMaxChars}，` +
         `走社群分支會被 master persona 的 100-250 words 壓住`,
       ).toBe("document");
+    }
+  });
+
+  it("每張自訂卡都掛一個具名參考，而且名字出現在卡片標題上", () => {
+    // 2026-09-05 (CJ「是否都有參考某個得獎案例或爆款文章」＋「卡片的命名，
+    // 請加上該案例的名稱」)。稽核當時 32 張裡只有 1 張自己寫了範例；其餘
+    // 吃得到平台工藝準則的結構，卻拿不到案例 —— fbCraft / igCraft / liCraft
+    // / edmCraft 只在「精確 task id」命中時才附參考，自建卡永遠不在那份表裡。
+    for (const card of gs.cards) {
+      if (card.kind !== "custom") continue;
+      const id = card.template.id;
+      const ex = CARD_EXEMPLARS[id];
+      expect(ex, `${id} 沒有配任何具名參考`).toBeTruthy();
+      expect(ex.short.length, `${id} 的參考名稱是空的`).toBeGreaterThan(2);
+      expect(ex.note.length, `${id} 的參考說明太短，等於沒說`).toBeGreaterThan(40);
+      // 名字要真的進到 prompt 與標題，否則這張表只是裝飾
+      expect(
+        card.template.systemPrompt,
+        `${id} 的 prompt 沒有帶到參考 ${ex.short}`,
+      ).toContain(ex.short);
+      const label = card.template.label as { en: string; zh: string };
+      expect(label.zh, `${id} 的中文標題沒有帶案例名`).toContain(ex.short);
+      expect(label.en, `${id} 的英文標題沒有帶案例名`).toContain(ex.short);
+    }
+  });
+
+  it("卡片標題不會因為掛了案例名而爆版", () => {
+    // 標題是 pill 上的文字。第一版把三組案例全列進工法卡的標題，49 個字，
+    // 而那三組本來就已經逐一標在變體標籤上了。
+    for (const card of gs.cards) {
+      if (card.kind !== "custom") continue;
+      const zh = (card.template.label as { zh: string }).zh;
+      expect(zh.length, `${card.template.id} 的標題 ${zh.length} 字，太長`).toBeLessThanOrEqual(40);
+    }
+  });
+
+  it("參考不得無中生有地宣稱得獎", () => {
+    // 編一個得獎紀錄跟編一張 ISO 認證是同一種錯誤，而且更難被發現 ——
+    // 事實白名單擋得住產品規格，擋不住這個。標 award 的必須指名獎項。
+    const AWARD_NAMES = /Shorty|Cannes Lions|IAC|CMI|Litmus|LinkedIn (官方|Marketing)|Business Insider|Webby|D&AD|Clio/;
+    for (const [id, ex] of Object.entries(CARD_EXEMPLARS)) {
+      if (ex.kind !== "award") continue;
+      expect(
+        ex.note,
+        `${id} 標成 award 卻沒有指名是哪個獎 —— 不確定就標 known`,
+      ).toMatch(AWARD_NAMES);
+    }
+  });
+
+  it("參考表沒有指向不存在的卡的孤兒項目", () => {
+    const ids = new Set(gs.cards.filter((c) => c.kind === "custom").map((c) => (c as any).template.id));
+    for (const id of Object.keys(CARD_EXEMPLARS)) {
+      expect(ids.has(id), `CARD_EXEMPLARS 列了不存在的卡 ${id}`).toBe(true);
     }
   });
 

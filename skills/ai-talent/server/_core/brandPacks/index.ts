@@ -15,11 +15,13 @@ import type { FBTaskTemplate, OrchestraConfig } from "../quickTaskFB";
 import type { BrandPack, BrandPackCard } from "./types";
 import { WUGAN_PACK } from "./wugan";
 import { GUSHENG_PACK } from "./gusheng";
+import { HOTU_PACK } from "./hotu";
 
 /** 所有已建置的客戶任務包。加新客戶就在這裡加一行。 */
 export const PACKS: BrandPack[] = [
   WUGAN_PACK,
   GUSHENG_PACK,
+  HOTU_PACK,
 ];
 
 export type { BrandPack, BrandPackCard } from "./types";

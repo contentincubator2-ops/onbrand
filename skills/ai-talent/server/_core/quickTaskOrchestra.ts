@@ -38,6 +38,9 @@ import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } 
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "./brandContext";
 import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
+// 2026-09-05: 官網頻道 2026-08-29 加上時沒有跟著補 craft 模組，是唯一沒有
+// 工藝層的內容頻道 —— 而長文最需要結構參考。見 webCraft.ts 檔頭。
+import { isWebsiteBodyTask, WEB_CRAFT_RUBRIC, webPlaybookFor } from "./webCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
 import { resolveTierVariantShape } from "./tierVariantShape";
 import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
@@ -793,6 +796,9 @@ async function callOneVariant(args: {
   const cwBlock = isCrossplatformBodyTask(template)
     ? `\n\n${CW_CRAFT_RUBRIC}\n\n${cwPlaybookFor(template.id)}\n`
     : "";
+  const webBlock = isWebsiteBodyTask(template)
+    ? `\n\n${WEB_CRAFT_RUBRIC}\n\n${webPlaybookFor(template.id)}\n`
+    : "";
 
   // 2026-07-18 多市場 (P2): the 11 award-craft rubrics are zh-TW "structure
   // textbooks" with Taiwan cultural framing. Rather than maintaining 11×N
@@ -801,7 +807,7 @@ async function callOneVariant(args: {
   // else. Applies when the brand's market is known and not zh-TW (null =
   // unmapped language — note still applies; undefined = legacy zh-TW).
   const anyCraft = edmBlock || igBlock || fbBlock || liBlock || ttBlock ||
-    ytBlock || prBlock || brBlock || klBlock || rsBlock || cwBlock;
+    ytBlock || prBlock || brBlock || klBlock || rsBlock || cwBlock || webBlock;
   const craftLocaleNote = (market !== undefined && market !== "zh-TW" && anyCraft)
     ? `\n\n【工藝準則在地化 — 重要】上方得獎工藝準則是以台灣市場中文寫成的「結構教材」：` +
       `只取其結構（開場鉤子 / 敘事弧 / 節奏 / 收尾 / 格式），**輸出一律用品牌目標市場語言**；` +
@@ -897,6 +903,7 @@ async function callOneVariant(args: {
       klBlock +
       rsBlock +
       cwBlock +
+      webBlock +
       craftLocaleNote +
       strategistSection +
       `\n\n【本次只產 1 個變體】**${label}**：在不更動章節結構的前提下，` +
@@ -928,6 +935,7 @@ async function callOneVariant(args: {
     klBlock +
     rsBlock +
     cwBlock +
+    webBlock +
     craftLocaleNote +
     strategistSection +
     `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +

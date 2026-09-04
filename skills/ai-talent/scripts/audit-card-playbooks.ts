@@ -19,6 +19,7 @@ import { isFacebookBodyTask, fbPlaybookFor } from "../server/_core/fbCraft";
 import { isInstagramBodyTask, igPlaybookFor } from "../server/_core/igCraft";
 import { isLinkedInBodyTask, liPlaybookFor } from "../server/_core/liCraft";
 import { isEmailBodyTask, edmPlaybookFor } from "../server/_core/edmCraft";
+import { isWebsiteBodyTask, webPlaybookFor } from "../server/_core/webCraft";
 
 const packKey = process.argv[2] || "gusheng";
 const pack = PACKS.find((p) => p.key === packKey);
@@ -38,7 +39,11 @@ const PROBES: Probe[] = [
   { name: "IG", matches: isInstagramBodyTask, playbook: igPlaybookFor },
   { name: "LI", matches: isLinkedInBodyTask, playbook: liPlaybookFor },
   { name: "EM", matches: isEmailBodyTask, playbook: edmPlaybookFor },
+  { name: "WEB", matches: isWebsiteBodyTask, playbook: webPlaybookFor },
 ];
+
+/** Does the resolved playbook actually name an outside piece of work? */
+const CITES = /具名參考|得獎參考/;
 
 let noRubric = 0;
 let generic = 0;
@@ -62,10 +67,13 @@ for (const card of pack.cards) {
   let line = "";
   try { line = hit.playbook(id) ?? ""; } catch (e: any) { line = `<threw: ${e?.message}>`; }
   const flat = String(line).replace(/\s+/g, " ").trim();
-  rows.push(`${hit.name}  ${id.padEnd(26)} ${flat.slice(0, 150)}`);
+  const cited = CITES.test(flat);
+  if (!cited) generic++;
+  rows.push(`${cited ? "CITED " : "NO-CASE"} ${hit.name.padEnd(4)} ${id.padEnd(26)} ${flat.slice(0, 130)}`);
 }
 
 for (const r of rows) console.log(r);
 console.log("");
 console.log(`cards with no craft layer at all: ${noRubric}`);
+console.log(`cards whose playbook names no outside work: ${generic}`);
 process.exit(0);
