@@ -305,7 +305,14 @@ ${CRAFT_STRUCTURES}${GUSHENG_VOICE}`,
     outputMode: "document",
     outputDefaults: { platform: "doc", post_type: "article" },
   }, docConfig(
-    ["A｜Process Walkthrough", "B｜Single Detail Deep-Dive", "C｜Myth Correction"],
+    // 2026-09-05 (CJ「卡片的命名，請加上該案例的名稱」)：範例是掛在變體上
+    // 而不是整張卡 —— 三個結構各自來自不同的媒體，使用者看到的也是三個分頁。
+    // 名字寫在標籤上，選變體時就知道自己在套誰的結構，不用去讀 prompt。
+    [
+      "A｜Process Walkthrough（Filson / Hiut Denim / Red Wing）",
+      "B｜Single Detail Deep-Dive（Permanent Style / Heddels）",
+      "C｜Myth Correction（Gear Patrol / Wirecutter）",
+    ],
     2800, 8000,
   )),
 
