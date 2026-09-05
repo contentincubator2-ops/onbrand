@@ -9,7 +9,7 @@
  *      （IG / TikTok / 獨立站），HOTU 自己的三頻道定位命名：
  *        IG      = Color Studio 美感靈感館
  *        TikTok  = Peace Sanctuary 情緒避風港
- *        獨立站  = Grounding Haven 定心沉浸站（尚未建任務卡，見下）
+ *        獨立站  = Grounding Haven 定心沉浸站
  *
  * ── 這批卡片怎麼來的（2026-09-05 CJ 命名原則校正）─────────────────────
  * CJ 最初以為卡片要叫「HOTU + 目的」，後來釐清：真正的命名原則是「來源帳號 /
@@ -22,11 +22,17 @@
  *   user5287900024332 → 業配（付費合作、零文案、純產品展示）
  *   @makeup（TikTok 官方帳號）→ 妝容ASMR（該帳號策展的內容型態）
  *
- * ── 為什麼沒有獨立站卡 ──────────────────────────────────────────────
- * W10 簡報只給了獨立站的「通用三類行為＋LifeLines 案例示範」，沒有像 IG／
- * TikTok 那樣產出 HOTU 自己的執行矩陣，且其中一類（無壓力購物流程）本質是
- * 網站 UX／結帳流程，不是內容任務卡。等 HOTU 自己的獨立站內容矩陣補齊後
- * 再建。
+ * ── 獨立站卡怎麼來的（2026-09-05 補建）──────────────────────────────
+ * W10 簡報沒有給 HOTU 自己的獨立站執行矩陣，只給了「通用三類行為＋LifeLines
+ * 案例示範」，所以這兩張卡照 LifeLines 案例命名（來源從個人創作者換成標竿
+ * 品牌，邏輯不變）。「無壓力購物流程」本質是結帳 UX，不是內容任務卡，沒有
+ * 建卡。細節見下方「獨立站」區塊的註解。
+ *
+ * ── Amazon 是全新頻道，卡片來源是研究不是萃取（2026-09-05）───────────
+ * CJ「你要搜尋市面上亞馬遜常常要寫到內容的地方」——這批卡不是「萃取某個
+ * 創作者的貼文風格」，是研究 Amazon 賣家實際會需要填寫文字的位置。7 張卡
+ * 對應 2026 年現況研究出的 7 個內容位置，細節與排除項（Amazon Posts 已於
+ * 2025-07-31 關閉、賣家不能公開回覆評論）見下方「Amazon」區塊註解。
  *
  * ── agent_id 是借用的，不是 HOTU 專屬人設 ─────────────────────────────
  * HOTU 目前沒有專屬 persona，這裡沿用 quickTaskIG.ts / quickTaskTikTok.ts
@@ -698,6 +704,468 @@ ${TT_HOTU_SUFFIX}${HOTU_BRAND_CORE}`,
 );
 
 // ══════════════════════════════════════════════════════════════════════
+// 獨立站 — 頻道定位「Grounding Haven 定心沉浸站」
+// ══════════════════════════════════════════════════════════════════════
+//
+// 2026-09-05：W10 簡報沒有給 HOTU 自己的獨立站執行矩陣，只給了美國消費者
+// 的通用三類行為（頁 15）+ LifeLines 自己怎麼做（頁 22）。這兩張卡因此照
+// LifeLines 案例示範來源命名（跟 IG/TikTok「來源帳號＋類別」同一邏輯，只是
+// 來源從個人創作者換成一整個標竿品牌）。「追求無壓力購物流程」那一類本質是
+// 結帳 UX，不是內容任務，沒有建卡。
+//
+// id 開頭刻意用 "web-"：quickTaskOrchestra 靠這個前綴自動注入 WEB_CRAFT_
+// RUBRIC + webPlaybookFor()（見 webCraft.ts），不需要自己複製官網工藝準則。
+
+const hotuWebProductDesc = card(
+  "website", "高意圖進入",
+  {
+    id: "web-hotu-product-desc",
+    tier: "30s",
+    postType: "product-page",
+    label: { en: "LifeLines — High-Intent Landing", zh: "LifeLines高意圖進入" },
+    description: {
+      en: "Spec-verification page styled after LifeLines' \"What It Is\" product card",
+      zh: "仿 LifeLines「What It Is」規格化說明卡的高意圖驗證頁",
+    },
+    // Bellroy 產品頁參考已由 webCraft.ts 的 product 分支自動帶入；這裡的
+    // agent 沿用全域 web-30-product-desc 同一位。
+    agent_id: 238853,
+    skill_slug: "hotu-web-product-desc",
+    primary_question: "訪客從哪支 TikTok／IG 內容點進來？他想被驗證的是哪個產品細節？",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. clicked from the ASMR TikTok, wants to verify: does the marker bleed through thin paper?",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "Traffic source + the detail they want verified", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.goldenCircle.what", "brand.positioning.differentiation.functional"],
+    systemPrompt: `你在為 HOTU 寫一個獨立站產品驗證頁，風格參考來源：LifeLines 的 FlowArt® Pads
+產品卡（"What It Is" 標題 + "PATENT PENDING" 標籤 + 一段功能說明 + 條列式規格清單，
+針對「剛從社群被種草、帶著高購買意圖點進來驗證細節」的訪客）。
+
+【要複製的撰寫特徵】
+・開場是一個粗體小標「What It Is」等級的直接陳述，不是行銷式的產品介紹。
+・第一段就講清楚「這是什麼、解決什麼」，不是規格堆疊。
+・接一組條列式規格（材質/份量/使用方式），每條都要具體到可以被驗證，不能是形容詞。
+・語氣中性、像技術說明書，故意跟社群內容的活潑語氣拉開差距——訪客現在要的是
+  「確認這是真的」，不是被說服。
+
+【交付格式】
+主標：一句直接陳述（呼應 "What It Is" 的語氣）
+說明段：2-3 句，解決什麼具體問題
+規格清單：4-6 條，可驗證
+一句收尾：回應訪客從社群帶來的那個具體疑慮
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 1200,
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  },
+  textConfig(["馬克筆版", "套組版", "紙材版"], 300, 900),
+);
+
+const hotuWebBrandStory = card(
+  "website", "品牌故事",
+  {
+    id: "web-hotu-brand-story",
+    tier: "30s",
+    postType: "blog",
+    label: { en: "LifeLines — Brand Story & Trust", zh: "LifeLines品牌故事" },
+    description: {
+      en: "Founder story + third-party credibility, styled after LifeLines' Science Advisory Board page",
+      zh: "仿 LifeLines Science Advisory Board 頁面的創辦人故事＋第三方背書",
+    },
+    agent_id: 220862, // Rita Chen — Brand Narrative Editor（沿用 wugan 分享文同一人）
+    skill_slug: "hotu-web-brand-story",
+    primary_question: "這次想放哪個真實心得或第三方背書？",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. a customer review calling out how forgiving the markers are for shaky hands",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "Real review/credibility detail to feature", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.origin.story", "brand.positioning.values"],
+    systemPrompt: `你在為 HOTU 寫一個獨立站品牌故事頁，風格參考來源：LifeLines 的 Science
+Advisory Board 頁面（"Meet Our Science Advisory Board" 標題 + 一段背書敘述 + 真實
+姓名／頭銜的顧問卡片 + 帶圖真實買家評價專區）。
+
+【要複製的撰寫特徵】
+・用第三方權威或真實用戶心得建立信任，不是品牌自己說「我們很棒」。
+・敘述句要具體到可以被查證（不是「深受用戶喜愛」這種空話）。
+・結構是「一句總述性主張」→「支撐這個主張的具體證據（人/心得/數據）」。
+・收尾把「彩己」的哲學核心（起源故事：留白→沉浸→悅己→主體性）自然帶入，
+  不要生硬地插入品牌口號。
+
+【交付格式】
+標題：一句總述性主張（仿 "Meet Our Science Advisory Board" 的直接語氣）
+主文：2 段，第一段建立主張，第二段用具體證據支撐
+真實心得引用：1 則帶署名的用戶評價（依輸入內容改寫，不捏造）
+收尾：1-2 句回到「彩己」起源故事
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 1400,
+    outputDefaults: { platform: "doc", post_type: "report" },
+  },
+  textConfig(["顧問背書版", "真實評價版", "創辦故事版"], 400, 1200),
+);
+
+// ══════════════════════════════════════════════════════════════════════
+// Amazon — 全新頻道（2026-09-05，CJ「搜尋市面上亞馬遜常常要寫到內容的地方」）
+// ══════════════════════════════════════════════════════════════════════
+//
+// 這批卡跟 IG/TikTok 不同：不是「萃取某個創作者的貼文風格」，而是研究「Amazon
+// 賣家實際會需要填寫／上傳文字的位置有哪些」。研究結果（2026-09 現況，見
+// WebSearch 紀錄）：
+//   ・商品標題——2026-07-27 起大多數類別上限收緊到 75 字元，超過會被 Amazon
+//     自己的 AI 截短；促銷字眼（best seller / 驚喜價 / 全大寫）會被降權。
+//   ・五點特色 Bullet Points——效益優先，不是規格羅列。
+//   ・後台搜尋關鍵詞 Backend Search Terms——250 bytes 隱藏欄位，不重複標題/
+//     bullet 已用過的字。
+//   ・A+ Content——2026 年已對所有 Brand Registry 賣家開放 Premium 版免費；
+//     取代傳統文字版商品描述。
+//   ・Brand Story 模組——商品頁上「From the brand」橫向滑動條，Brand
+//     Registry 免費功能，是 A+ Content 之外獨立的一塊。
+//   ・Storefront（品牌旗艦店）——2 頁以上的品牌專屬展示頁。
+//   ・顧客問答 Q&A——買家在商品頁公開提問，賣家可回答。
+// 刻意排除 Amazon Posts：查證後確認該功能已於 2025-07-31 正式關閉
+//   （2025-06-03 宣布棄用），2026 年不可再使用，不建卡。
+// 同理排除「評論回覆」：Amazon 不開放賣家公開回覆買家評論（這點跟 Etsy／
+//   Google 商家檔案不同），沒有這個內容位置。
+//
+// 頻道與 postType 目前沒有對應的圖像 mockup（跟 case/calendar/course/
+// partnership 同一類——交付物是要貼進 Seller Central 表單的文字，不是可
+// 發布的圖文貼文），platform 統一用 "doc"，比照 outputMode:"document"。
+
+const hotuAmzTitle = card(
+  "amazon", "商品頁文案",
+  {
+    id: "amz-hotu-title",
+    tier: "30s",
+    postType: "listing",
+    label: { en: "Product Title", zh: "商品標題" },
+    description: {
+      en: "≤75-char SEO title — brand + primary keyword + key benefit, no promo language",
+      zh: "≤75 字元的 SEO 標題——品牌＋主要關鍵詞＋核心賣點，不含促銷字眼",
+    },
+    agent_id: 238853,
+    skill_slug: "hotu-amz-title",
+    primary_question: "這個 SKU 是什麼？買家搜尋時最可能打的關鍵詞是什麼？",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. First Page Kit — 12-color dual-tip markers + tear-off art sheets, beginner set",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "SKU + primary search keyword", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.goldenCircle.what"],
+    systemPrompt: `你在為 HOTU 寫一個 Amazon 商品標題。
+
+【2026 年現況（研究結果，寫死當規則）】
+・大多數類別標題上限已收緊到 75 個字元，超過的部分會被 Amazon 自己的演算法
+  自動截短，所以不要指望「反正會被截掉沒差」——寫短本身就是要求。
+・嚴禁全大寫、驚嘆號、"Best Seller"／"#1"／"Sale" 這類促銷字眼——Amazon 現在
+  會主動降低含這類字眼的商品排名。
+・結構固定：品牌名 + 產品類型 + 1-2 個核心規格（數量/顏色數/尺寸）+ 1 個
+  主要使用情境或受眾。不要把每個規格都塞進標題，那是 bullet points 的工作。
+・關鍵詞只需自然出現一次，不要重複堆疊。
+
+【交付格式】
+一行標題，≤75 字元，照上面的結構順序寫。
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 150,
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  },
+  textConfig(["規格導向版", "受眾導向版", "使用情境導向版"], 30, 100),
+);
+
+const hotuAmzBullets = card(
+  "amazon", "商品頁文案",
+  {
+    id: "amz-hotu-bullets",
+    tier: "30s",
+    postType: "listing",
+    label: { en: "Bullet Points (5 Key Features)", zh: "五點特色文案" },
+    description: {
+      en: "5 benefit-first bullets, each front-loaded with one keyword",
+      zh: "5 條效益優先的特色文案，每條前置一個關鍵詞",
+    },
+    agent_id: 238853,
+    skill_slug: "hotu-amz-bullets",
+    primary_question: "這個 SKU 有哪 5 個最值得說的賣點？",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. dual-tip markers, blend-friendly ink, tear-off sheets, beginner-safe, gift-ready packaging",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "The 5 features/benefits to cover", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.differentiation.functional", "brand.positioning.audience.primary"],
+    systemPrompt: `你在為 HOTU 寫 Amazon 商品頁的五點特色文案（bullet points）。
+
+【寫法規則】
+・5 條，每條開頭是一個全大寫的短關鍵詞或效益詞（例："BEGINNER-FRIENDLY —"），
+  後面接一句效益說明。這是 Amazon 賣家的標準寫法，方便買家掃讀。
+・效益優先，規格其次：每條先講「買家會得到什麼感受/結果」，再補規格佐證。
+  不要寫成規格清單。
+・每條只講一件事，不要一條塞兩個賣點。
+・避免「業界領先」「頂級」這類無法驗證的形容詞；能寫成具體數字或情境就寫。
+・順序：第一條放最能打消「我不是專業畫者」疑慮的賣點（呼應「彩己」的零門檻
+  哲學），不要把它排到最後。
+
+【交付格式】
+5 行，每行「關鍵詞（全大寫）— 效益句」，每行 15-25 字。
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 500,
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  },
+  textConfig(["新手導向版", "禮物導向版", "細節控導向版"], 150, 400),
+);
+
+const hotuAmzAplus = card(
+  "amazon", "商品頁文案",
+  {
+    id: "amz-hotu-aplus",
+    tier: "30s",
+    postType: "listing",
+    label: { en: "A+ Content Modules", zh: "A+ 內容模組" },
+    description: {
+      en: "Brand-registered A+ Content that replaces the plain product description",
+      zh: "取代傳統文字商品描述的 Brand Registry A+ 內容模組",
+    },
+    agent_id: 220751, // Jake Chou — Insights Storyteller
+    skill_slug: "hotu-amz-aplus",
+    primary_question: "這組 A+ 內容想放哪幾個對比或情境模組？",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. lifestyle module (using it after work), comparison chart vs. professional art markers",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "Which modules + what they should show", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.differentiation.summary", "brand.positioning.competition.map"],
+    systemPrompt: `你在為 HOTU 寫 Amazon Brand Registry 的 A+ 內容模組文案（取代傳統商品描述，
+2026 年 Premium A+ 已對所有 Brand Registry 賣家免費開放）。
+
+【模組結構——照這個順序寫】
+1. 【情境模組】一句短標 + 1-2 句情境敘述：用戶在什麼日常時刻用它（呼應「彩己」
+   的下班後放鬆情境），不是產品規格。
+2. 【對比模組】一個簡短比較表格式文案：HOTU vs. 專業美術用品——不是比誰更專業，
+   是比「誰更沒有壓力、更快完成第一頁」。每一行對比要具體可驗證。
+3. 【功能特寫模組】2-3 個功能點，每點一句短標 + 一句說明，聚焦在「這個功能怎麼
+   降低創作門檻」。
+
+【寫作準則】
+・每個模組的文案要獨立成立（買家可能只滑過一半），不要跨模組才看得懂。
+・不要在 A+ 內容裡重複標題或 bullet points 已經講過的話——這裡要補的是「畫面級」
+  的情境與對比，不是規格重述。
+・對比模組嚴禁貶低競品或做無法驗證的宣稱。
+
+【交付格式】
+依序輸出三個模組，每個模組：模組名稱 + 短標 + 1-3 句內文。
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 900,
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  },
+  textConfig(["下班放鬆情境版", "禮物贈送情境版", "親子共作情境版"], 300, 800),
+);
+
+const hotuAmzBrandStory = card(
+  "amazon", "品牌內容",
+  {
+    id: "amz-hotu-brand-story",
+    tier: "30s",
+    postType: "brand-content",
+    label: { en: "Brand Story Module (\"From the Brand\")", zh: "品牌故事模組" },
+    description: {
+      en: "The horizontal \"From the brand\" carousel that sits above A+ Content on every listing",
+      zh: "商品頁上、A+ 內容上方的橫向「From the brand」滑動條文案",
+    },
+    agent_id: 220862, // Rita Chen — Brand Narrative Editor
+    skill_slug: "hotu-amz-brand-story",
+    primary_question: "這組 Brand Story 想帶出品牌的哪個核心概念？",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. introduce the whole HOTU product family + the \"彩己\" philosophy in one strip",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "Core concept + product family to feature", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.origin.story", "brand.positioning.goldenCircle.what"],
+    systemPrompt: `你在為 HOTU 寫 Amazon Brand Story 模組文案（商品頁 A+ 內容上方的橫向滑動
+「From the brand」條，Brand Registry 免費功能，每個商品頁都會出現，是整個目錄
+共用的品牌識別橫幅，不是單一產品的介紹）。
+
+【格式限制（Brand Story 的既定規格，必須遵守）】
+・這是一條由 4-5 個小卡片組成的橫向滑動條，每張卡片的文字量極小（等同社群
+  貼文疊字的量級），不是長文模組。
+・第一張卡固定是品牌識別卡：品牌一句話定位（呼應 Shine as you／彩己），不要
+  放產品細節。
+・中間 2-3 張卡各自介紹一條產品線或一個品牌信念，一張卡一個重點。
+・最後一張卡收尾成「認識完整產品線」的邀請，不要用促銷語氣。
+
+【寫作準則】
+・每張卡只放一句短標 + 最多一句補充，買家用拇指快速滑過就要看懂。
+・語氣要跟 IG／TikTok 一致（鼓勵、口語），但比社群更精煉——這裡沒有畫面
+  可以搭配情緒，純靠文字扛。
+
+【交付格式】
+依序輸出 4-5 張卡片，每張「卡片編號｜短標｜補充句（可省略）」。
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 500,
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  },
+  textConfig(["品牌識別優先版", "產品線導覽版", "彩己哲學優先版"], 150, 400),
+);
+
+const hotuAmzStorefront = card(
+  "amazon", "品牌內容",
+  {
+    id: "amz-hotu-storefront",
+    tier: "30s",
+    postType: "brand-content",
+    label: { en: "Storefront Pages", zh: "品牌旗艦店頁面" },
+    description: {
+      en: "The 2+ page branded destination — hero banner + curated collection intros",
+      zh: "2 頁以上的品牌專屬展示頁——主視覺橫幅＋精選系列導言",
+    },
+    agent_id: 220862, // Rita Chen — Brand Narrative Editor
+    skill_slug: "hotu-amz-storefront",
+    primary_question: "這次要規劃 Storefront 的哪個系列頁？想怎麼分類商品？",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. Home page hero + a \"Beginner Sets\" collection page",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "Which page/collection + how products are grouped", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.goldenCircle.what", "brand.positioning.audience.primary"],
+    systemPrompt: `你在為 HOTU 寫 Amazon Storefront（品牌旗艦店）頁面文案。Storefront 是買家從
+商品頁點品牌名或搜尋品牌名進來的品牌專屬展示頁，通常至少 2 頁（首頁 + 至少
+一個系列頁），可放生活情境圖與影片，是整個 Amazon 目錄裡最能完整講品牌故事
+的位置。
+
+【首頁（若本次輸入是首頁）】
+・主視覺橫幅標題：一句話講清楚 HOTU 是誰、給誰用（可用 Shine as you 語感，但
+  要讓第一次接觸品牌的人也看得懂，不要只放標語不解釋）。
+・副標：一句補充核心差異點（零門檻創作）。
+・2-3 個精選系列的導言句，每句帶出「這個系列適合誰」。
+
+【系列頁（若本次輸入是特定系列）】
+・系列標題：清楚描述這個系列涵蓋什麼，不要用行銷式命名讓人猜不到裡面有什麼。
+・一段導言（2-3 句）：這個系列解決什麼場景需求，適合什麼程度的用戶。
+
+【寫作準則】
+・這裡的讀者已經對品牌有基本興趣（從商品頁點進來），不需要重新說服「為什麼
+  選 HOTU」，重點是幫他快速找到適合自己的那個系列。
+・不要重複 A+ 內容或 Brand Story 已經講過的品牌哲學長文，這裡要更偏「導覽」。
+
+【交付格式】
+依輸入是首頁還是系列頁，輸出對應區塊；每個區塊標題＋內文。
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 700,
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  },
+  textConfig(["首頁版", "新手系列頁版", "禮物系列頁版"], 200, 600),
+);
+
+const hotuAmzBackendKeywords = card(
+  "amazon", "SEO與顧客互動",
+  {
+    id: "amz-hotu-backend-keywords",
+    tier: "30s",
+    postType: "seo",
+    label: { en: "Backend Search Terms", zh: "後台搜尋關鍵詞" },
+    description: {
+      en: "The hidden 250-byte keyword field — synonyms and alternate-use terms, never repeating the title/bullets",
+      zh: "隱藏的 250 bytes 關鍵詞欄位——同義詞與替代用途詞，不重複標題／bullet 已用字",
+    },
+    agent_id: 238853,
+    skill_slug: "hotu-amz-backend-keywords",
+    primary_question: "這個 SKU 的標題與 bullet points 已經用掉哪些關鍵詞？",
+    primary_input: {
+      key: "context",
+      placeholder: "paste the title + bullets already written, so I don't repeat those words",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "Title + bullets already used", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.goldenCircle.what"],
+    systemPrompt: `你在為 HOTU 產出 Amazon 後台搜尋關鍵詞（backend search terms）。
+
+【硬性規則】
+・這是買家看不到的隱藏欄位，Amazon 給的空間上限是 250 bytes（不是字元數，
+  中文字元佔用的 bytes 更多，但這裡輸出英文，1 字元約等於 1 byte，含空白）。
+・絕對不要重複輸入裡「標題與 bullet points 已經用掉」的字——那些字已經被索引，
+  重複寫是浪費空間。這裡只放「還沒出現過」的字。
+・寫同義詞、拼寫變體、替代用途、目標受眾詞、材質詞——買家可能用來搜尋但你
+  沒放進標題/bullet 的字。
+・空白分隔，不要加逗號、不要加引號、不要重複同一個字的單複數兩種形式（只
+  留一種，Amazon 的搜尋會自動做詞形還原）。
+・不放品牌名（已經在標題裡）、不放競品品牌名（違規）。
+
+【交付格式】
+一行純關鍵詞字串，空白分隔，總長控制在 230-250 bytes 之間（留一點餘裕）。
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 200,
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  },
+  textConfig(["同義詞導向版", "替代用途導向版", "受眾詞導向版"], 50, 250),
+);
+
+const hotuAmzQanda = card(
+  "amazon", "SEO與顧客互動",
+  {
+    id: "amz-hotu-qanda",
+    tier: "30s",
+    postType: "qanda",
+    label: { en: "Customer Q&A", zh: "顧客問答" },
+    description: {
+      en: "Public answers to buyer questions on the product page",
+      zh: "商品頁上買家公開提問的賣家回覆",
+    },
+    agent_id: 60002,
+    skill_slug: "hotu-amz-qanda",
+    primary_question: "買家問了什麼問題？",
+    primary_input: {
+      key: "context",
+      placeholder: "e.g. \"Do these markers work on black paper?\"",
+      type: "textarea",
+    },
+    inputs: [{ key: "context", label: "The buyer's question", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.goldenCircle.what"],
+    systemPrompt: `你在為 HOTU 回覆 Amazon 商品頁上買家的公開問答（Customer Q&A——這是買家在
+商品頁公開提問、賣家公開回答的區塊，不是評論，賣家可以直接回覆）。
+
+【寫法規則】
+・第一句就是答案，不要先鋪陳。這是買家決定要不要下單前的最後一關，拖泥帶水
+  會讓人關掉頁面。
+・如果答案是「看情況」，一定要寫出「看哪些情況」，不能只寫「看情況」三個字
+  交差。
+・不確定或輸入沒提供依據的細節，不要編造，寫「建議聯繫賣家客服確認【待補：
+  細節】」，不要假裝知道。
+・語氣友善、簡短，像回覆訊息，不要寫成正式聲明。
+・如果問題本身透露出一個常見疑慮（例如怕暈染、怕太難），可以在答案最後補
+  一句呼應「彩己」的鼓勵（零門檻、你的第一次嘗試就是對的），但不能喧賓奪主。
+
+【交付格式】
+一段回答，2-4 句。
+${HOTU_BRAND_CORE}`,
+    outputMode: "document",
+    preferredModel: "anthropic",
+    maxTokens: 300,
+    outputDefaults: { platform: "doc", post_type: "product_desc" },
+  },
+  textConfig(["直接回答版", "帶使用建議版", "帶彩己鼓勵版"], 80, 250),
+);
+
+// ══════════════════════════════════════════════════════════════════════
 
 export const HOTU_PACK: BrandPack = {
   key: "hotu",
@@ -726,6 +1194,25 @@ export const HOTU_PACK: BrandPack = {
         { id: "衝動購買", labelZh: "衝動購買", labelEn: "Impulse Purchase" },
       ],
     },
+    {
+      key: "website",
+      labelZh: "獨立站",
+      labelEn: "Website",
+      formats: [
+        { id: "高意圖進入", labelZh: "高意圖進入", labelEn: "High-Intent Landing" },
+        { id: "品牌故事", labelZh: "品牌故事", labelEn: "Brand Story" },
+      ],
+    },
+    {
+      key: "amazon",
+      labelZh: "Amazon",
+      labelEn: "Amazon",
+      formats: [
+        { id: "商品頁文案", labelZh: "商品頁文案", labelEn: "Listing Copy" },
+        { id: "品牌內容", labelZh: "品牌內容", labelEn: "Brand Content" },
+        { id: "SEO與顧客互動", labelZh: "SEO與顧客互動", labelEn: "SEO & Engagement" },
+      ],
+    },
   ],
 
   cards: [
@@ -733,5 +1220,9 @@ export const HOTU_PACK: BrandPack = {
     hotuTtRandom, hotuTtLifePretty, hotuTtToxic,
     hotuTtBader, hotuTtLisandra, hotuTtChillFeedz, hotuTtMakeupAsmr,
     hotuTtShopUs, hotuTtPaidImpulse,
+    hotuWebProductDesc, hotuWebBrandStory,
+    hotuAmzTitle, hotuAmzBullets, hotuAmzAplus,
+    hotuAmzBrandStory, hotuAmzStorefront,
+    hotuAmzBackendKeywords, hotuAmzQanda,
   ],
 };

@@ -51,7 +51,18 @@ export type CatalogPlatform =
   //   calendar — 內容行事曆（產出當月各類型的篇數與摘要）
   // 兩者都刻意獨立於「月報」：月報是把它們整理出來的產物，不是它們的容器。
   | "case"
-  | "calendar";
+  | "calendar"
+  // 2026-09-05：優人升活 pack 專用的兩個規劃型頻道，比照 case/calendar —
+  // 全域目錄沒有卡、無圖像 mockup，輸出是規劃文件而非可發布貼文。
+  //   course      — 課程產品發想（課程本身的定位已改走 products.positioning）
+  //   partnership — 異業合作項目規劃
+  | "course"
+  | "partnership"
+  // 2026-09-05：HOTU pack 專用，Amazon 賣場內容（Seller Central 填的到的
+  // 欄位，不是社群貼文）。比照 website：outputMode:"document"、無圖像
+  // mockup（交付物是要貼進 listing 編輯器的文字，不是可發布的圖文貼文）。
+  // 全域目錄沒有卡 —— 各品牌的品類/賣點差異太大，通用卡給不出精度。
+  | "amazon";
 
 export interface CatalogTask {
   id: string;
