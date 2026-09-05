@@ -98,6 +98,10 @@ jobs:
                 ) OR b.createdAt BETWEEN
                       DATE_SUB('$AROUND', INTERVAL 2 HOUR) AND DATE_ADD('$AROUND', INTERVAL 2 HOUR);"
 
+            echo "===== brands actually owned by userId 1238994 (the account behind the onboarding events) ====="
+            Q "SELECT id, name, slug, targetCountry, outputLanguage, createdAt
+                 FROM brands WHERE userId=1238994 OR createdBy=1238994;"
+
             echo "===== other tables that might hold a pre-users signup record ====="
             Q "SHOW TABLES LIKE '%lead%';"
             Q "SHOW TABLES LIKE '%signup%';"
