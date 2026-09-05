@@ -39,6 +39,7 @@ import { achievementsRouter } from "./achievementsRouter";
 // 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」)
 import { communityRouter } from "./communityRouter";
 // 2026-05-11 (CJ「Team / Agency 方案 + 多客戶 workspace」): multi-tenant container.
+import { reviewRouter } from "./reviewRouter";
 import { tenantRouter } from "./tenantRouter";
 // 2026-05-14 (CJ「我們使用 Stripe」): Stripe Checkout + webhook.
 import { stripeRouter } from "./stripeRouter";
@@ -104,6 +105,7 @@ export const appRouter = router({
   adminStats:      adminStatsRouter,
   achievements:    achievementsRouter,
   community:       communityRouter,
+  review:          reviewRouter,
   tenant:          tenantRouter,
   stripe:          stripeRouter,
   festival:        festivalRouter,
