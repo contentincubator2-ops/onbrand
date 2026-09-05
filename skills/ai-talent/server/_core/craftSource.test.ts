@@ -10,6 +10,7 @@ import {
   ALL_CRAFT_REFS, craftSourceFor, parseCraftRef, shortenCaseName, sourceForTemplate,
 } from "./craftSource";
 import { validateTaskSource } from "./taskSource";
+import { fbPlaybookFor } from "./fbCraft";
 import { buildTaskCatalogIndex } from "./taskCatalogIndex";
 
 describe("解析得獎工藝參考", () => {
@@ -96,5 +97,56 @@ describe("覆蓋率不能默默崩掉", () => {
     const t = cat.find((c) => c.id === "fb-30-ad-headline")!;
     expect(t.source.type).toBe("award");
     expect(t.source.short).toBe("Old Spice");
+  });
+});
+
+/**
+ * craft key 對不上活卡 = 那張卡默默失去得獎參考。
+ *
+ * 2026-09-05 實際發生過：fb-60-carousel-5 那 5 張改名成 99s、fb-90-* 那 4 張
+ * 併進 99s 時，craft 表的 key 沒跟著改。結果那 9 張卡生成時完全拿不到得獎
+ * 參考，同族其他卡有——而且 typecheck、測試、前台全部正常，沒有一處會紅。
+ *
+ * 下面的 RETIRED 是「卡真的退役了、ref 留著當資產」的白名單。要嘛把 key 改成
+ * 現行 id，要嘛明白寫進這裡；不能讓它靜靜地爛在那裡。
+ */
+describe("craft key 沒有孤兒", () => {
+  const RETIRED = new Set([
+    "fb-90-carousel-10frame", "fb-90-countdown-series", "fb-90-crisis-full",
+    "fb-90-event-launch", "fb-90-livestream-suite", "fb-90-monthly-calendar",
+    "fb-90-reels-full", "fb-99-crisis-playbook", "fb-99-launch-toolkit",
+    "fb-99-livestream-9seg", "ig-99-30day-calendar", "ig-99-account-reposition",
+    "ig-99-reel-series-6",
+  ]);
+
+  it("每個 craft key 不是對得上活卡，就是明列為已退役", () => {
+    const live = new Set(buildTaskCatalogIndex().map((c) => c.id));
+    const orphans = Object.keys(ALL_CRAFT_REFS)
+      .filter((k) => !live.has(k) && !RETIRED.has(k));
+    expect(
+      orphans,
+      "這些 craft key 對不上任何活卡——是不是卡改名了 key 沒跟著改？" +
+        "若卡真的退役，把 id 加進 RETIRED：" + orphans.join(", "),
+    ).toHaveLength(0);
+  });
+
+  it("RETIRED 名單本身不能過期——列在裡面的卡必須真的不在目錄", () => {
+    const live = new Set(buildTaskCatalogIndex().map((c) => c.id));
+    const resurrected = [...RETIRED].filter((id) => live.has(id));
+    expect(
+      resurrected,
+      "這些 id 又活過來了，請從 RETIRED 移除：" + resurrected.join(", "),
+    ).toHaveLength(0);
+  });
+
+  it("改名過的那 9 張，得獎參考真的進得了 prompt", () => {
+    for (const id of [
+      "fb-99-carousel-5", "fb-99-serial-3", "fb-99-viral-rewrite",
+      "fb-99-trend-rewrite", "fb-99-testimonial-rewrite",
+      "fb-99-monthly-calendar-promo", "fb-99-account-reposition",
+      "fb-99-quarterly-strategy", "fb-99-monthly-analytics",
+    ]) {
+      expect(fbPlaybookFor(id), `${id} 的 playbook 沒有得獎參考`).toContain("得獎參考");
+    }
   });
 });

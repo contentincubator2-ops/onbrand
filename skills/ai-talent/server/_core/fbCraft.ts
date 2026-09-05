@@ -102,7 +102,7 @@ export const FB_TASK_REF: Record<string, string> = {
     "BuzzFeed Tasty Facebook 原生影片 (Webby Award People's Voice 2017；Facebook 原生影片格式定義者)：連結貼文 = 先用 caption 完成 70% 的說服，點擊是延伸；影片本身在 Facebook 原生播放。",
   "fb-60-album-4":
     "NASA Facebook 相簿策略 (Shorty Award Best in Science & Education；NASA 是政府帳號 Facebook 相簿互動率最高)：4 張相簿 = 策展敘事（任務階段 / 星球表面 / 太空人視角 / 數據視覺化）；每張圖賺到下一張點擊；caption 序列建立宇宙探索弧線；科學內容通過相簿格式成為可分享的故事。",
-  "fb-60-carousel-5":
+  "fb-99-carousel-5":
     "LEGO「積木搭建故事」Facebook 5 張輪播廣告 (Cannes Lions Bronze Cyber；LEGO 輪播廣告以漸進式積木敘事著稱)：5 張輪播 = 封面展示空白→逐張搭建→末張成品 + CTA；每張滑動感覺像拼圖又近一步；懸念遞進讓完成率遠超行業均值。",
   "fb-60-countdown-5day":
     "Apple「iPhone 新品」5 日 Facebook 倒數系列 (PR Week Best Technology Event；Apple 每次 iPhone 發布的倒數社群敘事)：每天揭示一個功能線索而不是單純倒數日期；等待本身成為科技媒體報導的素材；momentum 累積讓發布日流量爆發。",
@@ -112,13 +112,13 @@ export const FB_TASK_REF: Record<string, string> = {
     "Coachella Facebook Live 多場次直播套組 (Shorty Award Best in Music 多屆；音樂節多日多舞台 Facebook Live 的標準格式)：Live 套組 = 前一天預告（今天哪些藝人）→ 當日多段直播（以不同舞台/時段為錨）→ 事後精選回顧；每個階段觸及不同時區/無法到場的受眾。",
   "fb-60-pinned-suite":
     "Barack Obama 2012 大選 Facebook 置頂套組 (TIME Person of the Year 2012；Digiday Award Best Political Social Strategy；史上最成功的政治社群動員)：置頂套組 = 「我是誰（信念）+ 我做什麼（政策）+ 你能做什麼（行動 CTA）」三件組合回答陌生訪客的所有問題；品牌政治與個人帳號建立永久架構的教科書。",
-  "fb-60-serial-3":
+  "fb-99-serial-3":
     "P&G「The Talk」Facebook 連載系列 (Cannes Lions Grand Prix Film 2018；Effie Gold 2019；品牌社會議題連載現代教科書)：3 集 = 設問（議題登場）→ 深化（不同家庭的版本）→ 解決 + 行動呼籲；每集獨立完整但讓人想看下集；品牌從講產品功能轉型為社會議題的主張者。",
-  "fb-60-viral-rewrite":
+  "fb-99-viral-rewrite":
     "Ryan Reynolds / Aviation Gin「Peloton Wife」病毒回應 (Cannes Lions Silver 2021；48 小時內完成拍攝發布的教科書病毒改寫)：分析原作分享機制 → 萃取 → 以品牌素材重建；速度是關鍵。",
-  "fb-60-trend-rewrite":
+  "fb-99-trend-rewrite":
     "Wendy's 社群趨勢內容改編 (Ad Age Social Media Campaign of the Year 2018；Shorty Award Best in Food & Beverage)：改 1 個元素讓它變品牌的；時機 > 製作精緻度；讓 trend 替自己發聲。",
-  "fb-60-testimonial-rewrite":
+  "fb-99-testimonial-rewrite":
     "P&G「Thank You Mom」奧運見證系列 (Cannes Lions Grand Prix Creative Effectiveness 2013；Effie Grand Prix 2012)：客戶 = 主角解決真實挑戰；品牌 = 使能工具，不是主詞；量化結果嵌入感性故事。",
   "fb-60-ad-pack-3":
     "Dollar Shave Club 廣告包 (Webby Award Best Viral Campaign 2012；AICP Next Award 2012；全球最高 ROI 的品牌發表之一)：3 支覆蓋漏斗認知/考慮/轉換；共用 1 條 campaign 主軸；每支單獨完整。",
@@ -126,17 +126,17 @@ export const FB_TASK_REF: Record<string, string> = {
   // ── 90s (squad-based: monthly / event / analytics / reels / crisis) ────
   "fb-90-monthly-calendar":
     "Starbucks 季節性 Facebook 月曆策略 (Shorty Award Best Brand Community 多屆；Starbucks 以季節限定主題月曆建立「等待感」文化)：1 個季節主題錨整月；每週格式輪替（產品故事/背後供應鏈/用戶分享/活動資訊）；季節發布日本身成為全球文化事件；UGC 徵集貫穿全月形成社群接力。",
-  "fb-90-monthly-calendar-promo":
+  "fb-99-monthly-calendar-promo":
     "Oreo「Cookie of the Year」促銷月曆 (Shorty Award Best Brand in Food & Beverage + Cannes Lions Bronze Social 多年)：促銷月曆 = 懸念→揭示→行動三階段鋪陳；不只公告折扣，而是把每一週打造成有敘事弧的等待報酬。",
   "fb-90-event-launch":
     "Samsung「Galaxy Unpacked」Facebook 活動發表系列 (Shorty Award Best Technology Brand；Samsung 的年度發表活動 Facebook 預告系列是科技品牌活動發表社群策略標竿)：活動發表套組 = 神秘預告（倒數）→ 直播當天（即時互動）→ 發表後亮點回顧；3 階段各有獨立的觀眾鉤子，合起來建立完整的活動媒體生命週期。",
   "fb-90-countdown-series":
     "Marvel Studios「Avengers: Endgame」Facebook 倒數系列 (Fandango 最高預售票房紀錄；社群倒數帶動全球搶票潮)：倒數系列 = 每天一個英雄/情節回顧 + 當天的懸念問題；倒數本身是完整的故事重溫體驗；讓等待成為集體儀式而非空白時間；每天獨立 hook 累積到發布日的爆發。",
-  "fb-90-account-reposition":
+  "fb-99-account-reposition":
     "Burberry 數位品牌重定位 (Cannes Lions Grand Prix Cyber 2015；傳統奢侈品牌數位轉型標竿)：帳號重定位 = 一致的新視覺語言 × 新語氣 × 新互動機制同步推進；不是一次爆發而是持續訊號更新；每一則貼文都在重複新定位。",
-  "fb-90-quarterly-strategy":
+  "fb-99-quarterly-strategy":
     "HubSpot 自身 Facebook 季度 B2B 內容策略 (CMI Award Best Content Marketing；HubSpot 官方 Facebook 頁面是 B2B 季度社群策略最廣引用的案例)：季度策略 = 1 個年度主題（「The State of Marketing」）× 多格式拆分（數據報告/客戶故事/工具教學/直播 AMA）；每月主題弧；數據回顧文章作為季度高峰內容；每個季度結束發布季度總結吸引下季訂閱。",
-  "fb-90-monthly-analytics":
+  "fb-99-monthly-analytics":
     "HubSpot 社群內容績效框架 (CMO Survey Award Best Marketing Analytics Practice 2022；HubSpot 每月 Facebook 績效分析是行業引用最廣的 B2B 社群報告格式)：月度分析報告 = 原始數字→品牌意義解讀→可行動調整建議；不是數字清單而是決策文件；每個指標都連結到明確的業務目標。",
   "fb-90-carousel-10frame":
     "IKEA「夢想家居」Facebook 10 張輪播廣告 (Cannes Lions Bronze Outdoor 2020；IKEA 輪播廣告每張獨立可儲存為靈感參考)：10 張 = 封面空房間（問題）→ 每張展示一個空間改造角度（解方）→ 末張完整家居 + 購買 CTA；每張賺到下一張滑動；「靈感帳號」模式讓輪播成為用戶主動儲存的內容，而非廣告。",
