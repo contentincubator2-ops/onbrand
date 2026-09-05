@@ -1,3 +1,4 @@
+import type { TaskSource } from "./taskSource";
 /**
  * 100s tier — REAL SQUAD index (2026-05-06).
  *
@@ -71,6 +72,12 @@ export interface SquadIndexEntry {
   id: string;
   /** Real squad slug in DB — drives /picker workspace selection */
   squad_slug: string;
+  /**
+   * 2026-09-05 — 這張卡的結構來源。IG 那七張策略卡的歸屬本來就寫在
+   * squad_slug 裡（ig-baer-youtility / ig-hormozi-save-worthy…），
+   * 只是沒有變成前台看得到的欄位。定義見 taskSource.ts。
+   */
+  source?: TaskSource;
   /** Platform — drives channel filter on /100s */
   platform: "facebook" | "instagram" | "youtube" | "tiktok" | "linkedin" | "email" | "press" | "brand" | "audience";
   /** Mockup post type (best fit) */
@@ -109,6 +116,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "fb-99-account-reposition",
     squad_slug: "fb-account-reposition",
+    source: { type: "benchmark", short: "Trout & Ries《定位》", takeaway: "先決定在心智裡佔哪個位置，再決定說什麼" },
     platform: "facebook", postType: "feed",
     label: { en: "FB Account Repositioning", zh: "FB 帳號重新定位" },
     description: { en: "Trout & Ries Positioning + Pulizzi Tilt + full transformation launch posts", zh: "Trout & Ries Positioning + Pulizzi Tilt + 完整轉型 launch posts" },
@@ -123,6 +131,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "fb-99-quarterly-strategy",
     squad_slug: "fb-quarterly-strategy",
+    source: { type: "benchmark", short: "Joe Pulizzi 季度節奏", takeaway: "用支柱決定一季的節奏，不是逐月想主題" },
     platform: "facebook", postType: "feed",
     label: { en: "FB Quarterly Content Strategy", zh: "FB 一季的內容策略" },
     description: { en: "3-month cadence: monthly themes + 12 flagship post topics + content-pillar mix", zh: "3 個月的整體節奏：每月主題 + 12 個重點貼文題目 + 內容支柱配比" },
@@ -137,6 +146,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "fb-99-monthly-analytics",
     squad_slug: "fb-monthly-analytics",
+    source: { type: "benchmark", short: "Avinash Kaushik《Web Analytics 2.0》", takeaway: "指標要能回答決策，不是把數字列完" },
     platform: "facebook", postType: "feed",
     label: { en: "FB Monthly Performance Review", zh: "FB 一個月成效檢討報告" },
     description: { en: "Insights from your data: engagement / reach / saves analysis + next month's optimizations", zh: "看數據找洞察：互動 / 觸及 / 收藏 全面分析 + 下月優化建議" },
@@ -151,6 +161,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "fb-99-carousel-cvo",
     squad_slug: "fb-deiss-cvo",
+    source: { type: "benchmark", short: "Ryan Deiss CVO 漏斗", takeaway: "一則內容走完認識到下單，不是只做一段" },
     platform: "facebook", postType: "carousel",
     label: { en: "FB Carousel: Awareness-to-Purchase Story", zh: "FB 多卡輪播：從認識到下單的故事" },
     description: { en: "10-card carousel narrative: how a stranger becomes a customer (aware→interest→evaluate→buy)", zh: "10 卡輪播完整敘事：陌生人怎麼一步步變成顧客（認識→興趣→評估→購買）" },
@@ -165,6 +176,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "fb-99-offer-first",
     squad_slug: "fb-hormozi-offer-first",
+    source: { type: "benchmark", short: "Alex Hormozi《$100M Offers》", takeaway: "提案本身要好到讓拒絕變得困難" },
     platform: "facebook", postType: "feed",
     label: { en: "FB Offer-First Post", zh: "FB 直接主打優惠的貼文" },
     description: { en: "Write the offer they can't refuse: value stacking + risk reversal + urgency", zh: "把優惠寫到讓人沒辦法拒絕：價值疊加 + 風險反轉 + 急迫感" },
@@ -179,6 +191,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "fb-99-magnetic-marketing",
     squad_slug: "fb-kennedy-magnetic",
+    source: { type: "benchmark", short: "Dan Kennedy Magnetic Marketing", takeaway: "訊息、market、media 三者要先對齊" },
     platform: "facebook", postType: "feed",
     label: { en: "FB Magnetic Marketing: Customer-Pull Posts", zh: "FB 把自己變磁鐵：吸客貼文" },
     description: { en: "Make the right people come to you: sharp positioning, strong appeal, clear CTA", zh: "讓對的人主動找上你：精準定位、強烈訴求、明確行動呼籲" },
@@ -193,6 +206,7 @@ export const FB_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "fb-99-mass-control",
     squad_slug: "fb-kern-mass-control",
+    source: { type: "benchmark", short: "Frank Kern Mass Control", takeaway: "先給到讓人不好意思不買，再開賣" },
     platform: "facebook", postType: "feed",
     label: { en: "FB Big-Launch Marketing Playbook", zh: "FB 大型發表會行銷劇本" },
     description: { en: "Hype-cycle launch: 3-stage teasers → showtime → wind-down (built for annual flagship events)", zh: "造勢式 launch：3 階段預告 → 開場壓軸 → 後續收束（適合年度大事件）" },
@@ -229,6 +243,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-99-monthly-calendar",
     squad_slug: "ig-monthly-calendar-pulizzi",
+    source: { type: "benchmark", short: "Joe Pulizzi 內容行事曆", takeaway: "以支柱主題排月曆，不是逐篇想題目" },
     platform: "instagram", postType: "feed",
     label: { en: "IG × Pulizzi 30-Day Calendar Strategy", zh: "IG × Pulizzi 30 天月曆策略" },
     description: { en: "Daily feed / reel / story allocation + this month's holidays + themes + visual consistency", zh: "每天 feed / reel / story 配置 + 抓本月節慶 + 主題 + 視覺一致性" },
@@ -243,6 +258,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-99-youtility",
     squad_slug: "ig-baer-youtility",
+    source: { type: "benchmark", short: "Jay Baer《Youtility》", takeaway: "有用到讓人想收藏，勝過有趣到讓人想笑" },
     platform: "instagram", postType: "feed",
     label: { en: "IG × Youtility Pure-Utility Strategy", zh: "IG × Youtility 純實用型策略" },
     description: { en: "30 days of genuinely useful content (no selling, pure help) that followers save and share", zh: "30 天「真的能用」的內容（不推銷、純幫忙），讓粉絲收藏分享" },
@@ -272,6 +288,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-99-visual-story",
     squad_slug: "ig-chrisdo-visual-story",
+    source: { type: "benchmark", short: "Chris Do / The Futur", takeaway: "視覺一致性本身就是識別，先定規則再產內容" },
     platform: "instagram", postType: "feed",
     label: { en: "IG × Chris Do Visual-Consistency Strategy", zh: "IG × Chris Do 視覺一致型策略" },
     description: { en: "Full visual identity + palette + composition style + 30-day visually consistent feed", zh: "整套視覺識別 + 配色 + 構圖風格 + 30 天 feed 視覺一致" },
@@ -301,6 +318,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-99-live-first",
     squad_slug: "ig-fanzo-live-first",
+    source: { type: "benchmark", short: "Brian Fanzo 直播優先", takeaway: "即時互動的不完美，比剪過的完美更可信" },
     platform: "instagram", postType: "live",
     label: { en: "IG × Live-First Strategy", zh: "IG × Live-First 直播優先型策略" },
     description: { en: "Livestream at the core: teasers + live kit + follow-up reel edits (high-engagement strategy)", zh: "以直播為核心：預告 + 直播配套 + 後續 reel 剪輯（高互動策略）" },
@@ -330,6 +348,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-99-document",
     squad_slug: "ig-garyvee-document",
+    source: { type: "benchmark", short: "Gary Vaynerchuk 紀實法", takeaway: "記錄過程而不是創作內容，產量與真實感一起解決" },
     platform: "instagram", postType: "feed",
     label: { en: "IG × GaryVee Document-Don't-Create Strategy", zh: "IG × GaryVee 紀實型策略" },
     description: { en: "Film real day-to-day work, skip the gloss — build authenticity and trust", zh: "拍真實日常工作場景，不過度包裝，建立品牌真實感與信任" },
@@ -359,6 +378,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-99-radical-transparency",
     squad_slug: "ig-hollis-radical-transparency",
+    source: { type: "benchmark", short: "Rachel Hollis 真實透明", takeaway: "先講失敗與代價，信任才會先於銷售建立" },
     platform: "instagram", postType: "feed",
     label: { en: "IG × Hollis Radical-Transparency Strategy", zh: "IG × Hollis 真實透明型策略" },
     description: { en: "Share the behind-the-scenes, failures and growth openly to build deep trust", zh: "把品牌幕後 / 失敗 / 成長過程公開，建立深度信任" },
@@ -388,6 +408,7 @@ export const IG_99S_SQUADS: SquadIndexEntry[] = [
   {
     id: "ig-99-save-worthy",
     squad_slug: "ig-hormozi-save-worthy",
+    source: { type: "benchmark", short: "Alex Hormozi 高收藏", takeaway: "把價值密度做到讓人不敢滑掉，收藏數優先於按讚" },
     platform: "instagram", postType: "carousel",
     label: { en: "IG × Hormozi Save-Worthy Strategy", zh: "IG × Hormozi 高收藏型策略" },
     description: { en: "Carousel tutorials / checklists / comparison charts followers want to save and share", zh: "用 carousel 教學 / 清單 / 對照表，讓粉絲想收藏分享給朋友" },
