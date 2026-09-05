@@ -34,6 +34,21 @@
  * 對應 2026 年現況研究出的 7 個內容位置，細節與排除項（Amazon Posts 已於
  * 2025-07-31 關閉、賣家不能公開回覆評論）見下方「Amazon」區塊註解。
  *
+ * ── 長青／爆款卡（2026-09-06，CJ「還需要一些長青的任務卡和爆款任務卡」）─
+ * 全庫沒有「長青 vs 爆款」的既有卡片分類先例。查證後：
+ *   ・「爆款」在這個 repo 一律指「一則真實存在、已經在爆的貼文/影片」，用來
+ *     反推結構再套上品牌——全域已有 ig-60-viral-rewrite / tt-60-viral-rewrite
+ *     等一整組「爆款改寫」卡，機制是 primary_input.key === "viral_source"，
+ *     由 viralSourceGuard.ts 在呼叫模型前擋掉空白/敷衍/太模糊的輸入。HOTU
+ *     這兩張（IG／TikTok 各一）沿用同一套「借結構、換主角」原則與同一個
+ *     guard，但維持 HOTU 其他卡一致的 30s／純文字設定，不跟進 60s 全域卡
+ *     那套雙人設＋比較表的重量級 config。
+ *   ・「長青」在這個 repo 只當形容詞用（「能長期沿用不過期」），沒有任何
+ *     任務卡機制可沿用。IG／TikTok 既有的卡全部綁在某個具體情境或趨勢上，
+ *     沒有一張是「品牌宣言，什麼時候發都一樣有效」的內容，這兩張（IG／
+ *     TikTok 各一）填的是這個空缺，錨定在「彩己」／Born Vivid 起源故事，
+ *     不需要外部參考來源。
+ *
  * ── agent_id 是借用的，不是 HOTU 專屬人設 ─────────────────────────────
  * HOTU 目前沒有專屬 persona，這裡沿用 quickTaskIG.ts / quickTaskTikTok.ts
  * 既有的全域 caption_writer，依任務性質選最貼近的一位（懶人包→Kurt Chen
@@ -311,6 +326,112 @@ ${HOTU_BRAND_CORE}`,
     outputDefaults: { platform: "instagram", post_type: "feed" },
   },
   textConfig(["顯色度心得版", "細節適用版", "新手初體驗版"], 150, 400),
+);
+
+// ── 長青（2026-09-06，CJ「還需要一些長青的任務卡」）───────────────────
+//
+// 全庫沒有「長青」當作任務卡類型的先例，唯一穩定用法是形容詞——「能長期
+// 沿用不過期」（見 quickTaskPR.ts 的長青一致性、seed-local-squads.ts 的
+// 長青內容更新再分發）。IG/TikTok 既有的卡全部綁在某個具體情境或趨勢上
+// （懶人包教技巧、社群認同曬單、感官解壓靠 ASMR 當下感受），沒有一張是
+// 「品牌宣言，什麼時候發都一樣有效」的內容——這是真正的空缺，不是重複
+// 造輪子。內容錨定在「彩己」／Born Vivid 起源故事，不需要外部參考來源。
+
+const hotuIgEvergreenManifesto = card(
+  "instagram", "長青",
+  {
+    id: "hotu-ig-evergreen-manifesto",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "Brand Manifesto — Evergreen", zh: "品牌宣言長青版" },
+    description: {
+      en: "Timeless 'why HOTU exists' post — no trend or season dependency, safe to run anytime",
+      zh: "不綁時事或檔期的「為什麼 HOTU 存在」貼文，任何時候發都成立",
+    },
+    agent_id: 180166, // Iris Liang — Instagram Marketing Specialist
+    skill_slug: "hotu-ig-evergreen-manifesto",
+    primary_question: "這次想從「彩己」的哪個面向切入（留白／沉浸／悅己／主體性）？",
+    primary_input: {
+      key: "topic",
+      placeholder: "e.g. the moment you stopped waiting to be 'good enough' to pick up a marker",
+      type: "textarea",
+    },
+    inputs: [{ key: "topic", label: "彩己面向 + 想切入的角度", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.origin.story", "brand.positioning.goldenCircle.why"],
+    systemPrompt: `你在為 HOTU 寫一篇「品牌宣言」貼文——這篇的價值是「長青」：不綁任何檔期、
+熱點或當下情境，一年後重發還是成立。內容錨定在品牌起源故事（彩己＝彩「動詞，用色彩做
+一件事」＋己「主體，是你，不是別人的標準」；Born Vivid＝你本來就是這樣的人，只是還沒
+被允許）。
+
+【跟其他 IG 卡的差異——不要寫成懶人包或曬單】
+・不教技巧、不轉發 UGC、不提任何限時活動或新品——那些是別的卡在做的事。
+・這篇要做的是把「為什麼 HOTU 存在」講清楚，讓一個第一次看到這個帳號的人，看完就懂
+  品牌在說什麼。
+
+【交付格式】
+caption（100-180 字）：從一個具體的「還沒被允許」的情境開場（怕畫錯、怕被評價）→
+帶出「你本來就是這樣的人」的核心信念 → 收尾回到 Shine as you 的行動邀請。
+hashtag：3-4 個，品牌向（#BornVivid 系），不要追時事標籤。
+${HOTU_BRAND_CORE}`,
+    preferredModel: "anthropic",
+    maxTokens: 500,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
+  textConfig(["留白切入版", "克服恐懼切入版", "主體性切入版"], 250, 550),
+);
+
+// ── 爆款改寫（2026-09-06）────────────────────────────────────────────
+//
+// 全庫既有的「爆款改寫」機制（ig-60-viral-rewrite / tt-60-viral-rewrite /
+// yt-60-viral-rewrite / fb-99-viral-rewrite）：用戶每次貼一個「真的正在
+// 爆」的連結或具體主題，模型只借結構／hook／節奏，主角換成品牌自己的事。
+// 由 viralSourceGuard.ts 在呼叫模型前擋掉空白／敷衍／太模糊的輸入，
+// 靠的是 primary_input.key === "viral_source"，不看 taskId，所以品牌包
+// 卡片一樣吃得到這層保護，不需要另外接線。
+// HOTU 版本沿用同一套「借結構、換主角」原則，但保持跟 HOTU 其他卡一致的
+// 30s／純文字設定，不跟進 60s 全域卡那套 strategist+specialty 雙人設、
+// compare table 的重量級 config。
+
+const hotuIgViralRewrite = card(
+  "instagram", "爆款",
+  {
+    id: "hotu-ig-viral-rewrite",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "Viral Post Rewrite", zh: "IG爆款改寫" },
+    description: {
+      en: "Paste a real trending IG post — borrow its hook/structure, swap in HOTU",
+      zh: "貼一則真的在爆的 IG 貼文，借它的鉤子與結構，主角換成 HOTU",
+    },
+    agent_id: 180166,
+    skill_slug: "hotu-ig-viral-rewrite",
+    primary_question: "貼上爆款原文 / 連結 / 主題",
+    primary_input: { key: "viral_source", placeholder: "原爆款貼文連結，或具體到能指認是哪一支的主題描述", type: "textarea" },
+    inputs: [
+      { key: "viral_source", label: "爆款原文 / 連結 / 主題", type: "textarea", required: true },
+      { key: "brand_angle", label: "想換成 HOTU 的哪個角度（可選）", type: "textarea", required: false },
+    ],
+    contextSources: ["brand.name", "brand.positioning.origin.story", "brand.positioning.voice"],
+    systemPrompt: `你在為 HOTU 做 IG 爆款改寫。輸入是一則真實存在、正在爆的 IG 貼文（連結或主題
+描述）。
+
+【原則：結構抄學，主題換血】
+・只借用原貼文的敘事結構、hook 機制、情緒節奏——不要照抄原文字句，不要複製原貼文的
+  人生哲學或通用情感場景硬套。
+・主角必須換成 HOTU 自己的事：彩己哲學、Shine as you、或某個具體產品。
+・不確定原貼文實際內容時，不要憑空編造細節去填——只根據用戶輸入裡實際提供的資訊改寫，
+  資訊不夠具體的地方寫得抽象一點，不要杜撰。
+
+【交付格式】
+第 1 行：一句話說明借用了原貼文的什麼結構/hook（給操作者看，不放進最終貼文）
+caption（100-200 字）：套用該結構，主角是 HOTU
+hashtag：3-5 個
+${HOTU_BRAND_CORE}`,
+    preferredModel: "anthropic",
+    maxTokens: 600,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
+  textConfig(["保結構式", "情感放大式", "反差式"], 200, 500),
 );
 
 // ══════════════════════════════════════════════════════════════════════
@@ -701,6 +822,99 @@ ${TT_HOTU_SUFFIX}${HOTU_BRAND_CORE}`,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
   textConfig(["漸層揭曉版", "對比色揭曉版", "細節收尾揭曉版"], 20, 150),
+);
+
+// ── 長青（2026-09-06）────────────────────────────────────────────────
+// 同 IG 長青卡的理由：既有 TikTok 卡全綁在某個具體情境（搜尋discovery／
+// ASMR 感官／檔期衝動購買），沒有一支是可以無限期重貼、不依賴任何當下
+// 情境的品牌宣言短片。維持 HOTU TikTok 既有的分鏡腳本交付格式。
+
+const hotuTtEvergreenManifesto = card(
+  "tiktok", "長青",
+  {
+    id: "hotu-tt-evergreen-manifesto",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Brand Manifesto — Evergreen", zh: "品牌宣言長青版" },
+    description: {
+      en: "Timeless 'why HOTU exists' short — safe to repost anytime, no trend or season dependency",
+      zh: "不綁時事或音效趨勢的品牌宣言短片，任何時候重貼都成立",
+    },
+    agent_id: 180158,
+    skill_slug: "hotu-tt-evergreen-manifesto",
+    primary_question: "這次想從「彩己」的哪個面向切入（留白／沉浸／悅己／主體性）？",
+    primary_input: {
+      key: "topic",
+      placeholder: "e.g. the moment you stopped waiting to be 'good enough' to pick up a marker",
+      type: "textarea",
+    },
+    inputs: [{ key: "topic", label: "彩己面向 + 想切入的角度", type: "textarea", required: true }],
+    contextSources: ["brand.name", "brand.positioning.origin.story", "brand.positioning.goldenCircle.why"],
+    systemPrompt: `你在為 HOTU 寫一支「品牌宣言」短片的貼文文案——這支的價值是「長青」：不搭任何
+熱門音效或當下趨勢，一年後重貼還是成立。內容錨定在品牌起源故事（彩己＝彩「動詞，用色彩
+做一件事」＋己「主體，是你，不是別人的標準」；Born Vivid＝你本來就是這樣的人，只是還沒
+被允許）。
+
+【跟其他 TikTok 卡的差異】
+・不追熱門音效、不做 ASMR 感官特寫、不帶任何檔期促銷——那些是別的卡在做的事。
+・這支要做的是把「為什麼 HOTU 存在」用畫面講清楚，讓第一次刷到的人看完就懂。
+
+【交付格式】
+caption（60-100 字）：從「你本來就是這樣的人」切入，收尾帶 Shine as you 的行動邀請
+分鏡提示（給拍攝者，不放進 caption）：3-4 格，每格「畫面 + 該格要傳達的信念片段」，
+不需要熱門音效，可用手寫字卡或口白
+hashtag：3-4 個，品牌向（#BornVivid 系），不要追時事標籤
+${TT_HOTU_SUFFIX}${HOTU_BRAND_CORE}`,
+    preferredModel: "anthropic",
+    maxTokens: 400,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  textConfig(["留白切入版", "克服恐懼切入版", "主體性切入版"], 150, 400),
+);
+
+// ── 爆款改寫（2026-09-06）────────────────────────────────────────────
+
+const hotuTtViralRewrite = card(
+  "tiktok", "爆款",
+  {
+    id: "hotu-tt-viral-rewrite",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Viral Video Rewrite", zh: "TikTok爆款改寫" },
+    description: {
+      en: "Paste a real trending TikTok — borrow its hook/pacing, swap in HOTU",
+      zh: "貼一支真的在爆的 TikTok，借它的鉤子與節奏，主角換成 HOTU",
+    },
+    agent_id: 180158,
+    skill_slug: "hotu-tt-viral-rewrite",
+    primary_question: "貼上爆款原文 / 連結 / 主題",
+    primary_input: { key: "viral_source", placeholder: "原爆款影片連結，或具體到能指認是哪一支的主題描述", type: "textarea" },
+    inputs: [
+      { key: "viral_source", label: "爆款原文 / 連結 / 主題", type: "textarea", required: true },
+      { key: "brand_angle", label: "想換成 HOTU 的哪個角度（可選）", type: "textarea", required: false },
+    ],
+    contextSources: ["brand.name", "brand.positioning.origin.story", "brand.positioning.voice"],
+    systemPrompt: `你在為 HOTU 做 TikTok 爆款改寫。輸入是一支真實存在、正在爆的 TikTok（連結或
+主題描述）。
+
+【原則：結構抄學，主題換血】
+・只借用原影片的分鏡節奏、hook 機制、情緒弧度——不要照抄原影片的台詞或畫面，不要把
+  原影片的人生哲學或通用情感場景直接套用。
+・主角必須換成 HOTU 自己的事：彩己哲學、Shine as you、或某個具體產品。
+・不確定原影片實際內容時不要編造細節——只根據用戶輸入裡實際提供的資訊改寫。
+・不得指名真實名人，不得照抄任何特定爆款的內容、金句或分鏡本身。
+
+【交付格式】
+第 1 行：一句話說明借用了原影片的什麼結構/節奏（給操作者看，不放進最終貼文）
+caption：60-100 字，套用該節奏，主角是 HOTU
+分鏡提示（給拍攝者）：3-5 格，每格「畫面 + 動作」，套用原影片的節奏但畫面換成 HOTU
+hashtag：3-5 個
+${TT_HOTU_SUFFIX}${HOTU_BRAND_CORE}`,
+    preferredModel: "anthropic",
+    maxTokens: 500,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  textConfig(["保結構式", "情感放大式", "反差式"], 150, 400),
 );
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1182,6 +1396,8 @@ export const HOTU_PACK: BrandPack = {
       formats: [
         { id: "懶人包", labelZh: "懶人包", labelEn: "Cheat Sheets" },
         { id: "社群認同", labelZh: "社群認同", labelEn: "Community" },
+        { id: "長青", labelZh: "長青", labelEn: "Evergreen" },
+        { id: "爆款", labelZh: "爆款", labelEn: "Viral Rewrite" },
       ],
     },
     {
@@ -1192,6 +1408,8 @@ export const HOTU_PACK: BrandPack = {
         { id: "搜尋引擎化", labelZh: "搜尋引擎化", labelEn: "Search Discovery" },
         { id: "感官解壓", labelZh: "感官解壓", labelEn: "Sensory" },
         { id: "衝動購買", labelZh: "衝動購買", labelEn: "Impulse Purchase" },
+        { id: "長青", labelZh: "長青", labelEn: "Evergreen" },
+        { id: "爆款", labelZh: "爆款", labelEn: "Viral Rewrite" },
       ],
     },
     {
@@ -1217,9 +1435,11 @@ export const HOTU_PACK: BrandPack = {
 
   cards: [
     hotuIgMavix, hotuIgInges, hotuIgCherry, hotuIgBts, hotuIgFateH,
+    hotuIgEvergreenManifesto, hotuIgViralRewrite,
     hotuTtRandom, hotuTtLifePretty, hotuTtToxic,
     hotuTtBader, hotuTtLisandra, hotuTtChillFeedz, hotuTtMakeupAsmr,
     hotuTtShopUs, hotuTtPaidImpulse,
+    hotuTtEvergreenManifesto, hotuTtViralRewrite,
     hotuWebProductDesc, hotuWebBrandStory,
     hotuAmzTitle, hotuAmzBullets, hotuAmzAplus,
     hotuAmzBrandStory, hotuAmzStorefront,
