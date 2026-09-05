@@ -20,8 +20,8 @@ import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import { TIER_ORDER, tierAccent, tierLabel } from "../lib/tierVocabulary";
 import {
-  SOURCE_ORDER, resolveSource, sourceAccent, sourceLabel, sourceWhy, sourcePillText,
-  type TaskSourceType,
+  SOURCE_ORDER, resolveSource, sourceAccent, sourceLabel, sourceWhy,
+  sourcePillText, sourceTooltip, type TaskSourceType,
 } from "../lib/sourceVocabulary";
 import {
   FB_FORMAT_TABS as FORMAT_TABS,
@@ -2059,7 +2059,7 @@ function PlatformTaskPageInner() {
                           <span
                             className="inline-flex items-center gap-1 self-start rounded-full px-1.5 py-0.5 max-w-full"
                             style={{ background: `${acc}14`, border: `1px solid ${acc}33` }}
-                            title={sourceWhy(src.type, lang)}
+                            title={sourceTooltip(src, lang)}
                           >
                             <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: acc }} />
                             <span

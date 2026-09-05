@@ -515,6 +515,14 @@ YYYY年M月D日（週N）｜發布時機：[星期幾 時段]
 export const MULTI_99S_TASKS: FBTaskTemplate[] = [
   {
     id: "tt-99-30day-foryou",
+    source: {
+      type: "viral",
+      short: "Chipotle「#GuacDance」",
+      metric: "6 天 25 萬支投稿、4.3 億次播放",
+      asOf: "2019-07",
+      takeaway:
+        "挑戰賽綁一個「已經存在的動作」（Dr. Jean 兒歌），觀眾不必學新東西就能拍——門檻決定投稿量。",
+    },
     tier: "99s", postType: "foryou",
     label: { en: "TikTok 30-Day For You Formula", zh: "TikTok 30 天推薦頁配方" },
     description: { en: "One script per day for 30 days + trend mapping + sound picks + scout pulls holidays/trends", zh: "30 天每天 1 支腳本 + trend 對應 + sound 建議 + scout 抓節慶/時事" },

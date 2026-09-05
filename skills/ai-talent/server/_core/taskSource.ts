@@ -65,6 +65,25 @@ export interface TaskSource {
    * 顯示在卡片詳情，也是寫卡的人自我檢查的欄位 —— 寫不出來代表還沒拆完。
    */
   takeaway?: string;
+  /**
+   * 傳播證據。**只有 viral 用，而且是必填。**
+   *
+   * 得獎是評審給的，講得出獎名就夠了；爆款是「真的傳開了」，所以證據是數字：
+   * 「6 天 4.3 億次播放、25 萬支投稿」。填不出數字就不是爆款，是你覺得它紅。
+   */
+  metric?: string;
+  /**
+   * 這個數字是什麼時候量的，格式 YYYY-MM。**只有 viral 用，而且是必填。**
+   *
+   * 為什麼只有爆款要日期：得獎不會過期，2014 年的 Grand Prix 今天還是 Grand
+   * Prix；爆款會。Metricool 2026 分析 230 萬則貼文，TikTok 單則內容壽命約
+   * 10 天；Publicis 的調查裡只有 27% 的趨勢活過兩週。
+   *
+   * 所以這裡有一條界線要守住：**爆款「結構」可以留，爆款「熱點」不要做成卡。**
+   * 熱點 3–5 天就死，做成卡等於上架即過期，那是流程要解的問題不是卡。
+   * 這張卡如果離不開某個特定音樂或梗，它就不該是 viral。
+   */
+  asOf?: string;
 }
 
 /** 未標記的卡一律視為長青公式。不猜、不編。 */
@@ -83,7 +102,31 @@ export function validateTaskSource(s: TaskSource): string | null {
   if (s.type === "evergreen") return null;
   if (!s.short || !s.short.trim()) return `source.type="${s.type}" 必須填 short（具體出處）`;
   if (s.short.trim().length > 40) return `source.short 過長（${s.short.length}），pill 放不下`;
+  if (s.type === "viral") {
+    // 爆款是唯一「證據會過期」的類型，所以它是唯一要交數字和日期的。
+    // 這條擋的不是筆誤，是「我覺得這個很紅」被寫成事實。
+    if (!s.metric || !s.metric.trim()) {
+      return `source.type="viral" 必須填 metric（傳播數字，例：6 天 4.3 億次播放）`;
+    }
+    if (!s.asOf || !/^\d{4}-(0[1-9]|1[0-2])$/.test(s.asOf)) {
+      return `source.type="viral" 必須填 asOf（測量年月 YYYY-MM），現值：${s.asOf ?? "（空）"}`;
+    }
+  }
   return null;
+}
+
+/**
+ * 這個來源的數字有多舊（月）。非 viral 或沒有 asOf 回 null。
+ *
+ * 刻意不在這裡定「幾個月算過期」：爆款「結構」可以放很久（e.l.f. 那支 2019
+ * 年的做法今天還在教），會爛掉的是熱點。所以這裡只給年齡，讓前台把日期顯示
+ * 出來、由看的人自己判斷，而不是我們替他決定什麼時候該不信。
+ */
+export function sourceAgeMonths(s: TaskSource, now: Date = new Date()): number | null {
+  if (s.type !== "viral" || !s.asOf) return null;
+  const m = /^(\d{4})-(\d{2})$/.exec(s.asOf);
+  if (!m) return null;
+  return (now.getFullYear() - Number(m[1])) * 12 + (now.getMonth() + 1 - Number(m[2]));
 }
 
 /**

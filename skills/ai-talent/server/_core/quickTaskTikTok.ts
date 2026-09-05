@@ -76,6 +76,14 @@ const TT_MECHANIC_CORE = `
 export const TT_30S_TASKS: FBTaskTemplate[] = [
   {
     id: "tt-30-opening-hook",
+    source: {
+      type: "viral",
+      short: "e.l.f.「#eyeslipsface」",
+      metric: "6 天破 10 億次播放，當時史上最快",
+      asOf: "2019-10",
+      takeaway:
+        "記憶點做在「聲音」不是畫面：品牌委製原創音樂，鉤子在觀眾沒看畫面時仍然成立。",
+    },
     tier: "30s",
     postType: "foryou",
     label: { en: "TikTok Opening Hook (First 3s)", zh: "TikTok 開場鉤子（前 3 秒）" },
@@ -368,6 +376,14 @@ caption 直接列 hashtag。`,
   },
   {
     id: "tt-30-duet-angle",
+    source: {
+      type: "viral",
+      short: "Ocean Spray × Nathan Apodaca「Dreams」",
+      metric: "原片 8,000 萬次觀看、1,290 萬讚、14.3 萬留言",
+      asOf: "2020-09",
+      takeaway:
+        "品牌沒有發起這支影片，是接住素人已經跑起來的動能——合拍要找「已經有人在做的事」，不是自己起一個梗。",
+    },
     tier: "30s",
     postType: "foryou",
     label: { en: "TikTok Duet Angle Ideas", zh: "TikTok 合拍角度建議" },

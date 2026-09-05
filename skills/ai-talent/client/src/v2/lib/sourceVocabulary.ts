@@ -37,6 +37,10 @@ export interface TaskSource {
   type: TaskSourceType;
   short?: string;
   takeaway?: string;
+  /** 傳播證據，只有 viral 有（server 端強制必填）。 */
+  metric?: string;
+  /** 這個數字量測的年月 YYYY-MM，只有 viral 有（server 端強制必填）。 */
+  asOf?: string;
 }
 
 export interface SourceVocabEntry {
@@ -125,6 +129,24 @@ export function sourceLabel(t: unknown, lang: string, opt?: { long?: boolean }):
 export function sourceWhy(t: unknown, lang: string): string {
   const e = SOURCE_VOCAB[isKnown(t) ? t : "evergreen"];
   return lang === "en" ? e.enWhy : e.zhWhy;
+}
+
+/**
+ * 滑過 pill 時看到的完整說明。
+ *
+ * 爆款一定要把「數字 + 什麼時候量的」講出來。這一類的可信度整個建立在
+ * 那個數字上，而數字會老 —— 只寫「爆款結構」不寫哪一年，等於要對方
+ * 相信一個我們沒說出口的東西。其餘類型不需要日期：獎不會過期。
+ */
+export function sourceTooltip(s: TaskSource | undefined, lang: string): string {
+  const t = s?.type ?? "evergreen";
+  const parts: string[] = [];
+  if (s?.short) parts.push(s.short);
+  if (s?.metric) parts.push(s.metric);
+  if (s?.asOf) parts.push(lang === "en" ? `measured ${s.asOf}` : `${s.asOf} 量測`);
+  if (s?.takeaway) parts.push(s.takeaway);
+  if (!parts.length) return sourceWhy(t, lang);
+  return `${sourceLabel(t, lang)}｜${parts.join("・")}`;
 }
 
 export function sourceAccent(t: unknown): string {
