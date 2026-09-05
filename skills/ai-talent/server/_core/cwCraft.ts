@@ -55,7 +55,7 @@ export const CW_CRAFT_RUBRIC = `
 /**
  * Per-task award reference — transferable craft pattern per task.
  */
-const CW_TASK_REF: Record<string, string> = {
+export const CW_TASK_REF: Record<string, string> = {
   "cw-60-crosspost-4platform": "Spotify「Wrapped」跨平台活動（Cannes Lions Grand Prix＋Shorty Award Best Cross-Platform Campaign）：同一個資料故事用 4 種不同的平台原生語言說給 4 個不同平台的受眾聽；不是同一素材的格式轉換，是同一主張的不同表達。",
   "cw-60-ab-variants":         "Netflix A/B 縮圖與文案測試方法論（Netflix Technology Blog）：Netflix 每個片名測試 10-20 個 variant；A/B variant＝不同假設，不是同一想法的不同執行——每個 variant 必須對應一個清楚的受眾假設。",
 };

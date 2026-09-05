@@ -58,7 +58,7 @@ export const BR_CRAFT_RUBRIC = `
 /**
  * Per-task award reference — transferable craft pattern per task.
  */
-const BR_TASK_REF: Record<string, string> = {
+export const BR_TASK_REF: Record<string, string> = {
   "br-30-positioning":     "Apple「Think Different」品牌定位（Cannes Lions Hall of Fame）：定位＝佔領心智空間而非描述功能；「不同凡想」對抗的是墨守成規，不是競爭對手產品。",
   "br-30-tagline":         "Nike「Just Do It」tagline（Cannes Lions Hall of Fame）：3 個字跨所有產品/受眾/文化皆成立；動詞框架給受眾行動身分，非品牌形容詞。",
   "br-30-value-prop":      "Airbnb「Belong Anywhere」價值主張（Cannes Lions Grand Prix Titanium 2014）：一句話橋接功能利益（住任何地方）＋情感利益（真正屬於）。",

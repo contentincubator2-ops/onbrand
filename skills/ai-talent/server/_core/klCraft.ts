@@ -61,7 +61,7 @@ KOL 合作是創作者優先——brief 給方向不給劇本；成功的 KOL �
 /**
  * Per-task award reference — transferable craft pattern per task.
  */
-const KL_TASK_REF: Record<string, string> = {
+export const KL_TASK_REF: Record<string, string> = {
   "kl-30-invite-opener":    "Gymshark 網紅種子計畫邀請信（Shorty Award Best in Sports & Fitness）：真正了解創作者內容的個人化開場＋對品牌信念的共鳴，建立了 Gymshark 的核心創作者社群。",
   "kl-30-influencer-brief": "TikTok「Creator Marketplace」官方 brief 模板（TikTok for Business Award）：在清晰品牌護欄內給予充分創作自由；創作者的個人風格是資產，不是風險。",
   "kl-60-pitch-pack":       "MrBeast 品牌合作 pitch 模型（YouTube Streamy Award Top Creator 2022-2023）：pitch pack＝創意概念＋受眾契合＋獨特機制＋成效衡量；四件缺一品牌不會簽。",

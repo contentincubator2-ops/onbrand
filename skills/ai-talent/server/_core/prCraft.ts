@@ -57,7 +57,7 @@ export const PR_CRAFT_RUBRIC = `
  * relevant award case; the line captures the transferable craft
  * pattern (principle, NOT the campaign's creative).
  */
-const PR_TASK_REF: Record<string, string> = {
+export const PR_TASK_REF: Record<string, string> = {
   "pr-30-headline":        "Apple 產品發表新聞稿標題（PR Week Award Best Technology PR）：主動語態＋最強事實＋45 字內；「One more thing」結構成為業界標準。",
   "pr-30-lead-paragraph":  "Patagonia「Don't Buy This Jacket」新聞稿（Cannes Lions PR Grand Prix 2013）：首段即呈現反直覺主張，記者一句話就抓到故事角度。",
   "pr-30-subhead":         "《經濟學人》副標寫作風格（多屆編輯大獎）：資訊密度＋機智，一行壓縮次要重點，非主標重複。",

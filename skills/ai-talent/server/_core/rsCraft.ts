@@ -65,7 +65,7 @@ export const RS_CRAFT_RUBRIC = `
 /**
  * Per-task award reference — methodology + market research references.
  */
-const RS_TASK_REF: Record<string, string> = {
+export const RS_TASK_REF: Record<string, string> = {
   "rs-30-persona-draft":        "Alan Cooper「The Inmates Are Running the Asylum」（HCI/UX 業界 persona 方法論標準）：persona 驅動 Apple、Google、IDEO 產品決策；行為基礎勝過人口統計基礎。",
   "rs-30-interview-guide":      "IDEO Design Thinking 訪談方法論（IDEO 是 design thinking 起源機構）：開放式問題＋時間線探索＋沉默作為工具；業界最被引用的訪談指南框架。",
   "rs-30-jtbd-guide":           "Clayton Christensen「Jobs To Be Done」框架（Harvard Business School）：Intercom 以 JTBD 建立產品策略；聚焦在「工作」不在解決方案——人們為什麼「雇用」一個產品。",

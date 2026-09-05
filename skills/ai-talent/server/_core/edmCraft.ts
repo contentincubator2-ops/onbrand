@@ -59,7 +59,7 @@ export const EDM_CRAFT_RUBRIC = `
  * Every email body task has a named, verifiable case study for agents
  * to draw transferable craft patterns from (not copy the creative).
  */
-const EDM_TASK_REF: Record<string, string> = {
+export const EDM_TASK_REF: Record<string, string> = {
   // ── 30s ───────────────────────────────────────────────────────────────
   "em-30-welcome":
     "Dropbox 歡迎信序列 (IAC Award Winner Onboarding Email；Dropbox 以進度里程碑式歡迎信讓試用轉正率提升)：第一封定錨在「你完成了第 1 步，還差 2 步就能體驗完整功能」而非促銷；進度指示 + 創辦人故事 + 明確下一步；讓用戶感覺在完成自己的任務，不是在接受品牌的 push。",
