@@ -144,6 +144,86 @@ ${KOL_TONE}`,
     preferredModel: "anthropic", maxTokens: 250,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "kl-30-catch-organic-fan",
+    tier: "30s",
+    postType: "generic",
+    label: { en: "KOL: Start With Who Already Mentions You", zh: "KOL：先找已經在提你的人" },
+    description: { en: "Catch the organic post first", zh: "接住自發內容，比開發新合作快" },
+    agent_id: 30015,              // 沿用同 postType 現役卡
+    skill_slug: "kol-outreach",
+    source: {
+      type: "viral",
+      short: "Ocean Spray × Nathan Apodaca",
+      metric: "原片 8,000 萬次觀看、1,290 萬讚",
+      asOf: "2020-09",
+      takeaway:
+        "最有效的合作對象是「已經免費提過你的人」——接住他，等於在一段已經有人相信的關係上加碼，而不是從零買信任。",
+    },
+    primary_question: "有誰在沒有合作的情況下提過你們？",
+    primary_input: { key: "topic", placeholder: "例：某位顧客拍過開箱 / 有人在影片裡帶到我們的產品", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "自發提過你們的人", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一份「接住自發內容」的合作邀約。
+
+要產出：
+1. 開場：具體提到他做過的那一則內容（哪一天、講了什麼），證明你真的看過。
+2. 回禮：先給東西，不要求回報。寫清楚給什麼。
+3. 合作提案：一個他做起來輕鬆、且延續他原本內容的形式。
+4. 明確的條件：報酬、期程、需要什麼素材、幾則。
+5. 一句話說明「不合作也沒關係，這份禮物照給」。
+
+硬規則：
+- 不要在第一封信就要求對方發文。
+- 不要用罐頭開場（「您好，我們是…」）。
+- 報酬若還沒定案，寫出區間或說明流程，不要留白。
+- 250-550 字。`,
+    preferredModel: "qwen",
+    maxTokens: 1210,
+    outputDefaults: { platform: "generic", post_type: "generic" },
+  },
+  {
+    id: "kl-30-fan-template-kit",
+    tier: "30s",
+    postType: "press",
+    label: { en: "Kit: Make a Template Anyone Can Wear", zh: "KOL 素材包：做成人人套得上的模板" },
+    description: { en: "Let creators put themselves in it", zh: "讓合作對象把自己放進去" },
+    agent_id: 220920,              // 沿用同 postType 現役卡
+    skill_slug: "kol-outreach",
+    source: {
+      type: "viral",
+      short: "Barbie 自拍生成器",
+      metric: "濾鏡上線後被使用逾 1,300 萬次",
+      asOf: "2023-04",
+      takeaway:
+        "素材包要能被「穿在創作者身上」——他仍然是主角，品牌只出借一個框；框越簡單，願意套的人越多。",
+    },
+    primary_question: "你想讓合作的創作者一起做什麼？可以套用的元素是什麼？",
+    primary_input: { key: "topic", placeholder: "例：統一的開場句型 / 品牌色邊框 / 固定的三個問題", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可被創作者套用的元素", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要設計一份給創作者的合作素材包，核心是「他仍然是主角」。
+
+要產出：
+1. 一個可套用的元素（句型、視覺框、固定的三個問題），描述到別人可以照做。
+2. 使用規則：什麼一定要保留、什麼可以自由改。自由改的部分要多於必須保留的。
+3. 三個示範，示範對象是三種不同類型的創作者。
+4. 授權與標註方式：怎麼標、要不要加註合作聲明。
+5. 一頁式的說明文字，不超過 200 字。
+
+硬規則：
+- 必須保留的元素不要超過兩項，超過就沒有人想用。
+- 不要求創作者背誦品牌訊息。
+- 標註方式要符合當地揭露規範，寫出必須揭露的字樣。
+- 不要限制創作者講缺點。`,
+    preferredModel: "qwen",
+    maxTokens: 1540,
+    outputDefaults: { platform: "generic", post_type: "press" },
+  },
 ];
 
 export const KOL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
@@ -167,5 +247,19 @@ export const KOL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["輕觸版", "推進版", "收尾版"],
     captionMinChars: 60, captionMaxChars: 150,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
+  },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "kl-30-catch-organic-fan": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["回禮版", "放大版", "長期版"],
+    captionMinChars: 250, captionMaxChars: 550,
+  },
+  "kl-30-fan-template-kit": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["模板版", "句型版", "濾鏡版"],
+    captionMinChars: 300, captionMaxChars: 700,
   },
 };

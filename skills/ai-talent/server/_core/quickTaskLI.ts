@@ -159,6 +159,200 @@ ${LI_TONE}`,
     preferredModel: "qwen", maxTokens: 1200,
     outputDefaults: { platform: "linkedin", post_type: "document" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "li-30-feed-cost-of-stance",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "Feed: Name What Your Stance Costs", zh: "LI 貼文：講出這個立場讓你少賺多少" },
+    description: { en: "Prove the stance with what you gave up", zh: "用放棄的東西證明主張是真的" },
+    agent_id: 30018,              // 沿用同 postType 現役卡
+    skill_slug: "linkedin-b2b",
+    source: {
+      type: "viral",
+      short: "Patagonia「Don't Buy This Jacket」",
+      metric: "隔年營收成長約三成至 5.43 億美元",
+      asOf: "2011-11",
+      takeaway:
+        "B2B 的信任不是靠主張建立的，是靠「你為這個主張付了多少」——把代價寫成數字，主張才不是話術。",
+    },
+    primary_question: "你們有什麼做法，是明知會少賺還在做的？",
+    primary_input: { key: "topic", placeholder: "例：不接某類案子 / 用比較貴的料 / 拒絕加價快出", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "明知少賺還在做的事", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 LinkedIn 貼文，用「我們為這個立場付出的代價」來證明立場是真的。
+
+結構：
+1. 第一句直接講那個做法，不鋪陳。
+2. 立刻給代價，而且要有數字（少接的案子數、多出的成本、拉長的天數）。
+3. 講一次為什麼仍然這樣做，用一件具體發生過的事，不要用理念。
+4. 收在一個開放問題，邀請同業講他們的取捨。
+
+硬規則：
+- 代價沒有數字就不要寫這則貼文，回去把數字找出來。
+- 不要比較競爭對手，不要暗示別人做得不對。
+- 不要用「我們相信」開頭。
+- 250-550 字，段落要短，手機上可讀。`,
+    preferredModel: "qwen",
+    maxTokens: 1210,
+    outputDefaults: { platform: "linkedin", post_type: "feed" },
+  },
+  {
+    id: "li-30-article-own-the-failure",
+    tier: "30s",
+    postType: "article",
+    label: { en: "Article: Publish the Post-Mortem", zh: "LI 長文：把出包寫成公開檢討" },
+    description: { en: "Tell it before someone else does", zh: "錯誤自己講完，比被別人講完好" },
+    agent_id: 180172,              // 沿用同 postType 現役卡
+    skill_slug: "thought-leadership",
+    source: {
+      type: "viral",
+      short: "KFC「FCK」",
+      metric: "逾 700 則報導，觸及約 7.97 億人",
+      asOf: "2018-02",
+      takeaway:
+        "出包的公開檢討之所以會傳，是因為它稀少——先認錯、用自嘲降低防衛、再給具體修正，順序錯了就變成公關稿。",
+    },
+    primary_question: "你們最近一次出包是什麼？後來怎麼處理的？",
+    primary_input: { key: "topic", placeholder: "例：出貨延誤三週 / 系統當機 / 品質批次問題", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "出過的包 + 處理過程", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一篇 LinkedIn 長文，公開檢討一次自家的出包。
+
+結構（順序不可調換）：
+1. 開頭 3 句內把錯誤講完，用最直白的說法，不要鋪墊背景。
+2. 用一個自嘲的說法降低防衛，但不要把事情講輕。
+3. 時間軸：什麼時候發現、什麼時候動作、多久修好。給時間點。
+4. 根因：講到制度層面，不要停在「某位同事疏失」。
+5. 修正：已經改了什麼、還沒改什麼、什麼時候改完。
+6. 受影響的人怎麼補償。
+
+硬規則：
+- 禁止「造成不便敬請見諒」這類公關語。
+- 不要在文中推銷任何產品。
+- 沒有做到的修正不要寫成已完成，寫成期限。
+- 如果還在處理中，就明說還在處理，不要假裝結案。`,
+    preferredModel: "qwen",
+    maxTokens: 2640,
+    outputDefaults: { platform: "linkedin", post_type: "article" },
+  },
+  {
+    id: "li-30-document-proof-deck",
+    tier: "30s",
+    postType: "document",
+    label: { en: "Document: A Deck Made of Evidence", zh: "LI 文件：用實例組成的證據簡報" },
+    description: { en: "One sample per page; reader draws the conclusion", zh: "每頁一個實例，結論留給讀者" },
+    agent_id: 220862,              // 沿用同 postType 現役卡
+    skill_slug: "narrative-editor",
+    source: {
+      type: "viral",
+      short: "Heinz「Draw Ketchup」",
+      metric: "賺得媒體 580 萬美元，為投放金額的 127 倍",
+      asOf: "2021-01",
+      takeaway:
+        "簡報最有力的一頁不是結論頁，是讓人自己數出結論的那幾頁——先給樣本，結論最後才出現，而且只出現一次。",
+    },
+    primary_question: "你有什麼可以蒐集的實例，能證明你想講的那件事？",
+    primary_input: { key: "topic", placeholder: "例：50 個客戶被問到同一題的答案", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可蒐集的實例 + 想證明的事", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一份 8 頁的 LinkedIn 文件貼文（PDF 輪播），用實例證明一件事。
+
+每頁寫出「標題（不超過 15 字）＋ 內文（不超過 50 字）」。
+
+結構：
+- 第 1 頁：這個蒐集怎麼做的（問了誰、幾個人、什麼時候）。不給結論。
+- 第 2-7 頁：一頁一個實例，只描述，不評論。
+- 第 8 頁：結論一句話 + 一個給讀者的問題。
+
+硬規則：
+- 前 7 頁不准出現品牌自誇。
+- 樣本數要誠實，12 個就寫 12 個。
+- 沒有真的做過就在第 1 頁註明這是提案。
+- 第 8 頁不要放 CTA。`,
+    preferredModel: "qwen",
+    maxTokens: 1760,
+    outputDefaults: { platform: "linkedin", post_type: "document" },
+  },
+  {
+    id: "li-30-newsletter-referral-loop",
+    tier: "30s",
+    postType: "newsletter",
+    label: { en: "Newsletter: Let Readers Recruit Readers", zh: "LI 電子報：讓訂閱者幫你招訂閱者" },
+    description: { en: "Make forwarding worth something", zh: "把轉寄變成有回報的動作" },
+    agent_id: 180009,              // 沿用同 postType 現役卡
+    skill_slug: "newsletter-editor",
+    source: {
+      type: "viral",
+      short: "Morning Brew 推薦訂閱制",
+      metric: "訂閱數從 10 萬成長至 450 萬，2020 年以 7,500 萬美元被收購",
+      asOf: "2020-10",
+      takeaway:
+        "訂閱成長靠的是「讀者手上有一個轉寄的理由」——把最值得轉的那一段做成可獨立存在的區塊，再給轉寄的人一個回報。",
+    },
+    primary_question: "你的電子報裡，哪一段是讀者會想轉給同事看的？",
+    primary_input: { key: "topic", placeholder: "例：每期的一張數據圖 / 一段業內祕辛", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "讀者會想轉寄的那一段", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要規劃一份 LinkedIn 電子報，核心是「讓現有讀者主動帶新讀者進來」。
+
+要產出：
+1. 一個固定區塊的設計：每期都有、可以單獨截圖轉發、看得懂而不需要前文。
+2. 一句話的轉寄請求，放在那個區塊正下方。
+3. 一個推薦回報機制：推薦幾人得到什麼，要具體、要做得到、不要用抽獎。
+4. 本期的開頭 150 字，示範那個固定區塊長什麼樣。
+
+硬規則：
+- 回報必須是你真的能持續給的東西，不要開一次性的空頭。
+- 不要在同一期放兩個以上的行動要求。
+- 轉寄請求要短，一句話，不要解釋機制細節。`,
+    preferredModel: "qwen",
+    maxTokens: 1650,
+    outputDefaults: { platform: "linkedin", post_type: "newsletter" },
+  },
+  {
+    id: "li-30-poll-public-wager",
+    tier: "30s",
+    postType: "poll",
+    label: { en: "Poll: Put Something on the Line", zh: "LI 投票：開一個你願意兌現的條件" },
+    description: { en: "The result obliges you to act", zh: "投票結果會讓你真的要做某件事" },
+    agent_id: 180173,              // 沿用同 postType 現役卡
+    skill_slug: "linkedin-engagement",
+    source: {
+      type: "viral",
+      short: "Wendy's × Carter Wilkerson",
+      metric: "340 萬次轉推，當時史上最多",
+      asOf: "2017-05",
+      takeaway:
+        "投票率低是因為沒有後果——把一個你真的會兌現的條件綁在票數上，投票就從表態變成參與。",
+    },
+    primary_question: "你願意為投票結果做什麼？",
+    primary_input: { key: "topic", placeholder: "例：破 500 票就把內部教材公開", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "你願意依投票結果兌現的事", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 LinkedIn 投票貼文，把一個「你會兌現的條件」綁在結果上。
+
+要產出：
+- 投票題目（不超過 30 字）與 2-4 個選項（每個不超過 12 字）。
+- 貼文內文：講清楚票數到多少、或哪個選項贏，你會做什麼。
+- 兌現的時間點。
+- 一句話說明你為什麼願意賭這個。
+
+硬規則：
+- 條件必須是你真的做得到、也真的願意做的。做不到就把門檻降低。
+- 選項之間不能有明顯正確答案。
+- 不要用投票收集名單，也不要要求私訊。
+- 100-260 字。`,
+    preferredModel: "qwen",
+    maxTokens: 572,
+    outputDefaults: { platform: "linkedin", post_type: "poll" },
+  },
 ];
 
 const ZEYU_ID      = 60071;  // Zeyu Yang (主場 insight-post)
@@ -177,6 +371,38 @@ export const LI_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "li-30-headline":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["職稱+價值", "結果型", "個性型"], captionMinChars: 30, captionMaxChars: 120 },
   "li-30-newsletter":     { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_GLEN, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["數據驅動", "故事性", "問題式"], captionMinChars: 150, captionMaxChars: 300 },
   "li-30-document":       { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_TONY, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4, variantLabels: ["教學清單型", "故事型", "反差型"], captionMinChars: 400, captionMaxChars: 1500 },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "li-30-feed-cost-of-stance": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["數字版", "故事版", "拒絕清單版"],
+    captionMinChars: 250, captionMaxChars: 550,
+  },
+  "li-30-article-own-the-failure": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["時間軸版", "根因版", "賠償版"],
+    captionMinChars: 600, captionMaxChars: 1200,
+  },
+  "li-30-document-proof-deck": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["樣本版", "對照版", "時間序版"],
+    captionMinChars: 350, captionMaxChars: 800,
+  },
+  "li-30-newsletter-referral-loop": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["轉寄誘因版", "專屬解鎖版", "共同署名版"],
+    captionMinChars: 350, captionMaxChars: 750,
+  },
+  "li-30-poll-public-wager": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["門檻版", "二選一版", "公開挑戰版"],
+    captionMinChars: 100, captionMaxChars: 260,
+  },
 };
 
 export function getLIOrchestraConfig(taskId: string): OrchestraConfig | null {

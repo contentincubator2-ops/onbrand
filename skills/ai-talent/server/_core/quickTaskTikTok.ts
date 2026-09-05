@@ -588,6 +588,120 @@ ${TT_SUFFIX}`,
     preferredModel: "qwen", maxTokens: 600,
     outputDefaults: { platform: "tiktok", post_type: "foryou" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "tt-30-live-relay-host",
+    tier: "30s",
+    postType: "live",
+    label: { en: "Live: Swap Hosts, Not Just Products", zh: "TikTok 直播：換人比換品更留人" },
+    description: { en: "Every segment opens like it's the first", zh: "每一段都當成新的開場" },
+    agent_id: 60073,              // 沿用同 postType 現役卡
+    skill_slug: "live-script",
+    source: {
+      type: "viral",
+      short: "Walmart TikTok 直播帶貨",
+      metric: "觀看人數達預期 7 倍，帳號追蹤數 +25%",
+      asOf: "2021-12",
+      takeaway:
+        "直播的流失發生在「聽不懂現在在幹嘛」的那一刻——每次換人都重講一次前提，等於每 10 分鐘救回一批新進來的人。",
+    },
+    primary_question: "這場直播要賣什麼？有誰可以輪流上場？",
+    primary_input: { key: "topic", placeholder: "例：老闆 + 資深店員 + 一位常客", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "商品 + 可輪流上場的人", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一份 60 分鐘的 TikTok 直播腳本，採「每 10 分鐘換一位主持」的接力制，共 6 段。
+
+每段寫出：
+- 主持人是誰、他的身分。
+- 開場 20 秒：對剛進來的人重講一次現在賣什麼、優惠是什麼。
+- 中段：這個人獨有的角度（他自己怎麼用、被客人問過什麼）。
+- 交棒 15 秒：預告下一位是誰、會講什麼。
+
+硬規則：
+- 每段都要能單獨看懂，禁止出現「剛剛說過的」。
+- 商品資訊每段完整重講，不要怕重複。
+- 沒有給定的優惠不要編，寫成「主持人現場公布」。`,
+    preferredModel: "qwen",
+    maxTokens: 1320,
+    outputDefaults: { platform: "tiktok", post_type: "live" },
+  },
+  {
+    id: "tt-30-profile-self-aware",
+    tier: "30s",
+    postType: "profile",
+    label: { en: "Profile: Build the Flaw Into the Persona", zh: "TikTok 帳號：把缺點寫進人設" },
+    description: { en: "Own the joke people already make", zh: "用大家已經在笑的事當帳號主題" },
+    agent_id: 220949,              // 沿用同 postType 現役卡
+    skill_slug: "tiktok-strategist",
+    source: {
+      type: "viral",
+      short: "Ryanair 自嘲短影音",
+      metric: "單月 16 支影片近 3,000 萬次觀看",
+      asOf: "2022-08",
+      takeaway:
+        "帳號人設要從「別人已經在講的話」長出來，不是從品牌想被怎麼看長出來——認領那個笑點，你就從被笑變成主辦人。",
+    },
+    primary_question: "大家最常拿你們的什麼開玩笑？",
+    primary_input: { key: "topic", placeholder: "例：座位很窄 / 排隊很久 / 包裝很醜", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "大家最常拿來開玩笑的點", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要設定一個 TikTok 帳號的人設，主題是「認領大家已經在笑的那件事」。
+
+要產出：
+1. 一句人設宣言（bio 用，不超過 40 字），要讓人一看就知道這帳號的立場。
+2. 三種固定內容型態，每種寫清楚拍什麼、多長、固定的開場方式。
+3. 面對負評的回覆原則，附 2 個範例回覆。
+4. 一條紅線：什麼事不能拿來自嘲。
+
+硬規則：
+- 自嘲的必須是真的存在的缺點，不能是假謙虛（「我們就是太用心」）。
+- 紅線一定要寫，安全、健康、歧視相關的事不能當梗。
+- 不要在人設裡放產品優點清單。`,
+    preferredModel: "qwen",
+    maxTokens: 770,
+    outputDefaults: { platform: "tiktok", post_type: "profile" },
+  },
+  {
+    id: "tt-30-storyboard-catch-wave",
+    tier: "30s",
+    postType: "storyboard",
+    label: { en: "Storyboard: Catch What Fans Already Filmed", zh: "TikTok 分鏡：接住素人已經拍好的東西" },
+    description: { en: "Don't start a trend; continue someone's", zh: "不自己起梗，去續拍別人的" },
+    agent_id: 180167,              // 沿用同 postType 現役卡
+    skill_slug: "tiktok-content",
+    source: {
+      type: "viral",
+      short: "Ocean Spray × Nathan Apodaca",
+      metric: "原片 8,000 萬次觀看、1,290 萬讚",
+      asOf: "2020-09",
+      takeaway:
+        "爆點通常不是品牌製造的，是品牌接住的——續拍時要保留原作者的主角地位，品牌站第二位才有人願意再傳。",
+    },
+    primary_question: "有沒有人自發拍過跟你們有關的影片？",
+    primary_input: { key: "topic", placeholder: "例：客人自己拍的開箱 / 有人在店門口跳舞", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "已經有人自發拍過的內容", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要規劃一支「接住素人內容」的 TikTok 分鏡表。
+
+輸出：5 格分鏡，每格標「畫面 / 動作 / 字卡 / 秒數」。
+
+結構原則：
+1. 第 1 格必須明確指向原作者（畫面重現、致敬、或直接合拍），讓人一眼認出這是續拍。
+2. 中間 3 格：品牌用自己的資源把那件事做大（更大的場地、更多人、更好的設備）。
+3. 最後 1 格：把功勞交回原作者，並邀請下一個人。
+
+硬規則：
+- 原作者要被指名，不能只是模仿卻不提。
+- 不要在片中推銷產品，產品只能自然出現在畫面裡。
+- 如果還沒取得原作者同意，在分鏡表最上方註明「需先取得授權」。`,
+    preferredModel: "qwen",
+    maxTokens: 1210,
+    outputDefaults: { platform: "tiktok", post_type: "storyboard" },
+  },
 ];
 
 const ANNA_ID      = 180165; // Anna Tseng (主場)
@@ -688,6 +802,26 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     videoTailHint:
       "同一個場景、同一個機位，但呈現「使用之後」的狀態：緊繃與混亂被平靜取代，" +
       "光線更柔和、空間更整齊、人物神情放鬆。不要換場景、不要換人、不要出現文字。",
+  },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "tt-30-live-relay-host": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["接力版", "雙人對打版", "顧客上場版"],
+    captionMinChars: 300, captionMaxChars: 600,
+  },
+  "tt-30-profile-self-aware": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["自嘲版", "對嗆版", "擺爛版"],
+    captionMinChars: 150, captionMaxChars: 350,
+  },
+  "tt-30-storyboard-catch-wave": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["續拍版", "致敬版", "回禮版"],
+    captionMinChars: 250, captionMaxChars: 550,
   },
 };
 

@@ -307,6 +307,307 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     maxTokens: 600,
     outputDefaults: { platform: "youtube", post_type: "shorts" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "yt-30-live-test-demo",
+    tier: "30s",
+    postType: "video",
+    label: { en: "Video: Turn the Claim Into a Live Test", zh: "YT 影片：把宣稱做成一場實測" },
+    description: { en: "Prove the spec instead of stating it", zh: "不講規格，當場證明給人看" },
+    agent_id: 224000,              // 沿用同 postType 現役卡
+    skill_slug: "youtube-content",
+    source: {
+      type: "viral",
+      short: "Volvo Trucks「Epic Split」",
+      metric: "首日 650 萬次觀看，累計逾 5,900 萬",
+      asOf: "2013-11",
+      takeaway:
+        "把規格變成一場有風險的實測——觀眾看的是「會不會失敗」，規格只是失敗的條件。",
+    },
+    primary_question: "你們有哪一項規格，可以當場做給人看？",
+    primary_input: { key: "topic", placeholder: "例：防水到可以泡水 24 小時 / 轉向精準到能走鋼索", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "想證明的規格", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一支「當場實測」的 YouTube 影片腳本，把品牌宣稱變成一場看得到成敗的測試。
+
+結構：
+1. 開場 10 秒：講清楚要測什麼、失敗會怎樣。失敗的後果要具體、要看得見。
+2. 設置：為什麼這個測法算數（誰在場、怎麼確保沒有作假）。
+3. 執行：逐段描述畫面，保留真實的緊張感，不要旁白劇透。
+4. 結果：不論成敗都照實呈現。成功不要歡呼，讓畫面自己說。
+
+硬規則：
+- 測試必須有真的失敗可能，安排好一定會成功的表演不算實測。
+- 不要在腳本裡列規格表，規格只以「測試條件」的身分出現一次。
+- 沒有實際做過的測試，在開場註明這是提案腳本。`,
+    preferredModel: "qwen",
+    maxTokens: 1980,
+    outputDefaults: { platform: "youtube", post_type: "video" },
+  },
+  {
+    id: "yt-30-premiere-countdown-room",
+    tier: "30s",
+    postType: "premiere",
+    label: { en: "Premiere: Make the Wait a Party", zh: "YT 首映：把等待變成聚會" },
+    description: { en: "The waiting room is the content", zh: "首映前的聊天室就是內容" },
+    agent_id: 223995,              // 沿用同 postType 現役卡
+    skill_slug: "shorts-scriptwriter",
+    source: {
+      type: "viral",
+      short: "BTS「Butter」YouTube 首映",
+      metric: "390 萬人同時在線，金氏世界紀錄",
+      asOf: "2021-05",
+      takeaway:
+        "首映的價值在「同時」——把倒數期間的聊天室當成節目的一部分經營，人才會準時到，而不是事後補看。",
+    },
+    primary_question: "這次首映要播什麼？粉絲彼此之間有什麼共同語言？",
+    primary_input: { key: "topic", placeholder: "例：新品發表 / 幕後紀錄片；粉絲會刷的那句話", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "首映內容 + 粉絲的共同語言", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要規劃一場 YouTube 首映（Premiere），重點是「首映前 30 分鐘」怎麼經營。
+
+要產出：
+1. 倒數畫面上要出現什麼（每 10 分鐘一次變化，共 3 段）。
+2. 官方帳號在聊天室要丟的 5 句話，每句都要能引發回應而不是宣布事項。
+3. 一個只有準時到場的人才拿得到的東西（暗號、限定圖、先看片段）。
+4. 首映結束後 5 分鐘內要發的第一則留言。
+
+硬規則：
+- 不要用「即將開始，敬請期待」這種佔位話術。
+- 那個「準時才有」的東西必須是真的做得到的，不要開空頭。
+- 聊天室的話要短，長句在滾動的聊天室裡沒有人讀。`,
+    preferredModel: "qwen",
+    maxTokens: 1650,
+    outputDefaults: { platform: "youtube", post_type: "premiere" },
+  },
+  {
+    id: "yt-30-watch-mirror-test",
+    tier: "30s",
+    postType: "watch",
+    label: { en: "Watch: Show People Their Own Gap", zh: "YT 長片：讓當事人看見自己的落差" },
+    description: { en: "An experiment that changes the subject on camera", zh: "設計一個讓受訪者當場改變的實驗" },
+    agent_id: 24,              // 沿用同 postType 現役卡
+    skill_slug: "youtube-publisher",
+    source: {
+      type: "viral",
+      short: "Dove「Real Beauty Sketches」",
+      metric: "12 天內逾 5,000 萬次觀看、370 萬次分享",
+      asOf: "2013-04",
+      takeaway:
+        "最會被分享的長片不是講品牌，是讓當事人在鏡頭前發現自己錯了——落差要由第三方揭露，品牌只負責設計那個裝置。",
+    },
+    primary_question: "你的顧客對自己有什麼誤解，是你能證明給他看的？",
+    primary_input: { key: "topic", placeholder: "例：以為自己不會挑 / 以為自己需要更貴的", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "顧客對自己的誤解", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要設計一支長片實驗，讓參與者在鏡頭前看見自己的認知落差。
+
+結構：
+1. 裝置：設計一個能產生兩個版本的機制（自己說的 vs 別人說的、盲測 vs 看標籤、現在 vs 半年前）。
+2. 過程：參與者不知道會被對照，全程自然。
+3. 揭露：兩個版本並排出現的那一刻，不要旁白，讓表情說話。
+4. 收束：一句話點出落差的意義，然後停住。
+
+硬規則：
+- 品牌全片不出現在畫面前面，最後才以極小的方式署名。
+- 落差必須是真的，不能事先套招。
+- 不要替參與者下結論，也不要煽情配樂指示以外的情緒指導。
+- 如果實驗會讓參與者難堪，改設計——落差要能讓人變好，不是被消費。`,
+    preferredModel: "qwen",
+    maxTokens: 2420,
+    outputDefaults: { platform: "youtube", post_type: "watch" },
+  },
+  {
+    id: "yt-30-shorts-sound-brand",
+    tier: "30s",
+    postType: "shorts",
+    label: { en: "Shorts: Make the Sound the Logo", zh: "YT Shorts：用聲音當記憶點" },
+    description: { en: "Recognisable with the screen off", zh: "關掉畫面也認得出來的短片" },
+    agent_id: 60030,              // 沿用同 postType 現役卡
+    skill_slug: "youtube-shorts-automation",
+    source: {
+      type: "viral",
+      short: "e.l.f.「#eyeslipsface」",
+      metric: "6 天破 10 億次播放，當時史上最快",
+      asOf: "2019-10",
+      takeaway:
+        "短影音的記憶點做在聲音上——畫面被滑走，聲音還會留在耳朵裡，而且別人翻拍時會自動帶著你的品牌。",
+    },
+    primary_question: "你的品牌可以有什麼固定的聲音？",
+    primary_input: { key: "topic", placeholder: "例：一句口號的唸法 / 開罐聲 / 三個音的旋律", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可以固定重複的聲音元素", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一支 15-30 秒的 YouTube Shorts 腳本，核心是「一個會被記住並被翻拍的聲音」。
+
+要產出：
+1. 那個聲音是什麼（旋律、口號唸法、實際音效），描述到別人可以照做。
+2. 聲音出現的時間點：開頭 3 秒內一次，結尾再一次，中間不要濫用。
+3. 逐鏡腳本，每鏡標秒數 / 畫面 / 聲音 / 字卡。
+4. 一句邀請別人用這個聲音翻拍的話。
+
+硬規則：
+- 聲音要短到 3 秒內能學會、能哼。
+- 不要用有版權疑慮的既有歌曲，寫成可自製的描述。
+- 字卡每行不超過 12 字。`,
+    preferredModel: "qwen",
+    maxTokens: 880,
+    outputDefaults: { platform: "youtube", post_type: "shorts" },
+  },
+  {
+    id: "yt-30-storyboard-one-take",
+    tier: "30s",
+    postType: "storyboard",
+    label: { en: "Storyboard: One Take Through the Company", zh: "YT 分鏡：一鏡到底走完全公司" },
+    description: { en: "One continuous shot that explains the business", zh: "用一個連續鏡頭把整個生意講完" },
+    agent_id: 210220,              // 沿用同 postType 現役卡
+    skill_slug: "youtube-content",
+    source: {
+      type: "viral",
+      short: "Dollar Shave Club",
+      metric: "48 小時 12,000 筆訂單，首小時官網被灌爆",
+      asOf: "2012-03",
+      takeaway:
+        "一鏡到底逼你把話講清楚——沒有剪接可以躲，說不完就是想不清楚；而且觀眾知道這沒法造假。",
+    },
+    primary_question: "你的工作現場有什麼是可以一路走過去拍的？",
+    primary_input: { key: "topic", placeholder: "例：從倉庫走到出貨口 / 從備料走到出餐", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可以一路走完的現場動線", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要畫一支「一鏡到底」的分鏡腳本，主角邊走邊講，把整個生意講完。
+
+輸出格式：逐段標「秒數 / 鏡頭移動 / 畫面裡有什麼 / 主角這段講的話」。
+
+結構：
+1. 起點：從一個具體的物件或動作開始，不要從人臉開始。
+2. 途中：每經過一個站點，帶出一件別人不知道的事實。至少 3 個站點。
+3. 終點：停在成品或客人手上，講最後一句。
+
+硬規則：
+- 全程不能有剪接點，鏡頭移動要寫得出來（推、跟、繞）。
+- 主角講的話要口語，不能是唸稿。
+- 每個站點的事實必須是真的，寧可少一個站點。
+- 不要出現字幕以外的動畫特效。`,
+    preferredModel: "qwen",
+    maxTokens: 1980,
+    outputDefaults: { platform: "youtube", post_type: "storyboard" },
+  },
+  {
+    id: "yt-30-thumbnail-one-object",
+    tier: "30s",
+    postType: "thumbnail",
+    label: { en: "Thumbnail: Leave One Thing on Screen", zh: "YT 縮圖：畫面上只留一個東西" },
+    description: { en: "So bare it survives the scroll", zh: "極簡到滑動時無法忽略" },
+    agent_id: 36,              // 沿用同 postType 現役卡
+    skill_slug: "youtube-thumbnail",
+    source: {
+      type: "viral",
+      short: "World Record Egg",
+      metric: "逾 5,200 萬個讚，當時 IG 史上最多",
+      asOf: "2019-02",
+      takeaway:
+        "縮圖的競爭對手不是別的縮圖，是滑動的手指——畫面越空，主體越大，越像一個錯誤，越有人停下來。",
+    },
+    primary_question: "這支影片最不尋常的那個畫面是什麼？",
+    primary_input: { key: "topic", placeholder: "例：一顆蛋 / 空掉的貨架 / 一張手寫紙條", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "影片裡最不尋常的畫面", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要提出 3 組 YouTube 縮圖方案，每一組都只放一個主體。
+
+每組要寫：
+- 主體是什麼、佔畫面多少比例（不得低於 40%）。
+- 背景（原則是純色或極簡，寫出顏色）。
+- 疊字：最多 3 個字，或不放字。寫出為什麼這 3 個字夠。
+- 為什麼這張在手機上縮到指甲大小時還認得出來。
+
+硬規則：
+- 不要放人臉張嘴的誇張表情，那已經是雜訊。
+- 不要放兩個以上的主體，也不要放箭頭與紅圈。
+- 縮圖承諾的東西，影片裡必須真的有。`,
+    preferredModel: "qwen",
+    maxTokens: 616,
+    outputDefaults: { platform: "youtube", post_type: "thumbnail" },
+  },
+  {
+    id: "yt-30-community-cliffhanger",
+    tier: "30s",
+    postType: "community",
+    label: { en: "Community: Make Channel News Everyone's News", zh: "YT 社群：把頻道的事變成大家的事" },
+    description: { en: "Let subscribers decide what happens next", zh: "讓訂閱者決定接下來發生什麼" },
+    agent_id: 180186,              // 沿用同 postType 現役卡
+    skill_slug: "youtube-publisher",
+    source: {
+      type: "viral",
+      short: "Duolingo「Duo 之死」",
+      metric: "兩週 17 億次自然曝光",
+      asOf: "2025-02",
+      takeaway:
+        "社群貼文不是公告欄，是把頻道的決定權分一點出去——人會為自己投過票的結果回來看。",
+    },
+    primary_question: "頻道接下來有什麼決定，可以讓觀眾參與？",
+    primary_input: { key: "topic", placeholder: "例：下一集拍什麼 / 要不要停更某系列 / 換不換片頭", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可以交給觀眾決定的事", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 YouTube 社群貼文，把頻道的一個決定交給訂閱者。
+
+結構：
+1. 第一句就講清楚要決定什麼，以及決定會造成什麼後果。
+2. 給 2-3 個選項，每個選項都要有真實的代價（不能有一個明顯是對的）。
+3. 說明什麼時候公布、依據什麼決定。
+4. 承諾會照結果做。
+
+硬規則：
+- 不要問「你們想看什麼」這種沒有邊界的問題，給明確選項。
+- 承諾了就要能做到，做不到的選項不要放進去。
+- 120-300 字，手機上一眼讀完。`,
+    preferredModel: "qwen",
+    maxTokens: 660,
+    outputDefaults: { platform: "youtube", post_type: "community" },
+  },
+  {
+    id: "yt-30-videocard-single-action",
+    tier: "30s",
+    postType: "video-card",
+    label: { en: "Card: One Card, One Action", zh: "YT 資訊卡：一張卡只要一個動作" },
+    description: { en: "No second option while the card is up", zh: "卡片出現時，畫面上不要有第二個選擇" },
+    agent_id: 30014,              // 沿用同 postType 現役卡
+    skill_slug: "youtube-publisher",
+    source: {
+      type: "viral",
+      short: "Coinbase QR 廣告",
+      metric: "一分鐘內逾 2,000 萬次掃描，官方 App 當機約一小時",
+      asOf: "2022-02",
+      takeaway:
+        "資訊卡跟畫面在搶同一雙眼睛——卡片出現的那幾秒，畫面與旁白都要停下來讓路，否則沒有人會點。",
+    },
+    primary_question: "你希望觀眾在影片中途做什麼？",
+    primary_input: { key: "topic", placeholder: "例：跳到工具頁 / 領取檔案 / 看前一集", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "希望觀眾在片中做的那一件事", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要規劃影片中的資訊卡（Card）出現方式，讓它真的被點。
+
+要產出 3 個方案，每個寫出：
+- 卡片出現的時間點，以及為什麼是這一刻（觀眾此時剛好缺什麼）。
+- 卡片出現的那 5 秒，畫面在做什麼、旁白在說什麼（原則是留白或直接指向）。
+- 卡片文案，不超過 12 字。
+- 不點的人會錯過什麼，用一句話講。
+
+硬規則：
+- 同一時間只出一張卡。
+- 不要在片頭 30 秒內出卡，觀眾還沒決定要不要看。
+- 卡片文案不要用「點這裡」，要講點了會得到什麼。`,
+    preferredModel: "qwen",
+    maxTokens: 500,
+    outputDefaults: { platform: "youtube", post_type: "video-card" },
+  },
 ];
 
 // ─── Plan B Orchestra config ────────────────────────────────────────────────
@@ -390,6 +691,56 @@ export const YT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
       "Slow cinematic push-in with gentle parallax, soft light drifting across " +
       "the frame. Steady camera, minimal motion — built to hold attention in " +
       "the first 1-2 seconds of a Short.",
+  },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "yt-30-live-test-demo": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["實測版", "對照組版", "素人挑戰版"],
+    captionMinChars: 400, captionMaxChars: 900,
+  },
+  "yt-30-premiere-countdown-room": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["倒數版", "解謎版", "應援版"],
+    captionMinChars: 350, captionMaxChars: 750,
+  },
+  "yt-30-watch-mirror-test": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["雙描述版", "盲測版", "時間差版"],
+    captionMinChars: 500, captionMaxChars: 1100,
+  },
+  "yt-30-shorts-sound-brand": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["原創旋律版", "招牌音效版", "口號節奏版"],
+    captionMinChars: 150, captionMaxChars: 400,
+  },
+  "yt-30-storyboard-one-take": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["動線版", "交接版", "逆向版"],
+    captionMinChars: 400, captionMaxChars: 900,
+  },
+  "yt-30-thumbnail-one-object": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["單一主體版", "反常版", "留白版"],
+    captionMinChars: 100, captionMaxChars: 280,
+  },
+  "yt-30-community-cliffhanger": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["投票版", "求救版", "公開帳本版"],
+    captionMinChars: 120, captionMaxChars: 300,
+  },
+  "yt-30-videocard-single-action": {
+    variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
+    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
+    variantLabels: ["停頓版", "懸念版", "補完版"],
+    captionMinChars: 80, captionMaxChars: 220,
   },
 };
 

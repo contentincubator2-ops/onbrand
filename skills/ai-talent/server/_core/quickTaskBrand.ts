@@ -165,6 +165,85 @@ ${BRAND_TONE}`,
     preferredModel: "qwen", maxTokens: 900,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "br-30-stance-manifesto",
+    tier: "30s",
+    postType: "generic",
+    label: { en: "Stance: Write a Line Some Will Reject", zh: "品牌主張：寫一句會有人不同意的話" },
+    description: { en: "If everyone agrees, it isn't a stance", zh: "人人點頭的主張不是主張" },
+    agent_id: 220869,              // 沿用同 postType 現役卡
+    skill_slug: "tagline-creative",
+    source: {
+      type: "viral",
+      short: "Nike × Colin Kaepernick",
+      metric: "單日社群聲量 +1,400%、270 萬則品牌提及",
+      asOf: "2018-09",
+      takeaway:
+        "品牌主張的強度等於它會冒犯到的人數——挑一邊站，並且準備好失去另一邊，主張才會被人替你傳。",
+    },
+    primary_question: "你們願意站在哪一邊，即使會失去一部分客人？",
+    primary_input: { key: "topic", placeholder: "例：我們支持修理而不是換新 / 我們不做限時逼單", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "願意站的那一邊", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一組品牌主張，條件是「一定會有人不同意」。
+
+要產出：
+1. 主張一句話，不超過 25 字。
+2. 這句話會冒犯到誰、為什麼——誠實寫出來。
+3. 為了這個主張，你們願意放棄什麼（要具體）。
+4. 三種不同語氣的改寫版本。
+
+硬規則：
+- 如果整組讀起來人人都會點頭，那不是主張，重寫。
+- 不能冒犯的對象：弱勢群體、任何身分特徵。要冒犯的是「做法」與「習慣」，不是人。
+- 不要點名競爭對手。
+- 願意放棄的東西必須是真的。`,
+    preferredModel: "qwen",
+    maxTokens: 990,
+    outputDefaults: { platform: "generic", post_type: "generic" },
+  },
+  {
+    id: "br-30-stance-cost-statement",
+    tier: "30s",
+    postType: "press",
+    label: { en: "Statement: Put the Price in the Statement", zh: "品牌聲明：把代價寫進聲明裡" },
+    description: { en: "Attach what you gave up", zh: "對外聲明附上你放棄了什麼" },
+    agent_id: 60002,              // 沿用同 postType 現役卡
+    skill_slug: "brand-strategy",
+    source: {
+      type: "viral",
+      short: "Patagonia「Don't Buy This Jacket」",
+      metric: "隔年營收成長約三成至 5.43 億美元",
+      asOf: "2011-11",
+      takeaway:
+        "對外聲明如果只有立場沒有代價，讀起來就是公關稿——把損失寫成數字，聲明才有重量。",
+    },
+    primary_question: "這份聲明要講什麼？做這件事讓你們損失了什麼？",
+    primary_input: { key: "topic", placeholder: "例：宣布不再做某產品線，損失年營收兩成", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "聲明內容 + 為此付出的代價", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一份品牌對外聲明，核心是「我們為這個決定付出了什麼」。
+
+結構：
+1. 決定是什麼，一句話。
+2. 代價：具體數字（營收、人力、時程、客戶數）。
+3. 為什麼仍然這樣做，一段，用事實不用理念。
+4. 對受影響的人怎麼處理，含時間表。
+5. 如何被檢驗——什麼時候公布結果。
+
+硬規則：
+- 沒有數字的代價不要寫，回去把數字找出來。
+- 不要在聲明裡宣傳其他產品。
+- 承諾要有可查核的日期。
+- 250-600 字。`,
+    preferredModel: "qwen",
+    maxTokens: 1320,
+    outputDefaults: { platform: "generic", post_type: "press" },
+  },
 ];
 
 const YATING_ID = 220872;
@@ -181,6 +260,20 @@ export const BRAND_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "br-30-forbidden-words":  { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["過時 buzzword", "競品用語", "業界陳腔"], captionMinChars: 200, captionMaxChars: 700 },
   "br-30-naming":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["描述型", "暗喻型", "創造詞型"], captionMinChars: 200, captionMaxChars: 800 },
   "br-30-competitor-map":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["價格 vs 功能", "大眾 vs 利基", "工具 vs 文化"], captionMinChars: 300, captionMaxChars: 900 },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "br-30-stance-manifesto": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["宣言版", "對立版", "承諾版"],
+    captionMinChars: 200, captionMaxChars: 450,
+  },
+  "br-30-stance-cost-statement": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["數字版", "時間表版", "公開承諾版"],
+    captionMinChars: 250, captionMaxChars: 600,
+  },
 };
 
 export function getBrandOrchestraConfig(taskId: string): OrchestraConfig | null {

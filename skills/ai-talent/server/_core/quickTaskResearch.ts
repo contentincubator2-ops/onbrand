@@ -165,6 +165,86 @@ ${RES_TONE}`,
     preferredModel: "qwen", maxTokens: 700,
     outputDefaults: { platform: "generic", post_type: "generic" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "rs-30-gap-experiment",
+    tier: "30s",
+    postType: "generic",
+    label: { en: "Research: Design a Visible Gap", zh: "用戶研究：設計一個看得見落差的實驗" },
+    description: { en: "Put two versions side by side", zh: "讓兩個版本並排，落差自己出現" },
+    agent_id: 210303,              // 沿用同 postType 現役卡
+    skill_slug: "ux-research",
+    source: {
+      type: "viral",
+      short: "Dove「Real Beauty Sketches」",
+      metric: "12 天內逾 5,000 萬次觀看、370 萬次分享",
+      asOf: "2013-04",
+      takeaway:
+        "研究要能被分享，靠的是把發現做成「兩個版本並排」的畫面——落差本身就是結論，不需要再寫一段解釋。",
+    },
+    primary_question: "你想驗證使用者對什麼有誤解？",
+    primary_input: { key: "topic", placeholder: "例：他們以為自己在意價格，其實在意等待時間", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "想驗證的使用者誤解", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要設計一個能產出「可視化落差」的用戶研究。
+
+要產出：
+1. 假設：使用者以為 X，實際上是 Y。一句話。
+2. 裝置：怎麼在同一批受試者身上取得兩個版本的答案（自述 vs 觀察、盲測 vs 具名、事前 vs 事後）。
+3. 招募條件與樣本數，以及為什麼這個樣本數夠用（或不夠用）。
+4. 訪談或測試的逐題腳本。
+5. 結果要怎麼呈現成一張並排的圖。
+
+硬規則：
+- 兩個版本必須來自同一批人，否則落差不成立。
+- 要寫出這個設計可能有的偏誤，至少兩項。
+- 不要在題目裡暗示期待的答案。
+- 樣本數不要吹大，12 人就寫 12 人。`,
+    preferredModel: "qwen",
+    maxTokens: 2420,
+    outputDefaults: { platform: "generic", post_type: "generic" },
+  },
+  {
+    id: "rs-30-personal-data-story",
+    tier: "30s",
+    postType: "press",
+    label: { en: "Findings: Give the Data Back", zh: "研究發表：把數據還給每個使用者" },
+    description: { en: "Aggregates don't travel; personal numbers do", zh: "總量沒人轉，個人化數字才會" },
+    agent_id: 90043,              // 沿用同 postType 現役卡
+    skill_slug: "user-research",
+    source: {
+      type: "viral",
+      short: "Spotify Wrapped",
+      metric: "24 小時 2 億人參與、逾 6.3 億次分享",
+      asOf: "2025-12",
+      takeaway:
+        "研究結果要傳開，得把總量翻譯成「這對你來說是多少」——人不會轉發統計，會轉發關於自己的發現。",
+    },
+    primary_question: "你的研究裡，有哪些數字可以還原到單一使用者？",
+    primary_input: { key: "topic", placeholder: "例：平均每人一年花在等待上的時間", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可以還原到個人的數字", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要把一份研究結果寫成會被轉發的發表稿。
+
+結構：
+1. 開頭給一個「換算到個人」的數字，不要先給總量。
+2. 說明換算方式，一段，讓人可以自己算。
+3. 三個延伸發現，每個都用「對你來說是…」的句型。
+4. 方法與限制：樣本、期間、誤差，誠實寫。
+5. 一句可被引用的結論。
+
+硬規則：
+- 總量數字最多出現一次，且不能放在開頭。
+- 換算必須數學上站得住，寫出分母。
+- 限制段不可省略，也不要寫在最不起眼的地方。
+- 沒做過的研究要註明這是設計稿。`,
+    preferredModel: "qwen",
+    maxTokens: 1980,
+    outputDefaults: { platform: "generic", post_type: "press" },
+  },
 ];
 
 const JOCHING_ID = 220530;
@@ -179,6 +259,20 @@ export const RESEARCH_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "rs-30-consent-form":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["精簡版", "完整版", "兒童 / 老人友善"], captionMinChars: 300, captionMaxChars: 800 },
   "rs-30-usability-script":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["First-impression 重", "Task completion 重", "Error recovery 重"], captionMinChars: 500, captionMaxChars: 1200 },
   "rs-30-screener":             { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["Broader quota", "Strict quota", "Mixed quota"], captionMinChars: 300, captionMaxChars: 700 },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "rs-30-gap-experiment": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["雙描述版", "盲測版", "前後測版"],
+    captionMinChars: 500, captionMaxChars: 1100,
+  },
+  "rs-30-personal-data-story": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["個人換算版", "對照版", "時間成本版"],
+    captionMinChars: 400, captionMaxChars: 900,
+  },
 };
 
 export function getResearchOrchestraConfig(taskId: string): OrchestraConfig | null {

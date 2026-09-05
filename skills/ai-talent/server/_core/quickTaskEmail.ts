@@ -171,6 +171,46 @@ ${EMAIL_TONE}`,
     preferredModel: "qwen", maxTokens: 500,
     outputDefaults: { platform: "email", post_type: "edm" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "em-30-annual-recap",
+    tier: "30s",
+    postType: "edm",
+    label: { en: "Email: A Recap About Them, Not You", zh: "EDM：一封只講「你」的年度回顧信" },
+    description: { en: "Every number in it belongs to the reader", zh: "信裡的每個數字都是收信人自己的" },
+    agent_id: 30017,              // 沿用同 postType 現役卡
+    skill_slug: "email-marketing",
+    source: {
+      type: "viral",
+      short: "Spotify Wrapped",
+      metric: "24 小時 2 億人參與、逾 6.3 億次分享",
+      asOf: "2025-12",
+      takeaway:
+        "年度回顧信會被截圖分享，前提是整封信講的是收信人自己——品牌的總量數字一出現，分享的動機就消失。",
+    },
+    primary_question: "你手上有哪些關於單一顧客的數字？",
+    primary_input: { key: "topic", placeholder: "例：他今年買了幾次 / 第一次購買是哪天 / 最常買哪一款", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可以講給單一顧客聽的數字", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一封「年度回顧」EDM，整封信只講收信人自己。
+
+結構：
+1. 主旨：放一個屬於他的數字，不超過 20 字。
+2. 開頭一句：直接給最意外的那個數字。
+3. 中段 3-4 個區塊，一個區塊一個數字 + 一句不超過 20 字的說明。
+4. 最後給一個可截圖分享的小結。
+
+硬規則：
+- 全信不得出現品牌的總量數字（賣出幾萬件、多少會員）。
+- 沒有拿到的數字不要編，寧可少一個區塊。
+- 不要放促銷；要放的話只能在可分享小結之後，且只有一行。
+- 每個數字都要附上它的計算期間。`,
+    preferredModel: "qwen",
+    maxTokens: 1320,
+    outputDefaults: { platform: "email", post_type: "edm" },
+  },
 ];
 
 const NATHAN_ID    = 60062;  // Nathan Lu (主場 welcome email)
@@ -187,6 +227,14 @@ export const EMAIL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "em-30-event-invite":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: EM_DIR_NORA, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["專業敘述", "故事感", "稀缺感"], captionMinChars: 200, captionMaxChars: 450 },
   "em-30-cold-email":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["共同點切入", "問題切入", "價值交換"], captionMinChars: 80, captionMaxChars: 200 },
   "em-30-transactional":  { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["精簡型", "完整型", "貼心型"], captionMinChars: 150, captionMaxChars: 300 },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "em-30-annual-recap": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["成就版", "懷舊版", "排名版"],
+    captionMinChars: 250, captionMaxChars: 600,
+  },
 };
 
 export function getEmailOrchestraConfig(taskId: string): OrchestraConfig | null {

@@ -227,6 +227,12 @@ export const LI_FORMAT_TABS: { id: LIActiveFormat; label: string; labelEn: strin
 ];
 
 export const LI_TASK_FORMAT_MAP: Record<string, LIActiveFormat> = {
+  // 爆款結構卡（2026-09-05）
+  "li-30-feed-cost-of-stance":         "貼文",
+  "li-30-article-own-the-failure":     "Article 長文",
+  "li-30-document-proof-deck":         "Document",
+  "li-30-newsletter-referral-loop":    "Newsletter",
+  "li-30-poll-public-wager":           "投票",
   // 貼文
   "li-30-insight-post":            "貼文",
   "li-30-hook-3":                  "貼文",
@@ -271,6 +277,15 @@ export const YT_FORMAT_TABS: { id: YTActiveFormat; label: string; labelEn: strin
 ];
 
 export const YT_TASK_FORMAT_MAP: Record<string, YTActiveFormat> = {
+  // 爆款結構卡（2026-09-05）
+  "yt-30-live-test-demo":              "影片",
+  "yt-30-premiere-countdown-room":     "系列 / 策略",
+  "yt-30-watch-mirror-test":           "純文案",
+  "yt-30-shorts-sound-brand":          "腳本",
+  "yt-30-storyboard-one-take":         "分鏡圖",
+  "yt-30-thumbnail-one-object":        "純文案",
+  "yt-30-community-cliffhanger":       "純文案",
+  "yt-30-videocard-single-action":     "純文案",
   // 純文案 — 已有影片/主題，只需要文字（標題/說明/留言/社群貼文）
   "yt-30-title-strategies":  "純文案",
   "yt-30-thumbnail-text":    "純文案",
@@ -332,6 +347,10 @@ export const TT_FORMAT_TABS: { id: TTActiveFormat; label: string; labelEn: strin
 ];
 
 export const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
+  // 爆款結構卡（2026-09-05）
+  "tt-30-live-relay-host":             "腳本",
+  "tt-30-profile-self-aware":          "帳號營運",
+  "tt-30-storyboard-catch-wave":       "分鏡表",
   // 選題 — 還沒有內容之前，決定「要做什麼」
   "tt-30-trend-remix":         "選題",
   "tt-30-duet-angle":          "選題",
@@ -383,6 +402,8 @@ export const EM_FORMAT_TABS: { id: EMActiveFormat; label: string; labelEn: strin
 ];
 
 export const EM_TASK_FORMAT_MAP: Record<string, EMActiveFormat> = {
+  // 爆款結構卡（2026-09-05）
+  "em-30-annual-recap":                "Newsletter / 培育",
   // 主旨 / 預覽
   "em-30-subject-line":    "主旨 / 預覽",
   "em-30-preview-text":    "主旨 / 預覽",
@@ -420,6 +441,9 @@ export const PR_FORMAT_TABS: { id: PRActiveFormat; label: string; labelEn: strin
 ];
 
 export const PR_TASK_FORMAT_MAP: Record<string, PRActiveFormat> = {
+  // 爆款結構卡（2026-09-05）
+  "pr-30-stunt-release":               "新聞稿",
+  "pr-30-media-own-mistake":           "媒體關係",
   // 新聞稿
   "pr-30-headline":          "新聞稿",
   "pr-30-subhead":           "新聞稿",
@@ -452,6 +476,9 @@ export const WEB_FORMAT_TABS: { id: WEBActiveFormat; label: string; labelEn: str
 ];
 
 export const WEB_TASK_FORMAT_MAP: Record<string, WEBActiveFormat> = {
+  // 爆款結構卡（2026-09-05）
+  "web-30-longform-open-books":        "長文",
+  "web-30-product-page-plain-talk":    "產品描述",
   // 長文
   "web-30-longform":     "長文",
   "web-30-column":       "長文",

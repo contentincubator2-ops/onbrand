@@ -375,6 +375,86 @@ ${PR_TONE}`,
     preferredModel: "qwen", maxTokens: 500,
     outputDefaults: { platform: "press", post_type: "press-release" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "pr-30-stunt-release",
+    tier: "30s",
+    postType: "press-release",
+    label: { en: "Release: Build a Place, Not a Message", zh: "新聞稿：把一個實體場景變成新聞" },
+    description: { en: "Reporters need something to photograph", zh: "記者要拍得到東西才會來" },
+    agent_id: 29,              // 沿用同 postType 現役卡
+    skill_slug: "press-release",
+    source: {
+      type: "viral",
+      short: "Airbnb「Barbie 夢幻之家」",
+      metric: "逾 13,000 則媒體報導、2.5 億次社群曝光",
+      asOf: "2023-07",
+      takeaway:
+        "會被大量轉載的新聞稿背後都有一個「可以被拍」的實體——先做出那個東西，新聞稿只是說明書。",
+    },
+    primary_question: "你可以做出什麼實體的、可以被拍照的東西？",
+    primary_input: { key: "topic", placeholder: "例：把門市改造成某個場景 / 開放一天的特殊空間", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可以被拍照的實體場景", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則以「實體場景」為核心的新聞稿。
+
+結構：
+1. 標題：講那個東西是什麼、在哪裡、什麼時候，不要形容詞。
+2. 首段：記者可以拍到什麼（列出 3 個具體畫面）。
+3. 為什麼做這件事，一段，不超過 100 字。
+4. 參與或採訪方式：時間、地點、聯絡窗口、是否需預約。
+5. 引述：一位真的參與製作的人，講一件執行上的細節，不要講願景。
+
+硬規則：
+- 首段不准出現品牌形容詞（領先、首創、頂級）。
+- 「可以拍到什麼」必須具體到攝影記者看得懂。
+- 沒有確定的時間地點不要發稿，寫成待定會被丟掉。
+- 引述要像人講的話。`,
+    preferredModel: "qwen",
+    maxTokens: 1980,
+    outputDefaults: { platform: "press", post_type: "press-release" },
+  },
+  {
+    id: "pr-30-media-own-mistake",
+    tier: "30s",
+    postType: "press",
+    label: { en: "Media: Say It All Before They Ask", zh: "媒體關係：出事時先把話講完" },
+    description: { en: "Take the story back with self-deprecation", zh: "用自嘲換回主導權的回應包" },
+    agent_id: 223197,              // 沿用同 postType 現役卡
+    skill_slug: "pr-writing",
+    source: {
+      type: "viral",
+      short: "KFC「FCK」",
+      metric: "逾 700 則報導，觸及約 7.97 億人",
+      asOf: "2018-02",
+      takeaway:
+        "危機報導的長度取決於記者還能問到什麼——把已知的全部先講完，並用一個自嘲的動作降低敵意，故事就會提早結束。",
+    },
+    primary_question: "現在發生了什麼事？已知的事實有哪些？",
+    primary_input: { key: "topic", placeholder: "例：缺貨 / 系統故障 / 品質問題，以及已確認的原因", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "事件 + 目前已確認的事實", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一份危機情況的媒體回應包。
+
+要產出：
+1. 一句話聲明：把事情講完，不超過 40 字，不要辯解。
+2. 已知事實清單：時間、範圍、影響人數，只列已確認的。
+3. 未知事項清單：明白寫出還不知道什麼、什麼時候會知道。
+4. 一個能降低敵意的具體動作（自嘲式的公開表達、主動公開資料、開放查核）。
+5. 記者最可能問的 5 個問題與答案，包含最難的那一題。
+
+硬規則：
+- 未知的事要說未知，不要用模糊句掩蓋。
+- 禁止「造成不便深感抱歉」這類套語，用具體的話道歉。
+- 不要把責任推給供應商或個別員工。
+- 答不出來的題目就寫「目前無法回答，X 日前補充」，不要編。`,
+    preferredModel: "qwen",
+    maxTokens: 1760,
+    outputDefaults: { platform: "press", post_type: "press" },
+  },
 ];
 
 const VINCENT_ID = 60011;
@@ -394,6 +474,20 @@ export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "pr-30-launch-social":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: VINCENT_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["FB 口吻", "LinkedIn 口吻", "Threads 口吻"], captionMinChars: 100, captionMaxChars: 250 },
   // 8-angle pool; RunPage pool mode (>4) gives 再給我幾個 reveal-more.
   "pr-30-news-hook":          { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["Reframe 換框架", "Newsjack 借時事", "反直覺數據", "人的故事", "產業意義", "對比衝突", "首次/之最", "在地連結"], captionMinChars: 80, captionMaxChars: 400 },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "pr-30-stunt-release": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["場景版", "限時版", "開放參觀版"],
+    captionMinChars: 400, captionMaxChars: 900,
+  },
+  "pr-30-media-own-mistake": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["自嘲版", "時間軸版", "第三方查核版"],
+    captionMinChars: 350, captionMaxChars: 800,
+  },
 };
 
 export function getPROrchestraConfig(taskId: string): OrchestraConfig | null {

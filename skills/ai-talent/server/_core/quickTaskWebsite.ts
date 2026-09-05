@@ -275,6 +275,87 @@ A：直接回答，2–4 句。先給答案，再補理由。
     maxTokens: 2200,
     outputDefaults: { platform: "doc", post_type: "product_desc" },
   },
+
+  // ── 爆款結構卡（2026-09-05）：source 一律帶 metric + asOf ──────────
+  {
+    id: "web-30-longform-open-books",
+    tier: "30s",
+    postType: "blog",
+    label: { en: "Long-form: Open the Books", zh: "官網長文：把成本和取捨攤開來寫" },
+    description: { en: "Publish the ugly numbers yourself", zh: "把難看的數字自己寫出來" },
+    agent_id: 220751,              // 沿用同 postType 現役卡
+    skill_slug: "website-longform",
+    source: {
+      type: "viral",
+      short: "Patagonia「Don't Buy This Jacket」",
+      metric: "隔年營收成長約三成至 5.43 億美元",
+      asOf: "2011-11",
+      takeaway:
+        "把不利於自己的數字自己寫出來，讀者就沒有理由懷疑其他數字——透明的說服力來自你放棄的辯解空間。",
+    },
+    primary_question: "你的產品有哪些成本或取捨，是一般不會公開的？",
+    primary_input: { key: "topic", placeholder: "例：一件的用水量 / 為什麼比別人貴 / 哪裡妥協了", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "通常不會公開的成本或取捨", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一篇官網長文，公開產品的成本與取捨，包含對自己不利的部分。
+
+結構：
+1. 開頭直接給一個對自己不利的數字，不鋪陳。
+2. 拆解：這個數字怎麼來的，逐項列出。
+3. 我們試過什麼方法降低它，哪些失敗了。失敗要寫清楚。
+4. 目前的取捨是什麼、為什麼選這個。
+5. 還沒解決的部分，以及打算什麼時候處理。
+
+硬規則：
+- 至少要有一個對自己不利的具體數字，沒有就不要寫這篇。
+- 不要在文末轉成促銷，最後一段仍然講未解決的問題。
+- 不要拿競爭對手當對照。
+- 沒有實際數據的段落要註明是估算，並寫出估算方式。
+- 1200-2400 字。`,
+    preferredModel: "qwen",
+    maxTokens: 5280,
+    outputDefaults: { platform: "doc", post_type: "report" },
+  },
+  {
+    id: "web-30-product-page-plain-talk",
+    tier: "30s",
+    postType: "product-page",
+    label: { en: "Product Page: Talk, Don't Pitch", zh: "產品頁：用講話的方式賣東西" },
+    description: { en: "One person, one take, no spec sheet", zh: "一個人把話講完，沒有規格表" },
+    agent_id: 238853,              // 沿用同 postType 現役卡
+    skill_slug: "product-page",
+    source: {
+      type: "viral",
+      short: "Dollar Shave Club",
+      metric: "48 小時 12,000 筆訂單，首小時官網被灌爆",
+      asOf: "2012-03",
+      takeaway:
+        "產品頁最有效的版本常常是「一個人把話講完」——先講價格與最直接的好處，把規格留到願意往下滑的人再看。",
+    },
+    primary_question: "如果只能講一段話介紹這個產品，你會說什麼？",
+    primary_input: { key: "topic", placeholder: "例：它就是一把好刮的刀，一個月一百塊", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "你會親口講的那一段介紹", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一個產品頁，全篇像一個人在講話，不是型錄。
+
+結構：
+1. 開頭 2 句：這是什麼、多少錢。價格不要藏。
+2. 一段自嘲或反話術，先把讀者心裡的懷疑講出來。
+3. 三個具體好處，每個配一個生活情境，不要用形容詞堆疊。
+4. 誰不適合買——明確講出來。
+5. 規格與細節放最後，用清單。
+
+硬規則：
+- 前四段不准出現「頂級／極致／完美／領先／匠心」。
+- 「誰不適合買」一定要寫，而且要是真的。
+- 價格若無法確定，寫成「待填」，不要編。
+- 500-1000 字。`,
+    preferredModel: "qwen",
+    maxTokens: 2200,
+    outputDefaults: { platform: "doc", post_type: "report" },
+  },
 ];
 
 /**
@@ -312,6 +393,20 @@ export const WEBSITE_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
     aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
     variantLabels: ["常見問答"], captionMinChars: 600, captionMaxChars: 1800,
+  },
+
+  // ── 爆款結構卡 ────────────────────────────────────────────────────
+  "web-30-longform-open-books": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["成本版", "取捨版", "失敗紀錄版"],
+    captionMinChars: 1200, captionMaxChars: 2400,
+  },
+  "web-30-product-page-plain-talk": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
+    variantLabels: ["口語版", "比價版", "反話術版"],
+    captionMinChars: 500, captionMaxChars: 1000,
   },
 };
 
