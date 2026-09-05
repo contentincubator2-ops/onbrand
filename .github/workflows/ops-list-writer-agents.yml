@@ -1,0 +1,72 @@
+name: "Ops — List content/marketing writer agents (read-only)"
+
+# 2026-09-06: need real agents.id values for 11 urenshenghuo.ts brand-pack
+# cards (web/course/partnership) that currently have agent_id undefined.
+# Read-only SELECT against the agents table, filtered to writer/strategist/
+# proposal-adjacent roles, plus existence checks for the 25 agent_ids the
+# pack already reuses from other brand packs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      verify_ids:
+        description: "Comma-separated agent ids to verify exist (optional)"
+        required: false
+        type: string
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query agents
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          VERIFY_IDS: ${{ inputs.verify_ids }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: VERIFY_IDS
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1" 2>&1; }
+
+            echo "===== total agent count ====="
+            Q "SELECT COUNT(*) AS n FROM agents;"
+
+            echo "===== web/content writer candidates ====="
+            Q "SELECT id, name, title FROM agents
+                WHERE (title LIKE '%Content%' OR title LIKE '%Copywriter%' OR title LIKE '%SEO%'
+                       OR title LIKE '%Web%' OR title LIKE '%Blog%')
+                  AND isAvailable = 1
+                ORDER BY id LIMIT 15;"
+
+            echo "===== strategist / ideation candidates ====="
+            Q "SELECT id, name, title FROM agents
+                WHERE (title LIKE '%Strategist%' OR title LIKE '%Innovation%' OR title LIKE '%Product%Strategy%'
+                       OR title LIKE '%Brand Strategist%')
+                  AND isAvailable = 1
+                ORDER BY id LIMIT 15;"
+
+            echo "===== proposal / partnership / BD candidates ====="
+            Q "SELECT id, name, title FROM agents
+                WHERE (title LIKE '%Partnership%' OR title LIKE '%Business Development%' OR title LIKE '%Proposal%'
+                       OR title LIKE '%Sales%' OR title LIKE '%Value Proposition%')
+                  AND isAvailable = 1
+                ORDER BY id LIMIT 15;"
+
+            echo "===== wellness / lifestyle industry agents (bonus — may fit this brand better) ====="
+            Q "SELECT id, name, title FROM agents
+                WHERE (industries LIKE '%wellness%' OR industries LIKE '%health%' OR industries LIKE '%lifestyle%'
+                       OR specialty LIKE '%wellness%' OR specialty LIKE '%health%')
+                  AND isAvailable = 1
+                ORDER BY id LIMIT 15;"
+
+            if [ -n "$VERIFY_IDS" ]; then
+              echo "===== verifying existing reused agent ids ====="
+              Q "SELECT id, name, title, isAvailable FROM agents WHERE id IN ($VERIFY_IDS) ORDER BY id;"
+            fi
