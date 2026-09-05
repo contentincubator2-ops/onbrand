@@ -702,8 +702,9 @@ ${TT_HOTU_SUFFIX}${HOTU_BRAND_CORE}`,
 export const HOTU_PACK: BrandPack = {
   key: "hotu",
   brandName: "HOTU",
-  // HOTU 尚未在 DB 建立品牌記錄，先靠 brandName 比對；有 brandId 後補上。
-  match: { brandNames: ["HOTU"] },
+  // 2992 = prod（sowork@sowork.tw 底下，2026-09-04 用 admin-create-brand-with-
+  // positioning workflow 建立，定位 JSON 8 段一次寫入，見本檔案開頭註解）。
+  match: { brandIds: [2992], brandNames: ["HOTU"] },
 
   channels: [
     {
