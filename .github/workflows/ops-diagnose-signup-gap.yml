@@ -1,0 +1,84 @@
+name: "Ops — Diagnose a signup that shows in the dashboard but not in users (read-only)"
+
+# 2026-09-05: CJ reports the admin dashboard shows ahohotaru@gmail.com
+# registered at 2026-09-02 08:55:36, but `users` has zero rows for that
+# email (checked via op-lookup-user-brands.yml) and `oauth_failures` has
+# zero rows in the last 7 days. This checks the other place a signup
+# "happening" could be recorded without a `users` row actually landing:
+# the error_log table (dual-purpose analytics channel — an
+# activation./signup event can fire client-side even if the server-side
+# user-creation write failed afterward), plus a looser (case/whitespace
+# tolerant) re-check of `users` in case of an encoding mismatch.
+#
+# Read-only. No password ever touched — only email + timestamp.
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Email to search for"
+        required: true
+        type: string
+      around:
+        description: "Timestamp to search around, YYYY-MM-DD HH:MM:SS"
+        required: true
+        type: string
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query error_log + loose users re-check
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          Q_EMAIL: ${{ inputs.email }}
+          Q_AROUND: ${{ inputs.around }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: Q_EMAIL,Q_AROUND
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1" 2>&1; }
+            E=$(printf "%s" "$Q_EMAIL" | sed "s/'/''/g")
+            AROUND=$(printf "%s" "$Q_AROUND" | sed "s/'/''/g")
+
+            echo "===== users: case/whitespace-tolerant search ====="
+            Q "SELECT id, email, planCode, planStatus, isActive, createdAt
+                 FROM users
+                WHERE LOWER(TRIM(email)) LIKE LOWER(CONCAT('%', '$E', '%'));"
+
+            echo "===== users: anyone created within +/- 2 hours of the timestamp ====="
+            Q "SELECT id, email, planCode, planStatus, isActive, createdAt
+                 FROM users
+                WHERE createdAt BETWEEN
+                      DATE_SUB('$AROUND', INTERVAL 2 HOUR) AND DATE_ADD('$AROUND', INTERVAL 2 HOUR)
+                ORDER BY createdAt;"
+
+            echo "===== error_log table columns ====="
+            Q "SHOW COLUMNS FROM error_log;"
+
+            echo "===== error_log: rows mentioning this email (any column via JSON search where applicable) ====="
+            Q "SELECT id, level, message, createdAt
+                 FROM error_log
+                WHERE (message LIKE CONCAT('%', '$E', '%'))
+                   OR (CAST(meta AS CHAR) LIKE CONCAT('%', '$E', '%'))
+                ORDER BY createdAt DESC LIMIT 20;"
+
+            echo "===== error_log: everything within +/- 30 minutes of the timestamp ====="
+            Q "SELECT id, level, LEFT(message, 120) AS message, createdAt
+                 FROM error_log
+                WHERE createdAt BETWEEN
+                      DATE_SUB('$AROUND', INTERVAL 30 MINUTE) AND DATE_ADD('$AROUND', INTERVAL 30 MINUTE)
+                ORDER BY createdAt LIMIT 50;"
+
+            echo "===== other tables that might hold a pre-users signup record ====="
+            Q "SHOW TABLES LIKE '%lead%';"
+            Q "SHOW TABLES LIKE '%signup%';"
+            Q "SHOW TABLES LIKE '%waitlist%';"
+            Q "SHOW TABLES LIKE '%invite%';"
