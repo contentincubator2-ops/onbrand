@@ -71,11 +71,32 @@ jobs:
                 ORDER BY createdAt DESC LIMIT 20;"
 
             echo "===== error_log: everything within +/- 30 minutes of the timestamp ====="
-            Q "SELECT id, level, LEFT(message, 120) AS message, createdAt
+            Q "SELECT id, level, userId, LEFT(message, 120) AS message, createdAt
                  FROM error_log
                 WHERE createdAt BETWEEN
                       DATE_SUB('$AROUND', INTERVAL 30 MINUTE) AND DATE_ADD('$AROUND', INTERVAL 30 MINUTE)
                 ORDER BY createdAt LIMIT 50;"
+
+            echo "===== who is the userId behind those events, and what email do they actually have on file ====="
+            Q "SELECT u.id, u.email, u.planCode, u.planStatus, u.isActive, u.createdAt
+                 FROM users u
+                WHERE u.id IN (
+                  SELECT DISTINCT userId FROM error_log
+                   WHERE createdAt BETWEEN
+                         DATE_SUB('$AROUND', INTERVAL 30 MINUTE) AND DATE_ADD('$AROUND', INTERVAL 30 MINUTE)
+                     AND userId IS NOT NULL
+                );"
+
+            echo "===== brand(s) that got a positioning_complete event in that window ====="
+            Q "SELECT b.id, b.name, b.userId, b.createdBy, b.createdAt
+                 FROM brands b
+                WHERE b.id IN (
+                  SELECT DISTINCT JSON_EXTRACT(meta, '\$.brandId') FROM error_log
+                   WHERE message = 'brand.positioning_complete'
+                     AND createdAt BETWEEN
+                         DATE_SUB('$AROUND', INTERVAL 30 MINUTE) AND DATE_ADD('$AROUND', INTERVAL 30 MINUTE)
+                ) OR b.createdAt BETWEEN
+                      DATE_SUB('$AROUND', INTERVAL 2 HOUR) AND DATE_ADD('$AROUND', INTERVAL 2 HOUR);"
 
             echo "===== other tables that might hold a pre-users signup record ====="
             Q "SHOW TABLES LIKE '%lead%';"
