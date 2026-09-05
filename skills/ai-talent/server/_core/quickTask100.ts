@@ -18,6 +18,7 @@
  * caption_writer prompts.
  */
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
+import type { TaskSource } from "./taskSource";
 
 const TONE_100 = `
 語氣要求：自然、有 hook、不官腔。
@@ -878,6 +879,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     label: { en: "PR Full Launch Media Toolkit", zh: "PR 完整上線媒體工具包" },
     description: { en: "Press release + interview Q&A + media outreach scripts + follow-up + spokesperson talking points", zh: "新聞稿 + 採訪問答 + 媒體聯絡話術 + 後續追蹤 + spokesperson talking points" },
     agent_id: 223197, skill_slug: "pr-writing", // Yi-Wen Wu — PR Strategist B2B SaaS (476 char)
+    source: { type: "award", short: "Whopper Detour（Cannes Lions 2019）", takeaway: "一個新聞鉤貫穿整套素材" },
     primary_question: "Launch 主題 + 目標媒體類型 + 發言人姓名職稱 + 發稿時機（四項一起填）",
     primary_input: {
       key: "launch_topic",
@@ -956,6 +958,7 @@ CTA：<本封按鈕文字，依下方階段規則，≤8 字>
     label: { en: "Newsjacking Hook", zh: "借時事新聞鉤" },
     description: { en: "Safely attach your brand to what's trending right now — angles reporters can actually run", zh: "把品牌安全接上此刻正在發燒的時事，產出可報導的角度" },
     agent_id: 223197, skill_slug: "pr-writing",
+    source: { type: "benchmark", short: "Oreo「Dunk in the Dark」", takeaway: "贏在時機，不是文案" },
     primary_question: "品牌想被看見的點 / 可連結的專業或產品？（若有想接的時事可一併寫）",
     primary_input: { key: "context", placeholder: "品牌專業領域/產品/觀點 + 手上事實或數字。系統會自動抓此刻熱門時事；若你已有想接的具體時事事件也可直接寫進來（沒抓到時就用你寫的）", type: "textarea" },
     inputs: [{ key: "context", label: "品牌可連結的點 + 手上素材（可附想接的時事）", type: "textarea", required: true }],
