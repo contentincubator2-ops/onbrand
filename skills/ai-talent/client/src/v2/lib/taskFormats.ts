@@ -153,6 +153,14 @@ export const IG_FORMAT_TABS: { id: IGActiveFormat; label: string; labelEn: strin
 ];
 
 export const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
+  // 爆款結構卡（2026-09-05）
+  "ig-30-feed-single-object":        "Feed 貼文",
+  "ig-30-reel-brand-event":          "Reels",
+  "ig-30-carousel-proof-set":        "Carousel 輪播",
+  "ig-30-story-one-action":          "Story 限時",
+  "ig-30-profile-self-insert":       "個人頁",
+  "ig-30-live-host-relay":           "Live 直播",
+  "ig-30-post-platform-firstday":    "互動 / 工具",
   // Feed 貼文
   "ig-30-caption-short":         "Feed 貼文",
   "ig-30-pure-text-hook":        "Feed 貼文",
