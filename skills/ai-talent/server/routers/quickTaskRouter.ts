@@ -935,6 +935,21 @@ import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../_core/qui
 import { ALL_99S_SQUADS } from "../_core/quickTask100Squads";
 import { is99sOrchestraListed, platformOfTaskId } from "../_core/taskCatalogIndex";
 import { resolveTaskSource } from "../_core/taskSource";
+import {
+  planQuotaFor, resolveChannels, filterTasksByPlan, daysUntilSwap, isUnlimited,
+} from "../_core/planGate";
+
+/** 讀一個品牌的 positioning JSON。讀不到回 null，呼叫端走方案預設。 */
+async function loadBrandPositioning(brandId: number): Promise<unknown> {
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning FROM brands WHERE id = ? LIMIT 1`, [brandId],
+    );
+    const raw = (rows as any[])[0]?.positioning;
+    return typeof raw === "string" ? JSON.parse(raw) : raw ?? null;
+  } catch { return null; }
+}
 import { sourceForTemplate } from "../_core/craftSource";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import {
@@ -1176,6 +1191,70 @@ export const quickTaskRouter = router({
       return packNavForBrand({ brandId: input?.brandId, brandName: input?.brandName });
     }),
 
+  /**
+   * 這個品牌目前啟用哪些通路、還剩幾天可以換。
+   *
+   * 前台需要它來畫「已選 2/2，還有 18 天可更換」那一排；沒有它的話通路
+   * 選擇只能讀不能改，用戶會被鎖在預設值上，等於這個賣點不存在。
+   */
+  channels: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const quota = await planQuotaFor(ctx.user!.id);
+      const positioning = await loadBrandPositioning(input.brandId);
+      const sel = resolveChannels(positioning, quota);
+      return {
+        platforms: sel.platforms,
+        limit: quota.platforms,
+        swappedAt: sel.swappedAt,
+        daysUntilSwap: daysUntilSwap(sel, quota),
+        canSwapNow: daysUntilSwap(sel, quota) === 0,
+      };
+    }),
+
+  /**
+   * 更換啟用的通路。
+   *
+   * 兩道檢查：數量不得超過方案額度、冷卻期內不得更換。冷卻是產品規則
+   * （每月換一次），不是技術限制 —— 沒有它的話「每月可更換一次」這句
+   * 文案就是空的。
+   */
+  setChannels: protectedProcedure
+    .input(z.object({
+      brandId: z.number(),
+      platforms: z.array(z.string().min(1).max(24)).min(1).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const quota = await planQuotaFor(ctx.user!.id);
+      const positioning = (await loadBrandPositioning(input.brandId)) ?? {};
+      const sel = resolveChannels(positioning, quota);
+
+      if (!isUnlimited(quota.platforms) && input.platforms.length > quota.platforms) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `你的方案最多同時開 ${quota.platforms} 個通路（選了 ${input.platforms.length} 個）。`,
+        });
+      }
+      const wait = daysUntilSwap(sel, quota);
+      if (wait > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `通路每 ${quota.platformSwapDays} 天可更換一次，還要 ${wait} 天。`,
+        });
+      }
+
+      const next = {
+        ...(typeof positioning === "object" && positioning ? positioning : {}),
+        __channels: { platforms: input.platforms, swappedAt: new Date().toISOString() },
+      };
+      const { default: localPool } = await import("../localDb");
+      await localPool.execute(
+        `UPDATE brands SET positioning = ? WHERE id = ?`,
+        [JSON.stringify(next), input.brandId],
+      );
+      return { platforms: input.platforms, daysUntilSwap: quota.platformSwapDays ?? 0 };
+    }),
+
   listFB: protectedProcedure
     .input(
       z.object({
@@ -1185,7 +1264,15 @@ export const quickTaskRouter = router({
         brandName: z.string().optional(),
       }).optional(),
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+    // ── 2026-09-06 方案閘門 ────────────────────────────────────────────
+    // 目錄要依方案過濾：爆款結構卡是 2,250 → 9,000 的升級鉤子，通路數是
+    // 兩級的另一條線。在這之前兩者都沒擋，2,250 的用戶拿得到全部 249 張、
+    // 11 個通路 —— 升級沒有任何理由。
+    const gateQuota = await planQuotaFor(ctx.user!.id);
+    // 讀不到品牌就走方案預設，不要讓目錄整個掛掉。
+    const gatePositioning = input?.brandId ? await loadBrandPositioning(input.brandId) : null;
+    const gateChannels = resolveChannels(gatePositioning, gateQuota);
     // Despite the name, this catalog now spans FB + IG (and other channels
     // as they ship). Frontend channel-icon row filters by task.platform /
     // postType prefix.
@@ -1416,7 +1503,7 @@ export const quickTaskRouter = router({
         }
       } catch { /* agent metadata failure non-fatal — UI shows fallback */ }
     }
-    return tasks.map((t: any) => {
+    return filterTasksByPlan(tasks.map((t: any) => {
       // Derive platform: explicit override (IG tasks) wins; else infer from
       // task id prefix (fb-* / ig-*) for back-compat with older FB rows.
       const platform =
@@ -1500,7 +1587,7 @@ export const quickTaskRouter = router({
         agent: t.agent_id ? (agentMap[t.agent_id] ?? null) : null,
         team: team.length > 0 ? team : undefined,
       };
-    });
+    }), gateQuota, gateChannels);
   }),
 
   // runQuick: execute a 30s or 60s FB task with a single LLM call.

@@ -40,6 +40,33 @@ export interface PlanQuota {
    *  -1 = unlimited (bypass point gating). */
   pointsPerCycle: number;
   pointsCycleDays: number;   // 7 for trial, 30 for monthly subs
+  /**
+   * 2026-09-06 定價改版 —— 以下五個欄位是「2,250 vs 9,000」那條線的全部依據。
+   *
+   * 在這之前兩級的差別只有 runsPerCycle（50 次 vs 無限），那是用量限制；
+   * CJ 的新設計把差別移到能力上：能開幾個通路、能不能用爆款結構卡、
+   * 能做幾個產品定位。用量限制留著，功能限制拿掉 —— 2,250 的任務是
+   * 取得客戶，不是賺錢。
+   */
+  /** 可同時啟用的通路數。-1 = 無限。 */
+  platforms: number;
+  /** 更換通路的冷卻天數。30 = 每月可換一次；0 = 隨時可換。 */
+  platformSwapDays: number;
+  /** 品牌自建任務卡上限（張）。-1 = 無限。
+   *  刻意低於策略顧問導入送的 8 張 —— 自建卡不能變成客製導入的替代品。 */
+  ownTaskCards: number;
+  /**
+   * 能不能使用爆款結構卡（source.type === "viral"，目前 46 張）。
+   *
+   * 這是 2,250 → 9,000 的主要升級鉤子，而且它是唯一由產品本身逼出續訂的
+   * 機制：爆款卡的 pill 上印著 asOf 量測年月，而 TikTok 只有 27% 的趨勢
+   * 活過兩週 —— 那個日期會自己變舊，客戶看得到它舊了。
+   */
+  viralTaskCards: boolean;
+  /** 產品定位數上限。2,250 只有品牌定位，所以是 0。 */
+  products: number;
+  /** 每個計費週期可做幾次活動定位。 */
+  eventsPerCycle: number;
   /** 2026-05-19 (CJ Starter plan) — monthly run limit regardless of task type.
    *  1 run = 1 task execution (all variants + images count as 1 run).
    *  -1 = unlimited. Enforced in executeTask.ts / quickTaskOrchestra.ts.
@@ -194,18 +221,24 @@ export const PLANS: Record<PlanCode, Plan> = {
     quota: {
       task_30s:   -1,  // run-gated via runsPerCycle; no per-type cap
       task_60s:   -1,
-      task_99s:    0,  // 99s locked on Starter (upgrade to Solo to unlock)
+      task_99s:   -1,  // 2026-09-06：企劃解鎖。功能限制全拿掉，差異改放在通路數與爆款卡
       image_gen:  -1,  // images included in the run count
       video_gen:   0,
       brands:      1,
       fb_publish: -1,
-      team_members: 1,
+      team_members: 2,
       multi_client: false,
       // Starter uses run-count gating (runsPerCycle), not points.
       // pointsPerCycle = -1 bypasses point check; runsPerCycle enforces the 50-run limit.
       pointsPerCycle: -1,
       pointsCycleDays: 30,
-      runsPerCycle: 50,  // 50 executions/month; 1 run = all variants + images
+      runsPerCycle: -1,  // 2026-09-06：不再以執行數分級，改以通路數 + 爆款卡分級
+      platforms: 2,
+      platformSwapDays: 30,
+      ownTaskCards: 3,
+      viralTaskCards: false,
+      products: 0,
+      eventsPerCycle: 0,
     },
     features: [
       "1 個品牌 · 1 位用戶",
@@ -246,6 +279,12 @@ export const PLANS: Record<PlanCode, Plan> = {
       pointsPerCycle: 1000,
       pointsCycleDays: 365,
       runsPerCycle: -1,   // trial: no run cap, gated by points instead
+      platforms: 2,
+      platformSwapDays: 0,
+      ownTaskCards: 1,
+      viralTaskCards: false,
+      products: 0,
+      eventsPerCycle: 0,
     },
     features: [
       "1000 點試用額度（不重置，用完即停）",
@@ -287,7 +326,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       video_gen: 0,                // 影片暫時下架（roadmap 加購包）
       brands: 1,                   // ← Solo = 1 個品牌
       fb_publish: -1,
-      team_members: 1,
+      team_members: 2,
       multi_client: false,
       // 2026-05-14 (CJ「無限文案 + 無限圖」): pointsPerCycle = -1 means
       // points gating is bypassed. Daily LLM cost cap (preflightCostCheck
@@ -295,6 +334,12 @@ export const PLANS: Record<PlanCode, Plan> = {
       pointsPerCycle: -1,
       pointsCycleDays: 30,
       runsPerCycle: -1,   // Solo: unlimited runs
+      platforms: 5,
+      platformSwapDays: 30,
+      ownTaskCards: 10,
+      viralTaskCards: true,
+      products: 10,
+      eventsPerCycle: 1,
     },
     features: [
       "1 個品牌 · 1 位用戶",
@@ -337,6 +382,12 @@ export const PLANS: Record<PlanCode, Plan> = {
       pointsPerCycle: -1,          // 無限文案 + 無限圖（fair-use daily $15 cap）
       pointsCycleDays: 30,
       runsPerCycle: -1,            // Studio: unlimited runs
+      platforms: -1,
+      platformSwapDays: 0,
+      ownTaskCards: -1,
+      viralTaskCards: true,
+      products: -1,
+      eventsPerCycle: -1,
     },
     features: [
       "最多 3 個品牌（自助切換）",
@@ -370,6 +421,12 @@ export const PLANS: Record<PlanCode, Plan> = {
       pointsPerCycle: 50000,
       pointsCycleDays: 30,
       runsPerCycle: -1,
+      platforms: -1,
+      platformSwapDays: 0,
+      ownTaskCards: -1,
+      viralTaskCards: true,
+      products: -1,
+      eventsPerCycle: -1,
     },
     features: [
       "無限用戶 · 無限品牌",
@@ -397,6 +454,12 @@ export const PLANS: Record<PlanCode, Plan> = {
       pointsPerCycle: -1,
       pointsCycleDays: 30,
       runsPerCycle: -1,
+      platforms: -1,
+      platformSwapDays: 0,
+      ownTaskCards: -1,
+      viralTaskCards: true,
+      products: -1,
+      eventsPerCycle: -1,
     },
     features: [
       "無限額度",
@@ -527,3 +590,65 @@ export const PARENT_DOMAIN = "https://www.sowork.ai";
 export const PRODUCT_DOMAIN = "https://onbrand.sowork.ai";
 export const COMPANY_NAME = "摘星社群行銷顧問股份有限公司";
 export const COMPANY_TAX_ID = "—";  // CJ to fill 統一編號
+
+/**
+ * 2026-09-06 —— 加購方案。**兩者都必須綁 drop_pro（NT$9,000/月）訂閱。**
+ *
+ * 綁定不是為了多賣，是為了讓導入費站得住：策略顧問導入的交付成本約
+ * NT$81,000（8 張客製卡 12hr ＋ SKILL 整理 6hr ＋ 品牌大腦 4hr ＋
+ * 產品策略 5hr = 27hr × 3,000），售價 80,000 單看是打平。綁上訂閱之後，
+ * 導入當月打平、之後每月淨賺約 8,000 —— 一次性費用不進 ARR，價值要落在月費。
+ */
+export const ADDONS = {
+  strategy_onboarding: {
+    id: "strategy_onboarding",
+    labelZh: "策略顧問導入",
+    labelEn: "Strategy Onboarding",
+    oneTimeTwd: 80000,
+    monthlyTwd: 0,
+    requiresPlan: "drop_pro" as PlanCode,
+    /** 含 8 張客製任務卡；第 9 張起單張加購。 */
+    includedCustomCards: 8,
+    extraCardTwd: 25000,
+    scopeZh: [
+      "內部 AI 寫文 SKILL 盤點與整理",
+      "客製任務卡建置 8 張（來源＝客戶自有方法論）",
+      "品牌大腦建置",
+      "產品策略建置",
+    ],
+  },
+  ecom_reporting: {
+    id: "ecom_reporting",
+    labelZh: "電商營運報告建置",
+    labelEn: "E-commerce Ops Reporting",
+    oneTimeTwd: 48000,
+    monthlyTwd: 25000,
+    requiresPlan: "drop_pro" as PlanCode,
+    /** 建置範圍：1 品牌 / 1 市場 / 20 品項內。 */
+    scope: { brands: 1, markets: 1, skus: 20 },
+  },
+} as const;
+export type AddonId = keyof typeof ADDONS;
+
+/**
+ * 電商營運報告的品項級距加購。超過 200 品項或多商店 → 專案報價（回 null）。
+ */
+export const ECOM_SKU_TIERS = [
+  { maxSkus: 20,  oneTimeTwd: 0,     monthlyTwd: 0 },
+  { maxSkus: 50,  oneTimeTwd: 8000,  monthlyTwd: 5000 },
+  { maxSkus: 100, oneTimeTwd: 12000, monthlyTwd: 10000 },
+  { maxSkus: 200, oneTimeTwd: 18000, monthlyTwd: 15000 },
+] as const;
+
+/** 依品項數算加購。回 null 代表落在「專案報價」區間。 */
+export function ecomSkuSurcharge(skus: number): { oneTimeTwd: number; monthlyTwd: number } | null {
+  for (const t of ECOM_SKU_TIERS) {
+    if (skus <= t.maxSkus) return { oneTimeTwd: t.oneTimeTwd, monthlyTwd: t.monthlyTwd };
+  }
+  return null;
+}
+
+/** 這個加購能不能賣給這個方案的用戶。 */
+export function addonAvailableFor(addon: AddonId, plan: PlanCode): boolean {
+  return ADDONS[addon].requiresPlan === plan || plan === "enterprise";
+}

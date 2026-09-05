@@ -22,6 +22,7 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { planQuotaFor, isUnlimited } from "../_core/planGate";
 import { router, protectedProcedure } from "../_core/trpc";
 import { assertBrandAccess } from "../_core/brandAuth";
 import { invokeLLM } from "../_core/llm";
@@ -345,10 +346,18 @@ export const brandTaskCardRouter = router({
       await assertBrandAccess(userId, input.brandId);
 
       const existing = await listBrandTaskCards(input.brandId);
-      if (existing.length >= MAX_CARDS_PER_BRAND) {
+      // 2026-09-06：上限改成跟著方案走（基礎 3 張 / 專業 10 張）。
+      // MAX_CARDS_PER_BRAND 留著當技術上限 —— 方案給再多也不該無限長，
+      // 這張表是塞在 brands.positioning 的 JSON 裡。
+      const ownQuota = await planQuotaFor(userId);
+      const cardCap = isUnlimited(ownQuota.ownTaskCards)
+        ? MAX_CARDS_PER_BRAND
+        : Math.min(ownQuota.ownTaskCards, MAX_CARDS_PER_BRAND);
+      if (existing.length >= cardCap) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `每個品牌最多 ${MAX_CARDS_PER_BRAND} 張自建卡，請先刪掉用不到的`,
+          message: `你的方案最多 ${cardCap} 張自建任務卡（目前 ${existing.length}）。`
+            + `升級後可以增加，或先刪掉用不到的。`,
         });
       }
 

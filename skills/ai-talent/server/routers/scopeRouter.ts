@@ -17,6 +17,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { planQuotaFor, isUnlimited, checkCap } from "../_core/planGate";
 import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
 import { callLLM } from "../_core/llmRouter";
@@ -175,6 +176,18 @@ export const productRouter = router({
         );
         productId = input.id;
       } else {
+        // 2026-09-06 方案上限：只擋新增，既有的不動（降級的人保有已建好的）。
+        const pQuota = await planQuotaFor(userId);
+        if (!isUnlimited(pQuota.products)) {
+          const [cnt]: any = await localPool.execute(
+            `SELECT COUNT(*) AS n FROM products WHERE userId = ?`
+              + (input.brandId ? ` AND brandId = ?` : ``),
+            input.brandId ? [userId, input.brandId] : [userId],
+          );
+          const used = Number((cnt as any[])[0]?.n ?? 0);
+          const chk = checkCap(used, pQuota.products, "個產品定位");
+          if (!chk.ok) throw new TRPCError({ code: "BAD_REQUEST", message: chk.message! });
+        }
         nextPositioning = patch;
         const [r]: any = await localPool.execute(
           `INSERT INTO products (userId, brandId, slug, name, positioning)
@@ -330,6 +343,19 @@ export const eventRouter = router({
         );
         eventId = input.id;
       } else {
+        // 2026-09-06 方案上限：活動定位是「每個計費週期幾次」，不是總量，
+        // 所以數的是最近 30 天內建立的筆數，不是全部。
+        const eQuota = await planQuotaFor(userId);
+        if (!isUnlimited(eQuota.eventsPerCycle)) {
+          const [cnt]: any = await localPool.execute(
+            `SELECT COUNT(*) AS n FROM events
+              WHERE userId = ? AND createdAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+            [userId],
+          );
+          const used = Number((cnt as any[])[0]?.n ?? 0);
+          const chk = checkCap(used, eQuota.eventsPerCycle, "次活動定位／月");
+          if (!chk.ok) throw new TRPCError({ code: "BAD_REQUEST", message: chk.message! });
+        }
         const [r]: any = await localPool.execute(
           `INSERT INTO events (userId, brandId, productId, slug, name, startAt, endAt, positioning)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
