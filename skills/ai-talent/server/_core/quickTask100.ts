@@ -153,6 +153,14 @@ caption 是輪播主貼文文（150-250 字 tease 整組要看完）。${TONE_10
     // 2026-05-18 (CJ「也要移動 viral/testimonial」): strategist + specialty
     // (Compare Editor) too heavy for 60s — same 502 risk as trend-rewrite.
     id: "fb-99-viral-rewrite",
+    source: {
+      type: "viral",
+      short: "Aviation Gin「Peloton Wife」",
+      metric: "48 小時內逾 700 萬次觀看，發布 75 小時逼近千萬",
+      asOf: "2019-12",
+      takeaway:
+        "爆款改寫的時效比文筆重要——事件還熱著的時候接上去，而且要站在被嘲笑那一方這邊，不是跟著嘲笑。",
+    },
     tier: "99s", postType: "feed",
     label: { en: "FB Viral Post Rewrite", zh: "FB 爆款改寫" },
     description: { en: "Kevin Liu maps the original viral structure + Siyu Li rewrites your brand version + comparison table (scout pulls similar virals)", zh: "Kevin Liu 找原爆款結構 + Siyu Li 改寫品牌版 + 對照表（scout 抓同類爆款）" },

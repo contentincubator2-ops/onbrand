@@ -45,6 +45,15 @@ export const FB_FORMAT_TABS: { id: FBActiveFormat; label: string; labelEn: strin
 ];
 
 export const FB_TASK_FORMAT_MAP: Record<string, FBActiveFormat> = {
+  // 爆款結構卡（2026-09-05）
+  "fb-30-ad-viral-monologue":      "廣告",
+  "fb-30-reel-self-roast":         "多媒體",
+  "fb-30-carousel-data-recap":     "輪播 Carousel",
+  "fb-30-album-period-recap":      "多媒體",
+  "fb-30-story-serial-event":      "多媒體",
+  "fb-30-pinned-stance":           "釘選貼文",
+  "fb-30-comment-signal-boost":    "互動 / 工具",
+  "fb-30-event-challenge":         "活動 / 系列",
   // ── 貼文 ──────────────────────────────────────────────────────────────
   "fb-30-caption-short":          "貼文",
   "fb-30-pure-text-hook":         "貼文",

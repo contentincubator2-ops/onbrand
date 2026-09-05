@@ -510,6 +510,315 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     maxTokens: 350,
     outputDefaults: { platform: "facebook", post_type: "feed" },
   },
+
+  // ── 爆款結構卡（2026-09-05）─────────────────────────────────────────
+  // 每張的 source 都帶 metric + asOf：爆款的證據是傳播數字，而數字會過期，
+  // 所以 validateTaskSource 對 viral 強制要求「傳了多少」與「什麼時候量的」。
+  // agent_id / skill_slug 一律沿用同 postType 現役卡在生產環境用的組合。
+  {
+    id: "fb-30-ad-viral-monologue",
+    tier: "30s",
+    postType: "ad",
+    label: { en: "Self-Roast Ad Monologue", zh: "FB 廣告：一鏡到底自嘲腳本" },
+    description: { en: "Opens with your own worst review", zh: "用自家最常被嫌的那一點開場" },
+    agent_id: 224114,              // Ivy Kuo — FB Ad Copy
+    skill_slug: "fb-ad-copy",
+    source: {
+      type: "viral",
+      short: "Dollar Shave Club",
+      metric: "48 小時 12,000 筆訂單，首小時官網被灌爆",
+      asOf: "2012-03",
+      takeaway:
+        "開場先講自己最弱的地方，觀眾就沒有理由關掉——自嘲買到的是信任，不是笑聲。",
+    },
+    primary_question: "這支廣告要賣什麼？你最常被嫌的是哪一點？",
+    primary_input: { key: "topic", placeholder: "例：訂閱制刮鬍刀 / 常被嫌「便宜的一定不好用」", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "產品 + 最常被嫌的一點", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫的是一支「一鏡到底、由品牌自己人對著鏡頭講完」的 FB 廣告腳本。
+
+結構（照順序，不要跳）：
+1. 第一句就講出這個產品最常被嫌的那一點，用對方會講的原話，不要美化。
+2. 承認它——不要辯解、不要「但是我們其實」。承認完才有下一步。
+3. 用一個具體到不像行銷的細節，解釋為什麼你們仍然這樣做。
+4. 收在一個「你可以現在就試」的動作，語氣是邀請不是命令。
+
+硬規則：
+- 全篇第一人稱，像一個人在講話，不是旁白。
+- 禁止形容詞堆疊（頂級／極致／完美／領先）。一個都不要。
+- 禁止「我們相信」「我們致力於」這類品牌腔。
+- 150-350 字，能被一口氣念完。`,
+    preferredModel: "qwen",
+    maxTokens: 600,
+    outputDefaults: { platform: "facebook", post_type: "ad" },
+  },
+  {
+    id: "fb-30-reel-self-roast",
+    tier: "30s",
+    postType: "reel",
+    label: { en: "Reel: Act Out the Bad Review", zh: "FB Reels：把負評演出來" },
+    description: { en: "Short-video script built from real complaints", zh: "拿客訴原句當台詞的短影音腳本" },
+    agent_id: 60033,              // 沿用短影音腳本 agent
+    skill_slug: "short-video-script",
+    source: {
+      type: "viral",
+      short: "Ryanair 自嘲短影音",
+      metric: "單月 16 支影片近 3,000 萬次觀看",
+      asOf: "2022-08",
+      takeaway:
+        "把客訴原句當台詞念出來，品牌站在觀眾那一邊，抱怨就變成素材。",
+    },
+    primary_question: "你最常收到的抱怨是哪一句？（原句照貼，不要修飾）",
+    primary_input: { key: "topic", placeholder: "例：「你們的座位真的很窄」／「排隊排超久」", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "最常收到的抱怨原句", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一支 15-25 秒的直式短影音腳本，主題是「把用戶對我們的抱怨演出來」。
+
+結構：
+1. 前 2 秒：把抱怨原句原封不動打成字卡，一個字都不要改。
+2. 中段：品牌方（人或吉祥物）當場承認，而且演得比抱怨的人還誇張。
+3. 收尾：給一個真的能解決或真的沒打算解決的答案——都可以，但要誠實。
+
+硬規則：
+- 逐鏡輸出，每一鏡標秒數、畫面、字卡文字。
+- 字卡每行不超過 12 字。
+- 不要出現「我們深感抱歉」這種公關語言，那會殺掉整支片。
+- 不要為了好笑而扭曲事實；抱怨是真的，回答也要是真的。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "facebook", post_type: "reel" },
+  },
+  {
+    id: "fb-30-carousel-data-recap",
+    tier: "30s",
+    postType: "carousel",
+    label: { en: "Carousel: Data as a Shareable Scorecard", zh: "FB 多卡：把數據變成想分享的成績單" },
+    description: { en: "One number per card, last card is the flex", zh: "一張卡一個數字，最後一張讓人想貼出去" },
+    agent_id: 180148,              // 沿用 fb-99-carousel-5 的 agent
+    skill_slug: "social-copy",
+    source: {
+      type: "viral",
+      short: "Spotify Wrapped",
+      metric: "24 小時 2 億人參與、逾 6.3 億次分享",
+      asOf: "2025-12",
+      takeaway:
+        "一張卡只放一個數字，而且那個數字要是「關於他的」——人分享的是自己，不是你的品牌。",
+    },
+    primary_question: "你手上有哪些關於「這位顧客自己」的數字？",
+    primary_input: { key: "topic", placeholder: "例：他今年回購 7 次 / 使用總時數 / 會員第幾天", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可以講給單一顧客聽的數字", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要產出一組 5 張的 FB 多卡輪播文案，把數據變成使用者「想貼出去」的成績單。
+
+每一張卡的規格：
+- 只放一個數字，配一句不超過 15 字的說明。
+- 那個數字必須是關於「這位使用者自己」的，不是品牌的總量。
+  （「你今年回購 7 次」可以；「我們賣出 300 萬瓶」不行。）
+- 第 1 張要讓人願意往右滑：先給一個他猜不到的數字。
+- 第 5 張是可以被截圖分享的總結，要有一句他會想引用的話。
+
+硬規則：
+- 逐張輸出，標明第幾張。
+- 沒有拿到的數字就不要編，寧可少一張卡。
+- 不要在任何一張卡放促銷或 CTA，那會讓人不想分享。`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "facebook", post_type: "carousel" },
+  },
+  {
+    id: "fb-30-album-period-recap",
+    tier: "30s",
+    postType: "album",
+    label: { en: "Album: Period Recap Set", zh: "FB 相簿：一段期間的回顧圖組" },
+    description: { en: "Each image stands alone; together they are proof", zh: "每張各自成立，整組是一段時間的證據" },
+    agent_id: 60068,              // 沿用 fb-60-album-4 的 agent
+    skill_slug: "social-copy",
+    source: {
+      type: "viral",
+      short: "Spotify Wrapped",
+      metric: "24 小時 2 億人參與、逾 6.3 億次分享",
+      asOf: "2025-12",
+      takeaway:
+        "每張圖各自成立、整組合起來才是一段時間的證據；回顧的力氣在「原來累積了這麼多」。",
+    },
+    primary_question: "要回顧哪一段期間？這段期間發生了什麼？",
+    primary_input: { key: "topic", placeholder: "例：開店第一年 / 這一季的新品 / 團隊今年做的事", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "期間 + 這段期間的事件", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一組 4 張的 FB 相簿貼文：一段期間的回顧。
+
+規格：
+- 主文 100-150 字，說清楚「這是哪一段時間」以及「為什麼現在回頭看」。
+- 4 張圖各配一句圖說，每句不超過 25 字。
+- 每一句圖說單獨看都要成立（有人只看到第 3 張也要看得懂）。
+- 4 句合起來要能看出累積，不是 4 件無關的事。
+
+硬規則：
+- 用具體的事件與數字，不要「充實的一年」這種話。
+- 沒有提供的事就不要補，寧可只寫 3 張。
+- 結尾不要促銷，回顧的說服力來自累積本身。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "facebook", post_type: "album" },
+  },
+  {
+    id: "fb-30-story-serial-event",
+    tier: "30s",
+    postType: "story",
+    label: { en: "Story: Serialise One Event", zh: "FB 限動：把一件事拆成連續劇" },
+    description: { en: "Each frame leaves an unanswered question", zh: "每則留一個過夜的問題" },
+    agent_id: 30002,              // Sarah Liu — AI Brand Story CMO
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "Duolingo「Duo 之死」",
+      metric: "兩週 17 億次自然曝光，吉祥物提及單日增 25,560%",
+      asOf: "2025-02",
+      takeaway:
+        "事件要留一個沒答案的問題過夜，觀眾才有理由回來看下一則。",
+    },
+    primary_question: "要拆的是哪一件事？它的結局是什麼？",
+    primary_input: { key: "topic", placeholder: "例：新店裝修到開幕 / 一支新品從打樣到上架", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "事件 + 已知的結局", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要把一件事拆成 5 則連續的 FB 限時動態，一天一則。
+
+每一則的規格：
+- 第 1 行是 5-8 字的疊字主標，可以單獨成立。
+- 接 30-60 字的內文，口語、即拋。
+- 每一則結尾必須留一個「明天才會知道」的問題。最後一則才給答案。
+
+硬規則：
+- 逐則輸出，標明第幾天。
+- 懸念要是真的（結局確實還沒發生或還沒公布），不要假吊胃口。
+- 第 5 則要回答第 1 則丟出的那個問題，不能換一個。
+- 不要在中間任何一則放促銷。`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "facebook", post_type: "story" },
+  },
+  {
+    id: "fb-30-pinned-stance",
+    tier: "30s",
+    postType: "pinned",
+    label: { en: "Pinned: Brand Stance", zh: "FB 釘選：品牌立場宣言" },
+    description: { en: "The line you are willing to pay for", zh: "願意付代價的那一句話" },
+    agent_id: 60024,              // 沿用 fb-30-pinned-short 的 agent
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "Nike × Colin Kaepernick",
+      metric: "單日社群聲量 +1,400%、270 萬則品牌提及",
+      asOf: "2018-09",
+      takeaway:
+        "立場要讓一部分人不同意才算立場；釘選的是你願意為它付代價的那句話。",
+    },
+    primary_question: "你們有什麼主張，是會讓一部分客人不同意的？",
+    primary_input: { key: "topic", placeholder: "例：我們不做折扣 / 我們只用台灣種的 / 我們拒接這類案子", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "會有人不同意的主張", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則會被釘在粉專最上面的品牌立場宣言。
+
+結構：
+1. 開頭直接講主張，一句話，不鋪陳。
+2. 講出這個主張讓你們放棄了什麼——具體到可以被查證（少賺的生意、拒絕的合作、變慢的出貨）。
+3. 講出為什麼仍然這樣做，用一件具體發生過的事，不要用理念。
+4. 收在一句可以被引用的話。
+
+硬規則：
+- 必須有人會不同意。如果整篇讀起來人人都會點頭，那不是立場，重寫。
+- 禁止「我們相信」「我們堅持」開頭。用做過的事代替。
+- 不要提到競爭對手。
+- 180-350 字。`,
+    preferredModel: "qwen",
+    maxTokens: 600,
+    outputDefaults: { platform: "facebook", post_type: "pinned" },
+  },
+  {
+    id: "fb-30-comment-signal-boost",
+    tier: "30s",
+    postType: "comment",
+    label: { en: "Comment: Turn One Reply Into an Event", zh: "FB 留言：把一則留言變成事件" },
+    description: { en: "Give the commenter a challenge others join", zh: "給留言者一個大家想加入的挑戰" },
+    agent_id: 180162,              // 沿用 fb-30-comment-reply 的 agent
+    skill_slug: "social-copy",
+    source: {
+      type: "viral",
+      short: "Wendy's × Carter Wilkerson",
+      metric: "340 萬次轉推，當時史上最多",
+      asOf: "2017-05",
+      takeaway:
+        "給留言者一個可完成的挑戰，其他人就有理由加入；回覆的目的是把對話變成大家的事。",
+    },
+    primary_question: "這則留言說了什麼？你願意給出什麼？",
+    primary_input: { key: "topic", placeholder: "例：有人問「買幾次才有免運」／我們可以給一年份", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "留言內容 + 你願意給的東西", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫 3 種公開回覆，把一則普通留言變成別人也想參與的事。
+
+每一種都要：
+- 直接對留言者說話，用他的原話當支點。
+- 開出一個明確、可完成、可被驗證的條件（數字要具體）。
+- 條件要高到有挑戰性，但不要高到明顯做不到。
+- 留一個讓旁觀者也能出手的縫（轉發、tag、投票都算）。
+
+硬規則：
+- 每則 40-120 字，讀起來像人在講話。
+- 不要用官方帳號腔，不要「感謝您的支持」。
+- 開出去的條件必須是品牌真的願意兌現的；不確定就把數字寫保守。
+- 不要嘲諷留言者本人。`,
+    preferredModel: "qwen",
+    maxTokens: 500,
+    outputDefaults: { platform: "facebook", post_type: "comment" },
+  },
+  {
+    id: "fb-30-event-challenge",
+    tier: "30s",
+    postType: "event",
+    label: { en: "Event: Participation Challenge", zh: "FB 活動：參與式挑戰貼文" },
+    description: { en: "Learn it in 10s, look good doing it", zh: "動作要 10 秒學得會、拍起來有面子" },
+    agent_id: 30016,              // 沿用 fb-60-launch-kit 的 agent
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "ALS 冰桶挑戰",
+      metric: "1,700 萬支影片、逾 2,800 萬人參與互動",
+      asOf: "2014-08",
+      takeaway:
+        "挑戰要三件事同時成立：動作 10 秒學得會、拍起來有面子、而且必須指名下一個人。",
+    },
+    primary_question: "這次活動想讓大家做什麼動作？為了什麼？",
+    primary_input: { key: "topic", placeholder: "例：帶自己的杯子來店裡拍一張 / 曬出用了三年的舊款", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "要大家做的動作 + 活動目的", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則發起參與式挑戰的 FB 活動貼文。
+
+必須同時成立的三件事（缺一個就會沒人參加）：
+1. 動作 10 秒內學得會，而且不需要買任何東西才能做。
+2. 拍出來對參加者本人是加分的——他願意讓朋友看到。
+3. 內建接力：參加完要指名下一個人，並說清楚指名的方式。
+
+貼文結構：
+- 開頭 1 句說清楚要做什麼，不要先講理念。
+- 中段：怎麼做（步驟不超過 3 步）、怎麼指名、到什麼時候。
+- 結尾：為什麼值得做——一句話，具體，不要口號。
+
+硬規則：
+- 不要設「購買才能參加」的門檻。
+- 期限要明確到日期。
+- 200-400 字。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "facebook", post_type: "event" },
+  },
 ];
 
 // ─── Plan B Orchestra config (2026-05-05) ──────────────────────────────────
@@ -910,6 +1219,104 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["焦慮式", "FOMO式", "期待式"],
     captionMinChars: 60,
     captionMaxChars: 120,
+  },
+
+  // ── 爆款結構卡 ──────────────────────────────────────────────────────
+  "fb-30-ad-viral-monologue": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    fluxSize: "landscape_4_3",
+    imageQualitySteps: 4,
+    variantLabels: ["自嘲開場", "反話術開場", "老闆親上陣"],
+    captionMinChars: 150,
+    captionMaxChars: 350,
+  },
+  "fb-30-reel-self-roast": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "9:16",
+    fluxSize: "portrait_9_16",
+    imageQualitySteps: 4,
+    variantLabels: ["直接照念", "誇張演出", "反問觀眾"],
+    captionMinChars: 100,
+    captionMaxChars: 250,
+  },
+  "fb-30-carousel-data-recap": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    fluxSize: "square_hd",
+    imageQualitySteps: 4,
+    variantLabels: ["成就感版", "反差版", "排名版"],
+    captionMinChars: 200,
+    captionMaxChars: 450,
+  },
+  "fb-30-album-period-recap": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    fluxSize: "square_hd",
+    imageQualitySteps: 4,
+    variantLabels: ["時序版", "主題版", "人物版"],
+    captionMinChars: 200,
+    captionMaxChars: 400,
+  },
+  "fb-30-story-serial-event": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "9:16",
+    fluxSize: "portrait_9_16",
+    imageQualitySteps: 4,
+    variantLabels: ["懸念版", "倒數版", "共同決定版"],
+    captionMinChars: 150,
+    captionMaxChars: 320,
+  },
+  "fb-30-pinned-stance": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    fluxSize: "landscape_4_3",
+    imageQualitySteps: 4,
+    variantLabels: ["宣言版", "拒絕版", "承諾版"],
+    captionMinChars: 180,
+    captionMaxChars: 350,
+  },
+  "fb-30-comment-signal-boost": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    fluxSize: "square_hd",
+    imageQualitySteps: 4,
+    variantLabels: ["開條件版", "抬價版", "拉旁人版"],
+    captionMinChars: 40,
+    captionMaxChars: 120,
+  },
+  "fb-30-event-challenge": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    fluxSize: "landscape_4_3",
+    imageQualitySteps: 4,
+    variantLabels: ["指名接力版", "曬成果版", "限時共創版"],
+    captionMinChars: 200,
+    captionMaxChars: 400,
   },
 };
 
