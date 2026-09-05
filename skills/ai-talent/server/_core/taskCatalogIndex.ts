@@ -38,6 +38,7 @@ import { MULTI_60S_TASKS } from "./quickTaskMulti60";
 import { ALL_99S_TASKS } from "./quickTask100";
 import { ALL_99S_SQUADS } from "./quickTask100Squads";
 import { WEBSITE_30S_TASKS } from "./quickTaskWebsite";
+import { resolveTaskSource, type TaskSource } from "./taskSource";
 
 /** 前端 channel 列使用的平台代號。 */
 export type CatalogPlatform =
@@ -60,6 +61,11 @@ export interface CatalogTask {
   postType: string;
   labelZh: string;
   labelEn: string;
+  /**
+   * 2026-09-05 — 這張卡的結構來源分類。永遠有值（未標記者回 evergreen），
+   * 所以 client 不必自己補預設。定義見 taskSource.ts。
+   */
+  source: TaskSource;
 }
 
 /**
@@ -118,6 +124,8 @@ function toTask(t: any, platform: CatalogPlatform, tier: string): CatalogTask {
     postType: String(t.postType ?? "feed"),
     labelZh: pick(t.label, "zh"),
     labelEn: pick(t.label, "en"),
+    // 未標記的卡一律回長青公式 —— 前台永遠拿得到一個值，不必自己補預設。
+    source: resolveTaskSource(t.source),
   };
 }
 

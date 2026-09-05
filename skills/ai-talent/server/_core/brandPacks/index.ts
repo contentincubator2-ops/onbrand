@@ -13,6 +13,7 @@
  */
 import type { FBTaskTemplate, OrchestraConfig } from "../quickTaskFB";
 import type { BrandPack, BrandPackCard } from "./types";
+import { DEFAULT_TASK_SOURCE, type TaskSource } from "../taskSource";
 import { WUGAN_PACK } from "./wugan";
 
 /** 所有已建置的客戶任務包。加新客戶就在這裡加一行。 */
@@ -100,6 +101,7 @@ export function expandPackCards(
     if (card.kind === "custom") {
       out.push({
         ...card.template,
+        source: sourceForPackCard(pack, card, card.template.source),
         kind: "fast" as const,
         platform: card.channel,
         packFormat: card.format,
@@ -113,12 +115,35 @@ export function expandPackCards(
       ...base,
       label: card.label ?? base.label,
       description: card.description ?? base.description,
+      source: sourceForPackCard(pack, card, base.source),
       platform: card.channel,
       packFormat: card.format,
       packOrigin: card.origin,
     });
   }
   return out;
+}
+
+/**
+ * 客製卡的結構來源。
+ *
+ * 卡片自己標了就用自己的 —— 拆自得獎案例或標竿品牌的卡（gusheng /
+ * urenshenghuo 的 CARD_EXEMPLARS）會走這條。
+ *
+ * 沒標的就從 `origin` 推導，不編任何東西：origin="brand" 的定義本來就是
+ * 「這張是客戶自己的做法」，那就是品牌方法論；origin="sowork" 是套我們的
+ * 通用結構，回長青公式。
+ */
+function sourceForPackCard(
+  pack: BrandPack,
+  card: BrandPackCard,
+  own: TaskSource | undefined,
+): TaskSource {
+  if (own) return own;
+  if (card.origin === "brand") {
+    return { type: "brand-method", short: pack.brandName };
+  }
+  return DEFAULT_TASK_SOURCE;
 }
 
 /** 前端頻道列與 pill 需要的結構。沒有 pack 就回 null（= 顯示全部）。 */

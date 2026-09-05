@@ -20,6 +20,10 @@ import { showToastGlobal } from "../../components/ui/Toast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import { TIER_ORDER, tierAccent, tierLabel } from "../lib/tierVocabulary";
 import {
+  SOURCE_ORDER, resolveSource, sourceAccent, sourceLabel, sourceWhy, sourcePillText,
+  type TaskSourceType,
+} from "../lib/sourceVocabulary";
+import {
   FB_FORMAT_TABS as FORMAT_TABS,
   FB_TASK_FORMAT_MAP as TASK_FORMAT_MAP,
   type FBActiveFormat as ActiveFormat,
@@ -506,6 +510,8 @@ function PlatformTaskPageInner() {
 
   // Tier tab state (used for non-FB/non-IG platforms)
   const [activeTier, setActiveTier] = useState<ActiveTier>("all");
+  // 結構來源篩選。"all" = 不篩。與 tier 是兩條獨立的軸，可同時生效。
+  const [activeSource, setActiveSource] = useState<TaskSourceType | "all">("all");
   // Format tab state (used for FB)
   const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
   // Format tab state (used for IG)
@@ -884,6 +890,9 @@ function PlatformTaskPageInner() {
       }
     } else {
       // Tier-based filter for other platforms
+      if (activeSource !== "all") {
+        list = list.filter((task) => resolveSource((task as any).source).type === activeSource);
+      }
       if (activeTier !== "all") {
         list = list.filter((task) => task.tier === activeTier);
       }
@@ -900,7 +909,7 @@ function PlatformTaskPageInner() {
       );
     }
     return list;
-  }, [allTasks, platform, activeTier, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery]);
+  }, [allTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -1787,6 +1796,50 @@ function PlatformTaskPageInner() {
             </div>
           )}
 
+          {/* 結構來源篩選 —— 只列出這個頻道實際存在的類型，避免一排點不動的空篩選。
+              與上面的 tier 分頁是兩條獨立的軸：一條問「產出多大」，一條問「憑什麼這樣寫」。 */}
+          {(() => {
+            const present = new Set<TaskSourceType>();
+            for (const t of allTasks) {
+              if (platform && (t as any).platform && (t as any).platform !== platform) continue;
+              present.add(resolveSource((t as any).source).type);
+            }
+            const types = SOURCE_ORDER.filter((t) => present.has(t));
+            if (types.length < 2) return null;   // 只有一種來源就不必給篩選
+            const tabs: Array<TaskSourceType | "all"> = ["all", ...types];
+            return (
+              <div className="mt-3 flex items-center gap-1.5 flex-wrap justify-center">
+                {tabs.map((id) => {
+                  const active = activeSource === id;
+                  const acc = id === "all" ? "#171717" : sourceAccent(id);
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setActiveSource(id)}
+                      title={id === "all" ? undefined : sourceWhy(id, lang)}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full text-tiny font-medium transition-all"
+                      style={
+                        active
+                          ? { background: acc, color: "white" }
+                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                      }
+                    >
+                      {id !== "all" && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ background: active ? "rgba(255,255,255,0.75)" : acc }}
+                        />
+                      )}
+                      {id === "all"
+                        ? (lang === "en" ? "All sources" : "全部來源")
+                        : sourceLabel(id, lang, { long: true })}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           {/* Task count micro-label */}
           <div className="mt-3 text-tiny text-default-400">
             {lang === "en"
@@ -1997,6 +2050,27 @@ function PlatformTaskPageInner() {
                       <p className="text-tiny text-default-500 line-clamp-2">
                         {lang === "en" ? (task.description_en ?? task.description) : task.description}
                       </p>
+                      {/* 結構來源 —— 用戶看得到「這張卡憑什麼這樣寫」。
+                          有具體出處就印出處（那才是賣點），沒有就印分類名。 */}
+                      {(() => {
+                        const src = resolveSource((task as any).source);
+                        const acc = sourceAccent(src.type);
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 self-start rounded-full px-1.5 py-0.5 max-w-full"
+                            style={{ background: `${acc}14`, border: `1px solid ${acc}33` }}
+                            title={sourceWhy(src.type, lang)}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: acc }} />
+                            <span
+                              className="text-[10px] font-semibold truncate"
+                              style={{ color: acc }}
+                            >
+                              {sourcePillText(src, lang)}
+                            </span>
+                          </span>
+                        );
+                      })()}
                       {(task as any).methodology && (
                         <span className="text-[10px] text-default-400 italic">📚 {(task as any).methodology}</span>
                       )}

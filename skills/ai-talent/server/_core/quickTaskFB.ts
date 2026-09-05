@@ -9,6 +9,8 @@
  * Image / video rendering is opt-in via MediaGenFlow (separate flow, no SLA).
  */
 
+import type { TaskSource } from "./taskSource";
+
 /**
  * 2026-05-11 — `DerivePath` describes WHERE an input's value can be
  * pulled from the brand context (so the modal doesn't ask users for
@@ -74,6 +76,15 @@ export interface FBTaskTemplate {
    */
   agent_id?: number;
   skill_slug?: string;
+  /**
+   * 2026-09-05 — 這張卡的結構「憑什麼這樣寫」。分類與規則見 taskSource.ts；
+   * 顯示名在 client/src/v2/lib/sourceVocabulary.ts。
+   *
+   * 未標記 = 長青公式（平台通則），那是誠實的預設值，不需要出處。
+   * 標成 award / benchmark / viral / brand-method 就必須說得出具體來源 ——
+   * 卡片會把它印在 pill 上，答不出來比不標更傷。
+   */
+  source?: TaskSource;
   primary_question?: string;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: InputDerive };
   inputs: TaskInput[];

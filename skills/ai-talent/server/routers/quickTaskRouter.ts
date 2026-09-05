@@ -934,6 +934,7 @@ import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "
 import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../_core/quickTask100";
 import { ALL_99S_SQUADS } from "../_core/quickTask100Squads";
 import { is99sOrchestraListed, platformOfTaskId } from "../_core/taskCatalogIndex";
+import { resolveTaskSource } from "../_core/taskSource";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import {
   checkViralSource,
@@ -1446,6 +1447,10 @@ export const quickTaskRouter = router({
         id: t.id, tier: t.tier, postType: t.postType, platform,
         label: labelStr, description: descStr, kind: t.kind,
         description_en: typeof t.description === "object" && t.description?.en ? t.description.en : null,
+        // 2026-09-05 — 結構來源。這是個白名單，漏掉這行前台的來源 pill 會
+        // 一律顯示「長青公式」而且沒有任何東西會報錯。未標記的卡由
+        // resolveTaskSource 補成 evergreen，所以前台永遠拿得到值。
+        source: resolveTaskSource(t.source),
       };
       if (t.kind === "squad") {
         // 100s squad tasks: surface lead agent + team roster + a primary
