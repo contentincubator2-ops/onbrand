@@ -95,6 +95,13 @@ const SAMPLE_INPUT: Record<string, string> = {
     "How to write a spec for a knitted hat so the sample and the bulk run match. Eight pages: the four lines that must be on the sheet, the one buyers always leave off (finished diameter after felting), and what goes wrong when they do.",
   "li-gs-cmo-dm-intro":
     "A head of product at a US heritage workwear brand who posted last week about moving their wool sourcing out of mainland China. That post is the reason to write. I would ask what is actually blocking the move, because in my experience it is never the factory search.",
+  // ── 五感十築 ────────────────────────────────────────────────────────────
+  // 2026-09-06：這支 probe 收 pack_key，但樣本輸入原本只有盛全那一包，所以
+  // 跑 wugan 一律「no sample input defined」。webCraft 把官網工藝層接到
+  // wg-web-* 之後需要驗證這個現有客戶沒有被改壞，於是補上。
+  "wg-web-longform":
+    "瑞士一間旅館把飲用水管線做成每日自動沖洗，避免水在管內滯留。想對到十築好水。重點是它處理的是「看不見的那一段」——水質不是只看最後出水口。",
+
   "fb-gs-process":
     "Felting. It is the step where the same yarn can come out right or come out ruined, and the difference is judgement about when to stop. Nobody here has ever written that judgement down — it is learned by standing next to someone who already has it.",
 };
