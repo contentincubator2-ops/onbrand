@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isUnlimited, resolveChannels, daysUntilSwap, filterTasksByPlan, checkCap,
-  checkTaskAllowed,
+  checkTaskAllowed, isViewerOnly,
 } from "./planGate";
 import { PLANS } from "./plans";
 
@@ -150,6 +150,21 @@ describe("執行層閘門 —— 列表看不到不等於不能用", () => {
   it("無限通路的方案不做通路檢查", () => {
     expect(checkTaskAllowed(Q({ platforms: -1, viralTaskCards: true }), ch,
       { platform: "tiktok", sourceType: "award" }).ok).toBe(true);
+  });
+});
+
+describe("角色閘門 —— viewer 只能看", () => {
+  it("只有 viewer 角色就不能動", () => {
+    expect(isViewerOnly(["viewer"])).toBe(true);
+    expect(isViewerOnly(["viewer", "viewer"])).toBe(true);
+  });
+  it("有任何 editor 以上的角色就放行", () => {
+    expect(isViewerOnly(["viewer", "editor"])).toBe(false);
+    expect(isViewerOnly(["admin"])).toBe(false);
+    expect(isViewerOnly(["owner"])).toBe(false);
+  });
+  it("沒有任何 workspace 紀錄（solo 用戶）放行 —— 不能因為沒加入團隊就被鎖", () => {
+    expect(isViewerOnly([])).toBe(false);
   });
 });
 

@@ -22,8 +22,9 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { planQuotaFor, isUnlimited } from "../_core/planGate";
+import { planQuotaFor, isUnlimited, assertCanAct } from "../_core/planGate";
 import { router, protectedProcedure } from "../_core/trpc";
+import { assertCanAct } from "../_core/planGate";
 import { assertBrandAccess } from "../_core/brandAuth";
 import { invokeLLM } from "../_core/llm";
 import { buildBrandPrefix } from "../_core/brandContext";
@@ -344,6 +345,7 @@ export const brandTaskCardRouter = router({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandAccess(userId, input.brandId);
+      await assertCanAct(userId);   // 2026-09-07 viewer 不能建卡
 
       const existing = await listBrandTaskCards(input.brandId);
       // 2026-09-06：上限改成跟著方案走（基礎 3 張 / 專業 10 張）。
@@ -511,6 +513,7 @@ export const brandTaskCardRouter = router({
   publish: protectedProcedure
     .input(z.object({ brandId: z.number(), cardId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanAct(ctx.user!.id);   // 2026-09-07 viewer 只能看，不能發布／排程／建卡
       const userId = ctx.user!.id;
       await assertBrandAccess(userId, input.brandId);
       const card = await getBrandTaskCard(input.brandId, input.cardId);

@@ -14,6 +14,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
+import { assertCanAct } from "../_core/planGate";
 import { getBrandPositioningById } from "../positioningBridge";
 import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
 import { getBrandRealContent } from "../_core/brandRealContent";
@@ -366,6 +367,7 @@ export const theaterRouter = router({
       days: z.array(z.string()).min(1).max(14),
     }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanAct(ctx.user!.id);   // 2026-09-07 viewer 只能看，不能發布／排程／建卡
       // 1) Brand positioning (for voice + context)
       const pos = await getBrandPositioningById(input.brandId, ctx.user.id);
       // PositioningResult has no brandName — fetch it separately from brand row

@@ -18,6 +18,7 @@ import {
   probePipedreamFacebookAccounts,
 } from "../_core/pipedreamFacebook";
 import { router, protectedProcedure } from "../_core/trpc";
+import { assertCanAct } from "../_core/planGate";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { assertBrandOwner } from "../_core/brandAuth";
@@ -241,6 +242,7 @@ export const calendarRouter = router({
       platform: z.string().min(1).max(24),
     }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanAct(ctx.user!.id);   // 2026-09-07 viewer 只能看，不能發布／排程／建卡
       const { default: localPool } = await import("../localDb");
       const [rows]: any = await localPool.execute(
         `SELECT m.userId, m.brandId, b.workspaceId, o.content
@@ -283,6 +285,7 @@ export const calendarRouter = router({
       scheduledAt: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanAct(ctx.user!.id);   // 2026-09-07 viewer 只能看，不能發布／排程／建卡
       const { default: localPool } = await import("../localDb");
       const at = new Date(input.scheduledAt);
       if (isNaN(at.getTime())) {
@@ -347,6 +350,7 @@ export const calendarRouter = router({
       confirmPlanningContent: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await assertCanAct(ctx.user!.id);   // 2026-09-07 viewer 只能看，不能發布／排程／建卡
       const { default: localPool } = await import("../localDb");
 
       // Load scheduled_post + verify ownership

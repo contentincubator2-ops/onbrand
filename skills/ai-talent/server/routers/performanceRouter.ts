@@ -49,7 +49,7 @@ export const performanceRouter = router({
         const [rows]: any = await localPool.execute(
           `SELECT status, selectedResourceId, connectedAt, authorizedResources
              FROM brand_integrations
-            WHERE brandId = ? AND userId = ? AND integrationType LIKE 'facebook%'
+            WHERE brandId = ? AND userId = ? AND integrationType = 'facebook_pages'
             ORDER BY id DESC LIMIT 1`,
           [input.brandId, ctx.user!.id],
         );
@@ -67,7 +67,8 @@ export const performanceRouter = router({
           pageLabel = hit?.name ?? String(fb.selectedResourceId);
         } catch { pageLabel = String(fb.selectedResourceId); }
       }
-      const fbConnected = !!fb && (fb.status === "active" || fb.status === "connected") && !!fb.selectedResourceId;
+      // status enum 是 connected | disconnected | error（drizzle schema），沒有 'active'。
+      const fbConnected = !!fb && fb.status === "connected" && !!fb.selectedResourceId;
 
       return [
         {

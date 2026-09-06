@@ -198,6 +198,10 @@ export async function assertTaskAllowed(args: {
   // 這一層是縱深防禦，列表層的閘門仍在；若在這裡 fail-closed，DB 一抖動就把
   // 所有付費用戶擋在執行入口外，那比讓極少數人多跑一次爆款卡糟得多。
   // 注意：「查到用戶但是 trial」不是基礎設施錯誤，那會正常走到下面被擋。
+  // 角色先於方案：viewer 不論方案都不能執行。五個執行入口都經過這裡，
+  // 所以在這裡擋一次就全部擋到，不必再各接一次。
+  await assertCanAct(args.userId);
+
   let quota: PlanQuota;
   let positioning: unknown = null;
   try {
@@ -213,6 +217,43 @@ export async function assertTaskAllowed(args: {
   if (!v.ok) {
     const { TRPCError } = await import("@trpc/server");
     throw new TRPCError({ code: "FORBIDDEN", message: v.message! });
+  }
+}
+
+// ── 角色閘門：viewer 只能看，不能產出或發布 ──────────────────────────────
+//
+// 2026-09-07。報價單的 5 席寫著「成效人員 —— 看數據」，但 workspace_members
+// 的 viewer 在執行層沒有任何地方檢查：viewer 跑任務、發布、建卡跟 editor
+// 一模一樣，它只是個標籤。這裡讓它變成真的。
+//
+// 規則：這個用戶在所有 workspace 裡「只有 viewer」→ 不能執行、發布、建卡。
+// 沒有任何 workspace 紀錄（solo 用戶）→ 放行。有一個 editor 以上 → 放行。
+
+/** 純判斷，方便測。 */
+export function isViewerOnly(roles: readonly string[]): boolean {
+  return roles.length > 0 && roles.every((r) => r === "viewer");
+}
+
+/** 這個用戶在各 workspace 的角色。讀不到回 []（fail-open，理由同執行閘門）。 */
+export async function memberRolesFor(userId: number): Promise<string[]> {
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT role FROM workspace_members WHERE userId = ?`, [userId],
+    );
+    return (rows as any[]).map((r) => String(r.role ?? ""));
+  } catch { return []; }
+}
+
+export const VIEWER_BLOCK_MESSAGE =
+  "你的角色是檢視者，只能查看內容與成效，不能產出、建卡或發布。請管理者調整你的權限。";
+
+/** 產出／發布／建卡前的角色檢查。viewer-only 丟 FORBIDDEN。 */
+export async function assertCanAct(userId: number): Promise<void> {
+  const roles = await memberRolesFor(userId);
+  if (isViewerOnly(roles)) {
+    const { TRPCError } = await import("@trpc/server");
+    throw new TRPCError({ code: "FORBIDDEN", message: VIEWER_BLOCK_MESSAGE });
   }
 }
 
