@@ -72,9 +72,6 @@ const WorkspaceSettingsPage = React.lazy(() => import("../pages/WorkspaceSetting
 const ReviewQueuePage = React.lazy(() => import("../pages/ReviewQueuePage"));
 const AchievementsPage = React.lazy(() => import("../pages/AchievementsPage"));
 const ChangelogPage = React.lazy(() => import("../pages/ChangelogPage"));
-const PhotoCopyPage = React.lazy(() => import("../pages/media/PhotoCopyPage"));
-const VideoCopyPage = React.lazy(() => import("../pages/media/VideoCopyPage"));
-const DocRewritePage = React.lazy(() => import("../pages/media/DocRewritePage"));
 
 // Admin (heaviest — adminProcedure-gated, almost never needed by general traffic)
 const AdminErrorsPage = React.lazy(() => import("../pages/AdminErrorsPage"));
@@ -352,10 +349,6 @@ export default function AppV2() {
           {/* 2026-05-13 — Layer 3 (admin support inbox) + Layer 5 (public changelog) */}
           <Route path="/admin/support" element={<AdminSupportPage />} />
           <Route path="/changelog" element={<ChangelogPage />} />
-          {/* 2026-05-18 (CJ): media-to-copy routes */}
-          <Route path="/media/photo/:channel" element={<PhotoCopyPage />} />
-          <Route path="/media/video/:channel" element={<VideoCopyPage />} />
-          <Route path="/media/doc" element={<DocRewritePage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />
