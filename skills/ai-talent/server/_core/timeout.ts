@@ -28,8 +28,6 @@ export const LLM_HARD_TIMEOUT_MS = 90_000;
 export const DAILY_USD_CAP_TRIAL  = 3;
 export const DAILY_USD_CAP_SOLO   = 5;
 export const DAILY_USD_CAP_STUDIO = 15;
-/** @deprecated kept for back-compat with older imports — alias for Solo cap. */
-export const DAILY_USD_CAP_PAID   = DAILY_USD_CAP_SOLO;
 
 /** Pre-flight credits floor — refuse new LLM calls if wallet under this. */
 export const MIN_CREDITS_TO_RUN = 10;

@@ -139,7 +139,7 @@ function toTask(t: any, platform: CatalogPlatform, tier: string): CatalogTask {
 export function buildTaskCatalogIndex(): CatalogTask[] {
   const out: CatalogTask[] = [];
 
-  // 30s + 已退役的 90s（FB_90S_TASK_INDEX 目前是空陣列）
+  // 30s（90s 層已於 2026-07-20 整層退役，2026-09-07 連空索引一併移除）
   for (const t of listAllFBTasks()) out.push(toTask(t, "facebook", "30s"));
   for (const t of IG_30S_TASKS) out.push(toTask(t, "instagram", "30s"));
   for (const t of YT_30S_TASKS) out.push(toTask(t, "youtube", "30s"));

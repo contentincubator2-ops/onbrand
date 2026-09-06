@@ -96,9 +96,6 @@ export const IG_TASK_REF: Record<string, string> = {
   "ig-60-serial-3":             "Humans of New York Instagram 連載格式 (TIME Magazine 封面故事；Peabody Award；Instagram 人物連載的定義性帳號)：3 集連載建在一個可無限持續的採訪前提（問 1 個問題 + 真實答案）；每集獨立完整，合起來建立整個世界觀；可重複的格式是讓創作者不會枯竭的結構。",
   "ig-60-viral-rewrite":        "Ryan Reynolds / Maximum Effort 病毒改寫策略 (Shorty Award Best Humor Brand 2021；Aviation Gin / Mint Mobile 一系列即時病毒回應)：分析文化病毒事件的分享機制（反差/荒謬/意外）→ 以「低預算但高智慧」幽默反差重建；品牌成為評論者而非主角；速度比製作精緻度重要。",
   "ig-60-testimonial-rewrite":  "8x8「The Power of You」(IAC B2B)：把客戶寫成解決真實挑戰的主角（短片敘事），非產品為主詞。",
-  "ig-99-30day-calendar":       "National Geographic Instagram 30 天主題月曆策略 (Shorty Award Best Brand Presence Travel；Instagram 第 1 個突破 1 億追蹤者的品牌)：30 天錨在一個可擁有的自然主題（「海洋月」「叢林月」）；多格式混搭（單張/輪播/Reel/Story）；跨攝影師/科學家/合作帳號分發；UGC 徵集貫穿全月；月曆本身成為訂閱者期待的年度儀式。",
-  "ig-99-reel-series-6":        "Genesis「G90」＋ Adobe (IAC)：6 集＝一個可重複格式/前提，每集不同主角，靠協作者帳號擴散。",
-  "ig-99-account-reposition":   "Lilly Pulitzer「New Generation of Originals」(IAC 時尚)：保留核心資產同時為新世代重構，全帳號視覺一致刷新。",
 };
 
 /** Per-use-case playbook — keyed by taskId pattern, plus the specific

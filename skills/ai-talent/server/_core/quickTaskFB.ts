@@ -1342,27 +1342,6 @@ export function getOrchestraConfig(taskId: string): OrchestraConfig | null {
 // See scripts/seed-fb-additional-squads.ts and seed-fb-calendar-variants.ts
 // for the full squad inventory. The list below is the user-facing label map.
 
-export const FB_90S_TASK_INDEX: Array<{
-  id: string;
-  squad_slug: string;
-  postType: string;
-  label: string | { en: string; zh: string };
-  description: string | { en: string; zh: string };
-}> = [
-  // 2026-07-20 (CJ「90s 卡在 100% 處理中 → 90s 整層退役」option B): the
-  // legacy 90s tier ran squads SYNCHRONOUSLY — any pipeline crossing
-  // nginx's 60s timeout left the client spinning at「處理中」forever.
-  // Every card here had a 99s/60s equivalent running the same squad (or
-  // its structured-orchestra replacement) via the async-polling path:
-  //   monthly-calendar(+promo) → fb-99-30day-calendar / fb-99-monthly-calendar-promo
-  //   event-launch → fb-99-launch-toolkit / fb-60-launch-kit
-  //   countdown → fb-99-14day-countdown · reposition → fb-99-account-reposition
-  //   quarterly → fb-99-quarterly-strategy · analytics → fb-99-monthly-analytics
-  //   carousel → fb-99-carousel-cvo / fb-99-carousel-5
-  //   livestream → fb-99-livestream-9seg · crisis → fb-99-crisis-playbook
-  // The one card with NO equivalent (fb-90-reels-full) moved to the 99s
-  // squad index as fb-99-reels-script (quickTask100Squads.ts).
-];
 
 /** Helper: get all FB tasks across tiers in a single list.
  *  2026-05-06: legacy FB_60S_TASKS removed from this list — new
@@ -1371,14 +1350,5 @@ export const FB_90S_TASK_INDEX: Array<{
 export function listAllFBTasks() {
   return [
     ...FB_30S_TASKS.map(t => ({ ...t, kind: "fast" as const })),
-    ...FB_90S_TASK_INDEX.map(t => ({
-      id: t.id,
-      tier: "90s" as const,
-      postType: t.postType,
-      label: t.label,
-      description: t.description,
-      kind: "squad" as const,
-      squad_slug: t.squad_slug,
-    })),
   ];
 }

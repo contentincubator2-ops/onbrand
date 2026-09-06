@@ -111,13 +111,9 @@ describe("覆蓋率不能默默崩掉", () => {
  * 現行 id，要嘛明白寫進這裡；不能讓它靜靜地爛在那裡。
  */
 describe("craft key 沒有孤兒", () => {
-  const RETIRED = new Set([
-    "fb-90-carousel-10frame", "fb-90-countdown-series", "fb-90-crisis-full",
-    "fb-90-event-launch", "fb-90-livestream-suite", "fb-90-monthly-calendar",
-    "fb-90-reels-full", "fb-99-crisis-playbook", "fb-99-launch-toolkit",
-    "fb-99-livestream-9seg", "ig-99-30day-calendar", "ig-99-account-reposition",
-    "ig-99-reel-series-6",
-  ]);
+  // 2026-09-07 全部清除。再有卡退役，直接把 craft key 改成現行 id 或刪掉條目，
+  // 不要留屍體在這裡 —— 這份清單存在的唯一理由是「知道它在」，不是保存它。
+  const RETIRED = new Set<string>([]);
 
   it("每個 craft key 不是對得上活卡，就是明列為已退役", () => {
     const live = new Set(buildTaskCatalogIndex().map((c) => c.id));

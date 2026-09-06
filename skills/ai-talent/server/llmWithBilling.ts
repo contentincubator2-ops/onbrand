@@ -31,7 +31,7 @@ import {
   withTimeout,
   LLM_HARD_TIMEOUT_MS,
   DAILY_USD_CAP_TRIAL,
-  DAILY_USD_CAP_PAID,
+  DAILY_USD_CAP_SOLO,
   MIN_CREDITS_TO_RUN,
 } from "./_core/timeout";
 import localPool from "./localDb";

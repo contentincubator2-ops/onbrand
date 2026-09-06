@@ -21,7 +21,6 @@ import { marketIntelRouter } from "./marketIntelRouter";
 import { geoRouter } from "./geoRouter";
 import { postFormatRouter } from "./postFormatRouter";
 import { mediaRouter } from "./mediaRouter";
-import { taskCatalogRouter } from "./taskCatalogRouter";
 import { platformConnectRouter } from "./platformConnectRouter";
 import { theaterRouter } from "./theaterRouter";
 import { positioningJobsRouter } from "./positioningJobsRouter";
@@ -90,7 +89,6 @@ export const appRouter = router({
   geo:           geoRouter,
   postFormat:    postFormatRouter,
   media:         mediaRouter,
-  taskCatalog:   taskCatalogRouter,
   platformConnect: platformConnectRouter,
   theater:         theaterRouter,
   positioningJobs: positioningJobsRouter,

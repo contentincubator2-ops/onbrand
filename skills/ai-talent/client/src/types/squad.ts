@@ -44,9 +44,6 @@ export interface DBAgent {
   avatarUrl?: string | null;
 }
 
-/** @deprecated Use DBAgent instead */
-export type DBAgentMember = DBAgent;
-
 /** Full squad detail: lead + agents + workflow steps */
 export interface DBSquadDetail {
   squadName: string;

@@ -73,7 +73,7 @@ async function main() {
     if (event) console.log(`Event: ${event.name} (#${event.id})`);
   }
 
-  // Build context (mirrors taskCatalogRouter.runAtomic)
+  // Build context (taskCatalogRouter 已於 2026-09-07 移除；此處自行組 context)
   const contextParts: string[] = [];
   const sub = [`【品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}`];
   if (brand.positioningSummary) sub.push(`品牌定位：${String(brand.positioningSummary).slice(0, 600)}`);

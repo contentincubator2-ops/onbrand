@@ -124,40 +124,20 @@ export const FB_TASK_REF: Record<string, string> = {
     "Dollar Shave Club 廣告包 (Webby Award Best Viral Campaign 2012；AICP Next Award 2012；全球最高 ROI 的品牌發表之一)：3 支覆蓋漏斗認知/考慮/轉換；共用 1 條 campaign 主軸；每支單獨完整。",
 
   // ── 90s (squad-based: monthly / event / analytics / reels / crisis) ────
-  "fb-90-monthly-calendar":
-    "Starbucks 季節性 Facebook 月曆策略 (Shorty Award Best Brand Community 多屆；Starbucks 以季節限定主題月曆建立「等待感」文化)：1 個季節主題錨整月；每週格式輪替（產品故事/背後供應鏈/用戶分享/活動資訊）；季節發布日本身成為全球文化事件；UGC 徵集貫穿全月形成社群接力。",
   "fb-99-monthly-calendar-promo":
     "Oreo「Cookie of the Year」促銷月曆 (Shorty Award Best Brand in Food & Beverage + Cannes Lions Bronze Social 多年)：促銷月曆 = 懸念→揭示→行動三階段鋪陳；不只公告折扣，而是把每一週打造成有敘事弧的等待報酬。",
-  "fb-90-event-launch":
-    "Samsung「Galaxy Unpacked」Facebook 活動發表系列 (Shorty Award Best Technology Brand；Samsung 的年度發表活動 Facebook 預告系列是科技品牌活動發表社群策略標竿)：活動發表套組 = 神秘預告（倒數）→ 直播當天（即時互動）→ 發表後亮點回顧；3 階段各有獨立的觀眾鉤子，合起來建立完整的活動媒體生命週期。",
-  "fb-90-countdown-series":
-    "Marvel Studios「Avengers: Endgame」Facebook 倒數系列 (Fandango 最高預售票房紀錄；社群倒數帶動全球搶票潮)：倒數系列 = 每天一個英雄/情節回顧 + 當天的懸念問題；倒數本身是完整的故事重溫體驗；讓等待成為集體儀式而非空白時間；每天獨立 hook 累積到發布日的爆發。",
   "fb-99-account-reposition":
     "Burberry 數位品牌重定位 (Cannes Lions Grand Prix Cyber 2015；傳統奢侈品牌數位轉型標竿)：帳號重定位 = 一致的新視覺語言 × 新語氣 × 新互動機制同步推進；不是一次爆發而是持續訊號更新；每一則貼文都在重複新定位。",
   "fb-99-quarterly-strategy":
     "HubSpot 自身 Facebook 季度 B2B 內容策略 (CMI Award Best Content Marketing；HubSpot 官方 Facebook 頁面是 B2B 季度社群策略最廣引用的案例)：季度策略 = 1 個年度主題（「The State of Marketing」）× 多格式拆分（數據報告/客戶故事/工具教學/直播 AMA）；每月主題弧；數據回顧文章作為季度高峰內容；每個季度結束發布季度總結吸引下季訂閱。",
   "fb-99-monthly-analytics":
     "HubSpot 社群內容績效框架 (CMO Survey Award Best Marketing Analytics Practice 2022；HubSpot 每月 Facebook 績效分析是行業引用最廣的 B2B 社群報告格式)：月度分析報告 = 原始數字→品牌意義解讀→可行動調整建議；不是數字清單而是決策文件；每個指標都連結到明確的業務目標。",
-  "fb-90-carousel-10frame":
-    "IKEA「夢想家居」Facebook 10 張輪播廣告 (Cannes Lions Bronze Outdoor 2020；IKEA 輪播廣告每張獨立可儲存為靈感參考)：10 張 = 封面空房間（問題）→ 每張展示一個空間改造角度（解方）→ 末張完整家居 + 購買 CTA；每張賺到下一張滑動；「靈感帳號」模式讓輪播成為用戶主動儲存的內容，而非廣告。",
-  "fb-90-reels-full":
-    "GoPro Facebook Reels 完整腳本策略 (Shorty Award Best in Sports 多屆；GoPro 以用戶第一視角定義 Facebook/IG Reels 原生感格式)：完整 Reels 腳本 = 第一視角動作開場（觀眾即刻身歷其境）→ 挑戰/高度揭示 → 動作高潮 → 回頭鏡頭（反差放大成就感）→ 品牌低調出現；靜音也能看懂；每幀有動作目的，不是風景。",
-  "fb-90-livestream-suite":
-    "BTS 線上演唱會 Facebook Live 多場次直播套組 (YouTube / VLIVE 直播同時在線觀看破紀錄；2020 年 Map of the Soul ON:E concert 99 萬人同時在線)：多場次直播套組 = 場前宣傳（歌單線索揭示）→ 各場次獨立直播（不同座位/視角/語言版本）→ 場後安可與粉絲互動；每個節點設計不同的全球時區再參與機制。",
-  "fb-90-crisis-full":
-    "Samsung Galaxy Note 7 召回危機 Facebook 完整溝通 (《哈佛商業評論》危機管理案例；三星主動停售聲明 Facebook 先行發布)：完整危機 playbook = 承認（聲明日）→ 調查（公告進度）→ 修正（召回機制）→ 重建（品質保證新品發布）；每階段語氣不同；主動透明而非被動回應讓品牌在危機後市場份額反彈；4 階段各有獨立的社群內容策略。",
 
   // ── 99s ───────────────────────────────────────────────────────────────
   "fb-99-30day-calendar":
     "Coca-Cola「Share a Coke」30 天多平台月曆 (Cannes Lions Grand Prix + Creative Effectiveness Grand Prix；在超過 80 個國家執行)：1 個可擁有主題錨 30 天；多格式混搭；UGC 鼓勵貫穿全月。",
   "fb-99-14day-countdown":
     "HBO《Game of Thrones》最終季 14 日社群倒數 (Shorty Award Best in Entertainment 2019；創下 HBO 平台流量紀錄)：14 天升級揭示——每天獨立 hook + 累積 momentum；社群期待本身成為節目。",
-  "fb-99-launch-toolkit":
-    "Apple「Shot on iPhone」全球發表工具包 (Cannes Lions Grand Prix Outdoor 2015；使用者生成內容成為廣告素材的教科書)：完整工具包 = 品牌徵件（UGC 種子）→ 戶外/社群發表 → 媒體報導 → 長尾創作者擴散；每件內容強化同一個品質主張；讓用戶成為主要內容創作者，品牌是策展者。",
-  "fb-99-livestream-9seg":
-    "Red Bull「Stratos」Facebook Live 9 段直播製作 (Shorty Award Best in Sports 2013；打破 YouTube 直播同時在線紀錄)：9 段 = 前中後完整生命週期；每段有獨立的再參與鉤子；直播事件 = 媒體財產。",
-  "fb-99-crisis-playbook":
-    "Domino's Pizza「Pizza Turnaround」社群危機回應 (Effie Gold Crisis & Issue Management 2010；危機發生 48h 內用 YouTube/Facebook 公開道歉重建信任的教科書)：承認→調查→修正→重建 4 階段；透明度 = 最強的危機文案策略。",
 };
 
 /** Per-use-case playbook — per taskId pattern + award reference appended. */
