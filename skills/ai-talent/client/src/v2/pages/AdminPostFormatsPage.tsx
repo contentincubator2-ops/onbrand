@@ -104,7 +104,7 @@ export default function AdminPostFormatsPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-2">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-2">
             ADMIN · POST FORMAT QUEUE
           </p>
           <h1
@@ -174,7 +174,7 @@ export default function AdminPostFormatsPage() {
             >
               {s === "all" ? "全部" : STATUS_META[s].label}
               {s !== "all" && (
-                <span className="ml-1.5 text-[11px] tabular-nums text-neutral-500">
+                <span className="ml-1.5 text-[12px] tabular-nums text-neutral-500">
                   {countOf(s)}
                 </span>
               )}
@@ -223,7 +223,7 @@ export default function AdminPostFormatsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1.5">
                     <span
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      className="text-[12px] font-semibold px-2 py-0.5 rounded-full"
                       style={{
                         background: STATUS_META[row.status].bg,
                         color: STATUS_META[row.status].color,
@@ -231,23 +231,23 @@ export default function AdminPostFormatsPage() {
                     >
                       {STATUS_META[row.status].label}
                     </span>
-                    <span className="text-[11px] font-semibold text-neutral-500 tracking-wide">
+                    <span className="text-[12px] font-semibold text-neutral-500 tracking-wide">
                       {row.market}
                     </span>
                     {row.seenCount > 1 && (
                       // 跨月重複出現 = 這個形式沒有消失。被否決過但一直回來的，
                       // 是值得重新考慮的訊號。
-                      <span className="text-[11px] text-neutral-500 tabular-nums">
+                      <span className="text-[12px] text-neutral-500 tabular-nums">
                         掃到 {row.seenCount} 次
                       </span>
                     )}
                     {row.duplicateOf && (
-                      <span className="text-[11px] text-neutral-500">
+                      <span className="text-[12px] text-neutral-500">
                         已有卡：<code className="font-mono">{row.duplicateOf}</code>
                       </span>
                     )}
                     {row.shippedTaskId && (
-                      <span className="text-[11px] text-indigo-700">
+                      <span className="text-[12px] text-indigo-700">
                         已開：<code className="font-mono">{row.shippedTaskId}</code>
                       </span>
                     )}
@@ -292,7 +292,7 @@ export default function AdminPostFormatsPage() {
                     </div>
                   )}
 
-                  <p className="text-[11px] text-neutral-400 mt-3">
+                  <p className="text-[12px] text-neutral-400 mt-3">
                     首次 {fmtDate(row.firstSeenAt)} · 最近 {fmtDate(row.lastSeenAt)}
                   </p>
                   {row.reviewNote && (

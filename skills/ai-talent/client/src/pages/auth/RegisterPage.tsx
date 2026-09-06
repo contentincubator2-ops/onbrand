@@ -183,7 +183,7 @@ export default function RegisterPage() {
               </span>
             </div>
             <div
-              className="inline-block text-[11px] font-bold px-3 py-1.5 rounded-md mb-5"
+              className="inline-block text-[12px] font-bold px-3 py-1.5 rounded-md mb-5"
               style={{ background: C.orangeChip, color: C.orangeDark }}
             >
               {lang === "en" ? "Step 1 complete" : "第 1 步完成"}
@@ -287,7 +287,7 @@ export default function RegisterPage() {
 
           {/* Pill chip */}
           <div
-            className="inline-block text-[11px] font-bold px-3 py-1.5 rounded-md mb-5"
+            className="inline-block text-[12px] font-bold px-3 py-1.5 rounded-md mb-5"
             style={{ background: C.orangeChip, color: C.orangeDark }}
           >
             {lang === "en" ? "AI-Powered Brand Brain" : "AI 驅動的品牌大腦"}
@@ -330,7 +330,7 @@ export default function RegisterPage() {
                 className="p-4 rounded-xl transition hover:-translate-y-0.5"
                 style={{ background: C.white, border: `1.5px solid ${C.ink}` }}
               >
-                <div className="text-[10px] font-black tracking-[0.2em] mb-2" style={{ color: C.orange }}>
+                <div className="text-[12px] font-black tracking-[0.2em] mb-2" style={{ color: C.orange }}>
                   {n}
                 </div>
                 <div className="text-[13.5px] font-bold mb-1 leading-snug" style={{ color: C.ink }}>
@@ -371,7 +371,7 @@ export default function RegisterPage() {
           {/* Hero copy */}
           <div className="mb-5 text-center">
             <div
-              className="inline-block text-[10px] font-bold tracking-[0.2em] uppercase px-3 py-1 rounded-md mb-3"
+              className="inline-block text-[12px] font-bold tracking-[0.2em] uppercase px-3 py-1 rounded-md mb-3"
               style={{ background: C.orangeChip, color: C.orangeDark }}
             >
               {lang === "en" ? "Start free" : "免費開始"}
@@ -544,7 +544,7 @@ export default function RegisterPage() {
             </form>
           </div>
 
-          <p className="text-center text-[11px] mt-6 leading-relaxed" style={{ color: C.muted }}>
+          <p className="text-center text-[12px] mt-6 leading-relaxed" style={{ color: C.muted }}>
             {lang === "en"
               ? "By signing up you agree to our Terms & Privacy. SoWork × OnBrand"
               : "註冊即代表同意《服務條款》與《隱私政策》。SoWork × OnBrand"}

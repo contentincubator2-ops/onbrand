@@ -217,16 +217,16 @@ function StageCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-tiny font-semibold truncate text-default-800">{displayName}</p>
-          <p className="text-[10px] text-default-500 truncate">{displayTitle}</p>
+          <p className="text-[12px] text-default-500 truncate">{displayTitle}</p>
         </div>
         <FontAwesomeIcon icon={slot.icon} className="text-default-400 text-tiny" />
       </div>
-      <div className="flex items-center justify-between text-[10px] mb-1.5">
+      <div className="flex items-center justify-between text-[12px] mb-1.5">
         <span className="font-medium">{statusLabel(stage.status, lang)}</span>
         <span className="tabular-nums opacity-70">{elapsed}</span>
       </div>
       {/* Live "thinking" / status text — animates while running */}
-      <div className={`text-[11px] leading-snug min-h-[2.5rem] ${stage.status === "running" ? "text-default-700" : stage.status === "done" ? "text-success-700" : "text-default-400"}`}>
+      <div className={`text-[12px] leading-snug min-h-[2.5rem] ${stage.status === "running" ? "text-default-700" : stage.status === "done" ? "text-success-700" : "text-default-400"}`}>
         {stage.status === "running" && (
           <span className="inline-block w-1 h-1 rounded-full bg-warning-500 mr-1 animate-pulse" />
         )}
@@ -274,7 +274,7 @@ export function StagePipelineView({
         <p className="text-tiny font-semibold text-default-700">
           {lang === "en" ? `🎼 Multi-agent collab · ${tier}` : `🎼 多 AI 專家協作 · ${tier}`}
         </p>
-        <p className="text-[10px] text-default-500 tabular-nums">
+        <p className="text-[12px] text-default-500 tabular-nums">
           {completedCount} / {visibleSlots.length} {lang === "en" ? "done" : "完成"}
         </p>
       </div>

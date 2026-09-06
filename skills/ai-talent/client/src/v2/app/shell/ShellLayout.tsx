@@ -560,7 +560,7 @@ export default function ShellLayout() {
           <Outlet context={{ brandId, setBrandId, brands, brandsLoaded, scope, setScope, userEmail: currentUserEmail }} />
         </RouteErrorBoundary>
         {/* 2026-05-10 global footer w/ legal links — shows on every authenticated page */}
-        <footer className="mt-12 pt-6 pb-8 border-t border-neutral-200 text-center text-[11px] text-neutral-400 space-x-3">
+        <footer className="mt-12 pt-6 pb-8 border-t border-neutral-200 text-center text-[12px] text-neutral-400 space-x-3">
           <a href="/terms" className="hover:text-neutral-700">{t("footer_terms")}</a>
           <a href="/privacy" className="hover:text-neutral-700">{t("footer_privacy")}</a>
           <a href="/refund" className="hover:text-neutral-700">{t("footer_refund")}</a>
@@ -647,7 +647,7 @@ export default function ShellLayout() {
               background: "#E01E5A",
               border: "2px solid white",
               color: "white",
-              fontSize: 11, fontWeight: 900, lineHeight: "18px",
+              fontSize: 12, fontWeight: 900, lineHeight: "18px",
               fontVariantNumeric: "tabular-nums",
               display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: "0 3px 10px rgba(224, 30, 90, 0.5)",
@@ -909,7 +909,7 @@ function IconBar({
               >
                 <FontAwesomeIcon icon={cur.icon} style={{ fontSize: 15 }} />
                 <span style={{ display: "flex", alignItems: "center", gap: 3, lineHeight: 1 }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.02em" }}>{cur.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.02em" }}>{cur.label}</span>
                   <FontAwesomeIcon
                     icon={faChevronDown}
                     className={modeMenuOpen ? undefined : "sw-chevron"}
@@ -953,7 +953,7 @@ function IconBar({
                   >
                     <FontAwesomeIcon icon={opt.icon} style={{ fontSize: 14, width: 16 }} />
                     <span style={{ flex: 1, fontSize: 13, fontWeight: active ? 800 : 600 }}>{opt.label}</span>
-                    {active && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 11 }} />}
+                    {active && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 12 }} />}
                   </button>
                 );
               })}
@@ -1050,8 +1050,8 @@ function IconBar({
               transition: "left 0.18s, right 0.18s",
               zIndex: 0,
             }} />
-            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.02em", color: isEn ? "#9ca3af" : "#fff", zIndex: 1, width: 22, textAlign: "center", position: "relative" }}>中</span>
-            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.02em", color: isEn ? "#fff" : "#9ca3af", zIndex: 1, width: 22, textAlign: "center", position: "relative" }}>EN</span>
+            <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.02em", color: isEn ? "#9ca3af" : "#fff", zIndex: 1, width: 22, textAlign: "center", position: "relative" }}>中</span>
+            <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.02em", color: isEn ? "#fff" : "#9ca3af", zIndex: 1, width: 22, textAlign: "center", position: "relative" }}>EN</span>
           </button>
         </Tooltip>
 
@@ -1078,7 +1078,7 @@ function IconBar({
             {(notifUnread ?? 0) > 0 && (
               <span style={{
                 position: "absolute", top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 8,
-                background: "#ef4444", color: "#fff", fontSize: 9, fontWeight: 700,
+                background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 700,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 padding: "0 3px", border: "1.5px solid white", pointerEvents: "none",
               }}>{(notifUnread ?? 0) > 9 ? "9+" : String(notifUnread)}</span>
@@ -1262,14 +1262,14 @@ function BrandHierarchyPill({
           ) : activeBrand ? (
             <span>{activeBrand.name.charAt(0).toUpperCase()}</span>
           ) : (
-            <FontAwesomeIcon icon={faPlus} style={{ fontSize: 11 }} />
+            <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} />
           )}
         </span>
         {/* Label */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15 }}>
           {(activeProduct || activeEvent) && (
             <span style={{
-              fontSize: 9, color: "#9ca3af", letterSpacing: "0.3px",
+              fontSize: 12, color: "#9ca3af", letterSpacing: "0.3px",
               maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
               {activeBrand?.name}{activeProduct ? ` › ${activeProduct.name}` : ""}
@@ -1288,7 +1288,7 @@ function BrandHierarchyPill({
         <FontAwesomeIcon
           icon={faChevronDown}
           style={{
-            fontSize: 11,
+            fontSize: 12,
             color: activeBrand ? "#9ca3af" : "#F97316",
             transition: "transform 0.15s",
             transform: open ? "rotate(180deg)" : "none",
@@ -1346,7 +1346,7 @@ function BrandHierarchyPill({
                 <FontAwesomeIcon icon={faPlus} />
                 {isEn ? "Add your first brand" : "新增你的第一個品牌"}
               </button>
-              <p style={{ fontSize: 11, color: "#9ca3af", padding: "8px 4px 0", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12, color: "#9ca3af", padding: "8px 4px 0", lineHeight: 1.5 }}>
                 {isEn
                   ? "Add a brand to unlock all AI marketing tools."
                   : "新增品牌後，所有 AI 行銷工具將解鎖。"}
@@ -1356,7 +1356,7 @@ function BrandHierarchyPill({
 
           {/* BRAND section */}
           {brands.length > 0 && (
-          <p style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>
             {isEn ? "Switch brand" : "切換品牌"}
           </p>
           )}
@@ -1383,14 +1383,14 @@ function BrandHierarchyPill({
                   width: 22, height: 22, borderRadius: 6, flexShrink: 0,
                   background: bColor.bgGradient,
                   color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700, overflow: "hidden",
+                  fontSize: 12, fontWeight: 700, overflow: "hidden",
                 }}>
                   {b.logoUrl ? <img src={b.logoUrl} alt={b.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (b.name?.charAt(0) ?? "?")}
                 </span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: isActive ? 600 : 500, color: "#1f2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {b.name}
                 </span>
-                {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: bColor.bg }} />}
+                {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 12, color: bColor.bg }} />}
               </button>
             );
           })}
@@ -1449,7 +1449,7 @@ function BrandHierarchyPill({
               <span style={{
                 width: 22, height: 22, borderRadius: 6, flexShrink: 0,
                 background: "rgba(124,58,237,0.10)", color: "#7C3AED",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12,
               }}>
                 <FontAwesomeIcon icon={faPlus} />
               </span>
@@ -1474,7 +1474,7 @@ function BrandHierarchyPill({
               onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             >
-              <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", color: opt.accent, fontSize: 10 }}>
+              <span style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", color: opt.accent, fontSize: 12 }}>
                 <FontAwesomeIcon icon={opt.icon} />
               </span>
               <span style={{ fontSize: 12, fontWeight: 500, color: "#6b7280" }}>{opt.label}</span>
@@ -1535,7 +1535,7 @@ function BrainSummaryPanel({
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div style={{ padding: "8px 10px 6px" }}>
       <p style={{
-        fontSize: 9, fontWeight: 700, color: "#525252",
+        fontSize: 12, fontWeight: 700, color: "#525252",
         letterSpacing: "0.22em", textTransform: "uppercase",
         marginBottom: 6,
       }}>{title}</p>
@@ -1577,7 +1577,7 @@ function BrainSummaryPanel({
           }
         />
         {!s?.positioning?.isLocked && (
-          <p style={{ fontSize: 10, color: "#9ca3af", marginTop: 4, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4, lineHeight: 1.5 }}>
             {isEn
               ? "Not locked yet — complete the positioning flow to lock your brand identity."
               : `尚未鎖定 · 完成 ${s?.positioning?.totalSections ?? 10} 步定位後會自動鎖定`}
@@ -1706,20 +1706,20 @@ function BrandSwitcherButton({
           {/* Show brand name when sidebar collapsed (icon-only mode hides text) — keep tiny label below logo */}
           {sidebarCollapsed ? (
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.1 }}>
-              <span style={{ fontSize: 9, color: "#7c3aed", fontWeight: 700, letterSpacing: "0.5px" }}>{isEn ? "BRAND" : "品牌"}</span>
-              <span style={{ fontSize: 11, color: "#1f2937", fontWeight: 600, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 12, color: "#7c3aed", fontWeight: 700, letterSpacing: "0.5px" }}>{isEn ? "BRAND" : "品牌"}</span>
+              <span style={{ fontSize: 12, color: "#1f2937", fontWeight: 600, maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {truncatedName}
               </span>
             </div>
           ) : (
             <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-              <span style={{ fontSize: 10, color: "#7c3aed", fontWeight: 700, display: "block", letterSpacing: "0.5px" }}>{isEn ? "BRAND" : "品牌"}</span>
+              <span style={{ fontSize: 12, color: "#7c3aed", fontWeight: 700, display: "block", letterSpacing: "0.5px" }}>{isEn ? "BRAND" : "品牌"}</span>
               <span style={{ fontSize: 13, color: "#1f2937", fontWeight: 700, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {activeBrand?.name ?? pickBrandLabel}
               </span>
             </div>
           )}
-          <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 10, color: "#9ca3af", transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "none" }} />
+          <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: 12, color: "#9ca3af", transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "none" }} />
         </button>
       </Tooltip>
 
@@ -1739,7 +1739,7 @@ function BrandSwitcherButton({
             padding: 6,
           }}
         >
-          <p style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>{isEn ? "Switch brand" : "切換品牌"}</p>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.5px", padding: "6px 10px 4px", textTransform: "uppercase" }}>{isEn ? "Switch brand" : "切換品牌"}</p>
           {brands.length === 0 && (
             <p style={{ fontSize: 12, color: "#9ca3af", padding: "8px 10px" }}>{isEn ? "No brands yet" : "還沒建立品牌"}</p>
           )}
@@ -1771,7 +1771,7 @@ function BrandSwitcherButton({
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: isActive ? 700 : 500, color: "#1f2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {b.name}
                 </span>
-                {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 11, color: "#7c3aed" }} />}
+                {isActive && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 12, color: "#7c3aed" }} />}
               </button>
             );
           })}
@@ -1857,7 +1857,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
           <span style={{
             width: 30, height: 22, borderRadius: 6,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, fontWeight: 700, letterSpacing: "-0.02em",
+            fontSize: 12, fontWeight: 700, letterSpacing: "-0.02em",
             position: "relative",
             color: active ? "white" : "#7C3AED",
             background: active ? "rgb(249,115,22)" : "rgba(124,58,237,0.10)",
@@ -1943,10 +1943,10 @@ function StarredHeader() {
   const { lang } = useLang();
   return (
     <div style={{ padding: "10px 14px 6px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-      <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
         {lang === "en" ? "Starred items" : "已標記星號的內容"}
       </span>
-      <button style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#A8A29E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 }}>
+      <button style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#A8A29E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>
         <FontAwesomeIcon icon={faPlus} />
       </button>
     </div>
@@ -2097,7 +2097,7 @@ function SlidePanel({
           {/* Starred brands */}
           <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
             {brands.length === 0 && (
-              <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 8px 8px", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12.5, color: "#A8A29E", padding: "4px 8px 8px", lineHeight: 1.5 }}>
                 {isEn ? "Star a brand to pin it here for quick access." : "點擊品牌的星號圖示，即可從這裡快速找到。"}
               </p>
             )}
@@ -2111,8 +2111,8 @@ function SlidePanel({
             {recentMissions.length > 0 && (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 8px 6px" }}>
-                  <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#A8A29E" }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>{isEn ? "Recent designs" : "近期設計"}</span>
+                  <FontAwesomeIcon icon={faClock} style={{ fontSize: 12, color: "#A8A29E" }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>{isEn ? "Recent designs" : "近期設計"}</span>
                 </div>
                 {recentMissions.map((m: any) => (
                   <PanelRow key={m.id}
@@ -2206,7 +2206,7 @@ function SlidePanel({
                 background: "#171717",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <span style={{ color: "white", fontSize: 9, fontWeight: 700 }}>
+                <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>
                   {((activeBrand?.name ?? "B") as string).slice(0,1).toUpperCase()}
                 </span>
               </div>
@@ -2214,7 +2214,7 @@ function SlidePanel({
                 {isEn ? "Brand kit" : "品牌工具組"}
               </span>
               <FontAwesomeIcon icon={faChevronDown} style={{
-                fontSize: 9, color: "#78716C",
+                fontSize: 12, color: "#78716C",
                 transform: brandDropOpen ? "rotate(180deg)" : "rotate(0deg)",
                 transition: "transform 0.2s",
               }} />
@@ -2233,7 +2233,7 @@ function SlidePanel({
                 <div style={{ padding: "8px 10px", borderBottom: "1px solid #F0EFED", position: "relative" }}>
                   <FontAwesomeIcon icon={faMagnifyingGlass} style={{
                     position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)",
-                    color: "#A8A29E", fontSize: 11, pointerEvents: "none",
+                    color: "#A8A29E", fontSize: 12, pointerEvents: "none",
                   }} />
                   <input
                     autoFocus
@@ -2276,14 +2276,14 @@ function SlidePanel({
                             background: "#171717",
                             display: "flex", alignItems: "center", justifyContent: "center",
                           }}>
-                            <span style={{ color: "white", fontSize: 9, fontWeight: 700 }}>
+                            <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>
                               {(b.name?.charAt(0) || "B").toUpperCase()}
                             </span>
                           </div>
                           <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1A1A18", fontWeight: isActive ? 600 : 400 }}>
                             {b.name}
                           </span>
-                          {isActive && <FontAwesomeIcon icon={faCheck} style={{ color: "#6366F1", fontSize: 10 }} />}
+                          {isActive && <FontAwesomeIcon icon={faCheck} style={{ color: "#6366F1", fontSize: 12 }} />}
                         </button>
                       );
                     })}
@@ -2307,7 +2307,7 @@ function SlidePanel({
                       onMouseEnter={e => e.currentTarget.style.background = "#F5F4F2"}
                       onMouseLeave={e => e.currentTarget.style.background = "none"}
                     >
-                      <FontAwesomeIcon icon={icon} style={{ fontSize: 10, width: 11 }} />
+                      <FontAwesomeIcon icon={icon} style={{ fontSize: 12, width: 11 }} />
                       {label}
                     </button>
                   ))}
@@ -2319,7 +2319,7 @@ function SlidePanel({
           {/* 大分類 nav — 品牌定位 / 視覺資產 / 設定 */}
           <nav style={{ flex: 1, overflowY: "auto", padding: "6px 8px 8px" }}>
             <p style={{
-              fontSize: 10, fontWeight: 700, color: "#A8A29E",
+              fontSize: 12, fontWeight: 700, color: "#A8A29E",
               letterSpacing: "0.10em", textTransform: "uppercase",
               padding: "4px 6px 6px", margin: 0,
             }}>{isEn ? "Categories" : "分類"}</p>
@@ -2364,25 +2364,25 @@ function SlidePanel({
           <div style={{ height: 1, background: "#f3f4f6", flexShrink: 0 }} />
           {/* Header showing current tier + brand context */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 14px 6px" }}>
-            <FontAwesomeIcon icon={faClock} style={{ fontSize: 10, color: "#A8A29E" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <FontAwesomeIcon icon={faClock} style={{ fontSize: 12, color: "#A8A29E" }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
               {isEn ? `${effTier} history` : `${effTier} 歷史任務`}
             </span>
           </div>
           {effBrandId == null ? (
-            <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.5 }}>
               {isEn ? `Pick a brand to see its ${effTier} runs.` : `選擇品牌後顯示這個品牌在 ${effTier} 跑過的任務。`}
             </p>
           ) : (
-            <p style={{ fontSize: 11, color: "#A8A29E", padding: "0 14px 6px", lineHeight: 1.4 }}>
+            <p style={{ fontSize: 12, color: "#A8A29E", padding: "0 14px 6px", lineHeight: 1.4 }}>
               {brands.find((b: any) => b.id === effBrandId)?.name ?? runQuery.data?.brand?.name ?? (isEn ? "Current brand" : "目前品牌")} · {effTier}
             </p>
           )}
           <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
             {recentRunsQuery.isLoading ? (
-              <p style={{ fontSize: 11, color: "#A8A29E", padding: "8px 14px", textAlign: "center" }}>{isEn ? "Loading…" : "讀取中…"}</p>
+              <p style={{ fontSize: 12, color: "#A8A29E", padding: "8px 14px", textAlign: "center" }}>{isEn ? "Loading…" : "讀取中…"}</p>
             ) : recentRuns.length === 0 && effBrandId != null ? (
-              <p style={{ fontSize: 11.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.6 }}>
+              <p style={{ fontSize: 12.5, color: "#A8A29E", padding: "4px 14px 8px", lineHeight: 1.6 }}>
                 {isEn ? (
                   <>No {effTier} runs for this brand yet.<br/>Your first one will land here.</>
                 ) : (
@@ -2529,15 +2529,15 @@ function GlobalScopeBar({ scope, setScope, brands }: {
         {segments.length === 0 ? (
           /* No scope selected — invite user to pick */
           <span style={{ padding: "0 14px", fontSize: 12, fontWeight: 500, color: "#9ca3af", display: "flex", alignItems: "center", gap: 6 }}>
-            <FontAwesomeIcon icon={faBuilding} style={{ fontSize: 11 }} />
+            <FontAwesomeIcon icon={faBuilding} style={{ fontSize: 12 }} />
             {isEn ? "Pick a brand" : "選擇品牌"}
-            <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 9, opacity: 0.5, transform: "rotate(90deg)" }} />
+            <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 12, opacity: 0.5, transform: "rotate(90deg)" }} />
           </span>
         ) : (
           segments.map((seg, i) => (
             <React.Fragment key={seg.key}>
               {i > 0 && (
-                <span style={{ fontSize: 10, color: "#d1d5db", padding: "0 2px", userSelect: "none" }}>›</span>
+                <span style={{ fontSize: 12, color: "#d1d5db", padding: "0 2px", userSelect: "none" }}>›</span>
               )}
               <span
                 onClick={(e) => { e.stopPropagation(); setActiveTab(seg.key); setOpen(true); }}
@@ -2556,7 +2556,7 @@ function GlobalScopeBar({ scope, setScope, brands }: {
                 {i === 0 && (
                   <span style={{
                     width: 18, height: 18, borderRadius: 5, background: seg.color,
-                    color: "#fff", fontSize: 9, fontWeight: 800,
+                    color: "#fff", fontSize: 12, fontWeight: 800,
                     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                   }}>
                     {seg.label.slice(0, 1).toUpperCase()}
@@ -2572,7 +2572,7 @@ function GlobalScopeBar({ scope, setScope, brands }: {
         {/* Chevron */}
         <span style={{ padding: "0 10px 0 4px", display: "flex", alignItems: "center" }}>
           <FontAwesomeIcon icon={faChevronRight} style={{
-            fontSize: 9, color: "#9ca3af",
+            fontSize: 12, color: "#9ca3af",
             transform: open ? "rotate(90deg)" : "rotate(90deg)",
             transition: "transform 0.15s",
             ...(open ? { transform: "rotate(-90deg)" } : {}),
@@ -2605,7 +2605,7 @@ function GlobalScopeBar({ scope, setScope, brands }: {
                 transition: "color 0.1s, border-color 0.1s",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
               }}>
-                <FontAwesomeIcon icon={tab.icon} style={{ fontSize: 11 }} />
+                <FontAwesomeIcon icon={tab.icon} style={{ fontSize: 12 }} />
                 {tab.label}
               </button>
             ))}
@@ -2681,7 +2681,7 @@ function TeamSubPanel() {
           }}>{isEn ? "S" : "S的"}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>{isEn ? "SoWork's team" : "SoWork 的團隊"}</p>
-            <p style={{ fontSize: 11, color: "#9ca3af" }}>{isEn ? "Team plan" : "團隊版"}</p>
+            <p style={{ fontSize: 12, color: "#9ca3af" }}>{isEn ? "Team plan" : "團隊版"}</p>
           </div>
           <FontAwesomeIcon icon={faCheck} style={{ color: "#F97316", fontSize: 14 }} />
         </PopupRow>
@@ -2735,7 +2735,7 @@ function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
             background: selectedId === item.id ? color : "#f3f4f6",
             color: selectedId === item.id ? "#fff" : "#6b7280",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, fontWeight: 800, transition: "background 0.15s, color 0.15s",
+            fontSize: 12, fontWeight: 800, transition: "background 0.15s, color 0.15s",
           }}>
             {(item.name ?? "?").slice(0, 1).toUpperCase()}
           </span>
@@ -2744,7 +2744,7 @@ function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
               {item.name}
             </p>
             {item.description && (
-              <p style={{ fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <p style={{ fontSize: 12, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.description}
               </p>
             )}
@@ -2931,7 +2931,7 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
                   </p>
                   <p style={{ fontSize: 12, color: "#9ca3af" }}>{isEn ? "Tap to see plans" : "點此看方案"}</p>
                 </div>
-                <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />
+                <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 12, color: "#9ca3af" }} />
               </PopupRow>
             </div>
             <Divider />
@@ -2949,12 +2949,12 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
                 {item.label}
                 {item.badge && (
                   <span style={{
-                    fontSize: 10, fontWeight: 600, color: "#7c3aed",
+                    fontSize: 12, fontWeight: 600, color: "#7c3aed",
                     background: "#ede9fe", borderRadius: 4, padding: "1px 5px",
                   }}>{item.badge}</span>
                 )}
               </span>
-              {item.arrow && <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 11, color: "#9ca3af" }} />}
+              {item.arrow && <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 12, color: "#9ca3af" }} />}
             </PopupRow>
           ))}
         </div>
@@ -2970,7 +2970,7 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", padding: "4px 8px 2px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+    <p style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af", padding: "4px 8px 2px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
       {children}
     </p>
   );
@@ -3015,7 +3015,7 @@ function AccountSubPanel() {
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 500, color: "#111827" }}>{acc.name}</p>
-              <p style={{ fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc.email}</p>
+              <p style={{ fontSize: 12, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc.email}</p>
             </div>
             {acc.active && <FontAwesomeIcon icon={faCheck} style={{ color: "#F97316", fontSize: 14 }} />}
           </PopupRow>
@@ -3106,7 +3106,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
             onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
             onMouseLeave={e => (e.currentTarget.style.background = "none")}
           >
-            <FontAwesomeIcon icon={faCheckDouble} style={{ fontSize: 11 }} />
+            <FontAwesomeIcon icon={faCheckDouble} style={{ fontSize: 12 }} />
             {isEn ? "Mark all read" : "將全部標示為已讀"}
           </button>
           <button onClick={onClose} style={{
@@ -3161,7 +3161,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
                     padding: "4px 8px", marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   }}>{n.excerpt}</div>
                 )}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#9ca3af" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#9ca3af" }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: isUnread ? "#ef4444" : "#d1d5db", flexShrink: 0 }} />
                   <span>{n.relativeTime}</span>
                 </div>
@@ -3245,7 +3245,7 @@ class RouteErrorBoundary extends React.Component<
       return (
         <div style={{ padding: "32px 24px", maxWidth: 720, margin: "0 auto" }}>
           <div style={{ padding: 20, border: "1px solid #fca5a5", background: "#fef2f2", borderRadius: 12 }}>
-            <p style={{ fontSize: 11, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>頁面載入失敗</p>
+            <p style={{ fontSize: 12, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>頁面載入失敗</p>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 6, color: "#0f172a" }}>
               這個頁面目前無法顯示
             </h2>

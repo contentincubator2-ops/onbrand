@@ -10,7 +10,7 @@
  *   退回修改   → 顯示理由 + 可再送一次
  *   已放行     → 綠色狀態，不再顯示按鈕
  *
- * 字級 13–14px。全站有 368 處 text-[10px]/[11px]，新元件不再往下加。
+ * 字級 13–14px。2026-09-06 已把介面地板抬到 12px；新元件不再往下貼地板。
  */
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";

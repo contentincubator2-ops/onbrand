@@ -226,7 +226,7 @@ export default function ProjectsPage() {
       <div className="relative pt-10 pb-5 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center max-w-[1100px] mx-auto">
           {/* 2026-05-11 (CJ): canonical header template — same as /30s / /60s / /99s. */}
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
             PROJECTS · OUTPUTS
           </p>
           <h1
@@ -344,7 +344,7 @@ export default function ProjectsPage() {
             hint={lang === "en" ? "from the strategy workbench" : "來自策略工作台的甜蜜點"}
           >
             {audienceFacets.length === 0 ? (
-              <span className="text-[11px] text-default-400">
+              <span className="text-[12px] text-default-400">
                 {lang === "en"
                   ? "No tagged runs yet — open a task from a sweet spot in the strategy workbench to tag it."
                   : "尚無標記 — 從策略工作台的甜蜜點點「內容角度」開任務，產出就會記住寫給哪個族群"}
@@ -372,7 +372,7 @@ export default function ProjectsPage() {
           </FacetRow>
           <FacetRow label={lang === "en" ? "Product" : "產品"}>
             {productFacets.length === 0 ? (
-              <span className="text-[11px] text-default-400">
+              <span className="text-[12px] text-default-400">
                 {lang === "en"
                   ? "No product-scoped runs yet — pick a product in the task modal."
                   : "尚無產品範圍的產出 — 在任務視窗選擇產品後，產出就會歸到該產品"}
@@ -563,10 +563,10 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
         )}
         {/* Workspace tag */}
         <span
-          className="absolute top-2 left-2 flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/95 shadow-sm"
+          className="absolute top-2 left-2 flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full bg-white/95 shadow-sm"
           style={{ color: tone }}
         >
-          <FontAwesomeIcon icon={icon} className="text-[9px]" />
+          <FontAwesomeIcon icon={icon} className="text-[12px]" />
           {ws}
         </span>
       </div>
@@ -616,7 +616,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             </button>
           </div>
         )}
-        <div className="flex items-center justify-between text-[11px] text-default-500">
+        <div className="flex items-center justify-between text-[12px] text-default-500">
           <span className="truncate">{mission.brandName ?? (lang === "en" ? "(No brand)" : "（未指定品牌）")}</span>
           <span className="shrink-0">{formatRelative(mission.updatedAt, lang)}</span>
         </div>
@@ -728,10 +728,10 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
 function FacetRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] font-semibold text-default-400 uppercase tracking-wider shrink-0">
+      <span className="text-[12px] font-semibold text-default-400 uppercase tracking-wider shrink-0">
         {label}
       </span>
-      {hint && <span className="text-[11px] text-default-300 shrink-0">{hint}</span>}
+      {hint && <span className="text-[12px] text-default-300 shrink-0">{hint}</span>}
       {children}
     </div>
   );

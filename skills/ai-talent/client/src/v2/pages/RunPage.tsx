@@ -285,7 +285,7 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition"
+        className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-full border transition"
         style={{ borderColor: "#e5d9b6", background: "#fbf6e7", color: "#8a6d1d" }}
         title={en ? "Craft reference" : "工藝依據"}
       >
@@ -296,10 +296,10 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
           className="absolute z-50 mt-1 left-0 rounded-lg border bg-white p-3 shadow-lg"
           style={{ width: 300, borderColor: "#ece7d6" }}
         >
-          <div className="text-[11px] font-bold text-neutral-900 mb-0.5">{caseLabel}</div>
-          <div className="text-[10px] text-neutral-500 mb-2">{awardLabel}</div>
-          <div className="text-[11px] leading-relaxed text-neutral-700">{princLabel}</div>
-          <div className="mt-2 pt-2 border-t text-[9px] text-neutral-400" style={{ borderColor: "#f0eee6" }}>
+          <div className="text-[12px] font-bold text-neutral-900 mb-0.5">{caseLabel}</div>
+          <div className="text-[12px] text-neutral-500 mb-2">{awardLabel}</div>
+          <div className="text-[12px] leading-relaxed text-neutral-700">{princLabel}</div>
+          <div className="mt-2 pt-2 border-t text-[12px] text-neutral-400" style={{ borderColor: "#f0eee6" }}>
             {en
               ? "Transferable craft principle applied — not an award certification or endorsement."
               : "套用可轉移的工藝原則，非得獎認證或案例背書。"}
@@ -2019,7 +2019,7 @@ export default function RunPage() {
         </p>
         {/* DEBUG (2026-05-09): show mockup variant + taskId so we can trace
             which mockup is being chosen. Remove after verification. */}
-        <Chip size="sm" variant="flat" className="font-mono text-[10px]">
+        <Chip size="sm" variant="flat" className="font-mono text-[12px]">
           {effectiveVariant ? `${effectiveVariant.platform}:${effectiveVariant.format}` : "?"} · {data.mission?.taskId ?? "no-task"}
         </Chip>
         {/* 2026-07-17 (CJ): deliverable label, not duration — tier is internal config */}
@@ -2062,7 +2062,7 @@ export default function RunPage() {
         ) : (
         <div className="mb-3 space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-default-500 mr-1">
+            <span className="text-[12px] text-default-500 mr-1">
               {lang === "en" ? "Strategy:" : "策略："}
             </span>
             {planningVariants.map((v, i) => (
@@ -2092,14 +2092,14 @@ export default function RunPage() {
           </div>
           {selectedContentKind === "publicVariants" && publicVariants.length > 1 && (
             <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l-2 border-primary-100">
-              <span className="text-[10px] text-default-400 mr-1">
+              <span className="text-[12px] text-default-400 mr-1">
                 {lang === "en" ? "Posts:" : "貼文："}
               </span>
               {publicVariants.map((v, i) => (
                 <button
                   key={v.id ?? `public-${i}`}
                   onClick={() => selectContent("publicVariants", i)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] transition border ${
+                  className={`px-2.5 py-1 rounded-full text-[12px] transition border ${
                     i === activeIdx
                       ? "bg-primary text-white border-primary"
                       : "bg-white text-default-600 border-default-200 hover:border-primary"
@@ -2122,7 +2122,7 @@ export default function RunPage() {
         const more = variants.length - shown;
         return (
           <div className="flex flex-wrap items-center gap-1.5 mb-3">
-            <span className="text-[10px] text-default-500 mr-1">
+            <span className="text-[12px] text-default-500 mr-1">
               {pool
                 ? (lang === "en" ? "Headlines:" : "標題：")
                 : isSequence
@@ -2624,7 +2624,7 @@ export default function RunPage() {
                 <p className="text-small font-semibold">
                   {lang === "en" ? "No public post to edit yet" : "目前沒有可操作的對外貼文"}
                 </p>
-                <p className="text-[11px] text-default-500 leading-relaxed">
+                <p className="text-[12px] text-default-500 leading-relaxed">
                   {lang === "en"
                     ? "Re-run this task to generate the public post again."
                     : "請重跑此任務，再次產生對外貼文。"}
@@ -2722,7 +2722,7 @@ export default function RunPage() {
               {mode === "chat" && (
                 <>
                   <p className="text-tiny font-semibold">{lang === "en" ? "Tell the AI specialist what to change" : "跟 AI 專家改文案"}</p>
-                  <p className="text-[11px] text-default-500 leading-relaxed">
+                  <p className="text-[12px] text-default-500 leading-relaxed">
                     {lang === "en"
                       ? "Tell the agent how to adjust it — e.g. \"end with a limited-time offer\" or \"too wordy, cut the second paragraph\"."
                       : "告訴 AI 專家你想怎麼調整：例如「結尾改成限時優惠」、「太囉嗦砍第二段」。"}
@@ -2730,7 +2730,7 @@ export default function RunPage() {
                   {chatHistory.length > 0 && (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto bg-default-50 rounded-lg p-2">
                       {chatHistory.slice(-4).map((m, i) => (
-                        <div key={i} className={`text-[11px] leading-relaxed ${m.role==="user" ? "text-default-900" : "text-secondary"}`}>
+                        <div key={i} className={`text-[12px] leading-relaxed ${m.role==="user" ? "text-default-900" : "text-secondary"}`}>
                           <span className="font-semibold mr-1">{m.role==="user" ? (lang === "en" ? "You" : "你") : "AI"}{lang === "en" ? ": " : "："}</span>
                           {m.content.slice(0, 180)}{m.content.length > 180 ? "…" : ""}
                         </div>
@@ -2744,7 +2744,7 @@ export default function RunPage() {
                     minRows={3}
                   />
                   {aiPreview && (
-                    <div className="text-[11px] bg-secondary-50 border border-secondary-200 rounded-lg p-2 space-y-1.5">
+                    <div className="text-[12px] bg-secondary-50 border border-secondary-200 rounded-lg p-2 space-y-1.5">
                       <p className="font-semibold text-secondary-700">{lang === "en" ? "AI rewrite preview" : "AI 改寫預覽"}</p>
                       <p className="whitespace-pre-wrap leading-relaxed text-default-800 max-h-32 overflow-y-auto">{aiPreview.text}</p>
                       <div className="flex gap-1.5 pt-1">
@@ -2806,7 +2806,7 @@ export default function RunPage() {
               {mode === "edit" && (
                 <>
                   <p className="text-tiny font-semibold">{t("run_mode_edit")}</p>
-                  <p className="text-[10px] text-default-500">
+                  <p className="text-[12px] text-default-500">
                     {lang === "en" ? "Edit here — the mockup updates live." : "在這裡改文字，左邊預覽即時更新。"}
                   </p>
                   <Textarea
@@ -2858,7 +2858,7 @@ export default function RunPage() {
                         maxLength={60}
                         className="w-full text-sm border border-warning-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:border-warning-500"
                       />
-                      <p className="text-[10px] text-warning-700 leading-relaxed">
+                      <p className="text-[12px] text-warning-700 leading-relaxed">
                         {lang === "en"
                           ? "AI can't render Chinese cleanly, so the image is generated text-free. Type your real title here — it overlays on the thumbnail and is included in the templated download."
                           : "AI 無法正確畫中文，所以圖片刻意產成無字背景。真正的標題在這裡打 — 會疊在縮圖上，並包含在「帶版型下載」裡。"}
@@ -2868,7 +2868,7 @@ export default function RunPage() {
                   {/* 2026-05-11 (CJ feedback「應該要先給用戶指令」):
                       明確分兩步 — Step 1 寫指令 → Step 2 產圖。
                       底下圖片變成「目前的圖」獨立區塊，不混在 prompt 裡 */}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700">
                     {lang === "en"
                       ? "Step 1: Describe the image you want (or adjust the current prompt)"
                       : "Step 1：先告訴我你想要什麼樣的圖（或調整現有 prompt）"}
@@ -2927,7 +2927,7 @@ export default function RunPage() {
                   {/* 2026-05-12 Phase 1 (CJ「prompt library 整合」):
                       Nano-Banana 175 商業攝影 prompt 範本。先選類別 → 列表
                       → 點 card 套用到 prompt textarea。 */}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
                     {lang === "en"
                       ? "Step 2 (optional): Start from a commercial-photography template"
                       : "Step 2（選填）：用商業攝影範本當起點"}
@@ -3048,7 +3048,7 @@ export default function RunPage() {
                           className="w-full text-left px-3 py-2 hover:bg-default-50 transition"
                         >
                           <p className="text-xs font-medium text-default-800 truncate">{t.title}</p>
-                          <p className="text-[10px] text-default-500 line-clamp-2 mt-0.5">{t.preview}</p>
+                          <p className="text-[12px] text-default-500 line-clamp-2 mt-0.5">{t.preview}</p>
                         </button>
                       ))}
                     </div>
@@ -3070,7 +3070,7 @@ export default function RunPage() {
                           }}
                         />
                         <span className="text-tiny font-semibold">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
-                        <span className="text-[10px] text-default-500">
+                        <span className="text-[12px] text-default-500">
                           {lang === "en"
                             ? "Composites the actual product (Nano Banana; model picker below is ignored)"
                             : "把真實產品原貌合成進場景 — 自動用 Nano Banana 保真模型，下方模型選擇不適用"}
@@ -3091,13 +3091,13 @@ export default function RunPage() {
                             </button>
                           ))}
                           {pickedRunProduct && (
-                            <span className="text-[10px] text-default-600 self-center ml-1 truncate max-w-[160px]">{pickedRunProduct.name}</span>
+                            <span className="text-[12px] text-default-600 self-center ml-1 truncate max-w-[160px]">{pickedRunProduct.name}</span>
                           )}
                         </div>
                       )}
                     </div>
                   )}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
                     {lang === "en"
                       ? "Step 3: Pick a model (each is best for a different style)"
                       : "Step 3：選用哪個模型（不同模型擅長不同風格）"}
@@ -3116,7 +3116,7 @@ export default function RunPage() {
                     ))}
                   </select>
                   {slide?.imageModelId && (
-                    <p className={`text-[10px] ${slide.imageFallbackUsed ? "text-warning-700" : "text-default-500"}`}>
+                    <p className={`text-[12px] ${slide.imageFallbackUsed ? "text-warning-700" : "text-default-500"}`}>
                       {lang === "en" ? "Current image model: " : "目前圖片實際模型："}
                       <span className="font-mono">{slide.imageModelId}</span>
                       {slide.imageFallbackUsed && (
@@ -3128,7 +3128,7 @@ export default function RunPage() {
                       )}
                     </p>
                   )}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
                     {lang === "en"
                       ? "Step 4: Hit the button to make a new image (replaces the current one)"
                       : "Step 4：按下面按鈕，會用你的指令重新產圖（蓋掉目前的圖）"}
@@ -3184,10 +3184,10 @@ export default function RunPage() {
                       : t("run_image_make")}
                   </Button>
                   {!data.brand?.id && (
-                    <p className="text-[10px] text-warning-700">⚠ {lang === "en" ? "This run has no brand — link a brand first" : "此 run 沒有 brand，請先綁品牌再產圖"}</p>
+                    <p className="text-[12px] text-warning-700">⚠ {lang === "en" ? "This run has no brand — link a brand first" : "此 run 沒有 brand，請先綁品牌再產圖"}</p>
                   )}
                   {missingRealProductSelection && (
-                    <p className="text-[10px] text-warning-700">⚠ {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
+                    <p className="text-[12px] text-warning-700">⚠ {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
                   )}
                 </>
               )}
@@ -3197,7 +3197,7 @@ export default function RunPage() {
                   {/* 2026-05-12 (CJ「我要改成只給腳本 — C」):
                       Storyboard mode = 腳本 + 每個 scene 配 Flux 參考圖。
                       用戶可拿這份 brief 自己拍 / 給拍攝團隊。 */}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700">
                     {lang === "en"
                       ? "Step 1: Describe what the video should show (we'll also use this caption as context)"
                       : "第 1 步：寫影片想呈現什麼（會自動帶入這篇的文案當補充）"}
@@ -3216,7 +3216,7 @@ export default function RunPage() {
                       : "可空白 — 留空就用此變體的文案當題目"}
                     autoFocus
                   />
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700">
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700">
                     {lang === "en"
                       ? "Step 2: Pick video length"
                       : "Step 2：選影片長度（決定分鏡數量）"}
@@ -3234,7 +3234,7 @@ export default function RunPage() {
                       >{d}s</button>
                     ))}
                   </div>
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
+                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
                     {lang === "en"
                       ? "Step 3: Generate storyboard (~1 min — script + one reference image per scene)"
                       : "Step 3：生成故事板（約 1 分鐘 — 腳本 + 每個 scene 一張參考圖）"}
@@ -3271,17 +3271,17 @@ export default function RunPage() {
                       : t("run_video_make", { n: videoDuration })}
                   </Button>
                   {videoJobId && (
-                    <div className="bg-default-50 rounded-lg p-2.5 text-[11px] space-y-2 border border-secondary-200 mt-2">
+                    <div className="bg-default-50 rounded-lg p-2.5 text-[12px] space-y-2 border border-secondary-200 mt-2">
                       <p className="font-semibold flex items-center gap-2">
                         {lang === "en" ? `Storyboard #${videoJobId}` : `故事板 #${videoJobId}`}
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        <span className={`text-[12px] px-2 py-0.5 rounded-full ${
                           videoStatus?.status === "completed" ? "bg-success-100 text-success-800" :
                           videoStatus?.status === "failed" ? "bg-danger-100 text-danger-800" :
                           "bg-warning-100 text-warning-800"
                         }`}>{videoStatusLabel}</span>
                       </p>
                       {videoStatus?.status === "failed" && (
-                        <p className="text-[11px] text-danger-700 leading-relaxed">
+                        <p className="text-[12px] text-danger-700 leading-relaxed">
                           {typeof videoStatus?.errorMessage === "string" ? videoStatus.errorMessage : (lang === "en" ? "Unknown error" : "未知錯誤")}
                         </p>
                       )}
@@ -3295,20 +3295,20 @@ export default function RunPage() {
                               {scene.imageUrl ? (
                                 <img src={scene.imageUrl} alt={`scene ${i + 1}`} className="w-full h-auto" />
                               ) : (
-                                <div className="w-full aspect-video bg-default-100 flex items-center justify-center text-[10px] text-default-400">
+                                <div className="w-full aspect-video bg-default-100 flex items-center justify-center text-[12px] text-default-400">
                                   {lang === "en"
                                     ? "(Reference image not generated / failed)"
                                     : "（此 scene 參考圖尚未產出 / 失敗）"}
                                 </div>
                               )}
                               <div className="p-2 space-y-1">
-                                <p className="text-[10px] font-semibold text-secondary-700">
+                                <p className="text-[12px] font-semibold text-secondary-700">
                                   Scene {i + 1} · {typeof scene.durationSec === "number" ? scene.durationSec : (scene.durationSec ?? "?")}s · {typeof scene.cameraMove === "string" ? scene.cameraMove : "static"}
                                 </p>
-                                <p className="text-[11px] text-default-700 leading-snug">
+                                <p className="text-[12px] text-default-700 leading-snug">
                                   <span className="text-default-500">{lang === "en" ? "Visual: " : "畫面："}</span>{typeof scene.visualPrompt === "string" ? scene.visualPrompt : ""}
                                 </p>
-                                <p className="text-[11px] text-default-700 leading-snug">
+                                <p className="text-[12px] text-default-700 leading-snug">
                                   <span className="text-default-500">{lang === "en" ? "Voiceover: " : "旁白："}</span>{typeof scene.narration === "string" ? scene.narration : ""}
                                 </p>
                               </div>
@@ -3364,13 +3364,13 @@ export default function RunPage() {
                       />
                       <span className="flex flex-col leading-tight">
                         <span>{focusedAgName}</span>
-                        {focusedAgTitle && <span className="text-[10px] text-default-400 font-normal">{focusedAgTitle}</span>}
+                        {focusedAgTitle && <span className="text-[12px] text-default-400 font-normal">{focusedAgTitle}</span>}
                       </span>
                     </p>
                     {/* Real orchestra stage timeline */}
                     {stages.length > 0 ? (
                       <div className="space-y-1.5">
-                        <p className="text-[10px] text-default-500 font-medium">{lang === "en" ? `Execution timeline (total ${(totalMs/1000).toFixed(1)}s)` : `執行流程（總耗時 ${(totalMs/1000).toFixed(1)}s）`}</p>
+                        <p className="text-[12px] text-default-500 font-medium">{lang === "en" ? `Execution timeline (total ${(totalMs/1000).toFixed(1)}s)` : `執行流程（總耗時 ${(totalMs/1000).toFixed(1)}s）`}</p>
                         <ol className="space-y-1">
                           {stages.map((s, i) => {
                             const dur = (s.completedAt ?? 0) - (s.startedAt ?? 0);
@@ -3383,11 +3383,11 @@ export default function RunPage() {
                               s.status === "failed" ? "✕" :
                               s.status === "running" ? "◌" : "○";
                             return (
-                              <li key={i} className="flex items-start gap-2 text-[11px] leading-tight py-1 border-b border-default-100 last:border-0">
+                              <li key={i} className="flex items-start gap-2 text-[12px] leading-tight py-1 border-b border-default-100 last:border-0">
                                 <span className={`${statusColor} font-mono text-sm leading-none mt-0.5`}>{dot}</span>
                                 <span className="flex-1 min-w-0">
                                   <span className="block text-default-800">{s.label}</span>
-                                  <span className="block text-[10px] text-default-400 font-mono">
+                                  <span className="block text-[12px] text-default-400 font-mono">
                                     {s.status === "done" && dur > 0 ? `${(dur/1000).toFixed(1)}s` : s.status}
                                   </span>
                                 </span>
@@ -3397,10 +3397,10 @@ export default function RunPage() {
                         </ol>
                       </div>
                     ) : (
-                      <p className="text-[11px] text-default-500 italic">{lang === "en" ? "No stage timeline for this run (older output)" : "這筆紀錄沒有 stage timeline（舊版產出）"}</p>
+                      <p className="text-[12px] text-default-500 italic">{lang === "en" ? "No stage timeline for this run (older output)" : "這筆紀錄沒有 stage timeline（舊版產出）"}</p>
                     )}
                     {/* Per-agent contextual content */}
-                    <div className="bg-default-50 rounded-lg p-2.5 text-[11px] leading-relaxed space-y-1.5 max-h-56 overflow-y-auto">
+                    <div className="bg-default-50 rounded-lg p-2.5 text-[12px] leading-relaxed space-y-1.5 max-h-56 overflow-y-auto">
                       {focusedAgent === "image" ? (
                         <>
                           <p className="font-semibold">{lang === "en" ? "Image brief for this version:" : "本版本配圖指引："}</p>
@@ -3424,18 +3424,18 @@ export default function RunPage() {
                       )}
                     </div>
                     {unavailableUrl ? (
-                      <p className="text-[10px] text-warning-700" title={unavailableUrl}>
+                      <p className="text-[12px] text-warning-700" title={unavailableUrl}>
                         ⚠️ {lang === "en"
                           ? "This link's content could not be fetched (platform restriction). Paste the video caption or describe the topic instead."
                           : "這個連結抓不到內容（平台限制），建議直接貼上影片文案或描述主題。"}
                       </p>
                     ) : fetchedUrl && (
-                      <p className="text-[10px] text-default-500">
+                      <p className="text-[12px] text-default-500">
                         🔗 {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{fetchedUrl}</a>
                       </p>
                     )}
                     {Array.isArray(md.errors) && md.errors.length > 0 && (
-                      <div className="bg-danger-50 border border-danger-200 rounded p-2 text-[10px] text-danger-700">
+                      <div className="bg-danger-50 border border-danger-200 rounded p-2 text-[12px] text-danger-700">
                         ⚠ {md.errors.slice(0, 2).join(" · ")}
                       </div>
                     )}
@@ -3445,7 +3445,7 @@ export default function RunPage() {
               {mode === "regen" && !isStrategyEnvelope && (
                 <>
                   <p className="text-tiny font-semibold">{lang === "en" ? "Rewrite this version" : "重生這段文案"}</p>
-                  <p className="text-[11px] text-default-500 leading-relaxed">
+                  <p className="text-[12px] text-default-500 leading-relaxed">
                     {lang === "en"
                       ? <>Have the same agent write this version again — &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
                       : <>讓同一位 AI 專家重新寫一次當前版本「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
@@ -3463,13 +3463,13 @@ export default function RunPage() {
                       ? (lang === "en" ? "Rewriting…" : "重生中…")
                       : (lang === "en" ? "Rewrite this version" : "立即重生這個版本")}
                   </Button>
-                  <p className="text-[10px] text-default-400">
+                  <p className="text-[12px] text-default-400">
                     {lang === "en"
                       ? <>Will ask {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "the copywriter"} to rewrite version {activeIdx + 1}.</>
                       : <>將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫者"} 重新產出第 {activeIdx + 1} 個版本。</>}
                   </p>
                   {Array.isArray(data.metadata?.archivedVariants) && data.metadata.archivedVariants.length > 0 && (
-                    <p className="text-[10px] text-default-500">
+                    <p className="text-[12px] text-default-500">
                       📚 {lang === "en"
                         ? `Rewritten ${data.metadata.archivedVariants.length} time(s) — history kept`
                         : `已重生 ${data.metadata.archivedVariants.length} 次（歷史保留）`}
@@ -3480,7 +3480,7 @@ export default function RunPage() {
               {mode === "rewrite" && (
                 <>
                   <p className="text-tiny font-semibold">{lang === "en" ? "Have another agent rewrite it" : "換一位 AI 專家重寫"}</p>
-                  <p className="text-[11px] text-default-500 leading-relaxed">
+                  <p className="text-[12px] text-default-500 leading-relaxed">
                     {lang === "en"
                       ? "Pick a specialist below — they rewrite this caption in their own style. Nothing changes until you accept the preview."
                       : "挑一位不同風格的專家，用他的寫法重寫這篇文案。改完先給你預覽，按「採用」才會生效。"}
@@ -3536,14 +3536,14 @@ export default function RunPage() {
                             {a.name}
                             <span className="ml-1.5 font-normal text-default-500">{lang === "en" ? a.titleEn : a.title}</span>
                           </p>
-                          <p className="text-[11px] text-default-500 truncate">{lang === "en" ? a.styleEn : a.style}</p>
+                          <p className="text-[12px] text-default-500 truncate">{lang === "en" ? a.styleEn : a.style}</p>
                         </div>
                         {rewriteBusy === a.name && <Spinner size="sm" color="secondary" />}
                       </button>
                     ))}
                   </div>
                   {rewritePreview && (
-                    <div className="text-[11px] bg-secondary-50 border border-secondary-200 rounded-lg p-2 space-y-1.5">
+                    <div className="text-[12px] bg-secondary-50 border border-secondary-200 rounded-lg p-2 space-y-1.5">
                       <p className="font-semibold text-secondary-700">
                         {lang === "en" ? `Rewritten by ${rewritePreview.agent}` : `${rewritePreview.agent} 的重寫版本`}
                       </p>
@@ -3652,7 +3652,7 @@ export default function RunPage() {
               </Button>
 
               {/* Auto-save note — always true, no action needed */}
-              <div className="text-[10px] text-default-400 text-center px-1 leading-relaxed">
+              <div className="text-[12px] text-default-400 text-center px-1 leading-relaxed">
                 {lang === "en"
                   ? "✓ Auto-saved to Projects — no action needed"
                   : "✓ 任務完成即自動記錄到專案，無需手動儲存"}
@@ -3889,7 +3889,7 @@ function PublishTemplateModal({
     <Modal isOpen={isOpen} onClose={onClose} size="2xl" backdrop="blur">
       <ModalContent>
         <ModalHeader className="flex flex-col items-stretch gap-0 py-2 px-4 border-b border-default-100">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-default-600">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-default-600">
             COMMUNITY · PUBLISH TEMPLATE
           </p>
           <p className="text-[13px] font-medium text-default-800">
@@ -3900,7 +3900,7 @@ function PublishTemplateModal({
         </ModalHeader>
         <ModalBody className="space-y-3 py-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-default-600 mb-1">{lang === "en" ? "Title" : "標題"}</p>
+            <p className="text-[12px] uppercase tracking-[0.18em] text-default-600 mb-1">{lang === "en" ? "Title" : "標題"}</p>
             <Input
               size="sm"
               value={title}
@@ -3912,7 +3912,7 @@ function PublishTemplateModal({
             />
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-default-600 mb-1">
+            <p className="text-[12px] uppercase tracking-[0.18em] text-default-600 mb-1">
               {lang === "en" ? "Description (when to use, why it works)" : "描述（用什麼情境、為什麼好用）"}
             </p>
             <Textarea
@@ -3927,7 +3927,7 @@ function PublishTemplateModal({
             />
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-default-600 mb-1">
+            <p className="text-[12px] uppercase tracking-[0.18em] text-default-600 mb-1">
               {lang === "en"
                 ? "Template content (replace brand-specific words with [variables] so others can plug in)"
                 : "範本內容（你可以把品牌專屬字眼改成 [變數]，讓別人套用）"}
@@ -3943,7 +3943,7 @@ function PublishTemplateModal({
               classNames={{ input: "font-serif" }}
             />
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-default-700">
+          <div className="flex items-center gap-2 text-[12px] text-default-700">
             <span className="font-semibold uppercase tracking-[0.18em] text-default-600">{lang === "en" ? "Visibility:" : "可見："}</span>
             <button
               className="px-2 py-1 rounded border text-xs"
@@ -3968,7 +3968,7 @@ function PublishTemplateModal({
               {lang === "en" ? "Only people with the link" : "只給有連結的人"}
             </button>
           </div>
-          <div className="text-[11px] text-default-600 bg-default-50 border border-default-200 rounded-md p-2 leading-relaxed">
+          <div className="text-[12px] text-default-600 bg-default-50 border border-default-200 rounded-md p-2 leading-relaxed">
             {lang === "en" ? (
               <>⚡ We don't share your brand name / audience / banned words — others get their own brand auto-applied. This template captures your <strong>structure and writing style</strong>, not your content data.</>
             ) : (

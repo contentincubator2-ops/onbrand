@@ -76,14 +76,14 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
       {/* Top rail — eyebrow + counter + 新增 button */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
         <span style={{
-          fontSize: 10, fontWeight: 600, color: "#525252",
+          fontSize: 12, fontWeight: 600, color: "#525252",
           letterSpacing: "0.22em", textTransform: "uppercase",
         }}>
           {en ? "BRAND KNOWLEDGE" : "品牌知識庫"}
         </span>
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         <span style={{
-          fontSize: 10, fontWeight: 500, color: "#525252",
+          fontSize: 12, fontWeight: 500, color: "#525252",
           letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
         }}>
           {items.length} / 50 · {totalChars.toLocaleString()} / 400,000
@@ -121,10 +121,10 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         background: "#FAFAF9", border: "1px solid #D4D4D4", borderRadius: 8,
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <span style={{ fontSize: 10.5, color: "#525252", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 12.5, color: "#525252", letterSpacing: "0.1em", textTransform: "uppercase" }}>
             {en ? `Capacity · ${charPct}%` : `容量使用率 · ${charPct}%`}
           </span>
-          <span style={{ fontSize: 10, color: "#525252" }}>{en ? "Cap: 50 entries × 8,000 chars each" : "上限：50 條 × 每條 8,000 字"}</span>
+          <span style={{ fontSize: 12, color: "#525252" }}>{en ? "Cap: 50 entries × 8,000 chars each" : "上限：50 條 × 每條 8,000 字"}</span>
         </div>
         <div style={{ height: 3, background: "#D4D4D4", borderRadius: 2, overflow: "hidden" }}>
           <div style={{
@@ -143,7 +143,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
           background: "#FFFFFF", border: "1px solid #171717", borderRadius: 10,
         }}>
           <p style={{
-            fontSize: 10, fontWeight: 600, color: "#525252",
+            fontSize: 12, fontWeight: 600, color: "#525252",
             letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 12,
           }}>
             {en ? "New Entry" : "新條目"}
@@ -296,7 +296,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 )}
                 <div style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
-                  fontSize: 9.5, color: "#525252",
+                  fontSize: 12.5, color: "#525252",
                   letterSpacing: "0.12em", textTransform: "uppercase",
                   borderTop: "1px solid #D4D4D4", paddingTop: 8,
                 }}>

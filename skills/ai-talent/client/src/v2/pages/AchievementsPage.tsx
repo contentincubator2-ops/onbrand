@@ -102,7 +102,7 @@ export default function AchievementsPage() {
 
         {/* 2026-05-11 (CJ): canonical header template — same as /30s · /60s · /99s. */}
         <div className="text-center mb-8">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
             ACHIEVEMENTS · ROUTES
           </p>
           <h1
@@ -293,19 +293,19 @@ export default function AchievementsPage() {
                           {typeof a.description === "string" ? a.description : String(a.description ?? "")}
                         </p>
                         <div className="flex items-center justify-between">
-                          <span className={`text-[10px] font-mono ${a.unlocked ? "text-neutral-700" : "text-neutral-400"}`}>
+                          <span className={`text-[12px] font-mono ${a.unlocked ? "text-neutral-700" : "text-neutral-400"}`}>
                             {lang === "en" ? `${a.points} pts` : `${a.points} 點`}
                           </span>
                           {!a.unlocked && a.ctaPath && (
                             <Link
                               to={a.ctaPath}
-                              className="text-[11px] text-neutral-900 hover:underline font-medium"
+                              className="text-[12px] text-neutral-900 hover:underline font-medium"
                             >
                               {(typeof a.ctaText === "string" ? a.ctaText : null) ?? (lang === "en" ? "Go" : "前往")} →
                             </Link>
                           )}
                           {a.unlocked && (
-                            <span className="text-[10px] text-neutral-500">
+                            <span className="text-[12px] text-neutral-500">
                               {a.unlockedAt ? new Date(a.unlockedAt).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW") : ""}
                             </span>
                           )}

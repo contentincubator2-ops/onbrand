@@ -315,7 +315,7 @@ export default function LandingPage() {
                   }}
                 >
                   <div
-                    className="text-[10px] font-black tracking-[0.2em] mb-2"
+                    className="text-[12px] font-black tracking-[0.2em] mb-2"
                     style={{ color: C.orange }}
                   >
                     {n}
@@ -369,7 +369,7 @@ export default function LandingPage() {
               >
                 {num}
               </div>
-              <div className="text-[11px] lg:text-[12px] opacity-70 leading-tight max-w-[80px]">
+              <div className="text-[12px] lg:text-[12px] opacity-70 leading-tight max-w-[80px]">
                 {label}
               </div>
             </div>
@@ -462,7 +462,7 @@ export default function LandingPage() {
           </div>
 
           {/* Operator / parent */}
-          <div className="text-[11px] opacity-60 leading-relaxed">
+          <div className="text-[12px] opacity-60 leading-relaxed">
             {en ? (
               <>
                 Operated by SoWork 摘星社群行銷顧問股份有限公司 · Service area: Taiwan
@@ -598,7 +598,7 @@ function FAQSection({ en }: { en: boolean }) {
         {/* Pill chip */}
         <div className="text-center mb-3">
           <span
-            className="inline-block text-[11px] font-bold px-3 py-1.5 rounded-md"
+            className="inline-block text-[12px] font-bold px-3 py-1.5 rounded-md"
             style={{ background: "#FDE6D8", color: "#C84516" }}
           >
             FAQ

@@ -78,7 +78,7 @@ export default function FestivalGlobalNudge() {
             // tasks are platform-first now.
             navigate(`/tasks/fb?topic=${encodeURIComponent(topic)}`);
           }}
-          className="px-3 py-1 rounded text-[11px] font-semibold whitespace-nowrap"
+          className="px-3 py-1 rounded text-[12px] font-semibold whitespace-nowrap"
           style={{ background: "#171717", color: "white" }}
         >
           {lang === "en" ? "Prep it for me →" : "幫我準備 →"}

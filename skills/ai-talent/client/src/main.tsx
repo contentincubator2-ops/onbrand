@@ -159,7 +159,7 @@ class AppErrorBoundary extends React.Component<
           <pre style={{ fontSize: 12, color: "#5c0011", whiteSpace: "pre-wrap", marginBottom: 16 }}>
             {this.state.error.message}
           </pre>
-          <pre style={{ fontSize: 11, color: "#820014", whiteSpace: "pre-wrap", opacity: 0.7 }}>
+          <pre style={{ fontSize: 12, color: "#820014", whiteSpace: "pre-wrap", opacity: 0.7 }}>
             {this.state.error.stack}
           </pre>
           <button

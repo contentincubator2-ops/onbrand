@@ -352,7 +352,7 @@ export default function StrategyConsultantPage() {
                   ? "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
                   : "bg-gray-100 text-gray-400 dark:bg-neutral-800 dark:text-neutral-600",
             ].join(" ")}>
-              {step > s ? <FontAwesomeIcon icon={faCheck} className="text-[10px]" /> : s}
+              {step > s ? <FontAwesomeIcon icon={faCheck} className="text-[12px]" /> : s}
             </div>
           ))}
         </div>
@@ -368,7 +368,7 @@ export default function StrategyConsultantPage() {
             onClick={reset}
             className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300 transition-colors flex items-center gap-1 shrink-0"
           >
-            <FontAwesomeIcon icon={faRotateRight} className="text-[10px]" /> {lang === "en" ? "Start over" : "重新開始"}
+            <FontAwesomeIcon icon={faRotateRight} className="text-[12px]" /> {lang === "en" ? "Start over" : "重新開始"}
           </button>
         )}
       </div>
@@ -408,7 +408,7 @@ export default function StrategyConsultantPage() {
                   {s.description}
                 </p>
                 <div className="mt-3 flex items-center gap-1 text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-medium">
-                  {lang === "en" ? "Pick" : "選擇"} <FontAwesomeIcon icon={faArrowRight} className="text-[10px]" />
+                  {lang === "en" ? "Pick" : "選擇"} <FontAwesomeIcon icon={faArrowRight} className="text-[12px]" />
                 </div>
               </button>
             ))}
@@ -496,7 +496,7 @@ export default function StrategyConsultantPage() {
                     {a.title}
                   </p>
                   {a.specialty && (
-                    <p className="text-[10px] text-gray-400 dark:text-neutral-600 line-clamp-2">
+                    <p className="text-[12px] text-gray-400 dark:text-neutral-600 line-clamp-2">
                       {a.specialty.split(",").slice(0, 3).join(" · ")}
                     </p>
                   )}
@@ -652,7 +652,7 @@ export default function StrategyConsultantPage() {
                   {!chatMut.isPending && <FontAwesomeIcon icon={faPaperPlane} />}
                 </Button>
               </div>
-              <p className="text-[10px] text-gray-400 dark:text-neutral-600 mt-1.5 px-1">
+              <p className="text-[12px] text-gray-400 dark:text-neutral-600 mt-1.5 px-1">
                 {lang === "en" ? "Enter to send · Shift+Enter for newline · your consultant remembers the full thread" : "Enter 送出 · Shift+Enter 換行 · 顧問記得完整對話歷史"}
               </p>
             </div>

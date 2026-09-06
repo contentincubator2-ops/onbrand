@@ -61,7 +61,7 @@ export function BrandActionChipsRow({
     <div className="flex items-center gap-1.5">
       <button
         onClick={onToggle}
-        className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full transition"
+        className="flex items-center gap-1 text-[12px] font-medium px-2.5 py-1 rounded-full transition"
         style={{
           background: expanded ? "#4338CA" : "#EEF2FF",
           color:      expanded ? "#fff"    : "#4338CA",
@@ -75,7 +75,7 @@ export function BrandActionChipsRow({
       </button>
       <button
         onClick={handleLock}
-        className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition text-white"
+        className="flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1 rounded-full transition text-white"
         style={{ background: status === "full" ? "#10B981" : "#9CA3AF" }}
         disabled={!brandId || status !== "full"}
         title={status !== "full"
@@ -132,7 +132,7 @@ export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | n
                 <span className="text-default-700 font-medium">{lang === "en" ? "6-scenario test results" : "6 情境試寫結果"}</span>
                 {meta && (
                   <span
-                    className="px-2 py-0.5 rounded-full text-[10px]"
+                    className="px-2 py-0.5 rounded-full text-[12px]"
                     style={{
                       background: meta.hasRealContent ? "#D1FAE5" : "#FEF3C7",
                       color:      meta.hasRealContent ? "#047857" : "#92400E",
@@ -185,11 +185,11 @@ export function BrandTestPanel({ brandId, open, onClose }: { brandId: number | n
               <div key={s.id} className="rounded-lg border border-default-100 bg-default-50/60" style={{ padding: 10, minHeight: 130 }}>
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <span style={{ fontSize: 13 }}>{s.icon}</span>
-                  <span className="text-[11px] font-medium text-default-600">{s.label}</span>
+                  <span className="text-[12px] font-medium text-default-600">{s.label}</span>
                 </div>
                 {s.ok
                   ? <p className="text-[12px] text-default-800 whitespace-pre-wrap leading-relaxed">{s.caption}</p>
-                  : <p className="text-[11px] text-danger italic">{s.error || (lang === "en" ? "Generation failed" : "產生失敗")}</p>}
+                  : <p className="text-[12px] text-danger italic">{s.error || (lang === "en" ? "Generation failed" : "產生失敗")}</p>}
               </div>
             ))}
           </div>

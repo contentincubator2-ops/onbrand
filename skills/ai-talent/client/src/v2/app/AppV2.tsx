@@ -204,7 +204,7 @@ class AppErrorBoundary extends React.Component<
             {/* 2026-05-29 (security): hide raw stack trace in production — leaks file
                 paths and internal class names. Dev mode still shows it for debugging. */}
             {import.meta.env.DEV && (
-              <pre style={{ marginTop: 12, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap" }}>
+              <pre style={{ marginTop: 12, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap" }}>
                 {this.state.error.stack}
               </pre>
             )}

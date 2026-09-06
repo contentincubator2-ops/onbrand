@@ -156,7 +156,7 @@ export default function PricingPage() {
       <div className="max-w-6xl mx-auto px-6 pt-14 pb-12">
         {/* Header */}
         <div className="text-center mb-10">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
             PRICING · CHOOSE YOUR SCALE
           </p>
           <h1
@@ -218,7 +218,7 @@ export default function PricingPage() {
             >
               {tier.highlightLabel && (
                 <span
-                  className="absolute -top-3 left-6 text-[10px] font-bold uppercase tracking-[0.18em] px-2 py-0.5 rounded-md"
+                  className="absolute -top-3 left-6 text-[12px] font-bold uppercase tracking-[0.18em] px-2 py-0.5 rounded-md"
                   style={{
                     background: tier.highlight
                       ? "#171717"
@@ -230,7 +230,7 @@ export default function PricingPage() {
                 </span>
               )}
               <div className="mb-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-600">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-neutral-600">
                   {tier.name}
                 </p>
                 <p className="text-xs text-neutral-700 mt-0.5">{tier.sub}</p>
@@ -258,7 +258,7 @@ export default function PricingPage() {
                   : (isEn ? "Cancel anytime" : "隨時取消")}
               </p>
               {currency === "TWD" && (
-                <p className="text-[11px] text-neutral-500 mt-1">
+                <p className="text-[12px] text-neutral-500 mt-1">
                   {isEn
                     ? "Fixed NTD pricing — no exchange rate fluctuation"
                     : "固定台幣定價，不受匯率影響"}
@@ -325,7 +325,7 @@ export default function PricingPage() {
         {/* Agency / Enterprise */}
         <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3 max-w-3xl mx-auto">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">
               AGENCY · CUSTOM
             </p>
             <p className="text-base font-semibold text-neutral-900">{isEn ? "Agency / Enterprise" : "Agency / 企業版"}</p>

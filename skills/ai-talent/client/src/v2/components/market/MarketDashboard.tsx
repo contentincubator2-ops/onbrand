@@ -32,7 +32,7 @@ const card: React.CSSProperties = {
   padding: "18px 20px", marginBottom: 16,
 };
 const th: React.CSSProperties = {
-  textAlign: "left", fontSize: 10, color: C.sub, letterSpacing: ".06em",
+  textAlign: "left", fontSize: 12, color: C.sub, letterSpacing: ".06em",
   fontWeight: 800, padding: "0 8px 8px", borderBottom: `1px solid ${C.border}`,
 };
 const td: React.CSSProperties = { padding: "9px 8px", borderBottom: "1px solid #f6f7f9", fontSize: 12 };
@@ -42,7 +42,7 @@ function Card({ title, sub, children }: { title: string; sub?: string; children:
   return (
     <div style={card}>
       <h3 style={{ fontSize: 13, margin: 0, fontWeight: 800 }}>{title}</h3>
-      <div style={{ fontSize: 11, color: C.sub, marginTop: 3, marginBottom: 16 }}>{sub ?? ""}</div>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 3, marginBottom: 16 }}>{sub ?? ""}</div>
       {children}
     </div>
   );
@@ -50,9 +50,9 @@ function Card({ title, sub, children }: { title: string; sub?: string; children:
 function Kpi({ k, v, d }: { k: string; v: string; d?: React.ReactNode }) {
   return (
     <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px" }}>
-      <div style={{ fontSize: 10, color: C.sub, letterSpacing: ".06em", fontWeight: 800 }}>{k}</div>
+      <div style={{ fontSize: 12, color: C.sub, letterSpacing: ".06em", fontWeight: 800 }}>{k}</div>
       <div style={{ fontSize: 19, fontWeight: 850, marginTop: 5, letterSpacing: "-.02em" }}>{v}</div>
-      <div style={{ marginTop: 3, fontSize: 11 }}>{d ?? <span style={{ color: C.sub }}>—</span>}</div>
+      <div style={{ marginTop: 3, fontSize: 12 }}>{d ?? <span style={{ color: C.sub }}>—</span>}</div>
     </div>
   );
 }
@@ -83,7 +83,7 @@ function Select({ label, value, onChange, options }: {
 }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span style={{ fontSize: 10, fontWeight: 800, color: C.sub, letterSpacing: ".06em" }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 800, color: C.sub, letterSpacing: ".06em" }}>{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}
         style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 9px",
                  fontSize: 12, background: "#fff", minWidth: 124, cursor: "pointer" }}>
@@ -111,7 +111,7 @@ function Bar({ lens, setLens }: { lens: MLens; setLens: (l: MLens) => void }) {
                 style={{ border: `1px solid ${C.border}`, background: "#fff", borderRadius: 8,
                          padding: "7px 11px", fontSize: 12, cursor: "pointer", color: C.mute }}>清除視角</button>
       )}
-      <div style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.bad,
+      <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: C.bad,
                     background: C.badBg, border: "1px solid #FECACA", borderRadius: 6, padding: "5px 9px" }}>⚠ 模擬資料</div>
     </div>
   );
@@ -130,7 +130,7 @@ function BrandTopicGrid({ onPick }: { onPick: (b: string, t: string) => void }) 
           {BRANDS.map((b) => (
             <tr key={b.id}>
               <td style={{ ...td, fontWeight: b.own ? 850 : 600, color: b.own ? C.text : C.mute }}>
-                {b.label}{b.own && <span style={{ fontSize: 9, marginLeft: 5, color: C.sub }}>本品牌</span>}
+                {b.label}{b.own && <span style={{ fontSize: 12, marginLeft: 5, color: C.sub }}>本品牌</span>}
               </td>
               {TOPICS.map((t) => {
                 const tot = mAggregate({ brand: b.id, topic: t.id });
@@ -149,7 +149,7 @@ function BrandTopicGrid({ onPick }: { onPick: (b: string, t: string) => void }) 
                             style={{ width: "100%", border: "none", borderRadius: 7, padding: "9px 4px",
                                      background: bg, color: mag > 0.55 ? "#fff" : C.text, cursor: "pointer", lineHeight: 1.25 }}>
                       <div style={{ fontSize: 13, fontWeight: 850, fontVariantNumeric: "tabular-nums" }}>{fmtSigned(ns)}</div>
-                      <div style={{ fontSize: 9, opacity: .75 }}>{fmtInt(tot.mentions)} 則</div>
+                      <div style={{ fontSize: 12, opacity: .75 }}>{fmtInt(tot.mentions)} 則</div>
                     </button>
                   </td>
                 );
@@ -275,7 +275,7 @@ function Keywords() {
             <td style={tdR}>{k.diff}</td>
             <td style={tdR}>${k.cpc.toFixed(1)}</td>
             <td style={{ ...td, textAlign: "center" }}>
-              <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 20,
+              <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 7px", borderRadius: 20,
                 background: k.intent === "high" ? C.goodBg : k.intent === "mid" ? "#f3f4f6" : C.badBg,
                 color: k.intent === "high" ? C.good : k.intent === "mid" ? C.mute : C.bad }}>
                 {k.intent === "high" ? "高" : k.intent === "mid" ? "中" : "低"}
@@ -327,7 +327,7 @@ function Geo() {
             <tr key={g.q}>
               <td style={{ ...td, fontWeight: 600 }}>{g.q}</td>
               <td style={{ ...td, textAlign: "center" }}>
-                <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 20,
+                <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 8px", borderRadius: 20,
                   background: g.hit ? C.goodBg : C.badBg, color: g.hit ? C.good : C.bad }}>{g.hit ? "命中" : "未命中"}</span>
               </td>
               <td style={{ ...td, color: C.mute }}>{g.note}</td>
@@ -365,7 +365,7 @@ function Opportunity() {
             <td style={{ ...td, color: C.mute }}>{r.why}</td>
             <td style={{ ...td, textAlign: "center" }}>{r.eff}</td>
             <td style={{ ...td, textAlign: "center" }}>
-              <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 20,
+              <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 7px", borderRadius: 20,
                 background: r.val === "高" ? C.goodBg : r.val === "避免" ? C.badBg : "#f3f4f6",
                 color: r.val === "高" ? C.good : r.val === "避免" ? C.bad : C.mute }}>{r.val}</span>
             </td>
@@ -434,7 +434,7 @@ function VerifyBadge({ v }: { v: VerifyState }) {
     unverified: { bg: C.badBg,  fg: C.bad, icon: "✕" },
   }[v];
   return (
-    <span style={{ background: m.bg, color: m.fg, fontSize: 10, fontWeight: 800,
+    <span style={{ background: m.bg, color: m.fg, fontSize: 12, fontWeight: 800,
                    padding: "3px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>
       {m.icon} {VERIFY_LABEL[v]}
     </span>
@@ -449,7 +449,7 @@ function ModelChips({ ids }: { ids: string[] }) {
         return (
           <span key={m.id} title={m.label}
             style={{
-              width: 20, height: 20, borderRadius: 6, fontSize: 9, fontWeight: 850,
+              width: 20, height: 20, borderRadius: 6, fontSize: 12, fontWeight: 850,
               display: "inline-flex", alignItems: "center", justifyContent: "center",
               background: on ? C.text : "#f3f4f6", color: on ? "#fff" : "#d1d5db",
             }}>{m.short}</span>
@@ -478,12 +478,12 @@ function AiObservation({ sourceId }: { sourceId: string }) {
       <div style={{ ...card, padding: "14px 16px", display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <Select label="觀測範圍" value={scope} onChange={setScope}
                 options={SCOPES.map((s) => ({ id: s.id, label: s.label }))} />
-        <div style={{ fontSize: 11, color: C.sub, paddingBottom: 8 }}>{sc.note}</div>
+        <div style={{ fontSize: 12, color: C.sub, paddingBottom: 8 }}>{sc.note}</div>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, paddingBottom: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={onlyVerified} onChange={(e) => setOnlyVerified(e.target.checked)} />
           只看已核實
         </label>
-        <div style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.bad,
+        <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: C.bad,
                       background: C.badBg, border: "1px solid #FECACA", borderRadius: 6, padding: "5px 9px" }}>⚠ 模擬資料</div>
       </div>
 
@@ -502,10 +502,10 @@ function AiObservation({ sourceId }: { sourceId: string }) {
         {items.map((f) => (
           <div key={f.id} style={{ borderTop: `1px solid ${C.border}`, padding: "14px 0" }}>
             <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 800, background: "#f3f4f6", color: C.mute,
+              <span style={{ fontSize: 12, fontWeight: 800, background: "#f3f4f6", color: C.mute,
                              padding: "3px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>{f.topic}</span>
               <VerifyBadge v={f.verify} />
-              <span style={{ fontSize: 10, color: C.sub, fontWeight: 700 }}>
+              <span style={{ fontSize: 12, color: C.sub, fontWeight: 700 }}>
                 強度 {f.strength === "high" ? "高" : f.strength === "mid" ? "中" : "低"}
               </span>
               <div style={{ marginLeft: "auto" }}>
@@ -513,7 +513,7 @@ function AiObservation({ sourceId }: { sourceId: string }) {
               </div>
             </div>
             <div style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 6 }}>{f.claim}</div>
-            <div style={{ fontSize: 11, color: C.mute }}>
+            <div style={{ fontSize: 12, color: C.mute }}>
               {f.models.length}/{AI_MODELS.length} 個模型提到
               {f.brands.length > 0 && <> · 涉及 {f.brands.join("、")}</>}
               {f.sourceNote && <> · {f.sourceNote}</>}
@@ -558,11 +558,11 @@ function GeoMultiModel() {
                                         color: c.sentiment === "pos" ? C.good : C.mute,
                                         borderRadius: 7, padding: "7px 4px", lineHeight: 1.3 }}>
                             <div style={{ fontSize: 13, fontWeight: 850 }}>#{c.rank}</div>
-                            <div style={{ fontSize: 9 }}>{c.cited ?? "—"}</div>
+                            <div style={{ fontSize: 12 }}>{c.cited ?? "—"}</div>
                           </div>
                         ) : (
                           <div style={{ background: C.badBg, color: C.bad, borderRadius: 7,
-                                        padding: "7px 4px", fontSize: 11, fontWeight: 800 }}>未提及</div>
+                                        padding: "7px 4px", fontSize: 12, fontWeight: 800 }}>未提及</div>
                         )}
                       </td>
                     );
@@ -637,7 +637,7 @@ export default function MarketDashboard({ sourceId }: { sourceId: string }) {
                 cursor: "pointer", textAlign: "left", lineHeight: 1.3,
               }}>
               <div style={{ fontSize: 12, fontWeight: 800 }}>{m.label}</div>
-              <div style={{ fontSize: 10, opacity: on ? .8 : .7 }}>{m.note}</div>
+              <div style={{ fontSize: 12, opacity: on ? .8 : .7 }}>{m.note}</div>
             </button>
           );
         })}

@@ -87,11 +87,11 @@ export default function TestSandboxModal({
                   <span>試寫結果</span>
                   {meta && (
                     <>
-                      <span className="ml-auto px-2 py-0.5 rounded-full text-[10px]"
+                      <span className="ml-auto px-2 py-0.5 rounded-full text-[12px]"
                         style={{ background: meta.positioning ? "#D1FAE5" : "#FEF3C7", color: meta.positioning ? "#047857" : "#92400E" }}>
                         {meta.positioning ? "已套用品牌定位" : "未套用定位"}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px]"
+                      <span className="px-2 py-0.5 rounded-full text-[12px]"
                         style={{ background: meta.knowledge ? "#D1FAE5" : "#F3F4F6", color: meta.knowledge ? "#047857" : "#6B7280" }}>
                         {meta.knowledge ? "已套用知識庫" : "無知識庫"}
                       </span>

@@ -95,7 +95,7 @@ export default function AdminErrorsPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-2">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-2">
             ADMIN · ERROR TRACKING
           </p>
           <h1
@@ -175,7 +175,7 @@ export default function AdminErrorsPage() {
                     className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-neutral-50"
                   >
                     <span
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider"
+                      className="text-[12px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider"
                       style={{
                         background: g.latest.level === "error" ? "#FEE2E2" : g.latest.level === "warn" ? "#FEF3C7" : "#E5E7EB",
                         color: g.latest.level === "error" ? "#B91C1C" : g.latest.level === "warn" ? "#92400E" : "#374151",
@@ -187,7 +187,7 @@ export default function AdminErrorsPage() {
                       <p className="text-sm font-medium text-neutral-900 truncate">
                         {g.latest.message}
                       </p>
-                      <p className="text-[11px] text-neutral-600 mt-0.5 truncate">
+                      <p className="text-[12px] text-neutral-600 mt-0.5 truncate">
                         <span className="font-mono">{g.latest.source}</span>
                         {g.latest.route && <span className="ml-2 text-neutral-500">· {g.latest.route}</span>}
                         <span className="ml-2 text-neutral-500">· 最後：{fmtTime(g.latest.createdAt)}</span>
@@ -224,7 +224,7 @@ export default function AdminErrorsPage() {
                       {g.rows.map((r) => (
                         <div key={r.id} className="px-4 py-3 border-b border-neutral-300 last:border-b-0">
                           <div className="flex items-start justify-between gap-3 mb-1.5">
-                            <div className="text-[11px] text-neutral-600 font-mono">
+                            <div className="text-[12px] text-neutral-600 font-mono">
                               #{r.id} · {fmtTime(r.createdAt)}
                               {r.userId && <span className="ml-2">user #{r.userId}</span>}
                               {r.resolvedAt && (
@@ -234,7 +234,7 @@ export default function AdminErrorsPage() {
                             {!r.resolvedAt && (
                               <button
                                 onClick={() => markResolvedM?.mutateAsync?.({ id: r.id })}
-                                className="text-[11px] text-neutral-600 hover:text-neutral-900 px-2 py-0.5 rounded hover:bg-neutral-200"
+                                className="text-[12px] text-neutral-600 hover:text-neutral-900 px-2 py-0.5 rounded hover:bg-neutral-200"
                               >
                                 標記此筆已處理
                               </button>
@@ -242,14 +242,14 @@ export default function AdminErrorsPage() {
                           </div>
                           {r.stack && (
                             <pre
-                              className="text-[11px] text-neutral-800 bg-white border border-neutral-300 rounded p-2 overflow-x-auto whitespace-pre-wrap mb-1.5"
+                              className="text-[12px] text-neutral-800 bg-white border border-neutral-300 rounded p-2 overflow-x-auto whitespace-pre-wrap mb-1.5"
                               style={{ maxHeight: 220 }}
                             >
                               {r.stack}
                             </pre>
                           )}
                           {r.meta && (
-                            <pre className="text-[11px] text-neutral-600 font-mono break-all bg-white border border-neutral-300 rounded p-2 overflow-x-auto">
+                            <pre className="text-[12px] text-neutral-600 font-mono break-all bg-white border border-neutral-300 rounded p-2 overflow-x-auto">
                               {JSON.stringify(r.meta, null, 2)}
                             </pre>
                           )}
@@ -270,7 +270,7 @@ export default function AdminErrorsPage() {
 function StatCell({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
     <div>
-      <p className="text-[9px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">{label}</p>
+      <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">{label}</p>
       <p className="text-2xl font-bold tabular-nums" style={{ color: accent }}>{value}</p>
     </div>
   );

@@ -59,7 +59,7 @@ function ProgressBar({ current, total, en }: { current: number; total: number; e
     <div>
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-medium text-default-600">{en ? "Training…" : "訓練中…"} {stepLabel}</span>
-        <span className="text-[11px] text-default-400">{current}/{total}</span>
+        <span className="text-[12px] text-default-400">{current}/{total}</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-default-100 overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: "#C2410C" }} />
@@ -102,8 +102,8 @@ function renderRowInput(
           </button>
         </div>
       ))}
-      <button onClick={addRow} className="text-[11px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1">
-        <FontAwesomeIcon icon={faPlus} style={{ fontSize: 9 }} /> {en ? "Add another" : "再加一個"}
+      <button onClick={addRow} className="text-[12px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1">
+        <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} /> {en ? "Add another" : "再加一個"}
       </button>
     </div>
   );
@@ -174,7 +174,7 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
         <div>
           <label className="text-xs font-semibold text-default-700 mb-1.5 block">
             {en ? "Video links" : "影音連結"}
-            <span className="ml-1 text-[10px] font-normal text-default-400">{en ? "(YouTube transcript only)" : "（目前僅支援 YouTube 逐字稿）"}</span>
+            <span className="ml-1 text-[12px] font-normal text-default-400">{en ? "(YouTube transcript only)" : "（目前僅支援 YouTube 逐字稿）"}</span>
           </label>
           {rowInput(videoUrls, setVideoUrls, "https://youtube.com/watch?v=…")}
         </div>
@@ -183,7 +183,7 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
       <div className="mb-4">
         <label className="text-xs font-semibold text-default-700 mb-1.5 block">
           {en ? "Cloud video/audio files" : "雲端影音檔案"}
-          <span className="ml-1 text-[10px] font-normal text-default-400">{en ? "(no captions needed — real speech-to-text)" : "（不需要字幕，直接語音轉文字）"}</span>
+          <span className="ml-1 text-[12px] font-normal text-default-400">{en ? "(no captions needed — real speech-to-text)" : "（不需要字幕，直接語音轉文字）"}</span>
         </label>
         <CloudFilePicker
           brandId={brandId}
@@ -196,7 +196,7 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
       <div className="mb-4">
         <label className="text-xs font-semibold text-default-700 mb-1.5 block">
           {en ? "Scope of application" : "應用範圍"}
-          <span className="ml-1 text-[10px] font-normal text-default-400">{en ? "(optional — can set after training)" : "（選填，訓練完成後也可再設定）"}</span>
+          <span className="ml-1 text-[12px] font-normal text-default-400">{en ? "(optional — can set after training)" : "（選填，訓練完成後也可再設定）"}</span>
         </label>
         <div className="flex flex-wrap gap-2">
           {PLATFORMS.map((p) => {
@@ -209,7 +209,7 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
                   on ? "border-default-900 bg-default-900 text-white" : "border-default-200 bg-white text-default-600 hover:border-default-400"
                 }`}
               >
-                <FontAwesomeIcon icon={p.icon} style={{ color: on ? "#fff" : p.tone, fontSize: 11 }} />
+                <FontAwesomeIcon icon={p.icon} style={{ color: on ? "#fff" : p.tone, fontSize: 12 }} />
                 {p.label}
               </button>
             );
@@ -225,7 +225,7 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
           className="text-xs font-semibold px-4 py-2 rounded-full text-white transition flex items-center gap-1.5"
           style={{ background: createMut?.isPending ? "#FDBA74" : "#F97316" }}
         >
-          <FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 11 }} />
+          <FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 12 }} />
           {createMut?.isPending ? (en ? "Starting…" : "建立中…") : (en ? "Start training" : "開始訓練")}
         </button>
       </div>
@@ -273,20 +273,20 @@ function AddSourcesPanel({ brandId, agentId, onDone }: { brandId: number; agentI
     <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-3.5 space-y-3">
       <div className="grid gap-3 md:grid-cols-3">
         <div>
-          <label className="text-[10px] font-semibold text-default-600 mb-1 block">{en ? "Text" : "文字"}</label>
+          <label className="text-[12px] font-semibold text-default-600 mb-1 block">{en ? "Text" : "文字"}</label>
           {renderRowInput(texts, setTexts, en ? "New text sample…" : "新的文字素材…", en, true)}
         </div>
         <div>
-          <label className="text-[10px] font-semibold text-default-600 mb-1 block">{en ? "Article link" : "文章連結"}</label>
+          <label className="text-[12px] font-semibold text-default-600 mb-1 block">{en ? "Article link" : "文章連結"}</label>
           {renderRowInput(articleUrls, setArticleUrls, "https://…", en)}
         </div>
         <div>
-          <label className="text-[10px] font-semibold text-default-600 mb-1 block">{en ? "Video link" : "影音連結"}</label>
+          <label className="text-[12px] font-semibold text-default-600 mb-1 block">{en ? "Video link" : "影音連結"}</label>
           {renderRowInput(videoUrls, setVideoUrls, "https://youtube.com/watch?v=…", en)}
         </div>
       </div>
       <div>
-        <label className="text-[10px] font-semibold text-default-600 mb-1 block">{en ? "Cloud file" : "雲端檔案"}</label>
+        <label className="text-[12px] font-semibold text-default-600 mb-1 block">{en ? "Cloud file" : "雲端檔案"}</label>
         <CloudFilePicker
           brandId={brandId}
           sources={cloudFiles}
@@ -295,11 +295,11 @@ function AddSourcesPanel({ brandId, agentId, onDone }: { brandId: number; agentI
         />
       </div>
       <div className="flex items-center justify-end gap-2">
-        <button onClick={onDone} className="text-[11px] font-medium text-default-500 px-3 py-1.5">{en ? "Cancel" : "取消"}</button>
+        <button onClick={onDone} className="text-[12px] font-medium text-default-500 px-3 py-1.5">{en ? "Cancel" : "取消"}</button>
         <button
           onClick={submit}
           disabled={addMut?.isPending}
-          className="text-[11px] font-semibold px-3.5 py-1.5 rounded-full text-white transition"
+          className="text-[12px] font-semibold px-3.5 py-1.5 rounded-full text-white transition"
           style={{ background: addMut?.isPending ? "#FDBA74" : "#F97316" }}
         >
           {addMut?.isPending ? (en ? "Adding…" : "加入中…") : (en ? "Add & retrain" : "加入並重新訓練")}
@@ -368,14 +368,14 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-default-900 truncate">{agent.name}</h3>
-              {agent.status === "ready" && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{en ? "Ready" : "已完成"}</span>}
-              {agent.status === "failed" && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">{en ? "Failed" : "失敗"}</span>}
+              {agent.status === "ready" && <span className="text-[12px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{en ? "Ready" : "已完成"}</span>}
+              {agent.status === "failed" && <span className="text-[12px] font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">{en ? "Failed" : "失敗"}</span>}
             </div>
             {agent.status === "ready" && agent.sourceSummary && (
-              <p className="text-[11px] text-default-400 mt-0.5">{agent.sourceSummary}</p>
+              <p className="text-[12px] text-default-400 mt-0.5">{agent.sourceSummary}</p>
             )}
             {agent.status === "failed" && agent.lastError && (
-              <p className="text-[11px] text-danger-500 mt-0.5">{agent.lastError}</p>
+              <p className="text-[12px] text-danger-500 mt-0.5">{agent.lastError}</p>
             )}
           </div>
         </div>
@@ -418,11 +418,11 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
                 <button
                   key={p.id}
                   onClick={() => toggleScope(p.id)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-medium transition ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[12px] font-medium transition ${
                     on ? "border-default-900 bg-default-900 text-white" : "border-default-200 bg-white text-default-500 hover:border-default-400"
                   }`}
                 >
-                  <FontAwesomeIcon icon={p.icon} style={{ color: on ? "#fff" : p.tone, fontSize: 10 }} />
+                  <FontAwesomeIcon icon={p.icon} style={{ color: on ? "#fff" : p.tone, fontSize: 12 }} />
                   {p.label}
                 </button>
               );
@@ -437,16 +437,16 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
           {expanded && (
             <div className="px-5 pb-5 border-t border-default-100 pt-4 space-y-4">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-default-400 mb-1.5">{en ? "Persona" : "人設"}</div>
+                <div className="text-[12px] font-bold uppercase tracking-widest text-default-400 mb-1.5">{en ? "Persona" : "人設"}</div>
                 <p className="text-xs text-default-700 leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto rounded-lg bg-default-50 p-3">{agent.persona}</p>
               </div>
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-default-400 mb-1.5">SKILL</div>
+                <div className="text-[12px] font-bold uppercase tracking-widest text-default-400 mb-1.5">SKILL</div>
                 <p className="text-xs text-default-700 leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto rounded-lg bg-default-50 p-3">{agent.skill}</p>
               </div>
 
               <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-3.5">
-                <div className="text-[11px] font-semibold text-default-700 mb-2">{en ? "Test-draft with this agent" : "用這個 Agent 試寫"}</div>
+                <div className="text-[12px] font-semibold text-default-700 mb-2">{en ? "Test-draft with this agent" : "用這個 Agent 試寫"}</div>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <select
                     value={draftPlatform}
@@ -473,8 +473,8 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
                 {draftResult && (
                   <div className="rounded-lg bg-white border border-default-200 p-3 mt-2">
                     <p className="text-xs text-default-800 leading-relaxed whitespace-pre-wrap">{draftResult}</p>
-                    <button onClick={copyDraft} className="mt-2 text-[11px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1">
-                      <FontAwesomeIcon icon={copied ? faCheck : faCopy} style={{ fontSize: 10 }} />
+                    <button onClick={copyDraft} className="mt-2 text-[12px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1">
+                      <FontAwesomeIcon icon={copied ? faCheck : faCopy} style={{ fontSize: 12 }} />
                       {copied ? (en ? "Copied" : "已複製") : (en ? "Copy" : "複製")}
                     </button>
                   </div>
@@ -486,9 +486,9 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
               ) : (
                 <button
                   onClick={() => setAddingSources(true)}
-                  className="text-[11px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1.5"
+                  className="text-[12px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1.5"
                 >
-                  <FontAwesomeIcon icon={faPlus} style={{ fontSize: 9 }} /> {en ? "Add more sources & retrain" : "加入更多素材並重新訓練"}
+                  <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} /> {en ? "Add more sources & retrain" : "加入更多素材並重新訓練"}
                 </button>
               )}
             </div>
@@ -536,7 +536,7 @@ export default function PersonaAgentPanel({ brandId }: { brandId: number | null 
             className="text-xs font-semibold px-4 py-2.5 rounded-full text-white transition flex items-center gap-1.5 shrink-0"
             style={{ background: "#F97316" }}
           >
-            <FontAwesomeIcon icon={faPlus} style={{ fontSize: 11 }} />
+            <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} />
             {en ? "New persona agent" : "新增人設 Agent"}
           </button>
         )}

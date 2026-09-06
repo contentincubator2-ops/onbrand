@@ -74,7 +74,7 @@ function ChipInput({
         {chips.map((c, i) => (
           <span
             key={i}
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-medium ${chipBg}`}
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[12px] font-medium ${chipBg}`}
           >
             {c}
             <button onClick={() => remove(i)} className="opacity-60 hover:opacity-100">
@@ -277,7 +277,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
         {/* Header */}
         <div className="px-6 py-5 border-b border-neutral-100 flex items-start justify-between gap-3 flex-shrink-0">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-0.5">
+            <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400 mb-0.5">
               {en ? "PRODUCT" : "產品"}
             </p>
             <h2 className="text-xl font-bold text-neutral-900">
@@ -310,7 +310,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
             <div className="bg-neutral-50 rounded-xl p-4 border border-indigo-100">
               <div className="flex items-center gap-1.5 mb-3">
                 <Sparkles size={13} className="text-indigo-500" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">
+                <span className="text-[12px] font-bold uppercase tracking-widest text-indigo-600">
                   {en ? "AI Positioning Summary" : "AI 定位摘要"}
                 </span>
               </div>
@@ -320,7 +320,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 )}
                 {tagline && (
                   <div>
-                    <span className="text-[9px] font-semibold uppercase text-indigo-400 tracking-wider">
+                    <span className="text-[12px] font-semibold uppercase text-indigo-400 tracking-wider">
                       {en ? "Tagline" : "標語"}
                     </span>
                     <p className="text-sm font-semibold text-neutral-900 mt-0.5">{tagline}</p>
@@ -328,13 +328,13 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 )}
                 {usp && (
                   <div>
-                    <span className="text-[9px] font-semibold uppercase text-indigo-400 tracking-wider">USP</span>
+                    <span className="text-[12px] font-semibold uppercase text-indigo-400 tracking-wider">USP</span>
                     <p className="text-sm text-neutral-700 mt-0.5">{usp}</p>
                   </div>
                 )}
                 {audience && (
                   <div>
-                    <span className="text-[9px] font-semibold uppercase text-indigo-400 tracking-wider">
+                    <span className="text-[12px] font-semibold uppercase text-indigo-400 tracking-wider">
                       {en ? "Audience" : "目標受眾"}
                     </span>
                     <p className="text-sm text-neutral-600 mt-0.5">{audience}</p>
@@ -388,7 +388,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                     : (en ? "Check & save" : "驗證並更新")}
                 </button>
               </div>
-              <p className={`text-[11px] mt-1.5 ${imageError ? "text-red-600" : "text-neutral-400"}`}>
+              <p className={`text-[12px] mt-1.5 ${imageError ? "text-red-600" : "text-neutral-400"}`}>
                 {imageError || (en
                   ? "Must be a public HTTPS URL that returns a raster image; SVG and HTML pages are rejected."
                   : "必須是可公開存取、直接回傳點陣圖片的 HTTPS 網址；不接受 SVG 或網頁。")}
@@ -465,7 +465,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                     setPeriods([...periods, { label: "", startDate: "", endDate: "" }]);
                     mark();
                   }}
-                  className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                  className="text-[12px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                 >
                   <Plus size={11} /> {en ? "Add period" : "新增時間"}
                 </button>
@@ -476,7 +476,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 </p>
               ) : (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-[9px] font-semibold uppercase text-neutral-400 tracking-wider px-0.5">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-[12px] font-semibold uppercase text-neutral-400 tracking-wider px-0.5">
                     <span>{en ? "Label" : "名稱"}</span>
                     <span>{en ? "Start" : "開始"}</span>
                     <span>{en ? "End" : "結束"}</span>

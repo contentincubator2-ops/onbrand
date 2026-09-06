@@ -67,7 +67,7 @@ export default function ChangelogPage() {
         {/* Hero */}
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <p style={{
-            fontSize: 10, fontWeight: 700, color: "#6b7280",
+            fontSize: 12, fontWeight: 700, color: "#6b7280",
             letterSpacing: "0.25em", textTransform: "uppercase",
             marginBottom: 12,
           }}>
@@ -108,7 +108,7 @@ export default function ChangelogPage() {
         {entries && entries.map((entry) => (
           <section key={entry.date} style={{ marginBottom: 36 }}>
             <h2 style={{
-              fontSize: 11, fontWeight: 700, color: "#6b7280",
+              fontSize: 12, fontWeight: 700, color: "#6b7280",
               letterSpacing: "0.15em", textTransform: "uppercase",
               marginBottom: 14, borderBottom: "1px solid #e5e7eb", paddingBottom: 8,
             }}>
@@ -123,7 +123,7 @@ export default function ChangelogPage() {
                   <li key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                     <span style={{
                       flexShrink: 0, padding: "2px 8px", borderRadius: 6,
-                      fontSize: 10, fontWeight: 700,
+                      fontSize: 12, fontWeight: 700,
                       background: style.bg, color: style.fg,
                       whiteSpace: "nowrap", minWidth: 50, textAlign: "center",
                       letterSpacing: 0.5,

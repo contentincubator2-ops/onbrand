@@ -701,7 +701,7 @@ export default function DataWorkspacePage() {
     <div style={{ padding: "20px 24px 80px", maxWidth: 1320, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9ca3af" }}>
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9ca3af" }}>
             {isPerformance ? "Performance Agents" : "Market Intelligence Agents"}
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 850, color: "#111827" }}>
@@ -718,7 +718,7 @@ export default function DataWorkspacePage() {
         </div>
         {!isPerformance && (
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 16, padding: "10px 12px", background: "#fff", minWidth: 220 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase" }}>Source Brand</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase" }}>Source Brand</div>
             <div style={{ fontSize: 14, fontWeight: 850, color: "#111827", marginTop: 3 }}>{activeBrandName || "（未選品牌）"}{brandId ? ` · brands#${brandId}` : ""}</div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>即時公開網路資料查詢</div>
           </div>
@@ -781,13 +781,13 @@ export default function DataWorkspacePage() {
                   {["news", "fanpage", "blog", "forum", "threads", "youtube"].map((t) => {
                     const m = sourceMeta(t);
                     return (
-                      <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: m.color }}>
+                      <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: m.color }}>
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: m.color, display: "inline-block" }} /> {m.label}
                       </span>
                     );
                   })}
                 </div>
-                <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>時間範圍改變後，重新點各區塊的即時查詢即可套用</span>
+                <span style={{ marginLeft: "auto", fontSize: 12, color: "#9ca3af" }}>時間範圍改變後，重新點各區塊的即時查詢即可套用</span>
               </div>
 
               {/* Phase 3 — 聲量趨勢 (依發布日，來自累積庫) */}
@@ -797,7 +797,7 @@ export default function DataWorkspacePage() {
                   <div style={{ gridColumn: "1 / -1", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", padding: "14px 16px" }}>
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
                       <span style={{ fontSize: 13, fontWeight: 850, color: "#111827" }}>聲量趨勢</span>
-                      <span style={{ fontSize: 11, color: "#9ca3af" }}>依發布日累積 · 近 {windowDays} 天{trend?.totalMentions ? ` · 共 ${trend.totalMentions} 則` : ""}</span>
+                      <span style={{ fontSize: 12, color: "#9ca3af" }}>依發布日累積 · 近 {windowDays} 天{trend?.totalMentions ? ` · 共 ${trend.totalMentions} 則` : ""}</span>
                     </div>
                     {trend && trend.series.length > 0 ? (() => {
                       const s = trend.series;
@@ -814,7 +814,7 @@ export default function DataWorkspacePage() {
                               return <rect key={d.day} x={i * (bw + gap)} y={H - h} width={bw} height={h} rx={1} fill={col} opacity={0.85}><title>{`${d.day}｜${d.mentions} 則（正 ${d.pos} / 負 ${d.neg}）`}</title></rect>;
                             })}
                           </svg>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#9ca3af", marginTop: 4 }}>
                             <span>{s[0]?.day}</span><span>{s[s.length - 1]?.day}</span>
                           </div>
                         </>
@@ -847,7 +847,7 @@ export default function DataWorkspacePage() {
                         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 850, color: "#111827" }}>{scope.title}</h3>
                           {res?.ok && <span style={{ fontSize: 12, fontWeight: 800, color: scope.color }}>{res.items!.length} 則</span>}
-                          {runAt && <span style={{ fontSize: 11, color: "#9ca3af" }}>· 擷取於 {runAt}</span>}
+                          {runAt && <span style={{ fontSize: 12, color: "#9ca3af" }}>· 擷取於 {runAt}</span>}
                         </div>
                         <p style={{ margin: "2px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>{scope.purpose}</p>
                       </div>
@@ -864,7 +864,7 @@ export default function DataWorkspacePage() {
                     {res?.ok && res.items && res.items.length > 0 && (
                       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,0.85fr) minmax(0,1.15fr)", gap: 18, padding: "14px 18px", borderBottom: "1px solid #f1f1f0", background: "#fcfcfb" }}>
                         <div>
-                          <div style={{ fontSize: 11, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>情緒分析</div>
+                          <div style={{ fontSize: 12, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>情緒分析</div>
                           {(() => {
                             const mix = res.sentimentMix ?? { positive: 0, negative: 0, neutral: 0 };
                             const total = mix.positive + mix.negative + mix.neutral || 1;
@@ -888,7 +888,7 @@ export default function DataWorkspacePage() {
                           })()}
                         </div>
                         <div>
-                          <div style={{ fontSize: 11, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>熱門關鍵詞</div>
+                          <div style={{ fontSize: 12, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>熱門關鍵詞</div>
                           {res.wordCloud && res.wordCloud.length > 0 ? (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 10px", alignItems: "baseline" }}>
                               {(() => {
@@ -913,10 +913,10 @@ export default function DataWorkspacePage() {
                           return (
                             <div key={i} style={{ display: "flex", gap: 12, padding: "13px 18px", borderTop: i === 0 ? "none" : "1px solid #f4f4f3" }}>
                               {/* left: source-type chip */}
-                              <span style={{ flex: "0 0 auto", fontSize: 10, fontWeight: 800, color: "#fff", background: m.color, padding: "3px 8px", borderRadius: 6, height: "fit-content", marginTop: 2 }}>{m.label}</span>
+                              <span style={{ flex: "0 0 auto", fontSize: 12, fontWeight: 800, color: "#fff", background: m.color, padding: "3px 8px", borderRadius: 6, height: "fit-content", marginTop: 2 }}>{m.label}</span>
                               {/* right: content */}
                               <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#9ca3af", marginBottom: 3, flexWrap: "wrap" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#9ca3af", marginBottom: 3, flexWrap: "wrap" }}>
                                   <span style={{ fontWeight: 700, color: "#6b7280" }}>{item.source}</span>
                                   <span>·</span>
                                   <span title={dateStr ? "文章發布日期" : "來源未提供發布日期"} style={{ color: dateStr ? "#6b7280" : "#c0392b" }}>
@@ -979,7 +979,7 @@ export default function DataWorkspacePage() {
                 const sovMax = Math.max(...sov.map((e) => e[1]), 1);
                 const sm = s.sentimentMix; const smTotal = (sm.positive + sm.negative + sm.neutral) || 1;
                 const card: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", padding: "14px 16px" };
-                const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 };
+                const lbl: React.CSSProperties = { fontSize: 12, fontWeight: 850, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 };
                 const ord: Sentiment[] = ["positive", "neutral", "negative"];
                 return (
                   <>
@@ -1040,10 +1040,10 @@ export default function DataWorkspacePage() {
                         return (
                           <div key={i} style={card}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                              <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: "#6b7280", padding: "2px 8px", borderRadius: 6 }}>{r.prompt.label}</span>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: "#fff", background: "#6b7280", padding: "2px 8px", borderRadius: 6 }}>{r.prompt.label}</span>
                               <span style={{ fontSize: 12.5, fontWeight: 850, color: r.brandPresent ? active.color : "#c0392b" }}>{r.brandPresent ? `✓ 有出現${r.brandRank ? `（第 ${r.brandRank} 個被提到）` : ""}` : "✕ 未出現"}</span>
                               {r.brandPresent && <span style={{ fontSize: 12, fontWeight: 700, color: se.color }}><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: se.color, marginRight: 4 }} />{se.label}</span>}
-                              {r.citations.length > 0 && <span style={{ fontSize: 11, color: "#9ca3af" }}>· 引用 {r.citations.length} 筆</span>}
+                              {r.citations.length > 0 && <span style={{ fontSize: 12, color: "#9ca3af" }}>· 引用 {r.citations.length} 筆</span>}
                             </div>
                             <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4 }}>問：{r.prompt.text}</div>
                             <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{String(r.answer).replace(/\s+/g, " ").slice(0, 260)}…</p>
@@ -1072,7 +1072,7 @@ export default function DataWorkspacePage() {
                 <section key={block.headline} style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 20 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: active.color }}>Live Market Brief</div>
+                      <div style={{ fontSize: 12, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: active.color }}>Live Market Brief</div>
                       <h3 style={{ margin: "6px 0", fontSize: 20, color: "#111827" }}>{block.headline}</h3>
                       <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>{block.summary}</p>
                     </div>
@@ -1080,7 +1080,7 @@ export default function DataWorkspacePage() {
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginTop: 16 }}>
                     {block.metrics.map((m) => (
                       <div key={m.label} style={{ borderRadius: 18, background: "#f9fafb", padding: 14 }}>
-                        <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 800 }}>{m.label}</div>
+                        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 800 }}>{m.label}</div>
                         <div style={{ fontSize: 22, color: "#111827", fontWeight: 900, marginTop: 4 }}>{m.value}</div>
                         <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, lineHeight: 1.4 }}>{m.note}</div>
                       </div>
@@ -1097,7 +1097,7 @@ export default function DataWorkspacePage() {
                         <div key={`${e.label}-${e.source}`} style={{ padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
                           <div style={{ fontSize: 12, fontWeight: 800, color: active.color }}>{e.label} · {e.source}</div>
                           <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>{e.note}</div>
-                          {e.url && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{e.url}</div>}
+                          {e.url && <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{e.url}</div>}
                         </div>
                       ))}
                     </div>
@@ -1113,7 +1113,7 @@ export default function DataWorkspacePage() {
             <section style={{ border: "1px solid #f9a8d4", borderRadius: 24, background: "#FFFFFF", padding: 20, marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start", marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: "#DB2777" }}>AI Topic → Content Task</div>
+                  <div style={{ fontSize: 12, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: "#DB2777" }}>AI Topic → Content Task</div>
                   <h3 style={{ margin: "6px 0", fontSize: 21, color: "#111827" }}>選話題、選產品，再直接進內容任務</h3>
                   <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>AI 先整理近期可跟的市場話題；使用者選定品牌或商品，再選 Facebook、Instagram、TikTok、EDM 或 PR 任務，系統會把 brief 帶進內容產出頁。</p>
                 </div>
@@ -1129,7 +1129,7 @@ export default function DataWorkspacePage() {
                       return (
                         <button key={topic.id} onClick={() => setSelectedHotTopicId(topic.id)} style={{ textAlign: "left", border: `1px solid ${selected ? "#DB2777" : "#f3f4f6"}`, background: selected ? "#fdf2f8" : "#fff", borderRadius: 16, padding: 12, cursor: "pointer" }}>
                           <div style={{ fontSize: 13, fontWeight: 850, color: "#111827" }}>{topic.title}</div>
-                          <div style={{ fontSize: 11, fontWeight: 800, color: "#DB2777", marginTop: 3 }}>{topic.signal}</div>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: "#DB2777", marginTop: 3 }}>{topic.signal}</div>
                           <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.45, marginTop: 4 }}>{topic.whyNow}</div>
                         </button>
                       );
@@ -1145,7 +1145,7 @@ export default function DataWorkspacePage() {
                       return (
                         <button key={entity.id} onClick={() => setSelectedHotEntityId(entity.id)} style={{ textAlign: "left", border: `1px solid ${selected ? "#DB2777" : "#f3f4f6"}`, background: selected ? "#fdf2f8" : "#fff", borderRadius: 14, padding: 10, cursor: "pointer" }}>
                           <div style={{ fontSize: 12.5, fontWeight: 850, color: "#111827" }}>{entity.label}</div>
-                          <div style={{ fontSize: 11.5, color: "#6b7280", lineHeight: 1.4, marginTop: 3 }}>{entity.detail}</div>
+                          <div style={{ fontSize: 12.5, color: "#6b7280", lineHeight: 1.4, marginTop: 3 }}>{entity.detail}</div>
                         </button>
                       );
                     })}
@@ -1160,7 +1160,7 @@ export default function DataWorkspacePage() {
                       return (
                         <button key={route.id} onClick={() => setSelectedContentRouteId(route.id)} style={{ textAlign: "left", border: `1px solid ${selected ? "#DB2777" : "#f3f4f6"}`, background: selected ? "#fdf2f8" : "#fff", borderRadius: 14, padding: 10, cursor: "pointer" }}>
                           <div style={{ fontSize: 12.5, fontWeight: 850, color: "#111827" }}>{route.label}</div>
-                          <div style={{ fontSize: 11.5, color: "#6b7280", lineHeight: 1.4, marginTop: 3 }}>{route.output}</div>
+                          <div style={{ fontSize: 12.5, color: "#6b7280", lineHeight: 1.4, marginTop: 3 }}>{route.output}</div>
                         </button>
                       );
                     })}
@@ -1198,10 +1198,10 @@ export default function DataWorkspacePage() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: active.color, background: `${active.color}12`, padding: "4px 8px", borderRadius: 999 }}>AGENT TASK</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: active.color, background: `${active.color}12`, padding: "4px 8px", borderRadius: 999 }}>AGENT TASK</span>
                     {isWired ? (
                       isRunning
-                        ? <span style={{ fontSize: 11, fontWeight: 700, color: active.color }}>查詢中…</span>
+                        ? <span style={{ fontSize: 12, fontWeight: 700, color: active.color }}>查詢中…</span>
                         : <Play size={16} color={active.color} />
                     ) : (
                       <LineChart size={16} color="#9ca3af" />
@@ -1225,16 +1225,16 @@ export default function DataWorkspacePage() {
         </main>
 
         <aside style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 18, position: "sticky", top: 84, maxHeight: "calc(100vh - 110px)", overflowY: "auto" }}>
-          <div style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9ca3af" }}>Evidence Panel</div>
+          <div style={{ fontSize: 12, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9ca3af" }}>Evidence Panel</div>
 
           {selectedKey && liveResults[selectedKey] && (
             <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "2px solid #f3f4f6" }}>
-              <div style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.14em", textTransform: "uppercase", color: "#DC2626", marginTop: 10 }}>即時搜尋結果</div>
+              <div style={{ fontSize: 12, fontWeight: 850, letterSpacing: "0.14em", textTransform: "uppercase", color: "#DC2626", marginTop: 10 }}>即時搜尋結果</div>
               <h3 style={{ margin: "6px 0 4px", fontSize: 16, fontWeight: 850, color: "#111827" }}>
                 {cards.find((c) => c.taskKey === selectedKey)?.title}
               </h3>
               {liveResults[selectedKey].generatedAt && (
-                <p style={{ margin: "0 0 10px", fontSize: 11, color: "#9ca3af" }}>
+                <p style={{ margin: "0 0 10px", fontSize: 12, color: "#9ca3af" }}>
                   {new Date(liveResults[selectedKey].generatedAt!).toLocaleString("zh-TW")} · 查詢字：{liveResults[selectedKey].query}
                 </p>
               )}
@@ -1247,7 +1247,7 @@ export default function DataWorkspacePage() {
                   {liveResults[selectedKey].items!.map((item, i) => (
                     <div key={i} style={{ border: "1px solid #f0f0ef", borderRadius: 14, padding: 12 }}>
                       <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", lineHeight: 1.4 }}>{item.title}</div>
-                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
                         {item.source}
                         {item.url && (
                           <a href={item.url} target="_blank" rel="noreferrer" style={{ color: active.color, display: "inline-flex", alignItems: "center" }}>

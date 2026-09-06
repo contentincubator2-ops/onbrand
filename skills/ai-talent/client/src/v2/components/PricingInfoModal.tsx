@@ -133,7 +133,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                   <span className="text-sm font-bold text-default-900">{p.name}</span>
                   {p.badge && (
                     <span
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                      className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white"
                       style={{ background: p.highlight ? "#7C3AED" : "#059669" }}
                     >
                       {p.badge}

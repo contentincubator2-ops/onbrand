@@ -97,11 +97,11 @@ function Header({ label, count }: { label: string; count?: number }) {
     }}>
       <Clock size={12} color="#A8A29E" />
       <span style={{
-        flex: 1, fontSize: 11, fontWeight: 700, color: "#525252",
+        flex: 1, fontSize: 12, fontWeight: 700, color: "#525252",
         textTransform: "uppercase", letterSpacing: "0.08em",
       }}>{label}</span>
       {count != null && (
-        <span style={{ fontSize: 11, color: "#9ca3af" }}>{count}</span>
+        <span style={{ fontSize: 12, color: "#9ca3af" }}>{count}</span>
       )}
     </div>
   );
@@ -142,11 +142,11 @@ function RunRow({ run, onClick }: { run: any; onClick: () => void }) {
         }}>
           {title}
         </span>
-        <span style={{ fontSize: 11, color: "#9ca3af", display: "flex", gap: 6, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#9ca3af", display: "flex", gap: 6, alignItems: "center" }}>
           {tier && <span style={{
             padding: "1px 6px", borderRadius: 4,
             background: "rgba(124,58,237,0.10)", color: "#5B21B6",
-            fontSize: 10, fontWeight: 600,
+            fontSize: 12, fontWeight: 600,
           }}>{tier}</span>}
           {platform && <span>{platform}</span>}
           {platform && <span>·</span>}

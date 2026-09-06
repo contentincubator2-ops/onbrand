@@ -1455,7 +1455,7 @@ export default function BrandsPage() {
             typography: tiny eyebrow, large bold title, subtle stats. */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
           {/* Eyebrow */}
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
             BRAND
           </p>
 
@@ -1583,7 +1583,7 @@ export default function BrandsPage() {
                         />
                       )}
                     </div>
-                    <p className={`text-[11px] mt-0.5 ${active ? "text-neutral-300" : "text-neutral-700"}`}>
+                    <p className={`text-[12px] mt-0.5 ${active ? "text-neutral-300" : "text-neutral-700"}`}>
                       {t.desc}
                       {locked && (lang === "en" ? " · Locked" : " · 已鎖定")}
                     </p>
@@ -1716,7 +1716,7 @@ export default function BrandsPage() {
           {/* Sub-nav — items for the active category (set by ShellLayout sidebar via ?cat=) */}
           <nav style={{ flex: 1, padding: "6px 8px 16px", display: "flex", flexDirection: "column", gap: 0, overflowY: "auto" }}>
             <p style={{
-              fontSize: 10, fontWeight: 700, color: "#A8A29E",
+              fontSize: 12, fontWeight: 700, color: "#A8A29E",
               letterSpacing: "0.10em", textTransform: "uppercase",
               padding: "4px 4px 6px", margin: 0,
             }}>
@@ -1799,7 +1799,7 @@ export default function BrandsPage() {
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
                 >
-                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 11, color: active ? "rgb(74,46,126)" : "#A8A29E" }} />
+                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 12, color: active ? "rgb(74,46,126)" : "#A8A29E" }} />
                   設定
                 </button>
               );
@@ -2199,7 +2199,7 @@ export default function BrandsPage() {
                         {/* 分組標題 — 細線 + 灰色小標籤 */}
                         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
                           <span style={{
-                            fontSize: 11, fontWeight: 600, color: "#A8A29E",
+                            fontSize: 12, fontWeight: 600, color: "#A8A29E",
                             letterSpacing: "0.10em", textTransform: "uppercase",
                             whiteSpace: "nowrap",
                           }}>{group.label}</span>
@@ -2358,13 +2358,13 @@ export default function BrandsPage() {
           {derivedCategory === "tools" && scopeMode === "brand" && (
             <div style={{ padding: "8px 0 32px" }} className="space-y-8">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 mb-4 px-1">
+                <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400 mb-4 px-1">
                   {lang === "en" ? "Knowledge Base" : "知識庫"}
                 </p>
                 <KnowledgeEditor brandId={activeBrandIdForLocks} />
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 mb-4 px-1">
+                <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400 mb-4 px-1">
                   {lang === "en" ? "AI Prompt Library" : "AI 指令庫"}
                 </p>
                 <AIPromptsEditor brandId={activeBrandIdForLocks} />
@@ -2406,7 +2406,7 @@ export default function BrandsPage() {
                         </span>
                       )}
                     </p>
-                    <p className="text-[11px] text-indigo-500 mt-1">
+                    <p className="text-[12px] text-indigo-500 mt-1">
                       {lang === "en" ? "This usually takes 30–120 seconds." : "通常需要 30–120 秒，請稍候。"}
                     </p>
                   </div>
@@ -2470,7 +2470,7 @@ export default function BrandsPage() {
                   >
                     {triggerDiscoveryMut?.isPending ? (lang === "en" ? "Starting…" : "啟動中…") : (lang === "en" ? "🔍 Scan website now" : "🔍 立即掃描官網")}
                   </button>
-                  <p className="text-[11px] text-neutral-400 mt-3">
+                  <p className="text-[12px] text-neutral-400 mt-3">
                     {lang === "en" ? "Or" : "或者"}{" "}
                     <button onClick={() => setAddModal({ open: true, tab: "product" })} className="underline hover:text-neutral-600">
                       {lang === "en" ? "add products manually" : "手動新增產品"}
@@ -2488,7 +2488,7 @@ export default function BrandsPage() {
                       triggerDiscoveryMut?.mutate?.({ brandId: activeBrandIdForLocks, websiteUrl: connData.website });
                     }}
                     disabled={triggerDiscoveryMut?.isPending}
-                    className="text-[11px] font-medium px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 transition flex items-center gap-1.5"
+                    className="text-[12px] font-medium px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 transition flex items-center gap-1.5"
                   >
                     {triggerDiscoveryMut?.isPending ? "…" : (lang === "en" ? "🔍 Re-scan" : "🔍 重新掃描")}
                   </button>
@@ -3041,14 +3041,14 @@ function TagRow({ items, max = 4 }: { items: string[]; max?: number }) {
       {items.slice(0, max).map((x, i) => (
         <span key={i} style={{
           display: "inline-block", marginRight: 6, marginBottom: 3,
-          fontSize: 10.5, color: "#404040",
+          fontSize: 12.5, color: "#404040",
           fontFamily: '"SF Mono", Menlo, monospace',
         }}>
           {x}
         </span>
       ))}
       {items.length > max && (
-        <span style={{ fontSize: 10, color: "#525252" }}>+{items.length - max}</span>
+        <span style={{ fontSize: 12, color: "#525252" }}>+{items.length - max}</span>
       )}
     </span>
   );
@@ -3096,7 +3096,7 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
               </span>
             )}
             {v.story && (
-              <span style={{ display: "block", marginTop: 4, fontSize: 11 }}>
+              <span style={{ display: "block", marginTop: 4, fontSize: 12 }}>
                 {truncate(v.story, 80)}
               </span>
             )}
@@ -3115,11 +3115,11 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
             {total != null && (
               <span style={{ display: "block", marginBottom: 4 }}>
                 <span style={{ fontSize: 22, fontWeight: 700, color: "#171717", fontFamily: "system-ui" }}>{total}</span>
-                <span style={{ fontSize: 11, color: "#525252", marginLeft: 4 }}>/ 100</span>
+                <span style={{ fontSize: 12, color: "#525252", marginLeft: 4 }}>/ 100</span>
               </span>
             )}
             {rows.slice(0, 3).map((r: any, i: number) => (
-              <span key={i} style={{ display: "block", fontSize: 11 }}>
+              <span key={i} style={{ display: "block", fontSize: 12 }}>
                 <span style={{ color: "#404040" }}>{r.dim}</span>
                 <span style={{ color: "#171717", fontWeight: 600, marginLeft: 6 }}>{r.score}</span>
               </span>
@@ -3144,13 +3144,13 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
               <span key={i} style={{ display: "block", marginBottom: 2 }}>
                 <span style={{ color: "#171717", fontWeight: 600, fontFamily: "system-ui" }}>· {it.label}</span>
                 {it.body && (
-                  <span style={{ color: "#404040", marginLeft: 4, fontSize: 11 }}>
+                  <span style={{ color: "#404040", marginLeft: 4, fontSize: 12 }}>
                     {truncate(it.body, 40)}
                   </span>
                 )}
               </span>
             ))}
-            {items.length > 4 && <span style={{ fontSize: 10, color: "#525252" }}>+{items.length - 4}</span>}
+            {items.length > 4 && <span style={{ fontSize: 12, color: "#525252" }}>+{items.length - 4}</span>}
           </span>
         ),
         hasContent: true,
@@ -3170,7 +3170,7 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
           <span>
             {intensity && <span style={{ display: "block" }}>{truncate(intensity, 90)}</span>}
             {direct.length > 0 && (
-              <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#404040", fontFamily: "system-ui" }}>
+              <span style={{ display: "block", marginTop: 4, fontSize: 12, color: "#404040", fontFamily: "system-ui" }}>
                 vs {direct.slice(0, 3).map((d: any) => d.name).join("、")}
                 {direct.length > 3 && <span> +{direct.length - 3}</span>}
               </span>
@@ -3193,13 +3193,13 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
         node: (
           <span>
             {fav.slice(0, 2).map((t: any, i: number) => (
-              <span key={`f${i}`} style={{ display: "block", fontSize: 11 }}>
+              <span key={`f${i}`} style={{ display: "block", fontSize: 12 }}>
                 <span style={{ color: "#059669", fontWeight: 600, fontFamily: "system-ui" }}>↗</span>
                 <span style={{ marginLeft: 4 }}>{truncate(t.name, 50)}</span>
               </span>
             ))}
             {risks.slice(0, 2).map((t: any, i: number) => (
-              <span key={`r${i}`} style={{ display: "block", fontSize: 11 }}>
+              <span key={`r${i}`} style={{ display: "block", fontSize: 12 }}>
                 <span style={{ color: "#B45309", fontWeight: 600, fontFamily: "system-ui" }}>↘</span>
                 <span style={{ marginLeft: 4 }}>{truncate(t.name, 50)}</span>
               </span>
@@ -3218,13 +3218,13 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
           <span>
             {arche && (
               <span style={{ display: "block", marginBottom: 4 }}>
-                <span style={{ fontSize: 10, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>{lang === "en" ? "Archetype" : "原型"}</span>
+                <span style={{ fontSize: 12, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>{lang === "en" ? "Archetype" : "原型"}</span>
                 <TagRow items={arche} max={3} />
               </span>
             )}
             {tone && (
               <span style={{ display: "block" }}>
-                <span style={{ fontSize: 10, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>{lang === "en" ? "Tone" : "語調"}</span>
+                <span style={{ fontSize: 12, color: "#525252", letterSpacing: "0.15em", textTransform: "uppercase", marginRight: 6 }}>{lang === "en" ? "Tone" : "語調"}</span>
                 <TagRow items={tone} max={4} />
               </span>
             )}
@@ -3249,7 +3249,7 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
               「{truncate(smp, 60)}」
             </span>
             {v.rationale && (
-              <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "#404040" }}>
+              <span style={{ display: "block", marginTop: 4, fontSize: 12, color: "#404040" }}>
                 {truncate(v.rationale, 80)}
               </span>
             )}
@@ -3320,13 +3320,13 @@ function buildBrandCheatPreview(seg?: Record<string, any>): { node: React.ReactN
           </span>
         )}
         {why && (
-          <span style={{ display: "block", fontSize: 11, marginBottom: 2 }}>
+          <span style={{ display: "block", fontSize: 12, marginBottom: 2 }}>
             <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>WHY</span>
             {truncate(why, 70)}
           </span>
         )}
         {diff && (
-          <span style={{ display: "block", fontSize: 11 }}>
+          <span style={{ display: "block", fontSize: 12 }}>
             <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>EDGE</span>
             {truncate(diff, 70)}
           </span>
@@ -3348,7 +3348,7 @@ function buildPromptsPreview(seg?: Record<string, any>, lang: "zh-TW" | "en" = "
     node: (
       <span>
         {arche && (
-          <span style={{ display: "block", marginBottom: 4, fontSize: 11 }}>
+          <span style={{ display: "block", marginBottom: 4, fontSize: 12 }}>
             <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>{lang === "en" ? "Archetype" : "原型"}</span>
             {arche.slice(0, 2).join(" / ")}
           </span>
@@ -3359,7 +3359,7 @@ function buildPromptsPreview(seg?: Record<string, any>, lang: "zh-TW" | "en" = "
           </span>
         )}
         {forbid && (
-          <span style={{ display: "block", fontSize: 10, color: "#B45309", fontFamily: "system-ui" }}>
+          <span style={{ display: "block", fontSize: 12, color: "#B45309", fontFamily: "system-ui" }}>
             {lang === "en" ? "Avoid · " : "禁區 · "}{forbid.slice(0, 3).join(lang === "en" ? ", " : "、")}{forbid.length > 3 ? `+${forbid.length - 3}` : ""}
           </span>
         )}
@@ -3400,7 +3400,7 @@ function PositioningCompletionBridge({
     >
       <div style={{ flex: "1 1 320px", minWidth: 0 }}>
         <p style={{
-          fontSize: 10, fontWeight: 600, color: "#404040",
+          fontSize: 12, fontWeight: 600, color: "#404040",
           letterSpacing: "0.25em", textTransform: "uppercase",
           marginBottom: 6,
         }}>
@@ -3473,7 +3473,7 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: intro ? 6 : 0 }}>
         <span style={{
-          fontSize: 10, fontWeight: 600, color: "#525252",
+          fontSize: 12, fontWeight: 600, color: "#525252",
           letterSpacing: "0.22em", textTransform: "uppercase",
         }}>
           {label}
@@ -3481,7 +3481,7 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         {counter && (
           <span style={{
-            fontSize: 10, fontWeight: 500, color: "#525252",
+            fontSize: 12, fontWeight: 500, color: "#525252",
             letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
           }}>
             {counter}
@@ -3599,7 +3599,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
         />
         {eyebrow && (
           <span style={{
-            fontSize: 9, fontWeight: 700, color: "#525252",
+            fontSize: 12, fontWeight: 700, color: "#525252",
             letterSpacing: "0.2em", textTransform: "uppercase",
             fontVariantNumeric: "tabular-nums",
           }}>
@@ -3609,7 +3609,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
         <div style={{ flex: 1 }} />
         {hasContent && (
           <span style={{
-            fontSize: 9, fontWeight: 600, color: "#171717",
+            fontSize: 12, fontWeight: 600, color: "#171717",
             letterSpacing: "0.18em", textTransform: "uppercase",
           }}>
             {lang === "en" ? "Filled" : "已填寫"}
@@ -3631,7 +3631,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
           over and the rationale is conserved for hover (title attr above). */}
       {rationale && !hasContent && (
         <p style={{
-          fontSize: 11.5, lineHeight: 1.55, color: "#404040",
+          fontSize: 12.5, lineHeight: 1.55, color: "#404040",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
           fontStyle: "italic", margin: 0,
         }}>
@@ -3655,7 +3655,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
         </div>
       ) : (
         <span style={{
-          fontSize: 11, color: "#525252", marginTop: "auto",
+          fontSize: 12, color: "#525252", marginTop: "auto",
           letterSpacing: "0.05em",
         }}>
           {lang === "en" ? "Empty — tap to start" : "尚未填寫 — 點擊開始"}
@@ -3684,10 +3684,10 @@ function previewForAsset(assetKey: string, value: any, lang: "zh-TW" | "en" = "z
             display: "inline-block", margin: "1px 3px 1px 0",
             padding: "1px 6px", borderRadius: 999,
             background: "rgba(255,255,255,0.7)", color: "#374151",
-            fontSize: 10, fontWeight: 500,
+            fontSize: 12, fontWeight: 500,
           }}>{x.length > 14 ? x.slice(0, 14) + "…" : x}</span>
         ))}
-        {cleaned.length > 4 && <span style={{ color: "#9CA3AF", fontSize: 10 }}>+{cleaned.length - 4}</span>}
+        {cleaned.length > 4 && <span style={{ color: "#9CA3AF", fontSize: 12 }}>+{cleaned.length - 4}</span>}
       </span>
     );
   }
@@ -3704,7 +3704,7 @@ function previewForAsset(assetKey: string, value: any, lang: "zh-TW" | "en" = "z
             <span style={{ color: "#374151", fontWeight: 500 }}>{p.to}</span>
           </span>
         ))}
-        {ps.length > 3 && <span style={{ color: "#9CA3AF", fontSize: 10 }}>+{ps.length - 3}{lang === "en" ? "" : " 條"}</span>}
+        {ps.length > 3 && <span style={{ color: "#9CA3AF", fontSize: 12 }}>+{ps.length - 3}{lang === "en" ? "" : " 條"}</span>}
       </span>
     );
   }
@@ -3717,7 +3717,7 @@ function previewForAsset(assetKey: string, value: any, lang: "zh-TW" | "en" = "z
         {colors.slice(0, 6).map((c: any, i: number) => (
           <span key={i} style={{
             display: "inline-flex", alignItems: "center", gap: 4,
-            fontSize: 10, color: "#374151",
+            fontSize: 12, color: "#374151",
           }}>
             <span style={{
               width: 14, height: 14, borderRadius: 4,
@@ -3733,7 +3733,7 @@ function previewForAsset(assetKey: string, value: any, lang: "zh-TW" | "en" = "z
   // LogoFields: { primaryUrl, ... }
   if (assetKey === "logo" && (v.primaryUrl || v.iconUrl || v.darkUrl)) {
     return (
-      <span style={{ fontSize: 10 }}>
+      <span style={{ fontSize: 12 }}>
         {v.primaryUrl && <span style={{ display: "block", color: "#374151" }}>{lang === "en" ? "Primary logo: " : "主 logo: "}{String(v.primaryUrl).slice(0, 40)}…</span>}
         {v.guidelines && <span style={{ display: "block", color: "#6B7280", marginTop: 2 }}>{String(v.guidelines).slice(0, 60)}</span>}
       </span>
@@ -3785,7 +3785,7 @@ function VisualNavItem({ id, label, badge, active, onClick }: {
       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
       {badge && (
         <span style={{
-          fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 20,
+          fontSize: 12, fontWeight: 700, padding: "1px 6px", borderRadius: 20,
           background: "rgba(163,112,252,0.20)", color: "rgb(74,46,126)",
           flexShrink: 0,
         }}>{badge}</span>
@@ -3795,7 +3795,7 @@ function VisualNavItem({ id, label, badge, active, onClick }: {
           width: 18, height: 18, borderRadius: 4, flexShrink: 0,
           background: "rgba(163,112,252,0.20)", display: "flex",
           alignItems: "center", justifyContent: "center",
-          fontSize: 11, color: "rgb(74,46,126)", fontWeight: 700,
+          fontSize: 12, color: "rgb(74,46,126)", fontWeight: 700,
         }}>+</span>
       )}
     </button>
@@ -4555,7 +4555,7 @@ function PositioningTopRow({
                 short of a full page reload. */}
             <button
               onClick={() => utils?.positioningJobs?.getStatus?.invalidate?.()}
-              className="text-[11px] text-default-500 hover:text-default-800 underline"
+              className="text-[12px] text-default-500 hover:text-default-800 underline"
               title={lang === "en" ? "Force-refresh status" : "強制重新查詢狀態"}
             >
               {lang === "en" ? "refresh" : "重新查詢"}
@@ -4603,7 +4603,7 @@ function KickerRow({
     <div className="mt-4 flex items-center gap-2 text-tiny text-default-600 flex-wrap justify-center">
       <span
         className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
-        style={{ background: "#7C3AED", fontSize: 9, letterSpacing: "0.15em" }}
+        style={{ background: "#7C3AED", fontSize: 12, letterSpacing: "0.15em" }}
       >
         BRAND WORKSPACE
       </span>
@@ -4850,7 +4850,7 @@ function CopyTabInline({
             ? (lang === "en" ? "Click to unlock copy" : "點擊解鎖文字")
             : (lang === "en" ? "Click to lock copy (becomes the single source of truth)" : "點擊鎖定文字（全平台用這份做為單一真相）")}
         >
-          <FontAwesomeIcon icon={locked ? faLock : faLockOpen} className="text-[11px]" />
+          <FontAwesomeIcon icon={locked ? faLock : faLockOpen} className="text-[12px]" />
           {locked
             ? (lang === "en" ? "Locked · click to unlock" : "已鎖定 · 點此解鎖")
             : (lang === "en" ? "Lock copy" : "鎖定文字")}
@@ -5061,7 +5061,7 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #E5E7EB" }}>
           <div>
-            <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#78716C", margin: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#78716C", margin: 0 }}>
               {en ? "Branded variants" : "品牌變體"}
             </p>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: "#171717", margin: "3px 0 0" }}>
@@ -5100,7 +5100,7 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
           {variants && variants.length > 0 && (
             <>
               {cutoutAvailable === false && (
-                <p style={{ fontSize: 11, color: "#92400E", background: "#FEF3C7", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>
+                <p style={{ fontSize: 12, color: "#92400E", background: "#FEF3C7", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>
                   {en
                     ? "⚠ REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
                     : "⚠ 還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
@@ -5119,14 +5119,14 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
                       style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, border: "1px solid #E5E7EB" }}
                     />
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                      <span style={{ fontSize: 11, color: "#78716C", fontWeight: 500 }}>
+                      <span style={{ fontSize: 12, color: "#78716C", fontWeight: 500 }}>
                         {v.layout}
                       </span>
                       <a
                         href={v.pngDataUrl}
                         download={`${title}_${v.layout}.png`}
                         style={{
-                          fontSize: 11, fontWeight: 600, color: "#E85D2E",
+                          fontSize: 12, fontWeight: 600, color: "#E85D2E",
                           textDecoration: "none", padding: "4px 8px",
                           border: "1px solid #E85D2E", borderRadius: 6,
                         }}
@@ -5232,7 +5232,7 @@ function BrandPaletteHero({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12, flexWrap: "wrap" }}>
         <div>
           <p style={{
-            fontSize: 10, fontWeight: 600, letterSpacing: "0.18em",
+            fontSize: 12, fontWeight: 600, letterSpacing: "0.18em",
             textTransform: "uppercase", color: "#78716C", margin: 0,
           }}>
             {en ? "Brand DNA · Color palette" : "品牌 DNA · 色彩"}
@@ -5253,7 +5253,7 @@ function BrandPaletteHero({
             <span
               title={en ? "User-locked — re-extracting will overwrite manual edits" : "已鎖定 — 重新萃取會覆寫手動編輯"}
               style={{
-                fontSize: 10, fontWeight: 600, padding: "3px 8px",
+                fontSize: 12, fontWeight: 600, padding: "3px 8px",
                 borderRadius: 4, background: "#FEF3C7", color: "#92400E",
                 letterSpacing: "0.08em", textTransform: "uppercase",
               }}
@@ -5365,7 +5365,7 @@ function BrandPaletteHero({
                 }}
               >
                 <span style={{
-                  fontSize: 9, fontWeight: 700, letterSpacing: "0.12em",
+                  fontSize: 12, fontWeight: 700, letterSpacing: "0.12em",
                   textTransform: "uppercase", opacity: 0.85,
                 }}>
                   {s.role}
@@ -5374,7 +5374,7 @@ function BrandPaletteHero({
                   <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.01em" }}>
                     {s.hex.toUpperCase()}
                   </div>
-                  <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+                  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
                     {(s.weight * 100).toFixed(0)}%
                   </div>
                 </div>
@@ -5419,12 +5419,12 @@ function ProductCardThumbnail({ imageUrl, name, en }: { imageUrl?: string; name:
       ) : (
         <div className={`flex flex-col items-center gap-1 px-3 text-center ${failed ? "text-amber-700" : "text-neutral-400"}`}>
           <FontAwesomeIcon icon={faBox} className="text-2xl" />
-          <span className="text-[10px] font-semibold tracking-wide">
+          <span className="text-[12px] font-semibold tracking-wide">
             {failed
               ? (en ? "Image link expired" : "圖片連結已失效")
               : (en ? "No image" : "尚無圖片")}
           </span>
-          <span className="text-[9px] opacity-80">
+          <span className="text-[12px] opacity-80">
             {en ? "Open this product to fix it" : "點擊查看以修正"}
           </span>
         </div>
@@ -5580,40 +5580,40 @@ function BrandEntityGrid({
                 {/* Name */}
                 <p className="text-sm font-semibold text-neutral-900 mb-2 truncate">{item.name}</p>
                 {kind === "product" && preview.price && (
-                  <p className="text-[10px] font-medium text-neutral-500 -mt-1 mb-2">{preview.price}</p>
+                  <p className="text-[12px] font-medium text-neutral-500 -mt-1 mb-2">{preview.price}</p>
                 )}
 
                 {positioned ? (
                   <div className="space-y-1.5">
                     {preview.tagline && (
                       <div>
-                        <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">
+                        <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
                           {kind === "product" ? (en ? "Tagline" : "標語") : (en ? "Theme" : "主軸")}
                         </span>
-                        <p className="text-[11px] text-neutral-700 leading-tight line-clamp-2 mt-0.5">{preview.tagline}</p>
+                        <p className="text-[12px] text-neutral-700 leading-tight line-clamp-2 mt-0.5">{preview.tagline}</p>
                       </div>
                     )}
                     {preview.usp && (
                       <div>
-                        <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">
+                        <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
                           {kind === "product" ? "USP" : (en ? "CTA / Offer" : "CTA / 優惠")}
                         </span>
-                        <p className="text-[11px] text-neutral-600 line-clamp-1 mt-0.5">{preview.usp}</p>
+                        <p className="text-[12px] text-neutral-600 line-clamp-1 mt-0.5">{preview.usp}</p>
                       </div>
                     )}
                     {preview.audience && (
                       <div>
-                        <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">
+                        <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
                           {kind === "product" ? (en ? "Audience" : "受眾") : (en ? "Period" : "時間")}
                         </span>
-                        <p className="text-[11px] text-neutral-500 line-clamp-1 mt-0.5">{preview.audience}</p>
+                        <p className="text-[12px] text-neutral-500 line-clamp-1 mt-0.5">{preview.audience}</p>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 mt-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                    <span className="text-[11px] text-neutral-400">
+                    <span className="text-[12px] text-neutral-400">
                       {en ? "Positioning not yet run" : "尚未建立定位"}
                     </span>
                   </div>
@@ -5628,7 +5628,7 @@ function BrandEntityGrid({
                       <button
                         onClick={(e) => { e.stopPropagation(); if (!isRunning) onPosition(item.id); }}
                         disabled={isRunning}
-                        className={`text-[10px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
+                        className={`text-[12px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
                           isRunning
                             ? "bg-indigo-100 text-indigo-500 cursor-wait animate-pulse"
                             : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
@@ -5685,7 +5685,7 @@ function BrandEntityGrid({
                           });
                         }
                       }}
-                      className="text-[10px] font-medium px-2 py-1 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
+                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
                       title={en ? "Generate 4 branded variants" : "用品牌色生成 4 種變體"}
                     >
                       {en ? "Variants" : "品牌變體"}
@@ -5694,7 +5694,7 @@ function BrandEntityGrid({
                   {/* Open */}
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpen(item.id); }}
-                    className="text-[10px] font-medium px-2 py-1 rounded-md bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition"
+                    className="text-[12px] font-medium px-2 py-1 rounded-md bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition"
                   >
                     {en ? "View" : "查看"}
                   </button>
@@ -5708,7 +5708,7 @@ function BrandEntityGrid({
                         onDelete(item.id);
                       }
                     }}
-                    className="text-[10px] px-2 py-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition"
+                    className="text-[12px] px-2 py-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition"
                     title={en ? "Delete" : "刪除"}
                   >
                     ✕

@@ -88,7 +88,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
           className="text-xs font-semibold px-4 py-2 rounded-full text-white transition flex items-center gap-1.5"
           style={{ background: connecting ? "#D6D3D1" : PROVIDER_TONE[provider] }}
         >
-          {connecting ? <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: 11 }} /> : <FontAwesomeIcon icon={PROVIDER_ICON[provider]} style={{ fontSize: 11 }} />}
+          {connecting ? <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: 12 }} /> : <FontAwesomeIcon icon={PROVIDER_ICON[provider]} style={{ fontSize: 12 }} />}
           {connecting ? (en ? "Connecting…" : "連接中…") : (en ? `Connect ${PROVIDER_LABEL[provider]}` : `連接 ${PROVIDER_LABEL[provider]}`)}
         </button>
       </div>
@@ -101,7 +101,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1 text-[11px] text-default-500 flex-wrap">
+        <div className="flex items-center gap-1 text-[12px] text-default-500 flex-wrap">
           {path.map((p, i) => (
             <span key={i} className="flex items-center gap-1">
               {i > 0 && <span className="text-default-300">/</span>}
@@ -114,7 +114,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
             </span>
           ))}
         </div>
-        {accountEmail && <span className="text-[10px] text-default-400 truncate max-w-[140px]">{accountEmail}</span>}
+        {accountEmail && <span className="text-[12px] text-default-400 truncate max-w-[140px]">{accountEmail}</span>}
       </div>
 
       <div className="rounded-lg border border-default-200 max-h-56 overflow-y-auto divide-y divide-default-100">
@@ -123,7 +123,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
             onClick={() => setPath((p) => p.slice(0, -1))}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-default-500 hover:bg-default-50"
           >
-            <FontAwesomeIcon icon={faChevronLeft} style={{ fontSize: 10 }} /> {en ? "Back" : "上一層"}
+            <FontAwesomeIcon icon={faChevronLeft} style={{ fontSize: 12 }} /> {en ? "Back" : "上一層"}
           </button>
         )}
         {listQ?.isLoading && <div className="px-3 py-4 text-center text-xs text-default-400">{en ? "Loading…" : "載入中…"}</div>}
@@ -148,11 +148,11 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
                   <button
                     disabled={isAdded}
                     onClick={() => onAdd({ provider, fileId: f.id, name: f.name })}
-                    className={`shrink-0 text-[11px] font-medium px-2 py-1 rounded-full flex items-center gap-1 ${
+                    className={`shrink-0 text-[12px] font-medium px-2 py-1 rounded-full flex items-center gap-1 ${
                       isAdded ? "text-emerald-600 bg-emerald-50" : "text-orange-600 bg-orange-50 hover:bg-orange-100"
                     }`}
                   >
-                    <FontAwesomeIcon icon={faPlus} style={{ fontSize: 9 }} /> {isAdded ? (en ? "Added" : "已加入") : (en ? "Add" : "加入")}
+                    <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} /> {isAdded ? (en ? "Added" : "已加入") : (en ? "Add" : "加入")}
                   </button>
                 </>
               )}
@@ -182,11 +182,11 @@ export default function CloudFilePicker({ brandId, sources, onAdd, onRemove }: {
           <button
             key={p}
             onClick={() => setTab(p)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium border transition ${
               tab === p ? "border-default-900 bg-default-900 text-white" : "border-default-200 bg-white text-default-500 hover:border-default-400"
             }`}
           >
-            <FontAwesomeIcon icon={PROVIDER_ICON[p]} style={{ color: tab === p ? "#fff" : PROVIDER_TONE[p], fontSize: 11 }} />
+            <FontAwesomeIcon icon={PROVIDER_ICON[p]} style={{ color: tab === p ? "#fff" : PROVIDER_TONE[p], fontSize: 12 }} />
             {PROVIDER_LABEL[p]}
           </button>
         ))}
@@ -198,15 +198,15 @@ export default function CloudFilePicker({ brandId, sources, onAdd, onRemove }: {
         <div className="mt-3 space-y-1.5">
           {sources.map((s) => (
             <div key={`${s.provider}:${s.fileId}`} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-default-50 text-xs">
-              <FontAwesomeIcon icon={PROVIDER_ICON[s.provider]} style={{ color: PROVIDER_TONE[s.provider], fontSize: 11 }} />
+              <FontAwesomeIcon icon={PROVIDER_ICON[s.provider]} style={{ color: PROVIDER_TONE[s.provider], fontSize: 12 }} />
               <span className="flex-1 min-w-0 truncate text-default-700">{s.name}</span>
-              <button onClick={() => onRemove(`${s.provider}:${s.fileId}`)} className="text-default-300 hover:text-danger-500 text-[10px]">✕</button>
+              <button onClick={() => onRemove(`${s.provider}:${s.fileId}`)} className="text-default-300 hover:text-danger-500 text-[12px]">✕</button>
             </div>
           ))}
         </div>
       )}
-      <p className="mt-2 text-[10px] text-default-400 leading-relaxed flex items-start gap-1">
-        <FontAwesomeIcon icon={faLink} style={{ fontSize: 9, marginTop: 2 }} />
+      <p className="mt-2 text-[12px] text-default-400 leading-relaxed flex items-start gap-1">
+        <FontAwesomeIcon icon={faLink} style={{ fontSize: 12, marginTop: 2 }} />
         {en ? "Files stay private — only the ones you add here are downloaded, transcribed, then discarded. Size limit ~24MB per file." : "檔案維持私人 — 只有你在這裡加入的檔案會被下載、轉成逐字稿後即捨棄。單檔上限約 24MB。"}
       </p>
     </div>

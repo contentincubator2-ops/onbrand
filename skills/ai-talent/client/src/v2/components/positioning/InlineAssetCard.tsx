@@ -88,7 +88,7 @@ export default function InlineAssetCard({
         <Icon size={12} strokeWidth={1.8} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />
         {eyebrow && (
           <span style={{
-            fontSize: 9, fontWeight: 700, color: "#525252",
+            fontSize: 12, fontWeight: 700, color: "#525252",
             letterSpacing: "0.2em", textTransform: "uppercase",
             fontVariantNumeric: "tabular-nums",
           }}>
@@ -99,14 +99,14 @@ export default function InlineAssetCard({
         {filling ? (
           <span style={{
             display: "inline-flex", alignItems: "center", gap: 4,
-            fontSize: 9, fontWeight: 600, letterSpacing: "0.18em",
+            fontSize: 12, fontWeight: 600, letterSpacing: "0.18em",
             textTransform: "uppercase", color: "#171717",
           }}>
             <Sparkles size={10} className="animate-pulse" /> Writing
           </span>
         ) : filled && (
           <span style={{
-            fontSize: 9, fontWeight: 600, color: "#171717",
+            fontSize: 12, fontWeight: 600, color: "#171717",
             letterSpacing: "0.18em", textTransform: "uppercase",
           }}>
             Filled
@@ -170,7 +170,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {items.length === 0 && (
         <div style={{
-          fontSize: 11.5, color: "#525252", fontStyle: "italic",
+          fontSize: 12.5, color: "#525252", fontStyle: "italic",
           padding: "4px 0",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         }}>
@@ -180,7 +180,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
       {items.map((it, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid #D4D4D4", padding: "4px 0" }}>
           <span style={{
-            fontSize: 9, color: "#525252", fontFamily: "system-ui",
+            fontSize: 12, color: "#525252", fontFamily: "system-ui",
             letterSpacing: "0.1em", minWidth: 18, textAlign: "right",
           }}>
             {String(i + 1).padStart(2, "0")}
@@ -213,7 +213,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
         onClick={() => setItems([...items, ""])}
         style={{
           alignSelf: "flex-start", marginTop: 6, padding: "3px 0",
-          fontSize: 11, color: "#525252", background: "transparent",
+          fontSize: 12, color: "#525252", background: "transparent",
           border: "none", cursor: "pointer", display: "flex",
           alignItems: "center", gap: 4, letterSpacing: "0.05em",
         }}
@@ -233,7 +233,7 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {pairs.length === 0 && (
         <div style={{
-          fontSize: 11.5, color: "#525252", fontStyle: "italic",
+          fontSize: 12.5, color: "#525252", fontStyle: "italic",
           padding: "4px 0",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         }}>
@@ -270,7 +270,7 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
         onClick={() => setPairs([...pairs, { from: "", to: "" }])}
         style={{
           alignSelf: "flex-start", marginTop: 6, padding: "3px 0",
-          fontSize: 11, color: "#525252", background: "transparent",
+          fontSize: 12, color: "#525252", background: "transparent",
           border: "none", cursor: "pointer", display: "flex",
           alignItems: "center", gap: 4, letterSpacing: "0.05em",
         }}

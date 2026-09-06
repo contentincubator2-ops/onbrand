@@ -486,7 +486,7 @@ export default function CalendarPage() {
       {/* ── Hero header ──────────────────────────────────────────── */}
       <div className="pt-8 pb-4 px-6 text-center">
         <div className="flex flex-col items-center max-w-[1100px] mx-auto">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-2">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-2">
             {lang === "en" ? "PUBLISHING · CONTENT CALENDAR" : "日曆 · 排程 & 發布管理"}
           </p>
           <h1
@@ -524,7 +524,7 @@ export default function CalendarPage() {
             </button>
             <div className="flex items-center gap-2 mb-3">
               <Info size={14} className="text-emerald-700" />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+              <span className="text-[12px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
                 {lang === "en" ? "HOW TO PUBLISH A POST" : "如何發布一篇貼文"}
               </span>
             </div>
@@ -557,7 +557,7 @@ export default function CalendarPage() {
               ].map((s) => (
                 <div key={s.step} className="flex items-start gap-3">
                   <div
-                    className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold text-white mt-0.5"
+                    className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[12px] font-bold text-white mt-0.5"
                     style={{ background: s.color }}
                   >
                     {s.step}
@@ -566,7 +566,7 @@ export default function CalendarPage() {
                     <p className="text-[12px] font-semibold text-default-900">
                       {lang === "en" ? s.en : s.zh}
                     </p>
-                    <p className="text-[11px] text-default-500 mt-0.5 leading-relaxed">
+                    <p className="text-[12px] text-default-500 mt-0.5 leading-relaxed">
                       {lang === "en" ? s.desc_en : s.desc_zh}
                     </p>
                   </div>
@@ -630,7 +630,7 @@ export default function CalendarPage() {
                   d.setHours(0, 0, 0, 0);
                   setWeekStart(d);
                 }}
-                className="ml-1 px-2.5 py-1 text-[11px] border border-default-300 rounded hover:border-default-900"
+                className="ml-1 px-2.5 py-1 text-[12px] border border-default-300 rounded hover:border-default-900"
               >
                 {lang === "en" ? "Today" : "今天"}
               </button>
@@ -654,7 +654,7 @@ export default function CalendarPage() {
               </button>
               <button
                 onClick={() => setMonthCursor(new Date(today.getFullYear(), today.getMonth(), 1))}
-                className="ml-1 px-2.5 py-1 text-[11px] border border-default-300 rounded hover:border-default-900"
+                className="ml-1 px-2.5 py-1 text-[12px] border border-default-300 rounded hover:border-default-900"
               >
                 {lang === "en" ? "Today" : "今天"}
               </button>
@@ -663,7 +663,7 @@ export default function CalendarPage() {
         </div>
 
         {/* Legend */}
-        <div className="hidden md:flex items-center gap-3 text-[11px] text-default-600">
+        <div className="hidden md:flex items-center gap-3 text-[12px] text-default-600">
           <span className="flex items-center gap-1.5">
             <Clock size={11} className="text-default-400" />
             {lang === "en" ? "Scheduled" : "待發布"}
@@ -694,7 +694,7 @@ export default function CalendarPage() {
             </p>
             <button
               onClick={() => rangeQ?.refetch?.()}
-              className="flex items-center gap-1 px-3 py-1 rounded text-[11px] font-medium text-red-700 hover:bg-red-100"
+              className="flex items-center gap-1 px-3 py-1 rounded text-[12px] font-medium text-red-700 hover:bg-red-100"
             >
               <RefreshCw size={11} />
               {lang === "en" ? "Retry" : "重試"}
@@ -734,7 +734,7 @@ export default function CalendarPage() {
                       }}
                     >
                       <p
-                        className="text-[10px] font-semibold uppercase tracking-[0.15em] mb-1"
+                        className="text-[12px] font-semibold uppercase tracking-[0.15em] mb-1"
                         style={{ color: isT ? "rgba(255,255,255,0.7)" : isPast ? "#a3a3a3" : "#525252" }}
                       >
                         {weekdayLabel}
@@ -746,7 +746,7 @@ export default function CalendarPage() {
                         {d.getDate()}
                       </p>
                       <p
-                        className="text-[10px] mt-0.5"
+                        className="text-[12px] mt-0.5"
                         style={{ color: isT ? "rgba(255,255,255,0.55)" : "#a3a3a3" }}
                       >
                         {d.toLocaleDateString(lang === "en" ? "en-US" : "zh-TW", { month: "short" })}
@@ -782,7 +782,7 @@ export default function CalendarPage() {
                       <div className="flex-1 p-2 flex flex-col gap-1.5">
                         {dayItems.length === 0 && !isLoading && (
                           <div className="flex-1 flex flex-col items-center justify-center py-6">
-                            <p className="text-[10px] text-default-300 text-center leading-relaxed">
+                            <p className="text-[12px] text-default-300 text-center leading-relaxed">
                               {isPast
                                 ? (lang === "en" ? "No posts" : "無發布記錄")
                                 : (lang === "en" ? "Nothing\nscheduled" : "尚無排程")}
@@ -814,7 +814,7 @@ export default function CalendarPage() {
                         <div className="p-2 pt-0">
                           <button
                             onClick={() => setPickerDate(d)}
-                            className="w-full py-2 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1 transition-colors"
+                            className="w-full py-2 rounded-lg text-[12px] font-medium flex items-center justify-center gap-1 transition-colors"
                             style={{
                               border: "1px dashed #D4D4D4",
                               color: "#a3a3a3",
@@ -864,7 +864,7 @@ export default function CalendarPage() {
                 <p className="text-[13px] font-semibold text-default-700 mb-0.5">
                   {lang === "en" ? "No posts scheduled this month" : "本月尚無排程或發布記錄"}
                 </p>
-                <p className="text-[11px] text-default-400">
+                <p className="text-[12px] text-default-400">
                   {lang === "en"
                     ? "Run a task → click \"Schedule\" on the result page → appears here."
                     : "跑任務 → 在結果頁按「排程」→ 選日期 → 貼文自動出現在這裡。"}
@@ -891,7 +891,7 @@ export default function CalendarPage() {
                 ).map((dw) => (
                   <div
                     key={dw}
-                    className="text-[10px] font-semibold uppercase tracking-[0.18em] text-default-500 py-2 px-3 border-r border-default-200 last:border-r-0"
+                    className="text-[12px] font-semibold uppercase tracking-[0.18em] text-default-500 py-2 px-3 border-r border-default-200 last:border-r-0"
                   >
                     {dw}
                   </div>
@@ -916,7 +916,7 @@ export default function CalendarPage() {
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span
-                          className="text-[11px] font-semibold tabular-nums"
+                          className="text-[12px] font-semibold tabular-nums"
                           style={{
                             color: isT ? "white" : "#525252",
                             background: isT ? "#171717" : "transparent",
@@ -927,7 +927,7 @@ export default function CalendarPage() {
                           {dc.date.getDate()}
                         </span>
                         {cellItems.length > 2 && (
-                          <span className="text-[9px] text-default-500 font-medium">
+                          <span className="text-[12px] text-default-500 font-medium">
                             +{cellItems.length - 2}
                           </span>
                         )}
@@ -942,7 +942,7 @@ export default function CalendarPage() {
                             <button
                               key={j}
                               onClick={() => navigate(`/run/${it.outputId}`)}
-                              className="w-full text-left text-[10px] truncate px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-default-100"
+                              className="w-full text-left text-[12px] truncate px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-default-100"
                               title={`${it.brandName ?? ""}・${it.preview ?? it.missionTitle ?? ""}`}
                               style={{ borderLeft: `2px solid ${color}` }}
                             >
@@ -956,7 +956,7 @@ export default function CalendarPage() {
                       {dc.inMonth && !isPast && (
                         <button
                           onClick={() => setPickerDate(dc.date)}
-                          className="mt-auto w-full py-0.5 rounded text-[9px] text-default-300 hover:text-violet-600 hover:bg-violet-50 flex items-center justify-center gap-0.5 transition-colors"
+                          className="mt-auto w-full py-0.5 rounded text-[12px] text-default-300 hover:text-violet-600 hover:bg-violet-50 flex items-center justify-center gap-0.5 transition-colors"
                         >
                           <Plus size={9} />
                         </button>
@@ -1067,7 +1067,7 @@ export default function CalendarPage() {
                   className="w-full text-left px-3 py-2 rounded-lg border border-default-200 hover:border-blue-400 hover:bg-blue-50 text-[13px]"
                 >
                   <span className="font-medium">{p.name}</span>
-                  {p.category && <span className="ml-2 text-[11px] text-default-400">{p.category}</span>}
+                  {p.category && <span className="ml-2 text-[12px] text-default-400">{p.category}</span>}
                 </button>
               ))}
             </div>
@@ -1139,22 +1139,22 @@ function PostPill({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1 mb-0.5">
             <StatusIcon size={9} style={{ color: statusColor }} />
-            <span className="text-[9px] font-semibold" style={{ color: statusColor }}>
+            <span className="text-[12px] font-semibold" style={{ color: statusColor }}>
               {isPublished
                 ? (lang === "en" ? "Published" : "已發布")
                 : isFailed
                 ? (lang === "en" ? "Failed" : "失敗")
                 : (lang === "en" ? "Scheduled" : "待發布")}
             </span>
-            <span className="text-[9px] text-default-400 ml-auto">
+            <span className="text-[12px] text-default-400 ml-auto">
               {getPlatformLabel(item.platform)}
             </span>
           </div>
-          <p className="text-[11px] text-default-900 font-medium truncate leading-tight">
+          <p className="text-[12px] text-default-900 font-medium truncate leading-tight">
             {String(item.preview || item.missionTitle || "—")}
           </p>
           {publishedTime && (
-            <p className="text-[9px] text-default-400 mt-0.5">{publishedTime}</p>
+            <p className="text-[12px] text-default-400 mt-0.5">{publishedTime}</p>
           )}
         </div>
       </button>
@@ -1167,7 +1167,7 @@ function PostPill({
         >
           <button
             onClick={() => navigate(`/run/${item.outputId}`)}
-            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-white border border-default-200 hover:border-default-500 text-default-700"
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-white border border-default-200 hover:border-default-500 text-default-700"
           >
             <ExternalLink size={9} />
             {lang === "en" ? "View" : "查看"}
@@ -1205,7 +1205,7 @@ function PostPill({
                     }
                   }}
                   disabled={publishing}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-white disabled:opacity-50"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-semibold text-white disabled:opacity-50"
                   style={{ background: publishing ? "#525252" : "#171717" }}
                 >
                   {publishing
@@ -1214,7 +1214,7 @@ function PostPill({
                 </button>
               )}
               {publishError && (
-                <div className="w-full mt-1 px-2 py-1.5 rounded-lg text-[10px] leading-relaxed space-y-1.5"
+                <div className="w-full mt-1 px-2 py-1.5 rounded-lg text-[12px] leading-relaxed space-y-1.5"
                   style={{ background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412" }}>
                   <p>⚠️ {publishError}</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -1229,7 +1229,7 @@ function PostPill({
                         onFocus={() => {
                           if (onPrefetchFacebook) void onPrefetchFacebook(item.brandId).catch(() => {});
                         }}
-                        className="px-2 py-1 rounded text-[10px] font-semibold text-white"
+                        className="px-2 py-1 rounded text-[12px] font-semibold text-white"
                         style={{ background: "#1877F2" }}
                       >
                         🔗 {lang === "en" ? "Connect Facebook" : "連接 Facebook"}
@@ -1237,7 +1237,7 @@ function PostPill({
                     )}
                     <button
                       onClick={() => navigate(`/run/${item.outputId}`)}
-                      className="px-2 py-1 rounded text-[10px] font-medium bg-white border border-orange-300 text-orange-800"
+                      className="px-2 py-1 rounded text-[12px] font-medium bg-white border border-orange-300 text-orange-800"
                     >
                       {lang === "en" ? "View post →" : "查看貼文 →"}
                     </button>
@@ -1246,7 +1246,7 @@ function PostPill({
               )}
               <button
                 onClick={() => onReschedule(item.id, item.at)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-white border border-violet-200 hover:border-violet-500 text-violet-700"
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-white border border-violet-200 hover:border-violet-500 text-violet-700"
               >
                 <RefreshCw size={9} />
                 {lang === "en" ? "Reschedule" : "改時間"}
@@ -1258,7 +1258,7 @@ function PostPill({
                   try { await onCancel(item.id); } finally { setCancelling(false); }
                 }}
                 disabled={cancelling}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-white border border-red-200 hover:border-red-400 text-red-600 disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-white border border-red-200 hover:border-red-400 text-red-600 disabled:opacity-50"
               >
                 <Trash2 size={9} />
                 {cancelling
@@ -1272,7 +1272,7 @@ function PostPill({
               href={item.externalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 border border-emerald-200 text-emerald-700 hover:border-emerald-500"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-emerald-50 border border-emerald-200 text-emerald-700 hover:border-emerald-500"
             >
               <ExternalLink size={9} />
               {lang === "en" ? "Live link" : "查看原文"}
@@ -1312,7 +1312,7 @@ function PlatformPickerModal({
         {/* Header */}
         <div className="px-6 py-5 flex items-center justify-between" style={{ borderBottom: "1px solid #E5E5E5" }}>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-default-500 mb-0.5">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-default-500 mb-0.5">
               {lang === "en" ? "NEW POST" : "新增貼文"}
             </p>
             <h2 className="text-[15px] font-semibold text-default-900">
@@ -1347,13 +1347,13 @@ function PlatformPickerModal({
                 style={{ border: `1px solid ${p.color}33`, background: `${p.color}08` }}
               >
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold"
                   style={{ background: p.color }}
                 >
                   {p.label.slice(0, 2)}
                 </div>
                 <span
-                  className="text-[10px] font-medium text-center leading-tight"
+                  className="text-[12px] font-medium text-center leading-tight"
                   style={{ color: p.color }}
                 >
                   {p.label}
@@ -1365,7 +1365,7 @@ function PlatformPickerModal({
 
         {/* Footer note */}
         <div className="px-6 pb-5">
-          <p className="text-[11px] text-default-400 text-center">
+          <p className="text-[12px] text-default-400 text-center">
             {lang === "en"
               ? "After AI generates the post, click \"Schedule\" on the result page to save it here."
               : "AI 生成完成後，在結果頁按「排程發布」→ 選擇時間 → 貼文就會出現在這裡。"}
@@ -1431,7 +1431,7 @@ function FestivalNudgeBanner({
       >
         <div className="flex items-center gap-2 mb-2">
           <Sparkles size={13} className="text-default-700" strokeWidth={2} />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-default-600">
+          <span className="text-[12px] font-semibold uppercase tracking-[0.22em] text-default-600">
             {lang === "en" ? "UPCOMING · Holidays & festivals" : "UPCOMING · 接下來的節慶"}
           </span>
         </div>
@@ -1451,7 +1451,7 @@ function FestivalNudgeBanner({
                     <span className="text-[13px] font-semibold text-default-900">
                       {String(lang === "en" ? (f.name_en ?? f.name_zh ?? "") : (f.name_zh ?? ""))}
                     </span>
-                    <span className="text-[11px] text-default-500 tabular-nums">
+                    <span className="text-[12px] text-default-500 tabular-nums">
                       {new Date(f.date).toLocaleDateString(
                         lang === "en" ? "en-US" : "zh-TW",
                         { month: "short", day: "numeric" }
@@ -1469,7 +1469,7 @@ function FestivalNudgeBanner({
                     if (!hint || typeof hint !== "string") return null;
                     return (
                       <p
-                        className="text-[11px] mt-0.5 line-clamp-1 text-default-500 italic"
+                        className="text-[12px] mt-0.5 line-clamp-1 text-default-500 italic"
                         style={{ fontFamily: '"Source Serif Pro","Noto Serif TC",Georgia,serif' }}
                       >
                         {hint}

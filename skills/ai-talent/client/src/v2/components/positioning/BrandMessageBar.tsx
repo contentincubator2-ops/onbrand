@@ -54,7 +54,7 @@ export default function BrandMessageBar({ brandId }: Props) {
         style={{ height: 64 }}
       >
         <span
-          className="text-[10px] font-semibold px-2.5 py-1 rounded-full shrink-0 tracking-wide"
+          className="text-[12px] font-semibold px-2.5 py-1 rounded-full shrink-0 tracking-wide"
           style={{ background: pillColor.bg, color: pillColor.fg }}
         >
           {pillColor.label}

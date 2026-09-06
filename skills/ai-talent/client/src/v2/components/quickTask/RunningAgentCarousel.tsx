@@ -160,7 +160,7 @@ export default function RunningAgentCarousel({
             className="absolute font-bold tabular-nums"
             style={{
               bottom: -4, right: -4,
-              fontSize: 11,
+              fontSize: 12,
               padding: "2px 6px",
               background: accentColor,
               color: "white",
@@ -201,7 +201,7 @@ export default function RunningAgentCarousel({
           ring above IS the progress indicator now. Only keep elapsed
           timestamp text. */}
       {elapsedText && (
-        <div className="mt-3 text-[10px] text-default-400 text-center tabular-nums">
+        <div className="mt-3 text-[12px] text-default-400 text-center tabular-nums">
           {elapsedText}
         </div>
       )}

@@ -116,14 +116,14 @@ export default function WorkspacePill() {
                 </span>
               </div>
               {w.id === activeId && (
-                <span className="text-[10px] text-emerald-600 font-medium">使用中</span>
+                <span className="text-[12px] text-emerald-600 font-medium">使用中</span>
               )}
             </button>
           ))}
           <div className="border-t border-neutral-100 mt-1 pt-1 px-3 py-2">
             <button
               onClick={() => { setOpen(false); navigate("/settings/workspace"); }}
-              className="text-[11px] text-neutral-500 hover:text-neutral-800 transition"
+              className="text-[12px] text-neutral-500 hover:text-neutral-800 transition"
             >
               {lang === "en" ? "Manage workspace →" : "管理工作空間 →"}
             </button>

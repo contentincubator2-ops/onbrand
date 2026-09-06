@@ -57,7 +57,7 @@ export default function AdminActivationPage() {
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
           <div style={{
-            display: "inline-block", fontSize: 11, fontWeight: 700,
+            display: "inline-block", fontSize: 12, fontWeight: 700,
             letterSpacing: "0.2em", textTransform: "uppercase",
             background: C.orangeChip, color: C.orangeDark,
             padding: "5px 11px", borderRadius: 5, marginBottom: 12,
@@ -149,7 +149,7 @@ export default function AdminActivationPage() {
             boxShadow: `4px 4px 0 ${C.ink}`,
           }}>
             <div style={{
-              fontSize: 11, fontWeight: 900, letterSpacing: "0.18em",
+              fontSize: 12, fontWeight: 900, letterSpacing: "0.18em",
               color: C.orangeDark, marginBottom: 16, textTransform: "uppercase",
             }}>
               漏斗 · {days} 天
@@ -181,7 +181,7 @@ export default function AdminActivationPage() {
                       </span>
                       {dropFromPrev > 0 && (
                         <span style={{
-                          fontSize: 11, color: "#dc2626", marginLeft: 6,
+                          fontSize: 12, color: "#dc2626", marginLeft: 6,
                           fontWeight: 700,
                         }}>
                           ↓ {dropFromPrev}
@@ -215,7 +215,7 @@ export default function AdminActivationPage() {
             borderRadius: 14, padding: 24, marginBottom: 24,
           }}>
             <div style={{
-              fontSize: 11, fontWeight: 900, letterSpacing: "0.18em",
+              fontSize: 12, fontWeight: 900, letterSpacing: "0.18em",
               color: C.orangeDark, marginBottom: 16, textTransform: "uppercase",
             }}>
               每日趨勢
@@ -226,10 +226,10 @@ export default function AdminActivationPage() {
               gap: "8px 16px",
               fontSize: 13, fontVariantNumeric: "tabular-nums",
             }}>
-              <div style={{ fontWeight: 800, color: C.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.12em" }}>日期</div>
-              <div style={{ fontWeight: 800, color: C.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.12em" }}>註冊</div>
-              <div style={{ fontWeight: 800, color: C.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.12em" }}>完成</div>
-              <div style={{ fontWeight: 800, color: C.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.12em" }}>轉換</div>
+              <div style={{ fontWeight: 800, color: C.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em" }}>日期</div>
+              <div style={{ fontWeight: 800, color: C.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em" }}>註冊</div>
+              <div style={{ fontWeight: 800, color: C.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em" }}>完成</div>
+              <div style={{ fontWeight: 800, color: C.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em" }}>轉換</div>
               {d.daily.slice(0, 14).map((row: any) => {
                 const conv = row.registered > 0
                   ? Math.round((row.completed / row.registered) * 100)
@@ -259,7 +259,7 @@ export default function AdminActivationPage() {
             borderRadius: 14, padding: 24,
           }}>
             <div style={{
-              fontSize: 11, fontWeight: 900, letterSpacing: "0.18em",
+              fontSize: 12, fontWeight: 900, letterSpacing: "0.18em",
               color: C.orangeDark, marginBottom: 16, textTransform: "uppercase",
             }}>
               最近完成活化（{d.recent.length}）
@@ -320,7 +320,7 @@ function SummaryCard({
       boxShadow: accent ? `4px 4px 0 ${C.orange}` : `3px 3px 0 ${C.ink}`,
     }}>
       <div style={{
-        fontSize: 10, fontWeight: 800, letterSpacing: "0.2em",
+        fontSize: 12, fontWeight: 800, letterSpacing: "0.2em",
         textTransform: "uppercase",
         color: accent ? C.orangeChip : C.muted, marginBottom: 8,
       }}>
@@ -334,7 +334,7 @@ function SummaryCard({
       </div>
       {hint && (
         <div style={{
-          fontSize: 11, marginTop: 6,
+          fontSize: 12, marginTop: 6,
           color: accent ? "rgba(255,255,255,0.65)" : C.muted,
         }}>
           {hint}

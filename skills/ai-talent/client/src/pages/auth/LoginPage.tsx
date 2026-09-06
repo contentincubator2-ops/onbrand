@@ -189,7 +189,7 @@ export default function LoginPage() {
 
           {/* Pill chip */}
           <div
-            className="inline-block text-[11px] font-bold px-3 py-1.5 rounded-md mb-5"
+            className="inline-block text-[12px] font-bold px-3 py-1.5 rounded-md mb-5"
             style={{ background: C.orangeChip, color: C.orangeDark }}
           >
             {lang === "en" ? "AI-Powered Brand Brain" : "AI 驅動的品牌大腦"}
@@ -234,7 +234,7 @@ export default function LoginPage() {
                 className="p-4 rounded-xl transition hover:-translate-y-0.5"
                 style={{ background: C.white, border: `1.5px solid ${C.ink}` }}
               >
-                <div className="text-[10px] font-black tracking-[0.2em] mb-2" style={{ color: C.orange }}>
+                <div className="text-[12px] font-black tracking-[0.2em] mb-2" style={{ color: C.orange }}>
                   {n}
                 </div>
                 <div className="text-[13.5px] font-bold mb-1 leading-snug" style={{ color: C.ink }}>
@@ -316,7 +316,7 @@ export default function LoginPage() {
           >
             {lang === "en" ? "Start free — build your Brand Brain →" : "免費開始 · 建立你的第一個品牌大腦 →"}
           </Link>
-          <p className="text-center text-[11px] mb-6" style={{ color: C.muted }}>
+          <p className="text-center text-[12px] mb-6" style={{ color: C.muted }}>
             {lang === "en" ? "No credit card. 14-step positioning takes ~10 minutes." : "免信用卡 · 14 步定位流程約 10 分鐘完成"}
           </p>
 
@@ -327,7 +327,7 @@ export default function LoginPage() {
             </div>
             <div className="relative flex justify-center">
               <span
-                className="px-3 text-[10px] uppercase tracking-[0.2em] font-bold"
+                className="px-3 text-[12px] uppercase tracking-[0.2em] font-bold"
                 style={{ background: C.cream, color: C.muted }}
               >
                 {lang === "en" ? "Already a member" : "已有帳號"}
@@ -500,7 +500,7 @@ export default function LoginPage() {
           </div>
 
           {/* Trust footer */}
-          <p className="text-center text-[11px] mt-6 leading-relaxed" style={{ color: C.muted }}>
+          <p className="text-center text-[12px] mt-6 leading-relaxed" style={{ color: C.muted }}>
             {lang === "en"
               ? "By continuing you agree to our Terms & Privacy. SoWork × OnBrand"
               : "繼續即代表同意《服務條款》與《隱私政策》。SoWork × OnBrand"}

@@ -300,25 +300,25 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
       {/* Label row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          {field.icon && <FontAwesomeIcon icon={field.icon} style={{ fontSize: 10, color: "#A8A29E" }} />}
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#78716C", letterSpacing: "0.03em" }}>{tr(field.label, lang)}</span>
+          {field.icon && <FontAwesomeIcon icon={field.icon} style={{ fontSize: 12, color: "#A8A29E" }} />}
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#78716C", letterSpacing: "0.03em" }}>{tr(field.label, lang)}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {(state.status === "filled" || isLoading) && (
-            <span style={{ fontSize: 9, color: src.color, background: `${src.color}14`, padding: "1px 6px", borderRadius: 8, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+            <span style={{ fontSize: 12, color: src.color, background: `${src.color}14`, padding: "1px 6px", borderRadius: 8, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
               <FontAwesomeIcon icon={src.icon} style={{ fontSize: 8 }} />{srcLabel}
             </span>
           )}
           {state.status === "filled" && !isEditing && (
             <>
               <button onClick={onEdit} title={lang === "en" ? "Edit" : "編輯"}
-                style={{ width: 20, height: 20, borderRadius: 5, border: "1px solid #E4E3E1", background: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#C4C0BB", fontSize: 9 }}
+                style={{ width: 20, height: 20, borderRadius: 5, border: "1px solid #E4E3E1", background: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#C4C0BB", fontSize: 12 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = "#7C3AED"; e.currentTarget.style.color = "#7C3AED"; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = "#E4E3E1"; e.currentTarget.style.color = "#C4C0BB"; }}
               ><FontAwesomeIcon icon={faPen} /></button>
               {field.source !== "scope" && (
                 <button onClick={onRefetch} title={lang === "en" ? "Refetch" : "重新抓取"}
-                  style={{ width: 20, height: 20, borderRadius: 5, border: "1px solid #E4E3E1", background: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#C4C0BB", fontSize: 9 }}
+                  style={{ width: 20, height: 20, borderRadius: 5, border: "1px solid #E4E3E1", background: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#C4C0BB", fontSize: 12 }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = "#0891B2"; e.currentTarget.style.color = "#0891B2"; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = "#E4E3E1"; e.currentTarget.style.color = "#C4C0BB"; }}
                 ><FontAwesomeIcon icon={faRotateRight} /></button>
@@ -327,7 +327,7 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
           )}
           {isEditing && (
             <button onClick={() => onChange(state.editDraft ?? state.value)}
-              style={{ width: 20, height: 20, borderRadius: 5, border: "none", background: "#7C3AED", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 9 }}
+              style={{ width: 20, height: 20, borderRadius: 5, border: "none", background: "#7C3AED", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 12 }}
             ><FontAwesomeIcon icon={faCheck} /></button>
           )}
         </div>
@@ -336,7 +336,7 @@ function FieldCard({ field, state, typing, onEdit, onRefetch, onChange }: {
       {/* Value */}
       {isLoading && (
         <div style={{ color: "#A8A29E", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: 10 }} />{lang === "en" ? "Filling in…" : "自動填入中…"}
+          <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: 12 }} />{lang === "en" ? "Filling in…" : "自動填入中…"}
         </div>
       )}
       {isIdle && !isUserInput && (
@@ -405,7 +405,7 @@ function SummaryTab({ contentTabs, fieldStates, typingFieldId, onEdit, onRefetch
         <div key={tab.id}>
           {/* Section header */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
               {tr(tab.label, lang)}
             </p>
             <div style={{ flex: 1, height: 1, background: "#F0F0EE" }} />
@@ -652,19 +652,19 @@ export function BriefPanel({
       <div style={{ padding: "12px 14px 8px", borderBottom: "1px solid #F0F0EE" }}>
         {onBack && (
           <button onClick={onBack}
-            style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "#A8A29E", fontSize: 11, padding: 0, marginBottom: 6 }}
+            style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "#A8A29E", fontSize: 12, padding: 0, marginBottom: 6 }}
             onMouseEnter={e => e.currentTarget.style.color = "#57534E"}
             onMouseLeave={e => e.currentTarget.style.color = "#A8A29E"}
           >
-            <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: 9 }} /> {lang === "en" ? "All methodologies" : "所有方法論"}
+            <FontAwesomeIcon icon={faArrowLeft} style={{ fontSize: 12 }} /> {lang === "en" ? "All methodologies" : "所有方法論"}
           </button>
         )}
         <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A18", lineHeight: 1.3 }}>
           {squadName ?? (lang === "en" ? "Methodology Squad" : "方法論小組")}
         </div>
         <div style={{ marginTop: 3, display: "flex", gap: 5 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: layerColor, background: `${layerColor}14`, padding: "2px 7px", borderRadius: 8 }}>{layerKey}</span>
-          {brandName && <span style={{ fontSize: 10, color: "#A8A29E" }}>{brandName}</span>}
+          <span style={{ fontSize: 12, fontWeight: 700, color: layerColor, background: `${layerColor}14`, padding: "2px 7px", borderRadius: 8 }}>{layerKey}</span>
+          {brandName && <span style={{ fontSize: 12, color: "#A8A29E" }}>{brandName}</span>}
         </div>
       </div>
 
@@ -672,7 +672,7 @@ export function BriefPanel({
       <div style={{ padding: "8px 14px", background: "white", borderBottom: "1px solid #F0F0EE" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: brandId ? "#16A34A" : "#D1D0CE" }} />
-          <span style={{ fontSize: 11, color: "#57534E", fontWeight: 600, flex: 1 }}>
+          <span style={{ fontSize: 12, color: "#57534E", fontWeight: 600, flex: 1 }}>
             Brand Brain {brandId ? (lang === "en" ? "connected" : "已連接") : (lang === "en" ? "not connected" : "未連接")}
           </span>
           <button onClick={runAuto} disabled={isAutoRunning}
@@ -680,10 +680,10 @@ export function BriefPanel({
               display: "flex", alignItems: "center", gap: 5,
               padding: "4px 10px", borderRadius: 20, border: "none", cursor: isAutoRunning ? "default" : "pointer",
               background: isAutoRunning ? "#F0F0EE" : layerColor, color: isAutoRunning ? "#A8A29E" : "white",
-              fontSize: 11, fontWeight: 600, transition: "all 0.15s",
+              fontSize: 12, fontWeight: 600, transition: "all 0.15s",
             }}
           >
-            <FontAwesomeIcon icon={isAutoRunning ? faPause : faWandSparkles} style={{ fontSize: 9 }} />
+            <FontAwesomeIcon icon={isAutoRunning ? faPause : faWandSparkles} style={{ fontSize: 12 }} />
             {isAutoRunning ? (lang === "en" ? "Filling…" : "填寫中…") : (lang === "en" ? "Autofill" : "自動填寫")}
           </button>
         </div>
@@ -691,7 +691,7 @@ export function BriefPanel({
         <div style={{ height: 3, background: "#F0F0EE", borderRadius: 10, overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${pct}%`, background: layerColor, borderRadius: 10, transition: "width 0.4s ease" }} />
         </div>
-        <div style={{ fontSize: 10, color: "#A8A29E", marginTop: 3 }}>{filledCount}/{totalFields} {lang === "en" ? "fields filled" : "欄位已填"}</div>
+        <div style={{ fontSize: 12, color: "#A8A29E", marginTop: 3 }}>{filledCount}/{totalFields} {lang === "en" ? "fields filled" : "欄位已填"}</div>
       </div>
 
       {/* ── Tabs (hidden in controlled/rail mode) ── */}
@@ -703,7 +703,7 @@ export function BriefPanel({
               style={{
                 flexShrink: 0, padding: "7px 12px", border: "none", background: "none",
                 cursor: isAutoRunning ? "default" : "pointer",
-                fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 500,
+                fontSize: 12, fontWeight: activeTab === tab.id ? 700 : 500,
                 color: activeTab === tab.id ? layerColor : "#A8A29E",
                 borderBottom: `2px solid ${activeTab === tab.id ? layerColor : "transparent"}`,
                 transition: "all 0.15s",

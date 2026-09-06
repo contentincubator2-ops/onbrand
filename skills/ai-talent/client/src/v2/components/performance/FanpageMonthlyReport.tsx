@@ -61,7 +61,7 @@ const card: React.CSSProperties = {
   background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, marginBottom: 14,
 };
 const kicker: React.CSSProperties = {
-  fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#9ca3af", fontWeight: 800,
+  fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "#9ca3af", fontWeight: 800,
 };
 
 function fmtMB(b: number) { return (b / 1024 / 1024).toFixed(1) + " MB"; }
@@ -212,7 +212,7 @@ export default function FanpageMonthlyReport() {
               <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 10,
                                          border: "1px solid #f1f3f5", borderRadius: 8, padding: "7px 10px" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, flex: 1, wordBreak: "break-all" }}>{d.name}</span>
-                <span style={{ fontSize: 11, color: "#9ca3af" }}>{fmtMB(d.bytes)}</span>
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>{fmtMB(d.bytes)}</span>
                 <button onClick={() => void remove(d.name)} disabled={!!busy}
                         style={{ border: "none", background: "none", color: "#9ca3af",
                                  cursor: "pointer", fontSize: 12 }}>移除</button>
@@ -241,7 +241,7 @@ export default function FanpageMonthlyReport() {
               {Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
                 <div key={k} style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: "6px 10px", background: "#fafafa" }}>
                   <b style={{ fontSize: 15 }}>{v}</b>
-                  <span style={{ display: "block", fontSize: 11, color: "#9ca3af" }}>{TYPE_ZH[k] ?? k}</span>
+                  <span style={{ display: "block", fontSize: 12, color: "#9ca3af" }}>{TYPE_ZH[k] ?? k}</span>
                 </div>
               ))}
             </div>
@@ -250,7 +250,7 @@ export default function FanpageMonthlyReport() {
                                     borderRadius: 8, padding: "9px 11px", marginBottom: 6, background: "#fafafa" }}>
                 <div style={{ fontSize: 13 }}>{f.message}</div>
                 {(f.evidence ?? []).map((e, j) => (
-                  <div key={j} style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>└ {e}</div>
+                  <div key={j} style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>└ {e}</div>
                 ))}
               </div>
             ))}
@@ -281,7 +281,7 @@ export default function FanpageMonthlyReport() {
                                                  height: pct(Math.max(s.ref!.h, 70000), H),
                                                  background: TYPE_COLOR[s.type], opacity: 0.75, borderRadius: 1 }} />
                         ))}
-                        <span style={{ position: "absolute", right: 2, bottom: 1, fontSize: 9, color: "#9ca3af",
+                        <span style={{ position: "absolute", right: 2, bottom: 1, fontSize: 12, color: "#9ca3af",
                                        background: "rgba(255,255,255,.85)", padding: "0 3px", borderRadius: 3 }}>
                           {sl.index}{n ? ` · ${n}` : ""}
                         </span>
@@ -298,7 +298,7 @@ export default function FanpageMonthlyReport() {
                     <div key={i} style={{ position: "absolute", left: pct(sh.x, W), top: pct(sh.y, H),
                                           width: pct(sh.w, W), height: pct(sh.h, H),
                                           border: "1px solid #eef0f3", borderRadius: 3, overflow: "hidden",
-                                          fontSize: 9, lineHeight: 1.25, color: "#6b7280", padding: "2px 3px",
+                                          fontSize: 12, lineHeight: 1.25, color: "#6b7280", padding: "2px 3px",
                                           background: sh.kind === "picture" ? "#f8f9fa" : "transparent" }}>
                       {sh.kind === "table" ? `▦ ${sh.table?.rows}×${sh.table?.cols}`
                         : sh.kind === "chart" ? `▤ ${(sh.chart?.kind ?? "").replace("Chart", "")}`
@@ -315,7 +315,7 @@ export default function FanpageMonthlyReport() {
                                   boxShadow: sel === s.id ? `0 0 0 2px ${TYPE_COLOR[s.type]}` : "none" }} />
                   ))}
                 </div>
-                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 6 }}>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 6 }}>
                   第 {page} 頁 · 依原檔真實座標繪製的示意圖（非像素縮圖）。點框看該欄位的設定。
                 </div>
               </div>
@@ -335,9 +335,9 @@ export default function FanpageMonthlyReport() {
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700 }}>
                       <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLOR[s.type] }} />
                       {s.ref?.shape || TYPE_ZH[s.type]}
-                      <span style={{ marginLeft: "auto", fontSize: 10, color: "#9ca3af" }}>{s.stability}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 12, color: "#9ca3af" }}>{s.stability}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
                       {s.observedValues?.[0]
                         ?? (s.type === "tableGroup" ? `${s.cardinality?.min}–${s.cardinality?.max} 項 · ${(s.fields ?? []).map(f => f.key).filter(Boolean).join("/")}`
                         : s.type === "chart" ? `${s.chartKind} · ${(s.series ?? []).map(x => x.name).join("/")}`
@@ -350,7 +350,7 @@ export default function FanpageMonthlyReport() {
                 {selected && (
                   <div style={{ border: "1px solid #2563eb", borderRadius: 8, padding: "10px 11px", marginTop: 12, background: "#fff" }}>
                     <div style={kicker}>欄位設定</div>
-                    <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse", marginTop: 6 }}>
+                    <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", marginTop: 6 }}>
                       <tbody>
                         <tr><td style={{ color: "#9ca3af", width: 68 }}>型別</td><td><b>{TYPE_ZH[selected.type]}</b></td></tr>
                         <tr><td style={{ color: "#9ca3af" }}>來源</td><td>{selected.ref?.shape}</td></tr>
@@ -369,7 +369,7 @@ export default function FanpageMonthlyReport() {
                         )}
                       </tbody>
                     </table>
-                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
+                    <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>
                       綁定資料來源（Meta / GA4 / 輿情 / GEO）與 AI 洞察撰寫在下一版開放。
                     </div>
                   </div>

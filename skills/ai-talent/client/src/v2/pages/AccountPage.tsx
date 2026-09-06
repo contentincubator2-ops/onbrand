@@ -313,7 +313,7 @@ export default function AccountPage() {
                     { key: "image_flux", label: lang === "en" ? "AI image"      : "AI 圖片" },
                   ].map(({ key, label }) => (
                     <div key={key} className="bg-neutral-50 rounded-lg px-3 py-2">
-                      <div className="text-neutral-500 text-[11px]">{label}</div>
+                      <div className="text-neutral-500 text-[12px]">{label}</div>
                       <div className="text-neutral-900 font-semibold tabular-nums">{pts.costs[key]} {lang === "en" ? "pts" : "點"}</div>
                     </div>
                   ))}
@@ -532,7 +532,7 @@ export default function AccountPage() {
                     }`}
                   >
                     {pack.id === "medium" && (
-                      <div className="text-[10px] inline-block px-2 py-0.5 rounded-full bg-neutral-900 text-white font-medium mb-2">
+                      <div className="text-[12px] inline-block px-2 py-0.5 rounded-full bg-neutral-900 text-white font-medium mb-2">
                         {lang === "en" ? "MOST POPULAR" : "最熱門"}
                       </div>
                     )}
@@ -544,20 +544,20 @@ export default function AccountPage() {
                     <div className="mt-2 text-sm font-semibold text-neutral-900">
                       {pack.currency === "USD" ? "US$" : "NT$"} {pack.amount.toLocaleString()}
                     </div>
-                    <div className="text-[11px] text-neutral-500 mt-0.5">
+                    <div className="text-[12px] text-neutral-500 mt-0.5">
                       {lang === "en"
                         ? `${pack.currency === "USD" ? "US$" : "NT$"} ${pack.perPoint.toFixed(pack.currency === "USD" ? 4 : 2)} / pt`
                         : `每點 ${pack.currency === "USD" ? "US$" : "NT$"} ${pack.perPoint.toFixed(pack.currency === "USD" ? 4 : 2)}`}
                     </div>
                     {pack.discountPct > 0 && (
-                      <div className="mt-2 inline-block text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">
+                      <div className="mt-2 inline-block text-[12px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">
                         {lang === "en" ? `Save ${pack.discountPct}%` : `省 ${pack.discountPct}%`}
                       </div>
                     )}
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-neutral-400 mt-4">
+              <p className="text-[12px] text-neutral-400 mt-4">
                 {lang === "en"
                   ? "Secure payment by Stripe · receipt emailed automatically."
                   : "Stripe 安全付款 · 收據自動寄到信箱"}

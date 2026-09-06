@@ -250,7 +250,7 @@ function BrainBar({
             />
           </div>
           <div
-            className="absolute -bottom-2 -right-2 px-2 py-0.5 text-[10px] font-bold text-white rounded-md"
+            className="absolute -bottom-2 -right-2 px-2 py-0.5 text-[12px] font-bold text-white rounded-md"
             style={{ background: accent, border: "1.5px solid #111" }}
           >
             {roleLabel}
@@ -351,7 +351,7 @@ function PlatformCell({
           When done, the primary action buttons replace it. */}
       {(hasContent || state.status === "queued") && !isDone && (
         <span
-          className={`absolute top-2 right-2 z-10 px-2 py-0.5 text-[10px] font-medium rounded-full shadow-sm ${
+          className={`absolute top-2 right-2 z-10 px-2 py-0.5 text-[12px] font-medium rounded-full shadow-sm ${
             state.status === "failed"
               ? "bg-red-600 text-white"
               : "bg-white text-neutral-700 border border-neutral-300"
@@ -366,14 +366,14 @@ function PlatformCell({
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
           <button
             onClick={() => onEdit()}
-            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur-sm border border-neutral-300 text-neutral-700 hover:bg-white hover:border-neutral-500 shadow-sm transition"
+            className="flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur-sm border border-neutral-300 text-neutral-700 hover:bg-white hover:border-neutral-500 shadow-sm transition"
           >
             <Pencil size={10} strokeWidth={2.5} />
             {lang === "en" ? "Edit" : "編輯"}
           </button>
           {/* Scheduled indicator — compact badge next to edit button */}
           {state.scheduledPostId && (
-            <span className="flex items-center gap-0.5 text-[10px] font-medium px-2 py-1 rounded-lg bg-emerald-500/90 text-white backdrop-blur-sm shadow-sm">
+            <span className="flex items-center gap-0.5 text-[12px] font-medium px-2 py-1 rounded-lg bg-emerald-500/90 text-white backdrop-blur-sm shadow-sm">
               <CheckCircle2 size={10} strokeWidth={2.5} />
               {lang === "en" ? "Scheduled" : "已排程"}
             </span>
@@ -405,7 +405,7 @@ function PlatformCell({
               shown beneath the mockup since not all PlatformMockup
               variants support these slots natively. */}
           {(state.structured as any)?.chapters?.length > 0 && (
-            <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[10px] leading-relaxed">
+            <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[12px] leading-relaxed">
               <p className="text-neutral-500 mb-0.5">{t("theater_chapters_label")}</p>
               {((state.structured as any).chapters as string[]).slice(0, 5).map((c, i) => (
                 <p key={i} className="text-neutral-700">{c}</p>
@@ -413,7 +413,7 @@ function PlatformCell({
             </div>
           )}
           {(state.structured as any)?.thread?.length > 1 && (
-            <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[10px] leading-relaxed">
+            <div className="mt-1.5 px-2 py-1 bg-neutral-50 rounded text-[12px] leading-relaxed">
               <p className="text-neutral-500 mb-0.5">{t("theater_thread_label", { n: (state.structured as any).thread.length })}</p>
               {((state.structured as any).thread as any[])
                 .filter((item: any) => typeof item === "string")
@@ -427,13 +427,13 @@ function PlatformCell({
             <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
               <Avatar src={imageDirAvatar ?? undefined} size="sm" className="w-8 h-8" />
               <Spinner size="sm" />
-              <p className="text-[10px] text-neutral-600">{t("theater_image_dir_busy")}</p>
+              <p className="text-[12px] text-neutral-600">{t("theater_image_dir_busy")}</p>
             </div>
           )}
           {/* Image generation failed — show retry hint instead of empty space */}
           {isDone && state.imageError && !state.imageUrl && (
             <div className="absolute bottom-2 left-0 right-0 flex justify-center">
-              <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+              <span className="text-[12px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                 ⚠️ {t("theater_image_failed")}
               </span>
             </div>
@@ -441,14 +441,14 @@ function PlatformCell({
           {isWriting && !caption && (
             <div className="absolute inset-0 bg-white/80 flex items-center gap-2 justify-center">
               <Avatar src={writerAvatar ?? undefined} size="sm" className="w-6 h-6" />
-              <p className="text-[11px] text-neutral-600">{t("theater_writer_busy")}</p>
+              <p className="text-[12px] text-neutral-600">{t("theater_writer_busy")}</p>
             </div>
           )}
           {isQA && (
             <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full shadow-sm">
               <Avatar src={qaAvatar ?? undefined} size="sm" className="w-5 h-5" />
               <Spinner size="sm" classNames={{ wrapper: "w-3 h-3", circle1: "border-b-amber-500", circle2: "border-b-amber-500" }} />
-              <span className="text-[10px] text-amber-700 font-medium pr-1">{t("theater_qa_busy")}</span>
+              <span className="text-[12px] text-amber-700 font-medium pr-1">{t("theater_qa_busy")}</span>
             </div>
           )}
         </div>
@@ -458,7 +458,7 @@ function PlatformCell({
           style={{ minHeight: 200, border: "1px dashed #d4d4d4" }}
         >
           <PlatformIcon platformKey={meta.iconKey} className="text-2xl text-neutral-400" />
-          <p className="text-[10px] text-neutral-400">
+          <p className="text-[12px] text-neutral-400">
             {isIdle ? t("theater_cell_idle_hint", { platform: meta.short }) : "—"}
           </p>
         </div>
@@ -497,7 +497,7 @@ function PlatformCell({
           )}
           {/* Scheduled time — tiny timestamp when scheduled */}
           {state.scheduledPostId && state.scheduledAt && (
-            <span className="ml-auto text-[9px] text-emerald-600 pr-1 truncate">
+            <span className="ml-auto text-[12px] text-emerald-600 pr-1 truncate">
               {new Date(state.scheduledAt).toLocaleString(
                 lang === "en" ? "en-US" : "zh-TW",
                 { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
@@ -1645,7 +1645,7 @@ export default function TheaterPage() {
               )}
             </span>
             <span
-              className="text-[11px] font-mono tabular-nums opacity-70"
+              className="text-[12px] font-mono tabular-nums opacity-70"
             >
               {pipelineStatusQ.data.currentStep ?? 0} / {pipelineStatusQ.data.totalSteps ?? 14}
             </span>
@@ -1666,7 +1666,7 @@ export default function TheaterPage() {
         <div className="flex items-end justify-between flex-wrap gap-4 mb-4">
           <div className="text-center mx-auto" style={{ flex: "1 1 auto" }}>
             {t("theater_hero_eyebrow") && (
-              <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
                 {t("theater_hero_eyebrow")}
               </p>
             )}
@@ -1740,7 +1740,7 @@ export default function TheaterPage() {
               return (
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex flex-col items-end">
-                    <div className="text-[11px] text-default-600 tabular-nums">
+                    <div className="text-[12px] text-default-600 tabular-nums">
                       {done}/{total} · {Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, "0")}
                       {" / "}
                       ~{Math.floor(expectedTotalSec / 60)}:{String(expectedTotalSec % 60).padStart(2, "0")}
@@ -1813,14 +1813,14 @@ export default function TheaterPage() {
         {(brandProducts.length > 0 || brandEvents.length > 0) && (
           <div className="mt-4 p-4 rounded-xl border border-neutral-200 bg-white space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+              <p className="text-[12px] font-semibold uppercase tracking-wider text-neutral-500">
                 {lang === "en" ? "Weekly focus — select what to promote" : "本週焦點 — 選擇要推廣的產品 / 活動"}
               </p>
               {(selectedProductIds.size > 0 || selectedEventIds.size > 0) && (
                 <button
                   onClick={handlePlanSchedule}
                   disabled={planScheduleMut?.isPending || running}
-                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition flex items-center gap-1.5"
+                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition flex items-center gap-1.5"
                 >
                   {planScheduleMut?.isPending
                     ? (lang === "en" ? "Planning…" : "排程中…")
@@ -1878,7 +1878,7 @@ export default function TheaterPage() {
                     >
                       <CalendarIcon size={10} className="inline mr-1" />
                       {selected ? "✓ " : ""}{e.name}
-                      {e.startAt && <span className="ml-1 opacity-70 text-[10px]">{e.startAt.slice(5)}</span>}
+                      {e.startAt && <span className="ml-1 opacity-70 text-[12px]">{e.startAt.slice(5)}</span>}
                     </button>
                   );
                 })}
@@ -1889,10 +1889,10 @@ export default function TheaterPage() {
             {scheduleVisible && aiSchedule && (
               <div className="mt-1 border-t border-neutral-100 pt-3 space-y-1.5">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[11px] font-semibold text-violet-700">
+                  <p className="text-[12px] font-semibold text-violet-700">
                     {lang === "en" ? "AI suggested schedule" : "AI 排程建議"}
                   </p>
-                  <button onClick={() => setScheduleVisible(false)} className="text-[10px] text-neutral-400 hover:text-neutral-700">
+                  <button onClick={() => setScheduleVisible(false)} className="text-[12px] text-neutral-400 hover:text-neutral-700">
                     {lang === "en" ? "hide" : "收起"}
                   </button>
                 </div>
@@ -1901,7 +1901,7 @@ export default function TheaterPage() {
                   if (!entry) return null;
                   const color = entry.type === "product" ? "#059669" : entry.type === "event" ? "#d97706" : "#6b7280";
                   return (
-                    <div key={d.date} className="flex items-start gap-2 text-[11px]">
+                    <div key={d.date} className="flex items-start gap-2 text-[12px]">
                       <span className="text-neutral-400 w-14 shrink-0 tabular-nums">{d.label}</span>
                       <span className="font-medium shrink-0" style={{ color }}>{entry.name}</span>
                       <span className="text-neutral-500 truncate" title={entry.rationale}>· {entry.angle}</span>
@@ -1923,7 +1923,7 @@ export default function TheaterPage() {
             <Plus size={16} strokeWidth={2.5} />
             <span>{t("theater_btn_add_materials")}</span>
             {totalMaterials > 0 && (
-              <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">
+              <span className="ml-1 text-[12px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">
                 {totalMaterials}
               </span>
             )}
@@ -1983,16 +1983,16 @@ export default function TheaterPage() {
                 <div key={d.date} className="space-y-3 min-w-0">
                   {/* Day header */}
                   <div className={`flex items-center gap-1.5 px-1 py-1.5 ${d.isToday ? "bg-neutral-900 text-white rounded-md px-2" : ""}`}>
-                    <span className={`text-[11px] font-semibold ${d.isToday ? "text-white" : "text-neutral-700"}`}>
+                    <span className={`text-[12px] font-semibold ${d.isToday ? "text-white" : "text-neutral-700"}`}>
                       {d.label}
                     </span>
                     {d.isToday && (
-                      <span className="text-[9px] font-bold tracking-wider bg-white text-neutral-900 px-1 py-0.5 rounded">
+                      <span className="text-[12px] font-bold tracking-wider bg-white text-neutral-900 px-1 py-0.5 rounded">
                         {t("theater_today_pill")}
                       </span>
                     )}
                     {matchingDate && (
-                      <span className="text-[10px] text-neutral-700 bg-neutral-100 border border-neutral-200 px-1.5 py-0.5 rounded">
+                      <span className="text-[12px] text-neutral-700 bg-neutral-100 border border-neutral-200 px-1.5 py-0.5 rounded">
                         {matchingDate.name}
                       </span>
                     )}
@@ -2020,11 +2020,11 @@ export default function TheaterPage() {
                       {state.status === "done" && (
                         <div className="flex justify-end mt-0.5 px-1">
                           {connectedPlatforms[p] ? (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success-50 border border-success-200 text-success-700 font-medium">
+                            <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-success-50 border border-success-200 text-success-700 font-medium">
                               ✓ {lang === "en" ? "可排程發布" : "可排程發布"}
                             </span>
                           ) : (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-warning-50 border border-warning-200 text-warning-700 font-medium">
+                            <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-warning-50 border border-warning-200 text-warning-700 font-medium">
                               ⚠ {lang === "en" ? "Connect account first" : "需先連接帳號"}
                             </span>
                           )}
@@ -2081,7 +2081,7 @@ export default function TheaterPage() {
                 <div className="space-y-4">
                   {/* Dropdown selector */}
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide block mb-1.5">
+                    <label className="text-[12px] font-semibold text-neutral-500 uppercase tracking-wide block mb-1.5">
                       {lang === "en" ? "Select or create event" : "選擇活動或新增"}
                     </label>
                     <select
@@ -2145,7 +2145,7 @@ export default function TheaterPage() {
                   {/* Added events with promo settings */}
                   {importantDates.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide">
+                      <p className="text-[12px] font-semibold text-neutral-500 uppercase tracking-wide">
                         {lang === "en" ? "Added" : "已加入"}
                       </p>
                       {importantDates.map((d) => (
@@ -2161,16 +2161,16 @@ export default function TheaterPage() {
                               <X size={14} />
                             </button>
                           </div>
-                          <div className="flex items-center gap-2 text-[11px] text-neutral-600">
+                          <div className="flex items-center gap-2 text-[12px] text-neutral-600">
                             <span>{lang === "en" ? "Posts/week:" : "每週推廣:"}</span>
                             {[1, 2, 3].map((n) => (
                               <button
                                 key={n}
                                 onClick={() => setImportantDates((prev) => prev.map((x) => x.id === d.id ? { ...x, promoFreqPerWeek: n } : x))}
-                                className={`w-6 h-6 rounded text-[11px] font-semibold transition ${(d.promoFreqPerWeek ?? 1) === n ? "bg-amber-500 text-white" : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-100"}`}
+                                className={`w-6 h-6 rounded text-[12px] font-semibold transition ${(d.promoFreqPerWeek ?? 1) === n ? "bg-amber-500 text-white" : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-100"}`}
                               >{n}</button>
                             ))}
-                            <span className="text-neutral-400 text-[10px]">{lang === "en" ? "posts" : "篇"}</span>
+                            <span className="text-neutral-400 text-[12px]">{lang === "en" ? "posts" : "篇"}</span>
                           </div>
                         </div>
                       ))}
@@ -2184,7 +2184,7 @@ export default function TheaterPage() {
                 <div className="space-y-4">
                   {/* Dropdown selector */}
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide block mb-1.5">
+                    <label className="text-[12px] font-semibold text-neutral-500 uppercase tracking-wide block mb-1.5">
                       {lang === "en" ? "Select or create product" : "選擇產品或新增"}
                     </label>
                     <select
@@ -2253,7 +2253,7 @@ export default function TheaterPage() {
                   {/* Added products with promo settings */}
                   {products.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide">
+                      <p className="text-[12px] font-semibold text-neutral-500 uppercase tracking-wide">
                         {lang === "en" ? "Added" : "已加入"}
                       </p>
                       {products.map((p) => (
@@ -2261,7 +2261,7 @@ export default function TheaterPage() {
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium">{p.name}</p>
-                              {p.usp && <p className="text-[10px] text-neutral-500 truncate">{p.usp}</p>}
+                              {p.usp && <p className="text-[12px] text-neutral-500 truncate">{p.usp}</p>}
                             </div>
                             <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900 mt-0.5 ml-2 shrink-0">
                               <X size={14} />
@@ -2269,23 +2269,23 @@ export default function TheaterPage() {
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
-                              <p className="text-[10px] text-neutral-500">{lang === "en" ? "Posts/week" : "每週推廣篇數"}</p>
+                              <p className="text-[12px] text-neutral-500">{lang === "en" ? "Posts/week" : "每週推廣篇數"}</p>
                               <div className="flex gap-1">
                                 {[1, 2, 3, 4, 5].map((n) => (
                                   <button
                                     key={n}
                                     onClick={() => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoFreqPerWeek: n } : x))}
-                                    className={`w-7 h-7 rounded text-[11px] font-semibold transition ${(p.promoFreqPerWeek ?? 2) === n ? "bg-emerald-500 text-white" : "bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-100"}`}
+                                    className={`w-7 h-7 rounded text-[12px] font-semibold transition ${(p.promoFreqPerWeek ?? 2) === n ? "bg-emerald-500 text-white" : "bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-100"}`}
                                   >{n}</button>
                                 ))}
                               </div>
                             </div>
                             <div className="space-y-1">
-                              <p className="text-[10px] text-neutral-500">{lang === "en" ? "Promo period" : "推廣區間"}</p>
+                              <p className="text-[12px] text-neutral-500">{lang === "en" ? "Promo period" : "推廣區間"}</p>
                               <div className="flex items-center gap-1">
-                                <input type="date" value={p.promoStartDate ?? ""} onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoStartDate: e.target.value || undefined } : x))} className="text-[10px] px-1.5 py-1 border border-neutral-300 rounded w-full" />
-                                <span className="text-neutral-400 text-[10px]">→</span>
-                                <input type="date" value={p.promoEndDate ?? ""} onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoEndDate: e.target.value || undefined } : x))} className="text-[10px] px-1.5 py-1 border border-neutral-300 rounded w-full" />
+                                <input type="date" value={p.promoStartDate ?? ""} onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoStartDate: e.target.value || undefined } : x))} className="text-[12px] px-1.5 py-1 border border-neutral-300 rounded w-full" />
+                                <span className="text-neutral-400 text-[12px]">→</span>
+                                <input type="date" value={p.promoEndDate ?? ""} onChange={(e) => setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, promoEndDate: e.target.value || undefined } : x))} className="text-[12px] px-1.5 py-1 border border-neutral-300 rounded w-full" />
                               </div>
                             </div>
                           </div>
@@ -2305,7 +2305,7 @@ export default function TheaterPage() {
                       {photos.map((ph) => (
                         <div key={ph.id} className="relative group">
                           <img src={ph.url} alt={ph.note ?? ph.tag} className="w-full aspect-square object-cover rounded-lg border border-pink-200" />
-                          <span className="absolute top-1 left-1 text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/90 text-white font-medium">
+                          <span className="absolute top-1 left-1 text-[12px] px-1.5 py-0.5 rounded-full bg-pink-500/90 text-white font-medium">
                             {t(`theater_photo_tag_${ph.tag}` as any)}
                           </span>
                           <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -2401,7 +2401,7 @@ export default function TheaterPage() {
               {/* Header */}
               <div className="px-6 py-5 flex items-center justify-between" style={{ borderBottom: "1px solid #E5E5E5" }}>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-400 mb-0.5">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-neutral-400 mb-0.5">
                     {lang === "en" ? "SCHEDULE TO CALENDAR" : "排程到行事曆"}
                   </p>
                   <h2 className="text-[15px] font-semibold text-neutral-900">
@@ -2420,7 +2420,7 @@ export default function TheaterPage() {
               <div className="px-6 py-5 space-y-4">
                 {/* Caption edit */}
                 <div>
-                  <label className="text-[11px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
+                  <label className="text-[12px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
                     <Pencil size={11} />
                     {lang === "en" ? "Caption (edit before scheduling)" : "文案（排程前可修改）"}
                   </label>
@@ -2432,14 +2432,14 @@ export default function TheaterPage() {
                     className="w-full text-[13px] leading-relaxed px-3 py-2.5 border border-neutral-200 rounded-xl resize-none focus:outline-none focus:border-neutral-900 transition"
                     style={{ fontFamily: "inherit" }}
                   />
-                  <p className="text-[10px] text-neutral-400 mt-1 text-right">
+                  <p className="text-[12px] text-neutral-400 mt-1 text-right">
                     {scheduleDraft.length} {lang === "en" ? "chars" : "字"}
                   </p>
                 </div>
 
                 {/* Date + time picker */}
                 <div>
-                  <label className="text-[11px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
+                  <label className="text-[12px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
                     <Clock size={11} />
                     {lang === "en" ? "Publish date & time" : "發布日期與時間"}
                   </label>
@@ -2520,7 +2520,7 @@ export default function TheaterPage() {
                       />
                       <div>
                         <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
-                        <p className="text-[11px] text-neutral-500 mt-0.5">{opt.hint}</p>
+                        <p className="text-[12px] text-neutral-500 mt-0.5">{opt.hint}</p>
                       </div>
                     </div>
                   </label>
@@ -2583,9 +2583,9 @@ export default function TheaterPage() {
                 title={`${m.name} — ${m.title}`}
               >
                 <Avatar src={avatarOf(m) ?? undefined} size="sm" className="w-5 h-5" />
-                <span className="text-[11px] text-neutral-700 font-medium">{m.name}</span>
+                <span className="text-[12px] text-neutral-700 font-medium">{m.name}</span>
                 {m.platform && (
-                  <span className="text-[9px] px-1 rounded bg-neutral-100 text-neutral-700 flex items-center gap-1">
+                  <span className="text-[12px] px-1 rounded bg-neutral-100 text-neutral-700 flex items-center gap-1">
                     <PlatformIcon platformKey={PLATFORM_META[m.platform].iconKey} className="text-neutral-700" />
                     {PLATFORM_META[m.platform].short}
                   </span>

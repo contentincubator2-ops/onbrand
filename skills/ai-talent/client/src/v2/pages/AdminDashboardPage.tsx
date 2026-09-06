@@ -25,7 +25,7 @@ const card: React.CSSProperties = {
   padding: "14px 16px",
 };
 const sectionTitle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 700, letterSpacing: "0.18em",
+  fontSize: 12, fontWeight: 700, letterSpacing: "0.18em",
   textTransform: "uppercase", color: "#525252", margin: "26px 0 10px",
   display: "flex", alignItems: "center", gap: 7,
 };
@@ -35,12 +35,12 @@ function Stat({ label, value, sub, warn }: {
 }) {
   return (
     <div style={card}>
-      <div style={{ fontSize: 11, color: "#737373", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: "#737373", marginBottom: 4 }}>{label}</div>
       <div style={{
         fontSize: 24, fontWeight: 700, lineHeight: 1.1,
         color: warn ? "#b91c1c" : "#171717", fontVariantNumeric: "tabular-nums",
       }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>{sub}</div>}
     </div>
   );
 }
@@ -162,7 +162,7 @@ export default function AdminDashboardPage() {
         {afQ?.data?.stages ? (
           <>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: "#737373" }}>
+              <div style={{ fontSize: 12, color: "#737373" }}>
                 Activation Rate（3+ 任務）
                 <span style={{ marginLeft: 8, color: "#9ca3af" }}>·</span>
                 <span style={{ marginLeft: 8 }}>投資人健康範圍 &gt; 40%</span>
@@ -230,7 +230,7 @@ export default function AdminDashboardPage() {
       </div>
       {ttfvQ?.data?.buckets && (
         <div style={{ ...card, marginTop: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#525252", marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#525252", marginBottom: 8 }}>
             分佈直方圖
           </div>
           {[
@@ -244,7 +244,7 @@ export default function AdminDashboardPage() {
             const pct = total > 0 ? Math.round((b.count / total) * 100) : 0;
             return (
               <div key={b.label} style={{ marginBottom: 5 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 2 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 2 }}>
                   <span style={{ color: "#374151" }}>{b.label}</span>
                   <span style={{ color: "#9ca3af", fontVariantNumeric: "tabular-nums" }}>
                     {b.count} 人 · {pct}%
@@ -263,7 +263,7 @@ export default function AdminDashboardPage() {
       <div style={sectionTitle}><Users size={13} /> Cohort Retention（按註冊週分組）</div>
       <div style={{ ...card, overflowX: "auto" }}>
         {crQ?.data?.grid?.length > 0 ? (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
             <thead>
               <tr style={{ color: "#737373", textAlign: "left" }}>
                 <th style={{ padding: "6px 8px", fontWeight: 600 }}>註冊週</th>
@@ -314,7 +314,7 @@ export default function AdminDashboardPage() {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <div style={card}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#525252", marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#525252", marginBottom: 8 }}>
             前 10 大花費用戶（30d）
           </div>
           {(uc?.topSpenders ?? []).map((s: any) => (
@@ -331,7 +331,7 @@ export default function AdminDashboardPage() {
           {(uc?.topSpenders ?? []).length === 0 && <Empty />}
         </div>
         <div style={card}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#525252", marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#525252", marginBottom: 8 }}>
             模型成本（7d）
           </div>
           {(uc?.byModel ?? []).map((m: any) => (
@@ -372,7 +372,7 @@ export default function AdminDashboardPage() {
       <div style={sectionTitle}>
         <TrendingUp size={13} /> 逐功能使用 + 完成率（近 {fbQ?.data?.days ?? 30} 天）
       </div>
-      <div style={{ fontSize: 11, color: "#9ca3af", margin: "-4px 0 8px" }}>
+      <div style={{ fontSize: 12, color: "#9ca3af", margin: "-4px 0 8px" }}>
         完成率 = 乾淨完成 ÷ 總次數。<b>高使用 + 低完成率</b> = 用戶想用但會卡住的功能，最該優先修。
       </div>
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
@@ -466,7 +466,7 @@ export default function AdminDashboardPage() {
                 )}
                 {b.bountyPoints > 0 && <span style={{ ...tagS }}>+{b.bountyPoints} 點</span>}
               </div>
-              <span style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 12, color: "#9ca3af", whiteSpace: "nowrap" }}>
                 {b.userEmail} · {new Date(b.createdAt).toLocaleString("zh-TW", { hour12: false })}
               </span>
             </div>
@@ -474,7 +474,7 @@ export default function AdminDashboardPage() {
               {String(b.body ?? "").slice(0, 280)}{(String(b.body ?? "").length > 280) ? "…" : ""}
             </div>
             {b.triageReason && typeof b.triageReason === "string" && (
-              <div style={{ fontSize: 11, color: "#737373", fontStyle: "italic", marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: "#737373", fontStyle: "italic", marginBottom: 6 }}>
                 triage：{b.triageReason}
               </div>
             )}
@@ -549,7 +549,7 @@ export default function AdminDashboardPage() {
 
 const td: React.CSSProperties = { padding: "7px 10px", color: "#374151", whiteSpace: "nowrap" };
 const tagS: React.CSSProperties = {
-  fontSize: 9, background: "#f3f4f6", color: "#525252",
+  fontSize: 12, background: "#f3f4f6", color: "#525252",
   borderRadius: 4, padding: "1px 5px", marginLeft: 6,
 };
 const Empty = () => <div style={{ fontSize: 12, color: "#9ca3af", padding: "8px 0" }}>無資料</div>;
@@ -557,7 +557,7 @@ const Empty = () => <div style={{ fontSize: 12, color: "#9ca3af", padding: "8px 
 function BugBtn({ label, onClick, busy }: { label: string; onClick: () => void; busy?: boolean }) {
   return (
     <button onClick={onClick} disabled={busy} style={{
-      fontSize: 11, border: "1px solid #e5e7eb", borderRadius: 6,
+      fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 6,
       padding: "4px 9px", background: busy ? "#f3f4f6" : "#fff",
       cursor: busy ? "default" : "pointer", color: "#374151",
     }}>{label}</button>

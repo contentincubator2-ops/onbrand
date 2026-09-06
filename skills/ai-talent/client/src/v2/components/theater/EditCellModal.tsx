@@ -268,7 +268,7 @@ export default function EditCellModal({
             </p>
           </div>
           {isAlreadyScheduled && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-success-100 text-success-700">
+            <span className="text-[12px] font-medium px-2 py-0.5 rounded-full bg-success-100 text-success-700">
               {en ? "✓ Scheduled" : "✓ 已排程"}
             </span>
           )}
@@ -290,7 +290,7 @@ export default function EditCellModal({
               <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                 {en ? "Post content" : "貼文內容"}
               </label>
-              <span className="text-[11px] text-neutral-400">{charCount} {en ? "chars" : "字"}</span>
+              <span className="text-[12px] text-neutral-400">{charCount} {en ? "chars" : "字"}</span>
             </div>
             <textarea
               ref={captionRef}
@@ -309,7 +309,7 @@ export default function EditCellModal({
                 {polishing ? <Spinner size="sm" color="current" /> : <span></span>}
                 {en ? "AI Polish" : "AI 潤稿"}
               </button>
-              {polishError && <span className="text-[11px] text-danger-600">{polishError}</span>}
+              {polishError && <span className="text-[12px] text-danger-600">{polishError}</span>}
             </div>
           </section>
 
@@ -370,7 +370,7 @@ export default function EditCellModal({
               <div className="space-y-1.5">
                 {(structured.chapters as string[]).map((ch, i) => (
                   <div key={i} className="flex gap-2 items-center">
-                    <span className="text-[11px] text-neutral-400 w-5 text-right shrink-0">{i + 1}.</span>
+                    <span className="text-[12px] text-neutral-400 w-5 text-right shrink-0">{i + 1}.</span>
                     <input
                       value={ch}
                       onChange={e => updateListItem("chapters", i, e.target.value)}
@@ -381,7 +381,7 @@ export default function EditCellModal({
                 ))}
                 <button
                   onClick={() => addListItem("chapters")}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 mt-1"
+                  className="text-[12px] text-indigo-600 hover:text-indigo-800 mt-1"
                 >
                   + {en ? "Add chapter" : "新增章節"}
                 </button>
@@ -400,7 +400,7 @@ export default function EditCellModal({
                   const val = typeof item === "string" ? item : (item?.text ?? "");
                   return (
                     <div key={i} className="flex gap-2 items-start">
-                      <span className="text-[11px] text-neutral-400 w-5 text-right shrink-0 mt-2">{i + 1}.</span>
+                      <span className="text-[12px] text-neutral-400 w-5 text-right shrink-0 mt-2">{i + 1}.</span>
                       <textarea
                         value={val}
                         rows={2}
@@ -417,7 +417,7 @@ export default function EditCellModal({
                 })}
                 <button
                   onClick={() => addListItem("thread")}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 mt-1"
+                  className="text-[12px] text-indigo-600 hover:text-indigo-800 mt-1"
                 >
                   + {en ? "Add thread post" : "新增串文"}
                 </button>
@@ -434,7 +434,7 @@ export default function EditCellModal({
               <div className="space-y-1.5">
                 {(structured.h2 as string[]).map((h, i) => (
                   <div key={i} className="flex gap-2 items-center">
-                    <span className="text-[11px] text-neutral-400 w-5 text-right shrink-0">H2</span>
+                    <span className="text-[12px] text-neutral-400 w-5 text-right shrink-0">H2</span>
                     <input
                       value={h}
                       onChange={e => updateListItem("h2", i, e.target.value)}
@@ -445,7 +445,7 @@ export default function EditCellModal({
                 ))}
                 <button
                   onClick={() => addListItem("h2")}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 mt-1"
+                  className="text-[12px] text-indigo-600 hover:text-indigo-800 mt-1"
                 >
                   + {en ? "Add H2" : "新增段落"}
                 </button>
@@ -473,7 +473,7 @@ export default function EditCellModal({
 
               {/* Prompt + regen */}
               <div className="flex-1 min-w-0 space-y-2">
-                <p className="text-[11px] text-neutral-500">
+                <p className="text-[12px] text-neutral-500">
                   {en
                     ? "Image prompt — edit to guide the next generation:"
                     : "圖片指令 — 可修改後重新產圖："}
@@ -495,7 +495,7 @@ export default function EditCellModal({
                   {imaging ? <Spinner size="sm" color="current" /> : <span>🎨</span>}
                   {en ? "Regenerate image" : "重新產圖"}
                 </button>
-                {imageError && <p className="text-[11px] text-danger-600">{imageError}</p>}
+                {imageError && <p className="text-[12px] text-danger-600">{imageError}</p>}
               </div>
             </div>
           </section>
@@ -507,7 +507,7 @@ export default function EditCellModal({
                 📅 {en ? "Schedule to Calendar" : "排程到行事曆"}
               </p>
               <div>
-                <label className="text-[11px] text-neutral-600 block mb-1">
+                <label className="text-[12px] text-neutral-600 block mb-1">
                   {en ? "Date & time" : "日期與時間"}
                 </label>
                 <input
@@ -517,7 +517,7 @@ export default function EditCellModal({
                   className="text-[13px] px-3 py-2 border border-indigo-200 rounded-xl focus:outline-none focus:border-indigo-500 transition bg-white"
                 />
               </div>
-              {scheduleError && <p className="text-[11px] text-danger-600">{scheduleError}</p>}
+              {scheduleError && <p className="text-[12px] text-danger-600">{scheduleError}</p>}
               <div className="flex gap-2">
                 <button
                   onClick={handleSchedule}

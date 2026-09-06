@@ -958,16 +958,16 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 </div>
                 {/* Connection status badge — always visible */}
                 {fullyConnected ? (
-                  <span className="flex items-center gap-1 text-[11px] text-success-700 bg-success-100 border border-success-300 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">
+                  <span className="flex items-center gap-1 text-[12px] text-success-700 bg-success-100 border border-success-300 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">
                     <CheckCircle2 size={11} /> {en ? "Connected" : "已連接"}
                   </span>
                 ) : isVerifying ? (
-                  <span className="flex items-center gap-1 text-[11px] text-primary-600 bg-primary-50 border border-primary-200 px-2 py-0.5 rounded-full flex-shrink-0 font-medium animate-pulse">
+                  <span className="flex items-center gap-1 text-[12px] text-primary-600 bg-primary-50 border border-primary-200 px-2 py-0.5 rounded-full flex-shrink-0 font-medium animate-pulse">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary-400 flex-shrink-0" />
                     {en ? "Verifying…" : "確認中…"}
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-[11px] text-default-400 bg-white border border-default-200 px-2 py-0.5 rounded-full flex-shrink-0">
+                  <span className="flex items-center gap-1 text-[12px] text-default-400 bg-white border border-default-200 px-2 py-0.5 rounded-full flex-shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-default-300 flex-shrink-0" /> {en ? "Not connected" : "尚未連接"}
                   </span>
                 )}
@@ -994,7 +994,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                       )}
                     </div>
                     {daysSince !== null && (
-                      <div className={`mt-0.5 text-[10px] ${isStale ? "text-warning-600 font-medium" : "text-default-400"}`}>
+                      <div className={`mt-0.5 text-[12px] ${isStale ? "text-warning-600 font-medium" : "text-default-400"}`}>
                         {isStale
                           ? (en ? `⚠ Connected ${daysSince}d ago — consider re-authorizing` : `⚠ 已連接 ${daysSince} 天，建議重新授權`)
                           : (en ? `Connected ${daysSince}d ago` : `已連接 ${daysSince} 天`)}
@@ -1039,16 +1039,16 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
               {/* ── 匯入語氣範例 (Facebook only, fully connected) ── */}
               {p.key === "facebook" && fullyConnected && (
                 <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-3 space-y-2">
-                  <p className="text-[11px] text-violet-800 font-medium leading-relaxed">
+                  <p className="text-[12px] text-violet-800 font-medium leading-relaxed">
                     📥 {en ? "Import voice from real posts" : "從真實貼文學習語氣"}
                   </p>
-                  <p className="text-[10px] text-violet-600 leading-relaxed">
+                  <p className="text-[12px] text-violet-600 leading-relaxed">
                     {en
                       ? "Fetch your page's recent posts, analyze writing style, and store real examples in Brand DNA so AI generates content that sounds like you."
                       : "抓取粉絲團最近 20-30 篇貼文，分析語氣特徵，存入品牌大腦作為真實範例。之後每次產文，AI 都會模仿你們真正的寫作風格。"}
                   </p>
                   {importResult && (
-                    <div className="text-[10px] text-violet-700 bg-violet-100 rounded-lg px-2 py-1.5 leading-relaxed">
+                    <div className="text-[12px] text-violet-700 bg-violet-100 rounded-lg px-2 py-1.5 leading-relaxed">
                       ✓ {en
                         ? `Imported ${importResult.samplesImported} samples. Tone: "${importResult.toneSummary}"`
                         : `已匯入 ${importResult.samplesImported} 篇範例。語氣定位：「${importResult.toneSummary}」`}

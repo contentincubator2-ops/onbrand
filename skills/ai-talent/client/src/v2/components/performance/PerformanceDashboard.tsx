@@ -43,7 +43,7 @@ function Card({ title, sub, children, style }: { title: string; sub?: string; ch
   return (
     <div style={{ ...card, ...style }}>
       <h3 style={{ fontSize: 13, margin: 0, fontWeight: 800, color: C.text }}>{title}</h3>
-      {sub && <div style={{ fontSize: 11, color: C.sub, marginTop: 3, marginBottom: 16 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: C.sub, marginTop: 3, marginBottom: 16 }}>{sub}</div>}
       {!sub && <div style={{ height: 12 }} />}
       {children}
     </div>
@@ -51,11 +51,11 @@ function Card({ title, sub, children, style }: { title: string; sub?: string; ch
 }
 
 function Delta({ cur, prev, invert }: { cur: number; prev: number; invert?: boolean }) {
-  if (!prev) return <span style={{ color: C.sub, fontSize: 11 }}>—</span>;
+  if (!prev) return <span style={{ color: C.sub, fontSize: 12 }}>—</span>;
   const d = (cur - prev) / prev;
   const better = invert ? d < 0 : d > 0;
   return (
-    <span style={{ color: Math.abs(d) < 0.005 ? C.sub : better ? C.good : C.bad, fontSize: 11, fontWeight: 700 }}>
+    <span style={{ color: Math.abs(d) < 0.005 ? C.sub : better ? C.good : C.bad, fontSize: 12, fontWeight: 700 }}>
       {d > 0 ? "+" : ""}{(d * 100).toFixed(1)}%
     </span>
   );
@@ -64,17 +64,17 @@ function Delta({ cur, prev, invert }: { cur: number; prev: number; invert?: bool
 function Kpi({ k, v, cur, prev, invert }: { k: string; v: string; cur?: number; prev?: number; invert?: boolean }) {
   return (
     <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px" }}>
-      <div style={{ fontSize: 10, color: C.sub, letterSpacing: ".06em", fontWeight: 800 }}>{k}</div>
+      <div style={{ fontSize: 12, color: C.sub, letterSpacing: ".06em", fontWeight: 800 }}>{k}</div>
       <div style={{ fontSize: 19, fontWeight: 850, marginTop: 5, letterSpacing: "-.02em", color: C.text }}>{v}</div>
       <div style={{ marginTop: 3 }}>
-        {cur != null && prev != null ? <Delta cur={cur} prev={prev} invert={invert} /> : <span style={{ color: C.sub, fontSize: 11 }}>—</span>}
+        {cur != null && prev != null ? <Delta cur={cur} prev={prev} invert={invert} /> : <span style={{ color: C.sub, fontSize: 12 }}>—</span>}
       </div>
     </div>
   );
 }
 
 const th: React.CSSProperties = {
-  textAlign: "left", fontSize: 10, color: C.sub, letterSpacing: ".06em",
+  textAlign: "left", fontSize: 12, color: C.sub, letterSpacing: ".06em",
   fontWeight: 800, padding: "0 8px 8px", borderBottom: `1px solid ${C.border}`,
 };
 const td: React.CSSProperties = { padding: "9px 8px", borderBottom: "1px solid #f6f7f9", fontSize: 12 };
@@ -85,7 +85,7 @@ function Tag({ kind, children }: { kind: "good" | "bad" | "warn" | "mute"; child
     good: { bg: C.goodBg, fg: "#047857" }, bad: { bg: C.badBg, fg: "#B91C1C" },
     warn: { bg: C.warnBg, fg: C.warn }, mute: { bg: "#f3f4f6", fg: C.mute },
   }[kind];
-  return <span style={{ background: m.bg, color: m.fg, fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 20 }}>{children}</span>;
+  return <span style={{ background: m.bg, color: m.fg, fontSize: 12, fontWeight: 800, padding: "2px 7px", borderRadius: 20 }}>{children}</span>;
 }
 
 function Note({ tone = "warn", children }: { tone?: "warn" | "bad"; children: React.ReactNode }) {
@@ -106,7 +106,7 @@ function Select({ label, value, onChange, options }: {
 }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span style={{ fontSize: 10, fontWeight: 800, color: C.sub, letterSpacing: ".06em" }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 800, color: C.sub, letterSpacing: ".06em" }}>{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -149,7 +149,7 @@ function FilterBar({ lens, setLens }: { lens: Lens; setLens: (l: Lens) => void }
                    padding: "7px 11px", fontSize: 12, cursor: "pointer", color: C.mute }}
         >清除視角</button>
       )}
-      <div style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.bad,
+      <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: C.bad,
                     background: C.badBg, border: "1px solid #FECACA", borderRadius: 6, padding: "5px 9px" }}>
         ⚠ 模擬資料
       </div>
@@ -178,7 +178,7 @@ function Funnel({ t }: { t: Totals }) {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: grid, gap: 12, fontSize: 10, color: C.sub,
+      <div style={{ display: "grid", gridTemplateColumns: grid, gap: 12, fontSize: 12, color: C.sub,
                     fontWeight: 800, letterSpacing: ".06em", paddingBottom: 7,
                     borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
         <div>階段</div><div /><div style={{ textAlign: "right" }}>人數</div>
@@ -194,13 +194,13 @@ function Funnel({ t }: { t: Totals }) {
           }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 12 }}>{s.nm}</div>
-              <div style={{ color: C.sub, fontSize: 10 }}>{s.en}</div>
+              <div style={{ color: C.sub, fontSize: 12 }}>{s.en}</div>
             </div>
             <div>
               <div style={{
                 height: 26, borderRadius: 5, background: isLeak ? C.bad : C.text,
                 width: `${Math.max(6, (s.v / max) * 100)}%`, display: "flex", alignItems: "center",
-                paddingLeft: 9, color: "#fff", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+                paddingLeft: 9, color: "#fff", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
               }}>
                 {s.rate != null && isLeak ? `↓ 流失 ${fmtPct(1 - s.rate)}` : ""}
               </div>
@@ -262,7 +262,7 @@ function Matrix({ product, onPick }: { product: string; onPick: (ta: string, app
                       <div style={{ fontSize: 14, fontWeight: 850, fontVariantNumeric: "tabular-nums" }}>
                         {thin ? "—" : c.roas.toFixed(2)}
                       </div>
-                      <div style={{ fontSize: 9, opacity: .75 }}>{thin ? "量太小" : `${fmtInt(c.orders)} 單`}</div>
+                      <div style={{ fontSize: 12, opacity: .75 }}>{thin ? "量太小" : `${fmtInt(c.orders)} 單`}</div>
                     </button>
                   </td>
                 );

@@ -112,7 +112,7 @@ export default function AgentPersonaBar({
           <Avatar src={avatar} size="lg" radius="md" style={{ width: avatarSize, height: avatarSize }} />
         </div>
         <div
-          className="absolute -bottom-2 -right-2 px-2 py-0.5 text-[10px] font-bold text-white whitespace-nowrap"
+          className="absolute -bottom-2 -right-2 px-2 py-0.5 text-[12px] font-bold text-white whitespace-nowrap"
           style={{ background: "#111", border: "1.5px solid #111", borderRadius: 6 }}
         >
           {p.label}
@@ -140,7 +140,7 @@ export default function AgentPersonaBar({
             }}
           />
           <div className="flex items-center justify-between gap-3 mb-1.5">
-            <div className="flex items-center gap-2 flex-wrap text-[11px] uppercase tracking-[0.22em] text-neutral-700">
+            <div className="flex items-center gap-2 flex-wrap text-[12px] uppercase tracking-[0.22em] text-neutral-700">
               <span className="font-semibold text-neutral-800">{p.label}</span>
               <span className="text-neutral-500">·</span>
               <span>{p.domain}</span>

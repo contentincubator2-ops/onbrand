@@ -227,13 +227,13 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 return (
                   <div key={s.n} className="flex items-center gap-2 flex-1">
                     <div
-                      className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold transition ${
+                      className={`flex items-center justify-center w-6 h-6 rounded-full text-[12px] font-bold transition ${
                         isDone ? "bg-emerald-500 text-white"
                           : isActive ? "bg-violet-600 text-white"
                           : "bg-default-100 text-default-400"
                       }`}
                     >
-                      {isDone ? <FontAwesomeIcon icon={faCheck} className="text-[9px]" /> : s.n}
+                      {isDone ? <FontAwesomeIcon icon={faCheck} className="text-[12px]" /> : s.n}
                     </div>
                     <span className={`text-xs ${isActive ? "font-semibold text-default-900" : "text-default-500"}`}>
                       {s.label}
@@ -254,7 +254,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
             {step === 1 && (
               <div className="py-2">
                 <p style={{
-                  fontSize: 10, fontWeight: 600, color: "#404040",
+                  fontSize: 12, fontWeight: 600, color: "#404040",
                   letterSpacing: "0.28em", textTransform: "uppercase",
                   marginBottom: 12,
                 }}>
@@ -306,7 +306,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                       }}
                     >
                       <p style={{
-                        fontSize: 9, fontWeight: 700, color: "#525252",
+                        fontSize: 12, fontWeight: 700, color: "#525252",
                         letterSpacing: "0.22em", marginBottom: 6,
                         fontVariantNumeric: "tabular-nums",
                       }}>
@@ -316,7 +316,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                         {s.label}
                       </p>
                       <p style={{
-                        fontSize: 11.5, lineHeight: 1.55, color: "#525252",
+                        fontSize: 12.5, lineHeight: 1.55, color: "#525252",
                         fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
                       }}>
                         {s.desc}
@@ -349,7 +349,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   {lang === "en" ? "Add your first brand" : "開始建立第一個品牌"}
                   <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
                 </button>
-                <p style={{ fontSize: 11, color: "#525252", marginTop: 10 }}>
+                <p style={{ fontSize: 12, color: "#525252", marginTop: 10 }}>
                   {lang === "en"
                     ? "About 2 minutes · once finished, AI is ready to write for your brand"
                     : "預計 2 分鐘 · 完成後 AI 已備好可以為你寫內容"}
@@ -505,7 +505,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
               <div>
                 <div className="mb-3">
                   <p style={{
-                    fontSize: 10, fontWeight: 600, color: "#404040",
+                    fontSize: 12, fontWeight: 600, color: "#404040",
                     letterSpacing: "0.28em", textTransform: "uppercase",
                     marginBottom: 6,
                   }}>
@@ -552,7 +552,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
             {step === 4 && (
               <div className="py-2">
                 <p style={{
-                  fontSize: 10, fontWeight: 600, color: "#404040",
+                  fontSize: 12, fontWeight: 600, color: "#404040",
                   letterSpacing: "0.28em", textTransform: "uppercase",
                   marginBottom: 12,
                 }}>
@@ -612,7 +612,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     {lang === "en" ? "Back to brand workspace" : "回品牌工作區"}
                   </button>
                 </div>
-                <p style={{ fontSize: 11, color: "#525252", marginBottom: 20 }}>
+                <p style={{ fontSize: 12, color: "#525252", marginBottom: 20 }}>
                   {lang === "en"
                     ? "You can re-run the SoWork Brand Method anytime from Brand → Settings"
                     : "日後可隨時在「品牌 → 設定」重新跑 SoWork 品牌定位法"}
@@ -626,7 +626,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   paddingTop: 16,
                 }}>
                   <p style={{
-                    fontSize: 10, fontWeight: 700, color: "#525252",
+                    fontSize: 12, fontWeight: 700, color: "#525252",
                     letterSpacing: "0.22em", textTransform: "uppercase",
                     marginBottom: 10,
                   }}>
@@ -674,7 +674,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                       {lang === "en" ? "4+ → Contact sales" : "4 個以上 → 聯繫業務"}
                     </a>
                   </div>
-                  <p style={{ fontSize: 11, color: "#737373", marginTop: 8, fontStyle: "italic" }}>
+                  <p style={{ fontSize: 12, color: "#737373", marginTop: 8, fontStyle: "italic" }}>
                     {lang === "en"
                       ? "Cancel anytime — keep access until the current period ends."
                       : "隨時可取消 — 當期結束前皆可正常使用。"}

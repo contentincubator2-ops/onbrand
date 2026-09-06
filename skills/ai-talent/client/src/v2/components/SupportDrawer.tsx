@@ -292,11 +292,11 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
             Mia
-            <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 500, color: "#6b7280" }}>
+            <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 500, color: "#6b7280" }}>
               · {isEn ? "Customer Success" : "客戶成功"}
             </span>
           </div>
-          <div style={{ fontSize: 11, color: "#10b981", display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ fontSize: 12, color: "#10b981", display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
             {isEn ? "Online — typically replies in seconds" : "在線中 — 通常秒回"}
           </div>
@@ -306,7 +306,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
           onClick={() => { setShowHistory(true); setHistoryConvId(null); }}
           title={isEn ? "View conversation history" : "查看歷史訊息"}
           style={{
-            fontSize: 11, fontWeight: 500, padding: "4px 8px", borderRadius: 6,
+            fontSize: 12, fontWeight: 500, padding: "4px 8px", borderRadius: 6,
             border: "1px solid #e5e7eb", background: "white", color: "#6b7280",
             cursor: "pointer", whiteSpace: "nowrap",
           }}
@@ -369,7 +369,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                       <span style={{ fontSize: 12, color: "#374151", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {c.firstUserMsg ?? (isEn ? "(no messages)" : "（無訊息）")}
                       </span>
-                      <span style={{ fontSize: 10, color: "#9ca3af" }}>
+                      <span style={{ fontSize: 12, color: "#9ca3af" }}>
                         {new Date(c.updatedAt).toLocaleDateString(isEn ? "en-US" : "zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                         {" · "}{c.msgCount}{isEn ? " msgs" : " 則"}
                         {" · "}<span style={{ color: c.status === "open" ? "#10b981" : "#9ca3af" }}>{c.status}</span>
@@ -419,7 +419,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
             width: 22, height: 22, borderRadius: "50%",
             background: "rgba(255,255,255,0.18)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, fontWeight: 700, flexShrink: 0,
+            fontSize: 12, fontWeight: 700, flexShrink: 0,
           }}>
             {pendingAuto.secondsLeft}
           </span>
@@ -433,7 +433,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
             style={{
               padding: "4px 10px", borderRadius: 6, border: "none",
               background: "rgba(255,255,255,0.2)", color: "white",
-              fontSize: 11, fontWeight: 600, cursor: "pointer",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
               flexShrink: 0,
             }}
           >
@@ -549,7 +549,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
               <button
                 onClick={() => setShowEscalate(true)}
                 style={{
-                  fontSize: 11, color: "#6b7280",
+                  fontSize: 12, color: "#6b7280",
                   background: "transparent", border: "none", cursor: "pointer",
                   padding: "2px 4px",
                 }}
@@ -584,7 +584,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                   }
                 }}
                 style={{
-                  fontSize: 11, color: "#7c3aed", fontWeight: 600,
+                  fontSize: 12, color: "#7c3aed", fontWeight: 600,
                   background: "transparent", border: "none", cursor: "pointer",
                   padding: "2px 4px",
                 }}
@@ -644,7 +644,7 @@ function MessageBubble({ message, onAction }: { message: Message; onAction: (a: 
         wordBreak: "break-word",
       }}>
         {isAdmin && (
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#B91C1C", marginBottom: 3, letterSpacing: 0.5 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#B91C1C", marginBottom: 3, letterSpacing: 0.5 }}>
             SOWORK 團隊
           </div>
         )}

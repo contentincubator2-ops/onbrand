@@ -148,11 +148,11 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
               {en ? "Existing voice lock" : "既有語調鎖定"}
             </span>
             {voiceLock ? (
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: "#7C3AED", color: "#fff" }}>
+              <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ background: "#7C3AED", color: "#fff" }}>
                 {en ? `${voiceLock.rules.length} rules locked` : `已鎖定 ${voiceLock.rules.length} 條規則`}
               </span>
             ) : (
-              <span className="text-[10px] text-default-400">
+              <span className="text-[12px] text-default-400">
                 {en ? "optional — for brands with a proven existing tone" : "選填——適合已有成效驗證語調的品牌"}
               </span>
             )}
@@ -168,7 +168,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
             </p>
             {voiceLock && (
               <div className="mb-3 rounded-xl border border-violet-200 bg-white p-3">
-                <p className="text-[11px] text-default-400 mb-1.5">{voiceLock.sourceSummary}</p>
+                <p className="text-[12px] text-default-400 mb-1.5">{voiceLock.sourceSummary}</p>
                 <ul className="space-y-1">
                   {voiceLock.rules.map((r, i) => (
                     <li key={i} className="text-xs text-default-700 flex gap-1.5">
@@ -182,7 +182,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
                     clearVoiceLockMut?.mutate?.({ brandId }, { onSuccess: () => utils.scope?.active?.invalidate?.() });
                   }}
                   disabled={clearVoiceLockMut?.isPending}
-                  className="mt-2.5 text-[11px] font-medium text-default-400 hover:text-danger-500 transition"
+                  className="mt-2.5 text-[12px] font-medium text-default-400 hover:text-danger-500 transition"
                 >
                   {clearVoiceLockMut?.isPending ? "…" : (en ? "Clear lock" : "清除鎖定")}
                 </button>
@@ -198,7 +198,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
               className="w-full text-xs border border-default-200 rounded-xl p-3 resize-y focus:outline-none focus:border-violet-400"
             />
             <div className="flex items-center justify-between mt-2">
-              <span className="text-[11px] text-default-400">
+              <span className="text-[12px] text-default-400">
                 {pasteText.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean).length} {en ? "posts detected" : "篇偵測到"}
               </span>
               <button
@@ -259,13 +259,13 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
               <FontAwesomeIcon icon={active.icon} style={{ color: active.tone, fontSize: 16 }} />
               <h2 className="font-semibold text-default-900">{en ? `${active.label} prompts` : `${active.label} 指令`}</h2>
               {savingPlatform === active.id && (
-                <span className="text-[10px] text-default-500 flex items-center gap-1">
+                <span className="text-[12px] text-default-500 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> {en ? "Auto-saving…" : "自動儲存中…"}
                 </span>
               )}
               {saved === active.id && (
-                <span className="text-[10px] text-emerald-600 flex items-center gap-1">
-                  <FontAwesomeIcon icon={faCheck} className="text-[10px]" /> {en ? "Saved" : "已儲存"}
+                <span className="text-[12px] text-emerald-600 flex items-center gap-1">
+                  <FontAwesomeIcon icon={faCheck} className="text-[12px]" /> {en ? "Saved" : "已儲存"}
                 </span>
               )}
             </div>
@@ -286,7 +286,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <label className="text-xs font-semibold text-default-700 mb-1.5 block flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[10px]">{en ? "Text prompt" : "文字指令"}</span>
+                <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[12px]">{en ? "Text prompt" : "文字指令"}</span>
                 {en ? "System prompt for copywriting" : "寫文案時的系統指令"}
               </label>
               <Textarea
@@ -303,7 +303,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
             </div>
             <div>
               <label className="text-xs font-semibold text-default-700 mb-1.5 block flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px]">{en ? "Image prompt" : "圖片指令"}</span>
+                <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[12px]">{en ? "Image prompt" : "圖片指令"}</span>
                 {en ? "Image / Flux style brief" : "配圖 / Flux 風格指引"}
               </label>
               <Textarea

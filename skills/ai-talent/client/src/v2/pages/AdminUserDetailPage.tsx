@@ -17,7 +17,7 @@ const card: React.CSSProperties = {
   padding: "14px 16px", marginBottom: 14,
 };
 const h2: React.CSSProperties = {
-  fontSize: 11, fontWeight: 700, letterSpacing: "0.16em",
+  fontSize: 12, fontWeight: 700, letterSpacing: "0.16em",
   textTransform: "uppercase", color: "#525252", marginBottom: 10,
 };
 const kv: React.CSSProperties = { fontSize: 12, color: "#374151", padding: "3px 0" };
@@ -150,6 +150,6 @@ export default function AdminUserDetailPage() {
 }
 
 const tag: React.CSSProperties = {
-  fontSize: 10, background: "#f3f4f6", color: "#525252",
+  fontSize: 12, background: "#f3f4f6", color: "#525252",
   borderRadius: 5, padding: "2px 7px", marginLeft: 8, verticalAlign: "middle",
 };

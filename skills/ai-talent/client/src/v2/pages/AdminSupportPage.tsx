@@ -97,7 +97,7 @@ export default function AdminSupportPage() {
                   onClick={() => setStatusFilter(s)}
                   style={{
                     padding: "3px 10px", borderRadius: 999,
-                    fontSize: 11, fontWeight: 600,
+                    fontSize: 12, fontWeight: 600,
                     border: active ? "1px solid #171717" : "1px solid #e5e7eb",
                     background: active ? "#171717" : "white",
                     color: active ? "white" : "#525252",
@@ -141,25 +141,25 @@ export default function AdminSupportPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{
                     padding: "1px 7px", borderRadius: 4,
-                    fontSize: 10, fontWeight: 700,
+                    fontSize: 12, fontWeight: 700,
                     background: sc.bg, color: sc.fg,
                   }}>{sc.label}</span>
                   {t.tag && (
                     <span style={{
                       padding: "1px 7px", borderRadius: 4,
-                      fontSize: 10, fontWeight: 600,
+                      fontSize: 12, fontWeight: 600,
                       background: (TAG_COLORS[t.tag] ?? "#9ca3af") + "22",
                       color: TAG_COLORS[t.tag] ?? "#525252",
                     }}>{t.tag}</span>
                   )}
-                  <span style={{ marginLeft: "auto", fontSize: 10, color: "#9ca3af" }}>
+                  <span style={{ marginLeft: "auto", fontSize: 12, color: "#9ca3af" }}>
                     #{t.id}
                   </span>
                 </div>
                 <div style={{ fontSize: 13, color: "#171717", fontWeight: 500, lineHeight: 1.35 }}>
                   {t.subject ?? "(no subject)"}
                 </div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>
                   {t.userEmail ?? `user ${t.userId}`} · {new Date(t.updatedAt).toLocaleString("zh-TW", { hour12: false, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                 </div>
               </button>
@@ -229,7 +229,7 @@ function TicketDetail({ ticketId, onUpdated }: { ticketId: number; onUpdated: ()
           <select
             value={ticket.status}
             onChange={(e) => updateMut?.mutate?.({ ticketId, status: e.target.value as any })}
-            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid #e5e7eb" }}
+            style={{ fontSize: 12, padding: "3px 8px", borderRadius: 6, border: "1px solid #e5e7eb" }}
           >
             <option value="open">未處理</option>
             <option value="in_progress">處理中</option>
@@ -238,7 +238,7 @@ function TicketDetail({ ticketId, onUpdated }: { ticketId: number; onUpdated: ()
           <select
             value={ticket.tag ?? ""}
             onChange={(e) => updateMut?.mutate?.({ ticketId, tag: e.target.value as any })}
-            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid #e5e7eb" }}
+            style={{ fontSize: 12, padding: "3px 8px", borderRadius: 6, border: "1px solid #e5e7eb" }}
           >
             <option value="">(no tag)</option>
             <option value="bug">bug</option>
@@ -249,7 +249,7 @@ function TicketDetail({ ticketId, onUpdated }: { ticketId: number; onUpdated: ()
           <select
             value={ticket.priority}
             onChange={(e) => updateMut?.mutate?.({ ticketId, priority: e.target.value as any })}
-            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid #e5e7eb" }}
+            style={{ fontSize: 12, padding: "3px 8px", borderRadius: 6, border: "1px solid #e5e7eb" }}
           >
             <option value="low">low</option>
             <option value="normal">normal</option>
@@ -259,14 +259,14 @@ function TicketDetail({ ticketId, onUpdated }: { ticketId: number; onUpdated: ()
         <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", marginBottom: 4 }}>
           {ticket.subject}
         </div>
-        <div style={{ fontSize: 11, color: "#6b7280" }}>
+        <div style={{ fontSize: 12, color: "#6b7280" }}>
           {ticket.userEmail ?? `user ${ticket.userId}`} · 開單於 {new Date(ticket.createdAt).toLocaleString("zh-TW", { hour12: false })}
         </div>
       </div>
 
       {/* Context summary */}
       {ticket.autoContext && (
-        <div style={{ padding: "10px 24px", background: "#FFFBEB", borderBottom: "1px solid #FCD34D", fontSize: 11, color: "#78350F", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+        <div style={{ padding: "10px 24px", background: "#FFFBEB", borderBottom: "1px solid #FCD34D", fontSize: 12, color: "#78350F", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>📍 系統自動帶入</div>
           {ticket.autoContext.sessionCtx ?? JSON.stringify(ticket.autoContext, null, 2)}
         </div>
@@ -282,7 +282,7 @@ function TicketDetail({ ticketId, onUpdated }: { ticketId: number; onUpdated: ()
           const align = isAdmin ? "flex-end" : "flex-start";
           return (
             <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: align }}>
-              <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 3 }}>
+              <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 3 }}>
                 {isUser ? "👤 用戶" : isAdmin ? "🟥 SoWork" : "🤖 Mia"} · {new Date(m.createdAt).toLocaleString("zh-TW", { hour12: false, hour: "2-digit", minute: "2-digit" })}
               </div>
               <div style={{

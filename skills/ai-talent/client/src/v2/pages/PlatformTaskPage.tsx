@@ -369,7 +369,7 @@ class PlatformPageErrorBoundary extends React.Component<
       return (
         <div style={{ padding: 32 }}>
           <div style={{ padding: 20, border: "1px solid #fca5a5", background: "#fef2f2", borderRadius: 12 }}>
-            <p style={{ fontSize: 11, color: "#dc2626", textTransform: "uppercase" }}>
+            <p style={{ fontSize: 12, color: "#dc2626", textTransform: "uppercase" }}>
               /tasks/{this.props.platform} render error
             </p>
             <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>頁面載入失敗</h2>
@@ -1441,7 +1441,7 @@ function PlatformTaskPageInner() {
             >
               <FontAwesomeIcon icon={meta.icon} className="text-sm" />
             </div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-default-500">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-default-500">
               {lang === "en" ? meta.label : meta.labelZh}
             </p>
           </div>
@@ -1520,7 +1520,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.labelZh}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -1555,7 +1555,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -1590,7 +1590,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -1625,7 +1625,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -1660,7 +1660,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -1695,7 +1695,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -1730,7 +1730,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -1765,7 +1765,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -1800,7 +1800,7 @@ function PlatformTaskPageInner() {
                       {lang === "en" ? tab.labelEn : tab.label}
                       {tab.id !== "all" && (
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
                           style={{
                             background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
                             color: active ? "rgba(255,255,255,0.85)" : "#737373",
@@ -2049,7 +2049,7 @@ function PlatformTaskPageInner() {
                             setResumeCardId(task.ownCardId!);
                             setComposerOpen(true);
                           }}
-                          className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-white/85 hover:bg-white text-[10px] font-semibold text-default-700 cursor-pointer"
+                          className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-white/85 hover:bg-white text-[12px] font-semibold text-default-700 cursor-pointer"
                         >
                           <FontAwesomeIcon icon={faPenToSquare} />
                           {lang === "en" ? "My card" : "我的卡"}
@@ -2065,7 +2065,7 @@ function PlatformTaskPageInner() {
                       {/* Deliverable badge — top right (no duration labels) */}
                       <span
                         className="absolute top-2 right-2 text-tiny font-bold px-2 py-0.5 rounded-full text-white shadow-sm"
-                        style={{ background: accent, fontSize: 9, letterSpacing: "0.06em" }}
+                        style={{ background: accent, fontSize: 12, letterSpacing: "0.06em" }}
                       >
                         {tierLabel(taskTier, lang)}
                       </span>
@@ -2075,7 +2075,7 @@ function PlatformTaskPageInner() {
                         if (days === null) return null;
                         return (
                           <span
-                            className="absolute bottom-2 right-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                            className="absolute bottom-2 right-2 text-[12px] font-semibold px-1.5 py-0.5 rounded-full"
                             style={{ background: "rgba(0,0,0,0.55)", color: "#fff", letterSpacing: "0.03em" }}
                           >
                             {days === 0 ? (lang === "en" ? "today" : "今天用過") : `${days}d ago`}
@@ -2087,7 +2087,7 @@ function PlatformTaskPageInner() {
                         className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center"
                         style={{ background: meta.bg }}
                       >
-                        <FontAwesomeIcon icon={meta.icon} className="text-white" style={{ fontSize: 9 }} />
+                        <FontAwesomeIcon icon={meta.icon} className="text-white" style={{ fontSize: 12 }} />
                       </div>
                     </div>
 
@@ -2123,7 +2123,7 @@ function PlatformTaskPageInner() {
                         );
                       })()}
                       {(task as any).methodology && (
-                        <span className="text-[10px] text-default-400 italic">📚 {(task as any).methodology}</span>
+                        <span className="text-[12px] text-default-400 italic">📚 {(task as any).methodology}</span>
                       )}
                       <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
                         <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
@@ -2139,7 +2139,7 @@ function PlatformTaskPageInner() {
                                 <Avatar key={m.id} src={m.avatarUrl || dicebear(m.name)} size="sm" className="w-5 h-5 ring-1 ring-white" title={m.name} />
                               ))}
                           </div>
-                          <span className="text-[10px] text-default-500">
+                          <span className="text-[12px] text-default-500">
                             {lang === "en" ? `${(task as any).team.length} collaborators` : `${(task as any).team.length} 位協作`}
                           </span>
                         </div>
@@ -2241,7 +2241,7 @@ function PlatformTaskPageInner() {
                   </div>
                   {/* Deliverable badge in modal header (no duration labels) */}
                   <span
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
+                    className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
                     style={{ background: tierAccent(effectiveTier(activeTask)) }}
                   >
                     {tierLabel(effectiveTier(activeTask), lang)}
@@ -2381,7 +2381,7 @@ function PlatformTaskPageInner() {
                   const renderChip = (c: any, missing: boolean) => {
                     const editable = isEditable(c.source) && c.source !== "brand.name";
                     const base: React.CSSProperties = {
-                      fontSize: 11, padding: "3px 8px", borderRadius: 4, fontWeight: 500,
+                      fontSize: 12, padding: "3px 8px", borderRadius: 4, fontWeight: 500,
                       ...(missing
                         ? { background: "transparent", color: "#A3A3A3", border: "1px dashed #D4D4D4" }
                         : { background: "#171717", color: "#FFFFFF" }),
@@ -2403,7 +2403,7 @@ function PlatformTaskPageInner() {
                   };
                   return (
                     <div className="mb-3 rounded-lg px-3 py-2.5" style={{ background: "#FAFAF9", border: "1px solid #171717" }}>
-                      <p style={{ fontSize: 9, fontWeight: 700, color: "#525252", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 6 }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: "#525252", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 6 }}>
                         {(() => {
                           const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
                           return lang === "en"
@@ -2429,14 +2429,14 @@ function PlatformTaskPageInner() {
                             </p>
                             {siblings.length > 0 && (
                               <div className="flex flex-wrap gap-1 mb-1.5">
-                                <span className="text-[10px] text-default-400 self-center">
+                                <span className="text-[12px] text-default-400 self-center">
                                   {lang === "en" ? "Pick:" : "可選用："}
                                 </span>
                                 {siblings.map((s) => (
                                   <button
                                     key={s.path}
                                     onClick={() => setEditValue(s.val)}
-                                    className="text-[10px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
+                                    className="text-[12px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
                                     title={s.val}
                                   >
                                     {s.val.length > 24 ? s.val.slice(0, 24) + "…" : s.val}
@@ -2451,7 +2451,7 @@ function PlatformTaskPageInner() {
                               autoFocus
                               placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
                             />
-                            <p className="text-[10px] text-default-400 mt-1">
+                            <p className="text-[12px] text-default-400 mt-1">
                               {lang === "en"
                                 ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
                                 : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}

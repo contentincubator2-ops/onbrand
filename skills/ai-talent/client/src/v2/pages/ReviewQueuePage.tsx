@@ -9,8 +9,8 @@
  *   等我放行  → 主管／owner・admin
  *   我送出的  → 小編，想知道自己的稿卡在哪一關
  *
- * 字級刻意不用 text-[10px]/[11px]：全站有 368 處那種尺寸，這頁是新的，
- * 從 13px 起跳（見 2026-09-06 的字級盤點）。
+ * 字級從 13px 起跳。2026-09-06 已把介面地板抬到 12px，這頁是新的，
+ * 不貼著地板寫。
  */
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";

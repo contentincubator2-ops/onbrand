@@ -241,7 +241,7 @@ export default function BrandsManagePage() {
             the title column can stay centered without competing for space. */}
         <div className="relative pt-2 pb-8 mb-2">
           <div className="text-center max-w-[1100px] mx-auto">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
               BRANDS · WORKSPACE
             </p>
             <h1
@@ -304,7 +304,7 @@ export default function BrandsManagePage() {
             }}
           >
             <span
-              className="text-[10px] font-semibold uppercase tracking-[0.15em] px-2 py-1 rounded"
+              className="text-[12px] font-semibold uppercase tracking-[0.15em] px-2 py-1 rounded"
               style={{ background: "rgba(124,58,237,0.12)", color: "#5B21B6" }}
             >
               {scopeKind === "event"
@@ -494,7 +494,7 @@ function BrandCard({
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-[11px] text-neutral-500 hover:text-neutral-900 inline-flex items-center gap-0.5"
+              className="text-[12px] text-neutral-500 hover:text-neutral-900 inline-flex items-center gap-0.5"
             >
               {brand.website.replace(/^https?:\/\//, "")} <ExternalLink size={9} />
             </a>
@@ -525,7 +525,7 @@ function BrandCard({
         <div className="mb-4 space-y-2">
           {products.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400 mb-1 flex items-center gap-1">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-neutral-400 mb-1 flex items-center gap-1">
                 <Package size={10} /> {lang === "en" ? "Products" : "產品"}
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -533,7 +533,7 @@ function BrandCard({
                   <button
                     key={p.id}
                     onClick={(e) => { e.stopPropagation(); onOpenProduct(p.id); }}
-                    className="text-[11px] px-2 py-1 rounded-md border border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50 transition max-w-[160px] truncate"
+                    className="text-[12px] px-2 py-1 rounded-md border border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50 transition max-w-[160px] truncate"
                     title={p.name}
                   >
                     {p.name}
@@ -544,7 +544,7 @@ function BrandCard({
           )}
           {events.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400 mb-1 flex items-center gap-1">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-neutral-400 mb-1 flex items-center gap-1">
                 <Calendar size={10} /> {lang === "en" ? "Events" : "活動"}
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -552,7 +552,7 @@ function BrandCard({
                   <button
                     key={ev.id}
                     onClick={(e) => { e.stopPropagation(); onOpenEvent(ev.id); }}
-                    className="text-[11px] px-2 py-1 rounded-md border border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50 transition max-w-[160px] truncate"
+                    className="text-[12px] px-2 py-1 rounded-md border border-neutral-200 text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50 transition max-w-[160px] truncate"
                     title={ev.name}
                   >
                     {ev.name}
@@ -566,7 +566,7 @@ function BrandCard({
 
       {/* Footer row */}
       <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
-        <span className="text-[11px] text-neutral-500">
+        <span className="text-[12px] text-neutral-500">
           {lang === "en" ? "Last activity" : "最近活動"} · {lastActivityLabel}
         </span>
         <button
@@ -587,7 +587,7 @@ function Stat({ icon: Icon, label, n }: { icon: any; label: string; n: number })
         <Icon size={11} strokeWidth={2} />
         <span className="text-base font-bold text-neutral-900">{n}</span>
       </div>
-      <p className="text-[10px] text-neutral-500 mt-0.5">{label}</p>
+      <p className="text-[12px] text-neutral-500 mt-0.5">{label}</p>
     </div>
   );
 }

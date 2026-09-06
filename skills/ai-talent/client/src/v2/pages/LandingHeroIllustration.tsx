@@ -127,7 +127,7 @@ export default function LandingHeroIllustration({ en }: { en: boolean }) {
 
       {/* Caption tag below illustration */}
       <div
-        className="absolute -bottom-3 left-6 px-3 py-1 rounded-md text-[11px] font-bold"
+        className="absolute -bottom-3 left-6 px-3 py-1 rounded-md text-[12px] font-bold"
         style={{ background: ink, color: white }}
       >
         {en ? "Your Brand Brain, visualised" : "你的品牌大腦，視覺化"}
