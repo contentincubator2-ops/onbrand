@@ -56,6 +56,7 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import ChannelPicker from "../components/plan/ChannelPicker";
+import TaskPicker from "../components/plan/TaskPicker";
 
 // ── Recently used tasks helpers ─────────────────────────────────────────────
 const LAST_USED_KEY = "onbrand_last_used_tasks_v1";
@@ -842,6 +843,43 @@ function PlatformTaskPageInner() {
       : "facebook");
 
   // ── Filtered task list ────────────────────────────────────────────────────
+  /** 這個通路的全部可見卡（已過方案閘門）。托盤與選卡器都吃這一份。 */
+  const platformTasks = useMemo(
+    () => allTasks.filter((task) => inferPlatform(task) === platform),
+    [allTasks, platform],
+  );
+
+  // ── 2026-09-06 任務托盤 ─────────────────────────────────────────────
+  // FB 有 47 張卡擠在同一頁，使用者要在 9 種 postType × 4 種來源裡自己找。
+  // 托盤把「瀏覽」與「選擇」分開：平常只擺挑過的（沒挑過就每個分類一張），
+  // 要換再開選卡器。
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [showAllTasks, setShowAllTasks] = useState(false);
+  const trayQuery = (trpc as any).quickTask?.tray?.useQuery
+    ? (trpc as any).quickTask.tray.useQuery(
+        { brandId: brandId ?? 0, platform },
+        { enabled: !!brandId, refetchOnWindowFocus: false },
+      )
+    : { data: undefined, refetch: () => {} };
+  const trayData = trayQuery.data as
+    | { stored: string[] | null; fallback: string[]; maxTray: number; viralLocked: number }
+    | undefined;
+
+  const setTrayMut = (trpc as any).quickTask?.setTray?.useMutation?.({
+    onSuccess: () => { setPickerOpen(false); trayQuery.refetch?.(); },
+    onError: (e: any) => showToastGlobal?.(e?.message ?? "儲存失敗"),
+  });
+
+  /** 這個通路實際擺出來的卡 id。存過的要跟「現在看得到的」取交集 —— 降級
+   *  或卡退役之後，托盤不能把方案擋掉的卡漏出來。 */
+  const trayIds = useMemo<string[]>(() => {
+    if (!trayData) return [];
+    const visible = new Set(platformTasks.map((t: any) => t.id));
+    const stored = (trayData.stored ?? []).filter((id) => visible.has(id));
+    if (stored.length) return stored;
+    return (trayData.fallback ?? []).filter((id) => visible.has(id));
+  }, [trayData, platformTasks]);
+
   const visibleTasks = useMemo(() => {
     let list = allTasks.filter((task) => inferPlatform(task) === platform);
     if (platform === "facebook") {
@@ -909,8 +947,16 @@ function PlatformTaskPageInner() {
         }),
       );
     }
+    // 托盤模式：只擺挑過的那幾張。有搜尋或篩選時自動退出托盤（那時使用者
+    // 是在找東西，不是在用日常的那幾張）。
+    const filtering = searchQuery.trim().length > 0
+      || activeSource !== "all" || activeTier !== "all";
+    if (!showAllTasks && !filtering && trayIds.length) {
+      const inTray = new Set(trayIds);
+      list = list.filter((task) => inTray.has(task.id));
+    }
     return list;
-  }, [allTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery]);
+  }, [allTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery, showAllTasks, trayIds]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -2104,10 +2150,66 @@ function PlatformTaskPageInner() {
                   </button>
                 );
               })}
+
+              {/* 2026-09-06 「新增任務卡」入口。刻意長得像一張任務卡而不是
+                  一顆按鈕 —— 它跟卡片並排，做的是同一件事的延伸。 */}
+              {brandId && !showAllTasks && trayIds.length > 0 && (
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300 text-[18px] leading-none">
+                    +
+                  </span>
+                  <span className="text-[14px] font-medium">
+                    {lang === "en" ? "Add task card" : "新增任務卡"}
+                  </span>
+                  <span className="px-4 text-center text-[13px] text-neutral-400">
+                    {lang === "en"
+                      ? "Browse by source — viral, evergreen, award…"
+                      : "依來源挑選 — 爆款、長青、得獎案例…"}
+                  </span>
+                </button>
+              )}
             </div>
+
+            {/* 托盤／全部 切換。顯示「現在只擺 N 張，這個通路共 M 張」，
+                讓使用者知道有東西被收起來了，而不是以為卡不見了。 */}
+            {brandId && trayIds.length > 0 && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-[13px] text-neutral-500">
+                <span>
+                  {showAllTasks
+                    ? (lang === "en"
+                      ? `Showing all ${platformTasks.length} cards`
+                      : `目前顯示全部 ${platformTasks.length} 張`)
+                    : (lang === "en"
+                      ? `Showing your ${trayIds.length} of ${platformTasks.length} cards`
+                      : `目前只擺你常用的 ${trayIds.length} 張，這個通路共 ${platformTasks.length} 張`)}
+                </span>
+                <button
+                  onClick={() => setShowAllTasks((v) => !v)}
+                  className="font-medium text-neutral-800 underline-offset-2 hover:underline"
+                >
+                  {showAllTasks
+                    ? (lang === "en" ? "Show my cards" : "只看常用")
+                    : (lang === "en" ? "Show all" : "看全部")}
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
+
+      <TaskPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        tasks={platformTasks as any[]}
+        selected={trayIds}
+        maxTray={trayData?.maxTray ?? 12}
+        viralLocked={trayData?.viralLocked ?? 0}
+        saving={setTrayMut?.isPending}
+        onSave={(ids) => setTrayMut?.mutate?.({ brandId: brandId ?? 0, platform, taskIds: ids })}
+      />
 
       {/* ─── Task modal (intake + running countdown) ───────────────────── */}
       <Modal

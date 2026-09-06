@@ -938,6 +938,8 @@ import { resolveTaskSource } from "../_core/taskSource";
 import {
   planQuotaFor, resolveChannels, filterTasksByPlan, daysUntilSwap, isUnlimited,
 } from "../_core/planGate";
+import { defaultTray, storedTray, MAX_TRAY } from "../_core/taskTray";
+import { buildTaskCatalogIndex } from "../_core/taskCatalogIndex";
 
 /** 讀一個品牌的 positioning JSON。讀不到回 null，呼叫端走方案預設。 */
 async function loadBrandPositioning(brandId: number): Promise<unknown> {
@@ -1189,6 +1191,59 @@ export const quickTaskRouter = router({
     )
     .query(({ input }) => {
       return packNavForBrand({ brandId: input?.brandId, brandName: input?.brandName });
+    }),
+
+  /**
+   * 任務托盤：這個品牌在這個通路平常擺哪幾張卡。
+   *
+   * 回「存的」與「預設的」兩份，解析交給 client —— 只有 client 手上有完整
+   * 的可見清單（全域目錄 ＋ 品牌任務包 ＋ 用戶自建卡）。server 若自己解析，
+   * 會把自建卡當成不存在而丟掉，那正好是這個功能要支援的東西。
+   *
+   * 預設仍由 server 算：預設只會挑全域卡，catalogue 就夠了。
+   */
+  tray: protectedProcedure
+    .input(z.object({ brandId: z.number(), platform: z.string().min(1).max(24) }))
+    .query(async ({ ctx, input }) => {
+      const quota = await planQuotaFor(ctx.user!.id);
+      const positioning = await loadBrandPositioning(input.brandId);
+      const channels = resolveChannels(positioning, quota);
+      const cat = buildTaskCatalogIndex();
+      const allowed = filterTasksByPlan(cat as any[], quota, channels);
+      // 這個通路有幾張爆款卡是被方案鎖住的。選卡器要誠實顯示升級提示，
+      // 數字不能寫死在前端 —— 卡片會增加，寫死的數字第二天就是錯的。
+      const viralLocked = quota.viralTaskCards === false
+        ? (cat as any[]).filter((t) =>
+            t.platform === input.platform && t.source?.type === "viral").length
+        : 0;
+      return {
+        stored: storedTray(positioning, input.platform),
+        fallback: defaultTray(allowed as any[], input.platform),
+        maxTray: MAX_TRAY,
+        viralLocked,
+      };
+    }),
+
+  /** 存這個通路的托盤。空陣列＝回到系統預設。 */
+  setTray: protectedProcedure
+    .input(z.object({
+      brandId: z.number(),
+      platform: z.string().min(1).max(24),
+      taskIds: z.array(z.string().min(1).max(80)).max(MAX_TRAY),
+    }))
+    .mutation(async ({ input }) => {
+      const positioning = (await loadBrandPositioning(input.brandId)) ?? {};
+      const base = typeof positioning === "object" && positioning ? positioning : {};
+      const tray = { ...((base as any).__tray ?? {}) };
+      if (input.taskIds.length) tray[input.platform] = input.taskIds;
+      else delete tray[input.platform];          // 清空＝回到預設
+      const next = { ...base, __tray: tray };
+      const { default: localPool } = await import("../localDb");
+      await localPool.execute(
+        `UPDATE brands SET positioning = ? WHERE id = ?`,
+        [JSON.stringify(next), input.brandId],
+      );
+      return { taskIds: input.taskIds, isDefault: input.taskIds.length === 0 };
     }),
 
   /**
