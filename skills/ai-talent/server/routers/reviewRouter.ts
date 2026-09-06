@@ -91,6 +91,36 @@ export const reviewRouter = router({
       return { id: Number(r?.insertId ?? 0), status: "pending" as const };
     }),
 
+  /**
+   * 單一產出的最新審核狀態。
+   *
+   * 產出頁的送審按鈕需要它才誠實：沒有這支，按鈕永遠顯示「送審」，
+   * 使用者會重複送、或不知道稿子已經被退回。
+   */
+  statusFor: protectedProcedure
+    .input(z.object({ outputId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT id, status, requestedBy, reviewerIds, revisionNote, approvedAt, createdAt
+           FROM mission_review_queue
+          WHERE outputId = ?
+          ORDER BY id DESC LIMIT 1`,
+        [input.outputId],
+      );
+      const r = (rows as any[])[0];
+      if (!r) return null;
+      return {
+        id: Number(r.id),
+        status: String(r.status),
+        revisionNote: r.revisionNote ?? null,
+        approvedAt: r.approvedAt ?? null,
+        createdAt: r.createdAt,
+        mine: Number(r.requestedBy) === ctx.user!.id,
+        canApprove: await canApprove(ctx.user!.id, Number(r.requestedBy), parseReviewers(r.reviewerIds)),
+      };
+    }),
+
   /** 等我放行的（給主管看）。 */
   listPending: protectedProcedure
     .input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional())

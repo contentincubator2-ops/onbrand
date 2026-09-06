@@ -69,6 +69,7 @@ import { tierLabel } from "../lib/tierVocabulary";
 import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
+import ReviewBar from "../components/review/ReviewBar";
 
 type Mode = "edit" | "chat" | "image" | "video" | "agent" | "regen" | "rewrite" | "publish";
 
@@ -1944,6 +1945,10 @@ export default function RunPage() {
           {lang === "en" ? `Version #${(data as any)?.version ?? 1}` : `版本 #${(data as any)?.version ?? 1}`}
         </span>
       </div>
+
+      {/* 2026-09-06 送審／審核狀態。沒有這條，/review 佇列永遠是空的 ——
+          後端能收、佇列頁有，但沒有入口把稿子送進去。 */}
+      <ReviewBar outputId={id} missionId={(data as any)?.mission?.id ?? null} />
 
       {/* 2026-05-14 (async polling): progress banner — only shown when the
           orchestra wrote captions early and is still working on images/QA */}

@@ -55,6 +55,7 @@ import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
+import ChannelPicker from "../components/plan/ChannelPicker";
 
 // ── Recently used tasks helpers ─────────────────────────────────────────────
 const LAST_USED_KEY = "onbrand_last_used_tasks_v1";
@@ -1795,6 +1796,10 @@ function PlatformTaskPageInner() {
               })}
             </div>
           )}
+
+          {/* 2026-09-06 通路選擇。沒有這一區，用戶被鎖在方案預設值上，
+              「11 個通路選 2 個、每月可更換一次」那句賣點就不存在。 */}
+          {brandId ? <ChannelPicker brandId={brandId} /> : null}
 
           {/* 結構來源篩選 —— 只列出這個頻道實際存在的類型，避免一排點不動的空篩選。
               與上面的 tier 分頁是兩條獨立的軸：一條問「產出多大」，一條問「憑什麼這樣寫」。 */}

@@ -15,7 +15,8 @@ describe("reviewRouter", () => {
   it("建得起來，procedure 名單如預期", () => {
     const names = Object.keys((reviewRouter as any)._def.procedures).sort();
     expect(names).toEqual([
-      "approve", "listMine", "listPending", "pendingCount", "requestRevision", "submit",
+      "approve", "listMine", "listPending", "pendingCount", "requestRevision",
+      "statusFor", "submit",
     ]);
   });
 
