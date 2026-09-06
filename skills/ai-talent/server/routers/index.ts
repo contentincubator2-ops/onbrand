@@ -47,8 +47,6 @@ import { stripeRouter } from "./stripeRouter";
 import { festivalRouter } from "./festivalRouter";
 // 2026-05-12 (CJ「Phase 1 prompt library」): Nano-Banana 175 image-prompt templates.
 import { promptTemplateRouter } from "./promptTemplateRouter";
-// 2026-05-12 (CJ「策略顧問 — 5 scenario cards + McKinsey reports + Q&A + 比稿」)
-import { strategyConsultantRouter } from "./strategyConsultantRouter";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc → brand-aligned platform copy.
 import { mediaCopyRouter } from "./mediaCopyRouter";
 // 2026-06-21 (CJ「按 riverflow 標準」brand DNA): auto-extracted brand color palette.
@@ -110,7 +108,6 @@ export const appRouter = router({
   stripe:          stripeRouter,
   festival:        festivalRouter,
   promptTemplate:      promptTemplateRouter,
-  strategyConsultant:  strategyConsultantRouter,
   mediaCopy:           mediaCopyRouter,
   brandColors:         brandColorsRouter,
 });

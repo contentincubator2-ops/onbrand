@@ -65,7 +65,6 @@ const ProjectsPage = React.lazy(() => import("../pages/ProjectsPage"));
 const BrandsPage = React.lazy(() => import("../pages/BrandsPage"));
 const BrandsManagePage = React.lazy(() => import("../pages/BrandsManagePage"));
 const BrandSettingsPage = React.lazy(() => import("../pages/BrandSettingsPage"));
-const StrategyConsultantPage = React.lazy(() => import("../pages/StrategyConsultantPage"));
 const SquadMockupsGalleryPage = React.lazy(() => import("../pages/SquadMockupsGalleryPage"));
 const SquadLabPage = React.lazy(() => import("../pages/admin/SquadLabPage"));
 const CalendarPage = React.lazy(() => import("../pages/CalendarPage"));
@@ -329,7 +328,6 @@ export default function AppV2() {
           {/* 2026-05-12 (CJ「不想要變成 modal，想跟品牌頁面一樣」): full-page
               brand settings (replaces the modal sheet for direct navigation). */}
           <Route path="/brands/settings" element={<BrandSettingsPage />} />
-          <Route path="/consultant" element={<StrategyConsultantPage />} />
           <Route path="/theater"   element={<TheaterPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
