@@ -77,6 +77,12 @@ function autoSlug(name: string, kind: string = "item"): string {
 export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultBrandId, onCreated }: Props) {
   const { lang } = useLang();
   const [tab, setTab] = useState<AddEntityTab>(initialTab);
+  // 2026-09-07 產品定位上限。建到第 11 個才被擋是死路，事前就要看得到「已用 N／M」。
+  // 數量用 scope.options 裡該品牌的產品數，上限用 billing.getStatus 的 quota。
+  const planStatusQ = (trpc as any).billing?.getStatus?.useQuery
+    ? (trpc as any).billing.getStatus.useQuery(undefined, { refetchOnWindowFocus: false })
+    : { data: undefined };
+  const productLimit: number | undefined = (planStatusQ.data as any)?.quota?.products;
   useEffect(() => { if (isOpen) setTab(initialTab); }, [isOpen, initialTab]);
 
   // ── Brand list (for product/event picker) ───────────────────────────
@@ -360,6 +366,18 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                 </Select>
               </div>
               <div>
+                {productLimit !== undefined && productLimit !== -1 && (() => {
+                  const used = ((scopeOptions as any)?.data?.products ?? [])
+                    .filter((p: any) => Number(p.brandId) === Number(prodBrandId)).length;
+                  const full = used >= productLimit;
+                  return (
+                    <p className={`mb-2 text-[13px] ${full ? "text-default-800 font-medium" : "text-default-500"}`}>
+                      {lang === "en"
+                        ? `Product positioning: ${used} / ${productLimit} used${full ? " — upgrade to add more." : "."}`
+                        : `產品定位已用 ${used} ／ ${productLimit} 個${full ? "，升級後可以增加。" : "。"}`}
+                    </p>
+                  );
+                })()}
                 <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Product name" : "產品名稱"}<span className="text-danger ml-0.5">*</span></label>
                 <Input value={prodName} onValueChange={setProdName} placeholder={lang === "en" ? "e.g. Healthy Meal 5g Protein microwave line" : "例：健力餐 5g 蛋白質微波系列"} autoFocus isRequired />
               </div>

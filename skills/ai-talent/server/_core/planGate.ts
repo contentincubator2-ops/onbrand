@@ -122,6 +122,100 @@ export function filterTasksByPlan<
   });
 }
 
+// ── 執行層閘門 ─────────────────────────────────────────────────────────
+//
+// 2026-09-07。列表層（listFB）擋了爆款卡與未開通路，但那只是 UI 閘門：
+// 基礎用戶拿一個舊書籤、或直接打任務 id，五個執行入口（runOrchestra /
+// runOrchestra60 / runOrchestra99 / squad runStepLive / stepExecute）
+// 全部沒過方案檢查。列表看不到不等於不能用 —— 2,250 → 9,000 的升級理由
+// 在執行層是漏的。這一段補的就是那個洞。
+
+export interface TaskGateInfo {
+  /** 卡的通路代號（facebook / instagram / …）。不知道就給 null。 */
+  platform: string | null;
+  /** 結構來源類型（viral / award / …）。不知道就給 null。 */
+  sourceType: string | null;
+}
+
+export interface GateVerdict { ok: boolean; reason?: "viral" | "channel"; message?: string }
+
+/**
+ * 純判斷：這個方案、這組已開通路，能不能跑這張卡。無 I/O，方便測。
+ *
+ * channels 給 null 代表「不知道這個品牌開了哪些通路」—— 那就**跳過通路檢查**
+ * 而不是用方案預設去擋。預設通路是 FB+IG，一個明明選了 TikTok 的合法用戶
+ * 若因為執行 input 少帶 brandId 就被擋，是誤殺；寧可放過也不誤殺。
+ * 爆款卡的檢查不依賴品牌，一律做。
+ */
+export function checkTaskAllowed(
+  quota: Pick<PlanQuota, "platforms" | "viralTaskCards">,
+  channels: ChannelSelection | null,
+  info: TaskGateInfo,
+): GateVerdict {
+  if (quota.viralTaskCards === false && info.sourceType === "viral") {
+    return {
+      ok: false, reason: "viral",
+      message: "這張是爆款結構卡，屬於專業方案。升級後即可使用（方案與定價）。",
+    };
+  }
+  if (channels && !isUnlimited(quota.platforms) && info.platform) {
+    if (!channels.platforms.includes(info.platform)) {
+      return {
+        ok: false, reason: "channel",
+        message: `這個通路（${info.platform}）目前沒有開通。到任務頁的「已開通路」更換，或升級方案增加通路數。`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
+/** 讀一個品牌的 positioning JSON。讀不到回 null —— 呼叫端會跳過通路檢查。 */
+export async function loadBrandPositioning(brandId: number | null | undefined): Promise<unknown> {
+  if (!brandId) return null;
+  try {
+    const { default: localPool } = await import("../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning FROM brands WHERE id = ? LIMIT 1`, [brandId],
+    );
+    const raw = (rows as any[])[0]?.positioning;
+    return typeof raw === "string" ? JSON.parse(raw) : raw ?? null;
+  } catch { return null; }
+}
+
+/**
+ * 執行前的方案檢查。不通過就丟 FORBIDDEN，訊息直接給用戶看。
+ *
+ * info 由呼叫端提供（quickTask 從目錄索引查、squad 從 slug 查）。
+ * 查不到的卡（用戶自建、品牌任務包客製）本來就是品牌專屬，呼叫端傳
+ * platform/sourceType 都 null 即可 —— 兩道檢查自然都不會觸發。
+ */
+export async function assertTaskAllowed(args: {
+  userId: number;
+  brandId?: number | null;
+  info: TaskGateInfo;
+}): Promise<void> {
+  // 基礎設施錯誤（DB 連不上、users 表讀失敗）一律 fail-open：記 warn 然後放行。
+  // 這一層是縱深防禦，列表層的閘門仍在；若在這裡 fail-closed，DB 一抖動就把
+  // 所有付費用戶擋在執行入口外，那比讓極少數人多跑一次爆款卡糟得多。
+  // 注意：「查到用戶但是 trial」不是基礎設施錯誤，那會正常走到下面被擋。
+  let quota: PlanQuota;
+  let positioning: unknown = null;
+  try {
+    quota = await planQuotaFor(args.userId);
+    if (args.brandId) positioning = await loadBrandPositioning(args.brandId);
+  } catch (err) {
+    console.warn("[planGate] 讀取方案失敗，執行層閘門放行：", (err as Error)?.message);
+    return;
+  }
+  if (isUnlimited(quota.platforms) && quota.viralTaskCards !== false) return; // 無限方案直接放行
+  const channels = args.brandId ? resolveChannels(positioning, quota) : null;
+  const v = checkTaskAllowed(quota, channels, args.info);
+  if (!v.ok) {
+    const { TRPCError } = await import("@trpc/server");
+    throw new TRPCError({ code: "FORBIDDEN", message: v.message! });
+  }
+}
+
 /** 上限檢查的結果。ok=false 時 message 是要直接給用戶看的中文。 */
 export interface CapCheck { ok: boolean; message?: string; limit?: number; used?: number }
 

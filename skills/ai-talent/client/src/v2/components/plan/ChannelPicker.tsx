@@ -15,6 +15,7 @@ import React, { useEffect, useState } from "react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
+import { toastWithUpgrade } from "../../lib/upgradeToast";
 import { Check, Lock, RefreshCw } from "lucide-react";
 
 const LABEL_ZH: Record<string, string> = {
@@ -39,7 +40,7 @@ export default function ChannelPicker({ brandId }: { brandId: number }) {
       setDraft(null);
       q.refetch?.();
     },
-    onError: (e: any) => showToastGlobal(e?.message ?? (isEn ? "Failed" : "更新失敗")),
+    onError: (e: any) => toastWithUpgrade(e?.message ?? (isEn ? "Failed" : "更新失敗"), isEn),
   });
 
   const data = q.data as
@@ -126,6 +127,16 @@ export default function ChannelPicker({ brandId }: { brandId: number }) {
         })}
       </div>
 
+      {/* 2026-09-07 自建卡額度。建到第 4 張才被擋是死路，事前就要看得到。
+          數字由 server 算（全品牌）；前台那條 ownCardsQuery 是單一通路的，
+          拿它對全品牌的上限會算錯。 */}
+      {(data as any)?.ownCards && (data as any).ownCards.limit !== -1 && (
+        <p className="mt-2 text-[13px] text-default-500">
+          {isEn
+            ? `Custom task cards: ${(data as any).ownCards.used} / ${(data as any).ownCards.limit} used.`
+            : `自建任務卡已用 ${(data as any).ownCards.used} ／ ${(data as any).ownCards.limit} 張。`}
+        </p>
+      )}
       <p className="mt-2 text-[13px] text-default-500">
         {isEn
           ? "Channels can be swapped once a month. Tasks from channels you haven't enabled are hidden."

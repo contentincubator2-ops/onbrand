@@ -258,6 +258,54 @@ export default function AccountPage() {
           </section>
         )}
 
+        {/* 2026-09-07 方案額度。資料一直都在（billing.getStatus 回 quota），
+            只是這頁只畫了點數 —— 使用者看不到自己的通路數／自建卡／席次。
+            撞到上限才發現，是死路；這裡先讓他看得到。 */}
+        {(status as any)?.quota && (
+          (() => {
+            const q = (status as any).quota as Record<string, number | boolean>;
+            const fmt = (n: number | boolean | undefined) =>
+              n === -1 || n === undefined ? "不限" : String(n);
+            const rows: Array<[string, string]> = [
+              ["同時開通路", fmt(q.platforms as number)],
+              ["自建任務卡", `${fmt(q.ownTaskCards as number)} 張`],
+              ["爆款結構卡", q.viralTaskCards === false ? "專業方案" : "可用"],
+              ["產品定位", fmt(q.products as number)],
+              ["活動定位", q.eventsPerCycle === -1 ? "不限" : `每月 ${q.eventsPerCycle}`],
+              ["席次", fmt(q.team_members as number)],
+              ["品牌", fmt(q.brands as number)],
+            ];
+            return (
+              <section className="mb-6 rounded-xl border border-neutral-200 bg-white p-5">
+                <div className="mb-3 flex items-baseline justify-between">
+                  <h2 className="text-[15px] font-semibold text-neutral-900">方案額度</h2>
+                  <span className="text-[13px] text-neutral-500">
+                    {String((status as any)?.planName ?? "")}
+                  </span>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                  {rows.map(([k, v]) => (
+                    <div key={k} className="flex items-baseline justify-between border-b border-neutral-100 py-1">
+                      <dt className="text-[13px] text-neutral-500">{k}</dt>
+                      <dd className="text-[14px] font-medium text-neutral-900">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-3 text-[13px] text-neutral-500">
+                  要增加額度，到
+                  <button
+                    onClick={() => navigate("/pricing")}
+                    className="mx-1 font-medium text-neutral-900 underline-offset-2 hover:underline"
+                  >
+                    方案與定價
+                  </button>
+                  升級。
+                </p>
+              </section>
+            );
+          })()
+        )}
+
         {/* Points balance — 2026-05-14 (CJ「點數系統」) replaces fixed quotas */}
         {(status as any)?.points && (
           (() => {

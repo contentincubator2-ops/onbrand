@@ -937,21 +937,11 @@ import { is99sOrchestraListed, platformOfTaskId } from "../_core/taskCatalogInde
 import { resolveTaskSource } from "../_core/taskSource";
 import {
   planQuotaFor, resolveChannels, filterTasksByPlan, daysUntilSwap, isUnlimited,
+  loadBrandPositioning, assertTaskAllowed, type TaskGateInfo,
 } from "../_core/planGate";
 import { defaultTray, storedTray, MAX_TRAY } from "../_core/taskTray";
 import { buildTaskCatalogIndex } from "../_core/taskCatalogIndex";
 
-/** 讀一個品牌的 positioning JSON。讀不到回 null，呼叫端走方案預設。 */
-async function loadBrandPositioning(brandId: number): Promise<unknown> {
-  try {
-    const { default: localPool } = await import("../localDb");
-    const [rows]: any = await localPool.execute(
-      `SELECT positioning FROM brands WHERE id = ? LIMIT 1`, [brandId],
-    );
-    const raw = (rows as any[])[0]?.positioning;
-    return typeof raw === "string" ? JSON.parse(raw) : raw ?? null;
-  } catch { return null; }
-}
 import { sourceForTemplate } from "../_core/craftSource";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import {
@@ -1073,6 +1063,26 @@ const runSquadAutoSingleFlight = singleFlightPerUser({
   ttlMs: RUN_SQUAD_AUTO_SINGLE_FLIGHT_TTL_MS,
   maxConcurrent: RUN_SQUAD_AUTO_MAX_CONCURRENT_PER_USER,
 });
+
+
+/**
+ * 執行前閘門用的「這張卡是什麼」：通路 + 來源類型。
+ *
+ * 從目錄索引查而不是從 template 推 —— 平台的推導規則以 taskCatalogIndex
+ * 為準（listFB 也是用它），兩邊才不會一邊擋、一邊放。
+ * 查不到的（用戶自建、品牌任務包客製）回 null，閘門自然不觸發：那些卡
+ * 本來就是品牌專屬的。
+ */
+let gateInfoCache: Map<string, TaskGateInfo> | null = null;
+function gateInfoFor(taskId: string): TaskGateInfo {
+  if (!gateInfoCache) {
+    gateInfoCache = new Map();
+    for (const t of buildTaskCatalogIndex()) {
+      gateInfoCache.set(t.id, { platform: t.platform, sourceType: t.source?.type ?? null });
+    }
+  }
+  return gateInfoCache.get(taskId) ?? { platform: null, sourceType: null };
+}
 
 export const quickTaskRouter = router({
   list: protectedProcedure.query(() => {
@@ -1258,12 +1268,17 @@ export const quickTaskRouter = router({
       const quota = await planQuotaFor(ctx.user!.id);
       const positioning = await loadBrandPositioning(input.brandId);
       const sel = resolveChannels(positioning, quota);
+      // 2026-09-07 自建卡「已用 N / 上限 M」。由 server 算：前台手上的
+      // ownCardsQuery 是單一通路的清單，拿它對全品牌的上限會算錯。
+      let ownUsed = 0;
+      try { ownUsed = (await listBrandTaskCards(input.brandId)).length; } catch { /* 顯示用，讀不到就 0 */ }
       return {
         platforms: sel.platforms,
         limit: quota.platforms,
         swappedAt: sel.swappedAt,
         daysUntilSwap: daysUntilSwap(sel, quota),
         canSwapNow: daysUntilSwap(sel, quota) === 0,
+        ownCards: { used: ownUsed, limit: quota.ownTaskCards },
       };
     }),
 
@@ -1679,6 +1694,12 @@ export const quickTaskRouter = router({
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
 
       const resolved = await resolveTaskOrThrow(input.taskId);
+      // 2026-09-07 執行層方案閘門：列表看不到不等於不能用。
+      await assertTaskAllowed({
+        userId: ctx.user!.id,
+        brandId: (input as any).brandId ?? null,
+        info: gateInfoFor(input.taskId),
+      });
       const template: any = resolved.template;
       // let：下面那條 60s 的中央規則會就地換掉 config（holdForImages / 版本數）。
       let config: any = resolved.config;
@@ -2747,6 +2768,12 @@ ${polishTemplate.polishHint}`
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
 
       const resolved = await resolveTaskOrThrow(input.taskId);
+      // 2026-09-07 執行層方案閘門：列表看不到不等於不能用。
+      await assertTaskAllowed({
+        userId: ctx.user!.id,
+        brandId: (input as any).brandId ?? null,
+        info: gateInfoFor(input.taskId),
+      });
       const template: any = resolved.template;
       const config: any = resolved.config;
 
@@ -2880,6 +2907,12 @@ ${polishTemplate.polishHint}`
       // 而不是靠「只查 30s 目錄」來擋 —— 後者查不到時的錯誤訊息會說謊，
       // 把一個存在的 60s 任務講成 "Unknown"。
       const resolved = await resolveTaskOrThrow(input.taskId);
+      // 2026-09-07 執行層方案閘門：列表看不到不等於不能用。
+      await assertTaskAllowed({
+        userId: ctx.user!.id,
+        brandId: (input as any).brandId ?? null,
+        info: gateInfoFor(input.taskId),
+      });
       if (resolved.tier !== "30s") {
         throw new Error(`任務「${input.taskId}」是 ${resolved.tier}，這個入口只收 30s（請走 runOrchestra60 / runOrchestra99）`);
       }

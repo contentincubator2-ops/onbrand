@@ -2804,6 +2804,13 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
   });
   const totalCredits = (balanceQuery?.data as any)?.totalAvailable ?? null;
 
+  // 2026-09-07 待審數量，給「審核佇列」那一項的紅點。沒有它主管不知道有東西
+  // 在等——審核工作流的整個價值就是有人會看到。
+  const pendingReviewQ = (trpc as any).review?.pendingCount?.useQuery
+    ? (trpc as any).review.pendingCount.useQuery(undefined, { refetchInterval: 60_000 })
+    : { data: 0 };
+  const pendingReviews = Number((pendingReviewQ as any)?.data ?? 0);
+
   // 2026-05-12 (CJ「通盤檢查每個 S 按鈕選項都要有地方去」):
   // 全部 7 項本來有 4 個是死按鈕（即將推出 toast / modal）。重整後每個都有
   // 真實的地方去，並補上「連結社群帳號」「我的成就」「客服」三個原本沒入口
@@ -2845,6 +2852,12 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
     {
       icon: faUsers, label: isEn ? "Team & permissions" : "成員與權限", arrow: true, badge: null, danger: false,
       action: () => { navigate("/settings/workspace"); onClose(); },
+    },
+    {
+      // 2026-09-07：審核佇列本來只能從某一則產出頁的送審列點進去，主管找不到。
+      icon: faFolderOpen, label: isEn ? "Review queue" : "審核佇列", arrow: true,
+      badge: pendingReviews > 0 ? String(pendingReviews) : null, danger: false,
+      action: () => { navigate("/review"); onClose(); },
     },
     {
       icon: faCircleInfo, label: isEn ? "Contact support" : "聯絡客服", arrow: false, badge: null, danger: false,

@@ -139,6 +139,14 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
   const ws = detail.workspace;
   const myRole: Role = detail.myRole;
   const members = (detail.members ?? []) as any[];
+  // 2026-09-07 席次上限。邀到第 6 個才被擋是死路，事前就要看得到「已用 N／M」。
+  const statusQ = (trpc as any).billing?.getStatus?.useQuery
+    ? (trpc as any).billing.getStatus.useQuery()
+    : { data: undefined };
+  const seatLimit: number | undefined = (statusQ.data as any)?.quota?.team_members;
+  const seatLabel = seatLimit === undefined || seatLimit === -1
+    ? ""
+    : (lang === "en" ? ` / ${seatLimit} seats` : ` ／ ${seatLimit} 席`);
   const brands = (detail.brands ?? []) as any[];
   const canManage = myRole === "owner" || myRole === "admin";
   const isOwner = myRole === "owner";
@@ -189,7 +197,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
       {/* Members */}
       <section className="bg-white border border-neutral-200 rounded-xl p-6">
         <h3 className="text-base font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-          <Shield size={16} /> {lang === "en" ? `Members (${members.length})` : `成員（${members.length}）`}
+          <Shield size={16} /> {lang === "en" ? `Members (${members.length}${seatLabel})` : `成員（${members.length}${seatLabel}）`}
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -325,8 +333,8 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
             )}
             <p className="mt-2 text-xs text-neutral-400">
               {lang === "en"
-                ? "They'll need a SoWork account first. Team plan: up to 5 members; Agency: unlimited."
-                : "對方需先在 drop.sowork.ai 註冊。Team 方案上限 5 位，Agency 方案無限。"}
+                ? "They'll need an OnBrand account first. Basic: 2 seats; Professional: 5 seats."
+                : "對方需先在 onbrand.sowork.ai 註冊。基礎方案 2 席，專業方案 5 席。"}
             </p>
           </div>
         )}

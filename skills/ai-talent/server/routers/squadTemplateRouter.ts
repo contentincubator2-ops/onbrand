@@ -22,6 +22,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
+import { assertTaskAllowed, type TaskGateInfo } from "../_core/planGate";
 import { normalizeTaskId, legacyTaskId } from "../_core/tierCompat";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
@@ -341,6 +342,17 @@ function genAgentKey(squadUid: string, agentName: string): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+
+/**
+ * squad 的執行前閘門資訊。squad 索引項本身就帶 platform 與 source，
+ * 用 slug 查；查不到（DB 裡的自訂 squad）回 null，閘門不觸發。
+ */
+async function squadGateInfo(slug: string): Promise<TaskGateInfo> {
+  const { ALL_99S_SQUADS } = await import("../_core/quickTask100Squads");
+  const m = ALL_99S_SQUADS.find((x) => x.squad_slug === normalizeTaskId(slug));
+  return { platform: m?.platform ?? null, sourceType: (m as any)?.source?.type ?? null };
+}
+
 export const squadTemplateRouter = router({
 
   // ── listByBrand ──────────────────────────────────────────────────────────────
@@ -500,6 +512,12 @@ export const squadTemplateRouter = router({
       ) as any[];
       const squad = (sqRows as any[])?.[0];
       if (!squad) throw new TRPCError({ code: "NOT_FOUND", message: `squad ${input.squadId} not found` });
+      // 2026-09-07 執行層方案閘門（squad 引擎與 orchestra 是分開的，要各接一次）
+      await assertTaskAllowed({
+        userId: ctx.user!.id,
+        brandId: input.brandId ?? (input.scopeKind === "brand" ? input.scopeId ?? null : null),
+        info: await squadGateInfo(String(squad.slug ?? "")),
+      });
       const steps = safeJsonParse<any[]>(squad.steps, []);
       const step = steps[input.stepIndex];
       if (!step) throw new TRPCError({ code: "NOT_FOUND", message: `step ${input.stepIndex} not found` });
@@ -2097,6 +2115,14 @@ ${agentCtx.systemPromptPrefix}`;
           );
         }
       }
+      // 2026-09-07 執行層方案閘門。放在下面那個 try 之前 —— 那個 try 是 scout
+      // 資料注入，錯誤會被吞掉，閘門丟出的 FORBIDDEN 若在裡面會被當成注入失敗。
+      await assertTaskAllowed({
+        userId: ctx.user!.id,
+        brandId: input.scopeBrandId ?? null,
+        info: await squadGateInfo(input.squadSlug),
+      });
+
       // ── 100s tier: inject real-time scout data (festivals / trending / news) ─
       // For squad slugs in our 100s pool, fetch real market data via Tavily/
       // Gemini and inject as context. Cached 5 min per (slug, brandId) to

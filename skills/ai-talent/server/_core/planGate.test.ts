@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isUnlimited, resolveChannels, daysUntilSwap, filterTasksByPlan, checkCap,
+  checkTaskAllowed,
 } from "./planGate";
 import { PLANS } from "./plans";
 
@@ -105,6 +106,50 @@ describe("目錄過濾", () => {
   it("兩道濾網會疊加", () => {
     const out = filterTasksByPlan(tasks, Q({ viralTaskCards: false, platforms: 2 }), ch);
     expect(out.map((t) => t.id)).toEqual(["a"]);
+  });
+});
+
+describe("執行層閘門 —— 列表看不到不等於不能用", () => {
+  const basic = Q({ viralTaskCards: false, platforms: 2 });
+  const pro = Q({ viralTaskCards: true, platforms: 5 });
+  const ch = { platforms: ["facebook", "instagram"], swappedAt: null };
+
+  it("基礎方案直接打爆款卡的 id 也要被擋", () => {
+    const v = checkTaskAllowed(basic, ch, { platform: "facebook", sourceType: "viral" });
+    expect(v.ok).toBe(false);
+    expect(v.reason).toBe("viral");
+    expect(v.message).toContain("專業方案");
+  });
+
+  it("沒開的通路擋下，訊息告訴他去哪裡換", () => {
+    const v = checkTaskAllowed(basic, ch, { platform: "tiktok", sourceType: "award" });
+    expect(v.ok).toBe(false);
+    expect(v.reason).toBe("channel");
+    expect(v.message).toContain("已開通路");
+  });
+
+  it("不知道品牌開了哪些通路時，跳過通路檢查 —— 寧可放過也不誤殺", () => {
+    const v = checkTaskAllowed(basic, null, { platform: "tiktok", sourceType: "award" });
+    expect(v.ok).toBe(true);
+  });
+
+  it("但爆款卡不依賴品牌，即使不知道通路也一律擋", () => {
+    const v = checkTaskAllowed(basic, null, { platform: null, sourceType: "viral" });
+    expect(v.ok).toBe(false);
+    expect(v.reason).toBe("viral");
+  });
+
+  it("查不到的卡（自建／品牌包客製）兩道檢查都不觸發", () => {
+    expect(checkTaskAllowed(basic, ch, { platform: null, sourceType: null }).ok).toBe(true);
+  });
+
+  it("專業方案在自己開的通路上跑爆款卡，放行", () => {
+    expect(checkTaskAllowed(pro, ch, { platform: "facebook", sourceType: "viral" }).ok).toBe(true);
+  });
+
+  it("無限通路的方案不做通路檢查", () => {
+    expect(checkTaskAllowed(Q({ platforms: -1, viralTaskCards: true }), ch,
+      { platform: "tiktok", sourceType: "award" }).ok).toBe(true);
   });
 });
 

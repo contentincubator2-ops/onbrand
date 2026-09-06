@@ -17,6 +17,7 @@ import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } f
 import { trpc } from "../../lib/trpc";
 import { useLang } from "../../lib/i18n";
 import { showToastGlobal } from "../../components/ui/Toast";
+import { toastWithUpgrade } from "../lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import { TIER_ORDER, tierAccent, tierLabel } from "../lib/tierVocabulary";
 import {
@@ -866,7 +867,7 @@ function PlatformTaskPageInner() {
 
   const setTrayMut = (trpc as any).quickTask?.setTray?.useMutation?.({
     onSuccess: () => { setPickerOpen(false); trayQuery.refetch?.(); },
-    onError: (e: any) => showToastGlobal?.(e?.message ?? "儲存失敗"),
+    onError: (e: any) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
   });
 
   /** 這個通路實際擺出來的卡 id。存過的要跟「現在看得到的」取交集 —— 降級
