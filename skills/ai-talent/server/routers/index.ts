@@ -40,6 +40,7 @@ import { achievementsRouter } from "./achievementsRouter";
 import { communityRouter } from "./communityRouter";
 // 2026-05-11 (CJ「Team / Agency 方案 + 多客戶 workspace」): multi-tenant container.
 import { reviewRouter } from "./reviewRouter";
+import { performanceRouter } from "./performanceRouter";
 import { tenantRouter } from "./tenantRouter";
 // 2026-05-14 (CJ「我們使用 Stripe」): Stripe Checkout + webhook.
 import { stripeRouter } from "./stripeRouter";
@@ -106,6 +107,7 @@ export const appRouter = router({
   achievements:    achievementsRouter,
   community:       communityRouter,
   review:          reviewRouter,
+  performance:     performanceRouter,
   tenant:          tenantRouter,
   stripe:          stripeRouter,
   festival:        festivalRouter,

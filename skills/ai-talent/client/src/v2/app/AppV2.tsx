@@ -40,6 +40,7 @@ import { LanguageProvider } from "../../lib/i18n";
 // LoginPage itself shows an authChecking spinner anyway.
 import LandingPage from "../pages/LandingPage";
 import RequireAuthV2 from "./RequireAuthV2";
+import RequireSoworkPreview from "./RequireSoworkPreview";
 import ShellLayout from "./shell/ShellLayout";
 import MissionRedirect from "./MissionRedirect";
 import ConnectionsRedirect from "../pages/ConnectionsRedirect";
@@ -309,8 +310,10 @@ export default function AppV2() {
           <Route path="/tasks/:platform" element={<PlatformTaskPage />} />
           <Route path="/performance" element={<DataWorkspacePage />} />
           <Route path="/performance/:sourceId" element={<DataWorkspacePage />} />
-          <Route path="/market-intel" element={<DataWorkspacePage />} />
-          <Route path="/market-intel/:sourceId" element={<DataWorkspacePage />} />
+          {/* 2026-09-07 市場數據層只給 sowork.tw 預覽群。導覽早就藏了，
+              但路由沒守門 —— 直接打網址就進得去，藏一半等於沒藏。 */}
+          <Route path="/market-intel" element={<RequireSoworkPreview><DataWorkspacePage /></RequireSoworkPreview>} />
+          <Route path="/market-intel/:sourceId" element={<RequireSoworkPreview><DataWorkspacePage /></RequireSoworkPreview>} />
           {/* 2026-05-09 (CJ): Phase 2 route-based output workspace.
               Replaces modal-based viewing for 60s/100s tasks. URL is
               shareable, browser back works, can multi-tab compare. */}

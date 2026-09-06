@@ -759,17 +759,19 @@ function IconBar({
         : currentPath.startsWith("/brands")
           ? "strategy"
           : "content";
-  // market/performance stay gated to the sowork.tw preview group (unchanged
-  // from before); 策略 additionally opens to isStrategyPreview accounts;
-  // 內容 is always available. Dropdown reads fine at 2 items
-  // (isStrategyPreview-only accounts) or 4 (sowork.tw).
+  // 2026-09-07 (CJ「隱藏市場數據層，但用模擬數據為每個品牌製作成效層」)：
+  //   市場 —— 仍只給 sowork.tw 預覽群（路由另有守門，直接打網址也進不去）
+  //   成效 —— 開放給所有帳號。畫面是標了「⚠ 模擬資料」的示意版，附三張
+  //           資料來源卡片誠實顯示串接狀態；真資料屆時在導入時接。
+  //   策略 —— 照舊給 isStrategyPreview；內容一律有。
   const modeOptions = [
     ...(isPrivatePreview ? [{ id: "market" as const, label: isEn ? "Market" : "市場", icon: faMagnifyingGlass, to: "/market-intel/overview", tip: isEn ? "Market intelligence" : "市場情報" }] : []),
     ...(isStrategyPreview ? [{ id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands", tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" }] : []),
     { id: "content" as const, label: isEn ? "Content" : "內容", icon: faWandMagicSparkles, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
-    ...(isPrivatePreview ? [{ id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview", tip: isEn ? "Performance" : "成效數據" }] : []),
+    { id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview", tip: isEn ? "Performance (sample data until connected)" : "成效數據（串接前為示意資料）" },
   ];
-  const showModeSwitcher = isPrivatePreview || isStrategyPreview;
+  // 成效對所有人開放之後，切換器至少有 2 項，一律顯示。
+  const showModeSwitcher = true;
   const [avatarOpen, setAvatarOpen] = React.useState(false);
   const avatarRef = React.useRef<HTMLDivElement>(null);
 

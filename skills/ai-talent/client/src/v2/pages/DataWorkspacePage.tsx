@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import PerformanceDashboard from "../components/performance/PerformanceDashboard";
+import ConnectionsPanel from "../components/performance/ConnectionsPanel";
+import { setMockBrandSeed } from "../components/performance/perfMockData";
 import FanpageMonthlyReport from "../components/performance/FanpageMonthlyReport";
 import MarketDashboard from "../components/market/MarketDashboard";
 
@@ -571,6 +573,9 @@ export default function DataWorkspacePage() {
   // .runListeningTask) scoped to whatever brand the URL's ?b= points at.
   // Everything else on this page (Iris Girls demo blocks) is untouched.
   const brandId = Number(searchParams.get("b") ?? 0) || null;
+  // 2026-09-07 示意資料按品牌播種：同一品牌每次一樣，不同品牌規模不同，
+  // 比值（ROAS／CPA／客單價）不變。切換品牌時重播。
+  setMockBrandSeed(brandId);
   const runListeningMut = (trpc as any).marketIntel?.runListeningTask?.useMutation?.() ?? null;
   const [liveResults, setLiveResults] = React.useState<Record<string, LiveRunResult>>({});
   const [runningKey, setRunningKey] = React.useState<string | null>(null);
@@ -747,6 +752,9 @@ export default function DataWorkspacePage() {
           {/* 粉絲團月報有自己的流程（上傳版型 → 跨月解析 → 體檢報告），不是
               PerformanceDashboard 那種模擬儀表板，所以整頁換掉而不是疊加。 */}
           {isPerformance && active.id === "fanpage_monthly" && <FanpageMonthlyReport />}
+          {/* 2026-09-07 資料來源卡片：總覽最上方，先讓人看到「哪些接了、哪些沒接、
+              沒接的要怎麼接」，再看下面標了「⚠ 模擬資料」的示意儀表板。 */}
+          {isPerformance && active.id === "overview" && <ConnectionsPanel brandId={brandId} />}
           {isPerformance && active.id !== "fanpage_monthly" && <PerformanceDashboard sourceId={active.id} />}
 
           {/* 2026-08-11 (CJ「接下去，模擬市場數據」): simulated 市場 layer for

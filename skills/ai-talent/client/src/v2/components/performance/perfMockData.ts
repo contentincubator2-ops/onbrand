@@ -168,9 +168,25 @@ const ZERO: Totals = {
   productViews: 0, atc: 0, checkout: 0, orders: 0, revenue: 0,
 };
 
+/**
+ * 2026-09-07 (CJ「用模擬數據，為每個品牌製作成效層」)：按品牌播種。
+ *
+ * 原本的數據對每個品牌都一模一樣 —— 拿去給兩個客戶看，一眼就穿幫。
+ * 用 brandId 導出一個 0.72–1.28 的固定倍率，整組量值一起縮放，
+ * 所以 ROAS／CPA／客單價這些比值不變（故事線不變），只有規模不同。
+ * 仍然是確定性的：同一個品牌每次看都一樣，不會今天 3 萬明天 5 萬。
+ */
+let brandScale = 1;
+export function setMockBrandSeed(brandId: number | null | undefined): void {
+  if (!brandId || brandId <= 0) { brandScale = 1; return; }
+  let h = 2166136261;
+  for (const ch of String(brandId)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  brandScale = 0.72 + ((h % 5600) / 10000);   // 0.72 … 1.28
+}
+
 export function aggregate(f: Filter, period: "current" | "previous" = "current"): Totals {
   const src = period === "current" ? CURRENT : PREVIOUS;
-  return src.reduce<Totals>((acc, c) => {
+  const t = src.reduce<Totals>((acc, c) => {
     if (f.ta && c.ta !== f.ta) return acc;
     if (f.appeal && c.appeal !== f.appeal) return acc;
     if (f.product && c.product !== f.product) return acc;
@@ -179,6 +195,15 @@ export function aggregate(f: Filter, period: "current" | "previous" = "current")
     acc.checkout += c.checkout; acc.orders += c.orders; acc.revenue += c.revenue;
     return acc;
   }, { ...ZERO });
+  if (brandScale === 1) return t;
+  const s = brandScale;
+  return {
+    spend: Math.round(t.spend * s), impressions: Math.round(t.impressions * s),
+    clicks: Math.round(t.clicks * s), sessions: Math.round(t.sessions * s),
+    productViews: Math.round(t.productViews * s), atc: Math.round(t.atc * s),
+    checkout: Math.round(t.checkout * s), orders: Math.round(t.orders * s),
+    revenue: Math.round(t.revenue * s),
+  };
 }
 
 export const roas = (t: Totals) => (t.spend > 0 ? t.revenue / t.spend : 0);
