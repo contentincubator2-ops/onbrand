@@ -223,3 +223,16 @@ button:focus-visible {
   outline: 2px solid #0A6EFA;
   outline-offset: 2px;
 }
+
+/* ─── 2026-09-06 字級：覆寫 HeroUI 的 tiny ─────────────────────────────
+   text-tiny 是全站用量最大的尺寸（737 處），HeroUI 預設 0.75rem(12px)。
+
+   為什麼寫在這裡而不是 tailwind.config：在 config 的 extend.fontSize 寫
+   "tiny" 會產出一條 .text-tiny 規則，但 HeroUI 自己那條
+   .text-tiny{font-size:var(--heroui-font-size-tiny)} 排在後面，同特異性
+   後者勝，覆寫會被靜靜吃掉（build 成功、config 看起來對，就是不生效）。
+   直接改變數才是真的有效的那一層。                                      */
+:root, .light, .dark {
+  --heroui-font-size-tiny: 0.8125rem;   /* 12 → 13px */
+  --heroui-line-height-tiny: 1.15rem;
+}

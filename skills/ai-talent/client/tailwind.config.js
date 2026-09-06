@@ -18,6 +18,20 @@ export default {
         mono:    ["'JetBrains Mono'", "ui-monospace", "monospace"],
       },
       fontSize: {
+        // ── 2026-09-06 第二批字級（CJ「全站的字都覺得小」）─────────────
+        // 這三個是用量最大的三個尺寸：text-tiny 737 處、text-xs 246 處、
+        // text-sm 318 處。在這裡改一次，勝過改 1,300 個地方，也只要改回
+        // 這三行就能整批回退。
+        //
+        // 行高一起調 —— 只放大字級不放行高，字會擠在一起，看起來比原本更糟。
+        "xs":   ["0.8125rem", { lineHeight: "1.15rem" }],   // 12 → 13px
+        "sm":   ["0.9375rem", { lineHeight: "1.4rem" }],    // 14 → 15px
+        //
+        // text-tiny 不在這裡改。在這裡寫 "tiny" 會產出一條 .text-tiny 規則，
+        // 但 HeroUI 的 .text-tiny{font-size:var(--heroui-font-size-tiny)}
+        // 排在它後面，同特異性後者勝 —— config 寫得再對也不會生效。
+        // 實際覆寫在 index.css 改那個 CSS 變數（已驗證產出的 CSS）。
+
         // Editorial scale
         "eyebrow": ["0.68rem", { lineHeight: "1", letterSpacing: "0.18em" }],
         "meta":    ["0.75rem", { lineHeight: "1.3", letterSpacing: "0.04em" }],
