@@ -170,3 +170,42 @@ describe("buildWuganVoiceReminder", () => {
     expect(msg).toContain("正向直述");
   });
 });
+
+describe("修補涵蓋驗證抓得到的每一種句型", () => {
+  // 2026-09-06：BANNED 在 2026-08-31 擴到整個「不止／不僅／不光／不只」家族，
+  // repairWuganVoice 的替換清單沒有跟上，於是「不僅是A，更是B」驗得出來、
+  // 修不掉。短文本還有具名重試兜底，長文件（captionMaxChars > 2000）直接跳到
+  // 修補 —— 所以它會原樣出稿。實測 wg-web-longform 產出「這不僅是對飲用水的
+  // 保障，更是對住客健康的承諾」就是這樣來的。
+  //
+  // 這組測試鎖的是「兩邊必須對得起來」，不是個別句型：只要有人再擴 BANNED
+  // 而忘了擴修補，這裡就會紅。
+  const VIOLATIONS = [
+    "這不僅是對飲用水的保障，更是對住客健康的承諾。",
+    "這不只是對飲用水的保障，更是對住客健康的承諾。",
+    "十築標準不只是規格表，更是生活的承諾。",
+    "這不光是設計，更是責任。",
+    "好水不止於過濾，而是整套系統。",
+    "這不僅是保障更是承諾。",           // 沒有逗號的寫法
+    "這不是保障，而是承諾。",
+    "並非只有外觀，而是整體。",
+    "這並不是運氣，而是設計的結果。",
+  ];
+
+  it.each(VIOLATIONS)("修得掉：%s", (text) => {
+    expect(validateWuganVoice(text), "測資本身要先是違反的").not.toBeNull();
+    const fixed = repairWuganVoice(text);
+    expect(validateWuganVoice(fixed), `修補後仍違反：${fixed}`).toBeNull();
+    expect(fixed.length, "修補不該把整句刪光").toBeGreaterThan(3);
+  });
+
+  const LEGIT = [
+    "讓空調不再是唯一的工具。",
+    "把自然放進家裡，也要讓它在不同天氣裡被好好照顧。",
+    "真正關注好水的家，會用心到看不見的管線裡。",
+  ];
+
+  it.each(LEGIT)("正常中文不動它：%s", (text) => {
+    expect(repairWuganVoice(text)).toBe(text);
+  });
+});
