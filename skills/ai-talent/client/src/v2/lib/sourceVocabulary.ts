@@ -53,6 +53,16 @@ export interface SourceVocabEntry {
   /** 一句話解釋這一類憑什麼可信 */
   zhWhy: string;
   enWhy: string;
+  /**
+   * 2026-09-06：改成中性灰階。
+   *
+   * 原本六個類型各一個色（玫瑰紅／琥珀／靛藍／藍綠…），出現在 249 張卡
+   * 的每一張上 —— 那違反 2026-05-10 就寫在 BrandsPage 的紀律：
+   * 「4A 代理商專業感，不要彩色」B&W Notion discipline。
+   *
+   * 現在只留一個功能性的強調：爆款結構（viral）用最深的墨色 #171717，
+   * 因為它是付費才有的那一類；其餘一律灰。色彩用來標示差異，不用來裝飾。
+   */
   accent: string;
 }
 
@@ -62,42 +72,42 @@ export const SOURCE_VOCAB: Record<TaskSourceType, SourceVocabEntry> = {
     zhLong: "長青公式", enLong: "Evergreen formula",
     zhWhy: "平台通則，長期可複用的基本結構。",
     enWhy: "Platform fundamentals that stay valid.",
-    accent: "#64748B",
+    accent: "#737373",
   },
   viral: {
     zh: "爆款結構", en: "Viral",
     zhLong: "爆款結構", enLong: "Viral structure",
     zhWhy: "從真實高表現帳號逐則拆解。會過期，每月更新。",
     enWhy: "Reverse-engineered from real high-performing accounts. Refreshed monthly.",
-    accent: "#E11D48",
+    accent: "#171717",
   },
   award: {
     zh: "得獎案例", en: "Award",
     zhLong: "得獎案例結構", enLong: "Award-winning structure",
     zhWhy: "從廣告獎作品拆解出的敘事機制。",
     enWhy: "Narrative mechanics taken from award-winning work.",
-    accent: "#B45309",
+    accent: "#404040",
   },
   benchmark: {
     zh: "標竿品牌", en: "Benchmark",
     zhLong: "標竿品牌結構", enLong: "Benchmark brand structure",
     zhWhy: "從國際品牌公開的內容資產拆解出的寫法。",
     enWhy: "Drawn from how benchmark brands actually write.",
-    accent: "#4F46E5",
+    accent: "#525252",
   },
   "brand-method": {
     zh: "品牌方法論", en: "Brand method",
     zhLong: "你的品牌方法論", enLong: "Your brand's own method",
     zhWhy: "從你自己的方法論長出來的卡，只有你有。",
     enWhy: "Built from your own methodology. Yours alone.",
-    accent: "#0F766E",
+    accent: "#404040",
   },
   "channel-spec": {
     zh: "通路規格", en: "Channel spec",
     zhLong: "通路規格遵循", enLong: "Channel specification",
     zhWhy: "平台欄位與規格遵循，不是創意結構。",
     enWhy: "Platform field and spec compliance, not creative structure.",
-    accent: "#475569",
+    accent: "#737373",
   },
 };
 

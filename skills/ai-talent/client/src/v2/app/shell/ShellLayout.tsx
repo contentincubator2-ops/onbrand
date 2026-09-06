@@ -1911,8 +1911,12 @@ function PlanInviteButtons({ onNavigate }: { onNavigate: (to: string) => void })
   return (
     <div style={{ padding: "0 10px 8px", display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
       {[
-        { icon: faCrown, label: isEn ? "Your plan" : "你的方案",   to: "/settings/plan" },
-        { icon: faUserGroup, label: isEn ? "Invite people" : "邀請使用者", to: "/settings/team" },
+        // 2026-09-06：這兩個本來指向 /settings/plan 與 /settings/team，
+        // 兩個路由都不存在 —— 側邊欄最顯眼的兩顆按鈕點下去是空的。
+        // 方案看 /settings/account（訂閱與額度條就在那），邀請成員看
+        // /settings/workspace（成員列表／角色／移除／Email 邀請都在那）。
+        { icon: faCrown, label: isEn ? "Your plan" : "你的方案",   to: "/settings/account" },
+        { icon: faUserGroup, label: isEn ? "Invite people" : "邀請使用者", to: "/settings/workspace" },
       ].map(({ icon, label, to }) => (
         <button key={label} onClick={() => onNavigate(to)} style={{
           width: "100%", display: "flex", alignItems: "center", gap: 8,
@@ -2832,9 +2836,14 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
       arrow: true, badge: null, danger: false,
       action: () => { setLang(lang === "en" ? "zh-TW" : "en"); },
     },
-    // 2026-05-12 (CJ「先移除 agency 邀請團隊的設計」): Team/Workspace entry
-    // removed from S-menu. /settings/workspace route still exists for direct
-    // access; re-add this entry when agency tier launches.
+    // 2026-05-12 (CJ「先移除 agency 邀請團隊的設計」) 曾移除此項，當時註明
+    // 「re-add this entry when agency tier launches」。2026-09-06 專業版 5 席
+    // 上線＝那個時機：審核工作流要求產出者與放行者分開，管理者必須有地方
+    // 把人加進來。
+    {
+      icon: faUsers, label: isEn ? "Team & permissions" : "成員與權限", arrow: true, badge: null, danger: false,
+      action: () => { navigate("/settings/workspace"); onClose(); },
+    },
     {
       icon: faCircleInfo, label: isEn ? "Contact support" : "聯絡客服", arrow: false, badge: null, danger: false,
       // 2026-05-14 (CJ「聯絡客服點擊無反應」): open the Mia support drawer

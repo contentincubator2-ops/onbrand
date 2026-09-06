@@ -326,7 +326,9 @@ export const PLANS: Record<PlanCode, Plan> = {
       video_gen: 0,                // 影片暫時下架（roadmap 加購包）
       brands: 1,                   // ← Solo = 1 個品牌
       fb_publish: -1,
-      team_members: 2,
+      // 2026-09-06：專業版 5 席。理由是審核工作流 —— 產出的人與放行的人
+      // 必須分開，5 席對應行銷／廣告／成效／中階主管（審核）／負責人。
+      team_members: 5,
       multi_client: false,
       // 2026-05-14 (CJ「無限文案 + 無限圖」): pointsPerCycle = -1 means
       // points gating is bypassed. Daily LLM cost cap (preflightCostCheck

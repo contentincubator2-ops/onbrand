@@ -2060,15 +2060,17 @@ function PlatformTaskPageInner() {
                       {(() => {
                         const src = resolveSource((task as any).source);
                         const acc = sourceAccent(src.type);
+                        // 2026-09-06：改為單色。原本是彩色圓點＋彩色文字＋淡色底，
+                        // 249 張卡每張都有 —— 違反「不要彩色」的紀律。現在只用
+                        // 墨色深淺與邊框，字級也從 10px 提到 12px。
                         return (
                           <span
-                            className="inline-flex items-center gap-1 self-start rounded-full px-1.5 py-0.5 max-w-full"
-                            style={{ background: `${acc}14`, border: `1px solid ${acc}33` }}
+                            className="inline-flex items-center self-start rounded-full border px-2 py-0.5 max-w-full"
+                            style={{ borderColor: "#E5E5E5", background: "#FFFFFF" }}
                             title={sourceTooltip(src, lang)}
                           >
-                            <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: acc }} />
                             <span
-                              className="text-[10px] font-semibold truncate"
+                              className="text-[12px] font-medium truncate"
                               style={{ color: acc }}
                             >
                               {sourcePillText(src, lang)}

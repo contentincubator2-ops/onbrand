@@ -144,4 +144,9 @@ describe("方案表本身", () => {
       expect(p.quota.team_members).toBeGreaterThanOrEqual(2);
     }
   });
+
+  it("席次：基礎 2、專業 5 —— 5 席是審核工作流要求產出者與放行者分開", () => {
+    expect(PLANS.drop_starter.quota.team_members).toBe(2);
+    expect(PLANS.drop_pro.quota.team_members).toBe(5);
+  });
 });
