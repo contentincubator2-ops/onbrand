@@ -323,7 +323,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
       </Card>
 
       <div className="mt-4 text-xs text-default-500 bg-default-50 rounded-lg p-3 leading-relaxed">
-        <div className="font-medium text-default-700 mb-1">{en ? "💡 How it works" : "💡 使用說明"}</div>
+        <div className="font-medium text-default-700 mb-1">{en ? "How it works" : "使用說明"}</div>
         {en
           ? "Every time a task runs for this platform (e.g. a Facebook short post), the system applies the Text and Image instructions above to the content AI for that platform. Platforms left blank fall back to the general brand voice."
           : "每次跑該平台的任務（如 FB 短貼文）時，系統會自動把這裡的「文字指令」+「圖片指令」套用到對應的 AI 專家。未填寫的平台會自動套用通用品牌口吻。"}

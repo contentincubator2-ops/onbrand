@@ -181,16 +181,15 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
 };
 
 // ── Shared utilities ─────────────────────────────────────────────────────────
-const CARD_PALETTES = [
-  { from: "#fde68a", to: "#fbbf24" },
-  { from: "#a5f3fc", to: "#22d3ee" },
-  { from: "#c4b5fd", to: "#8b5cf6" },
-  { from: "#bbf7d0", to: "#34d399" },
-  { from: "#fecaca", to: "#f87171" },
-  { from: "#fed7aa", to: "#fb923c" },
-  { from: "#bfdbfe", to: "#60a5fa" },
-  { from: "#f5d0fe", to: "#c084fc" },
-];
+/**
+ * 2026-09-06：原本這裡是 8 組彩色漸層（琥珀／青／紫／綠／紅／橘／藍／洋紅），
+ * 以 idx % 8 依「卡片在清單裡的位置」輪換 —— 同一張卡換個位置就換個顏色，
+ * 完全不帶資訊。那是色彩當裝飾，違反 BrandsPage.tsx:1407 從 2026-05-10
+ * 就寫著的紀律：「4A 代理商專業感，不要彩色」B&W Notion discipline。
+ *
+ * 現在卡片頂端是單一的中性底色，資訊由頭像、標題與來源 pill 承擔。
+ */
+const CARD_SURFACE = "#F5F4F2";
 
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
@@ -2014,7 +2013,6 @@ function PlatformTaskPageInner() {
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {visibleTasks.map((task, idx) => {
-                const pal = CARD_PALETTES[idx % CARD_PALETTES.length];
                 const agentName = task.agent?.name ?? "AI Agent";
                 const avatarSrc = task.agent?.avatarUrl || dicebear(agentName);
                 const taskTier = task.tier as string;
@@ -2027,10 +2025,10 @@ function PlatformTaskPageInner() {
                     className="flex flex-col rounded-2xl overflow-hidden text-left transition hover:scale-[1.02] hover:shadow-lg"
                     style={{ border: "1px solid rgba(0,0,0,0.07)", background: "white" }}
                   >
-                    {/* Card top — gradient bg + agent avatar centered (matches QuickTask30sPage) */}
+                    {/* 卡片頂端：中性底 + 置中的 agent 頭像 */}
                     <div
                       className="flex items-center justify-center relative"
-                      style={{ height: 130, background: `linear-gradient(135deg, ${pal.from} 0%, ${pal.to} 100%)` }}
+                      style={{ height: 130, background: CARD_SURFACE, borderBottom: "1px solid rgba(0,0,0,0.06)" }}
                     >
                       {/* 自己建的卡：標記 + 編輯入口。編輯放在卡片上而不是另開
                           管理頁 —— 使用者想改的時候，眼睛正看著這張卡。
@@ -2305,8 +2303,7 @@ function PlatformTaskPageInner() {
                 {/* Brand assets empty hint */}
                 {textAssetsEmpty && brandId && (
                   <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
-                    <span className="text-base leading-none mt-0.5">💡</span>
-                    <div className="flex-1 leading-relaxed">
+                                        <div className="flex-1 leading-relaxed">
                       {lang === "en" ? (
                         <>
                           <span className="font-medium">This brand's word assets are empty.</span>
@@ -2521,7 +2518,7 @@ function PlatformTaskPageInner() {
                         >
                           {polishing
                             ? (lang === "en" ? "Polishing…" : "潤稿中…")
-                            : (lang === "en" ? "AI polish my brief" : "✨ AI 潤稿")}
+                            : (lang === "en" ? "AI polish my brief" : "AI 潤稿")}
                         </Button>
                         <span className="text-tiny text-default-400">
                           {lang === "en"

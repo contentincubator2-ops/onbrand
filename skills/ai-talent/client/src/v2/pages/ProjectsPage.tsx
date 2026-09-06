@@ -233,7 +233,7 @@ export default function ProjectsPage() {
             className="font-semibold tracking-tight leading-none mb-3"
             style={{
               fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              background: "#171717",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -712,7 +712,7 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
           <button
             onClick={onCreate}
             className="flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm font-medium"
-            style={{ background: "linear-gradient(135deg, #7C3AED, #6366F1)" }}
+            style={{ background: "#171717" }}
           >
             <Plus size={14} /> {lang === "en" ? "New project" : "新任務"}
           </button>

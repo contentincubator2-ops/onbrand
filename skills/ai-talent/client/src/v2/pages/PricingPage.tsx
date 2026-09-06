@@ -163,7 +163,7 @@ export default function PricingPage() {
             className="font-semibold tracking-tight leading-tight mb-3"
             style={{
               fontSize: "clamp(1.8rem, 3.5vw, 2.75rem)",
-              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              background: "#171717",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -222,7 +222,7 @@ export default function PricingPage() {
                   style={{
                     background: tier.highlight
                       ? "#171717"
-                      : "linear-gradient(90deg, #059669 0%, #10b981 100%)",
+                      : "#059669",
                     color: "white",
                   }}
                 >

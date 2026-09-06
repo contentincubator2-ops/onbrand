@@ -370,7 +370,7 @@ export default function ImageSlotFlow({
                   >
                     <div className="flex items-center gap-1 w-full min-w-0">
                       <span className="text-tiny font-medium text-foreground truncate">{m.name.split(" ").slice(0, 3).join(" ")}</span>
-                      {isRecommended && <span className="text-tiny text-primary shrink-0">⭐</span>}
+                      {isRecommended && <span className="text-tiny text-primary shrink-0"></span>}
                       {m.status === "manual" && <span className="text-tiny text-warning shrink-0">📋</span>}
                     </div>
                     <span className="text-tiny text-default-400 truncate w-full">

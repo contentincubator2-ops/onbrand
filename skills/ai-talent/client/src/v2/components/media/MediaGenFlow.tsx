@@ -531,7 +531,7 @@ function ModelPhase({
                     <p className="text-small font-medium">{m.name}</p>
                     {m._recommended && (
                       <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
-                        {lang === "en" ? "⭐ Recommended" : "⭐ 推薦"}
+                        {lang === "en" ? "Recommended" : "推薦"}
                       </Chip>
                     )}
                   </div>

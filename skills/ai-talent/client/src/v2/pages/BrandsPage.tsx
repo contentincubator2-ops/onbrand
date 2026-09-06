@@ -2388,7 +2388,7 @@ export default function BrandsPage() {
 
               {/* ── AI Discovery progress banner (running) ── */}
               {discoveryRunning && (
-                <div className="mx-2 mb-5 px-5 py-4 rounded-xl border-2 border-indigo-300 bg-gradient-to-r from-indigo-50 to-violet-50 flex items-start gap-4">
+                <div className="mx-2 mb-5 px-5 py-4 rounded-xl border-2 border-indigo-300 bg-neutral-50 flex items-start gap-4">
                   <span className="text-2xl mt-0.5">🔍</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-indigo-900 mb-1">
@@ -2449,7 +2449,7 @@ export default function BrandsPage() {
 
               {/* ── No products + has website → big CTA scan banner ── */}
               {!discoveryRunning && (brandProductsList?.length ?? 0) === 0 && connData?.website && discoveryStatus?.status !== "done" && (
-                <div className="mx-2 mb-5 rounded-xl border-2 border-dashed border-indigo-300 bg-gradient-to-br from-indigo-50 to-white px-6 py-8 text-center">
+                <div className="mx-2 mb-5 rounded-xl border-2 border-dashed border-indigo-300 bg-neutral-50 px-6 py-8 text-center">
                   <div className="text-4xl mb-3">🔍</div>
                   <p className="text-base font-bold text-neutral-900 mb-2">
                     {lang === "en" ? "Let AI scan your website for products" : "讓 AI 自動從官網找出你的產品"}
@@ -2466,7 +2466,7 @@ export default function BrandsPage() {
                     }}
                     disabled={triggerDiscoveryMut?.isPending}
                     className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition disabled:opacity-50"
-                    style={{ background: "linear-gradient(135deg, #4F46E5, #7C3AED)" }}
+                    style={{ background: "#171717" }}
                   >
                     {triggerDiscoveryMut?.isPending ? (lang === "en" ? "Starting…" : "啟動中…") : (lang === "en" ? "🔍 Scan website now" : "🔍 立即掃描官網")}
                   </button>
@@ -4412,7 +4412,7 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
 
 /* ─────────────────────────── PositioningTopRow ───────────────────────
    Compact action row for the 定位 tab — replaces wide TabActionBar.
-   Shows: ✨ 自動定位 button + live job progress + 🔓 lock chip.
+   Shows: 自動定位 button + live job progress + 🔓 lock chip.
    The 自動定位 button fires positioningJobs.start (new background
    runner with retry × 5 + parallel waves + cost tracking).
    ───────────────────────────────────────────────────────────────────── */
@@ -5184,7 +5184,7 @@ function BrandPaletteHero({
       } else {
         const reason = (r as any)?.reason ?? "unknown";
         const msg = reason === "no_palette_yet"
-          ? (en ? "Extract the palette first (✨ Extract from products)." : "請先按「✨ 從產品圖萃取」取得色彩。")
+          ? (en ? "Extract the palette first (Extract from products)." : "請先按「從產品圖萃取」取得色彩。")
           : reason === "no_subject_image"
             ? (en
                 ? "No usable image found — fill in the brand website or add a product with an image, then retry."
@@ -5224,7 +5224,7 @@ function BrandPaletteHero({
       style={{
         borderRadius: 14,
         border: "1px solid #E5E7EB",
-        background: "linear-gradient(180deg, #FAFAFA 0%, #FFFFFF 100%)",
+        background: "#FFFFFF",
         padding: 20,
         position: "relative",
       }}
@@ -5277,7 +5277,7 @@ function BrandPaletteHero({
             {isLoading
               ? (en ? "Extracting…" : "萃取中…")
               : swatches.length === 0
-                ? (en ? "✨ Extract from products" : "✨ 從產品圖萃取")
+                ? (en ? "Extract from products" : "從產品圖萃取")
                 : userLocked
                   ? (en ? "Re-extract (overwrites lock)" : "重新萃取（覆寫鎖定）")
                   : (en ? "Re-extract" : "重新萃取")}
@@ -5297,7 +5297,7 @@ function BrandPaletteHero({
             >
               {genVisualMut?.isPending
                 ? (en ? "Generating…" : "生成中…")
-                : (en ? "✨ Brand visuals" : "✨ 生成品牌視覺")}
+                : (en ? "Brand visuals" : "生成品牌視覺")}
             </button>
           )}
         </div>
@@ -5668,8 +5668,8 @@ function BrandEntityGrid({
                             const reason = (r as any)?.reason ?? "unknown";
                             const msg = reason === "no_palette_yet"
                               ? (en
-                                  ? "Brand palette not extracted yet. Open the Visual tab and click ✨ Extract from products first."
-                                  : "品牌色彩還沒萃取。請先到「視覺」tab 按「✨ 從產品圖萃取」。")
+                                  ? "Brand palette not extracted yet. Open the Visual tab and click Extract from products first."
+                                  : "品牌色彩還沒萃取。請先到「視覺」tab 按「從產品圖萃取」。")
                               : reason === "product_has_no_image" || reason === "no_subject_image"
                                 ? (en
                                     ? "No usable image found — this product has no image and the brand website yielded none. Add a product image or fill in the website first."
@@ -5688,7 +5688,7 @@ function BrandEntityGrid({
                       className="text-[10px] font-medium px-2 py-1 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
                       title={en ? "Generate 4 branded variants" : "用品牌色生成 4 種變體"}
                     >
-                      {en ? "✨ Variants" : "✨ 品牌變體"}
+                      {en ? "Variants" : "品牌變體"}
                     </button>
                   )}
                   {/* Open */}

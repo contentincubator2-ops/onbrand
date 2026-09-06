@@ -289,7 +289,7 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
         style={{ borderColor: "#e5d9b6", background: "#fbf6e7", color: "#8a6d1d" }}
         title={en ? "Craft reference" : "工藝依據"}
       >
-        ✨ {en ? "Craft reference" : "工藝依據"}：{caseLabel}
+        {en ? "Craft reference" : "工藝依據"}：{caseLabel}
       </button>
       {open && (
         <div
@@ -2920,7 +2920,7 @@ export default function RunPage() {
                     >
                       {captionToPromptMut.isPending
                         ? (lang === "en" ? "Generating…" : "產生中…")
-                        : (lang === "en" ? "✨ Auto-generate prompt from this post" : "✨ 根據這篇文案自動產生圖片指令")}
+                        : (lang === "en" ? "Auto-generate prompt from this post" : "根據這篇文案自動產生圖片指令")}
                     </Button>
                   )}
 

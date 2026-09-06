@@ -109,7 +109,7 @@ export default function AchievementsPage() {
             className="font-semibold tracking-tight leading-tight mx-auto"
             style={{
               fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              background: "#171717",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -320,7 +320,7 @@ export default function AchievementsPage() {
         })}
 
         <div className="text-center text-xs text-neutral-400 mt-8">
-          <p>{lang === "en" ? "Unlock all 18 — you've used every part of OnBrand. From here, it's your creativity ✨" : "解鎖全部 18 個成就 = 你已用過 OnBrand 完整功能。然後就靠你的創意了 ✨"}</p>
+          <p>{lang === "en" ? "Unlock all 18 — you've used every part of OnBrand. From here, it's your creativity" : "解鎖全部 18 個成就 = 你已用過 OnBrand 完整功能。然後就靠你的創意了"}</p>
         </div>
       </div>
     </div>

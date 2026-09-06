@@ -96,7 +96,7 @@ caption 結構：
     id: "yt-30-chapter-timeline",
     tier: "30s",
     postType: "watch",
-    label: { en: "YT Chapter Timeline (Auto-Chaptering) ⭐", zh: "YT 章節時間軸（自動切章節）⭐" },
+    label: { en: "YT Chapter Timeline (Auto-Chaptering)", zh: "YT 章節時間軸（自動切章節）" },
     description: { en: "Paste a video URL → auto-chapter timestamps from the transcript", zh: "貼影片網址 → 自動從 transcript 切章節時間戳" },
     agent_id: 223993, // Pin-Chen Yang — YouTube Marketing Strategist 醫材 (1033 char)
     skill_slug: "extract-youtube-transcript",
@@ -289,7 +289,7 @@ YT Community 受眾比一般 IG 投入 — 可以用比較深度的內容（不�
     id: "yt-30-shorts-clip",
     tier: "30s",
     postType: "shorts",
-    label: { en: "YT Shorts Opening Clip (Real Video) ⭐", zh: "YT Shorts 開場動態片段（真的會動）⭐" },
+    label: { en: "YT Shorts Opening Clip (Real Video)", zh: "YT Shorts 開場動態片段（真的會動）" },
     description: { en: "AI renders an actual moving vertical clip for your Short's opening — not a script, a usable video asset", zh: "AI 直接生成一支會動的直式短片，不是腳本文字，是可以直接用的開場素材" },
     agent_id: 60030, // Boyu Hsu — YouTube Short Video Scriptwriter（同 yt-30-shorts-script，畫面人設延續）
     skill_slug: "youtube-shorts-automation",

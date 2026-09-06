@@ -1674,7 +1674,7 @@ export default function TheaterPage() {
               className="font-semibold tracking-tight leading-tight"
               style={{
                 fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                background: "#171717",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -1823,8 +1823,8 @@ export default function TheaterPage() {
                   className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition flex items-center gap-1.5"
                 >
                   {planScheduleMut?.isPending
-                    ? (lang === "en" ? "✨ Planning…" : "✨ 排程中…")
-                    : (lang === "en" ? "✨ AI Schedule" : "✨ AI 智能排程")}
+                    ? (lang === "en" ? "Planning…" : "排程中…")
+                    : (lang === "en" ? "AI Schedule" : "AI 智能排程")}
                 </button>
               )}
             </div>
@@ -1890,7 +1890,7 @@ export default function TheaterPage() {
               <div className="mt-1 border-t border-neutral-100 pt-3 space-y-1.5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[11px] font-semibold text-violet-700">
-                    {lang === "en" ? "✨ AI suggested schedule" : "✨ AI 排程建議"}
+                    {lang === "en" ? "AI suggested schedule" : "AI 排程建議"}
                   </p>
                   <button onClick={() => setScheduleVisible(false)} className="text-[10px] text-neutral-400 hover:text-neutral-700">
                     {lang === "en" ? "hide" : "收起"}

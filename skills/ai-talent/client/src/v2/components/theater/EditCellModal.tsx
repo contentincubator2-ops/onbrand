@@ -306,7 +306,7 @@ export default function EditCellModal({
                 disabled={polishing || !caption.trim()}
                 className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-40 transition"
               >
-                {polishing ? <Spinner size="sm" color="current" /> : <span>✨</span>}
+                {polishing ? <Spinner size="sm" color="current" /> : <span></span>}
                 {en ? "AI Polish" : "AI 潤稿"}
               </button>
               {polishError && <span className="text-[11px] text-danger-600">{polishError}</span>}

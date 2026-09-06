@@ -73,7 +73,7 @@ export default function AchievementUnlockWatcher() {
           if (seen.has(grantKey)) continue;
           seen.add(grantKey);
           const rewardLabels = (g.rewards ?? []).map((rw: any) => rw.label).join(" · ");
-          stagger(`🌟 完成路線「${routeChinese(g.route)}」獎勵：${rewardLabels}`);
+          stagger(`完成路線「${routeChinese(g.route)}」獎勵：${rewardLabels}`);
         }
 
         // 3) Finale — all 18 unlocked

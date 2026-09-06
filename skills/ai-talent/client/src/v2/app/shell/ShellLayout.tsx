@@ -848,7 +848,7 @@ function IconBar({
             position: "absolute",
             top: 4, right: 4,
             fontSize: 8, fontWeight: 800, letterSpacing: "0.08em",
-            color: "#fff", background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+            color: "#fff", background: "#C2410C",
             padding: "1.5px 4px", borderRadius: 3,
             lineHeight: 1, cursor: "default",
             boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
@@ -1120,7 +1120,7 @@ function IconBar({
  *  signature color used as the pill background; first-letter stays white.
  *  Uses HSL with controlled lightness/saturation so colors stay readable. */
 function brandColor(name: string): { bg: string; bgGradient: string; light: string } {
-  if (!name) return { bg: "#7c3aed", bgGradient: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)", light: "rgba(124,58,237,0.10)" };
+  if (!name) return { bg: "#7c3aed", bgGradient: "#171717", light: "rgba(124,58,237,0.10)" };
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0x7fffffff;
   const hue = hash % 360;
@@ -1131,7 +1131,9 @@ function brandColor(name: string): { bg: string; bgGradient: string; light: stri
   const bgDark = `hsl(${hue}, ${sat}%, ${Math.max(28, light - 14)}%)`;
   return {
     bg,
-    bgGradient: `linear-gradient(135deg, ${bg} 0%, ${bgDark} 100%)`,
+    // 2026-09-06：攤平成單色。這個顏色是用品牌名 hash 出來的識別色，
+    // 功能性的（區分品牌）所以保留，但不需要做成漸層。
+    bgGradient: bg,
     light: `hsla(${hue}, ${sat}%, ${light}%, 0.10)`,
   };
 }
@@ -1331,7 +1333,7 @@ function BrandHierarchyPill({
                 style={{
                   width: "100%", padding: "11px 14px",
                   borderRadius: 8,
-                  background: "linear-gradient(135deg, #F97316, #ea580c)",
+                  background: "#C2410C",
                   border: "none", cursor: "pointer", color: "#fff",
                   fontSize: 13, fontWeight: 700,
                   display: "flex", alignItems: "center", gap: 8,
@@ -1689,8 +1691,8 @@ function BrandSwitcherButton({
           <span style={{
             width: 36, height: 36, borderRadius: 10, flexShrink: 0,
             background: activeBrand
-              ? "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)"
-              : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
+              ? "#171717"
+              : "#9CA3AF",
             color: "#fff",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 14, fontWeight: 800,
@@ -2201,7 +2203,7 @@ function SlidePanel({
               {/* Swatch */}
               <div style={{
                 width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                background: "#171717",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 <span style={{ color: "white", fontSize: 9, fontWeight: 700 }}>
@@ -2271,7 +2273,7 @@ function SlidePanel({
                         >
                           <div style={{
                             width: 24, height: 24, borderRadius: 5, flexShrink: 0,
-                            background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                            background: "#171717",
                             display: "flex", alignItems: "center", justifyContent: "center",
                           }}>
                             <span style={{ color: "white", fontSize: 9, fontWeight: 700 }}>
@@ -2673,7 +2675,7 @@ function TeamSubPanel() {
         <PopupRow onClick={() => {}}>
           <span style={{
             width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-            background: "linear-gradient(135deg, #F97316 0%, #ea580c 100%)",
+            background: "#C2410C",
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: 13, fontWeight: 800,
           }}>{isEn ? "S" : "S的"}</span>
@@ -2917,7 +2919,7 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
               <PopupRow onClick={() => setPricingOpen(true)}>
                 <div style={{
                   width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                  background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                  background: "#171717",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: "#fff",
                 }}>

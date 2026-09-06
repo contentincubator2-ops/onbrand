@@ -42,8 +42,8 @@ export default function FestivalGlobalNudge() {
         top: 0, left: 70, right: 0,
         zIndex: 30,
         background: urgent
-          ? "linear-gradient(135deg, #FEF2F2 0%, #FFFBEB 100%)"
-          : "linear-gradient(135deg, rgba(124,58,237,0.10) 0%, rgba(0,180,188,0.10) 100%)",
+          ? "#F7F6F4"
+          : "#F7F6F4 100%)",
         borderBottom: `1px solid ${urgent ? "#FCA5A5" : "#D4D4D4"}`,
         fontSize: 12,
       }}

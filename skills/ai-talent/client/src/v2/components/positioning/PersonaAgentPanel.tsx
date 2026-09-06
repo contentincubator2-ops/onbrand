@@ -62,7 +62,7 @@ function ProgressBar({ current, total, en }: { current: number; total: number; e
         <span className="text-[11px] text-default-400">{current}/{total}</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-default-100 overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#F97316,#EA580C)" }} />
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: "#C2410C" }} />
       </div>
     </div>
   );

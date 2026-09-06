@@ -307,7 +307,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
 
           {/* AI Positioning Summary */}
           {(tagline || audience || usp || price) && (
-            <div className="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl p-4 border border-indigo-100">
+            <div className="bg-neutral-50 rounded-xl p-4 border border-indigo-100">
               <div className="flex items-center gap-1.5 mb-3">
                 <Sparkles size={13} className="text-indigo-500" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">

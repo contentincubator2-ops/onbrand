@@ -113,11 +113,11 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "👋 歡迎！你的品牌大腦初版好了，我幫你預設了 FB / IG / YouTube 三個平台 + 本週日期。" +
-        "按底下橘色「✨ 一鍵生成 7 天」就會出來 21 張卡（每天 × 3 平台）——大概 3 分鐘。" +
+        "按底下橘色「一鍵生成 7 天」就會出來 21 張卡（每天 × 3 平台）——大概 3 分鐘。" +
         "完整 14 步品牌定位還在背景跑，完成後我會再叫你來看。",
       en:
         "👋 Welcome! Your Brand Brain (express version) is ready. I've pre-" +
-        "selected FB / IG / YouTube + this week. Hit the orange '✨ Generate " +
+        "selected FB / IG / YouTube + this week. Hit the orange 'Generate " +
         "7 Days' button below — you'll see 21 cards (7 days × 3 channels) " +
         "in ~3 minutes. The full 14-step positioning is still running in " +
         "the background; I'll ping you when it's done.",
@@ -290,11 +290,11 @@ export const NUDGE_CATALOG = {
     id: "onboarding.first_login",
     message: {
       "zh-TW":
-        "嗨，我是 Mia ✨。我不會自動跳出來打擾你——但每當你完成一個動作（生成貼文、" +
+        "嗨，我是 Mia。我不會自動跳出來打擾你——但每當你完成一個動作（生成貼文、" +
         "鎖定品牌大腦、排七日…），我會在這個小頭像上留下未讀提示，告訴你接下來" +
         "最有用的一步是什麼。任何時候卡住，點我就好。",
       en:
-        "Hi, I'm Mia ✨. I won't auto-pop or interrupt — but each time you " +
+        "Hi, I'm Mia. I won't auto-pop or interrupt — but each time you " +
         "complete a step (generate a post, lock the Brand Brain, plan a week…) " +
         "I'll leave a small unread indicator on this avatar with the most " +
         "useful next move. Stuck anytime? Just click me.",

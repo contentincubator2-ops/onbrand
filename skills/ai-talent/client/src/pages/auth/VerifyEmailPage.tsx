@@ -101,7 +101,7 @@ export default function VerifyEmailPage() {
             <button
               onClick={() => navigate("/auth/login")}
               className="inline-block rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-all duration-200"
-              style={{ background: "linear-gradient(90deg, #6C5CE7, #a29bfe)" }}
+              style={{ background: "#171717" }}
             >
               {lang === "en" ? "← Back to sign in" : "返回登入"}
             </button>

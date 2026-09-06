@@ -286,7 +286,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
         display: "flex", alignItems: "center", gap: 10,
         padding: "12px 14px",
         borderBottom: "1px solid #f3f4f6",
-        background: "linear-gradient(135deg, rgba(124,58,237,0.06), rgba(0,180,188,0.06))",
+        background: "#F7F6F4)",
       }}>
         <img src={MIA_AVATAR} alt="Mia" style={{ width: 40, height: 40, borderRadius: "50%" }} />
         <div style={{ flex: 1, minWidth: 0 }}>

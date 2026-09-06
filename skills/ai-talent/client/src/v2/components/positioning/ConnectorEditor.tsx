@@ -157,7 +157,7 @@ export default function ConnectorEditor({ brandId }: { brandId: number | null })
       </div>
 
       <div className="mt-6 text-xs text-default-500 bg-default-50 rounded-lg p-3 leading-relaxed">
-        <div className="font-medium text-default-700 mb-1">{en ? "💡 Why fill these in?" : "💡 為什麼要填？"}</div>
+        <div className="font-medium text-default-700 mb-1">{en ? "Why fill these in?" : "為什麼要填？"}</div>
         {en
           ? "Before \"auto-fill\", \"test 6 scenarios\", or any task, the AI pulls real content from these URLs (OG tags, page summaries, hero text) and injects your actual voice / audience / industry into the prompt — so output matches your brand instead of guessing from the name."
           : "AI 在跑「自動填寫」、「測試 6 情境」或任何任務之前，會先抓這些連結的真實內容（OG 標籤、頁面摘要、首屏文字），把品牌實際在用的語氣 / 受眾 / 產業塞進指令，這樣產出才會貼合品牌而不是用品牌名瞎猜產業。"}

@@ -727,7 +727,7 @@ export default function DataWorkspacePage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: 16, alignItems: "start" }}>
         <main style={{ minWidth: 0 }}>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "linear-gradient(135deg,#fff 0%,#fafafa 100%)", padding: 22, marginBottom: 14 }}>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#FFFFFF", padding: 22, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 46, height: 46, borderRadius: 16, background: active.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>{active.icon}</div>
               <div>
@@ -1110,7 +1110,7 @@ export default function DataWorkspacePage() {
 
 
           {!isPerformance && active.id === "hot_topics" && (
-            <section style={{ border: "1px solid #f9a8d4", borderRadius: 24, background: "linear-gradient(135deg,#fff 0%,#fdf2f8 100%)", padding: 20, marginBottom: 14 }}>
+            <section style={{ border: "1px solid #f9a8d4", borderRadius: 24, background: "#FFFFFF", padding: 20, marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start", marginBottom: 16 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: "#DB2777" }}>AI Topic → Content Task</div>

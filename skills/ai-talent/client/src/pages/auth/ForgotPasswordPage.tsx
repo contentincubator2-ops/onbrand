@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
           <Link
             to="/auth/login"
             className="inline-block rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-all duration-200"
-            style={{ background: "linear-gradient(90deg, #6C5CE7, #a29bfe)" }}
+            style={{ background: "#171717" }}
           >
             {t("auth_back_to_login")}
           </Link>
@@ -76,7 +76,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "linear-gradient(160deg, #6C5CE7 0%, #a29bfe 100%)" }}>
+      <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "#171717" }}>
         <div className="text-white">
           <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
           <div className="text-xl opacity-80">
@@ -123,7 +123,7 @@ export default function ForgotPasswordPage() {
               disabled={loading || !email}
               className="w-full rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                background: loading ? "#d1cbf8" : "linear-gradient(90deg, #6C5CE7, #a29bfe)",
+                background: loading ? "#d1cbf8" : "#171717",
                 color: "white",
                 boxShadow: loading ? "none" : "0 4px 12px rgba(108,92,231,0.35)",
               }}

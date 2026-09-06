@@ -93,7 +93,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
           {/* Header */}
           <div
             className="px-6 py-5 text-white"
-            style={{ background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)" }}
+            style={{ background: "#171717" }}
           >
             <div className="flex items-center gap-2 mb-1">
               <Sparkles size={16} />
@@ -172,8 +172,8 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
           <div className="px-5 py-3 bg-amber-50 border-t border-amber-100">
             <p className="text-xs text-amber-800 leading-relaxed">
               {lang === "en"
-                ? "💡 One run = one task execution, including all variants + images. System failures are automatically refunded."
-                : "💡 一次執行 = 跑一次任務，包含所有版本 + 圖片，系統錯誤自動退回不計次數。"}
+                ? "One run = one task execution, including all variants + images. System failures are automatically refunded."
+                : "一次執行 = 跑一次任務，包含所有版本 + 圖片，系統錯誤自動退回不計次數。"}
             </p>
           </div>
 

@@ -272,7 +272,7 @@ export const YT_FORMAT_TABS: { id: YTActiveFormat; label: string; labelEn: strin
   { id: "純文案",      label: "純文案",      labelEn: "Pure Copy"         },
   { id: "腳本",        label: "腳本",        labelEn: "Script"            },
   { id: "分鏡圖",      label: "分鏡圖",      labelEn: "Storyboard"        },
-  { id: "影片",        label: "影片 ⭐",      labelEn: "Video ⭐"           },
+  { id: "影片",        label: "影片",      labelEn: "Video"           },
   { id: "系列 / 策略", label: "系列 / 策略", labelEn: "Series & Strategy" },
 ];
 

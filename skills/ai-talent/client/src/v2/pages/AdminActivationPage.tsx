@@ -196,7 +196,7 @@ export default function AdminActivationPage() {
                     <div style={{
                       height: "100%", width: `${widthPct}%`,
                       background: i === d.funnel.length - 1
-                        ? `linear-gradient(90deg, ${C.orange} 0%, ${C.orangeDark} 100%)`
+                        ? `${C.orange}`
                         : C.ink,
                       borderRadius: 5,
                       transition: "width 0.4s",

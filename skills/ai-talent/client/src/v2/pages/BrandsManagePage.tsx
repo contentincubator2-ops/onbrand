@@ -248,7 +248,7 @@ export default function BrandsManagePage() {
               className="font-semibold tracking-tight leading-tight"
               style={{
                 fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-                background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+                background: "#171717",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -299,7 +299,7 @@ export default function BrandsManagePage() {
           <div
             className="mb-6 rounded-xl border flex items-center gap-3 px-4 py-3"
             style={{
-              background: "linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(0,180,188,0.06) 100%)",
+              background: "#F7F6F4 100%)",
               borderColor: "#E4E3E1",
             }}
           >

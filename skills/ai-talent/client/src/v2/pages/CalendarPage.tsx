@@ -493,7 +493,7 @@ export default function CalendarPage() {
             className="font-semibold tracking-tight leading-tight"
             style={{
               fontSize: "clamp(1.5rem, 2.5vw, 2rem)",
-              background: "linear-gradient(135deg, #00b4bc 0%, #7c3aed 100%)",
+              background: "#171717",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -514,7 +514,7 @@ export default function CalendarPage() {
         <div className="max-w-[1100px] mx-auto px-6 mb-5">
           <div
             className="rounded-xl px-5 py-4 relative"
-            style={{ background: "linear-gradient(135deg,#f0fdf4,#eff6ff)", border: "1px solid #a7f3d0" }}
+            style={{ background: "#F7F6F4", border: "1px solid #a7f3d0" }}
           >
             <button
               onClick={dismissHowTo}
@@ -1425,7 +1425,7 @@ function FestivalNudgeBanner({
       <div
         className="rounded-xl px-4 py-3"
         style={{
-          background: "linear-gradient(135deg, rgba(124,58,237,0.05) 0%, rgba(0,180,188,0.05) 100%)",
+          background: "#F7F6F4 100%)",
           border: "1px solid #D4D4D4",
         }}
       >

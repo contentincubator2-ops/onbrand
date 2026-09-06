@@ -363,7 +363,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 <div className="flex items-center gap-3 mb-5">
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ background: "linear-gradient(135deg, #00b4bc, #7c3aed)" }}
+                    style={{ background: "#171717" }}
                   >
                     <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 16 }} />
                   </div>
@@ -488,7 +488,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     isLoading={createBrandMut?.isPending}
                     endContent={!createBrandMut?.isPending && <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />}
                     className="font-semibold"
-                    style={{ background: "linear-gradient(135deg, #7c3aed, #6366F1)" }}
+                    style={{ background: "#171717" }}
                   >
                     {lang === "en" ? "Create & start positioning" : "建立並開始定位"}
                   </Button>
