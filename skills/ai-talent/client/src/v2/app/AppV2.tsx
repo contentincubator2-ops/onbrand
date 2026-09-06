@@ -65,7 +65,6 @@ const ProjectsPage = React.lazy(() => import("../pages/ProjectsPage"));
 const BrandsPage = React.lazy(() => import("../pages/BrandsPage"));
 const BrandsManagePage = React.lazy(() => import("../pages/BrandsManagePage"));
 const BrandSettingsPage = React.lazy(() => import("../pages/BrandSettingsPage"));
-const SquadMockupsGalleryPage = React.lazy(() => import("../pages/SquadMockupsGalleryPage"));
 const SquadLabPage = React.lazy(() => import("../pages/admin/SquadLabPage"));
 const CalendarPage = React.lazy(() => import("../pages/CalendarPage"));
 const AccountPage = React.lazy(() => import("../pages/AccountPage"));
@@ -331,7 +330,6 @@ export default function AppV2() {
           <Route path="/theater"   element={<TheaterPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
-          <Route path="/squad-mockups" element={<SquadMockupsGalleryPage />} />
           <Route path="/admin/squads" element={<SquadLabPage />} />
           {/* 2026-05-11 — error tracking dashboard. adminProcedure-gated on
               server; non-admins see a friendly FORBIDDEN screen. */}
