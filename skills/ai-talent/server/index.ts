@@ -41,7 +41,6 @@ import { cloudOAuthRouter } from "./routes/cloudOAuthRoute";
 import { squadSearchRouter } from "./routers/squadSearchRouter";
 import { entitySearchRouter } from "./routers/entitySearchRouter";
 import { manusRouter } from "./routers/manusRouter";
-import { intakeRouter } from "./routers/intakeRouter";
 import { missionStepStreamRouter } from "./routes/missionStepStreamRoute";
 import { publicAgentsRoute } from "./routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
@@ -372,7 +371,6 @@ app.use("/api/oauth", cloudOAuthRouter);
 app.use("/api/squads/search", squadSearchRouter);
 app.use("/api/entity/search", entitySearchRouter);
 app.use("/api/manus", manusRouter);
-app.use("/api/intake", intakeRouter);
 app.use("/api/missions", missionStepStreamRouter);
 
 // ─── Public agent showcase (no auth required by default) ─────────────────────

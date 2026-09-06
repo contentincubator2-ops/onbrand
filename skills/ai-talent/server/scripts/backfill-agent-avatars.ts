@@ -17,7 +17,7 @@
 import "dotenv/config";
 import mysql from "mysql2/promise";
 
-// ── Colour logic (mirror of AgentAvatar.tsx bgFromHint) ──────────────────────
+// ── Colour logic (was a mirror of AgentAvatar.tsx bgFromHint; that component was removed 2026-09-07, this is now the only copy) ──────────────────────
 
 const PLATFORM_BG: Record<string, string> = {
   facebook:  "4267B2",

@@ -353,7 +353,7 @@ export interface MockupFields {
   /**
    * Session 7: embedded media-gen flow rendered inside the image slot.
    * When provided, renders instead of the default image placeholder/spinner.
-   * Pass <ImageSlotFlow ... /> from SquadDetailPanel when the active step is visual.
+   * Pass a media-gen flow node (MediaGenFlow) when the active step is visual.
    */
   imageSlotFlow?: React.ReactNode;
 }
