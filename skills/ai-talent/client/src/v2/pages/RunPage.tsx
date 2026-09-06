@@ -34,7 +34,6 @@ import {
 import {
   Pencil, MessageCircle, Image as LucideImage, Video,
   Wand2, Users as LucideUsers, Save, Copy as LucideCopy,
-  Share2 as LucideShare,
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
@@ -513,8 +512,6 @@ export default function RunPage() {
     setFocusedAgent(null);
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [copied, setCopied] = useState(false);
-  // 2026-05-11 (CJ「Spotify 模式」): community-template publish modal state.
-  const [shareModal, setShareModal] = useState(false);
   // 2026-05-28: FB flow state
   // fbOauthDone    — OAuth popup completed this session (button switches to "發布")
   // fbOauthPending — popup is open; show "✓ 已完成授權" confirm button instead
@@ -2691,11 +2688,6 @@ export default function RunPage() {
               <ToolbarBtn icon={LucideCopy}    label={lang === "en" ? "Copy caption" : "複製文案"}       onClick={onCopy} highlight={copied} />
               {/* 2026-05-11 (CJ feedback「存 Mission 不要出現在工具列，只要在下方」):
                   publish card 已經有「存到 Mission」按鈕，工具列這個是重複，砍掉。 */}
-              {/* 2026-05-11 (CJ「這個功能可以晚一點再上，先處理別的」):
-                  範本收藏 / 市集功能暫緩到 P1 後 — 等 insights 回饋系統做完
-                  才能設計品質門檻。Button 暫時拿掉，schema + endpoints 保留。
-                  設計留在 docs/template-marketplace-design.md。 */}
-              {/* <ToolbarBtn icon={LucideShare} label="存為我的模板" onClick={() => setShareModal(true)} /> */}
               <Divider />
               <Tooltip content={lang === "en" ? "Re-run task" : "重跑同任務"} placement="bottom">
                 <button
@@ -3811,216 +3803,10 @@ export default function RunPage() {
         </ModalContent>
       </Modal>
 
-      {/* 2026-05-11 (CJ「Spotify 模式」): publish this output as a
-          community template. activeVariant + brand context already in scope. */}
-      <PublishTemplateModal
-        isOpen={shareModal}
-        onClose={() => setShareModal(false)}
-        outputId={id}
-        defaultTitle={data?.mission?.title?.toString().slice(0, 80) ?? ""}
-        defaultKind={data?.mission?.tier === "99s" ? "campaign" : "caption"}
-        tier={data?.mission?.tier ?? null}
-        platform={data?.metadata?.platform ?? null}
-        taskId={data?.mission?.taskId ?? null}
-        previewText={(() => {
-          // Variants live inside the output's content JSON, not as a top-
-          // level field. Parse defensively + strip super long.
-          const anyData: any = data;
-          const variants = anyData?.variants
-            ?? (() => {
-                 try {
-                   const parsed = typeof anyData?.content === "string"
-                     ? JSON.parse(anyData.content)
-                     : anyData?.content;
-                   return Array.isArray(parsed) ? parsed : (parsed?.variants ?? []);
-                 } catch { return []; }
-               })();
-          const v = variants?.[0] ?? variants?.[activeIdx];
-          const cap = v?.caption ?? "";
-          return cap.length > 280 ? cap.slice(0, 280) + "…" : cap;
-        })()}
-      />
     </div>
   );
 }
 
-/* ────────────────── PublishTemplateModal ──────────────────
-   One-shot dialog that lets a user push the current RunPage output to
-   the community template gallery. Strips obvious brand-specific tokens
-   from the content body so the template stays portable; users can
-   review + edit before submit.
-   ─────────────────────────────────────────────────────────── */
-function PublishTemplateModal({
-  isOpen, onClose, outputId, defaultTitle, defaultKind, tier, platform, taskId, previewText,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  outputId: number;
-  defaultTitle: string;
-  defaultKind: "caption" | "campaign" | "positioning" | "prompt";
-  tier: string | null;
-  platform: string | null;
-  taskId: string | null;
-  previewText: string;
-}) {
-  const [title, setTitle] = useState(defaultTitle);
-  const [description, setDescription] = useState("");
-  // 2026-05-11 (CJ refocus): default to PRIVATE — primary use case is
-  // "save my own successful template", sharing is the opt-in extra.
-  const [visibility, setVisibility] = useState<"private" | "public" | "unlisted">("private");
-  const [body, setBody] = useState(previewText);
-  const [submitting, setSubmitting] = useState(false);
-  const navigate = useNavigate();
-  const { t, lang } = useLang();
-
-  React.useEffect(() => {
-    if (isOpen) {
-      setTitle(defaultTitle || "");
-      setDescription("");
-      setBody(previewText || "");
-      setVisibility("private");
-    }
-  }, [isOpen, defaultTitle, previewText]);
-
-  const publishMut = (trpc as any).community?.publishTemplate?.useMutation?.();
-
-  if (!isOpen) return null;
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} size="2xl" backdrop="blur">
-      <ModalContent>
-        <ModalHeader className="flex flex-col items-stretch gap-0 py-2 px-4 border-b border-default-100">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-default-600">
-            COMMUNITY · PUBLISH TEMPLATE
-          </p>
-          <p className="text-[13px] font-medium text-default-800">
-            {lang === "en"
-              ? "Share this output back to the community (+2 credits each time someone uses it)"
-              : "把這個產出公開回饋給社群（被別人用一次 +2 credits）"}
-          </p>
-        </ModalHeader>
-        <ModalBody className="space-y-3 py-4">
-          <div>
-            <p className="text-[12px] uppercase tracking-[0.18em] text-default-600 mb-1">{lang === "en" ? "Title" : "標題"}</p>
-            <Input
-              size="sm"
-              value={title}
-              onValueChange={setTitle}
-              placeholder={lang === "en"
-                ? "e.g. Holiday limited-offer hook + CTA template"
-                : "例：節慶限時優惠 hook + CTA 套版"}
-              variant="flat"
-            />
-          </div>
-          <div>
-            <p className="text-[12px] uppercase tracking-[0.18em] text-default-600 mb-1">
-              {lang === "en" ? "Description (when to use, why it works)" : "描述（用什麼情境、為什麼好用）"}
-            </p>
-            <Textarea
-              size="sm"
-              value={description}
-              onValueChange={setDescription}
-              minRows={3}
-              placeholder={lang === "en"
-                ? "e.g. Great for e-commerce 7-day countdown campaigns — hook leads with benefit, then time pressure"
-                : "例：適合電商品牌做 7 天倒數活動，hook 先給好處再點時間限制"}
-              variant="flat"
-            />
-          </div>
-          <div>
-            <p className="text-[12px] uppercase tracking-[0.18em] text-default-600 mb-1">
-              {lang === "en"
-                ? "Template content (replace brand-specific words with [variables] so others can plug in)"
-                : "範本內容（你可以把品牌專屬字眼改成 [變數]，讓別人套用）"}
-            </p>
-            <Textarea
-              size="sm"
-              value={body}
-              onValueChange={setBody}
-              minRows={6}
-              maxRows={14}
-              placeholder=""
-              variant="flat"
-              classNames={{ input: "font-serif" }}
-            />
-          </div>
-          <div className="flex items-center gap-2 text-[12px] text-default-700">
-            <span className="font-semibold uppercase tracking-[0.18em] text-default-600">{lang === "en" ? "Visibility:" : "可見："}</span>
-            <button
-              className="px-2 py-1 rounded border text-xs"
-              style={{
-                borderColor: visibility === "public" ? "#171717" : "#D4D4D4",
-                background: visibility === "public" ? "#171717" : "white",
-                color: visibility === "public" ? "white" : "#404040",
-              }}
-              onClick={() => setVisibility("public")}
-            >
-              {lang === "en" ? "Public (in template library)" : "公開（出現在範本庫）"}
-            </button>
-            <button
-              className="px-2 py-1 rounded border text-xs"
-              style={{
-                borderColor: visibility === "unlisted" ? "#171717" : "#D4D4D4",
-                background: visibility === "unlisted" ? "#171717" : "white",
-                color: visibility === "unlisted" ? "white" : "#404040",
-              }}
-              onClick={() => setVisibility("unlisted")}
-            >
-              {lang === "en" ? "Only people with the link" : "只給有連結的人"}
-            </button>
-          </div>
-          <div className="text-[12px] text-default-600 bg-default-50 border border-default-200 rounded-md p-2 leading-relaxed">
-            {lang === "en" ? (
-              <>⚡ We don't share your brand name / audience / banned words — others get their own brand auto-applied. This template captures your <strong>structure and writing style</strong>, not your content data.</>
-            ) : (
-              <>⚡ 我們不會公開你的品牌名 / 受眾 / 禁忌詞 — 別人用時系統會自動套用他們的品牌。
-              這份模板代表你的 <strong>結構與寫法</strong>，不是你的內容資料。</>
-            )}
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="light" onPress={onClose}>{t("cancel")}</Button>
-          <Button
-            color="primary"
-            isLoading={submitting}
-            isDisabled={!title.trim() || !body.trim()}
-            onPress={async () => {
-              setSubmitting(true);
-              try {
-                const r = await publishMut?.mutateAsync?.({
-                  title: title.trim(),
-                  description: description.trim() || undefined,
-                  kind: defaultKind,
-                  tier: (tier ?? undefined) as any,
-                  platform: platform ?? undefined,
-                  taskId: taskId ?? undefined,
-                  content: { body, structure: defaultKind },
-                  previewText: body.slice(0, 280),
-                  sourceOutputId: outputId,
-                  visibility,
-                });
-                showToastGlobal(
-                  lang === "en"
-                    ? `Published to template library (#${r?.id ?? "?"}) — +2 credits each time someone uses it ✓`
-                    : `已發布到範本庫（#${r?.id ?? "?"}）— 被別人用一次 +2 credits ✓`
-                );
-                onClose();
-                // /community retired 2026-05-14 — just close, no redirect.
-              } catch (e: any) {
-                showToastGlobal(
-                  lang === "en" ? `Publish failed: ${e?.message ?? e}` : `發布失敗：${e?.message ?? e}`
-                );
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-          >
-            {lang === "en" ? "Publish to library" : "發布到範本庫"}
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
-  );
-}
 
 function Divider() {
   return <div className="w-px h-5 bg-default-200 mx-1" />;
