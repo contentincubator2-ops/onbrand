@@ -24,12 +24,11 @@ import {
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faClipboard, faClipboardCheck, faRotateRight, faXmark,
-  faShare, faCalendarPlus, faEnvelope, faRocket, faFolderPlus,
-  faChevronLeft, faFolderOpen, faDownload, faChevronDown, faChevronUp,
+ faRotateRight, faXmark,
+  faShare, faCalendarPlus,
+ faFolderOpen, faDownload,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  faFacebook, faInstagram, faLinkedin, faYoutube,
 } from "@fortawesome/free-brands-svg-icons";
 import {
   Pencil, MessageCircle, Image as LucideImage, Video,
@@ -65,7 +64,6 @@ import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { parseRunOfShow } from "../lib/runOfShow";
 import { tierLabel } from "../lib/tierVocabulary";
-import { TRPCClientError } from "@trpc/client";
 import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
 import ReviewBar from "../components/review/ReviewBar";
