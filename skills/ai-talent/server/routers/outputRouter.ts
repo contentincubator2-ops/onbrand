@@ -116,16 +116,6 @@ export const outputRouter = router({
         catch (e: any) { failures.push(`${to}: ${e?.message ?? e}`); }
       }
 
-      // 2026-05-10 (achievement trigger): tag metadata.emailedTeam = ISO date
-      // so use_email_team achievement evaluator can detect this.
-      try {
-        await localPool.execute(
-          `UPDATE mission_outputs
-           SET metadata = JSON_SET(COALESCE(metadata, JSON_OBJECT()), '$.emailedTeam', ?)
-           WHERE id = ?`,
-          [new Date().toISOString(), input.id],
-        );
-      } catch {/* non-fatal */}
 
       return {
         ok: failures.length === 0,

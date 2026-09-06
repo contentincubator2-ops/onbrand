@@ -26,7 +26,7 @@ export default function TrialCountdownBar() {
   if (!status) return null;
   if (status.planStatus === "active" && !status.expired) return null;
 
-  // Trial active — show day countdown + points balance + achievements progress
+  // Trial active — show day countdown + points balance
   if (status.planStatus === "trial" && !status.expired) {
     const days = status.daysLeft ?? 0;
     const pointsLeft = status.points?.balance ?? 0;
@@ -63,8 +63,7 @@ export default function TrialCountdownBar() {
 }
 
 /**
- * Inner component — split out so we can call the achievements progress
- * hook conditionally (only when trial is active, to save query traffic).
+ * Inner component — the active-trial bar (days + points + upgrade CTA).
  */
 function TrialBarWithProgress({
   days,
@@ -78,14 +77,6 @@ function TrialBarWithProgress({
   urgency: "high" | "medium" | "low";
 }) {
   const { lang } = useLang();
-  const achQuery = (trpc as any).achievements?.getProgress?.useQuery
-    ? (trpc as any).achievements.getProgress.useQuery(undefined, {
-        refetchInterval: 60_000,
-        refetchOnWindowFocus: true,
-      })
-    : { data: null };
-  const ach = achQuery?.data;
-
   const pointsPct = pointsTotal > 0 ? Math.max(0, Math.round((pointsLeft / pointsTotal) * 100)) : 0;
 
   return (
@@ -117,13 +108,6 @@ function TrialBarWithProgress({
             : <><strong>{pointsLeft}</strong> 點剩餘</>}
         </span>
       </span>
-      {ach && (
-        <Link to="/achievements" className="flex items-center gap-2 hover:underline">
-          <span>
-            {lang === "en" ? "Achievements" : "成就"} <strong>{ach.unlockedCount} / {ach.totalCount}</strong>
-          </span>
-        </Link>
-      )}
       <Link
         to="/pricing"
         className="px-3 py-1 rounded-md bg-neutral-900 text-white font-semibold hover:bg-neutral-800 transition"

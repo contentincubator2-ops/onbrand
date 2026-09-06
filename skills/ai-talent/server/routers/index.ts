@@ -34,7 +34,6 @@ import { publishRouter } from "./publishRouter";
 import { billingRouter } from "./billingRouter";
 import { opsRouter } from "./opsRouter";
 import { adminStatsRouter } from "./adminStatsRouter";
-import { achievementsRouter } from "./achievementsRouter";
 // 2026-05-11 (CJ「Spotify 模式，大家貢獻範本」)
 import { communityRouter } from "./communityRouter";
 // 2026-05-11 (CJ「Team / Agency 方案 + 多客戶 workspace」): multi-tenant container.
@@ -98,7 +97,6 @@ export const appRouter = router({
   billing:         billingRouter,
   ops:             opsRouter,
   adminStats:      adminStatsRouter,
-  achievements:    achievementsRouter,
   community:       communityRouter,
   review:          reviewRouter,
   performance:     performanceRouter,

@@ -324,8 +324,8 @@ if (existsSync(publicDir)) {
 
 // 2026-05-14 (CJ「系統安全穩定」P0): tiered rate limits.
 //   · General /trpc and /api: 300/min — tRPC clients batch many calls
-//     into one HTTP req but background pollers (achievements.evaluate
-//     every ~90s, support drawer poll) plus app interaction can hit 100
+//     into one HTTP req but background pollers (notifications, support
+//     drawer poll) plus app interaction can hit 100
 //     under normal use. 300 gives 3x headroom.
 //   · /api/auth/*: 20/min — login/register/reset endpoints get a much
 //     tighter cap to slow down brute-force credential attacks. Each

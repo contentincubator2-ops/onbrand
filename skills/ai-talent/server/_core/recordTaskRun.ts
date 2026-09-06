@@ -470,16 +470,6 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
 
     if (tx) await tx.commit();
 
-    // 2026-05-10: fire-and-forget achievement evaluator + reward grant.
-    // Fresh unlocks + reward grants bubble up next time client polls
-    // achievements.evaluate (every 90s + on focus). Doesn't block task return.
-    Promise.resolve().then(async () => {
-      try {
-        const { evaluateAndRecord } = await import("./achievements");
-        await evaluateAndRecord(args.userId);
-      } catch {/* swallow — never break recordTaskRun */}
-    });
-
     return { missionId, outputId: outputId || null };
   } catch (e: any) {
     if (tx) {

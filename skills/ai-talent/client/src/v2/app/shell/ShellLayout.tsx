@@ -18,7 +18,6 @@ import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
 import PricingInfoModal from "../../components/PricingInfoModal";
 import TrialCountdownBar from "../../components/TrialCountdownBar";
 import WorkspacePill from "../../components/WorkspacePill";
-import AchievementUnlockWatcher from "../../components/AchievementUnlockWatcher";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
 import SupportDrawer from "../../components/SupportDrawer";
 // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
@@ -543,7 +542,7 @@ export default function ShellLayout() {
         paddingTop: 64,
         transition: "padding-left 0.22s cubic-bezier(0.4,0,0.2,1)",
       }}>
-        {/* 2026-05-10 trial countdown bar + achievement watcher (no UI) */}
+        {/* 2026-05-10 trial countdown bar */}
         <TrialCountdownBar />
         {/* 2026-05-12 workspace switcher pill — disabled with agency invite
             UI per CJ「先移除 agency 邀請團隊的設計」. Re-enable when team/agency
@@ -552,7 +551,6 @@ export default function ShellLayout() {
           <WorkspacePill />
         </div>
         */}
-        <AchievementUnlockWatcher />
         {/* FestivalGlobalNudge removed 2026-06-15 — CJ: banner is distracting
             and the /99s deep-link route returns 404. Festival prep handled
             through normal task picker instead. */}
@@ -566,7 +564,6 @@ export default function ShellLayout() {
           <a href="/refund" className="hover:text-neutral-700">{t("footer_refund")}</a>
           <a href="/pricing" className="hover:text-neutral-700">{t("footer_pricing")}</a>
           <a href="/settings/account" className="hover:text-neutral-700">{t("footer_account")}</a>
-          <a href="/achievements" className="hover:text-neutral-700">{lang === "en" ? "Achievements" : "成就"}</a>
           <a href="mailto:sowork@sowork.ai" className="hover:text-neutral-700">sowork@sowork.ai</a>
           <span>·</span>
           <span>{lang === "en" ? "© SoWork" : "© SoWork 摘星社群行銷顧問"}</span>
@@ -2833,11 +2830,6 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
       icon: faBriefcase, label: isEn ? "Plans & pricing" : "方案和定價", arrow: true, badge: null, danger: false,
       // 已有 /pricing 路由（4 個 tier），不再開 modal。
       action: () => { navigate("/pricing"); onClose(); },
-    },
-    {
-      icon: faTrophy, label: isEn ? "Achievements" : "我的成就", arrow: true, badge: null, danger: false,
-      // /achievements 已存在，原本 S 選單沒入口
-      action: () => { navigate("/achievements"); onClose(); },
     },
     {
       // 2026-05-12 Phase 0 i18n: language toggle. Tapping flips between

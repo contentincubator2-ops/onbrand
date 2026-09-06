@@ -113,7 +113,7 @@ const queryClient = new QueryClient({
       // Skip background refetches (only toast initial load)
       if ((query as any)?.state?.dataUpdateCount > 0) return;
       // 2026-05-15 (CJ「背景 polling 失敗」): queries with refetchInterval
-      // are background pollers (achievements / notifications / theater
+      // are background pollers (notifications / theater
       // status). A transient network blip would toast on every poll —
       // suppress all errors on those, they self-heal next tick.
       if ((query as any)?.options?.refetchInterval) return;

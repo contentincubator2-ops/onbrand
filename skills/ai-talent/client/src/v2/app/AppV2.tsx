@@ -70,7 +70,6 @@ const CalendarPage = React.lazy(() => import("../pages/CalendarPage"));
 const AccountPage = React.lazy(() => import("../pages/AccountPage"));
 const WorkspaceSettingsPage = React.lazy(() => import("../pages/WorkspaceSettingsPage"));
 const ReviewQueuePage = React.lazy(() => import("../pages/ReviewQueuePage"));
-const AchievementsPage = React.lazy(() => import("../pages/AchievementsPage"));
 const ChangelogPage = React.lazy(() => import("../pages/ChangelogPage"));
 
 // Admin (heaviest — adminProcedure-gated, almost never needed by general traffic)
@@ -341,11 +340,10 @@ export default function AppV2() {
           <Route path="/admin/post-formats" element={<AdminPostFormatsPage />} />
           {/* 2026-05-11 — content calendar (P0-1) */}
           <Route path="/calendar" element={<CalendarPage />} />
-          {/* 2026-05-10 account settings + achievements */}
+          {/* 2026-05-10 account settings */}
           <Route path="/settings/account" element={<AccountPage />} />
           <Route path="/settings/workspace" element={<WorkspaceSettingsPage />} />
           <Route path="/review" element={<ReviewQueuePage />} />
-          <Route path="/achievements" element={<AchievementsPage />} />
           {/* 2026-05-13 — Layer 3 (admin support inbox) + Layer 5 (public changelog) */}
           <Route path="/admin/support" element={<AdminSupportPage />} />
           <Route path="/changelog" element={<ChangelogPage />} />
